@@ -1,0 +1,14 @@
+{
+  "browser": "140.0.7339.16",
+  "desktop": {
+    "width": 1440,
+    "height": 900
+  },
+  "mobile": {
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "scrollHeight": 844
+  },
+  "pageErrors": []
+}
