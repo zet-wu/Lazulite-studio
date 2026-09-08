@@ -168,3 +168,5 @@ export function importTtml(xml: string): TtmlDocument {
 
 export function serializeOriginal(document: TtmlDocument) { return document.rawXml; }
 export function serializeWithXmlSerializer(xml: string) { const document = new DOMParser().parseFromString(xml, 'application/xml'); if (document.getElementsByTagName('parsererror')[0]) throw new Error('Invalid XML'); return new XMLSerializer().serializeToString(document); }
+
+export { createStudioDocument, parseStudioTtml, serializeStudioTtml } from './codec';
