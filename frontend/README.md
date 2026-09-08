@@ -1,6 +1,6 @@
 # Frontend
 
-采用 React + TypeScript + Vite、React Router、TanStack Query、CSS Modules。当前提供只读应用壳，数据由显式启用的 MSW 模拟接口提供；真实服务尚未实现。
+采用 React + TypeScript + Vite、React Router、TanStack Query、CSS Modules。项目应用壳通过显式启用的 MSW 模拟接口演示；`/editor` 提供独立的本地 TTML 编辑入口。真实服务尚未实现。
 
 | 目录 | 作用 |
 | --- | --- |
@@ -23,6 +23,10 @@ npx pnpm@10.30.3 dev:mock
 ```
 
 打开终端输出的本地地址，默认路由为 `/projects`。直接工作区入口为 `/projects/sample-project/edit`。`?scenario=empty`、`?scenario=error`、`?scenario=expired`、`?scenario=loading` 分别用于空库、服务失败、会话过期和加载状态；移除参数恢复正常演示。
+
+本地文件入口为 `/editor`，可在 `dev` 模式下使用，不需要 API 会话。普通文本行支持正文和起止秒数编辑，空时间表示未定；点击“应用修改”形成一次撤销事务。Ruby、混合结构和未知语义按字段只读，原 XML 留存。此入口不会把服务端行表摘要转换为可保存文件。
+
+本地检查点与服务器修订分开：S2 实施范围及当前检查进度见 [实施记录](../docs/s2-implementation.md)。草稿使用 Studio 命名空间标记未定时间，最终 TTML 需通过完整时间与 profile 检查。
 
 浏览器验收使用 `pnpm test:e2e`；若浏览器缓存需要放在临时目录，可先设置 `PLAYWRIGHT_BROWSERS_PATH=/tmp/lazulite-studio-browsers`。
 
