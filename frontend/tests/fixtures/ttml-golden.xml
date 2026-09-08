@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tt:tt xmlns:tt="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:ext="urn:studio:extension" xml:lang="ja">
+  <tt:head><?probe keep?><tt:metadata><![CDATA[ignore this metadata]]><ext:keep data="v"/></tt:metadata><ttm:agent xml:id="a1" type="person"><ttm:name>A</ttm:name></ttm:agent><ttm:agent xml:id="a2" type="person"><ttm:name>B</ttm:name></ttm:agent><ttm:agent xml:id="a3" type="person"><ttm:name>C</ttm:name></ttm:agent></tt:head>
+  <tt:body timeContainer="par" ext:flag="yes">
+    <tt:div begin="1.5s" dur="4s"><tt:p xml:id="p1" ttm:agent="a1" begin="250ms"> A 𝄞 é <tt:span xmlns:tts="http://www.w3.org/ns/ttml#styling" tts:ruby="container"><tt:span tts:ruby="base">今日</tt:span><tt:span tts:ruby="text">きょう</tt:span></tt:span><tt:br/> </tt:p>
+      <tt:p xml:id="p2" begin="00:00:02.000" end="00:00:03.000" ttm:agent="a2">second</tt:p>
+      <tt:p xml:id="p3" begin="10f" ttm:agent="a3">frame</tt:p>
+      <tt:p xml:id="p4" begin="1t">tick</tt:p>
+      <tt:p xml:id="p5" timeContainer="seq">seq</tt:p>
+      <tt:span ext:unknown="preserve">extension text</tt:span>
+    </tt:div>
+  </tt:body>
+</tt:tt>
