@@ -426,6 +426,8 @@
   margin: 4px 0;
   font-size: 28px;
 }
+.pageHeadingActions { display: flex; gap: 8px; align-items: center; }
+.pageHeadingActions a { text-decoration: none; }
 .muted {
   color: var(--muted);
   font-size: 13px;

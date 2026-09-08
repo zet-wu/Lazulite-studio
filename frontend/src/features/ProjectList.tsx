@@ -76,13 +76,10 @@ export function ProjectList() {
           <h1>项目</h1>
           <p className={styles.muted}>管理歌曲、歌词草稿与复核任务</p>
         </div>
-        <button
-          className={styles.primary}
-          disabled
-          title="创建项目服务尚未接入"
-        >
-          ＋ 新建项目
-        </button>
+        <div className={styles.pageHeadingActions}>
+          <Link className={styles.primary} to="/editor">打开 TTML</Link>
+          <button className={styles.primary} disabled title="创建项目服务尚未接入">＋ 新建项目</button>
+        </div>
       </div>
       <div className={styles.projectToolbar}>
         <label className={styles.search}>

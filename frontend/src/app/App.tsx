@@ -12,6 +12,7 @@ import {
 } from "react-router-dom";
 import { ProjectList } from "../features/ProjectList";
 import { Workspace } from "../features/Workspace";
+import { LocalEditor } from "../features/editor/LocalEditor";
 import { studioApi } from "../adapters/http/client";
 import styles from "./app.module.css";
 
@@ -47,6 +48,7 @@ function DemoBanner() {
   const [params] = useSearchParams();
   const scenario = params.get("scenario");
   const [open, setOpen] = useState(false);
+  if (window.location.pathname === "/editor") return null;
   if (!import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCKS !== "true")
     return null;
   const pick = (value: string) => {
@@ -92,6 +94,7 @@ function Login() {
             返回模拟工作台
           </button>
         ) : null}
+        <Link to="/editor">打开本地 TTML</Link>
       </div>
     </main>
   );
@@ -141,25 +144,23 @@ function AppRoutes() {
     <div className={styles.appFrame}>
       <DemoBanner />
       <div className={styles.appContent}>
-        <SessionGate>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/projects" element={<ProjectList />} />
-            <Route
-              path="/projects/:projectId/edit"
-              element={<WorkspaceRoute />}
-            />
-            <Route
-              path="/projects/:projectId/export"
-              element={<ExportPage />}
-            />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/projects" replace />} />
-          </Routes>
-        </SessionGate>
+        <Routes>
+          <Route path="/editor" element={<LocalEditor />} />
+          <Route path="*" element={<ProtectedRoutes />} />
+        </Routes>
       </div>
     </div>
   );
+}
+function ProtectedRoutes() {
+  return <SessionGate><Routes>
+    <Route path="/login" element={<Login />} />
+    <Route path="/projects" element={<ProjectList />} />
+    <Route path="/projects/:projectId/edit" element={<WorkspaceRoute />} />
+    <Route path="/projects/:projectId/export" element={<ExportPage />} />
+    <Route path="/settings" element={<Settings />} />
+    <Route path="*" element={<Navigate to="/projects" replace />} />
+  </Routes></SessionGate>;
 }
 function SessionGate({ children }: { children: ReactNode }) {
   const query = useQuery({
@@ -177,6 +178,7 @@ function SessionGate({ children }: { children: ReactNode }) {
         <strong>服务暂时不可用</strong>
         <p>会话服务没有响应。</p>
         <button onClick={() => query.refetch()}>重试</button>
+        <Link to="/editor">打开本地 TTML</Link>
       </main>
     );
   if (query.data && !query.data.authenticated) return <Login />;
