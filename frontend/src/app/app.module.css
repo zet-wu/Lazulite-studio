@@ -1,0 +1,108 @@
+.appFrame {
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.appContent {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.demoBanner {
+  z-index: 20;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-height: 28px;
+  padding: 3px 12px;
+  border-bottom: 1px solid #e5bd73;
+  background: #fff9ed;
+  color: #81550f;
+  font-size: 11px;
+}
+.demoBanner button {
+  border: 1px solid #e5d3ad;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+.demoBanner > button {
+  border: 0;
+  font-weight: 650;
+}
+.errorPage,
+.loginPage,
+.simplePage {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  background: var(--canvas);
+  color: var(--ink);
+}
+.errorPage {
+  text-align: center;
+}
+.errorPage button,
+.simplePage button {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 4px;
+  padding: 7px 12px;
+}
+.loginCard {
+  width: min(360px, calc(100vw - 32px));
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px #1b263610;
+}
+.loginLogo {
+  font-weight: 750;
+  font-size: 18px;
+}
+.loginLogo span {
+  color: var(--blue);
+  font-weight: 500;
+}
+.loginCard h1 {
+  margin: 42px 0 8px;
+  font-size: 21px;
+}
+.loginCard p,
+.simplePage p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.loginButton {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--blue);
+  color: #fff;
+  text-decoration: none;
+  font-size: 13px;
+  cursor: pointer;
+}
+.simplePage {
+  align-content: start;
+  justify-items: start;
+  padding: 60px max(20px, calc((100vw - 760px) / 2));
+}
+.simplePage a {
+  color: var(--blue);
+  text-decoration: none;
+}
+.simplePage h1 {
+  margin: 36px 0 4px;
+}
