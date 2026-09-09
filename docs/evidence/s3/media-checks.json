@@ -1,0 +1,38 @@
+[
+  {
+    "codec": "aac",
+    "container": "m4a",
+    "input_offset_seconds": 0,
+    "source_start_us": 0,
+    "duration_us": 512000,
+    "source_pulse_us": 333333,
+    "proxy_pulse_us": 333333,
+    "proxy_added_offset_us": 0,
+    "source_priming_samples": 0,
+    "levels_checked": 8
+  },
+  {
+    "codec": "aac",
+    "container": "m4a",
+    "input_offset_seconds": 2,
+    "source_start_us": 1978000,
+    "duration_us": 533333,
+    "source_pulse_us": 354667,
+    "proxy_pulse_us": 354667,
+    "proxy_added_offset_us": 0,
+    "source_priming_samples": 1024,
+    "levels_checked": 8
+  },
+  {
+    "codec": "alac",
+    "container": "mp4",
+    "input_offset_seconds": 2,
+    "source_start_us": 2000000,
+    "duration_us": 500000,
+    "source_pulse_us": 333333,
+    "proxy_pulse_us": 333333,
+    "proxy_added_offset_us": 0,
+    "source_priming_samples": 0,
+    "levels_checked": 8
+  }
+]

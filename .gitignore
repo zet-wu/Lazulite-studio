@@ -4,3 +4,7 @@ dist/
 test-results/
 playwright-report/
 .env.local
+server/.venv/
+server/data/
+__pycache__/
+*.py[cod]
