@@ -1,0 +1,508 @@
+import hashlib, json, os, secrets, tempfile, uuid
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import Annotated
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    FastAPI,
+    File,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+)
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
+
+from .auth import Settings
+from .db import Database
+from .revisions import INITIAL_TTML, RevisionStore
+from .studio.media import Asset, MediaError, MediaProbe, MediaService
+from .upload import UploadLimitMiddleware
+
+MAX_UPLOAD = 500 * 1024 * 1024
+
+
+def stamp():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def create_app(
+    data_dir: str | Path | None = None, settings: Settings | None = None
+) -> FastAPI:
+    cfg = settings or Settings.from_env()
+    if not cfg.origin or (not cfg.trusted_gateway and not cfg.password):
+        raise RuntimeError(
+            "set STUDIO_ORIGIN and STUDIO_PASSWORD, or enable STUDIO_TRUSTED_GATEWAY"
+        )
+    root = Path(
+        data_dir or os.getenv("STUDIO_DATA_DIR", Path(__file__).parent / "data")
+    )
+    db, media = Database(root / "studio.sqlite3"), MediaService(root)
+    revisions = RevisionStore(db, root / "revisions")
+    revisions.recover()
+    api = APIRouter(prefix="/api/v1")
+
+    def fail(code, message, status=400, retryable=False, **extra):
+        detail = {"code": code, "message": message, "retryable": retryable, **extra}
+        raise HTTPException(status, detail)
+
+    def auth(request: Request):
+        token = request.cookies.get("studio_session")
+        if cfg.trusted_gateway:
+            return "gateway"
+        if not token:
+            fail("unauthorized", "session required", 401)
+        with db.connect() as c:
+            row = c.execute(
+                "SELECT 1 FROM sessions WHERE token_hash=? AND revoked=0 AND expires_at>?",
+                (hashlib.sha256(token.encode()).hexdigest(), stamp()),
+            ).fetchone()
+        if not row:
+            fail("unauthorized", "session expired", 401)
+        return "local"
+
+    def write(request: Request, subject=Depends(auth)):
+        if (
+            not request.headers.get("origin")
+            or request.headers.get("origin") != cfg.origin
+        ):
+            fail("origin_forbidden", "origin is not allowed", 403)
+        csrf = request.cookies.get("studio_csrf")
+        if not cfg.trusted_gateway and (
+            not csrf or csrf != request.headers.get("x-csrf-token")
+        ):
+            fail("csrf_failed", "csrf token required", 403)
+        return subject
+
+    class Login(BaseModel):
+        password: str | None = None
+
+    class ProjectCreate(BaseModel):
+        name: str = Field(min_length=1, max_length=200)
+        source_asset_id: str
+
+    def asset_dto(row):
+        metadata = json.loads(row[10] or "{}")
+        return {
+            "schema_version": "studio-asset-v1",
+            "id": row[0],
+            "filename": row[4] or "",
+            "content_type": row[3],
+            "size_bytes": row[2],
+            "duration_us": metadata.get("proxy_duration_us"),
+            "status": "ready" if row[5] else "processing",
+            "asset_hash": row[1],
+            "source_start_us": row[7] or 0,
+            "proxy_offset_us": metadata.get("proxy_offset_us", 0),
+        }
+
+    @api.get("/session")
+    def get_session(request: Request):
+        try:
+            subject = auth(request)
+        except HTTPException:
+            subject = None
+        return {
+            "schema_version": "studio-session-v1",
+            "authenticated": subject is not None,
+            "user": {"id": "local", "name": "Local user"} if subject else None,
+        }
+
+    @api.post("/session")
+    def login(body: Login, request: Request):
+        if (
+            not request.headers.get("origin")
+            or request.headers.get("origin") != cfg.origin
+        ):
+            fail("origin_forbidden", "origin is not allowed", 403)
+        if cfg.password and not secrets.compare_digest(
+            body.password or "", cfg.password
+        ):
+            fail("invalid_credentials", "invalid password", 401)
+        token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
+        with db.transaction() as c:
+            c.execute(
+                "INSERT INTO sessions VALUES(?,?,0)",
+                (
+                    hashlib.sha256(token.encode()).hexdigest(),
+                    (datetime.now(timezone.utc) + timedelta(hours=8)).isoformat(),
+                ),
+            )
+        out = JSONResponse(
+            {
+                "schema_version": "studio-session-v1",
+                "authenticated": True,
+                "user": {"id": "local", "name": "Local user"},
+            }
+        )
+        secure = cfg.origin.startswith("https://")
+        out.set_cookie(
+            "studio_session",
+            token,
+            httponly=True,
+            samesite="lax",
+            secure=secure,
+            max_age=28800,
+        )
+        out.set_cookie(
+            "studio_csrf", csrf, samesite="lax", secure=secure, max_age=28800
+        )
+        return out
+
+    @api.delete("/session")
+    def logout(request: Request, _: object = Depends(write)):
+        token = request.cookies.get("studio_session")
+        if token:
+            with db.transaction() as c:
+                c.execute(
+                    "UPDATE sessions SET revoked=1 WHERE token_hash=?",
+                    (hashlib.sha256(token.encode()).hexdigest(),),
+                )
+        out = JSONResponse({"authenticated": False})
+        out.delete_cookie("studio_session")
+        out.delete_cookie("studio_csrf")
+        return out
+
+    @api.get("/capabilities")
+    def capabilities():
+        return {
+            "schema_version": "studio-capabilities-v1",
+            "items": [
+                {"id": "assets", "enabled": True, "reason": None},
+                {"id": "document.edit", "enabled": False, "reason": "S4"},
+                {"id": "job.run", "enabled": False, "reason": "S4"},
+            ],
+        }
+
+    @api.post("/assets")
+    async def upload(file: Annotated[UploadFile, File()], _: object = Depends(write)):
+        fd, temp_name = tempfile.mkstemp(prefix="studio-upload-", dir=root)
+        os.close(fd)
+        temp = Path(temp_name)
+        size = 0
+        try:
+            with temp.open("wb") as out:
+                while chunk := await file.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > MAX_UPLOAD:
+                        fail("upload_too_large", "upload exceeds limit", 413)
+                    out.write(chunk)
+            asset = await run_in_threadpool(media.import_asset, temp, file.filename)
+            proxy = await run_in_threadpool(media.playback_proxy, asset)
+            with db.transaction() as c:
+                existing = c.execute(
+                    "SELECT id FROM assets WHERE sha256=?", (asset.content_hash,)
+                ).fetchone()
+                asset_id = existing[0] if existing else asset.content_hash
+                metadata = json.dumps(
+                    {
+                        "codec": asset.probe.codec,
+                        "container": asset.probe.container,
+                        "proxy_offset_us": proxy.offset_us,
+                        "proxy_duration_us": proxy.duration_us,
+                    }
+                )
+                if not existing:
+                    c.execute(
+                        "INSERT INTO assets VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (
+                            asset_id,
+                            asset.content_hash,
+                            asset.size,
+                            asset.probe.mime_type,
+                            asset.original_name,
+                            1,
+                            asset.probe.duration_us,
+                            asset.probe.start_us,
+                            asset.probe.sample_rate,
+                            asset.probe.channels,
+                            metadata,
+                            stamp(),
+                        ),
+                    )
+            with db.connect() as c:
+                stored = c.execute(
+                    "SELECT * FROM assets WHERE id=?", (asset_id,)
+                ).fetchone()
+            return asset_dto(stored)
+        except MediaError as exc:
+            fail("media_invalid", str(exc), 415)
+        finally:
+            temp.unlink(missing_ok=True)
+            await file.close()
+
+    @api.post("/projects")
+    def create_project(
+        body: ProjectCreate,
+        request: Request,
+        subject: str = Depends(write),
+        idem: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    ):
+        name = body.name.strip()
+        if not name:
+            fail("invalid_name", "name cannot be blank", 422)
+        digest = hashlib.sha256(
+            json.dumps(
+                [subject, "project.create", body.model_dump()],
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        key = idem or uuid.uuid4().hex
+        with db.transaction() as c:
+            old = c.execute(
+                "SELECT response,request_hash FROM idempotency WHERE key=?", (key,)
+            ).fetchone()
+            if old:
+                if old[1] != digest:
+                    fail(
+                        "idempotency_mismatch", "key was used for another request", 409
+                    )
+                return json.loads(old[0])
+            asset = c.execute(
+                "SELECT * FROM assets WHERE id=?", (body.source_asset_id,)
+            ).fetchone()
+            if not asset:
+                fail("asset_not_found", "source asset not found", 404)
+            pid, t = uuid.uuid4().hex, stamp()
+            rev = uuid.uuid4().hex
+            path = root / "revisions" / f"{rev}.ttml"
+            revisions._write_atomic(path, INITIAL_TTML.encode())
+            c.execute(
+                "INSERT INTO projects VALUES(?,?,?,?,?,?)",
+                (pid, name, body.source_asset_id, rev, t, t),
+            )
+            c.execute(
+                "INSERT INTO revisions VALUES(?,?,?,?,?)",
+                (rev, pid, None, str(path), t),
+            )
+            result = {
+                "schema_version": "studio-project-v1",
+                "id": pid,
+                "name": name,
+                "updated_at": t,
+                "document_status": "draft",
+                "asset": asset_dto(asset),
+            }
+            c.execute(
+                "INSERT INTO idempotency VALUES(?,?,?,?,?)",
+                (key, subject, digest, json.dumps(result), t),
+            )
+        try:
+            revisions.materialize_current(pid)
+        except OSError:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "failed to materialize draft for %s", pid, exc_info=True
+            )
+        return result
+
+    def project(pid):
+        with db.connect() as c:
+            row = c.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone()
+        if not row:
+            fail("project_not_found", "project not found", 404)
+        return row
+
+    @api.get("/projects")
+    def projects(_: object = Depends(auth), limit: int = 50, cursor: str | None = None):
+        limit = max(1, min(limit, 100))
+        with db.connect() as c:
+            if cursor:
+                mark = c.execute(
+                    "SELECT updated_at,id FROM projects WHERE id=?", (cursor,)
+                ).fetchone()
+                rows = (
+                    c.execute(
+                        "SELECT * FROM projects WHERE (updated_at,id)<(?,?) ORDER BY updated_at DESC,id DESC LIMIT ?",
+                        (mark[0], mark[1], limit + 1),
+                    ).fetchall()
+                    if mark
+                    else []
+                )
+            else:
+                rows = c.execute(
+                    "SELECT * FROM projects ORDER BY updated_at DESC,id DESC LIMIT ?",
+                    (limit + 1,),
+                ).fetchall()
+        items = [
+            {
+                "schema_version": "studio-project-v1",
+                "id": r[0],
+                "name": r[1],
+                "updated_at": r[5],
+                "document_status": "draft",
+            }
+            for r in rows[:limit]
+        ]
+        return {
+            "schema_version": "studio-project-list-v1",
+            "items": items,
+            "next_cursor": rows[limit - 1][0] if len(rows) > limit else None,
+        }
+
+    @api.get("/projects/{pid}")
+    def get_project(pid: str, _: object = Depends(auth)):
+        r = project(pid)
+        with db.connect() as c:
+            a = c.execute("SELECT * FROM assets WHERE id=?", (r[2],)).fetchone()
+        return {
+            "schema_version": "studio-project-v1",
+            "id": r[0],
+            "name": r[1],
+            "updated_at": r[5],
+            "document_status": "draft",
+            "asset": asset_dto(a) if a else None,
+        }
+
+    @api.get("/projects/{pid}/jobs")
+    def jobs(pid: str, _: object = Depends(auth)):
+        project(pid)
+        return {"schema_version": "studio-job-list-v1", "items": []}
+
+    @api.get("/projects/{pid}/document")
+    def document(pid: str, response: Response, _: object = Depends(auth)):
+        r = project(pid)
+        response.headers["ETag"] = f'"{r[3]}"'
+        return {
+            "schema_version": "studio-document-shell-v1",
+            "project_id": pid,
+            "revision": r[3],
+            "title": r[1],
+            "language": "",
+            "lines": [],
+            "read_only_reasons": ["S3 只读摘要"],
+        }
+
+    @api.get("/projects/{pid}/lyrics")
+    def lyrics(pid: str, revision: str | None = None, _: object = Depends(auth)):
+        r = project(pid)
+        rev = revision or r[3]
+        with db.connect() as c:
+            x = c.execute(
+                "SELECT ttml_path FROM revisions WHERE id=? AND project_id=?",
+                (rev, pid),
+            ).fetchone()
+        if not x:
+            fail("revision_not_found", "revision not found", 404)
+        return FileResponse(
+            x[0], media_type="application/ttml+xml", headers={"ETag": f'"{rev}"'}
+        )
+
+    def asset_for(pid):
+        r = project(pid)
+        with db.connect() as c:
+            return r, c.execute("SELECT * FROM assets WHERE id=?", (r[2],)).fetchone()
+
+    def asset_model(row):
+        return Asset(
+            row[0],
+            row[1],
+            root / "assets" / row[1][:2] / row[1],
+            row[4],
+            row[2],
+            MediaProbe(row[6], row[7] or 0, row[8], row[9], None, None, row[3]),
+        )
+
+    @api.get("/projects/{pid}/audio")
+    def audio(pid: str, _: object = Depends(auth)):
+        r, a = asset_for(pid)
+        if not a:
+            fail("audio_not_found", "audio not found", 404)
+        asset = asset_model(a)
+        proxy = media.playback_proxy(asset)
+        return FileResponse(proxy.path, media_type=proxy.mime_type)
+
+    @api.get("/projects/{pid}/waveform")
+    def waveform(
+        pid: str,
+        level: int = 0,
+        start_us: int = 0,
+        end_us: int = 1_000_000,
+        _: object = Depends(auth),
+    ):
+        _, a = asset_for(pid)
+        try:
+            asset = asset_model(a)
+            peaks = media.peaks(asset, level=level, start_us=start_us, end_us=end_us)
+        except MediaError as exc:
+            fail("waveform_invalid", str(exc), 422)
+        return {
+            "schema_version": "studio-waveform-v1",
+            "asset_id": a[0],
+            "asset_hash": peaks.asset_hash,
+            "version": peaks.version,
+            "level": level,
+            "start_us": peaks.start_us,
+            "end_us": peaks.end_us,
+            "bucket_us": peaks.bucket_us,
+            "minimum": peaks.minimum,
+            "maximum": peaks.maximum,
+        }
+
+    app = FastAPI(title="Lazulite Studio API", version="0.3.0")
+    app.include_router(api)
+    app.add_middleware(UploadLimitMiddleware, limit=MAX_UPLOAD + 1024 * 1024)
+
+    @app.exception_handler(HTTPException)
+    async def http_error(request: Request, exc: HTTPException):
+        d = (
+            exc.detail
+            if isinstance(exc.detail, dict)
+            else {"code": "http_error", "message": str(exc.detail), "retryable": False}
+        )
+        return JSONResponse(
+            {**d, "request_id": request.headers.get("x-request-id", uuid.uuid4().hex)},
+            status_code=exc.status_code,
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def starlette_error(request: Request, exc: StarletteHTTPException):
+        if isinstance(exc.detail, dict):
+            detail = exc.detail
+        elif exc.status_code == 404:
+            detail = {
+                "code": "not_found",
+                "message": "resource not found",
+                "retryable": False,
+            }
+        elif exc.status_code == 405:
+            detail = {
+                "code": "method_not_allowed",
+                "message": "method not allowed",
+                "retryable": False,
+            }
+        else:
+            detail = {
+                "code": "http_error",
+                "message": str(exc.detail),
+                "retryable": False,
+            }
+        return JSONResponse(
+            {
+                **detail,
+                "request_id": request.headers.get("x-request-id", uuid.uuid4().hex),
+            },
+            status_code=exc.status_code,
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation(request: Request, exc: RequestValidationError):
+        return JSONResponse(
+            {
+                "code": "validation_error",
+                "message": "invalid request",
+                "retryable": False,
+                "request_id": request.headers.get("x-request-id", uuid.uuid4().hex),
+            },
+            status_code=422,
+        )
+
+    return app
