@@ -31,3 +31,18 @@
 | vitest | 3.2.4 | MIT |
 
 AMLL TTML Tool 仅作为布局与交互参考，本次未复制其源代码、字体和资源，也未引入 AMLL npm 包。引入预览适配器时再核验具体包版本、许可和表现能力。
+
+## S3 Python 服务与工具
+
+来源：本机安装包元数据，直接版本见 `server/requirements.txt`。
+
+| 包 | 版本 | 许可 |
+| --- | --- | --- |
+| fastapi | 0.115.6 | MIT |
+| uvicorn | 0.34.0 | BSD-3-Clause |
+| python-multipart | 0.0.20 | Apache-2.0 |
+| pytest（测试） | 8.3.4 | MIT |
+| httpx（测试） | 0.28.1 | BSD-3-Clause |
+| starlette（传递依赖，本次 Range 验证版本） | 0.41.3 | BSD-3-Clause |
+
+FFmpeg/ffprobe 是系统前置工具，不随仓库分发；本次使用系统 FFmpeg 5.1.8，发行版启用 GPL 构建选项。后续打包时需按实际构建重新核验许可。
