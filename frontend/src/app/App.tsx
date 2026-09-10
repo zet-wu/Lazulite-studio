@@ -1,6 +1,6 @@
 import { Component, useState, type ErrorInfo, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BrowserRouter,
   Link,
@@ -8,12 +8,13 @@ import {
   Route,
   Routes,
   useParams,
+  useNavigate,
   useSearchParams,
 } from "react-router-dom";
 import { ProjectList } from "../features/ProjectList";
 import { Workspace } from "../features/Workspace";
 import { LocalEditor } from "../features/editor/LocalEditor";
-import { studioApi } from "../adapters/http/client";
+import { ApiError, studioApi } from "../adapters/http/client";
 import styles from "./app.module.css";
 
 const queryClient = new QueryClient({
@@ -75,11 +76,33 @@ function DemoBanner() {
 }
 
 function Login() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const returnToDemo = () => {
     const next = new URL(window.location.href);
     next.pathname = "/projects";
     next.searchParams.delete("scenario");
     window.location.assign(next.toString());
+  };
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await studioApi.login(password);
+      await queryClient.invalidateQueries({ queryKey: ["session"] });
+      if (window.location.pathname === "/login")
+        navigate("/projects", { replace: true });
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError ? caught.body.message : "登录失败，请重试",
+      );
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <main className={styles.loginPage}>
@@ -87,8 +110,24 @@ function Login() {
         <div className={styles.loginLogo}>
           Lazulite <span>Studio</span>
         </div>
-        <h1>会话已过期</h1>
-        <p>服务端会话已失效，真实登录能力尚未接入。</p>
+        <h1>登录 Lazulite Studio</h1>
+        <p>输入服务端密码以继续。</p>
+        <form onSubmit={submit}>
+          <label>
+            密码
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoFocus
+              disabled={busy}
+            />
+          </label>
+          {error && <p className={styles.loginError}>{error}</p>}
+          <button className={styles.loginButton} disabled={busy || !password}>
+            {busy ? "登录中…" : "登录"}
+          </button>
+        </form>
         {import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCKS === "true" ? (
           <button className={styles.loginButton} onClick={returnToDemo}>
             返回模拟工作台
@@ -153,14 +192,18 @@ function AppRoutes() {
   );
 }
 function ProtectedRoutes() {
-  return <SessionGate><Routes>
-    <Route path="/login" element={<Login />} />
-    <Route path="/projects" element={<ProjectList />} />
-    <Route path="/projects/:projectId/edit" element={<WorkspaceRoute />} />
-    <Route path="/projects/:projectId/export" element={<ExportPage />} />
-    <Route path="/settings" element={<Settings />} />
-    <Route path="*" element={<Navigate to="/projects" replace />} />
-  </Routes></SessionGate>;
+  return (
+    <SessionGate>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/projects" element={<ProjectList />} />
+        <Route path="/projects/:projectId/edit" element={<WorkspaceRoute />} />
+        <Route path="/projects/:projectId/export" element={<ExportPage />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="*" element={<Navigate to="/projects" replace />} />
+      </Routes>
+    </SessionGate>
+  );
 }
 function SessionGate({ children }: { children: ReactNode }) {
   const query = useQuery({

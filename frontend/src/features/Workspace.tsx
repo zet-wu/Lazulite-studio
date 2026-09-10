@@ -5,8 +5,10 @@ import {
   studioApi,
   type DocumentShell,
   type JobList,
+  type Asset,
 } from "../adapters/http/client";
 import { Icon } from "../shared/Icon";
+import { MediaTransport } from "./MediaTransport";
 import styles from "./workspace.module.css";
 
 type Panel = "lyrics" | "candidates" | "tasks" | "properties";
@@ -29,11 +31,27 @@ export function Workspace({ projectId }: { projectId: string }) {
     queryKey: ["document", projectId],
     queryFn: () => studioApi.getDocument(projectId),
   });
+  const projectQuery = useQuery({
+    queryKey: ["project", projectId],
+    queryFn: () => studioApi.getProject(projectId),
+  });
   if (query.isLoading)
     return (
       <main className={styles.centerState}>
         <span className={styles.spinner} />
         正在加载歌词…
+      </main>
+    );
+  if (projectQuery.isError)
+    return (
+      <main className={styles.centerState}>
+        <strong>媒体信息加载失败</strong>
+        <button
+          className={styles.secondary}
+          onClick={() => projectQuery.refetch()}
+        >
+          重试
+        </button>
       </main>
     );
   if (query.isError || !query.data)
@@ -47,15 +65,23 @@ export function Workspace({ projectId }: { projectId: string }) {
         <Link to={projectsPath}>返回项目</Link>
       </main>
     );
-  return <WorkspaceContent projectId={projectId} document={query.data} />;
+  return (
+    <WorkspaceContent
+      projectId={projectId}
+      document={query.data}
+      asset={projectQuery.data?.asset ?? null}
+    />
+  );
 }
 
 function WorkspaceContent({
   projectId,
   document,
+  asset,
 }: {
   projectId: string;
   document: DocumentShell;
+  asset: Asset | null;
 }) {
   const [params, setParams] = useSearchParams();
   const lines = document.lines;
@@ -181,7 +207,13 @@ function WorkspaceContent({
           visible={panel === "properties"}
         />
       </div>
-      <Timeline />
+      <MediaTransport
+        key={projectId}
+        projectId={projectId}
+        lines={lines}
+        selectedLine={lines[selected]}
+        asset={asset}
+      />
     </div>
   );
 }
@@ -397,41 +429,5 @@ function Inspector({
         </button>
       </div>
     </aside>
-  );
-}
-
-function Timeline() {
-  return (
-    <footer className={styles.timeline}>
-      <div className={styles.wave}>
-        <span className={styles.timelineTick} style={{ left: "18%" }} />
-        <span className={styles.timelineTick} style={{ left: "50%" }} />
-        <span className={styles.timelineTick} style={{ left: "82%" }} />
-        <span className={styles.tickLabel} style={{ left: "18%" }}>
-          00:00
-        </span>
-        <span className={styles.tickLabel} style={{ left: "50%" }}>
-          —
-        </span>
-        <span className={styles.tickLabel} style={{ left: "82%" }}>
-          —
-        </span>
-      </div>
-      <div className={styles.transport}>
-        <button className={styles.playButton} disabled title="音频尚未连接">
-          <Icon name="play" />
-        </button>
-        <span className={styles.clock}>
-          --:--.--- <em>/ --:--.---</em>
-        </span>
-        <select disabled defaultValue="1" aria-label="播放速度">
-          <option value="1">1×</option>
-        </select>
-        <button disabled title="音频尚未连接">
-          循环当前行
-        </button>
-        <span className={styles.mediaNote}>未连接媒体 · 播放不可用</span>
-      </div>
-    </footer>
   );
 }

@@ -1,0 +1,90 @@
+.footer {
+  display: grid;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  min-height: 112px;
+}
+.header,
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #5d6674;
+  font-size: 11px;
+}
+.header span {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+.header button,
+.controls button,
+.controls select {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #fff;
+  color: #5d6674;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+.waveWrap {
+  position: relative;
+  height: 58px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #fafbfd;
+}
+.wave {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+.head {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--blue);
+  pointer-events: none;
+}
+.band {
+  position: absolute;
+  inset-block: 0;
+  background: rgb(37 99 235 / 12%);
+  border-inline: 1px solid var(--blue);
+  pointer-events: none;
+}
+.play {
+  width: 28px;
+  height: 28px;
+  border-radius: 50% !important;
+  color: #fff !important;
+  background: var(--blue) !important;
+}
+.active {
+  color: var(--blue) !important;
+  background: var(--blue-soft) !important;
+}
+.note {
+  color: #9a6b2d;
+}
+.error {
+  border: 0 !important;
+  color: var(--danger) !important;
+  background: transparent !important;
+}
+@media (max-width: 640px) {
+  .footer {
+    min-height: 142px;
+    padding: 7px 9px;
+  }
+  .controls {
+    gap: 5px;
+  }
+  .controls span {
+    font-variant-numeric: tabular-nums;
+  }
+}

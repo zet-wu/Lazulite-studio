@@ -38,7 +38,7 @@ test('shows empty, error, expired, and loading states and can recover', async ({
   await expect(page.getByText('项目暂时不可用', { exact: true })).toBeVisible();
 
   await page.goto('/projects?scenario=expired');
-  await expect(page.getByRole('heading', { name: '会话已过期' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '登录 Lazulite Studio' })).toBeVisible();
   await page.getByRole('button', { name: '返回模拟工作台', exact: true }).click();
   await expect(page.getByPlaceholder('搜索项目')).toBeVisible();
 

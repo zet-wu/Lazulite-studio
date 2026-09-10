@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { studioApi } from "../adapters/http/client";
+import { CreateProject } from "./CreateProject";
 import styles from "./workspace.module.css";
 
 export function ProjectList() {
@@ -59,13 +60,9 @@ export function ProjectList() {
       <main className={styles.centerState}>
         <strong>还没有项目</strong>
         <p className={styles.muted}>上传一首歌曲，开始制作歌词。</p>
-        <button
-          className={styles.primary}
-          disabled
-          title="创建项目服务尚未接入"
-        >
-          创建项目
-        </button>
+        <CreateProject
+          onCreated={(id) => window.location.assign(`/projects/${id}/edit`)}
+        />
       </main>
     );
   return (
@@ -77,8 +74,12 @@ export function ProjectList() {
           <p className={styles.muted}>管理歌曲、歌词草稿与复核任务</p>
         </div>
         <div className={styles.pageHeadingActions}>
-          <Link className={styles.primary} to="/editor">打开 TTML</Link>
-          <button className={styles.primary} disabled title="创建项目服务尚未接入">＋ 新建项目</button>
+          <Link className={styles.primary} to="/editor">
+            打开 TTML
+          </Link>
+          <CreateProject
+            onCreated={(id) => window.location.assign(`/projects/${id}/edit`)}
+          />
         </div>
       </div>
       <div className={styles.projectToolbar}>

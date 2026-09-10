@@ -1,6 +1,6 @@
 # Frontend
 
-采用 React + TypeScript + Vite、React Router、TanStack Query、CSS Modules。项目应用壳通过显式启用的 MSW 模拟接口演示；`/editor` 提供独立的本地 TTML 编辑入口。真实服务尚未实现。
+采用 React + TypeScript + Vite、React Router、TanStack Query、CSS Modules。S3 接入真实项目服务、上传与媒体播放；显式启用的 MSW 保留 S1 模拟场景。`/editor` 继续提供独立的本地 TTML 编辑入口。
 
 | 目录 | 作用 |
 | --- | --- |
@@ -32,6 +32,10 @@ npx pnpm@10.30.3 dev:mock
 
 `dev:mock` 显式开启合成数据。`dev` 默认请求同源 `/api/v1`，Vite 开发代理指向 `http://localhost:8000`；没有后端时会显示服务失败。生产构建不启用模拟，部署需要同源 API 和 SPA 路由回退。
 
+真实工作台先按 [服务端说明](../server/README.md) 启动 API，再运行 `npm run dev`。设置 `STUDIO_ORIGIN` 与浏览器地址一致，输入服务端密码登录。上传并创建项目后，底部提供播放、速度、波形定位、A/B 循环和窗口缩放；有完整时间的选中行可循环试听。波形支持方向键及 Home/End，工作区空格切换播放；输入控件和 IME 保留自身按键行为。
+
+项目歌词在 S3 仍为只读，创建时持久化空 TTML 草稿。服务项目与本地 `/editor` 是独立入口；自动保存与行级制作闭环进入 S4。
+
 ```sh
 npx pnpm@10.30.3 contracts:generate
 npx pnpm@10.30.3 typecheck
@@ -48,4 +52,4 @@ npx pnpm@10.30.3 test:e2e
 
 测试自动在 `127.0.0.1:5174` 启动独立模拟服务，不需要手动启动。若将浏览器安装在自定义目录，安装和测试时都设置相同的 `PLAYWRIGHT_BROWSERS_PATH`。本次沙箱验收使用 `/tmp/lazulite-studio-browsers`。
 
-实际结果见 [验收记录](../docs/s1-acceptance.md)。设计基线见 [架构](../../lyric-workflow/docs/lazulite_studio_frontend_architecture.md)。
+实际结果见 [S1](../docs/s1-acceptance.md)、[S2](../docs/s2-acceptance.md)、[S3](../docs/s3-acceptance.md) 验收记录。设计基线见 [架构](../../lyric-workflow/docs/lazulite_studio_frontend_architecture.md)。

@@ -13,8 +13,8 @@ export interface paths {
         };
         get: operations["getSession"];
         put?: never;
-        post?: never;
-        delete?: never;
+        post: operations["login"];
+        delete: operations["logout"];
         options?: never;
         head?: never;
         patch?: never;
@@ -45,7 +45,23 @@ export interface paths {
         };
         get: operations["listProjects"];
         put?: never;
-        post?: never;
+        post: operations["createProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["uploadAsset"];
         delete?: never;
         options?: never;
         head?: never;
@@ -100,10 +116,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/lyrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getLyrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAudio"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/waveform": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWaveform"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        LoginRequest: {
+            username?: string;
+            /** Format: password */
+            password: string;
+        };
+        CreateProjectRequest: {
+            name: string;
+            source_asset_id: string;
+        };
+        Asset: {
+            /** @constant */
+            schema_version: "studio-asset-v1";
+            id: string;
+            filename: string;
+            content_type: string;
+            size_bytes: number;
+            duration_us: number | null;
+            /** @enum {string} */
+            status: "ready";
+            asset_hash: string;
+            source_start_us: number;
+            proxy_offset_us: number;
+        };
+        WaveformWindow: {
+            /** @constant */
+            schema_version: "studio-waveform-v1";
+            asset_id: string;
+            asset_hash: string;
+            version: string;
+            level: number;
+            start_us: number;
+            end_us: number;
+            bucket_us: number;
+            minimum: number[];
+            maximum: number[];
+        };
         Error: {
             code: string;
             message: string;
@@ -138,6 +238,7 @@ export interface components {
             updated_at: string;
             /** @enum {string} */
             document_status: "empty" | "draft" | "ready";
+            asset?: components["schemas"]["Asset"] | null;
         };
         ProjectList: {
             /** @constant */
@@ -207,6 +308,10 @@ export interface components {
     parameters: {
         ProjectId: string;
         Cursor: string;
+        Level: number;
+        StartUs: number;
+        EndUs: number;
+        Revision: string;
     };
     requestBodies: never;
     headers: never;
@@ -233,6 +338,52 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            default: components["responses"]["Error"];
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Authenticated session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
             default: components["responses"]["Error"];
         };
     };
@@ -275,6 +426,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectList"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProjectRequest"];
+            };
+        };
+        responses: {
+            /** @description Created project */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectSummary"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    uploadAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Uploaded asset */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Asset"];
                 };
             };
             default: components["responses"]["Error"];
@@ -348,6 +552,91 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getLyrics: {
+        parameters: {
+            query?: {
+                revision?: components["parameters"]["Revision"];
+            };
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Committed TTML */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getAudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Playable audio */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Partial audio */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Range not satisfiable */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getWaveform: {
+        parameters: {
+            query?: {
+                level?: components["parameters"]["Level"];
+                start_us?: components["parameters"]["StartUs"];
+                end_us?: components["parameters"]["EndUs"];
+            };
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Waveform window */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveformWindow"];
+                };
+            };
             default: components["responses"]["Error"];
         };
     };

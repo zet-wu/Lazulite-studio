@@ -94,6 +94,26 @@
   font-size: 13px;
   cursor: pointer;
 }
+.loginCard form {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+  text-align: left;
+}
+.loginCard label {
+  display: grid;
+  gap: 6px;
+  color: #667085;
+  font-size: 12px;
+}
+.loginCard input {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 9px;
+}
+.loginError {
+  color: var(--danger) !important;
+}
 .simplePage {
   align-content: start;
   justify-items: start;
