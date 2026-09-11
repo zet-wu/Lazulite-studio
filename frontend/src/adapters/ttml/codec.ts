@@ -300,7 +300,10 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
         throw new Error('Final TTML export requires an editable or mixed profile');
     if (!draft && document.issues.length > 0)
         throw new Error('Final TTML export requires a clean validation profile');
-    const hasChanges = document.lines.some(line => line.text !== line.baseline.text || line.beginUs !== line.baseline.beginUs || line.endUs !== line.baseline.endUs || (draft && line.editable.timing && (line.beginUs === null || line.endUs === null)));
+    const baselineDocument = parseStudioTtml(document.baseline.xml);
+    const agentShape = (items: StudioLyricDocument['agents']) => items.map(agent => [agent.id, agent.name, agent.type, agent.actorRef, agent.groupRefs]);
+    const hasAgentChanges = JSON.stringify(agentShape(document.agents)) !== JSON.stringify(agentShape(baselineDocument.agents)) || document.lines.some(line => JSON.stringify(line.agentRefs) !== JSON.stringify(line.baseline.agentRefs));
+    const hasChanges = hasAgentChanges || document.lines.some(line => line.text !== line.baseline.text || line.beginUs !== line.baseline.beginUs || line.endUs !== line.baseline.endUs || (draft && line.editable.timing && (line.beginUs === null || line.endUs === null)));
     if (!hasChanges)
         return document.baseline.xml;
     const parsed = new DOMParser().parseFromString(document.baseline.xml, 'application/xml');
@@ -308,11 +311,14 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
         throw new Error('Invalid baseline XML');
     for (const line of document.lines) {
         const base = line.baseline;
-        if (line.text === base.text && line.beginUs === base.beginUs && line.endUs === base.endUs && !(draft && (line.beginUs === null || line.endUs === null)))
+        if (line.text === base.text && line.beginUs === base.beginUs && line.endUs === base.endUs && JSON.stringify(line.agentRefs) === JSON.stringify(base.agentRefs) && !(draft && (line.beginUs === null || line.endUs === null)))
             continue;
         const element = elementAt(parsed.documentElement, line.sourcePath);
         if (!element)
             throw new Error(`Line ${line.id} source path is missing`);
+        const agentValue = line.agentRefs.join(' ');
+        if (agentValue) element.setAttributeNS(TTM_NS, 'ttm:agent', agentValue);
+        else element.removeAttributeNS(TTM_NS, 'agent');
         if (!line.editable.text && line.text !== base.text)
             throw new Error(`Line ${line.id} text is read-only`);
         if (!line.editable.timing && (line.beginUs !== base.beginUs || line.endUs !== base.endUs))
@@ -371,6 +377,37 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
         }
         else if (line.editable.timing)
             element.removeAttributeNS(STUDIO_DRAFT_NS, 'null');
+    }
+    const baselineIds = new Set(baselineDocument.agents.map(agent => agent.id));
+    const removedAgents: Element[] = [];
+    for (const baselineAgent of baselineDocument.agents) {
+        const node = elementAt(parsed.documentElement, baselineAgent.sourcePath);
+        if (!node) continue;
+        const current = document.agents.find(agent => agent.id === baselineAgent.id);
+        if (!current) { removedAgents.push(node); continue; }
+        if (current.name !== baselineAgent.name) {
+            let name = Array.from(node.children).find(child => child.namespaceURI === TTM_NS && local(child) === 'name');
+            if (!name) { name = parsed.createElementNS(TTM_NS, 'ttm:name'); node.appendChild(name); }
+            name.textContent = current.name ?? '';
+        }
+        if (current.type !== baselineAgent.type) {
+            if (current.type) node.setAttribute('type', current.type); else node.removeAttribute('type');
+        }
+    }
+    for (const node of removedAgents) node.parentElement?.removeChild(node);
+    const newAgents = document.agents.filter(agent => !baselineIds.has(agent.id));
+    if (newAgents.length) {
+        const metadata = parsed.getElementsByTagNameNS(TTML_NS, 'metadata')[0] ?? (() => {
+            let head = parsed.getElementsByTagNameNS(TTML_NS, 'head')[0];
+            if (!head) { head = parsed.createElementNS(TTML_NS, 'head'); parsed.documentElement.insertBefore(head, parsed.documentElement.firstChild); }
+            const node = parsed.createElementNS(TTML_NS, 'metadata'); head.appendChild(node); return node;
+        })();
+        for (const agent of newAgents) {
+            if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(agent.id)) throw new Error(`Invalid agent id: ${agent.id}`);
+            const node = parsed.createElementNS(TTM_NS, 'ttm:agent'); node.setAttributeNS(XML_NS, 'xml:id', agent.id);
+            if (agent.type) node.setAttribute('type', agent.type);
+            const name = parsed.createElementNS(TTM_NS, 'ttm:name'); name.textContent = agent.name ?? ''; node.appendChild(name); metadata.appendChild(node);
+        }
     }
     return new XMLSerializer().serializeToString(parsed);
 }

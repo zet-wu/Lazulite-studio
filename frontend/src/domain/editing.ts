@@ -8,10 +8,12 @@ export type WorkflowSidecar = {
 };
 export type StudioDocument = StudioLyricDocument;
 
-export type LineUpdate = Partial<Pick<StudioLine, 'text' | 'beginUs' | 'endUs'>>;
+export type LineUpdate = Partial<Pick<StudioLine, 'text' | 'beginUs' | 'endUs' | 'agentRefs'>>;
 export type EditCommand =
   | { type: 'update-line'; lineId: string; changes: LineUpdate }
-  | { type: 'update-lines'; updates: Array<{ lineId: string; changes: LineUpdate }> };
+  | { type: 'update-lines'; updates: Array<{ lineId: string; changes: LineUpdate }> }
+  | { type: 'update-agents'; agents: StudioDocument['agents'] }
+  | { type: 'replace-document'; document: StudioDocument; workflow?: WorkflowSidecar };
 
 export type EditorSnapshot = { document: StudioDocument; workflow?: WorkflowSidecar };
 export type EditorState = {
@@ -35,10 +37,11 @@ const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.st
 
 function validateChanges(changes: LineUpdate): void {
   const keys = Object.keys(changes);
-  if (keys.some((key) => !['text', 'beginUs', 'endUs'].includes(key))) throw new Error('Unsupported line field');
+  if (keys.some((key) => !['text', 'beginUs', 'endUs', 'agentRefs'].includes(key))) throw new Error('Unsupported line field');
   if ('text' in changes && typeof changes.text !== 'string') throw new Error('Line text must be a string');
   if ('beginUs' in changes && !validTime(changes.beginUs)) throw new Error('beginUs must be a non-negative integer or null');
   if ('endUs' in changes && !validTime(changes.endUs)) throw new Error('endUs must be a non-negative integer or null');
+  if ('agentRefs' in changes && (!Array.isArray(changes.agentRefs) || changes.agentRefs.some((id) => typeof id !== 'string'))) throw new Error('agentRefs must be string ids');
 }
 
 function applyUpdates(snapshot: EditorSnapshot, updates: Array<{ lineId: string; changes: LineUpdate }>): EditorSnapshot {
@@ -55,9 +58,11 @@ function applyUpdates(snapshot: EditorSnapshot, updates: Array<{ lineId: string;
     const changedText = 'text' in update.changes && update.changes.text !== line.text;
     const changedBegin = 'beginUs' in update.changes && update.changes.beginUs !== line.beginUs;
     const changedEnd = 'endUs' in update.changes && update.changes.endUs !== line.endUs;
-    if (!changedText && !changedBegin && !changedEnd) continue;
+    const changedAgents = 'agentRefs' in update.changes && JSON.stringify(update.changes.agentRefs) !== JSON.stringify(line.agentRefs);
+    if (!changedText && !changedBegin && !changedEnd && !changedAgents) continue;
     if (changedText && !line.editable.text) throw new Error('Lines with Ruby or structured text are read-only');
     if ((changedBegin || changedEnd) && !line.editable.timing) throw new Error('Line timing is read-only');
+    if (changedAgents && update.changes.agentRefs!.some((id) => !document.agents.some((agent) => agent.id === id))) throw new Error('Line references an unknown agent');
     const nextBegin = 'beginUs' in update.changes ? update.changes.beginUs! : line.beginUs;
     const nextEnd = 'endUs' in update.changes ? update.changes.endUs! : line.endUs;
     if (nextBegin !== null && nextEnd !== null && nextBegin > nextEnd) throw new Error('Line beginUs must be <= endUs');
@@ -75,6 +80,33 @@ function applyUpdates(snapshot: EditorSnapshot, updates: Array<{ lineId: string;
 }
 
 export function executeCommand(state: EditorState, command: EditCommand): EditorState {
+  if (command.type === 'replace-document') {
+    if (command.document.schemaVersion !== state.present.document.schemaVersion) throw new Error('Document schema version mismatch');
+    const next: EditorSnapshot = { document: clone(command.document), workflow: clone(command.workflow) };
+    if (same(next, state.present)) return state;
+    return { present: next, past: [...state.past.slice(-(MAX_HISTORY - 1)), clone(state.present)], future: [] };
+  }
+  if (command.type === 'update-agents') {
+    const document = clone(state.present.document);
+    const ids = command.agents.map((agent) => agent.id);
+    if (new Set(ids).size !== ids.length || ids.some((id) => !id)) throw new Error('Agent ids must be unique');
+    const nextIds = new Set(ids);
+    for (const agent of command.agents) {
+      const previous = document.agents.find((item) => item.id === agent.id);
+      if (!previous && (agent.actorRef || agent.groupRefs.length)) throw new Error('S4 agent editing does not support actor or group references');
+    }
+    for (const previous of document.agents) {
+      const next = command.agents.find((agent) => agent.id === previous.id);
+      if (next && (next.actorRef !== previous.actorRef || JSON.stringify(next.groupRefs) !== JSON.stringify(previous.groupRefs))) throw new Error('S4 agent editing cannot change actor or group references');
+    }
+    for (const line of document.lines) {
+      for (const id of line.agentRefs) if (!nextIds.has(id)) throw new Error('Cannot delete an agent still assigned to a line');
+    }
+    if (JSON.stringify(document.agents) === JSON.stringify(command.agents)) return state;
+    document.agents = clone(command.agents);
+    const next: EditorSnapshot = { document, workflow: clone(state.present.workflow) };
+    return { present: next, past: [...state.past.slice(-(MAX_HISTORY - 1)), clone(state.present)], future: [] };
+  }
   const updates = command.type === 'update-line' ? [{ lineId: command.lineId, changes: command.changes }] : command.updates;
   if (updates.length === 0) return state;
   const next = applyUpdates(state.present, updates);
