@@ -217,6 +217,62 @@
             "$ref": "#/components/responses/Error"
           }
         }
+      },
+      "post": {
+        "operationId": "createJob",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobCreate" } } }
+        },
+        "responses": {
+          "202": { "description": "Queued job", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } } },
+          "409": { "$ref": "#/components/responses/Error" },
+          "default": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/projects/{projectId}/jobs/{kind}": {
+      "post": {
+        "operationId": "createTypedJob",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "name": "kind", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobParams" } } } },
+        "responses": { "202": { "description": "Queued job", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/jobs/{jobId}": {
+      "get": {
+        "operationId": "getJob",
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
+        "responses": { "200": { "description": "Job snapshot", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/jobs/{jobId}/cancel": {
+      "post": {
+        "operationId": "cancelJob",
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
+        "responses": { "200": { "description": "Cancellation state", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/jobs/{jobId}/result": {
+      "get": {
+        "operationId": "getJobResult",
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
+        "responses": { "200": { "description": "Job result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobResult" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/jobs/{jobId}/events": {
+      "get": {
+        "operationId": "streamJobEvents",
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }, { "name": "after_seq", "in": "query", "schema": { "type": "integer", "minimum": 0 } }],
+        "responses": { "200": { "description": "Server sent events", "content": { "text/event-stream": { "schema": { "type": "string" } } } }, "default": { "$ref": "#/components/responses/Error" } }
       }
     },
     "/projects/{projectId}/document": {
@@ -229,11 +285,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Read-only document shell",
+            "description": "Rich TTML document envelope",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentShell"
+                  "$ref": "#/components/schemas/DocumentEnvelope"
                 }
               }
             }
@@ -244,6 +300,25 @@
           "default": {
             "$ref": "#/components/responses/Error"
           }
+        }
+      },
+      "put": {
+        "operationId": "putDocument",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentEnvelope" } } }
+        },
+        "responses": {
+          "200": { "description": "Committed document", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentSaveResponse" } } } },
+          "409": { "$ref": "#/components/responses/Error" },
+          "412": { "$ref": "#/components/responses/Error" },
+          "428": { "$ref": "#/components/responses/Error" },
+          "default": { "$ref": "#/components/responses/Error" }
         }
       }
     },
@@ -258,6 +333,17 @@
           "200": { "description": "Committed TTML" },
           "default": { "$ref": "#/components/responses/Error" }
         }
+      }
+    },
+    "/projects/{projectId}/imports": {
+      "post": {
+        "operationId": "importCandidate",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/Revision" }
+        ],
+        "requestBody": { "required": true, "content": { "text/plain": {}, "application/ttml+xml": {} } },
+        "responses": { "200": { "description": "Candidate import; never saved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportCandidate" } } } }, "default": { "$ref": "#/components/responses/Error" } }
       }
     },
     "/projects/{projectId}/audio": {
@@ -336,6 +422,21 @@
         "in": "query",
         "required": false,
         "schema": { "type": "string" }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      "JobId": {
+        "name": "jobId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 }
       }
     },
     "responses": {
@@ -572,16 +673,77 @@
           }
         }
       },
+      "JobParams": {
+        "type": "object",
+        "required": ["params"],
+        "properties": { "params": { "type": "object", "additionalProperties": true } },
+        "additionalProperties": false
+      },
+      "JobCreate": {
+        "type": "object",
+        "required": ["kind", "params"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["search", "fetch", "transcribe", "align", "line_align"] },
+          "params": {
+            "type": "object",
+            "required": ["revision", "asset_id"],
+            "properties": {
+              "revision": { "type": "string" },
+              "asset_id": { "type": "string" },
+              "line_ids": { "type": "array", "items": { "type": "string" } },
+              "title": { "type": ["string", "null"] },
+              "artist": { "type": ["string", "null"] },
+              "album": { "type": ["string", "null"] }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "JobEvent": {
+        "type": "object",
+        "required": ["schema_version", "job_id", "seq", "kind", "state_version"],
+        "properties": {
+          "schema_version": { "const": "studio-job-event-v1" }, "job_id": { "type": "string" },
+          "seq": { "type": "integer", "minimum": 1 }, "kind": { "type": "string" },
+          "stage": { "type": ["string", "null"] }, "completed": { "type": ["integer", "null"] },
+          "total": { "type": ["integer", "null"] }, "message": { "type": ["string", "null"] },
+          "state_version": { "type": "integer", "minimum": 0 }, "created_at": { "type": "string" }
+        }
+      },
+      "JobResult": {
+        "type": "object",
+        "required": ["schema_version", "job_id", "binding"],
+        "properties": {
+          "schema_version": { "const": "studio-job-result-v1" }, "job_id": { "type": "string" },
+          "binding": { "type": "object", "required": ["project_id", "asset_id", "revision"], "properties": {
+            "project_id": { "type": "string" }, "asset_id": { "type": "string" }, "revision": { "type": "string" }, "revision_sha256": { "type": ["string", "null"] }
+          } },
+          "items": { "type": "array", "items": { "anyOf": [
+            { "$ref": "#/components/schemas/SearchCandidate" },
+            { "$ref": "#/components/schemas/FetchedLyric" },
+            { "$ref": "#/components/schemas/AlignedLine" },
+            { "$ref": "#/components/schemas/TranscriptionSegment" }
+          ] } }
+        },
+        "additionalProperties": true
+      },
+      "SearchCandidate": { "type": "object", "required": ["source", "candidate_id", "title", "match_score"], "properties": { "source": { "type": "string" }, "candidate_id": { "type": "string" }, "title": { "type": "string" }, "artist": { "type": ["string", "null"] }, "album": { "type": ["string", "null"] }, "duration": { "type": ["number", "null"] }, "match_score": { "type": "number" }, "raw": { "type": "object" } } },
+      "FetchedLyric": { "type": "object", "required": ["candidate", "provider_rank", "line_count", "lines"], "properties": { "candidate": { "$ref": "#/components/schemas/SearchCandidate" }, "provider_rank": { "type": "integer" }, "line_count": { "type": "integer" }, "lines": { "type": "array", "items": { "type": "object", "required": ["id", "text"], "properties": { "id": { "type": "string" }, "text": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] } } } } } },
+      "AlignedLine": { "type": "object", "required": ["line_id", "timing_source"], "properties": { "line_id": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "begin_us": { "type": ["integer", "null"] }, "end_us": { "type": ["integer", "null"] }, "similarity": { "type": ["number", "null"] }, "score": { "type": ["number", "null"] }, "timing_source": { "type": "string" }, "source_segment_ids": { "type": "array", "items": { "type": "string" } }, "issues": { "type": "array", "items": { "type": "string" } } } },
+      "TranscriptionSegment": { "type": "object", "required": ["source_segment_id", "text"], "properties": { "source_segment_id": { "type": "string" }, "text": { "type": "string" }, "language": { "type": ["string", "null"] }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "begin_us": { "type": ["integer", "null"] }, "end_us": { "type": ["integer", "null"] }, "confidence": { "type": ["number", "null"] }, "timed_text": { "type": "array", "items": { "type": "object" } } }, "additionalProperties": true },
       "Job": {
         "type": "object",
-        "required": ["id", "kind", "status", "stage", "completed", "total"],
+        "required": ["schema_version", "id", "project_id", "kind", "status", "request", "result_available", "state_version"],
         "properties": {
+          "schema_version": { "const": "studio-job-v1" },
           "id": {
             "type": "string"
           },
           "kind": {
             "type": "string"
           },
+          "project_id": { "type": "string" },
           "status": {
             "type": "string",
             "enum": [
@@ -593,17 +755,12 @@
               "cancelled"
             ]
           },
-          "stage": {
-            "type": ["string", "null"]
-          },
-          "completed": {
-            "type": ["integer", "null"],
-            "minimum": 0
-          },
-          "total": {
-            "type": ["integer", "null"],
-            "minimum": 0
-          }
+          "request": { "type": "object", "additionalProperties": true },
+          "result_available": { "type": "boolean" },
+          "error": { "type": ["object", "null"] },
+          "engine": { "type": ["object", "null"] },
+          "created_at": { "type": "string" }, "updated_at": { "type": "string" },
+          "state_version": { "type": "integer", "minimum": 0 }
         }
       },
       "JobList": {
@@ -619,6 +776,46 @@
               "$ref": "#/components/schemas/Job"
             }
           }
+        }
+      },
+      "DocumentEnvelope": {
+        "type": "object",
+        "required": ["schema_version", "project_id", "revision", "document"],
+        "properties": {
+          "schema_version": { "const": "studio-document-v1" },
+          "project_id": { "type": "string" },
+          "revision": { "type": ["string", "null"] },
+          "etag": { "type": "string" },
+          "sha256": { "type": "string" },
+          "client_seq": { "type": ["integer", "null"], "minimum": 0 },
+          "document": {
+            "type": "object",
+            "required": ["schema_version", "ttml"],
+            "properties": {
+              "schema_version": { "const": "studio-document-content-v1" },
+              "ttml": { "type": "string", "maxLength": 2097152 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "DocumentSaveResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/DocumentEnvelope" },
+          { "type": "object", "required": ["saved"], "properties": {
+            "saved": { "type": "object", "required": ["id", "etag", "sha256", "created_at"], "properties": {
+              "id": { "type": "string" }, "etag": { "type": "string" }, "sha256": { "type": "string" }, "created_at": { "type": "string" }, "client_seq": { "type": ["integer", "null"] }
+            } }
+          } }
+        ]
+      },
+      "ImportCandidate": {
+        "type": "object", "required": ["schema_version", "project_id", "input_revision", "candidate", "diagnostics", "saved"],
+        "properties": {
+          "schema_version": { "const": "studio-import-v1" }, "project_id": { "type": "string" }, "input_revision": { "type": ["string", "null"] },
+          "candidate": { "type": "object", "required": ["format"], "properties": { "format": { "enum": ["ttml", "lrc", "text"] }, "ttml": { "type": "string" }, "text": { "type": "string" }, "lines": { "type": "array", "items": { "type": "object", "required": ["begin_us", "text"], "properties": { "begin_us": { "type": ["integer", "null"] }, "text": { "type": "string" } } } } } },
+          "diagnostics": { "type": "array", "items": { "type": "object" } }, "saved": { "const": false }
         }
       },
       "DocumentShell": {

@@ -1,4 +1,5 @@
 import hashlib, json, os, secrets, tempfile, uuid
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Annotated
@@ -21,6 +22,12 @@ from pydantic import BaseModel, Field
 
 from .auth import Settings
 from .db import Database
+from .documents import DocumentService, build_router
+from .job_routes import create_job_router
+from .jobs import JobService
+from .engine import configured_engine
+from .projection import project_ttml
+from .review import build_router as build_review_router
 from .revisions import INITIAL_TTML, RevisionStore
 from .studio.media import Asset, MediaError, MediaProbe, MediaService
 from .upload import UploadLimitMiddleware
@@ -31,9 +38,8 @@ MAX_UPLOAD = 500 * 1024 * 1024
 def stamp():
     return datetime.now(timezone.utc).isoformat()
 
-
 def create_app(
-    data_dir: str | Path | None = None, settings: Settings | None = None
+    data_dir: str | Path | None = None, settings: Settings | None = None, engine=None
 ) -> FastAPI:
     cfg = settings or Settings.from_env()
     if not cfg.origin or (not cfg.trusted_gateway and not cfg.password):
@@ -46,6 +52,7 @@ def create_app(
     db, media = Database(root / "studio.sqlite3"), MediaService(root)
     revisions = RevisionStore(db, root / "revisions")
     revisions.recover()
+    configured_engine_instance = engine or configured_engine()
     api = APIRouter(prefix="/api/v1")
 
     def fail(code, message, status=400, retryable=False, **extra):
@@ -175,8 +182,14 @@ def create_app(
             "schema_version": "studio-capabilities-v1",
             "items": [
                 {"id": "assets", "enabled": True, "reason": None},
-                {"id": "document.edit", "enabled": False, "reason": "S4"},
-                {"id": "job.run", "enabled": False, "reason": "S4"},
+                {"id": "document.edit", "enabled": True, "reason": None},
+                {"id": "job.run", "enabled": True, "reason": None},
+                {"id": "job.search", "enabled": True, "reason": None},
+                {"id": "job.fetch", "enabled": True, "reason": None},
+                {"id": "job.transcribe", "enabled": bool(getattr(configured_engine_instance, "transcriber", None)),
+                 "reason": None if getattr(configured_engine_instance, "transcriber", None) else "未配置转写模型后端"},
+                {"id": "job.align", "enabled": bool(getattr(configured_engine_instance, "transcriber", None)),
+                 "reason": None if getattr(configured_engine_instance, "transcriber", None) else "未配置转写模型后端"},
             ],
         }
 
@@ -362,25 +375,6 @@ def create_app(
             "asset": asset_dto(a) if a else None,
         }
 
-    @api.get("/projects/{pid}/jobs")
-    def jobs(pid: str, _: object = Depends(auth)):
-        project(pid)
-        return {"schema_version": "studio-job-list-v1", "items": []}
-
-    @api.get("/projects/{pid}/document")
-    def document(pid: str, response: Response, _: object = Depends(auth)):
-        r = project(pid)
-        response.headers["ETag"] = f'"{r[3]}"'
-        return {
-            "schema_version": "studio-document-shell-v1",
-            "project_id": pid,
-            "revision": r[3],
-            "title": r[1],
-            "language": "",
-            "lines": [],
-            "read_only_reasons": ["S3 只读摘要"],
-        }
-
     @api.get("/projects/{pid}/lyrics")
     def lyrics(pid: str, revision: str | None = None, _: object = Depends(auth)):
         r = project(pid)
@@ -447,9 +441,55 @@ def create_app(
             "maximum": peaks.maximum,
         }
 
+    def job_project_exists(pid):
+        try:
+            project(pid)
+            return True
+        except HTTPException:
+            return False
+
+    def asset_path_for_project(pid):
+        _, row = asset_for(pid)
+        if not row:
+            raise ValueError("project source asset not found")
+        return root / "assets" / row[1][:2] / row[1]
+
+    def validate_job_request(pid, kind, params):
+        # Automated proposals must identify the immutable inputs they bind to.
+        revision = params.get("revision")
+        asset_id = params.get("asset_id")
+        row = project(pid)
+        if not revision or not asset_id or revision != row[3] and not _revision_belongs(pid, revision):
+            fail("job_input_invalid", "job must reference a revision and asset belonging to project", 422)
+        if asset_id != row[2]:
+            fail("job_input_invalid", "asset does not belong to project", 422)
+        with db.connect() as c:
+            revision_row = c.execute("SELECT ttml_path FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone()
+        if revision_row:
+            try:
+                projected = project_ttml(revision_row[0])
+                selected = params.get("line_ids")
+                if selected is not None and any(item not in {line["id"] for line in projected} for item in selected):
+                    fail("job_input_invalid", "selected line does not belong to revision", 422)
+                if kind in {"line_align", "align"}:
+                    params["lines"] = [line for line in projected if selected is None or line["id"] in selected]
+            except (ET.ParseError, OSError):
+                fail("job_input_invalid", "revision cannot be projected", 422)
+
+    def _revision_belongs(pid, revision):
+        with db.connect() as c:
+            return c.execute("SELECT 1 FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone() is not None
+
+    job_service = JobService(db, engine=configured_engine_instance, asset_path=asset_path_for_project)
+    api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
+    api.include_router(build_router(DocumentService(revisions), auth=auth, write=write, project_exists=project))
+    api.include_router(build_review_router(db, auth=auth, write=write, project_exists=project, stamp=stamp))
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
     app.include_router(api)
     app.add_middleware(UploadLimitMiddleware, limit=MAX_UPLOAD + 1024 * 1024)
+    @app.on_event("shutdown")
+    async def shutdown_jobs():
+        job_service.close()
 
     @app.exception_handler(HTTPException)
     async def http_error(request: Request, exc: HTTPException):

@@ -24,6 +24,30 @@ CREATE TABLE IF NOT EXISTS idempotency (
  key TEXT PRIMARY KEY, subject TEXT NOT NULL, request_hash TEXT NOT NULL, response TEXT NOT NULL, created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, expires_at TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS review_versions (project_id TEXT PRIMARY KEY, version INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS review_confirmations (
+ project_id TEXT NOT NULL, line_id TEXT NOT NULL, revision TEXT NOT NULL,
+ status TEXT NOT NULL, note TEXT, updated_at TEXT NOT NULL,
+ content_hash TEXT,
+ PRIMARY KEY(project_id,line_id)
+);
+CREATE TABLE IF NOT EXISTS jobs (
+ id TEXT PRIMARY KEY, project_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
+ request_json TEXT NOT NULL, result_json TEXT, error_json TEXT, engine_json TEXT,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, finished_at TEXT,
+ cancel_requested INTEGER NOT NULL DEFAULT 0, state_version INTEGER NOT NULL DEFAULT 0,
+ FOREIGN KEY(project_id) REFERENCES projects(id)
+);
+CREATE INDEX IF NOT EXISTS jobs_project_created ON jobs(project_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS job_events (
+ job_id TEXT NOT NULL, seq INTEGER NOT NULL, kind TEXT NOT NULL, stage TEXT,
+ completed INTEGER, total INTEGER, message TEXT, state_version INTEGER NOT NULL,
+ created_at TEXT NOT NULL, PRIMARY KEY(job_id, seq), FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+CREATE TABLE IF NOT EXISTS job_idempotency (
+ project_id TEXT NOT NULL, idem_key TEXT NOT NULL, request_hash TEXT NOT NULL, job_id TEXT NOT NULL,
+ PRIMARY KEY(project_id, idem_key), FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
 """
 
 
@@ -33,6 +57,9 @@ class Database:
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
             conn.executescript(SCHEMA)
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(review_confirmations)")}
+            if "content_hash" not in columns:
+                conn.execute("ALTER TABLE review_confirmations ADD COLUMN content_hash TEXT")
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

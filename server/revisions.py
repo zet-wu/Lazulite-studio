@@ -7,10 +7,12 @@ import os
 import shutil
 import tempfile
 import uuid
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .db import Database
+from .review_fingerprint import fingerprints
 
 INITIAL_TTML = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>'
 logger = logging.getLogger(__name__)
@@ -45,11 +47,12 @@ class RevisionStore:
         *,
         operation_id: str | None = None,
         subject: str = "local",
+        client_seq: int | None = None,
     ) -> dict:
         digest = hashlib.sha256(ttml.encode()).hexdigest()
         request_hash = hashlib.sha256(
             json.dumps(
-                [subject, project_id, base, digest], separators=(",", ":")
+                [subject, project_id, base, digest, client_seq], separators=(",", ":")
             ).encode()
         ).hexdigest()
         now = datetime.now(timezone.utc).isoformat()
@@ -86,12 +89,32 @@ class RevisionStore:
                     != 1
                 ):
                     raise RevisionConflict(row[0])
+                # Confirmations belong to a precise lyric revision. A saved
+                # document makes prior confirmations stale atomically.
+                old_hashes = {}
+                if base:
+                    old_row = conn.execute("SELECT ttml_path FROM revisions WHERE id=?", (base,)).fetchone()
+                    if old_row:
+                        old_root = ET.parse(old_row[0]).getroot()
+                        confirmed_ids = [row[0] for row in conn.execute("SELECT line_id FROM review_confirmations WHERE project_id=? AND status='confirmed'", (project_id,)).fetchall()]
+                        old_fingerprints = fingerprints(old_root)
+                        old_hashes = {line_id: old_fingerprints.get(line_id) for line_id in confirmed_ids}
+                new_root = ET.fromstring(ttml.encode())
+                new_fingerprints = fingerprints(new_root)
+                confirmed = conn.execute("SELECT line_id,content_hash FROM review_confirmations WHERE project_id=? AND status='confirmed'", (project_id,)).fetchall()
+                for item in confirmed:
+                    if old_hashes.get(item[0]) == new_fingerprints.get(item[0]) == item[1]:
+                        conn.execute("UPDATE review_confirmations SET revision=? WHERE project_id=? AND line_id=?", (revision, project_id, item[0]))
+                    else:
+                        conn.execute("UPDATE review_confirmations SET status='stale' WHERE project_id=? AND line_id=?", (project_id, item[0]))
                 result = {
                     "id": revision,
                     "etag": f'"{revision}"',
                     "sha256": digest,
                     "created_at": now,
                 }
+                if client_seq is not None:
+                    result["client_seq"] = client_seq
                 if operation_id:
                     conn.execute(
                         "INSERT INTO idempotency VALUES(?,?,?,?,?)",
@@ -108,6 +131,26 @@ class RevisionStore:
                 extra={"project_id": project_id, "revision": result["id"]},
             )
         return result
+
+    def read(self, project_id: str, revision: str | None = None) -> tuple[str, str]:
+        """Read an immutable revision and return (revision id, UTF-8 TTML)."""
+        with self.db.connect() as conn:
+            row = conn.execute(
+                "SELECT p.current_revision, r.id, r.ttml_path FROM projects p "
+                "JOIN revisions r ON r.project_id=p.id AND r.id=COALESCE(?, p.current_revision) "
+                "WHERE p.id=?",
+                (revision, project_id),
+            ).fetchone()
+        if row is None:
+            raise KeyError(project_id if revision is None else revision)
+        path = Path(row[2]).resolve()
+        root = self.root.resolve()
+        if root not in path.parents or path.suffix != ".ttml":
+            raise ValueError("revision path is outside revision store")
+        try:
+            return row[1], path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise ValueError("revision cannot be read") from exc
 
     def _write_atomic(self, destination: Path, content: bytes) -> None:
         fd, name = tempfile.mkstemp(
