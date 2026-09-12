@@ -20,4 +20,4 @@
 
 S4 行级制作范围与传输决策见 [实施记录](s4-implementation.md)，真实浏览器闭环、合成后端边界和性能测量见 [验收记录](s4-acceptance.md)。
 
-S5 日语整体 Ruby、读音候选、确认与用户词典的开发边界见 [实施记录](s5-implementation.md)。
+S5 日语整体 Ruby、读音候选、确认与用户词典的开发边界见 [实施记录](s5-implementation.md)，实际范围与验证结果见 [验收记录](s5-acceptance.md)。

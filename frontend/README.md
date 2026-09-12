@@ -24,7 +24,7 @@ npx pnpm@10.30.3 dev:mock
 
 打开终端输出的本地地址，默认路由为 `/projects`。直接工作区入口为 `/projects/sample-project/edit`。`?scenario=empty`、`?scenario=error`、`?scenario=expired`、`?scenario=loading` 分别用于空库、服务失败、会话过期和加载状态；移除参数恢复正常演示。
 
-本地文件入口为 `/editor`，可在 `dev` 模式下使用，不需要 API 会话。普通文本行支持正文和起止秒数编辑，空时间表示未定；点击“应用修改”形成一次撤销事务。Ruby、混合结构和未知语义按字段只读，原 XML 留存。此入口不会把服务端行表摘要转换为可保存文件。
+本地文件入口为 `/editor`，可在 `dev` 模式下使用，不需要 API 会话。普通文本行支持正文和起止秒数编辑，空时间表示未定；点击“应用修改”形成一次撤销事务。服务项目工作台在 S5 开放可理解的整体 Ruby，复杂混合结构和未知语义仍按字段只读；独立 `/editor` 保留原有基础编辑范围。
 
 本地检查点与服务器修订分开：S2 实施范围及当前检查进度见 [实施记录](../docs/s2-implementation.md)。草稿使用 Studio 命名空间标记未定时间，最终 TTML 需通过完整时间与 profile 检查。
 
@@ -34,7 +34,7 @@ npx pnpm@10.30.3 dev:mock
 
 真实工作台先按 [服务端说明](../server/README.md) 启动 API，再运行 `npm run dev`。设置 `STUDIO_ORIGIN` 与浏览器地址一致，输入服务端密码登录。上传并创建项目后，底部提供播放、速度、波形定位、A/B 循环和窗口缩放；有完整时间的选中行可循环试听。波形支持方向键及 Home/End，工作区空格切换播放；输入控件和 IME 保留自身按键行为。
 
-项目歌词在 S3 仍为只读，创建时持久化空 TTML 草稿。服务项目与本地 `/editor` 是独立入口；自动保存与行级制作闭环进入 S4。
+服务项目与本地 `/editor` 是独立入口。项目工作台支持自动保存、任务候选、行复核和多歌手；右侧“注音”用正文选择建立整体 reading，左侧“词典”维护项目特有读音，自动读音仍需人工应用并在保存后确认。
 
 ```sh
 npx pnpm@10.30.3 contracts:generate
@@ -52,4 +52,4 @@ npx pnpm@10.30.3 test:e2e
 
 测试自动在 `127.0.0.1:5174` 启动独立模拟服务，不需要手动启动。若将浏览器安装在自定义目录，安装和测试时都设置相同的 `PLAYWRIGHT_BROWSERS_PATH`。本次沙箱验收使用 `/tmp/lazulite-studio-browsers`。
 
-实际结果见 [S1](../docs/s1-acceptance.md)、[S2](../docs/s2-acceptance.md)、[S3](../docs/s3-acceptance.md) 验收记录。设计基线见 [架构](../../lyric-workflow/docs/lazulite_studio_frontend_architecture.md)。
+实际结果见 [S1](../docs/s1-acceptance.md)、[S2](../docs/s2-acceptance.md)、[S3](../docs/s3-acceptance.md)、[S4](../docs/s4-acceptance.md)、[S5](../docs/s5-acceptance.md) 验收记录。设计基线见 [架构](../../lyric-workflow/docs/lazulite_studio_frontend_architecture.md)。

@@ -44,5 +44,7 @@ AMLL TTML Tool 仅作为布局与交互参考，本次未复制其源代码、�
 | pytest（测试） | 8.3.4 | MIT |
 | httpx（测试） | 0.28.1 | BSD-3-Clause |
 | starlette（传递依赖，本次 Range 验证版本） | 0.41.3 | BSD-3-Clause |
+| SudachiPy | 0.6.10 | Apache-2.0 |
+| sudachidict_core | 20250129 | Apache-2.0 |
 
 FFmpeg/ffprobe 是系统前置工具，不随仓库分发；本次使用系统 FFmpeg 5.1.8，发行版启用 GPL 构建选项。后续打包时需按实际构建重新核验许可。

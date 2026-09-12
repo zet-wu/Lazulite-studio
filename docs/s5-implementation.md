@@ -1,6 +1,6 @@
 # S5：日语 Ruby 工作流
 
-开始：2026-09-12。依据工作流仓库的 [实施计划](../../lyric-workflow/docs/lazulite_studio_implementation_plan.md)、[前端架构](../../lyric-workflow/docs/lazulite_studio_frontend_architecture.md) 和 [总体 Ruby 工作流](../../lyric-workflow/docs/lazulite_music_workflow_plan.md)。S4 行级制作闭环已经验收，本阶段在富 TTML 草稿上开放可控的整体读音编辑。
+开始：2026-09-12；同日功能闭环验收通过，结果见 [验收记录](s5-acceptance.md)。依据工作流仓库的 [实施计划](../../lyric-workflow/docs/lazulite_studio_implementation_plan.md)、[前端架构](../../lyric-workflow/docs/lazulite_studio_frontend_architecture.md) 和 [总体 Ruby 工作流](../../lyric-workflow/docs/lazulite_music_workflow_plan.md)。S4 行级制作闭环已经验收，本阶段在富 TTML 草稿上开放可控的整体读音编辑。
 
 ## 开发范围
 
