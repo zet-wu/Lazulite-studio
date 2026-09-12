@@ -322,6 +322,38 @@
         }
       }
     },
+    "/projects/{projectId}/reading-dictionary": {
+      "get": {
+        "operationId": "listReadingDictionary",
+        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }],
+        "responses": {
+          "200": { "description": "Project reading dictionary", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReadingDictionary" } } } },
+          "default": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "post": {
+        "operationId": "createReadingDictionaryEntry",
+        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DictionaryEntryInput" } } } },
+        "responses": {
+          "201": { "description": "Created dictionary entry", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DictionaryEntry" } } } },
+          "default": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/projects/{projectId}/reading-dictionary/{entryId}": {
+      "put": {
+        "operationId": "updateReadingDictionaryEntry",
+        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }, { "name": "entryId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DictionaryEntryInput" } } } },
+        "responses": { "200": { "description": "Updated dictionary entry", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DictionaryEntry" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+      },
+      "delete": {
+        "operationId": "deleteReadingDictionaryEntry",
+        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }, { "name": "entryId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "204": { "description": "Deleted dictionary entry" }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
     "/projects/{projectId}/lyrics": {
       "get": {
         "operationId": "getLyrics",
@@ -683,7 +715,7 @@
         "type": "object",
         "required": ["kind", "params"],
         "properties": {
-          "kind": { "type": "string", "enum": ["search", "fetch", "transcribe", "align", "line_align"] },
+            "kind": { "type": "string", "enum": ["search", "fetch", "transcribe", "align", "line_align", "reading"] },
           "params": {
             "type": "object",
             "required": ["revision", "asset_id"],
@@ -723,10 +755,48 @@
             { "$ref": "#/components/schemas/SearchCandidate" },
             { "$ref": "#/components/schemas/FetchedLyric" },
             { "$ref": "#/components/schemas/AlignedLine" },
-            { "$ref": "#/components/schemas/TranscriptionSegment" }
+            { "$ref": "#/components/schemas/TranscriptionSegment" },
+            { "$ref": "#/components/schemas/ReadingProposal" }
           ] } }
+          ,"proposals": { "type": "array", "items": { "$ref": "#/components/schemas/ReadingProposal" } }
         },
         "additionalProperties": true
+      },
+      "DictionaryEntryInput": {
+        "type": "object",
+        "required": ["surface", "reading"],
+        "properties": {
+          "surface": { "type": "string", "minLength": 1 },
+          "reading": { "type": "string", "minLength": 1 }
+        }
+      },
+      "DictionaryEntry": {
+        "allOf": [
+          { "$ref": "#/components/schemas/DictionaryEntryInput" },
+          { "type": "object", "required": ["schema_version", "project_id", "id", "updated_at"], "properties": {
+            "schema_version": { "const": "studio-reading-dictionary-entry-v1" },
+            "project_id": { "type": "string" }, "id": { "type": "string" }, "updated_at": { "type": "string", "format": "date-time" }
+          } }
+        ]
+      },
+      "ReadingDictionary": {
+        "type": "object",
+        "required": ["schema_version", "project_id", "items"],
+        "properties": {
+          "schema_version": { "const": "studio-reading-dictionary-v1" },
+          "project_id": { "type": "string" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/DictionaryEntry" } }
+        }
+      },
+      "ReadingProposal": {
+        "type": "object",
+        "required": ["line_id", "proposal_id", "base_start", "base_end", "base", "reading", "source", "needs_review"],
+        "properties": {
+          "line_id": { "type": "string" }, "proposal_id": { "type": "string" },
+          "base_start": { "type": "integer", "minimum": 0 }, "base_end": { "type": "integer", "minimum": 1 },
+          "base": { "type": "string" }, "reading": { "type": "string", "minLength": 1 },
+          "source": { "type": "string", "enum": ["dictionary", "sudachi"] }, "needs_review": { "type": "boolean" }
+        }
       },
       "SearchCandidate": { "type": "object", "required": ["source", "candidate_id", "title", "match_score"], "properties": { "source": { "type": "string" }, "candidate_id": { "type": "string" }, "title": { "type": "string" }, "artist": { "type": ["string", "null"] }, "album": { "type": ["string", "null"] }, "duration": { "type": ["number", "null"] }, "match_score": { "type": "number" }, "raw": { "type": "object" } } },
       "FetchedLyric": { "type": "object", "required": ["candidate", "provider_rank", "line_count", "lines"], "properties": { "candidate": { "$ref": "#/components/schemas/SearchCandidate" }, "provider_rank": { "type": "integer" }, "line_count": { "type": "integer" }, "lines": { "type": "array", "items": { "type": "object", "required": ["id", "text"], "properties": { "id": { "type": "string" }, "text": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] } } } } } },

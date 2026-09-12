@@ -27,6 +27,7 @@ from .job_routes import create_job_router
 from .jobs import JobService
 from .engine import configured_engine
 from .projection import project_ttml
+from .reading import ReadingJobRunner, ReadingDictionary, SudachiReadingProposer, build_dictionary_router
 from .review import build_router as build_review_router
 from .revisions import INITIAL_TTML, RevisionStore
 from .studio.media import Asset, MediaError, MediaProbe, MediaService
@@ -39,7 +40,8 @@ def stamp():
     return datetime.now(timezone.utc).isoformat()
 
 def create_app(
-    data_dir: str | Path | None = None, settings: Settings | None = None, engine=None
+    data_dir: str | Path | None = None, settings: Settings | None = None, engine=None,
+    reading_proposer=None,
 ) -> FastAPI:
     cfg = settings or Settings.from_env()
     if not cfg.origin or (not cfg.trusted_gateway and not cfg.password):
@@ -53,6 +55,8 @@ def create_app(
     revisions = RevisionStore(db, root / "revisions")
     revisions.recover()
     configured_engine_instance = engine or configured_engine()
+    configured_reading_proposer = reading_proposer or SudachiReadingProposer()
+    reading_runner = ReadingJobRunner(db, configured_reading_proposer)
     api = APIRouter(prefix="/api/v1")
 
     def fail(code, message, status=400, retryable=False, **extra):
@@ -178,6 +182,7 @@ def create_app(
 
     @api.get("/capabilities")
     def capabilities():
+        reading_enabled = reading_runner.available()
         return {
             "schema_version": "studio-capabilities-v1",
             "items": [
@@ -190,6 +195,8 @@ def create_app(
                  "reason": None if getattr(configured_engine_instance, "transcriber", None) else "未配置转写模型后端"},
                 {"id": "job.align", "enabled": bool(getattr(configured_engine_instance, "transcriber", None)),
                  "reason": None if getattr(configured_engine_instance, "transcriber", None) else "未配置转写模型后端"},
+                {"id": "job.reading", "enabled": reading_enabled,
+                 "reason": None if reading_enabled else (reading_runner.reason() or "未配置日语读音后端")},
             ],
         }
 
@@ -459,7 +466,7 @@ def create_app(
         revision = params.get("revision")
         asset_id = params.get("asset_id")
         row = project(pid)
-        if not revision or not asset_id or revision != row[3] and not _revision_belongs(pid, revision):
+        if not revision or not asset_id or (revision != row[3] and not _revision_belongs(pid, revision)):
             fail("job_input_invalid", "job must reference a revision and asset belonging to project", 422)
         if asset_id != row[2]:
             fail("job_input_invalid", "asset does not belong to project", 422)
@@ -480,8 +487,9 @@ def create_app(
         with db.connect() as c:
             return c.execute("SELECT 1 FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone() is not None
 
-    job_service = JobService(db, engine=configured_engine_instance, asset_path=asset_path_for_project)
+    job_service = JobService(db, engine=configured_engine_instance, asset_path=asset_path_for_project, reading_runner=reading_runner)
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
+    api.include_router(build_dictionary_router(ReadingDictionary(db), auth=auth, write=write, project_exists=project))
     api.include_router(build_router(DocumentService(revisions), auth=auth, write=write, project_exists=project))
     api.include_router(build_review_router(db, auth=auth, write=write, project_exists=project, stamp=stamp))
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")

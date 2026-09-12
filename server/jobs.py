@@ -6,6 +6,7 @@ from typing import Any
 
 from .db import Database
 from .engine import EngineUnavailable, LazuliteEngine
+from .reading import ReadingUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +14,8 @@ def now(): return datetime.now(timezone.utc).isoformat()
 
 class JobService:
     """Durable single-slot executor. Every lifecycle transition is committed before notification."""
-    def __init__(self, db: Database, *, engine=None, asset_path=None):
-        self.db, self.engine, self.asset_path = db, engine or LazuliteEngine(), asset_path
+    def __init__(self, db: Database, *, engine=None, asset_path=None, reading_runner=None):
+        self.db, self.engine, self.asset_path, self.reading_runner = db, engine or LazuliteEngine(), asset_path, reading_runner
         self._lock = threading.Lock(); self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="studio-job")
         with db.transaction() as c:
             rows = c.execute("SELECT id FROM jobs WHERE status IN ('queued','running','cancel_requested')").fetchall()
@@ -51,7 +52,12 @@ class JobService:
             with self.db.connect() as c: record=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
             if not record: return
             request=json.loads(record[4]); kind=record[2]
-            result=self.engine.run(kind, asset_path=self.asset_path(record[1]) if self.asset_path else None, params=request, emit=lambda *x:self.emit(jid,*x))
+            if kind == "reading":
+                if self.reading_runner is None:
+                    raise ReadingUnavailable("未配置读音后端")
+                result = self.reading_runner.run(record[1], request)
+            else:
+                result=self.engine.run(kind, asset_path=self.asset_path(record[1]) if self.asset_path else None, params=request, emit=lambda *x:self.emit(jid,*x))
             with self.db.connect() as c:
                 project = c.execute("SELECT source_asset_id,current_revision FROM projects WHERE id=?", (record[1],)).fetchone()
                 bound_revision = request.get("revision")
@@ -66,7 +72,7 @@ class JobService:
                                  "revision_sha256": revision_hash}
             with self.db.transaction() as c:
                 t=now(); c.execute("UPDATE jobs SET status='succeeded',result_json=?,engine_json=?,updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps(result,ensure_ascii=False),json.dumps(result.get("engine",{})),t,t,jid)); self._event(c,jid,"state","succeeded",1,1,"任务完成")
-        except EngineUnavailable as exc: self._finish_error(jid,"capability_unavailable",str(exc))
+        except (EngineUnavailable, ReadingUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
         except Exception as exc:
             logger.exception("job %s failed", jid)
             self._finish_error(jid, "engine_error", "Lazulite engine failed; inspect server logs")

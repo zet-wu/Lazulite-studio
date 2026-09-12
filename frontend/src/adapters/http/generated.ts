@@ -196,6 +196,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/reading-dictionary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listReadingDictionary"];
+        put?: never;
+        post: operations["createReadingDictionaryEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/reading-dictionary/{entryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateReadingDictionaryEntry"];
+        post?: never;
+        delete: operations["deleteReadingDictionaryEntry"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{projectId}/lyrics": {
         parameters: {
             query?: never;
@@ -349,7 +381,7 @@ export interface components {
         };
         JobCreate: {
             /** @enum {string} */
-            kind: "search" | "fetch" | "transcribe" | "align" | "line_align";
+            kind: "search" | "fetch" | "transcribe" | "align" | "line_align" | "reading";
             params: {
                 revision: string;
                 asset_id: string;
@@ -384,9 +416,39 @@ export interface components {
                 revision: string;
                 revision_sha256?: string | null;
             };
-            items?: (components["schemas"]["SearchCandidate"] | components["schemas"]["FetchedLyric"] | components["schemas"]["AlignedLine"] | components["schemas"]["TranscriptionSegment"])[];
+            items?: (components["schemas"]["SearchCandidate"] | components["schemas"]["FetchedLyric"] | components["schemas"]["AlignedLine"] | components["schemas"]["TranscriptionSegment"] | components["schemas"]["ReadingProposal"])[];
+            proposals?: components["schemas"]["ReadingProposal"][];
         } & {
             [key: string]: unknown;
+        };
+        DictionaryEntryInput: {
+            surface: string;
+            reading: string;
+        };
+        DictionaryEntry: components["schemas"]["DictionaryEntryInput"] & {
+            /** @constant */
+            schema_version: "studio-reading-dictionary-entry-v1";
+            project_id: string;
+            id: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ReadingDictionary: {
+            /** @constant */
+            schema_version: "studio-reading-dictionary-v1";
+            project_id: string;
+            items: components["schemas"]["DictionaryEntry"][];
+        };
+        ReadingProposal: {
+            line_id: string;
+            proposal_id: string;
+            base_start: number;
+            base_end: number;
+            base: string;
+            reading: string;
+            /** @enum {string} */
+            source: "dictionary" | "sudachi";
+            needs_review: boolean;
         };
         SearchCandidate: {
             source: string;
@@ -981,6 +1043,106 @@ export interface operations {
             409: components["responses"]["Error"];
             412: components["responses"]["Error"];
             428: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listReadingDictionary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Project reading dictionary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadingDictionary"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createReadingDictionaryEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DictionaryEntryInput"];
+            };
+        };
+        responses: {
+            /** @description Created dictionary entry */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DictionaryEntry"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateReadingDictionaryEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+                entryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DictionaryEntryInput"];
+            };
+        };
+        responses: {
+            /** @description Updated dictionary entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DictionaryEntry"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteReadingDictionaryEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+                entryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted dictionary entry */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             default: components["responses"]["Error"];
         };
     };

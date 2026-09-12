@@ -48,6 +48,11 @@ CREATE TABLE IF NOT EXISTS job_idempotency (
  project_id TEXT NOT NULL, idem_key TEXT NOT NULL, request_hash TEXT NOT NULL, job_id TEXT NOT NULL,
  PRIMARY KEY(project_id, idem_key), FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
+CREATE TABLE IF NOT EXISTS reading_dictionary (
+ id TEXT PRIMARY KEY, project_id TEXT NOT NULL, surface TEXT NOT NULL, reading TEXT NOT NULL,
+ updated_at TEXT NOT NULL, UNIQUE(project_id, surface), FOREIGN KEY(project_id) REFERENCES projects(id)
+);
+CREATE INDEX IF NOT EXISTS reading_dictionary_project ON reading_dictionary(project_id, surface);
 """
 
 
