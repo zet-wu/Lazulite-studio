@@ -1,4 +1,5 @@
 import time
+import threading
 from fastapi.testclient import TestClient
 
 from server.db import Database
@@ -9,6 +10,14 @@ from server.app import create_app
 class FakeEngine:
     def run(self, kind, **kwargs):
         return {"kind": kind, "engine": {"name": "fake", "build": "test"}, "items": []}
+
+class BlockingEngine(FakeEngine):
+    started = threading.Event()
+    release = threading.Event()
+    def run(self, kind, **kwargs):
+        self.started.set()
+        self.release.wait(2)
+        return super().run(kind, **kwargs)
 
 
 def wait_for(service, job_id):
@@ -52,6 +61,21 @@ def test_restart_marks_running_interrupted(tmp_path):
     service = JobService(db, engine=FakeEngine())
     assert service.get("j")["status"] == "interrupted"
     assert service.events("j")[-1]["stage"] == "interrupted"
+    service.close()
+
+def test_queued_job_can_be_cancelled_while_executor_is_blocked(tmp_path):
+    db = Database(tmp_path / "studio.sqlite3")
+    seed_project(db, tmp_path)
+    engine = BlockingEngine()
+    service = JobService(db, engine=engine)
+    request = {"title": "demo", "revision": "r", "asset_id": "a"}
+    first = service.create("p", "search", request)
+    assert engine.started.wait(1)
+    second = service.create("p", "search", request)
+    assert service.cancel(second["id"])["status"] == "cancelled"
+    engine.release.set()
+    assert wait_for(service, first["id"])["status"] == "succeeded"
+    assert service.get(second["id"])["status"] == "cancelled"
     service.close()
 
 

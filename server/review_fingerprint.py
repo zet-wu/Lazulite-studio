@@ -23,7 +23,11 @@ def fingerprints(root: ET.Element) -> dict[str, str]:
         next_context = context + ((node.tag, attrs),)
         if local == "p":
             line_id = node.attrib.get("{http://www.w3.org/XML/1998/namespace}id") or "line-" + "-".join(map(str, path))
-            payload = repr((next_context, ET.tostring(node, encoding="utf-8").decode())).encode()
+            tail = node.tail
+            node.tail = None
+            serialized = ET.tostring(node, encoding="utf-8").decode()
+            node.tail = tail
+            payload = repr((next_context, serialized)).encode()
             result[line_id] = hashlib.sha256(payload).hexdigest()
             return
         for child_index, child in enumerate(node):

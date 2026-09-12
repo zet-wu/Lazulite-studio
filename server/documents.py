@@ -188,7 +188,7 @@ def build_router(service: DocumentService, *, auth: Callable, write: Callable,
         if len(data) > MAX_TTML_BYTES:
             raise HTTPException(413, {"code": "import_too_large", "message": "import exceeds 2 MiB limit", "retryable": False})
         try:
-            text = data.decode("utf-8")
+            text = data.decode("utf-8-sig")
             if content_type in ("application/ttml+xml", "application/xml", "text/xml"):
                 validate_ttml(text)
                 diagnostics = []
@@ -199,14 +199,17 @@ def build_router(service: DocumentService, *, auth: Callable, write: Callable,
                 if fmt == "text":
                     lines = [{"begin_us": None, "end_us": None, "text": raw_line} for raw_line in text.splitlines() if raw_line.strip()]
                 else:
-                    offset_us = 0
-                    timed = []
+                    offsets = []
                     for raw_line in text.splitlines():
                         if raw_line.lower().startswith("[offset:"):
                             try:
-                                offset_us = int(raw_line[8:].split("]", 1)[0]) * 1000
+                                offsets.append(int(raw_line[8:].split("]", 1)[0]) * 1000)
                             except ValueError:
                                 pass
+                    offset_us = offsets[-1] if offsets else 0
+                    timed = []
+                    for raw_line in text.splitlines():
+                        if raw_line.lower().startswith("[offset:"):
                             continue
                         if re.match(r"^\[[A-Za-z]+:", raw_line):
                             continue
@@ -216,7 +219,7 @@ def build_router(service: DocumentService, *, auth: Callable, write: Callable,
                             continue
                         for tag in tags:
                             fraction = (tag.group(3) or "").ljust(3, "0")
-                            begin = ((int(tag.group(1)) * 60 + int(tag.group(2))) * 1000000 + int(fraction) * 1000) + offset_us
+                            begin = max(0, ((int(tag.group(1)) * 60 + int(tag.group(2))) * 1000000 + int(fraction) * 1000) + offset_us)
                             timed.append((begin, body))
                     timed.sort(key=lambda item: item[0])
                     for index, (begin, body) in enumerate(timed):

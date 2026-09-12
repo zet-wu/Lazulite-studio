@@ -102,11 +102,16 @@ class RevisionStore:
                 new_root = ET.fromstring(ttml.encode())
                 new_fingerprints = fingerprints(new_root)
                 confirmed = conn.execute("SELECT line_id,content_hash FROM review_confirmations WHERE project_id=? AND status='confirmed'", (project_id,)).fetchall()
+                review_changed = False
                 for item in confirmed:
                     if old_hashes.get(item[0]) == new_fingerprints.get(item[0]) == item[1]:
                         conn.execute("UPDATE review_confirmations SET revision=? WHERE project_id=? AND line_id=?", (revision, project_id, item[0]))
+                        review_changed = True
                     else:
                         conn.execute("UPDATE review_confirmations SET status='stale' WHERE project_id=? AND line_id=?", (project_id, item[0]))
+                        review_changed = True
+                if review_changed:
+                    conn.execute("INSERT INTO review_versions(project_id,version) VALUES(?,1) ON CONFLICT(project_id) DO UPDATE SET version=version+1", (project_id,))
                 result = {
                     "id": revision,
                     "etag": f'"{revision}"',
