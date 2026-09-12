@@ -19,3 +19,5 @@
 当前 S1、S2、S3 已验收。S3 项目与媒体范围见 [实施记录](s3-implementation.md)，真实服务、媒体时间和浏览器检查见 [验收记录](s3-acceptance.md)。S2 的本地 TTML、可逆命令与检查点边界见 [实施记录](s2-implementation.md)，测试与浏览器证据见 [验收记录](s2-acceptance.md)。运行与开发命令见 [frontend](../frontend/README.md)，依赖许可见 [记录](dependency-licenses.md)。
 
 S4 行级制作范围与传输决策见 [实施记录](s4-implementation.md)，真实浏览器闭环、合成后端边界和性能测量见 [验收记录](s4-acceptance.md)。
+
+S5 日语整体 Ruby、读音候选、确认与用户词典的开发边界见 [实施记录](s5-implementation.md)。
