@@ -1,6 +1,6 @@
 # S4：行级制作闭环
 
-日期：2026-09-10。状态：开发中，尚未验收。
+开始：2026-09-10。2026-09-12 S4 功能闭环验收通过，测量与限制见 [验收记录](s4-acceptance.md)。下文保留开发中检查的历史记录。
 
 依据工作流仓库的 [实施计划](../../lyric-workflow/docs/lazulite_studio_implementation_plan.md)、[前端架构](../../lyric-workflow/docs/lazulite_studio_frontend_architecture.md) 和 [服务契约](../../lyric-workflow/docs/lazulite_studio_service_contract.md)，延续 S1–S3 的保真编辑、项目存储与媒体能力。
 
@@ -43,3 +43,15 @@
 6. 完成必要保存竞态测试、真实上传到重开导出流程、桌面/窄屏视觉与浏览器回归，再按批次提交。
 
 本次服务虚拟环境已安装并列 Lazulite 的轻量依赖，没有安装模型权重；未更改 Lazulite 引擎源码。
+
+## 继续开发（2026-09-11）
+
+额度恢复后继续使用 gpt-5.6-luna 编写代码，主 Agent 逐项审查和验收。现阶段仍未宣布 S4 完成。
+
+文档传输采用 `studio-document-v1` envelope，内容为版本化 `document.ttml`。它完整携带 TTML 结构，浏览器经 S2 codec 转为富编辑模型；服务端校验 XML 与可识别语义后保存原 XML。相较最初服务草案，这避免在 Python 重建第二套浏览器 XML 保留树，但不允许用旧行表摘要替代文档。`client_seq` 只确认本次编辑快照；随机操作 ID 用于保存重试，二者职责分开。
+
+复核使用独立版本与歌词 revision 校验；修改歌词和复核失效在同一数据库事务内提交。任务从不可变修订投影正文，Ruby 读音不混入正文，结果始终先作为候选展示。
+
+## 功能闭环复验（2026-09-12）
+
+富文档、任务候选、复核、多歌手和恢复已接入真实工作区。主 Agent 完成真实 HTTP/Chromium 闭环复验；详细结果、合成后端的验证边界及性能测量见 [S4 验收](s4-acceptance.md)。依据长列表测量补充虚拟行表；最终前端提交为 `e1bceec`，验收记录注明尚未证明的 p95 性能目标与真实模型质量边界。

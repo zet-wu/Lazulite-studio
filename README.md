@@ -2,7 +2,7 @@
 
 面向本地音乐的歌词制作工作台：承接 Lazulite 自动化证据，通过人工编辑产出 TTML，并逐步支持自包含 MP4/M4A 发布。
 
-当前状态（2026-09-10）：**S1、S2、S3 已验收。** 支持真实登录、音频上传与持久项目、Range 播放、窗口波形、seek、倍速和 A/B 循环。`/editor` 保留本地 TTML 编辑、撤销重做与检查点恢复。项目富文档保存及完整歌曲制作闭环进入 S4。结果见 [S1](docs/s1-acceptance.md)、[S2](docs/s2-acceptance.md) 和 [S3 验收](docs/s3-acceptance.md)。
+当前状态（2026-09-12）：S1–S3 已验收，S4 行级制作功能闭环已验证。支持项目富 TTML 编辑与自动保存、导入和任务候选人工应用、基础多歌手、行复核、离线恢复与 TTML 导出。媒体播放沿用 S3，`/editor` 保留本地编辑。验证结果与模型/性能边界见 [S4 验收](docs/s4-acceptance.md)，历史记录见 [S1](docs/s1-acceptance.md)、[S2](docs/s2-acceptance.md)、[S3](docs/s3-acceptance.md)。
 
 ## 设计入口
 

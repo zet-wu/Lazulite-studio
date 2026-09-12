@@ -17,3 +17,5 @@
 具体实现开始后，在这里记录已采用的决策与验证证据；对外分发前迁入冻结设计并更新链接。本次 S1 开发与校验见 [验收记录](s1-acceptance.md)，TTML 前置试验见 [profile 记录](ttml-profile-probe.md)。
 
 当前 S1、S2、S3 已验收。S3 项目与媒体范围见 [实施记录](s3-implementation.md)，真实服务、媒体时间和浏览器检查见 [验收记录](s3-acceptance.md)。S2 的本地 TTML、可逆命令与检查点边界见 [实施记录](s2-implementation.md)，测试与浏览器证据见 [验收记录](s2-acceptance.md)。运行与开发命令见 [frontend](../frontend/README.md)，依赖许可见 [记录](dependency-licenses.md)。
+
+S4 行级制作范围与传输决策见 [实施记录](s4-implementation.md)，真实浏览器闭环、合成后端边界和性能测量见 [验收记录](s4-acceptance.md)。
