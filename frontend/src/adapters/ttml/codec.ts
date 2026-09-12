@@ -1,5 +1,6 @@
 import type { TtmlAttribute, TtmlNode, TimeUs } from '../../domain/ttml';
 import type { InlineNode, StudioAgent, StudioLine, StudioLyricDocument, StudioRuby, SourceTiming } from '../../domain/document';
+import { validateRubySpans } from '../../domain/editing';
 import { STUDIO_SCHEMA_VERSION } from '../../domain/document';
 export const TTML_NS = 'http://www.w3.org/ns/ttml';
 export const TTM_NS = 'http://www.w3.org/ns/ttml#metadata';
@@ -113,8 +114,8 @@ function inline(e: Element): {
             return null;
         }
         const child = n as Element;
-        plain = false;
         if (child.namespaceURI !== TTML_NS) {
+            plain = false;
             return { kind: 'element', name: child.tagName, children: [], editable: false, reason: 'unknown inline namespace', raw: tree(child) };
         }
         if (local(child) === 'br') {
@@ -133,11 +134,13 @@ function inline(e: Element): {
                 const readingText = reading.textContent || '';
                 const start = cp(text);
                 text += baseText;
-                ruby.push({ base: baseText, reading: readingText, baseStart: start, baseEnd: cp(text) });
+                ruby.push({ id: '', base: baseText, reading: readingText, baseStart: start, baseEnd: cp(text) });
                 return { kind: 'element', name: child.tagName, children: [], editable: false, reason: 'ruby structure', raw: tree(child) };
             }
+            plain = false;
             return { kind: 'element', name: child.tagName, children: [], editable: false, reason: 'unsupported ruby structure', raw: tree(child) };
         }
+        plain = false;
         const children = Array.from(child.childNodes).map(visit).filter((x): x is InlineNode => x !== null);
         return { kind: 'element', name: child.tagName, children, editable: false, reason: 'structured inline', raw: tree(child) };
     };
@@ -203,6 +206,69 @@ function isLyricsLine(element: Element, root: Element): boolean {
     }
     return body !== null && body.parentElement === root;
 }
+
+function simpleRuby(node: Element): node is Element {
+    if (node.namespaceURI !== TTML_NS || attr(node, TTS_NS, 'ruby') !== 'container') return false;
+    const children = Array.from(node.children);
+    const base = children.find((child) => attr(child, TTS_NS, 'ruby') === 'base');
+    const reading = children.find((child) => attr(child, TTS_NS, 'ruby') === 'text');
+    return children.length === 2 && Boolean(base && reading) && [base!, reading!].every((part) => Array.from(part.childNodes).every((child) => child.nodeType === Node.TEXT_NODE || child.nodeType === Node.CDATA_SECTION_NODE));
+}
+
+function rubyContainers(line: Element): Element[] {
+    return Array.from(line.children).filter(simpleRuby);
+}
+
+function setRubyPart(node: Element, kind: 'base' | 'text', value: string): void {
+    const part = Array.from(node.children).find((child) => attr(child, TTS_NS, 'ruby') === kind);
+    if (!part) throw new Error('Ruby container is missing a base or text part');
+    while (part.firstChild) part.removeChild(part.firstChild);
+    part.appendChild(node.ownerDocument!.createTextNode(value));
+}
+
+function newRubyContainer(document: Document, span: StudioRuby): Element {
+    const container = document.createElementNS(TTML_NS, 'span');
+    container.setAttributeNS(TTS_NS, 'tts:ruby', 'container');
+    const base = document.createElementNS(TTML_NS, 'span');
+    base.setAttributeNS(TTS_NS, 'tts:ruby', 'base');
+    base.appendChild(document.createTextNode(span.base));
+    const reading = document.createElementNS(TTML_NS, 'span');
+    reading.setAttributeNS(TTS_NS, 'tts:ruby', 'text');
+    reading.appendChild(document.createTextNode(span.reading));
+    container.append(base, reading);
+    return container;
+}
+
+function writeRubyContent(element: Element, line: StudioLine): void {
+    validateRubySpans(line.text, line.ruby);
+    const existing = rubyContainers(element);
+    const baselineRuby = line.baseline.ruby;
+    const known = new Map<string, Element>();
+    for (const [index, node] of existing.entries()) {
+        const span = baselineRuby[index];
+        if (span) known.set(span.id, node);
+    }
+    const onlySimpleContent = Array.from(element.childNodes).every((node) => node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE || (node.nodeType === Node.ELEMENT_NODE && simpleRuby(node as Element)));
+    if (!onlySimpleContent) throw new Error(`Line ${line.id} has unsupported content adjacent to Ruby`);
+    const points = Array.from(line.text);
+    const sorted = [...line.ruby].sort((left, right) => left.baseStart - right.baseStart);
+    while (element.firstChild) element.removeChild(element.firstChild);
+    let cursor = 0;
+    for (const span of sorted) {
+        const before = points.slice(cursor, span.baseStart).join('');
+        if (before) element.appendChild(element.ownerDocument!.createTextNode(before));
+        const node = known.get(span.id) ?? newRubyContainer(element.ownerDocument!, span);
+        if (known.has(span.id)) {
+            setRubyPart(node, 'base', span.base);
+            setRubyPart(node, 'text', span.reading);
+        }
+        element.appendChild(node);
+        cursor = span.baseEnd;
+    }
+    const after = points.slice(cursor).join('');
+    if (after) element.appendChild(element.ownerDocument!.createTextNode(after));
+}
+
 export function parseStudioTtml(xml: string): StudioLyricDocument {
     if (new TextEncoder().encode(xml).byteLength > MAX_BYTES)
         throw new Error('TTML exceeds 2 MiB limit');
@@ -244,6 +310,7 @@ export function parseStudioTtml(xml: string): StudioLyricDocument {
             const content = inline(e);
             const xmlId = attr(e, XML_NS, 'id');
             const id = `line-${path.join('-') || 'root'}`;
+            const ruby = content.ruby.map((span) => ({ ...span, id: `${id}-ruby-${span.baseStart}-${span.baseEnd}` }));
             const draft = attr(e, STUDIO_DRAFT_NS, 'null');
             const unknownAttributes = hasUnknownLineAttributes(e) || hasUnknownAncestor(e.parentElement || e, root);
             if (unknownAttributes)
@@ -262,7 +329,7 @@ export function parseStudioTtml(xml: string): StudioLyricDocument {
                 endUs: end,
                 agentRefs: (attr(e, TTM_NS, 'agent') || '').split(/\s+/).filter(Boolean),
                 inline: content.nodes,
-                ruby: content.ruby,
+                ruby,
                 sourcePath: path,
                 parentPath,
                 sourceTiming: timing,
@@ -275,7 +342,8 @@ export function parseStudioTtml(xml: string): StudioLyricDocument {
                     text: content.text,
                     beginUs: begin,
                     endUs: end,
-                    agentRefs: (attr(e, TTM_NS, 'agent') || '').split(/\s+/).filter(Boolean)
+                    agentRefs: (attr(e, TTM_NS, 'agent') || '').split(/\s+/).filter(Boolean),
+                    ruby: ruby.map((span) => ({ ...span }))
                 }
             });
         }
@@ -303,7 +371,7 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
     const baselineDocument = parseStudioTtml(document.baseline.xml);
     const agentShape = (items: StudioLyricDocument['agents']) => items.map(agent => [agent.id, agent.name, agent.type, agent.actorRef, agent.groupRefs]);
     const hasAgentChanges = JSON.stringify(agentShape(document.agents)) !== JSON.stringify(agentShape(baselineDocument.agents)) || document.lines.some(line => JSON.stringify(line.agentRefs) !== JSON.stringify(line.baseline.agentRefs));
-    const hasChanges = hasAgentChanges || document.lines.some(line => line.text !== line.baseline.text || line.beginUs !== line.baseline.beginUs || line.endUs !== line.baseline.endUs || (draft && line.editable.timing && (line.beginUs === null || line.endUs === null)));
+    const hasChanges = hasAgentChanges || document.lines.some(line => line.text !== line.baseline.text || line.beginUs !== line.baseline.beginUs || line.endUs !== line.baseline.endUs || JSON.stringify(line.ruby) !== JSON.stringify(line.baseline.ruby) || (draft && line.editable.timing && (line.beginUs === null || line.endUs === null)));
     if (!hasChanges)
         return document.baseline.xml;
     const parsed = new DOMParser().parseFromString(document.baseline.xml, 'application/xml');
@@ -311,7 +379,9 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
         throw new Error('Invalid baseline XML');
     for (const line of document.lines) {
         const base = line.baseline;
-        if (line.text === base.text && line.beginUs === base.beginUs && line.endUs === base.endUs && JSON.stringify(line.agentRefs) === JSON.stringify(base.agentRefs) && !(draft && (line.beginUs === null || line.endUs === null)))
+        const rubyChanged = JSON.stringify(line.ruby) !== JSON.stringify(base.ruby);
+        const textChanged = line.text !== base.text;
+        if (!textChanged && line.beginUs === base.beginUs && line.endUs === base.endUs && JSON.stringify(line.agentRefs) === JSON.stringify(base.agentRefs) && !rubyChanged && !(draft && (line.beginUs === null || line.endUs === null)))
             continue;
         const element = elementAt(parsed.documentElement, line.sourcePath);
         if (!element)
@@ -323,10 +393,16 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
             throw new Error(`Line ${line.id} text is read-only`);
         if (!line.editable.timing && (line.beginUs !== base.beginUs || line.endUs !== base.endUs))
             throw new Error(`Line ${line.id} timing is read-only`);
-        if (line.text !== base.text) {
-            while (element.firstChild)
-                element.removeChild(element.firstChild);
-            element.appendChild(parsed.createTextNode(line.text));
+        if (textChanged || rubyChanged) {
+            if (!line.editable.text)
+                throw new Error(`Line ${line.id} text or Ruby is read-only`);
+            if (line.ruby.length || base.ruby.length)
+                writeRubyContent(element, line);
+            else {
+                while (element.firstChild)
+                    element.removeChild(element.firstChild);
+                element.appendChild(parsed.createTextNode(line.text));
+            }
         }
         const parentStart = line.sourceTiming.parentBeginUs;
         if (line.beginUs !== null && (!Number.isSafeInteger(line.beginUs) || line.beginUs < 0))

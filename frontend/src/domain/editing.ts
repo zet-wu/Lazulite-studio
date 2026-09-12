@@ -1,10 +1,11 @@
-import type { StudioLine, StudioLyricDocument } from './document';
+import type { StudioLine, StudioLyricDocument, StudioRuby } from './document';
 import type { TimeUs } from './ttml';
 
 const MAX_HISTORY = 20;
 
 export type WorkflowSidecar = {
   lineReviews?: Record<string, { status: 'confirmed' | 'needs-review' }>;
+  rubyReviews?: Record<string, { status: 'confirmed' | 'needs-review' }>;
 };
 export type StudioDocument = StudioLyricDocument;
 
@@ -12,6 +13,7 @@ export type LineUpdate = Partial<Pick<StudioLine, 'text' | 'beginUs' | 'endUs' |
 export type EditCommand =
   | { type: 'update-line'; lineId: string; changes: LineUpdate }
   | { type: 'update-lines'; updates: Array<{ lineId: string; changes: LineUpdate }> }
+  | { type: 'update-ruby'; lineId: string; ruby: StudioRuby[]; review?: 'confirmed' | 'needs-review' }
   | { type: 'update-agents'; agents: StudioDocument['agents'] }
   | { type: 'replace-document'; document: StudioDocument; workflow?: WorkflowSidecar };
 
@@ -21,6 +23,25 @@ export type EditorState = {
   past: EditorSnapshot[];
   future: EditorSnapshot[];
 };
+
+const codePoints = (value: string) => Array.from(value);
+
+export function validateRubySpans(text: string, ruby: StudioRuby[]): void {
+  if (!Array.isArray(ruby)) throw new Error('Ruby spans must be an array');
+  const seen = new Set<string>();
+  const ordered = [...ruby].sort((left, right) => left.baseStart - right.baseStart || left.baseEnd - right.baseEnd);
+  let previousEnd = 0;
+  const points = codePoints(text);
+  for (const span of ordered) {
+    if (!span || typeof span.id !== 'string' || !span.id || seen.has(span.id)) throw new Error('Ruby ids must be unique and non-empty');
+    seen.add(span.id);
+    if (typeof span.base !== 'string' || typeof span.reading !== 'string' || span.base.length === 0 || span.reading.length === 0) throw new Error('Ruby base and reading must be non-empty');
+    if (!Number.isSafeInteger(span.baseStart) || !Number.isSafeInteger(span.baseEnd) || span.baseStart < 0 || span.baseEnd <= span.baseStart || span.baseEnd > points.length) throw new Error('Ruby range must be a non-empty code-point range within the line');
+    if (span.baseStart < previousEnd) throw new Error('Ruby ranges must not overlap');
+    if (points.slice(span.baseStart, span.baseEnd).join('') !== span.base) throw new Error('Ruby base does not match the current line text');
+    previousEnd = span.baseEnd;
+  }
+}
 
 const clone = <T>(value: T): T => {
   if (value === undefined) return value;
@@ -61,6 +82,10 @@ function applyUpdates(snapshot: EditorSnapshot, updates: Array<{ lineId: string;
     const changedAgents = 'agentRefs' in update.changes && JSON.stringify(update.changes.agentRefs) !== JSON.stringify(line.agentRefs);
     if (!changedText && !changedBegin && !changedEnd && !changedAgents) continue;
     if (changedText && !line.editable.text) throw new Error('Lines with Ruby or structured text are read-only');
+    if (changedText && line.ruby.length) {
+      validateRubySpans(update.changes.text!, line.ruby);
+      if (line.ruby.some((span) => Array.from(line.text).slice(span.baseStart, span.baseEnd).join('') !== span.base)) throw new Error('Ruby cannot be safely remapped after text editing');
+    }
     if ((changedBegin || changedEnd) && !line.editable.timing) throw new Error('Line timing is read-only');
     if (changedAgents && update.changes.agentRefs!.some((id) => !document.agents.some((agent) => agent.id === id))) throw new Error('Line references an unknown agent');
     const nextBegin = 'beginUs' in update.changes ? update.changes.beginUs! : line.beginUs;
@@ -76,6 +101,31 @@ function applyUpdates(snapshot: EditorSnapshot, updates: Array<{ lineId: string;
     if ((changedText || changedBegin || changedEnd) && workflow?.lineReviews?.[line.id]?.status === 'confirmed') workflow.lineReviews[line.id] = { status: 'needs-review' };
     Object.assign(line, update.changes);
   }
+  return { document, workflow };
+}
+
+function applyRubyUpdate(snapshot: EditorSnapshot, lineId: string, ruby: StudioRuby[], review?: 'confirmed' | 'needs-review'): EditorSnapshot {
+  const document = clone(snapshot.document);
+  const workflow = clone(snapshot.workflow) ?? {};
+  if (document.profile.category === 'read-only') throw new Error('Document is read-only');
+  const line = document.lines.find((item) => item.id === lineId);
+  if (!line) throw new Error(`Line not found: ${lineId}`);
+  if (!line.editable.text) throw new Error('Ruby is read-only for this line');
+  validateRubySpans(line.text, ruby);
+  if (same(line.ruby, ruby) && !review) return snapshot;
+  const oldById = new Map(line.ruby.map((span) => [span.id, span]));
+  const nextById = new Map(ruby.map((span) => [span.id, span]));
+  const sidecar = workflow.rubyReviews ?? {};
+  workflow.rubyReviews = sidecar;
+  for (const old of line.ruby) {
+    const next = nextById.get(old.id);
+    if (!next) delete sidecar[old.id];
+    else if (!same(old, next)) sidecar[old.id] = { status: 'needs-review' };
+  }
+  for (const next of ruby) if (!oldById.has(next.id)) sidecar[next.id] = { status: review ?? 'needs-review' };
+  if (review) for (const next of ruby) sidecar[next.id] = { status: review };
+  line.ruby = clone(ruby);
+  if (workflow.lineReviews?.[line.id] && !same(line.baseline.ruby, ruby)) workflow.lineReviews[line.id] = { status: 'needs-review' };
   return { document, workflow };
 }
 
@@ -105,6 +155,11 @@ export function executeCommand(state: EditorState, command: EditCommand): Editor
     if (JSON.stringify(document.agents) === JSON.stringify(command.agents)) return state;
     document.agents = clone(command.agents);
     const next: EditorSnapshot = { document, workflow: clone(state.present.workflow) };
+    return { present: next, past: [...state.past.slice(-(MAX_HISTORY - 1)), clone(state.present)], future: [] };
+  }
+  if (command.type === 'update-ruby') {
+    const next = applyRubyUpdate(state.present, command.lineId, command.ruby, command.review);
+    if (same(next, state.present)) return state;
     return { present: next, past: [...state.past.slice(-(MAX_HISTORY - 1)), clone(state.present)], future: [] };
   }
   const updates = command.type === 'update-line' ? [{ lineId: command.lineId, changes: command.changes }] : command.updates;

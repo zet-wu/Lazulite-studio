@@ -48,4 +48,28 @@ describe('editor commands and history', () => {
     for (let index = 0; index < 25; index += 1) state = executeCommand(state, { type: 'update-line', lineId, changes: { text: `v${index}` } });
     expect(state.past).toHaveLength(20);
   });
+
+  it('adds, edits and removes Ruby as one undoable command while invalidating review', () => {
+    const parsed = parseStudioTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><p>𝄞今日と宇宙</p></body></tt>');
+    const line = parsed.lines[0];
+    const first = { id: `${line.id}-ruby-1-3`, base: '今日', reading: 'きょう', baseStart: 1, baseEnd: 3 };
+    const second = { id: `${line.id}-ruby-4-6`, base: '宇宙', reading: 'そら', baseStart: 4, baseEnd: 6 };
+    let state = createEditorState(parsed, { lineReviews: { [line.id]: { status: 'confirmed' } } });
+    state = executeCommand(state, { type: 'update-ruby', lineId: line.id, ruby: [first, second] });
+    expect(state.present.document.lines[0].ruby).toEqual([first, second]);
+    expect(state.present.workflow?.rubyReviews?.[first.id]).toEqual({ status: 'needs-review' });
+    state = executeCommand(state, { type: 'update-ruby', lineId: line.id, ruby: [{ ...first, reading: 'きょう' }, { ...second, reading: 'そら' }], review: 'confirmed' });
+    expect(state.present.workflow?.rubyReviews?.[first.id]).toEqual({ status: 'confirmed' });
+    state = executeCommand(state, { type: 'update-ruby', lineId: line.id, ruby: [second] });
+    expect(state.present.document.lines[0].ruby).toEqual([second]);
+    expect(undo(state).present.document.lines[0].ruby).toHaveLength(2);
+  });
+
+  it('rejects a text edit that would silently move a Ruby range', () => {
+    const parsed = parseStudioTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><p>今日</p></body></tt>');
+    const line = parsed.lines[0];
+    let state = createEditorState(parsed);
+    state = executeCommand(state, { type: 'update-ruby', lineId: line.id, ruby: [{ id: `${line.id}-ruby-0-2`, base: '今日', reading: 'きょう', baseStart: 0, baseEnd: 2 }] });
+    expect(() => executeCommand(state, { type: 'update-line', lineId: line.id, changes: { text: '明日' } })).toThrow(/base|remap/);
+  });
 });

@@ -95,9 +95,44 @@ describe('Studio TTML codec', () => {
         const cycle = parseStudioTtml('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><head><ttm:agent xml:id="a"><ttm:actor agent="b"/></ttm:agent><ttm:agent xml:id="b"><ttm:actor agent="a"/></ttm:agent></head><body/></tt>');
         expect(cycle.issues.some(issue => issue.code === 'agent-cycle')).toBe(true);
     });
+    it('locks a line containing an unknown inline namespace', () => {
+        const document = parseStudioTtml('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ext="urn:extension"><body><p>ok<ext:mark>?</ext:mark></p></body></tt>');
+        expect(document.lines[0].editable.text).toBe(false);
+        expect(document.lines[0].locks.text).toBeDefined();
+    });
     it('returns an editable starter document with an intentionally incomplete line', () => {
         const document = createStudioDocument();
         expect(document.lines).toHaveLength(1);
         expect(document.lines[0].editable).toEqual({ text: true, timing: true });
+    });
+
+    it('round-trips whole-word Ruby with code-point ranges, including non-BMP text', () => {
+        const document = parseStudioTtml('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p>𝄞今日と宇宙</p></body></tt>');
+        const line = document.lines[0];
+        expect(line.editable.text).toBe(true);
+        line.ruby = [
+            { id: `${line.id}-ruby-1-3`, base: '今日', reading: 'きょう', baseStart: 1, baseEnd: 3 },
+            { id: `${line.id}-ruby-4-6`, base: '宇宙', reading: 'そら', baseStart: 4, baseEnd: 6 },
+        ];
+        const xml = serializeStudioTtml(document, { draft: true });
+        const reparsed = parseStudioTtml(xml);
+        expect(reparsed.lines[0]).toMatchObject({ text: '𝄞今日と宇宙', ruby: [
+            { base: '今日', reading: 'きょう', baseStart: 1, baseEnd: 3 },
+            { base: '宇宙', reading: 'そら', baseStart: 4, baseEnd: 6 },
+        ] });
+        expect(xml).toContain('tts:ruby="container"');
+    });
+
+    it('keeps the following Ruby id after deleting the preceding span and round-tripping', () => {
+        const document = parseStudioTtml('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p>今日宇宙</p></body></tt>');
+        const line = document.lines[0];
+        line.ruby = [
+            { id: `${line.id}-ruby-0-2`, base: '今日', reading: 'きょう', baseStart: 0, baseEnd: 2 },
+            { id: `${line.id}-ruby-2-4`, base: '宇宙', reading: 'そら', baseStart: 2, baseEnd: 4 },
+        ];
+        const followingId = line.ruby[1].id;
+        line.ruby = [line.ruby[1]];
+        const reparsed = parseStudioTtml(serializeStudioTtml(document, { draft: true }));
+        expect(reparsed.lines[0].ruby[0].id).toBe(followingId);
     });
 });

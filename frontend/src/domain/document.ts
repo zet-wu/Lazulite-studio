@@ -22,6 +22,7 @@ export type SourceTiming = {
     relative: boolean;
 };
 export type StudioRuby = {
+    id: string;
     base: string;
     reading: string;
     baseStart: number;
@@ -47,7 +48,7 @@ export type StudioLine = {
         text?: string;
         timing?: string;
     };
-    baseline: Pick<StudioLine, 'text' | 'beginUs' | 'endUs' | 'agentRefs'>;
+    baseline: Pick<StudioLine, 'text' | 'beginUs' | 'endUs' | 'agentRefs' | 'ruby'>;
 };
 export type StudioAgent = {
     id: string;
