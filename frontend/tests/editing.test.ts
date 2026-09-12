@@ -36,11 +36,13 @@ describe('editor commands and history', () => {
     expect(redo(restored).present.document.lines[0].text).toBe('changed');
   });
 
-  it('rejects real Ruby text and timing edits as read-only', () => {
+  it('rejects Ruby text edits that move its range and allows simple Ruby timing edits', () => {
     const parsed = parseStudioTtml('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="plain">ok</p><p xml:id="ruby" begin="0s" end="1s"><span tts:ruby="container"><span tts:ruby="base">今</span><span tts:ruby="text">いま</span></span></p></body></tt>');
     const lineId = parsed.lines[1].id; const state = createEditorState(parsed);
     expect(() => executeCommand(state, { type: 'update-line', lineId, changes: { text: 'x' } })).toThrow(/Ruby/);
-    expect(() => executeCommand(state, { type: 'update-line', lineId, changes: { beginUs: 5 } })).toThrow(/timing is read-only/);
+    const timed = executeCommand(state, { type: 'update-line', lineId, changes: { beginUs: 500000, endUs: 900000 } });
+    expect(timed.present.document.lines[1]).toMatchObject({ beginUs: 500000, endUs: 900000 });
+    expect(parseStudioTtml(serializeStudioTtml(timed.present.document, { draft: true })).lines[1]).toMatchObject({ beginUs: 500000, endUs: 900000, ruby: [{ base: '今', reading: 'いま' }] });
   });
 
   it('bounds undo history at twenty snapshots', () => {

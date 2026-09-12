@@ -6,6 +6,7 @@
 .actions button, .cancel { border: 1px solid var(--line); border-radius: 3px; background: #fff; padding: 5px 8px; font-size: 11px; }
 .actions button:not(:disabled):hover { border-color: var(--blue); color: var(--blue); }
 .job { display: grid; gap: 5px; border: 1px solid var(--line); border-radius: 4px; padding: 9px; background: #fff; }
+.candidateRow { display: grid; gap: 2px; border-top: 1px solid #eef0f3; padding: 6px 0 0; }
 .jobHead { display: flex; justify-content: space-between; gap: 7px; }
 .status { color: var(--muted); }
 .error { color: var(--danger); }

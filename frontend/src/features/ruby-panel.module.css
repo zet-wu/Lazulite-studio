@@ -1,0 +1,27 @@
+.panel { display: grid; gap: 9px; padding: 12px; overflow: auto; font-size: 12px; }
+.note, .readonly, .range, .meta, .status { margin: 0; color: var(--muted); line-height: 1.45; }
+.readonly, .message { color: var(--danger); }
+.label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
+.selection { min-height: 58px; resize: vertical; padding: 7px; border: 1px solid var(--line); border-radius: 3px; background: #fff; color: var(--ink); line-height: 1.5; }
+.addRow, .dictionaryForm { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; }
+.addRow input, .dictionaryForm input, .rubyRow input { min-width: 0; border: 1px solid var(--line); border-radius: 3px; padding: 6px; background: #fff; }
+.panel button, .dictionary button { border: 1px solid var(--line); border-radius: 3px; background: #fff; color: var(--ink); padding: 5px 8px; font-size: 11px; }
+.panel button:hover, .panel button:focus-visible, .dictionary button:hover, .dictionary button:focus-visible { border-color: var(--blue); color: var(--blue); }
+.rubyList { display: grid; gap: 6px; }
+.rubyRow { display: grid; grid-template-columns: auto minmax(42px, 1fr) minmax(70px, 1fr) auto; align-items: center; gap: 5px; border-top: 1px solid var(--line); padding-top: 7px; }
+.preview { padding: 3px 5px; border: 1px solid #dce2eb; background: #f8fafc; white-space: nowrap; }
+.preview rt { color: var(--blue); font-size: 10px; }
+.baseInput { color: var(--muted); }
+.rubyRow .meta, .rubyRow .status { grid-column: 1 / -1; font-size: 10px; }
+.rubyRow .status { color: #7b571f; }
+.rubyRow button { grid-column: 4; grid-row: 1; padding: 3px 6px; }
+.message { margin: 0; font-size: 11px; }
+.dictionary { display: grid; gap: 8px; padding: 12px; overflow: auto; font-size: 12px; }
+.dictionaryForm { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+.dictionaryRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 5px; align-items: center; border-top: 1px solid var(--line); padding: 7px 0; }
+.dictionaryRow span:nth-child(2) { color: var(--muted); }
+@media (max-width: 640px) {
+  .dictionaryForm { grid-template-columns: 1fr 1fr; }
+  .dictionaryForm button { grid-column: auto; }
+  .rubyRow { grid-template-columns: minmax(0, auto) minmax(34px, 1fr) minmax(50px, 1fr) auto; }
+}

@@ -125,7 +125,6 @@ function inline(e: Element): {
         }
         const rubyKind = attr(child, TTS_NS, 'ruby');
         if (rubyKind && rubyKind !== 'none' && rubyKind !== 'base') {
-            plain = false;
             const children = Array.from(child.children);
             const base = children.find(x => attr(x, TTS_NS, 'ruby') === 'base');
             const reading = children.find(x => attr(x, TTS_NS, 'ruby') === 'text');

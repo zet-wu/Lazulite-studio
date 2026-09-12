@@ -135,4 +135,14 @@ describe('Studio TTML codec', () => {
         const reparsed = parseStudioTtml(serializeStudioTtml(document, { draft: true }));
         expect(reparsed.lines[0].ruby[0].id).toBe(followingId);
     });
+    it('allows editing and removing a simple Ruby already present in TTML', () => {
+        const document = parseStudioTtml('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="line">今日</p></body></tt>');
+        document.lines[0].ruby = [{ id: `${document.lines[0].id}-ruby-0-2`, base: '今日', reading: 'きょう', baseStart: 0, baseEnd: 2 }];
+        const withRuby = parseStudioTtml(serializeStudioTtml(document, { draft: true }));
+        expect(withRuby.lines[0].editable.text).toBe(true);
+        withRuby.lines[0].ruby[0].reading = 'こんにち';
+        expect(parseStudioTtml(serializeStudioTtml(withRuby, { draft: true })).lines[0].ruby[0].reading).toBe('こんにち');
+        withRuby.lines[0].ruby = [];
+        expect(parseStudioTtml(serializeStudioTtml(withRuby, { draft: true })).lines[0].ruby).toEqual([]);
+    });
 });

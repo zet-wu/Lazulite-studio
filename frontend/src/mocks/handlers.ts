@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { capabilities, document, emptyDocument, jobs, projects, sampleProject, session } from './data';
+import { capabilities, document, emptyDocument, jobs, projects, readingDictionary, sampleProject, session } from './data';
 
 const root = '/api/v1';
 const scenario = () => new URL(location.href).searchParams.get('scenario') ?? 'normal';
@@ -14,6 +14,29 @@ export const handlers = [
   http.get(`${root}/projects/:projectId`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(sampleProject) : error(404, 'project_not_found', '项目不存在')),
   http.get(`${root}/projects/:projectId/jobs`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(jobs) : error(404, 'project_not_found', '项目不存在')),
   http.get(`${root}/projects/:projectId/document`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'empty' ? emptyDocument : currentDocument) : error(404, 'project_not_found', '项目不存在')),
+  http.get(`${root}/projects/:projectId/reading-dictionary`, ({ params }) => params.projectId === 'sample-project' ? response(readingDictionary) : error(404, 'project_not_found', '项目不存在')),
+  http.post(`${root}/projects/:projectId/reading-dictionary`, async ({ params, request }) => {
+    if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
+    const body = await request.json() as { surface?: string; reading?: string };
+    const entry = { schema_version: 'studio-reading-dictionary-entry-v1' as const, project_id: 'sample-project', id: `dictionary-${Date.now()}`, surface: body.surface ?? '', reading: body.reading ?? '', updated_at: new Date().toISOString() };
+    readingDictionary.items.push(entry);
+    return HttpResponse.json(entry, { status: 201 });
+  }),
+  http.put(`${root}/projects/:projectId/reading-dictionary/:entryId`, async ({ params, request }) => {
+    if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
+    const body = await request.json() as { surface?: string; reading?: string };
+    const entry = readingDictionary.items.find((item) => item.id === params.entryId);
+    if (!entry) return error(404, 'dictionary_entry_not_found', '词典项不存在');
+    entry.surface = body.surface ?? entry.surface; entry.reading = body.reading ?? entry.reading; entry.updated_at = new Date().toISOString();
+    return HttpResponse.json(entry);
+  }),
+  http.delete(`${root}/projects/:projectId/reading-dictionary/:entryId`, ({ params }) => {
+    if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
+    const index = readingDictionary.items.findIndex((item) => item.id === params.entryId);
+    if (index < 0) return error(404, 'dictionary_entry_not_found', '词典项不存在');
+    readingDictionary.items.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
   http.put(`${root}/projects/:projectId/document`, async ({ params, request }) => {
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
     const body = await request.json() as { revision?: string; document?: { ttml?: string } };

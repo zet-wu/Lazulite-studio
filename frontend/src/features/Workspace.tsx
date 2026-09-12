@@ -19,15 +19,18 @@ import { ReviewPanel } from "./ReviewPanel";
 import { LineInspector } from "./LineInspector";
 import { LineTable } from "./LineTable";
 import { AgentPanel } from "./AgentPanel";
+import { RubyPanel } from "./RubyPanel";
+import { ReadingDictionaryPanel } from "./ReadingDictionaryPanel";
 import styles from "./workspace.module.css";
 
-type Panel = "lyrics" | "properties" | "candidates" | "tasks" | "agents";
+type Panel = "lyrics" | "properties" | "candidates" | "tasks" | "agents" | "dictionary";
 const labels: Record<Panel, string> = {
   lyrics: "歌词",
   properties: "属性",
   candidates: "候选",
   tasks: "任务",
   agents: "歌手",
+  dictionary: "词典",
 };
 export function Workspace({ projectId }: { projectId: string }) {
   const document = useQuery({
@@ -97,9 +100,10 @@ function Editor({
   );
   const [params, setParams] = useSearchParams();
   const [panel, setPanel] = useState<Panel>("lyrics");
-  const [sideTab, setSideTab] = useState<"candidates" | "tasks" | "agents">(
+  const [sideTab, setSideTab] = useState<"candidates" | "tasks" | "agents" | "dictionary">(
     "candidates",
   );
+  const [propertyTab, setPropertyTab] = useState<"attributes" | "ruby">("attributes");
   const [selected, setSelected] = useState(0);
   const [candidate, setCandidate] = useState<ImportProposal | null>(null);
   const [jobResult, setJobResult] = useState<JobResult | null>(null);
@@ -199,8 +203,12 @@ function Editor({
         dirty={editor.dirty}
         document={editor.document}
         onApply={(command) => {
-          editor.apply(command);
-          setJobResult(null);
+          try {
+            editor.apply(command);
+            if (jobResult?.kind !== "reading") setJobResult(null);
+          } catch (error) {
+            setMessage(error instanceof Error ? error.message : "候选无法应用");
+          }
         }}
       />
     ) : (
@@ -359,6 +367,7 @@ function Editor({
                 value === "agents"
               )
                 setSideTab(value);
+              if (value === "dictionary") setSideTab(value);
             }}
           >
             {labels[value]}
@@ -373,8 +382,9 @@ function Editor({
             <button onClick={() => setSideTab("candidates")}>候选</button>
             <button onClick={() => setSideTab("tasks")}>任务</button>
             <button onClick={() => setSideTab("agents")}>歌手</button>
+            <button onClick={() => setSideTab("dictionary")}>词典</button>
           </div>
-          <div className={styles.sideContent}>{side}</div>
+          <div className={styles.sideContent}>{sideTab === "dictionary" ? <ReadingDictionaryPanel projectId={projectId} /> : side}</div>
         </aside>
         <LineTable
           lines={lines}
@@ -387,10 +397,24 @@ function Editor({
         <aside
           className={`${styles.panel} ${styles.rightPanel} ${panel === "properties" ? styles.mobileVisible : styles.mobileHidden}`}
         >
-          <div className={styles.panelHeader}>属性</div>
+          <div className={styles.panelTabs}>
+            <button aria-label="行属性" className={propertyTab === "attributes" ? styles.tabActive : ""} onClick={() => setPropertyTab("attributes")}>属性</button>
+            <button className={propertyTab === "ruby" ? styles.tabActive : ""} onClick={() => setPropertyTab("ruby")}>注音</button>
+          </div>
           {line && (
             <div className={styles.propertyContent}>
-              <>
+              {propertyTab === "ruby" ? <>
+                <RubyPanel line={line} onApply={(ruby) => {
+                  try { editor.apply({ type: "update-ruby", lineId: line.id, ruby }); }
+                  catch (error) { setMessage(error instanceof Error ? error.message : "注音编辑失败"); }
+                }} />
+                <ReviewPanel
+                  projectId={projectId}
+                  revision={editor.revision}
+                  lineId={line.xmlId ?? line.id}
+                  dirty={editor.dirty}
+                />
+              </> : <>
                 <p>{line.text}</p>
                 <LineInspector
                   line={line}
@@ -402,7 +426,7 @@ function Editor({
                   lineId={line.xmlId ?? line.id}
                   dirty={editor.dirty}
                 />
-              </>
+              </>}
             </div>
           )}
         </aside>

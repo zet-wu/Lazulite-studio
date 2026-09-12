@@ -2,7 +2,7 @@ import type { Capabilities } from "./client";
 import { requestHeaders } from "./client";
 import { isCapabilities } from "./validate";
 
-export type JobKind = "search" | "transcribe" | "align";
+export type JobKind = "search" | "transcribe" | "align" | "reading";
 export type JobRequest = {
   revision: string;
   asset_id: string;
@@ -100,11 +100,29 @@ export type AlignResult = {
   reliable?: boolean;
   diagnostics?: string[];
 };
+export type ReadingProposal = {
+  line_id: string;
+  proposal_id: string;
+  base_start: number;
+  base_end: number;
+  base: string;
+  reading: string;
+  source: "dictionary" | "sudachi";
+  needs_review: boolean;
+};
+export type ReadingResult = {
+  schema_version?: string;
+  job_id?: string;
+  kind: "reading";
+  binding?: JobBinding;
+  proposals: ReadingProposal[];
+};
 export type JobResult =
   | SearchResult
   | FetchResult
   | TranscribeResult
-  | AlignResult;
+  | AlignResult
+  | ReadingResult;
 export type JobBinding = {
   revision?: string;
   asset_id?: string;
@@ -196,6 +214,22 @@ const isResult = (value: unknown): value is JobResult => {
           nullableNumber(item.end_us) &&
           nullableNumber(item.score) &&
           nullableNumber(item.similarity),
+      )
+      );
+  if (value.kind === "reading")
+    return (
+      Array.isArray(value.proposals) &&
+      value.proposals.every(
+        (proposal) =>
+          isRecord(proposal) &&
+          typeof proposal.line_id === "string" &&
+          typeof proposal.proposal_id === "string" &&
+          Number.isSafeInteger(proposal.base_start) &&
+          Number.isSafeInteger(proposal.base_end) &&
+          typeof proposal.base === "string" &&
+          typeof proposal.reading === "string" &&
+          ["dictionary", "sudachi"].includes(String(proposal.source)) &&
+          typeof proposal.needs_review === "boolean",
       )
     );
   return false;

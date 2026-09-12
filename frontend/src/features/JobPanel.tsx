@@ -23,6 +23,7 @@ const labels: Record<string, string> = {
   transcribe: "转写",
   align: "行对齐",
   fetch: "取词",
+  reading: "生成读音",
 };
 const statusLabels: Record<string, string> = {
   queued: "排队中",
@@ -135,7 +136,8 @@ export function JobPanel({
     !capabilities[`job.${kind}`]?.enabled ||
     busy !== null ||
     !assetId ||
-    (kind === "align" && selectedLineIds.length === 0);
+    ((kind === "align" || kind === "reading") && selectedLineIds.length === 0) ||
+    (kind === "reading" && dirty);
   return (
     <section className={styles.panel} aria-label="自动化任务">
       <div className={styles.form}>
@@ -156,7 +158,7 @@ export function JobPanel({
           />
         </label>
         <div className={styles.actions}>
-          {(["search", "transcribe", "align"] as JobKind[]).map((kind) => (
+          {(["search", "transcribe", "align", "reading"] as JobKind[]).map((kind) => (
             <button
               key={kind}
               disabled={disabled(kind)}
@@ -166,7 +168,7 @@ export function JobPanel({
             </button>
           ))}{" "}
         </div>
-        {(["search", "transcribe", "align"] as JobKind[]).map(
+        {(["search", "transcribe", "align", "reading"] as JobKind[]).map(
           (kind) =>
             !capabilities[`job.${kind}`]?.enabled && (
               <span className={styles.hint} key={kind}>
@@ -267,6 +269,15 @@ function renderResult(
         </p>
         <button className={styles.cancel} onClick={() => onCandidate(result)}>
           查看候选差异
+        </button>
+      </>
+    );
+  if (result.kind === "reading")
+    return (
+      <>
+        <p className={styles.hint}>读音候选 {result.proposals.length} 条，按行复核后应用。</p>
+        <button className={styles.cancel} onClick={() => onCandidate(result)}>
+          查看读音候选
         </button>
       </>
     );
