@@ -11,13 +11,15 @@ export type RecoveryRecord = {
   documentIdentity: string;
   savedAt: string;
   state: EditorState;
+  baseRevision?: string;
 };
 
 export type RecoveryAdapter = {
-  save(slotKey: string, documentIdentity: string, state: EditorState): Promise<void>;
+  save(slotKey: string, documentIdentity: string, state: EditorState, baseRevision?: string): Promise<void>;
   readCheckpoint(slotKey: string): Promise<RecoveryRecord | null>;
   load(slotKey: string, documentIdentity: string): Promise<EditorState | null>;
   clear(slotKey: string): Promise<void>;
+  discard(slotKey: string): Promise<void>;
 };
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -52,10 +54,9 @@ const isState = (value: unknown): value is EditorState => {
     return item.schemaVersion === 'studio-lyric-v1' && Array.isArray(item.lines) && typeof item.baseline?.xml === 'string'
       && item.lines.every((line) => !!line && typeof line.id === 'string' && !!line.sourceTiming && !!line.editable);
   };
-  const presentBaseline = candidate.present && candidate.present.document?.baseline?.xml;
-  return typeof presentBaseline === 'string' && !!candidate.present && Array.isArray(candidate.past) && Array.isArray(candidate.future)
+  return !!candidate.present && Array.isArray(candidate.past) && Array.isArray(candidate.future)
     && candidate.past.length <= 20 && candidate.future.length <= 20
-    && [candidate.present, ...candidate.past, ...candidate.future].every((snapshot) => !!snapshot && validDocument(snapshot.document) && snapshot.document.baseline.xml === presentBaseline);
+    && [candidate.present, ...candidate.past, ...candidate.future].every((snapshot) => !!snapshot && validDocument(snapshot.document));
 };
 const isRecord = (value: unknown): value is RecoveryRecord => {
   if (!value || typeof value !== 'object') return false;
@@ -66,9 +67,9 @@ const isRecord = (value: unknown): value is RecoveryRecord => {
 
 export function createRecoveryAdapter(): RecoveryAdapter {
   return {
-    async save(projectId, documentIdentity, state) {
+    async save(projectId, documentIdentity, state, baseRevision) {
       if (!projectId || !documentIdentity || !isState(state)) throw new Error('Invalid recovery checkpoint');
-      const record: RecoveryRecord = { version: RECORD_VERSION, projectId, documentIdentity, savedAt: new Date().toISOString(), state };
+      const record: RecoveryRecord = { version: RECORD_VERSION, projectId, documentIdentity, savedAt: new Date().toISOString(), state, baseRevision };
       await transaction('readwrite', (store) => store.put(record, keyFor(projectId)));
     },
     async readCheckpoint(projectId) {
@@ -86,6 +87,9 @@ export function createRecoveryAdapter(): RecoveryAdapter {
       return record.state;
     },
     async clear(projectId) {
+      await transaction('readwrite', (store) => store.delete(keyFor(projectId)));
+    },
+    async discard(projectId) {
       await transaction('readwrite', (store) => store.delete(keyFor(projectId)));
     },
   };

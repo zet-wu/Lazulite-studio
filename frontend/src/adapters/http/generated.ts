@@ -93,6 +93,86 @@ export interface paths {
         };
         get: operations["listJobs"];
         put?: never;
+        post: operations["createJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/jobs/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createTypedJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{jobId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{jobId}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getJobResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{jobId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["streamJobEvents"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -108,7 +188,7 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getDocument"];
-        put?: never;
+        put: operations["putDocument"];
         post?: never;
         delete?: never;
         options?: never;
@@ -126,6 +206,22 @@ export interface paths {
         get: operations["getLyrics"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["importCandidate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -246,19 +342,162 @@ export interface components {
             items: components["schemas"]["ProjectSummary"][];
             next_cursor: string | null;
         };
+        JobParams: {
+            params: {
+                [key: string]: unknown;
+            };
+        };
+        JobCreate: {
+            /** @enum {string} */
+            kind: "search" | "fetch" | "transcribe" | "align" | "line_align";
+            params: {
+                revision: string;
+                asset_id: string;
+                line_ids?: string[];
+                title?: string | null;
+                artist?: string | null;
+                album?: string | null;
+            } & {
+                [key: string]: unknown;
+            };
+        };
+        JobEvent: {
+            /** @constant */
+            schema_version: "studio-job-event-v1";
+            job_id: string;
+            seq: number;
+            kind: string;
+            stage?: string | null;
+            completed?: number | null;
+            total?: number | null;
+            message?: string | null;
+            state_version: number;
+            created_at?: string;
+        };
+        JobResult: {
+            /** @constant */
+            schema_version: "studio-job-result-v1";
+            job_id: string;
+            binding: {
+                project_id: string;
+                asset_id: string;
+                revision: string;
+                revision_sha256?: string | null;
+            };
+            items?: (components["schemas"]["SearchCandidate"] | components["schemas"]["FetchedLyric"] | components["schemas"]["AlignedLine"] | components["schemas"]["TranscriptionSegment"])[];
+        } & {
+            [key: string]: unknown;
+        };
+        SearchCandidate: {
+            source: string;
+            candidate_id: string;
+            title: string;
+            artist?: string | null;
+            album?: string | null;
+            duration?: number | null;
+            match_score: number;
+            raw?: Record<string, never>;
+        };
+        FetchedLyric: {
+            candidate: components["schemas"]["SearchCandidate"];
+            provider_rank: number;
+            line_count: number;
+            lines: {
+                id: string;
+                text: string;
+                start?: number | null;
+                end?: number | null;
+            }[];
+        };
+        AlignedLine: {
+            line_id: string;
+            start?: number | null;
+            end?: number | null;
+            begin_us?: number | null;
+            end_us?: number | null;
+            similarity?: number | null;
+            score?: number | null;
+            timing_source: string;
+            source_segment_ids?: string[];
+            issues?: string[];
+        };
+        TranscriptionSegment: {
+            source_segment_id: string;
+            text: string;
+            language?: string | null;
+            start?: number | null;
+            end?: number | null;
+            begin_us?: number | null;
+            end_us?: number | null;
+            confidence?: number | null;
+            timed_text?: Record<string, never>[];
+        } & {
+            [key: string]: unknown;
+        };
         Job: {
+            /** @constant */
+            schema_version: "studio-job-v1";
             id: string;
             kind: string;
+            project_id: string;
             /** @enum {string} */
             status: "queued" | "running" | "succeeded" | "failed" | "interrupted" | "cancelled";
-            stage: string | null;
-            completed: number | null;
-            total: number | null;
+            request: {
+                [key: string]: unknown;
+            };
+            result_available: boolean;
+            error?: Record<string, never> | null;
+            engine?: Record<string, never> | null;
+            created_at?: string;
+            updated_at?: string;
+            state_version: number;
         };
         JobList: {
             /** @constant */
             schema_version: "studio-job-list-v1";
             items: components["schemas"]["Job"][];
+        };
+        DocumentEnvelope: {
+            /** @constant */
+            schema_version: "studio-document-v1";
+            project_id: string;
+            revision: string | null;
+            etag?: string;
+            sha256?: string;
+            client_seq?: number | null;
+            document: {
+                /** @constant */
+                schema_version: "studio-document-content-v1";
+                ttml: string;
+            };
+        };
+        DocumentSaveResponse: components["schemas"]["DocumentEnvelope"] & {
+            saved: {
+                id: string;
+                etag: string;
+                sha256: string;
+                created_at: string;
+                client_seq?: number | null;
+            };
+        };
+        ImportCandidate: {
+            /** @constant */
+            schema_version: "studio-import-v1";
+            project_id: string;
+            input_revision: string | null;
+            candidate: {
+                /** @enum {unknown} */
+                format: "ttml" | "lrc" | "text";
+                ttml?: string;
+                text?: string;
+                lines?: {
+                    begin_us: number | null;
+                    text: string;
+                }[];
+            };
+            diagnostics: Record<string, never>[];
+            /** @constant */
+            saved: false;
         };
         DocumentShell: {
             /** @constant */
@@ -312,6 +551,9 @@ export interface components {
         StartUs: number;
         EndUs: number;
         Revision: string;
+        IfMatch: string;
+        IdempotencyKey: string;
+        JobId: string;
     };
     requestBodies: never;
     headers: never;
@@ -531,6 +773,160 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    createJob: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobCreate"];
+            };
+        };
+        responses: {
+            /** @description Queued job */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            409: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createTypedJob: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobParams"];
+            };
+        };
+        responses: {
+            /** @description Queued job */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job snapshot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    cancelJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancellation state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getJobResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobResult"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    streamJobEvents: {
+        parameters: {
+            query?: {
+                after_seq?: number;
+            };
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server sent events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     getDocument: {
         parameters: {
             query?: never;
@@ -542,16 +938,49 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Read-only document shell */
+            /** @description Rich TTML document envelope */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DocumentShell"];
+                    "application/json": components["schemas"]["DocumentEnvelope"];
                 };
             };
             404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    putDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": components["parameters"]["IfMatch"];
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentEnvelope"];
+            };
+        };
+        responses: {
+            /** @description Committed document */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSaveResponse"];
+                };
+            };
+            409: components["responses"]["Error"];
+            412: components["responses"]["Error"];
+            428: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };
@@ -574,6 +1003,36 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    importCandidate: {
+        parameters: {
+            query?: {
+                revision?: components["parameters"]["Revision"];
+            };
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/plain": unknown;
+                "application/ttml+xml": unknown;
+            };
+        };
+        responses: {
+            /** @description Candidate import; never saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportCandidate"];
+                };
             };
             default: components["responses"]["Error"];
         };

@@ -15,6 +15,7 @@ import { ProjectList } from "../features/ProjectList";
 import { Workspace } from "../features/Workspace";
 import { LocalEditor } from "../features/editor/LocalEditor";
 import { ApiError, studioApi } from "../adapters/http/client";
+import { parseStudioTtml } from "../adapters/ttml/codec";
 import styles from "./app.module.css";
 
 const queryClient = new QueryClient({
@@ -139,12 +140,26 @@ function Login() {
   );
 }
 function ExportPage() {
+  const { projectId = "" } = useParams();
+  const query = useQuery({ queryKey: ["export-document", projectId], queryFn: () => studioApi.getDocument(projectId) });
+  const [message, setMessage] = useState("");
+  const download = () => {
+    if (!query.data) return;
+    try {
+      const parsed = parseStudioTtml(query.data.document.ttml);
+      if (parsed.issues.length) throw new Error(parsed.issues.map((issue) => issue.message).join("；"));
+      const blob = new Blob([query.data.document.ttml], { type: "application/ttml+xml" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url; anchor.download = `${projectId || "lyrics"}.ttml`; anchor.click();
+      URL.revokeObjectURL(url); setMessage("已通过最终校验并开始下载");
+    } catch (error) { setMessage(error instanceof Error ? `导出校验失败：${error.message}` : "导出校验失败"); }
+  };
   return (
     <main className={styles.simplePage}>
       <Link to="/projects">‹ 返回项目</Link>
       <h1>导出 TTML</h1>
-      <p>导出校验与产物服务尚未接入。</p>
-      <button disabled>准备导出</button>
+      {query.isLoading ? <p>正在读取富文档…</p> : query.isError ? <p>富文档读取失败，请返回重试。</p> : <><p>下载前会使用编辑器同一套 TTML 校验器检查文档。</p><button onClick={download}>准备导出</button>{message && <p role="status">{message}</p>}</>}
     </main>
   );
 }

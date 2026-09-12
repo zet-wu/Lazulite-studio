@@ -2,6 +2,8 @@ import type {
   Asset,
   Capabilities,
   DocumentShell,
+  DocumentEnvelope,
+  ImportProposal,
   JobList,
   ProjectList,
   ProjectSummary,
@@ -19,6 +21,15 @@ export const SCHEMA_VERSION = {
   asset: "studio-asset-v1",
   waveform: "studio-waveform-v1",
 } as const;
+
+export function isDocumentEnvelope(value: unknown): value is DocumentEnvelope {
+  return object(value) && value.schema_version === "studio-document-v1" && string(value.project_id) &&
+    string(value.revision) && object(value.document) && value.document.schema_version === "studio-document-content-v1" &&
+    string(value.document.ttml) && string(value.sha256);
+}
+export function isImportCandidate(value: unknown): value is ImportProposal {
+  return object(value) && value.schema_version === 'studio-import-v1' && string(value.project_id) && string(value.input_revision) && object(value.candidate) && Array.isArray(value.diagnostics) && value.saved === false;
+}
 
 const object = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -85,6 +96,7 @@ export function isJobList(value: unknown): value is JobList {
       (item) =>
         object(item) &&
         string(item.id) &&
+        string(item.project_id) &&
         string(item.kind) &&
         [
           "queued",
@@ -94,15 +106,9 @@ export function isJobList(value: unknown): value is JobList {
           "interrupted",
           "cancelled",
         ].includes(String(item.status)) &&
-        (item.stage === null || string(item.stage)) &&
-        (item.completed === null ||
-          (typeof item.completed === "number" &&
-            Number.isSafeInteger(item.completed) &&
-            item.completed >= 0)) &&
-        (item.total === null ||
-          (typeof item.total === "number" &&
-            Number.isSafeInteger(item.total) &&
-            item.total >= 0)),
+        object(item.request) &&
+        typeof item.result_available === "boolean" &&
+        typeof item.state_version === "number" && Number.isSafeInteger(item.state_version) && item.state_version >= 0,
     )
   );
 }

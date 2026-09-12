@@ -13,14 +13,14 @@ test('searches, opens a project, selects a line, and switches compact panels', a
   await page.getByRole('link', { name: /星の手紙/ }).click();
   await expect(page.getByRole('option').first()).toBeVisible();
   await page.getByRole('option').first().press('ArrowDown');
-  await expect(page.getByRole('listbox', { name: '歌词行表' }).getByRole('option', { selected: true })).toContainText('遠い星を見上げて');
+  await expect(page.getByRole('listbox').locator('[role="option"][aria-selected="true"] input')).toHaveValue('遠い星を見上げて');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: '属性', exact: true }).click();
-  await expect(page.getByText('行属性', { exact: true })).toBeVisible();
+  await expect(page.getByText('审核', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '歌词', exact: true }).click();
-  await expect(page.getByRole('listbox', { name: '歌词行表' })).toBeVisible();
-  await expect(page.getByRole('listbox', { name: '歌词行表' }).getByRole('option', { selected: true })).toContainText('遠い星を見上げて');
+  await expect(page.getByRole('listbox')).toBeVisible();
+  await expect(page.getByRole('listbox').locator('[role="option"][aria-selected="true"] input')).toHaveValue('遠い星を見上げて');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(errors).toEqual([]);
 });
@@ -53,17 +53,20 @@ test('keeps deep edit navigation, task tabs, settings, and export state usable',
   const errors = pageErrors(page);
   await page.goto('/projects/sample-project/edit?line=line-4');
   await expect(page.getByRole('heading', { name: '歌词行表' })).toBeVisible();
-  await expect(page.getByRole('listbox', { name: '歌词行表' }).getByRole('option', { selected: true })).toContainText('小さな願いを抱いて');
-  await expect(page.getByText('--:--.--- — --:--.---', { exact: true })).toBeVisible();
+  await expect(page.getByRole('listbox').locator('[role="option"][aria-selected="true"] input')).toHaveValue('小さな願いを抱いて');
+  await expect(page.getByText('审核', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '任务', exact: true }).click();
-  await expect(page.getByText('对位预览', { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('region', { name: '自动化任务' }).locator('strong').filter({ hasText: '行对齐' })).toBeVisible({ timeout: 10_000 });
 
-  await page.getByRole('link', { name: '设置', exact: true }).click();
+  await page.goto('/settings');
   await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
   await expect(page.getByText('document.edit', { exact: true })).toBeVisible();
 
   await page.goto('/projects/sample-project/export');
   await expect(page.getByRole('heading', { name: '导出 TTML' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '准备导出', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '准备导出', exact: true })).toBeEnabled();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '准备导出', exact: true }).click();
+  expect((await download).suggestedFilename()).toBe('sample-project.ttml');
   expect(errors).toEqual([]);
 });

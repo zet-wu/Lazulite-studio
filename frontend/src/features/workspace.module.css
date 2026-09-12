@@ -1,8 +1,8 @@
 .shell {
   height: 100%;
   min-height: 0;
-  display: grid;
-  grid-template-rows: 42px 38px minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   background: var(--canvas);
 }
 .mobilePanels {
@@ -20,6 +20,7 @@
 }
 .topbar {
   font-size: 13px;
+  min-height: 44px;
 }
 .brand {
   color: var(--ink);
@@ -55,6 +56,7 @@
   gap: 16px;
   margin-left: auto;
 }
+.statusMessage { flex-basis: 100%; color: #7b571f; font-size: 12px; }
 .topActions a {
   color: #4b5563;
   text-decoration: none;
@@ -89,6 +91,38 @@
 .modeSpacer {
   flex: 1;
 }
+.importButton {
+  color: var(--blue);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.toast {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  z-index: 3;
+  padding: 6px 10px;
+  border: 1px solid #c9d8f4;
+  border-radius: 4px;
+  background: #f5f8ff;
+  color: #315da9;
+  font-size: 12px;
+}
+.conflict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  background: #fff4df;
+  color: #7b571f;
+  font-size: 12px;
+}
+.conflict span { color: #8b6e42; }
+.conflict button { margin-left: auto; border: 1px solid #d8bd88; background: #fff; border-radius: 3px; padding: 4px 8px; font-size: 11px; }
+.inlineInput { min-width: 0; width: 100%; border: 1px solid transparent; background: transparent; color: inherit; font: inherit; outline: 0; padding: 5px 2px; }
+.inlineInput:focus { border-color: #b9ccfa; background: #fff; border-radius: 3px; }
+.propertyContent label { display: grid; gap: 5px; margin: 12px 0; color: var(--muted); font-size: 11px; }
+.propertyContent input, .propertyContent select { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 3px; padding: 6px; background: #fff; }
 .readonlyTag {
   min-width: 0;
   max-width: 32vw;
@@ -103,14 +137,21 @@
 }
 .workspace {
   min-height: 0;
+  flex: 1;
   display: grid;
   grid-template-columns: 238px minmax(400px, 1fr) 270px;
+  grid-template-rows: minmax(0, 1fr);
   gap: 1px;
 }
 .panel,
 .editor {
   background: var(--panel);
   min-width: 0;
+  min-height: 0;
+}
+.editor {
+  display: flex;
+  flex-direction: column;
 }
 .panel {
   display: flex;
@@ -123,6 +164,10 @@
 .rightPanel {
   border-left: 1px solid var(--line);
 }
+.propertyContent {
+  padding: 14px;
+  overflow: auto;
+}
 .panelHeader {
   display: flex;
   justify-content: space-between;
@@ -132,6 +177,47 @@
   border-bottom: 1px solid var(--line);
   font-size: 13px;
 }
+.panelHeader button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 4px;
+  cursor: pointer;
+}
+.panelHeader button:hover,
+.panelHeader button:focus-visible {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+.rightPanel label {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.rightPanel input,
+.rightPanel textarea,
+.rightPanel select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 7px;
+  background: #fff;
+}
+.rightPanel textarea { min-height: 72px; resize: vertical; }
+.rightPanel button {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.rightPanel button:hover,
+.rightPanel button:focus-visible { border-color: var(--blue); color: var(--blue); }
 .panelTabs {
   display: flex;
   padding: 8px 12px 0;
@@ -245,6 +331,8 @@
   font-size: 12px;
 }
 .lineTable {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 7px 14px 18px;
 }
@@ -261,9 +349,10 @@
   width: 100%;
   min-height: 46px;
   display: grid;
-  grid-template-columns: 30px 76px minmax(0, 1fr) 14px 40px;
+  grid-template-columns: 32px 80px minmax(0, 1fr) 110px;
   gap: 7px;
   align-items: center;
+  column-gap: 8px;
   text-align: left;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -274,6 +363,7 @@
 .lineRow:hover {
   background: #f7f9fc;
 }
+.lineRow select { width: 100%; min-width: 0; }
 .lineSelected {
   background: var(--blue-soft) !important;
   border-color: #b9ccfa;
@@ -643,14 +733,18 @@
   font-size: 12px;
   margin: 0;
 }
+.candidateCard ol { margin: 10px 0; padding-left: 20px; }
+.candidateCard ol li { display: grid; gap: 3px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.candidateCard ol small { color: var(--muted); }
+.candidateCard section { padding: 0; }
+.sideContent ol { margin: 10px 0; padding-left: 20px; }
+.sideContent ol li { display: grid; gap: 3px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.sideContent ol small { color: var(--muted); }
 .modalHint {
   color: var(--muted);
   font-size: 12px;
 }
 @media (max-width: 900px) {
-  .shell {
-    grid-template-rows: 42px 38px 34px minmax(0, 1fr) auto;
-  }
   .mobilePanels {
     display: flex;
     align-items: center;
@@ -682,6 +776,8 @@
   .workspace > .editor.mobileVisible {
     display: flex !important;
   }
+  .mobileVisible { display: flex !important; }
+  .mobileHidden { display: none !important; }
   .mediaNote {
     display: none;
   }
@@ -690,9 +786,11 @@
   }
 }
 @media (max-width: 640px) {
-  .shell {
-    grid-template-rows: 42px 38px 34px minmax(0, 1fr) auto;
-  }
+  .topbar { height: auto; min-height: 42px; flex-wrap: wrap; padding-top: 7px; padding-bottom: 7px; }
+  .topActions { flex-wrap: wrap; gap: 5px; }
+  .topActions button { padding: 5px 3px; }
+  .modebar { height: auto; min-height: 38px; flex-wrap: wrap; gap: 10px; padding: 3px 12px; }
+  .modebar .modeSpacer { display: none; }
   .mobilePanels {
     display: flex;
     align-items: center;
@@ -736,7 +834,7 @@
     margin-top: 24px;
   }
   .lineRow {
-    grid-template-columns: 24px 69px minmax(0, 1fr) 12px;
+    grid-template-columns: 24px 69px minmax(0, 1fr) 80px;
   }
   .agent {
     display: none;
@@ -760,14 +858,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-}
-@media (max-width: 640px) {
-  .mobileVisible {
-    display: flex !important;
-  }
-  .mobileHidden {
-    display: none !important;
   }
 }
 @media (max-width: 900px) {

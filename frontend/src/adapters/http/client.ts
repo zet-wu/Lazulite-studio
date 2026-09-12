@@ -4,6 +4,8 @@ import {
   isAsset,
   isCapabilities,
   isDocumentShell,
+  isDocumentEnvelope,
+  isImportCandidate,
   isJobList,
   isProjectList,
   isProjectSummary,
@@ -17,13 +19,15 @@ export type ProjectList = components["schemas"]["ProjectList"];
 export type ProjectSummary = components["schemas"]["ProjectSummary"];
 export type JobList = components["schemas"]["JobList"];
 export type DocumentShell = components["schemas"]["DocumentShell"];
+export type DocumentEnvelope = components["schemas"]["DocumentEnvelope"];
+export type RichDocumentEnvelope = DocumentEnvelope & { revision: string; etag?: string };
 export type Asset = components["schemas"]["Asset"];
 export type WaveformWindow = components["schemas"]["WaveformWindow"];
 
 const API_ROOT = "/api/v1";
 const csrf = () =>
   document.cookie.match(/(?:^|; )studio_csrf=([^;]+)/)?.[1] ?? "";
-const requestHeaders = (extra: HeadersInit = {}) => ({
+export const requestHeaders = (extra: HeadersInit = {}) => ({
   "X-Request-ID": crypto.randomUUID(),
   ...(csrf() ? { "X-CSRF-Token": decodeURIComponent(csrf()) } : {}),
   ...extra,
@@ -225,7 +229,7 @@ export const studioApi = {
   getDocument: (projectId: string) =>
     request(
       `/projects/${encodeURIComponent(projectId)}/document`,
-      isDocumentShell,
+      isDocumentEnvelope,
     ),
   getWaveform: (
     projectId: string,
@@ -244,3 +248,25 @@ export const studioApi = {
 };
 
 export type StudioPaths = paths;
+
+export type SaveDocumentResult = components["schemas"]["DocumentSaveResponse"];
+export type ImportLine = { id?: string; text: string; begin_us?: number | null; end_us?: number | null; changed?: boolean };
+export type ImportProposal = { schema_version: string; project_id: string; input_revision: string | null; candidate: { format: "ttml" | "lrc" | "text"; ttml?: string; text?: string; lines?: ImportLine[] }; diagnostics: Array<{ code?: string; message?: string }>; saved: false };
+export type JobResult = components["schemas"]["JobResult"];
+const s4 = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+  const response = await fetch(`${API_ROOT}${path}`, { credentials: 'include', ...init, headers: requestHeaders(init.headers) });
+  if (!response.ok) throw new ApiError(response.status, { code: response.status === 412 ? 'revision_conflict' : 's4_request_failed', message: response.status === 412 ? '文档已在其他标签页更新' : '请求失败，请重试', request_id: '', retryable: response.status >= 500 });
+  return (await response.json()) as T;
+};
+
+export const studioS4 = {
+  getDocumentEnvelope: async (projectId: string): Promise<RichDocumentEnvelope> => {
+    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/document`, { credentials: "include", headers: requestHeaders() });
+    if (!response.ok) throw new ApiError(response.status, { code: "document_failed", message: "文档加载失败", request_id: "", retryable: response.status >= 500 });
+    const body: unknown = await response.json();
+    if (!isDocumentEnvelope(body) || !body.revision) throw new ApiError(502, { code: "invalid_response", message: "文档响应无有效 revision", request_id: "", retryable: false });
+    return { ...body, revision: body.revision, etag: response.headers.get("ETag") ?? undefined };
+  },
+  saveRichDocument: async (projectId: string, ttml: string, baseRevision: string, operationId: string, seq: number, etag?: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/document`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag ?? `"${baseRevision}"`, "Idempotency-Key": operationId }, body: JSON.stringify({ schema_version: "studio-document-v1", project_id: projectId, revision: baseRevision, client_seq: seq, document: { schema_version: "studio-document-content-v1", ttml } }) }); if (!isDocumentEnvelope(result) || !result.revision) throw new ApiError(502, { code: "invalid_response", message: "保存响应无有效 revision", request_id: "", retryable: false }); return { revision: result.revision, etag: `"${result.revision}"` }; },
+  importLyrics: async (projectId: string, revision: string, filename: string, content: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/imports?revision=${encodeURIComponent(revision)}`, { method: 'POST', headers: { 'Content-Type': filename.endsWith("ttml") || filename.endsWith("xml") ? "application/ttml+xml" : filename.endsWith(".lrc") ? "text/lrc" : "text/plain", 'Idempotency-Key': crypto.randomUUID() }, body: content }); if (!isImportCandidate(result)) throw new ApiError(502, { code: "invalid_response", message: "导入响应格式无效", request_id: "", retryable: false }); return result; },
+};
