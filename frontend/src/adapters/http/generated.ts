@@ -351,6 +351,7 @@ export interface components {
             id: string;
             enabled: boolean;
             reason: string | null;
+            experimental?: boolean;
         };
         Capabilities: {
             /** @constant */
@@ -381,11 +382,17 @@ export interface components {
         };
         JobCreate: {
             /** @enum {string} */
-            kind: "search" | "fetch" | "transcribe" | "align" | "line_align" | "reading";
+            kind: "search" | "fetch" | "transcribe" | "align" | "line_align" | "reading" | "forced_align";
             params: {
                 revision: string;
                 asset_id: string;
                 line_ids?: string[];
+                line_id?: string;
+                input_granularity?: "word" | "mora" | "phoneme";
+                language?: string | null;
+                coordinate_space?: "text" | "ruby";
+                ruby_id?: string;
+                base_range?: [number, number];
                 title?: string | null;
                 artist?: string | null;
                 album?: string | null;
@@ -416,10 +423,24 @@ export interface components {
                 revision: string;
                 revision_sha256?: string | null;
             };
-            items?: (components["schemas"]["SearchCandidate"] | components["schemas"]["FetchedLyric"] | components["schemas"]["AlignedLine"] | components["schemas"]["TranscriptionSegment"] | components["schemas"]["ReadingProposal"])[];
+            items?: (components["schemas"]["SearchCandidate"] | components["schemas"]["FetchedLyric"] | components["schemas"]["AlignedLine"] | components["schemas"]["TranscriptionSegment"] | components["schemas"]["ReadingProposal"] | components["schemas"]["ForcedAlignmentUnit"] )[];
             proposals?: components["schemas"]["ReadingProposal"][];
+            units?: components["schemas"]["ForcedAlignmentUnit"][];
+            evidence?: Record<string, unknown>;
         } & {
             [key: string]: unknown;
+        };
+        ForcedAlignmentUnit: {
+            line_id: string;
+            input_range: [number, number];
+            text: string;
+            source_range?: number[];
+            start: number | null;
+            end: number | null;
+            start_us: number | null;
+            end_us: number | null;
+            granularity: "subword" | "word" | "character" | "mora" | "phoneme";
+            confidence: number | null;
         };
         DictionaryEntryInput: {
             surface: string;

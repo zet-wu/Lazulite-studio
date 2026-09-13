@@ -16,8 +16,9 @@ class EngineUnavailable(RuntimeError):
 
 class LazuliteEngine:
     def __init__(self, transcriber: Any = None,
-                 provider_factory: Callable[[], Any] | None = None):
-        self.transcriber = transcriber
+                 provider_factory: Callable[[], Any] | None = None,
+                 forced_runner: Any = None):
+        self.transcriber, self.forced_runner = transcriber, forced_runner
         self.provider_factory = provider_factory
 
     def identity(self) -> dict[str, str]:
@@ -44,6 +45,10 @@ class LazuliteEngine:
                 "runtime_version": "unknown", "precision": "unknown"}
 
     def run(self, kind: str, *, asset_path: Path, params: dict[str, Any], emit):
+        if kind in {"forced", "forced_align", "forced-alignment"}:
+            if self.forced_runner is None:
+                raise EngineUnavailable("未配置实验 forced aligner")
+            return self.forced_runner.run(asset_path, params)
         from lazulite.audio.io import read_audio_metadata
         from lazulite.lyrics.service import search_lyrics, fetch_lyrics
         providers = self.provider_factory() if self.provider_factory else None

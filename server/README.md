@@ -31,6 +31,16 @@ playback proxy; waveform windows carry the asset hash and `peaks-v1` algorithm v
 
 `GET/POST /projects/{id}/reading-dictionary` 与条目 `PUT/DELETE` 管理项目词典。修改词典不会改写 TTML 或审核状态；下一次 `reading` 任务才会使用新条目。读音结果给出正文 Unicode code point 半开范围，始终先作为候选返回。
 
+S6 的 `forced_align` 使用独立于转写的实验后端。显式设置
+`LAZULITE_FORCED_BACKEND=qwen`、`LAZULITE_FORCED_MODEL_PATH` 才会加载；可选设置
+`LAZULITE_FORCED_MODEL_ID`、`LAZULITE_FORCED_MODEL_REVISION`、`LAZULITE_FORCED_DEVICE`。
+模型权重及 Lazulite 的 `forced-qwen` 可选依赖需事先准备。未配置时能力接口明确关闭此入口。
+
+任务必须指定已保存、已确认的行及 revision/asset；服务从该修订读取时间与歌词，裁剪对应音频。
+`coordinate_space=text` 使用正文，`coordinate_space=ruby` 还需 `ruby_id` 和正文 `base_range`，
+使用对应整体读音并保留回映范围。结果携带实际粒度、原始秒、整数微秒与证据，仍需人工应用。
+Qwen 的 character 输出不能视作 mora 或 phoneme；多后端 PoC 与真实日语歌唱基准不由协议测试代替。
+
 音频上传上限为 500 MiB，当前在一次上传请求内完成探测与代理生成，不支持断点续传。浏览器使用 Range 播放 WAV，不完整解码歌曲；WAV 代理占用空间约为每分钟 11.5 MB。取消请求不会删除已经生成的共享资产，未引用资产暂不自动回收。
 
 `GET lyrics` 下载当前或指定已提交修订。导入接口返回候选，不直接覆盖草稿；修订存储支持内部 CAS 与幂等事务，项目初始草稿使用合法空 TTML。

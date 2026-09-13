@@ -7,6 +7,7 @@ from typing import Any
 from .db import Database
 from .engine import EngineUnavailable, LazuliteEngine
 from .reading import ReadingUnavailable
+from .forced import ForcedUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class JobService:
                                  "revision_sha256": revision_hash}
             with self.db.transaction() as c:
                 t=now(); c.execute("UPDATE jobs SET status='succeeded',result_json=?,engine_json=?,updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps(result,ensure_ascii=False),json.dumps(result.get("engine",{})),t,t,jid)); self._event(c,jid,"state","succeeded",1,1,"任务完成")
-        except (EngineUnavailable, ReadingUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
+        except (EngineUnavailable, ReadingUnavailable, ForcedUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
         except Exception as exc:
             logger.exception("job %s failed", jid)
             self._finish_error(jid, "engine_error", "Lazulite engine failed; inspect server logs")

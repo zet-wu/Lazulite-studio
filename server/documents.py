@@ -92,6 +92,23 @@ def validate_ttml(ttml: str) -> str:
         ref = element.attrib.get("{http://www.w3.org/ns/ttml#metadata}agent", "")
         if any(item not in agents for item in ref.split()):
             raise ValueError("unknown ttm:agent reference")
+    studio_members = "{urn:lazulite:studio:draft}members"
+    groups = {e.attrib.get("{http://www.w3.org/XML/1998/namespace}id"): e
+              for e in root.iter() if e.tag == "{http://www.w3.org/ns/ttml#metadata}agent" and e.attrib.get(studio_members) is not None}
+    for group_id, element in groups.items():
+        members = element.attrib.get(studio_members, "").split()
+        if any(member not in agents and member not in groups for member in members):
+            raise ValueError("unknown studio group member reference")
+    def visit_group(group_id: str, trail: set[str]) -> None:
+        if group_id in trail:
+            raise ValueError("studio group membership cycle")
+        trail.add(group_id)
+        for member in groups[group_id].attrib.get(studio_members, "").split():
+            if member in groups:
+                visit_group(member, trail)
+        trail.remove(group_id)
+    for group_id in groups:
+        visit_group(group_id, set())
     return ttml
 
 

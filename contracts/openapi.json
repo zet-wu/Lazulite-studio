@@ -634,6 +634,9 @@
           },
           "reason": {
             "type": ["string", "null"]
+          },
+          "experimental": {
+            "type": "boolean"
           }
         }
       },
@@ -715,7 +718,7 @@
         "type": "object",
         "required": ["kind", "params"],
         "properties": {
-            "kind": { "type": "string", "enum": ["search", "fetch", "transcribe", "align", "line_align", "reading"] },
+            "kind": { "type": "string", "enum": ["search", "fetch", "transcribe", "align", "line_align", "reading", "forced_align"] },
           "params": {
             "type": "object",
             "required": ["revision", "asset_id"],
@@ -723,6 +726,13 @@
               "revision": { "type": "string" },
               "asset_id": { "type": "string" },
               "line_ids": { "type": "array", "items": { "type": "string" } },
+              "line_id": { "type": "string" },
+              "input_granularity": { "type": "string", "enum": ["word", "mora", "phoneme"] },
+              "language": { "type": ["string", "null"] },
+              "coordinate_space": { "type": "string", "enum": ["text", "ruby"] },
+              "ruby_id": { "type": "string" },
+              "base_range": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } },
+              "granularity": { "type": "string", "enum": ["word", "mora", "phoneme"] },
               "title": { "type": ["string", "null"] },
               "artist": { "type": ["string", "null"] },
               "album": { "type": ["string", "null"] }
@@ -756,9 +766,12 @@
             { "$ref": "#/components/schemas/FetchedLyric" },
             { "$ref": "#/components/schemas/AlignedLine" },
             { "$ref": "#/components/schemas/TranscriptionSegment" },
-            { "$ref": "#/components/schemas/ReadingProposal" }
+            { "$ref": "#/components/schemas/ReadingProposal" },
+            { "$ref": "#/components/schemas/ForcedAlignmentUnit" }
           ] } }
-          ,"proposals": { "type": "array", "items": { "$ref": "#/components/schemas/ReadingProposal" } }
+          ,"proposals": { "type": "array", "items": { "$ref": "#/components/schemas/ReadingProposal" } },
+          "units": { "type": "array", "items": { "$ref": "#/components/schemas/ForcedAlignmentUnit" } },
+          "evidence": { "type": "object", "additionalProperties": true }
         },
         "additionalProperties": true
       },
@@ -801,6 +814,7 @@
       "SearchCandidate": { "type": "object", "required": ["source", "candidate_id", "title", "match_score"], "properties": { "source": { "type": "string" }, "candidate_id": { "type": "string" }, "title": { "type": "string" }, "artist": { "type": ["string", "null"] }, "album": { "type": ["string", "null"] }, "duration": { "type": ["number", "null"] }, "match_score": { "type": "number" }, "raw": { "type": "object" } } },
       "FetchedLyric": { "type": "object", "required": ["candidate", "provider_rank", "line_count", "lines"], "properties": { "candidate": { "$ref": "#/components/schemas/SearchCandidate" }, "provider_rank": { "type": "integer" }, "line_count": { "type": "integer" }, "lines": { "type": "array", "items": { "type": "object", "required": ["id", "text"], "properties": { "id": { "type": "string" }, "text": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] } } } } } },
       "AlignedLine": { "type": "object", "required": ["line_id", "timing_source"], "properties": { "line_id": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "begin_us": { "type": ["integer", "null"] }, "end_us": { "type": ["integer", "null"] }, "similarity": { "type": ["number", "null"] }, "score": { "type": ["number", "null"] }, "timing_source": { "type": "string" }, "source_segment_ids": { "type": "array", "items": { "type": "string" } }, "issues": { "type": "array", "items": { "type": "string" } } } },
+      "ForcedAlignmentUnit": { "type": "object", "required": ["line_id", "input_range", "text", "start", "end", "start_us", "end_us", "granularity", "confidence"], "properties": { "line_id": { "type": "string" }, "input_range": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } }, "source_range": { "type": "array", "items": { "type": "integer" } }, "text": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "start_us": { "type": ["integer", "null"] }, "end_us": { "type": ["integer", "null"] }, "granularity": { "type": "string", "enum": ["subword", "word", "character", "mora", "phoneme"] }, "confidence": { "type": ["number", "null"] } } },
       "TranscriptionSegment": { "type": "object", "required": ["source_segment_id", "text"], "properties": { "source_segment_id": { "type": "string" }, "text": { "type": "string" }, "language": { "type": ["string", "null"] }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "begin_us": { "type": ["integer", "null"] }, "end_us": { "type": ["integer", "null"] }, "confidence": { "type": ["number", "null"] }, "timed_text": { "type": "array", "items": { "type": "object" } } }, "additionalProperties": true },
       "Job": {
         "type": "object",

@@ -26,7 +26,8 @@ from .documents import DocumentService, build_router
 from .job_routes import create_job_router
 from .jobs import JobService
 from .engine import configured_engine
-from .projection import project_ttml
+from .forced import configured_forced_runner, prepare_forced_request
+from .projection import project_ttml, project_ttml_for_forced
 from .reading import ReadingJobRunner, ReadingDictionary, SudachiReadingProposer, build_dictionary_router
 from .review import build_router as build_review_router
 from .revisions import INITIAL_TTML, RevisionStore
@@ -41,7 +42,7 @@ def stamp():
 
 def create_app(
     data_dir: str | Path | None = None, settings: Settings | None = None, engine=None,
-    reading_proposer=None,
+    reading_proposer=None, forced_aligner=None,
 ) -> FastAPI:
     cfg = settings or Settings.from_env()
     if not cfg.origin or (not cfg.trusted_gateway and not cfg.password):
@@ -55,6 +56,11 @@ def create_app(
     revisions = RevisionStore(db, root / "revisions")
     revisions.recover()
     configured_engine_instance = engine or configured_engine()
+    if forced_aligner is not None:
+        from .forced import ForcedAlignmentRunner
+        configured_engine_instance.forced_runner = ForcedAlignmentRunner(forced_aligner)
+    elif getattr(configured_engine_instance, "forced_runner", None) is None:
+        configured_engine_instance.forced_runner = configured_forced_runner()
     configured_reading_proposer = reading_proposer or SudachiReadingProposer()
     reading_runner = ReadingJobRunner(db, configured_reading_proposer)
     api = APIRouter(prefix="/api/v1")
@@ -195,6 +201,9 @@ def create_app(
                  "reason": None if getattr(configured_engine_instance, "transcriber", None) else "未配置转写模型后端"},
                 {"id": "job.align", "enabled": bool(getattr(configured_engine_instance, "transcriber", None)),
                  "reason": None if getattr(configured_engine_instance, "transcriber", None) else "未配置转写模型后端"},
+                {"id": "job.forced_align", "enabled": bool(getattr(getattr(configured_engine_instance, "forced_runner", None), "available", False)),
+                 "experimental": True,
+                 "reason": None if getattr(getattr(configured_engine_instance, "forced_runner", None), "available", False) else "未显式配置实验 forced aligner"},
                 {"id": "job.reading", "enabled": reading_enabled,
                  "reason": None if reading_enabled else (reading_runner.reason() or "未配置日语读音后端")},
             ],
@@ -474,13 +483,31 @@ def create_app(
             revision_row = c.execute("SELECT ttml_path FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone()
         if revision_row:
             try:
-                projected = project_ttml(revision_row[0])
+                selected_forced = params.get("line_id") if kind in {"forced", "forced_align", "forced-alignment"} else None
+                projected = (project_ttml_for_forced(revision_row[0], selected_forced) if kind in {"forced", "forced_align", "forced-alignment"}
+                             else project_ttml(revision_row[0]))
                 selected = params.get("line_ids")
                 if selected is not None and any(item not in {line["id"] for line in projected} for item in selected):
                     fail("job_input_invalid", "selected line does not belong to revision", 422)
                 if kind in {"line_align", "align"}:
                     params["lines"] = [line for line in projected if selected is None or line["id"] in selected]
-            except (ET.ParseError, OSError):
+                if kind in {"forced", "forced_align", "forced-alignment"}:
+                    line_id = params.get("line_id")
+                    if not line_id or line_id not in {line["id"] for line in projected}:
+                        fail("job_input_invalid", "forced alignment requires one line_id", 422)
+                    line = next(line for line in projected if line["id"] == line_id)
+                    with db.connect() as review_db:
+                        confirmation = review_db.execute(
+                            "SELECT status,revision FROM review_confirmations WHERE project_id=? AND line_id=?",
+                            (pid, line_id),
+                        ).fetchone()
+                    if not confirmation or confirmation[0] != "confirmed" or confirmation[1] != revision:
+                        fail("job_input_invalid", "forced alignment requires a confirmed lyric line at this revision", 422)
+                    try:
+                        prepare_forced_request(line, params, confirmed=bool(confirmation and confirmation[0] == "confirmed"), confirmed_revision=confirmation[1] if confirmation else None, revision=revision)
+                    except ValueError as exc:
+                        fail("job_input_invalid", str(exc), 422)
+            except (ET.ParseError, OSError, ValueError) as exc:
                 fail("job_input_invalid", "revision cannot be projected", 422)
 
     def _revision_belongs(pid, revision):
