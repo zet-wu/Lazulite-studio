@@ -21,9 +21,16 @@ import { LineTable } from "./LineTable";
 import { AgentPanel } from "./AgentPanel";
 import { RubyPanel } from "./RubyPanel";
 import { ReadingDictionaryPanel } from "./ReadingDictionaryPanel";
+import { TimingPanel } from "./TimingPanel";
 import styles from "./workspace.module.css";
 
-type Panel = "lyrics" | "properties" | "candidates" | "tasks" | "agents" | "dictionary";
+type Panel =
+  | "lyrics"
+  | "properties"
+  | "candidates"
+  | "tasks"
+  | "agents"
+  | "dictionary";
 const labels: Record<Panel, string> = {
   lyrics: "歌词",
   properties: "属性",
@@ -100,16 +107,22 @@ function Editor({
   );
   const [params, setParams] = useSearchParams();
   const [panel, setPanel] = useState<Panel>("lyrics");
-  const [sideTab, setSideTab] = useState<"candidates" | "tasks" | "agents" | "dictionary">(
-    "candidates",
-  );
-  const [propertyTab, setPropertyTab] = useState<"attributes" | "ruby">("attributes");
+  const [sideTab, setSideTab] = useState<
+    "candidates" | "tasks" | "agents" | "dictionary"
+  >("candidates");
+  const [propertyTab, setPropertyTab] = useState<
+    "attributes" | "ruby" | "timing"
+  >("attributes");
   const [selected, setSelected] = useState(0);
   const [candidate, setCandidate] = useState<ImportProposal | null>(null);
   const [jobResult, setJobResult] = useState<JobResult | null>(null);
   const [message, setMessage] = useState("");
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const lines = editor.document.lines;
   const line = lines[selected];
+  const selectedUnit = line?.timingUnits.find(
+    (unit) => unit.id === selectedUnitId,
+  );
   useEffect(() => {
     const id = params.get("line");
     const index = lines.findIndex(
@@ -136,6 +149,7 @@ function Editor({
   };
   const selectLine = (index: number) => {
     setSelected(index);
+    setSelectedUnitId(null);
     setParams(
       (current) => {
         current.set("line", lines[index]?.xmlId ?? lines[index]?.id ?? "");
@@ -184,6 +198,15 @@ function Editor({
         assetId={asset?.id ?? null}
         dirty={editor.dirty}
         selectedLineIds={line ? [line.xmlId ?? line.id] : []}
+        rubyOptions={
+          line?.ruby.map((ruby) => ({
+            id: ruby.id,
+            base: ruby.base,
+            reading: ruby.reading,
+            baseStart: ruby.baseStart,
+            baseEnd: ruby.baseEnd,
+          })) ?? []
+        }
         onCandidate={(result) => {
           setJobResult(result);
           setSideTab("candidates");
@@ -384,7 +407,13 @@ function Editor({
             <button onClick={() => setSideTab("agents")}>歌手</button>
             <button onClick={() => setSideTab("dictionary")}>词典</button>
           </div>
-          <div className={styles.sideContent}>{sideTab === "dictionary" ? <ReadingDictionaryPanel projectId={projectId} /> : side}</div>
+          <div className={styles.sideContent}>
+            {sideTab === "dictionary" ? (
+              <ReadingDictionaryPanel projectId={projectId} />
+            ) : (
+              side
+            )}
+          </div>
         </aside>
         <LineTable
           lines={lines}
@@ -398,35 +427,138 @@ function Editor({
           className={`${styles.panel} ${styles.rightPanel} ${panel === "properties" ? styles.mobileVisible : styles.mobileHidden}`}
         >
           <div className={styles.panelTabs}>
-            <button aria-label="行属性" className={propertyTab === "attributes" ? styles.tabActive : ""} onClick={() => setPropertyTab("attributes")}>属性</button>
-            <button className={propertyTab === "ruby" ? styles.tabActive : ""} onClick={() => setPropertyTab("ruby")}>注音</button>
+            <button
+              aria-label="行属性"
+              className={propertyTab === "attributes" ? styles.tabActive : ""}
+              onClick={() => setPropertyTab("attributes")}
+            >
+              属性
+            </button>
+            <button
+              className={propertyTab === "ruby" ? styles.tabActive : ""}
+              onClick={() => setPropertyTab("ruby")}
+            >
+              注音
+            </button>
+            <button
+              className={propertyTab === "timing" ? styles.tabActive : ""}
+              onClick={() => setPropertyTab("timing")}
+            >
+              时间
+            </button>
           </div>
           {line && (
             <div className={styles.propertyContent}>
-              {propertyTab === "ruby" ? <>
-                <RubyPanel line={line} onApply={(ruby) => {
-                  try { editor.apply({ type: "update-ruby", lineId: line.id, ruby }); }
-                  catch (error) { setMessage(error instanceof Error ? error.message : "注音编辑失败"); }
-                }} />
-                <ReviewPanel
-                  projectId={projectId}
-                  revision={editor.revision}
-                  lineId={line.xmlId ?? line.id}
-                  dirty={editor.dirty}
-                />
-              </> : <>
-                <p>{line.text}</p>
-                <LineInspector
+              {propertyTab === "timing" ? (
+                <TimingPanel
                   line={line}
-                  onChange={(changes) => edit(line.id, changes)}
+                  onSelect={setSelectedUnitId}
+                  onChange={(units) => {
+                    try {
+                      editor.apply({
+                        type: "update-timing-units",
+                        lineId: line.id,
+                        units,
+                      });
+                      return true;
+                    } catch (error) {
+                      setMessage(
+                        error instanceof Error
+                          ? error.message
+                          : "时间单元编辑失败",
+                      );
+                      return false;
+                    }
+                  }}
                 />
-                <ReviewPanel
-                  projectId={projectId}
-                  revision={editor.revision}
-                  lineId={line.xmlId ?? line.id}
-                  dirty={editor.dirty}
-                />
-              </>}
+              ) : propertyTab === "ruby" ? (
+                <>
+                  <RubyPanel
+                    line={line}
+                    onApply={(ruby) => {
+                      try {
+                        editor.apply({
+                          type: "update-ruby",
+                          lineId: line.id,
+                          ruby,
+                        });
+                      } catch (error) {
+                        setMessage(
+                          error instanceof Error
+                            ? error.message
+                            : "注音编辑失败",
+                        );
+                      }
+                    }}
+                  />
+                  <ReviewPanel
+                    projectId={projectId}
+                    revision={editor.revision}
+                    lineId={line.xmlId ?? line.id}
+                    dirty={editor.dirty}
+                  />
+                </>
+              ) : (
+                <>
+                  <p>{line.text}</p>
+                  <LineInspector
+                    line={line}
+                    onChange={(changes) => edit(line.id, changes)}
+                    onSplit={(at) => {
+                      try {
+                        editor.apply({
+                          type: "split-line",
+                          lineId: line.id,
+                          at,
+                          newLineId: `${line.id}-split-${Date.now()}`,
+                        });
+                      } catch (error) {
+                        setMessage(
+                          error instanceof Error ? error.message : "拆分失败",
+                        );
+                      }
+                    }}
+                    onMerge={
+                      selected < lines.length - 1
+                        ? () => {
+                            try {
+                              editor.apply({
+                                type: "merge-lines",
+                                firstLineId: line.id,
+                                secondLineId: lines[selected + 1].id,
+                              });
+                            } catch (error) {
+                              setMessage(
+                                error instanceof Error
+                                  ? error.message
+                                  : "合并失败",
+                              );
+                            }
+                          }
+                        : undefined
+                    }
+                    onShift={(deltaUs) => {
+                      try {
+                        editor.apply({
+                          type: "shift-line",
+                          lineId: line.id,
+                          deltaUs,
+                        });
+                      } catch (error) {
+                        setMessage(
+                          error instanceof Error ? error.message : "平移失败",
+                        );
+                      }
+                    }}
+                  />
+                  <ReviewPanel
+                    projectId={projectId}
+                    revision={editor.revision}
+                    lineId={line.xmlId ?? line.id}
+                    dirty={editor.dirty}
+                  />
+                </>
+              )}
             </div>
           )}
         </aside>
@@ -447,6 +579,11 @@ function Editor({
                 begin_us: line.beginUs,
                 end_us: line.endUs,
               }
+            : undefined
+        }
+        loopRange={
+          selectedUnit?.beginUs != null && selectedUnit.endUs != null
+            ? { begin_us: selectedUnit.beginUs, end_us: selectedUnit.endUs }
             : undefined
         }
         asset={asset}

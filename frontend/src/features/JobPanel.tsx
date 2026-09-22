@@ -16,6 +16,13 @@ type Props = {
   assetId: string | null;
   dirty: boolean;
   selectedLineIds: string[];
+  rubyOptions?: Array<{
+    id: string;
+    base: string;
+    reading: string;
+    baseStart: number;
+    baseEnd: number;
+  }>;
   onCandidate: (result: JobResult) => void;
 };
 const labels: Record<string, string> = {
@@ -24,6 +31,7 @@ const labels: Record<string, string> = {
   align: "行对齐",
   fetch: "取词",
   reading: "生成读音",
+  forced_align: "实验精细对齐",
 };
 const statusLabels: Record<string, string> = {
   queued: "排队中",
@@ -41,6 +49,7 @@ export function JobPanel({
   assetId,
   dirty,
   selectedLineIds,
+  rubyOptions = [],
   onCandidate,
 }: Props) {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -51,6 +60,18 @@ export function JobPanel({
   const [artist, setArtist] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState<JobKind | null>(null);
+  const [granularity, setGranularity] = useState<"word" | "mora" | "phoneme">(
+    "word",
+  );
+  const [coordinateSpace, setCoordinateSpace] = useState<"text" | "ruby">(
+    "text",
+  );
+  const [rubyId, setRubyId] = useState("");
+  const selectedRuby = rubyOptions.find((ruby) => ruby.id === rubyId);
+  useEffect(() => {
+    if (!rubyOptions.some((ruby) => ruby.id === rubyId))
+      setRubyId(rubyOptions[0]?.id ?? "");
+  }, [rubyId, rubyOptions]);
   const [results, setResults] = useState<Record<string, JobResult>>({});
   const refresh = async () => {
     try {
@@ -80,8 +101,26 @@ export function JobPanel({
       title: title.trim() || undefined,
       artist: artist.trim() || undefined,
       line_ids: selectedLineIds,
+      line_id: selectedLineIds[0],
+      input_granularity: granularity,
+      coordinate_space: coordinateSpace,
+      ruby_id: coordinateSpace === "ruby" ? rubyId : undefined,
+      base_range:
+        coordinateSpace === "ruby" && selectedRuby
+          ? [selectedRuby.baseStart, selectedRuby.baseEnd]
+          : undefined,
     }),
-    [artist, assetId, revision, selectedLineIds, title],
+    [
+      artist,
+      assetId,
+      coordinateSpace,
+      granularity,
+      revision,
+      rubyId,
+      selectedLineIds,
+      selectedRuby,
+      title,
+    ],
   );
   const create = async (kind: JobKind) => {
     if (!assetId) {
@@ -136,8 +175,11 @@ export function JobPanel({
     !capabilities[`job.${kind}`]?.enabled ||
     busy !== null ||
     !assetId ||
-    ((kind === "align" || kind === "reading") && selectedLineIds.length === 0) ||
-    (kind === "reading" && dirty);
+    ((kind === "align" || kind === "reading" || kind === "forced_align") &&
+      selectedLineIds.length === 0) ||
+    (kind === "reading" && dirty) ||
+    (kind === "forced_align" &&
+      (dirty || (coordinateSpace === "ruby" && !rubyId)));
   return (
     <section className={styles.panel} aria-label="自动化任务">
       <div className={styles.form}>
@@ -158,7 +200,15 @@ export function JobPanel({
           />
         </label>
         <div className={styles.actions}>
-          {(["search", "transcribe", "align", "reading"] as JobKind[]).map((kind) => (
+          {(
+            [
+              "search",
+              "transcribe",
+              "align",
+              "reading",
+              "forced_align",
+            ] as JobKind[]
+          ).map((kind) => (
             <button
               key={kind}
               disabled={disabled(kind)}
@@ -167,8 +217,62 @@ export function JobPanel({
               {labels[kind]}
             </button>
           ))}{" "}
+          <label>
+            对齐粒度
+            <select
+              aria-label="对齐粒度"
+              value={granularity}
+              onChange={(event) =>
+                setGranularity(event.target.value as typeof granularity)
+              }
+            >
+              <option value="word">词</option>
+              <option value="mora">音拍</option>
+              <option value="phoneme">音素</option>
+            </select>
+          </label>
+          <label>
+            对齐范围
+            <select
+              aria-label="对齐范围"
+              value={coordinateSpace}
+              onChange={(event) =>
+                setCoordinateSpace(event.target.value as typeof coordinateSpace)
+              }
+            >
+              <option value="text">当前行正文</option>
+              <option value="ruby" disabled={!rubyOptions.length}>
+                已确认读音
+              </option>
+            </select>
+          </label>
+          {coordinateSpace === "ruby" && (
+            <label>
+              读音
+              <select
+                aria-label="选择读音"
+                value={rubyId}
+                onChange={(event) => setRubyId(event.target.value)}
+              >
+                <option value="">请选择</option>
+                {rubyOptions.map((ruby) => (
+                  <option key={ruby.id} value={ruby.id}>
+                    {ruby.base} · {ruby.reading}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
-        {(["search", "transcribe", "align", "reading"] as JobKind[]).map(
+        {(
+          [
+            "search",
+            "transcribe",
+            "align",
+            "reading",
+            "forced_align",
+          ] as JobKind[]
+        ).map(
           (kind) =>
             !capabilities[`job.${kind}`]?.enabled && (
               <span className={styles.hint} key={kind}>
@@ -275,9 +379,22 @@ function renderResult(
   if (result.kind === "reading")
     return (
       <>
-        <p className={styles.hint}>读音候选 {result.proposals.length} 条，按行复核后应用。</p>
+        <p className={styles.hint}>
+          读音候选 {result.proposals.length} 条，按行复核后应用。
+        </p>
         <button className={styles.cancel} onClick={() => onCandidate(result)}>
           查看读音候选
+        </button>
+      </>
+    );
+  if (result.kind === "forced_align")
+    return (
+      <>
+        <p className={styles.hint}>
+          实验对齐 {result.units.length} 个片段，字符粒度仅展示。
+        </p>
+        <button className={styles.cancel} onClick={() => onCandidate(result)}>
+          查看实验候选
         </button>
       </>
     );

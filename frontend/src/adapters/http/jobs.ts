@@ -2,13 +2,23 @@ import type { Capabilities } from "./client";
 import { requestHeaders } from "./client";
 import { isCapabilities } from "./validate";
 
-export type JobKind = "search" | "transcribe" | "align" | "reading";
+export type JobKind =
+  | "search"
+  | "transcribe"
+  | "align"
+  | "reading"
+  | "forced_align";
 export type JobRequest = {
   revision: string;
   asset_id: string;
   title?: string;
   artist?: string;
   line_ids?: string[];
+  line_id?: string;
+  input_granularity?: "word" | "mora" | "phoneme";
+  coordinate_space?: "text" | "ruby";
+  ruby_id?: string;
+  base_range?: [number, number];
 };
 export type JobStatus =
   | "queued"
@@ -117,12 +127,41 @@ export type ReadingResult = {
   binding?: JobBinding;
   proposals: ReadingProposal[];
 };
+export type ForcedAlignmentUnit = {
+  line_id: string;
+  input_range: [number, number];
+  source_range?: [number, number];
+  text: string;
+  start_us: number | null;
+  end_us: number | null;
+  granularity: "word" | "character" | "mora" | "phoneme";
+  confidence: number | null;
+  ruby_id?: string | null;
+};
+export type ForcedAlignResult = {
+  schema_version?: string;
+  job_id?: string;
+  kind: "forced_align";
+  binding?: JobBinding;
+  units: ForcedAlignmentUnit[];
+  timing_source?: string;
+  requested_granularity?: string;
+  diagnostics?: string[];
+  evidence?: {
+    request?: {
+      ruby_id?: string;
+      coordinate_space?: string;
+      source_range?: [number, number];
+    };
+  };
+};
 export type JobResult =
   | SearchResult
   | FetchResult
   | TranscribeResult
   | AlignResult
-  | ReadingResult;
+  | ReadingResult
+  | ForcedAlignResult;
 export type JobBinding = {
   revision?: string;
   asset_id?: string;
@@ -215,7 +254,7 @@ const isResult = (value: unknown): value is JobResult => {
           nullableNumber(item.score) &&
           nullableNumber(item.similarity),
       )
-      );
+    );
   if (value.kind === "reading")
     return (
       Array.isArray(value.proposals) &&
@@ -230,6 +269,24 @@ const isResult = (value: unknown): value is JobResult => {
           typeof proposal.reading === "string" &&
           ["dictionary", "sudachi"].includes(String(proposal.source)) &&
           typeof proposal.needs_review === "boolean",
+      )
+    );
+  if (value.kind === "forced_align")
+    return (
+      Array.isArray(value.units) &&
+      value.units.every(
+        (unit) =>
+          isRecord(unit) &&
+          typeof unit.line_id === "string" &&
+          Array.isArray(unit.input_range) &&
+          unit.input_range.length === 2 &&
+          typeof unit.text === "string" &&
+          nullableNumber(unit.start_us) &&
+          nullableNumber(unit.end_us) &&
+          ["word", "character", "mora", "phoneme"].includes(
+            String(unit.granularity),
+          ) &&
+          nullableNumber(unit.confidence),
       )
     );
   return false;

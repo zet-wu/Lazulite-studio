@@ -3,6 +3,7 @@ import type { StudioLyricDocument } from "../domain/document";
 import type { EditCommand } from "../domain/editing";
 import type {
   AlignResult,
+  ForcedAlignResult,
   FetchResult,
   JobResult,
   ReadingProposal,
@@ -63,6 +64,58 @@ export function JobCandidatePanel({
         return;
       }
       if (result.kind === "reading") return;
+      if (result.kind === "forced_align") {
+        const line = document.lines.find(
+          (item) =>
+            item.id === result.units[0]?.line_id ||
+            item.xmlId === result.units[0]?.line_id,
+        );
+        const usable = result.units.filter(
+          (unit) =>
+            unit.granularity === "word" ||
+            unit.granularity === "mora" ||
+            unit.granularity === "phoneme",
+        );
+        if (!line || !usable.length) return;
+        const request = result.evidence?.request;
+        const rubyId =
+          request?.coordinate_space === "ruby"
+            ? (request.ruby_id ?? null)
+            : null;
+        const preserved = line.timingUnits.filter((unit) =>
+          rubyId ? unit.rubyId !== rubyId : unit.rubyId !== null,
+        );
+        const scope = rubyId ?? "text";
+        onApply({
+          type: "update-timing-units",
+          lineId: line.id,
+          units: [
+            ...preserved,
+            ...usable.map((unit, index) => ({
+              id: `${line.id}-forced-${scope}-${index}`,
+              kind: unit.granularity as "word" | "mora" | "phoneme",
+              textStart: (unit.source_range ??
+                request?.source_range ??
+                unit.input_range)[0],
+              textEnd: (unit.source_range ??
+                request?.source_range ??
+                unit.input_range)[1],
+              readingStart:
+                request?.coordinate_space === "ruby"
+                  ? unit.input_range[0]
+                  : null,
+              readingEnd:
+                request?.coordinate_space === "ruby"
+                  ? unit.input_range[1]
+                  : null,
+              rubyId,
+              beginUs: unit.start_us,
+              endUs: unit.end_us,
+            })),
+          ],
+        });
+        return;
+      }
       const updates = result.lines.flatMap((item) => {
         const line = document.lines.find(
           (candidate) =>
@@ -95,7 +148,9 @@ export function JobCandidatePanel({
               ? "转写候选"
               : result.kind === "reading"
                 ? "读音候选"
-                : "行对齐候选"}
+                : result.kind === "forced_align"
+                  ? "实验音频对齐候选"
+                  : "行对齐候选"}
       </strong>
       {stale && (
         <p className={styles.error}>
@@ -114,16 +169,66 @@ export function JobCandidatePanel({
       ) : result.kind === "transcribe" ? (
         <TranscribeView result={result} document={document} />
       ) : result.kind === "reading" ? (
-        <ReadingView result={result} document={document} stale={stale} onApply={onApply} />
+        <ReadingView
+          result={result}
+          document={document}
+          stale={stale}
+          onApply={onApply}
+        />
+      ) : result.kind === "forced_align" ? (
+        <ForcedView result={result} />
       ) : (
         <AlignView result={result} document={document} />
       )}
-      {result.kind !== "reading" && <button
-        className={styles.cancel}
-        disabled={stale || result.kind === "search"}
-        onClick={apply}
-      >人工应用候选</button>}
+      {result.kind !== "reading" && (
+        <button
+          className={styles.cancel}
+          disabled={
+            stale ||
+            result.kind === "search" ||
+            (result.kind === "forced_align" &&
+              !result.units.some((unit) =>
+                ["word", "mora", "phoneme"].includes(unit.granularity),
+              ))
+          }
+          onClick={apply}
+        >
+          人工应用候选
+        </button>
+      )}
     </section>
+  );
+}
+
+function ForcedView({ result }: { result: ForcedAlignResult }) {
+  return (
+    <div className={styles.job}>
+      <span className={styles.hint}>
+        实验结果 · {result.timing_source ?? "forced alignment"}
+      </span>
+      {result.units.map((unit, index) => (
+        <div className={styles.candidateRow} key={`${unit.line_id}-${index}`}>
+          <span>{unit.text || "片段"}</span>
+          <span className={styles.hint}>
+            {unit.granularity} ·{" "}
+            {unit.start_us == null
+              ? "未定"
+              : `${(unit.start_us / 1e6).toFixed(3)}s`}
+            –
+            {unit.end_us == null
+              ? "未定"
+              : `${(unit.end_us / 1e6).toFixed(3)}s`}{" "}
+            ·{" "}
+            {unit.confidence == null
+              ? "置信度未提供"
+              : `置信度 ${unit.confidence.toFixed(2)}`}
+          </span>
+          {unit.granularity === "character" ? (
+            <span className={styles.error}>字符粒度仅展示，不能应用</span>
+          ) : null}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -144,39 +249,86 @@ function ReadingView({
     current.push(proposal);
     grouped.set(proposal.line_id, current);
   }
-  if (!grouped.size) return <p className={styles.hint}>没有生成可用读音候选。</p>;
+  if (!grouped.size)
+    return <p className={styles.hint}>没有生成可用读音候选。</p>;
   return (
     <div>
       {[...grouped.entries()].map(([lineId, proposals]) => {
-        const line = document.lines.find((item) => item.id === lineId || item.xmlId === lineId);
-        const plan = line ? planReadingUpdate(line, proposals) : { accepted: [], applied: [], skipped: proposals.map((item) => ({ item, reason: "找不到对应歌词行" })), next: [] };
+        const line = document.lines.find(
+          (item) => item.id === lineId || item.xmlId === lineId,
+        );
+        const plan = line
+          ? planReadingUpdate(line, proposals)
+          : {
+              accepted: [],
+              applied: [],
+              skipped: proposals.map((item) => ({
+                item,
+                reason: "找不到对应歌词行",
+              })),
+              next: [],
+            };
         return (
           <div className={styles.job} key={lineId}>
             <strong>{line?.text ?? lineId}</strong>
             {proposals.map((item) => {
-              const skipped = plan.skipped.find((entry) => entry.item.proposal_id === item.proposal_id);
-              const accepted = plan.accepted.some((entry) => entry.proposal_id === item.proposal_id);
-              const applied = plan.applied.some((entry) => entry.proposal_id === item.proposal_id);
+              const skipped = plan.skipped.find(
+                (entry) => entry.item.proposal_id === item.proposal_id,
+              );
+              const accepted = plan.accepted.some(
+                (entry) => entry.proposal_id === item.proposal_id,
+              );
+              const applied = plan.applied.some(
+                (entry) => entry.proposal_id === item.proposal_id,
+              );
               return (
                 <div className={styles.candidateRow} key={item.proposal_id}>
-                  <span>{item.base} → {item.reading}</span>
-                  <span className={styles.hint}>{item.source === "dictionary" ? "词典" : "Sudachi"} · {item.needs_review ? "需复核" : "候选"}</span>
-                  <span className={skipped ? styles.error : styles.hint}>{skipped ? `跳过：${skipped.reason}` : applied ? "已应用" : accepted ? "可应用" : "待处理"}</span>
+                  <span>
+                    {item.base} → {item.reading}
+                  </span>
+                  <span className={styles.hint}>
+                    {item.source === "dictionary" ? "词典" : "Sudachi"} ·{" "}
+                    {item.needs_review ? "需复核" : "候选"}
+                  </span>
+                  <span className={skipped ? styles.error : styles.hint}>
+                    {skipped
+                      ? `跳过：${skipped.reason}`
+                      : applied
+                        ? "已应用"
+                        : accepted
+                          ? "可应用"
+                          : "待处理"}
+                  </span>
                 </div>
               );
             })}
             <button
               className={styles.cancel}
               disabled={stale || plan.accepted.length === 0 || !line}
-              onClick={() => line && onApply({ type: "update-ruby", lineId: line.id, ruby: plan.next })}
+              onClick={() =>
+                line &&
+                onApply({
+                  type: "update-ruby",
+                  lineId: line.id,
+                  ruby: plan.next,
+                })
+              }
             >
               应用本行读音
             </button>
-            {plan.skipped.length > 0 && <p className={styles.error}>存在重叠或正文范围不匹配的候选，已明确跳过。</p>}
+            {plan.skipped.length > 0 && (
+              <p className={styles.error}>
+                存在重叠或正文范围不匹配的候选，已明确跳过。
+              </p>
+            )}
           </div>
         );
       })}
-      {stale && <p className={styles.error}>结果绑定的 revision/asset 已过期或当前有未保存修改，禁止应用。</p>}
+      {stale && (
+        <p className={styles.error}>
+          结果绑定的 revision/asset 已过期或当前有未保存修改，禁止应用。
+        </p>
+      )}
     </div>
   );
 }
@@ -190,13 +342,30 @@ function planReadingUpdate(
   const skipped: Array<{ item: ReadingProposal; reason: string }> = [];
   const existing = [...line.ruby];
   const points = Array.from(line.text);
-  for (const item of [...proposals].sort((a, b) => a.base_start - b.base_start || a.base_end - b.base_end)) {
-    const sameRange = existing.find((span) => span.baseStart === item.base_start && span.baseEnd === item.base_end);
-    const overlap = existing.find((span) => span.baseStart < item.base_end && item.base_start < span.baseEnd && !sameRange);
-    const candidateOverlap = accepted.find((span) => span.base_start < item.base_end && item.base_start < span.base_end);
+  for (const item of [...proposals].sort(
+    (a, b) => a.base_start - b.base_start || a.base_end - b.base_end,
+  )) {
+    const sameRange = existing.find(
+      (span) =>
+        span.baseStart === item.base_start && span.baseEnd === item.base_end,
+    );
+    const overlap = existing.find(
+      (span) =>
+        span.baseStart < item.base_end &&
+        item.base_start < span.baseEnd &&
+        !sameRange,
+    );
+    const candidateOverlap = accepted.find(
+      (span) =>
+        span.base_start < item.base_end && item.base_start < span.base_end,
+    );
     if (!line.editable.text) {
       skipped.push({ item, reason: "该行注音只读" });
-    } else if (item.base_start < 0 || item.base_end <= item.base_start || points.slice(item.base_start, item.base_end).join("") !== item.base) {
+    } else if (
+      item.base_start < 0 ||
+      item.base_end <= item.base_start ||
+      points.slice(item.base_start, item.base_end).join("") !== item.base
+    ) {
       skipped.push({ item, reason: "正文范围不匹配" });
     } else if (sameRange?.reading === item.reading) {
       applied.push(item);
@@ -208,9 +377,20 @@ function planReadingUpdate(
       accepted.push(item);
     }
   }
-  const replacements = new Set(accepted.map((item) => `${item.base_start}:${item.base_end}`));
-  const next = existing.filter((span) => !replacements.has(`${span.baseStart}:${span.baseEnd}`));
-  for (const item of accepted) next.push({ id: `${line.id}-ruby-${item.base_start}-${item.base_end}`, base: item.base, reading: item.reading, baseStart: item.base_start, baseEnd: item.base_end });
+  const replacements = new Set(
+    accepted.map((item) => `${item.base_start}:${item.base_end}`),
+  );
+  const next = existing.filter(
+    (span) => !replacements.has(`${span.baseStart}:${span.baseEnd}`),
+  );
+  for (const item of accepted)
+    next.push({
+      id: `${line.id}-ruby-${item.base_start}-${item.base_end}`,
+      base: item.base,
+      reading: item.reading,
+      baseStart: item.base_start,
+      baseEnd: item.base_end,
+    });
   next.sort((a, b) => a.baseStart - b.baseStart);
   return { accepted, applied, skipped, next };
 }

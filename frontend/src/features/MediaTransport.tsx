@@ -25,9 +25,15 @@ type Props = {
   lines: DocumentShell["lines"];
   selectedLine?: DocumentShell["lines"][number];
   asset: Asset | null;
+  loopRange?: { begin_us: number; end_us: number };
 };
 
-export function MediaTransport({ projectId, selectedLine, asset }: Props) {
+export function MediaTransport({
+  projectId,
+  selectedLine,
+  asset,
+  loopRange,
+}: Props) {
   const audio = useRef<HTMLAudioElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const head = useRef<HTMLSpanElement>(null);
@@ -46,7 +52,7 @@ export function MediaTransport({ projectId, selectedLine, asset }: Props) {
   const [width, setWidth] = useState(640);
   const [pointA, setPointA] = useState<number | null>(null);
   const [pointB, setPointB] = useState<number | null>(null);
-  const [loop, setLoop] = useState<"off" | "ab" | "line">("off");
+  const [loop, setLoop] = useState<"off" | "ab" | "line" | "unit">("off");
   const [error, setError] = useState("");
   const startUs = Math.round(start * 1e6);
   const end = Math.min(duration, start + span);
@@ -73,14 +79,24 @@ export function MediaTransport({ projectId, selectedLine, asset }: Props) {
     selectedLine.end_us <= duration * 1e6;
   const lineA = validLine ? selectedLine!.begin_us! / 1e6 : null;
   const lineB = validLine ? selectedLine!.end_us! / 1e6 : null;
+  const validUnit = Boolean(
+    loopRange &&
+      Number.isSafeInteger(loopRange.begin_us) &&
+      Number.isSafeInteger(loopRange.end_us) &&
+      loopRange.begin_us >= 0 &&
+      loopRange.begin_us < loopRange.end_us &&
+      loopRange.end_us <= duration * 1e6,
+  );
   const activeLoop = useCallback(
     () =>
-      loop === "line" && validLine
-        ? ([lineA!, lineB!] as const)
-        : loop === "ab" && pointA != null && pointB != null && pointB > pointA
-          ? ([pointA, pointB] as const)
-          : null,
-    [lineA, lineB, loop, pointA, pointB, validLine],
+      loop === "unit" && validUnit && loopRange
+        ? ([loopRange.begin_us / 1e6, loopRange.end_us / 1e6] as const)
+        : loop === "line" && validLine
+          ? ([lineA!, lineB!] as const)
+          : loop === "ab" && pointA != null && pointB != null && pointB > pointA
+            ? ([pointA, pointB] as const)
+            : null,
+    [lineA, lineB, loop, loopRange, pointA, pointB, validLine, validUnit],
   );
   const readPosition = useCallback(
     () =>
@@ -99,7 +115,8 @@ export function MediaTransport({ projectId, selectedLine, asset }: Props) {
       if (head.current)
         head.current.style.left = `${span ? ((current - start) / span) * 100 : 0}%`;
       if (head.current)
-        head.current.style.display = current >= start && current <= start + span ? "block" : "none";
+        head.current.style.display =
+          current >= start && current <= start + span ? "block" : "none";
     },
     [duration, span, start],
   );
@@ -193,8 +210,9 @@ export function MediaTransport({ projectId, selectedLine, asset }: Props) {
   }, [activeLoop, asset, playing, readPosition, updateDom]);
 
   useEffect(() => {
-    if (loop === "line" && !validLine) setLoop("off");
-  }, [loop, validLine]);
+    if ((loop === "line" && !validLine) || (loop === "unit" && !validUnit))
+      setLoop("off");
+  }, [loop, validLine, validUnit]);
 
   useEffect(() => {
     const range = activeLoop();
@@ -435,6 +453,13 @@ export function MediaTransport({ projectId, selectedLine, asset }: Props) {
           onClick={() => setLoop(loop === "line" ? "off" : "line")}
         >
           循环当前行
+        </button>
+        <button
+          disabled={disabled || !validUnit}
+          className={loop === "unit" ? styles.active : ""}
+          onClick={() => setLoop(loop === "unit" ? "off" : "unit")}
+        >
+          循环当前单元
         </button>
         <button
           disabled={disabled}
