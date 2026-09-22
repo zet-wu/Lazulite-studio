@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   studioApi,
   studioS4,
@@ -106,6 +106,7 @@ function Editor({
     },
   );
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const [panel, setPanel] = useState<Panel>("lyrics");
   const [sideTab, setSideTab] = useState<
     "candidates" | "tasks" | "agents" | "dictionary"
@@ -132,14 +133,14 @@ function Editor({
   }, [lines, params]);
   useEffect(() => {
     const leave = (event: BeforeUnloadEvent) => {
-      if (editor.dirty || editor.saving) {
+      if (editor.dirty || editor.saving || editor.conflict) {
         event.preventDefault();
         event.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", leave);
     return () => window.removeEventListener("beforeunload", leave);
-  }, [editor.dirty, editor.saving]);
+  }, [editor.conflict, editor.dirty, editor.saving]);
   const edit = (id: string, changes: LineUpdate) => {
     try {
       editor.apply({ type: "update-line", lineId: id, changes });
@@ -271,6 +272,17 @@ function Editor({
           </button>
           <button onClick={editor.redo} disabled={!editor.canRedo}>
             重做
+          </button>
+          <button
+            onClick={() => {
+              if (editor.dirty || editor.saving || editor.conflict) {
+                setMessage("请先保存，发布与下载需要使用已保存版本");
+                return;
+              }
+              navigate(`/projects/${projectId}/export`);
+            }}
+          >
+            发布与下载
           </button>
           <button
             onClick={() => {

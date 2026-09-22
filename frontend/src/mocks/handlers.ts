@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { capabilities, document, emptyDocument, jobs, projects, readingDictionary, sampleProject, session } from './data';
+import { capabilities, document, emptyDocument, exports, jobs, projects, readingDictionary, sampleProject, session } from './data';
 
 const root = '/api/v1';
 const scenario = () => new URL(location.href).searchParams.get('scenario') ?? 'normal';
@@ -13,6 +13,14 @@ export const handlers = [
   http.get(`${root}/projects`, () => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : scenario() === 'empty' ? response({ schema_version: 'studio-project-list-v1', items: [], next_cursor: null }) : response(projects)),
   http.get(`${root}/projects/:projectId`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(sampleProject) : error(404, 'project_not_found', '项目不存在')),
   http.get(`${root}/projects/:projectId/jobs`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(jobs) : error(404, 'project_not_found', '项目不存在')),
+  http.get(`${root}/projects/:projectId/exports`, ({ params }) => params.projectId === 'sample-project' ? response(exports) : error(404, 'project_not_found', '项目不存在')),
+  http.post(`${root}/projects/:projectId/publish`, async ({ params, request }) => {
+    if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
+    const body = await request.json() as { revision?: string; asset_id?: string };
+    const id = `export-${Date.now()}`;
+    exports.items.unshift({ id, revision: body.revision ?? document.revision, asset_id: body.asset_id ?? 'sample-asset', status: 'processing', created_at: new Date().toISOString(), stale: false, report: null, download_url: null, error: null });
+    return HttpResponse.json({ id, status: 'processing', revision: body.revision, asset_id: body.asset_id }, { status: 202 });
+  }),
   http.get(`${root}/projects/:projectId/document`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'empty' ? emptyDocument : currentDocument) : error(404, 'project_not_found', '项目不存在')),
   http.get(`${root}/projects/:projectId/reading-dictionary`, ({ params }) => params.projectId === 'sample-project' ? response(readingDictionary) : error(404, 'project_not_found', '项目不存在')),
   http.post(`${root}/projects/:projectId/reading-dictionary`, async ({ params, request }) => {
