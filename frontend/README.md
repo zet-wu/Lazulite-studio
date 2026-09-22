@@ -53,3 +53,9 @@ npx pnpm@10.30.3 test:e2e
 测试自动在 `127.0.0.1:5174` 启动独立模拟服务，不需要手动启动。若将浏览器安装在自定义目录，安装和测试时都设置相同的 `PLAYWRIGHT_BROWSERS_PATH`。本次沙箱验收使用 `/tmp/lazulite-studio-browsers`。
 
 实际结果见 [S1](../docs/s1-acceptance.md)、[S2](../docs/s2-acceptance.md)、[S3](../docs/s3-acceptance.md)、[S4](../docs/s4-acceptance.md)、[S5](../docs/s5-acceptance.md) 验收记录。设计基线见 [架构](../../lyric-workflow/docs/lazulite_studio_frontend_architecture.md)。
+
+## S6 时间精修
+
+右侧“时间”选择正文或某段读音，选择范围后建立词/音拍/音素单元；使用单元内光标拆分、合并相邻单元，或编辑秒数、拖动边界。空时间表示未定，最终导出前必须补齐。底部可循环当前单元。行属性正文内的光标用于拆行，“整体前移/后移”同时移动行及其单元；直接修改行起止只调整边界，不移动已有单元。
+
+左侧“歌手”可创建组合、选择成员，再将组合分配给行。实验精细对齐需要服务端配置独立 forced 后端：先保存并确认正文/读音，再创建任务，查看结果后人工应用。任务结果继续受 revision/asset 与 dirty 状态约束。范围和已知边界见 [S6 验收](../docs/s6-acceptance.md)。
