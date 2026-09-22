@@ -1,7 +1,9 @@
 import type { TtmlAttribute, TtmlNode, TimeUs } from '../../domain/ttml';
-import type { InlineNode, StudioAgent, StudioLine, StudioLyricDocument, StudioRuby, SourceTiming } from '../../domain/document';
+import type { InlineNode, StudioAgent, StudioLine, StudioLyricDocument, StudioRuby, SourceTiming, TimingUnit } from '../../domain/document';
 import { validateRubySpans } from '../../domain/editing';
 import { STUDIO_SCHEMA_VERSION } from '../../domain/document';
+import { renderedTextLength, writeUnitTiming } from './inline-timing';
+import { snapshotLineElements } from './structure';
 export const TTML_NS = 'http://www.w3.org/ns/ttml';
 export const TTM_NS = 'http://www.w3.org/ns/ttml#metadata';
 export const TTS_NS = 'http://www.w3.org/ns/ttml#styling';
@@ -118,6 +120,11 @@ function inline(e: Element): {
             plain = false;
             return { kind: 'element', name: child.tagName, children: [], editable: false, reason: 'unknown inline namespace', raw: tree(child) };
         }
+        if (simpleTimedSpan(child) && Array.from(child.childNodes).every(x => x.nodeType === Node.TEXT_NODE || x.nodeType === Node.CDATA_SECTION_NODE)) {
+            const value = child.textContent || '';
+            text += value;
+            return { kind: 'text', text: value, editable: true };
+        }
         if (local(child) === 'br') {
             text += '\n';
             plain = false;
@@ -128,9 +135,9 @@ function inline(e: Element): {
             const children = Array.from(child.children);
             const base = children.find(x => attr(x, TTS_NS, 'ruby') === 'base');
             const reading = children.find(x => attr(x, TTS_NS, 'ruby') === 'text');
-            if (rubyKind === 'container' && base && reading && children.length === 2 && Array.from(base.childNodes).every(x => x.nodeType === Node.TEXT_NODE || x.nodeType === Node.CDATA_SECTION_NODE) && Array.from(reading.childNodes).every(x => x.nodeType === Node.TEXT_NODE || x.nodeType === Node.CDATA_SECTION_NODE)) {
-                const baseText = base.textContent || '';
-                const readingText = reading.textContent || '';
+            if (rubyKind === 'container' && simpleRuby(child)) {
+                const baseText = base!.textContent || '';
+                const readingText = reading!.textContent || '';
                 const start = cp(text);
                 text += baseText;
                 ruby.push({ id: '', base: baseText, reading: readingText, baseStart: start, baseEnd: cp(text) });
@@ -161,7 +168,10 @@ function checkAgentRefs(lines: StudioLine[], agents: StudioAgent[], issues: Stud
     for (const agent of agents)
         if (agent.actorRef && !ids.has(agent.actorRef))
             issues.push({ code: 'dangling-actor', message: `Unknown actor reference "${agent.actorRef}"`, path: agent.sourcePath });
-    const graph = new Map(agents.map(a => [a.id, a.actorRef ? [a.actorRef] : []]));
+    for (const agent of agents)
+        for (const id of agent.groupRefs)
+            if (!ids.has(id)) issues.push({ code: 'dangling-group', message: `Unknown group reference "${id}"`, path: agent.sourcePath });
+    const graph = new Map(agents.map(a => [a.id, [a.actorRef, ...a.groupRefs].filter((id): id is string => Boolean(id))]));
     const visit = (id: string, seen: Set<string>): boolean => { if (seen.has(id))
         return true; const nextSeen = new Set(seen); nextSeen.add(id); return (graph.get(id) || []).some(next => visit(next, nextSeen)); };
     for (const a of agents)
@@ -206,12 +216,25 @@ function isLyricsLine(element: Element, root: Element): boolean {
     return body !== null && body.parentElement === root;
 }
 
+function simpleTimedSpan(node: Element): boolean {
+    return node.namespaceURI === TTML_NS && local(node) === 'span' && Array.from(node.attributes).every(a => a.namespaceURI === null && ['begin', 'end'].includes(a.localName) || a.namespaceURI === STUDIO_DRAFT_NS && ['id', 'unit-id', 'kind', 'null', 'rubyId'].includes(a.localName)) && Array.from(node.childNodes).every(x => x.nodeType === Node.TEXT_NODE || x.nodeType === Node.CDATA_SECTION_NODE);
+}
 function simpleRuby(node: Element): node is Element {
     if (node.namespaceURI !== TTML_NS || attr(node, TTS_NS, 'ruby') !== 'container') return false;
+    const rubyAttrs = (part: Element, kind: 'container' | 'part') => Array.from(part.attributes).every(a => {
+        if (a.namespaceURI === XMLNS_NS || a.namespaceURI === XML_NS) return true;
+        if (a.namespaceURI === TTS_NS) return a.localName === 'ruby';
+        return kind === 'container' && a.namespaceURI === STUDIO_DRAFT_NS || a.namespaceURI === STUDIO_DRAFT_NS && ['id', 'unit-id', 'kind', 'null', 'rubyId'].includes(a.localName);
+    });
+    if (!rubyAttrs(node, 'container')) return false;
     const children = Array.from(node.children);
     const base = children.find((child) => attr(child, TTS_NS, 'ruby') === 'base');
     const reading = children.find((child) => attr(child, TTS_NS, 'ruby') === 'text');
-    return children.length === 2 && Boolean(base && reading) && [base!, reading!].every((part) => Array.from(part.childNodes).every((child) => child.nodeType === Node.TEXT_NODE || child.nodeType === Node.CDATA_SECTION_NODE));
+    const simplePart = (part: Element) => Array.from(part.childNodes).every((child) => {
+        if (child.nodeType === Node.TEXT_NODE || child.nodeType === Node.CDATA_SECTION_NODE) return true;
+        return child.nodeType === Node.ELEMENT_NODE && simpleTimedSpan(child as Element);
+    });
+    return children.length === 2 && Boolean(base && reading) && rubyAttrs(base!, 'part') && rubyAttrs(reading!, 'part') && simplePart(base!) && simplePart(reading!);
 }
 
 function rubyContainers(line: Element): Element[] {
@@ -238,16 +261,16 @@ function newRubyContainer(document: Document, span: StudioRuby): Element {
     return container;
 }
 
-function writeRubyContent(element: Element, line: StudioLine): void {
+function writeRubyContent(element: Element, line: StudioLine, preservedRuby: Map<string, Element> = new Map()): void {
     validateRubySpans(line.text, line.ruby);
     const existing = rubyContainers(element);
     const baselineRuby = line.baseline.ruby;
-    const known = new Map<string, Element>();
+    const known = new Map<string, Element>(preservedRuby);
     for (const [index, node] of existing.entries()) {
         const span = baselineRuby[index];
         if (span) known.set(span.id, node);
     }
-    const onlySimpleContent = Array.from(element.childNodes).every((node) => node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE || (node.nodeType === Node.ELEMENT_NODE && simpleRuby(node as Element)));
+    const onlySimpleContent = Array.from(element.childNodes).every((node) => node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE || (node.nodeType === Node.ELEMENT_NODE && (simpleRuby(node as Element) || simpleTimedSpan(node as Element))));
     if (!onlySimpleContent) throw new Error(`Line ${line.id} has unsupported content adjacent to Ruby`);
     const points = Array.from(line.text);
     const sorted = [...line.ruby].sort((left, right) => left.baseStart - right.baseStart);
@@ -256,8 +279,9 @@ function writeRubyContent(element: Element, line: StudioLine): void {
     for (const span of sorted) {
         const before = points.slice(cursor, span.baseStart).join('');
         if (before) element.appendChild(element.ownerDocument!.createTextNode(before));
-        const node = known.get(span.id) ?? newRubyContainer(element.ownerDocument!, span);
-        if (known.has(span.id)) {
+        const reused = known.get(span.id);
+        const node = reused ?? newRubyContainer(element.ownerDocument!, span);
+        if (reused) {
             setRubyPart(node, 'base', span.base);
             setRubyPart(node, 'text', span.reading);
         }
@@ -299,7 +323,7 @@ export function parseStudioTtml(xml: string): StudioLyricDocument {
             if (!id)
                 issues.push({ code: 'invalid-agent', message: 'ttm:agent requires xml:id', path });
             else
-                agents.push({ id, name: Array.from(e.children).find(x => x.namespaceURI === TTM_NS && local(x) === 'name')?.textContent || null, type: attr(e, null, 'type'), actorRef: actor ? attr(actor, null, 'agent') : null, groupRefs: [], sourcePath: path, raw: tree(e) });
+                agents.push({ id, name: Array.from(e.children).find(x => x.namespaceURI === TTM_NS && local(x) === 'name')?.textContent || null, type: attr(e, null, 'type'), actorRef: actor ? attr(actor, null, 'agent') : null, groupRefs: (attr(e, STUDIO_DRAFT_NS, 'members') || '').split(/\s+/).filter(Boolean), sourcePath: path, raw: tree(e) });
         }
         if (e.namespaceURI !== TTML_NS && e.namespaceURI !== TTM_NS && e.namespaceURI !== TTS_NS && e !== root) {
             extensions.push(tree(e));
@@ -309,7 +333,49 @@ export function parseStudioTtml(xml: string): StudioLyricDocument {
             const content = inline(e);
             const xmlId = attr(e, XML_NS, 'id');
             const id = `line-${path.join('-') || 'root'}`;
-            const ruby = content.ruby.map((span) => ({ ...span, id: `${id}-ruby-${span.baseStart}-${span.baseEnd}` }));
+            const ruby = content.ruby.map((span, sourceIndex) => ({ ...span, id: `${id}-ruby-${span.baseStart}-${span.baseEnd}`, sourceIndex }));
+            let timingUnits: TimingUnit[] = [];
+            const lineStartUs = (parent.begin ?? 0) + (parseTime(attr(e, null, 'begin')) ?? 0);
+            // Standard timed TTML spans are accepted as word/mora/phoneme units.
+            // The Studio attributes only carry identity and Ruby mapping.
+            let timedOffset = 0;
+            for (const child of Array.from(e.childNodes)) {
+                if (child.nodeType !== Node.ELEMENT_NODE || local(child as Element) !== 'span' || (child as Element).namespaceURI !== TTML_NS || attr(child as Element, TTS_NS, 'ruby') === 'container') {
+                    const element = child as Element; const base = element.nodeType === Node.ELEMENT_NODE && attr(element, TTS_NS, 'ruby') === 'container' ? Array.from(element.children).find(item => attr(item, TTS_NS, 'ruby') === 'base')?.textContent || '' : child.textContent || '';
+                    if (element.nodeType === Node.ELEMENT_NODE && attr(element, TTS_NS, 'ruby') === 'container') {
+                        const basePart = Array.from(element.children).find(item => attr(item, TTS_NS, 'ruby') === 'base');
+                        timedOffset += cp(basePart?.textContent || '');
+                    } else timedOffset += element.nodeType === Node.ELEMENT_NODE ? renderedTextLength(element, TTML_NS) : cp(base);
+                    continue;
+                }
+                const span = child as Element, value = span.textContent || '', start = timedOffset, end = start + cp(value); timedOffset = end;
+                const b = parseTime(attr(span, null, 'begin')), finish = parseTime(attr(span, null, 'end'));
+                if (b === null && finish === null && !attr(span, STUDIO_DRAFT_NS, 'id') && !attr(span, STUDIO_DRAFT_NS, 'kind')) continue;
+                const kind = attr(span, STUDIO_DRAFT_NS, 'kind') as TimingUnit['kind'] | null;
+                timingUnits.push({ id: attr(span, STUDIO_DRAFT_NS, 'id') || `${id}-unit-${start}-${end}`, kind: kind && ['word', 'mora', 'phoneme'].includes(kind) ? kind : 'word', textStart: start, textEnd: end, readingStart: null, readingEnd: null, rubyId: attr(span, STUDIO_DRAFT_NS, 'rubyId'), beginUs: b === null ? null : lineStartUs + b, endUs: finish === null ? null : lineStartUs + finish });
+            }
+            for (const [rubyIndex, container] of Array.from(e.children).filter(child => child.namespaceURI === TTML_NS && attr(child, TTS_NS, 'ruby') === 'container').entries()) {
+                const rubySpan = ruby[rubyIndex]; if (!rubySpan) continue;
+                const basePart = Array.from(container.children).find(child => attr(child, TTS_NS, 'ruby') === 'base');
+                let baseOffset = rubySpan.baseStart;
+                for (const child of Array.from(basePart?.childNodes || [])) {
+                    const value = child.textContent || '', start = baseOffset, end = start + cp(value); baseOffset = end;
+                    if (child.nodeType !== Node.ELEMENT_NODE) continue;
+                    const baseChild = child as Element;
+                    const b = parseTime(attr(baseChild, null, 'begin')), finish = parseTime(attr(baseChild, null, 'end'));
+                    if (b === null && finish === null && !attr(baseChild, STUDIO_DRAFT_NS, 'id') && !attr(baseChild, STUDIO_DRAFT_NS, 'kind')) continue;
+                    timingUnits.push({ id: attr(baseChild, STUDIO_DRAFT_NS, 'id') || `${rubySpan.id}-base-${start}-${end}`, kind: (attr(baseChild, STUDIO_DRAFT_NS, 'kind') as TimingUnit['kind']) || 'word', textStart: start, textEnd: end, readingStart: null, readingEnd: null, rubyId: null, beginUs: b === null ? null : lineStartUs + b, endUs: finish === null ? null : lineStartUs + finish });
+                }
+                const reading = Array.from(container.children).find(child => attr(child, TTS_NS, 'ruby') === 'text')!;
+                let readingOffset = 0;
+                for (const child of Array.from(reading.childNodes)) {
+                    const value = child.textContent || '', start = readingOffset, end = start + cp(value); readingOffset = end;
+                    if (child.nodeType !== Node.ELEMENT_NODE) continue;
+                    const b = parseTime(attr(child as Element, null, 'begin')), finish = parseTime(attr(child as Element, null, 'end'));
+                    if (b === null && finish === null && !attr(child as Element, STUDIO_DRAFT_NS, 'id') && !attr(child as Element, STUDIO_DRAFT_NS, 'kind')) continue;
+                    timingUnits.push({ id: attr(child as Element, STUDIO_DRAFT_NS, 'id') || `${rubySpan.id}-reading-${start}-${end}`, kind: (attr(child as Element, STUDIO_DRAFT_NS, 'kind') as TimingUnit['kind']) || 'word', textStart: rubySpan.baseStart, textEnd: rubySpan.baseEnd, readingStart: start, readingEnd: end, rubyId: rubySpan.id, beginUs: b === null ? null : lineStartUs + b, endUs: finish === null ? null : lineStartUs + finish });
+                }
+            }
             const draft = attr(e, STUDIO_DRAFT_NS, 'null');
             const unknownAttributes = hasUnknownLineAttributes(e) || hasUnknownAncestor(e.parentElement || e, root);
             if (unknownAttributes)
@@ -329,9 +395,11 @@ export function parseStudioTtml(xml: string): StudioLyricDocument {
                 agentRefs: (attr(e, TTM_NS, 'agent') || '').split(/\s+/).filter(Boolean),
                 inline: content.nodes,
                 ruby,
+                timingUnits,
                 sourcePath: path,
                 parentPath,
                 sourceTiming: timing,
+                sourceAttributes: Array.from(e.attributes).map((attribute): TtmlAttribute => ({ namespaceURI: attribute.namespaceURI, localName: attribute.localName, prefix: attribute.prefix, name: attribute.name, value: attribute.value })),
                 editable: { text: textEditable, timing: !timingLocked },
                 locks: {
                     ...(!textEditable ? { text: textReason } : {}),
@@ -342,7 +410,8 @@ export function parseStudioTtml(xml: string): StudioLyricDocument {
                     beginUs: begin,
                     endUs: end,
                     agentRefs: (attr(e, TTM_NS, 'agent') || '').split(/\s+/).filter(Boolean),
-                    ruby: ruby.map((span) => ({ ...span }))
+                    ruby: ruby.map((span) => ({ ...span })),
+                    timingUnits: timingUnits.map((unit) => ({ ...unit }))
                 }
             });
         }
@@ -363,6 +432,8 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
     const draft = options.draft === true;
     if (!draft && document.lines.some(l => l.beginUs === null || l.endUs === null))
         throw new Error('Final TTML export requires complete valid line timing');
+    if (!draft && document.lines.some(line => line.timingUnits.some(unit => unit.beginUs === null || unit.endUs === null)))
+        throw new Error('Final TTML export requires complete fine timing');
     if (!draft && document.profile.category === 'read-only')
         throw new Error('Final TTML export requires an editable or mixed profile');
     if (!draft && document.issues.length > 0)
@@ -370,19 +441,62 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
     const baselineDocument = parseStudioTtml(document.baseline.xml);
     const agentShape = (items: StudioLyricDocument['agents']) => items.map(agent => [agent.id, agent.name, agent.type, agent.actorRef, agent.groupRefs]);
     const hasAgentChanges = JSON.stringify(agentShape(document.agents)) !== JSON.stringify(agentShape(baselineDocument.agents)) || document.lines.some(line => JSON.stringify(line.agentRefs) !== JSON.stringify(line.baseline.agentRefs));
-    const hasChanges = hasAgentChanges || document.lines.some(line => line.text !== line.baseline.text || line.beginUs !== line.baseline.beginUs || line.endUs !== line.baseline.endUs || JSON.stringify(line.ruby) !== JSON.stringify(line.baseline.ruby) || (draft && line.editable.timing && (line.beginUs === null || line.endUs === null)));
+    const hasChanges = hasAgentChanges || document.lines.length !== baselineDocument.lines.length || document.lines.some(line => !line.sourcePath.length || line.text !== line.baseline.text || line.beginUs !== line.baseline.beginUs || line.endUs !== line.baseline.endUs || JSON.stringify(line.ruby) !== JSON.stringify(line.baseline.ruby) || JSON.stringify(line.timingUnits) !== JSON.stringify(line.baseline.timingUnits) || (draft && line.editable.timing && (line.beginUs === null || line.endUs === null)));
     if (!hasChanges)
         return document.baseline.xml;
     const parsed = new DOMParser().parseFromString(document.baseline.xml, 'application/xml');
     if (parsed.getElementsByTagName('parsererror')[0] || !parsed.documentElement)
         throw new Error('Invalid baseline XML');
+    const lineElements = snapshotLineElements(parsed.documentElement, baselineDocument.lines);
+    const preservedRuby = new Map<string, Element>();
+    for (const baselineLine of baselineDocument.lines) {
+        const element = lineElements.get(baselineLine.id);
+        if (!element) continue;
+        const containers = rubyContainers(element);
+        baselineLine.ruby.forEach((span, index) => {
+            const container = containers[index];
+            if (container) preservedRuby.set(span.id, container.cloneNode(true) as Element);
+        });
+    }
+    const lineElement = (line: StudioLine) => lineElements.get(line.id) || null;
+    const existingLine = (line: StudioLine) => lineElements.has(line.id);
+    const newLineIds = new Set<string>();
+    // Structural line transactions use empty sourcePath for inserted lines.
+    // Insert them beside their preceding line while retaining all unrelated DOM nodes.
+    for (const [index, line] of document.lines.entries()) {
+        if (line.sourcePath.length || existingLine(line)) continue;
+        const previous = document.lines[index - 1];
+        const anchor = previous ? lineElement(previous) : null;
+        const parent = anchor?.parentElement ?? parsed.getElementsByTagNameNS(TTML_NS, 'body')[0];
+        if (!parent) throw new Error(`Line ${line.id} has no structural parent`);
+        const sourceLineId = line.sourceLineId;
+        const source = sourceLineId ? lineElements.get(sourceLineId) : null;
+        const node = source ? source.cloneNode(true) as Element : parsed.createElementNS(TTML_NS, 'p');
+        node.removeAttribute('begin');
+        node.removeAttribute('end');
+        node.removeAttribute('dur');
+        if (!source) while (node.firstChild) node.removeChild(node.firstChild);
+        if (line.xmlId) node.setAttributeNS(XML_NS, 'xml:id', line.xmlId);
+        if (line.beginUs !== null) node.setAttribute('begin', timeText(line.beginUs - line.sourceTiming.parentBeginUs));
+        if (line.endUs !== null) node.setAttribute('end', timeText(line.endUs - line.sourceTiming.parentBeginUs));
+        if (!source) node.appendChild(parsed.createTextNode(line.text));
+        if (anchor) parent.insertBefore(node, anchor.nextSibling); else parent.appendChild(node);
+        lineElements.set(line.id, node);
+        newLineIds.add(line.id);
+    }
+    const currentLineIds = new Set(document.lines.map(line => line.id));
+    for (const old of baselineDocument.lines) if (!currentLineIds.has(old.id)) lineElement(old)?.remove();
     for (const line of document.lines) {
         const base = line.baseline;
         const rubyChanged = JSON.stringify(line.ruby) !== JSON.stringify(base.ruby);
+        const unitsChanged = JSON.stringify(line.timingUnits) !== JSON.stringify(base.timingUnits);
+        const timingChanged = line.beginUs !== base.beginUs || line.endUs !== base.endUs;
         const textChanged = line.text !== base.text;
-        if (!textChanged && line.beginUs === base.beginUs && line.endUs === base.endUs && JSON.stringify(line.agentRefs) === JSON.stringify(base.agentRefs) && !rubyChanged && !(draft && (line.beginUs === null || line.endUs === null)))
+        const structuralNew = newLineIds.has(line.id);
+        if (!structuralNew && !textChanged && line.beginUs === base.beginUs && line.endUs === base.endUs && JSON.stringify(line.agentRefs) === JSON.stringify(base.agentRefs) && !rubyChanged && !unitsChanged && !(draft && (line.beginUs === null || line.endUs === null)))
             continue;
-        const element = elementAt(parsed.documentElement, line.sourcePath);
+        if (!line.sourcePath.length && !newLineIds.has(line.id)) continue;
+        const element = lineElement(line);
         if (!element)
             throw new Error(`Line ${line.id} source path is missing`);
         const agentValue = line.agentRefs.join(' ');
@@ -392,16 +506,20 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
             throw new Error(`Line ${line.id} text is read-only`);
         if (!line.editable.timing && (line.beginUs !== base.beginUs || line.endUs !== base.endUs))
             throw new Error(`Line ${line.id} timing is read-only`);
-        if (textChanged || rubyChanged) {
+        if (!structuralNew && (textChanged || rubyChanged)) {
             if (!line.editable.text)
                 throw new Error(`Line ${line.id} text or Ruby is read-only`);
             if (line.ruby.length || base.ruby.length)
-                writeRubyContent(element, line);
+                writeRubyContent(element, line, preservedRuby);
             else {
                 while (element.firstChild)
                     element.removeChild(element.firstChild);
                 element.appendChild(parsed.createTextNode(line.text));
             }
+        }
+        if (structuralNew) {
+            if (line.ruby.length) writeRubyContent(element, line, preservedRuby);
+            else { while (element.firstChild) element.removeChild(element.firstChild); element.appendChild(parsed.createTextNode(line.text)); }
         }
         const parentStart = line.sourceTiming.parentBeginUs;
         if (line.beginUs !== null && (!Number.isSafeInteger(line.beginUs) || line.beginUs < 0))
@@ -452,6 +570,7 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
         }
         else if (line.editable.timing)
             element.removeAttributeNS(STUDIO_DRAFT_NS, 'null');
+        if (unitsChanged || timingChanged || structuralNew) { parsed.documentElement.setAttributeNS(XMLNS_NS, 'xmlns:studio', STUDIO_DRAFT_NS); writeUnitTiming(element, line); }
     }
     const baselineIds = new Set(baselineDocument.agents.map(agent => agent.id));
     const removedAgents: Element[] = [];
@@ -468,6 +587,11 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
         if (current.type !== baselineAgent.type) {
             if (current.type) node.setAttribute('type', current.type); else node.removeAttribute('type');
         }
+        if (JSON.stringify(current.groupRefs) !== JSON.stringify(baselineAgent.groupRefs)) {
+            if (current.groupRefs.length) node.setAttributeNS(STUDIO_DRAFT_NS, 'studio:members', current.groupRefs.join(' '));
+            else node.removeAttributeNS(STUDIO_DRAFT_NS, 'members');
+            parsed.documentElement.setAttributeNS(XMLNS_NS, 'xmlns:studio', STUDIO_DRAFT_NS);
+        }
     }
     for (const node of removedAgents) node.parentElement?.removeChild(node);
     const newAgents = document.agents.filter(agent => !baselineIds.has(agent.id));
@@ -481,6 +605,7 @@ export function serializeStudioTtml(document: StudioLyricDocument, options: {
             if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(agent.id)) throw new Error(`Invalid agent id: ${agent.id}`);
             const node = parsed.createElementNS(TTM_NS, 'ttm:agent'); node.setAttributeNS(XML_NS, 'xml:id', agent.id);
             if (agent.type) node.setAttribute('type', agent.type);
+            if (agent.groupRefs.length) { node.setAttributeNS(STUDIO_DRAFT_NS, 'studio:members', agent.groupRefs.join(' ')); parsed.documentElement.setAttributeNS(XMLNS_NS, 'xmlns:studio', STUDIO_DRAFT_NS); }
             const name = parsed.createElementNS(TTM_NS, 'ttm:name'); name.textContent = agent.name ?? ''; node.appendChild(name); metadata.appendChild(node);
         }
     }

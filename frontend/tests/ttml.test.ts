@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { importTtml, parseTime, serializeOriginal, serializeWithXmlSerializer } from '../src/adapters/ttml';
+import { parseStudioTtml, serializeStudioTtml } from '../src/adapters/ttml/codec';
 import golden from './fixtures/ttml-golden.xml?raw';
 
 describe('Studio TTML profile probe', () => {
+  it('imports editable standard timed spans with absolute microseconds and writes them back', () => {
+    const source = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div begin="2s"><p begin="1s" end="5s">A<span begin="500ms" end="1500ms">BC</span>D</p></div></body></tt>';
+    const parsed = parseStudioTtml(source);
+    expect(parsed.lines[0]).toMatchObject({ beginUs: 3_000_000, endUs: 7_000_000, editable: { text: true, timing: true } });
+    expect(parsed.lines[0].timingUnits[0]).toMatchObject({ textStart: 1, textEnd: 3, beginUs: 3_500_000, endUs: 4_500_000, rubyId: null });
+    const edited = structuredClone(parsed); edited.lines[0].timingUnits[0].endUs = 5_000_000;
+    const roundTrip = parseStudioTtml(serializeStudioTtml(edited));
+    expect(roundTrip.lines[0].timingUnits[0]).toMatchObject({ textStart: 1, textEnd: 3, beginUs: 3_500_000, endUs: 5_000_000 });
+  });
   it('parses media clock, milliseconds, nested relative timing and agents by namespace', () => {
     const document = importTtml(golden);
     expect(parseTime('00:00:01.250')).toBe(1_250_000);
@@ -53,5 +63,30 @@ describe('Studio TTML profile probe', () => {
     expect(document.issues.map((issue) => issue.code)).toEqual(expect.arrayContaining(['unsupported-seq', 'unsupported-time-base', 'unknown-namespace']));
     expect(() => importTtml('<!DOCTYPE tt [<!ENTITY x "bad">]><tt/>')).toThrow(/DTD/);
     expect(() => importTtml('<root xmlns="urn:other"/>')).toThrow(/Root/);
+  });
+
+  it('round-trips mixed Ruby reading gaps, null timing, deletion and repeated edits', () => {
+    const source = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p begin="1s" end="5s"><span tts:ruby="container"><span tts:ruby="base">今日</span><span tts:ruby="text">きょう</span></span>歌うよ</p></body></tt>';
+    const document = parseStudioTtml(source);
+    const line = document.lines[0], ruby = line.ruby[0];
+    line.timingUnits = [
+      { id: 'song', kind: 'word', textStart: 2, textEnd: 3, readingStart: null, readingEnd: null, rubyId: null, beginUs: 3_000_000, endUs: null },
+      { id: 'reading', kind: 'mora', textStart: ruby.baseStart, textEnd: ruby.baseEnd, readingStart: 0, readingEnd: 2, rubyId: ruby.id, beginUs: 1_000_000, endUs: 2_000_000 },
+    ];
+    const encoded = serializeStudioTtml(document, { draft: true });
+    expect(encoded).toContain('歌</span>うよ');
+    expect(encoded).toContain('studio:null="end"');
+    const reopened = parseStudioTtml(encoded);
+    expect(reopened.lines[0].text).toBe('今日歌うよ');
+    expect(reopened.lines[0].timingUnits).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'song', textStart: 2, textEnd: 3, rubyId: null, endUs: null }),
+      expect.objectContaining({ id: 'reading', readingStart: 0, readingEnd: 2 }),
+    ]));
+    reopened.lines[0].timingUnits = reopened.lines[0].timingUnits.filter(unit => unit.id !== 'song');
+    const edited = serializeStudioTtml(reopened, { draft: true });
+    expect(edited).toContain('歌うよ');
+    expect(edited).not.toContain('studio:id="song"');
+    const repeated = serializeStudioTtml(parseStudioTtml(edited), { draft: true });
+    expect(repeated).not.toContain('<span><span');
   });
 });

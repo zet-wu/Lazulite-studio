@@ -1,4 +1,4 @@
-import type { TtmlNode, TimeUs } from './ttml';
+import type { TtmlAttribute, TtmlNode, TimeUs } from './ttml';
 export const STUDIO_SCHEMA_VERSION = 'studio-lyric-v1' as const;
 export type InlineNode = {
     kind: 'text';
@@ -28,8 +28,22 @@ export type StudioRuby = {
     baseStart: number;
     baseEnd: number;
 };
+export type TimingUnitKind = 'word' | 'mora' | 'phoneme';
+/** Fine timing uses code-point coordinates; reading coordinates are independent. */
+export type TimingUnit = {
+    id: string;
+    kind: TimingUnitKind;
+    textStart: number;
+    textEnd: number;
+    readingStart: number | null;
+    readingEnd: number | null;
+    rubyId: string | null;
+    beginUs: TimeUs;
+    endUs: TimeUs;
+};
 export type StudioLine = {
     id: string;
+    sourceLineId?: string;
     xmlId: string | null;
     text: string;
     beginUs: TimeUs;
@@ -37,9 +51,12 @@ export type StudioLine = {
     agentRefs: string[];
     inline: InlineNode[];
     ruby: StudioRuby[];
+    timingUnits: TimingUnit[];
     sourcePath: number[];
     parentPath: number[];
     sourceTiming: SourceTiming;
+    /** Original line attributes, used to preserve metadata through structural edits. */
+    sourceAttributes: TtmlAttribute[];
     editable: {
         text: boolean;
         timing: boolean;
@@ -48,7 +65,7 @@ export type StudioLine = {
         text?: string;
         timing?: string;
     };
-    baseline: Pick<StudioLine, 'text' | 'beginUs' | 'endUs' | 'agentRefs' | 'ruby'>;
+    baseline: Pick<StudioLine, 'text' | 'beginUs' | 'endUs' | 'agentRefs' | 'ruby' | 'timingUnits'>;
 };
 export type StudioAgent = {
     id: string;
