@@ -25,6 +25,8 @@ from .db import Database
 from .documents import DocumentService, build_router
 from .job_routes import create_job_router
 from .jobs import JobService
+from .publish import PublishRunner, StppPublisher
+from .publish_routes import build_publish_router
 from .engine import configured_engine
 from .forced import configured_forced_runner, prepare_forced_request
 from .projection import project_ttml, project_ttml_for_forced
@@ -42,7 +44,7 @@ def stamp():
 
 def create_app(
     data_dir: str | Path | None = None, settings: Settings | None = None, engine=None,
-    reading_proposer=None, forced_aligner=None,
+    reading_proposer=None, forced_aligner=None, publisher=None,
 ) -> FastAPI:
     cfg = settings or Settings.from_env()
     if not cfg.origin or (not cfg.trusted_gateway and not cfg.password):
@@ -62,6 +64,8 @@ def create_app(
     elif getattr(configured_engine_instance, "forced_runner", None) is None:
         configured_engine_instance.forced_runner = configured_forced_runner()
     configured_reading_proposer = reading_proposer or SudachiReadingProposer()
+    if publisher is None:
+        publisher = StppPublisher()
     reading_runner = ReadingJobRunner(db, configured_reading_proposer)
     api = APIRouter(prefix="/api/v1")
 
@@ -206,6 +210,8 @@ def create_app(
                  "reason": None if getattr(getattr(configured_engine_instance, "forced_runner", None), "available", False) else "未显式配置实验 forced aligner"},
                 {"id": "job.reading", "enabled": reading_enabled,
                  "reason": None if reading_enabled else (reading_runner.reason() or "未配置日语读音后端")},
+                {"id": "publish.stpp", "enabled": publish_runner.available(),
+                 "reason": None if publish_runner.available() else "未配置 STPP 发布器"},
             ],
         }
 
@@ -471,6 +477,8 @@ def create_app(
         return root / "assets" / row[1][:2] / row[1]
 
     def validate_job_request(pid, kind, params):
+        if kind == "publish":
+            fail("publish_endpoint_required", "publish jobs must use /projects/{pid}/publish", 422)
         # Automated proposals must identify the immutable inputs they bind to.
         revision = params.get("revision")
         asset_id = params.get("asset_id")
@@ -514,10 +522,12 @@ def create_app(
         with db.connect() as c:
             return c.execute("SELECT 1 FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone() is not None
 
-    job_service = JobService(db, engine=configured_engine_instance, asset_path=asset_path_for_project, reading_runner=reading_runner)
+    publish_runner = PublishRunner(revisions, asset_path_for_project, root / "exports", publisher=publisher)
+    job_service = JobService(db, engine=configured_engine_instance, asset_path=asset_path_for_project, reading_runner=reading_runner, publish_runner=publish_runner)
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
     api.include_router(build_dictionary_router(ReadingDictionary(db), auth=auth, write=write, project_exists=project))
     api.include_router(build_router(DocumentService(revisions), auth=auth, write=write, project_exists=project))
+    api.include_router(build_publish_router(job_service, auth=auth, write=write, project_row=project))
     api.include_router(build_review_router(db, auth=auth, write=write, project_exists=project, stamp=stamp))
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
     app.include_router(api)

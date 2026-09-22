@@ -292,6 +292,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publishProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listExports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/exports/{jobId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -380,6 +428,36 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        PublishRequest: {
+            revision: string;
+            asset_id: string;
+        };
+        Export: {
+            id: string;
+            revision: string;
+            asset_id: string;
+            status: string;
+            created_at: string;
+            stale: boolean;
+            report: components["schemas"]["PublishReport"] | null;
+            download_url: string | null;
+            error: Record<string, never> | null;
+        };
+        ExportList: {
+            /** @constant */
+            schema_version: "studio-export-list-v1";
+            items: components["schemas"]["Export"][];
+        };
+        PublishReport: {
+            passed: boolean;
+            audio_streams: number;
+            audio_preserved: boolean;
+            metadata_preserved: boolean;
+            subtitle_handler: string;
+            subtitle_codec: string;
+            sample_count: number;
+            ttml_sha256: string;
+        };
         JobCreate: {
             /** @enum {string} */
             kind: "search" | "fetch" | "transcribe" | "align" | "line_align" | "reading" | "forced_align";
@@ -388,11 +466,15 @@ export interface components {
                 asset_id: string;
                 line_ids?: string[];
                 line_id?: string;
+                /** @enum {string} */
                 input_granularity?: "word" | "mora" | "phoneme";
                 language?: string | null;
+                /** @enum {string} */
                 coordinate_space?: "text" | "ruby";
                 ruby_id?: string;
-                base_range?: [number, number];
+                base_range?: number[];
+                /** @enum {string} */
+                granularity?: "word" | "mora" | "phoneme";
                 title?: string | null;
                 artist?: string | null;
                 album?: string | null;
@@ -423,24 +505,14 @@ export interface components {
                 revision: string;
                 revision_sha256?: string | null;
             };
-            items?: (components["schemas"]["SearchCandidate"] | components["schemas"]["FetchedLyric"] | components["schemas"]["AlignedLine"] | components["schemas"]["TranscriptionSegment"] | components["schemas"]["ReadingProposal"] | components["schemas"]["ForcedAlignmentUnit"] )[];
+            items?: (components["schemas"]["SearchCandidate"] | components["schemas"]["FetchedLyric"] | components["schemas"]["AlignedLine"] | components["schemas"]["TranscriptionSegment"] | components["schemas"]["ReadingProposal"] | components["schemas"]["ForcedAlignmentUnit"])[];
             proposals?: components["schemas"]["ReadingProposal"][];
             units?: components["schemas"]["ForcedAlignmentUnit"][];
-            evidence?: Record<string, unknown>;
+            evidence?: {
+                [key: string]: unknown;
+            };
         } & {
             [key: string]: unknown;
-        };
-        ForcedAlignmentUnit: {
-            line_id: string;
-            input_range: [number, number];
-            text: string;
-            source_range?: number[];
-            start: number | null;
-            end: number | null;
-            start_us: number | null;
-            end_us: number | null;
-            granularity: "subword" | "word" | "character" | "mora" | "phoneme";
-            confidence: number | null;
         };
         DictionaryEntryInput: {
             surface: string;
@@ -503,6 +575,19 @@ export interface components {
             timing_source: string;
             source_segment_ids?: string[];
             issues?: string[];
+        };
+        ForcedAlignmentUnit: {
+            line_id: string;
+            input_range: number[];
+            source_range?: number[];
+            text: string;
+            start: number | null;
+            end: number | null;
+            start_us: number | null;
+            end_us: number | null;
+            /** @enum {string} */
+            granularity: "subword" | "word" | "character" | "mora" | "phoneme";
+            confidence: number | null;
         };
         TranscriptionSegment: {
             source_segment_id: string;
@@ -1279,6 +1364,83 @@ export interface operations {
                     "application/json": components["schemas"]["WaveformWindow"];
                 };
             };
+            default: components["responses"]["Error"];
+        };
+    };
+    publishProject: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued publication */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            409: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listExports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Publication exports */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportList"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    downloadExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description STPP file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            409: components["responses"]["Error"];
+            410: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };

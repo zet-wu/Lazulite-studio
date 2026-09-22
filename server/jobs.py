@@ -8,6 +8,8 @@ from .db import Database
 from .engine import EngineUnavailable, LazuliteEngine
 from .reading import ReadingUnavailable
 from .forced import ForcedUnavailable
+from .publish import PublishInvalid
+from .publishing import PublishingError
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +17,8 @@ def now(): return datetime.now(timezone.utc).isoformat()
 
 class JobService:
     """Durable single-slot executor. Every lifecycle transition is committed before notification."""
-    def __init__(self, db: Database, *, engine=None, asset_path=None, reading_runner=None):
-        self.db, self.engine, self.asset_path, self.reading_runner = db, engine or LazuliteEngine(), asset_path, reading_runner
+    def __init__(self, db: Database, *, engine=None, asset_path=None, reading_runner=None, publish_runner=None):
+        self.db, self.engine, self.asset_path, self.reading_runner, self.publish_runner = db, engine or LazuliteEngine(), asset_path, reading_runner, publish_runner
         self._lock = threading.Lock(); self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="studio-job")
         with db.transaction() as c:
             rows = c.execute("SELECT id FROM jobs WHERE status IN ('queued','running','cancel_requested')").fetchall()
@@ -57,6 +59,10 @@ class JobService:
                 if self.reading_runner is None:
                     raise ReadingUnavailable("未配置读音后端")
                 result = self.reading_runner.run(record[1], request)
+            elif kind == "publish":
+                if self.publish_runner is None:
+                    raise RuntimeError("STPP publisher is not configured")
+                result = self.publish_runner.run(record[1], request)
             else:
                 result=self.engine.run(kind, asset_path=self.asset_path(record[1]) if self.asset_path else None, params=request, emit=lambda *x:self.emit(jid,*x))
             with self.db.connect() as c:
@@ -73,6 +79,7 @@ class JobService:
                                  "revision_sha256": revision_hash}
             with self.db.transaction() as c:
                 t=now(); c.execute("UPDATE jobs SET status='succeeded',result_json=?,engine_json=?,updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps(result,ensure_ascii=False),json.dumps(result.get("engine",{})),t,t,jid)); self._event(c,jid,"state","succeeded",1,1,"任务完成")
+        except (PublishInvalid, PublishingError) as exc: self._finish_error(jid, "publish_failed", str(exc))
         except (EngineUnavailable, ReadingUnavailable, ForcedUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
         except Exception as exc:
             logger.exception("job %s failed", jid)

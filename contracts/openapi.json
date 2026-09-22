@@ -411,6 +411,31 @@
           "default": { "$ref": "#/components/responses/Error" }
         }
       }
+    },
+    "/projects/{projectId}/publish": {
+      "post": {
+        "operationId": "publishProject",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PublishRequest" } } } },
+        "responses": { "202": { "description": "Queued publication", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } } }, "409": { "$ref": "#/components/responses/Error" }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/projects/{projectId}/exports": {
+      "get": {
+        "operationId": "listExports",
+        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }],
+        "responses": { "200": { "description": "Publication exports", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExportList" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/projects/{projectId}/exports/{jobId}/download": {
+      "get": {
+        "operationId": "downloadExport",
+        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }, { "$ref": "#/components/parameters/JobId" }],
+        "responses": { "200": { "description": "STPP file" }, "409": { "$ref": "#/components/responses/Error" }, "410": { "$ref": "#/components/responses/Error" }, "default": { "$ref": "#/components/responses/Error" } }
+      }
     }
   },
   "components": {
@@ -713,6 +738,30 @@
         "required": ["params"],
         "properties": { "params": { "type": "object", "additionalProperties": true } },
         "additionalProperties": false
+      },
+      "PublishRequest": {
+        "type": "object",
+        "required": ["revision", "asset_id"],
+        "additionalProperties": false,
+        "properties": { "revision": { "type": "string" }, "asset_id": { "type": "string" } }
+      },
+      "Export": {
+        "type": "object",
+        "required": ["id", "revision", "asset_id", "status", "created_at", "stale", "report", "download_url", "error"],
+        "properties": {
+          "id": { "type": "string" }, "revision": { "type": "string" }, "asset_id": { "type": "string" }, "status": { "type": "string" }, "created_at": { "type": "string" }, "stale": { "type": "boolean" }, "report": { "anyOf": [{ "$ref": "#/components/schemas/PublishReport" }, { "type": "null" }] }, "download_url": { "type": ["string", "null"] }, "error": { "type": ["object", "null"] }
+        }
+      },
+      "ExportList": {
+        "type": "object", "required": ["schema_version", "items"],
+        "properties": { "schema_version": { "const": "studio-export-list-v1" }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/Export" } } }
+      },
+      "PublishReport": {
+        "type": "object",
+        "required": ["passed", "audio_streams", "audio_preserved", "metadata_preserved", "subtitle_handler", "subtitle_codec", "sample_count", "ttml_sha256"],
+        "properties": {
+          "passed": { "type": "boolean" }, "audio_streams": { "type": "integer" }, "audio_preserved": { "type": "boolean" }, "metadata_preserved": { "type": "boolean" }, "subtitle_handler": { "type": "string" }, "subtitle_codec": { "type": "string" }, "sample_count": { "type": "integer" }, "ttml_sha256": { "type": "string" }
+        }
       },
       "JobCreate": {
         "type": "object",
