@@ -45,6 +45,10 @@ Qwen 的 character 输出不能视作 mora 或 phoneme；多后端 PoC 与真实
 
 `GET lyrics` 下载当前或指定已提交修订。导入接口返回候选，不直接覆盖草稿；修订存储支持内部 CAS 与幂等事务，项目初始草稿使用合法空 TTML。
 
+S7 的 `POST /projects/{id}/publish` 接收 `{revision, asset_id}` 和可选 `Idempotency-Key`，创建持久发布任务。`GET /projects/{id}/exports` 返回记录、旧版本标记、回读报告与受控下载地址；只有任务成功、报告通过且文件仍存在才开放下载。源资产和修订不会被覆盖，失败或中断后可重新创建任务。
+
+发布目前支持已有音轨的非分片 MP4/M4A，原编码直接保留，不转换 WAV/MP3 等输入。拒绝已有 `subt/stpp` 的源文件、分片容器和顶层 size=0 box；其他受支持编辑功能仍可用于这些项目并导出 TTML。媒体发布需要 `ffprobe`，输出在数据目录的 `exports/` 下。暂不自动清理产物，备份时一起保留。实现采用流式复制、原位替换 movie 索引和新增单 TTML sample，并验证原媒体字节、movie 索引、音轨信息、元数据及 TTML 回读。当前 MusicBox 的直接读取限制见 [消费端记录](../docs/s7-musicbox-compatibility.md)。
+
 验证（在仓库根目录运行）：
 
 ```sh

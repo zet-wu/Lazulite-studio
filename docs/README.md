@@ -23,3 +23,5 @@ S4 行级制作范围与传输决策见 [实施记录](s4-implementation.md)，�
 S5 日语整体 Ruby、读音候选、确认与用户词典的开发边界见 [实施记录](s5-implementation.md)，实际范围与验证结果见 [验收记录](s5-acceptance.md)。
 
 S6 细粒度时间、行拆合、组合歌手与实验 forced 对齐见 [实施记录](s6-implementation.md)，验证结果和性能边界见 [验收记录](s6-acceptance.md)。
+
+S7 媒体封装、持久发布与下载见 [实施记录](s7-implementation.md)和[验收记录](s7-acceptance.md)。[MusicBox 检查](s7-musicbox-compatibility.md)确认当前消费端尚缺 STPP sample 提取，不能将本阶段标记为完整消费端兼容。

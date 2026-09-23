@@ -2,7 +2,7 @@
 
 面向本地音乐的歌词制作工作台：承接 Lazulite 自动化证据，通过人工编辑产出 TTML，并逐步支持自包含 MP4/M4A 发布。
 
-当前状态（2026-09-22）：S1–S6 功能已实现。现支持正文/读音细粒度时间、可撤销拆合与拖动、组合歌手，以及按配置开放的独立 forced 对齐候选。验证与模型、性能边界见 [S6 验收](docs/s6-acceptance.md)，历史记录见 [S1](docs/s1-acceptance.md)、[S2](docs/s2-acceptance.md)、[S3](docs/s3-acceptance.md)、[S4](docs/s4-acceptance.md)、[S5](docs/s5-acceptance.md)。
+当前状态（2026-09-23）：S1–S6 功能已实现，S7 Studio 发布链路已完成。支持把已保存歌词封装到 MP4/M4A 的单样本 STPP 轨道，回读校验后下载独立成品；MusicBox 当前版本尚不能直接提取该轨道，完整消费端退出条件尚未满足。见 [S7 验收](docs/s7-acceptance.md)与[消费端检查](docs/s7-musicbox-compatibility.md)。细粒度编辑及模型、性能边界见 [S6](docs/s6-acceptance.md)，历史记录见 [S1](docs/s1-acceptance.md)、[S2](docs/s2-acceptance.md)、[S3](docs/s3-acceptance.md)、[S4](docs/s4-acceptance.md)、[S5](docs/s5-acceptance.md)。
 
 ## 设计入口
 
