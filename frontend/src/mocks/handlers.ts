@@ -18,8 +18,10 @@ export const handlers = [
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
     const body = await request.json() as { revision?: string; asset_id?: string };
     const id = `export-${Date.now()}`;
-    exports.items.unshift({ id, revision: body.revision ?? document.revision, asset_id: body.asset_id ?? 'sample-asset', status: 'processing', created_at: new Date().toISOString(), stale: false, report: null, download_url: null, error: null });
-    return HttpResponse.json({ id, status: 'processing', revision: body.revision, asset_id: body.asset_id }, { status: 202 });
+    const revision = body.revision ?? document.revision;
+    const assetId = body.asset_id ?? 'sample-asset';
+    exports.items.unshift({ id, revision, asset_id: assetId, status: 'failed', created_at: new Date().toISOString(), stale: false, report: null, download_url: null, error: '演示模式不生成媒体文件，请连接真实服务发布' });
+    return HttpResponse.json({ id, status: 'failed', revision, asset_id: assetId }, { status: 202 });
   }),
   http.get(`${root}/projects/:projectId/document`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'empty' ? emptyDocument : currentDocument) : error(404, 'project_not_found', '项目不存在')),
   http.get(`${root}/projects/:projectId/reading-dictionary`, ({ params }) => params.projectId === 'sample-project' ? response(readingDictionary) : error(404, 'project_not_found', '项目不存在')),

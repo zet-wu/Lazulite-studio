@@ -50,7 +50,7 @@ def test_publish_real_http_old_revision_idempotency_and_missing_file(tmp_path):
     headers = _headers(client, settings)
     pid, asset = _project(client, headers, tmp_path)
     empty = client.get(f"/api/v1/projects/{pid}/document").json()["revision"]
-    first = _save(client, headers, pid, empty, '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0s" end="1s">hello</p></body></tt>')
+    first = _save(client, headers, pid, empty, '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttp="http://www.w3.org/ns/ttml#parameter" ttp:timeBase="media"><body timeContainer="par"><p begin="0s" end="1s">hello</p></body></tt>')
     created = client.post(f"/api/v1/projects/{pid}/publish", json={"revision": first, "asset_id": asset}, headers={**headers, "idempotency-key": "pub-1"})
     assert created.status_code == 202
     retry = client.post(f"/api/v1/projects/{pid}/publish", json={"revision": first, "asset_id": asset}, headers={**headers, "idempotency-key": "pub-1"})
@@ -88,3 +88,6 @@ def test_publish_http_validation_and_download_auth_gate(tmp_path):
     assert unauthenticated.get(f"/api/v1/projects/{pid}/exports/{failed['id']}/download").status_code == 401
     assert client.post(f"/api/v1/projects/{pid}/publish", json={"revision": "missing", "asset_id": asset}, headers=headers).status_code == 422
     assert client.post(f"/api/v1/projects/{pid}/publish", json={"revision": bad, "asset_id": "other"}, headers=headers).status_code == 422
+    clock = _save(client, headers, pid, bad, '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0s" end="1s" dur="1s">x</p></body></tt>')
+    clock_job = client.post(f"/api/v1/projects/{pid}/publish", json={"revision": clock, "asset_id": asset}, headers={**headers, "idempotency-key": "clock"}).json()["id"]
+    assert _wait(client, clock_job)["error"]["code"] == "publish_failed"

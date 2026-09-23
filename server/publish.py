@@ -10,9 +10,11 @@ import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
-from .projection import _plain, _timing
+from .projection import _plain
 
 TTML_NS = "http://www.w3.org/ns/ttml"
+TTP_NS = "http://www.w3.org/ns/ttml#parameter"
+STUDIO_NS = "urn:lazulite:studio:draft"
 
 
 class PublishInvalid(ValueError):
@@ -90,9 +92,17 @@ def validate_publish_ttml(path: str | Path, max_duration: float | None = None) -
         if max_duration is not None and end > max_duration + 1e-6:
             raise PublishInvalid("lyrics exceed source audio duration")
     for element in root.iter():
-        if any(key.rsplit("}", 1)[-1] == "timeContainer" for key in element.attrib):
+        if element.attrib.get("timeContainer") not in (None, "par"):
             raise PublishInvalid("unsupported timeContainer")
-        if any(key.rsplit("}", 1)[-1].lower().endswith("null") for key in element.attrib):
+        if "dur" in element.attrib:
+            raise PublishInvalid("unsupported TTML clock parameter")
+        time_base = element.attrib.get(f"{{{TTP_NS}}}timeBase")
+        if time_base not in (None, "media"):
+            raise PublishInvalid("unsupported TTML clock parameter")
+        unsupported_clock = {"frameRate", "frameRateMultiplier", "subFrameRate", "tickRate"}
+        if any(key in {f"{{{TTP_NS}}}{name}" for name in unsupported_clock} for key in element.attrib):
+            raise PublishInvalid("unsupported TTML clock parameter")
+        if f"{{{STUDIO_NS}}}null" in element.attrib:
             raise PublishInvalid("draft timing null is not publishable")
         begin, end = element.get("begin"), element.get("end")
         if begin is not None or end is not None:
@@ -128,7 +138,7 @@ class PublishRunner:
         source = Path(row[0])
         asset = Path(self.asset_path(project_id))
         from .publishing import media_duration_us
-        report = validate_publish_ttml(source, media_duration_us(asset) / 1_000_000)
+        validate_publish_ttml(source, media_duration_us(asset) / 1_000_000)
         output = self.output_root / f"{uuid.uuid4().hex}{asset.suffix or '.mp4'}"
         result = self.publisher.publish(source, asset, output)
         result = dict(result or {})
