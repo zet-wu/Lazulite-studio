@@ -62,9 +62,6 @@ class Database:
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
             conn.executescript(SCHEMA)
-            columns = {row[1] for row in conn.execute("PRAGMA table_info(review_confirmations)")}
-            if "content_hash" not in columns:
-                conn.execute("ALTER TABLE review_confirmations ADD COLUMN content_hash TEXT")
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
