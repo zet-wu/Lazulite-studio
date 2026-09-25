@@ -57,7 +57,10 @@ export const handlers = [
   http.post(`${root}/projects/:projectId/imports`, async ({ params, request }) => {
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
     const content = await request.text();
-    return response({ schema_version: 'studio-import-v1', project_id: 'sample-project', input_revision: document.revision, candidate: { format: 'text', text: content, lines: content.split(/\r?\n/).filter(Boolean).map((text, index) => ({ id: `import-${index}`, text, begin_us: null, end_us: null })) }, diagnostics: [], saved: false });
+    const candidate = request.headers.get('content-type')?.includes('ttml')
+      ? { format: 'ttml', ttml: content }
+      : { format: 'text', text: content, lines: content.split(/\r?\n/).filter(Boolean).map((text, index) => ({ id: `import-${index}`, text, begin_us: null, end_us: null })) };
+    return response({ schema_version: 'studio-import-v1', project_id: 'sample-project', input_revision: currentDocument.revision, candidate, diagnostics: [], saved: false });
   }),
   http.get(`${root}/projects/:projectId/review`, ({ params }) => params.projectId === 'sample-project' ? response({ schema_version: 'studio-review-v1', project_id: 'sample-project', version: 1, items: [] }) : error(404, 'project_not_found', '项目不存在')),
   http.patch(`${root}/projects/:projectId/review`, ({ params }) => params.projectId === 'sample-project' ? response({ schema_version: 'studio-review-item-v1', project_id: 'sample-project', line_id: 'line-1', revision: document.revision, version: 2, status: 'confirmed', note: null }) : error(404, 'project_not_found', '项目不存在')),

@@ -1,44 +1,57 @@
-import { expect, test } from "@playwright/test";
-import { readFile } from "node:fs/promises";
+import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
-const source = `<?xml version="1.0"?><tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><head><metadata><agent xmlns="http://www.w3.org/ns/ttml#metadata" xml:id="v1"/></metadata></head><body><div><p xml:id="plain" begin="0s" end="1s">原始文字</p><p xml:id="ruby" begin="1s" end="2s"><span tts:ruby="container"><span tts:ruby="base">今日</span><span tts:ruby="text">きょう</span></span></p><x:unknown xmlns:x="urn:test">保留</x:unknown></div></body></tt>`;
-
-async function upload(page: import("@playwright/test").Page) {
-  await page.goto("/editor");
-  await page.locator('input[type="file"]').setInputFiles({ name: "sample.ttml", mimeType: "application/xml", buffer: Buffer.from(source) });
-  await expect(page.getByRole("cell", { name: "原始文字", exact: true })).toBeVisible();
+const fixture = '../docs/evidence/editor-e0/reference-apple-metadata.ttml';
+async function upload(page: import('@playwright/test').Page) {
+  await page.goto('/editor');
+  const source = await readFile(fixture);
+  await page.locator('input[type="file"]').setInputFiles({ name: 'sample.ttml', mimeType: 'application/xml', buffer: source });
+  await expect(page.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
 }
 
-test("imports, edits, undoes and downloads TTML while retaining Ruby", async ({ page }) => {
+test('imports, edits, undoes and downloads Ruby with background vocals', async ({ page }) => {
   await upload(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: "属性" }).click();
-  await page.getByLabel("正文").fill("修改文字");
-  await page.getByRole("button", { name: "应用修改" }).click();
-  await expect(page.getByLabel("正文")).toHaveValue("修改文字");
-  await page.getByRole("button", { name: "撤销" }).click();
-  await expect(page.getByLabel("正文")).toHaveValue("原始文字");
-  await page.getByRole("button", { name: "重做" }).click();
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "下载草稿" }).click();
-  const xml = await readFile(await (await download).path(), "utf8");
-  expect(xml).toContain("修改文字");
-  expect(xml).toContain("きょう");
-  expect(xml).toContain("urn:test");
+  const word = page.getByRole('textbox', { name: '词 今日', exact: true });
+  await word.fill('今日改');
+  await word.blur();
+  await expect(page.getByRole('textbox', { name: '词 今日改', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '重做' }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '下载草稿' }).click();
+  const xml = await readFile(await (await download).path(), 'utf8');
+  expect(xml).toContain('今日改');
+  expect(xml).toContain('きょ');
+  expect(xml).toContain('響く');
+  expect(xml).toContain('今天 也唱歌');
 });
 
-test("saves a real checkpoint, restores it after reload, and keeps undo history", async ({ page }) => {
+test('saves the semantic checkpoint and restores undo history', async ({ page }) => {
   await upload(page);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: "属性" }).click();
-  await page.getByLabel("正文").fill("检查点文字");
-  await page.getByRole("button", { name: "应用修改" }).click();
-  await page.getByRole("button", { name: "保存检查点" }).click();
-  await expect(page.getByText("本地检查点已保存", { exact: true })).toBeVisible();
-  page.once("dialog", dialog => dialog.accept());
+  const word = page.getByRole('textbox', { name: '词 今日', exact: true });
+  await word.fill('检查点文字');
+  await word.blur();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByText('检查点已保存')).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
   await page.reload();
-  await expect(page.getByText("已恢复本地检查点（含最近撤销历史）", { exact: true })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "检查点文字", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "撤销" }).click();
-  await expect(page.getByLabel("正文")).toHaveValue("原始文字");
+  await expect(page.getByText('恢复的草稿.ttml')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '词 检查点文字', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+});
+
+test('new local document clears the previous checkpoint', async ({ page }) => {
+  await upload(page);
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByText('检查点已保存')).toBeVisible();
+  await page.getByRole('button', { name: '新建' }).click();
+  await expect(page.getByText('未命名.ttml')).toBeVisible();
+  let prompted = false;
+  page.on('dialog', (dialog) => { prompted = true; void dialog.dismiss(); });
+  await page.reload();
+  await expect(page.getByText('未命名.ttml')).toBeVisible();
+  expect(prompted).toBe(false);
 });

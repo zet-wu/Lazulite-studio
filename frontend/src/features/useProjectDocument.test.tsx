@@ -47,9 +47,10 @@ describe("useProjectDocument save lifecycle", () => {
     const { result } = renderHook(hook, { wrapper: StrictMode });
     act(() =>
       result.current.apply({
-        type: "update-line",
-        lineId: "line-0-0-0",
-        changes: { text: "A1" },
+        type: "edit-word",
+        lineId: "a",
+        wordId: "a:word:0",
+        text: "A1",
       }),
     );
     await act(async () => {
@@ -57,15 +58,16 @@ describe("useProjectDocument save lifecycle", () => {
     });
     act(() =>
       result.current.apply({
-        type: "update-line",
-        lineId: "line-0-0-0",
-        changes: { text: "A2" },
+        type: "edit-word",
+        lineId: "a",
+        wordId: "a:word:0",
+        text: "A2",
       }),
     );
     await act(async () => resolve({ revision: "r2", etag: '"r2"' }));
     expect(result.current.dirty).toBe(true);
     const checkpoint = recovery.save.mock.calls.at(-1);
-    expect(checkpoint?.[2].present.document.lines[0].text).toBe("A2");
+    expect(checkpoint?.[2].present.lines[0].words[0].text).toBe("A2");
     expect(checkpoint?.[3]).toBe("r2");
     await act(async () => result.current.save());
     expect(saveMock.mock.calls[1][1]).toBe("r2");
@@ -80,9 +82,10 @@ describe("useProjectDocument save lifecycle", () => {
     const { result } = renderHook(hook, { wrapper: StrictMode });
     act(() =>
       result.current.apply({
-        type: "update-line",
-        lineId: "line-0-0-0",
-        changes: { text: "A1" },
+        type: "edit-word",
+        lineId: "a",
+        wordId: "a:word:0",
+        text: "A1",
       }),
     );
     await act(async () => result.current.save());

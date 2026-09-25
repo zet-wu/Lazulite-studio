@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRecoveryAdapter } from "../adapters/recovery";
-import { parseStudioTtml, serializeStudioTtml } from "../adapters/ttml";
+import { parseLyricTtml, serializeLyricTtml } from "../adapters/ttml/lyric-codec";
 import {
-  canRedo,
-  canUndo,
-  createEditorState,
-  executeCommand,
-  redo,
-  undo,
-  type EditCommand,
-  type EditorState,
-} from "../domain/editing";
-import type { StudioLyricDocument } from "../domain/document";
+  createLyricEditorState,
+  executeLyricCommand,
+  redoLyricCommand,
+  undoLyricCommand,
+  type LyricCommand,
+  type LyricEditorState,
+} from "../domain/lyric-commands";
 
 type Save = (
   ttml: string,
@@ -28,8 +25,8 @@ export function useProjectDocument(
   saveDocument: Save,
 ) {
   const identity = projectId;
-  const [state, setState] = useState<EditorState>(() =>
-    createEditorState(parseStudioTtml(initialTtml)),
+  const [state, setState] = useState<LyricEditorState>(() =>
+    createLyricEditorState(parseLyricTtml(initialTtml)),
   );
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -51,14 +48,20 @@ export function useProjectDocument(
     base: string;
     xml: string;
   } | null>(null);
+  const recoveryQueue = useRef<Promise<void>>(Promise.resolve());
+  const enqueueRecovery = useCallback((operation: () => Promise<void>) => {
+    const next = recoveryQueue.current.catch(() => undefined).then(operation);
+    recoveryQueue.current = next;
+    return next;
+  }, []);
   const checkpoint = useCallback(
-    async (next: EditorState) => {
-      await createRecoveryAdapter().save(projectId, identity, next, revision);
+    async (next: LyricEditorState) => {
+      await enqueueRecovery(() => createRecoveryAdapter().save(projectId, identity, next, revision));
     },
-    [identity, projectId, revision],
+    [enqueueRecovery, identity, projectId, revision],
   );
   const commit = useCallback(
-    (next: EditorState) => {
+    (next: LyricEditorState) => {
       ++sequence.current;
       setDirty(true);
       setError(null);
@@ -69,8 +72,8 @@ export function useProjectDocument(
     [checkpoint],
   );
   const dispatch = useCallback(
-    (command: EditCommand) => {
-      const next = executeCommand(stateRef.current, command);
+    (command: LyricCommand) => {
+      const next = executeLyricCommand(stateRef.current, command);
       if (next !== stateRef.current) {
         stateRef.current = next;
         setState(next);
@@ -89,7 +92,7 @@ export function useProjectDocument(
           uuid: crypto.randomUUID(),
           seq: sequence.current,
           base: revision,
-          xml: serializeStudioTtml(stateRef.current.present.document, {
+          xml: serializeLyricTtml(stateRef.current.present, {
             draft: true,
           }),
         };
@@ -107,14 +110,15 @@ export function useProjectDocument(
       pending.current = null;
       if (sequence.current === request.seq) {
         setDirty(false);
-        await createRecoveryAdapter().clear(projectId);
+        await enqueueRecovery(() => createRecoveryAdapter().clear(projectId));
+        setRecovery({ available: false });
       } else {
-        await createRecoveryAdapter().save(
+        await enqueueRecovery(() => createRecoveryAdapter().save(
           projectId,
           identity,
           stateRef.current,
           result.revision,
-        );
+        ));
       }
     } catch (caught) {
       if ((caught as { status?: number }).status === 412) setConflict(true);
@@ -125,14 +129,14 @@ export function useProjectDocument(
       inFlight.current = false;
       setSaving(false);
     }
-  }, [conflict, dirty, etag, identity, projectId, revision, saveDocument]);
+  }, [conflict, dirty, enqueueRecovery, etag, identity, projectId, revision, saveDocument]);
   useEffect(() => {
     if (!dirty || error || conflict) return;
     const timer = window.setTimeout(() => void save(), 700);
     return () => window.clearTimeout(timer);
   }, [conflict, dirty, error, save]);
   const history = useCallback(
-    (change: (s: EditorState) => EditorState) => {
+    (change: (s: LyricEditorState) => LyricEditorState) => {
       if (conflict) return;
       const next = change(stateRef.current);
       if (next !== stateRef.current) {
@@ -144,7 +148,7 @@ export function useProjectDocument(
     [commit, conflict],
   );
   const apply = useCallback(
-    (command: EditCommand) => {
+    (command: LyricCommand) => {
       if (conflict) return false;
       dispatch(command);
       return true;
@@ -185,16 +189,16 @@ export function useProjectDocument(
     };
   }, [projectId]);
   const discardRecovery = useCallback(async () => {
-    await createRecoveryAdapter().discard(projectId);
+    await enqueueRecovery(() => createRecoveryAdapter().discard(projectId));
     setRecovery({ available: false });
-  }, [projectId]);
+  }, [enqueueRecovery, projectId]);
   const restore = useCallback(async () => {
     const ok = await recover();
     if (ok) setRecovery({ available: false });
     return ok;
   }, [recover]);
   return {
-    document: state.present.document as StudioLyricDocument,
+    document: state.present,
     state,
     revision,
     dirty,
@@ -208,10 +212,10 @@ export function useProjectDocument(
     restore,
     discardRecovery,
     reloadRecovery: recover,
-    undo: () => history(undo),
-    redo: () => history(redo),
-    canUndo: canUndo(state),
-    canRedo: canRedo(state),
+    undo: () => history(undoLyricCommand),
+    redo: () => history(redoLyricCommand),
+    canUndo: state.past.length > 0,
+    canRedo: state.future.length > 0,
     clearConflict: () => setConflict(false),
   };
 }

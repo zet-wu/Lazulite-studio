@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { parseStudioTtml, serializeStudioTtml } from "../adapters/ttml";
+import { parseLyricTtml, serializeLyricTtml } from "../adapters/ttml/lyric-codec";
 import { publishingApi, type ExportItem } from "../adapters/http/publishing";
 import { studioApi, studioS4 } from "../adapters/http/client";
 import styles from "./export-page.module.css";
@@ -47,10 +47,10 @@ const reportFields: Array<[keyof NonNullable<ExportItem["report"]>, string]> = [
   ["passed", "验证结果"],
 ];
 export function validatePublishDocument(ttml: string) {
-  const parsed = parseStudioTtml(ttml);
-  if (parsed.issues.length)
-    throw new Error(parsed.issues.map((issue) => issue.message).join("；"));
-  return serializeStudioTtml(parsed, { draft: false });
+  const document = parseLyricTtml(ttml);
+  if (document.lines.some((line) => !line.backgroundOf && (line.beginUs === null || line.endUs === null)))
+    throw new Error('发布需要每行歌词的开始和结束时间');
+  return serializeLyricTtml(document);
 }
 
 export function ExportPage() {
@@ -212,15 +212,8 @@ export function ExportPage() {
               onClick={() => {
                 if (!documentQuery.data) return;
                 try {
-                  const parsed = parseStudioTtml(
-                    documentQuery.data.document.ttml,
-                  );
-                  if (parsed.issues.length)
-                    throw new Error(
-                      parsed.issues.map((issue) => issue.message).join("；"),
-                    );
                   const blob = new Blob(
-                    [serializeStudioTtml(parsed, { draft: false })],
+                    [validatePublishDocument(documentQuery.data.document.ttml)],
                     { type: "application/ttml+xml" },
                   );
                   const url = URL.createObjectURL(blob);

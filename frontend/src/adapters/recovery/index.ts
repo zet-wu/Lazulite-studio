@@ -1,8 +1,9 @@
-import type { EditorState } from '../../domain/editing';
+import type { LyricEditorState } from '../../domain/lyric-commands';
+import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
-const DATABASE = 'lazulite-studio-recovery';
+const DATABASE = 'lazulite-studio-recovery-v3';
 const STORE = 'projects';
-const RECORD_VERSION = 1;
+const RECORD_VERSION = 3;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {
@@ -10,14 +11,14 @@ export type RecoveryRecord = {
   projectId: string;
   documentIdentity: string;
   savedAt: string;
-  state: EditorState;
+  state: LyricEditorState;
   baseRevision?: string;
 };
 
 export type RecoveryAdapter = {
-  save(slotKey: string, documentIdentity: string, state: EditorState, baseRevision?: string): Promise<void>;
+  save(slotKey: string, documentIdentity: string, state: LyricEditorState, baseRevision?: string): Promise<void>;
   readCheckpoint(slotKey: string): Promise<RecoveryRecord | null>;
-  load(slotKey: string, documentIdentity: string): Promise<EditorState | null>;
+  load(slotKey: string, documentIdentity: string): Promise<LyricEditorState | null>;
   clear(slotKey: string): Promise<void>;
   discard(slotKey: string): Promise<void>;
 };
@@ -45,18 +46,20 @@ const transaction = async <T>(mode: IDBTransactionMode, operation: (store: IDBOb
   });
 };
 
-const isState = (value: unknown): value is EditorState => {
+const isState = (value: unknown): value is LyricEditorState => {
   if (!value || typeof value !== 'object') return false;
-  const candidate = value as EditorState;
+  const candidate = value as LyricEditorState;
   const validDocument = (document: unknown) => {
     if (!document || typeof document !== 'object') return false;
-    const item = document as EditorState['present']['document'];
-    return item.schemaVersion === 'studio-lyric-v1' && Array.isArray(item.lines) && typeof item.baseline?.xml === 'string'
-      && item.lines.every((line) => !!line && typeof line.id === 'string' && !!line.sourceTiming && !!line.editable);
+    const item = document as LyricDocument;
+    return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.agents)
+      && !!item.metadata && typeof item.metadata === 'object'
+      && item.lines.every((line) => !!line && typeof line.id === 'string' && Array.isArray(line.words)
+        && line.words.every((word) => !!word && typeof word.id === 'string' && typeof word.text === 'string' && Array.isArray(word.rubyUnits) && Array.isArray(word.alignmentUnits)));
   };
   return !!candidate.present && Array.isArray(candidate.past) && Array.isArray(candidate.future)
-    && candidate.past.length <= 20 && candidate.future.length <= 20
-    && [candidate.present, ...candidate.past, ...candidate.future].every((snapshot) => !!snapshot && validDocument(snapshot.document));
+    && candidate.past.length <= 256 && candidate.future.length <= 256
+    && [candidate.present, ...candidate.past, ...candidate.future].every(validDocument);
 };
 const isRecord = (value: unknown): value is RecoveryRecord => {
   if (!value || typeof value !== 'object') return false;

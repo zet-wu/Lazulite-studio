@@ -10,7 +10,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   studioApi,
   type Asset,
-  type DocumentShell,
 } from "../adapters/http/client";
 import styles from "./media.module.css";
 
@@ -22,8 +21,7 @@ const fmt = (s: number) => {
 const offset = (asset: Asset | null) => (asset?.proxy_offset_us ?? 0) / 1e6;
 type Props = {
   projectId: string;
-  lines: DocumentShell["lines"];
-  selectedLine?: DocumentShell["lines"][number];
+  selectedLine?: { begin_us: number | null; end_us: number | null };
   asset: Asset | null;
   loopRange?: { begin_us: number; end_us: number };
 };

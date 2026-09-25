@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile } from 'node:fs/promises';
 
 function pageErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -13,24 +14,14 @@ test("searches, opens a project, selects a line, and switches compact panels", a
   await page.goto("/projects");
   await page.getByPlaceholder("搜索项目").fill("星の手紙");
   await page.getByRole("link", { name: /星の手紙/ }).click();
-  await expect(page.getByRole("option").first()).toBeVisible();
-  await page.getByRole("option").first().press("ArrowDown");
-  await expect(
-    page
-      .getByRole("listbox")
-      .locator('[role="option"][aria-selected="true"] input'),
-  ).toHaveValue("遠い星を見上げて");
+  await page.getByRole("button", { name: "2 遠い星を見上げて" }).click();
+  await expect(page.getByText("已选行：遠い星を見上げて")).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: "属性", exact: true }).click();
-  await expect(page.getByText("审核", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "歌词", exact: true }).click();
-  await expect(page.getByRole("listbox")).toBeVisible();
-  await expect(
-    page
-      .getByRole("listbox")
-      .locator('[role="option"][aria-selected="true"] input'),
-  ).toHaveValue("遠い星を見上げて");
+  await page.getByRole("button", { name: "审核", exact: true }).click();
+  await expect(page.getByLabel("审核").getByText("审核", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "歌词编辑" })).toBeVisible();
+  await expect(page.getByText("已选行：遠い星を見上げて")).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -78,12 +69,8 @@ test("keeps deep edit navigation, task tabs, settings, and export state usable",
 }) => {
   const errors = pageErrors(page);
   await page.goto("/projects/sample-project/edit?line=line-4");
-  await expect(page.getByRole("heading", { name: "歌词行表" })).toBeVisible();
-  await expect(
-    page
-      .getByRole("listbox")
-      .locator('[role="option"][aria-selected="true"] input'),
-  ).toHaveValue("小さな願いを抱いて");
+  await expect(page.getByRole("heading", { name: "歌词编辑" })).toBeVisible();
+  await expect(page.getByText("已选行：小さな願いを抱いて")).toBeVisible();
   await expect(page.getByText("审核", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "任务", exact: true }).click();
   await expect(
@@ -108,4 +95,35 @@ test("keeps deep edit navigation, task tabs, settings, and export state usable",
   await page.getByRole("button", { name: "下载 TTML", exact: true }).click();
   expect((await download).suggestedFilename()).toBe("星の手紙 · 合成示例.ttml");
   expect(errors).toEqual([]);
+});
+
+test("saves a semantic project edit and reopens the saved revision", async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  const word = page.getByRole('textbox', { name: '词 夜の風が静かに吹く', exact: true });
+  await word.fill('夜の風が静かに歌う');
+  await word.blur();
+  await expect(page.getByText('已保存', { exact: true })).toBeVisible({ timeout: 10000 });
+  await page.getByRole('link', { name: 'Lazulite Studio' }).click();
+  await page.getByRole('link', { name: /星の手紙/ }).click();
+  await expect(page.getByRole('textbox', { name: '词 夜の風が静かに歌う', exact: true })).toBeVisible();
+});
+
+test('imports rich TTML, edits Ruby, undoes, saves and reopens it in a project', async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  const source = await readFile('../docs/evidence/editor-e0/reference-apple-metadata.ttml');
+  await page.locator('input[type="file"]').setInputFiles({ name: 'reference.ttml', mimeType: 'application/ttml+xml', buffer: source });
+  await page.getByRole('button', { name: '人工应用' }).click();
+  await expect(page.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+  const ruby = page.getByRole('textbox', { name: '读音 今日', exact: true }).first();
+  await ruby.fill('きよう');
+  await ruby.blur();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.getByRole('textbox', { name: '读音 今日', exact: true }).first()).toHaveValue('きょ');
+  await page.getByRole('button', { name: '重做' }).click();
+  await expect(page.getByText('已保存', { exact: true })).toBeVisible({ timeout: 10000 });
+  await page.getByRole('link', { name: 'Lazulite Studio' }).click();
+  await page.getByRole('link', { name: /星の手紙/ }).click();
+  await expect(page.getByRole('textbox', { name: '读音 今日', exact: true }).first()).toHaveValue('きよう');
+  await expect(page.getByRole('textbox', { name: '翻译 1' })).toHaveValue('今天 也唱歌');
+  await expect(page.getByRole('textbox', { name: '词 響く', exact: true })).toBeVisible();
 });
