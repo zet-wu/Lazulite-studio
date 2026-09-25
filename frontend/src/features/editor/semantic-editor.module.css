@@ -12,6 +12,8 @@
 .ribbon button:disabled { opacity: .5; cursor: default; }
 .ribbon small { color: var(--muted); }
 .layout { display: grid; grid-template-columns: 190px minmax(0,1fr) 250px; min-height: calc(100vh - 60px); }
+.simpleLayout { grid-template-columns: minmax(0, 1fr); }
+.simpleLayout .outline, .simpleLayout .inspector { display: none; }
 .outline, .inspector { background: var(--panel); padding: 12px; border-right: 1px solid var(--line); }
 .inspector { border-right: 0; border-left: 1px solid var(--line); }
 .outline h2, .inspector h2 { font-size: 14px; margin: 5px 0 12px; }

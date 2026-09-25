@@ -6,6 +6,8 @@ import { utf16ToCodePoint } from '../../domain/text-boundaries';
 import { copySelection, cutSelection, invertIds, moveWordsAcrossLine, pastePlain, pasteRich, selectIds, type EditorClipboard, type EditorSelection } from './editing-actions';
 import styles from './semantic-editor.module.css';
 
+const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
+
 type Props = {
   title: string;
   document: LyricDocument;
@@ -41,20 +43,22 @@ function isTextInput(target: EventTarget) {
   return target instanceof Element && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
 }
 
-function DraftInput({ value, label, onCommit, onFocus, onSplit, onMove }: { value: string; label: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number) => void; onMove?: (direction: -1 | 1) => void }) {
+function DraftInput({ value, label, onCommit, onFocus, onSplit, onMove, onNavigate, inputRef }: { value: string; label: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number) => void; onMove?: (direction: -1 | 1) => void; onNavigate?: (direction: -1 | 1) => void; inputRef?: (node: HTMLInputElement | null) => void }) {
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
+  const cancelled = useRef(false);
   useEffect(() => setDraft(value), [value]);
-  return <input ref={ref} aria-label={label} value={draft} onChange={(event) => setDraft(event.target.value)} onFocus={onFocus}
+  return <input ref={(node) => { ref.current = node; inputRef?.(node); }} aria-label={label} value={draft} onChange={(event) => setDraft(event.target.value)} onFocus={onFocus}
     onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
-    onBlur={() => { if (draft !== value) onCommit(draft); }}
+    onBlur={() => { if (cancelled.current) { cancelled.current = false; return; } if (draft !== value) onCommit(draft); }}
     onKeyDown={(event) => {
       if (composing.current) return;
       if (event.key === 'Enter') ref.current?.blur();
-      if (event.key === 'Escape') { setDraft(value); ref.current?.blur(); }
+      if (event.key === 'Escape') { cancelled.current = true; setDraft(value); ref.current?.blur(); }
       if (event.key === 'F8' && onSplit) { event.preventDefault(); onSplit(ref.current?.selectionStart ?? 0); }
       if (event.altKey && onMove && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) { event.preventDefault(); onMove(event.key === 'ArrowLeft' ? -1 : 1); }
+      if (event.altKey && onNavigate && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) { event.preventDefault(); onNavigate(event.key === 'ArrowUp' ? -1 : 1); }
     }} />;
 }
 
@@ -73,7 +77,10 @@ export function EditorSurface(props: Props) {
   const { document, apply } = props;
   const [selection, setSelection] = useState<EditorSelection | null>(null);
   const [clipboard, setClipboard] = useState<EditorClipboard | null>(null);
+  const clipboardToken = useRef('');
   const dragging = useRef<{ kind: 'line'; lineId: string } | { kind: 'word'; lineId: string; wordId: string } | null>(null);
+  const wordInputs = useRef(new Map<string, HTMLInputElement>());
+  const [simpleLayout, setSimpleLayout] = useState(false);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   useEffect(() => {
@@ -100,13 +107,13 @@ export function EditorSurface(props: Props) {
     const id = line.backgroundOf ?? line.id;
     const previous = selection?.kind === 'lines' ? selection : null;
     const ids = selectIds(mainIds, previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
-    setSelection({ kind: 'lines', ids, anchorId: shift ? previous?.anchorId ?? id : id, activeId: line.id });
+    setSelection({ kind: 'lines', ids, anchorId: shift || toggle ? previous?.anchorId ?? id : id, activeId: line.id });
     props.onSelectLine?.(line.id);
   };
   const selectWord = (line: LyricLine, word: LyricWord, shift = false, toggle = false, rubyId: string | null = null) => {
     const previous = selection?.kind === 'words' && selection.lineId === line.id ? selection : null;
     const ids = selectIds(line.words.map((item) => item.id), previous?.ids ?? [], previous?.anchorId ?? word.id, word.id, shift, toggle);
-    setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift ? previous?.anchorId ?? word.id : word.id, activeId: word.id, rubyId });
+    setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift || toggle ? previous?.anchorId ?? word.id : word.id, activeId: word.id, rubyId });
     props.onSelectLine?.(line.id);
   };
   const dispatch = (command: LyricCommand) => {
@@ -118,6 +125,7 @@ export function EditorSurface(props: Props) {
     const current = currentSelection();
     if (!current?.ids.length) return null;
     const next = copySelection(document, current);
+    clipboardToken.current = crypto.randomUUID();
     setClipboard(next);
     setMessage('已复制到编辑器剪贴板');
     return next;
@@ -128,6 +136,7 @@ export function EditorSurface(props: Props) {
     const next = copySelection(document, current);
     if (dispatch(cutSelection(current))) {
       setClipboard(next);
+      clipboardToken.current = crypto.randomUUID();
       const available = current.kind === 'words' ? current.lineId : mainIds.filter((id) => !current.ids.includes(id)).at(-1);
       setSelection(available ? { kind: 'lines', ids: [available], anchorId: available, activeId: available } : { kind: 'lines', ids: [], anchorId: '', activeId: '' });
       return next;
@@ -226,6 +235,11 @@ export function EditorSurface(props: Props) {
     if (index + direction < 0 || index + direction >= line.words.length) return;
     dispatch({ type: 'move-word', lineId: line.id, wordId: word.id, toLineId: line.id, afterWordId: direction < 0 ? line.words[index - 2]?.id ?? null : line.words[index + 1].id });
   };
+  const navigateWord = (wordId: string, direction: -1 | 1) => {
+    const order = document.lines.flatMap((line) => line.words.map((word) => word.id));
+    const target = order[order.indexOf(wordId) + direction];
+    if (target) wordInputs.current.get(target)?.focus();
+  };
   const wordView = (line: LyricLine, word: LyricWord, index: number) => <div className={`${styles.word} ${selection?.kind === 'words' && selection.ids.includes(word.id) ? styles.selectedWord : ''} ${dropTarget === `word:${word.id}` ? styles.dropWord : ''}`} key={word.id} data-word-id={word.id} tabIndex={0}
     onFocus={(event) => { if (event.target === event.currentTarget) selectWord(line, word); }}
     onMouseDown={(event) => { if ((event.target as Element).closest('[draggable="true"]')) return; if (event.shiftKey || event.ctrlKey || event.metaKey) { event.preventDefault(); selectWord(line, word, event.shiftKey, event.ctrlKey || event.metaKey); } }}
@@ -236,7 +250,8 @@ export function EditorSurface(props: Props) {
       <DraftInput value={word.text} label={`词 ${word.text}`} onFocus={() => selectWord(line, word)}
         onCommit={(text) => dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text })}
         onSplit={(at) => dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at: utf16ToCodePoint(word.text, at) })}
-        onMove={(direction) => moveWord(line, word, direction)} />
+        onMove={(direction) => moveWord(line, word, direction)} onNavigate={(direction) => navigateWord(word.id, direction)}
+        inputRef={(node) => { if (node) wordInputs.current.set(word.id, node); else wordInputs.current.delete(word.id); }} />
       <button aria-label={`词前移 ${word.text}`} disabled={index === 0} onClick={() => moveWord(line, word, -1)}>←</button>
       <button aria-label={`词后移 ${word.text}`} disabled={index === line.words.length - 1} onClick={() => moveWord(line, word, 1)}>→</button>
       <button aria-label={`拆分词 ${word.text}`} title="按光标位置拆分；输入中可按 F8" onClick={() => {
@@ -256,24 +271,24 @@ export function EditorSurface(props: Props) {
   return <div className={styles.page} onCopy={(event) => {
     if (isTextInput(event.target)) return;
     const item = copy();
-    if (item) { event.clipboardData.setData('text/plain', item.text); event.preventDefault(); }
+    if (item) { event.clipboardData.setData('text/plain', item.text); event.clipboardData.setData(CLIPBOARD_MIME, clipboardToken.current); event.preventDefault(); }
   }} onCut={(event) => {
     if (isTextInput(event.target)) return;
     const item = cut();
-    if (item) { event.clipboardData.setData('text/plain', item.text); event.preventDefault(); }
+    if (item) { event.clipboardData.setData('text/plain', item.text); event.clipboardData.setData(CLIPBOARD_MIME, clipboardToken.current); event.preventDefault(); }
   }} onPaste={(event) => {
     if (isTextInput(event.target)) return;
     const text = event.clipboardData.getData('text/plain');
     if (!text) return;
     event.preventDefault();
-    paste(clipboard?.text === text ? clipboard : null, text);
+    paste(clipboard && event.clipboardData.getData(CLIPBOARD_MIME) === clipboardToken.current ? clipboard : null, text);
   }} onKeyDown={(event) => {
     if (isTextInput(event.target) || event.nativeEvent.isComposing) return;
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
     <header className={styles.header}><Link to="/projects" className={styles.brand}>Lazulite Studio</Link><strong>{props.title}</strong><span>{props.saving ? '保存中' : props.dirty ? '未保存' : '已保存'}</span>
-      <div className={styles.actions}>{props.onOpen && <label>打开 TTML<input type="file" accept=".ttml,.xml" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) props.onOpen?.(file); event.target.value = ''; }} /></label>}{props.onNew && <button onClick={props.onNew}>新建</button>}<button onClick={props.onSave} disabled={props.saving}>保存</button><button onClick={props.undo} disabled={!props.canUndo}>撤销</button><button onClick={props.redo} disabled={!props.canRedo}>重做</button><button onClick={props.onDraft}>下载草稿</button><button onClick={props.onFinal}>最终 TTML</button></div>
+      <div className={styles.actions}>{props.onOpen && <label>打开 TTML<input type="file" accept=".ttml,.xml" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) props.onOpen?.(file); event.target.value = ''; }} /></label>}{props.onNew && <button onClick={props.onNew}>新建</button>}<button onClick={props.onSave} disabled={props.saving}>保存</button><button onClick={props.undo} disabled={!props.canUndo}>撤销</button><button onClick={props.redo} disabled={!props.canRedo}>重做</button><button onClick={() => setSimpleLayout((value) => !value)}>{simpleLayout ? '高级布局' : '简单布局'}</button><button onClick={props.onDraft}>下载草稿</button><button onClick={props.onFinal}>最终 TTML</button></div>
     </header>
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
     <div className={styles.ribbon} aria-label="编辑操作"><span>{selection ? `${selection.kind === 'words' ? '词' : '行'}已选 ${selection.ids.length}` : '当前行'}</span>
@@ -282,9 +297,9 @@ export function EditorSurface(props: Props) {
       <button onClick={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}>清空选择</button>
       <button disabled={selection?.kind !== 'words' || !selection.ids.length || document.lines.findIndex((line) => line.id === selection.lineId) === 0} onClick={() => moveSelectedWords(-1)}>词移上行</button>
       <button disabled={selection?.kind !== 'words' || !selection.ids.length || document.lines.findIndex((line) => line.id === selection.lineId) === document.lines.length - 1} onClick={() => moveSelectedWords(1)}>词移下行</button>
-      <small>非输入框内 Ctrl/Cmd+C、X、V 使用词块剪贴板；外部纯文本按行插入。</small>
+      <small>非输入框内 Ctrl/Cmd+C、X、V 使用词块剪贴板；Alt+↑/↓ 切词；外部纯文本按行插入。</small>
     </div>
-    <div className={styles.layout}><aside className={styles.outline}><h2>大纲</h2>{document.lines.map((line, index) => <button key={line.id} className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''} onClick={(event) => selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey)}>{index + 1} {line.backgroundOf ? '↳ ' : ''}{lineText(line) || '空行'}</button>)}</aside>
+    <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>{document.lines.map((line, index) => <button key={line.id} className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''} onClick={(event) => selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey)}>{index + 1} {line.backgroundOf ? '↳ ' : ''}{lineText(line) || '空行'}</button>)}</aside>
       <main className={styles.canvas}><div className={styles.canvasHeader}><h1>歌词编辑</h1><button onClick={() => dispatch({ type: 'insert-line', afterLineId: document.lines.at(-1)?.id ?? null })}>新增歌词行</button></div>
         {document.lines.map((line) => <section className={`${styles.line} ${selection ? selection.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selectedLine : '' : selection.lineId === line.id ? styles.selectedLine : '' : selectedLine?.id === line.id ? styles.selectedLine : ''} ${props.playheadLineId === line.id ? styles.playheadLine : ''} ${dropTarget === `line:${line.id}` ? styles.dropLine : ''}`} key={line.id} data-line-id={line.id} tabIndex={0} aria-label={`歌词行 ${lineText(line) || '空行'}`} onClick={(event) => { if (!(event.target as Element).closest('[data-word-id]')) selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); }} onDragOver={(event) => overDrop(event, `line:${line.id}`)} onDrop={(event) => dropLine(event, line)} onKeyDown={(event) => {
           if (event.target !== event.currentTarget || event.nativeEvent.isComposing || !event.altKey) return;

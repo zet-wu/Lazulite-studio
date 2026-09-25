@@ -104,6 +104,10 @@ test('selects a word range, cuts it once, and restores it with undo', async ({ p
   await upload(page);
   const firstLine = page.locator('[data-line-id="L1"]');
   await firstLine.getByRole('textbox', { name: '词 今日', exact: true }).focus();
+  await firstLine.locator('[data-word-id]').nth(1).click({ modifiers: ['Control'] });
+  await expect(page.getByText('词已选 2')).toBeVisible();
+  await firstLine.locator('[data-word-id]').nth(1).click({ modifiers: ['Control'] });
+  await expect(page.getByText('词已选 1')).toBeVisible();
   await firstLine.locator('[data-word-id]').nth(1).click({ modifiers: ['Shift'] });
   await expect(page.getByText('词已选 2')).toBeVisible();
   await page.getByRole('button', { name: '剪切', exact: true }).click();
@@ -156,4 +160,49 @@ test('drags words and grouped lines to reorder, and Ctrl-drag copies a word', as
   await expect(page.locator('[data-line-id]').last().getByRole('textbox', { name: '词 響く', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '撤销' }).click();
   await expect(page.locator('[data-line-id]')).toHaveCount(3);
+});
+
+test('navigates between words and edits in simple and advanced layouts', async ({ page }) => {
+  await upload(page);
+  const first = page.getByRole('textbox', { name: '词 今日', exact: true });
+  await first.focus();
+  await first.press('Alt+ArrowDown');
+  const second = page.getByRole('textbox', { name: '词 も歌う', exact: true });
+  await expect(second).toBeFocused();
+  await second.fill('临时输入');
+  await second.press('Escape');
+  await expect(second).toHaveValue(' も歌う');
+  await expect(page.getByRole('button', { name: '撤销' })).toBeDisabled();
+  await second.focus();
+  await second.press('Alt+ArrowDown');
+  await expect(page.getByRole('textbox', { name: '词 響く', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: '简单布局' }).click();
+  await expect(page.getByRole('heading', { name: '大纲' })).toBeHidden();
+  await expect(page.getByRole('heading', { name: '属性' })).toBeHidden();
+  await second.fill(' も歌うよ');
+  await second.blur();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.getByRole('textbox', { name: '词 も歌う', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '高级布局' }).click();
+  await expect(page.getByRole('heading', { name: '大纲' })).toBeVisible();
+});
+
+test('keyboard copy and paste retain Ruby across lines', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await upload(page);
+  await page.locator('[data-line-id="L1"] [data-word-id]').first().focus();
+  await page.keyboard.press('ControlOrMeta+C');
+  await page.getByRole('button', { name: '3 宇宙' }).click();
+  await page.locator('[data-line-id="L2"]').focus();
+  await page.keyboard.press('ControlOrMeta+V');
+  await expect(page.locator('[data-line-id="L2"]').getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+  await expect(page.locator('[data-line-id="L2"]').getByRole('textbox', { name: '读音 今日', exact: true })).toHaveCount(2);
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-line-id="L2"]').getByRole('textbox', { name: '词 今日', exact: true })).toHaveCount(0);
+  await page.evaluate(() => navigator.clipboard.writeText('新行\n第二行'));
+  await page.locator('[data-line-id="L2"]').focus();
+  await page.keyboard.press('ControlOrMeta+V');
+  await expect(page.locator('[data-line-id]')).toHaveCount(5);
+  await expect(page.getByRole('textbox', { name: '词 新行', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '词 第二行', exact: true })).toBeVisible();
 });
