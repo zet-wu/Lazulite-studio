@@ -41,22 +41,25 @@ export function cutSelection(selection: EditorSelection): LyricCommand {
     : selection.ids.map((lineId) => ({ type: 'delete-line', lineId })) };
 }
 
-export function moveWordsAcrossLine(document: LyricDocument, selection: Extract<EditorSelection, { kind: 'words' }>, targetLineId: string): LyricCommand {
+function expandedLineTime(target: LyricLine, words: LyricWord[]) {
+  const starts = words.map((word) => word.beginUs).filter((value): value is number => value !== null);
+  const ends = words.map((word) => word.endUs).filter((value): value is number => value !== null);
+  return { beginUs: target.beginUs === null ? null : Math.min(target.beginUs, ...starts), endUs: target.endUs === null ? null : Math.max(target.endUs, ...ends) };
+}
+
+export function moveWordsAcrossLine(document: LyricDocument, selection: Extract<EditorSelection, { kind: 'words' }>, targetLineId: string, afterWordId?: string | null): LyricCommand {
   const source = document.lines.find((line) => line.id === selection.lineId)!;
   const target = document.lines.find((line) => line.id === targetLineId)!;
   if (source.id === target.id) throw new Error('目标行必须不同于当前行');
   const words = source.words.filter((word) => selection.ids.includes(word.id));
   if (!words.length) throw new Error('请先选择词块');
-  const starts = words.map((word) => word.beginUs).filter((value): value is number => value !== null);
-  const ends = words.map((word) => word.endUs).filter((value): value is number => value !== null);
-  const beginUs = target.beginUs === null ? null : Math.min(target.beginUs, ...starts);
-  const endUs = target.endUs === null ? null : Math.max(target.endUs, ...ends);
+  const { beginUs, endUs } = expandedLineTime(target, words);
   const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'move-word' }>> = [];
   if (beginUs !== target.beginUs || endUs !== target.endUs) commands.push({ type: 'set-line-time', lineId: target.id, beginUs, endUs });
-  let afterWordId = target.words.at(-1)?.id ?? null;
+  let after = afterWordId === undefined ? target.words.at(-1)?.id ?? null : afterWordId;
   for (const word of words) {
-    commands.push({ type: 'move-word', lineId: source.id, wordId: word.id, toLineId: target.id, afterWordId });
-    afterWordId = word.id;
+    commands.push({ type: 'move-word', lineId: source.id, wordId: word.id, toLineId: target.id, afterWordId: after });
+    after = word.id;
   }
   return { type: 'batch', commands };
 }
@@ -72,13 +75,15 @@ function cloneLine(line: LyricLine, id: string, backgroundOf: string | null): Ly
 }
 
 export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null): { command: LyricCommand; selection: EditorSelection } {
-  const selectedLineId = selection?.kind === 'words' ? selection.lineId : selection?.ids.at(-1);
+  const selectedLineId = selection?.kind === 'words' ? selection.lineId : selection?.activeId || selection?.ids.at(-1);
   const currentLine = document.lines.find((line) => line.id === selectedLineId);
   if (clipboard.kind === 'words') {
     if (!currentLine) throw new Error('请先选择粘贴目标行');
     const afterWordId = selection?.kind === 'words' ? selection.ids.at(-1) ?? null : currentLine.words.at(-1)?.id ?? null;
     const words = clipboard.words.map(cloneWord);
-    const commands: Extract<LyricCommand, { type: 'insert-word' }>[] = [];
+    const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'insert-word' }>> = [];
+    const { beginUs, endUs } = expandedLineTime(currentLine, words);
+    if (beginUs !== currentLine.beginUs || endUs !== currentLine.endUs) commands.push({ type: 'set-line-time', lineId: currentLine.id, beginUs, endUs });
     let after = afterWordId;
     for (const word of words) { commands.push({ type: 'insert-word', lineId: currentLine.id, afterWordId: after, word }); after = word.id; }
     return { command: { type: 'batch', commands }, selection: { kind: 'words', lineId: currentLine.id, ids: words.map((word) => word.id), anchorId: words[0].id, activeId: words.at(-1)!.id, rubyId: null } };
@@ -105,7 +110,7 @@ export function pastePlain(document: LyricDocument, text: string, selection: Edi
     return { command: { type: 'insert-word', lineId: selection.lineId, afterWordId: selection.ids.at(-1) ?? null, word },
       selection: { kind: 'words', lineId: selection.lineId, ids: [word.id], anchorId: word.id, activeId: word.id, rubyId: null } };
   }
-  const currentLine = document.lines.find((line) => line.id === (selection?.kind === 'words' ? selection.lineId : selection?.ids.at(-1)));
+  const currentLine = document.lines.find((line) => line.id === (selection?.kind === 'words' ? selection.lineId : selection?.activeId || selection?.ids.at(-1)));
   let after = currentLine?.backgroundOf ?? currentLine?.id ?? document.lines.filter((line) => !line.backgroundOf).at(-1)?.id ?? null;
   const commands: Extract<LyricCommand, { type: 'insert-line' }>[] = [];
   for (const value of lines) {

@@ -73,10 +73,17 @@ describe('editor selection and clipboard', () => {
     target.words[0].beginUs = 1_000_000; target.words[0].endUs = 2_000_000;
     document.lines.push(target);
     const selection = { kind: 'words' as const, lineId: document.lines[0].id, ids: [word.id], anchorId: word.id, activeId: word.id, rubyId: null };
-    const state = executeLyricCommand(createLyricEditorState(document), moveWordsAcrossLine(document, selection, target.id));
+    const state = executeLyricCommand(createLyricEditorState(document), moveWordsAcrossLine(document, selection, target.id, null));
     expect(state.present.lines[1].beginUs).toBe(0);
-    expect(state.present.lines[1].words[1]).toBe(word);
-    expect(state.present.lines[1].words[1].rubyUnits[0].reading).toBe('きょう');
+    expect(state.present.lines[1].words[0]).toBe(word);
+    expect(state.present.lines[1].words[0].rubyUnits[0].reading).toBe('きょう');
     expect(undoLyricCommand(state).present).toBe(document);
+
+    const clipboard = copySelection(document, selection);
+    const targetSelection = { kind: 'lines' as const, ids: [target.id], anchorId: target.id, activeId: target.id };
+    const pasted = executeLyricCommand(createLyricEditorState(document), pasteRich(document, clipboard, targetSelection).command);
+    expect(pasted.present.lines[1].beginUs).toBe(0);
+    expect(pasted.present.lines[1].words[1].rubyUnits[0].reading).toBe('きょう');
+    expect(undoLyricCommand(pasted).present).toBe(document);
   });
 });
