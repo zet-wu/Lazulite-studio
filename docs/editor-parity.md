@@ -12,25 +12,25 @@
 - 对唱实操：选中 `L2` 时参考工具的“对唱歌词”处于勾选状态；关闭后导出的 `L2` 从 `ttm:agent="v2"` 变为 `v1`。见[勾选截图](evidence/editor-e0/reference-duet-1440.png)和[关闭后的导出](evidence/editor-e0/reference-duet-off.ttml)。Studio 语义 codec 按参考的 `v1/v2` 规则映射 `duet` 与 agent。
 - 焦点状态实测：双击正文词“も歌う”后焦点落在对应文本 input，直接点击读音“きょ”后焦点落在 Ruby input。见[正文焦点](evidence/editor-e0/reference-word-focus-1440.png)和[Ruby 焦点](evidence/editor-e0/reference-ruby-focus-1440.png)。
 - 参考工具的“行时间戳”导出会把词块合并为整行，见 [`reference-line-timing.ttml`](evidence/editor-e0/reference-line-timing.ttml)。跨工具 Ruby 验证使用逐字时间导出配置，不能拿整行导出误判为 Ruby 保真。
-- Studio 旧入口打开同一参考文件时，将无单位时间报为只读，正文混入翻译、音译和背景；见 [`studio-before-1440.png`](evidence/editor-e0/studio-before-1440.png)。新语义 codec 的 [`studio-roundtrip.ttml`](evidence/editor-e0/studio-roundtrip.ttml) 已由参考工具 `parseTTML` 重新解析，正文、词、两段 Ruby、翻译、音译和背景时间与原样例相等。新 codec 尚未接入编辑页。
+- Studio 旧入口打开同一参考文件时，将无单位时间报为只读，正文混入翻译、音译和背景；见 [`studio-before-1440.png`](evidence/editor-e0/studio-before-1440.png)。该入口已被共用语义编辑器替换。新 codec 的 [`studio-roundtrip.ttml`](evidence/editor-e0/studio-roundtrip.ttml) 已由参考工具 `parseTTML` 重新解析，正文、词、两段 Ruby、翻译、音译和背景时间与原样例相等；项目与本地浏览器路径也已验证。
 - 测试素材将使用自制短句与合成音频，避免依赖商业歌曲或模型下载。双工具互读、长文档和真实媒体样例待生成。
 
 ## 操作矩阵
 
 | 编号 | 参考入口与目标操作 | Studio 当前入口与差距 | 样例/验收证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| UI-01 | `App.tsx`、`components/TopMenu`、`components/RibbonBar`、`components/Sidebar`：编辑/打轴/预览、简单/高级、主题与底部播放 | `features/Workspace.tsx`：单页三栏，缺三模式 | [编辑 1440](evidence/editor-e0/reference-import-1440.png)、[打轴 1440](evidence/editor-e0/reference-sync-1440.png)、[预览 1440](evidence/editor-e0/reference-preview-1440.png)、[高级 1920](evidence/editor-e0/reference-advanced-1920.png)、[深色 390](evidence/editor-e0/reference-edit-dark-390.png)、[Studio 现状](evidence/editor-e0/studio-before-1440.png) | 参考截图已取；功能待实现 |
-| ED-01 | `modules/lyric-editor/components/lyric-line-view.tsx`：行词 CRUD、剪贴、多选、拖动 | `LineTable.tsx` 与 `domain/editing.ts`：整行编辑、拆合行 | 无时间中英日混排，排序后撤销/重做 | 待实现 |
-| ED-02 | 词属性、背景/对唱及行附属内容 | `AgentPanel.tsx` 已有多歌手；新语义模型已支持背景和参考 `v1/v2` 对唱 | [对唱勾选截图](evidence/editor-e0/reference-duet-1440.png)、[关闭后导出](evidence/editor-e0/reference-duet-off.ttml)；三歌手、重叠背景、空拍与批量修改待测试 | 参考对唱编码已验证；Studio 界面待实现 |
-| SG-01 | `modules/segmentation`：手动/自动/高级分词 | `TimingPanel.tsx` 仅编辑时间单元 | [手动分词实操](evidence/editor-e0/reference-manual-split-1440.png)、[高级分词弹窗](evidence/editor-e0/reference-segmentation-dialog-1440.png)；连空格、标点、忽略词、自定义规则待测试 | 参考手动分词已验证；Studio 功能待实现 |
-| RB-01 | `modules/lyric-editor/tools/RubyEditor.tsx`：读音子块拆合与计时 | `RubyPanel.tsx` 整体 Ruby，`TimingPanel.tsx` 另管计时 | [Ruby 可编辑截图](evidence/editor-e0/reference-ruby-editable-1440.png)、[编辑后导出](evidence/editor-e0/reference-ruby-edited.ttml)；新模型命令与往返单测 | 参考 UI 可编辑已验证；Studio 界面待实现 |
+| UI-01 | `App.tsx`、`components/TopMenu`、`components/RibbonBar`、`components/Sidebar`：编辑/打轴/预览、简单/高级、主题与底部播放 | 两入口共用 `EditorSurface`，目前是基础三栏；E2 实现三模式、Ribbon 与视觉对齐 | [编辑 1440](evidence/editor-e0/reference-import-1440.png)、[打轴 1440](evidence/editor-e0/reference-sync-1440.png)、[预览 1440](evidence/editor-e0/reference-preview-1440.png)、[高级 1920](evidence/editor-e0/reference-advanced-1920.png)、[深色 390](evidence/editor-e0/reference-edit-dark-390.png)、[旧 Studio](evidence/editor-e0/studio-before-1440.png) | E0 基线通过；E2 界面待实现 |
+| ED-01 | `modules/lyric-editor/components/lyric-line-view.tsx`：行词 CRUD、剪贴、多选、拖动 | `lyric-commands.ts` 与共用界面已支持基础行词增删改、插入、拆词；剪贴、多选和拖动归 E2 | 无时间拆词及 ID 单测；项目和本地浏览器编辑测试；排序及移动界面待测 | E1 基础通过；E2 工作流待完成 |
+| ED-02 | 词属性、背景/对唱及行附属内容 | 语义模型、codec 与共用界面已覆盖背景、agent、翻译、音译；批量属性和完整对唱操作归 E2 | [对唱勾选截图](evidence/editor-e0/reference-duet-1440.png)、[关闭后导出](evidence/editor-e0/reference-duet-off.ttml)；三歌手、重叠背景、空拍待测试 | E1 模型通过；E2 界面待完成 |
+| SG-01 | `modules/segmentation`：手动/自动/高级分词 | E1 提供单边界拆词命令和输入内 F8；完整分词交互归 E3 | [手动分词实操](evidence/editor-e0/reference-manual-split-1440.png)、[高级分词弹窗](evidence/editor-e0/reference-segmentation-dialog-1440.png)；连空格、标点、忽略词、自定义规则待测试 | E1 基础命令通过；E3 待实现 |
+| RB-01 | `modules/lyric-editor/tools/RubyEditor.tsx`：读音子块拆合与计时 | 共用界面可编辑、添加、删除 Ruby 及时间；拆分命令已实现，完整 Ruby 工作流归 E4 | [Ruby 可编辑截图](evidence/editor-e0/reference-ruby-editable-1440.png)、[编辑后导出](evidence/editor-e0/reference-ruby-edited.ttml)；语义往返及浏览器闭环 | E1 基础通过；E4 工作流待完成 |
 | TM-01 | `sync-keybinding.tsx`、`TouchSyncPanel`：连续打轴与导航 | 数值时间编辑及拖动，缺连续游标 | 真实音频键盘打轴及模式切换 | 待实现 |
 | TM-02 | `modules/spectrogram/hooks/useTimelineEditing.ts`：偏移、平滑、链接、拖动 | 行整体移动及单元边界已有 | 时间缺口、重叠、链接、拖动撤销 | 待实现 |
 | AU-01 | `modules/audio`、`modules/spectrogram`、`Sidebar/BpmPanel.tsx`：频谱、BPM、试听 | `MediaTransport.tsx` 已有播放、速度、波形、循环 | [10 秒合成音频的展开时间轴](evidence/editor-e0/reference-timeline-1440.png)；10 分钟音频及频谱/BPM 实操待测 | 短音频布局已取；长音频功能待验证 |
 | PV-01 | `components/AMLLWrapper`、预览模式 | 无动态歌词预览 | Ruby/背景/对唱/译文的真实渲染截图 | 待实现 |
-| IO-01 | `modules/ttml-processor`：TTML 导入/导出及多格式菜单 | `adapters/ttml/codec.ts`：旧 XML 路径模型；本地与项目入口分离 | [参考导出](evidence/editor-e0/reference-rich.ttml)→新 codec→[Studio 导出](evidence/editor-e0/studio-roundtrip.ttml)→参考解析；无时间草稿单测 | Ruby/背景样例已互读；入口与其余格式待实现 |
-| ST-01 | 同一操作事务、输入历史、保存恢复 | `domain/editing.ts` 20 个快照；`useProjectDocument.ts` revision/ETag | 保存中继续编辑、冲突、刷新恢复 | 待验证 |
-| UX-01 | 快捷键、IME、弹窗、触屏、变高长列表 | `LineTable.tsx` 固定行高 | 2,000 行/20,000 词与移动视口 | 待实现 |
+| IO-01 | `modules/ttml-processor`：TTML 导入/导出及多格式菜单 | 两入口共用 `lyric-codec.ts`；TTML 和草稿闭环已验收，其余格式及完整元数据归 E7 | [参考导出](evidence/editor-e0/reference-rich.ttml)→[Studio 导出](evidence/editor-e0/studio-roundtrip.ttml)→参考解析；项目与本地浏览器测试、真实 FastAPI 保存重开 | E1 TTML 闭环通过；E7 格式待完成 |
+| ST-01 | 同一操作事务、输入历史、保存恢复 | `lyric-commands.ts` 256 次有界历史，`useProjectDocument.ts` revision/ETag 串行保存，两个入口使用 v3 检查点 | 保存中继续编辑、冲突及恢复单测；本地恢复和项目保存重开浏览器测试 | E1 核心通过；后续工作流继续验证 |
+| UX-01 | 快捷键、IME、弹窗、触屏、变高长列表 | 当前共用界面处理 IME 输入与变高行；键盘、触控工作流和长文档归 E2–E5 | 2,000 行/20,000 词与移动视口 | 待实现 |
 
 ## 已知格式映射
 
