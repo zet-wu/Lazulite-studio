@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createLyricDocument, lineText } from '../src/domain/lyric-document';
+import { createLine, createLyricDocument, createWord, lineText } from '../src/domain/lyric-document';
 import { createLyricEditorState, executeLyricCommand, redoLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
 import { codePointToUtf16, splitAtGrapheme, utf16ToCodePoint } from '../src/domain/text-boundaries';
 
@@ -41,5 +41,34 @@ describe('semantic lyric commands', () => {
     expect(() => utf16ToCodePoint(text, 1)).toThrow(/surrogate/);
     expect(() => splitAtGrapheme(text, 2)).toThrow(/grapheme/);
     expect(splitAtGrapheme(text, 3)).toEqual(['𝄞e\u0301', 'きょ']);
+  });
+
+  it('keeps background vocals with their parent through line edits and undo', () => {
+    const document = createLyricDocument('主唱');
+    const parent = document.lines[0];
+    const background = { ...createLine('和声', 'bg'), backgroundOf: parent.id };
+    const second = createLine('第二行', 'second');
+    document.lines.push(background, second);
+    let state = createLyricEditorState(document);
+    state = executeLyricCommand(state, { type: 'move-line', lineId: parent.id, afterLineId: second.id });
+    expect(state.present.lines.map((line) => line.id)).toEqual(['second', parent.id, 'bg']);
+    expect(undoLyricCommand(state).present.lines.map((line) => line.id)).toEqual([parent.id, 'bg', 'second']);
+    state = executeLyricCommand(state, { type: 'delete-line', lineId: parent.id });
+    expect(state.present.lines.map((line) => line.id)).toEqual(['second']);
+    expect(undoLyricCommand(state).present.lines.map((line) => line.id)).toEqual(['second', parent.id, 'bg']);
+  });
+
+  it('inserts words and sublyrics as single undoable operations', () => {
+    const document = createLyricDocument('今日');
+    const lineId = document.lines[0].id;
+    const first = document.lines[0].words[0];
+    let state = createLyricEditorState(document);
+    state = executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: first.id, word: createWord(' も', 'next') });
+    state = executeLyricCommand(state, { type: 'set-sublyrics', lineId, kind: 'translations', items: [{ language: 'zh', text: '今天也' }] });
+    expect(lineText(state.present.lines[0])).toBe('今日 も');
+    expect(state.present.lines[0].translations[0].text).toBe('今天也');
+    expect(undoLyricCommand(state).present.lines[0].translations).toEqual([]);
+    expect(undoLyricCommand(undoLyricCommand(state)).present).toBe(document);
+    expect(() => executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: null, word: createWord('重', first.id) })).toThrow(/already exists/);
   });
 });
