@@ -80,6 +80,15 @@ function lineIndex(document: LyricDocument, id: string): number {
   return index;
 }
 
+function afterLineGroup(lines: LyricLine[], id: string): number {
+  const index = lines.findIndex((line) => line.id === id);
+  if (index < 0) throw new Error(`Line not found: ${id}`);
+  const line = lines[index];
+  if (line.backgroundOf) throw new Error('Use the parent line as the insertion anchor');
+  const background = lines.findIndex((item) => item.backgroundOf === id);
+  return background >= 0 ? background : index;
+}
+
 function wordFitsLine(word: LyricWord, line: LyricLine) {
   validTime(word.beginUs, word.endUs);
   if (line.beginUs !== null && word.beginUs !== null && word.beginUs < line.beginUs || line.endUs !== null && word.endUs !== null && word.endUs > line.endUs) throw new Error('Word time exceeds line');
@@ -91,7 +100,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const line = command.line ?? createLine('');
       if (document.lines.some((item) => item.id === line.id)) throw new Error(`Line id already exists: ${line.id}`);
       if (line.backgroundOf) throw new Error('Insert a background vocal with its parent line');
-      const after = command.afterLineId === null ? -1 : lineIndex(document, command.afterLineId);
+      const after = command.afterLineId === null ? -1 : afterLineGroup(document.lines, command.afterLineId);
       const lines = document.lines.slice();
       lines.splice(after + 1, 0, line);
       return { ...document, lines };
@@ -120,7 +129,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const group = document.lines.filter((item) => item.id === line.id || item.backgroundOf === line.id);
       const rest = document.lines.filter((item) => !group.includes(item));
       if (command.afterLineId !== null && group.some((item) => item.id === command.afterLineId)) throw new Error('Cannot move a line after itself');
-      const after = command.afterLineId === null ? -1 : lineIndex({ ...document, lines: rest }, command.afterLineId);
+      const after = command.afterLineId === null ? -1 : afterLineGroup(rest, command.afterLineId);
       rest.splice(after + 1, 0, ...group);
       return rest.every((item, i) => item === document.lines[i]) ? document : { ...document, lines: rest };
     }

@@ -58,6 +58,21 @@ describe('semantic lyric commands', () => {
     expect(undoLyricCommand(state).present.lines.map((line) => line.id)).toEqual(['second', parent.id, 'bg']);
   });
 
+  it('inserts and moves lines after the full background group', () => {
+    const document = createLyricDocument('主唱');
+    const parent = document.lines[0];
+    const background = { ...createLine('和声', 'bg'), backgroundOf: parent.id };
+    const second = createLine('第二行', 'second');
+    document.lines.push(background, second);
+    const inserted = executeLyricCommand(createLyricEditorState(document), { type: 'insert-line', afterLineId: parent.id, line: createLine('插入', 'new') });
+    expect(inserted.present.lines.map((line) => line.id)).toEqual([parent.id, 'bg', 'new', 'second']);
+    const moved = executeLyricCommand(inserted, { type: 'move-line', lineId: 'new', afterLineId: parent.id });
+    expect(moved).toBe(inserted);
+    const movedParent = executeLyricCommand(inserted, { type: 'move-line', lineId: parent.id, afterLineId: second.id });
+    expect(movedParent.present.lines.map((line) => line.id)).toEqual(['new', 'second', parent.id, 'bg']);
+    expect(undoLyricCommand(movedParent).present).toBe(inserted.present);
+  });
+
   it('inserts words and sublyrics as single undoable operations', () => {
     const document = createLyricDocument('今日');
     const lineId = document.lines[0].id;
