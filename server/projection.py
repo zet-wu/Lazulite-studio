@@ -6,7 +6,11 @@ from pathlib import Path
 
 TTML = "http://www.w3.org/ns/ttml"
 TTS = "http://www.w3.org/ns/ttml#styling"
+TTM = "http://www.w3.org/ns/ttml#metadata"
 RUBY = {"ruby", "rt", "rtc"}
+
+def _content(value: str) -> str:
+    return "" if not value.strip() and ("\n" in value or "\r" in value) else value
 
 def _seconds(value: str | None) -> float | None:
     if not value:
@@ -14,6 +18,8 @@ def _seconds(value: str | None) -> float | None:
     match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(ms|s)", value.strip())
     if match:
         return float(match.group(1)) / (1000 if match.group(2) == "ms" else 1)
+    if re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", value.strip()):
+        return float(value)
     match = re.fullmatch(r"([0-9]+):([0-9]{2}):([0-9]{2}(?:\.[0-9]+)?)", value.strip())
     if match and int(match.group(2)) < 60 and float(match.group(3)) < 60:
         return float(match.group(1)) * 3600 + int(match.group(2)) * 60 + float(match.group(3))
@@ -31,8 +37,15 @@ def _timing(node: ET.Element, parent_begin: float, parent_end: float | None) -> 
     dur = _seconds(dur_raw) if dur_raw is not None else None
     if (begin_raw is not None and begin is None) or (end_raw is not None and end is None) or (dur_raw is not None and dur is None):
         raise ValueError("forced projection has unsupported timing expression")
-    absolute_begin = parent_begin + (begin or 0.0)
-    candidates = [x for x in (parent_end, parent_begin + end if end is not None else None, absolute_begin + dur if dur is not None else None) if x is not None]
+    # Reference-tool numeric clocks are absolute media seconds; unit-bearing
+    # TTML expressions remain offsets from the parent.
+    def position(raw: str | None, parsed: float | None) -> float | None:
+        if parsed is None:
+            return None
+        return parsed if raw is not None and re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", raw.strip()) else parent_begin + parsed
+    absolute_begin = position(begin_raw, begin) if begin_raw is not None else parent_begin
+    assert absolute_begin is not None
+    candidates = [x for x in (parent_end, position(end_raw, end), absolute_begin + dur if dur is not None else None) if x is not None]
     absolute_end = min(candidates) if candidates else None
     if absolute_end is not None and absolute_end < absolute_begin:
         raise ValueError("forced projection timing is inverted")
@@ -41,12 +54,14 @@ def _timing(node: ET.Element, parent_begin: float, parent_end: float | None) -> 
 def _plain(node: ET.Element) -> str:
     local = node.tag.rsplit("}", 1)[-1]
     ruby_value = node.attrib.get("{" + TTS + "}ruby")
+    if node.attrib.get("{" + TTM + "}role") in {"x-translation", "x-roman", "x-bg"}:
+        return ""
     if local in RUBY or str(ruby_value).lower() in {"text", "textcontainer", "delimiter", "reading", "annotation"}:
         return ""
     if not (node.tag.startswith("{" + TTML + "}") and local in {"p", "span", "br"}):
         return ""
-    value = "\n" if local == "br" else (node.text or "")
-    return value + "".join(_plain(child) + (child.tail or "") for child in node)
+    value = "\n" if local == "br" else _content(node.text or "")
+    return value + "".join(_plain(child) + _content(child.tail or "") for child in node)
 
 def project_ttml(path: str | Path) -> list[dict[str, str]]:
     root = ET.parse(path).getroot()
@@ -118,11 +133,13 @@ def project_ttml_for_forced(path: str | Path, selected_line_id: str | None = Non
                     return
                 local_name = node.tag.rsplit("}", 1)[-1]
                 ruby = node.attrib.get("{" + TTS + "}ruby")
+                if node.attrib.get("{" + TTM + "}role") in {"x-translation", "x-roman", "x-bg"}:
+                    return
                 if str(ruby).lower() in {"text", "textcontainer", "delimiter", "reading", "annotation"}:
                     return
                 if str(ruby).lower() == "container":
                     base_node = next((x for x in node if x.attrib.get("{" + TTS + "}ruby") == "base"), None)
-                    reading_node = next((x for x in node if x.attrib.get("{" + TTS + "}ruby") == "text"), None)
+                    reading_node = next((x for x in node if x.attrib.get("{" + TTS + "}ruby") in {"text", "textContainer"}), None)
                     if base_node is not None and reading_node is not None:
                         start = len("".join(text_parts))
                         def ruby_text(value: ET.Element) -> str:
@@ -130,7 +147,7 @@ def project_ttml_for_forced(path: str | Path, selected_line_id: str | None = Non
                                 raise ValueError("unsupported Ruby child")
                             if any(not child.tag.startswith("{" + TTML + "}") or child.tag.rsplit("}", 1)[-1] != "span" for child in value.iter()):
                                 raise ValueError("unsupported Ruby annotation subtree")
-                            return "".join(value.itertext())
+                            return "".join(_content(part) for part in value.itertext())
                         base = ruby_text(base_node)
                         reading = ruby_text(reading_node)
                         append_text(base)
@@ -141,10 +158,10 @@ def project_ttml_for_forced(path: str | Path, selected_line_id: str | None = Non
                 if local_name == "br":
                     append_text("\n")
                     return
-                append_text(node.text or "")
+                append_text(_content(node.text or ""))
                 for child in node:
                     walk(child)
-                    append_text(child.tail or "")
+                    append_text(_content(child.tail or ""))
 
             walk(element)
             raw_text = "".join(text_parts)

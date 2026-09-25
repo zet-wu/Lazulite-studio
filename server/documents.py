@@ -18,7 +18,7 @@ from .revisions import IdempotencyConflict, RevisionConflict, RevisionStore
 TTML_NS = "http://www.w3.org/ns/ttml"
 MAX_TTML_BYTES = 2 * 1024 * 1024
 _DOCTYPE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.I)
-_TIME = re.compile(r"^(?:\d+(?:\.\d+)?(?:ms|s)|\d+:\d{2}:\d{2}(?:\.\d+)?)$")
+_TIME = re.compile(r"^(?:\d+(?:\.\d+)?(?:ms|s)?|\d+:\d{2}:\d{2}(?:\.\d+)?)$")
 _LRC = re.compile(r"\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\](.*)$")
 _LRC_TAGS = re.compile(r"\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]")
 
@@ -77,6 +77,8 @@ def validate_ttml(ttml: str) -> str:
                 return float(value[:-2]) / 1000
             if value.endswith("s"):
                 return float(value[:-1])
+            if ":" not in value:
+                return float(value)
             h, m, rest = value.split(":")
             return int(h) * 3600 + int(m) * 60 + float(rest)
         if element.tag == f"{{{TTML_NS}}}tt" or element.tag.startswith(f"{{{TTML_NS}}}"):
