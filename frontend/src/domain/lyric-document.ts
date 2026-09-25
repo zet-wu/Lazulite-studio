@@ -30,6 +30,7 @@ export type LyricLine = {
   endUs: TimeUs;
   agentRefs: string[];
   backgroundOf: string | null;
+  songPart: string | null;
   duet: boolean;
   translations: SubLyric[];
   romanizations: SubLyric[];
@@ -60,7 +61,7 @@ export function createWord(text: string, id: string = crypto.randomUUID()): Lyri
 export function createLine(text: string, id: string = `line-${crypto.randomUUID()}`): LyricLine {
   return {
     id, words: text ? [createWord(text, `${id}:word:0`)] : [],
-    beginUs: null, endUs: null, agentRefs: [], backgroundOf: null,
+    beginUs: null, endUs: null, agentRefs: [], backgroundOf: null, songPart: null,
     duet: false, translations: [], romanizations: [], ignoreSync: false,
   };
 }

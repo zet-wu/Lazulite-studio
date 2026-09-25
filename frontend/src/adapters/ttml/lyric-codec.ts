@@ -6,6 +6,7 @@ const TTM = 'http://www.w3.org/ns/ttml#metadata';
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const STUDIO = 'urn:lazulite:studio:draft';
 const ITUNES = 'http://music.apple.com/lyric-ttml-internal';
+const AMLL = 'http://www.example.com/ns/amll';
 const MAX_BYTES = 2 * 1024 * 1024;
 
 const attr = (node: Element, ns: string | null, name: string) => node.getAttributeNS(ns, name);
@@ -62,7 +63,7 @@ function checkAttributes(node: Element, allowed: string[]) {
     if (attribute.namespaceURI === TTS && attribute.localName === 'ruby') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'role') continue;
-    if (attribute.namespaceURI === ITUNES && ['key', 'timing'].includes(attribute.localName)) continue;
+    if (attribute.namespaceURI === ITUNES && ['key', 'timing', 'songPart'].includes(attribute.localName)) continue;
     if (attribute.namespaceURI === STUDIO && ['id', 'null'].includes(attribute.localName)) continue;
     throw new Error(`Unsupported TTML attribute ${attribute.name} on <${node.localName}>`);
   }
@@ -133,8 +134,37 @@ export function parseLyricTtml(xml: string): LyricDocument {
   if (!is(root, TTML, 'tt')) throw new Error('Root must be TTML tt');
   checkAttributes(root, ['begin', 'end']);
   const agents: LyricAgent[] = [];
-  const metadata: Record<string, string[]> = {};
+  const metadata: Record<string, string[]> = Object.create(null);
   const lines: LyricLine[] = [];
+  const appleSubLyrics = new Map<string, { translations: LyricLine['translations']; romanizations: LyricLine['romanizations'] }>();
+  const addMetadata = (key: string, value: string) => { (metadata[key] ??= []).push(value); };
+  const readAppleMetadata = (node: Element) => {
+    checkAttributes(node, []);
+    for (const group of Array.from(node.children)) {
+      if (!is(group, ITUNES, 'songwriters') && !is(group, ITUNES, 'translations') && !is(group, ITUNES, 'transliterations')) throw new Error(`Unsupported iTunes metadata <${group.localName}>`);
+      checkAttributes(group, []);
+      for (const entry of Array.from(group.children)) {
+        if (is(group, ITUNES, 'songwriters')) {
+          if (!is(entry, ITUNES, 'songwriter')) throw new Error(`Unsupported songwriter <${entry.localName}>`);
+          checkAttributes(entry, []);
+          addMetadata('songwriter', textOnly(entry, 'Songwriter'));
+          continue;
+        }
+        const translation = is(group, ITUNES, 'translations');
+        if (!is(entry, ITUNES, translation ? 'translation' : 'transliteration')) throw new Error(`Unsupported iTunes sublyric <${entry.localName}>`);
+        checkAttributes(entry, []);
+        for (const item of Array.from(entry.children)) {
+          if (!is(item, ITUNES, 'text')) throw new Error(`Unsupported iTunes sublyric child <${item.localName}>`);
+          checkAttributes(item, ['for']);
+          const lineId = attr(item, null, 'for');
+          if (!lineId) throw new Error('iTunes sublyric needs a line reference');
+          const target = appleSubLyrics.get(lineId) ?? { translations: [], romanizations: [] };
+          target[translation ? 'translations' : 'romanizations'].push({ language: attr(entry, XML, 'lang'), text: textOnly(item, 'iTunes sublyric') });
+          appleSubLyrics.set(lineId, target);
+        }
+      }
+    }
+  };
   const rootStart = attr(root, null, 'begin') === null ? 0 : parseTime(attr(root, null, 'begin')!);
   const head = Array.from(root.children).find((child) => is(child, TTML, 'head'));
   if (head) {
@@ -158,23 +188,33 @@ export function parseLyricTtml(xml: string): LyricDocument {
             agents.push({ id, name: name ? textOnly(name, 'Agent name') : null, type: attr(entry, null, 'type') });
             continue;
           }
+          if (is(entry, AMLL, 'meta')) {
+            checkAttributes(entry, ['key', 'value']);
+            const key = attr(entry, null, 'key');
+            const value = attr(entry, null, 'value');
+            if (!key || value === null) throw new Error('AMLL metadata needs key and value');
+            addMetadata(key === 'musicName' ? 'title' : key === 'artists' ? 'artist' : key, value);
+            continue;
+          }
+          if (is(entry, ITUNES, 'iTunesMetadata')) { readAppleMetadata(entry); continue; }
           if (entry.namespaceURI !== TTM) throw new Error(`Unsupported metadata <${entry.localName}>`);
           checkAttributes(entry, []);
-          (metadata[entry.localName] ??= []).push(textOnly(entry, 'Metadata'));
+          addMetadata(entry.localName, textOnly(entry, 'Metadata'));
         }
       } else throw new Error(`Unsupported TTML head child <${child.localName}>`);
     }
   }
   const body = Array.from(root.children).find((child) => is(child, TTML, 'body'));
   if (!body || Array.from(root.children).some((child) => child !== head && child !== body)) throw new Error('TTML requires one body and supported head content');
-  const visit = (parent: Element, parentStart: number, parentEnd: TimeUs, depth: number) => {
+  const visit = (parent: Element, parentStart: number, parentEnd: TimeUs, depth: number, songPart: string | null) => {
     if (depth > 128) throw new Error('TTML nesting exceeds depth 128');
     checkAttributes(parent, ['begin', 'end', 'dur', 'timeContainer']);
     const [ownBegin, ownEnd] = boundaries(parent, parentStart, parentEnd);
     const start = ownBegin ?? parentStart;
+    const part = attr(parent, ITUNES, 'songPart') ?? songPart;
     for (const child of Array.from(parent.children)) {
       if (is(child, TTML, 'div')) {
-        visit(child, start, ownEnd, depth + 1);
+        visit(child, start, ownEnd, depth + 1, part);
         continue;
       }
       if (!is(child, TTML, 'p')) throw new Error(`Unsupported TTML body child <${child.localName}>`);
@@ -207,7 +247,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
       }
       const agentRefs = (attr(child, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
       if (agentRefs.some((ref) => !agents.some((agent) => agent.id === ref))) throw new Error(`Unknown agent on line ${id}`);
-      lines.push({ id, words, beginUs, endUs, agentRefs, backgroundOf: null, duet: false, translations, romanizations, ignoreSync: false });
+      lines.push({ id, words, beginUs, endUs, agentRefs, backgroundOf: null, songPart: part, duet: false, translations, romanizations, ignoreSync: false });
       if (background) {
         checkAttributes(background, ['begin', 'end', 'dur']);
         const [bgBegin, bgEnd] = boundaries(background, wordStart, endUs);
@@ -219,12 +259,18 @@ export function parseLyricTtml(xml: string): LyricDocument {
           const last = bgWords.length - 1;
           bgWords[last] = { ...bgWords[last], text: bgWords[last].text.replace(/\)$/, '') };
         }
-        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin, endUs: bgEnd, agentRefs, backgroundOf: id, duet: false, translations: [], romanizations: [], ignoreSync: false });
+        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin ?? (bgWords.every((word) => word.beginUs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginUs!)) : null), endUs: bgEnd ?? (bgWords.every((word) => word.endUs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endUs!)) : null), agentRefs, backgroundOf: id, songPart: part, duet: false, translations: [], romanizations: [], ignoreSync: false });
       }
     }
   };
-  visit(body, rootStart, null, 1);
+  visit(body, rootStart, null, 1, null);
   if (new Set(lines.map((line) => line.id)).size !== lines.length) throw new Error('Duplicate line id');
+  for (const [id, content] of appleSubLyrics) {
+    const line = lines.find((item) => item.id === id && !item.backgroundOf);
+    if (!line) throw new Error(`iTunes sublyric refers to unknown line ${id}`);
+    line.translations.push(...content.translations);
+    line.romanizations.push(...content.romanizations);
+  }
   return { schemaVersion: LYRIC_SCHEMA_VERSION, lines, agents, metadata, language: attr(root, XML, 'lang') };
 }
 
@@ -240,17 +286,31 @@ function setTime(node: Element, begin: TimeUs, end: TimeUs, draft: boolean) {
 export function serializeLyricTtml(document: LyricDocument, options: { draft?: boolean } = {}): string {
   if (document.schemaVersion !== LYRIC_SCHEMA_VERSION) throw new Error('Unsupported lyric document schema');
   const draft = options.draft === true;
-  const xml = new DOMParser().parseFromString(`<tt xmlns="${TTML}" xmlns:tts="${TTS}" xmlns:ttm="${TTM}" xmlns:itunes="${ITUNES}"${draft ? ` xmlns:studio="${STUDIO}"` : ''}><body/></tt>`, 'application/xml');
+  const xml = new DOMParser().parseFromString(`<tt xmlns="${TTML}" xmlns:tts="${TTS}" xmlns:ttm="${TTM}" xmlns:itunes="${ITUNES}" xmlns:amll="${AMLL}"${draft ? ` xmlns:studio="${STUDIO}"` : ''}><body/></tt>`, 'application/xml');
   const root = xml.documentElement;
   if (document.language) root.setAttributeNS(XML, 'xml:lang', document.language);
   if (document.agents.length || Object.keys(document.metadata).length) {
     const head = xml.createElementNS(TTML, 'head');
     const metadataNode = xml.createElementNS(TTML, 'metadata');
+    const songwriters = document.metadata.songwriter ?? [];
     for (const [key, values] of Object.entries(document.metadata)) for (const value of values) {
       if (!/^[A-Za-z][\w.-]*$/.test(key)) throw new Error(`Invalid metadata name: ${key}`);
-      const entry = xml.createElementNS(TTM, `ttm:${key}`);
-      entry.textContent = value;
+      if (key === 'songwriter') continue;
+      const entry = xml.createElementNS(AMLL, 'amll:meta');
+      entry.setAttribute('key', key === 'title' ? 'musicName' : key === 'artist' ? 'artists' : key);
+      entry.setAttribute('value', value);
       metadataNode.appendChild(entry);
+    }
+    if (songwriters.length) {
+      const itunes = xml.createElementNS(ITUNES, 'itunes:iTunesMetadata');
+      const group = xml.createElementNS(ITUNES, 'itunes:songwriters');
+      for (const value of songwriters) {
+        const writer = xml.createElementNS(ITUNES, 'itunes:songwriter');
+        writer.textContent = value;
+        group.appendChild(writer);
+      }
+      itunes.appendChild(group);
+      metadataNode.appendChild(itunes);
     }
     for (const agent of document.agents) {
       const entry = xml.createElementNS(TTM, 'ttm:agent');
@@ -268,15 +328,12 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   }
   const body = Array.from(root.children).find((child) => is(child, TTML, 'body'))!;
   const mainLines = document.lines.filter((line) => !line.backgroundOf);
-  const lineBegins = mainLines.map((line) => line.beginUs).filter((value): value is number => value !== null);
   const lineEnds = mainLines.map((line) => line.endUs).filter((value): value is number => value !== null);
-  const div = xml.createElementNS(TTML, 'div');
-  if (lineBegins.length) div.setAttribute('begin', timeText(Math.min(...lineBegins)));
   if (lineEnds.length) {
-    div.setAttribute('end', timeText(Math.max(...lineEnds)));
     body.setAttribute('dur', timeText(Math.max(...lineEnds)));
   }
-  body.appendChild(div);
+  let div: Element | null = null;
+  let currentPart: string | null | undefined;
   const backgrounds = new Map<string, LyricLine>();
   for (const line of document.lines) if (line.backgroundOf) {
     if (backgrounds.has(line.backgroundOf)) throw new Error(`Multiple background vocals for ${line.backgroundOf}`);
@@ -286,6 +343,12 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   for (const line of document.lines) {
     if (line.backgroundOf) continue;
     if (line.duet || line.ignoreSync) throw new Error(`Line ${line.id} has fields not yet mapped to TTML`);
+    if (!div || currentPart !== line.songPart) {
+      currentPart = line.songPart;
+      div = xml.createElementNS(TTML, 'div');
+      if (currentPart) div.setAttributeNS(ITUNES, 'itunes:songPart', currentPart);
+      body.appendChild(div);
+    }
     const p = xml.createElementNS(TTML, 'p');
     p.setAttributeNS(XML, 'xml:id', line.id);
     p.setAttributeNS(ITUNES, 'itunes:key', line.id);
