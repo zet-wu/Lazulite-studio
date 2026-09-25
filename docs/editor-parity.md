@@ -19,8 +19,8 @@
 
 | 编号 | 参考入口与目标操作 | Studio 当前入口与差距 | 样例/验收证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| UI-01 | `App.tsx`、`components/TopMenu`、`components/RibbonBar`、`components/Sidebar`：编辑/打轴/预览、简单/高级、主题与底部播放 | 两入口共用 `EditorSurface`，目前是基础三栏；E2 实现三模式、Ribbon 与视觉对齐 | [编辑 1440](evidence/editor-e0/reference-import-1440.png)、[打轴 1440](evidence/editor-e0/reference-sync-1440.png)、[预览 1440](evidence/editor-e0/reference-preview-1440.png)、[高级 1920](evidence/editor-e0/reference-advanced-1920.png)、[深色 390](evidence/editor-e0/reference-edit-dark-390.png)、[旧 Studio](evidence/editor-e0/studio-before-1440.png) | E0 基线通过；E2 界面待实现 |
-| ED-01 | `modules/lyric-editor/components/lyric-line-view.tsx`：行词 CRUD、剪贴、多选、拖动 | `lyric-commands.ts` 与共用界面已支持基础行词增删改、插入、拆词；E2 首步接入词/带背景行的按钮和 Alt+方向键重排。剪贴、多选和拖动仍待完成 | 无时间拆词及 ID 单测；项目和本地浏览器编辑测试；背景分组排序与撤销浏览器测试 | E1 基础通过；E2 部分实现 |
+| UI-01 | `App.tsx`、`components/TopMenu`、`components/RibbonBar`、`components/Sidebar`：编辑/打轴/预览、简单/高级、主题与底部播放 | 两入口共用 `EditorSurface`；已有操作 Ribbon 和简单/高级布局切换。参考菜单密度、主题、三模式及时间轴布局仍待对齐 | [编辑 1440](evidence/editor-e0/reference-import-1440.png)、[打轴 1440](evidence/editor-e0/reference-sync-1440.png)、[预览 1440](evidence/editor-e0/reference-preview-1440.png)、[高级 1920](evidence/editor-e0/reference-advanced-1920.png)、[深色 390](evidence/editor-e0/reference-edit-dark-390.png)、[旧 Studio](evidence/editor-e0/studio-before-1440.png)；布局切换浏览器测试 | E0 基线通过；E2 部分实现 |
+| ED-01 | `modules/lyric-editor/components/lyric-line-view.tsx`：行词 CRUD、剪贴、多选、拖动 | 共用界面已有行词增删改、拆词、Ctrl/Cmd 多选、Shift 范围、全选/反选、内部富词块剪贴板、纯文本粘贴、跨行词移动、词与带背景行拖放排序及 Ctrl 拖动复制；跨行多选和触控拖放仍待完成 | 无时间拆词、ID、Ruby/对齐复制及跨行时间单测；项目和本地浏览器编辑、拖放、剪贴、撤销测试 | E1 基础通过；E2 部分实现 |
 | ED-02 | 词属性、背景/对唱及行附属内容 | 语义模型、codec 与共用界面已覆盖背景、agent、翻译、音译；批量属性和完整对唱操作归 E2 | [对唱勾选截图](evidence/editor-e0/reference-duet-1440.png)、[关闭后导出](evidence/editor-e0/reference-duet-off.ttml)；三歌手、重叠背景、空拍待测试 | E1 模型通过；E2 界面待完成 |
 | SG-01 | `modules/segmentation`：手动/自动/高级分词 | E1 提供单边界拆词命令和输入内 F8；完整分词交互归 E3 | [手动分词实操](evidence/editor-e0/reference-manual-split-1440.png)、[高级分词弹窗](evidence/editor-e0/reference-segmentation-dialog-1440.png)；连空格、标点、忽略词、自定义规则待测试 | E1 基础命令通过；E3 待实现 |
 | RB-01 | `modules/lyric-editor/tools/RubyEditor.tsx`：读音子块拆合与计时 | 共用界面可编辑、添加、删除 Ruby 及时间；拆分命令已实现，完整 Ruby 工作流归 E4 | [Ruby 可编辑截图](evidence/editor-e0/reference-ruby-editable-1440.png)、[编辑后导出](evidence/editor-e0/reference-ruby-edited.ttml)；语义往返及浏览器闭环 | E1 基础通过；E4 工作流待完成 |
@@ -30,7 +30,7 @@
 | PV-01 | `components/AMLLWrapper`、预览模式 | 无动态歌词预览 | Ruby/背景/对唱/译文的真实渲染截图 | 待实现 |
 | IO-01 | `modules/ttml-processor`：TTML 导入/导出及多格式菜单 | 两入口共用 `lyric-codec.ts`；TTML 和草稿闭环已验收，其余格式及完整元数据归 E7 | [参考导出](evidence/editor-e0/reference-rich.ttml)→[Studio 导出](evidence/editor-e0/studio-roundtrip.ttml)→参考解析；项目与本地浏览器测试、真实 FastAPI 保存重开 | E1 TTML 闭环通过；E7 格式待完成 |
 | ST-01 | 同一操作事务、输入历史、保存恢复 | `lyric-commands.ts` 256 次有界历史，`useProjectDocument.ts` revision/ETag 串行保存，两个入口使用 v3 检查点；E2 已区分选择、焦点与播放头视觉标记 | 保存中继续编辑、冲突及恢复单测；本地恢复、项目保存重开、重排撤销和播放头浏览器测试 | E1 核心通过；E2 部分实现 |
-| UX-01 | 快捷键、IME、弹窗、触屏、变高长列表 | 当前共用界面处理 IME 输入与变高行；键盘、触控工作流和长文档归 E2–E5 | 2,000 行/20,000 词与移动视口 | 待实现 |
+| UX-01 | 快捷键、IME、弹窗、触屏、变高长列表 | 当前共用界面处理 IME、Alt+↑/↓ 切词、Alt+←/→ 重排和 Escape 取消输入；移动端按钮可用。双击编辑、触控拖放和变高虚拟列表仍待完成 | 键盘切词、Escape、390px 视口浏览器测试；2,000 行/20,000 词待测 | E2 部分实现 |
 
 ## 已知格式映射
 
