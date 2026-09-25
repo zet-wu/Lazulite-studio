@@ -13,6 +13,7 @@ test('imports, edits, undoes and downloads Ruby with background vocals', async (
   await upload(page);
   await page.setViewportSize({ width: 390, height: 844 });
   const word = page.getByRole('textbox', { name: '词 今日', exact: true });
+  await word.dblclick();
   await word.fill('今日改');
   await word.blur();
   await expect(page.getByRole('textbox', { name: '词 今日改', exact: true })).toBeVisible();
@@ -31,6 +32,7 @@ test('imports, edits, undoes and downloads Ruby with background vocals', async (
 test('saves the semantic checkpoint and restores undo history', async ({ page }) => {
   await upload(page);
   const word = page.getByRole('textbox', { name: '词 今日', exact: true });
+  await word.dblclick();
   await word.fill('检查点文字');
   await word.blur();
   await page.getByRole('button', { name: '保存', exact: true }).click();
@@ -169,6 +171,8 @@ test('navigates between words and edits in simple and advanced layouts', async (
   await first.press('Alt+ArrowDown');
   const second = page.getByRole('textbox', { name: '词 も歌う', exact: true });
   await expect(second).toBeFocused();
+  await expect(second).toHaveAttribute('readonly', '');
+  await second.dblclick();
   await second.fill('临时输入');
   await second.press('Escape');
   await expect(second).toHaveValue(' も歌う');
@@ -179,6 +183,7 @@ test('navigates between words and edits in simple and advanced layouts', async (
   await page.getByRole('button', { name: '简单布局' }).click();
   await expect(page.getByRole('heading', { name: '大纲' })).toBeHidden();
   await expect(page.getByRole('heading', { name: '属性' })).toBeHidden();
+  await second.dblclick();
   await second.fill(' も歌うよ');
   await second.blur();
   await page.getByRole('button', { name: '撤销' }).click();
@@ -205,4 +210,129 @@ test('keyboard copy and paste retain Ruby across lines', async ({ page, context 
   await expect(page.locator('[data-line-id]')).toHaveCount(5);
   await expect(page.getByRole('textbox', { name: '词 新行', exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: '词 第二行', exact: true })).toBeVisible();
+});
+
+test('sorts from the outline and edits mixed line properties in one undo step', async ({ page }) => {
+  await upload(page);
+  await page.getByRole('button', { name: '1 今日 も歌う' }).click();
+  await page.getByRole('button', { name: '3 宇宙' }).click({ modifiers: ['Control'] });
+  await expect(page.getByText('行已选 2')).toBeVisible();
+  const agents = page.getByRole('combobox', { name: '歌手' });
+  await expect(agents).toHaveValue('__mixed__');
+  await agents.selectOption('v1');
+  await expect(agents).toHaveValue('v1');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(agents).toHaveValue('__mixed__');
+  await page.getByRole('combobox', { name: '对唱' }).selectOption('true');
+  await expect(page.getByRole('combobox', { name: '对唱' })).toHaveValue('true');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.getByRole('combobox', { name: '对唱' })).toHaveValue('__mixed__');
+  await page.getByRole('button', { name: '大纲下移 今日 も歌う' }).click();
+  await expect(page.locator('[data-line-id]').first()).toHaveAttribute('data-line-id', 'L2');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-line-id]').first()).toHaveAttribute('data-line-id', 'L1');
+  await expect(page.locator('[data-line-id="L1"]').getByRole('textbox', { name: '读音 今日' }).first()).toHaveValue('きょ');
+});
+
+test('keeps 2000 variable-height lines virtual and locates the final line', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.goto('/editor');
+  const body = Array.from({ length: 2000 }, (_, index) => {
+    const words = Array.from({ length: 10 }, (_, word) => `<span>词${index}-${word} </span>`).join('');
+    const translation = index % 2 ? '<span xmlns:ttm="http://www.w3.org/ns/ttml#metadata" ttm:role="x-translation">译文</span>' : '';
+    return `<p itunes:key="L${index + 1}">${words}${translation}</p>`;
+  }).join('');
+  const xml = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal"><body><div>${body}</div></body></tt>`;
+  await page.locator('input[type="file"]').setInputFiles({ name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await expect(page.getByRole('button', { name: /2000 词1999-0/ })).toBeVisible();
+  expect(await page.locator('[data-line-id]').count()).toBeLessThan(40);
+  const heights = await page.locator('[data-line-id]').evaluateAll((items) => items.slice(0, 2).map((item) => item.getBoundingClientRect().height));
+  expect(heights[0]).not.toBe(heights[1]);
+  const firstInput = page.locator('[data-line-id="L1"] [data-word-id]').first().getByRole('textbox', { name: '词 词0-0', exact: true });
+  await firstInput.dblclick();
+  await firstInput.fill('保留草稿');
+  await page.getByLabel('歌词列表').evaluate((list) => { list.scrollTop = list.scrollHeight; });
+  await expect(page.locator('[data-line-id="L2000"]')).toBeVisible();
+  await expect(firstInput).toHaveValue('保留草稿');
+  await expect(firstInput).toBeFocused();
+  await expect(page.getByRole('button', { name: '撤销' })).toBeDisabled();
+  await page.getByRole('button', { name: /2000 词1999-0/ }).click();
+  await expect(page.locator('[data-line-id="L2000"]')).toBeVisible();
+  expect(await page.locator('[data-line-id]').count()).toBeLessThan(40);
+  await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await page.getByRole('button', { name: /^1 词0-0/ }).click();
+  await expect(firstInput).toHaveValue('词0-0 ');
+});
+
+test('reorders a word with a touch drag handle', async ({ browser }) => {
+  const context = await browser.newContext({ hasTouch: true, viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await upload(page);
+  const firstLine = page.locator('[data-line-id="L1"]');
+  const handle = page.getByRole('button', { name: '拖动词 今日' });
+  const target = firstLine.locator('[data-word-id]').nth(1);
+  await handle.scrollIntoViewIfNeeded();
+  const from = (await handle.boundingBox())!;
+  const to = (await target.boundingBox())!;
+  const client = await context.newCDPSession(page);
+  const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+  const end = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
+  for (let step = 1; step <= 5; step++) {
+    await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: start.x + (end.x - start.x) * step / 5, y: start.y + (end.y - start.y) * step / 5 }] });
+  }
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(firstLine.locator('[data-word-id]').first().getByRole('textbox', { name: '词 も歌う', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(firstLine.locator('[data-word-id]').first().getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+  await context.close();
+});
+
+test('selects and cuts words across lines, then restores Ruby and timing with undo', async ({ page }) => {
+  await upload(page);
+  await page.locator('[data-line-id="L1"] [data-word-id]').first().focus();
+  await page.locator('[data-line-id="L2"] [data-word-id]').first().click({ modifiers: ['Shift'] });
+  await expect(page.getByText('词已选 4')).toBeVisible();
+  await expect(page.locator('[data-line-id="L1"]')).toHaveClass(/selectedLine/);
+  await expect(page.locator('[data-line-id="L2"]')).toHaveClass(/selectedLine/);
+  await page.getByRole('button', { name: '复制', exact: true }).click();
+  await page.getByRole('button', { name: '剪切', exact: true }).click();
+  await expect(page.locator('[data-word-id]')).toHaveCount(0);
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-word-id]')).toHaveCount(4);
+  await page.getByRole('button', { name: '3 宇宙' }).click();
+  await page.getByRole('button', { name: '粘贴', exact: true }).click();
+  await expect(page.locator('[data-line-id="L2"] [data-word-id]')).toHaveCount(5);
+  await expect(page.getByRole('textbox', { name: '行 L2开始秒数' })).toHaveValue('1');
+  await expect(page.locator('[data-line-id="L2"]').getByRole('textbox', { name: '读音 今日' })).toHaveCount(2);
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-line-id="L2"] [data-word-id]')).toHaveCount(1);
+});
+
+test('reports invalid inline time without losing the edit session', async ({ page }) => {
+  await upload(page);
+  const start = page.getByRole('textbox', { name: '词 今日开始秒数' });
+  await start.fill('-1');
+  await start.blur();
+  await expect(page.getByRole('alert').filter({ hasText: '时间必须是非负秒数' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '撤销' })).toBeDisabled();
+  await start.fill('1');
+  await start.blur();
+  await expect(page.getByText('时间必须是非负秒数')).toHaveCount(0);
+  await expect(start).toHaveValue('1');
+});
+
+test('keeps IME composition active when Escape is pressed', async ({ page }) => {
+  await upload(page);
+  const word = page.getByRole('textbox', { name: '词 今日', exact: true });
+  await word.dblclick();
+  await word.dispatchEvent('compositionstart');
+  await word.press('Escape');
+  await expect(word).toBeFocused();
+  await expect(word).not.toHaveAttribute('readonly', '');
+  await word.dispatchEvent('compositionend');
+  await word.press('Escape');
+  await expect(word).toHaveAttribute('readonly', '');
+  await expect(page.getByRole('button', { name: '撤销' })).toBeDisabled();
 });

@@ -3,7 +3,7 @@ import { createRecoveryAdapter } from '../../adapters/recovery';
 import { parseLyricTtml, serializeLyricTtml } from '../../adapters/ttml/lyric-codec';
 import { createLyricEditorState, executeLyricCommand, redoLyricCommand, undoLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
 import { createLyricDocument, type LyricDocument } from '../../domain/lyric-document';
-import { EditorSurface } from './EditorSurface';
+import { EditorWorkspace } from './EditorWorkspace';
 
 function download(xml: string, name: string) {
   const url = URL.createObjectURL(new Blob([xml], { type: 'application/ttml+xml' }));
@@ -73,7 +73,7 @@ export function LocalEditor() {
       touched.current = true; setState(createLyricEditorState(next)); setClean(next); setName('未命名.ttml'); setMessage(null);
     } catch (error) { setMessage(error instanceof Error ? error.message : '新建失败'); }
   };
-  return <EditorSurface title={name} document={state.present} apply={apply} undo={() => setState(undoLyricCommand)} redo={() => setState(redoLyricCommand)}
+  return <EditorWorkspace title={name} document={state.present} apply={apply} undo={() => setState(undoLyricCommand)} redo={() => setState(redoLyricCommand)}
     canUndo={state.past.length > 0} canRedo={state.future.length > 0} dirty={dirty} saving={saving} error={message}
     onSave={() => void save()} onOpen={(file) => void open(file)} onNew={() => void createNew()}
     onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} />;

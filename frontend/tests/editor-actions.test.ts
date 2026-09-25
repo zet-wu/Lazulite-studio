@@ -45,7 +45,7 @@ describe('editor selection and clipboard', () => {
     expect(duplicated.present.lines.map((line) => line.id)).toEqual([parent.id, 'bg', pasted.selection.ids[0], `${pasted.selection.ids[0]}:bg`, 'next']);
     expect(duplicated.present.lines[2].translations).toEqual(parent.translations);
     expect(duplicated.present.lines[3].backgroundOf).toBe(duplicated.present.lines[2].id);
-    const cut = executeLyricCommand(duplicated, cutSelection(selection));
+    const cut = executeLyricCommand(duplicated, cutSelection(duplicated.present, selection));
     expect(cut.present.lines.map(lineText)).toEqual(['主唱', '和声', '下一行']);
     expect(undoLyricCommand(cut).present).toBe(duplicated.present);
   });

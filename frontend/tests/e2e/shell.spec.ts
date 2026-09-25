@@ -100,6 +100,7 @@ test("keeps deep edit navigation, task tabs, settings, and export state usable",
 test("saves a semantic project edit and reopens the saved revision", async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   const word = page.getByRole('textbox', { name: '词 夜の風が静かに吹く', exact: true });
+  await word.dblclick();
   await word.fill('夜の風が静かに歌う');
   await word.blur();
   await expect(page.getByText('已保存', { exact: true })).toBeVisible({ timeout: 10000 });

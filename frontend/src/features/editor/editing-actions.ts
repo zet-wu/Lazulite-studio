@@ -25,9 +25,8 @@ export function invertIds(order: string[], selected: string[]): string[] {
 
 export function copySelection(document: LyricDocument, selection: EditorSelection): EditorClipboard {
   if (selection.kind === 'words') {
-    const line = document.lines.find((item) => item.id === selection.lineId)!;
-    const words = line.words.filter((word) => selection.ids.includes(word.id));
-    return { kind: 'words', words, text: words.map((word) => word.text).join('') };
+    const groups = document.lines.map((line) => line.words.filter((word) => selection.ids.includes(word.id))).filter((words) => words.length);
+    return { kind: 'words', words: groups.flat(), text: groups.map((words) => words.map((word) => word.text).join('')).join('\n') };
   }
   const groups = document.lines.filter((line) => !line.backgroundOf && selection.ids.includes(line.id)).map((line) => ({
     line, background: document.lines.find((item) => item.backgroundOf === line.id) ?? null,
@@ -35,9 +34,9 @@ export function copySelection(document: LyricDocument, selection: EditorSelectio
   return { kind: 'lines', groups, text: groups.map(({ line }) => lineText(line)).join('\n') };
 }
 
-export function cutSelection(selection: EditorSelection): LyricCommand {
+export function cutSelection(document: LyricDocument, selection: EditorSelection): LyricCommand {
   return { type: 'batch', commands: selection.kind === 'words'
-    ? selection.ids.map((wordId) => ({ type: 'delete-word', lineId: selection.lineId, wordId }))
+    ? document.lines.flatMap((line) => line.words.filter((word) => selection.ids.includes(word.id)).map((word) => ({ type: 'delete-word' as const, lineId: line.id, wordId: word.id })))
     : selection.ids.map((lineId) => ({ type: 'delete-line', lineId })) };
 }
 
@@ -48,17 +47,17 @@ function expandedLineTime(target: LyricLine, words: LyricWord[]) {
 }
 
 export function moveWordsAcrossLine(document: LyricDocument, selection: Extract<EditorSelection, { kind: 'words' }>, targetLineId: string, afterWordId?: string | null): LyricCommand {
-  const source = document.lines.find((line) => line.id === selection.lineId)!;
   const target = document.lines.find((line) => line.id === targetLineId)!;
-  if (source.id === target.id) throw new Error('目标行必须不同于当前行');
-  const words = source.words.filter((word) => selection.ids.includes(word.id));
-  if (!words.length) throw new Error('请先选择词块');
+  const selected = document.lines.flatMap((line) => line.words.filter((word) => selection.ids.includes(word.id)).map((word) => ({ line, word })));
+  if (selected.some(({ line }) => line.id === target.id)) throw new Error('目标行必须不同于所选词所在行');
+  const words = selected.map(({ word }) => word);
+  if (!selected.length) throw new Error('请先选择词块');
   const { beginUs, endUs } = expandedLineTime(target, words);
   const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'move-word' }>> = [];
   if (beginUs !== target.beginUs || endUs !== target.endUs) commands.push({ type: 'set-line-time', lineId: target.id, beginUs, endUs });
   let after = afterWordId === undefined ? target.words.at(-1)?.id ?? null : afterWordId;
-  for (const word of words) {
-    commands.push({ type: 'move-word', lineId: source.id, wordId: word.id, toLineId: target.id, afterWordId: after });
+  for (const { line, word } of selected) {
+    commands.push({ type: 'move-word', lineId: line.id, wordId: word.id, toLineId: target.id, afterWordId: after });
     after = word.id;
   }
   return { type: 'batch', commands };
@@ -79,7 +78,7 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
   const currentLine = document.lines.find((line) => line.id === selectedLineId);
   if (clipboard.kind === 'words') {
     if (!currentLine) throw new Error('请先选择粘贴目标行');
-    const afterWordId = selection?.kind === 'words' ? selection.ids.at(-1) ?? null : currentLine.words.at(-1)?.id ?? null;
+    const afterWordId = selection?.kind === 'words' && currentLine.words.some((word) => word.id === selection.activeId) ? selection.activeId : currentLine.words.at(-1)?.id ?? null;
     const words = clipboard.words.map(cloneWord);
     const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'insert-word' }>> = [];
     const { beginUs, endUs } = expandedLineTime(currentLine, words);
@@ -107,7 +106,9 @@ export function pastePlain(document: LyricDocument, text: string, selection: Edi
   if (lines.at(-1) === '' && lines.length > 1) lines.pop();
   if (lines.length === 1 && selection?.kind === 'words') {
     const word = createWord(lines[0]);
-    return { command: { type: 'insert-word', lineId: selection.lineId, afterWordId: selection.ids.at(-1) ?? null, word },
+    const line = document.lines.find((item) => item.id === selection.lineId)!;
+    const afterWordId = line.words.some((item) => item.id === selection.activeId) ? selection.activeId : line.words.at(-1)?.id ?? null;
+    return { command: { type: 'insert-word', lineId: selection.lineId, afterWordId, word },
       selection: { kind: 'words', lineId: selection.lineId, ids: [word.id], anchorId: word.id, activeId: word.id, rubyId: null } };
   }
   const currentLine = document.lines.find((line) => line.id === (selection?.kind === 'words' ? selection.lineId : selection?.activeId || selection?.ids.at(-1)));

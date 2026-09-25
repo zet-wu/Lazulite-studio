@@ -207,7 +207,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const line = document.lines[index];
       if (line.backgroundOf) throw new Error('Set duet on the parent line');
       if (!document.agents.some((agent) => agent.id === 'v1') || !document.agents.some((agent) => agent.id === 'v2')) throw new Error('Duet editing requires v1 and v2 agents');
-      if (line.agentRefs.length !== 1 || !['v1', 'v2'].includes(line.agentRefs[0])) throw new Error('Duet editing requires a v1 or v2 line');
       const agentRefs = [command.duet ? 'v2' : 'v1'];
       const lines = document.lines.slice();
       lines[index] = { ...line, duet: command.duet, agentRefs };
