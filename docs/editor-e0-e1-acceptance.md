@@ -20,6 +20,6 @@
 | Ruby、翻译、背景导入→修改→撤销→保存→重开 | AMLL、Apple 样例经语义 codec 往返；项目浏览器测试实操导入 Apple TTML、修改 Ruby、撤销重做、自动保存、离开再打开，Ruby、翻译和背景仍在。`/editor` 浏览器测试覆盖本地文件、草稿导出和检查点恢复历史。 |
 | 正文投影正确 | 服务端 AMLL、Apple 样例投影测试通过；Studio 语义 codec 的产物经真实 FastAPI 保存、重开及歌词文件读取通过，Ruby、翻译和背景不混入正文。 |
 | 每次操作有稳定 ID | 行、词、Ruby 单元以 ID 操作；拆词与 Ruby 拆分、撤销的领域测试通过。草稿 TTML 保留内部 ID，重开项目后继续定位编辑。 |
-| 替换旧模型、共用本地/项目编辑状态及恢复格式 | 两个入口共用 `EditorSurface`、语义命令和 `lyric-codec`；本地和项目检查点统一使用 `studio-lyric-v3` 状态。旧 `text + ruby[] + timingUnits[]` 模型及组件、测试已删除。项目仍使用原 revision/ETag API。 |
+| 替换旧模型、共用本地/项目编辑状态及恢复格式 | 两个入口共用 `EditorWorkspace`（E2 阶段改名）、语义命令和 `lyric-codec`；本地和项目检查点统一使用 `studio-lyric-v3` 状态。旧 `text + ruby[] + timingUnits[]` 模型及组件、测试已删除。项目仍使用原 revision/ETag API。 |
 
 验证：前端类型检查、生产构建、33 项单测、8 项 Chromium 浏览器测试，以及后端 36 项测试通过。E1 浏览器测试使用 mock 服务；另以真实 FastAPI 测试覆盖 Studio 语义 TTML 的保存与重开。项目保存队列及本地恢复的行为测试保留。旧开发草稿使用旧 IndexedDB/schema，不自动迁移；应从原 TTML 重新导入，旧库与用户文件未删除。E2 将继续完成主画布布局、选择反馈与完整词操作工作流。

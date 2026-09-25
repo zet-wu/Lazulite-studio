@@ -1,6 +1,6 @@
 # 歌词编辑器重构与 AMLL TTML Tool 对齐计划
 
-日期：2026-09-25。状态：E0–E1 已验收，E2 起待实施。下文“当前实现与限制”表保留计划制定时的 `2ff3b2c` 基线；进度以[验收记录](editor-e0-e1-acceptance.md)和[对齐矩阵](editor-parity.md)为准。
+日期：2026-09-25。状态：E0–E2 已验收，E3 起待实施。下文“当前实现与限制”表保留计划制定时的 `2ff3b2c` 基线；进度以[E0–E1 验收](editor-e0-e1-acceptance.md)、[E2 验收](editor-e2-acceptance.md)和[对齐矩阵](editor-parity.md)为准。
 
 ## 1. 目标与基线
 

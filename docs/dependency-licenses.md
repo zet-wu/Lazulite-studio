@@ -7,6 +7,7 @@
 | 包 | 版本 | 许可 |
 | --- | --- | --- |
 | @tanstack/react-query | 5.85.5 | MIT |
+| @tanstack/react-virtual | 3.14.13 | MIT |
 | react | 19.1.1 | MIT |
 | react-dom | 19.1.1 | MIT |
 | react-router-dom | 7.8.2 | MIT |
