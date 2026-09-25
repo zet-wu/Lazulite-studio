@@ -1,14 +1,14 @@
 # 歌词编辑器 E0–E1 验收记录
 
-日期：2026-09-25。依据：[实施计划](lyric-editor-implementation-plan.md)的阶段退出条件。结论：**E0 未通过，E1 未通过**。已通过的单项不替代阶段验收。
+日期：2026-09-25。依据：[实施计划](lyric-editor-implementation-plan.md)的阶段退出条件。结论：**E0 通过，E1 待完成**。已通过的单项不替代阶段验收。
 
 ## E0：行为与视觉基线
 
 | 退出条件 | 核查结果 |
 | --- | --- |
-| 操作清单与截图作为验收规格 | [对齐矩阵](editor-parity.md)已覆盖计划各大工作项；编辑、打轴、预览、布局、Ruby、手动分词、对唱和时间轴有运行截图。手动分词与对唱切换已实操验证；全部焦点状态及更多元数据仍缺可复现证据，未通过。 |
+| 操作清单与截图作为验收规格 | 通过。[对齐矩阵](editor-parity.md)覆盖计划各大工作项；编辑、打轴、预览、布局、Ruby、手动分词、对唱和时间轴有运行截图。正文词和 Ruby 输入焦点已实操验证。更多格式及元数据字段归 E7 覆盖。 |
 | Ruby 文件在参考工具重开且可编辑 | 通过。参考 UI 重新导入后可编辑两个词上的三个读音框；修改首框、导出并重解析后，Ruby 单元时间仍保留。见[截图](evidence/editor-e0/reference-ruby-editable-1440.png)及[导出文件](evidence/editor-e0/reference-ruby-edited.ttml)。 |
-| 关键模型决策无未说明的双轨状态 | 文档已明确词块和 Ruby 为唯一可写序列、会话与交换格式分离；但旧模型仍负责两个产品入口，因此实施层面未通过。 |
+| 关键模型决策无未说明的双轨状态 | 通过。实施计划已确定词块和 Ruby 为唯一可写序列、会话与交换格式分离、切换后删除旧实现。当前代码的临时双轨属于 E1 尚未完成的实施问题，不再混入 E0 的规格验收。 |
 
 两种参考工具导出样例：[AMLL](evidence/editor-e0/reference-amll-metadata.ttml)、[Apple Music](evidence/editor-e0/reference-apple-metadata.ttml)。已核对标题、艺人、作者、段落、agent、译文、音译、背景、Ruby 与空白；[对唱关闭导出](evidence/editor-e0/reference-duet-off.ttml)确认 `v2`→`v1`。更多元数据仍待取证。
 

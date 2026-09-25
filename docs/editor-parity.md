@@ -10,6 +10,7 @@
 - 已在参考工具 UI 中重新导入 Ruby 文件，直接将首个读音由“きょ”改为“きよう”，导出并重新解析为两个保留原时间的 Ruby 单元。证据为 [可编辑截图](evidence/editor-e0/reference-ruby-editable-1440.png) 和 [编辑后的导出](evidence/editor-e0/reference-ruby-edited.ttml)。
 - 手动分词实操：在参考工具中右击“も歌う”→“拆分单词…”；弹窗显示每个 grapheme 之间的可切换边界，取消第一个边界后确认，词块由“も歌う”变成“も歌”与“う”。见[操作截图](evidence/editor-e0/reference-manual-split-1440.png)。
 - 对唱实操：选中 `L2` 时参考工具的“对唱歌词”处于勾选状态；关闭后导出的 `L2` 从 `ttm:agent="v2"` 变为 `v1`。见[勾选截图](evidence/editor-e0/reference-duet-1440.png)和[关闭后的导出](evidence/editor-e0/reference-duet-off.ttml)。Studio 语义 codec 按参考的 `v1/v2` 规则映射 `duet` 与 agent。
+- 焦点状态实测：双击正文词“も歌う”后焦点落在对应文本 input，直接点击读音“きょ”后焦点落在 Ruby input。见[正文焦点](evidence/editor-e0/reference-word-focus-1440.png)和[Ruby 焦点](evidence/editor-e0/reference-ruby-focus-1440.png)。
 - 参考工具的“行时间戳”导出会把词块合并为整行，见 [`reference-line-timing.ttml`](evidence/editor-e0/reference-line-timing.ttml)。跨工具 Ruby 验证使用逐字时间导出配置，不能拿整行导出误判为 Ruby 保真。
 - Studio 旧入口打开同一参考文件时，将无单位时间报为只读，正文混入翻译、音译和背景；见 [`studio-before-1440.png`](evidence/editor-e0/studio-before-1440.png)。新语义 codec 的 [`studio-roundtrip.ttml`](evidence/editor-e0/studio-roundtrip.ttml) 已由参考工具 `parseTTML` 重新解析，正文、词、两段 Ruby、翻译、音译和背景时间与原样例相等。新 codec 尚未接入编辑页。
 - 测试素材将使用自制短句与合成音频，避免依赖商业歌曲或模型下载。双工具互读、长文档和真实媒体样例待生成。
@@ -41,4 +42,4 @@
 | 背景 | 主 `p` 内 `span ttm:role="x-bg"`，内部词带括号；Apple 样式的容器可无时间，时间从子词推导 | 多背景、歌手及对唱属性仍待测 |
 | 元数据/角色 | `amll:meta key="musicName"/"artists"` 对应标题/艺人；`iTunesMetadata/songwriters/songwriter` 对应作者；`itunes:songPart` 位于 `div`；`ttm:agent` 位于 `p`，参考对唱使用 `v2`、关闭后为 `v1` | 更多字段与重复值顺序仍待测 |
 
-E0 退出条件尚未满足：全部焦点状态和更多元数据仍缺证据。390px 参考页面的主画布受到大纲挤压，[深色截图](evidence/editor-e0/reference-edit-dark-390.png)已记录；Studio 实现须满足计划要求的移动端操作，不照搬这一布局缺陷。后续提交应逐项更新证据和状态，不填写总体完成率。
+E0 行为与视觉基线已满足阶段退出条件：关键布局、焦点、Ruby、分词、背景、对唱和常见元数据均有参考操作或双工具样例。更多元数据字段和格式覆盖按 E7 验证；这不改变 E0 对现有常见结构的映射结论。390px 参考页面的主画布受到大纲挤压，[深色截图](evidence/editor-e0/reference-edit-dark-390.png)已记录；Studio 实现须满足计划要求的移动端操作，不照搬这一布局缺陷。后续提交应逐项更新证据和状态，不填写总体完成率。
