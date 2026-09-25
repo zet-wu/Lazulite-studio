@@ -9,6 +9,7 @@ export type LyricCommand =
   | { type: 'move-line'; lineId: string; afterLineId: string | null }
   | { type: 'insert-word'; lineId: string; afterWordId: string | null; word: LyricWord }
   | { type: 'delete-word'; lineId: string; wordId: string }
+  | { type: 'move-word'; lineId: string; wordId: string; toLineId: string; afterWordId: string | null }
   | { type: 'set-line-time'; lineId: string; beginUs: TimeUs; endUs: TimeUs }
   | { type: 'set-sublyrics'; lineId: string; kind: 'translations' | 'romanizations'; items: SubLyric[] }
   | { type: 'set-agents'; agents: LyricAgent[] }
@@ -18,9 +19,11 @@ export type LyricCommand =
   | { type: 'set-word-time'; lineId: string; wordId: string; beginUs: TimeUs; endUs: TimeUs }
   | { type: 'add-ruby'; lineId: string; wordId: string; reading: string; rubyId?: string }
   | { type: 'split-ruby'; lineId: string; wordId: string; rubyId: string; at: number; newRubyId?: string }
-  | { type: 'edit-ruby'; lineId: string; wordId: string; rubyId: string; reading: string };
+  | { type: 'edit-ruby'; lineId: string; wordId: string; rubyId: string; reading: string }
+  | { type: 'delete-ruby'; lineId: string; wordId: string; rubyId: string }
+  | { type: 'set-ruby-time'; lineId: string; wordId: string; rubyId: string; beginUs: TimeUs; endUs: TimeUs };
 
-type WordCommand = Extract<LyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'split-ruby' | 'edit-ruby' }>
+type WordCommand = Extract<LyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>
 
 export type LyricEditorState = { present: LyricDocument; past: LyricDocument[]; future: LyricDocument[] };
 
@@ -71,6 +74,11 @@ function lineIndex(document: LyricDocument, id: string): number {
   return index;
 }
 
+function wordFitsLine(word: LyricWord, line: LyricLine) {
+  validTime(word.beginUs, word.endUs);
+  if (line.beginUs !== null && word.beginUs !== null && word.beginUs < line.beginUs || line.endUs !== null && word.endUs !== null && word.endUs > line.endUs) throw new Error('Word time exceeds line');
+}
+
 function applyStructure(document: LyricDocument, command: LyricCommand): LyricDocument | null {
   switch (command.type) {
     case 'insert-line': {
@@ -103,6 +111,7 @@ function applyStructure(document: LyricDocument, command: LyricCommand): LyricDo
       const line = document.lines[index];
       if (document.lines.some((item) => item.words.some((word) => word.id === command.word.id))) throw new Error(`Word id already exists: ${command.word.id}`);
       if (!command.word.text) throw new Error('Word text must be non-empty');
+      wordFitsLine(command.word, line);
       const after = command.afterWordId === null ? -1 : line.words.findIndex((word) => word.id === command.afterWordId);
       if (command.afterWordId !== null && after < 0) throw new Error(`Word not found: ${command.afterWordId}`);
       const words = line.words.slice();
@@ -117,6 +126,29 @@ function applyStructure(document: LyricDocument, command: LyricCommand): LyricDo
       if (!line.words.some((word) => word.id === command.wordId)) throw new Error(`Word not found: ${command.wordId}`);
       const lines = document.lines.slice();
       lines[index] = { ...line, words: line.words.filter((word) => word.id !== command.wordId) };
+      return { ...document, lines };
+    }
+    case 'move-word': {
+      const fromIndex = lineIndex(document, command.lineId);
+      const toIndex = lineIndex(document, command.toLineId);
+      const from = document.lines[fromIndex];
+      const to = document.lines[toIndex];
+      const word = from.words.find((item) => item.id === command.wordId);
+      if (!word) throw new Error(`Word not found: ${command.wordId}`);
+      if (command.afterWordId === word.id) throw new Error('Cannot move a word after itself');
+      wordFitsLine(word, to);
+      const destination = to.words.filter((item) => item.id !== word.id);
+      const after = command.afterWordId === null ? -1 : destination.findIndex((item) => item.id === command.afterWordId);
+      if (command.afterWordId !== null && after < 0) throw new Error(`Word not found: ${command.afterWordId}`);
+      destination.splice(after + 1, 0, word);
+      const lines = document.lines.slice();
+      if (fromIndex === toIndex) {
+        if (destination.every((item, index) => item === from.words[index])) return document;
+        lines[fromIndex] = { ...from, words: destination };
+      } else {
+        lines[fromIndex] = { ...from, words: from.words.filter((item) => item.id !== word.id) };
+        lines[toIndex] = { ...to, words: destination };
+      }
       return { ...document, lines };
     }
     case 'set-line-time': {
@@ -188,6 +220,17 @@ export function executeLyricCommand(state: LyricEditorState, command: LyricComma
       case 'edit-ruby':
         if (!wordCommand.reading) throw new Error('Ruby reading must be non-empty');
         return [updateRuby(word, wordCommand.rubyId, (unit) => wordCommand.reading === unit.reading ? [unit] : [{ ...unit, reading: wordCommand.reading }])];
+      case 'delete-ruby':
+        return [updateRuby(word, wordCommand.rubyId, () => [])];
+      case 'set-ruby-time': {
+        validTime(wordCommand.beginUs, wordCommand.endUs);
+        if (word.beginUs !== null && wordCommand.beginUs !== null && wordCommand.beginUs < word.beginUs || word.endUs !== null && wordCommand.endUs !== null && wordCommand.endUs > word.endUs) throw new Error('Ruby unit time exceeds word');
+        const updated = updateRuby(word, wordCommand.rubyId, (unit) => unit.beginUs === wordCommand.beginUs && unit.endUs === wordCommand.endUs ? [unit] : [{ ...unit, beginUs: wordCommand.beginUs, endUs: wordCommand.endUs }]);
+        if (updated === word) return [word];
+        const beginUs = word.beginUs ?? (updated.rubyUnits.every((unit) => unit.beginUs !== null) ? Math.min(...updated.rubyUnits.map((unit) => unit.beginUs!)) : null);
+        const endUs = word.endUs ?? (updated.rubyUnits.every((unit) => unit.endUs !== null) ? Math.max(...updated.rubyUnits.map((unit) => unit.endUs!)) : null);
+        return [{ ...updated, beginUs, endUs }];
+      }
     }
   });
   if (next === state.present) return state;

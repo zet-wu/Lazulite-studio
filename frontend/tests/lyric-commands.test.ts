@@ -71,4 +71,20 @@ describe('semantic lyric commands', () => {
     expect(undoLyricCommand(undoLyricCommand(state)).present).toBe(document);
     expect(() => executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: null, word: createWord('重', first.id) })).toThrow(/already exists/);
   });
+
+  it('moves a timed Ruby word across lines without changing its identity or timing', () => {
+    const document = createLyricDocument('今日');
+    const first = document.lines[0];
+    const second = createLine('明日', 'second');
+    document.lines.push(second);
+    let state = createLyricEditorState(document);
+    state = executeLyricCommand(state, { type: 'add-ruby', lineId: first.id, wordId: first.words[0].id, reading: 'きょう', rubyId: 'ruby' });
+    state = executeLyricCommand(state, { type: 'set-ruby-time', lineId: first.id, wordId: first.words[0].id, rubyId: 'ruby', beginUs: 100_000, endUs: 800_000 });
+    expect(state.present.lines[0].words[0]).toMatchObject({ beginUs: 100_000, endUs: 800_000 });
+    const beforeMove = state.present;
+    state = executeLyricCommand(state, { type: 'move-word', lineId: first.id, wordId: first.words[0].id, toLineId: second.id, afterWordId: null });
+    expect(state.present.lines[1].words[0]).toBe(beforeMove.lines[0].words[0]);
+    expect(undoLyricCommand(state).present).toBe(beforeMove);
+    expect(() => executeLyricCommand(state, { type: 'set-ruby-time', lineId: second.id, wordId: first.words[0].id, rubyId: 'ruby', beginUs: 0, endUs: 800_000 })).toThrow(/exceeds word/);
+  });
 });
