@@ -12,7 +12,7 @@ def test_projection_excludes_ruby_and_non_ttml_paragraphs(tmp_path):
 
 def test_reference_tool_roles_and_absolute_numeric_times_are_projected_as_main_lyrics():
     evidence = Path(__file__).resolve().parents[2] / "docs/evidence/editor-e0"
-    for filename, line_id in [("reference-rich.ttml", "line-1-0-0"), ("studio-roundtrip.ttml", "L1")]:
+    for filename, line_id in [("reference-rich.ttml", "L1"), ("studio-roundtrip.ttml", "L1")]:
         source = evidence / filename
         validate_ttml(source.read_text(encoding="utf-8"))
         assert project_ttml(source) == [{"id": line_id, "text": "今日も歌う"}]
@@ -25,3 +25,16 @@ def test_reference_tool_roles_and_absolute_numeric_times_are_projected_as_main_l
             "ruby_id": f"{line_id}:ruby-0", "base_start": 0, "base_end": 2,
             "base": "今日", "reading": "きょう",
         }]
+
+
+def test_apple_reference_projection_uses_itunes_line_keys_and_skips_metadata():
+    source = Path(__file__).resolve().parents[2] / "docs/evidence/editor-e0/reference-apple-metadata.ttml"
+    validate_ttml(source.read_text(encoding="utf-8"))
+    assert project_ttml(source) == [{"id": "L1", "text": "今日 も歌う"}, {"id": "L2", "text": "宇宙"}]
+    forced = project_ttml_for_forced(source, selected_line_id="L1")
+    assert len(forced) == 1
+    assert forced[0]["id"] == "L1"
+    assert forced[0]["text"] == "今日 も歌う"
+    assert forced[0]["begin"] == 1.0
+    assert forced[0]["end"] == 3.0
+    assert forced[0]["reading_spans"][0]["base"] == "今日"

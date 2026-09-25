@@ -7,6 +7,7 @@ from pathlib import Path
 TTML = "http://www.w3.org/ns/ttml"
 TTS = "http://www.w3.org/ns/ttml#styling"
 TTM = "http://www.w3.org/ns/ttml#metadata"
+ITUNES = "http://music.apple.com/lyric-ttml-internal"
 RUBY = {"ruby", "rt", "rtc"}
 
 def _content(value: str) -> str:
@@ -78,7 +79,7 @@ def project_ttml(path: str | Path) -> list[dict[str, str]]:
             local = element.tag.rsplit("}", 1)[-1]
             current_path = path + [child_index]
             if local == "p":
-                xml_id = element.attrib.get("{http://www.w3.org/XML/1998/namespace}id")
+                xml_id = element.attrib.get("{http://www.w3.org/XML/1998/namespace}id") or element.attrib.get("{" + ITUNES + "}key")
                 fallback = "line-" + "-".join(str(item) for item in current_path)
                 lines.append({"id": xml_id or fallback, "text": _plain(element).strip()})
                 index += 1
@@ -112,13 +113,13 @@ def project_ttml_for_forced(path: str | Path, selected_line_id: str | None = Non
                 try:
                     div_begin, div_end = _timing(element, parent_begin, parent_end)
                 except ValueError:
-                    ids = {child.attrib.get("{" + "http://www.w3.org/XML/1998/namespace" + "}id") for child in element.iter()}
+                    ids = {child.attrib.get("{http://www.w3.org/XML/1998/namespace}id") or child.attrib.get("{" + ITUNES + "}key") for child in element.iter()}
                     if selected_line_id is not None and selected_line_id not in ids:
                         continue
                     raise
                 visit(element, current_path, div_begin, div_end)
                 continue
-            line_id = element.attrib.get("{" + "http://www.w3.org/XML/1998/namespace" + "}id") or "line-" + "-".join(map(str, current_path))
+            line_id = element.attrib.get("{http://www.w3.org/XML/1998/namespace}id") or element.attrib.get("{" + ITUNES + "}key") or "line-" + "-".join(map(str, current_path))
             if selected_line_id is not None and line_id != selected_line_id:
                 continue
             text_parts: list[str] = []
