@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
-import { lineText, rubyReading } from '../src/domain/lyric-document';
+import { createLine, createLyricDocument, lineText, rubyReading } from '../src/domain/lyric-document';
 
 const simple = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="line-1">今日も歌う</p></body></tt>';
 
@@ -75,5 +75,20 @@ describe('semantic TTML codec', () => {
     const reopened = parseLyricTtml(serializeLyricTtml(undone.present, { draft: true }));
     expect(reopened.lines).toEqual(undone.present.lines);
     expect(reopened.metadata).toEqual(undone.present.metadata);
+  });
+
+  it('creates background vocals and metadata in one semantic document', () => {
+    const document = createLyricDocument('今日');
+    const parentLineId = document.lines[0].id;
+    let state = createLyricEditorState(document);
+    state = executeLyricCommand(state, { type: 'batch', commands: [
+      { type: 'insert-background', parentLineId, line: createLine('響く', 'background') },
+      { type: 'set-metadata', key: 'title', values: ['自作サンプル'] },
+    ] });
+    const reopened = parseLyricTtml(serializeLyricTtml(state.present, { draft: true }));
+    expect(reopened.lines.map(lineText)).toEqual(['今日', '響く']);
+    expect(reopened.lines[1].backgroundOf).toBe(parentLineId);
+    expect(reopened.metadata.title).toEqual(['自作サンプル']);
+    expect(undoLyricCommand(state).present).toBe(document);
   });
 });

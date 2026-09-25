@@ -5,6 +5,7 @@ const MAX_HISTORY = 256;
 
 type AtomicLyricCommand =
   | { type: 'insert-line'; afterLineId: string | null; line?: LyricLine }
+  | { type: 'insert-background'; parentLineId: string; line: LyricLine }
   | { type: 'delete-line'; lineId: string }
   | { type: 'move-line'; lineId: string; afterLineId: string | null }
   | { type: 'insert-word'; lineId: string; afterWordId: string | null; word: LyricWord }
@@ -12,6 +13,7 @@ type AtomicLyricCommand =
   | { type: 'move-word'; lineId: string; wordId: string; toLineId: string; afterWordId: string | null }
   | { type: 'set-line-time'; lineId: string; beginUs: TimeUs; endUs: TimeUs }
   | { type: 'set-sublyrics'; lineId: string; kind: 'translations' | 'romanizations'; items: SubLyric[] }
+  | { type: 'set-metadata'; key: string; values: string[] }
   | { type: 'set-agents'; agents: LyricAgent[] }
   | { type: 'replace-document'; document: LyricDocument }
   | { type: 'split-word'; lineId: string; wordId: string; at: number; newWordId?: string }
@@ -91,6 +93,18 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       lines.splice(after + 1, 0, line);
       return { ...document, lines };
     }
+    case 'insert-background': {
+      const index = lineIndex(document, command.parentLineId);
+      const parent = document.lines[index];
+      if (parent.backgroundOf) throw new Error('Background vocals cannot own a background vocal');
+      if (document.lines.some((line) => line.id === command.line.id)) throw new Error(`Line id already exists: ${command.line.id}`);
+      if (document.lines.some((line) => line.backgroundOf === parent.id)) throw new Error('Line already has a background vocal');
+      if (command.line.backgroundOf && command.line.backgroundOf !== parent.id) throw new Error('Background parent does not match');
+      const background = { ...command.line, backgroundOf: parent.id, songPart: parent.songPart };
+      const lines = document.lines.slice();
+      lines.splice(index + 1, 0, background);
+      return { ...document, lines };
+    }
     case 'delete-line': {
       lineIndex(document, command.lineId);
       const lines = document.lines.filter((line) => line.id !== command.lineId && line.backgroundOf !== command.lineId);
@@ -164,9 +178,17 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     }
     case 'set-sublyrics': {
       const index = lineIndex(document, command.lineId);
+      if (document.lines[index].backgroundOf) throw new Error('Background vocal sublyrics are not supported');
       const lines = document.lines.slice();
       lines[index] = { ...lines[index], [command.kind]: command.items };
       return { ...document, lines };
+    }
+    case 'set-metadata': {
+      if (!/^[A-Za-z][\w.-]*$/.test(command.key)) throw new Error(`Invalid metadata name: ${command.key}`);
+      const metadata = { ...document.metadata };
+      if (command.values.length) metadata[command.key] = command.values;
+      else delete metadata[command.key];
+      return { ...document, metadata };
     }
     case 'set-agents':
       if (document.lines.some((line) => line.agentRefs.some((ref) => !command.agents.some((agent) => agent.id === ref)))) throw new Error('An assigned agent cannot be removed');
