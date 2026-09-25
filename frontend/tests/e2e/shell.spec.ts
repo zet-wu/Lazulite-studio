@@ -119,6 +119,18 @@ test('keeps the playhead highlight separate from the selected line', async ({ pa
   await expect(page.locator('[data-line-id="line-2"]')).not.toHaveClass(/selectedLine/);
 });
 
+test('moves an untimed word across lines without changing line timing and restores it with undo', async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  await page.getByRole('textbox', { name: '词 夜の風が静かに吹く', exact: true }).focus();
+  await page.getByRole('button', { name: '词移下行' }).click();
+  await expect(page.locator('[data-line-id="line-1"] [data-word-id]')).toHaveCount(0);
+  await expect(page.locator('[data-line-id="line-2"]').getByRole('textbox', { name: '词 夜の風が静かに吹く', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '行 line-2开始秒数' })).toHaveValue('5');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-line-id="line-1"]').getByRole('textbox', { name: '词 夜の風が静かに吹く', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '行 line-2开始秒数' })).toHaveValue('5');
+});
+
 test('imports rich TTML, edits Ruby, undoes, saves and reopens it in a project', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   const source = await readFile('../docs/evidence/editor-e0/reference-apple-metadata.ttml');

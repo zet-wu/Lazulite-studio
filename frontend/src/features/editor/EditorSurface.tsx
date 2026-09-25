@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, type TimeUs } from '../../domain/lyric-document';
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
+import { copySelection, cutSelection, invertIds, moveWordsAcrossLine, pastePlain, pasteRich, selectIds, type EditorClipboard, type EditorSelection } from './editing-actions';
 import styles from './semantic-editor.module.css';
 
 type Props = {
@@ -36,6 +37,10 @@ function parseSeconds(value: string): TimeUs {
   return number;
 }
 
+function isTextInput(target: EventTarget) {
+  return target instanceof Element && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+}
+
 function DraftInput({ value, label, onCommit, onFocus, onSplit, onMove }: { value: string; label: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number) => void; onMove?: (direction: -1 | 1) => void }) {
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
@@ -66,14 +71,95 @@ function TimePair({ begin, end, label, onCommit }: { begin: TimeUs; end: TimeUs;
 
 export function EditorSurface(props: Props) {
   const { document, apply } = props;
-  const [selection, setSelection] = useState<{ lineId: string; wordId: string | null; rubyId: string | null } | null>(null);
+  const [selection, setSelection] = useState<EditorSelection | null>(null);
+  const [clipboard, setClipboard] = useState<EditorClipboard | null>(null);
   const [message, setMessage] = useState('');
-  const selectedLine = document.lines.find((line) => line.id === (selection?.lineId ?? props.selectedLineId)) ?? document.lines[0];
+  useEffect(() => {
+    setSelection((current) => {
+      if (!current) return current;
+      if (current.kind === 'lines') {
+        const order = document.lines.filter((line) => !line.backgroundOf).map((line) => line.id);
+        const ids = current.ids.filter((id) => order.includes(id));
+        if (ids.length === current.ids.length && (current.activeId === '' || document.lines.some((line) => line.id === current.activeId))) return current;
+        return { ...current, ids, anchorId: order.includes(current.anchorId) ? current.anchorId : ids[0] ?? '', activeId: document.lines.some((line) => line.id === current.activeId) ? current.activeId : ids.at(-1) ?? '' };
+      }
+      const line = document.lines.find((item) => item.id === current.lineId);
+      const ids = current.ids.filter((id) => line?.words.some((word) => word.id === id));
+      if (line && ids.length === current.ids.length && (!current.rubyId || line.words.some((word) => word.rubyUnits.some((unit) => unit.id === current.rubyId)))) return current;
+      return line ? { ...current, ids, anchorId: line.words.some((word) => word.id === current.anchorId) ? current.anchorId : ids[0] ?? '', activeId: ids.includes(current.activeId) ? current.activeId : ids.at(-1) ?? '', rubyId: null }
+        : { kind: 'lines', ids: [], anchorId: '', activeId: '' };
+    });
+  }, [document]);
+  const activeLineId = selection?.kind === 'words' ? selection.lineId : selection?.activeId || props.selectedLineId;
+  const selectedLine = document.lines.find((line) => line.id === activeLineId) ?? document.lines[0];
   const mainLines = document.lines.filter((line) => !line.backgroundOf);
-  const select = (lineId: string, wordId: string | null = null, rubyId: string | null = null) => { setSelection({ lineId, wordId, rubyId }); props.onSelectLine?.(lineId); };
+  const mainIds = mainLines.map((line) => line.id);
+  const selectLine = (line: LyricLine, shift = false, toggle = false) => {
+    const id = line.backgroundOf ?? line.id;
+    const previous = selection?.kind === 'lines' ? selection : null;
+    const ids = selectIds(mainIds, previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
+    setSelection({ kind: 'lines', ids, anchorId: shift ? previous?.anchorId ?? id : id, activeId: line.id });
+    props.onSelectLine?.(line.id);
+  };
+  const selectWord = (line: LyricLine, word: LyricWord, shift = false, toggle = false, rubyId: string | null = null) => {
+    const previous = selection?.kind === 'words' && selection.lineId === line.id ? selection : null;
+    const ids = selectIds(line.words.map((item) => item.id), previous?.ids ?? [], previous?.anchorId ?? word.id, word.id, shift, toggle);
+    setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift ? previous?.anchorId ?? word.id : word.id, activeId: word.id, rubyId });
+    props.onSelectLine?.(line.id);
+  };
   const dispatch = (command: LyricCommand) => {
-    try { apply(command); setMessage(''); }
-    catch (error) { setMessage(error instanceof Error ? error.message : '编辑失败'); }
+    try { apply(command); setMessage(''); return true; }
+    catch (error) { setMessage(error instanceof Error ? error.message : '编辑失败'); return false; }
+  };
+  const currentSelection = (): EditorSelection | null => selection ?? (selectedLine ? { kind: 'lines', ids: [selectedLine.backgroundOf ?? selectedLine.id], anchorId: selectedLine.backgroundOf ?? selectedLine.id, activeId: selectedLine.id } : null);
+  const copy = () => {
+    const current = currentSelection();
+    if (!current?.ids.length) return null;
+    const next = copySelection(document, current);
+    setClipboard(next);
+    setMessage('已复制到编辑器剪贴板');
+    return next;
+  };
+  const cut = () => {
+    const current = currentSelection();
+    if (!current?.ids.length) return null;
+    const next = copySelection(document, current);
+    if (dispatch(cutSelection(current))) {
+      setClipboard(next);
+      const available = current.kind === 'words' ? current.lineId : mainIds.filter((id) => !current.ids.includes(id)).at(-1);
+      setSelection(available ? { kind: 'lines', ids: [available], anchorId: available, activeId: available } : { kind: 'lines', ids: [], anchorId: '', activeId: '' });
+      return next;
+    }
+    return null;
+  };
+  const paste = (next: EditorClipboard | null, plain?: string) => {
+    if (!next && !plain) return;
+    try {
+      const result = next ? pasteRich(document, next, currentSelection()) : pastePlain(document, plain!, currentSelection());
+      if (dispatch(result.command)) setSelection(result.selection);
+    } catch (error) { setMessage(error instanceof Error ? error.message : '粘贴失败'); }
+  };
+  const selectAll = (invert: boolean) => {
+    if (selection?.kind === 'words') {
+      const line = document.lines.find((item) => item.id === selection.lineId)!;
+      const order = line.words.map((word) => word.id);
+      const ids = invert ? invertIds(order, selection.ids) : order;
+      setSelection({ ...selection, ids, anchorId: ids[0] ?? '', activeId: ids.at(-1) ?? '' });
+    } else {
+      const ids = invert ? invertIds(mainIds, selection?.kind === 'lines' ? selection.ids : []) : mainIds;
+      setSelection({ kind: 'lines', ids, anchorId: ids[0] ?? '', activeId: ids.at(-1) ?? '' });
+    }
+  };
+  const moveSelectedWords = (direction: -1 | 1) => {
+    if (selection?.kind !== 'words' || !selection.ids.length) return;
+    const target = document.lines[document.lines.findIndex((line) => line.id === selection.lineId) + direction];
+    if (!target) return;
+    try {
+      if (dispatch(moveWordsAcrossLine(document, selection, target.id))) {
+        setSelection({ ...selection, lineId: target.id, rubyId: null });
+        props.onSelectLine?.(target.id);
+      }
+    } catch (error) { setMessage(error instanceof Error ? error.message : '跨行移动失败'); }
   };
   const sublyric = (line: LyricLine, kind: 'translations' | 'romanizations', index: number, text: string) => {
     const items = line[kind].map((item, i) => i === index ? { ...item, text } : item);
@@ -89,9 +175,12 @@ export function EditorSurface(props: Props) {
     if (index + direction < 0 || index + direction >= line.words.length) return;
     dispatch({ type: 'move-word', lineId: line.id, wordId: word.id, toLineId: line.id, afterWordId: direction < 0 ? line.words[index - 2]?.id ?? null : line.words[index + 1].id });
   };
-  const wordView = (line: LyricLine, word: LyricWord, index: number) => <div className={`${styles.word} ${selection?.wordId === word.id ? styles.selectedWord : ''}`} key={word.id} data-word-id={word.id}>
+  const wordView = (line: LyricLine, word: LyricWord, index: number) => <div className={`${styles.word} ${selection?.kind === 'words' && selection.ids.includes(word.id) ? styles.selectedWord : ''}`} key={word.id} data-word-id={word.id} tabIndex={0}
+    onFocus={(event) => { if (event.target === event.currentTarget) selectWord(line, word); }}
+    onMouseDown={(event) => { if (event.shiftKey || event.ctrlKey || event.metaKey) { event.preventDefault(); selectWord(line, word, event.shiftKey, event.ctrlKey || event.metaKey); } }}
+    onClick={(event) => { if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !(event.target as Element).closest('[data-ruby-id],button')) selectWord(line, word); }}>
     <div className={styles.wordMain}>
-      <DraftInput value={word.text} label={`词 ${word.text}`} onFocus={() => select(line.id, word.id)}
+      <DraftInput value={word.text} label={`词 ${word.text}`} onFocus={() => selectWord(line, word)}
         onCommit={(text) => dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text })}
         onSplit={(at) => dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at: utf16ToCodePoint(word.text, at) })}
         onMove={(direction) => moveWord(line, word, direction)} />
@@ -104,21 +193,47 @@ export function EditorSurface(props: Props) {
       <button aria-label={`删除词 ${word.text}`} onClick={() => dispatch({ type: 'delete-word', lineId: line.id, wordId: word.id })}>×</button>
     </div>
     <TimePair begin={word.beginUs} end={word.endUs} label={`词 ${word.text}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginUs, endUs })} />
-    <div className={styles.rubies}>{word.rubyUnits.map((unit) => <div key={unit.id} className={`${styles.ruby} ${selection?.rubyId === unit.id ? styles.selectedRuby : ''}`}>
-      <DraftInput value={unit.reading} label={`读音 ${word.text}`} onFocus={() => select(line.id, word.id, unit.id)}
+    <div className={styles.rubies}>{word.rubyUnits.map((unit) => <div key={unit.id} data-ruby-id={unit.id} className={`${styles.ruby} ${selection?.kind === 'words' && selection.rubyId === unit.id ? styles.selectedRuby : ''}`}>
+      <DraftInput value={unit.reading} label={`读音 ${word.text}`} onFocus={() => selectWord(line, word, false, false, unit.id)}
         onCommit={(reading) => dispatch({ type: 'edit-ruby', lineId: line.id, wordId: word.id, rubyId: unit.id, reading })} />
       <button aria-label={`删除读音 ${unit.reading}`} onClick={() => dispatch({ type: 'delete-ruby', lineId: line.id, wordId: word.id, rubyId: unit.id })}>×</button>
       <TimePair begin={unit.beginUs} end={unit.endUs} label={`读音 ${unit.reading}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-ruby-time', lineId: line.id, wordId: word.id, rubyId: unit.id, beginUs, endUs })} />
     </div>)}<button onClick={() => { const reading = window.prompt('输入读音'); if (reading) dispatch({ type: 'add-ruby', lineId: line.id, wordId: word.id, reading }); }}>加读音</button></div>
   </div>;
-  return <div className={styles.page}>
+  return <div className={styles.page} onCopy={(event) => {
+    if (isTextInput(event.target)) return;
+    const item = copy();
+    if (item) { event.clipboardData.setData('text/plain', item.text); event.preventDefault(); }
+  }} onCut={(event) => {
+    if (isTextInput(event.target)) return;
+    const item = cut();
+    if (item) { event.clipboardData.setData('text/plain', item.text); event.preventDefault(); }
+  }} onPaste={(event) => {
+    if (isTextInput(event.target)) return;
+    const text = event.clipboardData.getData('text/plain');
+    if (!text) return;
+    event.preventDefault();
+    paste(clipboard?.text === text ? clipboard : null, text);
+  }} onKeyDown={(event) => {
+    if (isTextInput(event.target) || event.nativeEvent.isComposing) return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
+    if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
+  }}>
     <header className={styles.header}><Link to="/projects" className={styles.brand}>Lazulite Studio</Link><strong>{props.title}</strong><span>{props.saving ? '保存中' : props.dirty ? '未保存' : '已保存'}</span>
       <div className={styles.actions}>{props.onOpen && <label>打开 TTML<input type="file" accept=".ttml,.xml" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) props.onOpen?.(file); event.target.value = ''; }} /></label>}{props.onNew && <button onClick={props.onNew}>新建</button>}<button onClick={props.onSave} disabled={props.saving}>保存</button><button onClick={props.undo} disabled={!props.canUndo}>撤销</button><button onClick={props.redo} disabled={!props.canRedo}>重做</button><button onClick={props.onDraft}>下载草稿</button><button onClick={props.onFinal}>最终 TTML</button></div>
     </header>
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
-    <div className={styles.layout}><aside className={styles.outline}><h2>大纲</h2>{document.lines.map((line, index) => <button key={line.id} className={selectedLine?.id === line.id ? styles.selected : ''} onClick={() => select(line.id)}>{index + 1} {line.backgroundOf ? '↳ ' : ''}{lineText(line) || '空行'}</button>)}</aside>
+    <div className={styles.ribbon} aria-label="编辑操作"><span>{selection ? `${selection.kind === 'words' ? '词' : '行'}已选 ${selection.ids.length}` : '当前行'}</span>
+      <button onClick={() => copy()} disabled={selection?.ids.length === 0}>复制</button><button onClick={() => cut()} disabled={selection?.ids.length === 0}>剪切</button>
+      <button onClick={() => paste(clipboard)} disabled={!clipboard}>粘贴</button><button onClick={() => selectAll(false)}>全选</button><button onClick={() => selectAll(true)}>反选</button>
+      <button onClick={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}>清空选择</button>
+      <button disabled={selection?.kind !== 'words' || !selection.ids.length || document.lines.findIndex((line) => line.id === selection.lineId) === 0} onClick={() => moveSelectedWords(-1)}>词移上行</button>
+      <button disabled={selection?.kind !== 'words' || !selection.ids.length || document.lines.findIndex((line) => line.id === selection.lineId) === document.lines.length - 1} onClick={() => moveSelectedWords(1)}>词移下行</button>
+      <small>非输入框内 Ctrl/Cmd+C、X、V 使用词块剪贴板；外部纯文本按行插入。</small>
+    </div>
+    <div className={styles.layout}><aside className={styles.outline}><h2>大纲</h2>{document.lines.map((line, index) => <button key={line.id} className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''} onClick={(event) => selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey)}>{index + 1} {line.backgroundOf ? '↳ ' : ''}{lineText(line) || '空行'}</button>)}</aside>
       <main className={styles.canvas}><div className={styles.canvasHeader}><h1>歌词编辑</h1><button onClick={() => dispatch({ type: 'insert-line', afterLineId: document.lines.at(-1)?.id ?? null })}>新增歌词行</button></div>
-        {document.lines.map((line) => <section className={`${styles.line} ${selectedLine?.id === line.id ? styles.selectedLine : ''} ${props.playheadLineId === line.id ? styles.playheadLine : ''}`} key={line.id} data-line-id={line.id} tabIndex={0} aria-label={`歌词行 ${lineText(line) || '空行'}`} onClick={(event) => { if (!(event.target as Element).closest('[data-word-id]')) select(line.id); }} onKeyDown={(event) => {
+        {document.lines.map((line) => <section className={`${styles.line} ${selection ? selection.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selectedLine : '' : selection.lineId === line.id ? styles.selectedLine : '' : selectedLine?.id === line.id ? styles.selectedLine : ''} ${props.playheadLineId === line.id ? styles.playheadLine : ''}`} key={line.id} data-line-id={line.id} tabIndex={0} aria-label={`歌词行 ${lineText(line) || '空行'}`} onClick={(event) => { if (!(event.target as Element).closest('[data-word-id]')) selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); }} onKeyDown={(event) => {
           if (event.target !== event.currentTarget || event.nativeEvent.isComposing || !event.altKey) return;
           if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); moveLine(line, event.key === 'ArrowUp' ? -1 : 1); }
         }}>

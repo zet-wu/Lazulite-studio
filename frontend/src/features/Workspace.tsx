@@ -76,7 +76,7 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     <button onClick={() => { if (editor.dirty || editor.conflict || editor.saving) setMessage('请先保存后发布'); else navigate(`/projects/${projectId}/export`); }}>发布与下载</button>
     <p>{line ? `当前行：${lineText(line)}` : '无歌词行'}</p>
   </div>;
-  return <><EditorSurface title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) setMessage('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
+  return <><EditorSurface title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
     onSave={() => void editor.save()} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} auxiliary={auxiliary}
     selectedLineId={selectedLineId} playheadLineId={playheadLineId} onSelectLine={(id) => { setSelectedLineId(id); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }} />

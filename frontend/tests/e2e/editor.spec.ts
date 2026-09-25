@@ -74,3 +74,56 @@ test('reorders words and grouped background lines through buttons and keyboard w
   await expect(page.locator('[data-line-id]').first()).toHaveAttribute('data-line-id', 'L1');
   await expect(firstLine.getByRole('textbox', { name: '读音 今日' }).first()).toHaveValue('きょ');
 });
+
+test('copies timed Ruby words and background line groups with one-step undo', async ({ page }) => {
+  await upload(page);
+  const firstLine = page.locator('[data-line-id="L1"]');
+  await page.getByRole('textbox', { name: '词 今日', exact: true }).focus();
+  await page.getByRole('button', { name: '复制', exact: true }).click();
+  await page.getByRole('button', { name: '粘贴', exact: true }).click();
+  await expect(firstLine.getByRole('textbox', { name: '词 今日', exact: true })).toHaveCount(2);
+  await expect(firstLine.getByRole('textbox', { name: '读音 今日', exact: true })).toHaveCount(4);
+  const ids = await firstLine.locator('[data-word-id]').evaluateAll((items) => items.map((item) => item.getAttribute('data-word-id')));
+  expect(new Set(ids).size).toBe(ids.length);
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(firstLine.getByRole('textbox', { name: '词 今日', exact: true })).toHaveCount(1);
+
+  await page.getByRole('button', { name: '1 今日 も歌う' }).click();
+  await page.getByRole('button', { name: '复制', exact: true }).click();
+  await page.getByRole('button', { name: '粘贴', exact: true }).click();
+  await expect(page.locator('[data-line-id]')).toHaveCount(5);
+  const copied = page.locator('[data-line-id]').nth(2);
+  const copiedBackground = page.locator('[data-line-id]').nth(3);
+  await expect(copied.getByRole('textbox', { name: '翻译 1' })).toHaveValue('今天 也唱歌');
+  await expect(copiedBackground.getByRole('textbox', { name: '词 響く', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-line-id]')).toHaveCount(3);
+});
+
+test('selects a word range, cuts it once, and restores it with undo', async ({ page }) => {
+  await upload(page);
+  const firstLine = page.locator('[data-line-id="L1"]');
+  await firstLine.getByRole('textbox', { name: '词 今日', exact: true }).focus();
+  await firstLine.locator('[data-word-id]').nth(1).click({ modifiers: ['Shift'] });
+  await expect(page.getByText('词已选 2')).toBeVisible();
+  await page.getByRole('button', { name: '剪切', exact: true }).click();
+  await expect(firstLine.locator('[data-word-id]')).toHaveCount(0);
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(firstLine.locator('[data-word-id]')).toHaveCount(2);
+  await page.getByRole('button', { name: '1 今日 も歌う' }).click();
+  await page.getByRole('button', { name: '粘贴', exact: true }).click();
+  await expect(firstLine.locator('[data-word-id]')).toHaveCount(4);
+});
+
+test('widens a destination line for a timed Ruby word moved across lines', async ({ page }) => {
+  await upload(page);
+  await page.getByRole('textbox', { name: '词 今日', exact: true }).focus();
+  await page.getByRole('button', { name: '词移下行' }).click();
+  const background = page.locator('[data-line-id="L1:bg"]');
+  await expect(background.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+  await expect(background.getByRole('textbox', { name: '读音 今日', exact: true })).toHaveCount(2);
+  await expect(page.getByRole('textbox', { name: '行 L1:bg开始秒数' })).toHaveValue('1');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-line-id="L1"]').getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '行 L1:bg开始秒数' })).toHaveValue('1.5');
+});

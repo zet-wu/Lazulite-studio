@@ -6,6 +6,11 @@
 .actions button, .actions label, .canvasHeader button, .line button, .inspector button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 5px; padding: 5px 8px; cursor: pointer; }
 .actions label { display: inline-flex; align-items: center; }
 .actions button:disabled, .line button:disabled { opacity: .5; cursor: default; }
+.ribbon { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 7px 16px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 12px; }
+.ribbon span { min-width: 68px; color: var(--muted); }
+.ribbon button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 5px; padding: 5px 8px; cursor: pointer; }
+.ribbon button:disabled { opacity: .5; cursor: default; }
+.ribbon small { color: var(--muted); }
 .layout { display: grid; grid-template-columns: 190px minmax(0,1fr) 250px; min-height: calc(100vh - 60px); }
 .outline, .inspector { background: var(--panel); padding: 12px; border-right: 1px solid var(--line); }
 .inspector { border-right: 0; border-left: 1px solid var(--line); }
