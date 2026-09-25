@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, type TimeUs } from '../../domain/lyric-document';
@@ -73,6 +73,8 @@ export function EditorSurface(props: Props) {
   const { document, apply } = props;
   const [selection, setSelection] = useState<EditorSelection | null>(null);
   const [clipboard, setClipboard] = useState<EditorClipboard | null>(null);
+  const dragging = useRef<{ kind: 'line'; lineId: string } | { kind: 'word'; lineId: string; wordId: string } | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   useEffect(() => {
     setSelection((current) => {
@@ -161,6 +163,55 @@ export function EditorSurface(props: Props) {
       }
     } catch (error) { setMessage(error instanceof Error ? error.message : '跨行移动失败'); }
   };
+  const startDrag = (event: DragEvent, source: NonNullable<typeof dragging.current>) => {
+    dragging.current = source;
+    event.dataTransfer.effectAllowed = 'copyMove';
+    event.dataTransfer.setData('text/plain', source.kind === 'line' ? lineText(document.lines.find((line) => line.id === source.lineId)!) : document.lines.find((line) => line.id === source.lineId)!.words.find((word) => word.id === source.wordId)!.text);
+  };
+  const overDrop = (event: DragEvent, key: string) => {
+    if (!dragging.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = event.ctrlKey || event.metaKey ? 'copy' : 'move';
+    setDropTarget(key);
+  };
+  const dropLine = (event: DragEvent, target: LyricLine) => {
+    const source = dragging.current;
+    if (!source) return;
+    event.preventDefault(); event.stopPropagation();
+    dragging.current = null; setDropTarget(null);
+    const targetId = target.backgroundOf ?? target.id;
+    if (source.kind === 'line') {
+      if (source.lineId === targetId) return;
+      if (event.ctrlKey || event.metaKey) {
+        const item = copySelection(document, { kind: 'lines', ids: [source.lineId], anchorId: source.lineId, activeId: source.lineId });
+        const result = pasteRich(document, item, { kind: 'lines', ids: [targetId], anchorId: targetId, activeId: targetId });
+        if (dispatch(result.command)) setSelection(result.selection);
+      } else if (dispatch({ type: 'move-line', lineId: source.lineId, afterLineId: targetId })) setSelection({ kind: 'lines', ids: [source.lineId], anchorId: source.lineId, activeId: source.lineId });
+      return;
+    }
+    dropWord(event, target, target.words.at(-1)?.id ?? null, source);
+  };
+  const dropWord = (event: DragEvent, targetLine: LyricLine, afterWordId: string | null, source = dragging.current) => {
+    if (!source || source.kind !== 'word') return;
+    event.preventDefault(); event.stopPropagation();
+    dragging.current = null; setDropTarget(null);
+    if (source.lineId === targetLine.id && source.wordId === afterWordId) return;
+    const sourceSelection: Extract<EditorSelection, { kind: 'words' }> = { kind: 'words', lineId: source.lineId, ids: [source.wordId], anchorId: source.wordId, activeId: source.wordId, rubyId: null };
+    if (event.ctrlKey || event.metaKey) {
+      const item = copySelection(document, sourceSelection);
+      const targetSelection: EditorSelection = afterWordId
+        ? { kind: 'words', lineId: targetLine.id, ids: [afterWordId], anchorId: afterWordId, activeId: afterWordId, rubyId: null }
+        : { kind: 'lines', ids: [targetLine.backgroundOf ?? targetLine.id], anchorId: targetLine.backgroundOf ?? targetLine.id, activeId: targetLine.id };
+      const result = pasteRich(document, item, targetSelection);
+      if (dispatch(result.command)) setSelection(result.selection);
+    } else {
+      const command = source.lineId === targetLine.id
+        ? { type: 'move-word' as const, lineId: source.lineId, wordId: source.wordId, toLineId: targetLine.id, afterWordId }
+        : moveWordsAcrossLine(document, sourceSelection, targetLine.id, afterWordId);
+      if (dispatch(command)) setSelection({ ...sourceSelection, lineId: targetLine.id });
+    }
+  };
   const sublyric = (line: LyricLine, kind: 'translations' | 'romanizations', index: number, text: string) => {
     const items = line[kind].map((item, i) => i === index ? { ...item, text } : item);
     dispatch({ type: 'set-sublyrics', lineId: line.id, kind, items });
@@ -175,11 +226,13 @@ export function EditorSurface(props: Props) {
     if (index + direction < 0 || index + direction >= line.words.length) return;
     dispatch({ type: 'move-word', lineId: line.id, wordId: word.id, toLineId: line.id, afterWordId: direction < 0 ? line.words[index - 2]?.id ?? null : line.words[index + 1].id });
   };
-  const wordView = (line: LyricLine, word: LyricWord, index: number) => <div className={`${styles.word} ${selection?.kind === 'words' && selection.ids.includes(word.id) ? styles.selectedWord : ''}`} key={word.id} data-word-id={word.id} tabIndex={0}
+  const wordView = (line: LyricLine, word: LyricWord, index: number) => <div className={`${styles.word} ${selection?.kind === 'words' && selection.ids.includes(word.id) ? styles.selectedWord : ''} ${dropTarget === `word:${word.id}` ? styles.dropWord : ''}`} key={word.id} data-word-id={word.id} tabIndex={0}
     onFocus={(event) => { if (event.target === event.currentTarget) selectWord(line, word); }}
-    onMouseDown={(event) => { if (event.shiftKey || event.ctrlKey || event.metaKey) { event.preventDefault(); selectWord(line, word, event.shiftKey, event.ctrlKey || event.metaKey); } }}
-    onClick={(event) => { if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !(event.target as Element).closest('[data-ruby-id],button')) selectWord(line, word); }}>
+    onMouseDown={(event) => { if ((event.target as Element).closest('[draggable="true"]')) return; if (event.shiftKey || event.ctrlKey || event.metaKey) { event.preventDefault(); selectWord(line, word, event.shiftKey, event.ctrlKey || event.metaKey); } }}
+    onClick={(event) => { if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !(event.target as Element).closest('[data-ruby-id],button')) selectWord(line, word); }}
+    onDragOver={(event) => { if (dragging.current?.kind === 'word') overDrop(event, `word:${word.id}`); }} onDrop={(event) => dropWord(event, line, word.id)}>
     <div className={styles.wordMain}>
+      <button className={styles.dragHandle} draggable aria-label={`拖动词 ${word.text}`} title="拖放排序；按 Ctrl 复制" onDragStart={(event) => startDrag(event, { kind: 'word', lineId: line.id, wordId: word.id })} onDragEnd={() => { dragging.current = null; setDropTarget(null); }}>⋮⋮</button>
       <DraftInput value={word.text} label={`词 ${word.text}`} onFocus={() => selectWord(line, word)}
         onCommit={(text) => dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text })}
         onSplit={(at) => dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at: utf16ToCodePoint(word.text, at) })}
@@ -233,11 +286,11 @@ export function EditorSurface(props: Props) {
     </div>
     <div className={styles.layout}><aside className={styles.outline}><h2>大纲</h2>{document.lines.map((line, index) => <button key={line.id} className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''} onClick={(event) => selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey)}>{index + 1} {line.backgroundOf ? '↳ ' : ''}{lineText(line) || '空行'}</button>)}</aside>
       <main className={styles.canvas}><div className={styles.canvasHeader}><h1>歌词编辑</h1><button onClick={() => dispatch({ type: 'insert-line', afterLineId: document.lines.at(-1)?.id ?? null })}>新增歌词行</button></div>
-        {document.lines.map((line) => <section className={`${styles.line} ${selection ? selection.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selectedLine : '' : selection.lineId === line.id ? styles.selectedLine : '' : selectedLine?.id === line.id ? styles.selectedLine : ''} ${props.playheadLineId === line.id ? styles.playheadLine : ''}`} key={line.id} data-line-id={line.id} tabIndex={0} aria-label={`歌词行 ${lineText(line) || '空行'}`} onClick={(event) => { if (!(event.target as Element).closest('[data-word-id]')) selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); }} onKeyDown={(event) => {
+        {document.lines.map((line) => <section className={`${styles.line} ${selection ? selection.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selectedLine : '' : selection.lineId === line.id ? styles.selectedLine : '' : selectedLine?.id === line.id ? styles.selectedLine : ''} ${props.playheadLineId === line.id ? styles.playheadLine : ''} ${dropTarget === `line:${line.id}` ? styles.dropLine : ''}`} key={line.id} data-line-id={line.id} tabIndex={0} aria-label={`歌词行 ${lineText(line) || '空行'}`} onClick={(event) => { if (!(event.target as Element).closest('[data-word-id]')) selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); }} onDragOver={(event) => overDrop(event, `line:${line.id}`)} onDrop={(event) => dropLine(event, line)} onKeyDown={(event) => {
           if (event.target !== event.currentTarget || event.nativeEvent.isComposing || !event.altKey) return;
           if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); moveLine(line, event.key === 'ArrowUp' ? -1 : 1); }
         }}>
-          <div className={styles.lineHeader}><span>{line.backgroundOf ? '背景' : '主唱'} · {line.id}</span><TimePair begin={line.beginUs} end={line.endUs} label={`行 ${line.id}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-line-time', lineId: line.id, beginUs, endUs })} />
+          <div className={styles.lineHeader}>{!line.backgroundOf && <button className={styles.dragHandle} draggable aria-label={`拖动行 ${lineText(line)}`} title="拖放排序；按 Ctrl 复制" onDragStart={(event) => startDrag(event, { kind: 'line', lineId: line.id })} onDragEnd={() => { dragging.current = null; setDropTarget(null); }}>⋮⋮</button>}<span>{line.backgroundOf ? '背景' : '主唱'} · {line.id}</span><TimePair begin={line.beginUs} end={line.endUs} label={`行 ${line.id}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-line-time', lineId: line.id, beginUs, endUs })} />
             {!line.backgroundOf && <><button aria-label={`行上移 ${lineText(line)}`} disabled={mainLines[0]?.id === line.id} onClick={() => moveLine(line, -1)}>↑</button><button aria-label={`行下移 ${lineText(line)}`} disabled={mainLines.at(-1)?.id === line.id} onClick={() => moveLine(line, 1)}>↓</button></>}
             <button onClick={() => dispatch({ type: 'insert-line', afterLineId: line.backgroundOf ?? line.id })}>后插行</button><button onClick={() => dispatch({ type: 'delete-line', lineId: line.id })}>删行</button></div>
           <div className={styles.words}>{line.words.map((word, index) => wordView(line, word, index))}<button onClick={() => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') })}>加词</button></div>

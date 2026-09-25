@@ -23,13 +23,17 @@
 .line { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin-bottom: 10px; }
 .selectedLine { border-color: var(--blue); }
 .playheadLine { box-shadow: inset 4px 0 #e19731; }
+.dropLine { outline: 2px dashed #e19731; outline-offset: 2px; }
 .line:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .lineHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .words { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; padding: 10px 0; }
 .word { border: 1px solid var(--line); padding: 6px; border-radius: 5px; background: var(--canvas); }
 .selectedWord { border-color: var(--blue); background: var(--blue-soft); }
+.dropWord { outline: 2px dashed #e19731; outline-offset: 2px; }
 .word:focus-within { outline: 2px solid var(--blue); outline-offset: 2px; }
 .wordMain { display: flex; gap: 3px; }
+.dragHandle { cursor: grab !important; touch-action: none; color: var(--muted) !important; }
+.dragHandle:active { cursor: grabbing !important; }
 .wordMain input { min-width: 4ch; width: 12ch; }
 .rubies { display: grid; gap: 3px; margin-top: 5px; }
 .ruby { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; }

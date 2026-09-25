@@ -127,3 +127,33 @@ test('widens a destination line for a timed Ruby word moved across lines', async
   await expect(page.locator('[data-line-id="L1"]').getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: '行 L1:bg开始秒数' })).toHaveValue('1.5');
 });
+
+test('drags words and grouped lines to reorder, and Ctrl-drag copies a word', async ({ page }) => {
+  await upload(page);
+  await page.setViewportSize({ width: 1440, height: 1400 });
+  const firstLine = page.locator('[data-line-id="L1"]');
+  await page.getByRole('button', { name: /拖动词 今日/ }).dragTo(firstLine.locator('[data-word-id]').nth(1));
+  await expect(firstLine.locator('[data-word-id]').first().getByRole('textbox', { name: '词 も歌う', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(firstLine.locator('[data-word-id]').first().getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+
+  await page.keyboard.down('Control');
+  await page.getByRole('button', { name: /拖动词 今日/ }).dragTo(firstLine.locator('[data-word-id]').nth(1));
+  await page.keyboard.up('Control');
+  await expect(firstLine.locator('[data-word-id]')).toHaveCount(3);
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(firstLine.locator('[data-word-id]')).toHaveCount(2);
+
+  await page.getByRole('button', { name: /拖动行 今日/ }).dragTo(page.locator('[data-line-id="L2"]'));
+  await expect(page.locator('[data-line-id]').first()).toHaveAttribute('data-line-id', 'L2');
+  await expect(page.locator('[data-line-id]').last()).toHaveAttribute('data-line-id', 'L1:bg');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-line-id]').first()).toHaveAttribute('data-line-id', 'L1');
+  await page.keyboard.down('Control');
+  await page.getByRole('button', { name: /拖动行 今日/ }).dragTo(page.locator('[data-line-id="L2"]'));
+  await page.keyboard.up('Control');
+  await expect(page.locator('[data-line-id]')).toHaveCount(5);
+  await expect(page.locator('[data-line-id]').last().getByRole('textbox', { name: '词 響く', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-line-id]')).toHaveCount(3);
+});
