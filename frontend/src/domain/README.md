@@ -1,9 +1,7 @@
 # Domain：歌词编辑规则
 
-当前 `document.ts` 定义 `StudioLyricDocument`、行、整体 Ruby、正文/读音时间单元、agent/group 与 XML 来源信息。行仍以 `text + ruby[] + timingUnits[]` 表达，尚无参考工具式完整词块序列。
+`lyric-document.ts` 是当前唯一可写文档：行 → 词块 → Ruby 读音单元。行另存翻译、音译、背景关联和 agent；词可附着 mora/phoneme 对齐结果。时间为绝对整数微秒或 `null`，正文由词序列投影，不另存一份可写整行文本。
 
-时间使用绝对整数微秒/null；正文和读音范围使用独立的 Unicode code point 半开区间。XML 解析在 adapter，领域层不依赖 React、DOM、HTTP 或模型后端。
+`lyric-commands.ts` 提供纯函数编辑事务、撤销和重做，历史上限为 256 次操作。词和读音使用稳定 ID；拆分位置使用 Unicode code point，并验证 grapheme 边界。带 Ruby 或未分配附属属性的词不能猜测式拆分。命令批次只产生一次历史记录。
 
-`editing.ts` 提供行/批量更新、Ruby、时间单元、行移动/边界、拆合、agent 更新和文档替换，历史上限为 20 个快照。`structure.ts` 实现行拆合，`timing.ts` 实现细粒度校验和操作。修改正文目前会清除该行时间单元，并受到 Ruby 范围约束；复杂未知结构仍可能只读。
-
-ID 与来源 XML 路径仍存在关联，结构操作需要维护来源信息。这是当前实现，不是下一阶段必须延续的设计。[编辑器重构计划](../../../docs/lyric-editor-implementation-plan.md)将直接替换为行/词/Ruby 单元模型，不增加旧内部数据兼容层。
+XML、HTTP、播放和 IndexedDB 均在领域层之外。TTML 导入和当前版本草稿序列化由 `adapters/ttml/lyric-codec.ts` 实现；最终交换文件不包含 Studio 内部 ID 与对齐元数据。旧 `text + ruby[] + timingUnits[]` 模型已移除，旧开发检查点不会自动迁移。

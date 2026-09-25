@@ -1,14 +1,7 @@
 # Features：用户操作与工作区
 
-当前项目工作区由 `Workspace.tsx` 组合：
+`editor/EditorSurface.tsx` 是本地 `/editor` 与项目路由共用的语义编辑界面，可修改行、词、Ruby、时间、翻译、音译、背景、歌手和常见元数据。`editor/LocalEditor.tsx` 负责本地文件与当前版本检查点；`Workspace.tsx` 负责项目加载、revision 保存、候选、任务、词典、审核及媒体入口。两者调用同一领域命令与 TTML codec。
 
-- `LineTable`、`LineInspector`：整行正文、行时间和拆合。
-- `RubyPanel`、`TimingPanel`：整体读音与正文/读音时间单元精修。
-- `AgentPanel`、`ReadingDictionaryPanel`、`ReviewPanel`：歌手/组合、词典和复核。
-- `CandidatePanel`、`JobPanel`、`JobCandidatePanel`：导入、任务和人工应用候选。
-- `MediaTransport`：播放、倍速、窗口波形、定位及 A/B/行/单元循环。
-- `ExportPage`：已保存修订的 STPP 发布、报告与下载。
+`useProjectDocument.ts` 管理撤销重做、串行保存、冲突和本地恢复。`CandidatePanel` 与 `JobCandidatePanel` 将候选转为一次领域事务，不直接改服务器文档。`MediaTransport` 保留播放和波形控制，`ExportPage` 下载或发布已保存的语义文档。
 
-`useProjectDocument` 管理编辑副本、撤销重做、串行保存、冲突和带 base revision 的本地检查点。候选通过领域命令应用，不直接覆盖服务器文档。`editor/LocalEditor` 是独立的本地基础编辑入口。
-
-当前尚无完整词块直接编辑、自动/高级分词、连续键盘打轴和 AMLL 动态预览。[下一阶段](../../../docs/lyric-editor-implementation-plan.md)重建画布并统一两个编辑入口；现有任务和词典保留为辅助功能。
+E1 已完成文档闭环；E2 起继续实现参考工具的主画布工作流、选择与焦点反馈。自动/高级分词、连续打轴和动态预览分别属于后续阶段，见[实施计划](../../../docs/lyric-editor-implementation-plan.md)。
