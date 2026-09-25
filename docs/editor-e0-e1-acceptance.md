@@ -6,11 +6,11 @@
 
 | 退出条件 | 核查结果 |
 | --- | --- |
-| 操作清单与截图作为验收规格 | [对齐矩阵](editor-parity.md)已覆盖计划各大工作项；编辑、打轴、预览、布局、Ruby、手动分词和时间轴有运行截图。手动分词的词块变化已实操验证；全部焦点状态和对唱编码仍无可复现证据，未通过。 |
+| 操作清单与截图作为验收规格 | [对齐矩阵](editor-parity.md)已覆盖计划各大工作项；编辑、打轴、预览、布局、Ruby、手动分词、对唱和时间轴有运行截图。手动分词与对唱切换已实操验证；全部焦点状态及更多元数据仍缺可复现证据，未通过。 |
 | Ruby 文件在参考工具重开且可编辑 | 通过。参考 UI 重新导入后可编辑两个词上的三个读音框；修改首框、导出并重解析后，Ruby 单元时间仍保留。见[截图](evidence/editor-e0/reference-ruby-editable-1440.png)及[导出文件](evidence/editor-e0/reference-ruby-edited.ttml)。 |
 | 关键模型决策无未说明的双轨状态 | 文档已明确词块和 Ruby 为唯一可写序列、会话与交换格式分离；但旧模型仍负责两个产品入口，因此实施层面未通过。 |
 
-两种参考工具导出样例：[AMLL](evidence/editor-e0/reference-amll-metadata.ttml)、[Apple Music](evidence/editor-e0/reference-apple-metadata.ttml)。已核对标题、艺人、作者、段落、agent、译文、音译、背景、Ruby 与空白。更多元数据与对唱的编码仍待取证。
+两种参考工具导出样例：[AMLL](evidence/editor-e0/reference-amll-metadata.ttml)、[Apple Music](evidence/editor-e0/reference-apple-metadata.ttml)。已核对标题、艺人、作者、段落、agent、译文、音译、背景、Ruby 与空白；[对唱关闭导出](evidence/editor-e0/reference-duet-off.ttml)确认 `v2`→`v1`。更多元数据仍待取证。
 
 ## E1：编辑文档与 TTML 闭环
 
