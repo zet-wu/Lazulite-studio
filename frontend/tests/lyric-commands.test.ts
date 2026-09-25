@@ -87,4 +87,24 @@ describe('semantic lyric commands', () => {
     expect(undoLyricCommand(state).present).toBe(beforeMove);
     expect(() => executeLyricCommand(state, { type: 'set-ruby-time', lineId: second.id, wordId: first.words[0].id, rubyId: 'ruby', beginUs: 0, endUs: 800_000 })).toThrow(/exceeds word/);
   });
+
+  it('applies several edits as one undo step and rejects a failed batch atomically', () => {
+    const document = createLyricDocument('今日 も');
+    const lineId = document.lines[0].id;
+    const wordId = document.lines[0].words[0].id;
+    const state = createLyricEditorState(document);
+    const edited = executeLyricCommand(state, { type: 'batch', commands: [
+      { type: 'split-word', lineId, wordId, at: 2, newWordId: 'rest' },
+      { type: 'edit-word', lineId, wordId: 'rest', text: ' も歌う' },
+      { type: 'set-sublyrics', lineId, kind: 'translations', items: [{ language: 'zh', text: '今天也唱歌' }] },
+    ] });
+    expect(lineText(edited.present.lines[0])).toBe('今日 も歌う');
+    expect(edited.past).toEqual([document]);
+    expect(undoLyricCommand(edited).present).toBe(document);
+    expect(() => executeLyricCommand(state, { type: 'batch', commands: [
+      { type: 'split-word', lineId, wordId, at: 2, newWordId: 'rest' },
+      { type: 'edit-word', lineId, wordId: 'missing', text: '失敗' },
+    ] })).toThrow(/Word not found/);
+    expect(state.present).toBe(document);
+  });
 });

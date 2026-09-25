@@ -3,7 +3,7 @@ import { splitAtGrapheme } from './text-boundaries';
 
 const MAX_HISTORY = 256;
 
-export type LyricCommand =
+type AtomicLyricCommand =
   | { type: 'insert-line'; afterLineId: string | null; line?: LyricLine }
   | { type: 'delete-line'; lineId: string }
   | { type: 'move-line'; lineId: string; afterLineId: string | null }
@@ -23,7 +23,8 @@ export type LyricCommand =
   | { type: 'delete-ruby'; lineId: string; wordId: string; rubyId: string }
   | { type: 'set-ruby-time'; lineId: string; wordId: string; rubyId: string; beginUs: TimeUs; endUs: TimeUs };
 
-type WordCommand = Extract<LyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>
+export type LyricCommand = AtomicLyricCommand | { type: 'batch'; commands: AtomicLyricCommand[] };
+type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
 
 export type LyricEditorState = { present: LyricDocument; past: LyricDocument[]; future: LyricDocument[] };
 
@@ -79,7 +80,7 @@ function wordFitsLine(word: LyricWord, line: LyricLine) {
   if (line.beginUs !== null && word.beginUs !== null && word.beginUs < line.beginUs || line.endUs !== null && word.endUs !== null && word.endUs > line.endUs) throw new Error('Word time exceeds line');
 }
 
-function applyStructure(document: LyricDocument, command: LyricCommand): LyricDocument | null {
+function applyStructure(document: LyricDocument, command: AtomicLyricCommand): LyricDocument | null {
   switch (command.type) {
     case 'insert-line': {
       const line = command.line ?? createLine('');
@@ -177,10 +178,10 @@ function applyStructure(document: LyricDocument, command: LyricCommand): LyricDo
   }
 }
 
-export function executeLyricCommand(state: LyricEditorState, command: LyricCommand): LyricEditorState {
-  const structured = applyStructure(state.present, command);
+function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): LyricDocument {
+  const structured = applyStructure(document, command);
   const wordCommand = command as WordCommand;
-  const next = structured ?? editWord(state.present, wordCommand.lineId, wordCommand.wordId, (word, line) => {
+  return structured ?? editWord(document, wordCommand.lineId, wordCommand.wordId, (word, line) => {
     switch (wordCommand.type) {
       case 'split-word': {
         if (word.rubyUnits.length) throw new Error('Splitting a Ruby base requires an explicit reading split');
@@ -233,6 +234,10 @@ export function executeLyricCommand(state: LyricEditorState, command: LyricComma
       }
     }
   });
+}
+
+export function executeLyricCommand(state: LyricEditorState, command: LyricCommand): LyricEditorState {
+  const next = command.type === 'batch' ? command.commands.reduce(applyAtomic, state.present) : applyAtomic(state.present, command);
   if (next === state.present) return state;
   return { present: next, past: [...state.past.slice(-(MAX_HISTORY - 1)), state.present], future: [] };
 }
