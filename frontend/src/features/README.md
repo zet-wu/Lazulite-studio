@@ -1,11 +1,14 @@
 # Features：用户操作与工作区
 
-后续按需要创建 projects、upload、lyric-candidates、editor、timeline、agents、jobs、preview、export；Ruby 和细粒度编辑逐阶段加入。
+当前项目工作区由 `Workspace.tsx` 组合：
 
-功能组件把用户意图转成领域命令，经公共接口调用服务；选择、弹窗和面板状态可以局部保存。功能之间通过组合层协调，不读取对方组件私有状态，不直接修改权威文档。
+- `LineTable`、`LineInspector`：整行正文、行时间和拆合。
+- `RubyPanel`、`TimingPanel`：整体读音与正文/读音时间单元精修。
+- `AgentPanel`、`ReadingDictionaryPanel`、`ReviewPanel`：歌手/组合、词典和复核。
+- `CandidatePanel`、`JobPanel`、`JobCandidatePanel`：导入、任务和人工应用候选。
+- `MediaTransport`：播放、倍速、窗口波形、定位及 A/B/行/单元循环。
+- `ExportPage`：已保存修订的 STPP 发布、报告与下载。
 
-每项功能应覆盖加载、空态、失败、只读和能力未配置状态。机器任务完成进入提案复核，不自动替换歌词。
+`useProjectDocument` 管理编辑副本、撤销重做、串行保存、冲突和带 base revision 的本地检查点。候选通过领域命令应用，不直接覆盖服务器文档。`editor/LocalEditor` 是独立的本地基础编辑入口。
 
-## 当前实现
-
-S4 工作区组合行表、属性/复核、歌手管理与导入/任务候选面板。`useProjectDocument` 管理编辑副本、串行自动保存及恢复；候选组件只输出领域命令，不自行写服务器。任务通过 HTTP adapter 访问持久队列，媒体控制沿用 S3。`/editor` 保留本地 TTML 工作流。
+当前尚无完整词块直接编辑、自动/高级分词、连续键盘打轴和 AMLL 动态预览。[下一阶段](../../../docs/lyric-editor-implementation-plan.md)重建画布并统一两个编辑入口；现有任务和词典保留为辅助功能。

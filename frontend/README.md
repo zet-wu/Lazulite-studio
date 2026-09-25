@@ -1,5 +1,7 @@
 # Frontend
 
+当前状态（2026-09-25）：项目工作区已覆盖 S3–S6 的媒体、保存、候选、整体 Ruby 和细粒度时间编辑，S7 发布页已接入。仍以整行表单和属性面板为主，尚未实现参考工具式词块、分词、连续打轴和动态预览；[下一阶段编辑器计划](../docs/lyric-editor-implementation-plan.md)尚未实施。
+
 采用 React + TypeScript + Vite、React Router、TanStack Query、CSS Modules。S3 接入真实项目服务、上传与媒体播放；显式启用的 MSW 保留 S1 模拟场景。`/editor` 继续提供独立的本地 TTML 编辑入口。
 
 | 目录 | 作用 |

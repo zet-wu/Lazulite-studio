@@ -1,17 +1,11 @@
 # Adapters：外部系统与格式
 
-后续适配方向：
+当前实现：
 
-- HTTP：版本化 API 类型映射、运行时校验、错误/会话处理、SSE 恢复。
-- TTML：解析、富模型映射、保留树、profile 校验与序列化；保留未知语义。
-- AMLL：富模型到预览模型的单向映射，以及能力损失说明。
-- Media：媒体时钟、Range 资源、播放代理映射、窗口 peaks。
-- Recovery：浏览器工作副本恢复，关联服务器 revision 并报告缓存失败。
+- `http/`：项目/媒体、文档保存、任务/SSE、读音/词典、复核和发布接口。生成类型来自 OpenAPI，部分接口另有手写类型；当前契约缺口见[契约说明](../../../contracts/README.md)。
+- `ttml/`：XML 解析、保留树、profile、简单 span/整体 Ruby/细粒度时间、结构写回和候选映射。可理解内容开放编辑，未知结构仍按字段限制。
+- `recovery/`：IndexedDB 检查点，保存编辑状态及有限历史。项目工作区同时保存 base revision；本地编辑使用文档身份区分检查点。
 
-实现 domain 定义的端口，由 app 装配。适配器不决定用户是否接受机器结果，也不以解析便利为由丢弃 XML 内容。
+媒体服务请求已经接入，播放时钟与交互在 `features/MediaTransport.tsx`，并不存在独立 Media adapter 目录。AMLL 预览适配器尚未实现。
 
-## 当前实现
-
-S1 提供 HTTP 生成类型、响应校验与模拟接口消费。S2 的 `ttml/codec.ts` 将原始 XML 映射到富文档，并基于源节点写回安全修改；`recovery` 用 IndexedDB 保存本地工作副本及最近 20 步历史，等待事务完成才确认成功。
-
-当前恢复使用单个本地检查点，不连接服务器 revision。AMLL、媒体和服务器保存协议留待后续阶段。
+适配器不决定用户是否接受机器结果。[下一阶段](../../../docs/lyric-editor-implementation-plan.md)重构 TTML 映射和恢复格式，直接切换当前模型，不添加旧版本回退。

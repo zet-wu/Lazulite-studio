@@ -1,11 +1,13 @@
 # App：组合与应用生命周期
 
-后续负责启动、路由、providers、会话恢复、错误边界、工作区布局和适配器注入。项目切换显式处理未保存状态与媒体资源释放。
+当前 `App.tsx` 负责 Query provider、错误边界、浏览器路由、会话检查、登录和服务能力页。
 
-主路由为 `/projects`、`/projects/:projectId/edit`、`/projects/:projectId/export`，辅以登录和设置。编辑面板切换保持同一文档与播放器实例。
+- `/editor`：无需 API 会话的本地 TTML 基础编辑器。
+- `/projects`：项目列表和创建/上传入口。
+- `/projects/:projectId/edit`：项目工作区，编辑副本和媒体生命周期由功能组件管理。
+- `/projects/:projectId/export`：已保存版本的发布、记录、报告和下载。
+- `/login`、`/settings`：登录与服务能力查看。
 
-可依赖 features、domain、adapters、shared；不在这里实现歌词校验、XML 解析或自动化算法。
+模拟数据仅在显式开启 `VITE_ENABLE_MOCKS` 的开发环境使用。当前本地编辑器和项目工作区是两套不同能力的页面；共享新编辑器是[下一阶段计划](../../../docs/lyric-editor-implementation-plan.md)，尚未实现。
 
-## 当前实现
-
-S1 已增加启动、路由、Query provider、错误边界与只读页面组装。编辑会话和媒体生命周期仍待后续阶段。
+可依赖 features、domain、adapters、shared；歌词规则和 XML 解析留在对应模块。
