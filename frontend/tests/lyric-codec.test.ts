@@ -65,6 +65,7 @@ describe('semantic TTML codec', () => {
     expect(document.metadata).toMatchObject({ title: ['自作サンプル'], artist: ['Test'], songwriter: ['Composer'] });
     expect(document.lines.map(lineText)).toEqual(['今日 も歌う', '響く', '宇宙']);
     expect(document.lines[0].songPart).toBe('Verse');
+    expect(document.lines[2]).toMatchObject({ duet: true, agentRefs: ['v2'] });
     expect(document.lines[0].translations).toEqual([{ language: 'zh', text: '今天 也唱歌' }]);
     expect(document.lines[0].romanizations).toEqual([{ language: 'ja-Latn', text: 'kyou mo utau' }]);
     expect(document.lines[1]).toMatchObject({ backgroundOf: 'L1', beginUs: 1_500_000, endUs: 2_700_000 });
@@ -75,6 +76,8 @@ describe('semantic TTML codec', () => {
     const reopened = parseLyricTtml(serializeLyricTtml(undone.present, { draft: true }));
     expect(reopened.lines).toEqual(undone.present.lines);
     expect(reopened.metadata).toEqual(undone.present.metadata);
+    const duetOff = executeLyricCommand(state, { type: 'set-duet', lineId: 'L2', duet: false });
+    expect(parseLyricTtml(serializeLyricTtml(duetOff.present)).lines[2]).toMatchObject({ duet: false, agentRefs: ['v1'] });
   });
 
   it('creates background vocals and metadata in one semantic document', () => {

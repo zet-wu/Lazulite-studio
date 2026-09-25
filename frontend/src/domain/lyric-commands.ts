@@ -12,6 +12,7 @@ type AtomicLyricCommand =
   | { type: 'delete-word'; lineId: string; wordId: string }
   | { type: 'move-word'; lineId: string; wordId: string; toLineId: string; afterWordId: string | null }
   | { type: 'set-line-time'; lineId: string; beginUs: TimeUs; endUs: TimeUs }
+  | { type: 'set-duet'; lineId: string; duet: boolean }
   | { type: 'set-sublyrics'; lineId: string; kind: 'translations' | 'romanizations'; items: SubLyric[] }
   | { type: 'set-metadata'; key: string; values: string[] }
   | { type: 'set-agents'; agents: LyricAgent[] }
@@ -100,7 +101,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (document.lines.some((line) => line.id === command.line.id)) throw new Error(`Line id already exists: ${command.line.id}`);
       if (document.lines.some((line) => line.backgroundOf === parent.id)) throw new Error('Line already has a background vocal');
       if (command.line.backgroundOf && command.line.backgroundOf !== parent.id) throw new Error('Background parent does not match');
-      const background = { ...command.line, backgroundOf: parent.id, songPart: parent.songPart };
+      const background = { ...command.line, backgroundOf: parent.id, songPart: parent.songPart, agentRefs: parent.agentRefs, duet: parent.duet };
       const lines = document.lines.slice();
       lines.splice(index + 1, 0, background);
       return { ...document, lines };
@@ -174,6 +175,19 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (line.beginUs === command.beginUs && line.endUs === command.endUs) return document;
       const lines = document.lines.slice();
       lines[index] = { ...line, beginUs: command.beginUs, endUs: command.endUs };
+      return { ...document, lines };
+    }
+    case 'set-duet': {
+      const index = lineIndex(document, command.lineId);
+      const line = document.lines[index];
+      if (line.backgroundOf) throw new Error('Set duet on the parent line');
+      if (!document.agents.some((agent) => agent.id === 'v1') || !document.agents.some((agent) => agent.id === 'v2')) throw new Error('Duet editing requires v1 and v2 agents');
+      if (line.agentRefs.length !== 1 || !['v1', 'v2'].includes(line.agentRefs[0])) throw new Error('Duet editing requires a v1 or v2 line');
+      const agentRefs = [command.duet ? 'v2' : 'v1'];
+      const lines = document.lines.slice();
+      lines[index] = { ...line, duet: command.duet, agentRefs };
+      const backgroundIndex = lines.findIndex((item) => item.backgroundOf === line.id);
+      if (backgroundIndex >= 0) lines[backgroundIndex] = { ...lines[backgroundIndex], duet: command.duet, agentRefs };
       return { ...document, lines };
     }
     case 'set-sublyrics': {

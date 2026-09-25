@@ -247,7 +247,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
       }
       const agentRefs = (attr(child, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
       if (agentRefs.some((ref) => !agents.some((agent) => agent.id === ref))) throw new Error(`Unknown agent on line ${id}`);
-      lines.push({ id, words, beginUs, endUs, agentRefs, backgroundOf: null, songPart: part, duet: false, translations, romanizations, ignoreSync: false });
+      lines.push({ id, words, beginUs, endUs, agentRefs, backgroundOf: null, songPart: part, duet: agentRefs.includes('v2'), translations, romanizations, ignoreSync: false });
       if (background) {
         checkAttributes(background, ['begin', 'end', 'dur']);
         const [bgBegin, bgEnd] = boundaries(background, wordStart, endUs);
@@ -259,7 +259,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           const last = bgWords.length - 1;
           bgWords[last] = { ...bgWords[last], text: bgWords[last].text.replace(/\)$/, '') };
         }
-        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin ?? (bgWords.every((word) => word.beginUs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginUs!)) : null), endUs: bgEnd ?? (bgWords.every((word) => word.endUs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endUs!)) : null), agentRefs, backgroundOf: id, songPart: part, duet: false, translations: [], romanizations: [], ignoreSync: false });
+        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin ?? (bgWords.every((word) => word.beginUs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginUs!)) : null), endUs: bgEnd ?? (bgWords.every((word) => word.endUs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endUs!)) : null), agentRefs, backgroundOf: id, songPart: part, duet: agentRefs.includes('v2'), translations: [], romanizations: [], ignoreSync: false });
       }
     }
   };
@@ -342,7 +342,8 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   for (const parentId of backgrounds.keys()) if (!document.lines.some((line) => line.id === parentId && !line.backgroundOf)) throw new Error(`Background vocal has no parent: ${parentId}`);
   for (const line of document.lines) {
     if (line.backgroundOf) continue;
-    if (line.duet || line.ignoreSync) throw new Error(`Line ${line.id} has fields not yet mapped to TTML`);
+    if (line.ignoreSync) throw new Error(`Line ${line.id} has fields not yet mapped to TTML`);
+    if (line.duet !== line.agentRefs.includes('v2')) throw new Error(`Line ${line.id} duet flag disagrees with agent v2`);
     if (!div || currentPart !== line.songPart) {
       currentPart = line.songPart;
       div = xml.createElementNS(TTML, 'div');
@@ -390,7 +391,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     }
     const bg = backgrounds.get(line.id);
     if (bg) {
-      if (bg.duet || bg.ignoreSync || bg.translations.length || bg.romanizations.length) throw new Error(`Background vocal ${bg.id} has fields not yet mapped to TTML`);
+      if (bg.duet !== bg.agentRefs.includes('v2') || bg.ignoreSync || bg.translations.length || bg.romanizations.length) throw new Error(`Background vocal ${bg.id} has fields not yet mapped to TTML`);
       const span = xml.createElementNS(TTML, 'span');
       span.setAttributeNS(TTM, 'ttm:role', 'x-bg');
       setTime(span, bg.beginUs, bg.endUs, draft);
