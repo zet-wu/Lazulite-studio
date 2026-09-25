@@ -5,6 +5,7 @@ const TTS = 'http://www.w3.org/ns/ttml#styling';
 const TTM = 'http://www.w3.org/ns/ttml#metadata';
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const STUDIO = 'urn:lazulite:studio:draft';
+const ITUNES = 'http://music.apple.com/lyric-ttml-internal';
 const MAX_BYTES = 2 * 1024 * 1024;
 
 const attr = (node: Element, ns: string | null, name: string) => node.getAttributeNS(ns, name);
@@ -13,7 +14,8 @@ const is = (node: Element, ns: string, name: string) => node.namespaceURI === ns
 function parseTime(value: string): number {
   const raw = value.trim();
   let seconds: number;
-  if (/^\d+(?:\.\d+)?ms$/.test(raw)) seconds = Number(raw.slice(0, -2)) / 1000;
+  if (/^\d+(?:\.\d+)?$/.test(raw)) seconds = Number(raw);
+  else if (/^\d+(?:\.\d+)?ms$/.test(raw)) seconds = Number(raw.slice(0, -2)) / 1000;
   else if (/^\d+(?:\.\d+)?s$/.test(raw)) seconds = Number(raw.slice(0, -1));
   else {
     const match = /^(\d+):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(raw);
@@ -26,7 +28,7 @@ function parseTime(value: string): number {
 }
 
 function timeText(us: number) {
-  return `${(us / 1_000_000).toFixed(6).replace(/0+$/, '').replace(/\.$/, '')}s`;
+  return (us / 1_000_000).toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function boundaries(node: Element, parentStart: number, parentEnd: TimeUs): [TimeUs, TimeUs] {
@@ -35,8 +37,11 @@ function boundaries(node: Element, parentStart: number, parentEnd: TimeUs): [Tim
   const endRaw = attr(node, null, 'end');
   const durRaw = attr(node, null, 'dur');
   const nulls = (attr(node, STUDIO, 'null') ?? '').split(/\s+/);
-  const begin = nulls.includes('begin') ? null : beginRaw === null ? null : parentStart + parseTime(beginRaw);
-  const endFromEnd = endRaw === null ? null : parentStart + parseTime(endRaw);
+  // Reference-tool numeric clock values are absolute media seconds. Unit-bearing
+  // TTML offsets retain their relative timing semantics.
+  const value = (raw: string) => /^\d+(?:\.\d+)?$/.test(raw.trim()) ? parseTime(raw) : parentStart + parseTime(raw);
+  const begin = nulls.includes('begin') ? null : beginRaw === null ? null : value(beginRaw);
+  const endFromEnd = endRaw === null ? null : value(endRaw);
   const endFromDur = durRaw === null ? null : (begin ?? parentStart) + parseTime(durRaw);
   const end = nulls.includes('end') ? null : [endFromEnd, endFromDur].filter((value): value is number => value !== null).reduce<number | null>((left, value) => left === null ? value : Math.min(left, value), null);
   if (begin !== null && end !== null && begin > end) throw new Error('TTML end precedes begin');
@@ -56,6 +61,8 @@ function checkAttributes(node: Element, allowed: string[]) {
     if (attribute.namespaceURI === XML && ['id', 'lang'].includes(attribute.localName)) continue;
     if (attribute.namespaceURI === TTS && attribute.localName === 'ruby') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
+    if (attribute.namespaceURI === TTM && attribute.localName === 'role') continue;
+    if (attribute.namespaceURI === ITUNES && ['key', 'timing'].includes(attribute.localName)) continue;
     if (attribute.namespaceURI === STUDIO && ['id', 'null'].includes(attribute.localName)) continue;
     throw new Error(`Unsupported TTML attribute ${attribute.name} on <${node.localName}>`);
   }
@@ -65,6 +72,7 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   const id = `${lineId}:word:${index}`;
   if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) {
     const text = node.nodeValue ?? '';
+    if (!text.trim() && /[\r\n]/.test(text)) return null;
     return text ? createWord(text, id) : null;
   }
   if (node.nodeType !== Node.ELEMENT_NODE) throw new Error('Unsupported TTML line child');
@@ -82,7 +90,7 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   const parts = Array.from(element.children);
   if (parts.length !== 2 || parts.some((part) => !is(part, TTML, 'span'))) throw new Error('Ruby container requires one base and one reading span');
   const base = parts.find((part) => attr(part, TTS, 'ruby') === 'base');
-  const reading = parts.find((part) => attr(part, TTS, 'ruby') === 'text');
+  const reading = parts.find((part) => ['text', 'textContainer'].includes(attr(part, TTS, 'ruby') ?? ''));
   if (!base || !reading) throw new Error('Ruby container requires base and text spans');
   checkAttributes(base, []);
   checkAttributes(reading, []);
@@ -93,12 +101,14 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   for (const child of Array.from(reading.childNodes)) {
     if (child.nodeType === Node.TEXT_NODE || child.nodeType === Node.CDATA_SECTION_NODE) {
       const value = child.nodeValue ?? '';
+      if (!value.trim() && /[\r\n]/.test(value)) continue;
       if (value) rubyUnits.push({ id: `${wordId}:ruby:${unitIndex++}`, reading: value, beginUs: null, endUs: null });
       continue;
     }
     if (child.nodeType !== Node.ELEMENT_NODE || !is(child as Element, TTML, 'span')) throw new Error('Unsupported Ruby reading child');
     const part = child as Element;
     checkAttributes(part, ['begin', 'end', 'dur']);
+    if (attr(reading, TTS, 'ruby') === 'textContainer' && attr(part, TTS, 'ruby') !== 'text') throw new Error('Ruby textContainer requires text spans');
     const value = textOnly(part, 'Ruby reading unit');
     if (!value) throw new Error('Ruby reading unit must be non-empty');
     const [unitBegin, unitEnd] = boundaries(part, lineStart, lineEnd);
@@ -106,7 +116,12 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
     unitIndex++;
   }
   if (!rubyUnits.length) throw new Error('Ruby reading must be non-empty');
-  return { ...createWord(text, wordId), beginUs, endUs, rubyUnits };
+  return {
+    ...createWord(text, wordId),
+    beginUs: beginUs ?? (rubyUnits.every((unit) => unit.beginUs !== null) ? Math.min(...rubyUnits.map((unit) => unit.beginUs!)) : null),
+    endUs: endUs ?? (rubyUnits.every((unit) => unit.endUs !== null) ? Math.max(...rubyUnits.map((unit) => unit.endUs!)) : null),
+    rubyUnits,
+  };
 }
 
 export function parseLyricTtml(xml: string): LyricDocument {
@@ -134,6 +149,15 @@ export function parseLyricTtml(xml: string): LyricDocument {
         agents.push({ id, name: nameNode ? textOnly(nameNode, 'Agent name') : null, type: attr(child, null, 'type') });
       } else if (is(child, TTML, 'metadata')) {
         for (const entry of Array.from(child.children)) {
+          if (is(entry, TTM, 'agent')) {
+            checkAttributes(entry, ['type']);
+            const id = attr(entry, XML, 'id');
+            if (!id) throw new Error('Agent needs xml:id');
+            const name = Array.from(entry.children).find((item) => is(item, TTM, 'name'));
+            if (Array.from(entry.children).some((item) => item !== name)) throw new Error('Unsupported agent structure');
+            agents.push({ id, name: name ? textOnly(name, 'Agent name') : null, type: attr(entry, null, 'type') });
+            continue;
+          }
           if (entry.namespaceURI !== TTM) throw new Error(`Unsupported metadata <${entry.localName}>`);
           checkAttributes(entry, []);
           (metadata[entry.localName] ??= []).push(textOnly(entry, 'Metadata'));
@@ -156,12 +180,47 @@ export function parseLyricTtml(xml: string): LyricDocument {
       if (!is(child, TTML, 'p')) throw new Error(`Unsupported TTML body child <${child.localName}>`);
       checkAttributes(child, ['begin', 'end', 'dur']);
       const [beginUs, endUs] = boundaries(child, start, ownEnd);
-      const id = attr(child, XML, 'id') ?? `line-${lines.length + 1}`;
+      const id = attr(child, XML, 'id') ?? attr(child, ITUNES, 'key') ?? `line-${lines.length + 1}`;
       const wordStart = beginUs ?? start;
-      const words = Array.from(child.childNodes).map((node, index) => makeWord(node, id, index, wordStart, endUs)).filter((word): word is LyricWord => word !== null);
+      const translations: LyricLine['translations'] = [];
+      const romanizations: LyricLine['romanizations'] = [];
+      let background: Element | null = null;
+      const words: LyricWord[] = [];
+      for (const [index, node] of Array.from(child.childNodes).entries()) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const role = attr(node as Element, TTM, 'role');
+          if (role === 'x-translation' || role === 'x-roman') {
+            checkAttributes(node as Element, []);
+            const value = { language: attr(node as Element, XML, 'lang'), text: textOnly(node as Element, role) };
+            (role === 'x-translation' ? translations : romanizations).push(value);
+            continue;
+          }
+          if (role === 'x-bg') {
+            if (background) throw new Error(`Line ${id} has multiple background vocals`);
+            background = node as Element;
+            continue;
+          }
+          if (role) throw new Error(`Unsupported TTML role ${role}`);
+        }
+        const word = makeWord(node, id, index, wordStart, endUs);
+        if (word) words.push(word);
+      }
       const agentRefs = (attr(child, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
       if (agentRefs.some((ref) => !agents.some((agent) => agent.id === ref))) throw new Error(`Unknown agent on line ${id}`);
-      lines.push({ id, words, beginUs, endUs, agentRefs, backgroundOf: null, duet: false, translations: [], romanizations: [], ignoreSync: false });
+      lines.push({ id, words, beginUs, endUs, agentRefs, backgroundOf: null, duet: false, translations, romanizations, ignoreSync: false });
+      if (background) {
+        checkAttributes(background, ['begin', 'end', 'dur']);
+        const [bgBegin, bgEnd] = boundaries(background, wordStart, endUs);
+        const bgId = `${id}:bg`;
+        const bgStart = bgBegin ?? wordStart;
+        const bgWords = Array.from(background.childNodes).map((node, index) => makeWord(node, bgId, index, bgStart, bgEnd)).filter((word): word is LyricWord => word !== null);
+        if (bgWords.length) {
+          bgWords[0] = { ...bgWords[0], text: bgWords[0].text.replace(/^\(/, '') };
+          const last = bgWords.length - 1;
+          bgWords[last] = { ...bgWords[last], text: bgWords[last].text.replace(/\)$/, '') };
+        }
+        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin, endUs: bgEnd, agentRefs, backgroundOf: id, duet: false, translations: [], romanizations: [], ignoreSync: false });
+      }
     }
   };
   visit(body, rootStart, null, 1);
@@ -169,9 +228,9 @@ export function parseLyricTtml(xml: string): LyricDocument {
   return { schemaVersion: LYRIC_SCHEMA_VERSION, lines, agents, metadata, language: attr(root, XML, 'lang') };
 }
 
-function setTime(node: Element, begin: TimeUs, end: TimeUs, parentStart: number, draft: boolean) {
-  if (begin !== null) node.setAttribute('begin', timeText(begin - parentStart));
-  if (end !== null) node.setAttribute('end', timeText(end - parentStart));
+function setTime(node: Element, begin: TimeUs, end: TimeUs, draft: boolean) {
+  if (begin !== null) node.setAttribute('begin', timeText(begin));
+  if (end !== null) node.setAttribute('end', timeText(end));
   if (draft) {
     const nulls = [begin === null ? 'begin' : '', end === null ? 'end' : ''].filter(Boolean);
     if (nulls.length) node.setAttributeNS(STUDIO, 'studio:null', nulls.join(' '));
@@ -181,7 +240,7 @@ function setTime(node: Element, begin: TimeUs, end: TimeUs, parentStart: number,
 export function serializeLyricTtml(document: LyricDocument, options: { draft?: boolean } = {}): string {
   if (document.schemaVersion !== LYRIC_SCHEMA_VERSION) throw new Error('Unsupported lyric document schema');
   const draft = options.draft === true;
-  const xml = new DOMParser().parseFromString(`<tt xmlns="${TTML}" xmlns:tts="${TTS}" xmlns:ttm="${TTM}"${draft ? ` xmlns:studio="${STUDIO}"` : ''}><body/></tt>`, 'application/xml');
+  const xml = new DOMParser().parseFromString(`<tt xmlns="${TTML}" xmlns:tts="${TTS}" xmlns:ttm="${TTM}" xmlns:itunes="${ITUNES}"${draft ? ` xmlns:studio="${STUDIO}"` : ''}><body/></tt>`, 'application/xml');
   const root = xml.documentElement;
   if (document.language) root.setAttributeNS(XML, 'xml:lang', document.language);
   if (document.agents.length || Object.keys(document.metadata).length) {
@@ -193,7 +252,6 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       entry.textContent = value;
       metadataNode.appendChild(entry);
     }
-    if (metadataNode.childNodes.length) head.appendChild(metadataNode);
     for (const agent of document.agents) {
       const entry = xml.createElementNS(TTM, 'ttm:agent');
       entry.setAttributeNS(XML, 'xml:id', agent.id);
@@ -203,44 +261,80 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
         name.textContent = agent.name;
         entry.appendChild(name);
       }
-      head.appendChild(entry);
+      metadataNode.appendChild(entry);
     }
+    head.appendChild(metadataNode);
     root.insertBefore(head, root.firstChild);
   }
   const body = Array.from(root.children).find((child) => is(child, TTML, 'body'))!;
+  const mainLines = document.lines.filter((line) => !line.backgroundOf);
+  const lineBegins = mainLines.map((line) => line.beginUs).filter((value): value is number => value !== null);
+  const lineEnds = mainLines.map((line) => line.endUs).filter((value): value is number => value !== null);
+  const div = xml.createElementNS(TTML, 'div');
+  if (lineBegins.length) div.setAttribute('begin', timeText(Math.min(...lineBegins)));
+  if (lineEnds.length) {
+    div.setAttribute('end', timeText(Math.max(...lineEnds)));
+    body.setAttribute('dur', timeText(Math.max(...lineEnds)));
+  }
+  body.appendChild(div);
+  const backgrounds = new Map<string, LyricLine>();
+  for (const line of document.lines) if (line.backgroundOf) {
+    if (backgrounds.has(line.backgroundOf)) throw new Error(`Multiple background vocals for ${line.backgroundOf}`);
+    backgrounds.set(line.backgroundOf, line);
+  }
+  for (const parentId of backgrounds.keys()) if (!document.lines.some((line) => line.id === parentId && !line.backgroundOf)) throw new Error(`Background vocal has no parent: ${parentId}`);
   for (const line of document.lines) {
-    if (line.backgroundOf || line.duet || line.translations.length || line.romanizations.length || line.ignoreSync) throw new Error(`Line ${line.id} has fields not yet mapped to TTML`);
+    if (line.backgroundOf) continue;
+    if (line.duet || line.ignoreSync) throw new Error(`Line ${line.id} has fields not yet mapped to TTML`);
     const p = xml.createElementNS(TTML, 'p');
     p.setAttributeNS(XML, 'xml:id', line.id);
-    setTime(p, line.beginUs, line.endUs, 0, draft);
+    p.setAttributeNS(ITUNES, 'itunes:key', line.id);
+    setTime(p, line.beginUs, line.endUs, draft);
     if (line.agentRefs.length) p.setAttributeNS(TTM, 'ttm:agent', line.agentRefs.join(' '));
-    const lineStart = line.beginUs ?? 0;
-    for (const word of line.words) {
+    const appendWord = (parent: Element, word: LyricWord, text: string) => {
       if (word.romanization || word.obscene || word.emptyBeat) throw new Error(`Word ${word.id} has fields not yet mapped to TTML`);
       const span = xml.createElementNS(TTML, 'span');
       if (draft) span.setAttributeNS(STUDIO, 'studio:id', word.id);
-      setTime(span, word.beginUs, word.endUs, lineStart, draft);
-      if (!word.rubyUnits.length) span.textContent = word.text;
+      setTime(span, word.beginUs, word.endUs, draft);
+      if (!word.rubyUnits.length) span.textContent = text;
       else {
         span.setAttributeNS(TTS, 'tts:ruby', 'container');
         const base = xml.createElementNS(TTML, 'span');
         base.setAttributeNS(TTS, 'tts:ruby', 'base');
-        base.textContent = word.text;
+        base.textContent = text;
         span.appendChild(base);
         const reading = xml.createElementNS(TTML, 'span');
-        reading.setAttributeNS(TTS, 'tts:ruby', 'text');
+        reading.setAttributeNS(TTS, 'tts:ruby', 'textContainer');
         for (const unit of word.rubyUnits) {
           const part = xml.createElementNS(TTML, 'span');
+          part.setAttributeNS(TTS, 'tts:ruby', 'text');
           if (draft) part.setAttributeNS(STUDIO, 'studio:id', unit.id);
-          setTime(part, unit.beginUs, unit.endUs, lineStart, draft);
+          setTime(part, unit.beginUs, unit.endUs, draft);
           part.textContent = unit.reading;
           reading.appendChild(part);
         }
         span.appendChild(reading);
       }
+      parent.appendChild(span);
+    };
+    for (const word of line.words) appendWord(p, word, word.text);
+    for (const [role, items] of [['x-translation', line.translations], ['x-roman', line.romanizations]] as const) for (const item of items) {
+      const span = xml.createElementNS(TTML, 'span');
+      span.setAttributeNS(TTM, 'ttm:role', role);
+      if (item.language) span.setAttributeNS(XML, 'xml:lang', item.language);
+      span.textContent = item.text;
       p.appendChild(span);
     }
-    body.appendChild(p);
+    const bg = backgrounds.get(line.id);
+    if (bg) {
+      if (bg.duet || bg.ignoreSync || bg.translations.length || bg.romanizations.length) throw new Error(`Background vocal ${bg.id} has fields not yet mapped to TTML`);
+      const span = xml.createElementNS(TTML, 'span');
+      span.setAttributeNS(TTM, 'ttm:role', 'x-bg');
+      setTime(span, bg.beginUs, bg.endUs, draft);
+      bg.words.forEach((word, index) => appendWord(span, word, `${index === 0 ? '(' : ''}${word.text}${index === bg.words.length - 1 ? ')' : ''}`));
+      p.appendChild(span);
+    }
+    div.appendChild(p);
   }
   return new XMLSerializer().serializeToString(xml);
 }

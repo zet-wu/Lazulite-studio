@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
 import { lineText, rubyReading } from '../src/domain/lyric-document';
@@ -37,5 +38,24 @@ describe('semantic TTML codec', () => {
 
   it('rejects unknown inline structure instead of silently flattening it', () => {
     expect(() => parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><p><x-translation>translation</x-translation></p></body></tt>')).toThrow(/Unsupported TTML line child/);
+  });
+
+  it('reads the reference tool Ruby, translation, romanization and background sample', () => {
+    const source = readFileSync('../docs/evidence/editor-e0/reference-rich.ttml', 'utf8');
+    const document = parseLyricTtml(source);
+    expect(document.lines).toHaveLength(2);
+    expect(lineText(document.lines[0])).toBe('今日も歌う');
+    expect(document.lines[0].words[0].rubyUnits.map((unit) => [unit.reading, unit.beginUs, unit.endUs])).toEqual([
+      ['きょ', 0, 500_000], ['う', 500_000, 1_000_000],
+    ]);
+    const state = createLyricEditorState(document);
+    expect(() => executeLyricCommand(state, { type: 'set-word-time', lineId: document.lines[0].id, wordId: document.lines[0].words[0].id, beginUs: 600_000, endUs: 1_000_000 })).toThrow(/Ruby unit/);
+    expect(document.lines[0].translations).toEqual([{ language: 'zh', text: '今天也唱歌' }]);
+    expect(document.lines[0].romanizations).toEqual([{ language: 'ja-Latn', text: 'kyou mo utau' }]);
+    expect(document.lines[1]).toMatchObject({ backgroundOf: document.lines[0].id, beginUs: 500_000, endUs: 1_800_000 });
+    expect(lineText(document.lines[1])).toBe('響く');
+    const reopened = parseLyricTtml(serializeLyricTtml(document, { draft: true }));
+    expect(reopened.lines.map(lineText)).toEqual(['今日も歌う', '響く']);
+    expect(reopened.lines[0].words[0].rubyUnits).toEqual(document.lines[0].words[0].rubyUnits);
   });
 });

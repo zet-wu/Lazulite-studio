@@ -1,0 +1,26 @@
+<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:amll="http://www.example.com/ns/amll" xml:lang="ja">
+    <head>
+        <metadata>
+            <ttm:agent type="person" xml:id="v1"/>
+        </metadata>
+    </head>
+    <body dur="2.000">
+        <div begin="0.000" end="2.000">
+            <p begin="0.000" end="2.000" itunes:key="L1">
+                <span tts:ruby="container">
+                    <span tts:ruby="base">今日</span>
+                    <span tts:ruby="textContainer">
+                        <span tts:ruby="text" begin="0.000" end="0.500">きょ</span>
+                        <span tts:ruby="text" begin="0.500" end="1.000">う</span>
+                    </span>
+                </span>
+                <span begin="1.000" end="2.000">も歌う</span>
+                <span ttm:role="x-translation" xml:lang="zh">今天也唱歌</span>
+                <span ttm:role="x-roman" xml:lang="ja-Latn">kyou mo utau</span>
+                <span ttm:role="x-bg" begin="0.500" end="1.800">
+                    <span begin="0.500" end="1.800">(響く)</span>
+                </span>
+            </p>
+        </div>
+    </body>
+</tt>
