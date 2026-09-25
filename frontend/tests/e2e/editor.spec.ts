@@ -55,3 +55,22 @@ test('new local document clears the previous checkpoint', async ({ page }) => {
   await expect(page.getByText('未命名.ttml')).toBeVisible();
   expect(prompted).toBe(false);
 });
+
+test('reorders words and grouped background lines through buttons and keyboard with undo', async ({ page }) => {
+  await upload(page);
+  const firstLine = page.locator('[data-line-id="L1"]');
+  await page.getByRole('textbox', { name: '词 今日', exact: true }).focus();
+  await expect(firstLine.locator('[data-word-id]').first()).toHaveClass(/selectedWord/);
+  await page.getByRole('button', { name: '词后移 今日' }).click();
+  await expect(firstLine.locator('[data-word-id]').first().getByRole('textbox', { name: '词 も歌う', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(firstLine.locator('[data-word-id]').first().getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: '词 今日', exact: true }).press('Alt+ArrowRight');
+  await expect(firstLine.locator('[data-word-id]').first().getByRole('textbox', { name: '词 も歌う', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /行下移.*今日/ }).click();
+  await expect(page.locator('[data-line-id]').first()).toHaveAttribute('data-line-id', 'L2');
+  await expect(page.locator('[data-line-id]').last()).toHaveAttribute('data-line-id', 'L1:bg');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-line-id]').first()).toHaveAttribute('data-line-id', 'L1');
+  await expect(firstLine.getByRole('textbox', { name: '读音 今日' }).first()).toHaveValue('きょ');
+});

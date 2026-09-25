@@ -108,6 +108,17 @@ test("saves a semantic project edit and reopens the saved revision", async ({ pa
   await expect(page.getByRole('textbox', { name: '词 夜の風が静かに歌う', exact: true })).toBeVisible();
 });
 
+test('keeps the playhead highlight separate from the selected line', async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  const canvas = page.locator('footer canvas');
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await canvas.click({ position: { x: box!.width * 7 / 120, y: box!.height / 2 } });
+  await expect(page.locator('[data-line-id="line-1"]')).toHaveClass(/selectedLine/);
+  await expect(page.locator('[data-line-id="line-2"]')).toHaveClass(/playheadLine/);
+  await expect(page.locator('[data-line-id="line-2"]')).not.toHaveClass(/selectedLine/);
+});
+
 test('imports rich TTML, edits Ruby, undoes, saves and reopens it in a project', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   const source = await readFile('../docs/evidence/editor-e0/reference-apple-metadata.ttml');

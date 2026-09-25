@@ -23,6 +23,7 @@ type Props = {
   onFinal: () => void;
   auxiliary?: ReactNode;
   selectedLineId?: string | null;
+  playheadLineId?: string | null;
   onSelectLine?: (id: string) => void;
 };
 
@@ -35,7 +36,7 @@ function parseSeconds(value: string): TimeUs {
   return number;
 }
 
-function DraftInput({ value, label, onCommit, onFocus, onSplit }: { value: string; label: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number) => void }) {
+function DraftInput({ value, label, onCommit, onFocus, onSplit, onMove }: { value: string; label: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number) => void; onMove?: (direction: -1 | 1) => void }) {
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
@@ -48,6 +49,7 @@ function DraftInput({ value, label, onCommit, onFocus, onSplit }: { value: strin
       if (event.key === 'Enter') ref.current?.blur();
       if (event.key === 'Escape') { setDraft(value); ref.current?.blur(); }
       if (event.key === 'F8' && onSplit) { event.preventDefault(); onSplit(ref.current?.selectionStart ?? 0); }
+      if (event.altKey && onMove && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) { event.preventDefault(); onMove(event.key === 'ArrowLeft' ? -1 : 1); }
     }} />;
 }
 
@@ -67,6 +69,7 @@ export function EditorSurface(props: Props) {
   const [selection, setSelection] = useState<{ lineId: string; wordId: string | null; rubyId: string | null } | null>(null);
   const [message, setMessage] = useState('');
   const selectedLine = document.lines.find((line) => line.id === (selection?.lineId ?? props.selectedLineId)) ?? document.lines[0];
+  const mainLines = document.lines.filter((line) => !line.backgroundOf);
   const select = (lineId: string, wordId: string | null = null, rubyId: string | null = null) => { setSelection({ lineId, wordId, rubyId }); props.onSelectLine?.(lineId); };
   const dispatch = (command: LyricCommand) => {
     try { apply(command); setMessage(''); }
@@ -76,11 +79,24 @@ export function EditorSurface(props: Props) {
     const items = line[kind].map((item, i) => i === index ? { ...item, text } : item);
     dispatch({ type: 'set-sublyrics', lineId: line.id, kind, items });
   };
-  const wordView = (line: LyricLine, word: LyricWord) => <div className={styles.word} key={word.id} data-word-id={word.id}>
+  const moveLine = (line: LyricLine, direction: -1 | 1) => {
+    const index = mainLines.findIndex((item) => item.id === line.id);
+    if (line.backgroundOf || index + direction < 0 || index + direction >= mainLines.length) return;
+    dispatch({ type: 'move-line', lineId: line.id, afterLineId: direction < 0 ? mainLines[index - 2]?.id ?? null : mainLines[index + 1].id });
+  };
+  const moveWord = (line: LyricLine, word: LyricWord, direction: -1 | 1) => {
+    const index = line.words.findIndex((item) => item.id === word.id);
+    if (index + direction < 0 || index + direction >= line.words.length) return;
+    dispatch({ type: 'move-word', lineId: line.id, wordId: word.id, toLineId: line.id, afterWordId: direction < 0 ? line.words[index - 2]?.id ?? null : line.words[index + 1].id });
+  };
+  const wordView = (line: LyricLine, word: LyricWord, index: number) => <div className={`${styles.word} ${selection?.wordId === word.id ? styles.selectedWord : ''}`} key={word.id} data-word-id={word.id}>
     <div className={styles.wordMain}>
       <DraftInput value={word.text} label={`词 ${word.text}`} onFocus={() => select(line.id, word.id)}
         onCommit={(text) => dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text })}
-        onSplit={(at) => dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at: utf16ToCodePoint(word.text, at) })} />
+        onSplit={(at) => dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at: utf16ToCodePoint(word.text, at) })}
+        onMove={(direction) => moveWord(line, word, direction)} />
+      <button aria-label={`词前移 ${word.text}`} disabled={index === 0} onClick={() => moveWord(line, word, -1)}>←</button>
+      <button aria-label={`词后移 ${word.text}`} disabled={index === line.words.length - 1} onClick={() => moveWord(line, word, 1)}>→</button>
       <button aria-label={`拆分词 ${word.text}`} title="按光标位置拆分；输入中可按 F8" onClick={() => {
         const at = Math.floor(Array.from(word.text).length / 2);
         dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at });
@@ -88,7 +104,7 @@ export function EditorSurface(props: Props) {
       <button aria-label={`删除词 ${word.text}`} onClick={() => dispatch({ type: 'delete-word', lineId: line.id, wordId: word.id })}>×</button>
     </div>
     <TimePair begin={word.beginUs} end={word.endUs} label={`词 ${word.text}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginUs, endUs })} />
-    <div className={styles.rubies}>{word.rubyUnits.map((unit) => <div key={unit.id} className={styles.ruby}>
+    <div className={styles.rubies}>{word.rubyUnits.map((unit) => <div key={unit.id} className={`${styles.ruby} ${selection?.rubyId === unit.id ? styles.selectedRuby : ''}`}>
       <DraftInput value={unit.reading} label={`读音 ${word.text}`} onFocus={() => select(line.id, word.id, unit.id)}
         onCommit={(reading) => dispatch({ type: 'edit-ruby', lineId: line.id, wordId: word.id, rubyId: unit.id, reading })} />
       <button aria-label={`删除读音 ${unit.reading}`} onClick={() => dispatch({ type: 'delete-ruby', lineId: line.id, wordId: word.id, rubyId: unit.id })}>×</button>
@@ -102,10 +118,14 @@ export function EditorSurface(props: Props) {
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
     <div className={styles.layout}><aside className={styles.outline}><h2>大纲</h2>{document.lines.map((line, index) => <button key={line.id} className={selectedLine?.id === line.id ? styles.selected : ''} onClick={() => select(line.id)}>{index + 1} {line.backgroundOf ? '↳ ' : ''}{lineText(line) || '空行'}</button>)}</aside>
       <main className={styles.canvas}><div className={styles.canvasHeader}><h1>歌词编辑</h1><button onClick={() => dispatch({ type: 'insert-line', afterLineId: document.lines.at(-1)?.id ?? null })}>新增歌词行</button></div>
-        {document.lines.map((line) => <section className={`${styles.line} ${selectedLine?.id === line.id ? styles.selectedLine : ''}`} key={line.id} data-line-id={line.id} onClick={() => { if (selection?.lineId !== line.id) select(line.id); }}>
+        {document.lines.map((line) => <section className={`${styles.line} ${selectedLine?.id === line.id ? styles.selectedLine : ''} ${props.playheadLineId === line.id ? styles.playheadLine : ''}`} key={line.id} data-line-id={line.id} tabIndex={0} aria-label={`歌词行 ${lineText(line) || '空行'}`} onClick={(event) => { if (!(event.target as Element).closest('[data-word-id]')) select(line.id); }} onKeyDown={(event) => {
+          if (event.target !== event.currentTarget || event.nativeEvent.isComposing || !event.altKey) return;
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); moveLine(line, event.key === 'ArrowUp' ? -1 : 1); }
+        }}>
           <div className={styles.lineHeader}><span>{line.backgroundOf ? '背景' : '主唱'} · {line.id}</span><TimePair begin={line.beginUs} end={line.endUs} label={`行 ${line.id}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-line-time', lineId: line.id, beginUs, endUs })} />
-            <button onClick={() => dispatch({ type: 'insert-line', afterLineId: line.id })}>后插行</button><button onClick={() => dispatch({ type: 'delete-line', lineId: line.id })}>删行</button></div>
-          <div className={styles.words}>{line.words.map((word) => wordView(line, word))}<button onClick={() => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') })}>加词</button></div>
+            {!line.backgroundOf && <><button aria-label={`行上移 ${lineText(line)}`} disabled={mainLines[0]?.id === line.id} onClick={() => moveLine(line, -1)}>↑</button><button aria-label={`行下移 ${lineText(line)}`} disabled={mainLines.at(-1)?.id === line.id} onClick={() => moveLine(line, 1)}>↓</button></>}
+            <button onClick={() => dispatch({ type: 'insert-line', afterLineId: line.backgroundOf ?? line.id })}>后插行</button><button onClick={() => dispatch({ type: 'delete-line', lineId: line.id })}>删行</button></div>
+          <div className={styles.words}>{line.words.map((word, index) => wordView(line, word, index))}<button onClick={() => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') })}>加词</button></div>
           {!line.backgroundOf && <div className={styles.sublyrics}>{(['translations', 'romanizations'] as const).map((kind) => <div key={kind}><strong>{kind === 'translations' ? '翻译' : '音译'}</strong>{line[kind].map((item, index) => <div key={index}><DraftInput value={item.text} label={`${kind === 'translations' ? '翻译' : '音译'} ${index + 1}`} onCommit={(text) => sublyric(line, kind, index, text)} /><small>{item.language ?? '未指定语言'}</small></div>)}<button onClick={() => dispatch({ type: 'set-sublyrics', lineId: line.id, kind, items: [...line[kind], { language: null, text: '' }] })}>添加</button></div>)}</div>}
         </section>)}
       </main>

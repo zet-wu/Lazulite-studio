@@ -24,6 +24,7 @@ type Props = {
   selectedLine?: { begin_us: number | null; end_us: number | null };
   asset: Asset | null;
   loopRange?: { begin_us: number; end_us: number };
+  onPosition?: (positionUs: number) => void;
 };
 
 export function MediaTransport({
@@ -31,6 +32,7 @@ export function MediaTransport({
   selectedLine,
   asset,
   loopRange,
+  onPosition,
 }: Props) {
   const audio = useRef<HTMLAudioElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -115,8 +117,9 @@ export function MediaTransport({
       if (head.current)
         head.current.style.display =
           current >= start && current <= start + span ? "block" : "none";
+      onPosition?.(Math.round(current * 1_000_000));
     },
-    [duration, span, start],
+    [duration, onPosition, span, start],
   );
   const seekTo = useCallback(
     (raw: number) => {

@@ -43,6 +43,7 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
   const [jobResult, setJobResult] = useState<JobResult | null>(null);
   const [tab, setTab] = useState<'import' | 'tasks' | 'dictionary' | 'review'>('import');
   const [message, setMessage] = useState('');
+  const [playheadLineId, setPlayheadLineId] = useState<string | null>(null);
   const line: LyricLine | undefined = editor.document.lines.find((item) => item.id === selectedLineId) ?? editor.document.lines[0];
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
@@ -78,8 +79,12 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
   return <><EditorSurface title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) setMessage('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
     onSave={() => void editor.save()} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} auxiliary={auxiliary}
-    selectedLineId={selectedLineId} onSelectLine={(id) => { setSelectedLineId(id); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }} />
+    selectedLineId={selectedLineId} playheadLineId={playheadLineId} onSelectLine={(id) => { setSelectedLineId(id); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }} />
     {editor.recovery.available && <aside>发现本地草稿 <button onClick={() => void editor.restore().catch((error) => setMessage(error.message))}>恢复</button><button onClick={() => void editor.discardRecovery().catch((error) => setMessage(error.message))}>丢弃</button></aside>}
     {editor.conflict && <aside role="alert">服务器已有新版本，本地修改已保留。<button onClick={() => exportFile(true)}>下载本地草稿</button><button onClick={() => { if (window.confirm('重新加载服务器版本并清除本地检查点？')) void editor.discardRecovery().then(() => window.location.reload()); }}>重新加载服务器</button></aside>}
-    <MediaTransport projectId={projectId} selectedLine={line ? { begin_us: line.beginUs, end_us: line.endUs } : undefined} asset={asset} /></>;
+    <MediaTransport projectId={projectId} selectedLine={line ? { begin_us: line.beginUs, end_us: line.endUs } : undefined} asset={asset}
+      onPosition={(positionUs) => {
+        const active = editor.document.lines.find((item) => !item.backgroundOf && item.beginUs !== null && item.endUs !== null && item.beginUs <= positionUs && positionUs < item.endUs)?.id ?? null;
+        setPlayheadLineId((current) => current === active ? current : active);
+      }} /></>;
 }
