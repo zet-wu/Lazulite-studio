@@ -60,6 +60,7 @@ export function executeLyricCommand(state: LyricEditorState, command: LyricComma
     switch (command.type) {
       case 'split-word': {
         if (word.rubyUnits.length) throw new Error('Splitting a Ruby base requires an explicit reading split');
+        if (word.romanization || word.obscene || word.emptyBeat) throw new Error('Splitting a word with attached properties requires explicit redistribution');
         const [left, right] = splitAtGrapheme(word.text, command.at);
         const newId = command.newWordId ?? crypto.randomUUID();
         if (line.words.some((item) => item.id === newId)) throw new Error('Word id already exists');
@@ -76,6 +77,7 @@ export function executeLyricCommand(state: LyricEditorState, command: LyricComma
         validTime(command.beginUs, command.endUs);
         if (line.beginUs !== null && command.beginUs !== null && command.beginUs < line.beginUs) throw new Error('Word starts before line');
         if (line.endUs !== null && command.endUs !== null && command.endUs > line.endUs) throw new Error('Word ends after line');
+        if (word.rubyUnits.some((unit) => command.beginUs !== null && unit.beginUs !== null && unit.beginUs < command.beginUs || command.endUs !== null && unit.endUs !== null && unit.endUs > command.endUs)) throw new Error('Word time cannot exclude a Ruby unit');
         return [word.beginUs === command.beginUs && word.endUs === command.endUs ? word : { ...word, beginUs: command.beginUs, endUs: command.endUs }];
       case 'add-ruby': {
         if (!command.reading) throw new Error('Ruby reading must be non-empty');
