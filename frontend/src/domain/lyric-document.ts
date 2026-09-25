@@ -1,5 +1,5 @@
 /** The semantic editor document. Transport, XML trees and playback stay outside it. */
-export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v2' as const;
+export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v3' as const;
 
 export type TimeUs = number | null;
 
@@ -10,6 +10,17 @@ export type RubyUnit = {
   endUs: TimeUs;
 };
 
+export type AlignmentUnit = {
+  id: string;
+  kind: 'word' | 'mora' | 'phoneme';
+  text: string;
+  beginUs: TimeUs;
+  endUs: TimeUs;
+  readingStart: number | null;
+  readingEnd: number | null;
+  rubyUnitId: string | null;
+};
+
 export type LyricWord = {
   id: string;
   text: string;
@@ -17,6 +28,7 @@ export type LyricWord = {
   endUs: TimeUs;
   romanization: string;
   rubyUnits: RubyUnit[];
+  alignmentUnits: AlignmentUnit[];
   obscene: boolean;
   emptyBeat: number;
 };
@@ -55,7 +67,7 @@ export const lineText = (line: LyricLine) => line.words.map((word) => word.text)
 export const rubyReading = (word: LyricWord) => word.rubyUnits.map((unit) => unit.reading).join('');
 
 export function createWord(text: string, id: string = crypto.randomUUID()): LyricWord {
-  return { id, text, beginUs: null, endUs: null, romanization: '', rubyUnits: [], obscene: false, emptyBeat: 0 };
+  return { id, text, beginUs: null, endUs: null, romanization: '', rubyUnits: [], alignmentUnits: [], obscene: false, emptyBeat: 0 };
 }
 
 export function createLine(text: string, id: string = `line-${crypto.randomUUID()}`): LyricLine {

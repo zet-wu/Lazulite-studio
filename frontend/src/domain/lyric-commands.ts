@@ -1,4 +1,4 @@
-import { createLine, createWord, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RubyUnit, type SubLyric, type TimeUs } from './lyric-document';
+import { createLine, createWord, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RubyUnit, type SubLyric, type TimeUs } from './lyric-document';
 import { splitAtGrapheme } from './text-boundaries';
 
 const MAX_HISTORY = 256;
@@ -10,8 +10,10 @@ type AtomicLyricCommand =
   | { type: 'move-line'; lineId: string; afterLineId: string | null }
   | { type: 'insert-word'; lineId: string; afterWordId: string | null; word: LyricWord }
   | { type: 'delete-word'; lineId: string; wordId: string }
+  | { type: 'set-word-alignments'; lineId: string; wordId: string; units: AlignmentUnit[] }
   | { type: 'move-word'; lineId: string; wordId: string; toLineId: string; afterWordId: string | null }
   | { type: 'set-line-time'; lineId: string; beginUs: TimeUs; endUs: TimeUs }
+  | { type: 'set-line-agents'; lineId: string; agentRefs: string[] }
   | { type: 'set-duet'; lineId: string; duet: boolean }
   | { type: 'set-sublyrics'; lineId: string; kind: 'translations' | 'romanizations'; items: SubLyric[] }
   | { type: 'set-metadata'; key: string; values: string[] }
@@ -144,6 +146,8 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       lines[index] = { ...line, words: line.words.filter((word) => word.id !== command.wordId) };
       return { ...document, lines };
     }
+    case 'set-word-alignments':
+      return editWord(document, command.lineId, command.wordId, (word) => [{ ...word, alignmentUnits: command.units }]);
     case 'move-word': {
       const fromIndex = lineIndex(document, command.lineId);
       const toIndex = lineIndex(document, command.toLineId);
@@ -177,6 +181,18 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       lines[index] = { ...line, beginUs: command.beginUs, endUs: command.endUs };
       return { ...document, lines };
     }
+    case 'set-line-agents': {
+      const index = lineIndex(document, command.lineId);
+      const line = document.lines[index];
+      if (line.backgroundOf) throw new Error('Set agents on the parent line');
+      if (command.agentRefs.some((ref) => !document.agents.some((agent) => agent.id === ref))) throw new Error('Unknown lyric agent');
+      const lines = document.lines.slice();
+      const duet = command.agentRefs.includes('v2');
+      lines[index] = { ...line, agentRefs: command.agentRefs, duet };
+      const backgroundIndex = lines.findIndex((item) => item.backgroundOf === line.id);
+      if (backgroundIndex >= 0) lines[backgroundIndex] = { ...lines[backgroundIndex], agentRefs: command.agentRefs, duet };
+      return { ...document, lines };
+    }
     case 'set-duet': {
       const index = lineIndex(document, command.lineId);
       const line = document.lines[index];
@@ -205,6 +221,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       return { ...document, metadata };
     }
     case 'set-agents':
+      if (command.agents.some((agent) => !/^[A-Za-z_][\w.-]*$/.test(agent.id)) || new Set(command.agents.map((agent) => agent.id)).size !== command.agents.length) throw new Error('Invalid or duplicate agent ID');
       if (document.lines.some((line) => line.agentRefs.some((ref) => !command.agents.some((agent) => agent.id === ref)))) throw new Error('An assigned agent cannot be removed');
       return { ...document, agents: command.agents };
     case 'replace-document':
@@ -221,7 +238,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
     switch (wordCommand.type) {
       case 'split-word': {
         if (word.rubyUnits.length) throw new Error('Splitting a Ruby base requires an explicit reading split');
-        if (word.romanization || word.obscene || word.emptyBeat) throw new Error('Splitting a word with attached properties requires explicit redistribution');
+        if (word.romanization || word.obscene || word.emptyBeat || word.alignmentUnits.length) throw new Error('Splitting a word with attached properties requires explicit redistribution');
         const [left, right] = splitAtGrapheme(word.text, wordCommand.at);
         const newId = wordCommand.newWordId ?? crypto.randomUUID();
         if (line.words.some((item) => item.id === newId)) throw new Error('Word id already exists');
@@ -233,7 +250,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
       }
       case 'edit-word':
         if (!wordCommand.text) throw new Error('Word text must be non-empty');
-        return [wordCommand.text === word.text ? word : { ...word, text: wordCommand.text }];
+        return [wordCommand.text === word.text ? word : { ...word, text: wordCommand.text, alignmentUnits: [] }];
       case 'set-word-time':
         validTime(wordCommand.beginUs, wordCommand.endUs);
         if (line.beginUs !== null && wordCommand.beginUs !== null && wordCommand.beginUs < line.beginUs) throw new Error('Word starts before line');

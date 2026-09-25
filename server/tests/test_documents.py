@@ -31,6 +31,27 @@ def test_document_save_retry_and_cas_preserves_unknown(tmp_path):
     assert client.put("/api/v1/projects/p/document", json=body, headers=stale).status_code == 412
 
 
+def test_semantic_editor_ttml_saves_and_reopens_with_clean_main_lyrics(tmp_path):
+    setup_project(tmp_path)
+    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
+    source = Path(__file__).resolve().parents[2] / "docs/evidence/editor-e0/studio-roundtrip.ttml"
+    ttml = source.read_text(encoding="utf-8").replace("きょ</span>", "きよう</span>")
+    before = client.get("/api/v1/projects/p/document")
+    revision = before.json()["revision"]
+    body = {"schema_version": "studio-document-v1", "project_id": "p", "revision": revision,
+            "document": {"schema_version": "studio-document-content-v1", "ttml": ttml}}
+    saved = client.put("/api/v1/projects/p/document", json=body, headers={
+        "origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "semantic-edit"})
+    assert saved.status_code == 200
+    reopened = client.get("/api/v1/projects/p/document")
+    assert reopened.json()["revision"] == saved.json()["revision"]
+    assert reopened.json()["document"]["ttml"] == ttml
+    assert "きよう" in reopened.json()["document"]["ttml"]
+    lyrics = client.get("/api/v1/projects/p/lyrics")
+    assert lyrics.status_code == 200
+    assert lyrics.text == ttml
+
+
 def test_import_is_candidate_and_does_not_change_revision(tmp_path):
     setup_project(tmp_path)
     client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
