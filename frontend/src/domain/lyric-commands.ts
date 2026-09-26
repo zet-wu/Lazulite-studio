@@ -11,6 +11,8 @@ type AtomicLyricCommand =
   | { type: 'insert-word'; lineId: string; afterWordId: string | null; word: LyricWord }
   | { type: 'delete-word'; lineId: string; wordId: string }
   | { type: 'set-word-alignments'; lineId: string; wordId: string; units: AlignmentUnit[] }
+  | { type: 'segment-word'; lineId: string; wordId: string; words: LyricWord[] }
+  | { type: 'merge-words'; lineId: string; firstWordId: string; secondWordId: string }
   | { type: 'move-word'; lineId: string; wordId: string; toLineId: string; afterWordId: string | null }
   | { type: 'set-line-time'; lineId: string; beginUs: TimeUs; endUs: TimeUs }
   | { type: 'set-line-agents'; lineId: string; agentRefs: string[] }
@@ -157,6 +159,34 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     }
     case 'set-word-alignments':
       return editWord(document, command.lineId, command.wordId, (word) => [{ ...word, alignmentUnits: command.units }]);
+    case 'segment-word':
+      return editWord(document, command.lineId, command.wordId, (word, line) => {
+        if (command.words.length < 2 || command.words.map((part) => part.text).join('') !== word.text || command.words[0].id !== word.id) throw new Error('分词必须保留原文和首词 ID');
+        if (word.rubyUnits.length || word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
+        const ids = command.words.map((part) => part.id);
+        if (new Set(ids).size !== ids.length || ids.slice(1).some((id) => document.lines.some((item) => item.words.some((part) => part.id === id)))) throw new Error('分词 ID 重复');
+        for (const part of command.words) {
+          if (!part.text || part.rubyUnits.length || part.romanization || part.alignmentUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
+          wordFitsLine(part, line);
+        }
+        if (command.words[0].beginUs !== word.beginUs || command.words.at(-1)?.endUs !== word.endUs) throw new Error('分词必须保留父词时间区间');
+        return command.words;
+      });
+    case 'merge-words': {
+      const index = lineIndex(document, command.lineId);
+      const line = document.lines[index];
+      const first = line.words.findIndex((word) => word.id === command.firstWordId);
+      if (first < 0 || line.words[first + 1]?.id !== command.secondWordId) throw new Error('只能合并相邻词');
+      const left = line.words[first], right = line.words[first + 1];
+      if ([left, right].some((word) => word.rubyUnits.length || word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat)) throw new Error('带附属属性的词不能直接合并');
+      const words = line.words.slice();
+      const starts = [left.beginUs, right.beginUs].filter((value): value is number => value !== null);
+      const ends = [left.endUs, right.endUs].filter((value): value is number => value !== null);
+      words.splice(first, 2, { ...left, text: left.text + right.text, beginUs: starts.length ? Math.min(...starts) : null, endUs: ends.length ? Math.max(...ends) : null });
+      const lines = document.lines.slice();
+      lines[index] = { ...line, words };
+      return { ...document, lines };
+    }
     case 'move-word': {
       const fromIndex = lineIndex(document, command.lineId);
       const toIndex = lineIndex(document, command.toLineId);
