@@ -64,7 +64,7 @@ function checkAttributes(node: Element, allowed: string[]) {
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'role') continue;
     if (attribute.namespaceURI === ITUNES && ['key', 'timing', 'songPart'].includes(attribute.localName)) continue;
-    if (attribute.namespaceURI === STUDIO && ['id', 'null', 'alignments', 'endLink', 'romanization'].includes(attribute.localName)) continue;
+    if (attribute.namespaceURI === STUDIO && ['id', 'null', 'alignments', 'endLink', 'romanization', 'emptyBeat', 'ignoreSync'].includes(attribute.localName)) continue;
     throw new Error(`Unsupported TTML attribute ${attribute.name} on <${node.localName}>`);
   }
 }
@@ -108,11 +108,13 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   const wordId = attr(element, STUDIO, 'id') ?? id;
   const alignmentUnits = readAlignments(element);
   const romanization = attr(element, STUDIO, 'romanization') ?? '';
+  const emptyBeat = Number(attr(element, STUDIO, 'emptyBeat') ?? 0);
+  if (!Number.isSafeInteger(emptyBeat) || emptyBeat < 0 || emptyBeat > 32) throw new Error('Invalid draft empty beat count');
   const [beginUs, endUs] = boundaries(element, lineStart, lineEnd);
   const rubyKind = attr(element, TTS, 'ruby');
   if (!rubyKind) {
     const text = textOnly(element, 'Word');
-    return text ? { ...createWord(text, wordId), beginUs, endUs, alignmentUnits, romanization } : null;
+    return text ? { ...createWord(text, wordId), beginUs, endUs, alignmentUnits, romanization, emptyBeat } : null;
   }
   if (rubyKind !== 'container') throw new Error(`Unsupported Ruby type: ${rubyKind}`);
   const parts = Array.from(element.children);
@@ -151,6 +153,7 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
     rubyUnits,
     alignmentUnits,
     romanization,
+    emptyBeat,
   };
 }
 
@@ -289,7 +292,9 @@ export function parseLyricTtml(xml: string): LyricDocument {
       }
       const agentRefs = (attr(child, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
       if (agentRefs.some((ref) => !agents.some((agent) => agent.id === ref))) throw new Error(`Unknown agent on line ${id}`);
-      lines.push({ id, words, beginUs, endUs, endLink: readEndLink(child), agentRefs, backgroundOf: null, songPart: part, duet: agentRefs.includes('v2'), translations, romanizations, ignoreSync: false });
+      const ignoreSync = attr(child, STUDIO, 'ignoreSync');
+      if (ignoreSync !== null && ignoreSync !== 'true' && ignoreSync !== 'false') throw new Error('Invalid draft ignoreSync flag');
+      lines.push({ id, words, beginUs, endUs, endLink: readEndLink(child), agentRefs, backgroundOf: null, songPart: part, duet: agentRefs.includes('v2'), translations, romanizations, ignoreSync: ignoreSync === 'true' });
       if (background) {
         checkAttributes(background, ['begin', 'end', 'dur']);
         const [bgBegin, bgEnd] = boundaries(background, wordStart, endUs);
@@ -424,7 +429,6 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   for (const parentId of backgrounds.keys()) if (!document.lines.some((line) => line.id === parentId && !line.backgroundOf)) throw new Error(`Background vocal has no parent: ${parentId}`);
   for (const line of document.lines) {
     if (line.backgroundOf) continue;
-    if (line.ignoreSync) throw new Error(`Line ${line.id} has fields not yet mapped to TTML`);
     if (line.duet !== line.agentRefs.includes('v2')) throw new Error(`Line ${line.id} duet flag disagrees with agent v2`);
     if (!div || currentPart !== line.songPart) {
       currentPart = line.songPart;
@@ -441,12 +445,14 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     p.setAttributeNS(ITUNES, 'itunes:key', line.id);
     setTime(p, line.beginUs, line.endUs, draft);
     if (draft && line.endLink) p.setAttributeNS(STUDIO, 'studio:endLink', JSON.stringify(line.endLink));
+    if (draft && line.ignoreSync) p.setAttributeNS(STUDIO, 'studio:ignoreSync', 'true');
     if (line.agentRefs.length) p.setAttributeNS(TTM, 'ttm:agent', line.agentRefs.join(' '));
     const appendWord = (parent: Element, word: LyricWord, text: string) => {
-      if (word.obscene || word.emptyBeat) throw new Error(`Word ${word.id} has fields not yet mapped to TTML`);
+      if (word.obscene) throw new Error(`Word ${word.id} has fields not yet mapped to TTML`);
       const span = xml.createElementNS(TTML, 'span');
       if (draft) span.setAttributeNS(STUDIO, 'studio:id', word.id);
       if (draft && word.romanization) span.setAttributeNS(STUDIO, 'studio:romanization', word.romanization);
+      if (draft && word.emptyBeat) span.setAttributeNS(STUDIO, 'studio:emptyBeat', String(word.emptyBeat));
       if (draft && word.alignmentUnits.length) span.setAttributeNS(STUDIO, 'studio:alignments', JSON.stringify(word.alignmentUnits));
       setTime(span, word.beginUs, word.endUs, draft);
       if (!word.rubyUnits.length) span.textContent = text;

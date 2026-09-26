@@ -1,6 +1,7 @@
 import { createLine, createWord, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RubyUnit, type SubLyric, type TimeUs } from './lyric-document';
 import { splitAtGrapheme } from './text-boundaries';
 import { distributeRubyTime, splitReadingMora } from './ruby-editing';
+import { stampSync, type SyncAction, type SyncCursor } from './sync-editing';
 
 const MAX_HISTORY = 256;
 
@@ -22,9 +23,11 @@ type AtomicLyricCommand =
   | { type: 'unlink-line-end'; lineId: string }
   | { type: 'set-line-agents'; lineId: string; agentRefs: string[] }
   | { type: 'set-duet'; lineId: string; duet: boolean }
+  | { type: 'set-ignore-sync'; lineId: string; ignoreSync: boolean }
   | { type: 'set-sublyrics'; lineId: string; kind: 'translations' | 'romanizations'; items: SubLyric[] }
   | { type: 'set-metadata'; key: string; values: string[] }
   | { type: 'set-agents'; agents: LyricAgent[] }
+  | { type: 'sync-stamp'; cursor: SyncCursor; action: SyncAction; timeUs: number }
   | { type: 'replace-document'; document: LyricDocument }
   | { type: 'split-word'; lineId: string; wordId: string; at: number; newWordId?: string }
   | { type: 'edit-word'; lineId: string; wordId: string; text: string }
@@ -35,13 +38,14 @@ type AtomicLyricCommand =
   | { type: 'set-ruby-units'; lineId: string; wordId: string; units: RubyUnit[]; overwrite?: boolean }
   | { type: 'redistribute-ruby-time'; lineId: string; wordId: string }
   | { type: 'set-word-romanization'; lineId: string; wordId: string; romanization: string }
+  | { type: 'set-word-empty-beat'; lineId: string; wordId: string; emptyBeat: number }
   | { type: 'split-ruby'; lineId: string; wordId: string; rubyId: string; at: number; newRubyId?: string }
   | { type: 'edit-ruby'; lineId: string; wordId: string; rubyId: string; reading: string }
   | { type: 'delete-ruby'; lineId: string; wordId: string; rubyId: string }
   | { type: 'set-ruby-time'; lineId: string; wordId: string; rubyId: string; beginUs: TimeUs; endUs: TimeUs };
 
 export type LyricCommand = AtomicLyricCommand | { type: 'batch'; commands: AtomicLyricCommand[] };
-type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'merge-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-romanization' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
+type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'merge-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-romanization' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
 
 export type LyricEditorState = { present: LyricDocument; past: LyricDocument[]; future: LyricDocument[] };
 
@@ -108,6 +112,7 @@ function wordFitsLine(word: LyricWord, line: LyricLine) {
 
 function applyStructure(document: LyricDocument, command: AtomicLyricCommand): LyricDocument | null {
   switch (command.type) {
+    case 'sync-stamp': return stampSync(document, command.cursor, command.action, command.timeUs);
     case 'insert-line': {
       const line = command.line ?? createLine('');
       if (document.lines.some((item) => item.id === line.id)) throw new Error(`Line id already exists: ${line.id}`);
@@ -337,6 +342,15 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (backgroundIndex >= 0) lines[backgroundIndex] = { ...lines[backgroundIndex], duet: command.duet, agentRefs };
       return { ...document, lines };
     }
+    case 'set-ignore-sync': {
+      const index = lineIndex(document, command.lineId);
+      const line = document.lines[index];
+      if (line.backgroundOf) throw new Error('背景行不参与打轴');
+      if (line.ignoreSync === command.ignoreSync) return document;
+      const lines = document.lines.slice();
+      lines[index] = { ...line, ignoreSync: command.ignoreSync };
+      return { ...document, lines };
+    }
     case 'set-sublyrics': {
       const index = lineIndex(document, command.lineId);
       if (document.lines[index].backgroundOf) throw new Error('Background vocal sublyrics are not supported');
@@ -430,6 +444,9 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
         return [{ ...word, rubyUnits: distributeRubyTime(word, word.rubyUnits) }];
       case 'set-word-romanization':
         return [word.romanization === wordCommand.romanization ? word : { ...word, romanization: wordCommand.romanization }];
+      case 'set-word-empty-beat':
+        if (!Number.isSafeInteger(wordCommand.emptyBeat) || wordCommand.emptyBeat < 0 || wordCommand.emptyBeat > 32) throw new Error('空拍数必须是 0–32 的整数');
+        return [word.emptyBeat === wordCommand.emptyBeat ? word : { ...word, emptyBeat: wordCommand.emptyBeat }];
       case 'split-ruby':
         return [updateRuby(word, wordCommand.rubyId, (unit) => {
           if (word.alignmentUnits.some((item) => item.rubyUnitId === unit.id)) throw new Error('带对齐结果的读音不能直接拆分');
