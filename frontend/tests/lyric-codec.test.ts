@@ -65,7 +65,10 @@ describe('semantic TTML codec', () => {
     expect(document.lines[0].words.map((word) => word.romanization)).toEqual(['kyou', 'sora']);
     expect(document.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['きょ', 'う']);
     for (const draft of [true, false]) {
-      const reopened = parseLyricTtml(serializeLyricTtml(document, { draft }));
+      const output = serializeLyricTtml(document, { draft });
+      expect(output).toContain(`<iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal">`);
+      expect(output).toContain('itunes:key="L1"');
+      const reopened = parseLyricTtml(output);
       expect(reopened.lines[0].words.map((word) => word.romanization)).toEqual(['kyou', 'sora']);
     }
   });

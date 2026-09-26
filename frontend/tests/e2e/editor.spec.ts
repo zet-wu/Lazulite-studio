@@ -440,9 +440,18 @@ test('previews line romanization, generates timed Ruby, and undoes the batch', a
   await dialog.getByRole('button', { name: '应用（一次撤销）' }).click();
   await expect(page.locator('[data-line-id="L1"] [data-word-id]').first().getByRole('textbox', { name: '读音 今日' })).toHaveCount(2);
   await expect(page.getByRole('textbox', { name: '逐词音译 宇宙' })).toHaveValue('sora');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '最终 TTML' }).click();
+  const exported = await readFile(await (await download).path(), 'utf8');
+  expect(exported).toContain('transliterations');
+  expect(exported).toContain('>kyou</span>');
+  expect(exported).toContain('>sora</span>');
   await page.getByRole('button', { name: '撤销' }).click();
   await expect(page.locator('[data-line-id="L1"] [data-word-id]').first().getByRole('textbox', { name: '读音 今日' })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: '逐词音译 宇宙' })).toHaveValue('');
+  await page.locator('input[type="file"]').setInputFiles({ name: 'reopened.ttml', mimeType: 'application/xml', buffer: Buffer.from(exported) });
+  await expect(page.getByRole('textbox', { name: '逐词音译 宇宙' })).toHaveValue('sora');
+  await expect(page.locator('[data-line-id="L1"] [data-word-id]').first().getByRole('textbox', { name: '读音 今日' })).toHaveCount(2);
 });
 
 test('keeps IME composition active when Escape is pressed', async ({ page }) => {

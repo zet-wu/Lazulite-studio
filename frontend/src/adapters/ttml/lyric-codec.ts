@@ -344,7 +344,7 @@ function setTime(node: Element, begin: TimeUs, end: TimeUs, draft: boolean) {
 export function serializeLyricTtml(document: LyricDocument, options: { draft?: boolean } = {}): string {
   if (document.schemaVersion !== LYRIC_SCHEMA_VERSION) throw new Error('Unsupported lyric document schema');
   const draft = options.draft === true;
-  const xml = new DOMParser().parseFromString(`<tt xmlns="${TTML}" xmlns:tts="${TTS}" xmlns:ttm="${TTM}" xmlns:itunes="${ITUNES}" xmlns:amll="${AMLL}"${draft ? ` xmlns:studio="${STUDIO}"` : ''}><body/></tt>`, 'application/xml');
+  const xml = new DOMParser().parseFromString(`<tt xmlns="${TTML}" xmlns:tts="${TTS}" xmlns:ttm="${TTM}" xmlns:amll="${AMLL}"${draft ? ` xmlns:studio="${STUDIO}"` : ''}><body/></tt>`, 'application/xml');
   const root = xml.documentElement;
   if (document.language) root.setAttributeNS(XML, 'xml:lang', document.language);
   if (!draft && document.lines.some((line) => line.backgroundOf && line.words.some((word) => word.romanization))) {
@@ -363,11 +363,11 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       entry.setAttribute('value', value);
       metadataNode.appendChild(entry);
     }
-    const itunes = xml.createElementNS(ITUNES, 'itunes:iTunesMetadata');
+    const itunes = xml.createElementNS(ITUNES, 'iTunesMetadata');
     if (songwriters.length) {
-      const group = xml.createElementNS(ITUNES, 'itunes:songwriters');
+      const group = xml.createElementNS(ITUNES, 'songwriters');
       for (const value of songwriters) {
-        const writer = xml.createElementNS(ITUNES, 'itunes:songwriter');
+        const writer = xml.createElementNS(ITUNES, 'songwriter');
         writer.textContent = value;
         group.appendChild(writer);
       }
@@ -385,17 +385,17 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       metadataNode.appendChild(entry);
     }
     if (romanizedLines.length) {
-      const group = xml.createElementNS(ITUNES, 'itunes:transliterations');
-      const entry = xml.createElementNS(ITUNES, 'itunes:transliteration');
+      const group = xml.createElementNS(ITUNES, 'transliterations');
+      const entry = xml.createElementNS(ITUNES, 'transliteration');
       for (const line of romanizedLines) {
-        const textNode = xml.createElementNS(ITUNES, 'itunes:text');
+        const textNode = xml.createElementNS(ITUNES, 'text');
         textNode.setAttribute('for', line.id);
         for (const word of line.words) if (word.romanization) {
           if (word.beginUs === null || word.endUs === null) {
             if (draft) continue;
             throw new Error(`Word ${word.id} needs timing before final transliteration export`);
           }
-          const span = xml.createElementNS(ITUNES, 'itunes:span');
+          const span = xml.createElementNS(ITUNES, 'span');
           setTime(span, word.beginUs, word.endUs, draft);
           span.textContent = word.romanization;
           textNode.appendChild(span);
@@ -429,10 +429,14 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     if (!div || currentPart !== line.songPart) {
       currentPart = line.songPart;
       div = xml.createElementNS(TTML, 'div');
-      if (currentPart) div.setAttributeNS(ITUNES, 'itunes:songPart', currentPart);
+      if (currentPart) {
+        div.setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:itunes', ITUNES);
+        div.setAttributeNS(ITUNES, 'itunes:songPart', currentPart);
+      }
       body.appendChild(div);
     }
     const p = xml.createElementNS(TTML, 'p');
+    p.setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:itunes', ITUNES);
     p.setAttributeNS(XML, 'xml:id', line.id);
     p.setAttributeNS(ITUNES, 'itunes:key', line.id);
     setTime(p, line.beginUs, line.endUs, draft);
