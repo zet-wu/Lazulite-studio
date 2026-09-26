@@ -41,6 +41,7 @@ type Props = {
   onSelectLine?: (id: string) => void;
   onSelectUnit?: (lineId: string, wordId: string | null, rubyId: string | null) => void;
   transport?: RefObject<TransportHandle | null>;
+  embedded?: boolean;
 };
 
 type DragSource = { kind: 'line'; lineId: string } | { kind: 'word'; lineId: string; wordId: string };
@@ -339,7 +340,7 @@ export function EditorWorkspace(props: Props) {
     <DraftInput value={word.romanization} label={`逐词音译 ${word.text}`} placeholder="逐词音译" onCommit={(romanization) => dispatch({ type: 'set-word-romanization', lineId: line.id, wordId: word.id, romanization })} />
     <label className={styles.emptyBeat}>空拍 <input type="number" min="0" max="32" aria-label={`词 ${word.text}空拍数`} value={word.emptyBeat} onChange={(event) => dispatch({ type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: Number(event.target.value) })} /></label>
   </LyricWordView>;
-  return <div className={styles.page} onCopy={(event) => {
+  return <div className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`} onCopy={(event) => {
     if (isTextInput(event.target)) return;
     const item = copy();
     if (item) { event.clipboardData.setData('text/plain', item.text); event.clipboardData.setData(CLIPBOARD_MIME, clipboardToken.current); event.preventDefault(); }

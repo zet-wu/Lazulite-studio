@@ -47,6 +47,22 @@ test('advances the sync cursor through a project without moving the audio on und
   await expect(panel).toHaveCount(0);
 });
 
+test('records keyboard sync marks against one playing audio clock', async ({ page }) => {
+  const wav = await readFile('../frontend/tests/fixtures/editor-beats.wav');
+  await page.goto('/projects/sample-project/edit');
+  await page.locator('audio').evaluate((element, source) => { const audio = element as HTMLAudioElement; audio.src = `data:audio/wav;base64,${source}`; audio.load(); }, wav.toString('base64'));
+  await page.getByRole('button', { name: '播放', exact: true }).click();
+  await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '打轴', exact: true }).click();
+  await page.keyboard.press('s');
+  await page.waitForTimeout(120);
+  await page.keyboard.press('d');
+  await expect(page.getByRole('region', { name: '连续打轴' }).getByText('打轴 2/6')).toBeVisible();
+  const end = Number(await page.getByRole('textbox', { name: '词 夜の風が静かに吹く结束秒数' }).inputValue());
+  expect(end).toBeGreaterThan(0);
+  await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible();
+});
+
 test("shows empty, error, expired, and loading states and can recover", async ({
   page,
 }) => {

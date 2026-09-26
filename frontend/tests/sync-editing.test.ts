@@ -69,4 +69,23 @@ describe('E5 sync editing', () => {
     expect(serializeLyricTtml(state.present)).not.toContain('studio:');
     expect(undoLyricCommand(state).present).toBe(document);
   });
+
+  it('takes a short song through every Ruby and word and reopens the final TTML', () => {
+    const document = createLyricDocument('今日');
+    document.lines[0].words[0].rubyUnits = [
+      { id: 'r1', reading: 'きょ', beginUs: null, endUs: null },
+      { id: 'r2', reading: 'う', beginUs: null, endUs: null },
+    ];
+    document.lines.push(createLine('宇宙', 'second'));
+    const units = syncUnits(document);
+    let state = createLyricEditorState(document);
+    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[0], action: 'start', timeUs: 1_000_000 });
+    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[0], action: 'next', timeUs: 1_500_000 });
+    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[1], action: 'next', timeUs: 2_000_000 });
+    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[2], action: 'end', timeUs: 3_000_000 });
+    const reopened = parseLyricTtml(serializeLyricTtml(state.present));
+    expect(reopened.lines.map((line) => [line.beginUs, line.endUs])).toEqual([[1_000_000, 2_000_000], [2_000_000, 3_000_000]]);
+    expect(reopened.lines[0].words[0].rubyUnits.map((unit) => [unit.beginUs, unit.endUs])).toEqual([[1_000_000, 1_500_000], [1_500_000, 2_000_000]]);
+    expect(reopened.lines[1].words[0]).toMatchObject({ beginUs: 2_000_000, endUs: 3_000_000 });
+  });
 });

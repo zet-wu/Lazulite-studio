@@ -13,6 +13,7 @@ import { ReviewPanel } from './ReviewPanel';
 import { JobCandidatePanel } from './JobCandidatePanel';
 import { EditorWorkspace } from './editor/EditorWorkspace';
 import { useProjectDocument } from './useProjectDocument';
+import styles from './workspace.module.css';
 
 function download(xml: string, name: string) {
   const url = URL.createObjectURL(new Blob([xml], { type: 'application/ttml+xml' }));
@@ -84,7 +85,7 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     <button onClick={() => { if (editor.dirty || editor.conflict || editor.saving) setMessage('请先保存后发布'); else navigate(`/projects/${projectId}/export`); }}>发布与下载</button>
     <p>{line ? `当前行：${lineText(line)}` : '无歌词行'}</p>
   </div>;
-  return <><EditorWorkspace title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
+  return <div className={styles.editorShell}><EditorWorkspace embedded title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
     onSave={() => void editor.save()} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} auxiliary={auxiliary}
     selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { setSelectedLineId(id); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
@@ -95,5 +96,5 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
       onPosition={(positionUs) => {
         const active = editor.document.lines.find((item) => !item.backgroundOf && item.beginUs !== null && item.endUs !== null && item.beginUs <= positionUs && positionUs < item.endUs)?.id ?? null;
         setPlayheadLineId((current) => current === active ? current : active);
-      }} /></>;
+      }} /></div>;
 }
