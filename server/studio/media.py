@@ -164,6 +164,20 @@ class MediaService:
             duration_us = round(audio.getnframes() * 1_000_000 / audio.getframerate())
         return Proxy(target, "audio/wav", asset.probe.start_us, 0, duration_us)
 
+    def pcm_window(self, asset: Asset, *, start_us: int, end_us: int) -> tuple[bytes, int, int]:
+        """Read at most four seconds from the existing PCM proxy for viewport analysis."""
+        if start_us < 0 or end_us <= start_us or end_us - start_us > 4_000_000:
+            raise MediaError("invalid PCM window")
+        proxy = self.playback_proxy(asset)
+        with wave.open(str(proxy.path), "rb") as audio:
+            rate = audio.getframerate()
+            first = round(start_us * rate / 1_000_000)
+            last = min(audio.getnframes(), round(end_us * rate / 1_000_000))
+            if first >= last:
+                raise MediaError("PCM window is outside the audio")
+            audio.setpos(first)
+            return audio.readframes(last - first), rate, audio.getnchannels()
+
     def peaks(self, asset: Asset, *, level: int, start_us: int, end_us: int) -> PeakWindow:
         if level < 0 or level > 15 or end_us <= start_us:
             raise MediaError("invalid waveform window")

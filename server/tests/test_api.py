@@ -144,6 +144,10 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
     assert lyrics.status_code == 200 and lyrics.headers["etag"] == f'"{revision}"'
     audio = client.get(f"/api/v1/projects/{pid}/audio", headers={"range": "bytes=0-9"})
     assert audio.status_code == 206 and len(audio.content) == 10
+    pcm = client.get(f"/api/v1/projects/{pid}/pcm?start_us=0&end_us=500000")
+    assert pcm.status_code == 200 and pcm.headers["x-sample-rate"] == "48000"
+    assert pcm.headers["x-channels"] == "2" and len(pcm.content) == 96_000
+    assert client.get(f"/api/v1/projects/{pid}/pcm?start_us=0&end_us=5000000").status_code == 422
     assert (
         client.get(
             f"/api/v1/projects/{pid}/audio", headers={"range": "bytes=-10"}

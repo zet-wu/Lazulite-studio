@@ -463,6 +463,17 @@ def create_app(
             "maximum": peaks.maximum,
         }
 
+    @api.get("/projects/{pid}/pcm")
+    def pcm_window(pid: str, start_us: int, end_us: int, _: object = Depends(auth)):
+        _, row = asset_for(pid)
+        if not row:
+            fail("audio_not_found", "audio not found", 404)
+        try:
+            data, rate, channels = media.pcm_window(asset_model(row), start_us=start_us, end_us=end_us)
+        except MediaError as exc:
+            fail("pcm_invalid", str(exc), 422)
+        return Response(data, media_type="application/octet-stream", headers={"X-Sample-Rate": str(rate), "X-Channels": str(channels), "Cache-Control": "private, max-age=60"})
+
     def job_project_exists(pid):
         try:
             project(pid)
