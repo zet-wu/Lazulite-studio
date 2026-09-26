@@ -1,6 +1,6 @@
 # 歌词编辑器重构与 AMLL TTML Tool 对齐计划
 
-日期：2026-09-26。状态：E0–E6 已实施；E6 的长音频帧率和跨行轨道框选仍需实测，E7 待实施。下文“当前实现与限制”表保留计划制定时的 `2ff3b2c` 基线；进度以[E0–E1 验收](editor-e0-e1-acceptance.md)、[E2 验收](editor-e2-acceptance.md)、[E3 验收](editor-e3-acceptance.md)、[E4 验收](editor-e4-acceptance.md)、[E5 验收](editor-e5-acceptance.md)、[E6 验收](editor-e6-acceptance.md)和[对齐矩阵](editor-parity.md)为准。
+日期：2026-09-26。状态：E0–E7 已实施；未完成的逐项证据和真实长媒体性能限制见验收记录。下文“当前实现与限制”表保留计划制定时的 `2ff3b2c` 基线；进度以[E0–E1 验收](editor-e0-e1-acceptance.md)、[E2 验收](editor-e2-acceptance.md)、[E3 验收](editor-e3-acceptance.md)、[E4 验收](editor-e4-acceptance.md)、[E5 验收](editor-e5-acceptance.md)、[E6 验收](editor-e6-acceptance.md)、[E7 验收](editor-e7-acceptance.md)和[对齐矩阵](editor-parity.md)为准。
 
 ## 1. 目标与基线
 

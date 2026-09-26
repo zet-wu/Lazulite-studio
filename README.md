@@ -6,7 +6,7 @@
 
 ## 设计入口
 
-当前歌词编辑器已完成 E0–E3：参考基线、语义词块文档、直接编辑画布、分词与时间批处理。执行入口为[歌词编辑器实施计划](docs/lyric-editor-implementation-plan.md)，逐项进展和实测证据见[对齐清单](docs/editor-parity.md)，开发约定见 [AGENTS.md](AGENTS.md)。E4 的完整 Ruby 工作流和后续打轴、时间轴、预览仍按计划推进。
+当前歌词编辑器已实施 E0–E7：词块/Ruby、分词、连续打轴、时间轴、频谱/BPM、AMLL 预览和多格式文件菜单。执行入口为[歌词编辑器实施计划](docs/lyric-editor-implementation-plan.md)，逐项进展和未完成的外部验证见[对齐清单](docs/editor-parity.md)与[E7 验收](docs/editor-e7-acceptance.md)，开发约定见 [AGENTS.md](AGENTS.md)。
 
 - [前端架构](../lyric-workflow/docs/lazulite_studio_frontend_architecture.md)：技术选择、工作区、富歌词模型、状态与 TTML 保真。
 - [服务契约草案](../lyric-workflow/docs/lazulite_studio_service_contract.md)：项目、媒体、保存版本、任务与 SSE。
@@ -24,6 +24,6 @@
 | [server](server/README.md) | FastAPI 会话、项目、修订存储与媒体服务 |
 | [docs](docs/README.md) | 架构约束和设计索引 |
 
-TTML 承载歌词权威内容，项目数据库承载工作流，浏览器持有未保存工作副本。Lazulite 的行级模型只用于自动化；AMLL 动态预览尚未接入，下一阶段作为单向预览适配目标。默认部署方向为 GPU 主机提供静态前端和同源 API，浏览器无需安装模型。
+TTML 承载歌词权威内容，项目数据库承载工作流，浏览器持有未保存工作副本。Lazulite 的行级模型只用于自动化；AMLL 只读取当前歌词草稿用于动态预览，不改写权威文档。默认部署方向为 GPU 主机提供静态前端和同源 API，浏览器无需安装模型。
 
 启动与验证命令见 [前端说明](frontend/README.md) 和 [服务端说明](server/README.md)。模拟模式只使用合成数据，不连接 Lazulite 引擎；默认启动模式请求同源 API。

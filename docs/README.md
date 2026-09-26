@@ -1,6 +1,6 @@
 # 设计索引
 
-下一阶段执行入口：[歌词编辑器重构与 AMLL TTML Tool 对齐计划](lyric-editor-implementation-plan.md)（2026-09-25，待实施）。编辑器布局、模型与旧数据兼容策略以该计划及根目录 [AGENTS.md](../AGENTS.md) 为准；以下 S1–S7 文档保留为历史记录。
+编辑器执行入口：[歌词编辑器重构与 AMLL TTML Tool 对齐计划](lyric-editor-implementation-plan.md)；E0–E7 的操作证据与仍需外部验证的差异见[E7 验收](editor-e7-acceptance.md)和[对齐矩阵](editor-parity.md)。编辑器布局、模型与旧数据兼容策略以计划及根目录 [AGENTS.md](../AGENTS.md) 为准；以下 S1–S7 文档保留为历史记录。
 
 本仓库维护新编辑器计划与各阶段验收；并列工作流仓库维护总体衔接与现状摘要：
 

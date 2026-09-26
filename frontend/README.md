@@ -1,6 +1,6 @@
 # Frontend
 
-当前状态（2026-09-26）：项目工作区与本地 `/editor` 共用语义词块画布。E0–E3 已覆盖直接行词编辑、Ruby 基础字段、分词和时间批处理；连续打轴、可编辑时间轴和动态预览仍待 E4–E7。[编辑器计划](../docs/lyric-editor-implementation-plan.md)和[E3 验收](../docs/editor-e3-acceptance.md)记录进度与边界。
+当前状态（2026-09-26）：项目工作区与本地 `/editor` 共用语义词块画布，E0–E7 覆盖 Ruby、分词、连续打轴、可编辑时间轴、按需频谱、BPM、AMLL 预览和多格式文件菜单。[编辑器计划](../docs/lyric-editor-implementation-plan.md)与[E7 验收](../docs/editor-e7-acceptance.md)记录实际边界。
 
 采用 React + TypeScript + Vite、React Router、TanStack Query、CSS Modules。S3 接入真实项目服务、上传与媒体播放；显式启用的 MSW 保留 S1 模拟场景。`/editor` 继续提供独立的本地 TTML 编辑入口。
 
@@ -26,7 +26,7 @@ npx pnpm@10.30.3 dev:mock
 
 打开终端输出的本地地址，默认路由为 `/projects`。直接工作区入口为 `/projects/sample-project/edit`。`?scenario=empty`、`?scenario=error`、`?scenario=expired`、`?scenario=loading` 分别用于空库、服务失败、会话过期和加载状态；移除参数恢复正常演示。
 
-本地文件入口为 `/editor`，可在 `dev` 模式下使用，不需要 API 会话。两个入口使用同一词块画布与命令；编辑 Ribbon 的“分词…”提供手动边界、自动和高级规则，“批处理…”提供替换、时间偏移、CJK 边界平滑、行时间同步和行尾链接。每次应用是一次撤销，未定时间保留为未定。两入口的区别仅在加载、保存和项目辅助功能。
+本地文件入口为 `/editor`，可在 `dev` 模式下使用，不需要 API 会话。两个入口使用同一词块画布与命令；编辑 Ribbon 的“分词…”提供手动边界、自动和高级规则，“批处理…”提供替换、时间偏移、CJK 边界平滑、行时间同步和行尾链接。模式栏切换编辑、打轴和预览，主题按钮切换明暗。本地和项目均可导入 TTML、文本、LRC、ESLRC、QRC、YRC、LYS；可导出这些格式及 ASS。低表达力格式不保留 Ruby，需保真交换时使用 TTML。
 
 本地检查点与服务器修订分开：S2 实施范围及当前检查进度见 [实施记录](../docs/s2-implementation.md)。草稿使用 Studio 命名空间标记未定时间，最终 TTML 需通过完整时间与 profile 检查。
 

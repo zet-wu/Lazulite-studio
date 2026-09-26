@@ -6,12 +6,16 @@
 
 | 包 | 版本 | 许可 |
 | --- | --- | --- |
+| @applemusic-like-lyrics/core | 0.5.2 | AGPL-3.0-only |
+| @applemusic-like-lyrics/react | 0.5.2 | AGPL-3.0-only |
+| @applemusic-like-lyrics/lyric | 1.0.2 | AGPL-3.0-only |
 | @tanstack/react-query | 5.85.5 | MIT |
 | @tanstack/react-virtual | 3.14.13 | MIT |
 | hyphen | 1.14.1 | ISC |
 | react | 19.1.1 | MIT |
 | react-dom | 19.1.1 | MIT |
 | react-router-dom | 7.8.2 | MIT |
+| wanakana | 5.3.1 | MIT |
 
 ## 开发工具
 
@@ -33,7 +37,7 @@
 | vite | 7.1.3 | MIT |
 | vitest | 3.2.4 | MIT |
 
-AMLL TTML Tool 仅作为布局与交互参考，本次未复制其源代码、字体和资源，也未引入 AMLL npm 包。引入预览适配器时再核验具体包版本、许可和表现能力。
+AMLL TTML Tool 仍作为布局与交互参考；E7 为动态预览和多格式解析直接引入上述三个 AMLL 包。其 AGPL-3.0-only 许可已随包提供，后续分发和部署安排需要据此核对项目许可义务；未复制参考工具源码、字体和资源。
 
 ## S3 Python 服务与工具
 
