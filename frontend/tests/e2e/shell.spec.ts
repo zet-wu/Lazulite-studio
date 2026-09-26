@@ -116,6 +116,36 @@ test('renders the current draft in AMLL preview and returns to editing', async (
   expect(errors).toEqual([]);
 });
 
+test('previews Ruby, translation and background from a rich draft', async ({ page }) => {
+  const source = await readFile('../docs/evidence/editor-e0/reference-apple-metadata.ttml');
+  const wav = await readFile('../frontend/tests/fixtures/editor-beats.wav');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/projects/sample-project/edit');
+  await page.locator('audio').evaluate((element, source) => { const audio = element as HTMLAudioElement; audio.src = `data:audio/wav;base64,${source}`; audio.load(); }, wav.toString('base64'));
+  await page.locator('input[type="file"]').first().setInputFiles({ name: 'rich.ttml', mimeType: 'application/xml', buffer: source });
+  await expect(page.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '预览', exact: true }).click();
+  await expect(page.getByRole('region', { name: '动态歌词预览' })).toBeVisible();
+  await expect(page.getByText('今天 也唱歌')).toBeVisible();
+  await expect(page.getByText('響く')).toBeVisible();
+  await expect(page.getByRole('region', { name: '动态歌词预览' }).getByText('きょ')).toBeVisible();
+  await page.getByRole('region', { name: '动态歌词预览' }).getByText('今日').click();
+  await expect(page.getByRole('slider', { name: '波形进度' })).toHaveAttribute('aria-valuenow', '1');
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: '../docs/evidence/editor-e7/studio-preview-rich-1440.png', fullPage: true });
+  await page.getByRole('button', { name: '编辑', exact: true }).click();
+  const ruby = page.getByRole('textbox', { name: '读音 今日', exact: true }).first();
+  await ruby.fill('きよう'); await ruby.blur();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByText('已保存', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Lazulite Studio' }).click();
+  await page.getByRole('link', { name: /星の手紙/ }).click();
+  await expect(page.getByRole('textbox', { name: '读音 今日', exact: true }).first()).toHaveValue('きよう');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '最终 TTML' }).click();
+  expect(await readFile(await (await download).path(), 'utf8')).toContain('きよう');
+});
+
 test("shows empty, error, expired, and loading states and can recover", async ({
   page,
 }) => {

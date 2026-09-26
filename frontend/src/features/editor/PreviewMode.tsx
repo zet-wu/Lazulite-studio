@@ -46,9 +46,10 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
       <LyricPlayer ref={player} lyricLines={lyricLines} currentTime={transport ? undefined : localTime}
         playing={transport ? playing : false} hidePassedLines={hidePassed} wordFadeWidth={fadeWidth}
         onLyricLineClick={(event) => {
-          const startTime = event.line.getLine().startTime;
-          const matched = lines.find((line) => line.lyric.startTime === startTime);
-          if (matched) onSelectLine?.(matched.id);
+          const matched = lines[event.lineIndex];
+          if (!matched) return;
+          const startTime = matched.lyric.startTime;
+          onSelectLine?.(matched.id);
           if (transport) transport.current?.seekUs(startTime * 1000);
           else setLocalTime(startTime);
         }} />
