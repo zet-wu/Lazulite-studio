@@ -64,7 +64,7 @@ function checkAttributes(node: Element, allowed: string[]) {
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'role') continue;
     if (attribute.namespaceURI === ITUNES && ['key', 'timing', 'songPart'].includes(attribute.localName)) continue;
-    if (attribute.namespaceURI === STUDIO && ['id', 'null', 'alignments'].includes(attribute.localName)) continue;
+    if (attribute.namespaceURI === STUDIO && ['id', 'null', 'alignments', 'endLink'].includes(attribute.localName)) continue;
     throw new Error(`Unsupported TTML attribute ${attribute.name} on <${node.localName}>`);
   }
 }
@@ -82,6 +82,16 @@ function readAlignments(node: Element): AlignmentUnit[] {
     && (item.readingEnd === null || Number.isSafeInteger(item.readingEnd) && item.readingEnd >= 0)
     && (item.rubyUnitId === null || typeof item.rubyUnitId === 'string'))) throw new Error('Invalid draft word alignments');
   return value as AlignmentUnit[];
+}
+
+function readEndLink(node: Element): LyricLine['endLink'] {
+  const raw = attr(node, STUDIO, 'endLink');
+  if (raw === null) return null;
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { throw new Error('Invalid draft line end link'); }
+  if (!value || typeof value !== 'object' || typeof (value as { targetLineId?: unknown }).targetLineId !== 'string' ||
+    !((value as { originalEndUs?: unknown }).originalEndUs === null || Number.isSafeInteger((value as { originalEndUs?: unknown }).originalEndUs) && Number((value as { originalEndUs?: unknown }).originalEndUs) >= 0)) throw new Error('Invalid draft line end link');
+  return value as LyricLine['endLink'];
 }
 
 function makeWord(node: Node, lineId: string, index: number, lineStart: number, lineEnd: TimeUs): LyricWord | null {
@@ -264,7 +274,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
       }
       const agentRefs = (attr(child, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
       if (agentRefs.some((ref) => !agents.some((agent) => agent.id === ref))) throw new Error(`Unknown agent on line ${id}`);
-      lines.push({ id, words, beginUs, endUs, agentRefs, backgroundOf: null, songPart: part, duet: agentRefs.includes('v2'), translations, romanizations, ignoreSync: false });
+      lines.push({ id, words, beginUs, endUs, endLink: readEndLink(child), agentRefs, backgroundOf: null, songPart: part, duet: agentRefs.includes('v2'), translations, romanizations, ignoreSync: false });
       if (background) {
         checkAttributes(background, ['begin', 'end', 'dur']);
         const [bgBegin, bgEnd] = boundaries(background, wordStart, endUs);
@@ -276,12 +286,16 @@ export function parseLyricTtml(xml: string): LyricDocument {
           const last = bgWords.length - 1;
           bgWords[last] = { ...bgWords[last], text: bgWords[last].text.replace(/\)$/, '') };
         }
-        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin ?? (bgWords.every((word) => word.beginUs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginUs!)) : null), endUs: bgEnd ?? (bgWords.every((word) => word.endUs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endUs!)) : null), agentRefs, backgroundOf: id, songPart: part, duet: agentRefs.includes('v2'), translations: [], romanizations: [], ignoreSync: false });
+        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin ?? (bgWords.every((word) => word.beginUs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginUs!)) : null), endUs: bgEnd ?? (bgWords.every((word) => word.endUs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endUs!)) : null), endLink: null, agentRefs, backgroundOf: id, songPart: part, duet: agentRefs.includes('v2'), translations: [], romanizations: [], ignoreSync: false });
       }
     }
   };
   visit(body, rootStart, null, 1, null);
   if (new Set(lines.map((line) => line.id)).size !== lines.length) throw new Error('Duplicate line id');
+  for (const line of lines) if (line.endLink) {
+    const target = lines.find((item) => item.id === line.endLink!.targetLineId);
+    if (!target || target.backgroundOf || target.beginUs === null || line.endUs !== target.beginUs) throw new Error(`Invalid draft end link on line ${line.id}`);
+  }
   for (const [id, content] of appleSubLyrics) {
     const line = lines.find((item) => item.id === id && !item.backgroundOf);
     if (!line) throw new Error(`iTunes sublyric refers to unknown line ${id}`);
@@ -371,6 +385,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     p.setAttributeNS(XML, 'xml:id', line.id);
     p.setAttributeNS(ITUNES, 'itunes:key', line.id);
     setTime(p, line.beginUs, line.endUs, draft);
+    if (draft && line.endLink) p.setAttributeNS(STUDIO, 'studio:endLink', JSON.stringify(line.endLink));
     if (line.agentRefs.length) p.setAttributeNS(TTM, 'ttm:agent', line.agentRefs.join(' '));
     const appendWord = (parent: Element, word: LyricWord, text: string) => {
       if (word.romanization || word.obscene || word.emptyBeat) throw new Error(`Word ${word.id} has fields not yet mapped to TTML`);

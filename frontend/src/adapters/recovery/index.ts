@@ -3,7 +3,7 @@ import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-doc
 
 const DATABASE = 'lazulite-studio-recovery-v3';
 const STORE = 'projects';
-const RECORD_VERSION = 3;
+const RECORD_VERSION = 4;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {

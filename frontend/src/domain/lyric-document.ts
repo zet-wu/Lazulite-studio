@@ -1,5 +1,5 @@
 /** The semantic editor document. Transport, XML trees and playback stay outside it. */
-export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v3' as const;
+export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v4' as const;
 
 export type TimeUs = number | null;
 
@@ -40,6 +40,7 @@ export type LyricLine = {
   words: LyricWord[];
   beginUs: TimeUs;
   endUs: TimeUs;
+  endLink: { targetLineId: string; originalEndUs: TimeUs } | null;
   agentRefs: string[];
   backgroundOf: string | null;
   songPart: string | null;
@@ -73,7 +74,7 @@ export function createWord(text: string, id: string = crypto.randomUUID()): Lyri
 export function createLine(text: string, id: string = `line-${crypto.randomUUID()}`): LyricLine {
   return {
     id, words: text ? [createWord(text, `${id}:word:0`)] : [],
-    beginUs: null, endUs: null, agentRefs: [], backgroundOf: null, songPart: null,
+    beginUs: null, endUs: null, endLink: null, agentRefs: [], backgroundOf: null, songPart: null,
     duet: false, translations: [], romanizations: [], ignoreSync: false,
   };
 }

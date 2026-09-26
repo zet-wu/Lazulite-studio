@@ -15,6 +15,8 @@ type AtomicLyricCommand =
   | { type: 'merge-words'; lineId: string; firstWordId: string; secondWordId: string }
   | { type: 'move-word'; lineId: string; wordId: string; toLineId: string; afterWordId: string | null }
   | { type: 'set-line-time'; lineId: string; beginUs: TimeUs; endUs: TimeUs }
+  | { type: 'link-line-end'; lineId: string; targetLineId: string }
+  | { type: 'unlink-line-end'; lineId: string }
   | { type: 'set-line-agents'; lineId: string; agentRefs: string[] }
   | { type: 'set-duet'; lineId: string; duet: boolean }
   | { type: 'set-sublyrics'; lineId: string; kind: 'translations' | 'romanizations'; items: SubLyric[] }
@@ -121,7 +123,13 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     }
     case 'delete-line': {
       lineIndex(document, command.lineId);
-      const lines = document.lines.filter((line) => line.id !== command.lineId && line.backgroundOf !== command.lineId);
+      const removed = new Set(document.lines.filter((line) => line.id === command.lineId || line.backgroundOf === command.lineId).map((line) => line.id));
+      const lines = document.lines.filter((line) => !removed.has(line.id)).map((line) => {
+        if (!line.endLink || !removed.has(line.endLink.targetLineId)) return line;
+        const endUs = line.endLink.originalEndUs;
+        if (endUs !== null && line.words.some((word) => word.endUs !== null && word.endUs > endUs)) throw new Error('Cannot remove linked target: original line end excludes a word');
+        return { ...line, endUs, endLink: null };
+      });
       return { ...document, lines };
     }
     case 'move-line': {
@@ -217,7 +225,38 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (line.words.some((word) => command.beginUs !== null && word.beginUs !== null && word.beginUs < command.beginUs || command.endUs !== null && word.endUs !== null && word.endUs > command.endUs)) throw new Error('Line time cannot exclude a word');
       if (line.beginUs === command.beginUs && line.endUs === command.endUs) return document;
       const lines = document.lines.slice();
-      lines[index] = { ...line, beginUs: command.beginUs, endUs: command.endUs };
+      lines[index] = { ...line, beginUs: command.beginUs, endUs: command.endUs, endLink: line.endUs === command.endUs ? line.endLink : null };
+      for (let linkedIndex = 0; linkedIndex < lines.length; linkedIndex++) {
+        const linked = lines[linkedIndex];
+        if (linked.endLink?.targetLineId !== line.id) continue;
+        const linkedEnd = command.beginUs;
+        if (linkedEnd === null || linked.words.some((word) => word.endUs !== null && word.endUs > linkedEnd)) throw new Error('Linked line end cannot precede its words');
+        validTime(linked.beginUs, linkedEnd);
+        lines[linkedIndex] = { ...linked, endUs: linkedEnd };
+      }
+      return { ...document, lines };
+    }
+    case 'link-line-end': {
+      const index = lineIndex(document, command.lineId);
+      const target = document.lines[lineIndex(document, command.targetLineId)];
+      const line = document.lines[index];
+      if (line.id === target.id || line.backgroundOf || target.backgroundOf || target.beginUs === null) throw new Error('只能链接到其他已定开始时间的主唱行');
+      const targetBegin = target.beginUs;
+      if (line.words.some((word) => word.endUs !== null && word.endUs > targetBegin)) throw new Error('目标行开始时间早于当前词结束时间');
+      validTime(line.beginUs, targetBegin);
+      if (line.endLink?.targetLineId === target.id) return document;
+      const lines = document.lines.slice();
+      lines[index] = { ...line, endUs: targetBegin, endLink: { targetLineId: target.id, originalEndUs: line.endLink?.originalEndUs ?? line.endUs } };
+      return { ...document, lines };
+    }
+    case 'unlink-line-end': {
+      const index = lineIndex(document, command.lineId);
+      const line = document.lines[index];
+      if (!line.endLink) return document;
+      const endUs = line.endLink.originalEndUs;
+      if (endUs !== null && line.words.some((word) => word.endUs !== null && word.endUs > endUs)) throw new Error('原结束时间早于当前词结束时间');
+      const lines = document.lines.slice();
+      lines[index] = { ...line, endUs, endLink: null };
       return { ...document, lines };
     }
     case 'set-line-agents': {
