@@ -292,6 +292,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/pcm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPcmWindow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{projectId}/publish": {
         parameters: {
             query?: never;
@@ -1362,6 +1378,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WaveformWindow"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getPcmWindow: {
+        parameters: {
+            query: {
+                start_us: number;
+                /** @description Exclusive end, at most 4 seconds after start_us */
+                end_us: number;
+            };
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Interleaved 16-bit PCM samples from the playback proxy */
+            200: {
+                headers: {
+                    "X-Sample-Rate"?: number;
+                    "X-Channels"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
                 };
             };
             default: components["responses"]["Error"];

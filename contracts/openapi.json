@@ -412,6 +412,27 @@
         }
       }
     },
+    "/projects/{projectId}/pcm": {
+      "get": {
+        "operationId": "getPcmWindow",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "name": "start_us", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 0 } },
+          { "name": "end_us", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 }, "description": "Exclusive end, at most 4 seconds after start_us" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Interleaved 16-bit PCM samples from the playback proxy",
+            "headers": {
+              "X-Sample-Rate": { "schema": { "type": "integer", "minimum": 1000 } },
+              "X-Channels": { "schema": { "type": "integer", "minimum": 1 } }
+            },
+            "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "default": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/projects/{projectId}/publish": {
       "post": {
         "operationId": "publishProject",

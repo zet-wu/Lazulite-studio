@@ -12,6 +12,7 @@ const timed = (begin: number | null, end: number | null): begin is number => beg
 export function TimelineTracks({ document, selectedLineId, startUs, endUs, positionUs, bpm, snap, apply, onSelectLine, onError }: Props) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
+  const [selectedLines, setSelectedLines] = useState<string[]>([]);
   const dragRef = useRef<Drag | null>(null);
   const spanUs = Math.max(1, endUs - startUs);
   const line = document.lines.find((item) => item.id === selectedLineId && !item.backgroundOf) ?? document.lines.find((item) => !item.backgroundOf);
@@ -35,6 +36,14 @@ export function TimelineTracks({ document, selectedLineId, startUs, endUs, posit
   const pct = (timeUs: number) => `${((timeUs - startUs) / spanUs) * 100}%`;
   const begin = (event: PointerEvent<HTMLElement>, target: TimelineTarget | null, side: Drag['side'], originalUs: number) => {
     event.preventDefault(); event.stopPropagation();
+    if (target?.kind === 'line' && (event.shiftKey || event.ctrlKey || event.metaKey)) {
+      const ids = document.lines.filter((item) => !item.backgroundOf).map((item) => item.id);
+      const candidate = selectedLines.at(-1) ?? selectedLineId;
+      const anchor = candidate && ids.includes(candidate) ? candidate : target.lineId;
+      const first = ids.indexOf(anchor), last = ids.indexOf(target.lineId);
+      setSelectedLines(event.shiftKey ? ids.slice(Math.min(first, last), Math.max(first, last) + 1) : selectedLines.includes(target.lineId) ? selectedLines.filter((id) => id !== target.lineId) : [...selectedLines, target.lineId]);
+      return;
+    }
     const lane = event.currentTarget.closest('[data-track-lane]') as HTMLElement;
     const next = { target, side, x: event.clientX, current: event.clientX, width: lane.getBoundingClientRect().width, originalUs };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -56,7 +65,7 @@ export function TimelineTracks({ document, selectedLineId, startUs, endUs, posit
       return;
     }
     if (!current.target || Math.abs(current.current - current.x) < 3) {
-      if (current.target?.kind === 'line') onSelectLine(current.target.lineId);
+      if (current.target?.kind === 'line') { setSelectedLines([current.target.lineId]); onSelectLine(current.target.lineId); }
       else if (current.target?.kind === 'word') setSelectedWords([current.target.wordId]);
       return;
     }
@@ -65,7 +74,7 @@ export function TimelineTracks({ document, selectedLineId, startUs, endUs, posit
     const timeUs = snap ? snapTime(proposed, anchors.filter((value) => value !== current.originalUs), spanUs * 8 / current.width) : proposed;
     try {
       const changed = current.side === 'move'
-        ? moveTimeline(document, target.kind === 'word' && selectedWords.includes(target.wordId) ? selectedWords.map((wordId) => ({ kind: 'word' as const, lineId: target.lineId, wordId })) : [target], timeUs - current.originalUs)
+        ? moveTimeline(document, target.kind === 'word' && selectedWords.includes(target.wordId) ? selectedWords.map((wordId) => ({ kind: 'word' as const, lineId: target.lineId, wordId })) : target.kind === 'line' && selectedLines.includes(target.lineId) ? selectedLines.map((lineId) => ({ kind: 'line' as const, lineId })) : [target], timeUs - current.originalUs)
         : resizeTimeline(document, target, current.side, timeUs);
       apply({ type: 'replace-document', document: changed }); onError('');
     } catch (cause) { onError(cause instanceof Error ? cause.message : '时间轴编辑失败'); }
@@ -93,7 +102,7 @@ export function TimelineTracks({ document, selectedLineId, startUs, endUs, posit
     } catch (cause) { onError(cause instanceof Error ? cause.message : '无法闭合空隙'); }
   };
   return <div className={styles.tracks} aria-label="可编辑时间轴">
-    {row('行', overview.map((item) => bar({ kind: 'line', lineId: item.id }, `时间轴行 ${item.id}`, item.beginUs!, item.endUs!, item.id === line?.id)))}
+    {row('行', overview.map((item) => bar({ kind: 'line', lineId: item.id }, `时间轴行 ${item.id}`, item.beginUs!, item.endUs!, selectedLines.includes(item.id) || item.id === line?.id)))}
     {line && row('词', words.map((word) => bar({ kind: 'word', lineId: line.id, wordId: word.id }, `时间轴词 ${word.text}`, word.beginUs!, word.endUs!, selectedWords.includes(word.id))), true)}
     {line && row('Ruby', rubies.map(({ word, unit }) => bar({ kind: 'ruby', lineId: line.id, wordId: word.id, rubyId: unit.id }, `时间轴Ruby ${unit.reading}`, unit.beginUs!, unit.endUs!)))}
     {line && row('空隙', gaps.map(({ left, right, beginUs, endUs, overlap }) => <button key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`}

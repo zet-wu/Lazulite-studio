@@ -1,6 +1,6 @@
 # Contracts：前后端协议
 
-[openapi.json](openapi.json) 已覆盖会话、能力、项目、上传、文档 GET/PUT、导入、歌词下载、媒体、任务/SSE、读音词典、发布及成品下载。文档接口承载带 revision 的 TTML envelope，不再是 S1 的只读行摘要。
+[openapi.json](openapi.json) 已覆盖会话、能力、项目、上传、文档 GET/PUT、导入、歌词下载、媒体播放、波形和 PCM 片段、任务/SSE、读音词典、发布及成品下载。文档接口承载带 revision 的 TTML envelope，不再是 S1 的只读行摘要。
 
 前端在 `frontend/` 执行：
 

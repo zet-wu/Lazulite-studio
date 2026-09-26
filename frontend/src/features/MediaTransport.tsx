@@ -431,8 +431,9 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const beatUs = 60_000_000 / bpm;
   const firstBeat = Math.ceil(startUs / beatUs);
   const beatCount = bpm > 0 && endUs > startUs ? Math.max(0, Math.min(500, Math.floor((endUs - firstBeat * beatUs) / beatUs) + 1)) : 0;
-  const tickStep = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((value) => span / value <= 12) ?? 600;
-  const ticks = span > 0 ? Array.from({ length: Math.min(13, Math.floor(end / tickStep) - Math.ceil(start / tickStep) + 1) }, (_, index) => (Math.ceil(start / tickStep) + index) * tickStep) : [];
+  const maxTicks = Math.max(2, Math.floor(width / 82));
+  const tickStep = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((value) => span / value <= maxTicks) ?? 600;
+  const ticks = span > 0 ? Array.from({ length: Math.min(maxTicks + 1, Math.max(0, Math.floor(end / tickStep) - Math.ceil(start / tickStep) + 1)) }, (_, index) => (Math.ceil(start / tickStep) + index) * tickStep) : [];
   return (
     <footer className={styles.footer} onKeyDown={keyDown}>
       <audio
@@ -483,7 +484,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           onClick={disabled ? undefined : seekClick}
         />
         <span ref={head} className={styles.head} />
-        {snap && Array.from({ length: beatCount }, (_, index) => <span key={index} className={styles.beatLine} style={{ left: `${((firstBeat + index) * beatUs - startUs) / (endUs - startUs) * 100}%` }} />)}
+        {snap && span <= 30 && Array.from({ length: beatCount }, (_, index) => <span key={index} className={styles.beatLine} style={{ left: `${((firstBeat + index) * beatUs - startUs) / (endUs - startUs) * 100}%` }} />)}
         {bandA != null && bandB != null && bandB > bandA && (
           <span
             className={styles.band}
@@ -496,7 +497,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       </div>
       {document && onTimelineCommand && onSelectLine && <>
         <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
-          <button onClick={tapBpm}>Tap</button><button disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label><small>{bpmStatus || '拖动色块移动；拖边界调整；在词轨空白处拖出选区。空隙可点击闭合。'}</small></div>
+          <button onClick={tapBpm}>Tap</button><button disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label><small>{bpmStatus || '拖动色块调整；Shift 点击行块选范围并成组移动；词轨空白可框选。'}</small></div>
         <TimelineTracks document={document} selectedLineId={selectedLineId ?? null} startUs={startUs} endUs={endUs} positionUs={Math.round(position * 1e6)} bpm={bpm} snap={snap}
           apply={onTimelineCommand} onSelectLine={onSelectLine} onError={setError} />
       </>}
