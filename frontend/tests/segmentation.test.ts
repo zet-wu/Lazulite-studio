@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createLyricDocument, lineText } from '../src/domain/lyric-document';
+import { createLine, createLyricDocument, createWord, lineText } from '../src/domain/lyric-document';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, loadSyllableDivider, segmentText, segmentationPreview } from '../src/domain/segmentation';
 
@@ -36,6 +36,18 @@ describe('E3 segmentation', () => {
     expect(undoLyricCommand(state).present).toBe(document);
   });
 
+  it('keeps known endpoints on a partly untimed word and preserves repeated spaces', () => {
+    const document = createLyricDocument('a  b');
+    const word = document.lines[0].words[0];
+    word.beginUs = 500_000;
+    const parts = segmentText(word.text, { ...DEFAULT_SEGMENT_OPTIONS, whitespace: 'separate', punctuation: 'separate' });
+    expect(parts).toEqual(['a', '  ', 'b']);
+    const words = distributeSegmentTime(word, parts, 0.2);
+    expect(words.map((item) => [item.beginUs, item.endUs])).toEqual([[500_000, null], [null, null], [null, null]]);
+    word.beginUs = null; word.endUs = 900_000;
+    expect(distributeSegmentTime(word, parts, 0.2).map((item) => [item.beginUs, item.endUs])).toEqual([[null, null], [null, null], [null, 900_000]]);
+  });
+
   it('leaves an untimed Ruby word intact and merges adjacent plain words', () => {
     const document = createLyricDocument('今日も');
     const line = document.lines[0], word = line.words[0];
@@ -48,5 +60,23 @@ describe('E3 segmentation', () => {
     const merged = executeLyricCommand(split, { type: 'merge-words', lineId: line.id, firstWordId: parts[0].id, secondWordId: parts[1].id });
     expect(merged.present.lines[0].words).toHaveLength(1);
     expect(merged.present.lines[0].words[0].text).toBe('今日も');
+  });
+
+  it('applies full-document segmentation in one command across 2000 lines', () => {
+    const document = createLyricDocument();
+    document.lines = Array.from({ length: 2_000 }, (_, index) => {
+      const line = createLine('', `line-${index}`);
+      line.words = Array.from({ length: 10 }, (_, wordIndex) => createWord('中文', `word-${index}-${wordIndex}`));
+      return line;
+    });
+    const changes = document.lines.flatMap((line) => line.words.map((word) => ({
+      lineId: line.id, wordId: word.id, words: distributeSegmentTime(word, ['中', '文'], 0.2),
+    })));
+    const state = executeLyricCommand(createLyricEditorState(document), { type: 'segment-words', changes });
+    expect(state.present.lines).toHaveLength(2_000);
+    expect(state.present.lines[0].words).toHaveLength(20);
+    expect(state.present.lines[1_999].words).toHaveLength(20);
+    expect(state.past).toEqual([document]);
+    expect(undoLyricCommand(state).present).toBe(document);
   });
 });

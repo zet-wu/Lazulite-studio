@@ -2,6 +2,7 @@ import type { LyricCommand } from './lyric-commands';
 import type { AlignmentUnit, LyricDocument, LyricLine, LyricWord, RubyUnit, TimeUs } from './lyric-document';
 
 const safe = (value: number) => Number.isSafeInteger(value) && value >= 0;
+const cjkSyllable = (text: string) => /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+$/u.test(text);
 const shifted = (value: TimeUs, delta: number): TimeUs => {
   if (value === null) return null;
   const result = value + delta;
@@ -40,6 +41,7 @@ export function smoothWordTimes(document: LyricDocument, lineIds: string[], thre
     const words = line.words.slice();
     for (let index = 0; index < words.length - 1; index++) {
       const left = words[index], right = words[index + 1];
+      if (!cjkSyllable(left.text) || !cjkSyllable(right.text)) continue;
       if (left.endUs === null || right.beginUs === null || Math.abs(right.beginUs - left.endUs) > thresholdUs || left.endUs === right.beginUs) continue;
       if (left.rubyUnits.length || right.rubyUnits.length || left.alignmentUnits.length || right.alignmentUnits.length) continue;
       const middle = Math.round((left.endUs + right.beginUs) / 2);

@@ -6,7 +6,7 @@
 
 ## 设计入口
 
-下一阶段聚焦歌词编辑器，对齐 amll-ttml-tool 的界面与编辑工作流。执行入口为[歌词编辑器实施计划](docs/lyric-editor-implementation-plan.md)，逐项进展和实测证据见[对齐清单](docs/editor-parity.md)，开发约定见 [AGENTS.md](AGENTS.md)。E0 基线及 E1 词块模型纵向样例已开始，编辑页仍使用旧模型。
+当前歌词编辑器已完成 E0–E3：参考基线、语义词块文档、直接编辑画布、分词与时间批处理。执行入口为[歌词编辑器实施计划](docs/lyric-editor-implementation-plan.md)，逐项进展和实测证据见[对齐清单](docs/editor-parity.md)，开发约定见 [AGENTS.md](AGENTS.md)。E4 的完整 Ruby 工作流和后续打轴、时间轴、预览仍按计划推进。
 
 - [前端架构](../lyric-workflow/docs/lazulite_studio_frontend_architecture.md)：技术选择、工作区、富歌词模型、状态与 TTML 保真。
 - [服务契约草案](../lyric-workflow/docs/lazulite_studio_service_contract.md)：项目、媒体、保存版本、任务与 SSE。

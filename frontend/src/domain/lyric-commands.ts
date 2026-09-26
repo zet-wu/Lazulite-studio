@@ -12,6 +12,7 @@ type AtomicLyricCommand =
   | { type: 'delete-word'; lineId: string; wordId: string }
   | { type: 'set-word-alignments'; lineId: string; wordId: string; units: AlignmentUnit[] }
   | { type: 'segment-word'; lineId: string; wordId: string; words: LyricWord[] }
+  | { type: 'segment-words'; changes: Array<{ lineId: string; wordId: string; words: LyricWord[] }> }
   | { type: 'merge-words'; lineId: string; firstWordId: string; secondWordId: string }
   | { type: 'move-word'; lineId: string; wordId: string; toLineId: string; afterWordId: string | null }
   | { type: 'set-line-time'; lineId: string; beginUs: TimeUs; endUs: TimeUs }
@@ -180,6 +181,35 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
         if (command.words[0].beginUs !== word.beginUs || command.words.at(-1)?.endUs !== word.endUs) throw new Error('分词必须保留父词时间区间');
         return command.words;
       });
+    case 'segment-words': {
+      if (!command.changes.length) return document;
+      const changes = new Map(command.changes.map((change) => [change.wordId, change]));
+      if (changes.size !== command.changes.length) throw new Error('分词目标重复');
+      const originalIds = new Set(document.lines.flatMap((line) => line.words.map((word) => word.id)));
+      const generatedIds = new Set<string>();
+      let applied = 0;
+      const lines = document.lines.map((line) => {
+        if (!line.words.some((word) => changes.has(word.id))) return line;
+        const words = line.words.flatMap((word) => {
+          const change = changes.get(word.id);
+          if (!change) return [word];
+          if (change.lineId !== line.id || change.words.length < 2 || change.words[0].id !== word.id || change.words.map((part) => part.text).join('') !== word.text) throw new Error('分词目标或原文不匹配');
+          if (word.rubyUnits.length || word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
+          if (change.words[0].beginUs !== word.beginUs || change.words.at(-1)?.endUs !== word.endUs) throw new Error('分词必须保留父词时间区间');
+          for (const [index, part] of change.words.entries()) {
+            if (!part.text || part.rubyUnits.length || part.romanization || part.alignmentUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
+            if (generatedIds.has(part.id) || index > 0 && originalIds.has(part.id)) throw new Error('分词 ID 重复');
+            generatedIds.add(part.id);
+            wordFitsLine(part, line);
+          }
+          applied++;
+          return change.words;
+        });
+        return { ...line, words };
+      });
+      if (applied !== changes.size) throw new Error('分词目标不存在');
+      return { ...document, lines };
+    }
     case 'merge-words': {
       const index = lineIndex(document, command.lineId);
       const line = document.lines[index];

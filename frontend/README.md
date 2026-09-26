@@ -1,6 +1,6 @@
 # Frontend
 
-当前状态（2026-09-25）：项目工作区已覆盖 S3–S6 的媒体、保存、候选、整体 Ruby 和细粒度时间编辑，S7 发布页已接入。仍以整行表单和属性面板为主，尚未实现参考工具式词块、分词、连续打轴和动态预览；[下一阶段编辑器计划](../docs/lyric-editor-implementation-plan.md)尚未实施。
+当前状态（2026-09-26）：项目工作区与本地 `/editor` 共用语义词块画布。E0–E3 已覆盖直接行词编辑、Ruby 基础字段、分词和时间批处理；连续打轴、可编辑时间轴和动态预览仍待 E4–E7。[编辑器计划](../docs/lyric-editor-implementation-plan.md)和[E3 验收](../docs/editor-e3-acceptance.md)记录进度与边界。
 
 采用 React + TypeScript + Vite、React Router、TanStack Query、CSS Modules。S3 接入真实项目服务、上传与媒体播放；显式启用的 MSW 保留 S1 模拟场景。`/editor` 继续提供独立的本地 TTML 编辑入口。
 
@@ -26,7 +26,7 @@ npx pnpm@10.30.3 dev:mock
 
 打开终端输出的本地地址，默认路由为 `/projects`。直接工作区入口为 `/projects/sample-project/edit`。`?scenario=empty`、`?scenario=error`、`?scenario=expired`、`?scenario=loading` 分别用于空库、服务失败、会话过期和加载状态；移除参数恢复正常演示。
 
-本地文件入口为 `/editor`，可在 `dev` 模式下使用，不需要 API 会话。普通文本行支持正文和起止秒数编辑，空时间表示未定；点击“应用修改”形成一次撤销事务。服务项目工作台在 S5 开放可理解的整体 Ruby，复杂混合结构和未知语义仍按字段只读；独立 `/editor` 保留原有基础编辑范围。
+本地文件入口为 `/editor`，可在 `dev` 模式下使用，不需要 API 会话。两个入口使用同一词块画布与命令；编辑 Ribbon 的“分词…”提供手动边界、自动和高级规则，“批处理…”提供替换、时间偏移、CJK 边界平滑、行时间同步和行尾链接。每次应用是一次撤销，未定时间保留为未定。两入口的区别仅在加载、保存和项目辅助功能。
 
 本地检查点与服务器修订分开：S2 实施范围及当前检查进度见 [实施记录](../docs/s2-implementation.md)。草稿使用 Studio 命名空间标记未定时间，最终 TTML 需通过完整时间与 profile 检查。
 
@@ -56,7 +56,7 @@ npx pnpm@10.30.3 test:e2e
 
 实际结果见 [S1](../docs/s1-acceptance.md)、[S2](../docs/s2-acceptance.md)、[S3](../docs/s3-acceptance.md)、[S4](../docs/s4-acceptance.md)、[S5](../docs/s5-acceptance.md) 验收记录。设计基线见 [架构](../../lyric-workflow/docs/lazulite_studio_frontend_architecture.md)。
 
-## S6 时间精修
+## S6 历史时间精修记录
 
 右侧“时间”选择正文或某段读音，选择范围后建立词/音拍/音素单元；使用单元内光标拆分、合并相邻单元，或编辑秒数、拖动边界。空时间表示未定，最终导出前必须补齐。底部可循环当前单元。行属性正文内的光标用于拆行，“整体前移/后移”同时移动行及其单元；直接修改行起止只调整边界，不移动已有单元。
 

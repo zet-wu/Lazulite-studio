@@ -116,9 +116,9 @@ export function distributeSegmentTime(word: LyricWord, parts: string[], punctuat
   const begin = word.beginUs, end = word.endUs;
   let cumulative = 0;
   return parts.map((part, index) => {
-    const start = begin === null || end === null ? null : begin + Math.round((end - begin) * cumulative / (sum || parts.length));
+    const start = begin === null || end === null ? index === 0 ? begin : null : begin + Math.round((end - begin) * cumulative / (sum || parts.length));
     cumulative += sum ? weights[index] : 1;
-    const finish = begin === null || end === null ? null : index === parts.length - 1 ? end : begin + Math.round((end - begin) * cumulative / (sum || parts.length));
+    const finish = begin === null || end === null ? index === parts.length - 1 ? end : null : index === parts.length - 1 ? end : begin + Math.round((end - begin) * cumulative / (sum || parts.length));
     return { ...createWord(part, index === 0 ? word.id : crypto.randomUUID()), beginUs: start, endUs: finish };
   });
 }

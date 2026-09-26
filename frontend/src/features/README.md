@@ -4,4 +4,4 @@
 
 `useProjectDocument.ts` 管理撤销重做、串行保存、冲突和本地恢复。`CandidatePanel` 与 `JobCandidatePanel` 将候选转为一次领域事务，不直接改服务器文档。`MediaTransport` 保留播放和波形控制，`ExportPage` 下载或发布已保存的语义文档。
 
-E1 已完成文档闭环。E2 当前的 `editor/editing-actions.ts` 负责有序选择、带 Ruby/时间/对齐的内部剪贴板、纯文本插入和跨行词事务；画布接入了按钮、键盘与桌面拖放，支持简单/高级布局切换。完整视觉对齐、双击编辑、触控拖放和变高虚拟列表仍待完成。自动/高级分词、连续打轴和动态预览分别属于后续阶段，见[实施计划](../../../docs/lyric-editor-implementation-plan.md)。
+E1–E3 已完成词块文档闭环、共用画布、手动/自动/高级分词与时间批处理。`editor/editing-actions.ts` 负责有序选择、带 Ruby/时间/对齐的内部剪贴板、纯文本插入和跨行词事务；`SegmentationPanel` 与 `BatchToolsPanel` 调用相同命令历史。连续打轴、完整 Ruby 工作流、时间轴和动态预览仍按[实施计划](../../../docs/lyric-editor-implementation-plan.md)开发。

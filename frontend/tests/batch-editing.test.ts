@@ -24,7 +24,7 @@ describe('E3 batch editing', () => {
   it('smooths only nearby plain word boundaries and synchronizes line envelope', () => {
     const document = createLyricDocument('a');
     const line = document.lines[0];
-    line.words = [{ ...createWord('a', 'a'), beginUs: 100_000, endUs: 400_000 }, { ...createWord('b', 'b'), beginUs: 420_000, endUs: 900_000 }];
+    line.words = [{ ...createWord('中', 'a'), beginUs: 100_000, endUs: 400_000 }, { ...createWord('文', 'b'), beginUs: 420_000, endUs: 900_000 }];
     const smoothed = smoothWordTimes(document, [line.id], 30_000);
     expect(smoothed.count).toBe(1);
     const state = executeLyricCommand(createLyricEditorState(document), smoothed.command);

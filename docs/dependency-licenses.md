@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | @tanstack/react-query | 5.85.5 | MIT |
 | @tanstack/react-virtual | 3.14.13 | MIT |
+| hyphen | 1.14.1 | ISC |
 | react | 19.1.1 | MIT |
 | react-dom | 19.1.1 | MIT |
 | react-router-dom | 7.8.2 | MIT |
@@ -19,6 +20,7 @@
 | @testing-library/jest-dom | 6.8.0 | MIT |
 | @testing-library/react | 16.3.0 | MIT |
 | @playwright/test | 1.55.0 | Apache-2.0 |
+| @types/hyphen | 1.14.0 | MIT |
 | @types/react | 19.1.10 | MIT |
 | @types/react-dom | 19.1.7 | MIT |
 | @types/node | 22.18.0 | MIT |

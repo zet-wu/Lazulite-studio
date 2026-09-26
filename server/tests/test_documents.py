@@ -52,6 +52,26 @@ def test_semantic_editor_ttml_saves_and_reopens_with_clean_main_lyrics(tmp_path)
     assert lyrics.text == ttml
 
 
+def test_e3_draft_end_link_survives_real_project_save(tmp_path):
+    setup_project(tmp_path)
+    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
+    ttml = ('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft">'
+            '<body><div><p xml:id="a" begin="1" end="3" '
+            'studio:endLink=\'{"targetLineId":"b","originalEndUs":2500000}\'>'
+            '<span begin="1" end="2">中文</span></p>'
+            '<p xml:id="b" begin="3" end="4"><span begin="3" end="4">下一句</span></p>'
+            '</div></body></tt>')
+    before = client.get("/api/v1/projects/p/document")
+    saved = client.put("/api/v1/projects/p/document", json={
+        "schema_version": "studio-document-v1", "project_id": "p", "revision": before.json()["revision"],
+        "document": {"schema_version": "studio-document-content-v1", "ttml": ttml}},
+        headers={"origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "e3-end-link"})
+    assert saved.status_code == 200
+    reopened = client.get("/api/v1/projects/p/document")
+    assert reopened.json()["document"]["ttml"] == ttml
+    assert reopened.json()["revision"] == saved.json()["revision"]
+
+
 def test_import_is_candidate_and_does_not_change_revision(tmp_path):
     setup_project(tmp_path)
     client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")

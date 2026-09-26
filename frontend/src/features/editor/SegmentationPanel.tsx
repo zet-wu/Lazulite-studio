@@ -82,9 +82,9 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
     try {
       const changed = preview.filter((item) => item.parts.length > 1 && !item.blocked);
       if (!changed.length) return;
-      const commands = changed.map((item) => ({ type: 'segment-word' as const, lineId: item.lineId, wordId: item.word.id,
+      const changes = changed.map((item) => ({ lineId: item.lineId, wordId: item.word.id,
         words: distributeSegmentTime(item.word, item.parts, options.punctuationWeight) }));
-      if (apply({ type: 'batch', commands })) close();
+      if (apply({ type: 'segment-words', changes })) close();
     } catch (cause) { setError(cause instanceof Error ? cause.message : '应用分词失败'); }
   };
   return <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
