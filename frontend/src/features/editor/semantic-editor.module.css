@@ -5,6 +5,7 @@
 .brand { color: var(--blue); text-decoration: none; font-weight: 700; }
 .header > span { font-size: 12px; color: var(--muted); }
 .actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
+.actions select { border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--ink); padding: 5px; }
 .actions button, .actions label, .canvasHeader button, .line button, .inspector button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 5px; padding: 5px 8px; cursor: pointer; }
 .actions label { display: inline-flex; align-items: center; }
 .actions button:disabled, .line button:disabled { opacity: .5; cursor: default; }
@@ -66,6 +67,7 @@
 .inspector button { margin-bottom: 12px; }
 .metadataPanel textarea { box-sizing: border-box; width: 100%; min-height: 45px; resize: vertical; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 4px; font: inherit; }
 .error { margin: 0; padding: 8px 16px; background: #fff0ed; color: #a32b20; }
+:global([data-theme='dark']) .error { background: #4b292b; color: #ffd3ce; }
 .dialogBackdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: #0009; padding: 12px; }
 .dialog { box-sizing: border-box; width: min(700px, 100%); max-height: min(88dvh, 850px); overflow: auto; padding: 18px; border-radius: 10px; background: var(--panel); color: var(--ink); box-shadow: 0 12px 36px #0005; }
 .dialogHeader, .dialogActions, .dialogTabs, .inlineFields { display: flex; align-items: center; gap: 8px; }
@@ -115,3 +117,4 @@
 .segmentPreview em { grid-column: 1 / -1; color: #a45a17; }
 .toolHint { font-size: 13px; color: var(--muted); line-height: 1.5; }
 @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .outline { display: flex; flex-wrap: wrap; gap: 4px; border: 0; border-bottom: 1px solid var(--line); } .outline h2 { flex-basis: 100%; } .outlineRow { max-width: 100%; } .inspector { border: 0; border-top: 1px solid var(--line); } }
+@media (max-width: 600px) { .actions { width: 100%; margin-left: 0; flex-wrap: nowrap; overflow-x: auto; } .actions > * { flex: 0 0 auto; } }

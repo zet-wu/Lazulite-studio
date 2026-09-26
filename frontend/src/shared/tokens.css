@@ -16,6 +16,21 @@
   --radius: 6px;
 }
 
+:root[data-theme='dark'] {
+  color: #e7edf5;
+  background: #111824;
+  color-scheme: dark;
+  --blue: #88acff;
+  --blue-soft: #263b61;
+  --ink: #e7edf5;
+  --muted: #aab6c8;
+  --line: #3b4758;
+  --panel: #1c2635;
+  --canvas: #111824;
+  --danger: #ff968d;
+  --warning: #e9b779;
+}
+
 * { box-sizing: border-box; }
 html, body, #root { min-width: 320px; min-height: 100%; margin: 0; }
 button, input, select { font: inherit; }

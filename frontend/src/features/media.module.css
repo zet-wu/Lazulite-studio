@@ -6,6 +6,15 @@
   border-top: 1px solid var(--line);
   min-height: 112px;
 }
+:global([data-theme='dark']) .footer { background: var(--panel); }
+:global([data-theme='dark']) .waveWrap { background: #182334; }
+:global([data-theme='dark']) .header button, :global([data-theme='dark']) .controls button, :global([data-theme='dark']) .controls select,
+:global([data-theme='dark']) .timelineTools button, :global([data-theme='dark']) .timelineTools input { background: var(--panel); color: var(--ink); }
+:global([data-theme='dark']) .trackLane { background: #172234; border-color: var(--line); }
+:global([data-theme='dark']) .trackBar { color: #192d4a; }
+:global([data-theme='dark']) .trackSelected { color: #fff; }
+:global([data-theme='dark']) .header, :global([data-theme='dark']) .controls, :global([data-theme='dark']) .timelineTools,
+:global([data-theme='dark']) .ruler, :global([data-theme='dark']) .trackRow > strong { color: var(--muted); }
 .header,
 .controls {
   display: flex;

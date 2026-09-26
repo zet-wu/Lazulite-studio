@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { LyricFormat } from '../../adapters/lyric-formats';
 import styles from './semantic-editor.module.css';
 
@@ -23,6 +23,11 @@ type Props = {
 
 export function EditorMenu(props: Props) {
   const [format, setFormat] = useState<LyricFormat>('lrc');
+  const [dark, setDark] = useState(() => localStorage.getItem('lazulite-editor-theme') === 'dark');
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    localStorage.setItem('lazulite-editor-theme', dark ? 'dark' : 'light');
+  }, [dark]);
   return <header className={styles.header}>
     <Link to="/projects" className={styles.brand}>Lazulite Studio</Link>
     <strong>{props.title}</strong>
@@ -38,6 +43,7 @@ export function EditorMenu(props: Props) {
       <button onClick={props.undo} disabled={!props.canUndo}>撤销</button>
       <button onClick={props.redo} disabled={!props.canRedo}>重做</button>
       <button onClick={props.onToggleLayout}>{props.simpleLayout ? '高级布局' : '简单布局'}</button>
+      <button onClick={() => setDark((value) => !value)}>{dark ? '日间模式' : '夜间模式'}</button>
       <button onClick={props.onDraft}>下载草稿</button>
       <button onClick={props.onFinal}>最终 TTML</button>
       {props.onExportFormat && <><select aria-label="导出格式" value={format} onChange={(event) => setFormat(event.target.value as LyricFormat)}>
