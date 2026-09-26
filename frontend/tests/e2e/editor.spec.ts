@@ -29,6 +29,56 @@ test('imports, edits, undoes and downloads Ruby with background vocals', async (
   expect(xml).toContain('今天 也唱歌');
 });
 
+test('previews manual boundaries and auto segmentation, then undoes each application', async ({ page }) => {
+  await upload(page);
+  const firstLine = page.locator('[data-line-id="L1"]');
+  await firstLine.getByRole('textbox', { name: '词  も歌う', exact: true }).focus();
+  await page.getByRole('button', { name: '分词…' }).click();
+  await page.getByRole('button', { name: '切分边界 2' }).click();
+  await page.getByRole('button', { name: '生成预览' }).click();
+  await expect(page.getByRole('dialog', { name: '分词' })).toContainText(' も │ 歌う');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: '../docs/evidence/editor-e3/studio-manual-390.png' });
+  await page.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await expect(firstLine.getByRole('textbox', { name: '词  も', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(firstLine.getByRole('textbox', { name: '词  も歌う', exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: '分词…' }).click();
+  await page.getByRole('button', { name: '自动' }).click();
+  await page.getByRole('button', { name: '生成预览' }).click();
+  await expect(page.getByRole('dialog', { name: '分词' })).toContainText('含 Ruby 或附属属性，保留原词');
+  await page.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await expect(firstLine.getByRole('textbox', { name: '词  も', exact: true })).toBeVisible();
+  await expect(firstLine.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await page.getByRole('button', { name: '分词…' }).click();
+  await page.getByRole('button', { name: '高级' }).click();
+  await page.getByRole('textbox', { name: '忽略列表（每行一个）' }).fill('今日');
+  await page.getByRole('textbox', { name: '自定义规则（每行 原文=部分|部分）' }).fill('も歌う=も|歌う');
+  await page.getByRole('button', { name: '生成预览' }).click();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: '../docs/evidence/editor-e3/studio-advanced-1440.png' });
+});
+
+test('shifts current line and background together, then links and restores its end', async ({ page }) => {
+  await upload(page);
+  await page.getByRole('button', { name: '批处理…' }).click();
+  await page.getByRole('button', { name: '时间偏移' }).click();
+  await page.getByRole('spinbutton', { name: '偏移毫秒（负数为提前）' }).fill('100');
+  await page.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await expect(page.getByRole('textbox', { name: '行 L1开始秒数' })).toHaveValue('1.1');
+  await expect(page.getByRole('textbox', { name: '行 L1:bg开始秒数' })).toHaveValue('1.6');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.getByRole('textbox', { name: '行 L1开始秒数' })).toHaveValue('1');
+  await page.getByRole('button', { name: '批处理…' }).click();
+  await page.getByRole('button', { name: '结束时间链接' }).click();
+  await page.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await expect(page.getByRole('dialog', { name: '批处理' })).toContainText('当前行链接到 L2');
+  await page.getByRole('button', { name: '取消链接' }).click();
+  await expect(page.getByRole('dialog', { name: '批处理' })).toContainText('已取消链接并恢复原结束时间');
+});
+
 test('saves the semantic checkpoint and restores undo history', async ({ page }) => {
   await upload(page);
   const word = page.getByRole('textbox', { name: '词 今日', exact: true });

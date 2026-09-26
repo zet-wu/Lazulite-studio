@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createLyricDocument, lineText } from '../src/domain/lyric-document';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
-import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, segmentText, segmentationPreview } from '../src/domain/segmentation';
+import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, loadSyllableDivider, segmentText, segmentationPreview } from '../src/domain/segmentation';
 
 describe('E3 segmentation', () => {
   it('keeps mixed text and whitespace while applying ignore and custom rules', () => {
@@ -11,6 +11,13 @@ describe('E3 segmentation', () => {
     expect(parts).toEqual(['東京', '  hel', 'lo,', '世', '界', ' 𝄞e\u0301']);
     expect(parts.join('')).toBe(text);
     expect(() => segmentText('e\u0301', { ...options, rules: [{ source: 'e\u0301', parts: ['e', '\u0301'] }] })).toThrow(/字符/);
+  });
+
+  it('loads a real language pattern and keeps the western word intact across syllables', async () => {
+    const divide = await loadSyllableDivider('en-us');
+    const parts = segmentText('internationalization', { ...DEFAULT_SEGMENT_OPTIONS, western: 'syllable' }, divide);
+    expect(parts.length).toBeGreaterThan(1);
+    expect(parts.join('')).toBe('internationalization');
   });
 
   it('preserves the timed interval and undoes a multiword change once', () => {

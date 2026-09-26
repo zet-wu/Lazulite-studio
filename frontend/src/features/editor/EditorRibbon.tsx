@@ -14,6 +14,8 @@ type Props = {
   clearSelection: () => void;
   moveUp: () => void;
   moveDown: () => void;
+  openSegmentation: () => void;
+  openBatchTools: () => void;
 };
 
 export function EditorRibbon(props: Props) {
@@ -28,6 +30,8 @@ export function EditorRibbon(props: Props) {
     <button onClick={props.clearSelection}>清空选择</button>
     <button disabled={!props.canMoveUp} onClick={props.moveUp}>词移上行</button>
     <button disabled={!props.canMoveDown} onClick={props.moveDown}>词移下行</button>
+    <button onClick={props.openSegmentation}>分词…</button>
+    <button onClick={props.openBatchTools}>批处理…</button>
     <small>非输入框内 Ctrl/Cmd+C、X、V 使用词块剪贴板；Alt+↑/↓ 切词；外部纯文本按行插入。</small>
   </div>;
 }

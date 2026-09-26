@@ -9,6 +9,8 @@ import { LyricWord as LyricWordView } from './LyricWord';
 import { DraftInput, TimePair } from './EditorFields';
 import { EditorMenu } from './EditorMenu';
 import { EditorRibbon } from './EditorRibbon';
+import { SegmentationPanel } from './SegmentationPanel';
+import { BatchToolsPanel } from './BatchToolsPanel';
 import styles from './semantic-editor.module.css';
 
 const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
@@ -53,6 +55,8 @@ export function EditorWorkspace(props: Props) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [editingWordId, setEditingWordId] = useState<string | null>(null);
+  const [segmentationOpen, setSegmentationOpen] = useState(false);
+  const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [locate, setLocate] = useState<{ id: string; serial: number } | null>(null);
   const locateSerial = useRef(0);
   const requestLocate = (id: string) => setLocate({ id, serial: ++locateSerial.current });
@@ -291,6 +295,7 @@ export function EditorWorkspace(props: Props) {
         const at = Math.floor(Array.from(word.text).length / 2);
         dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at });
       }}>拆</button>
+      <button aria-label={`合并前词 ${word.text}`} disabled={index === 0} onClick={() => dispatch({ type: 'merge-words', lineId: line.id, firstWordId: line.words[index - 1].id, secondWordId: word.id })}>合</button>
       <button aria-label={`删除词 ${word.text}`} onClick={() => dispatch({ type: 'delete-word', lineId: line.id, wordId: word.id })}>×</button>
     </div>
     <TimePair begin={word.beginUs} end={word.endUs} label={`词 ${word.text}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginUs, endUs })} />
@@ -328,7 +333,7 @@ export function EditorWorkspace(props: Props) {
       copy={() => { copy(); }} cut={() => { cut(); }} paste={() => paste(clipboard)}
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
-      moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} />
+      moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)} />
     <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
       {document.lines.map((line, index) => <div className={styles.outlineRow} key={line.id}>
         <button className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
@@ -374,5 +379,7 @@ export function EditorWorkspace(props: Props) {
         <h2>元数据</h2>{(['title', 'artist', 'songwriter'] as const).map((key) => <label key={key}>{key}<DraftInput value={document.metadata[key]?.[0] ?? ''} label={key} onCommit={(value) => dispatch({ type: 'set-metadata', key, values: value ? [value] : [] })} /></label>)}
         {props.auxiliary}
       </aside></div>
+    {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
+    {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
   </div>;
 }
