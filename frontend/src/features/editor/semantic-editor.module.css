@@ -45,11 +45,15 @@
 .dragHandle:active { cursor: grabbing !important; }
 .wordMain input { min-width: 4ch; width: 12ch; }
 .wordMain input[readonly] { border-color: transparent; background: transparent; cursor: default; }
-.rubies { display: grid; gap: 3px; margin-top: 5px; }
-.ruby { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; }
+.rubyEditor { display: grid; gap: 4px; margin-bottom: 5px; }
+.rubyAbove { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; }
+.rubyTile { display: grid; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
+.rubyTileActions, .rubyTools, .rubyAdd { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.rubyTools button, .rubyTileActions button, .rubyAdd button { font-size: 11px; padding: 2px 4px; }
+.rubyAdd input { width: 10ch; }
 .selectedRuby { background: #e9f6ef; border-radius: 4px; }
-.ruby:focus-within { outline: 2px solid #258457; outline-offset: 2px; }
-.ruby input { width: 8ch; }
+.rubyTile:focus-within { outline: 2px solid #258457; outline-offset: 2px; }
+.rubyTile input { width: 8ch; }
 .times { display: inline-flex; gap: 2px; align-items: center; font-size: 11px; }
 .times input { width: 7ch; font-variant-numeric: tabular-nums; }
 .sublyrics { display: flex; flex-wrap: wrap; gap: 15px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 12px; }

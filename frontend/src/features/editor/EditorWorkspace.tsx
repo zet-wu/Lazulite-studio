@@ -11,6 +11,7 @@ import { EditorMenu } from './EditorMenu';
 import { EditorRibbon } from './EditorRibbon';
 import { SegmentationPanel } from './SegmentationPanel';
 import { BatchToolsPanel } from './BatchToolsPanel';
+import { RubyWordEditor } from './RubyWordEditor';
 import styles from './semantic-editor.module.css';
 
 const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
@@ -57,6 +58,10 @@ export function EditorWorkspace(props: Props) {
   const [editingWordId, setEditingWordId] = useState<string | null>(null);
   const [segmentationOpen, setSegmentationOpen] = useState(false);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
+  const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number } | null>(null);
+  const rubyShortcutSerial = useRef(0);
+  const [rubyBaseOpen, setRubyBaseOpen] = useState(false);
+  const [rubyBaseReading, setRubyBaseReading] = useState('');
   const [locate, setLocate] = useState<{ id: string; serial: number } | null>(null);
   const locateSerial = useRef(0);
   const requestLocate = (id: string) => setLocate({ id, serial: ++locateSerial.current });
@@ -92,6 +97,21 @@ export function EditorWorkspace(props: Props) {
   const duetValue = selectedDuets.every((value) => value === selectedDuets[0]) ? String(selectedDuets[0] ?? false) : '__mixed__';
   const selectedWordLineIndexes = selection?.kind === 'words'
     ? document.lines.flatMap((line, index) => line.words.some((word) => selection.ids.includes(word.id)) ? [index] : []) : [];
+  const rubyBaseLine = selection?.kind === 'words' && selection.ids.length > 1 ? document.lines.find((line) => line.words.some((word) => word.id === selection.ids[0])) : undefined;
+  const rubyBaseWords = rubyBaseLine && selection?.kind === 'words' ? rubyBaseLine.words.filter((word) => selection.ids.includes(word.id)) : [];
+  const canCreateRubyBase = Boolean(rubyBaseLine && rubyBaseWords.length === selection?.ids.length && rubyBaseWords.length > 1 &&
+    rubyBaseLine.words.findIndex((word) => word.id === rubyBaseWords[0].id) + rubyBaseWords.length - 1 === rubyBaseLine.words.findIndex((word) => word.id === rubyBaseWords.at(-1)?.id));
+  const createRubyBase = () => {
+    if (!canCreateRubyBase || !rubyBaseLine || !rubyBaseReading) return;
+    const firstId = rubyBaseWords[0].id;
+    if (dispatch({ type: 'batch', commands: [
+      { type: 'merge-ruby-base', lineId: rubyBaseLine.id, wordIds: rubyBaseWords.map((word) => word.id) },
+      { type: 'add-ruby', lineId: rubyBaseLine.id, wordId: firstId, reading: rubyBaseReading },
+    ] })) {
+      setSelection({ kind: 'words', lineId: rubyBaseLine.id, ids: [firstId], anchorId: firstId, activeId: firstId, rubyId: null });
+      setRubyBaseOpen(false); setRubyBaseReading('');
+    }
+  };
   const selectLine = (line: LyricLine, shift = false, toggle = false) => {
     const id = line.backgroundOf ?? line.id;
     const previous = selection?.kind === 'lines' ? selection : null;
@@ -281,11 +301,19 @@ export function EditorWorkspace(props: Props) {
     onSelect={(shift, toggle) => selectWord(line, word, shift, toggle)}
     onDragOver={(event) => { if (dragging.current?.kind === 'word') overDrop(event, `word:${word.id}`); }}
     onDrop={(event) => dropWord(event, line, word.id)}>
+    <RubyWordEditor lineId={line.id} word={word} selectedRubyId={selection?.kind === 'words' && selection.activeId === word.id ? selection.rubyId : null}
+      onSelectRuby={(rubyId) => selectWord(line, word, false, false, rubyId)} apply={dispatch}
+      requestAddSerial={rubyShortcut?.wordId === word.id ? rubyShortcut.serial : undefined} />
     <div className={styles.wordMain}>
       <button className={styles.dragHandle} draggable aria-label={`拖动词 ${word.text}`} title="拖放排序；按 Ctrl 复制" onDragStart={(event) => startDrag(event, { kind: 'word', lineId: line.id, wordId: word.id })} onDragEnd={() => { dragging.current = null; setDropTarget(null); }} {...touchHandle({ kind: 'word', lineId: line.id, wordId: word.id })}>⋮⋮</button>
       <DraftInput value={word.text} label={`词 ${word.text}`} onFocus={() => selectWord(line, word)}
         readOnly={editingWordId !== word.id} onEdit={() => setEditingWordId(word.id)} onExit={() => setEditingWordId(null)}
-        onCommit={(text) => dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text })}
+        onCommit={(text) => {
+          const shortcut = text.endsWith('|');
+          const next = shortcut ? text.slice(0, -1) : text;
+          if (!next) { setMessage('Ruby 快捷输入需要正文'); return; }
+          if (dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text: next }) && shortcut) setRubyShortcut({ wordId: word.id, serial: ++rubyShortcutSerial.current });
+        }}
         onSplit={(at) => dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at: utf16ToCodePoint(word.text, at) })}
         onMove={(direction) => moveWord(line, word, direction)} onNavigate={(direction) => navigateWord(word.id, direction)}
         inputRef={(node) => { if (node) { wordInputs.current.set(word.id, node); if (pendingFocus.current === word.id) { pendingFocus.current = null; node.focus(); } } else wordInputs.current.delete(word.id); }} />
@@ -299,12 +327,6 @@ export function EditorWorkspace(props: Props) {
       <button aria-label={`删除词 ${word.text}`} onClick={() => dispatch({ type: 'delete-word', lineId: line.id, wordId: word.id })}>×</button>
     </div>
     <TimePair begin={word.beginUs} end={word.endUs} label={`词 ${word.text}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginUs, endUs })} />
-    <div className={styles.rubies}>{word.rubyUnits.map((unit) => <div key={unit.id} data-ruby-id={unit.id} className={`${styles.ruby} ${selection?.kind === 'words' && selection.rubyId === unit.id ? styles.selectedRuby : ''}`}>
-      <DraftInput value={unit.reading} label={`读音 ${word.text}`} onFocus={() => selectWord(line, word, false, false, unit.id)}
-        onCommit={(reading) => dispatch({ type: 'edit-ruby', lineId: line.id, wordId: word.id, rubyId: unit.id, reading })} />
-      <button aria-label={`删除读音 ${unit.reading}`} onClick={() => dispatch({ type: 'delete-ruby', lineId: line.id, wordId: word.id, rubyId: unit.id })}>×</button>
-      <TimePair begin={unit.beginUs} end={unit.endUs} label={`读音 ${unit.reading}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-ruby-time', lineId: line.id, wordId: word.id, rubyId: unit.id, beginUs, endUs })} />
-    </div>)}<button onClick={() => { const reading = window.prompt('输入读音'); if (reading) dispatch({ type: 'add-ruby', lineId: line.id, wordId: word.id, reading }); }}>加读音</button></div>
   </LyricWordView>;
   return <div className={styles.page} onCopy={(event) => {
     if (isTextInput(event.target)) return;
@@ -333,7 +355,8 @@ export function EditorWorkspace(props: Props) {
       copy={() => { copy(); }} cut={() => { cut(); }} paste={() => paste(clipboard)}
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
-      moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)} />
+      moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
+      canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)} />
     <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
       {document.lines.map((line, index) => <div className={styles.outlineRow} key={line.id}>
         <button className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
@@ -381,5 +404,6 @@ export function EditorWorkspace(props: Props) {
       </aside></div>
     {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
     {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
+    {rubyBaseOpen && <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRubyBaseOpen(false); }}><section className={styles.dialog} role="dialog" aria-modal="true" aria-label="整体 Ruby"><div className={styles.dialogHeader}><h2>整体 Ruby</h2><button aria-label="关闭整体 Ruby" onClick={() => setRubyBaseOpen(false)}>×</button></div><p>base：{rubyBaseWords.map((word) => word.text).join('')}</p><label>读音 <input autoFocus value={rubyBaseReading} onChange={(event) => setRubyBaseReading(event.target.value)} onKeyDown={(event) => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') createRubyBase(); if (event.key === 'Escape') setRubyBaseOpen(false); }} /></label><p>合并相邻词后创建一个整体读音；其他词和时间保持原样。</p><div className={styles.dialogActions}><button onClick={() => setRubyBaseOpen(false)}>取消</button><button disabled={!rubyBaseReading} onClick={createRubyBase}>应用（一次撤销）</button></div></section></div>}
   </div>;
 }

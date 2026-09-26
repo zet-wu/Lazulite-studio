@@ -29,6 +29,60 @@ test('imports, edits, undoes and downloads Ruby with background vocals', async (
   expect(xml).toContain('今天 也唱歌');
 });
 
+test('edits Ruby above its base with Backspace merge, F8 split and the trailing bar shortcut', async ({ page }) => {
+  await upload(page);
+  const word = page.locator('[data-line-id="L1"] [data-word-id]').first();
+  const rubies = word.getByRole('textbox', { name: '读音 今日', exact: true });
+  const rubyBox = await word.locator('[data-ruby-id]').first().boundingBox();
+  const baseBox = await word.getByRole('textbox', { name: '词 今日', exact: true }).boundingBox();
+  expect(rubyBox!.y).toBeLessThan(baseBox!.y);
+  await rubies.nth(1).focus();
+  await rubies.nth(1).press('Home');
+  await rubies.nth(1).press('Backspace');
+  await expect(rubies).toHaveCount(1);
+  await expect(rubies.first()).toHaveValue('きょう');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(rubies).toHaveCount(2);
+  await rubies.nth(1).focus();
+  await rubies.nth(1).press('Home');
+  await rubies.nth(1).press('Backspace');
+  await rubies.first().evaluate((input: HTMLInputElement) => input.setSelectionRange(2, 2));
+  await rubies.first().press('F8');
+  await expect(rubies).toHaveCount(2);
+  await word.getByRole('button', { name: '重分配读音时间' }).click();
+  await expect(word.getByRole('textbox', { name: '读音 きょ结束秒数' })).toHaveValue('1.5');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: '../docs/evidence/editor-e4/studio-ruby-390.png' });
+
+  const plain = page.getByRole('textbox', { name: '词  も歌う', exact: true });
+  await plain.dblclick();
+  await plain.fill(' も歌う|');
+  await plain.blur();
+  const add = page.getByRole('textbox', { name: '新增读音  も歌う' });
+  await expect(add).toBeVisible();
+  await add.fill('もうたう');
+  await add.press('Enter');
+  await expect(page.locator('[data-line-id="L1"]').getByRole('textbox', { name: '读音  も歌う', exact: true })).toHaveValue('もうたう');
+});
+
+test('creates one Ruby base from selected adjacent words and restores them with undo', async ({ page }) => {
+  await page.goto('/editor');
+  const xml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="plain" begin="1" end="2"><span begin="1" end="1.5">今</span><span begin="1.5" end="2">日</span></p></div></body></tt>';
+  await page.locator('input[type="file"]').setInputFiles({ name: 'plain.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  const line = page.locator('[data-line-id="plain"]');
+  await line.getByRole('textbox', { name: '词 今', exact: true }).focus();
+  await line.locator('[data-word-id]').nth(1).click({ modifiers: ['Control'] });
+  await page.getByRole('button', { name: '合并为 Ruby base…' }).click();
+  await expect(page.getByRole('dialog', { name: '整体 Ruby' })).toContainText('base：今日');
+  await page.getByRole('textbox', { name: '读音' }).fill('きょう');
+  await page.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await expect(line.locator('[data-word-id]')).toHaveCount(1);
+  await expect(line.getByRole('textbox', { name: '读音 今日', exact: true })).toHaveValue('きょう');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(line.locator('[data-word-id]')).toHaveCount(2);
+  await expect(line.getByRole('textbox', { name: '词 今', exact: true })).toBeVisible();
+});
+
 test('previews manual boundaries and auto segmentation, then undoes each application', async ({ page }) => {
   await upload(page);
   const firstLine = page.locator('[data-line-id="L1"]');

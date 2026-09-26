@@ -16,6 +16,8 @@ type Props = {
   moveDown: () => void;
   openSegmentation: () => void;
   openBatchTools: () => void;
+  createRubyBase: () => void;
+  canCreateRubyBase: boolean;
 };
 
 export function EditorRibbon(props: Props) {
@@ -32,6 +34,7 @@ export function EditorRibbon(props: Props) {
     <button disabled={!props.canMoveDown} onClick={props.moveDown}>词移下行</button>
     <button onClick={props.openSegmentation}>分词…</button>
     <button onClick={props.openBatchTools}>批处理…</button>
+    <button disabled={!props.canCreateRubyBase} onClick={props.createRubyBase}>合并为 Ruby base…</button>
     <small>非输入框内 Ctrl/Cmd+C、X、V 使用词块剪贴板；Alt+↑/↓ 切词；外部纯文本按行插入。</small>
   </div>;
 }
