@@ -83,6 +83,17 @@ test('drags a timed word on the waveform tracks and undoes it once', async ({ pa
   await expect(end).toHaveValue('5');
 });
 
+test('uses live PCM tiles for the spectrum and analyzes the beat', async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  await page.getByRole('button', { name: '自动 BPM' }).click();
+  await expect(page.getByText('检测到 120 BPM')).toBeVisible();
+  await page.getByRole('button', { name: '频谱' }).click();
+  await expect(page.getByText('放大到 20 秒以内显示频谱')).toBeVisible();
+  for (let index = 0; index < 3; index++) await page.getByRole('button', { name: '放大波形' }).click();
+  await expect(page.getByLabel('实时频谱')).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
 test("shows empty, error, expired, and loading states and can recover", async ({
   page,
 }) => {

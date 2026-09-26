@@ -4,12 +4,12 @@ import type { LyricDocument, LyricLine, LyricWord } from '../domain/lyric-docume
 import { moveTimeline, resizeTimeline, snapTime, type TimelineTarget } from '../domain/timeline-editing';
 import styles from './media.module.css';
 
-type Props = { document: LyricDocument; selectedLineId: string | null; startUs: number; endUs: number; bpm: number; snap: boolean;
+type Props = { document: LyricDocument; selectedLineId: string | null; startUs: number; endUs: number; positionUs: number; bpm: number; snap: boolean;
   apply: (command: LyricCommand) => void; onSelectLine: (lineId: string) => void; onError: (message: string) => void };
 type Drag = { target: TimelineTarget | null; side: 'move' | 'beginUs' | 'endUs' | 'select'; x: number; current: number; width: number; originalUs: number };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end > begin;
 
-export function TimelineTracks({ document, selectedLineId, startUs, endUs, bpm, snap, apply, onSelectLine, onError }: Props) {
+export function TimelineTracks({ document, selectedLineId, startUs, endUs, positionUs, bpm, snap, apply, onSelectLine, onError }: Props) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
   const dragRef = useRef<Drag | null>(null);
@@ -71,7 +71,7 @@ export function TimelineTracks({ document, selectedLineId, startUs, endUs, bpm, 
     } catch (cause) { onError(cause instanceof Error ? cause.message : '时间轴编辑失败'); }
   };
   const bar = (target: TimelineTarget, label: string, beginUs: number, endUs: number, active = false) => <div key={`${target.kind}:${target.lineId}:${target.kind === 'line' ? '' : target.wordId}:${target.kind === 'ruby' ? target.rubyId : ''}`}
-    className={`${styles.trackBar} ${active ? styles.trackSelected : ''}`} role="button" tabIndex={0} aria-label={label}
+    className={`${styles.trackBar} ${active ? styles.trackSelected : ''} ${positionUs >= beginUs && positionUs < endUs ? styles.trackPlaying : ''}`} role="button" tabIndex={0} aria-label={label}
     style={{ left: pct(beginUs), width: `${Math.max(0.8, (endUs - beginUs) / spanUs * 100)}%` }}
     onPointerDown={(event) => begin(event, target, 'move', beginUs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { dragRef.current = null; setDrag(null); }}
     onKeyDown={(event) => { if (event.key === 'Enter' && target.kind === 'line') onSelectLine(target.lineId); }}>

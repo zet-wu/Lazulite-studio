@@ -17,6 +17,8 @@ import styles from "./media.module.css";
 import type { LyricCommand } from '../domain/lyric-commands';
 import type { LyricDocument } from '../domain/lyric-document';
 import { TimelineTracks } from './TimelineTracks';
+import { SpectrogramCanvas } from './SpectrogramCanvas';
+import { estimateBpm } from '../domain/bpm';
 
 const fmt = (s: number) => {
   if (!Number.isFinite(s)) return "--:--.---";
@@ -61,6 +63,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const clock = useRef<HTMLSpanElement>(null);
   const slider = useRef<HTMLDivElement>(null);
   const raf = useRef<number | undefined>(undefined);
+  const lastTrackPaint = useRef(0);
   const positionRef = useRef(0);
   const auditionEnd = useRef<number | null>(null);
   const [duration, setDuration] = useState(
@@ -78,6 +81,9 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [error, setError] = useState("");
   const [bpm, setBpm] = useState(120);
   const [snap, setSnap] = useState(true);
+  const [showSpectrum, setShowSpectrum] = useState(false);
+  const [follow, setFollow] = useState(false);
+  const [bpmStatus, setBpmStatus] = useState('');
   const tapTimes = useRef<number[]>([]);
   const startUs = Math.round(start * 1e6);
   const end = Math.min(duration, start + span);
@@ -238,6 +244,13 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     const frame = () => {
       const current = readPosition();
       updateDom(current);
+      if (performance.now() - lastTrackPaint.current > 80) {
+        setPosition(current);
+        lastTrackPaint.current = performance.now();
+      }
+      if (follow && span < duration && current > start + span * 0.85 && current < duration) {
+        setStart(Math.min(duration - span, Math.max(0, current - span * 0.3)));
+      }
       if (auditionEnd.current !== null && current >= auditionEnd.current) {
         auditionEnd.current = null;
         el.pause();
@@ -252,7 +265,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     };
     raf.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf.current ?? 0);
-  }, [activeLoop, asset, playing, readPosition, updateDom]);
+  }, [activeLoop, asset, duration, follow, playing, readPosition, span, start, updateDom]);
 
   useEffect(() => {
     if ((loop === "line" && !validLine) || (loop === "unit" && !validUnit))
@@ -388,6 +401,18 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       setBpm(Math.round(60_000 / sorted[Math.floor(sorted.length / 2)]));
     }
   };
+  const autoBpm = async () => {
+    try {
+      setBpmStatus('分析中…');
+      const window = await studioApi.getWaveform(projectId, 0, Math.min(Math.round(duration * 1e6), 20_000_000), 0);
+      const result = estimateBpm(window.minimum, window.maximum, window.bucket_us);
+      if (result === null) { setBpmStatus('未检测到稳定节拍'); return; }
+      setBpm(result);
+      setBpmStatus(`检测到 ${result} BPM`);
+    } catch {
+      setBpmStatus('BPM 分析失败');
+    }
+  };
   const beatUs = 60_000_000 / bpm;
   const firstBeat = Math.ceil(startUs / beatUs);
   const beatCount = bpm > 0 && endUs > startUs ? Math.max(0, Math.min(500, Math.floor((endUs - firstBeat * beatUs) / beatUs) + 1)) : 0;
@@ -452,10 +477,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       </div>
       {document && onTimelineCommand && onSelectLine && <>
         <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
-          <button onClick={tapBpm}>Tap</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><small>拖动色块移动；拖边界调整；在词轨空白处拖出选区。空隙可点击闭合。</small></div>
-        <TimelineTracks document={document} selectedLineId={selectedLineId ?? null} startUs={startUs} endUs={endUs} bpm={bpm} snap={snap}
+          <button onClick={tapBpm}>Tap</button><button disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label><small>{bpmStatus || '拖动色块移动；拖边界调整；在词轨空白处拖出选区。空隙可点击闭合。'}</small></div>
+        <TimelineTracks document={document} selectedLineId={selectedLineId ?? null} startUs={startUs} endUs={endUs} positionUs={Math.round(position * 1e6)} bpm={bpm} snap={snap}
           apply={onTimelineCommand} onSelectLine={onSelectLine} onError={setError} />
       </>}
+      {showSpectrum && asset && <SpectrogramCanvas projectId={projectId} startUs={startUs} endUs={endUs} durationUs={Math.round(duration * 1e6)} />}
       <div className={styles.controls}>
         <button
           className={styles.play}
@@ -541,6 +567,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         >
           −
         </button>
+        <button disabled={disabled} className={showSpectrum ? styles.active : ''} onClick={() => setShowSpectrum((value) => !value)}>频谱</button>
         {error ? (
           <button className={styles.error} onClick={retryMedia}>
             {error} · 重试

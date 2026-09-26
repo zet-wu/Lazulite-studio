@@ -58,6 +58,8 @@
   pointer-events: none;
 }
 .beatLine { position: absolute; inset-block: 0; width: 1px; background: #d6b27d77; pointer-events: none; }
+.spectrogram canvas { display: block; width: 100%; height: 72px; border-radius: 3px; }
+.spectrogram small, .spectrumHint { color: #756b5f; font-size: 11px; margin: 0; }
 .timelineTools { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; font-size: 11px; color: #5d6674; }
 .timelineTools input[type="number"] { width: 4.5em; }
 .timelineTools button, .timelineTools input { border: 1px solid var(--line); border-radius: 4px; background: #fff; color: #5d6674; padding: 3px 5px; }
@@ -68,6 +70,7 @@
 .trackBar, .gapBar { position: absolute; box-sizing: border-box; inset-block: 1px; display: flex; align-items: center; overflow: hidden; white-space: nowrap; border: 1px solid #7297d6; border-radius: 3px; background: #a9c5ef; color: #233c65; cursor: grab; touch-action: none; }
 .trackBar:active { cursor: grabbing; }
 .trackSelected { background: #518ae2; color: #fff; border-color: #2d64bc; }
+.trackPlaying { box-shadow: inset 0 0 0 2px #f0a42b; }
 .trackBarText { flex: 1; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .trackHandle { width: 5px; min-width: 5px; height: 100%; cursor: ew-resize; background: #487acb66; }
 .gapBar { justify-content: center; min-width: 12px; padding: 0 2px; border-color: #c58c45; background: #f7d6a3; color: #674414; font-size: 9px; }
