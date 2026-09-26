@@ -245,6 +245,14 @@ export const studioApi = {
     ),
   audioUrl: (projectId: string) =>
     `${API_ROOT}/projects/${encodeURIComponent(projectId)}/audio`,
+  getPcmWindow: async (projectId: string, startUs: number, endUs: number, signal?: AbortSignal) => {
+    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/pcm?start_us=${startUs}&end_us=${endUs}`, { credentials: 'include', signal });
+    if (!response.ok) throw new Error(`PCM window request failed: ${response.status}`);
+    const rate = Number(response.headers.get('x-sample-rate'));
+    const channels = Number(response.headers.get('x-channels'));
+    if (!Number.isSafeInteger(rate) || rate < 1000 || !Number.isSafeInteger(channels) || channels < 1 || channels > 8) throw new Error('Invalid PCM window headers');
+    return { pcm: await response.arrayBuffer(), rate, channels };
+  },
 };
 
 export type StudioPaths = paths;

@@ -24,6 +24,24 @@ export const handlers = [
     return HttpResponse.json({ id, status: 'failed', revision, asset_id: assetId }, { status: 202 });
   }),
   http.get(`${root}/projects/:projectId/document`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'empty' ? emptyDocument : currentDocument) : error(404, 'project_not_found', '项目不存在')),
+  http.get(`${root}/projects/:projectId/waveform`, ({ params, request }) => {
+    if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
+    const query = new URL(request.url).searchParams;
+    const bucket_us = 10_000 * 2 ** Number(query.get('level') ?? 8);
+    const start_us = Math.floor(Number(query.get('start_us') ?? 0) / bucket_us) * bucket_us;
+    const end_us = Math.ceil(Number(query.get('end_us') ?? 120_000_000) / bucket_us) * bucket_us;
+    const maximum = Array.from({ length: Math.max(0, (end_us - start_us) / bucket_us) }, (_, index) => (Math.floor((start_us + index * bucket_us) / 500_000) !== Math.floor((start_us + (index - 1) * bucket_us) / 500_000) ? 0.8 : 0.1));
+    return response({ schema_version: 'studio-waveform-v1', asset_id: 'sample-asset', asset_hash: 'sample', version: 'peaks-v1', level: Number(query.get('level') ?? 8), start_us, end_us, bucket_us, minimum: maximum.map((value) => -value), maximum });
+  }),
+  http.get(`${root}/projects/:projectId/pcm`, ({ params, request }) => {
+    if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
+    const query = new URL(request.url).searchParams;
+    const start = Number(query.get('start_us') ?? 0), end = Number(query.get('end_us') ?? 0);
+    if (end <= start || end - start > 4_000_000) return error(422, 'invalid_range', 'PCM 范围无效');
+    const rate = 16_000;
+    const pcm = Int16Array.from({ length: Math.ceil((end - start) / 1_000_000 * rate) }, (_, index) => Math.round(Math.sin(2 * Math.PI * 440 * index / rate) * 9000));
+    return new HttpResponse(pcm.buffer, { headers: { 'content-type': 'application/octet-stream', 'x-sample-rate': String(rate), 'x-channels': '1' } });
+  }),
   http.get(`${root}/projects/:projectId/reading-dictionary`, ({ params }) => params.projectId === 'sample-project' ? response(readingDictionary) : error(404, 'project_not_found', '项目不存在')),
   http.post(`${root}/projects/:projectId/reading-dictionary`, async ({ params, request }) => {
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
