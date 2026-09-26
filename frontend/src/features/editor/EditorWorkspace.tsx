@@ -14,7 +14,9 @@ import { BatchToolsPanel } from './BatchToolsPanel';
 import { RubyWordEditor } from './RubyWordEditor';
 import { RomanizationPanel } from './RomanizationPanel';
 import { SyncPanel } from './SyncPanel';
+import { MetadataPanel } from './MetadataPanel';
 import type { TransportHandle } from '../MediaTransport';
+import type { LyricFormat } from '../../adapters/lyric-formats';
 import styles from './semantic-editor.module.css';
 
 const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
@@ -36,6 +38,7 @@ type Props = {
   onNew?: () => void;
   onDraft: () => void;
   onFinal: () => void;
+  onExportFormat?: (format: LyricFormat) => void;
   auxiliary?: ReactNode;
   selectedLineId?: string | null;
   playheadLineId?: string | null;
@@ -417,7 +420,7 @@ export function EditorWorkspace(props: Props) {
         </>}
       </>}
         <h2>歌手</h2>{document.agents.map((agent) => <div key={agent.id}><strong>{agent.id}</strong><DraftInput value={agent.name ?? ''} label={`歌手 ${agent.id}`} onCommit={(name) => dispatch({ type: 'set-agents', agents: document.agents.map((item) => item.id === agent.id ? { ...item, name: name || null } : item) })} /><button onClick={() => dispatch({ type: 'set-agents', agents: document.agents.filter((item) => item.id !== agent.id) })}>删除歌手</button></div>)}<button onClick={() => { const id = window.prompt('歌手 ID'); if (!id) return; if (document.agents.some((agent) => agent.id === id)) return setMessage('歌手 ID 已存在'); const name = window.prompt('歌手名称') || null; dispatch({ type: 'set-agents', agents: [...document.agents, { id, name, type: null }] }); }}>添加歌手</button>
-        <h2>元数据</h2>{(['title', 'artist', 'songwriter'] as const).map((key) => <label key={key}>{key}<DraftInput value={document.metadata[key]?.[0] ?? ''} label={key} onCommit={(value) => dispatch({ type: 'set-metadata', key, values: value ? [value] : [] })} /></label>)}
+        <MetadataPanel document={document} apply={dispatch} />
         {props.auxiliary}
       </aside></div>}
     {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRecoveryAdapter } from '../../adapters/recovery';
-import { parseLyricTtml, serializeLyricTtml } from '../../adapters/ttml/lyric-codec';
+import { serializeLyricTtml } from '../../adapters/ttml/lyric-codec';
+import { detectLyricFormat, exportLyricFile, importLyricFile, type LyricFormat } from '../../adapters/lyric-formats';
 import { createLyricEditorState, executeLyricCommand, redoLyricCommand, undoLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
 import { createLyricDocument, type LyricDocument } from '../../domain/lyric-document';
 import { EditorWorkspace } from './EditorWorkspace';
 
 function download(xml: string, name: string) {
-  const url = URL.createObjectURL(new Blob([xml], { type: 'application/ttml+xml' }));
+  const url = URL.createObjectURL(new Blob([xml], { type: name.endsWith('.ttml') ? 'application/ttml+xml' : 'text/plain;charset=utf-8' }));
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = name;
@@ -52,7 +53,9 @@ export function LocalEditor() {
   const open = async (file: File) => {
     if (dirty && !window.confirm('当前修改尚未保存，确定打开其他文件吗？')) return;
     try {
-      const parsed = parseLyricTtml(await file.text());
+      const format = detectLyricFormat(file.name);
+      if (format === 'ass') throw new Error('ASS 目前仅支持导出');
+      const parsed = importLyricFile(await file.text(), format);
       await createRecoveryAdapter().clear('local');
       touched.current = true;
       setState(createLyricEditorState(parsed));
@@ -63,6 +66,10 @@ export function LocalEditor() {
   };
   const exportFile = (draft: boolean) => {
     try { download(serializeLyricTtml(state.present, { draft }), name.replace(/\.ttml$/i, '') + (draft ? '.draft.ttml' : '.ttml')); setMessage(null); }
+    catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
+  };
+  const exportFormat = (format: LyricFormat) => {
+    try { download(exportLyricFile(state.present, format), name.replace(/\.[^.]*$/, '') + '.' + format); setMessage(null); }
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
   };
   const createNew = async () => {
@@ -76,5 +83,5 @@ export function LocalEditor() {
   return <EditorWorkspace title={name} document={state.present} apply={apply} undo={() => setState(undoLyricCommand)} redo={() => setState(redoLyricCommand)}
     canUndo={state.past.length > 0} canRedo={state.future.length > 0} dirty={dirty} saving={saving} error={message}
     onSave={() => void save()} onOpen={(file) => void open(file)} onNew={() => void createNew()}
-    onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} />;
+    onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat} />;
 }

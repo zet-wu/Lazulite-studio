@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { studioApi, studioS4, type Asset, type ImportProposal } from '../adapters/http/client';
 import type { JobResult } from '../adapters/http/jobs';
 import { serializeLyricTtml } from '../adapters/ttml/lyric-codec';
+import { detectLyricFormat, exportLyricFile, importLyricFile, type LyricFormat } from '../adapters/lyric-formats';
 import { lineText, type LyricLine } from '../domain/lyric-document';
 import { CandidatePanel } from './CandidatePanel';
 import { JobPanel } from './JobPanel';
@@ -16,7 +17,7 @@ import { useProjectDocument } from './useProjectDocument';
 import styles from './workspace.module.css';
 
 function download(xml: string, name: string) {
-  const url = URL.createObjectURL(new Blob([xml], { type: 'application/ttml+xml' }));
+  const url = URL.createObjectURL(new Blob([xml], { type: name.endsWith('.ttml') ? 'application/ttml+xml' : 'text/plain;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = url; link.download = name; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -65,6 +66,19 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     try { download(serializeLyricTtml(editor.document, { draft }), `${title}${draft ? '.draft' : ''}.ttml`); setMessage(''); }
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
   };
+  const openFile = async (file: File) => {
+    if (editor.dirty && !window.confirm('当前修改尚未保存，确定导入其他歌词吗？')) return;
+    try {
+      const format = detectLyricFormat(file.name);
+      if (format === 'ass') throw new Error('ASS 目前仅支持导出');
+      editor.apply({ type: 'replace-document', document: importLyricFile(await file.text(), format) });
+      setMessage('歌词已导入，请检查后保存');
+    } catch (error) { setMessage(error instanceof Error ? error.message : '导入失败'); }
+  };
+  const exportFormat = (format: LyricFormat) => {
+    try { download(exportLyricFile(editor.document, format), `${title}.${format}`); setMessage(''); }
+    catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
+  };
   const rubyOptions = (line?.words ?? []).flatMap((word) => {
     return word.rubyUnits.map((unit) => {
       const baseStart = line ? Array.from(line.words.slice(0, line.words.indexOf(word)).map((item) => item.text).join('')).length : 0;
@@ -87,7 +101,7 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
   </div>;
   return <div className={styles.editorShell}><EditorWorkspace embedded title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
-    onSave={() => void editor.save()} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} auxiliary={auxiliary}
+    onSave={() => void editor.save()} onOpen={(file) => void openFile(file)} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat} auxiliary={auxiliary}
     selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { setSelectedLineId(id); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
     onSelectUnit={(lineId, wordId, rubyId) => setSelectedUnit(wordId ? { lineId, wordId, rubyId } : null)} />
     {editor.recovery.available && <aside>发现本地草稿 <button onClick={() => void editor.restore().catch((error) => setMessage(error.message))}>恢复</button><button onClick={() => void editor.discardRecovery().catch((error) => setMessage(error.message))}>丢弃</button></aside>}

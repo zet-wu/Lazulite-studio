@@ -9,6 +9,22 @@ async function upload(page: import('@playwright/test').Page) {
   await expect(page.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
 }
 
+test('imports text lines and exports a timed project as LRC and ASS', async ({ page }) => {
+  await page.goto('/editor');
+  await page.locator('input[type="file"]').setInputFiles({ name: 'plain.txt', mimeType: 'text/plain', buffer: Buffer.from('First\nSecond\n') });
+  await expect(page.getByRole('textbox', { name: '词 First', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '词 Second', exact: true })).toBeVisible();
+  await page.goto('/projects/sample-project/edit');
+  await page.getByRole('combobox', { name: '导出格式' }).selectOption('lrc');
+  const lrcDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出所选格式' }).click();
+  expect(await readFile(await (await lrcDownload).path(), 'utf8')).toContain('夜の風が静かに吹く');
+  await page.getByRole('combobox', { name: '导出格式' }).selectOption('ass');
+  const assDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出所选格式' }).click();
+  expect(await readFile(await (await assDownload).path(), 'utf8')).toContain('[Events]');
+});
+
 test('imports, edits, undoes and downloads Ruby with background vocals', async ({ page }) => {
   await upload(page);
   await page.setViewportSize({ width: 390, height: 844 });
