@@ -1,6 +1,8 @@
 import {
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   type KeyboardEvent,
@@ -27,13 +29,21 @@ type Props = {
   onPosition?: (positionUs: number) => void;
 };
 
-export function MediaTransport({
+export type TransportHandle = {
+  getPositionUs: () => number;
+  seekUs: (timeUs: number) => void;
+  play: () => void;
+  pause: () => void;
+  audition: (beginUs: number, endUs: number) => void;
+};
+
+export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaTransport({
   projectId,
   selectedLine,
   asset,
   loopRange,
   onPosition,
-}: Props) {
+}: Props, ref) {
   const audio = useRef<HTMLAudioElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const head = useRef<HTMLSpanElement>(null);
@@ -41,6 +51,7 @@ export function MediaTransport({
   const slider = useRef<HTMLDivElement>(null);
   const raf = useRef<number | undefined>(undefined);
   const positionRef = useRef(0);
+  const auditionEnd = useRef<number | null>(null);
   const [duration, setDuration] = useState(
     asset?.duration_us ? asset.duration_us / 1e6 : 0,
   );
@@ -124,6 +135,7 @@ export function MediaTransport({
   const seekTo = useCallback(
     (raw: number) => {
       if (!audio.current || !asset || !duration) return;
+      auditionEnd.current = null;
       const current = Math.max(0, Math.min(duration, raw));
       audio.current.currentTime = Math.max(0, current - offset(asset));
       updateDom(current);
@@ -138,6 +150,19 @@ export function MediaTransport({
       void audio.current.play().catch(() => setError("媒体无法播放，请重试"));
     else audio.current.pause();
   }, [asset]);
+  useImperativeHandle(ref, () => ({
+    getPositionUs: () => Math.round(positionRef.current * 1_000_000),
+    seekUs: (timeUs) => { auditionEnd.current = null; seekTo(timeUs / 1_000_000); },
+    play: () => { if (audio.current?.paused) play(); },
+    pause: () => audio.current?.pause(),
+    audition: (beginUs, endUs) => {
+      if (!asset || endUs <= beginUs) return;
+      setLoop('off');
+      seekTo(beginUs / 1_000_000);
+      auditionEnd.current = endUs / 1_000_000;
+      if (audio.current?.paused) play();
+    },
+  }), [asset, play, seekTo]);
 
   useEffect(() => {
     const d = asset?.duration_us ? asset.duration_us / 1e6 : 0;
@@ -199,6 +224,11 @@ export function MediaTransport({
     const frame = () => {
       const current = readPosition();
       updateDom(current);
+      if (auditionEnd.current !== null && current >= auditionEnd.current) {
+        auditionEnd.current = null;
+        el.pause();
+        return;
+      }
       const range = activeLoop();
       if (range && current >= range[1]) {
         el.currentTime = Math.max(0, range[0] - offset(asset));
@@ -492,4 +522,4 @@ export function MediaTransport({
       </div>
     </footer>
   );
-}
+});

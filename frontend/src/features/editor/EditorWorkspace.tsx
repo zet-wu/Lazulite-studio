@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord } from '../../domain/lyric-document';
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
@@ -13,6 +13,8 @@ import { SegmentationPanel } from './SegmentationPanel';
 import { BatchToolsPanel } from './BatchToolsPanel';
 import { RubyWordEditor } from './RubyWordEditor';
 import { RomanizationPanel } from './RomanizationPanel';
+import { SyncPanel } from './SyncPanel';
+import type { TransportHandle } from '../MediaTransport';
 import styles from './semantic-editor.module.css';
 
 const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
@@ -37,6 +39,8 @@ type Props = {
   selectedLineId?: string | null;
   playheadLineId?: string | null;
   onSelectLine?: (id: string) => void;
+  onSelectUnit?: (lineId: string, wordId: string | null, rubyId: string | null) => void;
+  transport?: RefObject<TransportHandle | null>;
 };
 
 type DragSource = { kind: 'line'; lineId: string } | { kind: 'word'; lineId: string; wordId: string };
@@ -54,6 +58,7 @@ export function EditorWorkspace(props: Props) {
   const touchDrag = useRef<{ source: DragSource; target: string | null } | null>(null);
   const wordInputs = useRef(new Map<string, HTMLInputElement>());
   const [simpleLayout, setSimpleLayout] = useState(false);
+  const [mode, setMode] = useState<'edit' | 'sync'>('edit');
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [editingWordId, setEditingWordId] = useState<string | null>(null);
@@ -120,6 +125,7 @@ export function EditorWorkspace(props: Props) {
     const ids = selectIds(mainIds, previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
     setSelection({ kind: 'lines', ids, anchorId: shift || toggle ? previous?.anchorId ?? id : id, activeId: line.id });
     props.onSelectLine?.(line.id);
+    props.onSelectUnit?.(line.id, null, null);
   };
   const selectWord = (line: LyricLine, word: LyricWord, shift = false, toggle = false, rubyId: string | null = null) => {
     const previous = selection?.kind === 'words' ? selection : null;
@@ -127,6 +133,7 @@ export function EditorWorkspace(props: Props) {
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? word.id, word.id, shift, toggle);
     setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift || toggle ? previous?.anchorId ?? word.id : word.id, activeId: word.id, rubyId });
     props.onSelectLine?.(line.id);
+    props.onSelectUnit?.(line.id, word.id, rubyId);
   };
   const dispatch = (command: LyricCommand) => {
     try { apply(command); setMessage(''); return true; }
@@ -330,6 +337,7 @@ export function EditorWorkspace(props: Props) {
     </div>
     <TimePair begin={word.beginUs} end={word.endUs} label={`词 ${word.text}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginUs, endUs })} />
     <DraftInput value={word.romanization} label={`逐词音译 ${word.text}`} placeholder="逐词音译" onCommit={(romanization) => dispatch({ type: 'set-word-romanization', lineId: line.id, wordId: word.id, romanization })} />
+    <label className={styles.emptyBeat}>空拍 <input type="number" min="0" max="32" aria-label={`词 ${word.text}空拍数`} value={word.emptyBeat} onChange={(event) => dispatch({ type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: Number(event.target.value) })} /></label>
   </LyricWordView>;
   return <div className={styles.page} onCopy={(event) => {
     if (isTextInput(event.target)) return;
@@ -352,14 +360,17 @@ export function EditorWorkspace(props: Props) {
   }}>
     <EditorMenu {...props} simpleLayout={simpleLayout} onToggleLayout={() => setSimpleLayout((value) => !value)} />
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
-    <EditorRibbon selection={selection} canPaste={Boolean(clipboard)}
+    <nav className={styles.modeTabs} aria-label="工作模式"><button aria-current={mode === 'edit' ? 'page' : undefined} onClick={() => setMode('edit')}>编辑</button><button aria-current={mode === 'sync' ? 'page' : undefined} onClick={() => setMode('sync')}>打轴</button></nav>
+    {mode === 'sync' && <SyncPanel document={document} currentLineId={selectedLine?.id ?? null} apply={dispatch} transport={props.transport}
+      onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; selectWord(line, word, false, false, cursor.rubyUnitId); requestLocate(line.id); }} />}
+    {mode === 'edit' && <EditorRibbon selection={selection} canPaste={Boolean(clipboard)}
       canMoveUp={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes[0] > 0}
       canMoveDown={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes.at(-1) !== document.lines.length - 1}
       copy={() => { copy(); }} cut={() => { cut(); }} paste={() => paste(clipboard)}
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)} openRomanization={() => setRomanizationOpen(true)}
-      canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)} />
+      canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)} />}
     <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
       {document.lines.map((line, index) => <div className={styles.outlineRow} key={line.id}>
         <button className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
@@ -388,6 +399,7 @@ export function EditorWorkspace(props: Props) {
       <aside className={styles.inspector}><h2>属性</h2>{selectedLine && <>
         <p>已选行：{selection?.kind === 'lines' && selection.ids.length > 1 ? `${selection.ids.length} 行` : lineText(selectedLine) || '空行'}</p>
         {selectedMainLines.length > 0 && <>
+          <label><input type="checkbox" checked={selectedMainLines.every((line) => line.ignoreSync)} onChange={(event) => dispatch({ type: 'batch', commands: selectedMainLines.map((line) => ({ type: 'set-ignore-sync', lineId: line.id, ignoreSync: event.target.checked })) })} /> 跳过打轴</label>
           <label>歌手 <select value={agentValue} onChange={(event) => dispatch({ type: 'batch', commands: selectedMainLines.map((line) => ({ type: 'set-line-agents', lineId: line.id, agentRefs: event.target.value ? [event.target.value] : [] })) })}>
             {agentValue === '__mixed__' && <option value="__mixed__" disabled>混合值</option>}
             <option value="">未指定</option>{document.agents.map((agent) => <option value={agent.id} key={agent.id}>{agent.name ?? agent.id}</option>)}

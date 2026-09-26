@@ -89,6 +89,17 @@
 .romanizationPreview label { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 6px; }
 .romanizationPreview input { min-width: 0; width: 100%; padding: 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--canvas); color: var(--ink); }
 .romanizationPreview em { grid-column: 1 / -1; color: var(--warning, #b35b18); font-style: normal; }
+.modeTabs, .syncButtons { display: flex; flex-wrap: wrap; gap: 6px; }
+.modeTabs { padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.modeTabs button[aria-current="page"] { background: var(--blue-soft); border-color: var(--blue); }
+.syncPanel { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.syncPanel button, .modeTabs button { border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; background: var(--canvas); color: var(--ink); cursor: pointer; }
+.syncPanel button:disabled { opacity: .5; cursor: default; }
+.syncPanel input { width: 7em; padding: 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--canvas); color: var(--ink); }
+.syncBindings { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; }
+.syncBindings label { display: grid; gap: 3px; }
+.emptyBeat { display: flex; align-items: center; gap: 4px; font-size: 11px; }
+.emptyBeat input { width: 3.5em; }
 @media (max-width: 600px) { .romanizationPreview > div { grid-template-columns: 1fr; } }
 .segmentPreview { display: grid; gap: 5px; max-height: 28dvh; overflow: auto; border-top: 1px solid var(--line); padding-top: 8px; font-size: 13px; }
 .segmentPreview > div { display: grid; grid-template-columns: 1fr 1.5fr; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 0; }

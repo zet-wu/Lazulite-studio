@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { studioApi, studioS4, type Asset, type ImportProposal } from '../adapters/http/client';
@@ -7,7 +7,7 @@ import { serializeLyricTtml } from '../adapters/ttml/lyric-codec';
 import { lineText, type LyricLine } from '../domain/lyric-document';
 import { CandidatePanel } from './CandidatePanel';
 import { JobPanel } from './JobPanel';
-import { MediaTransport } from './MediaTransport';
+import { MediaTransport, type TransportHandle } from './MediaTransport';
 import { ReadingDictionaryPanel } from './ReadingDictionaryPanel';
 import { ReviewPanel } from './ReviewPanel';
 import { JobCandidatePanel } from './JobCandidatePanel';
@@ -31,6 +31,7 @@ export function Workspace({ projectId }: { projectId: string }) {
 }
 
 function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }: { projectId: string; title: string; initialTtml: string; initialRevision: string; asset: Asset | null }) {
+  const transport = useRef<TransportHandle>(null);
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const editor = useProjectDocument(projectId, initialTtml, initialRevision, undefined,
@@ -44,7 +45,14 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
   const [tab, setTab] = useState<'import' | 'tasks' | 'dictionary' | 'review'>('import');
   const [message, setMessage] = useState('');
   const [playheadLineId, setPlayheadLineId] = useState<string | null>(null);
+  const [selectedUnit, setSelectedUnit] = useState<{ lineId: string; wordId: string; rubyId: string | null } | null>(null);
   const line: LyricLine | undefined = editor.document.lines.find((item) => item.id === selectedLineId) ?? editor.document.lines[0];
+  const unitLine = editor.document.lines.find((item) => item.id === selectedUnit?.lineId);
+  const unitWord = unitLine?.words.find((item) => item.id === selectedUnit?.wordId);
+  const unitRuby = unitWord?.rubyUnits.find((item) => item.id === selectedUnit?.rubyId);
+  const unitBegin = unitRuby?.beginUs ?? unitWord?.beginUs;
+  const unitEnd = unitRuby?.endUs ?? unitWord?.endUs;
+  const unitRange = unitBegin != null && unitEnd != null ? { begin_us: unitBegin, end_us: unitEnd } : undefined;
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
       if (editor.dirty || editor.saving || editor.conflict) { event.preventDefault(); event.returnValue = ''; }
@@ -79,10 +87,11 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
   return <><EditorWorkspace title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
     onSave={() => void editor.save()} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} auxiliary={auxiliary}
-    selectedLineId={selectedLineId} playheadLineId={playheadLineId} onSelectLine={(id) => { setSelectedLineId(id); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }} />
+    selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { setSelectedLineId(id); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
+    onSelectUnit={(lineId, wordId, rubyId) => setSelectedUnit(wordId ? { lineId, wordId, rubyId } : null)} />
     {editor.recovery.available && <aside>发现本地草稿 <button onClick={() => void editor.restore().catch((error) => setMessage(error.message))}>恢复</button><button onClick={() => void editor.discardRecovery().catch((error) => setMessage(error.message))}>丢弃</button></aside>}
     {editor.conflict && <aside role="alert">服务器已有新版本，本地修改已保留。<button onClick={() => exportFile(true)}>下载本地草稿</button><button onClick={() => { if (window.confirm('重新加载服务器版本并清除本地检查点？')) void editor.discardRecovery().then(() => window.location.reload()); }}>重新加载服务器</button></aside>}
-    <MediaTransport projectId={projectId} selectedLine={line ? { begin_us: line.beginUs, end_us: line.endUs } : undefined} asset={asset}
+    <MediaTransport ref={transport} projectId={projectId} selectedLine={line ? { begin_us: line.beginUs, end_us: line.endUs } : undefined} loopRange={unitRange} asset={asset}
       onPosition={(positionUs) => {
         const active = editor.document.lines.find((item) => !item.backgroundOf && item.beginUs !== null && item.endUs !== null && item.beginUs <= positionUs && positionUs < item.endUs)?.id ?? null;
         setPlayheadLineId((current) => current === active ? current : active);
