@@ -59,6 +59,24 @@ describe('semantic TTML codec', () => {
     expect(reopened.lines[0].words[0].rubyUnits).toEqual(document.lines[0].words[0].rubyUnits);
   });
 
+  it('roundtrips timed per-word romanization from the reference tool', () => {
+    const source = readFileSync('../docs/evidence/editor-e4/reference-word-roman.ttml', 'utf8');
+    const document = parseLyricTtml(source);
+    expect(document.lines[0].words.map((word) => word.romanization)).toEqual(['kyou', 'sora']);
+    expect(document.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['きょ', 'う']);
+    for (const draft of [true, false]) {
+      const reopened = parseLyricTtml(serializeLyricTtml(document, { draft }));
+      expect(reopened.lines[0].words.map((word) => word.romanization)).toEqual(['kyou', 'sora']);
+    }
+  });
+
+  it('keeps untimed per-word romanization in drafts and requires timing for exchange', () => {
+    const document = createLyricDocument('今日');
+    document.lines[0].words[0].romanization = 'kyou';
+    expect(parseLyricTtml(serializeLyricTtml(document, { draft: true })).lines[0].words[0].romanization).toBe('kyou');
+    expect(() => serializeLyricTtml(document)).toThrow(/needs timing/);
+  });
+
   it.each(['amll', 'apple'])('roundtrips reference %s metadata, song part and background timing', (style) => {
     const source = readFileSync(`../docs/evidence/editor-e0/reference-${style}-metadata.ttml`, 'utf8');
     const document = parseLyricTtml(source);
