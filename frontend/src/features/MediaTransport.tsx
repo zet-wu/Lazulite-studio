@@ -41,6 +41,7 @@ type Props = {
 
 export type TransportHandle = {
   getPositionUs: () => number;
+  isPlaying: () => boolean;
   seekUs: (timeUs: number) => void;
   play: () => void;
   pause: () => void;
@@ -173,6 +174,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   }, [asset]);
   useImperativeHandle(ref, () => ({
     getPositionUs: () => Math.round(positionRef.current * 1_000_000),
+    isPlaying: () => Boolean(audio.current && !audio.current.paused),
     seekUs: (timeUs) => { auditionEnd.current = null; seekTo(timeUs / 1_000_000); },
     play: () => { if (audio.current?.paused) play(); },
     pause: () => audio.current?.pause(),

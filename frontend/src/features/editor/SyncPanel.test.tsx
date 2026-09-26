@@ -14,7 +14,7 @@ it('stamps Ruby with configured keys while ignoring repeated and text-input keys
   ];
   let timeUs = 1_000_000;
   let state = createLyricEditorState(document);
-  const transport = { current: { getPositionUs: () => timeUs, seekUs: () => {}, play: () => {}, pause: () => {}, audition: () => {} } satisfies TransportHandle };
+  const transport = { current: { getPositionUs: () => timeUs, isPlaying: () => false, seekUs: () => {}, play: () => {}, pause: () => {}, audition: () => {} } satisfies TransportHandle };
   render(<SyncPanel document={document} currentLineId={document.lines[0].id} transport={transport} onCursor={() => {}}
     apply={(command) => { state = executeLyricCommand(state, command); return true; }} />);
   fireEvent.keyDown(window, { code: 'KeyS', key: 's', repeat: true });

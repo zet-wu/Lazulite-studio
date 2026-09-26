@@ -101,6 +101,21 @@ test('uses live PCM tiles for the spectrum and analyzes the beat', async ({ page
   await page.screenshot({ path: '../docs/evidence/editor-e6/studio-timeline-spectrum-1440.png', fullPage: true });
 });
 
+test('renders the current draft in AMLL preview and returns to editing', async ({ page }) => {
+  const errors = pageErrors(page);
+  await page.goto('/projects/sample-project/edit');
+  await page.getByRole('button', { name: '预览', exact: true }).click();
+  await expect(page.getByRole('region', { name: '动态歌词预览' })).toBeVisible();
+  await expect(page.getByText('夜の風が静かに吹く').first()).toBeVisible();
+  await page.getByText('遠い星を見上げて').first().click();
+  await expect(page.getByRole('slider', { name: '波形进度' })).toHaveAttribute('aria-valuenow', '5');
+  await page.getByRole('checkbox', { name: '翻译' }).uncheck();
+  await page.getByRole('checkbox', { name: '音译' }).uncheck();
+  await page.getByRole('button', { name: '编辑', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '歌词编辑' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("shows empty, error, expired, and loading states and can recover", async ({
   page,
 }) => {

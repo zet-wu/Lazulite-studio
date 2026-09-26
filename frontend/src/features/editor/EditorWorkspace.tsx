@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord } from '../../domain/lyric-document';
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
@@ -18,6 +18,7 @@ import type { TransportHandle } from '../MediaTransport';
 import styles from './semantic-editor.module.css';
 
 const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
+const PreviewMode = lazy(() => import('./PreviewMode').then((module) => ({ default: module.PreviewMode })));
 
 type Props = {
   title: string;
@@ -59,7 +60,7 @@ export function EditorWorkspace(props: Props) {
   const touchDrag = useRef<{ source: DragSource; target: string | null } | null>(null);
   const wordInputs = useRef(new Map<string, HTMLInputElement>());
   const [simpleLayout, setSimpleLayout] = useState(false);
-  const [mode, setMode] = useState<'edit' | 'sync'>('edit');
+  const [mode, setMode] = useState<'edit' | 'sync' | 'preview'>('edit');
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [editingWordId, setEditingWordId] = useState<string | null>(null);
@@ -361,7 +362,8 @@ export function EditorWorkspace(props: Props) {
   }}>
     <EditorMenu {...props} simpleLayout={simpleLayout} onToggleLayout={() => setSimpleLayout((value) => !value)} />
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
-    <nav className={styles.modeTabs} aria-label="工作模式"><button aria-current={mode === 'edit' ? 'page' : undefined} onClick={() => setMode('edit')}>编辑</button><button aria-current={mode === 'sync' ? 'page' : undefined} onClick={() => setMode('sync')}>打轴</button></nav>
+    <nav className={styles.modeTabs} aria-label="工作模式"><button aria-current={mode === 'edit' ? 'page' : undefined} onClick={() => setMode('edit')}>编辑</button><button aria-current={mode === 'sync' ? 'page' : undefined} onClick={() => setMode('sync')}>打轴</button><button aria-current={mode === 'preview' ? 'page' : undefined} onClick={() => setMode('preview')}>预览</button></nav>
+    {mode === 'preview' && <Suspense fallback={<p>正在载入预览…</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={props.onSelectLine} /></Suspense>}
     {mode === 'sync' && <SyncPanel document={document} currentLineId={selectedLine?.id ?? null} apply={dispatch} transport={props.transport}
       onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; selectWord(line, word, false, false, cursor.rubyUnitId); requestLocate(line.id); }} />}
     {mode === 'edit' && <EditorRibbon selection={selection} canPaste={Boolean(clipboard)}
@@ -372,7 +374,7 @@ export function EditorWorkspace(props: Props) {
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)} openRomanization={() => setRomanizationOpen(true)}
       canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)} />}
-    <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
+    {mode !== 'preview' && <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
       {document.lines.map((line, index) => <div className={styles.outlineRow} key={line.id}>
         <button className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
           onClick={(event) => { selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); requestLocate(line.id); }}>
@@ -417,7 +419,7 @@ export function EditorWorkspace(props: Props) {
         <h2>歌手</h2>{document.agents.map((agent) => <div key={agent.id}><strong>{agent.id}</strong><DraftInput value={agent.name ?? ''} label={`歌手 ${agent.id}`} onCommit={(name) => dispatch({ type: 'set-agents', agents: document.agents.map((item) => item.id === agent.id ? { ...item, name: name || null } : item) })} /><button onClick={() => dispatch({ type: 'set-agents', agents: document.agents.filter((item) => item.id !== agent.id) })}>删除歌手</button></div>)}<button onClick={() => { const id = window.prompt('歌手 ID'); if (!id) return; if (document.agents.some((agent) => agent.id === id)) return setMessage('歌手 ID 已存在'); const name = window.prompt('歌手名称') || null; dispatch({ type: 'set-agents', agents: [...document.agents, { id, name, type: null }] }); }}>添加歌手</button>
         <h2>元数据</h2>{(['title', 'artist', 'songwriter'] as const).map((key) => <label key={key}>{key}<DraftInput value={document.metadata[key]?.[0] ?? ''} label={key} onCommit={(value) => dispatch({ type: 'set-metadata', key, values: value ? [value] : [] })} /></label>)}
         {props.auxiliary}
-      </aside></div>
+      </aside></div>}
     {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
     {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
     {romanizationOpen && <RomanizationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setRomanizationOpen(false)} />}

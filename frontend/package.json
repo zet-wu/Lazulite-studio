@@ -14,6 +14,8 @@
     "contracts:generate": "openapi-typescript ../contracts/openapi.json -o src/adapters/http/generated.ts"
   },
   "dependencies": {
+    "@applemusic-like-lyrics/core": "0.5.2",
+    "@applemusic-like-lyrics/react": "0.5.2",
     "@tanstack/react-query": "5.85.5",
     "@tanstack/react-virtual": "3.14.13",
     "hyphen": "1.14.1",
