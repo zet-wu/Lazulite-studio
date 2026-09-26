@@ -26,6 +26,7 @@ type AtomicLyricCommand =
   | { type: 'set-ignore-sync'; lineId: string; ignoreSync: boolean }
   | { type: 'set-sublyrics'; lineId: string; kind: 'translations' | 'romanizations'; items: SubLyric[] }
   | { type: 'set-metadata'; key: string; values: string[] }
+  | { type: 'set-language'; language: string | null }
   | { type: 'set-agents'; agents: LyricAgent[] }
   | { type: 'sync-stamp'; cursor: SyncCursor; action: SyncAction; timeUs: number }
   | { type: 'replace-document'; document: LyricDocument }
@@ -365,6 +366,9 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       else delete metadata[command.key];
       return { ...document, metadata };
     }
+    case 'set-language':
+      if (command.language !== null && !/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(command.language)) throw new Error('Invalid language tag');
+      return { ...document, language: command.language };
     case 'set-agents':
       if (command.agents.some((agent) => !/^[A-Za-z_][\w.-]*$/.test(agent.id)) || new Set(command.agents.map((agent) => agent.id)).size !== command.agents.length) throw new Error('Invalid or duplicate agent ID');
       if (document.lines.some((line) => line.agentRefs.some((ref) => !command.agents.some((agent) => agent.id === ref)))) throw new Error('An assigned agent cannot be removed');
