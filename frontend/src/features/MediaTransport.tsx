@@ -14,6 +14,9 @@ import {
   type Asset,
 } from "../adapters/http/client";
 import styles from "./media.module.css";
+import type { LyricCommand } from '../domain/lyric-commands';
+import type { LyricDocument } from '../domain/lyric-document';
+import { TimelineTracks } from './TimelineTracks';
 
 const fmt = (s: number) => {
   if (!Number.isFinite(s)) return "--:--.---";
@@ -27,6 +30,10 @@ type Props = {
   asset: Asset | null;
   loopRange?: { begin_us: number; end_us: number };
   onPosition?: (positionUs: number) => void;
+  document?: LyricDocument;
+  selectedLineId?: string | null;
+  onTimelineCommand?: (command: LyricCommand) => void;
+  onSelectLine?: (lineId: string) => void;
 };
 
 export type TransportHandle = {
@@ -43,6 +50,10 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   asset,
   loopRange,
   onPosition,
+  document,
+  selectedLineId,
+  onTimelineCommand,
+  onSelectLine,
 }: Props, ref) {
   const audio = useRef<HTMLAudioElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -65,6 +76,9 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [pointB, setPointB] = useState<number | null>(null);
   const [loop, setLoop] = useState<"off" | "ab" | "line" | "unit">("off");
   const [error, setError] = useState("");
+  const [bpm, setBpm] = useState(120);
+  const [snap, setSnap] = useState(true);
+  const tapTimes = useRef<number[]>([]);
   const startUs = Math.round(start * 1e6);
   const end = Math.min(duration, start + span);
   const endUs = Math.round(end * 1e6);
@@ -365,6 +379,18 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   };
   const bandA = loop === "line" ? lineA : pointA;
   const bandB = loop === "line" ? lineB : pointB;
+  const tapBpm = () => {
+    const now = performance.now();
+    tapTimes.current = [...tapTimes.current.filter((value) => now - value < 3000), now].slice(-8);
+    const intervals = tapTimes.current.slice(1).map((value, index) => value - tapTimes.current[index]);
+    if (intervals.length >= 2) {
+      const sorted = intervals.slice().sort((left, right) => left - right);
+      setBpm(Math.round(60_000 / sorted[Math.floor(sorted.length / 2)]));
+    }
+  };
+  const beatUs = 60_000_000 / bpm;
+  const firstBeat = Math.ceil(startUs / beatUs);
+  const beatCount = bpm > 0 && endUs > startUs ? Math.max(0, Math.min(500, Math.floor((endUs - firstBeat * beatUs) / beatUs) + 1)) : 0;
   return (
     <footer className={styles.footer} onKeyDown={keyDown}>
       <audio
@@ -413,6 +439,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           onClick={disabled ? undefined : seekClick}
         />
         <span ref={head} className={styles.head} />
+        {snap && Array.from({ length: beatCount }, (_, index) => <span key={index} className={styles.beatLine} style={{ left: `${((firstBeat + index) * beatUs - startUs) / (endUs - startUs) * 100}%` }} />)}
         {bandA != null && bandB != null && bandB > bandA && (
           <span
             className={styles.band}
@@ -423,6 +450,12 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           />
         )}
       </div>
+      {document && onTimelineCommand && onSelectLine && <>
+        <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
+          <button onClick={tapBpm}>Tap</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><small>拖动色块移动；拖边界调整；在词轨空白处拖出选区。空隙可点击闭合。</small></div>
+        <TimelineTracks document={document} selectedLineId={selectedLineId ?? null} startUs={startUs} endUs={endUs} bpm={bpm} snap={snap}
+          apply={onTimelineCommand} onSelectLine={onSelectLine} onError={setError} />
+      </>}
       <div className={styles.controls}>
         <button
           className={styles.play}

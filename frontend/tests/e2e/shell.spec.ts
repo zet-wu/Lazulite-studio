@@ -63,6 +63,26 @@ test('records keyboard sync marks against one playing audio clock', async ({ pag
   await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible();
 });
 
+test('drags a timed word on the waveform tracks and undoes it once', async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  const start = page.getByRole('textbox', { name: '词 夜の風が静かに吹く开始秒数' });
+  const end = page.getByRole('textbox', { name: '词 夜の風が静かに吹く结束秒数' });
+  await start.fill('0'); await start.blur();
+  await end.fill('5'); await end.blur();
+  for (let index = 0; index < 3; index++) await page.getByRole('button', { name: '放大波形' }).click();
+  const bar = page.getByRole('button', { name: '时间轴词 夜の風が静かに吹く' });
+  await expect(bar).toBeVisible();
+  const box = (await bar.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 32, box.y + box.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await expect(start).not.toHaveValue('0');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(start).toHaveValue('0');
+  await expect(end).toHaveValue('5');
+});
+
 test("shows empty, error, expired, and loading states and can recover", async ({
   page,
 }) => {
