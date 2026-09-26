@@ -12,6 +12,7 @@ import { EditorRibbon } from './EditorRibbon';
 import { SegmentationPanel } from './SegmentationPanel';
 import { BatchToolsPanel } from './BatchToolsPanel';
 import { RubyWordEditor } from './RubyWordEditor';
+import { RomanizationPanel } from './RomanizationPanel';
 import styles from './semantic-editor.module.css';
 
 const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
@@ -58,6 +59,7 @@ export function EditorWorkspace(props: Props) {
   const [editingWordId, setEditingWordId] = useState<string | null>(null);
   const [segmentationOpen, setSegmentationOpen] = useState(false);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
+  const [romanizationOpen, setRomanizationOpen] = useState(false);
   const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number } | null>(null);
   const rubyShortcutSerial = useRef(0);
   const [rubyBaseOpen, setRubyBaseOpen] = useState(false);
@@ -327,6 +329,7 @@ export function EditorWorkspace(props: Props) {
       <button aria-label={`删除词 ${word.text}`} onClick={() => dispatch({ type: 'delete-word', lineId: line.id, wordId: word.id })}>×</button>
     </div>
     <TimePair begin={word.beginUs} end={word.endUs} label={`词 ${word.text}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginUs, endUs })} />
+    <DraftInput value={word.romanization} label={`逐词音译 ${word.text}`} placeholder="逐词音译" onCommit={(romanization) => dispatch({ type: 'set-word-romanization', lineId: line.id, wordId: word.id, romanization })} />
   </LyricWordView>;
   return <div className={styles.page} onCopy={(event) => {
     if (isTextInput(event.target)) return;
@@ -355,7 +358,7 @@ export function EditorWorkspace(props: Props) {
       copy={() => { copy(); }} cut={() => { cut(); }} paste={() => paste(clipboard)}
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
-      moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
+      moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)} openRomanization={() => setRomanizationOpen(true)}
       canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)} />
     <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
       {document.lines.map((line, index) => <div className={styles.outlineRow} key={line.id}>
@@ -404,6 +407,7 @@ export function EditorWorkspace(props: Props) {
       </aside></div>
     {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
     {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
+    {romanizationOpen && <RomanizationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setRomanizationOpen(false)} />}
     {rubyBaseOpen && <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRubyBaseOpen(false); }}><section className={styles.dialog} role="dialog" aria-modal="true" aria-label="整体 Ruby"><div className={styles.dialogHeader}><h2>整体 Ruby</h2><button aria-label="关闭整体 Ruby" onClick={() => setRubyBaseOpen(false)}>×</button></div><p>base：{rubyBaseWords.map((word) => word.text).join('')}</p><label>读音 <input autoFocus value={rubyBaseReading} onChange={(event) => setRubyBaseReading(event.target.value)} onKeyDown={(event) => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') createRubyBase(); if (event.key === 'Escape') setRubyBaseOpen(false); }} /></label><p>合并相邻词后创建一个整体读音；其他词和时间保持原样。</p><div className={styles.dialogActions}><button onClick={() => setRubyBaseOpen(false)}>取消</button><button disabled={!rubyBaseReading} onClick={createRubyBase}>应用（一次撤销）</button></div></section></div>}
   </div>;
 }

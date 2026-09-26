@@ -427,6 +427,24 @@ test('reports invalid inline time without losing the edit session', async ({ pag
   await expect(start).toHaveValue('1');
 });
 
+test('previews line romanization, generates timed Ruby, and undoes the batch', async ({ page }) => {
+  await page.goto('/editor');
+  const xml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="L1" begin="0s" end="4s"><span begin="1s" end="2s">今日</span><span begin="2s" end="2.5s">も</span><span begin="2.5s" end="4s" tts:ruby="container"><span tts:ruby="base">宇宙</span><span tts:ruby="text"><span begin="2.5s" end="4s">そら</span></span></span><span ttm:role="x-roman">kyou mo sora</span></p></body></tt>';
+  await page.locator('input[type="file"]').setInputFiles({ name: 'roman.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await page.getByRole('button', { name: '音译与 Ruby…' }).click();
+  await page.getByRole('button', { name: '生成预览' }).click();
+  const dialog = page.getByRole('dialog', { name: '音译与 Ruby' });
+  await expect(dialog.getByRole('textbox', { name: '逐词音译 今日' })).toHaveValue('kyou');
+  await expect(dialog.getByText('Ruby：きょ │ う')).toBeVisible();
+  await expect(dialog.getByText('已有 Ruby：そら（保留）')).toBeVisible();
+  await dialog.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await expect(page.locator('[data-line-id="L1"] [data-word-id]').first().getByRole('textbox', { name: '读音 今日' })).toHaveCount(2);
+  await expect(page.getByRole('textbox', { name: '逐词音译 宇宙' })).toHaveValue('sora');
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('[data-line-id="L1"] [data-word-id]').first().getByRole('textbox', { name: '读音 今日' })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: '逐词音译 宇宙' })).toHaveValue('');
+});
+
 test('keeps IME composition active when Escape is pressed', async ({ page }) => {
   await upload(page);
   const word = page.getByRole('textbox', { name: '词 今日', exact: true });

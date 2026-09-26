@@ -11,13 +11,13 @@ function parseSeconds(value: string): TimeUs {
   return number;
 }
 
-export function DraftInput({ value, label, onCommit, onFocus, onSplit, onMergePrevious, onMove, onNavigate, inputRef, readOnly, onEdit, onExit }: { value: string; label: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number, draft: string) => void; onMergePrevious?: (draft: string) => void; onMove?: (direction: -1 | 1) => void; onNavigate?: (direction: -1 | 1) => void; inputRef?: (node: HTMLInputElement | null) => void; readOnly?: boolean; onEdit?: () => void; onExit?: () => void }) {
+export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSplit, onMergePrevious, onMove, onNavigate, inputRef, readOnly, onEdit, onExit }: { value: string; label: string; placeholder?: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number, draft: string) => void; onMergePrevious?: (draft: string) => void; onMove?: (direction: -1 | 1) => void; onNavigate?: (direction: -1 | 1) => void; inputRef?: (node: HTMLInputElement | null) => void; readOnly?: boolean; onEdit?: () => void; onExit?: () => void }) {
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   const cancelled = useRef(false);
   useEffect(() => setDraft(value), [value]);
-  return <input ref={(node) => { ref.current = node; inputRef?.(node); }} aria-label={label} value={draft} readOnly={readOnly} onChange={(event) => { cancelled.current = false; setDraft(event.target.value); }} onFocus={onFocus} onDoubleClick={onEdit}
+  return <input ref={(node) => { ref.current = node; inputRef?.(node); }} aria-label={label} placeholder={placeholder} value={draft} readOnly={readOnly} onChange={(event) => { cancelled.current = false; setDraft(event.target.value); }} onFocus={onFocus} onDoubleClick={onEdit}
     onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
     onBlur={() => { onExit?.(); if (cancelled.current) { cancelled.current = false; return; } if (draft !== value) onCommit(draft); }}
     onKeyDown={(event) => {
