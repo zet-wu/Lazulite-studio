@@ -29,6 +29,17 @@ it('maps a reading candidate to the matching semantic word', () => {
   expect(state.present.lines[0].words[1]).toBe(document.lines[0].words[1]);
 });
 
+it('merges adjacent words into one Ruby base for a reading candidate', () => {
+  const document = parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="line"><span>宇</span><span>宙</span><span>へ</span></p></body></tt>');
+  const result: ReadingResult = { kind: 'reading', binding: { revision: 'r1', asset_id: 'asset' }, proposals: [{ line_id: 'line', proposal_id: 'p1', base_start: 0, base_end: 2, base: '宇宙', reading: 'そら', source: 'dictionary', needs_review: true }] };
+  let state = createLyricEditorState(document);
+  render(<JobCandidatePanel result={result} currentRevision="r1" currentAssetId="asset" dirty={false} document={document} onApply={(command) => { state = executeLyricCommand(state, command); }} />);
+  fireEvent.click(screen.getByRole('button', { name: '人工应用候选' }));
+  expect(state.present.lines[0].words.map((word) => word.text)).toEqual(['宇宙', 'へ']);
+  expect(state.present.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['そら']);
+  expect(state.present.lines[0].words[1]).toBe(document.lines[0].words[2]);
+});
+
 it('maps forced Ruby timing to a Ruby unit without touching another word', () => {
   const document = parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="line"><span tts:ruby="container"><span tts:ruby="base">今日</span><span tts:ruby="textContainer"><span tts:ruby="text">きょう</span></span></span><span>宇宙</span></p></body></tt>');
   const word = document.lines[0].words[0];

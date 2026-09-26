@@ -16,11 +16,16 @@ function candidateDocument(lines: Array<{ text?: string; id?: string; start?: nu
   return document;
 }
 
-function wordAtRange(line: LyricLine, begin: number, end: number, text: string): LyricWord | null {
+function wordsAtRange(line: LyricLine, begin: number, end: number, text: string): LyricWord[] | null {
   let offset = 0;
-  for (const word of line.words) {
+  let first = -1;
+  for (const [index, word] of line.words.entries()) {
     const next = offset + Array.from(word.text).length;
-    if (offset === begin && next === end && word.text === text) return word;
+    if (offset === begin) first = index;
+    if (next === end && first >= 0) {
+      const words = line.words.slice(first, index + 1);
+      return words.map((item) => item.text).join('') === text ? words : null;
+    }
     offset = next;
   }
   return null;
@@ -36,12 +41,16 @@ function wordCovering(line: LyricLine, begin: number, end: number): LyricWord | 
   return null;
 }
 
-function readingCommand(document: LyricDocument, proposal: ReadingProposal): LyricCommand | null {
+function readingCommands(document: LyricDocument, proposal: ReadingProposal): { commands: Extract<LyricCommand, { type: 'batch' }>['commands']; wordIds: string[] } | null {
   const line = document.lines.find((item) => item.id === proposal.line_id);
   if (!line || Array.from(lineText(line)).slice(proposal.base_start, proposal.base_end).join('') !== proposal.base) return null;
-  const word = wordAtRange(line, proposal.base_start, proposal.base_end, proposal.base);
-  if (!word || word.rubyUnits.length) return null;
-  return { type: 'add-ruby', lineId: line.id, wordId: word.id, reading: proposal.reading };
+  const words = wordsAtRange(line, proposal.base_start, proposal.base_end, proposal.base);
+  if (!words || words.some((word) => word.rubyUnits.length)) return null;
+  if (words.length > 1 && words.some((word) => word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat)) return null;
+  const commands: Extract<LyricCommand, { type: 'batch' }>['commands'] = [];
+  if (words.length > 1) commands.push({ type: 'merge-ruby-base', lineId: line.id, wordIds: words.map((word) => word.id) });
+  commands.push({ type: 'add-ruby', lineId: line.id, wordId: words[0].id, reading: proposal.reading });
+  return { commands, wordIds: words.map((word) => word.id) };
 }
 
 export function JobCandidatePanel({ result, currentRevision, currentAssetId, dirty, document, onApply }: {
@@ -66,10 +75,16 @@ export function JobCandidatePanel({ result, currentRevision, currentAssetId, dir
         if (!commands.length) throw new Error('没有可应用的行时间');
         onApply({ type: 'batch', commands: commands as Extract<LyricCommand, { type: 'set-line-time' }>[] });
       } else if (result.kind === 'reading') {
-        const commands = result.proposals.map((item) => readingCommand(document, item)).filter((item): item is Extract<LyricCommand, { type: 'add-ruby' }> => item?.type === 'add-ruby');
-        if (!commands.length) throw new Error('候选范围尚未与独立词块对齐，请先分词');
+        const used = new Set<string>();
+        const accepted = result.proposals.map((item) => readingCommands(document, item)).filter((item) => {
+          if (!item || item.wordIds.some((id) => used.has(id))) return false;
+          item.wordIds.forEach((id) => used.add(id));
+          return true;
+        });
+        const commands = accepted.flatMap((item) => item!.commands);
+        if (!commands.length) throw new Error('候选范围未与词块边界对齐，或词已有读音及附属属性');
         onApply({ type: 'batch', commands });
-        setMessage(`已应用 ${commands.length} 个读音；其余候选需要先分词或已有读音。`);
+        setMessage(`已应用 ${accepted.length} 个读音；其余候选需要先分词或已有读音。`);
         return;
       } else if (result.kind === 'forced_align') {
         const commands: Array<Extract<LyricCommand, { type: 'set-word-time' | 'set-ruby-time' | 'set-word-alignments' }>> = [];
@@ -104,7 +119,7 @@ export function JobCandidatePanel({ result, currentRevision, currentAssetId, dir
     {result.kind === 'fetch' && <><select aria-label="取词版本" value={selected} onChange={(event) => setSelected(Number(event.target.value))}>{result.items.map((item, index) => <option key={index} value={index}>{item.candidate?.title ?? `版本 ${index + 1}`}</option>)}</select><ol>{result.items[selected]?.lines?.map((line, index) => <li key={index}>{line.text}</li>)}</ol></>}
     {result.kind === 'transcribe' && <ol>{result.segments.map((item, index) => <li key={index}>{item.text}</li>)}</ol>}
     {result.kind === 'line_align' && <ol>{result.lines.map((item) => <li key={item.line_id}>{item.line_id}: {item.begin_us == null ? '未定' : `${item.begin_us / 1e6}s`}–{item.end_us == null ? '未定' : `${item.end_us / 1e6}s`}</li>)}</ol>}
-    {result.kind === 'reading' && <ol>{result.proposals.map((item) => <li key={item.proposal_id}>{item.base} → {item.reading} · {readingCommand(document, item) ? '可应用' : '需先分词或已有读音'}</li>)}</ol>}
+    {result.kind === 'reading' && <ol>{result.proposals.map((item) => <li key={item.proposal_id}>{item.base} → {item.reading} · {readingCommands(document, item) ? '可应用' : '需先分词或已有读音'}</li>)}</ol>}
     {result.kind === 'forced_align' && <ol>{result.units.map((item, index) => <li key={index}>{item.text} · {item.granularity} · {item.start_us == null ? '未定' : `${item.start_us / 1e6}s`}</li>)}</ol>}
     {result.kind !== 'search' && <button disabled={stale} onClick={apply}>人工应用候选</button>}
     {message && <p role="status">{message}</p>}
