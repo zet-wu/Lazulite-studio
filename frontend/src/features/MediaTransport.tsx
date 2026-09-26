@@ -7,6 +7,7 @@ import {
   useState,
   type KeyboardEvent,
   type MouseEvent,
+  type WheelEvent,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -201,6 +202,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     if (!el) return;
     const sync = () => updateDom(readPosition());
     const metadata = () => {
+      setError('');
       if (!asset?.duration_us && Number.isFinite(el.duration))
         setDuration(el.duration);
       if (!asset?.duration_us && Number.isFinite(el.duration))
@@ -340,6 +342,17 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     const r = e.currentTarget.getBoundingClientRect();
     seekTo(start + ((e.clientX - r.left) / r.width) * span);
   };
+  const wheelView = (event: WheelEvent<HTMLDivElement>) => {
+    if (!asset) return;
+    event.preventDefault();
+    if (event.ctrlKey || event.metaKey) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const center = start + (event.clientX - rect.left) / rect.width * span;
+      setView(span * (event.deltaY > 0 ? 1.25 : 0.8), center);
+    } else {
+      setStart((value) => Math.max(0, Math.min(duration - span, value + Math.sign(event.deltaY || event.deltaX) * span * 0.2)));
+    }
+  };
   const interactive = (target: EventTarget | null) => {
     const el = target as HTMLElement | null;
     return Boolean(
@@ -416,6 +429,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const beatUs = 60_000_000 / bpm;
   const firstBeat = Math.ceil(startUs / beatUs);
   const beatCount = bpm > 0 && endUs > startUs ? Math.max(0, Math.min(500, Math.floor((endUs - firstBeat * beatUs) / beatUs) + 1)) : 0;
+  const tickStep = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((value) => span / value <= 12) ?? 600;
+  const ticks = span > 0 ? Array.from({ length: Math.min(13, Math.floor(end / tickStep) - Math.ceil(start / tickStep) + 1) }, (_, index) => (Math.ceil(start / tickStep) + index) * tickStep) : [];
   return (
     <footer className={styles.footer} onKeyDown={keyDown}>
       <audio
@@ -448,9 +463,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           ›
         </button>
       </div>
+      <div className={styles.ruler} aria-label="时间标尺">{ticks.map((time) => <span key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
       <div
         ref={slider}
         className={styles.waveWrap}
+        onWheel={wheelView}
         role="slider"
         tabIndex={disabled ? -1 : 0}
         aria-label="波形进度"

@@ -85,6 +85,12 @@ test('drags a timed word on the waveform tracks and undoes it once', async ({ pa
 
 test('uses live PCM tiles for the spectrum and analyzes the beat', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
+  const wav = await readFile('../frontend/tests/fixtures/editor-beats.wav');
+  await page.locator('audio').evaluate((element, source) => { const audio = element as HTMLAudioElement; audio.src = `data:audio/wav;base64,${source}`; audio.load(); }, wav.toString('base64'));
+  const wordStart = page.getByRole('textbox', { name: '词 夜の風が静かに吹く开始秒数' });
+  const wordEnd = page.getByRole('textbox', { name: '词 夜の風が静かに吹く结束秒数' });
+  await wordStart.fill('0'); await wordStart.blur();
+  await wordEnd.fill('5'); await wordEnd.blur();
   await page.getByRole('button', { name: '自动 BPM' }).click();
   await expect(page.getByText('检测到 120 BPM')).toBeVisible();
   await page.getByRole('button', { name: '频谱' }).click();
@@ -92,6 +98,7 @@ test('uses live PCM tiles for the spectrum and analyzes the beat', async ({ page
   for (let index = 0; index < 3; index++) await page.getByRole('button', { name: '放大波形' }).click();
   await expect(page.getByLabel('实时频谱')).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.screenshot({ path: '../docs/evidence/editor-e6/studio-timeline-spectrum-1440.png', fullPage: true });
 });
 
 test("shows empty, error, expired, and loading states and can recover", async ({
