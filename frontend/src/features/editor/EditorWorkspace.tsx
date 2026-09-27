@@ -621,7 +621,19 @@ export function EditorWorkspace(props: Props) {
       if (event.currentTarget.hasPointerCapture(pending.pointerId)) event.currentTarget.releasePointerCapture(pending.pointerId);
       pointerDrag.current = null; setDropTarget(null); event.preventDefault(); return;
     }
-    if (isTextInput(event.target) || event.nativeEvent.isComposing) return;
+    if (event.nativeEvent.isComposing || (event.target instanceof Element && event.target.closest('[role="dialog"]'))) return;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      if (!props.saving) props.onSave();
+      return;
+    }
+    if (isTextInput(event.target)) return;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      if (event.shiftKey) { if (props.canRedo) props.redo(); }
+      else if (props.canUndo) props.undo();
+      return;
+    }
     if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') {
       const target = event.target as HTMLElement;
       const rect = target.getBoundingClientRect();
