@@ -36,6 +36,17 @@ describe('semantic TTML codec', () => {
     expect(reopened.lines[0].words[0].rubyUnits.map((unit) => [unit.beginUs, unit.endUs])).toEqual([[1_750_000, 2_250_000], [2_250_000, 2_750_000]]);
   });
 
+  it('imports AMLL generator namespaces and absolute minute timestamps without shifting words', () => {
+    const xml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:amll="http://www.example.com/ns/amll" itunes:timing="Word"><head xmlns=""><metadata><ttm:agent type="person" xml:id="v1"/><iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><transliterations><transliteration><text for="L1"><span begin="2:09.983" end="2:10.500">yuki</span></text></transliteration></transliterations></iTunesMetadata><amll:meta key="musicName" value="Test"/></metadata></head><body xmlns="" dur="2:11.000"><div begin="2:09.000" end="2:11.000"><p begin="2:09.983" end="2:10.500" itunes:key="L1" ttm:agent="v1"><span begin="2:09.983" end="2:10.500">雪</span></p></div></body></tt>';
+    const imported = parseLyricTtml(xml);
+    expect(imported.lines[0]).toMatchObject({ beginUs: 129_983_000, endUs: 130_500_000, agentRefs: ['v1'] });
+    expect(imported.lines[0].words[0]).toMatchObject({ text: '雪', beginUs: 129_983_000, endUs: 130_500_000, romanization: 'yuki' });
+    expect(imported.metadata.title).toEqual(['Test']);
+    const reopened = parseLyricTtml(serializeLyricTtml(imported));
+    expect(reopened.lines[0].words[0].beginUs).toBe(129_983_000);
+    expect(reopened.lines[0].words[0].romanization).toBe('yuki');
+  });
+
   it('rejects unknown inline structure instead of silently flattening it', () => {
     expect(() => parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><p><x-translation>translation</x-translation></p></body></tt>')).toThrow(/Unsupported TTML line child/);
   });

@@ -10,7 +10,7 @@ const AMLL = 'http://www.example.com/ns/amll';
 const MAX_BYTES = 2 * 1024 * 1024;
 
 const attr = (node: Element, ns: string | null, name: string) => node.getAttributeNS(ns, name);
-const is = (node: Element, ns: string, name: string) => node.namespaceURI === ns && node.localName === name;
+const is = (node: Element, ns: string, name: string) => (node.namespaceURI === ns || ns === TTML && node.namespaceURI === null) && node.localName === name;
 
 function parseTime(value: string): number {
   const raw = value.trim();
@@ -19,9 +19,15 @@ function parseTime(value: string): number {
   else if (/^\d+(?:\.\d+)?ms$/.test(raw)) seconds = Number(raw.slice(0, -2)) / 1000;
   else if (/^\d+(?:\.\d+)?s$/.test(raw)) seconds = Number(raw.slice(0, -1));
   else {
-    const match = /^(\d+):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(raw);
-    if (!match || Number(match[2]) >= 60 || Number(match[3]) >= 60) throw new Error(`Unsupported TTML time: ${value}`);
-    seconds = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) + Number(`0.${match[4] ?? '0'}`);
+    const shortClock = /^(\d+):(\d{2})(?:\.(\d+))?$/.exec(raw);
+    if (shortClock) {
+      if (Number(shortClock[2]) >= 60) throw new Error(`Unsupported TTML time: ${value}`);
+      seconds = Number(shortClock[1]) * 60 + Number(shortClock[2]) + Number(`0.${shortClock[3] ?? '0'}`);
+    } else {
+      const match = /^(\d+):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(raw);
+      if (!match || Number(match[2]) >= 60 || Number(match[3]) >= 60) throw new Error(`Unsupported TTML time: ${value}`);
+      seconds = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) + Number(`0.${match[4] ?? '0'}`);
+    }
   }
   const us = Math.round(seconds * 1_000_000);
   if (!Number.isSafeInteger(us)) throw new Error(`TTML time exceeds microsecond range: ${value}`);
@@ -32,15 +38,15 @@ function timeText(us: number) {
   return (us / 1_000_000).toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
 }
 
-function boundaries(node: Element, parentStart: number, parentEnd: TimeUs): [TimeUs, TimeUs] {
+function boundaries(node: Element, parentStart: number, parentEnd: TimeUs, absoluteTimes: boolean): [TimeUs, TimeUs] {
   if (attr(node, null, 'timeContainer') === 'seq') throw new Error('Sequential TTML timing is not supported');
   const beginRaw = attr(node, null, 'begin');
   const endRaw = attr(node, null, 'end');
   const durRaw = attr(node, null, 'dur');
   const nulls = (attr(node, STUDIO, 'null') ?? '').split(/\s+/);
-  // Reference-tool numeric clock values are absolute media seconds. Unit-bearing
-  // TTML offsets retain their relative timing semantics.
-  const value = (raw: string) => /^\d+(?:\.\d+)?$/.test(raw.trim()) ? parseTime(raw) : parentStart + parseTime(raw);
+  // AMLL uses absolute media times; ordinary TTML offsets remain relative.
+  const value = (raw: string) => absoluteTimes || /^\d+(?:\.\d+)?$/.test(raw.trim()) || /^\d+:\d{2}(?:\.\d+)?$/.test(raw.trim())
+    ? parseTime(raw) : parentStart + parseTime(raw);
   const begin = nulls.includes('begin') ? null : beginRaw === null ? null : value(beginRaw);
   const endFromEnd = endRaw === null ? null : value(endRaw);
   const endFromDur = durRaw === null ? null : (begin ?? parentStart) + parseTime(durRaw);
@@ -94,7 +100,7 @@ function readEndLink(node: Element): LyricLine['endLink'] {
   return value as LyricLine['endLink'];
 }
 
-function makeWord(node: Node, lineId: string, index: number, lineStart: number, lineEnd: TimeUs): LyricWord | null {
+function makeWord(node: Node, lineId: string, index: number, lineStart: number, lineEnd: TimeUs, absoluteTimes: boolean): LyricWord | null {
   const id = `${lineId}:word:${index}`;
   if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) {
     const text = node.nodeValue ?? '';
@@ -110,7 +116,7 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   const romanization = attr(element, STUDIO, 'romanization') ?? '';
   const emptyBeat = Number(attr(element, STUDIO, 'emptyBeat') ?? 0);
   if (!Number.isSafeInteger(emptyBeat) || emptyBeat < 0 || emptyBeat > 32) throw new Error('Invalid draft empty beat count');
-  const [beginUs, endUs] = boundaries(element, lineStart, lineEnd);
+  const [beginUs, endUs] = boundaries(element, lineStart, lineEnd, absoluteTimes);
   const rubyKind = attr(element, TTS, 'ruby');
   if (!rubyKind) {
     const text = textOnly(element, 'Word');
@@ -141,7 +147,7 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
     if (attr(reading, TTS, 'ruby') === 'textContainer' && attr(part, TTS, 'ruby') !== 'text') throw new Error('Ruby textContainer requires text spans');
     const value = textOnly(part, 'Ruby reading unit');
     if (!value) throw new Error('Ruby reading unit must be non-empty');
-    const [unitBegin, unitEnd] = boundaries(part, lineStart, lineEnd);
+    const [unitBegin, unitEnd] = boundaries(part, lineStart, lineEnd, absoluteTimes);
     rubyUnits.push({ id: attr(part, STUDIO, 'id') ?? `${wordId}:ruby:${unitIndex}`, reading: value, beginUs: unitBegin, endUs: unitEnd });
     unitIndex++;
   }
@@ -163,8 +169,9 @@ export function parseLyricTtml(xml: string): LyricDocument {
   const parsed = new DOMParser().parseFromString(xml, 'application/xml');
   if (parsed.querySelector('parsererror')) throw new Error('Invalid TTML XML');
   const root = parsed.documentElement;
-  if (!is(root, TTML, 'tt')) throw new Error('Root must be TTML tt');
+  if (root.namespaceURI !== TTML || root.localName !== 'tt') throw new Error('Root must be TTML tt');
   checkAttributes(root, ['begin', 'end']);
+  const absoluteTimes = attr(root, ITUNES, 'timing') !== null;
   const agents: LyricAgent[] = [];
   const metadata: Record<string, string[]> = Object.create(null);
   const lines: LyricLine[] = [];
@@ -197,7 +204,9 @@ export function parseLyricTtml(xml: string): LyricDocument {
             for (const span of Array.from(item.children)) {
               if (!is(span, ITUNES, 'span')) throw new Error(`Unsupported iTunes transliteration child <${span.localName}>`);
               checkAttributes(span, ['begin', 'end', 'dur']);
-              const [beginUs, endUs] = boundaries(span, 0, null);
+              const text = textOnly(span, 'Word transliteration');
+              if (!text) continue;
+              const [beginUs, endUs] = boundaries(span, 0, null, absoluteTimes);
               if (beginUs === null || endUs === null) throw new Error(`Word transliteration for ${lineId} needs timing`);
               entries.push({ text: textOnly(span, 'Word transliteration'), beginUs, endUs });
             }
@@ -254,7 +263,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
   const visit = (parent: Element, parentStart: number, parentEnd: TimeUs, depth: number, songPart: string | null) => {
     if (depth > 128) throw new Error('TTML nesting exceeds depth 128');
     checkAttributes(parent, ['begin', 'end', 'dur', 'timeContainer']);
-    const [ownBegin, ownEnd] = boundaries(parent, parentStart, parentEnd);
+    const [ownBegin, ownEnd] = boundaries(parent, parentStart, parentEnd, absoluteTimes);
     const start = ownBegin ?? parentStart;
     const part = attr(parent, ITUNES, 'songPart') ?? songPart;
     for (const child of Array.from(parent.children)) {
@@ -264,7 +273,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
       }
       if (!is(child, TTML, 'p')) throw new Error(`Unsupported TTML body child <${child.localName}>`);
       checkAttributes(child, ['begin', 'end', 'dur']);
-      const [beginUs, endUs] = boundaries(child, start, ownEnd);
+      const [beginUs, endUs] = boundaries(child, start, ownEnd, absoluteTimes);
       const id = attr(child, XML, 'id') ?? attr(child, ITUNES, 'key') ?? `line-${lines.length + 1}`;
       const wordStart = beginUs ?? start;
       const translations: LyricLine['translations'] = [];
@@ -287,7 +296,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           }
           if (role) throw new Error(`Unsupported TTML role ${role}`);
         }
-        const word = makeWord(node, id, index, wordStart, endUs);
+        const word = makeWord(node, id, index, wordStart, endUs, absoluteTimes);
         if (word) words.push(word);
       }
       const agentRefs = (attr(child, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
@@ -297,10 +306,10 @@ export function parseLyricTtml(xml: string): LyricDocument {
       lines.push({ id, words, beginUs, endUs, endLink: readEndLink(child), agentRefs, backgroundOf: null, songPart: part, duet: agentRefs.includes('v2'), translations, romanizations, ignoreSync: ignoreSync === 'true' });
       if (background) {
         checkAttributes(background, ['begin', 'end', 'dur']);
-        const [bgBegin, bgEnd] = boundaries(background, wordStart, endUs);
+        const [bgBegin, bgEnd] = boundaries(background, wordStart, endUs, absoluteTimes);
         const bgId = `${id}:bg`;
         const bgStart = bgBegin ?? wordStart;
-        const bgWords = Array.from(background.childNodes).map((node, index) => makeWord(node, bgId, index, bgStart, bgEnd)).filter((word): word is LyricWord => word !== null);
+        const bgWords = Array.from(background.childNodes).map((node, index) => makeWord(node, bgId, index, bgStart, bgEnd, absoluteTimes)).filter((word): word is LyricWord => word !== null);
         if (bgWords.length) {
           bgWords[0] = { ...bgWords[0], text: bgWords[0].text.replace(/^\(/, '') };
           const last = bgWords.length - 1;
