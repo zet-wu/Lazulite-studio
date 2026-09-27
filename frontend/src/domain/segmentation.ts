@@ -110,7 +110,7 @@ export function segmentText(text: string, options: SegmentOptions, divide?: (tex
 export function distributeSegmentTime(word: LyricWord, parts: string[], punctuationWeight: number): LyricWord[] {
   if (!parts.length || parts.join('') !== word.text || parts.some((part) => !part)) throw new Error('分词结果未保留原文');
   if (parts.length === 1) return [word];
-  if (word.rubyUnits.length || word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error(`词“${word.text}”包含注音或附属属性，请先手动处理`);
+  if (word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error(`词“${word.text}”包含注音或附属属性，请先手动处理`);
   const weights = parts.map((part) => graphemes(part).reduce((total, item) => total + (isSpace(item) ? 0 : isPunctuation(item) ? punctuationWeight : 1), 0));
   const sum = weights.reduce((a, b) => a + b, 0);
   const begin = word.beginUs, end = word.endUs;
@@ -127,7 +127,7 @@ export function segmentationPreview(document: LyricDocument, wordIds: string[], 
   const chosen = new Set(wordIds);
   return document.lines.flatMap((line) => line.words.filter((word) => chosen.has(word.id)).map((word) => {
     const parts = segmentText(word.text, options, divide);
-    const blocked = parts.length > 1 && Boolean(word.rubyUnits.length || word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat);
+    const blocked = parts.length > 1 && Boolean(word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat);
     return { lineId: line.id, word, parts, blocked };
   }));
 }

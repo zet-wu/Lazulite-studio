@@ -1,4 +1,4 @@
-import { createLine, createWord, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RubyUnit, type SubLyric, type TimeUs } from './lyric-document';
+import { createLine, createWord, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type SubLyric, type TimeUs } from './lyric-document';
 import { splitAtGrapheme } from './text-boundaries';
 import { distributeRubyTime, splitReadingMora } from './ruby-editing';
 import { stampSync, type SyncAction, type SyncCursor } from './sync-editing';
@@ -22,9 +22,14 @@ type AtomicLyricCommand =
   | { type: 'link-line-end'; lineId: string; targetLineId: string }
   | { type: 'unlink-line-end'; lineId: string }
   | { type: 'set-line-agents'; lineId: string; agentRefs: string[] }
-  | { type: 'set-duet'; lineId: string; duet: boolean }
   | { type: 'set-ignore-sync'; lineId: string; ignoreSync: boolean }
-  | { type: 'set-sublyrics'; lineId: string; kind: 'translations' | 'romanizations'; items: SubLyric[] }
+  | { type: 'set-sublyrics'; lineId: string; kind: 'translations'; items: SubLyric[] }
+  | { type: 'add-romanization-track'; track: RomanizationTrack }
+  | { type: 'delete-romanization-track'; trackId: string }
+  | { type: 'move-romanization-track'; trackId: string; direction: -1 | 1 }
+  | { type: 'insert-romanization-content'; trackId: string; content: RomanizationContent }
+  | { type: 'set-romanization-content'; trackId: string; content: RomanizationContent }
+  | { type: 'delete-romanization-content'; trackId: string; contentId: string }
   | { type: 'set-metadata'; key: string; values: string[] }
   | { type: 'set-language'; language: string | null }
   | { type: 'set-agents'; agents: LyricAgent[] }
@@ -38,7 +43,6 @@ type AtomicLyricCommand =
   | { type: 'merge-ruby'; lineId: string; wordId: string; firstRubyId: string; secondRubyId: string }
   | { type: 'set-ruby-units'; lineId: string; wordId: string; units: RubyUnit[]; overwrite?: boolean }
   | { type: 'redistribute-ruby-time'; lineId: string; wordId: string }
-  | { type: 'set-word-romanization'; lineId: string; wordId: string; romanization: string }
   | { type: 'set-word-empty-beat'; lineId: string; wordId: string; emptyBeat: number }
   | { type: 'split-ruby'; lineId: string; wordId: string; rubyId: string; at: number; newRubyId?: string }
   | { type: 'edit-ruby'; lineId: string; wordId: string; rubyId: string; reading: string }
@@ -46,7 +50,7 @@ type AtomicLyricCommand =
   | { type: 'set-ruby-time'; lineId: string; wordId: string; rubyId: string; beginUs: TimeUs; endUs: TimeUs };
 
 export type LyricCommand = AtomicLyricCommand | { type: 'batch'; commands: AtomicLyricCommand[] };
-type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'merge-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-romanization' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
+type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'merge-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
 
 export type LyricEditorState = { present: LyricDocument; past: LyricDocument[]; future: LyricDocument[] };
 
@@ -130,7 +134,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (document.lines.some((line) => line.id === command.line.id)) throw new Error(`Line id already exists: ${command.line.id}`);
       if (document.lines.some((line) => line.backgroundOf === parent.id)) throw new Error('Line already has a background vocal');
       if (command.line.backgroundOf && command.line.backgroundOf !== parent.id) throw new Error('Background parent does not match');
-      const background = { ...command.line, backgroundOf: parent.id, songPart: parent.songPart, agentRefs: parent.agentRefs, duet: parent.duet };
+      const background = { ...command.line, backgroundOf: parent.id, songPart: parent.songPart, agentRefs: parent.agentRefs };
       const lines = document.lines.slice();
       lines.splice(index + 1, 0, background);
       return { ...document, lines };
@@ -144,7 +148,8 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
         if (endUs !== null && line.words.some((word) => word.endUs !== null && word.endUs > endUs)) throw new Error('Cannot remove linked target: original line end excludes a word');
         return { ...line, endUs, endLink: null };
       });
-      return { ...document, lines };
+      const romanizationTracks = document.romanizationTracks.map((track) => ({ ...track, contents: track.contents.filter((content) => !removed.has(content.lineId)) }));
+      return { ...document, lines, romanizationTracks };
     }
     case 'move-line': {
       const index = lineIndex(document, command.lineId);
@@ -184,11 +189,11 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     case 'segment-word':
       return editWord(document, command.lineId, command.wordId, (word, line) => {
         if (command.words.length < 2 || command.words.map((part) => part.text).join('') !== word.text || command.words[0].id !== word.id) throw new Error('分词必须保留原文和首词 ID');
-        if (word.rubyUnits.length || word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
+        if (word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
         const ids = command.words.map((part) => part.id);
         if (new Set(ids).size !== ids.length || ids.slice(1).some((id) => document.lines.some((item) => item.words.some((part) => part.id === id)))) throw new Error('分词 ID 重复');
         for (const part of command.words) {
-          if (!part.text || part.rubyUnits.length || part.romanization || part.alignmentUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
+          if (!part.text || part.rubyUnits.length || part.alignmentUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
           wordFitsLine(part, line);
         }
         if (command.words[0].beginUs !== word.beginUs || command.words.at(-1)?.endUs !== word.endUs) throw new Error('分词必须保留父词时间区间');
@@ -207,10 +212,10 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
           const change = changes.get(word.id);
           if (!change) return [word];
           if (change.lineId !== line.id || change.words.length < 2 || change.words[0].id !== word.id || change.words.map((part) => part.text).join('') !== word.text) throw new Error('分词目标或原文不匹配');
-          if (word.rubyUnits.length || word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
+          if (word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
           if (change.words[0].beginUs !== word.beginUs || change.words.at(-1)?.endUs !== word.endUs) throw new Error('分词必须保留父词时间区间');
           for (const [index, part] of change.words.entries()) {
-            if (!part.text || part.rubyUnits.length || part.romanization || part.alignmentUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
+            if (!part.text || part.rubyUnits.length || part.alignmentUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
             if (generatedIds.has(part.id) || index > 0 && originalIds.has(part.id)) throw new Error('分词 ID 重复');
             generatedIds.add(part.id);
             wordFitsLine(part, line);
@@ -229,7 +234,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const first = line.words.findIndex((word) => word.id === command.firstWordId);
       if (first < 0 || line.words[first + 1]?.id !== command.secondWordId) throw new Error('只能合并相邻词');
       const left = line.words[first], right = line.words[first + 1];
-      if ([left, right].some((word) => word.rubyUnits.length || word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat)) throw new Error('带附属属性的词不能直接合并');
+      if ([left, right].some((word) => word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat)) throw new Error('带附属属性的词不能直接合并');
       const words = line.words.slice();
       const starts = [left.beginUs, right.beginUs].filter((value): value is number => value !== null);
       const ends = [left.endUs, right.endUs].filter((value): value is number => value !== null);
@@ -245,7 +250,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const first = line.words.findIndex((word) => word.id === command.wordIds[0]);
       if (first < 0 || command.wordIds.some((id, offset) => line.words[first + offset]?.id !== id)) throw new Error('Ruby base 必须由同一行相邻词组成');
       const group = line.words.slice(first, first + command.wordIds.length);
-      if (group.some((word) => word.rubyUnits.length || word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat)) throw new Error('带附属属性的词不能直接合成 Ruby base');
+      if (group.some((word) => word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat)) throw new Error('带附属属性的词不能直接合成 Ruby base');
       const starts = group.map((word) => word.beginUs).filter((value): value is number => value !== null);
       const ends = group.map((word) => word.endUs).filter((value): value is number => value !== null);
       const merged = { ...group[0], text: group.map((word) => word.text).join(''), beginUs: starts.length ? Math.min(...starts) : null, endUs: ends.length ? Math.max(...ends) : null };
@@ -325,22 +330,9 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (line.backgroundOf) throw new Error('Set agents on the parent line');
       if (command.agentRefs.some((ref) => !document.agents.some((agent) => agent.id === ref))) throw new Error('Unknown lyric agent');
       const lines = document.lines.slice();
-      const duet = command.agentRefs.includes('v2');
-      lines[index] = { ...line, agentRefs: command.agentRefs, duet };
+      lines[index] = { ...line, agentRefs: command.agentRefs };
       const backgroundIndex = lines.findIndex((item) => item.backgroundOf === line.id);
-      if (backgroundIndex >= 0) lines[backgroundIndex] = { ...lines[backgroundIndex], agentRefs: command.agentRefs, duet };
-      return { ...document, lines };
-    }
-    case 'set-duet': {
-      const index = lineIndex(document, command.lineId);
-      const line = document.lines[index];
-      if (line.backgroundOf) throw new Error('Set duet on the parent line');
-      if (!document.agents.some((agent) => agent.id === 'v1') || !document.agents.some((agent) => agent.id === 'v2')) throw new Error('Duet editing requires v1 and v2 agents');
-      const agentRefs = [command.duet ? 'v2' : 'v1'];
-      const lines = document.lines.slice();
-      lines[index] = { ...line, duet: command.duet, agentRefs };
-      const backgroundIndex = lines.findIndex((item) => item.backgroundOf === line.id);
-      if (backgroundIndex >= 0) lines[backgroundIndex] = { ...lines[backgroundIndex], duet: command.duet, agentRefs };
+      if (backgroundIndex >= 0) lines[backgroundIndex] = { ...lines[backgroundIndex], agentRefs: command.agentRefs };
       return { ...document, lines };
     }
     case 'set-ignore-sync': {
@@ -358,6 +350,45 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const lines = document.lines.slice();
       lines[index] = { ...lines[index], [command.kind]: command.items };
       return { ...document, lines };
+    }
+    case 'add-romanization-track':
+      if (document.romanizationTracks.some((track) => track.id === command.track.id)) throw new Error('音译轨道 ID 重复');
+      if (command.track.contents.length) throw new Error('新轨道必须为空');
+      return { ...document, romanizationTracks: [...document.romanizationTracks, command.track] };
+    case 'delete-romanization-track':
+      if (!document.romanizationTracks.some((track) => track.id === command.trackId)) throw new Error('音译轨道不存在');
+      return { ...document, romanizationTracks: document.romanizationTracks.filter((track) => track.id !== command.trackId) };
+    case 'move-romanization-track': {
+      const index = document.romanizationTracks.findIndex((track) => track.id === command.trackId);
+      if (index < 0) throw new Error('音译轨道不存在');
+      const target = index + command.direction;
+      if (target < 0 || target >= document.romanizationTracks.length) return document;
+      const romanizationTracks = document.romanizationTracks.slice();
+      [romanizationTracks[index], romanizationTracks[target]] = [romanizationTracks[target], romanizationTracks[index]];
+      return { ...document, romanizationTracks };
+    }
+    case 'insert-romanization-content':
+    case 'set-romanization-content':
+    case 'delete-romanization-content': {
+      const index = document.romanizationTracks.findIndex((track) => track.id === command.trackId);
+      if (index < 0) throw new Error('音译轨道不存在');
+      const track = document.romanizationTracks[index];
+      const contentIndex = track.contents.findIndex((content) => content.id === (command.type === 'delete-romanization-content' ? command.contentId : command.content.id));
+      let contents: RomanizationContent[];
+      if (command.type === 'insert-romanization-content') {
+        if (contentIndex >= 0) throw new Error('音译内容 ID 重复');
+        if (!document.lines.some((line) => line.id === command.content.lineId && !line.backgroundOf)) throw new Error('音译主行不存在');
+        contents = [...track.contents, command.content];
+      } else {
+        if (contentIndex < 0) throw new Error('音译内容不存在');
+        if (command.type === 'set-romanization-content') {
+          if (!document.lines.some((line) => line.id === command.content.lineId && !line.backgroundOf)) throw new Error('音译主行不存在');
+          contents = track.contents.slice(); contents[contentIndex] = command.content;
+        } else contents = track.contents.filter((content) => content.id !== command.contentId);
+      }
+      const romanizationTracks = document.romanizationTracks.slice();
+      romanizationTracks[index] = { ...track, contents };
+      return { ...document, romanizationTracks };
     }
     case 'set-metadata': {
       if (!/^[A-Za-z][\w.-]*$/.test(command.key)) throw new Error(`Invalid metadata name: ${command.key}`);
@@ -387,7 +418,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
     switch (wordCommand.type) {
       case 'split-word': {
         if (word.rubyUnits.length) throw new Error('Splitting a Ruby base requires an explicit reading split');
-        if (word.romanization || word.obscene || word.emptyBeat || word.alignmentUnits.length) throw new Error('Splitting a word with attached properties requires explicit redistribution');
+        if (word.obscene || word.emptyBeat || word.alignmentUnits.length) throw new Error('Splitting a word with attached properties requires explicit redistribution');
         const [left, right] = splitAtGrapheme(word.text, wordCommand.at);
         const newId = wordCommand.newWordId ?? crypto.randomUUID();
         if (line.words.some((item) => item.id === newId)) throw new Error('Word id already exists');
@@ -446,8 +477,6 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
       case 'redistribute-ruby-time':
         if (word.alignmentUnits.some((unit) => unit.rubyUnitId)) throw new Error('带对齐结果的读音不能自动重分配时间');
         return [{ ...word, rubyUnits: distributeRubyTime(word, word.rubyUnits) }];
-      case 'set-word-romanization':
-        return [word.romanization === wordCommand.romanization ? word : { ...word, romanization: wordCommand.romanization }];
       case 'set-word-empty-beat':
         if (!Number.isSafeInteger(wordCommand.emptyBeat) || wordCommand.emptyBeat < 0 || wordCommand.emptyBeat > 32) throw new Error('空拍数必须是 0–32 的整数');
         return [word.emptyBeat === wordCommand.emptyBeat ? word : { ...word, emptyBeat: wordCommand.emptyBeat }];

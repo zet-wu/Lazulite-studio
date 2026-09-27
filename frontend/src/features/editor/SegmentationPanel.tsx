@@ -68,7 +68,7 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
       if (mode === 'manual') {
         if (!activeWord || !manualLine) throw new Error('请先选择一个词');
         const parts = manualParts(activeWord);
-        setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.romanization || activeWord.alignmentUnits.length || activeWord.obscene || activeWord.emptyBeat) }]);
+        setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.alignmentUnits.length || activeWord.obscene || activeWord.emptyBeat) }]);
         return;
       }
       const ids = targetWordIds(document, selection, currentLineId, scope, from, to);
@@ -96,7 +96,7 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
         <div className={styles.manualGraphemes} aria-label="字符切分边界">{chars.map((char, index) => <span key={index}><span>{char}</span>{index < chars.length - 1 && <button aria-label={`切分边界 ${index + 1}`} aria-pressed={manualBoundaries.includes(index + 1)} onClick={() => {
           const next = manualBoundaries.includes(index + 1) ? manualBoundaries.filter((value) => value !== index + 1) : [...manualBoundaries, index + 1];
           setManualBoundaries(next);
-          if (activeWord && manualLine) { const parts = manualParts(activeWord, next); setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.romanization || activeWord.alignmentUnits.length || activeWord.obscene || activeWord.emptyBeat) }]); }
+          if (activeWord && manualLine) { const parts = manualParts(activeWord, next); setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.alignmentUnits.length || activeWord.obscene || activeWord.emptyBeat) }]); }
         }}>{manualBoundaries.includes(index + 1) ? '│' : '·'}</button>}</span>)}</div>
       </div> : <div className={styles.dialogControls}>
         <label>应用范围<select value={scope} onChange={(event) => { setScope(event.target.value); setPreview([]); }}><option value="current">当前行</option><option value="selected">选中词或行</option><option value="range">指定行范围</option><option value="all">全文</option></select></label>

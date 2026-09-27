@@ -1,5 +1,6 @@
 import { parseEslrc, parseLrc, parseLys, parseQrc, parseYrc, stringifyAss, stringifyEslrc, stringifyLrc, stringifyLys, stringifyQrc, stringifyYrc, type LyricLine as FormatLine } from '@applemusic-like-lyrics/lyric';
-import { createLine, createLyricDocument, createWord, type LyricDocument } from '../domain/lyric-document';
+import { createLine, createLyricDocument, createWord, type LyricDocument, type RomanizationTrack } from '../domain/lyric-document';
+import { toAmllLines } from '../domain/preview-adapter';
 import { parseLyricTtml, serializeLyricTtml } from './ttml/lyric-codec';
 
 export type LyricFormat = 'ttml' | 'txt' | 'lrc' | 'eslrc' | 'qrc' | 'yrc' | 'lys' | 'ass';
@@ -29,34 +30,42 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
   const parsed = parseTimed[format](content);
   if (!parsed.length || parsed.length > 20_000) throw new Error('未解析出歌词行或行数过多');
   let mainId: string | null = null;
+  const timedTrack: RomanizationTrack = { id: crypto.randomUUID(), language: null, contents: [] };
+  const plainTrack: RomanizationTrack = { id: crypto.randomUUID(), language: null, contents: [] };
   const lines = parsed.map((item) => {
     const line = createLine('');
     if (item.isBG && mainId) line.backgroundOf = mainId;
     else mainId = line.id;
-    line.duet = item.isDuet;
+    line.agentRefs = item.isDuet ? ['v2'] : ['v1'];
     line.beginUs = microseconds(item.startTime); line.endUs = microseconds(item.endTime);
     if (line.endUs < line.beginUs) throw new Error('歌词时间倒序');
-    line.words = item.words.map((word) => ({ ...createWord(word.word), beginUs: microseconds(word.startTime), endUs: microseconds(word.endTime), romanization: word.romanWord ?? '' }));
+    line.words = item.words.map((word) => ({ ...createWord(word.word), beginUs: microseconds(word.startTime), endUs: microseconds(word.endTime) }));
+    const romanUnits = item.words.filter((word) => word.romanWord !== undefined).map((word) => ({ id: crypto.randomUUID(), text: word.romanWord ?? '', beginUs: microseconds(word.startTime), endUs: microseconds(word.endTime) }));
+    if (romanUnits.length) timedTrack.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'timed', units: romanUnits });
     line.translations = item.translatedLyric ? [{ language: null, text: item.translatedLyric }] : [];
-    line.romanizations = item.romanLyric ? [{ language: null, text: item.romanLyric }] : [];
+    if (item.romanLyric) plainTrack.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: item.romanLyric });
     return line;
   });
-  return { ...createLyricDocument(), lines };
+  for (const line of lines) if (line.backgroundOf) line.agentRefs = lines.find((parent) => parent.id === line.backgroundOf)!.agentRefs;
+  return { ...createLyricDocument(), lines,
+    agents: [{ id: 'v1', name: null, type: 'person' }, { id: 'v2', name: null, type: 'person' }],
+    romanizationTracks: [timedTrack, plainTrack].filter((track) => track.contents.length) };
 }
 
 export function exportLyricFile(document: LyricDocument, format: LyricFormat, draft = false): string {
   if (format === 'ttml') return serializeLyricTtml(document, { draft });
   if (format === 'txt') return document.lines.filter((line) => !line.backgroundOf).map((line) => line.words.map((word) => word.text).join('')).join('\n') + '\n';
+  const preview = new Map(toAmllLines(document, false, true).map((item) => [item.id, item.lyric]));
   const lines: FormatLine[] = document.lines.map((line) => {
     if (line.beginUs === null || line.endUs === null || line.endUs <= line.beginUs) throw new Error('导出前请补全每行时间');
-    const words = line.words.map((word) => {
+    const words = line.words.map((word, index) => {
       const begin = word.beginUs ?? (line.words.length === 1 ? line.beginUs : null);
       const end = word.endUs ?? (line.words.length === 1 ? line.endUs : null);
       if (begin === null || end === null || end <= begin) throw new Error('导出前请补全逐词时间');
-      return { word: word.text, startTime: Math.round(begin / 1000), endTime: Math.round(end / 1000), romanWord: word.romanization || undefined };
+      return { word: word.text, startTime: Math.round(begin / 1000), endTime: Math.round(end / 1000), romanWord: preview.get(line.id)?.words[index]?.romanWord };
     });
     return { words, startTime: Math.round(line.beginUs / 1000), endTime: Math.round(line.endUs / 1000),
-      translatedLyric: line.translations.map((item) => item.text).join(' / '), romanLyric: line.romanizations.map((item) => item.text).join(' / '), isBG: Boolean(line.backgroundOf), isDuet: line.duet };
+      translatedLyric: line.translations.map((item) => item.text).join(' / '), romanLyric: preview.get(line.id)?.romanLyric ?? '', isBG: Boolean(line.backgroundOf), isDuet: preview.get(line.id)?.isDuet ?? false };
   });
   return stringifyTimed[format](lines);
 }

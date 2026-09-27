@@ -8,6 +8,36 @@ import { shiftLineTimes } from '../src/domain/batch-editing';
 const simple = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="line-1">今日も歌う</p></body></tt>';
 
 describe('semantic TTML codec', () => {
+  const trackSemantics = (document: ReturnType<typeof parseLyricTtml>) => document.romanizationTracks.map((track) => ({
+    language: track.language,
+    contents: track.contents.map((content) => content.kind === 'plain'
+      ? { lineId: content.lineId, kind: content.kind, text: content.text }
+      : { lineId: content.lineId, kind: content.kind, units: content.units.map(({ text, beginUs, endUs }) => ({ text, beginUs, endUs })) }),
+  }));
+
+  it.each(['phase2-multitrack', 'phase2-powder-snow'])('roundtrips %s track order, references, units, timing and spaces', (name) => {
+    const imported = parseLyricTtml(readFileSync(`../tests/fixtures/ttml/${name}.ttml`, 'utf8'));
+    if (name === 'phase2-powder-snow') {
+      expect(imported.romanizationTracks).toHaveLength(1);
+      expect(imported.romanizationTracks[0].contents).toHaveLength(38);
+      expect(imported.romanizationTracks[0].contents.flatMap((content) => content.kind === 'timed' ? content.units : [])).toHaveLength(355);
+      const l4 = imported.romanizationTracks[0].contents.find((content) => content.lineId === 'L4');
+      expect(l4?.kind).toBe('timed');
+      if (l4?.kind === 'timed') {
+        expect(l4.units).toHaveLength(9);
+        expect(l4.units.slice(0, 2)).toMatchObject([{ text: 'ko ', beginUs: 129_983_000 }, { text: 'na ' }]);
+      }
+    } else {
+      expect(imported.romanizationTracks.map((track) => track.language)).toEqual(['ja-Latn', 'ja-Latn', 'ja-Hira']);
+      expect(imported.romanizationTracks.map((track) => track.contents.length)).toEqual([2, 1, 2]);
+    }
+    for (const draft of [true, false]) {
+      const reopened = parseLyricTtml(serializeLyricTtml(imported, { draft }));
+      expect(trackSemantics(reopened)).toEqual(trackSemantics(imported));
+      if (draft) expect(reopened.romanizationTracks).toEqual(imported.romanizationTracks);
+    }
+  });
+
   it('imports, splits Ruby, edits a neighboring word, undoes, saves and reopens', () => {
     const imported = parseLyricTtml(simple);
     const lineId = imported.lines[0].id;
@@ -41,25 +71,26 @@ describe('semantic TTML codec', () => {
     const xml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:amll="http://www.example.com/ns/amll" itunes:timing="Word"><head xmlns=""><metadata><ttm:agent type="person" xml:id="v1"/><iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><transliterations><transliteration><text for="L1"><span begin="2:09.983" end="2:10.500">yuki</span></text></transliteration></transliterations></iTunesMetadata><amll:meta key="musicName" value="Test"/></metadata></head><body xmlns="" dur="2:11.000"><div begin="2:09.000" end="2:11.000"><p begin="2:09.983" end="2:10.500" itunes:key="L1" ttm:agent="v1"><span begin="2:09.983" end="2:10.500">雪</span></p></div></body></tt>';
     const imported = parseLyricTtml(xml);
     expect(imported.lines[0]).toMatchObject({ beginUs: 129_983_000, endUs: 130_500_000, agentRefs: ['v1'] });
-    expect(imported.lines[0].words[0]).toMatchObject({ text: '雪', beginUs: 129_983_000, endUs: 130_500_000, romanization: 'yuki' });
+    expect(imported.lines[0].words[0]).toMatchObject({ text: '雪', beginUs: 129_983_000, endUs: 130_500_000 });
+    expect(imported.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1', kind: 'timed', units: [{ text: 'yuki', beginUs: 129_983_000, endUs: 130_500_000 }] });
     expect(imported.metadata.title).toEqual(['Test']);
     const reopened = parseLyricTtml(serializeLyricTtml(imported));
     expect(reopened.lines[0].words[0].beginUs).toBe(129_983_000);
-    expect(reopened.lines[0].words[0].romanization).toBe('yuki');
+    expect(reopened.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1', kind: 'timed', units: [{ text: 'yuki' }] });
   });
 
   it('preserves finer AMLL transliteration timing as a separate track', () => {
     const xml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="Word"><head xmlns=""><metadata><iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><transliterations><transliteration xml:lang="ja-Latn"><text for="L1"><span begin="2:09.983" end="2:10.161">ko </span><span begin="2:10.162" end="2:10.346">na </span></text></transliteration></transliterations></iTunesMetadata></metadata></head><body xmlns="" dur="2:11.000"><div begin="2:09.000" end="2:11.000"><p begin="2:09.984" end="2:10.347" itunes:key="L1"><span begin="2:09.984" end="2:10.347">粉</span></p></div></body></tt>';
     const imported = parseLyricTtml(xml);
-    expect(imported.lines[0].words[0].romanization).toBe('');
-    expect(imported.lines[0].timedRomanizations).toEqual([{ language: 'ja-Latn', words: [
+    expect(imported.romanizationTracks[0].language).toBe('ja-Latn');
+    expect(imported.romanizationTracks[0].contents[0]).toMatchObject({ kind: 'timed', units: [
       { text: 'ko ', beginUs: 129_983_000, endUs: 130_161_000 },
       { text: 'na ', beginUs: 130_162_000, endUs: 130_346_000 },
-    ] }]);
-    expect(parseLyricTtml(serializeLyricTtml(imported)).lines[0].timedRomanizations).toEqual(imported.lines[0].timedRomanizations);
+    ] });
+    expect(parseLyricTtml(serializeLyricTtml(imported, { draft: true })).romanizationTracks).toEqual(imported.romanizationTracks);
     const shifted = shiftLineTimes(imported, ['L1'], 1_000_000);
     expect(shifted.type).toBe('replace-document');
-    if (shifted.type === 'replace-document') expect(shifted.document.lines[0].timedRomanizations?.[0].words[0].beginUs).toBe(130_983_000);
+    if (shifted.type === 'replace-document' && shifted.document.romanizationTracks[0].contents[0].kind === 'timed') expect(shifted.document.romanizationTracks[0].contents[0].units[0].beginUs).toBe(130_983_000);
   });
 
   it('keeps full clock timestamps relative when AMLL timing is absent', () => {
@@ -82,7 +113,7 @@ describe('semantic TTML codec', () => {
     const state = createLyricEditorState(document);
     expect(() => executeLyricCommand(state, { type: 'set-word-time', lineId: document.lines[0].id, wordId: document.lines[0].words[0].id, beginUs: 600_000, endUs: 1_000_000 })).toThrow(/Ruby unit/);
     expect(document.lines[0].translations).toEqual([{ language: 'zh', text: '今天也唱歌' }]);
-    expect(document.lines[0].romanizations).toEqual([{ language: 'ja-Latn', text: 'kyou mo utau' }]);
+    expect(document.romanizationTracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ lineId: document.lines[0].id, kind: 'plain', text: 'kyou mo utau' }] });
     expect(document.lines[1]).toMatchObject({ backgroundOf: document.lines[0].id, beginUs: 500_000, endUs: 1_800_000 });
     expect(lineText(document.lines[1])).toBe('響く');
     const reopened = parseLyricTtml(serializeLyricTtml(document, { draft: true }));
@@ -93,21 +124,21 @@ describe('semantic TTML codec', () => {
   it('roundtrips timed per-word romanization from the reference tool', () => {
     const source = readFileSync('../tests/fixtures/ttml/reference-word-roman.ttml', 'utf8');
     const document = parseLyricTtml(source);
-    expect(document.lines[0].words.map((word) => word.romanization)).toEqual(['kyou', 'sora']);
+    expect(document.romanizationTracks[0].contents[0]).toMatchObject({ kind: 'timed', units: [{ text: 'kyou' }, { text: 'sora' }] });
     expect(document.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['きょ', 'う']);
     for (const draft of [true, false]) {
       const output = serializeLyricTtml(document, { draft });
       expect(output).toContain(`<iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal">`);
       expect(output).toContain('itunes:key="L1"');
       const reopened = parseLyricTtml(output);
-      expect(reopened.lines[0].words.map((word) => word.romanization)).toEqual(['kyou', 'sora']);
+      expect(reopened.romanizationTracks[0].contents[0]).toMatchObject({ kind: 'timed', units: [{ text: 'kyou' }, { text: 'sora' }] });
     }
   });
 
-  it('keeps untimed per-word romanization in drafts and requires timing for exchange', () => {
+  it('keeps untimed track units in drafts and requires timing for exchange', () => {
     const document = createLyricDocument('今日');
-    document.lines[0].words[0].romanization = 'kyou';
-    expect(parseLyricTtml(serializeLyricTtml(document, { draft: true })).lines[0].words[0].romanization).toBe('kyou');
+    document.romanizationTracks.push({ id: 'track', language: null, contents: [{ id: 'content', lineId: document.lines[0].id, kind: 'timed', units: [{ id: 'unit', text: 'kyou', beginUs: null, endUs: null }] }] });
+    expect(parseLyricTtml(serializeLyricTtml(document, { draft: true })).romanizationTracks).toEqual(document.romanizationTracks);
     expect(() => serializeLyricTtml(document)).toThrow(/needs timing/);
   });
 
@@ -117,9 +148,9 @@ describe('semantic TTML codec', () => {
     expect(document.metadata).toMatchObject({ title: ['自作サンプル'], artist: ['Test'], songwriter: ['Composer'] });
     expect(document.lines.map(lineText)).toEqual(['今日 も歌う', '響く', '宇宙']);
     expect(document.lines[0].songPart).toBe('Verse');
-    expect(document.lines[2]).toMatchObject({ duet: true, agentRefs: ['v2'] });
+    expect(document.lines[2]).toMatchObject({ agentRefs: ['v2'] });
     expect(document.lines[0].translations).toEqual([{ language: 'zh', text: '今天 也唱歌' }]);
-    expect(document.lines[0].romanizations).toEqual([{ language: 'ja-Latn', text: 'kyou mo utau' }]);
+    expect(document.romanizationTracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ lineId: document.lines[0].id, kind: 'plain', text: 'kyou mo utau' }] });
     expect(document.lines[1]).toMatchObject({ backgroundOf: 'L1', beginUs: 1_500_000, endUs: 2_700_000 });
     const state = createLyricEditorState(document);
     const edited = executeLyricCommand(state, { type: 'edit-word', lineId: 'L1', wordId: document.lines[0].words[1].id, text: ' も唄う' });
@@ -128,8 +159,8 @@ describe('semantic TTML codec', () => {
     const reopened = parseLyricTtml(serializeLyricTtml(undone.present, { draft: true }));
     expect(reopened.lines).toEqual(undone.present.lines);
     expect(reopened.metadata).toEqual(undone.present.metadata);
-    const duetOff = executeLyricCommand(state, { type: 'set-duet', lineId: 'L2', duet: false });
-    expect(parseLyricTtml(serializeLyricTtml(duetOff.present)).lines[2]).toMatchObject({ duet: false, agentRefs: ['v1'] });
+    const singerChanged = executeLyricCommand(state, { type: 'set-line-agents', lineId: 'L2', agentRefs: ['v1'] });
+    expect(parseLyricTtml(serializeLyricTtml(singerChanged.present)).lines[2]).toMatchObject({ agentRefs: ['v1'] });
   });
 
   it('creates background vocals and metadata in one semantic document', () => {

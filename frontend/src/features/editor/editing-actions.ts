@@ -1,12 +1,12 @@
 import type { LyricCommand } from '../../domain/lyric-commands';
-import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord } from '../../domain/lyric-document';
+import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent } from '../../domain/lyric-document';
 
 export type EditorSelection =
   | { kind: 'lines'; ids: string[]; anchorId: string; activeId: string }
   | { kind: 'words'; lineId: string; ids: string[]; anchorId: string; activeId: string; rubyId: string | null };
 
 export type EditorClipboard =
-  | { kind: 'lines'; groups: Array<{ line: LyricLine; background: LyricLine | null }>; text: string }
+  | { kind: 'lines'; groups: Array<{ line: LyricLine; background: LyricLine | null; romanizations: Array<{ trackId: string; content: RomanizationContent }> }>; text: string }
   | { kind: 'words'; words: LyricWord[]; text: string };
 
 export function selectIds(order: string[], current: string[], anchor: string, id: string, shift: boolean, toggle: boolean): string[] {
@@ -30,6 +30,7 @@ export function copySelection(document: LyricDocument, selection: EditorSelectio
   }
   const groups = document.lines.filter((line) => !line.backgroundOf && selection.ids.includes(line.id)).map((line) => ({
     line, background: document.lines.find((item) => item.backgroundOf === line.id) ?? null,
+    romanizations: document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === line.id).map((content) => ({ trackId: track.id, content }))),
   }));
   return { kind: 'lines', groups, text: groups.map(({ line }) => lineText(line)).join('\n') };
 }
@@ -70,8 +71,7 @@ function cloneWord(word: LyricWord): LyricWord {
 }
 
 function cloneLine(line: LyricLine, id: string, backgroundOf: string | null): LyricLine {
-  return { ...line, id, backgroundOf, words: line.words.map(cloneWord), translations: line.translations.map((item) => ({ ...item })), romanizations: line.romanizations.map((item) => ({ ...item })),
-    ...(line.timedRomanizations ? { timedRomanizations: line.timedRomanizations.map((track) => ({ ...track, words: track.words.map((word) => ({ ...word })) })) } : {}) };
+  return { ...line, id, backgroundOf, words: line.words.map(cloneWord), translations: line.translations.map((item) => ({ ...item })) };
 }
 
 export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null): { command: LyricCommand; selection: EditorSelection } {
@@ -88,7 +88,7 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
     for (const word of words) { commands.push({ type: 'insert-word', lineId: currentLine.id, afterWordId: after, word }); after = word.id; }
     return { command: { type: 'batch', commands }, selection: { kind: 'words', lineId: currentLine.id, ids: words.map((word) => word.id), anchorId: words[0].id, activeId: words.at(-1)!.id, rubyId: null } };
   }
-  const commands: Array<Extract<LyricCommand, { type: 'insert-line' | 'insert-background' }>> = [];
+  const commands: Array<Extract<LyricCommand, { type: 'insert-line' | 'insert-background' | 'insert-romanization-content' }>> = [];
   const ids: string[] = [];
   let after = currentLine?.backgroundOf ?? currentLine?.id ?? document.lines.filter((line) => !line.backgroundOf).at(-1)?.id ?? null;
   for (const group of clipboard.groups) {
@@ -96,6 +96,9 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
     const line = cloneLine(group.line, id, null);
     commands.push({ type: 'insert-line', afterLineId: after, line });
     if (group.background) commands.push({ type: 'insert-background', parentLineId: id, line: cloneLine(group.background, `${id}:bg`, id) });
+    for (const { trackId, content } of group.romanizations) commands.push({ type: 'insert-romanization-content', trackId, content: content.kind === 'plain'
+      ? { ...content, id: crypto.randomUUID(), lineId: id }
+      : { ...content, id: crypto.randomUUID(), lineId: id, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) } });
     ids.push(id);
     after = id;
   }

@@ -1,5 +1,5 @@
 /** The semantic editor document. Transport, XML trees and playback stay outside it. */
-export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v4' as const;
+export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v5' as const;
 
 export type TimeUs = number | null;
 
@@ -26,7 +26,6 @@ export type LyricWord = {
   text: string;
   beginUs: TimeUs;
   endUs: TimeUs;
-  romanization: string;
   rubyUnits: RubyUnit[];
   alignmentUnits: AlignmentUnit[];
   obscene: boolean;
@@ -34,7 +33,12 @@ export type LyricWord = {
 };
 
 export type SubLyric = { language: string | null; text: string };
-export type TimedRomanization = { language: string | null; words: { text: string; beginUs: number; endUs: number }[] };
+export type RomanizationUnit = { id: string; text: string; beginUs: TimeUs; endUs: TimeUs };
+export type RomanizationContent = { id: string; lineId: string } & (
+  | { kind: 'plain'; text: string }
+  | { kind: 'timed'; units: RomanizationUnit[] }
+);
+export type RomanizationTrack = { id: string; language: string | null; contents: RomanizationContent[] };
 
 export type LyricLine = {
   id: string;
@@ -45,10 +49,7 @@ export type LyricLine = {
   agentRefs: string[];
   backgroundOf: string | null;
   songPart: string | null;
-  duet: boolean;
   translations: SubLyric[];
-  romanizations: SubLyric[];
-  timedRomanizations?: TimedRomanization[];
   ignoreSync: boolean;
 };
 
@@ -61,6 +62,7 @@ export type LyricAgent = {
 export type LyricDocument = {
   schemaVersion: typeof LYRIC_SCHEMA_VERSION;
   lines: LyricLine[];
+  romanizationTracks: RomanizationTrack[];
   agents: LyricAgent[];
   metadata: Record<string, string[]>;
   language: string | null;
@@ -70,17 +72,17 @@ export const lineText = (line: LyricLine) => line.words.map((word) => word.text)
 export const rubyReading = (word: LyricWord) => word.rubyUnits.map((unit) => unit.reading).join('');
 
 export function createWord(text: string, id: string = crypto.randomUUID()): LyricWord {
-  return { id, text, beginUs: null, endUs: null, romanization: '', rubyUnits: [], alignmentUnits: [], obscene: false, emptyBeat: 0 };
+  return { id, text, beginUs: null, endUs: null, rubyUnits: [], alignmentUnits: [], obscene: false, emptyBeat: 0 };
 }
 
 export function createLine(text: string, id: string = `line-${crypto.randomUUID()}`): LyricLine {
   return {
     id, words: text ? [createWord(text, `${id}:word:0`)] : [],
     beginUs: null, endUs: null, endLink: null, agentRefs: [], backgroundOf: null, songPart: null,
-    duet: false, translations: [], romanizations: [], ignoreSync: false,
+    translations: [], ignoreSync: false,
   };
 }
 
 export function createLyricDocument(text = ''): LyricDocument {
-  return { schemaVersion: LYRIC_SCHEMA_VERSION, lines: [createLine(text)], agents: [], metadata: {}, language: null };
+  return { schemaVersion: LYRIC_SCHEMA_VERSION, lines: [createLine(text)], romanizationTracks: [], agents: [], metadata: {}, language: null };
 }

@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-按 `346a3bc` 源码核对（2026-09-27）。本文介绍当前实现；人工审阅整改是[外部开发计划](../../lyric-workflow/docs/studio/plans/phase2-human-review-remediation.md)，不是已经落地的架构。
+2026-09-27 更新：Phase 2 R1 已将语义模型切至 v5，R2–R7 交互整改仍按[外部开发计划](../../lyric-workflow/docs/studio/plans/phase2-human-review-remediation.md)实施。
 
 ## 1. 应用与目录
 
@@ -26,17 +26,17 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 ## 3. 权威文档与事务
 
-`LyricDocument`（`studio-lyric-v4`）为唯一可写歌词文档，含 lines、agents、metadata、language。行包含 words、背景父 ID、agentRefs、duet、翻译/音译与时间链接；词含 text、时间、Ruby 单元、对齐单元、romanization、空拍等。正文由词拼接，读音由 Ruby 拼接。
+`LyricDocument`（`studio-lyric-v5`）为唯一可写歌词文档，含 lines、romanizationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs、翻译与时间链接；词含 text、时间、Ruby 单元、对齐单元、空拍等。音译轨道按主行 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
 
 时间使用绝对整数微秒/null；拆分坐标使用 code point 并检查 grapheme 边界。`lyric-commands.ts` 提供纯函数事务与 256 次历史。selection、focus、播放时钟不作为歌词权威内容；批量操作一次入历史，最终改动经 codec 保存。
 
-当前存在三个音译表示：`word.romanization`、`line.romanizations`、`line.timedRomanizations`。精确匹配词时间的音译进入词字段，其他定时内容只读保留。`duet` 也仍和 agentRefs 双存。这些是现有实现的限制，不是长期数据规范。
+词级与行级旧音译字段已移除，预览临时派生逐词音译与二侧歌手状态。R2 将补全轨道附属行的可编辑视图。
 
 ## 4. 格式与保存
 
 `adapters/ttml/lyric-codec.ts` 解析为语义文档并规范化导出，旧 XML 保留树模型已移除。支持常见词/Ruby/背景、行内和 iTunes sidecar 附属内容、当前草稿辅助属性，以及 AMLL 无命名空间子节点和绝对分钟时间修复；未知不支持内容会报错，不宣称任意 TTML 可无损编辑。
 
-`lyric-formats.ts` 支持文本、LRC/ESLRC/QRC/YRC/LYS 双向与 ASS 导出。低表达力格式不能携带全部 Ruby/元数据。预览投影只使用完整时间，不修改文档；当前 isDuet 仍读取行字段。
+`lyric-formats.ts` 支持文本、LRC/ESLRC/QRC/YRC/LYS 双向与 ASS 导出。低表达力格式不能携带全部 Ruby/元数据或多条音译轨道。预览投影只使用完整时间，不修改文档；isDuet 从歌手引用派生。
 
 项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存当前格式检查点；FastAPI 接受 TTML envelope，不接收浏览器对象图。修订以不可变文件与 DB 指针提交。候选只能由用户应用。
 

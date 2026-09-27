@@ -12,7 +12,6 @@ import { EditorRibbon } from './EditorRibbon';
 import { SegmentationPanel } from './SegmentationPanel';
 import { BatchToolsPanel } from './BatchToolsPanel';
 import { RubyWordEditor } from './RubyWordEditor';
-import { RomanizationPanel } from './RomanizationPanel';
 import { SyncPanel } from './SyncPanel';
 import { MetadataPanel } from './MetadataPanel';
 import type { TransportHandle } from '../MediaTransport';
@@ -69,7 +68,6 @@ export function EditorWorkspace(props: Props) {
   const [editingWordId, setEditingWordId] = useState<string | null>(null);
   const [segmentationOpen, setSegmentationOpen] = useState(false);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
-  const [romanizationOpen, setRomanizationOpen] = useState(false);
   const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number } | null>(null);
   const rubyShortcutSerial = useRef(0);
   const [rubyBaseOpen, setRubyBaseOpen] = useState(false);
@@ -105,8 +103,6 @@ export function EditorWorkspace(props: Props) {
     : selectedLine && !selectedLine.backgroundOf ? [selectedLine] : [];
   const selectedAgents = selectedMainLines.map((line) => line.agentRefs[0] ?? '');
   const agentValue = selectedAgents.every((value) => value === selectedAgents[0]) ? selectedAgents[0] ?? '' : '__mixed__';
-  const selectedDuets = selectedMainLines.map((line) => line.duet);
-  const duetValue = selectedDuets.every((value) => value === selectedDuets[0]) ? String(selectedDuets[0] ?? false) : '__mixed__';
   const selectedWordLineIndexes = selection?.kind === 'words'
     ? document.lines.flatMap((line, index) => line.words.some((word) => selection.ids.includes(word.id)) ? [index] : []) : [];
   const rubyBaseLine = selection?.kind === 'words' && selection.ids.length > 1 ? document.lines.find((line) => line.words.some((word) => word.id === selection.ids[0])) : undefined;
@@ -285,9 +281,9 @@ export function EditorWorkspace(props: Props) {
     },
     onPointerCancel: () => { touchDrag.current = null; setDropTarget(null); },
   });
-  const sublyric = (line: LyricLine, kind: 'translations' | 'romanizations', index: number, text: string) => {
-    const items = line[kind].map((item, i) => i === index ? { ...item, text } : item);
-    dispatch({ type: 'set-sublyrics', lineId: line.id, kind, items });
+  const sublyric = (line: LyricLine, index: number, text: string) => {
+    const items = line.translations.map((item, i) => i === index ? { ...item, text } : item);
+    dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items });
   };
   const moveLine = (line: LyricLine, direction: -1 | 1) => {
     const index = mainLines.findIndex((item) => item.id === line.id);
@@ -341,7 +337,6 @@ export function EditorWorkspace(props: Props) {
       <button aria-label={`删除词 ${word.text}`} onClick={() => dispatch({ type: 'delete-word', lineId: line.id, wordId: word.id })}>×</button>
     </div>
     <TimePair begin={word.beginUs} end={word.endUs} label={`词 ${word.text}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginUs, endUs })} />
-    <DraftInput value={word.romanization} label={`逐词音译 ${word.text}`} placeholder="逐词音译" onCommit={(romanization) => dispatch({ type: 'set-word-romanization', lineId: line.id, wordId: word.id, romanization })} />
     <label className={styles.emptyBeat}>空拍 <input type="number" min="0" max="32" aria-label={`词 ${word.text}空拍数`} value={word.emptyBeat} onChange={(event) => dispatch({ type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: Number(event.target.value) })} /></label>
   </LyricWordView>;
   return <div className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`} onCopy={(event) => {
@@ -375,7 +370,7 @@ export function EditorWorkspace(props: Props) {
       copy={() => { copy(); }} cut={() => { cut(); }} paste={() => paste(clipboard)}
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
-      moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)} openRomanization={() => setRomanizationOpen(true)}
+      moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
       canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)} />}
     {mode !== 'preview' && <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
       {document.lines.map((line, index) => <div className={styles.outlineRow} key={line.id}>
@@ -399,7 +394,7 @@ export function EditorWorkspace(props: Props) {
             {!line.backgroundOf && <><button aria-label={`行上移 ${lineText(line)}`} disabled={mainLines[0]?.id === line.id} onClick={() => moveLine(line, -1)}>↑</button><button aria-label={`行下移 ${lineText(line)}`} disabled={mainLines.at(-1)?.id === line.id} onClick={() => moveLine(line, 1)}>↓</button></>}
             <button onClick={() => dispatch({ type: 'insert-line', afterLineId: line.backgroundOf ?? line.id })}>后插行</button><button onClick={() => dispatch({ type: 'delete-line', lineId: line.id })}>删行</button></div>
           <div className={styles.words}>{line.words.map((word, index) => wordView(line, word, index))}<button onClick={() => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') })}>加词</button></div>
-          {!line.backgroundOf && <div className={styles.sublyrics}>{(['translations', 'romanizations'] as const).map((kind) => <div key={kind}><strong>{kind === 'translations' ? '翻译' : '音译'}</strong>{line[kind].map((item, index) => <div key={index}><DraftInput value={item.text} label={`${kind === 'translations' ? '翻译' : '音译'} ${index + 1}`} onCommit={(text) => sublyric(line, kind, index, text)} /><small>{item.language ?? '未指定语言'}</small></div>)}<button onClick={() => dispatch({ type: 'set-sublyrics', lineId: line.id, kind, items: [...line[kind], { language: null, text: '' }] })}>添加</button></div>)}{line.timedRomanizations?.map((track, index) => <div key={`timed-roman-${index}`}><strong>定时音译</strong><p>{track.words.map((word) => word.text).join('')}</p><small>{track.language ?? '未指定语言'} · 当前只读；整行偏移会同步移动，单词改时不会</small></div>)}</div>}
+          {!line.backgroundOf && <div className={styles.sublyrics}><div><strong>翻译</strong>{line.translations.map((item, index) => <div key={index}><DraftInput value={item.text} label={`翻译 ${index + 1}`} onCommit={(text) => sublyric(line, index, text)} /><small>{item.language ?? '未指定语言'}</small></div>)}<button onClick={() => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items: [...line.translations, { language: null, text: '' }] })}>添加</button></div></div>}
         </LyricLineView>} />
       </main>
       <aside className={styles.inspector}><h2>属性</h2>{selectedLine && <>
@@ -410,12 +405,6 @@ export function EditorWorkspace(props: Props) {
             {agentValue === '__mixed__' && <option value="__mixed__" disabled>混合值</option>}
             <option value="">未指定</option>{document.agents.map((agent) => <option value={agent.id} key={agent.id}>{agent.name ?? agent.id}</option>)}
           </select></label>
-          {document.agents.some((agent) => agent.id === 'v1') && document.agents.some((agent) => agent.id === 'v2') && <label>对唱
-            <select value={duetValue} onChange={(event) => dispatch({ type: 'batch', commands: selectedMainLines.map((line) => ({ type: 'set-duet', lineId: line.id, duet: event.target.value === 'true' })) })}>
-              {duetValue === '__mixed__' && <option value="__mixed__" disabled>混合值</option>}
-              <option value="false">关闭</option><option value="true">开启</option>
-            </select>
-          </label>}
           {selectedMainLines.length === 1 && <button onClick={() => dispatch({ type: 'insert-background', parentLineId: selectedMainLines[0].id, line: createLine('背景歌词') })} disabled={document.lines.some((line) => line.backgroundOf === selectedMainLines[0].id)}>添加背景歌词</button>}
         </>}
       </>}
@@ -425,7 +414,6 @@ export function EditorWorkspace(props: Props) {
       </aside></div>}
     {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
     {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
-    {romanizationOpen && <RomanizationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setRomanizationOpen(false)} />}
     {rubyBaseOpen && <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRubyBaseOpen(false); }}><section className={styles.dialog} role="dialog" aria-modal="true" aria-label="整体 Ruby"><div className={styles.dialogHeader}><h2>整体 Ruby</h2><button aria-label="关闭整体 Ruby" onClick={() => setRubyBaseOpen(false)}>×</button></div><p>base：{rubyBaseWords.map((word) => word.text).join('')}</p><label>读音 <input autoFocus value={rubyBaseReading} onChange={(event) => setRubyBaseReading(event.target.value)} onKeyDown={(event) => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') createRubyBase(); if (event.key === 'Escape') setRubyBaseOpen(false); }} /></label><p>合并相邻词后创建一个整体读音；其他词和时间保持原样。</p><div className={styles.dialogActions}><button onClick={() => setRubyBaseOpen(false)}>取消</button><button disabled={!rubyBaseReading} onClick={createRubyBase}>应用（一次撤销）</button></div></section></div>}
   </div>;
 }

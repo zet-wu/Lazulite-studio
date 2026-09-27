@@ -10,11 +10,12 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
   const player = useRef<LyricPlayerRef>(null);
   const [showTranslation, setShowTranslation] = useState(true);
   const [showRomanization, setShowRomanization] = useState(true);
+  const [romanizationTrackId, setRomanizationTrackId] = useState<string | null>(null);
   const [fadeWidth, setFadeWidth] = useState(0.5);
   const [hidePassed, setHidePassed] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [localTime, setLocalTime] = useState(0);
-  const lines = useMemo(() => toAmllLines(document, showTranslation, showRomanization), [document, showTranslation, showRomanization]);
+  const lines = useMemo(() => toAmllLines(document, showTranslation, showRomanization, romanizationTrackId), [document, showTranslation, showRomanization, romanizationTrackId]);
   const lyricLines = useMemo(() => lines.map((line) => line.lyric), [lines]);
   const duration = Math.max(0, ...lines.map((line) => line.lyric.endTime));
   useEffect(() => {
@@ -38,6 +39,7 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
       <strong>动态预览</strong>
       <label><input type="checkbox" checked={showTranslation} onChange={(event) => setShowTranslation(event.target.checked)} /> 翻译</label>
       <label><input type="checkbox" checked={showRomanization} onChange={(event) => setShowRomanization(event.target.checked)} /> 音译</label>
+      {document.romanizationTracks.length > 1 && <label>预览音译轨道 <select value={romanizationTrackId ?? ''} onChange={(event) => setRomanizationTrackId(event.target.value || null)}><option value="">每行首条</option>{document.romanizationTracks.map((track, index) => <option key={track.id} value={track.id}>{index + 1} · {track.language ?? '未指定语言'}</option>)}</select></label>}
       <label><input type="checkbox" checked={hidePassed} onChange={(event) => setHidePassed(event.target.checked)} /> 隐藏已播行</label>
       <label>词渐变宽度 <input type="range" min="0.05" max="1.5" step="0.05" value={fadeWidth} onChange={(event) => setFadeWidth(Number(event.target.value))} /></label>
       {!transport && <label>试听位置 <input type="range" min="0" max={duration} value={localTime} onChange={(event) => setLocalTime(Number(event.target.value))} /></label>}

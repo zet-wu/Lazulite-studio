@@ -46,7 +46,7 @@ function readingCommands(document: LyricDocument, proposal: ReadingProposal): { 
   if (!line || Array.from(lineText(line)).slice(proposal.base_start, proposal.base_end).join('') !== proposal.base) return null;
   const words = wordsAtRange(line, proposal.base_start, proposal.base_end, proposal.base);
   if (!words || words.some((word) => word.rubyUnits.length)) return null;
-  if (words.length > 1 && words.some((word) => word.romanization || word.alignmentUnits.length || word.obscene || word.emptyBeat)) return null;
+  if (words.length > 1 && words.some((word) => word.alignmentUnits.length || word.obscene || word.emptyBeat)) return null;
   const commands: Extract<LyricCommand, { type: 'batch' }>['commands'] = [];
   if (words.length > 1) commands.push({ type: 'merge-ruby-base', lineId: line.id, wordIds: words.map((word) => word.id) });
   commands.push({ type: 'add-ruby', lineId: line.id, wordId: words[0].id, reading: proposal.reading });

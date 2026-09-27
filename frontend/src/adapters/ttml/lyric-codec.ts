@@ -1,4 +1,4 @@
-import { createWord, LYRIC_SCHEMA_VERSION, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RubyUnit, type TimedRomanization, type TimeUs } from '../../domain/lyric-document';
+import { createWord, LYRIC_SCHEMA_VERSION, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationTrack, type RomanizationUnit, type RubyUnit, type TimeUs } from '../../domain/lyric-document';
 
 const TTML = 'http://www.w3.org/ns/ttml';
 const TTS = 'http://www.w3.org/ns/ttml#styling';
@@ -70,7 +70,7 @@ function checkAttributes(node: Element, allowed: string[]) {
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'role') continue;
     if (attribute.namespaceURI === ITUNES && ['key', 'timing', 'songPart'].includes(attribute.localName)) continue;
-    if (attribute.namespaceURI === STUDIO && ['id', 'null', 'alignments', 'endLink', 'romanization', 'emptyBeat', 'ignoreSync'].includes(attribute.localName)) continue;
+    if (attribute.namespaceURI === STUDIO && ['id', 'kind', 'null', 'alignments', 'endLink', 'emptyBeat', 'ignoreSync'].includes(attribute.localName)) continue;
     throw new Error(`Unsupported TTML attribute ${attribute.name} on <${node.localName}>`);
   }
 }
@@ -113,14 +113,13 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   checkAttributes(element, ['begin', 'end', 'dur']);
   const wordId = attr(element, STUDIO, 'id') ?? id;
   const alignmentUnits = readAlignments(element);
-  const romanization = attr(element, STUDIO, 'romanization') ?? '';
   const emptyBeat = Number(attr(element, STUDIO, 'emptyBeat') ?? 0);
   if (!Number.isSafeInteger(emptyBeat) || emptyBeat < 0 || emptyBeat > 32) throw new Error('Invalid draft empty beat count');
   const [beginUs, endUs] = boundaries(element, lineStart, lineEnd, absoluteTimes);
   const rubyKind = attr(element, TTS, 'ruby');
   if (!rubyKind) {
     const text = textOnly(element, 'Word');
-    return text ? { ...createWord(text, wordId), beginUs, endUs, alignmentUnits, romanization, emptyBeat } : null;
+    return text ? { ...createWord(text, wordId), beginUs, endUs, alignmentUnits, emptyBeat } : null;
   }
   if (rubyKind !== 'container') throw new Error(`Unsupported Ruby type: ${rubyKind}`);
   const parts = Array.from(element.children);
@@ -158,7 +157,6 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
     endUs: endUs ?? (rubyUnits.every((unit) => unit.endUs !== null) ? Math.max(...rubyUnits.map((unit) => unit.endUs!)) : null),
     rubyUnits,
     alignmentUnits,
-    romanization,
     emptyBeat,
   };
 }
@@ -175,8 +173,9 @@ export function parseLyricTtml(xml: string): LyricDocument {
   const agents: LyricAgent[] = [];
   const metadata: Record<string, string[]> = Object.create(null);
   const lines: LyricLine[] = [];
-  const appleSubLyrics = new Map<string, { translations: LyricLine['translations']; romanizations: LyricLine['romanizations'] }>();
-  const appleWordRomanizations = new Map<string, TimedRomanization[]>();
+  const appleTranslations = new Map<string, LyricLine['translations']>();
+  const romanizationTracks: RomanizationTrack[] = [];
+  const inlineRomanizationTracks = new Map<string, RomanizationTrack>();
   const addMetadata = (key: string, value: string) => { (metadata[key] ??= []).push(value); };
   const readAppleMetadata = (node: Element) => {
     checkAttributes(node, []);
@@ -193,33 +192,50 @@ export function parseLyricTtml(xml: string): LyricDocument {
         const translation = is(group, ITUNES, 'translations');
         if (!is(entry, ITUNES, translation ? 'translation' : 'transliteration')) throw new Error(`Unsupported iTunes sublyric <${entry.localName}>`);
         checkAttributes(entry, []);
+        const track: RomanizationTrack | null = translation ? null : {
+          id: attr(entry, STUDIO, 'id') ?? crypto.randomUUID(),
+          language: attr(entry, XML, 'lang'), contents: [],
+        };
         for (const item of Array.from(entry.children)) {
           if (!is(item, ITUNES, 'text')) throw new Error(`Unsupported iTunes sublyric child <${item.localName}>`);
           checkAttributes(item, ['for']);
           const lineId = attr(item, null, 'for');
           if (!lineId) throw new Error('iTunes sublyric needs a line reference');
-          const target = appleSubLyrics.get(lineId) ?? { translations: [], romanizations: [] };
-          if (!translation && item.children.length) {
-            const words: TimedRomanization['words'] = [];
-            for (const span of Array.from(item.children)) {
+          if (translation) {
+            const values = appleTranslations.get(lineId) ?? [];
+            values.push({ language: attr(entry, XML, 'lang'), text: textOnly(item, 'iTunes translation') });
+            appleTranslations.set(lineId, values);
+            continue;
+          }
+          const contentId = attr(item, STUDIO, 'id') ?? crypto.randomUUID();
+          if (item.children.length || attr(item, STUDIO, 'kind') === 'timed') {
+            const units: RomanizationUnit[] = [];
+            let pending = '';
+            for (const node of Array.from(item.childNodes)) {
+              if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) {
+                const value = node.nodeValue ?? '';
+                if (value.trim() || !/[\r\n]/.test(value)) {
+                  if (units.length) units[units.length - 1].text += value;
+                  else pending += value;
+                }
+                continue;
+              }
+              if (node.nodeType !== Node.ELEMENT_NODE) throw new Error('Unsupported iTunes transliteration node');
+              const span = node as Element;
               if (!is(span, ITUNES, 'span')) throw new Error(`Unsupported iTunes transliteration child <${span.localName}>`);
               checkAttributes(span, ['begin', 'end', 'dur']);
-              const text = textOnly(span, 'Word transliteration');
-              if (!text) continue;
+              const text = pending + textOnly(span, 'Word transliteration');
+              pending = '';
               const [beginUs, endUs] = boundaries(span, 0, null, absoluteTimes);
-              if (beginUs === null || endUs === null) throw new Error(`Word transliteration for ${lineId} needs timing`);
-              words.push({ text, beginUs, endUs });
+              units.push({ id: attr(span, STUDIO, 'id') ?? crypto.randomUUID(), text, beginUs, endUs });
             }
-            if (words.length) {
-              const tracks = appleWordRomanizations.get(lineId) ?? [];
-              tracks.push({ language: attr(entry, XML, 'lang'), words });
-              appleWordRomanizations.set(lineId, tracks);
-            }
+            if (pending && units.length) units[units.length - 1].text += pending;
+            track!.contents.push({ id: contentId, lineId, kind: 'timed', units });
           } else {
-            target[translation ? 'translations' : 'romanizations'].push({ language: attr(entry, XML, 'lang'), text: textOnly(item, 'iTunes sublyric') });
-            appleSubLyrics.set(lineId, target);
+            track!.contents.push({ id: contentId, lineId, kind: 'plain', text: textOnly(item, 'iTunes transliteration') });
           }
         }
+        if (track) romanizationTracks.push(track);
       }
     }
   };
@@ -281,7 +297,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
       const id = attr(child, XML, 'id') ?? attr(child, ITUNES, 'key') ?? `line-${lines.length + 1}`;
       const wordStart = beginUs ?? start;
       const translations: LyricLine['translations'] = [];
-      const romanizations: LyricLine['romanizations'] = [];
+      const inlineRomanizations: Array<{ language: string | null; text: string }> = [];
       let background: Element | null = null;
       const words: LyricWord[] = [];
       for (const [index, node] of Array.from(child.childNodes).entries()) {
@@ -290,7 +306,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           if (role === 'x-translation' || role === 'x-roman') {
             checkAttributes(node as Element, []);
             const value = { language: attr(node as Element, XML, 'lang'), text: textOnly(node as Element, role) };
-            (role === 'x-translation' ? translations : romanizations).push(value);
+            (role === 'x-translation' ? translations : inlineRomanizations).push(value);
             continue;
           }
           if (role === 'x-bg') {
@@ -307,7 +323,16 @@ export function parseLyricTtml(xml: string): LyricDocument {
       if (agentRefs.some((ref) => !agents.some((agent) => agent.id === ref))) throw new Error(`Unknown agent on line ${id}`);
       const ignoreSync = attr(child, STUDIO, 'ignoreSync');
       if (ignoreSync !== null && ignoreSync !== 'true' && ignoreSync !== 'false') throw new Error('Invalid draft ignoreSync flag');
-      lines.push({ id, words, beginUs, endUs, endLink: readEndLink(child), agentRefs, backgroundOf: null, songPart: part, duet: agentRefs.includes('v2'), translations, romanizations, ignoreSync: ignoreSync === 'true' });
+      lines.push({ id, words, beginUs, endUs, endLink: readEndLink(child), agentRefs, backgroundOf: null, songPart: part, translations, ignoreSync: ignoreSync === 'true' });
+      inlineRomanizations.forEach((value, index) => {
+        const key = `${value.language ?? ''}\u0000${index}`;
+        let track = inlineRomanizationTracks.get(key);
+        if (!track) {
+          track = { id: crypto.randomUUID(), language: value.language, contents: [] };
+          inlineRomanizationTracks.set(key, track);
+        }
+        track.contents.push({ id: crypto.randomUUID(), lineId: id, kind: 'plain', text: value.text });
+      });
       if (background) {
         checkAttributes(background, ['begin', 'end', 'dur']);
         const [bgBegin, bgEnd] = boundaries(background, wordStart, endUs, absoluteTimes);
@@ -319,7 +344,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           const last = bgWords.length - 1;
           bgWords[last] = { ...bgWords[last], text: bgWords[last].text.replace(/\)$/, '') };
         }
-        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin ?? (bgWords.every((word) => word.beginUs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginUs!)) : null), endUs: bgEnd ?? (bgWords.every((word) => word.endUs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endUs!)) : null), endLink: null, agentRefs, backgroundOf: id, songPart: part, duet: agentRefs.includes('v2'), translations: [], romanizations: [], ignoreSync: false });
+        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin ?? (bgWords.every((word) => word.beginUs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginUs!)) : null), endUs: bgEnd ?? (bgWords.every((word) => word.endUs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endUs!)) : null), endLink: null, agentRefs, backgroundOf: id, songPart: part, translations: [], ignoreSync: false });
       }
     }
   };
@@ -329,30 +354,16 @@ export function parseLyricTtml(xml: string): LyricDocument {
     const target = lines.find((item) => item.id === line.endLink!.targetLineId);
     if (!target || target.backgroundOf || target.beginUs === null || line.endUs !== target.beginUs) throw new Error(`Invalid draft end link on line ${line.id}`);
   }
-  for (const [id, content] of appleSubLyrics) {
+  for (const [id, translations] of appleTranslations) {
     const line = lines.find((item) => item.id === id && !item.backgroundOf);
     if (!line) throw new Error(`iTunes sublyric refers to unknown line ${id}`);
-    line.translations.push(...content.translations);
-    line.romanizations.push(...content.romanizations);
+    line.translations.push(...translations);
   }
-  for (const [id, tracks] of appleWordRomanizations) {
-    const line = lines.find((item) => item.id === id && !item.backgroundOf);
-    if (!line) throw new Error(`iTunes word transliteration refers to unknown line ${id}`);
-    for (const track of tracks) {
-      const used = new Set<string>();
-      const matches = track.words.map((entry) => {
-        const word = line.words.find((item) => !used.has(item.id) && item.beginUs === entry.beginUs && item.endUs === entry.endUs);
-        if (word) used.add(word.id);
-        return word;
-      });
-      if (matches.every((word, index) => word && (!word.romanization || word.romanization === track.words[index].text))) {
-        matches.forEach((word, index) => { word!.romanization = track.words[index].text; });
-      } else {
-        (line.timedRomanizations ??= []).push(track);
-      }
-    }
+  romanizationTracks.push(...inlineRomanizationTracks.values());
+  for (const track of romanizationTracks) for (const content of track.contents) {
+    if (!lines.some((line) => line.id === content.lineId && !line.backgroundOf)) throw new Error(`iTunes transliteration refers to unknown line ${content.lineId}`);
   }
-  return { schemaVersion: LYRIC_SCHEMA_VERSION, lines, agents, metadata, language: attr(root, XML, 'lang') };
+  return { schemaVersion: LYRIC_SCHEMA_VERSION, lines, romanizationTracks, agents, metadata, language: attr(root, XML, 'lang') };
 }
 
 function setTime(node: Element, begin: TimeUs, end: TimeUs, draft: boolean) {
@@ -370,11 +381,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   const xml = new DOMParser().parseFromString(`<tt xmlns="${TTML}" xmlns:tts="${TTS}" xmlns:ttm="${TTM}" xmlns:amll="${AMLL}"${draft ? ` xmlns:studio="${STUDIO}"` : ''}><body/></tt>`, 'application/xml');
   const root = xml.documentElement;
   if (document.language) root.setAttributeNS(XML, 'xml:lang', document.language);
-  if (!draft && document.lines.some((line) => line.backgroundOf && line.words.some((word) => word.romanization))) {
-    throw new Error('Background word transliteration has no exchange TTML mapping');
-  }
-  const romanizedLines = document.lines.filter((line) => !line.backgroundOf && (line.words.some((word) => word.romanization) || line.timedRomanizations?.length));
-  if (document.agents.length || Object.keys(document.metadata).length || romanizedLines.length) {
+  if (document.agents.length || Object.keys(document.metadata).length || document.romanizationTracks.length) {
     const head = xml.createElementNS(TTML, 'head');
     const metadataNode = xml.createElementNS(TTML, 'metadata');
     const songwriters = document.metadata.songwriter ?? [];
@@ -407,40 +414,37 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       }
       metadataNode.appendChild(entry);
     }
-    if (romanizedLines.length) {
+    if (document.romanizationTracks.length) {
       const group = xml.createElementNS(ITUNES, 'transliterations');
-      const entry = xml.createElementNS(ITUNES, 'transliteration');
-      for (const line of romanizedLines) {
-        const textNode = xml.createElementNS(ITUNES, 'text');
-        textNode.setAttribute('for', line.id);
-        for (const word of line.words) if (word.romanization) {
-          if (word.beginUs === null || word.endUs === null) {
-            if (draft) continue;
-            throw new Error(`Word ${word.id} needs timing before final transliteration export`);
+      for (const track of document.romanizationTracks) {
+        const entry = xml.createElementNS(ITUNES, 'transliteration');
+        if (draft) entry.setAttributeNS(STUDIO, 'studio:id', track.id);
+        if (track.language !== null) entry.setAttributeNS(XML, 'xml:lang', track.language);
+        for (const content of track.contents) {
+          if (!document.lines.some((line) => line.id === content.lineId && !line.backgroundOf)) throw new Error(`Transliteration refers to unknown line ${content.lineId}`);
+          const textNode = xml.createElementNS(ITUNES, 'text');
+          textNode.setAttribute('for', content.lineId);
+          if (draft) {
+            textNode.setAttributeNS(STUDIO, 'studio:id', content.id);
+            if (content.kind === 'timed') textNode.setAttributeNS(STUDIO, 'studio:kind', 'timed');
           }
-          const span = xml.createElementNS(ITUNES, 'span');
-          setTime(span, word.beginUs, word.endUs, draft);
-          span.textContent = word.romanization;
-          textNode.appendChild(span);
+          if (content.kind === 'plain') textNode.textContent = content.text;
+          else {
+            if (!draft && !content.units.length) throw new Error(`Timed transliteration ${content.id} has no units`);
+            for (const unit of content.units) {
+              if (!draft && (unit.beginUs === null || unit.endUs === null)) throw new Error(`Transliteration unit ${unit.id} needs timing`);
+              const span = xml.createElementNS(ITUNES, 'span');
+              if (draft) span.setAttributeNS(STUDIO, 'studio:id', unit.id);
+              setTime(span, unit.beginUs, unit.endUs, draft);
+              span.textContent = unit.text;
+              textNode.appendChild(span);
+            }
+          }
+          entry.appendChild(textNode);
         }
-        if (textNode.childNodes.length) entry.appendChild(textNode);
+        group.appendChild(entry);
       }
-      if (entry.childNodes.length) group.appendChild(entry);
-      for (const line of romanizedLines) for (const track of line.timedRomanizations ?? []) {
-        const timedEntry = xml.createElementNS(ITUNES, 'transliteration');
-        if (track.language) timedEntry.setAttributeNS(XML, 'xml:lang', track.language);
-        const textNode = xml.createElementNS(ITUNES, 'text');
-        textNode.setAttribute('for', line.id);
-        for (const word of track.words) {
-          const span = xml.createElementNS(ITUNES, 'span');
-          setTime(span, word.beginUs, word.endUs, draft);
-          span.textContent = word.text;
-          textNode.appendChild(span);
-        }
-        timedEntry.appendChild(textNode);
-        group.appendChild(timedEntry);
-      }
-      if (group.childNodes.length) itunes.appendChild(group);
+      itunes.appendChild(group);
     }
     if (itunes.childNodes.length) metadataNode.appendChild(itunes);
     head.appendChild(metadataNode);
@@ -462,7 +466,6 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   for (const parentId of backgrounds.keys()) if (!document.lines.some((line) => line.id === parentId && !line.backgroundOf)) throw new Error(`Background vocal has no parent: ${parentId}`);
   for (const line of document.lines) {
     if (line.backgroundOf) continue;
-    if (line.duet !== line.agentRefs.includes('v2')) throw new Error(`Line ${line.id} duet flag disagrees with agent v2`);
     if (!div || currentPart !== line.songPart) {
       currentPart = line.songPart;
       div = xml.createElementNS(TTML, 'div');
@@ -484,7 +487,6 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       if (word.obscene) throw new Error(`Word ${word.id} has fields not yet mapped to TTML`);
       const span = xml.createElementNS(TTML, 'span');
       if (draft) span.setAttributeNS(STUDIO, 'studio:id', word.id);
-      if (draft && word.romanization) span.setAttributeNS(STUDIO, 'studio:romanization', word.romanization);
       if (draft && word.emptyBeat) span.setAttributeNS(STUDIO, 'studio:emptyBeat', String(word.emptyBeat));
       if (draft && word.alignmentUnits.length) span.setAttributeNS(STUDIO, 'studio:alignments', JSON.stringify(word.alignmentUnits));
       setTime(span, word.beginUs, word.endUs, draft);
@@ -510,16 +512,16 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       parent.appendChild(span);
     };
     for (const word of line.words) appendWord(p, word, word.text);
-    for (const [role, items] of [['x-translation', line.translations], ['x-roman', line.romanizations]] as const) for (const item of items) {
+    for (const item of line.translations) {
       const span = xml.createElementNS(TTML, 'span');
-      span.setAttributeNS(TTM, 'ttm:role', role);
+      span.setAttributeNS(TTM, 'ttm:role', 'x-translation');
       if (item.language) span.setAttributeNS(XML, 'xml:lang', item.language);
       span.textContent = item.text;
       p.appendChild(span);
     }
     const bg = backgrounds.get(line.id);
     if (bg) {
-      if (bg.duet !== bg.agentRefs.includes('v2') || bg.ignoreSync || bg.translations.length || bg.romanizations.length) throw new Error(`Background vocal ${bg.id} has fields not yet mapped to TTML`);
+      if (bg.ignoreSync || bg.translations.length) throw new Error(`Background vocal ${bg.id} has fields not yet mapped to TTML`);
       const span = xml.createElementNS(TTML, 'span');
       span.setAttributeNS(TTM, 'ttm:role', 'x-bg');
       setTime(span, bg.beginUs, bg.endUs, draft);

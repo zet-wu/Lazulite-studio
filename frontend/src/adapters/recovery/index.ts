@@ -1,9 +1,9 @@
 import type { LyricEditorState } from '../../domain/lyric-commands';
 import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
-const DATABASE = 'lazulite-studio-recovery-v3';
+const DATABASE = 'lazulite-studio-recovery-v5';
 const STORE = 'projects';
-const RECORD_VERSION = 4;
+const RECORD_VERSION = 5;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {
@@ -52,7 +52,7 @@ const isState = (value: unknown): value is LyricEditorState => {
   const validDocument = (document: unknown) => {
     if (!document || typeof document !== 'object') return false;
     const item = document as LyricDocument;
-    return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.agents)
+    return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.romanizationTracks) && Array.isArray(item.agents)
       && !!item.metadata && typeof item.metadata === 'object'
       && item.lines.every((line) => !!line && typeof line.id === 'string' && Array.isArray(line.words)
         && line.words.every((word) => !!word && typeof word.id === 'string' && typeof word.text === 'string' && Array.isArray(word.rubyUnits) && Array.isArray(word.alignmentUnits)));

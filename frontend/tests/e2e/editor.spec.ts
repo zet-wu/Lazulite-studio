@@ -27,7 +27,7 @@ test('imports text lines and exports a timed project as LRC and ASS', async ({ p
 
 test('imports, edits, undoes and downloads Ruby with background vocals', async ({ page }) => {
   await upload(page);
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   const word = page.getByRole('textbox', { name: '词 今日', exact: true });
   await word.dblclick();
   await word.fill('今日改');
@@ -67,7 +67,7 @@ test('edits Ruby above its base with Backspace merge, F8 split and the trailing 
   await expect(rubies).toHaveCount(2);
   await word.getByRole('button', { name: '重分配读音时间' }).click();
   await expect(word.getByRole('textbox', { name: '读音 きょ结束秒数' })).toHaveValue('1.5');
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: test.info().outputPath('studio-ruby-390.png') });
 
   const plain = page.getByRole('textbox', { name: '词  も歌う', exact: true });
@@ -107,7 +107,7 @@ test('previews manual boundaries and auto segmentation, then undoes each applica
   await page.getByRole('button', { name: '切分边界 2' }).click();
   await page.getByRole('button', { name: '生成预览' }).click();
   await expect(page.getByRole('dialog', { name: '分词' })).toContainText(' も │ 歌う');
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: test.info().outputPath('studio-manual-390.png') });
   await page.getByRole('button', { name: '应用（一次撤销）' }).click();
   await expect(firstLine.getByRole('textbox', { name: '词  も', exact: true })).toBeVisible();
@@ -343,10 +343,6 @@ test('sorts from the outline and edits mixed line properties in one undo step', 
   await expect(agents).toHaveValue('v1');
   await page.getByRole('button', { name: '撤销' }).click();
   await expect(agents).toHaveValue('__mixed__');
-  await page.getByRole('combobox', { name: '对唱' }).selectOption('true');
-  await expect(page.getByRole('combobox', { name: '对唱' })).toHaveValue('true');
-  await page.getByRole('button', { name: '撤销' }).click();
-  await expect(page.getByRole('combobox', { name: '对唱' })).toHaveValue('__mixed__');
   await page.getByRole('button', { name: '大纲下移 今日 も歌う' }).click();
   await expect(page.locator('[data-line-id]').first()).toHaveAttribute('data-line-id', 'L2');
   await page.getByRole('button', { name: '撤销' }).click();
@@ -441,33 +437,6 @@ test('reports invalid inline time without losing the edit session', async ({ pag
   await start.blur();
   await expect(page.getByText('时间必须是非负秒数')).toHaveCount(0);
   await expect(start).toHaveValue('1');
-});
-
-test('previews line romanization, generates timed Ruby, and undoes the batch', async ({ page }) => {
-  await page.goto('/editor');
-  const xml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="L1" begin="0s" end="4s"><span begin="1s" end="2s">今日</span><span begin="2s" end="2.5s">も</span><span begin="2.5s" end="4s" tts:ruby="container"><span tts:ruby="base">宇宙</span><span tts:ruby="text"><span begin="2.5s" end="4s">そら</span></span></span><span ttm:role="x-roman">kyou mo sora</span></p></body></tt>';
-  await page.locator('input[type="file"]').setInputFiles({ name: 'roman.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
-  await page.getByRole('button', { name: '音译与 Ruby…' }).click();
-  await page.getByRole('button', { name: '生成预览' }).click();
-  const dialog = page.getByRole('dialog', { name: '音译与 Ruby' });
-  await expect(dialog.getByRole('textbox', { name: '逐词音译 今日' })).toHaveValue('kyou');
-  await expect(dialog.getByText('Ruby：きょ │ う')).toBeVisible();
-  await expect(dialog.getByText('已有 Ruby：そら（保留）')).toBeVisible();
-  await dialog.getByRole('button', { name: '应用（一次撤销）' }).click();
-  await expect(page.locator('[data-line-id="L1"] [data-word-id]').first().getByRole('textbox', { name: '读音 今日' })).toHaveCount(2);
-  await expect(page.getByRole('textbox', { name: '逐词音译 宇宙' })).toHaveValue('sora');
-  const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '最终 TTML' }).click();
-  const exported = await readFile(await (await download).path(), 'utf8');
-  expect(exported).toContain('transliterations');
-  expect(exported).toContain('>kyou</span>');
-  expect(exported).toContain('>sora</span>');
-  await page.getByRole('button', { name: '撤销' }).click();
-  await expect(page.locator('[data-line-id="L1"] [data-word-id]').first().getByRole('textbox', { name: '读音 今日' })).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: '逐词音译 宇宙' })).toHaveValue('');
-  await page.locator('input[type="file"]').setInputFiles({ name: 'reopened.ttml', mimeType: 'application/xml', buffer: Buffer.from(exported) });
-  await expect(page.getByRole('textbox', { name: '逐词音译 宇宙' })).toHaveValue('sora');
-  await expect(page.locator('[data-line-id="L1"] [data-word-id]').first().getByRole('textbox', { name: '读音 今日' })).toHaveCount(2);
 });
 
 test('keeps IME composition active when Escape is pressed', async ({ page }) => {

@@ -13,6 +13,7 @@ const shifted = (value: TimeUs, delta: number): TimeUs => {
 export function shiftLineTimes(document: LyricDocument, lineIds: string[], deltaUs: number): LyricCommand {
   if (!Number.isSafeInteger(deltaUs)) throw new Error('时间偏移必须是整数微秒');
   const selected = new Set(lineIds);
+  for (const line of document.lines) if (line.backgroundOf && selected.has(line.backgroundOf)) selected.add(line.id);
   const shiftedLines = document.lines.map((line): LyricLine => {
     if (!selected.has(line.id)) return line;
     return { ...line, beginUs: shifted(line.beginUs, deltaUs), endUs: shifted(line.endUs, deltaUs),
@@ -20,8 +21,7 @@ export function shiftLineTimes(document: LyricDocument, lineIds: string[], delta
       words: line.words.map((word): LyricWord => ({ ...word, beginUs: shifted(word.beginUs, deltaUs), endUs: shifted(word.endUs, deltaUs),
         rubyUnits: word.rubyUnits.map((unit): RubyUnit => ({ ...unit, beginUs: shifted(unit.beginUs, deltaUs), endUs: shifted(unit.endUs, deltaUs) })),
         alignmentUnits: word.alignmentUnits.map((unit): AlignmentUnit => ({ ...unit, beginUs: shifted(unit.beginUs, deltaUs), endUs: shifted(unit.endUs, deltaUs) })),
-      })),
-      ...(line.timedRomanizations ? { timedRomanizations: line.timedRomanizations.map((track) => ({ ...track, words: track.words.map((word) => ({ ...word, beginUs: shifted(word.beginUs, deltaUs)!, endUs: shifted(word.endUs, deltaUs)! })) })) } : {}) };
+      })) };
   });
   const lines = shiftedLines.map((line) => {
     if (!line.endLink) return line;
@@ -30,7 +30,11 @@ export function shiftLineTimes(document: LyricDocument, lineIds: string[], delta
     if (endUs === null || line.beginUs !== null && endUs < line.beginUs || line.words.some((word) => word.endUs !== null && word.endUs > endUs)) throw new Error('偏移后链接的行结束时间不能覆盖词块');
     return endUs === line.endUs ? line : { ...line, endUs };
   });
-  return { type: 'replace-document', document: { ...document, lines } };
+  const romanizationTracks = document.romanizationTracks.map((track) => ({ ...track, contents: track.contents.map((content) =>
+    selected.has(content.lineId) && content.kind === 'timed'
+      ? { ...content, units: content.units.map((unit) => ({ ...unit, beginUs: shifted(unit.beginUs, deltaUs), endUs: shifted(unit.endUs, deltaUs) })) }
+      : content) }));
+  return { type: 'replace-document', document: { ...document, lines, romanizationTracks } };
 }
 
 export function smoothWordTimes(document: LyricDocument, lineIds: string[], thresholdUs: number): { command: LyricCommand; count: number } {
@@ -78,7 +82,7 @@ export function replaceWords(document: LyricDocument, wordIds: string[], search:
     if (!selected.has(word.id)) continue;
     const matches = word.text.match(pattern);
     if (!matches?.length) continue;
-    if (word.rubyUnits.length || word.alignmentUnits.length || word.romanization || word.obscene || word.emptyBeat) throw new Error(`词“${word.text}”含注音或附属属性，不能批量替换`);
+    if (word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error(`词“${word.text}”含注音或附属属性，不能批量替换`);
     const next = word.text.replace(pattern, () => replacement);
     count += matches.length;
     commands.push(next ? { type: 'edit-word', lineId: line.id, wordId: word.id, text: next } : { type: 'delete-word', lineId: line.id, wordId: word.id });
