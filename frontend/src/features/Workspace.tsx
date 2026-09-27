@@ -39,6 +39,7 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
   const [message, setMessage] = useState('');
   const [playheadLineId, setPlayheadLineId] = useState<string | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<{ lineId: string; wordId: string; rubyId: string | null } | null>(null);
+  const [selectedRomanization, setSelectedRomanization] = useState<{ trackId: string; contentId: string } | null>(null);
   const line: LyricLine | undefined = editor.document.lines.find((item) => item.id === selectedLineId) ?? editor.document.lines[0];
   const unitLine = editor.document.lines.find((item) => item.id === selectedUnit?.lineId);
   const unitWord = unitLine?.words.find((item) => item.id === selectedUnit?.wordId);
@@ -74,13 +75,14 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
     onSave={() => void editor.save()} onOpen={(file) => void openFile(file)} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat}
     onPublish={() => { if (editor.dirty || editor.conflict || editor.saving) setMessage('请先保存后发布'); else navigate(`/projects/${projectId}/export`); }}
-    selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { setSelectedLineId(id); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
+    selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
+    onSelectRomanization={(trackId, contentId) => setSelectedRomanization({ trackId, contentId })}
     onSelectUnit={(lineId, wordId, rubyId) => setSelectedUnit(wordId ? { lineId, wordId, rubyId } : null)} />
     {editor.recovery.available && <aside>发现本地草稿 <button onClick={() => void editor.restore().catch((error) => setMessage(error.message))}>恢复</button><button onClick={() => void editor.discardRecovery().catch((error) => setMessage(error.message))}>丢弃</button></aside>}
     {editor.conflict && <aside role="alert">服务器已有新版本，本地修改已保留。<button onClick={() => exportFile(true)}>下载本地草稿</button><button onClick={() => { if (window.confirm('重新加载服务器版本并清除本地检查点？')) void editor.discardRecovery().then(() => window.location.reload()); }}>重新加载服务器</button></aside>}
     <MediaTransport ref={transport} projectId={projectId} selectedLine={line ? { begin_us: line.beginUs, end_us: line.endUs } : undefined} loopRange={unitRange} asset={asset}
-      document={editor.document} selectedLineId={line?.id ?? null} onTimelineCommand={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }}
-      onSelectLine={(id) => { setSelectedLineId(id); setSelectedUnit(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
+      document={editor.document} selectedLineId={line?.id ?? null} selectedRomanization={selectedRomanization} onTimelineCommand={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }}
+      onSelectLine={(id) => { setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
       onPosition={(positionUs) => {
         const active = editor.document.lines.find((item) => !item.backgroundOf && item.beginUs !== null && item.endUs !== null && item.beginUs <= positionUs && positionUs < item.endUs)?.id ?? null;
         setPlayheadLineId((current) => current === active ? current : active);

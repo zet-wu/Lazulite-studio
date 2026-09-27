@@ -49,6 +49,7 @@ type Props = {
   playheadLineId?: string | null;
   onSelectLine?: (id: string) => void;
   onSelectUnit?: (lineId: string, wordId: string | null, rubyId: string | null) => void;
+  onSelectRomanization?: (trackId: string, contentId: string) => void;
   transport?: RefObject<TransportHandle | null>;
   embedded?: boolean;
 };
@@ -133,6 +134,7 @@ export function EditorWorkspace(props: Props) {
   const activeLineId = selectionLineId(selection) ?? props.selectedLineId;
   const selectedLine = document.lines.find((line) => line.id === activeLineId) ?? document.lines[0];
   const mainLines = document.lines.filter((line) => !line.backgroundOf);
+  const ordinalById = new Map(mainLines.map((line, index) => [line.id, index + 1]));
   useEffect(() => {
     if (!selectedLine) return;
     const preceding = document.lines.slice(0, document.lines.findIndex((line) => line.id === selectedLine.id)).filter((line) => !line.backgroundOf).at(-1);
@@ -191,6 +193,7 @@ export function EditorWorkspace(props: Props) {
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? contentId, contentId, shift, toggle);
     setSelection({ kind: 'romanization-content', lineId, trackId, contentId, ids, anchorId: shift || toggle ? previous?.anchorId ?? contentId : contentId, activeId: contentId });
     props.onSelectLine?.(lineId);
+    props.onSelectRomanization?.(trackId, contentId);
   };
   const selectRomanizationUnit = (lineId: string, trackId: string, contentId: string, unitId: string, shift = false, toggle = false) => {
     const previous = selection?.kind === 'romanization-unit' && selection.contentId === contentId ? selection : null;
@@ -199,6 +202,7 @@ export function EditorWorkspace(props: Props) {
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? unitId, unitId, shift, toggle);
     setSelection({ kind: 'romanization-unit', lineId, trackId, contentId, ids, anchorId: shift || toggle ? previous?.anchorId ?? unitId : unitId, activeId: unitId });
     props.onSelectLine?.(lineId);
+    props.onSelectRomanization?.(trackId, contentId);
   };
   const dispatch = (command: LyricCommand) => {
     try { apply(command); setMessage(''); return true; }
@@ -528,6 +532,7 @@ export function EditorWorkspace(props: Props) {
     ];
     setSelection(effective);
     props.onSelectLine?.(line.id);
+    if (effective.kind === 'romanization-content' || effective.kind === 'romanization-unit') props.onSelectRomanization?.(effective.trackId, effective.contentId);
     setContextMenu({ x, y, title, actions: [...shared, ...actions], target: target.closest<HTMLElement>('[data-ruby-id], [data-romanization-unit-id], [data-romanization-content-id], [data-word-id], [data-line-id]') ?? target });
     return true;
   };
@@ -638,10 +643,10 @@ export function EditorWorkspace(props: Props) {
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
       canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)} />}
     {(mode === 'edit' || mode === 'sync') && <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
-      {document.lines.map((line, index) => <div className={styles.outlineRow} data-line-id={line.id} key={line.id}>
+      {document.lines.map((line) => <div className={styles.outlineRow} data-line-id={line.id} key={line.id}>
         <button data-outline-drag className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
           onClick={(event) => { selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); requestLocate(line.id); }}>
-          {index + 1} {line.backgroundOf ? '↳ ' : ''}{lineText(line) || '空行'}
+          L{ordinalById.get(line.backgroundOf ?? line.id)} {line.backgroundOf ? '· 背景 ' : '· '}{lineText(line) || '空行'}
         </button>
       </div>)}
     </aside>
@@ -650,7 +655,7 @@ export function EditorWorkspace(props: Props) {
           selected={selection ? selection.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) : selection.kind === 'words' ? line.words.some((word) => selection.ids.includes(word.id)) : line.id === selection.lineId : selectedLine?.id === line.id}
           playhead={props.playheadLineId === line.id} dropTarget={dropTarget === `line:${line.id}`}
           onSelect={(shift, toggle) => selectLine(line, shift, toggle)} onMove={(direction) => moveLine(line, direction)}>
-          <div className={styles.lineHeader}><span>{line.backgroundOf ? '背景' : '主唱'} · {line.id}</span></div>
+          <div className={styles.lineHeader}><span>L{ordinalById.get(line.backgroundOf ?? line.id)} · {line.backgroundOf ? '背景' : '主唱'}</span></div>
           <div className={styles.words}>{line.words.map((word) => wordView(line, word))}</div>
           {!line.backgroundOf && <div className={styles.sublyrics}><div><strong>翻译</strong>{line.translations.map((item, index) => <div key={index}><DraftInput value={item.text} label={`翻译 ${index + 1}`} onCommit={(text) => sublyric(line, index, text)} /><small>{item.language ?? '未指定语言'}</small></div>)}<button onClick={() => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items: [...line.translations, { language: null, text: '' }] })}>添加</button></div></div>}
           {!line.backgroundOf && <div className={styles.romanizationTracks}>
@@ -658,7 +663,7 @@ export function EditorWorkspace(props: Props) {
               const contents = track.contents.filter((content) => content.lineId === line.id);
               return <div key={track.id}>
                 <div className={styles.romanizationTrackHeader}>
-                  <span>轨道 {trackIndex + 1} · {track.language ?? '未指定语言'}</span>
+                  <span>L{ordinalById.get(line.id)} · 音译轨道 {trackIndex + 1} · {track.language ?? '未指定语言'}</span>
                   <button onClick={() => dispatch({ type: 'insert-romanization-content', trackId: track.id, content: { id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: '' } })}>添加音译</button>
                 </div>
                 {contents.map((content) => <RomanizationRow key={content.id} track={track} content={content}

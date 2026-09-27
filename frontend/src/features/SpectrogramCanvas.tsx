@@ -15,6 +15,8 @@ export function SpectrogramCanvas({ projectId, startUs, endUs, durationUs }: { p
   const [error, setError] = useState('');
   const [width, setWidth] = useState(640);
   const visible = endUs > startUs && endUs - startUs <= 20_000_000;
+  const firstTile = Math.floor(startUs / WINDOW_US) * WINDOW_US;
+  const lastTile = Math.ceil(endUs / WINDOW_US) * WINDOW_US;
 
   useEffect(() => {
     cache.current.clear(); pending.current.clear();
@@ -32,7 +34,7 @@ export function SpectrogramCanvas({ projectId, startUs, endUs, durationUs }: { p
     if (!visible) return;
     const controller = new AbortController();
     const requested: number[] = [];
-    for (let first = Math.floor(startUs / WINDOW_US) * WINDOW_US; first < endUs; first += WINDOW_US) {
+    for (let first = firstTile; first < lastTile; first += WINDOW_US) {
       if (cache.current.has(first) || pending.current.has(first) || first >= durationUs) continue;
       const end = Math.min(first + WINDOW_US, durationUs);
       pending.current.add(first);
@@ -41,14 +43,14 @@ export function SpectrogramCanvas({ projectId, startUs, endUs, durationUs }: { p
         worker.current?.postMessage({ id: first, pcm, rate, channels }, [pcm]);
       }).catch((cause) => {
         pending.current.delete(first);
-        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '频谱片段加载失败');
+        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '声谱图片段加载失败');
       });
     }
     return () => {
       controller.abort();
       for (const first of requested) pending.current.delete(first);
     };
-  }, [durationUs, endUs, projectId, startUs, visible]);
+  }, [durationUs, firstTile, lastTile, projectId, visible]);
 
   useEffect(() => {
     const element = canvas.current;
@@ -85,6 +87,6 @@ export function SpectrogramCanvas({ projectId, startUs, endUs, durationUs }: { p
     return () => observer.disconnect();
   }, [visible]);
 
-  if (!visible) return <p className={styles.spectrumHint}>放大到 20 秒以内显示频谱</p>;
-  return <div className={styles.spectrogram}><canvas ref={canvas} aria-label="实时频谱" />{error && <small role="alert">{error}</small>}</div>;
+  if (!visible) return <p className={styles.spectrumHint}>放大到 20 秒以内显示声谱图</p>;
+  return <div className={styles.spectrogram}><canvas ref={canvas} aria-label="声谱图" />{error && <small role="alert">{error}</small>}</div>;
 }
