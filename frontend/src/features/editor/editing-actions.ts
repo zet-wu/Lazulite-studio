@@ -88,14 +88,19 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
     for (const word of words) { commands.push({ type: 'insert-word', lineId: currentLine.id, afterWordId: after, word }); after = word.id; }
     return { command: { type: 'batch', commands }, selection: { kind: 'words', lineId: currentLine.id, ids: words.map((word) => word.id), anchorId: words[0].id, activeId: words.at(-1)!.id, rubyId: null } };
   }
-  const commands: Array<Extract<LyricCommand, { type: 'insert-line' | 'insert-background' | 'insert-romanization-content' }>> = [];
+  const commands: Array<Extract<LyricCommand, { type: 'insert-line' | 'set-background-of' | 'insert-romanization-content' }>> = [];
   const ids: string[] = [];
   let after = currentLine?.backgroundOf ?? currentLine?.id ?? document.lines.filter((line) => !line.backgroundOf).at(-1)?.id ?? null;
   for (const group of clipboard.groups) {
     const id = `line-${crypto.randomUUID()}`;
     const line = cloneLine(group.line, id, null);
     commands.push({ type: 'insert-line', afterLineId: after, line });
-    if (group.background) commands.push({ type: 'insert-background', parentLineId: id, line: cloneLine(group.background, `${id}:bg`, id) });
+    if (group.background) {
+      const background = cloneLine(group.background, `${id}:bg`, null);
+      background.agentRefs = [];
+      commands.push({ type: 'insert-line', afterLineId: id, line: background });
+      commands.push({ type: 'set-background-of', lineId: background.id, parentLineId: id });
+    }
     for (const { trackId, content } of group.romanizations) commands.push({ type: 'insert-romanization-content', trackId, content: content.kind === 'plain'
       ? { ...content, id: crypto.randomUUID(), lineId: id }
       : { ...content, id: crypto.randomUUID(), lineId: id, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) } });

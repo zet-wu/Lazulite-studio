@@ -7,7 +7,7 @@ const MAX_HISTORY = 256;
 
 type AtomicLyricCommand =
   | { type: 'insert-line'; afterLineId: string | null; line?: LyricLine }
-  | { type: 'insert-background'; parentLineId: string; line: LyricLine }
+  | { type: 'set-background-of'; lineId: string; parentLineId: string | null }
   | { type: 'delete-line'; lineId: string }
   | { type: 'move-line'; lineId: string; afterLineId: string | null }
   | { type: 'insert-word'; lineId: string; afterWordId: string | null; word: LyricWord }
@@ -127,16 +127,25 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       lines.splice(after + 1, 0, line);
       return { ...document, lines };
     }
-    case 'insert-background': {
-      const index = lineIndex(document, command.parentLineId);
-      const parent = document.lines[index];
-      if (parent.backgroundOf) throw new Error('Background vocals cannot own a background vocal');
-      if (document.lines.some((line) => line.id === command.line.id)) throw new Error(`Line id already exists: ${command.line.id}`);
-      if (document.lines.some((line) => line.backgroundOf === parent.id)) throw new Error('Line already has a background vocal');
-      if (command.line.backgroundOf && command.line.backgroundOf !== parent.id) throw new Error('Background parent does not match');
-      const background = { ...command.line, backgroundOf: parent.id, songPart: parent.songPart, agentRefs: parent.agentRefs };
-      const lines = document.lines.slice();
-      lines.splice(index + 1, 0, background);
+    case 'set-background-of': {
+      const sourceIndex = lineIndex(document, command.lineId);
+      const source = document.lines[sourceIndex];
+      if (source.backgroundOf === command.parentLineId) return document;
+      if (command.parentLineId === null) {
+        const lines = document.lines.slice();
+        lines[sourceIndex] = { ...source, backgroundOf: null };
+        return { ...document, lines };
+      }
+      const parent = document.lines[lineIndex(document, command.parentLineId)];
+      if (source.id === parent.id || parent.backgroundOf) throw new Error('背景歌词只能附属于另一条主行');
+      if (document.lines.some((line) => line.backgroundOf === source.id)) throw new Error('此行已有背景歌词，请先处理所属关系');
+      if (document.lines.some((line) => line.backgroundOf === parent.id && line.id !== source.id)) throw new Error('目标主行已有背景歌词');
+      if (document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === source.id))) throw new Error('此行有音译内容，请先转移或删除');
+      if (source.translations.length || source.endLink || document.lines.some((line) => line.endLink?.targetLineId === source.id)) throw new Error('此行有翻译或行尾链接，请先处理');
+      if (parent.beginUs !== null && source.beginUs !== null && source.beginUs < parent.beginUs || parent.endUs !== null && source.endUs !== null && source.endUs > parent.endUs) throw new Error('背景歌词时间须位于主行区间内');
+      const lines = document.lines.filter((line) => line.id !== source.id);
+      const parentIndex = lines.findIndex((line) => line.id === parent.id);
+      lines.splice(parentIndex + 1, 0, { ...source, backgroundOf: parent.id, agentRefs: [], songPart: null });
       return { ...document, lines };
     }
     case 'delete-line': {
@@ -331,8 +340,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (command.agentRefs.some((ref) => !document.agents.some((agent) => agent.id === ref))) throw new Error('Unknown lyric agent');
       const lines = document.lines.slice();
       lines[index] = { ...line, agentRefs: command.agentRefs };
-      const backgroundIndex = lines.findIndex((item) => item.backgroundOf === line.id);
-      if (backgroundIndex >= 0) lines[backgroundIndex] = { ...lines[backgroundIndex], agentRefs: command.agentRefs };
       return { ...document, lines };
     }
     case 'set-ignore-sync': {

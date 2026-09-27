@@ -72,6 +72,7 @@ export function EditorWorkspace(props: Props) {
   const rubyShortcutSerial = useRef(0);
   const [rubyBaseOpen, setRubyBaseOpen] = useState(false);
   const [rubyBaseReading, setRubyBaseReading] = useState('');
+  const [backgroundTargetId, setBackgroundTargetId] = useState('');
   const [locate, setLocate] = useState<{ id: string; serial: number } | null>(null);
   const locateSerial = useRef(0);
   const requestLocate = (id: string) => setLocate({ id, serial: ++locateSerial.current });
@@ -97,8 +98,13 @@ export function EditorWorkspace(props: Props) {
   const activeLineId = selection?.kind === 'words' ? selection.lineId : selection?.activeId || props.selectedLineId;
   const selectedLine = document.lines.find((line) => line.id === activeLineId) ?? document.lines[0];
   const mainLines = document.lines.filter((line) => !line.backgroundOf);
+  useEffect(() => {
+    if (!selectedLine) return;
+    const preceding = document.lines.slice(0, document.lines.findIndex((line) => line.id === selectedLine.id)).filter((line) => !line.backgroundOf).at(-1);
+    setBackgroundTargetId(selectedLine.backgroundOf ?? preceding?.id ?? mainLines.find((line) => line.id !== selectedLine.id)?.id ?? '');
+  }, [selectedLine?.id]);
   const mainIds = mainLines.map((line) => line.id);
-  const selectedMainLines = selection?.kind === 'lines' && selection.ids.length
+  const selectedMainLines = selectedLine?.backgroundOf ? [] : selection?.kind === 'lines' && selection.ids.length
     ? mainLines.filter((line) => selection.ids.includes(line.id))
     : selectedLine && !selectedLine.backgroundOf ? [selectedLine] : [];
   const selectedAgents = selectedMainLines.map((line) => line.agentRefs[0] ?? '');
@@ -405,8 +411,20 @@ export function EditorWorkspace(props: Props) {
             {agentValue === '__mixed__' && <option value="__mixed__" disabled>混合值</option>}
             <option value="">未指定</option>{document.agents.map((agent) => <option value={agent.id} key={agent.id}>{agent.name ?? agent.id}</option>)}
           </select></label>
-          {selectedMainLines.length === 1 && <button onClick={() => dispatch({ type: 'insert-background', parentLineId: selectedMainLines[0].id, line: createLine('背景歌词') })} disabled={document.lines.some((line) => line.backgroundOf === selectedMainLines[0].id)}>添加背景歌词</button>}
         </>}
+        {selection?.kind !== 'lines' || selection.ids.length <= 1 ? <>
+          <label><input type="checkbox" checked={Boolean(selectedLine.backgroundOf)} onChange={(event) => {
+            if (event.target.checked && !backgroundTargetId) { setMessage('请先选择所属主行'); return; }
+            dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: event.target.checked ? backgroundTargetId : null });
+          }} /> 背景歌词</label>
+          <label>所属主行 <select value={selectedLine.backgroundOf ?? backgroundTargetId} onChange={(event) => {
+            setBackgroundTargetId(event.target.value);
+            if (selectedLine.backgroundOf) dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: event.target.value });
+          }}>
+            <option value="">请选择</option>{mainLines.filter((line) => line.id !== selectedLine.id && !document.lines.some((item) => item.backgroundOf === line.id && item.id !== selectedLine.id)).map((line) => <option key={line.id} value={line.id}>{mainLines.indexOf(line) + 1} · {lineText(line) || '空行'}</option>)}
+          </select></label>
+          {selectedLine.backgroundOf && <p>歌手继承自所属主行：{document.lines.find((line) => line.id === selectedLine.backgroundOf)?.agentRefs.map((id) => document.agents.find((agent) => agent.id === id)?.name ?? id).join('、') || '未指定'}</p>}
+        </> : null}
       </>}
         <h2>歌手</h2>{document.agents.map((agent) => <div key={agent.id}><strong>{agent.id}</strong><DraftInput value={agent.name ?? ''} label={`歌手 ${agent.id}`} onCommit={(name) => dispatch({ type: 'set-agents', agents: document.agents.map((item) => item.id === agent.id ? { ...item, name: name || null } : item) })} /><button onClick={() => dispatch({ type: 'set-agents', agents: document.agents.filter((item) => item.id !== agent.id) })}>删除歌手</button></div>)}<button onClick={() => { const id = window.prompt('歌手 ID'); if (!id) return; if (document.agents.some((agent) => agent.id === id)) return setMessage('歌手 ID 已存在'); const name = window.prompt('歌手名称') || null; dispatch({ type: 'set-agents', agents: [...document.agents, { id, name, type: null }] }); }}>添加歌手</button>
         <MetadataPanel document={document} apply={dispatch} />

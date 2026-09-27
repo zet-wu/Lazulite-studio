@@ -344,7 +344,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           const last = bgWords.length - 1;
           bgWords[last] = { ...bgWords[last], text: bgWords[last].text.replace(/\)$/, '') };
         }
-        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin ?? (bgWords.every((word) => word.beginUs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginUs!)) : null), endUs: bgEnd ?? (bgWords.every((word) => word.endUs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endUs!)) : null), endLink: null, agentRefs, backgroundOf: id, songPart: part, translations: [], ignoreSync: false });
+        lines.push({ id: bgId, words: bgWords, beginUs: bgBegin ?? (bgWords.every((word) => word.beginUs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginUs!)) : null), endUs: bgEnd ?? (bgWords.every((word) => word.endUs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endUs!)) : null), endLink: null, agentRefs: [], backgroundOf: id, songPart: null, translations: [], ignoreSync: false });
       }
     }
   };

@@ -168,7 +168,8 @@ describe('semantic TTML codec', () => {
     const parentLineId = document.lines[0].id;
     let state = createLyricEditorState(document);
     state = executeLyricCommand(state, { type: 'batch', commands: [
-      { type: 'insert-background', parentLineId, line: createLine('響く', 'background') },
+      { type: 'insert-line', afterLineId: parentLineId, line: createLine('響く', 'background') },
+      { type: 'set-background-of', lineId: 'background', parentLineId },
       { type: 'set-metadata', key: 'title', values: ['自作サンプル'] },
     ] });
     const reopened = parseLyricTtml(serializeLyricTtml(state.present, { draft: true }));

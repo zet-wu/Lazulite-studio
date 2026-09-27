@@ -58,6 +58,29 @@ describe('semantic lyric commands', () => {
     expect(undoLyricCommand(state).present.lines.map((line) => line.id)).toEqual(['second', parent.id, 'bg']);
   });
 
+  it('turns an existing row into a background relation and restores it in one undo', () => {
+    const document = createLyricDocument('主唱');
+    const main = document.lines[0];
+    const background = createLine('和声', 'bg');
+    const another = createLine('另一主行', 'another');
+    document.lines.push(another, background);
+    const original = createLyricEditorState(document);
+    const attached = executeLyricCommand(original, { type: 'set-background-of', lineId: background.id, parentLineId: main.id });
+    expect(attached.present.lines.map((line) => [line.id, line.backgroundOf])).toEqual([[main.id, null], ['bg', main.id], ['another', null]]);
+    expect(undoLyricCommand(attached).present).toBe(document);
+    expect(() => executeLyricCommand(attached, { type: 'set-background-of', lineId: another.id, parentLineId: main.id })).toThrow(/已有背景/);
+    const detached = executeLyricCommand(attached, { type: 'set-background-of', lineId: background.id, parentLineId: null });
+    expect(detached.present.lines[1]).toMatchObject({ id: 'bg', backgroundOf: null, words: background.words });
+  });
+
+  it('does not turn a line with attached transliteration into a background row', () => {
+    const document = createLyricDocument('主唱');
+    const candidate = createLine('保留音译', 'candidate');
+    document.lines.push(candidate);
+    document.romanizationTracks.push({ id: 'track', language: null, contents: [{ id: 'content', lineId: candidate.id, kind: 'plain', text: 'romaji' }] });
+    expect(() => executeLyricCommand(createLyricEditorState(document), { type: 'set-background-of', lineId: candidate.id, parentLineId: document.lines[0].id })).toThrow(/音译内容/);
+  });
+
   it('inserts and moves lines after the full background group', () => {
     const document = createLyricDocument('主唱');
     const parent = document.lines[0];
