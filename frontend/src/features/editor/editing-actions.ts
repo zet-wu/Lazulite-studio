@@ -1,15 +1,17 @@
 import type { LyricCommand } from '../../domain/lyric-commands';
-import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationUnit } from '../../domain/lyric-document';
+import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationUnit, type RubyUnit } from '../../domain/lyric-document';
 
 export type EditorSelection =
   | { kind: 'lines'; ids: string[]; anchorId: string; activeId: string }
-  | { kind: 'words'; lineId: string; ids: string[]; anchorId: string; activeId: string; rubyId: string | null }
+  | { kind: 'words'; lineId: string; ids: string[]; anchorId: string; activeId: string }
+  | { kind: 'ruby'; lineId: string; wordId: string; ids: string[]; anchorId: string; activeId: string }
   | { kind: 'romanization-content'; lineId: string; trackId: string; contentId: string; ids: string[]; anchorId: string; activeId: string }
   | { kind: 'romanization-unit'; lineId: string; trackId: string; contentId: string; ids: string[]; anchorId: string; activeId: string };
 
 export type EditorClipboard =
   | { kind: 'lines'; groups: Array<{ line: LyricLine; background: LyricLine | null; romanizations: Array<{ trackId: string; content: RomanizationContent }> }>; text: string }
   | { kind: 'words'; words: LyricWord[]; text: string }
+  | { kind: 'ruby'; units: RubyUnit[]; text: string }
   | { kind: 'romanization-content'; trackId: string; contents: RomanizationContent[]; text: string }
   | { kind: 'romanization-unit'; trackId: string; contentId: string; units: RomanizationUnit[]; text: string };
 
@@ -30,6 +32,12 @@ export function invertIds(order: string[], selected: string[]): string[] {
 }
 
 export function copySelection(document: LyricDocument, selection: EditorSelection): EditorClipboard {
+  if (selection.kind === 'ruby') {
+    const word = document.lines.find((line) => line.id === selection.lineId)?.words.find((item) => item.id === selection.wordId);
+    if (!word) throw new Error('读音所属词不存在');
+    const units = word.rubyUnits.filter((unit) => selection.ids.includes(unit.id));
+    return { kind: 'ruby', units, text: units.map((unit) => unit.reading).join('') };
+  }
   if (selection.kind === 'romanization-content' || selection.kind === 'romanization-unit') {
     const track = document.romanizationTracks.find((item) => item.id === selection.trackId);
     const content = track?.contents.find((item) => item.id === selection.contentId);
@@ -54,6 +62,7 @@ export function copySelection(document: LyricDocument, selection: EditorSelectio
 }
 
 export function cutSelection(document: LyricDocument, selection: EditorSelection): LyricCommand {
+  if (selection.kind === 'ruby') return { type: 'batch', commands: selection.ids.map((rubyId) => ({ type: 'delete-ruby', lineId: selection.lineId, wordId: selection.wordId, rubyId })) };
   if (selection.kind === 'romanization-content') return { type: 'batch', commands: selection.ids.map((contentId) => ({ type: 'delete-romanization-content', trackId: selection.trackId, contentId })) };
   if (selection.kind === 'romanization-unit') {
     const content = document.romanizationTracks.find((track) => track.id === selection.trackId)?.contents.find((item) => item.id === selection.contentId);
@@ -101,6 +110,21 @@ function cloneLine(line: LyricLine, id: string, backgroundOf: string | null): Ly
 export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null): { command: LyricCommand; selection: EditorSelection } {
   const selectedLineId = selectionLineId(selection);
   const currentLine = document.lines.find((line) => line.id === selectedLineId);
+  if (clipboard.kind === 'ruby') {
+    if (selection?.kind !== 'ruby') throw new Error('请先选择目标读音单元');
+    const word = currentLine?.words.find((item) => item.id === selection.wordId);
+    if (!word) throw new Error('读音所属词不存在');
+    const copied = clipboard.units.map((unit) => ({ ...unit, id: crypto.randomUUID() }));
+    const commands: Array<Extract<LyricCommand, { type: 'insert-ruby' | 'set-ruby-time' }>> = [];
+    let afterRubyId = selection.activeId;
+    for (const unit of copied) {
+      commands.push({ type: 'insert-ruby', lineId: selection.lineId, wordId: word.id, afterRubyId, reading: unit.reading, rubyId: unit.id });
+      if (unit.beginUs !== null || unit.endUs !== null) commands.push({ type: 'set-ruby-time', lineId: selection.lineId, wordId: word.id, rubyId: unit.id, beginUs: unit.beginUs, endUs: unit.endUs });
+      afterRubyId = unit.id;
+    }
+    return { command: { type: 'batch', commands },
+      selection: { ...selection, ids: copied.map((unit) => unit.id), anchorId: copied[0].id, activeId: copied.at(-1)!.id } };
+  }
   if (clipboard.kind === 'romanization-content') {
     if (!currentLine || currentLine.backgroundOf) throw new Error('请先选择主歌词行');
     const contents = clipboard.contents.map((content) => content.kind === 'plain'
@@ -129,7 +153,7 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
     if (beginUs !== currentLine.beginUs || endUs !== currentLine.endUs) commands.push({ type: 'set-line-time', lineId: currentLine.id, beginUs, endUs });
     let after = afterWordId;
     for (const word of words) { commands.push({ type: 'insert-word', lineId: currentLine.id, afterWordId: after, word }); after = word.id; }
-    return { command: { type: 'batch', commands }, selection: { kind: 'words', lineId: currentLine.id, ids: words.map((word) => word.id), anchorId: words[0].id, activeId: words.at(-1)!.id, rubyId: null } };
+    return { command: { type: 'batch', commands }, selection: { kind: 'words', lineId: currentLine.id, ids: words.map((word) => word.id), anchorId: words[0].id, activeId: words.at(-1)!.id } };
   }
   const commands: Array<Extract<LyricCommand, { type: 'insert-line' | 'set-background-of' | 'insert-romanization-content' }>> = [];
   const ids: string[] = [];
@@ -154,6 +178,11 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
 }
 
 export function pastePlain(document: LyricDocument, text: string, selection: EditorSelection | null): { command: LyricCommand; selection: EditorSelection } {
+  if (selection?.kind === 'ruby') {
+    const rubyId = crypto.randomUUID();
+    return { command: { type: 'insert-ruby', lineId: selection.lineId, wordId: selection.wordId, afterRubyId: selection.activeId, reading: text, rubyId },
+      selection: { ...selection, ids: [rubyId], anchorId: rubyId, activeId: rubyId } };
+  }
   if (selection?.kind === 'romanization-content') {
     const content = { id: crypto.randomUUID(), lineId: selection.lineId, kind: 'plain' as const, text };
     return { command: { type: 'insert-romanization-content', trackId: selection.trackId, content }, selection: { ...selection, contentId: content.id, ids: [content.id], anchorId: content.id, activeId: content.id } };
@@ -174,7 +203,7 @@ export function pastePlain(document: LyricDocument, text: string, selection: Edi
     const line = document.lines.find((item) => item.id === selection.lineId)!;
     const afterWordId = line.words.some((item) => item.id === selection.activeId) ? selection.activeId : line.words.at(-1)?.id ?? null;
     return { command: { type: 'insert-word', lineId: selection.lineId, afterWordId, word },
-      selection: { kind: 'words', lineId: selection.lineId, ids: [word.id], anchorId: word.id, activeId: word.id, rubyId: null } };
+      selection: { kind: 'words', lineId: selection.lineId, ids: [word.id], anchorId: word.id, activeId: word.id } };
   }
   const currentLine = document.lines.find((line) => line.id === selectionLineId(selection));
   let after = currentLine?.backgroundOf ?? currentLine?.id ?? document.lines.filter((line) => !line.backgroundOf).at(-1)?.id ?? null;

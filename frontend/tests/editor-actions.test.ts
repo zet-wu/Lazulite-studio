@@ -19,7 +19,7 @@ describe('editor selection and clipboard', () => {
     word.beginUs = 0; word.endUs = 1_000_000;
     word.rubyUnits = [{ id: 'ruby', reading: 'きょう', beginUs: 0, endUs: 1_000_000 }];
     word.alignmentUnits = [{ id: 'mora', kind: 'mora', text: 'きょ', beginUs: 0, endUs: 500_000, readingStart: 0, readingEnd: 2, rubyUnitId: 'ruby' }];
-    const selection = { kind: 'words' as const, lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id, rubyId: null };
+    const selection = { kind: 'words' as const, lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id };
     const clipboard = copySelection(document, selection);
     const pasted = pasteRich(document, clipboard, selection);
     const state = executeLyricCommand(createLyricEditorState(document), pasted.command);
@@ -29,6 +29,24 @@ describe('editor selection and clipboard', () => {
     expect(clone.rubyUnits[0]).toMatchObject({ reading: 'きょう', beginUs: 0, endUs: 1_000_000 });
     expect(clone.rubyUnits[0].id).not.toBe('ruby');
     expect(clone.alignmentUnits[0].rubyUnitId).toBe(clone.rubyUnits[0].id);
+    expect(undoLyricCommand(state).present).toBe(document);
+  });
+
+  it('copies a selected Ruby unit without clearing existing alignment references', () => {
+    const document = createLyricDocument('歌');
+    const line = document.lines[0], word = line.words[0];
+    line.beginUs = 0; line.endUs = 1_000_000;
+    word.beginUs = 0; word.endUs = 1_000_000;
+    word.rubyUnits = [{ id: 'ruby', reading: 'うた', beginUs: 0, endUs: 1_000_000 }];
+    word.alignmentUnits = [{ id: 'aligned', kind: 'mora', text: 'う', beginUs: 0, endUs: 500_000, readingStart: 0, readingEnd: 1, rubyUnitId: 'ruby' }];
+    const selection = { kind: 'ruby' as const, lineId: line.id, wordId: word.id, ids: ['ruby'], anchorId: 'ruby', activeId: 'ruby' };
+    const clipboard = copySelection(document, selection);
+    const pasted = pasteRich(document, clipboard, selection);
+    const state = executeLyricCommand(createLyricEditorState(document), pasted.command);
+    const result = state.present.lines[0].words[0];
+    expect(result.alignmentUnits).toEqual(word.alignmentUnits);
+    expect(result.rubyUnits.map((unit) => [unit.reading, unit.beginUs, unit.endUs])).toEqual([['うた', 0, 1_000_000], ['うた', 0, 1_000_000]]);
+    expect(result.rubyUnits[1].id).not.toBe('ruby');
     expect(undoLyricCommand(state).present).toBe(document);
   });
 
@@ -72,7 +90,7 @@ describe('editor selection and clipboard', () => {
   it('pastes plain text as untimed words or lines according to selection', () => {
     const document = createLyricDocument('前');
     const word = document.lines[0].words[0];
-    const wordSelection = { kind: 'words' as const, lineId: document.lines[0].id, ids: [word.id], anchorId: word.id, activeId: word.id, rubyId: null };
+    const wordSelection = { kind: 'words' as const, lineId: document.lines[0].id, ids: [word.id], anchorId: word.id, activeId: word.id };
     const one = pastePlain(document, ' 後', wordSelection);
     const withWord = executeLyricCommand(createLyricEditorState(document), one.command).present;
     expect(withWord.lines[0].words.map((item) => [item.text, item.beginUs])).toEqual([['前', null], [' 後', null]]);
@@ -91,7 +109,7 @@ describe('editor selection and clipboard', () => {
     target.beginUs = 1_000_000; target.endUs = 2_000_000;
     target.words[0].beginUs = 1_000_000; target.words[0].endUs = 2_000_000;
     document.lines.push(target);
-    const selection = { kind: 'words' as const, lineId: document.lines[0].id, ids: [word.id], anchorId: word.id, activeId: word.id, rubyId: null };
+    const selection = { kind: 'words' as const, lineId: document.lines[0].id, ids: [word.id], anchorId: word.id, activeId: word.id };
     const state = executeLyricCommand(createLyricEditorState(document), moveWordsAcrossLine(document, selection, target.id, null));
     expect(state.present.lines[1].beginUs).toBe(0);
     expect(state.present.lines[1].words[0]).toBe(word);

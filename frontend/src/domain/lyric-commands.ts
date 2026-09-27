@@ -48,6 +48,7 @@ type AtomicLyricCommand =
   | { type: 'add-ruby'; lineId: string; wordId: string; reading: string; rubyId?: string }
   | { type: 'insert-ruby'; lineId: string; wordId: string; afterRubyId: string | null; reading: string; rubyId?: string }
   | { type: 'merge-ruby'; lineId: string; wordId: string; firstRubyId: string; secondRubyId: string }
+  | { type: 'move-ruby'; lineId: string; wordId: string; rubyId: string; afterRubyId: string | null }
   | { type: 'set-ruby-units'; lineId: string; wordId: string; units: RubyUnit[]; overwrite?: boolean }
   | { type: 'redistribute-ruby-time'; lineId: string; wordId: string }
   | { type: 'set-word-empty-beat'; lineId: string; wordId: string; emptyBeat: number }
@@ -57,7 +58,7 @@ type AtomicLyricCommand =
   | { type: 'set-ruby-time'; lineId: string; wordId: string; rubyId: string; beginUs: TimeUs; endUs: TimeUs };
 
 export type LyricCommand = AtomicLyricCommand | { type: 'batch'; commands: AtomicLyricCommand[] };
-type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'merge-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
+type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'merge-ruby' | 'move-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
 
 export type LyricEditorState = { present: LyricDocument; past: LyricDocument[]; future: LyricDocument[] };
 
@@ -605,6 +606,17 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
         const ends = [left.endUs, right.endUs].filter((value): value is number => value !== null);
         const rubyUnits = word.rubyUnits.slice();
         rubyUnits.splice(first, 2, { ...left, reading: left.reading + right.reading, beginUs: starts.length ? Math.min(...starts) : null, endUs: ends.length ? Math.max(...ends) : null });
+        return [{ ...word, rubyUnits }];
+      }
+      case 'move-ruby': {
+        if (wordCommand.afterRubyId === wordCommand.rubyId) return [word];
+        const rubyUnits = word.rubyUnits.slice();
+        const index = rubyUnits.findIndex((unit) => unit.id === wordCommand.rubyId);
+        if (index < 0) throw new Error('读音单元不存在');
+        const [unit] = rubyUnits.splice(index, 1);
+        const after = wordCommand.afterRubyId === null ? -1 : rubyUnits.findIndex((item) => item.id === wordCommand.afterRubyId);
+        if (wordCommand.afterRubyId !== null && after < 0) throw new Error('读音目标位置不存在');
+        rubyUnits.splice(after + 1, 0, unit);
         return [{ ...word, rubyUnits }];
       }
       case 'set-ruby-units': {

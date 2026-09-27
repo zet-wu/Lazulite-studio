@@ -34,6 +34,20 @@ describe('semantic lyric commands', () => {
     expect(() => executeLyricCommand(state, { type: 'split-word', lineId, wordId: firstId, at: 1 })).toThrow(/Ruby base/);
   });
 
+  it('reorders Ruby only within its word while preserving unit identity and timing', () => {
+    const document = createLyricDocument('歌');
+    const line = document.lines[0], word = line.words[0];
+    word.rubyUnits = [
+      { id: 'one', reading: 'う', beginUs: 100_000, endUs: 200_000 },
+      { id: 'two', reading: 'た', beginUs: 200_000, endUs: 300_000 },
+    ];
+    const state = createLyricEditorState(document);
+    const moved = executeLyricCommand(state, { type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId: 'two', afterRubyId: null });
+    expect(moved.present.lines[0].words[0].rubyUnits[0]).toBe(word.rubyUnits[1]);
+    expect(undoLyricCommand(moved).present).toBe(document);
+    expect(() => executeLyricCommand(state, { type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId: 'two', afterRubyId: 'elsewhere' })).toThrow(/目标位置/);
+  });
+
   it('uses grapheme boundaries across UTF-16 and code points', () => {
     const text = '𝄞e\u0301きょ';
     expect(codePointToUtf16(text, 1)).toBe(2);
