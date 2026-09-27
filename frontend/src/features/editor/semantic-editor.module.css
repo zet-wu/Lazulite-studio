@@ -17,6 +17,9 @@
 .ribbon button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 5px; padding: 5px 8px; cursor: pointer; }
 .ribbon button:disabled { opacity: .5; cursor: default; }
 .ribbon small { color: var(--muted); }
+.ribbonMenu { position: relative; }
+.ribbonMenu summary { cursor: pointer; list-style: none; border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; }
+.ribbonMenu > div { position: absolute; top: 100%; left: 0; z-index: 12; display: grid; min-width: 190px; padding: 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); box-shadow: 0 5px 16px #0003; }
 .layout { flex: 1; display: grid; grid-template-columns: 190px minmax(0,1fr) 250px; min-width: 0; min-height: 0; overflow: hidden; }
 .simpleLayout { grid-template-columns: minmax(0, 1fr); }
 .simpleLayout .outline, .simpleLayout .inspector { display: none; }
@@ -26,16 +29,16 @@
 .outlineRow { display: flex; align-items: flex-start; }
 .outlineRow > button { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; color: var(--ink); padding: 8px 4px; overflow-wrap: anywhere; }
 .outlineRow > button.selected { background: var(--blue-soft); }
-.outlineOrder { display: inline-flex; }
-.outlineOrder button { border: 0; background: transparent; color: var(--ink); padding: 8px 2px; cursor: pointer; }
-.outlineOrder button:disabled { opacity: .3; cursor: default; }
 .canvas { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding: 14px; min-width: 0; min-height: 0; overflow: hidden; }
 .canvasHeader { display: flex; justify-content: space-between; align-items: center; }
+.canvasHeader > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .canvasHeader h1 { margin: 0 0 12px; font-size: 19px; }
 .lyricScroller { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .virtualContent { position: relative; width: 100%; }
 .virtualRow { position: absolute; top: 0; left: 0; width: 100%; }
 .line { min-width: 0; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+.line, .word, .rubyTile, .romanizationRow, .romanizationUnit { cursor: grab; }
+.line:active, .word:active, .rubyTile:active, .romanizationRow:active, .romanizationUnit:active { cursor: grabbing; }
 .selectedLine { border-color: var(--blue); }
 .playheadLine { box-shadow: inset 4px 0 #e19731; }
 .dropLine { outline: 2px dashed #e19731; outline-offset: 2px; }
@@ -47,15 +50,13 @@
 .dropWord { outline: 2px dashed #e19731; outline-offset: 2px; }
 .word:focus-within { outline: 2px solid var(--blue); outline-offset: 2px; }
 .wordMain { display: flex; gap: 3px; }
-.dragHandle { cursor: grab !important; touch-action: none; color: var(--muted) !important; }
-.dragHandle:active { cursor: grabbing !important; }
 .wordMain input { min-width: 0; width: 12ch; max-width: 100%; }
 .wordMain input[readonly] { border-color: transparent; background: transparent; cursor: default; }
 .rubyEditor { display: grid; gap: 4px; margin-bottom: 5px; }
 .rubyAbove { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; }
 .rubyTile { display: grid; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
-.rubyTileActions, .rubyTools, .rubyAdd { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
-.rubyTools button, .rubyTileActions button, .rubyAdd button { font-size: 11px; padding: 2px 4px; }
+.rubyAdd { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.rubyAdd button { font-size: 11px; padding: 2px 4px; }
 .rubyAdd input { width: 10ch; }
 .selectedRuby { background: #e9f6ef; border-radius: 4px; }
 .rubyTile:focus-within { outline: 2px solid #258457; outline-offset: 2px; }
@@ -66,7 +67,7 @@
 .sublyrics > div { display: grid; gap: 4px; }
 .sublyrics input { min-width: 0; max-width: 100%; width: 18ch; }
 .romanizationTracks { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; min-width: 0; }
-.romanizationTrackHeader, .romanizationHeader, .romanizationPlain, .romanizationUnitActions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.romanizationTrackHeader, .romanizationHeader, .romanizationPlain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .romanizationTrackHeader input { width: 10ch; min-width: 0; }
 .romanizationRow { min-width: 0; border: 1px solid var(--line); border-radius: 5px; padding: 7px; background: var(--canvas); }
 .romanizationHeader span { color: var(--muted); font-size: 11px; margin-right: auto; }
@@ -74,7 +75,6 @@
 .romanizationUnits { display: flex; flex-wrap: wrap; gap: 7px; align-items: flex-start; margin-top: 6px; }
 .romanizationUnit { display: grid; gap: 4px; min-width: 0; padding: 5px; border: 1px solid var(--line); border-radius: 4px; }
 .romanizationUnit > input { min-width: 0; width: 12ch; }
-.romanizationUnitActions button { font-size: 11px; padding: 2px 4px; }
 .inspector label { display: grid; gap: 4px; margin-bottom: 12px; font-size: 12px; }
 .inspector input, .inspector select, .word input, .times input, .sublyrics input { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 4px; font: inherit; }
 .inspector button { margin-bottom: 12px; }
@@ -84,6 +84,9 @@
 .metadataPanel input, .singerList input { min-width: 0; padding: 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
 .singerList { display: grid; gap: 10px; margin-top: 14px; }
 .singerList > div { display: grid; grid-template-columns: minmax(5ch, auto) minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.trackManager { display: grid; gap: 10px; margin-top: 14px; }
+.trackManager > div { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.trackManager input { min-width: 0; width: 11ch; padding: 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
 .auxiliaryPlaceholder { flex: 1; min-height: 0; overflow-y: auto; padding: 28px; }
 .error { margin: 0; padding: 8px 16px; background: #fff0ed; color: #a32b20; }
 :global([data-theme='dark']) .error { background: #4b292b; color: #ffd3ce; }
@@ -135,6 +138,10 @@
 .segmentPreview small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .segmentPreview em { grid-column: 1 / -1; color: #a45a17; }
 .toolHint { font-size: 13px; color: var(--muted); line-height: 1.5; }
-.lineStructureActions { display: flex; flex-wrap: wrap; gap: .4rem; }
 .splitAssignment { display: flex; align-items: center; justify-content: space-between; gap: .8rem; min-width: 0; }
 .splitAssignment span { min-width: 0; overflow-wrap: anywhere; }
+.contextMenu { position: fixed; z-index: 30; display: grid; min-width: 200px; max-height: min(70dvh, 420px); overflow-y: auto; padding: 5px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); box-shadow: 0 10px 28px #0004; }
+.contextMenu strong { padding: 6px 8px; font-size: 12px; overflow-wrap: anywhere; }
+.contextMenu button { width: 100%; border: 0; border-radius: 4px; padding: 6px 8px; text-align: left; background: transparent; color: var(--ink); cursor: pointer; }
+.contextMenu button:hover, .contextMenu button:focus-visible { background: var(--blue-soft); }
+.contextMenu button:disabled { opacity: .45; cursor: default; }

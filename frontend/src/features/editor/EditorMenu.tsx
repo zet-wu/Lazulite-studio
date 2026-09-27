@@ -36,23 +36,27 @@ export function EditorMenu(props: Props) {
     <strong>{props.title}</strong>
     <span>{props.saving ? '保存中' : props.dirty ? '未保存' : '已保存'}</span>
     <div className={styles.actions}>
-      {props.onOpen && <label>导入歌词<input type="file" accept=".ttml,.xml,.txt,.lrc,.eslrc,.qrc,.yrc,.lys" hidden onChange={(event) => {
-        const file = event.target.files?.[0];
-        if (file) props.onOpen?.(file);
-        event.target.value = '';
-      }} /></label>}
-      {props.onNew && <button onClick={props.onNew}>新建</button>}
+      <details className={styles.settingsMenu}><summary>文件</summary><div>
+        {props.onOpen && <label>导入歌词<input type="file" accept=".ttml,.xml,.txt,.lrc,.eslrc,.qrc,.yrc,.lys" hidden onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) props.onOpen?.(file);
+          event.target.value = '';
+        }} /></label>}
+        {props.onNew && <button onClick={props.onNew}>新建</button>}
+        <button onClick={props.onDraft}>下载草稿</button>
+        <button onClick={props.onFinal}>最终 TTML</button>
+        {props.onExportFormat && <><select aria-label="导出格式" value={format} onChange={(event) => setFormat(event.target.value as LyricFormat)}>
+          <option value="txt">纯文本</option><option value="lrc">LRC</option><option value="eslrc">ESLRC</option><option value="qrc">QRC</option><option value="yrc">YRC</option><option value="lys">LYS</option><option value="ass">ASS</option>
+        </select><button onClick={() => props.onExportFormat?.(format)}>导出所选格式</button></>}
+        {props.onPublish && <button onClick={props.onPublish}>发布与下载</button>}
+      </div></details>
       <button onClick={props.onSave} disabled={props.saving}>保存</button>
       <button onClick={props.undo} disabled={!props.canUndo}>撤销</button>
       <button onClick={props.redo} disabled={!props.canRedo}>重做</button>
-      <button onClick={props.onToggleLayout}>{props.simpleLayout ? '高级布局' : '简单布局'}</button>
-      <button onClick={() => setDark((value) => !value)}>{dark ? '日间模式' : '夜间模式'}</button>
-      <button onClick={props.onDraft}>下载草稿</button>
-      <button onClick={props.onFinal}>最终 TTML</button>
-      {props.onExportFormat && <><select aria-label="导出格式" value={format} onChange={(event) => setFormat(event.target.value as LyricFormat)}>
-        <option value="txt">纯文本</option><option value="lrc">LRC</option><option value="eslrc">ESLRC</option><option value="qrc">QRC</option><option value="yrc">YRC</option><option value="lys">LYS</option><option value="ass">ASS</option>
-      </select><button onClick={() => props.onExportFormat?.(format)}>导出所选格式</button></>}
-      {props.onPublish && <button onClick={props.onPublish}>发布与下载</button>}
+      <details className={styles.settingsMenu}><summary>视图</summary><div>
+        <button onClick={props.onToggleLayout}>{props.simpleLayout ? '高级布局' : '简单布局'}</button>
+        <button onClick={() => setDark((value) => !value)}>{dark ? '日间模式' : '夜间模式'}</button>
+      </div></details>
       <details className={styles.settingsMenu}><summary>设置</summary><div>
         <button onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); props.onMetadata(); }}>元数据编辑</button>
         <button onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); props.onSingers(); }}>歌手管理</button>

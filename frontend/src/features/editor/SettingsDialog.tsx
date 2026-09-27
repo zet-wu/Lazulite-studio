@@ -14,7 +14,7 @@ export function SettingsDialog({ title, close, children }: { title: string; clos
       if (event.key !== 'Tab') return;
       const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])') ?? []);
       if (!items.length) { event.preventDefault(); return; }
-      if (event.shiftKey && document.activeElement === items[0]) { event.preventDefault(); items.at(-1)?.focus(); }
+      if (event.shiftKey && (document.activeElement === items[0] || document.activeElement === ref.current)) { event.preventDefault(); items.at(-1)?.focus(); }
       else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0].focus(); }
     }}>
       <div className={styles.dialogHeader}><h2>{title}</h2><button aria-label={`关闭${title}`} onClick={close}>×</button></div>

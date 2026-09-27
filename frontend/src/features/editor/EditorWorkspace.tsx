@@ -1,7 +1,8 @@
-import { lazy, Suspense, useEffect, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord } from '../../domain/lyric-document';
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
+import { distributeRubyTime, splitReadingMora } from '../../domain/ruby-editing';
 import { copySelection, cutSelection, invertIds, moveWordsAcrossLine, pastePlain, pasteRich, selectIds, selectionLineId, type EditorClipboard, type EditorSelection } from './editing-actions';
 import { LyricList } from './LyricList';
 import { LyricLine as LyricLineView } from './LyricLine';
@@ -18,6 +19,7 @@ import { SyncPanel } from './SyncPanel';
 import { MetadataPanel } from './MetadataPanel';
 import { SingerDialog } from './SingerDialog';
 import { SettingsDialog } from './SettingsDialog';
+import { EditorContextMenu, type ContextAction } from './EditorContextMenu';
 import type { TransportHandle } from '../MediaTransport';
 import type { LyricFormat } from '../../adapters/lyric-formats';
 import styles from './semantic-editor.module.css';
@@ -51,7 +53,10 @@ type Props = {
   embedded?: boolean;
 };
 
-type DragSource = { kind: 'line'; lineId: string } | { kind: 'word'; lineId: string; wordId: string };
+type DragSource = { kind: 'line'; lineId: string } | { kind: 'word'; lineId: string; wordId: string }
+  | { kind: 'ruby'; lineId: string; wordId: string; rubyId: string }
+  | { kind: 'romanization-content'; lineId: string; trackId: string; contentId: string }
+  | { kind: 'romanization-unit'; lineId: string; trackId: string; contentId: string; unitId: string };
 
 function isTextInput(target: EventTarget) {
   return target instanceof Element && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
@@ -62,12 +67,12 @@ export function EditorWorkspace(props: Props) {
   const [selection, setSelection] = useState<EditorSelection | null>(null);
   const [clipboard, setClipboard] = useState<EditorClipboard | null>(null);
   const clipboardToken = useRef('');
-  const dragging = useRef<DragSource | null>(null);
-  const touchDrag = useRef<{ source: DragSource; target: string | null } | null>(null);
+  const pointerDrag = useRef<{ source: DragSource; pointerId: number; x: number; y: number; started: boolean; target: string | null } | null>(null);
+  const draggedClick = useRef(false);
   const wordInputs = useRef(new Map<string, HTMLInputElement>());
   const [simpleLayout, setSimpleLayout] = useState(false);
   const [mode, setMode] = useState<'edit' | 'sync' | 'preview' | 'auxiliary'>('edit');
-  const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | null>(null);
+  const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [editingWordId, setEditingWordId] = useState<string | null>(null);
@@ -79,6 +84,8 @@ export function EditorWorkspace(props: Props) {
   const [rubyBaseReading, setRubyBaseReading] = useState('');
   const [backgroundTargetId, setBackgroundTargetId] = useState('');
   const [splitLineId, setSplitLineId] = useState<string | null>(null);
+  const [contentTransfer, setContentTransfer] = useState<{ trackId: string; contentId: string; targetLineId: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; title: string; actions: ContextAction[]; target: HTMLElement } | null>(null);
   const [locate, setLocate] = useState<{ id: string; serial: number } | null>(null);
   const locateSerial = useRef(0);
   const requestLocate = (id: string) => setLocate({ id, serial: ++locateSerial.current });
@@ -93,20 +100,33 @@ export function EditorWorkspace(props: Props) {
         return { ...current, ids, anchorId: order.includes(current.anchorId) ? current.anchorId : ids[0] ?? '', activeId: document.lines.some((line) => line.id === current.activeId) ? current.activeId : ids.at(-1) ?? '' };
       }
       if (current.kind === 'romanization-content' || current.kind === 'romanization-unit') {
-        const content = document.romanizationTracks.find((track) => track.id === current.trackId)?.contents.find((item) => item.id === current.contentId);
-        if (!content) return null;
-        if (current.kind === 'romanization-content') return current.lineId === content.lineId ? current : { ...current, lineId: content.lineId };
+        const track = document.romanizationTracks.find((item) => item.id === current.trackId);
+        const content = track?.contents.find((item) => item.id === current.contentId);
+        if (!track || !content) return null;
+        if (current.kind === 'romanization-content') {
+          const ids = current.ids.filter((id) => track.contents.some((item) => item.id === id && item.lineId === content.lineId));
+          return ids.length === current.ids.length && current.lineId === content.lineId ? current
+            : { ...current, lineId: content.lineId, ids, anchorId: ids.includes(current.anchorId) ? current.anchorId : ids[0] ?? '', activeId: ids.includes(current.activeId) ? current.activeId : ids.at(-1) ?? '' };
+        }
         if (content.kind !== 'timed') return null;
         const ids = current.ids.filter((id) => content.units.some((unit) => unit.id === id));
         return ids.length ? { ...current, lineId: content.lineId, ids, anchorId: ids.includes(current.anchorId) ? current.anchorId : ids[0], activeId: ids.includes(current.activeId) ? current.activeId : ids.at(-1)! }
           : { kind: 'romanization-content', lineId: content.lineId, trackId: current.trackId, contentId: content.id, ids: [content.id], anchorId: content.id, activeId: content.id };
       }
+      if (current.kind === 'ruby') {
+        const line = document.lines.find((item) => item.id === current.lineId);
+        const word = line?.words.find((item) => item.id === current.wordId);
+        if (!word) return null;
+        const ids = current.ids.filter((id) => word.rubyUnits.some((unit) => unit.id === id));
+        return ids.length ? { ...current, ids, anchorId: ids.includes(current.anchorId) ? current.anchorId : ids[0], activeId: ids.includes(current.activeId) ? current.activeId : ids.at(-1)! }
+          : { kind: 'words', lineId: line!.id, ids: [word.id], anchorId: word.id, activeId: word.id };
+      }
       const order = document.lines.flatMap((line) => line.words.map((word) => word.id));
       const ids = current.ids.filter((id) => order.includes(id));
       const activeId = order.includes(current.activeId) ? current.activeId : ids.at(-1) ?? '';
       const activeLine = document.lines.find((line) => line.words.some((word) => word.id === activeId));
-      if (activeLine && ids.length === current.ids.length && current.lineId === activeLine.id && (!current.rubyId || activeLine.words.some((word) => word.rubyUnits.some((unit) => unit.id === current.rubyId)))) return current;
-      return activeLine ? { ...current, lineId: activeLine.id, ids, anchorId: order.includes(current.anchorId) ? current.anchorId : ids[0] ?? '', activeId, rubyId: null }
+      if (activeLine && ids.length === current.ids.length && current.lineId === activeLine.id) return current;
+      return activeLine ? { ...current, lineId: activeLine.id, ids, anchorId: order.includes(current.anchorId) ? current.anchorId : ids[0] ?? '', activeId }
         : { kind: 'lines', ids: [], anchorId: '', activeId: '' };
     });
   }, [document]);
@@ -137,7 +157,7 @@ export function EditorWorkspace(props: Props) {
       { type: 'merge-ruby-base', lineId: rubyBaseLine.id, wordIds: rubyBaseWords.map((word) => word.id) },
       { type: 'add-ruby', lineId: rubyBaseLine.id, wordId: firstId, reading: rubyBaseReading },
     ] })) {
-      setSelection({ kind: 'words', lineId: rubyBaseLine.id, ids: [firstId], anchorId: firstId, activeId: firstId, rubyId: null });
+      setSelection({ kind: 'words', lineId: rubyBaseLine.id, ids: [firstId], anchorId: firstId, activeId: firstId });
       setRubyBaseOpen(false); setRubyBaseReading('');
     }
   };
@@ -149,11 +169,19 @@ export function EditorWorkspace(props: Props) {
     props.onSelectLine?.(line.id);
     props.onSelectUnit?.(line.id, null, null);
   };
-  const selectWord = (line: LyricLine, word: LyricWord, shift = false, toggle = false, rubyId: string | null = null) => {
+  const selectWord = (line: LyricLine, word: LyricWord, shift = false, toggle = false) => {
     const previous = selection?.kind === 'words' ? selection : null;
     const order = document.lines.flatMap((item) => item.words.map((value) => value.id));
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? word.id, word.id, shift, toggle);
-    setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift || toggle ? previous?.anchorId ?? word.id : word.id, activeId: word.id, rubyId });
+    setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift || toggle ? previous?.anchorId ?? word.id : word.id, activeId: word.id });
+    props.onSelectLine?.(line.id);
+    props.onSelectUnit?.(line.id, word.id, null);
+  };
+  const selectRuby = (line: LyricLine, word: LyricWord, rubyId: string, shift = false, toggle = false) => {
+    const previous = selection?.kind === 'ruby' && selection.wordId === word.id ? selection : null;
+    const order = word.rubyUnits.map((unit) => unit.id);
+    const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? rubyId, rubyId, shift, toggle);
+    setSelection({ kind: 'ruby', lineId: line.id, wordId: word.id, ids, anchorId: shift || toggle ? previous?.anchorId ?? rubyId : rubyId, activeId: rubyId });
     props.onSelectLine?.(line.id);
     props.onSelectUnit?.(line.id, word.id, rubyId);
   };
@@ -177,8 +205,8 @@ export function EditorWorkspace(props: Props) {
     catch (error) { setMessage(error instanceof Error ? error.message : '编辑失败'); return false; }
   };
   const currentSelection = (): EditorSelection | null => selection ?? (selectedLine ? { kind: 'lines', ids: [selectedLine.backgroundOf ?? selectedLine.id], anchorId: selectedLine.backgroundOf ?? selectedLine.id, activeId: selectedLine.id } : null);
-  const copy = () => {
-    const current = currentSelection();
+  const copy = (target?: EditorSelection) => {
+    const current = target ?? currentSelection();
     if (!current?.ids.length) return null;
     const next = copySelection(document, current);
     clipboardToken.current = crypto.randomUUID();
@@ -186,8 +214,8 @@ export function EditorWorkspace(props: Props) {
     setMessage('已复制到编辑器剪贴板');
     return next;
   };
-  const cut = () => {
-    const current = currentSelection();
+  const cut = (target?: EditorSelection) => {
+    const current = target ?? currentSelection();
     if (!current?.ids.length) return null;
     const next = copySelection(document, current);
     if (dispatch(cutSelection(document, current))) {
@@ -199,15 +227,19 @@ export function EditorWorkspace(props: Props) {
     }
     return null;
   };
-  const paste = (next: EditorClipboard | null, plain?: string) => {
+  const paste = (next: EditorClipboard | null, plain?: string, target?: EditorSelection) => {
     if (!next && !plain) return;
     try {
-      const result = next ? pasteRich(document, next, currentSelection()) : pastePlain(document, plain!, currentSelection());
+      const result = next ? pasteRich(document, next, target ?? currentSelection()) : pastePlain(document, plain!, target ?? currentSelection());
       if (dispatch(result.command)) setSelection(result.selection);
     } catch (error) { setMessage(error instanceof Error ? error.message : '粘贴失败'); }
   };
   const selectAll = (invert: boolean) => {
-    if (selection?.kind === 'romanization-unit') {
+    if (selection?.kind === 'ruby') {
+      const order = document.lines.find((line) => line.id === selection.lineId)?.words.find((word) => word.id === selection.wordId)?.rubyUnits.map((unit) => unit.id) ?? [];
+      const ids = invert ? invertIds(order, selection.ids) : order;
+      setSelection({ ...selection, ids, anchorId: ids[0] ?? '', activeId: ids.at(-1) ?? '' });
+    } else if (selection?.kind === 'romanization-unit') {
       const content = document.romanizationTracks.find((track) => track.id === selection.trackId)?.contents.find((item) => item.id === selection.contentId);
       const order = content?.kind === 'timed' ? content.units.map((unit) => unit.id) : [];
       const ids = invert ? invertIds(order, selection.ids) : order;
@@ -232,22 +264,10 @@ export function EditorWorkspace(props: Props) {
     if (!target) return;
     try {
       if (dispatch(moveWordsAcrossLine(document, selection, target.id))) {
-        setSelection({ ...selection, lineId: target.id, rubyId: null });
+        setSelection({ ...selection, lineId: target.id });
         props.onSelectLine?.(target.id);
       }
     } catch (error) { setMessage(error instanceof Error ? error.message : '跨行移动失败'); }
-  };
-  const startDrag = (event: DragEvent, source: DragSource) => {
-    dragging.current = source;
-    event.dataTransfer.effectAllowed = 'copyMove';
-    event.dataTransfer.setData('text/plain', source.kind === 'line' ? lineText(document.lines.find((line) => line.id === source.lineId)!) : document.lines.find((line) => line.id === source.lineId)!.words.find((word) => word.id === source.wordId)!.text);
-  };
-  const overDrop = (event: DragEvent, key: string) => {
-    if (!dragging.current) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.dataTransfer.dropEffect = event.ctrlKey || event.metaKey ? 'copy' : 'move';
-    setDropTarget(key);
   };
   const applyLineDrop = (source: DragSource, target: LyricLine, copyMode: boolean) => {
     const targetId = target.backgroundOf ?? target.id;
@@ -257,7 +277,12 @@ export function EditorWorkspace(props: Props) {
         const item = copySelection(document, { kind: 'lines', ids: [source.lineId], anchorId: source.lineId, activeId: source.lineId });
         const result = pasteRich(document, item, { kind: 'lines', ids: [targetId], anchorId: targetId, activeId: targetId });
         if (dispatch(result.command)) setSelection(result.selection);
-      } else if (dispatch({ type: 'move-line', lineId: source.lineId, afterLineId: targetId })) setSelection({ kind: 'lines', ids: [source.lineId], anchorId: source.lineId, activeId: source.lineId });
+      } else {
+        const sourceIndex = mainLines.findIndex((line) => line.id === source.lineId);
+        const targetIndex = mainLines.findIndex((line) => line.id === targetId);
+        const afterLineId = sourceIndex > targetIndex ? mainLines[targetIndex - 1]?.id ?? null : targetId;
+        if (dispatch({ type: 'move-line', lineId: source.lineId, afterLineId })) setSelection({ kind: 'lines', ids: [source.lineId], anchorId: source.lineId, activeId: source.lineId });
+      }
       return;
     }
     applyWordDrop(source, target, target.words.at(-1)?.id ?? null, copyMode);
@@ -265,11 +290,16 @@ export function EditorWorkspace(props: Props) {
   const applyWordDrop = (source: DragSource, targetLine: LyricLine, afterWordId: string | null, copyMode: boolean) => {
     if (source.kind !== 'word') return;
     if (source.lineId === targetLine.id && source.wordId === afterWordId) return;
-    const sourceSelection: Extract<EditorSelection, { kind: 'words' }> = { kind: 'words', lineId: source.lineId, ids: [source.wordId], anchorId: source.wordId, activeId: source.wordId, rubyId: null };
+    if (!copyMode && source.lineId === targetLine.id && afterWordId) {
+      const sourceIndex = targetLine.words.findIndex((word) => word.id === source.wordId);
+      const targetIndex = targetLine.words.findIndex((word) => word.id === afterWordId);
+      if (sourceIndex > targetIndex) afterWordId = targetLine.words[targetIndex - 1]?.id ?? null;
+    }
+    const sourceSelection: Extract<EditorSelection, { kind: 'words' }> = { kind: 'words', lineId: source.lineId, ids: [source.wordId], anchorId: source.wordId, activeId: source.wordId };
     if (copyMode) {
       const item = copySelection(document, sourceSelection);
       const targetSelection: EditorSelection = afterWordId
-        ? { kind: 'words', lineId: targetLine.id, ids: [afterWordId], anchorId: afterWordId, activeId: afterWordId, rubyId: null }
+        ? { kind: 'words', lineId: targetLine.id, ids: [afterWordId], anchorId: afterWordId, activeId: afterWordId }
         : { kind: 'lines', ids: [targetLine.backgroundOf ?? targetLine.id], anchorId: targetLine.backgroundOf ?? targetLine.id, activeId: targetLine.id };
       const result = pasteRich(document, item, targetSelection);
       if (dispatch(result.command)) setSelection(result.selection);
@@ -280,52 +310,89 @@ export function EditorWorkspace(props: Props) {
       if (dispatch(command)) setSelection({ ...sourceSelection, lineId: targetLine.id });
     }
   };
-  const dropLine = (event: DragEvent, target: LyricLine) => {
-    const source = dragging.current;
-    if (!source) return;
-    event.preventDefault(); event.stopPropagation();
-    dragging.current = null; setDropTarget(null);
-    applyLineDrop(source, target, event.ctrlKey || event.metaKey);
+  const pointerSource = (element: Element): DragSource | null => {
+    const lineId = element.closest<HTMLElement>('[data-line-id]')?.dataset.lineId;
+    if (!lineId) return null;
+    const romanContentId = element.closest<HTMLElement>('[data-romanization-content-id]')?.dataset.romanizationContentId;
+    const romanUnitId = element.closest<HTMLElement>('[data-romanization-unit-id]')?.dataset.romanizationUnitId;
+    if (romanContentId) {
+      const track = document.romanizationTracks.find((item) => item.contents.some((content) => content.id === romanContentId));
+      if (!track) return null;
+      return romanUnitId ? { kind: 'romanization-unit', lineId, trackId: track.id, contentId: romanContentId, unitId: romanUnitId }
+        : { kind: 'romanization-content', lineId, trackId: track.id, contentId: romanContentId };
+    }
+    const wordId = element.closest<HTMLElement>('[data-word-id]')?.dataset.wordId;
+    const rubyId = element.closest<HTMLElement>('[data-ruby-id]')?.dataset.rubyId;
+    if (rubyId && wordId) return { kind: 'ruby', lineId, wordId, rubyId };
+    if (wordId) return { kind: 'word', lineId, wordId };
+    const line = document.lines.find((item) => item.id === lineId);
+    return { kind: 'line', lineId: line?.backgroundOf ?? lineId };
   };
-  const dropWord = (event: DragEvent, targetLine: LyricLine, afterWordId: string | null) => {
-    const source = dragging.current;
-    if (!source) return;
-    event.preventDefault(); event.stopPropagation();
-    dragging.current = null; setDropTarget(null);
-    applyWordDrop(source, targetLine, afterWordId, event.ctrlKey || event.metaKey);
+  const pointerTarget = (source: DragSource, element: Element | null): string | null => {
+    if (!element) return null;
+    const lineId = element.closest<HTMLElement>('[data-line-id]')?.dataset.lineId;
+    if (!lineId) return null;
+    if (source.kind === 'line') return `line:${lineId}`;
+    if (source.kind === 'word') {
+      const wordId = element.closest<HTMLElement>('[data-word-id]')?.dataset.wordId;
+      return wordId ? `word:${wordId}` : `line:${lineId}`;
+    }
+    if (lineId !== source.lineId) return null;
+    if (source.kind === 'ruby') {
+      const wordId = element.closest<HTMLElement>('[data-word-id]')?.dataset.wordId;
+      const rubyId = element.closest<HTMLElement>('[data-ruby-id]')?.dataset.rubyId;
+      return wordId === source.wordId && rubyId ? `ruby:${rubyId}` : null;
+    }
+    const contentId = element.closest<HTMLElement>('[data-romanization-content-id]')?.dataset.romanizationContentId;
+    if (!contentId) return null;
+    if (source.kind === 'romanization-content') {
+      const track = document.romanizationTracks.find((item) => item.id === source.trackId);
+      return track?.contents.some((content) => content.id === contentId && content.lineId === source.lineId) ? `roman-content:${contentId}` : null;
+    }
+    const unitId = element.closest<HTMLElement>('[data-romanization-unit-id]')?.dataset.romanizationUnitId;
+    return source.contentId === contentId && unitId ? `roman-unit:${unitId}` : null;
   };
-  const touchHandle = (source: DragSource) => ({
-    onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (event.pointerType !== 'touch') return;
-      event.currentTarget.setPointerCapture(event.pointerId);
-      touchDrag.current = { source, target: null };
-    },
-    onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (event.pointerType !== 'touch' || !touchDrag.current) return;
-      const element = event.currentTarget.ownerDocument.elementFromPoint(event.clientX, event.clientY);
-      const word = element?.closest('[data-word-id]');
-      const line = element?.closest('[data-line-id]');
-      const target = source.kind === 'word' && word ? `word:${word.getAttribute('data-word-id')}` : line ? `line:${line.getAttribute('data-line-id')}` : null;
-      touchDrag.current.target = target;
-      setDropTarget(target);
-    },
-    onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (event.pointerType !== 'touch' || !touchDrag.current) return;
-      const { target } = touchDrag.current;
-      touchDrag.current = null;
-      setDropTarget(null);
-      if (!target) return;
-      const id = target.slice(5);
-      if (target.startsWith('line:')) {
-        const line = document.lines.find((item) => item.id === id);
-        if (line) applyLineDrop(source, line, false);
-      } else {
-        const line = document.lines.find((item) => item.words.some((word) => word.id === id));
-        if (line) applyWordDrop(source, line, id, false);
-      }
-    },
-    onPointerCancel: () => { touchDrag.current = null; setDropTarget(null); },
-  });
+  const endPointerDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const current = pointerDrag.current;
+    pointerDrag.current = null; setDropTarget(null);
+    if (!current || !current.started) return;
+    draggedClick.current = true;
+    window.setTimeout(() => { draggedClick.current = false; }, 0);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (!current.target) return;
+    const { source, target } = current;
+    const copyMode = event.altKey || event.ctrlKey && !event.metaKey;
+    if (source.kind === 'line' && target.startsWith('line:')) {
+      const line = document.lines.find((item) => item.id === target.slice(5));
+      if (line) applyLineDrop(source, line, copyMode);
+    } else if (source.kind === 'word') {
+      const wordId = target.startsWith('word:') ? target.slice(5) : null;
+      const line = wordId ? document.lines.find((item) => item.words.some((word) => word.id === wordId)) : document.lines.find((item) => item.id === target.slice(5));
+      if (line) applyWordDrop(source, line, wordId ?? line.words.at(-1)?.id ?? null, copyMode);
+    } else if (source.kind === 'ruby' && target.startsWith('ruby:')) {
+      const targetId = target.slice(5);
+      const units = document.lines.find((line) => line.id === source.lineId)?.words.find((word) => word.id === source.wordId)?.rubyUnits ?? [];
+      const sourceIndex = units.findIndex((unit) => unit.id === source.rubyId), targetIndex = units.findIndex((unit) => unit.id === targetId);
+      const afterRubyId = sourceIndex > targetIndex ? units[targetIndex - 1]?.id ?? null : targetId;
+      if (afterRubyId !== source.rubyId && dispatch({ type: 'move-ruby', lineId: source.lineId, wordId: source.wordId, rubyId: source.rubyId, afterRubyId }))
+        setSelection({ kind: 'ruby', lineId: source.lineId, wordId: source.wordId, ids: [source.rubyId], anchorId: source.rubyId, activeId: source.rubyId });
+    } else if (source.kind === 'romanization-unit' && target.startsWith('roman-unit:')) {
+      const targetId = target.slice('roman-unit:'.length);
+      const content = document.romanizationTracks.find((track) => track.id === source.trackId)?.contents.find((item) => item.id === source.contentId);
+      const units = content?.kind === 'timed' ? content.units : [];
+      const sourceIndex = units.findIndex((unit) => unit.id === source.unitId), targetIndex = units.findIndex((unit) => unit.id === targetId);
+      const afterUnitId = sourceIndex > targetIndex ? units[targetIndex - 1]?.id ?? null : targetId;
+      if (afterUnitId !== source.unitId && dispatch({ type: 'move-romanization-unit', trackId: source.trackId, contentId: source.contentId, unitId: source.unitId, afterUnitId }))
+        setSelection({ kind: 'romanization-unit', lineId: source.lineId, trackId: source.trackId, contentId: source.contentId, ids: [source.unitId], anchorId: source.unitId, activeId: source.unitId });
+    } else if (source.kind === 'romanization-content' && target.startsWith('roman-content:')) {
+      const targetId = target.slice('roman-content:'.length);
+      const contents = document.romanizationTracks.find((track) => track.id === source.trackId)?.contents ?? [];
+      const sourceIndex = contents.findIndex((content) => content.id === source.contentId), targetIndex = contents.findIndex((content) => content.id === targetId);
+      const afterContentId = sourceIndex > targetIndex ? contents[targetIndex - 1]?.id ?? null : targetId;
+      if (afterContentId !== source.contentId && dispatch({ type: 'move-romanization-content', trackId: source.trackId, contentId: source.contentId, lineId: source.lineId, afterContentId }))
+        setSelection({ kind: 'romanization-content', lineId: source.lineId, trackId: source.trackId, contentId: source.contentId, ids: [source.contentId], anchorId: source.contentId, activeId: source.contentId });
+    }
+  };
   const sublyric = (line: LyricLine, index: number, text: string) => {
     const items = line.translations.map((item, i) => i === index ? { ...item, text } : item);
     dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items });
@@ -340,6 +407,131 @@ export function EditorWorkspace(props: Props) {
     if (index + direction < 0 || index + direction >= line.words.length) return;
     dispatch({ type: 'move-word', lineId: line.id, wordId: word.id, toLineId: line.id, afterWordId: direction < 0 ? line.words[index - 2]?.id ?? null : line.words[index + 1].id });
   };
+  const openContext = (target: HTMLElement, x: number, y: number) => {
+    const rubyId = target.closest<HTMLElement>('[data-ruby-id]')?.dataset.rubyId;
+    const romanUnitId = target.closest<HTMLElement>('[data-romanization-unit-id]')?.dataset.romanizationUnitId;
+    const romanContentId = target.closest<HTMLElement>('[data-romanization-content-id]')?.dataset.romanizationContentId;
+    const wordId = target.closest<HTMLElement>('[data-word-id]')?.dataset.wordId;
+    const lineId = target.closest<HTMLElement>('[data-line-id]')?.dataset.lineId;
+    const line = document.lines.find((item) => item.id === lineId);
+    if (!line) return false;
+    const word = line.words.find((item) => item.id === wordId);
+    let effective: EditorSelection;
+    let title = '歌词行';
+    let actions: ContextAction[] = [];
+    if (rubyId && word) {
+      const index = word.rubyUnits.findIndex((unit) => unit.id === rubyId);
+      const unit = word.rubyUnits[index];
+      if (!unit) return false;
+      effective = selection?.kind === 'ruby' && selection.wordId === word.id && selection.ids.includes(rubyId) ? { ...selection, activeId: rubyId }
+        : { kind: 'ruby', lineId: line.id, wordId: word.id, ids: [rubyId], anchorId: rubyId, activeId: rubyId };
+      title = `Ruby · ${unit.reading}`;
+      actions = [
+        { label: '添加读音', run: () => { const reading = window.prompt('读音'); if (reading) dispatch({ type: 'insert-ruby', lineId: line.id, wordId: word.id, afterRubyId: rubyId, reading }); } },
+        { label: '拆分读音', disabled: Array.from(unit.reading).length < 2, run: () => dispatch({ type: 'split-ruby', lineId: line.id, wordId: word.id, rubyId, at: Math.floor(Array.from(unit.reading).length / 2) }) },
+        { label: '合并前一读音', disabled: index === 0, run: () => dispatch({ type: 'merge-ruby', lineId: line.id, wordId: word.id, firstRubyId: word.rubyUnits[index - 1].id, secondRubyId: rubyId }) },
+        { label: '向前移动', disabled: index === 0, run: () => dispatch({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId, afterRubyId: word.rubyUnits[index - 2]?.id ?? null }) },
+        { label: '向后移动', disabled: index === word.rubyUnits.length - 1, run: () => dispatch({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId, afterRubyId: word.rubyUnits[index + 1].id }) },
+        { label: '按音拍拆分', disabled: splitReadingMora(unit.reading).length < 2, run: () => {
+          if (word.alignmentUnits.some((item) => item.rubyUnitId)) { setMessage('带对齐结果的读音不能自动拆分'); return; }
+          const parts = splitReadingMora(unit.reading).map((reading, partIndex) => ({ ...unit, id: partIndex ? crypto.randomUUID() : unit.id, reading }));
+          const distributed = distributeRubyTime({ ...word, beginUs: unit.beginUs, endUs: unit.endUs }, parts);
+          dispatch({ type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: word.rubyUnits.flatMap((item) => item.id === unit.id ? distributed : [item]), overwrite: true });
+        } },
+        { label: '重分配读音时间', run: () => dispatch({ type: 'redistribute-ruby-time', lineId: line.id, wordId: word.id }) },
+        { label: '删除读音', run: () => dispatch({ type: 'delete-ruby', lineId: line.id, wordId: word.id, rubyId }) },
+      ];
+    } else if (romanContentId) {
+      const track = document.romanizationTracks.find((item) => item.contents.some((content) => content.id === romanContentId));
+      const content = track?.contents.find((item) => item.id === romanContentId);
+      if (!track || !content) return false;
+      if (romanUnitId && content.kind === 'timed') {
+        const index = content.units.findIndex((unit) => unit.id === romanUnitId);
+        const unit = content.units[index];
+        if (!unit) return false;
+        effective = selection?.kind === 'romanization-unit' && selection.contentId === content.id && selection.ids.includes(unit.id) ? { ...selection, activeId: unit.id }
+          : { kind: 'romanization-unit', lineId: line.id, trackId: track.id, contentId: content.id, ids: [unit.id], anchorId: unit.id, activeId: unit.id };
+        title = `音译单元 · ${unit.text}`;
+        actions = [
+          { label: '拆分单元', disabled: Array.from(unit.text).length < 2, run: () => dispatch({ type: 'split-romanization-unit', trackId: track.id, contentId: content.id, unitId: unit.id, at: Math.floor(Array.from(unit.text).length / 2) }) },
+          { label: '合并前一单元', disabled: index === 0, run: () => dispatch({ type: 'merge-romanization-units', trackId: track.id, contentId: content.id, firstUnitId: content.units[index - 1].id, secondUnitId: unit.id }) },
+          { label: '向前移动', disabled: index === 0, run: () => dispatch({ type: 'move-romanization-unit', trackId: track.id, contentId: content.id, unitId: unit.id, afterUnitId: content.units[index - 2]?.id ?? null }) },
+          { label: '向后移动', disabled: index === content.units.length - 1, run: () => dispatch({ type: 'move-romanization-unit', trackId: track.id, contentId: content.id, unitId: unit.id, afterUnitId: content.units[index + 1].id }) },
+          { label: '删除单元', run: () => dispatch({ type: 'set-romanization-content', trackId: track.id, content: { ...content, units: content.units.filter((item) => item.id !== unit.id) } }) },
+        ];
+      } else {
+        effective = selection?.kind === 'romanization-content' && selection.trackId === track.id && selection.ids.includes(content.id) ? { ...selection, activeId: content.id, contentId: content.id }
+          : { kind: 'romanization-content', lineId: line.id, trackId: track.id, contentId: content.id, ids: [content.id], anchorId: content.id, activeId: content.id };
+        title = `音译内容 · ${track.language ?? '未指定语言'}`;
+        const siblings = track.contents.filter((item) => item.lineId === line.id);
+        const siblingIndex = siblings.findIndex((item) => item.id === content.id);
+        const previousGlobal = siblingIndex > 0 ? track.contents.findIndex((item) => item.id === siblings[siblingIndex - 1].id) : -1;
+        actions = [
+          { label: '分词并定时', disabled: content.kind === 'timed', run: () => { if (content.kind === 'plain') dispatch({ type: 'set-romanization-content', trackId: track.id, content: { ...content, kind: 'timed', units: (content.text.match(/\S+\s*|\s+/gu) ?? []).map((text) => ({ id: crypto.randomUUID(), text, beginUs: null, endUs: null })) } }); } },
+          { label: '音译内容前移', disabled: siblingIndex === 0, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: track.contents[previousGlobal - 1]?.id ?? null }) },
+          { label: '音译内容后移', disabled: siblingIndex === siblings.length - 1, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: siblings[siblingIndex + 1].id }) },
+          { label: '转移到其他主行…', disabled: mainLines.length < 2, run: () => setContentTransfer({ trackId: track.id, contentId: content.id, targetLineId: mainLines.find((item) => item.id !== line.id)?.id ?? '' }) },
+          { label: '删除内容', run: () => dispatch({ type: 'delete-romanization-content', trackId: track.id, contentId: content.id }) },
+          { label: '管理轨道…', run: () => setSettingsDialog('tracks') },
+          { label: '轨道前移', run: () => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: -1 }) },
+          { label: '轨道后移', run: () => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: 1 }) },
+        ];
+      }
+    } else if (word) {
+      const index = line.words.findIndex((item) => item.id === word.id);
+      effective = selection?.kind === 'words' && selection.ids.includes(word.id) ? { ...selection, lineId: line.id, activeId: word.id }
+        : { kind: 'words', lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id };
+      title = `词 · ${word.text}`;
+      actions = [
+        { label: '前插词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words[index - 1]?.id ?? null, word: createWord('新词') }) },
+        { label: '后插词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: word.id, word: createWord('新词') }) },
+        { label: '拆分词', disabled: Array.from(word.text).length < 2, run: () => dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at: Math.floor(Array.from(word.text).length / 2) }) },
+        { label: '合并前一词', disabled: index === 0, run: () => dispatch({ type: 'merge-words', lineId: line.id, firstWordId: line.words[index - 1].id, secondWordId: word.id }) },
+        { label: '词前移', disabled: index === 0, run: () => moveWord(line, word, -1) },
+        { label: '词后移', disabled: index === line.words.length - 1, run: () => moveWord(line, word, 1) },
+        { label: '移到上一行', disabled: document.lines[document.lines.indexOf(line) - 1] === undefined, run: () => {
+          const target = document.lines[document.lines.indexOf(line) - 1];
+          if (target) dispatch(moveWordsAcrossLine(document, effective as Extract<EditorSelection, { kind: 'words' }>, target.id));
+        } },
+        { label: '移到下一行', disabled: document.lines[document.lines.indexOf(line) + 1] === undefined, run: () => {
+          const target = document.lines[document.lines.indexOf(line) + 1];
+          if (target) dispatch(moveWordsAcrossLine(document, effective as Extract<EditorSelection, { kind: 'words' }>, target.id));
+        } },
+        { label: '添加 Ruby', run: () => { const reading = window.prompt('读音'); if (reading) dispatch({ type: 'add-ruby', lineId: line.id, wordId: word.id, reading }); } },
+        { label: '重分配读音时间', disabled: word.rubyUnits.length === 0, run: () => dispatch({ type: 'redistribute-ruby-time', lineId: line.id, wordId: word.id }) },
+        { label: '删除词', run: () => dispatch({ type: 'delete-word', lineId: line.id, wordId: word.id }) },
+      ];
+    } else {
+      const id = line.backgroundOf ?? line.id;
+      effective = selection?.kind === 'lines' && selection.ids.includes(id) ? { ...selection, activeId: line.id }
+        : { kind: 'lines', ids: [id], anchorId: id, activeId: line.id };
+      title = `歌词行 · ${lineText(line) || '空行'}`;
+      actions = [
+        { label: '前插行', run: () => { const index = mainLines.findIndex((item) => item.id === id); dispatch({ type: 'insert-line', afterLineId: mainLines[index - 1]?.id ?? null }); } },
+        { label: '后插行', run: () => dispatch({ type: 'insert-line', afterLineId: id }) },
+        { label: '添加词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') }) },
+        { label: '行上移', disabled: Boolean(line.backgroundOf) || mainLines[0]?.id === line.id, run: () => moveLine(line, -1) },
+        { label: '行下移', disabled: Boolean(line.backgroundOf) || mainLines.at(-1)?.id === line.id, run: () => moveLine(line, 1) },
+        { label: '拆分行…', disabled: Boolean(line.backgroundOf) || line.words.length < 2, run: () => setSplitLineId(line.id) },
+        { label: '合并下一行', disabled: Boolean(line.backgroundOf) || mainLines.at(-1)?.id === line.id, run: () => {
+          const next = mainLines[mainLines.findIndex((item) => item.id === line.id) + 1];
+          if (next) dispatch({ type: 'merge-lines', firstLineId: line.id, secondLineId: next.id });
+        } },
+        { label: '分词…', run: () => setSegmentationOpen(true) },
+        { label: '删除行', run: () => dispatch({ type: 'delete-line', lineId: line.id }) },
+      ];
+    }
+    const shared: ContextAction[] = [
+      { label: '复制', run: () => { copy(effective); } },
+      { label: '剪切', run: () => { cut(effective); } },
+      { label: '粘贴', disabled: !clipboard, run: () => paste(clipboard, undefined, effective) },
+    ];
+    setSelection(effective);
+    props.onSelectLine?.(line.id);
+    setContextMenu({ x, y, title, actions: [...shared, ...actions], target: target.closest<HTMLElement>('[data-ruby-id], [data-romanization-unit-id], [data-romanization-content-id], [data-word-id], [data-line-id]') ?? target });
+    return true;
+  };
+  const closeContext = () => { const target = contextMenu?.target; setContextMenu(null); target?.focus(); };
   const navigateWord = (wordId: string, direction: -1 | 1) => {
     const order = document.lines.flatMap((line) => line.words.map((word) => ({ lineId: line.id, wordId: word.id })));
     const target = order[order.findIndex((item) => item.wordId === wordId) + direction];
@@ -351,16 +543,13 @@ export function EditorWorkspace(props: Props) {
       requestLocate(target.lineId);
     }
   };
-  const wordView = (line: LyricLine, word: LyricWord, index: number) => <LyricWordView key={word.id} id={word.id}
+  const wordView = (line: LyricLine, word: LyricWord) => <LyricWordView key={word.id} id={word.id}
     selected={selection?.kind === 'words' && selection.ids.includes(word.id)} dropTarget={dropTarget === `word:${word.id}`}
-    onSelect={(shift, toggle) => selectWord(line, word, shift, toggle)}
-    onDragOver={(event) => { if (dragging.current?.kind === 'word') overDrop(event, `word:${word.id}`); }}
-    onDrop={(event) => dropWord(event, line, word.id)}>
-    <RubyWordEditor lineId={line.id} word={word} selectedRubyId={selection?.kind === 'words' && selection.activeId === word.id ? selection.rubyId : null}
-      onSelectRuby={(rubyId) => selectWord(line, word, false, false, rubyId)} apply={dispatch}
+    onSelect={(shift, toggle) => selectWord(line, word, shift, toggle)}>
+    <RubyWordEditor lineId={line.id} word={word} selectedRubyIds={selection?.kind === 'ruby' && selection.wordId === word.id ? selection.ids : []} dropTargetId={dropTarget?.startsWith('ruby:') ? dropTarget.slice(5) : null}
+      onSelectRuby={(rubyId, shift, toggle) => selectRuby(line, word, rubyId, shift, toggle)} apply={dispatch}
       requestAddSerial={rubyShortcut?.wordId === word.id ? rubyShortcut.serial : undefined} />
     <div className={styles.wordMain}>
-      <button className={styles.dragHandle} draggable aria-label={`拖动词 ${word.text}`} title="拖放排序；按 Ctrl 复制" onDragStart={(event) => startDrag(event, { kind: 'word', lineId: line.id, wordId: word.id })} onDragEnd={() => { dragging.current = null; setDropTarget(null); }} {...touchHandle({ kind: 'word', lineId: line.id, wordId: word.id })}>⋮⋮</button>
       <DraftInput value={word.text} label={`词 ${word.text}`} onFocus={() => selectWord(line, word)}
         readOnly={editingWordId !== word.id} onEdit={() => setEditingWordId(word.id)} onExit={() => setEditingWordId(null)}
         onCommit={(text) => {
@@ -372,19 +561,39 @@ export function EditorWorkspace(props: Props) {
         onSplit={(at) => dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at: utf16ToCodePoint(word.text, at) })}
         onMove={(direction) => moveWord(line, word, direction)} onNavigate={(direction) => navigateWord(word.id, direction)}
         inputRef={(node) => { if (node) { wordInputs.current.set(word.id, node); if (pendingFocus.current === word.id) { pendingFocus.current = null; node.focus(); } } else wordInputs.current.delete(word.id); }} />
-      <button aria-label={`词前移 ${word.text}`} disabled={index === 0} onClick={() => moveWord(line, word, -1)}>←</button>
-      <button aria-label={`词后移 ${word.text}`} disabled={index === line.words.length - 1} onClick={() => moveWord(line, word, 1)}>→</button>
-      <button aria-label={`拆分词 ${word.text}`} title="按光标位置拆分；输入中可按 F8" onClick={() => {
-        const at = Math.floor(Array.from(word.text).length / 2);
-        dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at });
-      }}>拆</button>
-      <button aria-label={`合并前词 ${word.text}`} disabled={index === 0} onClick={() => dispatch({ type: 'merge-words', lineId: line.id, firstWordId: line.words[index - 1].id, secondWordId: word.id })}>合</button>
-      <button aria-label={`删除词 ${word.text}`} onClick={() => dispatch({ type: 'delete-word', lineId: line.id, wordId: word.id })}>×</button>
     </div>
     <TimePair begin={word.beginUs} end={word.endUs} label={`词 ${word.text}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginUs, endUs })} />
     <label className={styles.emptyBeat}>空拍 <input type="number" min="0" max="32" aria-label={`词 ${word.text}空拍数`} value={word.emptyBeat} onChange={(event) => dispatch({ type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: Number(event.target.value) })} /></label>
   </LyricWordView>;
-  return <div className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`} onCopy={(event) => {
+  return <div className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`}
+    onPointerDown={(event) => {
+      if (mode !== 'edit' || event.pointerType !== 'mouse' || event.button !== 0 || event.shiftKey) return;
+      const element = event.target as Element;
+      if (element.closest('input,select,textarea,a,[contenteditable="true"],[role="menu"]') || element.closest('button') && !element.closest('[data-outline-drag]')) return;
+      const source = pointerSource(element);
+      if (source) pointerDrag.current = { source, pointerId: event.pointerId, x: event.clientX, y: event.clientY, started: false, target: null };
+      draggedClick.current = false;
+    }}
+    onPointerMove={(event) => {
+      const current = pointerDrag.current;
+      if (!current || current.pointerId !== event.pointerId) return;
+      if (!current.started) {
+        if (Math.hypot(event.clientX - current.x, event.clientY - current.y) < 4) return;
+        current.started = true;
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+      event.preventDefault();
+      const element = event.currentTarget.ownerDocument.elementFromPoint(event.clientX, event.clientY);
+      const target = pointerTarget(current.source, element);
+      if (target !== current.target) { current.target = target; setDropTarget(target); }
+    }}
+    onPointerUp={endPointerDrag}
+    onPointerCancel={() => { pointerDrag.current = null; setDropTarget(null); }}
+    onClickCapture={(event) => { if (draggedClick.current) { draggedClick.current = false; event.preventDefault(); event.stopPropagation(); } }}
+    onContextMenu={(event: ReactMouseEvent<HTMLDivElement>) => {
+    if (isTextInput(event.target)) return;
+    if (openContext(event.target as HTMLElement, event.clientX, event.clientY)) event.preventDefault();
+  }} onCopy={(event) => {
     if (isTextInput(event.target)) return;
     const item = copy();
     if (item) { event.clipboardData.setData('text/plain', item.text); event.clipboardData.setData(CLIPBOARD_MIME, clipboardToken.current); event.preventDefault(); }
@@ -399,9 +608,19 @@ export function EditorWorkspace(props: Props) {
     event.preventDefault();
     paste(clipboard && event.clipboardData.getData(CLIPBOARD_MIME) === clipboardToken.current ? clipboard : null, text);
   }} onKeyDown={(event) => {
+    if (event.key === 'Escape' && pointerDrag.current) {
+      const pending = pointerDrag.current;
+      if (event.currentTarget.hasPointerCapture(pending.pointerId)) event.currentTarget.releasePointerCapture(pending.pointerId);
+      pointerDrag.current = null; setDropTarget(null); event.preventDefault(); return;
+    }
     if (isTextInput(event.target) || event.nativeEvent.isComposing) return;
+    if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') {
+      const target = event.target as HTMLElement;
+      const rect = target.getBoundingClientRect();
+      if (openContext(target, rect.left + 12, rect.bottom)) event.preventDefault();
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
-    if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
+    if (event.key === 'Escape') { event.preventDefault(); pointerDrag.current = null; setDropTarget(null); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
     <EditorMenu {...props} simpleLayout={simpleLayout} onToggleLayout={() => setSimpleLayout((value) => !value)} onMetadata={() => setSettingsDialog('metadata')} onSingers={() => setSettingsDialog('singers')} />
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
@@ -409,7 +628,7 @@ export function EditorWorkspace(props: Props) {
     {mode === 'auxiliary' && <section className={styles.auxiliaryPlaceholder}><h1>项目辅助</h1><p>候选、任务、词典与审核流程将在后续阶段整理到此处。歌词文档与播放器保持当前状态。</p></section>}
     {mode === 'preview' && <Suspense fallback={<p>正在载入预览…</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={props.onSelectLine} /></Suspense>}
     {mode === 'sync' && <SyncPanel document={document} currentLineId={selectedLine?.id ?? null} apply={dispatch} transport={props.transport}
-      onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; selectWord(line, word, false, false, cursor.rubyUnitId); requestLocate(line.id); }} />}
+      onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id); }} />}
     {mode === 'edit' && <EditorRibbon selection={selection} canPaste={Boolean(clipboard)}
       canMoveUp={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes[0] > 0}
       canMoveDown={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes.at(-1) !== document.lines.length - 1}
@@ -419,65 +638,43 @@ export function EditorWorkspace(props: Props) {
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
       canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)} />}
     {(mode === 'edit' || mode === 'sync') && <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
-      {document.lines.map((line, index) => <div className={styles.outlineRow} key={line.id}>
-        <button className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
+      {document.lines.map((line, index) => <div className={styles.outlineRow} data-line-id={line.id} key={line.id}>
+        <button data-outline-drag className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
           onClick={(event) => { selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); requestLocate(line.id); }}>
           {index + 1} {line.backgroundOf ? '↳ ' : ''}{lineText(line) || '空行'}
         </button>
-        {!line.backgroundOf && <span className={styles.outlineOrder}>
-          <button aria-label={`大纲上移 ${lineText(line) || '空行'}`} disabled={mainLines[0]?.id === line.id} onClick={() => moveLine(line, -1)}>↑</button>
-          <button aria-label={`大纲下移 ${lineText(line) || '空行'}`} disabled={mainLines.at(-1)?.id === line.id} onClick={() => moveLine(line, 1)}>↓</button>
-        </span>}
       </div>)}
     </aside>
-      <main className={styles.canvas}><div className={styles.canvasHeader}><h1>歌词编辑</h1><button onClick={() => dispatch({ type: 'insert-line', afterLineId: document.lines.at(-1)?.id ?? null })}>新增歌词行</button></div>
+      <main className={styles.canvas}><div className={styles.canvasHeader}><h1>歌词编辑</h1><div><button onClick={() => setSettingsDialog('tracks')}>管理音译轨道</button><button onClick={() => dispatch({ type: 'insert-line', afterLineId: document.lines.at(-1)?.id ?? null })}>新增歌词行</button></div></div>
         <LyricList lines={document.lines} locate={locate} renderLine={(line) => <LyricLineView key={line.id} line={line}
           selected={selection ? selection.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) : selection.kind === 'words' ? line.words.some((word) => selection.ids.includes(word.id)) : line.id === selection.lineId : selectedLine?.id === line.id}
           playhead={props.playheadLineId === line.id} dropTarget={dropTarget === `line:${line.id}`}
-          onSelect={(shift, toggle) => selectLine(line, shift, toggle)} onMove={(direction) => moveLine(line, direction)}
-          onDragOver={(event) => overDrop(event, `line:${line.id}`)} onDrop={(event) => dropLine(event, line)}>
-          <div className={styles.lineHeader}>{!line.backgroundOf && <button className={styles.dragHandle} draggable aria-label={`拖动行 ${lineText(line)}`} title="拖放排序；按 Ctrl 复制" onDragStart={(event) => startDrag(event, { kind: 'line', lineId: line.id })} onDragEnd={() => { dragging.current = null; setDropTarget(null); }} {...touchHandle({ kind: 'line', lineId: line.id })}>⋮⋮</button>}<span>{line.backgroundOf ? '背景' : '主唱'} · {line.id}</span><TimePair begin={line.beginUs} end={line.endUs} label={`行 ${line.id}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-line-time', lineId: line.id, beginUs, endUs })} />
-            {!line.backgroundOf && <><button aria-label={`行上移 ${lineText(line)}`} disabled={mainLines[0]?.id === line.id} onClick={() => moveLine(line, -1)}>↑</button><button aria-label={`行下移 ${lineText(line)}`} disabled={mainLines.at(-1)?.id === line.id} onClick={() => moveLine(line, 1)}>↓</button></>}
-            <button onClick={() => dispatch({ type: 'insert-line', afterLineId: line.backgroundOf ?? line.id })}>后插行</button><button onClick={() => dispatch({ type: 'delete-line', lineId: line.id })}>删行</button></div>
-          <div className={styles.words}>{line.words.map((word, index) => wordView(line, word, index))}<button onClick={() => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') })}>加词</button></div>
+          onSelect={(shift, toggle) => selectLine(line, shift, toggle)} onMove={(direction) => moveLine(line, direction)}>
+          <div className={styles.lineHeader}><span>{line.backgroundOf ? '背景' : '主唱'} · {line.id}</span></div>
+          <div className={styles.words}>{line.words.map((word) => wordView(line, word))}</div>
           {!line.backgroundOf && <div className={styles.sublyrics}><div><strong>翻译</strong>{line.translations.map((item, index) => <div key={index}><DraftInput value={item.text} label={`翻译 ${index + 1}`} onCommit={(text) => sublyric(line, index, text)} /><small>{item.language ?? '未指定语言'}</small></div>)}<button onClick={() => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items: [...line.translations, { language: null, text: '' }] })}>添加</button></div></div>}
           {!line.backgroundOf && <div className={styles.romanizationTracks}>
             {document.romanizationTracks.map((track, trackIndex) => {
               const contents = track.contents.filter((content) => content.lineId === line.id);
               return <div key={track.id}>
                 <div className={styles.romanizationTrackHeader}>
-                  <span>轨道 {trackIndex + 1}</span>
-                  <DraftInput value={track.language ?? ''} label={`音译轨道 ${trackIndex + 1} 语言`} placeholder="语言" onCommit={(language) => dispatch({ type: 'set-romanization-track-language', trackId: track.id, language: language || null })} />
-                  <button disabled={trackIndex === 0} onClick={() => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: -1 })}>轨道上移</button>
-                  <button disabled={trackIndex === document.romanizationTracks.length - 1} onClick={() => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: 1 })}>轨道下移</button>
+                  <span>轨道 {trackIndex + 1} · {track.language ?? '未指定语言'}</span>
                   <button onClick={() => dispatch({ type: 'insert-romanization-content', trackId: track.id, content: { id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: '' } })}>添加音译</button>
-                  <button onClick={() => dispatch({ type: 'delete-romanization-track', trackId: track.id })}>删除轨道</button>
                 </div>
-                {contents.map((content, contentIndex) => {
-                  const previousIndex = contentIndex ? track.contents.findIndex((item) => item.id === contents[contentIndex - 1].id) : -1;
-                  return <RomanizationRow key={content.id} track={track} content={content}
+                {contents.map((content) => <RomanizationRow key={content.id} track={track} content={content}
                     selectedContent={selection?.kind === 'romanization-content' && selection.ids.includes(content.id)}
                     selectedUnitIds={selection?.kind === 'romanization-unit' && selection.contentId === content.id ? selection.ids : []}
+                    dropTarget={dropTarget}
                     selectContent={(shift, toggle) => selectRomanizationContent(line.id, track.id, content.id, shift, toggle)}
-                    selectUnit={(unitId, shift, toggle) => selectRomanizationUnit(line.id, track.id, content.id, unitId, shift, toggle)} apply={dispatch}
-                    canMoveUp={contentIndex > 0} canMoveDown={contentIndex < contents.length - 1}
-                    moveUp={() => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: track.contents[previousIndex - 1]?.id ?? null })}
-                    moveDown={() => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: contents[contentIndex + 1].id })} />;
-                })}
+                    selectUnit={(unitId, shift, toggle) => selectRomanizationUnit(line.id, track.id, content.id, unitId, shift, toggle)} apply={dispatch} />)}
               </div>;
             })}
-            <button onClick={() => {
-              const trackId = crypto.randomUUID(), contentId = crypto.randomUUID();
-              if (dispatch({ type: 'batch', commands: [
-                { type: 'add-romanization-track', track: { id: trackId, language: null, contents: [] } },
-                { type: 'insert-romanization-content', trackId, content: { id: contentId, lineId: line.id, kind: 'plain', text: '' } },
-              ] })) selectRomanizationContent(line.id, trackId, contentId);
-            }}>新增音译轨道</button>
           </div>}
         </LyricLineView>} />
       </main>
       <aside className={styles.inspector}><h2>属性</h2>{selectedLine && <>
         <p>已选行：{selection?.kind === 'lines' && selection.ids.length > 1 ? `${selection.ids.length} 行` : lineText(selectedLine) || '空行'}</p>
+        <TimePair begin={selectedLine.beginUs} end={selectedLine.endUs} label={`行 ${selectedLine.id}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginUs, endUs })} />
         {selectedMainLines.length > 0 && <>
           <label><input type="checkbox" checked={selectedMainLines.every((line) => line.ignoreSync)} onChange={(event) => dispatch({ type: 'batch', commands: selectedMainLines.map((line) => ({ type: 'set-ignore-sync', lineId: line.id, ignoreSync: event.target.checked })) })} /> 跳过打轴</label>
           <label>歌手 <select value={agentValue} onChange={(event) => dispatch({ type: 'batch', commands: selectedMainLines.map((line) => ({ type: 'set-line-agents', lineId: line.id, agentRefs: event.target.value ? [event.target.value] : [] })) })}>
@@ -486,13 +683,6 @@ export function EditorWorkspace(props: Props) {
           </select></label>
         </>}
         {selection?.kind !== 'lines' || selection.ids.length <= 1 ? <>
-          {!selectedLine.backgroundOf && <div className={styles.lineStructureActions}>
-            <button disabled={selectedLine.words.length < 2} onClick={() => setSplitLineId(selectedLine.id)}>拆分行…</button>
-            <button disabled={mainLines.at(-1)?.id === selectedLine.id} onClick={() => {
-              const next = mainLines[mainLines.findIndex((line) => line.id === selectedLine.id) + 1];
-              if (next) dispatch({ type: 'merge-lines', firstLineId: selectedLine.id, secondLineId: next.id });
-            }}>合并下一行</button>
-          </div>}
           <label><input type="checkbox" checked={Boolean(selectedLine.backgroundOf)} onChange={(event) => {
             if (event.target.checked && !backgroundTargetId) { setMessage('请先选择所属主行'); return; }
             dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: event.target.checked ? backgroundTargetId : null });
@@ -509,6 +699,31 @@ export function EditorWorkspace(props: Props) {
       </aside></div>}
     {settingsDialog === 'metadata' && <SettingsDialog title="元数据编辑" close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} /></SettingsDialog>}
     {settingsDialog === 'singers' && <SingerDialog document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
+    {settingsDialog === 'tracks' && <SettingsDialog title="音译轨道管理" close={() => setSettingsDialog(null)}><div className={styles.trackManager}>
+      {document.romanizationTracks.map((track, index) => <div key={track.id}><strong>轨道 {index + 1}</strong>
+        <DraftInput value={track.language ?? ''} label={`音译轨道 ${index + 1} 语言`} placeholder="语言" onCommit={(language) => dispatch({ type: 'set-romanization-track-language', trackId: track.id, language: language || null })} />
+        <span>{track.contents.length} 项</span>
+        <button disabled={index === 0} onClick={() => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: -1 })}>上移</button>
+        <button disabled={index === document.romanizationTracks.length - 1} onClick={() => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: 1 })}>下移</button>
+        <button onClick={() => dispatch({ type: 'delete-romanization-track', trackId: track.id })}>删除</button>
+      </div>)}
+      <button onClick={() => dispatch({ type: 'add-romanization-track', track: { id: crypto.randomUUID(), language: null, contents: [] } })}>新增轨道</button>
+    </div></SettingsDialog>}
+    {contentTransfer && (() => {
+      const track = document.romanizationTracks.find((item) => item.id === contentTransfer.trackId);
+      const content = track?.contents.find((item) => item.id === contentTransfer.contentId);
+      if (!track || !content) return null;
+      return <SettingsDialog title="转移音译内容" close={() => setContentTransfer(null)}><p>{content.kind === 'plain' ? content.text : content.units.map((unit) => unit.text).join('')}</p>
+        <label>目标主行 <select value={contentTransfer.targetLineId} onChange={(event) => setContentTransfer({ ...contentTransfer, targetLineId: event.target.value })}>
+          {mainLines.filter((line) => line.id !== content.lineId).map((line) => <option key={line.id} value={line.id}>{lineText(line) || '空行'}</option>)}
+        </select></label>
+        <p>文字与独立时间保持原值，主行引用会改变。</p>
+        <div className={styles.dialogActions}><button onClick={() => setContentTransfer(null)}>取消</button><button onClick={() => {
+          const afterContentId = track.contents.filter((item) => item.lineId === contentTransfer.targetLineId).at(-1)?.id ?? null;
+          if (dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: contentTransfer.targetLineId, afterContentId })) setContentTransfer(null);
+        }}>应用（一次撤销）</button></div>
+      </SettingsDialog>;
+    })()}
     {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
     {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
     {rubyBaseOpen && <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRubyBaseOpen(false); }}><section className={styles.dialog} role="dialog" aria-modal="true" aria-label="整体 Ruby"><div className={styles.dialogHeader}><h2>整体 Ruby</h2><button aria-label="关闭整体 Ruby" onClick={() => setRubyBaseOpen(false)}>×</button></div><p>base：{rubyBaseWords.map((word) => word.text).join('')}</p><label>读音 <input autoFocus value={rubyBaseReading} onChange={(event) => setRubyBaseReading(event.target.value)} onKeyDown={(event) => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') createRubyBase(); if (event.key === 'Escape') setRubyBaseOpen(false); }} /></label><p>合并相邻词后创建一个整体读音；其他词和时间保持原样。</p><div className={styles.dialogActions}><button onClick={() => setRubyBaseOpen(false)}>取消</button><button disabled={!rubyBaseReading} onClick={createRubyBase}>应用（一次撤销）</button></div></section></div>}
@@ -517,5 +732,6 @@ export function EditorWorkspace(props: Props) {
       attached={document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === splitLineId).map((content) => ({ track, content })))}
       close={() => setSplitLineId(null)}
       submit={(beforeWordId, contentIdsForNewLine, backgroundTarget) => dispatch({ type: 'split-line', lineId: splitLineId, beforeWordId, newLineId: crypto.randomUUID(), contentIdsForNewLine, backgroundTarget })} />}
+    {contextMenu && <EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.title} actions={contextMenu.actions} close={closeContext} />}
   </div>;
 }
