@@ -1,0 +1,26 @@
+<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+  <head>
+    <metadata>
+      <ttm:agent xml:id="lead" type="person"/>
+      <iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal">
+        <transliterations>
+          <transliteration xml:lang="ja-Latn">
+            <text for="line-a"><span begin="0.999" end="1.500">fu </span><span begin="1.500" end="2.000">ta </span><span begin="2.000" end="3.001">ri</span></text>
+            <text for="line-b">konnichiwa</text>
+          </transliteration>
+          <transliteration xml:lang="ja-Latn">
+            <text for="line-a"><span begin="1.000" end="2.000">huta </span><span begin="2.000" end="3.000">ri</span></text>
+          </transliteration>
+          <transliteration xml:lang="ja-Hira">
+            <text for="line-a"><span begin="1.000" end="3.000">ふたり</span></text>
+            <text for="line-b">こんにちは</text>
+          </transliteration>
+        </transliterations>
+      </iTunesMetadata>
+    </metadata>
+  </head>
+  <body dur="5.000"><div begin="1.000" end="5.000">
+    <p begin="1.000" end="3.000" itunes:key="line-a" ttm:agent="lead"><span begin="1.000" end="3.000">二人</span></p>
+    <p begin="3.000" end="5.000" itunes:key="line-b" ttm:agent="lead"><span begin="3.000" end="5.000">今日は</span></p>
+  </div></body>
+</tt>
