@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-2026-09-27 更新：Phase 2 R1 已将语义模型切至 v5，R2–R7 交互整改仍按[外部开发计划](../../lyric-workflow/docs/studio/plans/phase2-human-review-remediation.md)实施。
+2026-09-28 更新：Phase 2 R1–R7 的代码路径已按[外部开发计划](../../lyric-workflow/docs/studio/plans/phase2-human-review-remediation.md)调整；浏览器、长音频和 Windows/macOS 实测状态见工作流仓库的验收记录。
 
 ## 1. 应用与目录
 
@@ -22,7 +22,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 `/editor` 由 LocalEditor 管本地文件与检查点，`/projects/:projectId/edit` 由 Workspace 管项目；两者使用同一个 EditorWorkspace、领域命令和 codec。项目路由有音频服务与保存冲突处理；本地路由没有同等媒体资产能力。
 
-其他路由为 `/projects`、`/projects/:projectId/export`、`/login`、`/settings`。编辑器当前提供编辑/打轴/预览，项目辅助仍在属性区域；整改计划将移成一级占位页。
+其他路由为 `/projects`、`/projects/:projectId/export`、`/login`、`/settings`。编辑器当前提供编辑/打轴/预览及一级“项目辅助”占位；大纲、歌词列表、属性各自滚动，元数据与歌手分别在设置弹窗中编辑。
 
 ## 3. 权威文档与事务
 
@@ -30,7 +30,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 时间使用绝对整数微秒/null；拆分坐标使用 code point 并检查 grapheme 边界。`lyric-commands.ts` 提供纯函数事务与 256 次历史。selection、focus、播放时钟不作为歌词权威内容；批量操作一次入历史，最终改动经 codec 保存。
 
-词级与行级旧音译字段已移除，预览临时派生逐词音译与二侧歌手状态。R2 将补全轨道附属行的可编辑视图。
+词级与行级旧音译字段已移除，预览临时派生逐词音译与二侧歌手状态。音译轨道在主行下作为独立附属内容编辑；“从音译生成 Ruby”只在显式提交时把提案写入 Ruby，源轨道继续保留。旧格式数据直接丢弃，不设迁移或双写。
 
 ## 4. 格式与保存
 
@@ -42,7 +42,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 ## 5. 媒体与服务
 
-HTMLMediaElement 为项目主时钟，媒体代理 offset 在边界转换；服务提供音频 Range、窗口 peaks 和 PCM。声谱图 Worker 按需计算，BPM 提供手动/Tap/自动估计。当前循环仍分 off/ab/line/unit，待整改统一。
+HTMLMediaElement 为项目主时钟，媒体代理 offset 在边界转换；服务提供音频 Range、窗口 peaks 和 PCM。声谱图 Worker 按需计算，BPM 提供手动/Tap/自动估计。时间轴用微秒 viewport 显示波形、标尺与歌词轨道，普通滚轮按指针锚点缩放、空白处拖动平移；A/B 仅有一个数值区间状态，当前行/单元命令写入当时精确边界，不和歌词历史绑定。
 
 服务为登录用户共享项目库的单工作台，显式配置会话/网关模式。任务状态持久化，SSE 提供变化，结果从资源接口读取。reading、词典与实验 forced 的可用性取决于配置；HTTP 通过不代表模型质量。
 
