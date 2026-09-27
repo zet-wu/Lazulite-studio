@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
-const fixture = '../docs/evidence/editor-e0/reference-apple-metadata.ttml';
+const fixture = '../tests/fixtures/ttml/reference-apple-metadata.ttml';
 async function upload(page: import('@playwright/test').Page) {
   await page.goto('/editor');
   const source = await readFile(fixture);
@@ -68,7 +68,7 @@ test('edits Ruby above its base with Backspace merge, F8 split and the trailing 
   await word.getByRole('button', { name: '重分配读音时间' }).click();
   await expect(word.getByRole('textbox', { name: '读音 きょ结束秒数' })).toHaveValue('1.5');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: '../docs/evidence/editor-e4/studio-ruby-390.png' });
+  await page.screenshot({ path: test.info().outputPath('studio-ruby-390.png') });
 
   const plain = page.getByRole('textbox', { name: '词  も歌う', exact: true });
   await plain.dblclick();
@@ -108,7 +108,7 @@ test('previews manual boundaries and auto segmentation, then undoes each applica
   await page.getByRole('button', { name: '生成预览' }).click();
   await expect(page.getByRole('dialog', { name: '分词' })).toContainText(' も │ 歌う');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: '../docs/evidence/editor-e3/studio-manual-390.png' });
+  await page.screenshot({ path: test.info().outputPath('studio-manual-390.png') });
   await page.getByRole('button', { name: '应用（一次撤销）' }).click();
   await expect(firstLine.getByRole('textbox', { name: '词  も', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '撤销' }).click();
@@ -128,7 +128,7 @@ test('previews manual boundaries and auto segmentation, then undoes each applica
   await page.getByRole('textbox', { name: '自定义规则（每行 原文=部分|部分）' }).fill('も歌う=も|歌う');
   await page.getByRole('button', { name: '生成预览' }).click();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.screenshot({ path: '../docs/evidence/editor-e3/studio-advanced-1440.png' });
+  await page.screenshot({ path: test.info().outputPath('studio-advanced-1440.png') });
 });
 
 test('shifts current line and background together, then links and restores its end', async ({ page }) => {

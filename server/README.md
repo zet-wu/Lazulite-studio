@@ -1,58 +1,7 @@
-# Studio server
+# Server 架构
 
-```sh
-cd LazuliteStudio
-python3 -m venv server/.venv
-server/.venv/bin/pip install -r server/requirements.txt
-server/.venv/bin/pip install -e ../Lazulite
-STUDIO_PASSWORD=dev STUDIO_ORIGIN=http://localhost:5173 server/.venv/bin/uvicorn --factory server.app:create_app --reload
-```
+FastAPI 同源 API，SQLite 管理项目、资产索引、修订指针、任务和复核。文件存储管理源媒体、代理/peaks、不可变 TTML 与发布成品。
 
-`STUDIO_ORIGIN` 是必需的同源写入校验配置；本地密码模式还需要
-`STUDIO_PASSWORD`。当前服务使用短期会话 cookie，不需要配置 session secret。
-`STUDIO_TRUSTED_GATEWAY=true` 可显式启用已经完成认证的网关模式，不能根据网络地址推断。
-媒体探测、播放代理和 waveform peaks 需要系统命令 `ffprobe` 与 `ffmpeg`，并且二者必须在 `PATH` 中。
+`app.py` 组合认证与路由；`documents.py/revisions.py` 管 TTML 与 CAS 保存；`jobs.py/job_routes.py` 管任务/SSE；`reading.py/review.py` 管读音词典和复核；`studio/media.py` 与 `media.py` 管音频窗口；`publish*.py/publishing.py` 管发布和回读。`projection.py` 为引擎构造正文投影，不把 Ruby 或 sidecar 当作正文。
 
-服务是单工作台，登录者共享项目库。文档保存、导入候选、搜索/取词和日语读音任务已经接入；转写和行对齐仅在显式配置模型后端时启用。读音任务使用 SudachiPy 与 core dictionary，并优先采用当前项目的读音词典。
-
-Writes require the `studio_session` cookie and matching `studio_csrf` cookie /
-`X-CSRF-Token` header (except trusted gateway mode). `POST /session` accepts
-`{"password":"..."}`；trusted gateway 模式不需要密码。
-Uploads are bounded to 500 MiB and imported through the media probe/proxy
-service. Project creation accepts `Idempotency-Key`.
-
-`GET /projects/{id}/document` returns the current rich TTML document and PUT
-commits immutable revisions through SQLite compare-and-swap. `GET /projects/{id}/audio` serves the normalized WAV
-playback proxy; waveform windows carry the asset hash and `peaks-v1` algorithm version.
-
-数据默认写入 `server/data/`，可用 `STUDIO_DATA_DIR` 指定独立目录。SQLite 保存项目、资产元数据、会话和当前修订指针；源媒体按内容 hash 保留，PCM 代理与多级 peaks 是派生缓存。备份时同时保留数据库和整个数据目录。
-
-任务默认使用真实 Lazulite 搜索/取词。需要转写或行对齐时，设置 `LAZULITE_TRANSCRIBER=whisper` 或 `qwen`、`LAZULITE_MODEL_PATH`，并可设置 `LAZULITE_MODEL_ID`、`LAZULITE_MODEL_REVISION` 和 `LAZULITE_DEVICE`；对应模型依赖按 Lazulite 后端文档安装。服务启动时只加载显式配置的后端；测试可通过 `create_app(..., engine=...)` 注入引擎。任务结果绑定创建请求中的 revision 和 asset，不随当前草稿变化。
-
-`GET/POST /projects/{id}/reading-dictionary` 与条目 `PUT/DELETE` 管理项目词典。修改词典不会改写 TTML 或审核状态；下一次 `reading` 任务才会使用新条目。读音结果给出正文 Unicode code point 半开范围，始终先作为候选返回。
-
-S6 的 `forced_align` 使用独立于转写的实验后端。显式设置
-`LAZULITE_FORCED_BACKEND=qwen`、`LAZULITE_FORCED_MODEL_PATH` 才会加载；可选设置
-`LAZULITE_FORCED_MODEL_ID`、`LAZULITE_FORCED_MODEL_REVISION`、`LAZULITE_FORCED_DEVICE`。
-模型权重及 Lazulite 的 `forced-qwen` 可选依赖需事先准备。未配置时能力接口明确关闭此入口。
-
-任务必须指定已保存、已确认的行及 revision/asset；服务从该修订读取时间与歌词，裁剪对应音频。
-`coordinate_space=text` 使用正文，`coordinate_space=ruby` 还需 `ruby_id` 和正文 `base_range`，
-使用对应整体读音并保留回映范围。结果携带实际粒度、原始秒、整数微秒与证据，仍需人工应用。
-Qwen 的 character 输出不能视作 mora 或 phoneme；多后端 PoC 与真实日语歌唱基准不由协议测试代替。
-
-音频上传上限为 500 MiB，当前在一次上传请求内完成探测与代理生成，不支持断点续传。浏览器使用 Range 播放 WAV，不完整解码歌曲；WAV 代理占用空间约为每分钟 11.5 MB。取消请求不会删除已经生成的共享资产，未引用资产暂不自动回收。
-
-`GET lyrics` 下载当前或指定已提交修订。导入接口返回候选，不直接覆盖草稿；修订存储支持内部 CAS 与幂等事务，项目初始草稿使用合法空 TTML。
-
-S7 的 `POST /projects/{id}/publish` 接收 `{revision, asset_id}` 和可选 `Idempotency-Key`，创建持久发布任务。`GET /projects/{id}/exports` 返回记录、旧版本标记、回读报告与受控下载地址；只有任务成功、报告通过且文件仍存在才开放下载。源资产和修订不会被覆盖，失败或中断后可重新创建任务。
-
-发布目前支持已有音轨的非分片 MP4/M4A，原编码直接保留，不转换 WAV/MP3 等输入。拒绝已有 `subt/stpp` 的源文件、分片容器和顶层 size=0 box；其他受支持编辑功能仍可用于这些项目并导出 TTML。媒体发布需要 `ffprobe`，输出在数据目录的 `exports/` 下。暂不自动清理产物，备份时一起保留。实现采用流式复制、原位替换 movie 索引和新增单 TTML sample，并验证原媒体字节、movie 索引、音轨信息、元数据及 TTML 回读。当前 MusicBox 的直接读取限制见 [消费端记录](../docs/s7-musicbox-compatibility.md)。
-
-验证（在仓库根目录运行）：
-
-```sh
-server/.venv/bin/pytest -q server/tests
-```
-
-前端开发另开终端运行 `cd frontend && npm run dev`，Vite 将 `/api` 转发到端口 8000。浏览器实际访问的 origin 必须与 `STUDIO_ORIGIN` 一致，包括主机名和端口。生产部署沿用同源反向代理；本阶段未执行托管或部署。
+服务是登录者共享项目库的单工作台；模型按配置开放。启动配置与验证命令见[服务端开发说明](../../lyric-workflow/docs/studio/development/server-development.md)，接口摘要见[契约说明](../../lyric-workflow/docs/studio/reference/service-contract.md)。

@@ -11,7 +11,7 @@ def test_projection_excludes_ruby_and_non_ttml_paragraphs(tmp_path):
 
 
 def test_reference_tool_roles_and_absolute_numeric_times_are_projected_as_main_lyrics():
-    evidence = Path(__file__).resolve().parents[2] / "docs/evidence/editor-e0"
+    evidence = Path(__file__).resolve().parents[2] / "tests/fixtures/ttml"
     for filename, line_id in [("reference-rich.ttml", "L1"), ("studio-roundtrip.ttml", "L1")]:
         source = evidence / filename
         validate_ttml(source.read_text(encoding="utf-8"))
@@ -28,7 +28,7 @@ def test_reference_tool_roles_and_absolute_numeric_times_are_projected_as_main_l
 
 
 def test_apple_reference_projection_uses_itunes_line_keys_and_skips_metadata():
-    source = Path(__file__).resolve().parents[2] / "docs/evidence/editor-e0/reference-apple-metadata.ttml"
+    source = Path(__file__).resolve().parents[2] / "tests/fixtures/ttml/reference-apple-metadata.ttml"
     validate_ttml(source.read_text(encoding="utf-8"))
     assert project_ttml(source) == [{"id": "L1", "text": "今日 も歌う"}, {"id": "L2", "text": "宇宙"}]
     forced = project_ttml_for_forced(source, selected_line_id="L1")

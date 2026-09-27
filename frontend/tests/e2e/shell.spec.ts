@@ -132,7 +132,7 @@ test('uses live PCM tiles for the spectrum and analyzes the beat', async ({ page
   for (let index = 0; index < 3; index++) await page.getByRole('button', { name: '放大波形' }).click();
   await expect(page.getByLabel('实时频谱')).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await page.screenshot({ path: '../docs/evidence/editor-e6/studio-timeline-spectrum-1440.png', fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('studio-timeline-spectrum-1440.png'), fullPage: true });
 });
 
 test('renders the current draft in AMLL preview and returns to editing', async ({ page }) => {
@@ -158,13 +158,13 @@ test('switches the editor between light and dark themes', async ({ page }) => {
   await page.getByRole('button', { name: '夜间模式' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.getByRole('button', { name: '日间模式' }).evaluate((element) => { element.parentElement!.scrollLeft = 0; });
-  await page.screenshot({ path: '../docs/evidence/editor-e7/studio-edit-dark-390.png', fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('studio-edit-dark-390.png'), fullPage: true });
   await page.getByRole('button', { name: '日间模式' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
 test('previews Ruby, translation and background from a rich draft', async ({ page }) => {
-  const source = await readFile('../docs/evidence/editor-e0/reference-apple-metadata.ttml');
+  const source = await readFile('../tests/fixtures/ttml/reference-apple-metadata.ttml');
   const wav = await readFile('../frontend/tests/fixtures/editor-beats.wav');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/projects/sample-project/edit');
@@ -179,9 +179,9 @@ test('previews Ruby, translation and background from a rich draft', async ({ pag
   await page.getByRole('region', { name: '动态歌词预览' }).getByText('今日').click();
   await expect(page.getByRole('slider', { name: '波形进度' })).toHaveAttribute('aria-valuenow', '1');
   await page.waitForTimeout(500);
-  await page.screenshot({ path: '../docs/evidence/editor-e7/studio-preview-rich-1440.png', fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('studio-preview-rich-1440.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: '../docs/evidence/editor-e7/studio-preview-rich-390.png', fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('studio-preview-rich-390.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   const ruby = page.getByRole('textbox', { name: '读音 今日', exact: true }).first();
@@ -300,7 +300,7 @@ test('moves an untimed word across lines without changing line timing and restor
 
 test('imports rich TTML, edits Ruby, undoes, saves and reopens it in a project', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
-  const source = await readFile('../docs/evidence/editor-e0/reference-apple-metadata.ttml');
+  const source = await readFile('../tests/fixtures/ttml/reference-apple-metadata.ttml');
   await page.locator('input[type="file"]').last().setInputFiles({ name: 'reference.ttml', mimeType: 'application/ttml+xml', buffer: source });
   await page.getByRole('button', { name: '人工应用' }).click();
   await expect(page.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();

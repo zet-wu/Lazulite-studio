@@ -34,7 +34,7 @@ def test_document_save_retry_and_cas_preserves_unknown(tmp_path):
 def test_semantic_editor_ttml_saves_and_reopens_with_clean_main_lyrics(tmp_path):
     setup_project(tmp_path)
     client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
-    source = Path(__file__).resolve().parents[2] / "docs/evidence/editor-e0/studio-roundtrip.ttml"
+    source = Path(__file__).resolve().parents[2] / "tests/fixtures/ttml/studio-roundtrip.ttml"
     ttml = source.read_text(encoding="utf-8").replace("きょ</span>", "きよう</span>")
     before = client.get("/api/v1/projects/p/document")
     revision = before.json()["revision"]

@@ -72,7 +72,7 @@ describe('semantic TTML codec', () => {
   });
 
   it('reads the reference tool Ruby, translation, romanization and background sample', () => {
-    const source = readFileSync('../docs/evidence/editor-e0/reference-rich.ttml', 'utf8');
+    const source = readFileSync('../tests/fixtures/ttml/reference-rich.ttml', 'utf8');
     const document = parseLyricTtml(source);
     expect(document.lines).toHaveLength(2);
     expect(lineText(document.lines[0])).toBe('今日も歌う');
@@ -91,7 +91,7 @@ describe('semantic TTML codec', () => {
   });
 
   it('roundtrips timed per-word romanization from the reference tool', () => {
-    const source = readFileSync('../docs/evidence/editor-e4/reference-word-roman.ttml', 'utf8');
+    const source = readFileSync('../tests/fixtures/ttml/reference-word-roman.ttml', 'utf8');
     const document = parseLyricTtml(source);
     expect(document.lines[0].words.map((word) => word.romanization)).toEqual(['kyou', 'sora']);
     expect(document.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['きょ', 'う']);
@@ -112,7 +112,7 @@ describe('semantic TTML codec', () => {
   });
 
   it.each(['amll', 'apple'])('roundtrips reference %s metadata, song part and background timing', (style) => {
-    const source = readFileSync(`../docs/evidence/editor-e0/reference-${style}-metadata.ttml`, 'utf8');
+    const source = readFileSync(`../tests/fixtures/ttml/reference-${style}-metadata.ttml`, 'utf8');
     const document = parseLyricTtml(source);
     expect(document.metadata).toMatchObject({ title: ['自作サンプル'], artist: ['Test'], songwriter: ['Composer'] });
     expect(document.lines.map(lineText)).toEqual(['今日 も歌う', '響く', '宇宙']);
