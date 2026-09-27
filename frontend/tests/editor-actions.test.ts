@@ -50,6 +50,25 @@ describe('editor selection and clipboard', () => {
     expect(undoLyricCommand(cut).present).toBe(duplicated.present);
   });
 
+  it('copies attached track contents with fresh IDs and one undo', () => {
+    const document = createLyricDocument('二人');
+    const line = document.lines[0];
+    document.romanizationTracks.push({ id: 'track', language: 'ja-Latn', contents: [{ id: 'content', lineId: line.id, kind: 'timed', units: [
+      { id: 'fu', text: 'fu ', beginUs: 999_000, endUs: 1_500_000 },
+      { id: 'tari', text: 'tari', beginUs: 1_500_000, endUs: 3_001_000 },
+    ] }] });
+    const selection = { kind: 'lines' as const, ids: [line.id], anchorId: line.id, activeId: line.id };
+    const copied = copySelection(document, selection);
+    const pasted = pasteRich(document, copied, selection);
+    const state = executeLyricCommand(createLyricEditorState(document), pasted.command);
+    const contents = state.present.romanizationTracks[0].contents;
+    expect(contents).toHaveLength(2);
+    expect(contents[1]).toMatchObject({ lineId: pasted.selection.ids[0], kind: 'timed', units: [{ text: 'fu ', beginUs: 999_000 }, { text: 'tari', endUs: 3_001_000 }] });
+    expect(contents[1].id).not.toBe(contents[0].id);
+    if (contents[0].kind === 'timed' && contents[1].kind === 'timed') expect(contents[1].units[0].id).not.toBe(contents[0].units[0].id);
+    expect(undoLyricCommand(state).present).toBe(document);
+  });
+
   it('pastes plain text as untimed words or lines according to selection', () => {
     const document = createLyricDocument('前');
     const word = document.lines[0].words[0];

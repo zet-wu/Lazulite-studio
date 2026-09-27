@@ -81,6 +81,59 @@ describe('semantic lyric commands', () => {
     expect(() => executeLyricCommand(createLyricEditorState(document), { type: 'set-background-of', lineId: candidate.id, parentLineId: document.lines[0].id })).toThrow(/音译内容/);
   });
 
+  it('edits and reorders independent transliteration units in one undoable command each', () => {
+    const document = createLyricDocument('二人');
+    const lineId = document.lines[0].id;
+    document.romanizationTracks.push({ id: 'track', language: 'ja-Latn', contents: [{ id: 'content', lineId, kind: 'timed', units: [
+      { id: 'fu', text: 'fu ', beginUs: 999_000, endUs: 1_500_000 },
+      { id: 'tari', text: 'tari', beginUs: 1_500_000, endUs: 3_001_000 },
+    ] }] });
+    let state = createLyricEditorState(document);
+    state = executeLyricCommand(state, { type: 'split-romanization-unit', trackId: 'track', contentId: 'content', unitId: 'tari', at: 2 });
+    const content = state.present.romanizationTracks[0].contents[0];
+    expect(content.kind).toBe('timed');
+    if (content.kind !== 'timed') return;
+    expect(content.units.map((unit) => unit.text)).toEqual(['fu ', 'ta', 'ri']);
+    expect(content.units[2].endUs).toBe(3_001_000);
+    const moved = executeLyricCommand(state, { type: 'move-romanization-unit', trackId: 'track', contentId: 'content', unitId: content.units[2].id, afterUnitId: null });
+    const reordered = moved.present.romanizationTracks[0].contents[0];
+    if (reordered.kind !== 'timed') return;
+    expect(reordered.units[0]).toBe(content.units[2]);
+    expect(undoLyricCommand(moved).present).toBe(state.present);
+    const deleted = executeLyricCommand(moved, { type: 'delete-line', lineId });
+    expect(deleted.present.romanizationTracks[0].contents).toEqual([]);
+    expect(undoLyricCommand(deleted).present).toBe(moved.present);
+  });
+
+  it('splits and merges main lines with explicit transliteration and background ownership', () => {
+    const document = createLyricDocument('前後');
+    const main = document.lines[0];
+    main.words = [createWord('前', 'front'), createWord('後', 'back')];
+    main.beginUs = 0; main.endUs = 2_000_000;
+    main.words[0].beginUs = 0; main.words[0].endUs = 1_000_000;
+    main.words[1].beginUs = 1_000_000; main.words[1].endUs = 2_000_000;
+    const bg = createLine('和声', 'bg');
+    bg.beginUs = 1_200_000; bg.endUs = 1_800_000;
+    document.lines.push(bg);
+    document.romanizationTracks.push({ id: 'track', language: 'ja-Latn', contents: [
+      { id: 'first', lineId: main.id, kind: 'plain', text: 'mae' },
+      { id: 'second', lineId: main.id, kind: 'plain', text: 'ushiro' },
+    ] });
+    const original = createLyricEditorState(document);
+    const withBackground = executeLyricCommand(original, { type: 'set-background-of', lineId: bg.id, parentLineId: main.id });
+    expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', contentIdsForNewLine: ['second'], backgroundTarget: null })).toThrow(/背景歌词归属/);
+    expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', contentIdsForNewLine: ['second'], backgroundTarget: 'left' })).toThrow(/背景歌词时间/);
+    const split = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', contentIdsForNewLine: ['second'], backgroundTarget: 'right' });
+    expect(split.present.lines.map((line) => [line.id, line.backgroundOf])).toEqual([[main.id, null], ['right', null], ['bg', 'right']]);
+    expect(split.present.romanizationTracks[0].contents.map((content) => [content.id, content.lineId])).toEqual([['first', main.id], ['second', 'right']]);
+    expect(undoLyricCommand(split).present).toBe(withBackground.present);
+    const detached = executeLyricCommand(split, { type: 'set-background-of', lineId: 'bg', parentLineId: null });
+    const merged = executeLyricCommand(detached, { type: 'merge-lines', firstLineId: main.id, secondLineId: 'right' });
+    expect(merged.present.lines[0].words.map((word) => word.id)).toEqual(['front', 'back']);
+    expect(merged.present.romanizationTracks[0].contents.map((content) => content.lineId)).toEqual([main.id, main.id]);
+    expect(undoLyricCommand(merged).present).toBe(detached.present);
+  });
+
   it('inserts and moves lines after the full background group', () => {
     const document = createLyricDocument('主唱');
     const parent = document.lines[0];

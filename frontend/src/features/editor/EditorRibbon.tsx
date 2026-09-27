@@ -23,7 +23,7 @@ type Props = {
 export function EditorRibbon(props: Props) {
   const { selection } = props;
   return <div className={styles.ribbon} aria-label="编辑操作">
-    <span>{selection ? `${selection.kind === 'words' ? '词' : '行'}已选 ${selection.ids.length}` : '当前行'}</span>
+    <span>{selection ? `${selection.kind === 'words' ? '词' : selection.kind === 'lines' ? '行' : selection.kind === 'romanization-unit' ? '音译单元' : '音译内容'}已选 ${selection.ids.length}` : '当前行'}</span>
     <button onClick={props.copy} disabled={selection?.ids.length === 0}>复制</button>
     <button onClick={props.cut} disabled={selection?.ids.length === 0}>剪切</button>
     <button onClick={props.paste} disabled={!props.canPaste}>粘贴</button>
