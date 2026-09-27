@@ -50,5 +50,5 @@ function VirtualLyricList({ lines, renderLine, locate }: Props) {
 
 export function LyricList(props: Props) {
   if (props.lines.length > 80) return <VirtualLyricList {...props} />;
-  return <div aria-label="歌词列表">{props.lines.map(props.renderLine)}</div>;
+  return <div className={styles.lyricScroller} aria-label="歌词列表">{props.lines.map(props.renderLine)}</div>;
 }

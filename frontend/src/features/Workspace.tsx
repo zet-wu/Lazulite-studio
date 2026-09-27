@@ -1,17 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { studioApi, studioS4, type Asset, type ImportProposal } from '../adapters/http/client';
-import type { JobResult } from '../adapters/http/jobs';
+import { studioApi, studioS4, type Asset } from '../adapters/http/client';
 import { serializeLyricTtml } from '../adapters/ttml/lyric-codec';
 import { detectLyricFormat, exportLyricFile, importLyricFile, type LyricFormat } from '../adapters/lyric-formats';
-import { lineText, type LyricLine } from '../domain/lyric-document';
-import { CandidatePanel } from './CandidatePanel';
-import { JobPanel } from './JobPanel';
+import type { LyricLine } from '../domain/lyric-document';
 import { MediaTransport, type TransportHandle } from './MediaTransport';
-import { ReadingDictionaryPanel } from './ReadingDictionaryPanel';
-import { ReviewPanel } from './ReviewPanel';
-import { JobCandidatePanel } from './JobCandidatePanel';
 import { EditorWorkspace } from './editor/EditorWorkspace';
 import { useProjectDocument } from './useProjectDocument';
 import styles from './workspace.module.css';
@@ -42,9 +36,6 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
       return { revision: saved.revision, etag: saved.etag };
     });
   const [selectedLineId, setSelectedLineId] = useState<string | null>(params.get('line'));
-  const [candidate, setCandidate] = useState<ImportProposal | null>(null);
-  const [jobResult, setJobResult] = useState<JobResult | null>(null);
-  const [tab, setTab] = useState<'import' | 'tasks' | 'dictionary' | 'review'>('import');
   const [message, setMessage] = useState('');
   const [playheadLineId, setPlayheadLineId] = useState<string | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<{ lineId: string; wordId: string; rubyId: string | null } | null>(null);
@@ -79,29 +70,10 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     try { download(exportLyricFile(editor.document, format), `${title}.${format}`); setMessage(''); }
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
   };
-  const rubyOptions = (line?.words ?? []).flatMap((word) => {
-    return word.rubyUnits.map((unit) => {
-      const baseStart = line ? Array.from(line.words.slice(0, line.words.indexOf(word)).map((item) => item.text).join('')).length : 0;
-      const item = { id: unit.id, base: word.text, reading: unit.reading, baseStart, baseEnd: baseStart + Array.from(word.text).length };
-      return item;
-    });
-  });
-  const auxiliary = <div>
-    <h2>项目辅助</h2><div>{(['import', 'tasks', 'dictionary', 'review'] as const).map((value) => <button key={value} onClick={() => setTab(value)}>{({ import: '候选', tasks: '任务', dictionary: '词典', review: '审核' })[value]}</button>)}</div>
-    {tab === 'import' && <><label>导入 TTML/LRC/text<input type="file" accept=".ttml,.xml,.lrc,.txt" onChange={(event) => {
-      const file = event.target.files?.[0]; if (!file) return;
-      void file.text().then((content) => studioS4.importLyrics(projectId, editor.revision, file.name, content)).then(setCandidate).catch((error) => setMessage(error instanceof Error ? error.message : '导入失败'));
-      event.target.value = '';
-    }} /></label><CandidatePanel proposal={candidate} currentRevision={editor.revision} dirty={editor.dirty} document={editor.document} onApply={(document) => { editor.apply({ type: 'replace-document', document }); setCandidate(null); }} /></>}
-    {tab === 'tasks' && <><JobPanel projectId={projectId} revision={editor.revision} assetId={asset?.id ?? null} dirty={editor.dirty} selectedLineIds={line ? [line.id] : []} rubyOptions={rubyOptions} onCandidate={setJobResult} /><JobCandidatePanel result={jobResult} currentRevision={editor.revision} currentAssetId={asset?.id ?? null} dirty={editor.dirty} document={editor.document} onApply={(command) => { try { editor.apply(command); setMessage(''); } catch (error) { setMessage(error instanceof Error ? error.message : '应用候选失败'); } }} /></>}
-    {tab === 'dictionary' && <ReadingDictionaryPanel projectId={projectId} />}
-    {tab === 'review' && <ReviewPanel projectId={projectId} revision={editor.revision} lineId={line?.id} dirty={editor.dirty} />}
-    <button onClick={() => { if (editor.dirty || editor.conflict || editor.saving) setMessage('请先保存后发布'); else navigate(`/projects/${projectId}/export`); }}>发布与下载</button>
-    <p>{line ? `当前行：${lineText(line)}` : '无歌词行'}</p>
-  </div>;
   return <div className={styles.editorShell}><EditorWorkspace embedded title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
-    onSave={() => void editor.save()} onOpen={(file) => void openFile(file)} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat} auxiliary={auxiliary}
+    onSave={() => void editor.save()} onOpen={(file) => void openFile(file)} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat}
+    onPublish={() => { if (editor.dirty || editor.conflict || editor.saving) setMessage('请先保存后发布'); else navigate(`/projects/${projectId}/export`); }}
     selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { setSelectedLineId(id); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
     onSelectUnit={(lineId, wordId, rubyId) => setSelectedUnit(wordId ? { lineId, wordId, rubyId } : null)} />
     {editor.recovery.available && <aside>发现本地草稿 <button onClick={() => void editor.restore().catch((error) => setMessage(error.message))}>恢复</button><button onClick={() => void editor.discardRecovery().catch((error) => setMessage(error.message))}>丢弃</button></aside>}

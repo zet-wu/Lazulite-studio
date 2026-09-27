@@ -19,6 +19,9 @@ type Props = {
   onDraft: () => void;
   onFinal: () => void;
   onExportFormat?: (format: LyricFormat) => void;
+  onMetadata: () => void;
+  onSingers: () => void;
+  onPublish?: () => void;
 };
 
 export function EditorMenu(props: Props) {
@@ -49,6 +52,11 @@ export function EditorMenu(props: Props) {
       {props.onExportFormat && <><select aria-label="导出格式" value={format} onChange={(event) => setFormat(event.target.value as LyricFormat)}>
         <option value="txt">纯文本</option><option value="lrc">LRC</option><option value="eslrc">ESLRC</option><option value="qrc">QRC</option><option value="yrc">YRC</option><option value="lys">LYS</option><option value="ass">ASS</option>
       </select><button onClick={() => props.onExportFormat?.(format)}>导出所选格式</button></>}
+      {props.onPublish && <button onClick={props.onPublish}>发布与下载</button>}
+      <details className={styles.settingsMenu}><summary>设置</summary><div>
+        <button onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); props.onMetadata(); }}>元数据编辑</button>
+        <button onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); props.onSingers(); }}>歌手管理</button>
+      </div></details>
     </div>
   </header>;
 }
