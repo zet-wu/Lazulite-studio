@@ -20,7 +20,8 @@ export function shiftLineTimes(document: LyricDocument, lineIds: string[], delta
       words: line.words.map((word): LyricWord => ({ ...word, beginUs: shifted(word.beginUs, deltaUs), endUs: shifted(word.endUs, deltaUs),
         rubyUnits: word.rubyUnits.map((unit): RubyUnit => ({ ...unit, beginUs: shifted(unit.beginUs, deltaUs), endUs: shifted(unit.endUs, deltaUs) })),
         alignmentUnits: word.alignmentUnits.map((unit): AlignmentUnit => ({ ...unit, beginUs: shifted(unit.beginUs, deltaUs), endUs: shifted(unit.endUs, deltaUs) })),
-      })) };
+      })),
+      ...(line.timedRomanizations ? { timedRomanizations: line.timedRomanizations.map((track) => ({ ...track, words: track.words.map((word) => ({ ...word, beginUs: shifted(word.beginUs, deltaUs)!, endUs: shifted(word.endUs, deltaUs)! })) })) } : {}) };
   });
   const lines = shiftedLines.map((line) => {
     if (!line.endLink) return line;

@@ -21,7 +21,7 @@ export function toAmllLines(document: LyricDocument, showTranslation: boolean, s
     return [{ id: line.id, lyric: {
       words, startTime: milliseconds(begin), endTime: milliseconds(end!),
       translatedLyric: showTranslation ? line.translations.map((item) => item.text).join(' / ') : '',
-      romanLyric: showRomanization ? line.romanizations.map((item) => item.text).join(' / ') : '',
+      romanLyric: showRomanization ? [...line.romanizations.map((item) => item.text), ...(line.timedRomanizations ?? []).map((track) => track.words.map((word) => word.text).join(''))].join(' / ') : '',
       isBG: Boolean(line.backgroundOf), isDuet: line.duet,
     } }];
   });

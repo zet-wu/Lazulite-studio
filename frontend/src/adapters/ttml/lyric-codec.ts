@@ -1,4 +1,4 @@
-import { createWord, LYRIC_SCHEMA_VERSION, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RubyUnit, type TimeUs } from '../../domain/lyric-document';
+import { createWord, LYRIC_SCHEMA_VERSION, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RubyUnit, type TimedRomanization, type TimeUs } from '../../domain/lyric-document';
 
 const TTML = 'http://www.w3.org/ns/ttml';
 const TTS = 'http://www.w3.org/ns/ttml#styling';
@@ -176,7 +176,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
   const metadata: Record<string, string[]> = Object.create(null);
   const lines: LyricLine[] = [];
   const appleSubLyrics = new Map<string, { translations: LyricLine['translations']; romanizations: LyricLine['romanizations'] }>();
-  const appleWordRomanizations = new Map<string, Array<{ text: string; beginUs: TimeUs; endUs: TimeUs }>>();
+  const appleWordRomanizations = new Map<string, TimedRomanization[]>();
   const addMetadata = (key: string, value: string) => { (metadata[key] ??= []).push(value); };
   const readAppleMetadata = (node: Element) => {
     checkAttributes(node, []);
@@ -200,7 +200,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           if (!lineId) throw new Error('iTunes sublyric needs a line reference');
           const target = appleSubLyrics.get(lineId) ?? { translations: [], romanizations: [] };
           if (!translation && item.children.length) {
-            const entries = appleWordRomanizations.get(lineId) ?? [];
+            const words: TimedRomanization['words'] = [];
             for (const span of Array.from(item.children)) {
               if (!is(span, ITUNES, 'span')) throw new Error(`Unsupported iTunes transliteration child <${span.localName}>`);
               checkAttributes(span, ['begin', 'end', 'dur']);
@@ -208,9 +208,13 @@ export function parseLyricTtml(xml: string): LyricDocument {
               if (!text) continue;
               const [beginUs, endUs] = boundaries(span, 0, null, absoluteTimes);
               if (beginUs === null || endUs === null) throw new Error(`Word transliteration for ${lineId} needs timing`);
-              entries.push({ text: textOnly(span, 'Word transliteration'), beginUs, endUs });
+              words.push({ text, beginUs, endUs });
             }
-            appleWordRomanizations.set(lineId, entries);
+            if (words.length) {
+              const tracks = appleWordRomanizations.get(lineId) ?? [];
+              tracks.push({ language: attr(entry, XML, 'lang'), words });
+              appleWordRomanizations.set(lineId, tracks);
+            }
           } else {
             target[translation ? 'translations' : 'romanizations'].push({ language: attr(entry, XML, 'lang'), text: textOnly(item, 'iTunes sublyric') });
             appleSubLyrics.set(lineId, target);
@@ -331,16 +335,21 @@ export function parseLyricTtml(xml: string): LyricDocument {
     line.translations.push(...content.translations);
     line.romanizations.push(...content.romanizations);
   }
-  for (const [id, entries] of appleWordRomanizations) {
+  for (const [id, tracks] of appleWordRomanizations) {
     const line = lines.find((item) => item.id === id && !item.backgroundOf);
     if (!line) throw new Error(`iTunes word transliteration refers to unknown line ${id}`);
-    const used = new Set<string>();
-    for (const entry of entries) {
-      const word = line.words.find((item) => !used.has(item.id) && item.beginUs === entry.beginUs && item.endUs === entry.endUs);
-      if (!word) throw new Error(`Word transliteration for ${id} has no matching timed word`);
-      if (word.romanization && word.romanization !== entry.text) throw new Error(`Conflicting word transliteration on ${id}`);
-      word.romanization = entry.text;
-      used.add(word.id);
+    for (const track of tracks) {
+      const used = new Set<string>();
+      const matches = track.words.map((entry) => {
+        const word = line.words.find((item) => !used.has(item.id) && item.beginUs === entry.beginUs && item.endUs === entry.endUs);
+        if (word) used.add(word.id);
+        return word;
+      });
+      if (matches.every((word, index) => word && (!word.romanization || word.romanization === track.words[index].text))) {
+        matches.forEach((word, index) => { word!.romanization = track.words[index].text; });
+      } else {
+        (line.timedRomanizations ??= []).push(track);
+      }
     }
   }
   return { schemaVersion: LYRIC_SCHEMA_VERSION, lines, agents, metadata, language: attr(root, XML, 'lang') };
@@ -364,7 +373,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   if (!draft && document.lines.some((line) => line.backgroundOf && line.words.some((word) => word.romanization))) {
     throw new Error('Background word transliteration has no exchange TTML mapping');
   }
-  const romanizedLines = document.lines.filter((line) => !line.backgroundOf && line.words.some((word) => word.romanization));
+  const romanizedLines = document.lines.filter((line) => !line.backgroundOf && (line.words.some((word) => word.romanization) || line.timedRomanizations?.length));
   if (document.agents.length || Object.keys(document.metadata).length || romanizedLines.length) {
     const head = xml.createElementNS(TTML, 'head');
     const metadataNode = xml.createElementNS(TTML, 'metadata');
@@ -416,7 +425,22 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
         }
         if (textNode.childNodes.length) entry.appendChild(textNode);
       }
-      if (entry.childNodes.length) { group.appendChild(entry); itunes.appendChild(group); }
+      if (entry.childNodes.length) group.appendChild(entry);
+      for (const line of romanizedLines) for (const track of line.timedRomanizations ?? []) {
+        const timedEntry = xml.createElementNS(ITUNES, 'transliteration');
+        if (track.language) timedEntry.setAttributeNS(XML, 'xml:lang', track.language);
+        const textNode = xml.createElementNS(ITUNES, 'text');
+        textNode.setAttribute('for', line.id);
+        for (const word of track.words) {
+          const span = xml.createElementNS(ITUNES, 'span');
+          setTime(span, word.beginUs, word.endUs, draft);
+          span.textContent = word.text;
+          textNode.appendChild(span);
+        }
+        timedEntry.appendChild(textNode);
+        group.appendChild(timedEntry);
+      }
+      if (group.childNodes.length) itunes.appendChild(group);
     }
     if (itunes.childNodes.length) metadataNode.appendChild(itunes);
     head.appendChild(metadataNode);

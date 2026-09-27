@@ -34,6 +34,7 @@ export type LyricWord = {
 };
 
 export type SubLyric = { language: string | null; text: string };
+export type TimedRomanization = { language: string | null; words: { text: string; beginUs: number; endUs: number }[] };
 
 export type LyricLine = {
   id: string;
@@ -47,6 +48,7 @@ export type LyricLine = {
   duet: boolean;
   translations: SubLyric[];
   romanizations: SubLyric[];
+  timedRomanizations?: TimedRomanization[];
   ignoreSync: boolean;
 };
 

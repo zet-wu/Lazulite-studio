@@ -70,7 +70,8 @@ function cloneWord(word: LyricWord): LyricWord {
 }
 
 function cloneLine(line: LyricLine, id: string, backgroundOf: string | null): LyricLine {
-  return { ...line, id, backgroundOf, words: line.words.map(cloneWord), translations: line.translations.map((item) => ({ ...item })), romanizations: line.romanizations.map((item) => ({ ...item })) };
+  return { ...line, id, backgroundOf, words: line.words.map(cloneWord), translations: line.translations.map((item) => ({ ...item })), romanizations: line.romanizations.map((item) => ({ ...item })),
+    ...(line.timedRomanizations ? { timedRomanizations: line.timedRomanizations.map((track) => ({ ...track, words: track.words.map((word) => ({ ...word })) })) } : {}) };
 }
 
 export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null): { command: LyricCommand; selection: EditorSelection } {

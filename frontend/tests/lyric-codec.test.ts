@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
 import { createLine, createLyricDocument, lineText, rubyReading } from '../src/domain/lyric-document';
+import { shiftLineTimes } from '../src/domain/batch-editing';
 
 const simple = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="line-1">今日も歌う</p></body></tt>';
 
@@ -45,6 +46,25 @@ describe('semantic TTML codec', () => {
     const reopened = parseLyricTtml(serializeLyricTtml(imported));
     expect(reopened.lines[0].words[0].beginUs).toBe(129_983_000);
     expect(reopened.lines[0].words[0].romanization).toBe('yuki');
+  });
+
+  it('preserves finer AMLL transliteration timing as a separate track', () => {
+    const xml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="Word"><head xmlns=""><metadata><iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><transliterations><transliteration xml:lang="ja-Latn"><text for="L1"><span begin="2:09.983" end="2:10.161">ko </span><span begin="2:10.162" end="2:10.346">na </span></text></transliteration></transliterations></iTunesMetadata></metadata></head><body xmlns="" dur="2:11.000"><div begin="2:09.000" end="2:11.000"><p begin="2:09.984" end="2:10.347" itunes:key="L1"><span begin="2:09.984" end="2:10.347">粉</span></p></div></body></tt>';
+    const imported = parseLyricTtml(xml);
+    expect(imported.lines[0].words[0].romanization).toBe('');
+    expect(imported.lines[0].timedRomanizations).toEqual([{ language: 'ja-Latn', words: [
+      { text: 'ko ', beginUs: 129_983_000, endUs: 130_161_000 },
+      { text: 'na ', beginUs: 130_162_000, endUs: 130_346_000 },
+    ] }]);
+    expect(parseLyricTtml(serializeLyricTtml(imported)).lines[0].timedRomanizations).toEqual(imported.lines[0].timedRomanizations);
+    const shifted = shiftLineTimes(imported, ['L1'], 1_000_000);
+    expect(shifted.type).toBe('replace-document');
+    if (shifted.type === 'replace-document') expect(shifted.document.lines[0].timedRomanizations?.[0].words[0].beginUs).toBe(130_983_000);
+  });
+
+  it('keeps full clock timestamps relative when AMLL timing is absent', () => {
+    const xml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div begin="00:00:01.000"><p begin="00:00:01.000" end="00:00:02.000">Test</p></div></body></tt>';
+    expect(parseLyricTtml(xml).lines[0]).toMatchObject({ beginUs: 2_000_000, endUs: 3_000_000 });
   });
 
   it('rejects unknown inline structure instead of silently flattening it', () => {
