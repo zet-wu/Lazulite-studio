@@ -116,6 +116,20 @@
 .romanizationPreview label { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 6px; }
 .romanizationPreview input { min-width: 0; width: 100%; padding: 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--canvas); color: var(--ink); }
 .romanizationPreview em { grid-column: 1 / -1; color: var(--warning, #b35b18); font-style: normal; }
+.rubyGeneration { display: grid; gap: 10px; font-size: 13px; }
+.rubyGeneration > p { margin: 2px 0; }
+.rubyGeneration fieldset { display: flex; flex-wrap: wrap; gap: 8px 15px; min-width: 0; border: 1px solid var(--line); border-radius: 5px; }
+.rubyGeneration fieldset label { display: inline-flex; align-items: center; gap: 5px; }
+.rubyGenerationOptions { display: flex; flex-wrap: wrap; gap: 10px; }
+.rubyGenerationOptions label { display: grid; gap: 4px; }
+.rubyGeneration select, .rubyGeneration input:not([type="checkbox"]) { box-sizing: border-box; min-width: 0; max-width: 100%; padding: 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--canvas); color: var(--ink); font: inherit; }
+.rubyGenerationRows { display: grid; gap: 7px; max-height: 40dvh; overflow-y: auto; }
+.rubyGenerationRow { display: grid; grid-template-columns: minmax(80px, .6fr) minmax(105px, 1fr) minmax(130px, 1.2fr) minmax(115px, 1fr); align-items: center; gap: 5px 8px; padding: 7px; border: 1px solid var(--line); border-radius: 5px; }
+.rubyGenerationRow > strong, .rubyGenerationRow > small { overflow-wrap: anywhere; }
+.rubyGenerationRow label { display: grid; gap: 3px; min-width: 0; }
+.rubyGenerationRow label:has([type="checkbox"]) { display: flex; align-items: center; }
+.rubyGenerationRow > small:last-child { grid-column: 1 / -1; }
+@media (max-width: 640px) { .rubyGenerationRow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 .modeTabs, .syncButtons { display: flex; flex-wrap: wrap; gap: 6px; }
 .modeTabs { padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .modeTabs button[aria-current="page"] { background: var(--blue-soft); border-color: var(--blue); }

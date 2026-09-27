@@ -20,6 +20,7 @@ import { MetadataPanel } from './MetadataPanel';
 import { SingerDialog } from './SingerDialog';
 import { SettingsDialog } from './SettingsDialog';
 import { EditorContextMenu, type ContextAction } from './EditorContextMenu';
+import { RubyGenerationDialog } from './RubyGenerationDialog';
 import type { TransportHandle } from '../MediaTransport';
 import type { LyricFormat } from '../../adapters/lyric-formats';
 import styles from './semantic-editor.module.css';
@@ -86,6 +87,7 @@ export function EditorWorkspace(props: Props) {
   const [backgroundTargetId, setBackgroundTargetId] = useState('');
   const [splitLineId, setSplitLineId] = useState<string | null>(null);
   const [contentTransfer, setContentTransfer] = useState<{ trackId: string; contentId: string; targetLineId: string } | null>(null);
+  const [rubyGeneration, setRubyGeneration] = useState<{ lineIds: string[]; trackId?: string; contentId?: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; title: string; actions: ContextAction[]; target: HTMLElement } | null>(null);
   const [locate, setLocate] = useState<{ id: string; serial: number } | null>(null);
   const locateSerial = useRef(0);
@@ -476,6 +478,7 @@ export function EditorWorkspace(props: Props) {
           { label: '音译内容后移', disabled: siblingIndex === siblings.length - 1, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: siblings[siblingIndex + 1].id }) },
           { label: '转移到其他主行…', disabled: mainLines.length < 2, run: () => setContentTransfer({ trackId: track.id, contentId: content.id, targetLineId: mainLines.find((item) => item.id !== line.id)?.id ?? '' }) },
           { label: '删除内容', run: () => dispatch({ type: 'delete-romanization-content', trackId: track.id, contentId: content.id }) },
+          { label: '从音译生成 Ruby…', run: () => setRubyGeneration({ lineIds: [line.id], trackId: track.id, contentId: content.id }) },
           { label: '管理轨道…', run: () => setSettingsDialog('tracks') },
           { label: '轨道前移', run: () => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: -1 }) },
           { label: '轨道后移', run: () => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: 1 }) },
@@ -641,7 +644,9 @@ export function EditorWorkspace(props: Props) {
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
-      canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)} />}
+      canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)}
+      canGenerateRuby={selectedMainLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
+      openRubyGeneration={() => setRubyGeneration({ lineIds: selectedMainLines.map((line) => line.id) })} />}
     {(mode === 'edit' || mode === 'sync') && <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
       {document.lines.map((line) => <div className={styles.outlineRow} data-line-id={line.id} key={line.id}>
         <button data-outline-drag className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
@@ -731,6 +736,8 @@ export function EditorWorkspace(props: Props) {
     })()}
     {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
     {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
+    {rubyGeneration && <RubyGenerationDialog document={document} lineIds={rubyGeneration.lineIds} initialTrackId={rubyGeneration.trackId} initialContentId={rubyGeneration.contentId}
+      apply={dispatch} close={() => setRubyGeneration(null)} />}
     {rubyBaseOpen && <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRubyBaseOpen(false); }}><section className={styles.dialog} role="dialog" aria-modal="true" aria-label="整体 Ruby"><div className={styles.dialogHeader}><h2>整体 Ruby</h2><button aria-label="关闭整体 Ruby" onClick={() => setRubyBaseOpen(false)}>×</button></div><p>base：{rubyBaseWords.map((word) => word.text).join('')}</p><label>读音 <input autoFocus value={rubyBaseReading} onChange={(event) => setRubyBaseReading(event.target.value)} onKeyDown={(event) => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') createRubyBase(); if (event.key === 'Escape') setRubyBaseOpen(false); }} /></label><p>合并相邻词后创建一个整体读音；其他词和时间保持原样。</p><div className={styles.dialogActions}><button onClick={() => setRubyBaseOpen(false)}>取消</button><button disabled={!rubyBaseReading} onClick={createRubyBase}>应用（一次撤销）</button></div></section></div>}
     {splitLineId && document.lines.find((line) => line.id === splitLineId) && <LineSplitDialog key={splitLineId} line={document.lines.find((line) => line.id === splitLineId)!}
       background={document.lines.find((line) => line.backgroundOf === splitLineId) ?? null}

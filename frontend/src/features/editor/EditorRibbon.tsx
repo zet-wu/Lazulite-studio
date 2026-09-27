@@ -18,6 +18,8 @@ type Props = {
   openBatchTools: () => void;
   createRubyBase: () => void;
   canCreateRubyBase: boolean;
+  canGenerateRuby: boolean;
+  openRubyGeneration: () => void;
 };
 
 export function EditorRibbon(props: Props) {
@@ -38,6 +40,7 @@ export function EditorRibbon(props: Props) {
       <button onClick={props.openSegmentation}>分词…</button>
       <button onClick={props.openBatchTools}>批处理…</button>
       <button disabled={!props.canCreateRubyBase} onClick={props.createRubyBase}>合并为 Ruby base…</button>
+      <button disabled={!props.canGenerateRuby} onClick={props.openRubyGeneration}>从音译生成 Ruby…</button>
     </div></details>
     <small>空白处拖动排序；右键打开对象菜单。</small>
   </div>;
