@@ -22,6 +22,7 @@ export function TopMenu({ id, title, className, activeMenuId, onMenuChange, chil
   return <details ref={root} open={opened} className={className} data-top-menu={id}
     onPointerEnter={clear}
     onPointerLeave={() => {
+      if (!opened) return;
       clear();
       timer.current = setTimeout(() => {
         timer.current = null;
