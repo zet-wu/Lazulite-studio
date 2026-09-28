@@ -8,3 +8,5 @@ server/.venv/
 server/data/
 __pycache__/
 *.py[cod]
+
+performance-results/

@@ -1,5 +1,5 @@
-export const SPECTRUM_WIDTH = 96;
-export const SPECTRUM_HEIGHT = 48;
+export const SPECTRUM_WIDTH = 384;
+export const SPECTRUM_HEIGHT = 96;
 export const FFT_SIZE = 512;
 const SIZE = FFT_SIZE;
 export const SPECTRUM_WINDOW_US = 4_000_000;

@@ -147,6 +147,8 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
     pcm = client.get(f"/api/v1/projects/{pid}/pcm?start_us=0&end_us=500000")
     assert pcm.status_code == 200 and pcm.headers["x-sample-rate"] == "48000"
     assert pcm.headers["x-channels"] == "2" and len(pcm.content) == 96_000
+    assert client.get(f"/api/v1/projects/{pid}/pcm?start_us=0&end_us=4020000").status_code == 200
+    assert client.get(f"/api/v1/projects/{pid}/pcm?start_us=0&end_us=4020001").status_code == 422
     assert client.get(f"/api/v1/projects/{pid}/pcm?start_us=0&end_us=5000000").status_code == 422
     assert (
         client.get(

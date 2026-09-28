@@ -282,3 +282,72 @@ test('P3-08 file input survives cancellation, same-file reselection and format e
   expect((await download).suggestedFilename()).toMatch(/\.txt$/);
   await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
 });
+
+for (const dpr of [1, 1.25, 2]) test(`P3-09 spectrum has no unloaded seam DPR ${dpr}`, async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: dpr });
+  const page = await context.newPage();
+  await page.goto('http://127.0.0.1:5174/projects/sample-project/edit');
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: '放大波形' }).click();
+  await page.getByLabel('时间轴图层').getByRole('button', { name: '声谱图', exact: true }).click();
+  const spectrum = page.locator('[data-spectrum-ready]');
+  await expect.poll(() => spectrum.getAttribute('data-spectrum-ready')).toBe('4');
+  const canvas = page.getByLabel('声谱图', { exact: true });
+  const pixels = await canvas.evaluate((canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext('2d')!;
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let background = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i] === 16 && data[i + 1] === 22 && data[i + 2] === 34 || data[i] === 36 && data[i + 1] === 53 && data[i + 2] === 75) background++;
+    return background;
+  });
+  expect(pixels).toBe(0);
+  const wave = (await page.getByRole('slider', { name: '波形进度' }).boundingBox())!, plot = (await canvas.boundingBox())!;
+  expect(Math.abs(wave.x - plot.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(wave.width - plot.width)).toBeLessThanOrEqual(1);
+  const stats = JSON.parse((await spectrum.getAttribute('data-spectrum-stats'))!);
+  await test.info().attach('spectrum-stats.json', { body: JSON.stringify({ dpr, stats }), contentType: 'application/json' });
+  await page.screenshot({ path: test.info().outputPath(`spectrum-dpr-${dpr}.png`) });
+  await context.close();
+});
+
+test('P3-10 limits PCM concurrency and stops requests on hide', async ({ page }) => {
+  let requests = 0;
+  page.on('request', r => { if (r.url().includes('/pcm?')) requests++; });
+  await page.addInitScript(() => {
+    const fetch = window.fetch;
+    const counters = { active: 0, peak: 0 };
+    (window as unknown as { pcmCounters: typeof counters }).pcmCounters = counters;
+    window.fetch = async (...args) => {
+      if (!String(args[0]).includes('/pcm?')) return fetch(...args);
+      let active = true;
+      const finish = () => { if (active) { active = false; counters.active--; } };
+      counters.active++; counters.peak = Math.max(counters.peak, counters.active);
+      args[1]?.signal?.addEventListener('abort', finish, { once: true });
+      try { return await fetch(...args); } finally { finish(); }
+    };
+  });
+  await page.goto('/projects/sample-project/edit');
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: '放大波形' }).click();
+  const toggle = page.getByLabel('时间轴图层').getByRole('button', { name: '声谱图', exact: true });
+  await toggle.click();
+  await expect.poll(() => page.locator('[data-spectrum-ready]').getAttribute('data-spectrum-ready')).toBe('4');
+  expect(await page.evaluate(() => (window as unknown as { pcmCounters: { peak: number } }).pcmCounters.peak)).toBeLessThanOrEqual(2);
+  await toggle.click();
+  const before = requests;
+  await page.getByRole('button', { name: '后移窗口' }).click();
+  await page.waitForTimeout(300);
+  expect(requests).toBe(before);
+  await toggle.click();
+  await expect(page.locator('[data-spectrum-ready]')).toBeVisible();
+});
+
+test('P3-01 canvases rebuild when DPR changes without a CSS resize', async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: '放大波形' }).click();
+  await page.getByLabel('时间轴图层').getByRole('button', { name: '声谱图', exact: true }).click();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 2, mobile: false });
+  for (const canvas of await page.locator('canvas').all()) {
+    await expect.poll(() => canvas.evaluate((c: HTMLCanvasElement) => Math.abs(c.width - Math.round(c.getBoundingClientRect().width * devicePixelRatio)))).toBeLessThanOrEqual(1);
+  }
+  await cdp.detach();
+});

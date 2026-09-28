@@ -18,6 +18,7 @@ import styles from "./media.module.css";
 import type { LyricCommand } from '../domain/lyric-commands';
 import type { LyricDocument } from '../domain/lyric-document';
 import { TimelineTracks } from './TimelineTracks';
+import { useCanvasMetrics } from './useCanvasMetrics';
 import { SpectrogramCanvas } from './SpectrogramCanvas';
 import { estimateBpm } from '../domain/bpm';
 import { panViewport, waveformRequestWindow, zoomViewport } from '../domain/timeline-viewport';
@@ -83,13 +84,14 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [rate, setRate] = useState(1);
   const [start, setStart] = useState(0);
   const [span, setSpan] = useState(0);
-  const [width, setWidth] = useState(640);
+
   const [loop, setLoop] = useState<LoopState>(emptyLoop);
   const [error, setError] = useState("");
   const [bpm, setBpm] = useState(120);
   const [snap, setSnap] = useState(true);
   const [expanded, setExpanded] = useState(true);
   const [visible, setVisible] = useState({ line: true, word: true, ruby: true, gap: true, spectrum: false });
+  const { width, ratio } = useCanvasMetrics(canvas, expanded);
   const [follow, setFollow] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
   viewportRef.current = { start, span, duration, follow };
@@ -286,18 +288,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     if (audio.current) audio.current.playbackRate = rate;
   }, [rate]);
   useEffect(() => {
-    const element = canvas.current;
-    if (!element || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [expanded]);
-  useEffect(() => {
     const c = canvas.current;
     if (!c) return;
     const draw = () => {
       const r = c.getBoundingClientRect();
-      const scale = devicePixelRatio || 1;
+      const scale = ratio;
       c.width = Math.max(1, Math.round(r.width * scale));
       c.height = Math.max(1, Math.round(r.height * scale));
       const ctx = c.getContext("2d");
@@ -320,7 +315,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       });
     };
     draw();
-  }, [endUs, startUs, waveform.data, width]);
+  }, [endUs, startUs, waveform.data, width, ratio]);
   const zoomAt = (factor: number, fraction: number) => {
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }
     const next = zoomViewport({ startUs, spanUs: Math.round(span * 1e6) }, durationUs, factor, fraction);
@@ -578,7 +573,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           visible={visible}
           onZoomRange={(begin, end) => { setFollow(false); setStart(begin / 1e6); setSpan(Math.max(1000, end - begin) / 1e6); }} apply={onTimelineCommand} onSelectLine={onSelectLine} onPan={(nextStartUs) => { setFollow(false); setStart(panViewport({ startUs: 0, spanUs: Math.round(span * 1e6) }, durationUs, nextStartUs).startUs / 1e6); }} onError={setError} />
       </>}
-      {visible.spectrum && asset && <SpectrogramCanvas projectId={projectId} startUs={startUs} endUs={endUs} durationUs={durationUs} />}
+      {visible.spectrum && asset && <SpectrogramCanvas assetIdentity={`${asset.id}:${asset.asset_hash}`} projectId={projectId} startUs={startUs} endUs={endUs} durationUs={durationUs} />}
       </div>
       <div className={styles.controls}>
         <select
