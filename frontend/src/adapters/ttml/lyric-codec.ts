@@ -335,8 +335,8 @@ export function parseLyricTtml(xml: string): LyricDocument {
       });
       if (background) {
         checkAttributes(background, ['begin', 'end', 'dur']);
-        const [bgBegin, bgEnd] = boundaries(background, wordStart, endUs, absoluteTimes);
-        const bgId = `${id}:bg`;
+        const [bgBegin, bgEnd] = boundaries(background, wordStart, ownEnd, absoluteTimes);
+        const bgId = attr(background, STUDIO, 'id') ?? `${id}:bg`;
         const bgStart = bgBegin ?? wordStart;
         const bgWords = Array.from(background.childNodes).map((node, index) => makeWord(node, bgId, index, bgStart, bgEnd, absoluteTimes)).filter((word): word is LyricWord => word !== null);
         if (bgWords.length) {
@@ -451,8 +451,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     root.insertBefore(head, root.firstChild);
   }
   const body = Array.from(root.children).find((child) => is(child, TTML, 'body'))!;
-  const mainLines = document.lines.filter((line) => !line.backgroundOf);
-  const lineEnds = mainLines.map((line) => line.endUs).filter((value): value is number => value !== null);
+  const lineEnds = document.lines.map((line) => line.endUs).filter((value): value is number => value !== null);
   if (lineEnds.length) {
     body.setAttribute('dur', timeText(Math.max(...lineEnds)));
   }
@@ -524,6 +523,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       if (bg.ignoreSync || bg.translations.length) throw new Error(`Background vocal ${bg.id} has fields not yet mapped to TTML`);
       const span = xml.createElementNS(TTML, 'span');
       span.setAttributeNS(TTM, 'ttm:role', 'x-bg');
+      if (draft) span.setAttributeNS(STUDIO, 'studio:id', bg.id);
       setTime(span, bg.beginUs, bg.endUs, draft);
       bg.words.forEach((word, index) => appendWord(span, word, `${index === 0 ? '(' : ''}${word.text}${index === bg.words.length - 1 ? ')' : ''}`));
       p.appendChild(span);

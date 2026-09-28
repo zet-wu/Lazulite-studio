@@ -136,7 +136,8 @@ describe('semantic lyric commands', () => {
     const original = createLyricEditorState(document);
     const withBackground = executeLyricCommand(original, { type: 'set-background-of', lineId: bg.id, parentLineId: main.id });
     expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', contentIdsForNewLine: ['second'], backgroundTarget: null })).toThrow(/背景歌词归属/);
-    expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', contentIdsForNewLine: ['second'], backgroundTarget: 'left' })).toThrow(/背景歌词时间/);
+    const leftAssigned = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', contentIdsForNewLine: ['second'], backgroundTarget: 'left' });
+    expect(leftAssigned.present.lines.find(line => line.id === bg.id)).toMatchObject({ backgroundOf: main.id, beginUs: bg.beginUs, endUs: bg.endUs });
     const split = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', contentIdsForNewLine: ['second'], backgroundTarget: 'right' });
     expect(split.present.lines.map((line) => [line.id, line.backgroundOf])).toEqual([[main.id, null], ['right', null], ['bg', 'right']]);
     expect(split.present.romanizationTracks[0].contents.map((content) => [content.id, content.lineId])).toEqual([['first', main.id], ['second', 'right']]);
@@ -214,7 +215,7 @@ describe('semantic lyric commands', () => {
   });
 });
 
-it.each(['child', 'translation', 'link', 'referenced', 'time'])('P3-05 rejects background %s without modifying document or history', reason => {
+it.each(['child', 'translation', 'link', 'referenced'])('P3-05 rejects background %s without modifying document or history', reason => {
   const document = createLyricDocument('主唱');
   const main = document.lines[0], source = createLine('源歌词', 'source');
   main.beginUs = 1_000_000; main.endUs = 10_000_000;
@@ -224,9 +225,28 @@ it.each(['child', 'translation', 'link', 'referenced', 'time'])('P3-05 rejects b
   if (reason === 'translation') source.translations.push({ language: 'zh', text: '译文保留' });
   if (reason === 'link') source.endLink = { targetLineId: main.id, originalEndUs: source.endUs };
   if (reason === 'referenced') main.endLink = { targetLineId: source.id, originalEndUs: main.endUs };
-  if (reason === 'time') source.endUs = 11_000_000;
   const snapshot = structuredClone(document), state = createLyricEditorState(document);
   expect(() => executeLyricCommand(state, { type: 'set-background-of', lineId: source.id, parentLineId: main.id })).toThrow();
   expect(state.present).toEqual(snapshot);
   expect(state.past).toHaveLength(0);
+});
+
+it.each([[0, 500_000], [2_000_000, 5_000_000], [0, 5_000_000], [null, null]])('P4 background %s–%s preserves independent time on attach/rebind/detach and undo', (beginUs, endUs) => {
+  const document = createLyricDocument('主行');
+  const main = document.lines[0], source = createLine('背景', 'bg'), another = createLine('另一主行', 'another');
+  main.beginUs = 1_000_000; main.endUs = 2_000_000;
+  source.beginUs = beginUs; source.endUs = endUs;
+  source.words[0].beginUs = beginUs; source.words[0].endUs = endUs;
+  source.words[0].rubyUnits = [{ id: 'r', reading: '背景音', beginUs, endUs }];
+  document.lines.push(source, another);
+  const original = createLyricEditorState(document);
+  const attached = executeLyricCommand(original, { type: 'set-background-of', lineId: source.id, parentLineId: main.id });
+  expect(attached.present.lines[0]).toBe(main);
+  expect(attached.present.lines[1]).toMatchObject({ backgroundOf: main.id, beginUs, endUs, words: source.words });
+  expect(attached.past).toHaveLength(1);
+  expect(undoLyricCommand(attached).present).toBe(document);
+  const rebound = executeLyricCommand(attached, { type: 'set-background-of', lineId: source.id, parentLineId: another.id });
+  expect(rebound.present.lines.find(line => line.id === source.id)).toMatchObject({ backgroundOf: another.id, beginUs, endUs, words: source.words });
+  const detached = executeLyricCommand(rebound, { type: 'set-background-of', lineId: source.id, parentLineId: null });
+  expect(detached.present.lines.find(line => line.id === source.id)).toMatchObject({ backgroundOf: null, beginUs, endUs, words: source.words });
 });

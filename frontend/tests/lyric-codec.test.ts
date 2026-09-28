@@ -188,3 +188,15 @@ describe('semantic TTML codec', () => {
     expect(serializeLyricTtml(document)).not.toContain('mora-1');
   });
 });
+
+it.each(['draft', 'exchange'] as const)('P4 %s roundtrip preserves independent background and extends only body duration', mode => {
+  const document = parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="parent" begin="1" end="2"><span begin="1" end="2">主行</span></p><p xml:id="background" begin="2" end="5"><span begin="2" end="4">背景</span></p></div></body></tt>');
+  const attached = executeLyricCommand(createLyricEditorState(document), { type: 'set-background-of', lineId: 'background', parentLineId: 'parent' }).present;
+  const xml = serializeLyricTtml(attached, { draft: mode === 'draft' });
+  const tree = new DOMParser().parseFromString(xml, 'application/xml');
+  expect(tree.getElementsByTagName('body')[0].getAttribute('dur')).toBe('5');
+  const reopened = parseLyricTtml(xml);
+  if (mode === 'draft') expect(reopened.lines[1].id).toBe('background');
+  expect(reopened.lines[0]).toMatchObject({ beginUs: 1_000_000, endUs: 2_000_000 });
+  expect(reopened.lines[1]).toMatchObject({ backgroundOf: reopened.lines[0].id, beginUs: 2_000_000, endUs: 5_000_000, words: [{ beginUs: 2_000_000, endUs: 4_000_000 }] });
+});

@@ -150,7 +150,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (document.lines.some((line) => line.backgroundOf === parent.id && line.id !== source.id)) throw new Error('目标主行已有背景歌词');
       if (document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === source.id))) throw new Error('此行有音译内容，请先转移或删除');
       if (source.translations.length || source.endLink || document.lines.some((line) => line.endLink?.targetLineId === source.id)) throw new Error('此行有翻译或行尾链接，请先处理');
-      if (parent.beginUs !== null && source.beginUs !== null && source.beginUs < parent.beginUs || parent.endUs !== null && source.endUs !== null && source.endUs > parent.endUs) throw new Error('背景歌词时间须位于主行区间内');
       const lines = document.lines.filter((line) => line.id !== source.id);
       const parentIndex = lines.findIndex((line) => line.id === parent.id);
       lines.splice(parentIndex + 1, 0, { ...source, backgroundOf: parent.id, agentRefs: [], songPart: null });
@@ -199,11 +198,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       validTime(right.beginUs, right.endUs);
       left.words.forEach((word) => wordFitsLine(word, left));
       right.words.forEach((word) => wordFitsLine(word, right));
-      if (background) {
-        const owner = command.backgroundTarget === 'right' ? right : left;
-        if (owner.beginUs !== null && background.beginUs !== null && background.beginUs < owner.beginUs ||
-            owner.endUs !== null && background.endUs !== null && background.endUs > owner.endUs) throw new Error('背景歌词时间超出分配后的主行');
-      }
       const lines = document.lines.filter((item) => item.id !== background?.id);
       lines[index] = left;
       lines.splice(index + 1, 0, right);
