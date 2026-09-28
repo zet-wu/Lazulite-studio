@@ -6,7 +6,7 @@ import { SpectrumCache } from './spectrum-cache';
 import styles from './media.module.css';
 
 type Props = { projectId: string; assetIdentity: string; startUs: number; endUs: number; durationUs: number };
-type Request = { token: number; controller: AbortController; began: number };
+type Request = { token: number; controller: AbortController; began: number; posted: boolean };
 type Result = { id: number; token: number; pixels: Uint8Array; computeMs: number; error?: string };
 
 export function SpectrogramCanvas(props: Props) {
@@ -38,12 +38,13 @@ function AssetSpectrum({ projectId, startUs, endUs, durationUs }: Props) {
     for (const first of wanted.current) {
       if (cache.current.get(first) || pending.current.has(first) || failed.current.has(first)) continue;
       if (pending.current.size >= 2) break;
-      const request: Request = { token: ++nextToken.current, controller: new AbortController(), began: performance.now() };
+      const request: Request = { token: ++nextToken.current, controller: new AbortController(), began: performance.now(), posted: false };
       const window = spectrumWindow(first, Math.min(first + SPECTRUM_WINDOW_US, durationUs), durationUs);
       pending.current.set(first, request);
       void studioApi.getPcmWindow(projectId, window.requestStartUs, window.requestEndUs, request.controller.signal).then(({ pcm, rate, channels }) => {
         if (pending.current.get(first) !== request || !wanted.current.includes(first)) return;
         stats.current.requestMs = [...stats.current.requestMs.slice(-127), performance.now() - request.began];
+        request.posted = true;
         processor.postMessage({ id: first, token: request.token, pcm, rate, channels, window }, [pcm]);
       }).catch(cause => {
         if (pending.current.get(first) !== request) return;
@@ -86,8 +87,18 @@ function AssetSpectrum({ projectId, startUs, endUs, durationUs }: Props) {
 
   useEffect(() => {
     wanted.current = visible ? Array.from({ length: Math.max(0, (lastTile - firstTile) / SPECTRUM_WINDOW_US) }, (_, index) => firstTile + index * SPECTRUM_WINDOW_US).filter(first => first < durationUs) : [];
-    for (const [first, request] of pending.current) if (!wanted.current.includes(first)) { request.controller.abort(); pending.current.delete(first); }
-    pump.current(); changed();
+    for (const first of failed.current.keys()) if (!wanted.current.includes(first)) failed.current.delete(first);
+    const cancelWorker = [...pending.current].some(([first, request]) => request.posted && !wanted.current.includes(first));
+    if (cancelWorker) {
+      // Stop obsolete computation too, so rapid panning cannot build an unbounded worker queue.
+      worker.current?.terminate(); worker.current = null;
+      for (const request of pending.current.values()) request.controller.abort();
+      pending.current.clear(); setRetry(value => value + 1);
+    } else {
+      for (const [first, request] of pending.current) if (!wanted.current.includes(first)) { request.controller.abort(); pending.current.delete(first); }
+      pump.current();
+    }
+    changed();
   }, [durationUs, firstTile, lastTile, visible, retry]);
 
   useEffect(() => {

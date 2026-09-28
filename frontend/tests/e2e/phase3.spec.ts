@@ -372,3 +372,41 @@ test('P3-03 narrow blocks preserve true width and expose separated endpoints', a
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(page.getByRole('textbox', { name: '词 夜の風が静かに吹く', exact: true })).toBeVisible();
 });
+
+test('P3-10 rapid panning terminates obsolete worker jobs instead of queuing them', async ({ page }) => {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    const counts = { pending: 0, peak: 0, canceled: 0 };
+    (window as unknown as { workerCounts: typeof counts }).workerCounts = counts;
+    window.Worker = class extends NativeWorker {
+      private jobs = new Map<number, ReturnType<typeof setTimeout>>();
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        this.addEventListener('message', event => {
+          if (this.jobs.delete(event.data.token)) counts.pending--;
+        });
+      }
+      postMessage(message: { token: number }, transfer: Transferable[]) {
+        counts.pending++; counts.peak = Math.max(counts.peak, counts.pending);
+        this.jobs.set(message.token, setTimeout(() => super.postMessage(message, transfer), 500));
+      }
+      terminate() {
+        counts.canceled += this.jobs.size;
+        counts.pending -= this.jobs.size;
+        for (const timer of this.jobs.values()) clearTimeout(timer);
+        this.jobs.clear(); super.terminate();
+      }
+    };
+  });
+  await page.goto('/projects/sample-project/edit');
+  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: '放大波形' }).click();
+  await page.getByLabel('时间轴图层').getByRole('button', { name: '声谱图', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { workerCounts: { pending: number } }).workerCounts.pending)).toBeGreaterThan(0);
+  const wave = (await page.getByRole('slider', { name: '波形进度' }).boundingBox())!;
+  await page.mouse.move(wave.x + wave.width * .8, wave.y + 25); await page.mouse.down();
+  await page.mouse.move(wave.x + wave.width * .2, wave.y + 25, { steps: 4 }); await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { workerCounts: { canceled: number } }).workerCounts.canceled)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => (window as unknown as { workerCounts: { peak: number } }).workerCounts.peak)).toBeLessThanOrEqual(2);
+  const spectrum = page.locator('[data-spectrum-ready]');
+  await expect.poll(async () => (await spectrum.getAttribute('data-spectrum-ready')) === (await spectrum.getAttribute('data-spectrum-wanted'))).toBe(true);
+});
