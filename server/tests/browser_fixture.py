@@ -23,6 +23,10 @@ def create_browser_app():
     subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=8.123', '-af', 'asetpts=PTS+2/TB', '-c:a', 'aac', str(audio)], check=True)
     ttml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div>' + ''.join(f'<p xml:id="media-{i}" begin="1.123" end="3.985"><span begin="1.123" end="3.985">合成媒体行{i}</span></p>' for i in range(3)) + '</div></body></tt>'
     add_media_project(root, db, store, 'phase3-media', audio, ttml)
+    long_audio = root / 'long-background.m4a'
+    subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=220:sample_rate=48000:duration=132', '-c:a', 'aac', str(long_audio)], check=True)
+    add_media_project(root, db, store, 'phase4-background', long_audio,
+        '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="1" end="2">合成占位</p></body></tt>')
     app = create_app(root, Settings(None, True, "http://127.0.0.1:5175"))
     app.add_event_handler("shutdown", temporary.cleanup)
     return app

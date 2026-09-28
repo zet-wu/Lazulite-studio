@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { LyricDocument } from '../../domain/lyric-document';
 import { toAmllLines } from '../../domain/preview-adapter';
 import type { TransportHandle } from '../MediaTransport';
+import { StudioLyricPlayer } from './StudioLyricPlayer';
 import styles from './semantic-editor.module.css';
 
 export function PreviewMode({ document, transport, onSelectLine }: { document: LyricDocument; transport?: RefObject<TransportHandle | null>; onSelectLine?: (id: string) => void }) {
@@ -45,7 +46,7 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
       {!transport && <label>试听位置 <input type="range" min="0" max={duration} value={localTime} onChange={(event) => setLocalTime(Number(event.target.value))} /></label>}
     </div>
     {lines.length ? <div className={styles.previewPlayer}>
-      <LyricPlayer ref={player} lyricLines={lyricLines} currentTime={transport ? undefined : localTime}
+      <LyricPlayer lyricPlayer={StudioLyricPlayer} ref={player} lyricLines={lyricLines} currentTime={transport ? undefined : localTime}
         playing={transport ? playing : false} hidePassedLines={hidePassed} wordFadeWidth={fadeWidth}
         onLyricLineClick={(event) => {
           const matched = lines[event.lineIndex];

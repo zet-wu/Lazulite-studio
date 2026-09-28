@@ -28,3 +28,17 @@ it('keeps all nine L4 syllables when the player cannot express their word groupi
   expect(preview?.romanLyric).toBe('ko na yu ki ga so ra ka ra ');
   expect(document.romanizationTracks[0].contents.find((content) => content.lineId === 'L4')).toBe(before);
 });
+
+it('P4 projects independent background before, after and beyond its parent without extending parent', () => {
+  const document = createLyricDocument('主行');
+  const main = document.lines[0]; main.beginUs = 1_000_000; main.endUs = 2_000_000;
+  const bg = createLine('背景'); bg.backgroundOf = main.id; bg.beginUs = 2_000_000; bg.endUs = 5_000_000;
+  bg.words[0].beginUs = 2_000_000; bg.words[0].endUs = 4_000_000; document.lines.push(bg);
+  for (const [beginUs, endUs] of [[2_000_000, 5_000_000], [0, 500_000], [0, 5_000_000]]) {
+    bg.beginUs = beginUs; bg.endUs = endUs;
+    const snapshot = JSON.stringify(document), lines = toAmllLines(document, false, false);
+    expect(lines[0].lyric).toMatchObject({ startTime: 1000, endTime: 2000, isBG: false });
+    expect(lines[1].lyric).toMatchObject({ startTime: beginUs / 1000, endTime: endUs / 1000, isBG: true });
+    expect(JSON.stringify(document)).toBe(snapshot);
+  }
+});
