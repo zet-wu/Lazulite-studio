@@ -148,3 +148,38 @@ test('P3-07 reduced motion and wheel cancel use only the lyric scroller', async 
   expect(Math.abs(await scroller.evaluate(e => e.scrollTop) - top)).toBeLessThan(250);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
+
+test('P3-05 attaches, rebinds, detaches and restores a stable background relation', async ({ page }) => {
+  await page.goto('/editor');
+  await page.locator('input[type=file]').setInputFiles({ name: 'bg.ttml', mimeType: 'application/xml', buffer: Buffer.from(overlapTtml()) });
+  const outline = page.locator('[data-outline-drag]');
+  await outline.first().click();
+  const background = page.getByLabel('背景歌词', { exact: true });
+  const parent = page.getByLabel('所属主行');
+  await expect(parent).toBeDisabled();
+  await background.click();
+  await expect(background).not.toBeChecked();
+  await expect(page.getByRole('alert')).toContainText('之前没有主行');
+  await outline.nth(1).click();
+  await background.check();
+  await expect(background).toBeChecked();
+  await expect(parent).toBeEnabled();
+  await expect(parent).toHaveValue('overlap-0');
+  await expect(parent.locator('option:checked')).toHaveText('L1');
+  await parent.selectOption('overlap-2');
+  await expect(parent).toHaveValue('overlap-2');
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(parent).toHaveValue('overlap-0');
+  await background.uncheck();
+  await expect(parent).toBeDisabled();
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(parent).toHaveValue('overlap-0');
+  await page.getByRole('button', { name: '重做', exact: true }).click();
+  await expect(background).not.toBeChecked();
+  await background.check();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  page.once('dialog', d => d.accept());
+  await page.reload();
+  await page.locator('[data-outline-drag]').nth(1).click();
+  await expect(page.getByLabel('所属主行')).toHaveValue('overlap-0');
+});

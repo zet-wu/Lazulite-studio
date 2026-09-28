@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
-import { createLyricDocument } from '../../domain/lyric-document';
+import { createLine, createLyricDocument } from '../../domain/lyric-document';
 import { EditorWorkspace } from './EditorWorkspace';
 
 afterEach(cleanup);
@@ -51,4 +51,32 @@ it('routes desktop history shortcuts only outside inputs, dialogs and IME compos
   expect(undo).toHaveBeenCalledOnce();
   fireEvent.keyDown(line, { key: 's', metaKey: true });
   expect(onSave).toHaveBeenCalledOnce();
+});
+
+it('rejects an occupied preceding main row without searching farther back or changing selection', () => {
+  const lyric = createLyricDocument();
+  lyric.lines = ['未占用', '前主行', '背景', '源行'].map(text => createLine(text));
+  lyric.lines[2].backgroundOf = lyric.lines[1].id;
+  const apply = vi.fn();
+  render(<MemoryRouter><EditorWorkspace title="背景" document={lyric} selectedLineId={lyric.lines[3].id} apply={apply}
+    undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
+    onSave={() => {}} onDraft={() => {}} onFinal={() => {}} /></MemoryRouter>);
+  expect(screen.getByLabelText('所属主行')).toBeDisabled();
+  fireEvent.click(screen.getByLabelText('背景歌词'));
+  expect(apply).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert')).toHaveTextContent('前一主行已有背景');
+  expect(screen.getByLabelText('背景歌词')).not.toBeChecked();
+  expect(screen.getByText('已选行：源行')).toBeVisible();
+});
+
+it('dispatches exactly one attachment to the nearest main row, skipping background rows', () => {
+  const lyric = createLyricDocument();
+  lyric.lines = ['前行', '背景', '最近主行', '源行'].map(text => createLine(text));
+  lyric.lines[1].backgroundOf = lyric.lines[0].id;
+  const apply = vi.fn();
+  render(<MemoryRouter><EditorWorkspace title="背景" document={lyric} selectedLineId={lyric.lines[3].id} apply={apply}
+    undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
+    onSave={() => {}} onDraft={() => {}} onFinal={() => {}} /></MemoryRouter>);
+  fireEvent.click(screen.getByLabelText('背景歌词'));
+  expect(apply).toHaveBeenCalledExactlyOnceWith({ type: 'set-background-of', lineId: lyric.lines[3].id, parentLineId: lyric.lines[2].id });
 });

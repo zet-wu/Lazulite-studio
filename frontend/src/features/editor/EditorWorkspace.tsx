@@ -84,7 +84,6 @@ export function EditorWorkspace(props: Props) {
   const rubyShortcutSerial = useRef(0);
   const [rubyBaseOpen, setRubyBaseOpen] = useState(false);
   const [rubyBaseReading, setRubyBaseReading] = useState('');
-  const [backgroundTargetId, setBackgroundTargetId] = useState('');
   const [splitLineId, setSplitLineId] = useState<string | null>(null);
   const [contentTransfer, setContentTransfer] = useState<{ trackId: string; contentId: string; targetLineId: string } | null>(null);
   const [rubyGeneration, setRubyGeneration] = useState<{ lineIds: string[]; trackId?: string; contentId?: string } | null>(null);
@@ -137,11 +136,6 @@ export function EditorWorkspace(props: Props) {
   const selectedLine = document.lines.find((line) => line.id === activeLineId) ?? document.lines[0];
   const mainLines = document.lines.filter((line) => !line.backgroundOf);
   const ordinalById = new Map(mainLines.map((line, index) => [line.id, index + 1]));
-  useEffect(() => {
-    if (!selectedLine) return;
-    const preceding = document.lines.slice(0, document.lines.findIndex((line) => line.id === selectedLine.id)).filter((line) => !line.backgroundOf).at(-1);
-    setBackgroundTargetId(selectedLine.backgroundOf ?? preceding?.id ?? mainLines.find((line) => line.id !== selectedLine.id)?.id ?? '');
-  }, [selectedLine?.id]);
   const mainIds = mainLines.map((line) => line.id);
   const selectedMainLines = selectedLine?.backgroundOf ? [] : selection?.kind === 'lines' && selection.ids.length
     ? mainLines.filter((line) => selection.ids.includes(line.id))
@@ -706,11 +700,14 @@ export function EditorWorkspace(props: Props) {
         </>}
         {selection?.kind !== 'lines' || selection.ids.length <= 1 ? <>
           <label><input type="checkbox" checked={Boolean(selectedLine.backgroundOf)} onChange={(event) => {
-            if (event.target.checked && !backgroundTargetId) { setMessage('请先选择所属主行'); return; }
-            dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: event.target.checked ? backgroundTargetId : null });
+            if (!event.target.checked) { dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: null }); return; }
+            const index = document.lines.findIndex(line => line.id === selectedLine.id);
+            const preceding = document.lines.slice(0, index).filter(line => !line.backgroundOf).at(-1);
+            if (!preceding) { setMessage('此行之前没有主行，不能设为背景歌词'); return; }
+            if (document.lines.some(line => line.backgroundOf === preceding.id)) { setMessage('前一主行已有背景歌词，请先处理所属关系'); return; }
+            dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: preceding.id });
           }} /> 背景歌词</label>
-          <label>所属主行 <select value={selectedLine.backgroundOf ?? backgroundTargetId} onChange={(event) => {
-            setBackgroundTargetId(event.target.value);
+          <label>所属主行 <select disabled={!selectedLine.backgroundOf} value={selectedLine.backgroundOf ?? ''} onChange={(event) => {
             if (selectedLine.backgroundOf) dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: event.target.value });
           }}>
             <option value="">请选择</option>{mainLines.filter((line) => line.id !== selectedLine.id && !document.lines.some((item) => item.backgroundOf === line.id && item.id !== selectedLine.id)).map((line) => <option key={line.id} value={line.id}>L{mainLines.indexOf(line) + 1}</option>)}

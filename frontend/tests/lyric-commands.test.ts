@@ -213,3 +213,20 @@ describe('semantic lyric commands', () => {
     expect(state.present).toBe(document);
   });
 });
+
+it.each(['child', 'translation', 'link', 'referenced', 'time'])('P3-05 rejects background %s without modifying document or history', reason => {
+  const document = createLyricDocument('主唱');
+  const main = document.lines[0], source = createLine('源歌词', 'source');
+  main.beginUs = 1_000_000; main.endUs = 10_000_000;
+  source.beginUs = 2_000_000; source.endUs = 3_000_000;
+  document.lines.push(source);
+  if (reason === 'child') document.lines.push({ ...createLine('子背景', 'child'), backgroundOf: source.id });
+  if (reason === 'translation') source.translations.push({ language: 'zh', text: '译文保留' });
+  if (reason === 'link') source.endLink = { targetLineId: main.id, originalEndUs: source.endUs };
+  if (reason === 'referenced') main.endLink = { targetLineId: source.id, originalEndUs: main.endUs };
+  if (reason === 'time') source.endUs = 11_000_000;
+  const snapshot = structuredClone(document), state = createLyricEditorState(document);
+  expect(() => executeLyricCommand(state, { type: 'set-background-of', lineId: source.id, parentLineId: main.id })).toThrow();
+  expect(state.present).toEqual(snapshot);
+  expect(state.past).toHaveLength(0);
+});
