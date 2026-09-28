@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { phase4Ttml } from '../fixtures/phase4';
+import { phase4Ttml, rubyTtml } from '../fixtures/phase4';
 
 for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) {
   test(`P4-01 compact persistent toggle ${theme} ${width}`, async ({ page }) => {
@@ -49,4 +49,38 @@ test('P4-02 playing color is visible on ordinary and true narrow widths', async 
     }
     await page.screenshot({ path: test.info().outputPath(`playing-${theme}.png`) });
   }
+});
+
+test('P4-04/05 grouped skips, manual generation, history and checkpoint with bounded layout', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/editor');
+  await page.locator('input[type=file]').setInputFiles({ name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(rubyTtml()) });
+  const line = page.locator('main section[data-line-id="kana"]');
+  await expect(line.locator('[data-romanization-content-id]')).toBeVisible();
+  const source = await line.locator('[data-romanization-content-id] input').evaluateAll(nodes => nodes.map(n => (n as HTMLInputElement).value));
+  await line.getByText('音译 · ja-Latn').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
+  const skips = dialog.getByLabel('跳过生成');
+  await expect(skips).toHaveCount(3);
+  for (const skip of await skips.all()) {
+    await expect(skip).toBeChecked();
+    expect(await skip.locator('..').evaluate(e => getComputedStyle(e).whiteSpace)).toBe('nowrap');
+  }
+  expect(await dialog.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+  await expect(dialog.getByRole('status')).toContainText('所有单元均跳过');
+  await page.screenshot({ path: test.info().outputPath('ruby-default-skips.png') });
+  await skips.nth(0).uncheck(); await skips.nth(1).uncheck();
+  await dialog.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(2);
+  await expect(line.getByRole('textbox', { name: '读音 か', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '重做', exact: true }).click();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByText('检查点已保存')).toBeVisible();
+  page.once('dialog', dialog => dialog.accept());
+  await page.reload();
+  await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(2);
+  expect(await line.locator('[data-romanization-content-id] input').evaluateAll(nodes => nodes.map(n => (n as HTMLInputElement).value))).toEqual(source);
 });

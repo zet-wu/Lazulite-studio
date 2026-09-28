@@ -10,6 +10,8 @@ export type RubySourceRow = {
 };
 export type RubyProposalRow = RubySourceRow & { wordId: string | null; reading: string | null; conversionIssue: string | null };
 
+export const RUBY_OVERLAP_TOLERANCE_US = 10_000;
+
 const kana = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
 const sourceReading = (text: string) => text.replace(/\s+/gu, '');
 const convert = (value: string, output: RubyOutput) => output === 'roman' ? value : output === 'hiragana' ? toHiragana(value) : toKatakana(value);
@@ -31,9 +33,11 @@ export function rubySourceRows(document: LyricDocument, trackId: string, content
       const ranked = unit.beginUs !== null && unit.endUs !== null && unit.beginUs < unit.endUs
         ? line.words.map((word) => ({ id: word.id, amount: overlap(unit.beginUs!, unit.endUs!, word) })).filter((item) => item.amount > 0).sort((left, right) => right.amount - left.amount)
         : [];
+      const substantial = ranked[0]?.amount > RUBY_OVERLAP_TOLERANCE_US;
+      const candidates = substantial ? ranked.filter(item => item.amount > RUBY_OVERLAP_TOLERANCE_US) : ranked;
       return { key: `${content.id}:${unit.id ?? 'plain'}`, lineId: line.id, trackId, contentId: content.id, unitId: unit.id,
         sourceText: unit.text, beginUs: unit.beginUs, endUs: unit.endUs,
-        candidates: ranked.map((item) => item.id), suggestedWordId: ranked[0]?.id ?? null, defaultWordId: ranked.length === 1 ? ranked[0].id : null };
+        candidates: candidates.map((item) => item.id), suggestedWordId: candidates[0]?.id ?? null, defaultWordId: substantial && candidates.length === 1 ? candidates[0].id : null };
     });
   });
 }
@@ -58,6 +62,27 @@ export function proposeRuby(rows: RubySourceRow[], output: RubyOutput, assignmen
     }
   }
   return proposed;
+}
+
+/** Compare the entire assigned group before filtering skipped rows; manual readings stay explicit. */
+export function defaultRubySkips(document: LyricDocument, rows: RubyProposalRow[], output: RubyOutput, readings: Record<string, string>): Set<string> {
+  const skipped = new Set<string>();
+  if (output === 'roman') return skipped;
+  const targetKana = output === 'hiragana' ? /^[\p{Script=Hiragana}ー]+$/u : /^[\p{Script=Katakana}ー]+$/u;
+  const words = new Map<string, LyricWord>(document.lines.flatMap(line => line.words.map(word => [`${line.id}:${word.id}`, word] as const)));
+  const groups = new Map<string, RubyProposalRow[]>();
+  for (const row of rows) if (row.wordId) {
+    const key = `${row.lineId}:${row.wordId}`;
+    const group = groups.get(key);
+    if (group) group.push(row); else groups.set(key, [row]);
+  }
+  for (const [key, group] of groups) {
+    const text = words.get(key)!.text.normalize('NFC');
+    if (!targetKana.test(text) || group.some(row => row.conversionIssue || !row.reading)) continue;
+    const joined = group.map(row => readings[row.key] ?? row.reading).join('').normalize('NFC');
+    if (joined === text) for (const row of group) if (!Object.hasOwn(readings, row.key)) skipped.add(row.key);
+  }
+  return skipped;
 }
 
 type Envelope = { beginUs: TimeUs; endUs: TimeUs };
