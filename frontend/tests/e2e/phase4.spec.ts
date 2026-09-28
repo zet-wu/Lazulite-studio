@@ -84,3 +84,27 @@ test('P4-04/05 grouped skips, manual generation, history and checkpoint with bou
   await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(2);
   expect(await line.locator('[data-romanization-content-id] input').evaluateAll(nodes => nodes.map(n => (n as HTMLInputElement).value))).toEqual(source);
 });
+
+test('P4-06 wheel zoom keeps clipped edges uneditable and pointercancel leaves no transaction', async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  await page.locator('input[type=file]').last().setInputFiles({ name: 'phase4.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase4Ttml()) });
+  const bar = page.getByRole('button', { name: '时间轴行 L1', exact: true });
+  await expect(bar).toBeVisible();
+  await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 2; e.dispatchEvent(new Event('seeked')); });
+  for (let i = 0; i < 6; i++) await page.getByRole('button', { name: '放大波形' }).click();
+  await expect(bar.getByLabel('时间轴行 L1开始边界')).toHaveCount(0);
+  await expect(bar.getByLabel('时间轴行 L1结束边界')).toBeVisible();
+  const wave = page.getByRole('slider', { name: '波形进度' });
+  const width = (await bar.boundingBox())!.width;
+  await wave.hover();
+  await page.mouse.wheel(0, -100);
+  await expect.poll(async () => (await bar.boundingBox())!.width).toBeGreaterThan(width);
+  const begin = page.getByRole('textbox', { name: '行 ordinary开始秒数', exact: true });
+  const before = await begin.inputValue();
+  const box = (await bar.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 20, box.y + box.height / 2);
+  await bar.dispatchEvent('pointercancel');
+  await page.mouse.up();
+  await expect(begin).toHaveValue(before);
+});

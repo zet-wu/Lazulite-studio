@@ -357,25 +357,39 @@ test('P3-01 canvases rebuild when DPR changes without a CSS resize', async ({ pa
   await cdp.detach();
 });
 
-test('P3-03 narrow blocks preserve true width and expose separated endpoints', async ({ page }) => {
+test('P4-06 narrow blocks use existing zoom then normal endpoints without adding height', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   await page.locator('input[type=file]').last().setInputFiles({ name: 'narrow.ttml', mimeType: 'application/xml', buffer: Buffer.from('<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="narrow" begin="2" end="2.001"><span begin="2" end="2.001">窄</span></p></div></body></tt>') });
   const bar = page.getByRole('button', { name: '时间轴行 L1', exact: true });
   await expect(bar).toBeVisible();
-  expect((await bar.locator('[data-time-color]').boundingBox())?.width ?? 0).toBeLessThan(1);
+  expect((await bar.locator('[data-time-color]').boundingBox())!.width).toBeLessThan(1);
+  const height = (await page.locator('footer').boundingBox())!.height;
   await bar.focus();
-  await page.getByRole('button', { name: '放大选中区间' }).click();
-  const controls = page.getByLabel('选中区间边界');
-  const begin = controls.getByRole('button', { name: '调整开始边界' });
-  const end = controls.getByRole('button', { name: '调整结束边界' });
+  await bar.press('Enter');
+  expect((await page.locator('footer').boundingBox())!.height).toBe(height);
+  await expect(page.getByLabel('选中区间边界')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '放大选中区间' })).toHaveCount(0);
+  await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 2; e.dispatchEvent(new Event('seeked')); });
+  for (let i = 0; i < 14; i++) await page.getByRole('button', { name: '放大波形' }).click();
+  await page.getByLabel('吸附', { exact: true }).uncheck();
+  const begin = bar.getByLabel('时间轴行 L1开始边界');
+  const end = bar.getByLabel('时间轴行 L1结束边界');
+  await expect(begin).toBeVisible(); await expect(end).toBeVisible();
   const a = (await begin.boundingBox())!, b = (await end.boundingBox())!;
-  expect(a.x + a.width).toBeLessThanOrEqual(b.x);
+  expect(a.x + a.width).toBeLessThan(b.x);
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
   await page.mouse.move(a.x + a.width / 2 - 12, a.y + a.height / 2, { steps: 3 });
   await page.keyboard.press('Escape'); await page.mouse.up();
   await expect(page.getByRole('textbox', { name: '行 narrow开始秒数', exact: true })).toHaveValue('2');
-  await page.getByRole('button', { name: '撤销', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: '词 夜の風が静かに吹く', exact: true })).toBeVisible();
+  for (const side of ['开始边界', '结束边界']) {
+    const box = (await bar.getByLabel('时间轴行 L1' + side).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + (side === '开始边界' ? -12 : 12), box.y + box.height / 2, { steps: 3 }); await page.mouse.up();
+    await page.getByRole('button', { name: '撤销', exact: true }).click();
+  }
+  await expect(page.getByRole('textbox', { name: '行 narrow开始秒数', exact: true })).toHaveValue('2');
+  await expect(page.getByRole('textbox', { name: '行 narrow结束秒数', exact: true })).toHaveValue('2.001');
+  await page.screenshot({ path: test.info().outputPath('narrow-existing-zoom.png') });
 });
 
 test('P3-10 rapid panning terminates obsolete worker jobs instead of queuing them', async ({ page }) => {

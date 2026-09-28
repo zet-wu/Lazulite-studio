@@ -2,7 +2,7 @@ export type TimelineViewport = { startUs: number; spanUs: number };
 
 export function clampViewport(view: TimelineViewport, durationUs: number): TimelineViewport {
   if (durationUs <= 0) return { startUs: 0, spanUs: 0 };
-  const spanUs = Math.max(Math.min(durationUs, 1_000_000), Math.min(durationUs, Math.round(view.spanUs)));
+  const spanUs = Math.max(Math.min(durationUs, 10_000), Math.min(durationUs, Math.round(view.spanUs)));
   return { startUs: Math.max(0, Math.min(durationUs - spanUs, Math.round(view.startUs))), spanUs };
 }
 

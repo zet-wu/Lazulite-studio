@@ -126,7 +126,6 @@
 .trackSelected { box-shadow: inset 0 0 0 1px #2d64bc; }
 .trackBar:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 
-.timelineTools > span { max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .trackBar.narrowHit { min-width: 8px; background: transparent; box-shadow: none; }
 .narrowColor { position: absolute; left: 0; top: 0; bottom: 0; background: #a9c5ef; pointer-events: none; }

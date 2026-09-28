@@ -21,7 +21,7 @@ import { TimelineTracks } from './TimelineTracks';
 import { useCanvasMetrics } from './useCanvasMetrics';
 import { SpectrogramCanvas } from './SpectrogramCanvas';
 import { estimateBpm } from '../domain/bpm';
-import { clampViewport, panViewport, waveformRequestWindow, zoomViewport } from '../domain/timeline-viewport';
+import { panViewport, waveformRequestWindow, zoomViewport } from '../domain/timeline-viewport';
 import { captureLoop, emptyLoop, loopRange as activeLoopRange, setLoopA, setLoopB, type LoopState } from '../domain/timeline-loop';
 
 const fmt = (s: number) => {
@@ -578,7 +578,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           <button onClick={tapBpm}>Tap</button><button disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label><small>{bpmStatus || '拖动色块调整；Shift 点击行块选范围并成组移动；词轨空白可框选。'}</small></div>
         <TimelineTracks document={document} selectedLineId={selectedLineId ?? null} selectedRomanization={selectedRomanization ?? null} startUs={startUs} endUs={endUs} positionUs={Math.round(position * 1e6)} bpm={bpm} snap={snap}
           visible={visible}
-          onZoomRange={(begin, end) => { const next = clampViewport({ startUs: begin, spanUs: end - begin }, durationUs); setFollow(false); setStart(next.startUs / 1e6); setSpan(next.spanUs / 1e6); }} apply={onTimelineCommand} onSelectLine={onSelectLine} onPan={(nextStartUs) => { setFollow(false); setStart(panViewport({ startUs: 0, spanUs: Math.round(span * 1e6) }, durationUs, nextStartUs).startUs / 1e6); }} onError={setError} />
+          apply={onTimelineCommand} onSelectLine={onSelectLine} onPan={(nextStartUs) => { setFollow(false); setStart(panViewport({ startUs: 0, spanUs: Math.round(span * 1e6) }, durationUs, nextStartUs).startUs / 1e6); }} onError={setError} />
       </>}
       {visible.spectrum && asset && <SpectrogramCanvas assetIdentity={`${asset.id}:${asset.asset_hash}`} projectId={projectId} startUs={startUs} endUs={endUs} durationUs={durationUs} />}
       </div>

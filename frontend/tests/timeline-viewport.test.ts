@@ -17,3 +17,9 @@ describe('timeline viewport', () => {
       .toEqual(waveformRequestWindow({ startUs: 10_200_000, spanUs: 8_000_000 }, 40_000_000));
   });
 });
+
+it('P4 allows existing zoom to expose millisecond endpoints and clamps at 10ms', () => {
+  const next = zoomViewport({ startUs: 2_000_000, spanUs: 1_000_000 }, 120_000_000, 0.001, 0);
+  expect(next).toEqual({ startUs: 2_000_000, spanUs: 10_000 });
+  expect(zoomViewport({ startUs: 0, spanUs: 5000 }, 5000, 0.5, 0)).toEqual({ startUs: 0, spanUs: 5000 });
+});
