@@ -115,10 +115,11 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
     const narrow = (Math.min(endUs, propsEndUs) - clippedBegin) / spanUs * plotWidth < 16;
     const choose = () => setBoundary({ target, label, beginUs, endUs });
     return <div key={key} data-timeline-key={key}
-      className={`${styles.trackBar} ${active ? styles.trackSelected : ''} ${positionUs >= beginUs && positionUs < endUs ? styles.trackPlaying : ''}`} role="button" tabIndex={0} aria-label={label}
+      className={`${styles.trackBar} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${positionUs >= beginUs && positionUs < endUs ? styles.trackPlaying : ''}`} role="button" tabIndex={0} aria-label={label}
       style={{ left: pct(clippedBegin), width: `${(right - clippedBegin) / spanUs * 100}%`, top: 1 + layout.lanes.get(key)! * 22, height: 20 }}
       onFocus={choose} onPointerDown={(event) => { choose(); begin(event, target, 'move', beginUs); }} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { dragRef.current = null; setDrag(null); }}
       onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); choose(); if (target.kind === 'line') onSelectLine(target.lineId); } }}>
+      {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanUs * plotWidth }} /><span className={styles.narrowMarker} title="窄区间：选中后放大或使用分离边界控件" /></>}
       {!narrow && beginUs >= startUs && <span className={styles.trackHandle} aria-label={`${label}开始边界`} onPointerDown={(event) => begin(event, target, 'beginUs', beginUs)} onPointerMove={move} onPointerUp={finish} />}
       <span className={styles.trackBarText}>{label.replace(/^时间轴(?:行|词|Ruby) /, '')}</span>
       {!narrow && endUs <= propsEndUs && <span className={styles.trackHandle} aria-label={`${label}结束边界`} onPointerDown={(event) => begin(event, target, 'endUs', endUs)} onPointerMove={move} onPointerUp={finish} />}

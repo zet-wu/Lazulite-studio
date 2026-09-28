@@ -351,3 +351,24 @@ test('P3-01 canvases rebuild when DPR changes without a CSS resize', async ({ pa
   }
   await cdp.detach();
 });
+
+test('P3-03 narrow blocks preserve true width and expose separated endpoints', async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  await page.locator('input[type=file]').last().setInputFiles({ name: 'narrow.ttml', mimeType: 'application/xml', buffer: Buffer.from('<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="narrow" begin="2" end="2.001"><span begin="2" end="2.001">窄</span></p></div></body></tt>') });
+  const bar = page.getByRole('button', { name: '时间轴行 L1', exact: true });
+  await expect(bar).toBeVisible();
+  expect((await bar.locator('[data-time-color]').boundingBox())?.width ?? 0).toBeLessThan(1);
+  await bar.focus();
+  await page.getByRole('button', { name: '放大选中区间' }).click();
+  const controls = page.getByLabel('选中区间边界');
+  const begin = controls.getByRole('button', { name: '调整开始边界' });
+  const end = controls.getByRole('button', { name: '调整结束边界' });
+  const a = (await begin.boundingBox())!, b = (await end.boundingBox())!;
+  expect(a.x + a.width).toBeLessThanOrEqual(b.x);
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
+  await page.mouse.move(a.x + a.width / 2 - 12, a.y + a.height / 2, { steps: 3 });
+  await page.keyboard.press('Escape'); await page.mouse.up();
+  await expect(page.getByRole('textbox', { name: '行 narrow开始秒数', exact: true })).toHaveValue('2');
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '词 夜の風が静かに吹く', exact: true })).toBeVisible();
+});
