@@ -12,7 +12,7 @@ type Props = {
 /** Only explicit requests scroll this container. At most two measured corrections. */
 type ListProps = Props & { handled: RefObject<number | null> };
 
-function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate, handled }: ListProps, mountTarget?: (index: number) => void) {
+function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate, handled }: ListProps, mountTarget?: (index: number | null) => void) {
   useEffect(() => {
     if (!locate || handled.current === locate.serial) return;
     handled.current = locate.serial;
@@ -29,13 +29,14 @@ function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate,
       const raw = scroller.scrollTop + row.top - view.top - (row.height >= view.height ? 0 : (view.height - row.height) / 2);
       return Math.max(0, Math.min(scroller.scrollHeight - scroller.clientHeight, raw));
     };
-    const cancel = () => { cancelAnimationFrame(frame); scroller.scrollTo({ top: scroller.scrollTop, behavior: 'instant' }); };
+    const cancel = () => { cancelAnimationFrame(frame); mountTarget?.(null); scroller.scrollTo({ top: scroller.scrollTop, behavior: 'instant' }); };
     const measure = (now: number) => {
       const top = targetTop();
       if (top !== null) {
         stable = Math.abs(top - previous) < 1 ? stable + 1 : 0;
         previous = top;
         if (corrections === 0 && (stable >= 2 || attempts >= 12)) {
+          mountTarget?.(null); // Supersede the virtualizer's coarse index reconciliation.
           scroller.scrollTo({ top, behavior: reduced ? 'instant' : 'smooth' });
           corrections++; settledAt = now + (reduced ? 32 : 650);
         } else if (corrections === 1 && now >= settledAt) {
@@ -77,7 +78,10 @@ function VirtualLyricList(props: ListProps) {
     useFlushSync: false,
   });
   // The stable virtualizer instance owns the coarse mount; smooth scrolling uses measured DOM.
-  const mountTarget = useRef((index: number) => virtualizer.scrollToIndex(index, { align: 'center', behavior: 'auto' })).current;
+  const mountTarget = useRef((index: number | null) => {
+    if (index !== null) virtualizer.scrollToIndex(index, { align: 'center', behavior: 'auto' });
+    else if (scrollRef.current) virtualizer.scrollToOffset(scrollRef.current.scrollTop, { behavior: 'auto' });
+  }).current;
   useLocate(scrollRef, props, mountTarget);
   return <div ref={scrollRef} className={styles.lyricScroller} aria-label="歌词列表"
     onFocus={event => setFocusedLineId((event.target as Element).closest('[data-line-id]')?.getAttribute('data-line-id') ?? null)}
