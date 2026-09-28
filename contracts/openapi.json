@@ -418,7 +418,7 @@
         "parameters": [
           { "$ref": "#/components/parameters/ProjectId" },
           { "name": "start_us", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 0 } },
-          { "name": "end_us", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 }, "description": "Exclusive end, at most 4 seconds after start_us" }
+          { "name": "end_us", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 }, "description": "Exclusive end, at most 4,020,000 microseconds after start_us (including FFT context)" }
         ],
         "responses": {
           "200": {

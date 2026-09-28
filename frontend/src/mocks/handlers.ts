@@ -37,9 +37,9 @@ export const handlers = [
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
     const query = new URL(request.url).searchParams;
     const start = Number(query.get('start_us') ?? 0), end = Number(query.get('end_us') ?? 0);
-    if (end <= start || end - start > 4_000_000) return error(422, 'invalid_range', 'PCM 范围无效');
-    const rate = 16_000;
-    const pcm = Int16Array.from({ length: Math.ceil((end - start) / 1_000_000 * rate) }, (_, index) => Math.round(Math.sin(2 * Math.PI * 440 * index / rate) * 9000));
+    if (end <= start || end - start > 4_020_000) return error(422, 'invalid_range', 'PCM 范围无效');
+    const rate = 48_000;
+    const pcm = Int16Array.from({ length: Math.round(end / 1_000_000 * rate) - Math.round(start / 1_000_000 * rate) }, (_, index) => Math.round(Math.sin(2 * Math.PI * 440 * (index + Math.round(start / 1_000_000 * rate)) / rate) * 9000));
     return new HttpResponse(pcm.buffer, { headers: { 'content-type': 'application/octet-stream', 'x-sample-rate': String(rate), 'x-channels': '1' } });
   }),
   http.get(`${root}/projects/:projectId/reading-dictionary`, ({ params }) => params.projectId === 'sample-project' ? response(readingDictionary) : error(404, 'project_not_found', '项目不存在')),

@@ -1387,7 +1387,7 @@ export interface operations {
         parameters: {
             query: {
                 start_us: number;
-                /** @description Exclusive end, at most 4 seconds after start_us */
+                /** @description Exclusive end, at most 4,020,000 microseconds after start_us (including FFT context) */
                 end_us: number;
             };
             header?: never;

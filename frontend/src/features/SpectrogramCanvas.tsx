@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { studioApi } from '../adapters/http/client';
-import { SPECTRUM_HEIGHT, SPECTRUM_WIDTH } from '../domain/spectrogram';
+import { SPECTRUM_HEIGHT, SPECTRUM_WIDTH, spectrumWindow, type SpectrumWindow } from '../domain/spectrogram';
 import styles from './media.module.css';
 
 const WINDOW_US = 4_000_000;
-type Tile = { startUs: number; pixels: Uint8Array };
+type Tile = { startUs: number; endUs: number; pixels: Uint8Array };
 
 export function SpectrogramCanvas({ projectId, startUs, endUs, durationUs }: { projectId: string; startUs: number; endUs: number; durationUs: number }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -22,8 +22,9 @@ export function SpectrogramCanvas({ projectId, startUs, endUs, durationUs }: { p
     cache.current.clear(); pending.current.clear();
     const processor = new Worker(new URL('./spectrogram.worker.ts', import.meta.url), { type: 'module' });
     worker.current = processor;
-    processor.onmessage = (event: MessageEvent<{ id: number; pixels: Uint8Array }>) => {
-      cache.current.set(event.data.id, { startUs: event.data.id, pixels: event.data.pixels });
+    processor.onmessage = (event: MessageEvent<{ id: number; token: number; window: SpectrumWindow; pixels: Uint8Array; error?: string }>) => {
+      if (event.data.error) { setError(event.data.error); pending.current.delete(event.data.id); return; }
+      cache.current.set(event.data.id, { startUs: event.data.id, endUs: event.data.window.coreEndUs, pixels: event.data.pixels });
       pending.current.delete(event.data.id);
       setRevision((value) => value + 1);
     };
@@ -39,8 +40,9 @@ export function SpectrogramCanvas({ projectId, startUs, endUs, durationUs }: { p
       const end = Math.min(first + WINDOW_US, durationUs);
       pending.current.add(first);
       requested.push(first);
-      void studioApi.getPcmWindow(projectId, first, end, controller.signal).then(({ pcm, rate, channels }) => {
-        worker.current?.postMessage({ id: first, pcm, rate, channels }, [pcm]);
+      const window = spectrumWindow(first, end, durationUs);
+      void studioApi.getPcmWindow(projectId, window.requestStartUs, window.requestEndUs, controller.signal).then(({ pcm, rate, channels }) => {
+        worker.current?.postMessage({ id: first, token: first, pcm, rate, channels, window }, [pcm]);
       }).catch((cause) => {
         pending.current.delete(first);
         if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '声谱图片段加载失败');
@@ -60,10 +62,10 @@ export function SpectrogramCanvas({ projectId, startUs, endUs, durationUs }: { p
     element.height = Math.round(72 * ratio);
     const context = element.getContext('2d');
     if (!context) return;
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    context.fillStyle = '#101622'; context.fillRect(0, 0, width, 72);
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.fillStyle = '#101622'; context.fillRect(0, 0, element.width, element.height);
     for (const tile of cache.current.values()) {
-      if (tile.startUs + WINDOW_US < startUs || tile.startUs > endUs) continue;
+      if (tile.endUs < startUs || tile.startUs > endUs) continue;
       const image = context.createImageData(SPECTRUM_WIDTH, SPECTRUM_HEIGHT);
       for (let index = 0; index < tile.pixels.length; index++) {
         const value = tile.pixels[index] / 255;
@@ -74,8 +76,9 @@ export function SpectrogramCanvas({ projectId, startUs, endUs, durationUs }: { p
       }
       const offscreen = document.createElement('canvas'); offscreen.width = SPECTRUM_WIDTH; offscreen.height = SPECTRUM_HEIGHT;
       offscreen.getContext('2d')!.putImageData(image, 0, 0);
-      const x = (tile.startUs - startUs) / (endUs - startUs) * width;
-      context.drawImage(offscreen, x, 0, WINDOW_US / (endUs - startUs) * width, 72);
+      const left = Math.round((tile.startUs - startUs) / (endUs - startUs) * element.width);
+      const right = Math.round((tile.endUs - startUs) / (endUs - startUs) * element.width);
+      context.drawImage(offscreen, left, 0, right - left, element.height);
     }
   }, [endUs, revision, startUs, visible, width]);
 

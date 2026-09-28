@@ -165,8 +165,8 @@ class MediaService:
         return Proxy(target, "audio/wav", asset.probe.start_us, 0, duration_us)
 
     def pcm_window(self, asset: Asset, *, start_us: int, end_us: int) -> tuple[bytes, int, int]:
-        """Read at most four seconds from the existing PCM proxy for viewport analysis."""
-        if start_us < 0 or end_us <= start_us or end_us - start_us > 4_000_000:
+        """Read at most 4.02 seconds from the PCM proxy, including FFT context."""
+        if start_us < 0 or end_us <= start_us or end_us - start_us > 4_020_000:
             raise MediaError("invalid PCM window")
         proxy = self.playback_proxy(asset)
         with wave.open(str(proxy.path), "rb") as audio:

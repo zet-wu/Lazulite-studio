@@ -465,6 +465,7 @@ def create_app(
 
     @api.get("/projects/{pid}/pcm")
     def pcm_window(pid: str, start_us: int, end_us: int, _: object = Depends(auth)):
+        """Read a PCM proxy window of at most 4,020,000 microseconds (FFT context included)."""
         _, row = asset_for(pid)
         if not row:
             fail("audio_not_found", "audio not found", 404)

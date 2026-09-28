@@ -1,6 +1,22 @@
 export const SPECTRUM_WIDTH = 96;
 export const SPECTRUM_HEIGHT = 48;
-const SIZE = 512;
+export const FFT_SIZE = 512;
+const SIZE = FFT_SIZE;
+export const SPECTRUM_WINDOW_US = 4_000_000;
+export const PROXY_SAMPLE_RATE = 48_000;
+export type SpectrumWindow = { coreStartUs: number; coreEndUs: number; requestStartUs: number; requestEndUs: number; durationUs: number };
+
+// Nearest integer microsecond lies within 0.024 sample of a 48kHz frame,
+// avoiding the Python round / JS Math.round half-sample disagreement.
+export const sampleTimestamp = (frame: number) => Math.round(frame * 1e6 / PROXY_SAMPLE_RATE);
+export function spectrumWindow(coreStartUs: number, coreEndUs: number, durationUs: number): SpectrumWindow {
+  const first = Math.round(coreStartUs * PROXY_SAMPLE_RATE / 1e6);
+  const last = Math.round(coreEndUs * PROXY_SAMPLE_RATE / 1e6);
+  return { coreStartUs, coreEndUs, durationUs,
+    requestStartUs: sampleTimestamp(Math.max(0, first - SIZE / 2)),
+    requestEndUs: Math.min(durationUs, sampleTimestamp(last + SIZE / 2)),
+  };
+}
 
 function fft(real: Float32Array, imaginary: Float32Array) {
   for (let index = 1, reversed = 0; index < SIZE; index++) {
@@ -26,19 +42,26 @@ function fft(real: Float32Array, imaginary: Float32Array) {
 }
 
 /** Returns logarithmic frequency bins, low frequencies at the bottom. */
-export function computeSpectrogram(pcm: Int16Array, rate: number, channels: number): Uint8Array {
+export function computeSpectrogram(pcm: Int16Array, rate: number, channels: number, window?: SpectrumWindow): Uint8Array {
   if (!Number.isSafeInteger(rate) || rate < 1000 || !Number.isSafeInteger(channels) || channels < 1 || channels > 8) throw new Error('Invalid PCM format');
   const frames = Math.floor(pcm.length / channels);
   const output = new Uint8Array(SPECTRUM_WIDTH * SPECTRUM_HEIGHT);
-  if (frames < SIZE) return output;
+  if (!frames) return output;
+  if (window && rate !== PROXY_SAMPLE_RATE) throw new Error('PCM代理采样率必须为48kHz');
+  const requestFirst = window ? Math.round(window.requestStartUs * rate / 1e6) : 0;
+  const coreFirst = window ? Math.round(window.coreStartUs * rate / 1e6) : 0;
+  const coreLast = window ? Math.round(window.coreEndUs * rate / 1e6) : frames;
+  const mediaLast = window ? Math.round(window.durationUs * rate / 1e6) : frames;
   const real = new Float32Array(SIZE), imaginary = new Float32Array(SIZE);
   const high = Math.min(8000, rate / 2);
   for (let column = 0; column < SPECTRUM_WIDTH; column++) {
-    const center = Math.round((column + 0.5) / SPECTRUM_WIDTH * frames);
+    const center = coreFirst + Math.round((column + 0.5) / SPECTRUM_WIDTH * (coreLast - coreFirst)) - requestFirst;
     for (let index = 0; index < SIZE; index++) {
-      const frame = Math.max(0, Math.min(frames - 1, center + index - SIZE / 2));
+      const frame = center + index - SIZE / 2;
+      const absolute = frame + requestFirst;
+      if ((frame < 0 || frame >= frames) && absolute >= 0 && absolute < mediaLast) throw new Error('PCM窗口缺少FFT上下文');
       let sample = 0;
-      for (let channel = 0; channel < channels; channel++) sample += pcm[frame * channels + channel] / 32768;
+      if (frame >= 0 && frame < frames) for (let channel = 0; channel < channels; channel++) sample += pcm[frame * channels + channel] / 32768;
       real[index] = sample / channels * (0.5 - 0.5 * Math.cos(2 * Math.PI * index / (SIZE - 1)));
       imaginary[index] = 0;
     }
