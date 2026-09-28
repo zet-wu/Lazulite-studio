@@ -80,6 +80,11 @@ for (const kind of ['行', '词', 'Ruby']) test(`P3-03 edits each overlapping ${
   await expect(bars).toHaveCount(4);
   const first = (await bars.nth(0).boundingBox())!, second = (await bars.nth(1).boundingBox())!;
   expect(Math.abs(first.y - second.y)).toBeGreaterThanOrEqual(22);
+  const lane = (await bars.first().locator('..').boundingBox())!;
+  for (const bar of await bars.all()) {
+    const box = (await bar.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(lane.y + lane.height);
+  }
   for (let i = 0; i < 3; i++) {
     const bar = bars.nth(i);
     for (const side of ['move', '开始边界', '结束边界']) {
