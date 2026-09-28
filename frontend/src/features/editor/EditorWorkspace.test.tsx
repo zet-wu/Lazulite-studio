@@ -4,7 +4,9 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { createLine, createLyricDocument } from '../../domain/lyric-document';
 import { EditorWorkspace } from './EditorWorkspace';
 
-afterEach(cleanup);
+vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+
+afterEach(() => { cleanup(); localStorage.clear(); });
 
 it('selects Ruby independently and opens its card menu while leaving input context native', () => {
   const lyric = createLyricDocument('歌');

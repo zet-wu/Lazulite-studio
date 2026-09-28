@@ -183,3 +183,50 @@ test('P3-05 attaches, rebinds, detaches and restores a stable background relatio
   await page.locator('[data-outline-drag]').nth(1).click();
   await expect(page.getByLabel('所属主行')).toHaveValue('overlap-0');
 });
+
+test('P3-06 columns resize independently, cancel, reset and persist outside lyric history', async ({ page }) => {
+  await page.goto('/editor');
+  const outline = page.getByRole('separator', { name: '大纲宽度' });
+  const inspector = page.getByRole('separator', { name: '属性栏宽度' });
+  await outline.focus(); await page.keyboard.press('ArrowRight');
+  await expect(outline).toHaveAttribute('aria-valuenow', '198');
+  await inspector.focus(); await page.keyboard.press('Shift+ArrowLeft');
+  await expect(inspector).toHaveAttribute('aria-valuenow', '282');
+  const saved = await page.evaluate(() => localStorage.getItem('lazulite-editor-columns'));
+  const box = (await outline.boundingBox())!;
+  await page.mouse.move(box.x + 3, box.y + 20); await page.mouse.down();
+  await page.mouse.move(box.x + 60, box.y + 20);
+  expect(await page.evaluate(() => localStorage.getItem('lazulite-editor-columns'))).toBe(saved);
+  await page.keyboard.press('Escape'); await page.mouse.up();
+  await expect(outline).toHaveAttribute('aria-valuenow', '198');
+  await outline.dblclick();
+  await expect(outline).toHaveAttribute('aria-valuenow', '190');
+  let separators = 2;
+  for (const [name, expected] of [['显示大纲', 1], ['显示属性栏', 0], ['显示大纲', 1], ['显示属性栏', 2]] as const) {
+    const view = page.locator('summary').filter({ hasText: '视图' });
+    if (await view.locator('..').getAttribute('open') === null) await view.click();
+    await page.getByRole('button', { name, exact: true }).click();
+    await expect(page.getByRole('separator')).toHaveCount(expected);
+  }
+  await expect(page.getByRole('separator')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByText('已保存', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(inspector).toHaveAttribute('aria-valuenow', '282');
+  await page.setViewportSize({ width: 900, height: 800 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  expect(JSON.parse((await page.evaluate(() => localStorage.getItem('lazulite-editor-columns')))!).inspectorWidth).toBe(282);
+});
+
+
+test('P3-04 inspector remains usable at its 200px minimum with long text', async ({ page }) => {
+  await page.goto('/editor');
+  await page.locator('input[type=file]').setInputFiles({ name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
+  const separator = page.getByRole('separator', { name: '属性栏宽度' });
+  await separator.focus();
+  for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowRight');
+  await expect(separator).toHaveAttribute('aria-valuenow', '200');
+  const inspector = page.locator('aside').filter({ has: page.getByRole('heading', { name: '属性', exact: true }) });
+  expect(await inspector.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: test.info().outputPath('inspector-minimum.png') });
+});

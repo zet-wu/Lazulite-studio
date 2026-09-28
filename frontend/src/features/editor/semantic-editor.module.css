@@ -21,8 +21,6 @@
 .ribbonMenu summary { cursor: pointer; list-style: none; border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; }
 .ribbonMenu > div { position: absolute; top: 100%; left: 0; z-index: 12; display: grid; min-width: 190px; padding: 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); box-shadow: 0 5px 16px #0003; }
 .layout { flex: 1; display: grid; grid-template-columns: 190px minmax(0,1fr) 250px; min-width: 0; min-height: 0; overflow: hidden; }
-.simpleLayout { grid-template-columns: minmax(0, 1fr); }
-.simpleLayout .outline, .simpleLayout .inspector { display: none; }
 .outline, .inspector { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--panel); padding: 12px; border-right: 1px solid var(--line); }
 .inspector { border-right: 0; border-left: 1px solid var(--line); }
 .outline h2, .inspector h2 { font-size: 14px; margin: 5px 0 12px; }
@@ -166,3 +164,6 @@
 .inspector .times input { flex: 1; width: 7ch; }
 .inspector label:has(input[type="checkbox"]) { display: inline-flex; align-items: center; gap: 5px; }
 .inspector input[type="checkbox"] { width: auto; flex: none; margin: 0; }
+.columnSeparator { cursor: col-resize; background: var(--line); touch-action: none; }
+.columnSeparator:hover, .columnSeparator:focus-visible { background: var(--blue); outline: none; }
+.canvasHeader { flex-wrap: wrap; gap: 6px; }

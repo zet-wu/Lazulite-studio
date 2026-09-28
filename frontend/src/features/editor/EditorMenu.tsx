@@ -14,8 +14,10 @@ type Props = {
   onSave: () => void;
   undo: () => void;
   redo: () => void;
-  simpleLayout: boolean;
-  onToggleLayout: () => void;
+  outlineVisible: boolean;
+  inspectorVisible: boolean;
+  onToggleOutline: () => void;
+  onToggleInspector: () => void;
   onDraft: () => void;
   onFinal: () => void;
   onExportFormat?: (format: LyricFormat) => void;
@@ -54,7 +56,8 @@ export function EditorMenu(props: Props) {
       <button onClick={props.undo} disabled={!props.canUndo}>撤销</button>
       <button onClick={props.redo} disabled={!props.canRedo}>重做</button>
       <details className={styles.settingsMenu}><summary>视图</summary><div>
-        <button onClick={props.onToggleLayout}>{props.simpleLayout ? '高级布局' : '简单布局'}</button>
+        <button aria-pressed={props.outlineVisible} onClick={props.onToggleOutline}>显示大纲</button>
+        <button aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}>显示属性栏</button>
         <button onClick={() => setDark((value) => !value)}>{dark ? '日间模式' : '夜间模式'}</button>
       </div></details>
       <details className={styles.settingsMenu}><summary>设置</summary><div>

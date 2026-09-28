@@ -8,6 +8,8 @@ import { LyricList } from './LyricList';
 import { LyricLine as LyricLineView } from './LyricLine';
 import { LyricWord as LyricWordView } from './LyricWord';
 import { DraftInput, TimePair } from './EditorFields';
+import { ColumnSeparator } from './ColumnSeparator';
+import { COLUMN_LIMITS, COLUMN_STORAGE, readColumnPreferences, renderedColumns, type ColumnPreferences, type ColumnSide } from './column-preferences';
 import { EditorMenu } from './EditorMenu';
 import { EditorRibbon } from './EditorRibbon';
 import { SegmentationPanel } from './SegmentationPanel';
@@ -72,8 +74,31 @@ export function EditorWorkspace(props: Props) {
   const pointerDrag = useRef<{ source: DragSource; pointerId: number; x: number; y: number; started: boolean; target: string | null } | null>(null);
   const draggedClick = useRef(false);
   const wordInputs = useRef(new Map<string, HTMLInputElement>());
-  const [simpleLayout, setSimpleLayout] = useState(false);
   const [mode, setMode] = useState<'edit' | 'sync' | 'preview' | 'auxiliary'>('edit');
+  const [columns, setColumns] = useState(readColumnPreferences);
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const outlineRef = useRef<HTMLElement>(null), inspectorRef = useRef<HTMLElement>(null), mainRef = useRef<HTMLElement>(null);
+  const [layoutWidth, setLayoutWidth] = useState(1280);
+  useEffect(() => {
+    const element = layoutRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => setLayoutWidth(element.clientWidth));
+    observer.observe(element); return () => observer.disconnect();
+  }, [mode]);
+  const commitColumns = (next: ColumnPreferences) => { setColumns(next); localStorage.setItem(COLUMN_STORAGE, JSON.stringify(next)); };
+  const toggleColumn = (side: ColumnSide) => {
+    const pane = side === 'outline' ? outlineRef.current : inspectorRef.current;
+    if (pane?.contains(pane.ownerDocument.activeElement)) mainRef.current?.focus();
+    commitColumns({ ...columns, [`${side}Visible`]: !columns[`${side}Visible`] });
+  };
+  const rendered = renderedColumns(columns, layoutWidth);
+  const separator = (side: ColumnSide) => {
+    const other = side === 'outline' ? 'inspector' : 'outline';
+    const maximum = Math.max(COLUMN_LIMITS[side].min, Math.min(COLUMN_LIMITS[side].max, layoutWidth - rendered[other] - (Number(columns.outlineVisible) + Number(columns.inspectorVisible)) * 6 - 480));
+    return <ColumnSeparator side={side} width={rendered[side]} preferredWidth={columns[`${side}Width`]} maximum={maximum}
+      onChange={width => setColumns(current => ({ ...current, [`${side}Width`]: width }))}
+      onCommit={width => commitColumns({ ...columns, [`${side}Width`]: width })} />;
+  };
   const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [message, setMessage] = useState('');
@@ -636,7 +661,7 @@ export function EditorWorkspace(props: Props) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
     if (event.key === 'Escape') { event.preventDefault(); pointerDrag.current = null; setDropTarget(null); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
-    <EditorMenu {...props} simpleLayout={simpleLayout} onToggleLayout={() => setSimpleLayout((value) => !value)} onMetadata={() => setSettingsDialog('metadata')} onSingers={() => setSettingsDialog('singers')} />
+    <EditorMenu {...props} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} onMetadata={() => setSettingsDialog('metadata')} onSingers={() => setSettingsDialog('singers')} />
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
     <nav className={styles.modeTabs} aria-label="工作模式"><button aria-current={mode === 'edit' ? 'page' : undefined} onClick={() => setMode('edit')}>编辑</button><button aria-current={mode === 'sync' ? 'page' : undefined} onClick={() => setMode('sync')}>打轴</button><button aria-current={mode === 'preview' ? 'page' : undefined} onClick={() => setMode('preview')}>预览</button><button aria-current={mode === 'auxiliary' ? 'page' : undefined} onClick={() => setMode('auxiliary')}>项目辅助</button></nav>
     {mode === 'auxiliary' && <section className={styles.auxiliaryPlaceholder}><h1>项目辅助</h1><p>候选、任务、词典与审核流程将在后续阶段整理到此处。歌词文档与播放器保持当前状态。</p></section>}
@@ -653,15 +678,15 @@ export function EditorWorkspace(props: Props) {
       canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)}
       canGenerateRuby={selectedMainLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
       openRubyGeneration={() => setRubyGeneration({ lineIds: selectedMainLines.map((line) => line.id) })} />}
-    {(mode === 'edit' || mode === 'sync') && <div className={`${styles.layout} ${simpleLayout ? styles.simpleLayout : ''}`}><aside className={styles.outline}><h2>大纲</h2>
+    {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: `${columns.outlineVisible ? `${rendered.outline}px 6px ` : ''}minmax(0, 1fr)${columns.inspectorVisible ? ` 6px ${rendered.inspector}px` : ''}` }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline}><h2>大纲</h2>
       {document.lines.map((line) => <div className={styles.outlineRow} data-line-id={line.id} key={line.id}>
         <button data-outline-drag className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
           onClick={(event) => { selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); requestLocate(line.id); }}>
           L{ordinalById.get(line.backgroundOf ?? line.id)} {line.backgroundOf ? '· 背景 ' : '· '}{lineText(line) || '空行'}
         </button>
       </div>)}
-    </aside>
-      <main className={styles.canvas}><div className={styles.canvasHeader}><h1>歌词编辑</h1><div><button onClick={() => setSettingsDialog('tracks')}>管理音译轨道</button><button onClick={() => dispatch({ type: 'insert-line', afterLineId: document.lines.at(-1)?.id ?? null })}>新增歌词行</button></div></div>
+    </aside>}{columns.outlineVisible && separator('outline')}
+      <main ref={mainRef} tabIndex={-1} className={styles.canvas}><div className={styles.canvasHeader}><h1>歌词编辑</h1><div><button onClick={() => setSettingsDialog('tracks')}>管理音译轨道</button><button onClick={() => dispatch({ type: 'insert-line', afterLineId: document.lines.at(-1)?.id ?? null })}>新增歌词行</button></div></div>
         <LyricList lines={document.lines} locate={locate} renderLine={(line) => <LyricLineView key={line.id} line={line}
           selected={selection ? selection.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) : selection.kind === 'words' ? line.words.some((word) => selection.ids.includes(word.id)) : line.id === selection.lineId : selectedLine?.id === line.id}
           playhead={props.playheadLineId === line.id} dropTarget={dropTarget === `line:${line.id}`}
@@ -688,7 +713,7 @@ export function EditorWorkspace(props: Props) {
           </div>}
         </LyricLineView>} />
       </main>
-      <aside className={styles.inspector}><h2>属性</h2>{selectedLine && <>
+      {columns.inspectorVisible && separator('inspector')}{columns.inspectorVisible && <aside ref={inspectorRef} className={styles.inspector}><h2>属性</h2>{selectedLine && <>
         <p>已选行：{selection?.kind === 'lines' && selection.ids.length > 1 ? `${selection.ids.length} 行` : lineText(selectedLine) || '空行'}</p>
         <TimePair begin={selectedLine.beginUs} end={selectedLine.endUs} label={`行 ${selectedLine.id}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginUs, endUs })} />
         {selectedMainLines.length > 0 && <>
@@ -715,7 +740,7 @@ export function EditorWorkspace(props: Props) {
           {selectedLine.backgroundOf && <p>歌手继承自所属主行：{document.lines.find((line) => line.id === selectedLine.backgroundOf)?.agentRefs.map((id) => document.agents.find((agent) => agent.id === id)?.name ?? id).join('、') || '未指定'}</p>}
         </> : null}
       </>}
-      </aside></div>}
+      </aside>}</div>}
     {settingsDialog === 'metadata' && <SettingsDialog title="元数据编辑" close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} /></SettingsDialog>}
     {settingsDialog === 'singers' && <SingerDialog document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'tracks' && <SettingsDialog title="音译轨道管理" close={() => setSettingsDialog(null)}><div className={styles.trackManager}>
