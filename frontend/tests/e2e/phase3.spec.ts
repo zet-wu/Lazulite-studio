@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { timelineTtml, listText, overlapTtml } from '../fixtures/phase3';
+import { timelineTtml, listText, overlapTtml, performanceTtml } from '../fixtures/phase3';
 
 test('P3-01 uses the same physical plot for waveform and lyric tracks', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
@@ -414,4 +414,45 @@ test('P3-10 rapid panning terminates obsolete worker jobs instead of queuing the
   expect(await page.evaluate(() => (window as unknown as { workerCounts: { peak: number } }).workerCounts.peak)).toBeLessThanOrEqual(2);
   const spectrum = page.locator('[data-spectrum-ready]');
   await expect.poll(async () => (await spectrum.getAttribute('data-spectrum-ready')) === (await spectrum.getAttribute('data-spectrum-wanted'))).toBe(true);
+});
+
+for (const count of [80, 83]) test(`P3-07 variable Ruby/transliteration height and background locate ${count} rows`, async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, recordVideo: { dir: test.info().outputPath('locate-video') } });
+  const page = await context.newPage();
+  await page.goto('http://127.0.0.1:5174/editor');
+  const bg = count - 1, parent = count - 2;
+  let xml = performanceTtml(count).replace(new RegExp(`<text for="p${bg}">[\\s\\S]*?</text>`), '');
+  xml = xml.replace(`<p xml:id="p${parent}" begin="${(parent * .3).toFixed(3)}" end="${(parent * .3 + .29).toFixed(3)}">`, `<p xml:id="p${parent}" begin="${(parent * .3).toFixed(3)}" end="${(bg * .3 + .29).toFixed(3)}">`);
+  xml = xml.replace('</transliteration>', `${Array.from({ length: 12 }, (_, i) => `<text for="p40">合成变高附属${i}</text>`).join('')}</transliteration>`);
+  await page.locator('input[type=file]').setInputFiles({ name: 'variable.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  const outline = page.locator('[data-outline-drag]');
+  await expect(outline).toHaveCount(count);
+  await outline.last().click(); await page.getByLabel('背景歌词', { exact: true }).check();
+  await expect(page.getByLabel('背景歌词', { exact: true })).toBeChecked();
+  const scroller = page.getByLabel('歌词列表');
+  await outline.first().click();
+  await expect.poll(() => scroller.evaluate(e => e.scrollTop)).toBeLessThan(2);
+  await outline.nth(40).click();
+  const tall = page.locator('main section[data-line-id="p40"]');
+  await expect(tall).toBeVisible();
+  expect((await tall.boundingBox())!.height).toBeGreaterThan((await scroller.boundingBox())!.height);
+  await expect.poll(async () => Math.abs((await tall.boundingBox())!.y - (await scroller.boundingBox())!.y)).toBeLessThan(3);
+  await expect(outline.nth(40)).toBeFocused();
+  await outline.nth(60).click();
+  const middle = page.locator('main section[data-line-id="p60"]');
+  await expect(middle).toBeVisible();
+  expect((await middle.boundingBox())!.height).toBeLessThan((await scroller.boundingBox())!.height);
+  await expect.poll(async () => {
+    const r = (await middle.boundingBox())!, v = (await scroller.boundingBox())!;
+    return Math.abs(r.y + r.height / 2 - v.y - v.height / 2);
+  }).toBeLessThan(3);
+  await outline.last().click();
+  const background = page.locator(`main section[data-line-id="p${bg}"]`);
+  await expect(background).toBeVisible();
+  await expect.poll(() => scroller.evaluate(e => Math.abs(e.scrollHeight - e.clientHeight - e.scrollTop))).toBeLessThan(3);
+  await expect(outline.last()).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await page.screenshot({ path: test.info().outputPath(`background-locate-${count}.png`) });
+  await context.close();
+  await page.video()!.saveAs(test.info().outputPath(`variable-locate-${count}.webm`));
 });
