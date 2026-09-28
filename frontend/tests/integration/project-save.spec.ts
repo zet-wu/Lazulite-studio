@@ -1,0 +1,30 @@
+import { expect, test } from '@playwright/test';
+
+test('generates Ruby, saves through FastAPI and reopens the complete current draft', async ({ page }) => {
+  await page.goto('/projects/phase2/edit');
+  const line = page.locator('main section[data-line-id="line-a"]');
+  await expect(line.getByRole('textbox', { name: '词 二人', exact: true })).toBeVisible();
+  const content = line.locator('[data-romanization-content-id]').first();
+  const source = await content.locator('input').evaluateAll((items) => items.map((item) => (item as HTMLInputElement).value));
+  await content.getByText('音译 · ja-Latn').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
+  await dialog.getByLabel('确认同时扩展上述词/行时间').check();
+  await dialog.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await expect(line.getByRole('textbox', { name: '读音 二人', exact: true })).toHaveCount(3);
+  const savedResponse = page.waitForResponse((response) => response.url().endsWith('/api/v1/projects/phase2/document') && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  expect((await savedResponse).status()).toBe(200);
+  await expect(page.getByText('已保存', { exact: true })).toBeVisible();
+  const saved = await (await page.request.get('/api/v1/projects/phase2/document')).json();
+  expect(saved.document.ttml).toContain('urn:lazulite:studio:draft');
+  await page.reload();
+  await expect(line.getByRole('textbox', { name: '读音 二人', exact: true })).toHaveCount(3);
+  expect(await line.getByRole('textbox', { name: '读音 二人', exact: true }).evaluateAll((items) => items.map((item) => (item as HTMLInputElement).value))).toEqual(['ふ', 'た', 'り']);
+  await expect(line.locator('[data-romanization-content-id]')).toHaveCount(3);
+  expect(await content.locator('input').evaluateAll((items) => items.map((item) => (item as HTMLInputElement).value))).toEqual(source);
+  await expect(page.getByRole('textbox', { name: '行 line-a开始秒数' })).toHaveValue('0.999');
+  const reopened = await (await page.request.get('/api/v1/projects/phase2/document')).json();
+  expect(reopened.revision).toBe(saved.revision);
+  expect(reopened.document.ttml).toBe(saved.document.ttml);
+});
