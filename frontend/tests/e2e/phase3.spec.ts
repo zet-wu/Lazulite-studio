@@ -230,3 +230,55 @@ test('P3-04 inspector remains usable at its 200px minimum with long text', async
   expect(await inspector.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: test.info().outputPath('inspector-minimum.png') });
 });
+
+test('P3-08 top menus are mutually exclusive and dismiss with pointer, outside, command and Escape', async ({ page }) => {
+  await page.goto('/editor');
+  const menu = (id: string) => page.locator(`[data-top-menu="${id}"]`);
+  await menu('clipboard').locator('summary').click();
+  await expect(menu('clipboard')).toHaveAttribute('open', '');
+  await menu('tools').locator('summary').click();
+  await expect(page.locator('[data-top-menu][open]')).toHaveCount(1);
+  await expect(menu('clipboard')).not.toHaveAttribute('open');
+  const trigger = (await menu('tools').locator('summary').boundingBox())!;
+  await page.mouse.move(trigger.x + 10, trigger.y + trigger.height + 3);
+  await page.waitForTimeout(80);
+  await page.mouse.move(trigger.x + 10, trigger.y + 10);
+  await expect(menu('tools')).toHaveAttribute('open', '');
+  await page.mouse.move(2, 2);
+  await expect(menu('tools')).not.toHaveAttribute('open');
+  await menu('file').locator('summary').click();
+  await page.getByLabel('导出格式').focus();
+  await page.getByLabel('导出格式').selectOption('txt');
+  await page.mouse.move(2, 2); await page.waitForTimeout(250);
+  await expect(menu('file')).toHaveAttribute('open', ''); // select retains keyboard focus
+  await page.keyboard.press('Escape');
+  await expect(menu('file')).not.toHaveAttribute('open');
+  await expect(menu('file').locator('summary')).toBeFocused();
+  await menu('settings').locator('summary').click();
+  await page.getByRole('button', { name: '元数据编辑' }).click();
+  await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
+  await page.getByRole('button', { name: '关闭元数据编辑' }).click();
+  await menu('view').locator('summary').click();
+  await page.getByRole('heading', { name: '歌词编辑' }).click();
+  await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
+});
+
+test('P3-08 file input survives cancellation, same-file reselection and format export', async ({ page }) => {
+  await page.goto('/editor');
+  const summary = page.locator('[data-top-menu="file"] summary');
+  await summary.click();
+  await page.locator('input[type=file]').dispatchEvent('cancel');
+  await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
+  for (let i = 0; i < 2; i++) {
+    await page.locator('input[type=file]').setInputFiles({ name: 'same.txt', mimeType: 'text/plain', buffer: Buffer.from('合成歌词') });
+    await expect(page.getByRole('textbox', { name: '词 合成歌词', exact: true })).toBeVisible();
+    expect(await page.locator('input[type=file]').inputValue()).toBe('');
+  }
+  await summary.click();
+  await page.getByLabel('导出格式').selectOption('txt');
+  await expect(page.locator('[data-top-menu="file"]')).toHaveAttribute('open', '');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出所选格式' }).click();
+  expect((await download).suggestedFilename()).toMatch(/\.txt$/);
+  await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
+});

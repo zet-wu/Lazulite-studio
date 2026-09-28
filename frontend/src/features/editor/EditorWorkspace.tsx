@@ -75,6 +75,7 @@ export function EditorWorkspace(props: Props) {
   const draggedClick = useRef(false);
   const wordInputs = useRef(new Map<string, HTMLInputElement>());
   const [mode, setMode] = useState<'edit' | 'sync' | 'preview' | 'auxiliary'>('edit');
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [columns, setColumns] = useState(readColumnPreferences);
   const layoutRef = useRef<HTMLDivElement>(null);
   const outlineRef = useRef<HTMLElement>(null), inspectorRef = useRef<HTMLElement>(null), mainRef = useRef<HTMLElement>(null);
@@ -661,14 +662,14 @@ export function EditorWorkspace(props: Props) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
     if (event.key === 'Escape') { event.preventDefault(); pointerDrag.current = null; setDropTarget(null); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
-    <EditorMenu {...props} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} onMetadata={() => setSettingsDialog('metadata')} onSingers={() => setSettingsDialog('singers')} />
+    <EditorMenu {...props} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} onMetadata={() => setSettingsDialog('metadata')} onSingers={() => setSettingsDialog('singers')} />
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
     <nav className={styles.modeTabs} aria-label="工作模式"><button aria-current={mode === 'edit' ? 'page' : undefined} onClick={() => setMode('edit')}>编辑</button><button aria-current={mode === 'sync' ? 'page' : undefined} onClick={() => setMode('sync')}>打轴</button><button aria-current={mode === 'preview' ? 'page' : undefined} onClick={() => setMode('preview')}>预览</button><button aria-current={mode === 'auxiliary' ? 'page' : undefined} onClick={() => setMode('auxiliary')}>项目辅助</button></nav>
     {mode === 'auxiliary' && <section className={styles.auxiliaryPlaceholder}><h1>项目辅助</h1><p>候选、任务、词典与审核流程将在后续阶段整理到此处。歌词文档与播放器保持当前状态。</p></section>}
     {mode === 'preview' && <Suspense fallback={<p>正在载入预览…</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={props.onSelectLine} /></Suspense>}
     {mode === 'sync' && <SyncPanel document={document} currentLineId={selectedLine?.id ?? null} apply={dispatch} transport={props.transport}
       onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id); }} />}
-    {mode === 'edit' && <EditorRibbon selection={selection} canPaste={Boolean(clipboard)}
+    {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canPaste={Boolean(clipboard)}
       canMoveUp={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes[0] > 0}
       canMoveDown={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes.at(-1) !== document.lines.length - 1}
       copy={() => { copy(); }} cut={() => { cut(); }} paste={() => paste(clipboard)}
