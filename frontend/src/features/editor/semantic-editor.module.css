@@ -159,3 +159,10 @@
 .contextMenu button { width: 100%; border: 0; border-radius: 4px; padding: 6px 8px; text-align: left; background: transparent; color: var(--ink); cursor: pointer; }
 .contextMenu button:hover, .contextMenu button:focus-visible { background: var(--blue-soft); }
 .contextMenu button:disabled { opacity: .45; cursor: default; }
+
+.inspector > *, .inspector label { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.inspector input:not([type="checkbox"]), .inspector select { box-sizing: border-box; min-width: 0; max-width: 100%; width: 100%; }
+.inspector .times { display: flex; min-width: 0; flex-wrap: wrap; }
+.inspector .times input { flex: 1; width: 7ch; }
+.inspector label:has(input[type="checkbox"]) { display: inline-flex; align-items: center; gap: 5px; }
+.inspector input[type="checkbox"] { width: auto; flex: none; margin: 0; }

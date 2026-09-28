@@ -713,7 +713,7 @@ export function EditorWorkspace(props: Props) {
             setBackgroundTargetId(event.target.value);
             if (selectedLine.backgroundOf) dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: event.target.value });
           }}>
-            <option value="">请选择</option>{mainLines.filter((line) => line.id !== selectedLine.id && !document.lines.some((item) => item.backgroundOf === line.id && item.id !== selectedLine.id)).map((line) => <option key={line.id} value={line.id}>{mainLines.indexOf(line) + 1} · {lineText(line) || '空行'}</option>)}
+            <option value="">请选择</option>{mainLines.filter((line) => line.id !== selectedLine.id && !document.lines.some((item) => item.backgroundOf === line.id && item.id !== selectedLine.id)).map((line) => <option key={line.id} value={line.id}>L{mainLines.indexOf(line) + 1}</option>)}
           </select></label>
           {selectedLine.backgroundOf && <p>歌手继承自所属主行：{document.lines.find((line) => line.id === selectedLine.backgroundOf)?.agentRefs.map((id) => document.agents.find((agent) => agent.id === id)?.name ?? id).join('、') || '未指定'}</p>}
         </> : null}

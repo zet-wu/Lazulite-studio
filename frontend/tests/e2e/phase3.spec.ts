@@ -18,3 +18,53 @@ test('P3-07 locates the last row of a normal list', async ({ page }) => {
   await page.locator('[data-outline-drag]').last().click();
   await expect.poll(() => page.getByLabel('歌词列表').evaluate(e => e.scrollTop)).toBeGreaterThan(0);
 });
+
+for (const dpr of [1, 1.25, 2]) test(`P3-01 plot geometry and inverse pointer mapping DPR ${dpr}`, async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: dpr });
+  const page = await context.newPage();
+  await page.goto('http://127.0.0.1:5174/projects/sample-project/edit');
+  await page.locator('input[type=file]').last().setInputFiles({ name: 'synthetic.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
+  await expect(page.locator('[data-outline-drag]')).toHaveCount(4);
+  await page.locator('[data-outline-drag]').first().click();
+  await page.getByRole('button', { name: '循环当前行' }).click();
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: '放大波形' }).click();
+  const wave = page.getByRole('slider', { name: '波形进度' });
+  for (const width of [1280, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    const w = (await wave.boundingBox())!;
+    for (const lane of await page.locator('[data-track-lane]').all()) {
+      const l = (await lane.boundingBox())!;
+      expect(Math.abs(l.x - w.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(l.width - w.width)).toBeLessThanOrEqual(1);
+    }
+    const bar = (await page.getByRole('button', { name: '时间轴行 L1', exact: true }).boundingBox())!;
+    const a = (await page.getByRole('slider', { name: '循环 A 边界' }).boundingBox())!;
+    const b = (await page.getByRole('slider', { name: '循环 B 边界' }).boundingBox())!;
+    expect(Math.abs(a.x + a.width / 2 - bar.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(b.x + b.width / 2 - bar.x - bar.width)).toBeLessThanOrEqual(1);
+    const rects = await page.locator('[data-tick-us]').evaluateAll(nodes => nodes.map(n => ({ us: Number(n.getAttribute('data-tick-us')), x: n.getBoundingClientRect().x + n.getBoundingClientRect().width / 2 })));
+    const span = 15; // sample asset duration 120 / 2^3
+    for (const tick of rects) expect(Math.abs(tick.x - bar.x - (tick.us - 1_123_000) / (5_985_000 - 1_123_000) * bar.width)).toBeLessThanOrEqual(1);
+    const canvas = page.locator('canvas').first();
+    await expect.poll(() => canvas.evaluate((n: HTMLCanvasElement) => n.width)).toBe(Math.round(w.width * dpr));
+    const boundary = page.getByRole('slider', { name: '循环 B 边界' });
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(w.x + w.width / 2, b.y + b.height / 2, { steps: 5 });
+    await page.mouse.up();
+    expect(Number(await boundary.getAttribute('aria-valuenow'))).toBeCloseTo(1.123 + (w.x + w.width / 2 - bar.x) / bar.width * (5.985 - 1.123), 2);
+    await page.getByRole('button', { name: '循环当前行' }).click();
+  }
+  await page.screenshot({ path: test.info().outputPath(`geometry-dpr-${dpr}.png`) });
+  await context.close();
+});
+
+test('P3-04 constrains long inspector controls and aligns checkbox labels', async ({ page }) => {
+  await page.goto('/editor');
+  await page.locator('input[type=file]').setInputFiles({ name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
+  await page.locator('[data-outline-drag]').first().click();
+  const inspector = page.locator('aside').filter({ has: page.getByRole('heading', { name: '属性', exact: true }) });
+  await expect.poll(() => inspector.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+  await expect(page.getByLabel('所属主行').locator('option').nth(1)).toHaveText('L2');
+  expect(await page.getByLabel('背景歌词').evaluate(e => getComputedStyle(e.parentElement!).display)).toBe('inline-flex');
+});

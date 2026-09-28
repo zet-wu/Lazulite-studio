@@ -526,8 +526,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         </button>
         <button disabled={disabled} aria-label="放大波形" onClick={() => zoomAt(0.5, span ? (positionRef.current - start) / span : 0.5)}>＋</button>
         <button disabled={disabled} aria-label="缩小波形" onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}>−</button>
-        <button disabled={disabled || loop.aUs === null || loop.bUs === null} onClick={() => { if (loop.aUs !== null && loop.bUs !== null) { setFollow(false); setStart(Math.max(0, Math.min(duration - span, loop.aUs / 1e6))); } }}>定位 A/B</button>
-        <span className={styles.viewportRange}>{fmt(start)} – {fmt(end)}</span>
+        <span className={styles.viewportRange}>视窗 {fmt(start)} – {fmt(end)}</span>
         <div className={styles.visibility} aria-label="时间轴图层">
           {(['line', 'word', 'ruby', 'gap', 'spectrum'] as const).map((key) => <button key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
             {({ line: '行', word: '词', ruby: 'Ruby', gap: '空隙', spectrum: '声谱图' })[key]}
@@ -535,7 +534,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         </div>
         <button onClick={() => setExpanded(false)}>收起</button>
       </div>
-      <div className={styles.ruler} aria-label="时间标尺" onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={() => { panDrag.current = null; }}>{ticks.map((time) => <span key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
+      <div className={styles.ruler} aria-label="时间标尺" onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={() => { panDrag.current = null; }}>{ticks.map((time) => <span data-tick-us={Math.round(time * 1e6)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
       <div
         ref={slider}
         className={styles.waveWrap}
@@ -624,6 +623,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         >
           循环 A/B
         </button>
+        <button disabled={disabled || loop.aUs === null || loop.bUs === null} onClick={() => { if (loop.aUs !== null && loop.bUs !== null) { setFollow(false); setStart(Math.max(0, Math.min(duration - span, loop.aUs / 1e6))); } }}>定位 A/B</button>
         <button
           disabled={disabled || !validLine}
           onClick={() => setLoop(captureLoop(selectedLine!.begin_us!, selectedLine!.end_us!, durationUs))}
