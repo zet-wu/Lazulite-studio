@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-2026-09-28 更新：Phase 2 R1–R7 的代码路径已按[外部开发计划](../../lyric-workflow/docs/studio/plans/phase2-human-review-remediation.md)调整；浏览器、长音频和 Windows/macOS 实测状态见工作流仓库的验收记录。
+2026-09-28 更新，源码基线 `94a1e4c`：本文描述 Phase 2 R1–R7 开发后的实际架构。待实施的 Phase 3 与已验证范围分别见外部[方案](../../lyric-workflow/docs/studio/plans/phase3-timeline-layout-remediation.md)、[当前状态](../../lyric-workflow/docs/studio/current-state.md)，不计入当前能力。
 
 ## 1. 应用与目录
 
@@ -22,7 +22,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 `/editor` 由 LocalEditor 管本地文件与检查点，`/projects/:projectId/edit` 由 Workspace 管项目；两者使用同一个 EditorWorkspace、领域命令和 codec。项目路由有音频服务与保存冲突处理；本地路由没有同等媒体资产能力。
 
-其他路由为 `/projects`、`/projects/:projectId/export`、`/login`、`/settings`。编辑器当前提供编辑/打轴/预览及一级“项目辅助”占位；大纲、歌词列表、属性各自滚动，元数据与歌手分别在设置弹窗中编辑。
+其他路由为 `/projects`、`/projects/:projectId/export`、`/login`、`/settings`。编辑器当前提供编辑/打轴/预览及一级“项目辅助”占位；大纲、歌词列表、属性各自滚动，元数据与歌手分别在设置弹窗中编辑。两侧列宽固定为 190px/250px，简单布局同时隐藏两侧；普通列表（≤80 行）尚不消费显式定位请求，虚拟列表立即居中定位。菜单仍有独立原生 details 的展开状态。
 
 ## 3. 权威文档与事务
 
@@ -42,7 +42,11 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 ## 5. 媒体与服务
 
-HTMLMediaElement 为项目主时钟，媒体代理 offset 在边界转换；服务提供音频 Range、窗口 peaks 和 PCM。声谱图 Worker 按需计算，BPM 提供手动/Tap/自动估计。时间轴用微秒 viewport 显示波形、标尺与歌词轨道，普通滚轮按指针锚点缩放、空白处拖动平移；A/B 仅有一个数值区间状态，当前行/单元命令写入当时精确边界，不和歌词历史绑定。
+HTMLMediaElement 为项目主时钟，媒体代理 offset 在边界转换；服务提供音频 Range、窗口 peaks 和 PCM。PCM代理固定48kHz双声道s16le，Studio时间从解码样本0开始，播放offset为0；当前PCM请求最多4秒。声谱图 Worker 按需计算，BPM 提供手动/Tap/自动估计。时间轴用微秒 viewport 显示波形、标尺与歌词轨道，普通滚轮按指针锚点缩放、空白处拖动平移；A/B 仅有一个数值区间状态，当前行/单元命令写入当时精确边界，不和歌词历史绑定。
+
+当前波形、标尺和 A/B 使用整个容器宽度，而歌词轨道扣除 36px 标签列和 5px 间距，尚未共享物理绘图区；行、词、Ruby 在各自单层绝对定位，重叠会遮挡。行概览在可见主行超过 120 条时抽样，色块有 0.8% 最小显示宽度，不能以此代表精确时间边界。背景和所选定时音译另有只读轨道。
+
+声谱图每 4 秒请求 PCM，Worker 用 512 点 Hann FFT 生成 96×48 网格；视窗超过 20 秒提示放大。当前缓存为按分片起点索引的 Map，没有容量上限；分片缺少相邻 PCM 窗上下文，Canvas 按小数 CSS 坐标逐片绘制。分片接缝、固定分辨率升级与缓存约束均尚未整改。
 
 服务为登录用户共享项目库的单工作台，显式配置会话/网关模式。任务状态持久化，SSE 提供变化，结果从资源接口读取。reading、词典与实验 forced 的可用性取决于配置；HTTP 通过不代表模型质量。
 

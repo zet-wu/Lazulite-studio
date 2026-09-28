@@ -8,4 +8,4 @@
 
 `sync-editing.ts` 处理连续打轴游标和单次落点事务，`timeline-editing.ts` 处理行/词/Ruby 的平移与边界修改；`bpm.ts` 根据峰值估算节拍，`spectrogram.ts` 在 Worker 中计算按需片段。`preview-adapter.ts` 只投影有完整时间的语义文档给 AMLL，不修改草稿。
 
-XML、HTTP、播放和 IndexedDB 均在领域层之外。TTML 导入和当前版本草稿序列化由 `adapters/ttml/lyric-codec.ts` 实现；最终交换文件不包含 Studio 内部 ID 与对齐元数据。旧开发检查点不会自动迁移。Phase 2 的音译附属行 UI 仍在实施中。
+XML、HTTP、播放和 IndexedDB 均在领域层之外。TTML 导入和当前版本草稿序列化由 `adapters/ttml/lyric-codec.ts` 实现；最终交换文件不包含 Studio 内部 ID 与对齐元数据。旧开发检查点不会自动迁移。音译附属行 UI 与显式 Ruby 生成已接入。背景建立/改绑复用 `set-background-of`，由命令保持父引用、内容归属和时间约束。
