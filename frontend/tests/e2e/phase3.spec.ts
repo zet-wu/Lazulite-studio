@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { timelineTtml, listText } from '../fixtures/phase3';
+import { timelineTtml, listText, overlapTtml } from '../fixtures/phase3';
 
 test('P3-01 uses the same physical plot for waveform and lyric tracks', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
@@ -67,4 +67,47 @@ test('P3-04 constrains long inspector controls and aligns checkbox labels', asyn
   await expect.poll(() => inspector.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
   await expect(page.getByLabel('所属主行').locator('option').nth(1)).toHaveText('L2');
   expect(await page.getByLabel('背景歌词').evaluate(e => getComputedStyle(e.parentElement!).display)).toBe('inline-flex');
+});
+
+for (const kind of ['行', '词', 'Ruby']) test(`P3-03 edits each overlapping ${kind} interval and undoes once`, async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  await page.locator('input[type=file]').last().setInputFiles({ name: 'overlap.ttml', mimeType: 'application/xml', buffer: Buffer.from(overlapTtml()) });
+  await expect(page.locator('[data-outline-drag]')).toHaveCount(4);
+  await page.locator('[data-outline-drag]').first().click();
+  await page.getByLabel('吸附', { exact: true }).uncheck();
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: '放大波形' }).click();
+  const bars = page.getByRole('button', { name: new RegExp(`^时间轴${kind} `) });
+  await expect(bars).toHaveCount(4);
+  const first = (await bars.nth(0).boundingBox())!, second = (await bars.nth(1).boundingBox())!;
+  expect(Math.abs(first.y - second.y)).toBeGreaterThanOrEqual(22);
+  for (let i = 0; i < 3; i++) {
+    const bar = bars.nth(i);
+    for (const side of ['move', '开始边界', '结束边界']) {
+      await bar.scrollIntoViewIfNeeded();
+      const before = (await bar.boundingBox())!;
+      const box = (await (side === 'move' ? bar : bar.getByLabel(new RegExp(side))).boundingBox())!;
+      expect(await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('[data-timeline-key]'), { x: box.x + box.width / 2, y: box.y + box.height / 2 })).toBe(true);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + (side === '开始边界' ? -8 : 8), box.y + box.height / 2, { steps: 3 });
+      await page.mouse.up();
+      await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
+      await page.getByRole('button', { name: '撤销', exact: true }).click();
+      const restored = (await bar.boundingBox())!;
+      expect(Math.abs(restored.x - before.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(restored.width - before.width)).toBeLessThanOrEqual(1);
+    }
+  }
+  await page.screenshot({ path: test.info().outputPath(`overlap-${kind}.png`) });
+});
+
+test('P3-03 renders all 2000 visible timed rows and keeps the canvas and loop controls usable', async ({ page }) => {
+  await page.goto('/projects/sample-project/edit');
+  await page.locator('input[type=file]').last().setInputFiles({ name: 'dense.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml(2000)) });
+  await expect(page.getByRole('button', { name: /^时间轴行 / })).toHaveCount(2000);
+  await expect(page.getByRole('button', { name: '循环当前行' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '歌词编辑' })).toBeVisible();
+  expect(await page.locator('main section[data-line-id]').count()).toBeLessThan(80);
+  const plots = page.locator('[data-track-lane]').first().locator('../..');
+  expect(await plots.evaluate(e => e.scrollHeight)).toBeGreaterThan(300);
 });

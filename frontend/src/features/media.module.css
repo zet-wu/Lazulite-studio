@@ -131,3 +131,8 @@
 }
 
 .ruler, .waveWrap, .spectrogram, .spectrumHint { margin-left: calc(var(--timeline-label-width) + var(--timeline-gap)); min-width: 0; }
+
+.timelinePlots { max-height: 300px; overflow-y: auto; min-width: 0; }
+.trackBar { border: 0; box-shadow: inset 0 0 0 1px #7297d6; }
+.trackSelected { box-shadow: inset 0 0 0 1px #2d64bc; }
+.trackBar:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
