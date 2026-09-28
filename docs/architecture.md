@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-2026-09-28 更新，本文随 Phase 3 分包更新实际架构。实施计划与已验证范围分别见外部[方案](../../lyric-workflow/docs/studio/plans/phase3-timeline-layout-remediation.md)、[当前状态](../../lyric-workflow/docs/studio/current-state.md)，不计入当前能力。
+2026-09-28 更新至 Phase 4。本文描述实际架构；执行依据见[Phase 4方案](../../lyric-workflow/docs/studio/plans/phase4-ruby-background-timeline-remediation.md)，实际验证与开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
 
 ## 1. 应用与目录
 
@@ -28,15 +28,15 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 `LyricDocument`（`studio-lyric-v5`）为唯一可写歌词文档，含 lines、romanizationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs、翻译与时间链接；词含 text、时间、Ruby 单元、对齐单元、空拍等。音译轨道按主行 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
 
-时间使用绝对整数微秒/null；拆分坐标使用 code point 并检查 grapheme 边界。`lyric-commands.ts` 提供纯函数事务与 256 次历史。背景勾选时原子附属最近的前一主行，前行已占用即拒绝，不向更早或后方寻找；下拉仅建立关系后启用，显示动态Lx，value保留稳定ID。内容/链接/时间约束仍由单一命令校验。selection、focus、播放时钟不作为歌词权威内容；批量操作一次入历史，最终改动经 codec 保存。
+时间使用绝对整数微秒/null；拆分坐标使用 code point 并检查 grapheme 边界。`lyric-commands.ts` 提供纯函数事务与 256 次历史。背景勾选时原子附属最近的前一主行，前行已占用即拒绝，不向更早或后方寻找；下拉仅建立关系后启用，显示动态Lx，value保留稳定ID。内容、链接及各单元自身时间由单一命令校验；背景建立/改绑及主行拆分归属允许父背景各自独立绝对时间，不截短背景或扩展父行。selection、focus、播放时钟不作为歌词权威内容；批量操作一次入历史，最终改动经 codec 保存。
 
-词级与行级旧音译字段已移除，预览临时派生逐词音译与二侧歌手状态。音译轨道在主行下作为独立附属内容编辑；“从音译生成 Ruby”只在显式提交时把提案写入 Ruby，源轨道继续保留。旧格式数据直接丢弃，不设迁移或双写。
+词级与行级旧音译字段已移除，预览临时派生逐词音译与二侧歌手状态。音译轨道在主行下作为独立附属内容编辑；“从音译生成 Ruby”只在显式提交时把提案写入 Ruby，源轨道继续保留。候选判断采用10ms边缘容差：最大重叠>10ms才滤除其他≤10ms候选，全短/多候选仍人工。假名转换整词连接后与正文NFC相同，派生默认跳过；手动boolean覆盖保留用户取消，目标/输出/源变化按事件重算。对话框使用“跳过生成”，全跳过禁用应用，不新增空历史；>80行使用已有TanStack Virtual，仅挂载可见提案，全部状态以稳定row key保留，源/覆盖列表有界滚动。旧格式数据直接丢弃，不设迁移或双写。
 
 ## 4. 格式与保存
 
-`adapters/ttml/lyric-codec.ts` 解析为语义文档并规范化导出，旧 XML 保留树模型已移除。支持常见词/Ruby/背景、行内和 iTunes sidecar 附属内容、当前草稿辅助属性，以及 AMLL 无命名空间子节点和绝对分钟时间修复；未知不支持内容会报错，不宣称任意 TTML 可无损编辑。
+`adapters/ttml/lyric-codec.ts` 解析为语义文档并规范化导出，旧 XML 保留树模型已移除。支持常见词/Ruby/背景、行内和 iTunes sidecar 附属内容、当前草稿辅助属性，以及 AMLL 无命名空间子节点和绝对分钟时间修复；x-bg保留自身begin/end，解析用外层容器校验而不要求位于父p内；body dur计入背景结束时间，草稿studio:id保持背景ID。未知不支持内容会报错，不宣称任意 TTML 可无损编辑。
 
-`lyric-formats.ts` 支持文本、LRC/ESLRC/QRC/YRC/LYS 双向与 ASS 导出。低表达力格式不能携带全部 Ruby/元数据或多条音译轨道。预览投影只使用完整时间，不修改文档；isDuet 从歌手引用派生。
+`lyric-formats.ts` 支持文本、LRC/ESLRC/QRC/YRC/LYS 双向与 ASS 导出。低表达力格式不能携带全部 Ruby/元数据或多条音译轨道。预览投影只使用完整时间，不修改文档；isDuet 从歌手引用派生。StudioLyricPlayer使用AMLL的单一DOM播放器，关闭自动时间改写，仅把父/背景显示组活跃区设为两行时间并集，保持各行及词/Ruby输入时间。
 
 项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存当前格式检查点；FastAPI 接受 TTML envelope，不接收浏览器对象图。修订以不可变文件与 DB 指针提交。候选只能由用户应用。
 
@@ -44,7 +44,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 HTMLMediaElement 为项目主时钟，媒体代理 offset 在边界转换；服务提供音频 Range、窗口 peaks 和 PCM。PCM代理固定48kHz双声道s16le，Studio时间从解码样本0开始，播放offset为0；PCM请求最多4.02秒，包含FFT上下文。声谱图 Worker 按需计算，BPM 提供手动/Tap/自动估计。时间轴用微秒 viewport 显示波形、标尺与歌词轨道，普通滚轮按指针锚点缩放、空白处拖动平移；A/B 仅有一个数值区间状态，当前行/单元命令写入当时精确边界，不和歌词历史绑定。
 
-波形、标尺、A/B、声谱图与歌词轨道共享36px标签和5px间距后的实际绘图区；边框采用内阴影，不占时间映射宽度。顶部显示视窗，定位A/B位于底部循环组；行、词、Ruby分别用确定性O(n log n)区间分轨，布局从真实区间计算，文档提交后才重排。删除行抽样和最小色块宽度；视窗裁剪不伪造端点，选中对象有分离边界控件和放大入口。绘图区整体限制高度并纵向滚动，控制组保留。背景和所选定时音译另有只读轨道。
+波形、标尺、A/B、声谱图与歌词轨道共享36px标签和5px间距后的实际绘图区；边框采用内阴影，不占时间映射宽度。顶部显示视窗，定位A/B位于底部循环组；行、词、Ruby分别用确定性O(n log n)区间分轨，布局从真实区间计算，文档提交后才重排。删除行抽样和最小色块宽度；视窗裁剪不伪造端点；无额外边界工具行或专用放大，窄块以既有滚轮/加号缩放后拖动普通端点，最小视窗10ms。绘图区整体限制高度并纵向滚动，控制组保留。背景和所选定时音译另有只读轨道。播放/时间/三角按钮持续挂载；收起取消min-height，仅卸载昂贵图层。播放位置约80ms更新轨道，暂停/seeked同步最终位置；普通色块用独立伪元素高亮，窄块仅真实颜色层高亮，选择与焦点可组合。
 
 声谱图使用4秒核心片、512点Hann FFT和固定384×96显示网格（频率范围/色标不变）；视窗超过20秒提示放大。最多128个强度tile的简单LRU约4.5MiB，PCM转移后释放，不保留持久RGBA/位图；同时最多2个在途请求，取消离开视窗的网络工作；已进入Worker的过期计算直接终止并重建Worker，防止快速平移堆积任务，token拒绝过期结果。项目/资产/算法身份决定实例生命周期，隐藏/收起卸载后停止提交并释放Worker；分片两侧按48kHz样本位置请求半FFT上下文，Worker仅生成核心列，末片按真实时长绘制；Canvas相邻片共用取整设备像素边界。波形/频谱共用ResizeObserver及DPR变化监听，设备像素尺寸随显示变化重建。加载/失败片段与低能量颜色分开，失败有显式重试。
 
