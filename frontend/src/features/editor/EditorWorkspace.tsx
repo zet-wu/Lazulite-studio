@@ -93,11 +93,17 @@ export function EditorWorkspace(props: Props) {
     commitColumns({ ...columns, [`${side}Visible`]: !columns[`${side}Visible`] });
   };
   const rendered = renderedColumns(columns, layoutWidth);
+  const template = (sizes: { outline: number; inspector: number }) => `${columns.outlineVisible ? `${sizes.outline}px 6px ` : ''}minmax(0, 1fr)${columns.inspectorVisible ? ` 6px ${sizes.inspector}px` : ''}`;
   const separator = (side: ColumnSide) => {
     const other = side === 'outline' ? 'inspector' : 'outline';
     const maximum = Math.max(COLUMN_LIMITS[side].min, Math.min(COLUMN_LIMITS[side].max, layoutWidth - rendered[other] - (Number(columns.outlineVisible) + Number(columns.inspectorVisible)) * 6 - 480));
     return <ColumnSeparator side={side} width={rendered[side]} preferredWidth={columns[`${side}Width`]} maximum={maximum}
-      onChange={width => setColumns(current => ({ ...current, [`${side}Width`]: width }))}
+      onChange={width => {
+        // Preview geometry directly; keep the 2000-row editor out of pointermove renders.
+        const preview = renderedColumns({ ...columns, [`${side}Width`]: width }, layoutWidth);
+        layoutRef.current!.style.gridTemplateColumns = template(preview);
+        return preview[side];
+      }}
       onCommit={width => commitColumns({ ...columns, [`${side}Width`]: width })} />;
   };
   const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | null>(null);
@@ -163,6 +169,7 @@ export function EditorWorkspace(props: Props) {
   const mainLines = document.lines.filter((line) => !line.backgroundOf);
   const ordinalById = new Map(mainLines.map((line, index) => [line.id, index + 1]));
   const mainIds = mainLines.map((line) => line.id);
+  const occupiedParents = new Set(document.lines.filter(line => line.backgroundOf && line.id !== selectedLine?.id).map(line => line.backgroundOf));
   const selectedMainLines = selectedLine?.backgroundOf ? [] : selection?.kind === 'lines' && selection.ids.length
     ? mainLines.filter((line) => selection.ids.includes(line.id))
     : selectedLine && !selectedLine.backgroundOf ? [selectedLine] : [];
@@ -679,7 +686,7 @@ export function EditorWorkspace(props: Props) {
       canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)}
       canGenerateRuby={selectedMainLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
       openRubyGeneration={() => setRubyGeneration({ lineIds: selectedMainLines.map((line) => line.id) })} />}
-    {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: `${columns.outlineVisible ? `${rendered.outline}px 6px ` : ''}minmax(0, 1fr)${columns.inspectorVisible ? ` 6px ${rendered.inspector}px` : ''}` }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline}><h2>大纲</h2>
+    {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline}><h2>大纲</h2>
       {document.lines.map((line) => <div className={styles.outlineRow} data-line-id={line.id} key={line.id}>
         <button data-outline-drag className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
           onClick={(event) => { selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); requestLocate(line.id); }}>
@@ -736,7 +743,7 @@ export function EditorWorkspace(props: Props) {
           <label>所属主行 <select disabled={!selectedLine.backgroundOf} value={selectedLine.backgroundOf ?? ''} onChange={(event) => {
             if (selectedLine.backgroundOf) dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: event.target.value });
           }}>
-            <option value="">请选择</option>{mainLines.filter((line) => line.id !== selectedLine.id && !document.lines.some((item) => item.backgroundOf === line.id && item.id !== selectedLine.id)).map((line) => <option key={line.id} value={line.id}>L{mainLines.indexOf(line) + 1}</option>)}
+            <option value="">请选择</option>{mainLines.filter((line) => line.id !== selectedLine.id && !occupiedParents.has(line.id)).map((line) => <option key={line.id} value={line.id}>L{ordinalById.get(line.id)}</option>)}
           </select></label>
           {selectedLine.backgroundOf && <p>歌手继承自所属主行：{document.lines.find((line) => line.id === selectedLine.backgroundOf)?.agentRefs.map((id) => document.agents.find((agent) => agent.id === id)?.name ?? id).join('、') || '未指定'}</p>}
         </> : null}

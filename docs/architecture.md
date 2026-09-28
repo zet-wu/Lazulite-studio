@@ -22,7 +22,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 `/editor` 由 LocalEditor 管本地文件与检查点，`/projects/:projectId/edit` 由 Workspace 管项目；两者使用同一个 EditorWorkspace、领域命令和 codec。项目路由有音频服务与保存冲突处理；本地路由没有同等媒体资产能力。
 
-其他路由为 `/projects`、`/projects/:projectId/export`、`/login`、`/settings`。编辑器当前提供编辑/打轴/预览及一级“项目辅助”占位；大纲、歌词列表、属性各自滚动，元数据与歌手分别在设置弹窗中编辑。两侧独立显隐，默认190px/250px，范围160–360px/200–420px；6px分隔条支持指针捕获、取消、键盘8/32px、双击默认。单一localStorage偏好不进入文档/history，resize仅限制渲染宽度；普通/虚拟列表共用显式ID/serial定位：远端先挂载，再按真实卡片矩形平滑居中，超高卡片靠顶；有界校准，新请求及用户滚动取消，尊重reduced-motion，不抢焦点。EditorMenu与EditorRibbon共用单一activeMenuId；受控details保留输入挂载，跨菜单互斥，命令/外点/Escape关闭（Escape回触发器），离开200ms关闭并保护菜单内键盘焦点；文件cancel监听独立清理。
+其他路由为 `/projects`、`/projects/:projectId/export`、`/login`、`/settings`。编辑器当前提供编辑/打轴/预览及一级“项目辅助”占位；大纲、歌词列表、属性各自滚动，元数据与歌手分别在设置弹窗中编辑。两侧独立显隐，默认190px/250px，范围160–360px/200–420px；6px分隔条支持指针捕获、取消、键盘8/32px、双击默认。拖动直接预览grid几何，仅分隔条更新自身ARIA，松手才提交工作区偏好；单一localStorage偏好不进入文档/history，resize仅限制渲染宽度；普通/虚拟列表共用显式ID/serial定位：远端先挂载，再按真实卡片矩形平滑居中，超高卡片靠顶；有界校准，新请求及用户滚动取消，尊重reduced-motion，不抢焦点。EditorMenu与EditorRibbon共用单一activeMenuId；受控details保留输入挂载，跨菜单互斥，命令/外点/Escape关闭（Escape回触发器），离开200ms关闭并保护菜单内键盘焦点；文件cancel监听独立清理。
 
 ## 3. 权威文档与事务
 
