@@ -22,7 +22,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 `/editor` 由 LocalEditor 管本地文件与检查点，`/projects/:projectId/edit` 由 Workspace 管项目；两者使用同一个 EditorWorkspace、领域命令和 codec。项目路由有音频服务与保存冲突处理；本地路由没有同等媒体资产能力。
 
-其他路由为 `/projects`、`/projects/:projectId/export`、`/login`、`/settings`。编辑器当前提供编辑/打轴/预览及一级“项目辅助”占位；大纲、歌词列表、属性各自滚动，元数据与歌手分别在设置弹窗中编辑。两侧列宽固定为 190px/250px，简单布局同时隐藏两侧；普通列表（≤80 行）尚不消费显式定位请求，虚拟列表立即居中定位。菜单仍有独立原生 details 的展开状态。
+其他路由为 `/projects`、`/projects/:projectId/export`、`/login`、`/settings`。编辑器当前提供编辑/打轴/预览及一级“项目辅助”占位；大纲、歌词列表、属性各自滚动，元数据与歌手分别在设置弹窗中编辑。两侧列宽固定为 190px/250px，简单布局同时隐藏两侧；普通/虚拟列表共用显式ID/serial定位：远端先挂载，再按真实卡片矩形平滑居中，超高卡片靠顶；有界校准，新请求及用户滚动取消，尊重reduced-motion，不抢焦点。菜单仍有独立原生 details 的展开状态。
 
 ## 3. 权威文档与事务
 

@@ -111,3 +111,40 @@ test('P3-03 renders all 2000 visible timed rows and keeps the canvas and loop co
   const plots = page.locator('[data-track-lane]').first().locator('../..');
   expect(await plots.evaluate(e => e.scrollHeight)).toBeGreaterThan(300);
 });
+
+for (const count of [80, 81, 2000]) test(`P3-07 measured locate ${count} rows keeps other scrollers and focus`, async ({ page }) => {
+  await page.goto('/editor');
+  await page.locator('input[type=file]').setInputFiles({ name: 'rows.txt', mimeType: 'text/plain', buffer: Buffer.from(listText(count)) });
+  const outline = page.locator('[data-outline-drag]');
+  await expect(outline).toHaveCount(count);
+  await outline.nth(count - 5).click();
+  const id = await outline.nth(count - 5).evaluate(e => e.parentElement!.getAttribute('data-line-id'));
+  const row = page.locator(`main section[data-line-id="${id}"]`);
+  await expect(row).toBeVisible();
+  const scroller = page.getByLabel('歌词列表');
+  await expect.poll(async () => {
+    const r = (await row.boundingBox())!, s = (await scroller.boundingBox())!;
+    return Math.abs((r.y + r.height / 2) - (s.y + s.height / 2));
+  }).toBeLessThan(3);
+  await expect(outline.nth(count - 5)).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await outline.nth(2).click();
+  await outline.nth(10).click();
+  await expect.poll(() => row.isVisible()).toBe(count === 80);
+  expect(await page.locator('main section[data-line-id]').count()).toBeLessThanOrEqual(80);
+});
+
+test('P3-07 reduced motion and wheel cancel use only the lyric scroller', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/editor');
+  await page.locator('input[type=file]').setInputFiles({ name: 'rows.txt', mimeType: 'text/plain', buffer: Buffer.from(listText(81)) });
+  await page.locator('[data-outline-drag]').nth(60).click();
+  const scroller = page.getByLabel('歌词列表');
+  await expect.poll(() => scroller.evaluate(e => e.scrollTop)).toBeGreaterThan(1000);
+  await scroller.hover();
+  await page.mouse.wheel(0, -200);
+  const top = await scroller.evaluate(e => e.scrollTop);
+  await page.waitForTimeout(800);
+  expect(Math.abs(await scroller.evaluate(e => e.scrollTop) - top)).toBeLessThan(250);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});

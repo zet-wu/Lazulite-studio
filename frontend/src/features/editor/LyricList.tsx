@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import type { LyricLine } from '../../domain/lyric-document';
 import styles from './semantic-editor.module.css';
@@ -9,38 +9,81 @@ type Props = {
   locate: { id: string; serial: number } | null;
 };
 
-function VirtualLyricList({ lines, renderLine, locate }: Props) {
+/** Only explicit requests scroll this container. At most two measured corrections. */
+type ListProps = Props & { handled: RefObject<number | null> };
+
+function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate, handled }: ListProps, mountTarget?: (index: number) => void) {
+  useEffect(() => {
+    if (!locate || handled.current === locate.serial) return;
+    handled.current = locate.serial;
+    const scroller = scrollRef.current!;
+    const index = lines.findIndex(line => line.id === locate.id);
+    if (index < 0) return;
+    mountTarget?.(index);
+    let frame = 0, attempts = 0, corrections = 0, previous = NaN, stable = 0, settledAt = 0;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const targetTop = () => {
+      const target = [...scroller.querySelectorAll<HTMLElement>('[data-line-id]')].find(node => node.dataset.lineId === locate.id);
+      if (!target) return null;
+      const row = target.getBoundingClientRect(), view = scroller.getBoundingClientRect();
+      const raw = scroller.scrollTop + row.top - view.top - (row.height >= view.height ? 0 : (view.height - row.height) / 2);
+      return Math.max(0, Math.min(scroller.scrollHeight - scroller.clientHeight, raw));
+    };
+    const cancel = () => { cancelAnimationFrame(frame); scroller.scrollTo({ top: scroller.scrollTop, behavior: 'instant' }); };
+    const measure = (now: number) => {
+      const top = targetTop();
+      if (top !== null) {
+        stable = Math.abs(top - previous) < 1 ? stable + 1 : 0;
+        previous = top;
+        if (corrections === 0 && (stable >= 2 || attempts >= 12)) {
+          scroller.scrollTo({ top, behavior: reduced ? 'instant' : 'smooth' });
+          corrections++; settledAt = now + (reduced ? 32 : 650);
+        } else if (corrections === 1 && now >= settledAt) {
+          if (Math.abs(scroller.scrollTop - top) > 1) scroller.scrollTo({ top, behavior: reduced ? 'instant' : 'smooth' });
+          return;
+        }
+      }
+      if (++attempts < 90) frame = requestAnimationFrame(measure);
+    };
+    frame = requestAnimationFrame(measure);
+    const key = (event: KeyboardEvent) => { if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) cancel(); };
+    scroller.addEventListener('wheel', cancel, { passive: true });
+    scroller.addEventListener('pointerdown', cancel);
+    scroller.addEventListener('keydown', key);
+    return () => {
+      cancel();
+      scroller.removeEventListener('wheel', cancel);
+      scroller.removeEventListener('pointerdown', cancel);
+      scroller.removeEventListener('keydown', key);
+    };
+  }, [locate, lines, mountTarget, scrollRef]);
+}
+
+function VirtualLyricList(props: ListProps) {
+  const { lines, renderLine } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
-  const handledLocate = useRef<number | null>(null);
   const [focusedLineId, setFocusedLineId] = useState<string | null>(null);
-  const focusedIndex = lines.findIndex((line) => line.id === focusedLineId);
+  const focusedIndex = lines.findIndex(line => line.id === focusedLineId);
   const virtualizer = useVirtualizer({
     count: lines.length,
     getScrollElement: () => scrollRef.current,
-    getItemKey: (index) => lines[index].id,
+    getItemKey: index => lines[index].id,
     estimateSize: () => 180,
     overscan: 4,
-    rangeExtractor: (range) => {
+    rangeExtractor: range => {
       const visible = defaultRangeExtractor(range);
       return focusedIndex < 0 || visible.includes(focusedIndex) ? visible : [...visible, focusedIndex].sort((a, b) => a - b);
     },
     useFlushSync: false,
   });
-
-  useEffect(() => {
-    if (!locate || handledLocate.current === locate.serial) return;
-    const index = lines.findIndex((line) => line.id === locate.id);
-    if (index >= 0) {
-      virtualizer.scrollToIndex(index, { align: 'center' });
-      handledLocate.current = locate.serial;
-    }
-  }, [locate, lines, virtualizer]);
-
+  // The stable virtualizer instance owns the coarse mount; smooth scrolling uses measured DOM.
+  const mountTarget = useRef((index: number) => virtualizer.scrollToIndex(index, { align: 'center', behavior: 'auto' })).current;
+  useLocate(scrollRef, props, mountTarget);
   return <div ref={scrollRef} className={styles.lyricScroller} aria-label="歌词列表"
-    onFocus={(event) => setFocusedLineId((event.target as Element).closest('[data-line-id]')?.getAttribute('data-line-id') ?? null)}
-    onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedLineId(null); }}>
+    onFocus={event => setFocusedLineId((event.target as Element).closest('[data-line-id]')?.getAttribute('data-line-id') ?? null)}
+    onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedLineId(null); }}>
     <div className={styles.virtualContent} style={{ height: virtualizer.getTotalSize() }}>
-      {virtualizer.getVirtualItems().map((row) => <div key={row.key} data-index={row.index} ref={virtualizer.measureElement}
+      {virtualizer.getVirtualItems().map(row => <div key={row.key} data-index={row.index} ref={virtualizer.measureElement}
         className={styles.virtualRow} style={{ transform: `translateY(${row.start}px)` }}>
         {renderLine(lines[row.index], row.index)}
       </div>)}
@@ -48,7 +91,13 @@ function VirtualLyricList({ lines, renderLine, locate }: Props) {
   </div>;
 }
 
+function NormalLyricList(props: ListProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useLocate(scrollRef, props);
+  return <div ref={scrollRef} className={styles.lyricScroller} aria-label="歌词列表">{props.lines.map(props.renderLine)}</div>;
+}
+
 export function LyricList(props: Props) {
-  if (props.lines.length > 80) return <VirtualLyricList {...props} />;
-  return <div className={styles.lyricScroller} aria-label="歌词列表">{props.lines.map(props.renderLine)}</div>;
+  const handled = useRef<number | null>(null);
+  return props.lines.length > 80 ? <VirtualLyricList {...props} handled={handled} /> : <NormalLyricList {...props} handled={handled} />;
 }
