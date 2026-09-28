@@ -1,4 +1,6 @@
+import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { performanceTtml } from '../fixtures/phase3';
 import { phase4Ttml, rubyTtml } from '../fixtures/phase4';
 
 for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) {
@@ -16,7 +18,9 @@ for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) {
     await expect(collapsed).toBeFocused();
     await expect(collapsed).toHaveAttribute('data-persistent-toggle', 'yes');
     await expect(collapsed).toHaveAttribute('aria-expanded', 'false');
-    expect((await page.locator('footer').boundingBox())!.height).toBeLessThan(60);
+    const collapsedHeight = (await page.locator('footer').boundingBox())!.height;
+    expect(collapsedHeight).toBeLessThan(60);
+    await expect(collapsed.locator('svg path')).toHaveAttribute('d', 'M1 7h10L6 1z');
     expect(Math.abs((await clock.boundingBox())!.x - x)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: test.info().outputPath('collapsed.png') });
     await collapsed.press('Enter');
@@ -26,6 +30,8 @@ for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) {
     await collapsed.press('Space');
     await expect(toggle).toBeFocused();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+    await expect(toggle.locator('svg path')).toHaveAttribute('d', 'M1 1h10L6 7z');
+    await writeFile(test.info().outputPath('geometry.json'), JSON.stringify({ width, height: 900, theme, dpr: 1, collapsedHeight, expandedHeight: (await page.locator('footer').boundingBox())!.height, clockX: x }, null, 2));
     await page.screenshot({ path: test.info().outputPath('expanded.png') });
   });
 }
@@ -42,6 +48,7 @@ test('P4-02 playing color is visible on ordinary and true narrow widths', async 
       await page.locator('[data-outline-drag]').nth(index).click();
       for (const kind of ['行', '词', 'Ruby']) {
         const bar = page.getByRole('button', { name: new RegExp(`^时间轴${kind} `) }).nth(kind === '行' ? index : 0);
+        await bar.focus();
         const color = index === 1 ? bar.locator('[data-time-color]') : bar;
         await expect.poll(() => color.evaluate(e => getComputedStyle(e, e.hasAttribute('data-time-color') ? null : '::after').boxShadow)).toContain('240, 164, 43');
         if (index === 1) expect((await color.boundingBox())!.width).toBeLessThan(1);
@@ -107,4 +114,40 @@ test('P4-06 wheel zoom keeps clipped edges uneditable and pointercancel leaves n
   await bar.dispatchEvent('pointercancel');
   await page.mouse.up();
   await expect(begin).toHaveValue(before);
+});
+
+test('P4-08 large proposal scroll preserves manual choices while mounting only visible rows', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/editor');
+  const xml = performanceTtml(2000).replace(/<text for="p(\d+)"><span begin="[^"]*" end="[^"]*">rom<\/span><\/text>/g, (_, i) =>
+    `<text for="p${i}"><span begin="${(Number(i) * .3).toFixed(3)}" end="${(Number(i) * .3 + .024).toFixed(3)}">ko</span></text>`);
+  await page.locator('input[type=file]').setInputFiles({ name: 'large-ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await expect(page.locator('[data-outline-drag]')).toHaveCount(2000);
+  await page.locator('[data-outline-drag]').first().click();
+  await page.locator('[data-top-menu="clipboard"] summary').click(); await page.getByRole('button', { name: '全选', exact: true }).click();
+  await page.locator('[data-top-menu="tools"] summary').click(); await page.getByRole('button', { name: '从音译生成 Ruby…', exact: true }).click();
+  const dialog = page.locator('[role=dialog]');
+  const rows = dialog.locator('[data-proposal-count]');
+  await expect(rows).toHaveAttribute('data-proposal-count', '2000');
+  expect(await dialog.getByLabel('目标词').count()).toBeLessThan(80);
+  const first = rows.locator('[data-index="0"]');
+  await first.getByLabel('跳过生成').check();
+  await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
+  const last = rows.locator('[data-index="1999"]');
+  await expect.poll(async () => {
+    await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
+    return last.isVisible();
+  }, { timeout: 20_000 }).toBe(true);
+  await last.getByLabel('目标 Ruby').fill('手动末行');
+  await rows.evaluate(e => { e.scrollTop = 0; });
+  await expect(first.getByLabel('跳过生成')).toBeChecked();
+  await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
+  await expect.poll(async () => {
+    await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
+    return last.isVisible();
+  }, { timeout: 20_000 }).toBe(true);
+  await expect(last.getByLabel('目标 Ruby')).toHaveValue('手动末行');
+  expect(await dialog.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: test.info().outputPath('large-ruby-visible-rows.png') });
 });

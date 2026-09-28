@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { LyricCommand } from '../../domain/lyric-commands';
-import { createLine, createLyricDocument } from '../../domain/lyric-document';
+import { createWord, createLyricDocument } from '../../domain/lyric-document';
 import { RubyGenerationDialog } from './RubyGenerationDialog';
 
 afterEach(cleanup);
@@ -66,25 +66,21 @@ it('P4 default skips are visible, false overrides persist, output resets and all
 });
 
 it('P4 target changes clear only affected groups and regroup defaults before skipping', () => {
-  const lyric = createLyricDocument('が');
-  lyric.lines = ['が', 'な', 'か'].map(text => createLine(text));
-  for (const [i, line] of lyric.lines.entries()) {
-    line.beginUs = 0; line.endUs = 1_000_000;
-    line.words[0].beginUs = 0; line.words[0].endUs = 1_000_000;
-    lyric.romanizationTracks.push({ id: 'track' + i, language: 'ja', contents: [{ id: 'c' + i, lineId: line.id, kind: 'timed', units: [{ id: 'unit', text: ['ga', 'na', 'ka'][i], beginUs: 0, endUs: 1_000_000 }] }] });
-  }
-  // One track containing the three groups.
-  lyric.romanizationTracks[0].contents.push(...lyric.romanizationTracks[1].contents, ...lyric.romanizationTracks[2].contents);
+  const lyric = createLyricDocument('合成'), line = lyric.lines[0];
+  line.beginUs = 0; line.endUs = 3_000_000;
+  line.words = ['が', 'な', 'か'].map((text, i) => ({ ...createWord(text), beginUs: i * 1_000_000, endUs: (i + 1) * 1_000_000 }));
+  lyric.romanizationTracks.push({ id: 'track', language: 'ja', contents: [{ id: 'c', lineId: line.id, kind: 'timed',
+    units: ['ga', 'na', 'ka'].map((text, i) => ({ id: 'u' + i, text, beginUs: i * 1_000_000, endUs: (i + 1) * 1_000_000 })) }] });
   const apply = vi.fn(() => true);
   render(<RubyGenerationDialog document={lyric} lineIds={lyric.lines.map(line => line.id)} apply={apply} close={vi.fn()} />);
   const skips = screen.getAllByLabelText('跳过生成');
   skips.forEach(skip => fireEvent.click(skip));
   const targets = screen.getAllByLabelText('目标词');
-  fireEvent.change(targets[0], { target: { value: '' } });
+  fireEvent.change(targets[0], { target: { value: line.words[1].id } });
   expect(skips[0]).not.toBeChecked();
   expect(skips[1]).not.toBeChecked();
   fireEvent.change(targets[0], { target: { value: lyric.lines[0].words[0].id } });
   expect(skips[0]).toBeChecked();
-  expect(skips[1]).not.toBeChecked();
+  expect(skips[1]).toBeChecked();
   expect(skips[2]).not.toBeChecked();
 });
