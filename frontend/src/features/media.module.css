@@ -6,8 +6,10 @@
   padding: 8px 14px;
   background: #fff;
   border-top: 1px solid var(--line);
-  min-height: 112px;
+
 }
+.expanded { min-height: 112px; }
+.collapsed { min-height: 0; }
 :global([data-theme='dark']) .footer { background: var(--panel); }
 :global([data-theme='dark']) .waveWrap { background: #182334; }
 :global([data-theme='dark']) .header button, :global([data-theme='dark']) .controls button, :global([data-theme='dark']) .controls select,
@@ -26,15 +28,14 @@
   color: #5d6674;
   font-size: 11px;
 }
+.header { min-height: 34px; }
+.header .timelineToggle { margin-left: auto; width: 30px; height: 30px; padding: 0; flex-shrink: 0; display: grid; place-items: center; cursor: pointer; }
 .header span {
   font-variant-numeric: tabular-nums;
 }
 .header .viewportRange { color: var(--muted); white-space: nowrap; }
 .visibility { display: flex; gap: 4px; margin-left: auto; }
 .visibility button { min-width: 32px; }
-.collapsedControls { display: flex; align-items: center; gap: 9px; min-height: 34px; font-size: 11px; }
-.collapsedControls button { border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); padding: 4px 8px; cursor: pointer; }
-.collapsedControls button:last-child { margin-left: auto; }
 .header button,
 .controls button,
 .controls select {
@@ -92,7 +93,7 @@
 .trackSelected { background: #518ae2; color: #fff; border-color: #2d64bc; }
 .backgroundBar { background: #d7e4f5; border-color: #9ab4d7; cursor: default; }
 .romanTrackBar { cursor: default; }
-.trackPlaying { box-shadow: inset 0 0 0 2px #f0a42b; }
+
 .trackBarText { flex: 1; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .trackHandle { width: 5px; min-width: 5px; height: 100%; cursor: ew-resize; background: #487acb66; }
 .gapBar { justify-content: center; min-width: 12px; padding: 0 2px; border-color: #c58c45; background: #f7d6a3; color: #674414; font-size: 9px; }
@@ -117,18 +118,6 @@
   color: var(--danger) !important;
   background: transparent !important;
 }
-@media (max-width: 640px) {
-  .footer {
-    min-height: 142px;
-    padding: 7px 9px;
-  }
-  .controls {
-    gap: 5px;
-  }
-  .controls span {
-    font-variant-numeric: tabular-nums;
-  }
-}
 
 .ruler, .waveWrap, .spectrogram, .spectrumHint { margin-left: calc(var(--timeline-label-width) + var(--timeline-gap)); min-width: 0; }
 
@@ -142,3 +131,7 @@
 .trackBar.narrowHit { min-width: 8px; background: transparent; box-shadow: none; }
 .narrowColor { position: absolute; left: 0; top: 0; bottom: 0; background: #a9c5ef; pointer-events: none; }
 .narrowMarker { position: absolute; left: 0; top: 0; bottom: 0; width: 7px; border-left: 1px dashed #487acb; }
+
+.trackPlaying:not(.narrowHit)::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2px #f0a42b; pointer-events: none; }
+.trackSelected .narrowColor { background: #518ae2; }
+.trackPlaying .narrowColor { box-shadow: inset 0 0 0 2px #f0a42b; }

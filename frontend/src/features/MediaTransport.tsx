@@ -225,14 +225,16 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       setPlaying(true);
       sync();
     };
+    const syncFinalPosition = () => { const current = readPosition(); updateDom(current); setPosition(current); };
     const onPause = () => {
       setPlaying(false);
-      sync();
+      syncFinalPosition();
     };
     el.addEventListener("loadedmetadata", metadata);
     el.addEventListener("timeupdate", sync);
     el.addEventListener("play", onPlay);
     el.addEventListener("pause", onPause);
+    el.addEventListener("seeked", syncFinalPosition);
     el.addEventListener("error", onError);
     el.addEventListener("ended", ended);
     sync();
@@ -241,6 +243,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       el.removeEventListener("timeupdate", sync);
       el.removeEventListener("play", onPlay);
       el.removeEventListener("pause", onPause);
+      el.removeEventListener("seeked", syncFinalPosition);
       el.removeEventListener("error", onError);
       el.removeEventListener("ended", ended);
     };
@@ -489,16 +492,16 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const tickStep = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((value) => span / value <= maxTicks) ?? 600;
   const ticks = span > 0 ? Array.from({ length: Math.min(maxTicks + 1, Math.max(0, Math.floor(end / tickStep) - Math.ceil(start / tickStep) + 1)) }, (_, index) => (Math.ceil(start / tickStep) + index) * tickStep) : [];
   return (
-    <footer className={styles.footer} onKeyDown={keyDown}>
+    <footer className={`${styles.footer} ${expanded ? styles.expanded : styles.collapsed}`} onKeyDown={keyDown}>
       <audio
         ref={audio}
         preload="metadata"
         src={asset ? studioApi.audioUrl(projectId) : undefined}
       />
-      {expanded ? <>
       <div className={styles.header}>
         <button className={styles.play} disabled={disabled} aria-label={playing ? '暂停' : '播放'} onClick={play}>{playGlyph}</button>
         <span ref={clock}>{fmt(position)} / {fmt(duration)}</span>
+        {expanded && <>
         <button
           disabled={disabled}
           onClick={() => { setFollow(false); setStart(0); setSpan(duration); }}
@@ -527,9 +530,13 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
             {({ line: '行', word: '词', ruby: 'Ruby', gap: '空隙', spectrum: '声谱图' })[key]}
           </button>)}
         </div>
-        <button onClick={() => setExpanded(false)}>收起</button>
+        </>}
+        <button className={styles.timelineToggle} aria-label={expanded ? "收起时间轴" : "展开时间轴"} title={expanded ? "收起时间轴" : "展开时间轴"} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>
+          <svg width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d={expanded ? "M1 1h10L6 7z" : "M1 7h10L6 1z"} fill="currentColor" /></svg>
+        </button>
       </div>
-      <div className={styles.timelinePlots}>
+      {expanded && <>
+      <div id="timeline-plots" className={styles.timelinePlots}>
       <div className={styles.ruler} aria-label="时间标尺" onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={() => { panDrag.current = null; }}>{ticks.map((time) => <span data-tick-us={Math.round(time * 1e6)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
       <div
         ref={slider}
@@ -645,11 +652,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           </button>
         ) : null}
       </div>
-      </> : <div className={styles.collapsedControls}>
-        <button className={styles.play} disabled={disabled} aria-label={playing ? '暂停' : '播放'} onClick={play}>{playGlyph}</button>
-        <span ref={clock}>{fmt(position)} / {fmt(duration)}</span>
-        <button onClick={() => setExpanded(true)}>展开时间轴</button>
-      </div>}
+      </>}
     </footer>
   );
 });
