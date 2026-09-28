@@ -391,9 +391,10 @@ test('P3-10 rapid panning terminates obsolete worker jobs instead of queuing the
           if (this.jobs.delete(event.data.token)) counts.pending--;
         });
       }
-      postMessage(message: { token: number }, transfer: Transferable[]) {
+      postMessage(message: { token: number }, transfer: Transferable[] | StructuredSerializeOptions = []) {
         counts.pending++; counts.peak = Math.max(counts.peak, counts.pending);
-        this.jobs.set(message.token, setTimeout(() => super.postMessage(message, transfer), 500));
+        const transferables = Array.isArray(transfer) ? transfer : transfer.transfer ?? [];
+        this.jobs.set(message.token, setTimeout(() => super.postMessage(message, transferables), 500));
       }
       terminate() {
         counts.canceled += this.jobs.size;
@@ -415,6 +416,7 @@ test('P3-10 rapid panning terminates obsolete worker jobs instead of queuing the
   const spectrum = page.locator('[data-spectrum-ready]');
   await expect.poll(async () => (await spectrum.getAttribute('data-spectrum-ready')) === (await spectrum.getAttribute('data-spectrum-wanted'))).toBe(true);
 });
+
 
 for (const count of [80, 83]) test(`P3-07 variable Ruby/transliteration height and background locate ${count} rows`, async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, recordVideo: { dir: test.info().outputPath('locate-video') } });
