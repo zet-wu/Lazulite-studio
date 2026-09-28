@@ -9,6 +9,7 @@ import { LyricLine as LyricLineView } from './LyricLine';
 import { LyricWord as LyricWordView } from './LyricWord';
 import { DraftInput, TimePair } from './EditorFields';
 import { ColumnSeparator } from './ColumnSeparator';
+import { OutlineRow } from './OutlineRow';
 import { COLUMN_LIMITS, COLUMN_STORAGE, readColumnPreferences, renderedColumns, type ColumnPreferences, type ColumnSide } from './column-preferences';
 import { EditorMenu } from './EditorMenu';
 import { EditorRibbon } from './EditorRibbon';
@@ -686,13 +687,14 @@ export function EditorWorkspace(props: Props) {
       canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)}
       canGenerateRuby={selectedMainLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
       openRubyGeneration={() => setRubyGeneration({ lineIds: selectedMainLines.map((line) => line.id) })} />}
-    {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline}><h2>大纲</h2>
-      {document.lines.map((line) => <div className={styles.outlineRow} data-line-id={line.id} key={line.id}>
-        <button data-outline-drag className={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) ? styles.selected : '' : selectedLine?.id === line.id ? styles.selected : ''}
-          onClick={(event) => { selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); requestLocate(line.id); }}>
-          L{ordinalById.get(line.backgroundOf ?? line.id)} {line.backgroundOf ? '· 背景 ' : '· '}{lineText(line) || '空行'}
-        </button>
-      </div>)}
+    {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} onClick={event => {
+      const button = (event.target as Element).closest('[data-outline-drag]');
+      if (!button) return;
+      const line = document.lines.find(item => item.id === button.parentElement!.getAttribute('data-line-id'))!;
+      selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); requestLocate(line.id);
+    }}><h2>大纲</h2>
+      {document.lines.map(line => <OutlineRow key={line.id} line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)}
+        selected={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) : selectedLine?.id === line.id} />)}
     </aside>}{columns.outlineVisible && separator('outline')}
       <main ref={mainRef} tabIndex={-1} className={styles.canvas}><div className={styles.canvasHeader}><h1>歌词编辑</h1><div><button onClick={() => setSettingsDialog('tracks')}>管理音译轨道</button><button onClick={() => dispatch({ type: 'insert-line', afterLineId: document.lines.at(-1)?.id ?? null })}>新增歌词行</button></div></div>
         <LyricList lines={document.lines} locate={locate} renderLine={(line) => <LyricLineView key={line.id} line={line}
