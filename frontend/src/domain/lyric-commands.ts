@@ -1,3 +1,4 @@
+import { nonemptyTranslations } from './sublyrics';
 import { createLine, createWord, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type SubLyric, type TimeUs } from './lyric-document';
 import { splitAtGrapheme } from './text-boundaries';
 import { distributeRubyTime, splitReadingMora } from './ruby-editing';
@@ -417,7 +418,9 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const index = lineIndex(document, command.lineId);
       if (document.lines[index].backgroundOf) throw new Error('Background vocal sublyrics are not supported');
       const lines = document.lines.slice();
-      lines[index] = { ...lines[index], [command.kind]: command.items };
+      const items = nonemptyTranslations(command.items);
+      if (items.length === lines[index].translations.length && items.every((item, i) => item.text === lines[index].translations[i].text && item.language === lines[index].translations[i].language)) return document;
+      lines[index] = { ...lines[index], [command.kind]: items };
       return { ...document, lines };
     }
     case 'add-romanization-track':

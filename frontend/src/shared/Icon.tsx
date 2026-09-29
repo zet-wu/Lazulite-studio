@@ -1,4 +1,4 @@
-type IconName = "chevron" | "search" | "play" | "pause" | "dots" | "back";
+type IconName = "chevron" | "search" | "play" | "pause" | "dots" | "back" | "trash";
 
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, string> = {
@@ -7,6 +7,7 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
     play: "m6 4 9 4-9 4Z",
     pause: "M6 4v8M10 4v8",
     dots: "M5 8h.01M8 8h.01M11 8h.01",
+    trash: "M3 4h10M6 4V2h4v2M4 4l1 10h6l1-10M7 7v4M9 7v4",
     back: "m10 4-4 4 4 4",
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>;

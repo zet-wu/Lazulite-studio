@@ -1,3 +1,4 @@
+import { nonemptyTranslations } from '../../domain/sublyrics';
 import { createWord, LYRIC_SCHEMA_VERSION, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationTrack, type RomanizationUnit, type RubyUnit, type TimeUs } from '../../domain/lyric-document';
 
 const TTML = 'http://www.w3.org/ns/ttml';
@@ -359,6 +360,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
     if (!line) throw new Error(`iTunes sublyric refers to unknown line ${id}`);
     line.translations.push(...translations);
   }
+  for (const line of lines) line.translations = nonemptyTranslations(line.translations);
   romanizationTracks.push(...inlineRomanizationTracks.values());
   for (const track of romanizationTracks) for (const content of track.contents) {
     if (!lines.some((line) => line.id === content.lineId && !line.backgroundOf)) throw new Error(`iTunes transliteration refers to unknown line ${content.lineId}`);
@@ -511,7 +513,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       parent.appendChild(span);
     };
     for (const word of line.words) appendWord(p, word, word.text);
-    for (const item of line.translations) {
+    for (const item of nonemptyTranslations(line.translations)) {
       const span = xml.createElementNS(TTML, 'span');
       span.setAttributeNS(TTM, 'ttm:role', 'x-translation');
       if (item.language) span.setAttributeNS(XML, 'xml:lang', item.language);

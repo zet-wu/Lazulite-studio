@@ -220,3 +220,12 @@
 .settingsMenu button[aria-pressed]::before { content: ' '; display: inline-block; width: 1.4em; }
 .settingsMenu button[aria-pressed="true"]::before { content: '✓'; color: var(--blue); }
 .settingsMenu button[aria-pressed="true"] { background: var(--blue-soft); }
+
+.translationRow { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.sublyrics .translationLanguage { width: 12ch; }
+.iconButton { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; padding: 4px; }
+.iconButton:hover { background: var(--blue-soft); }
+.iconButton:active { background: var(--line); }
+.iconButton:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.iconButton:disabled { opacity: .5; }
+.translationRow small { flex-basis: 100%; color: var(--danger); }

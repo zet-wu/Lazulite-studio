@@ -17,6 +17,7 @@ import { EditorRibbon } from './EditorRibbon';
 import { SegmentationPanel } from './SegmentationPanel';
 import { BatchToolsPanel } from './BatchToolsPanel';
 import { RubyWordEditor } from './RubyWordEditor';
+import { TranslationEditor } from './TranslationEditor';
 import { RomanizationRow } from './RomanizationRow';
 import { LineSplitDialog } from './LineSplitDialog';
 import { SyncPanel } from './SyncPanel';
@@ -317,10 +318,6 @@ export function EditorWorkspace(props: Props) {
     const line = document.lines.find((item) => item.id === lineId);
     return { kind: 'line', lineId: line?.backgroundOf ?? lineId };
   };
-  const sublyric = (line: LyricLine, index: number, text: string) => {
-    const items = line.translations.map((item, i) => i === index ? { ...item, text } : item);
-    dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items });
-  };
   const moveLine = (line: LyricLine, direction: -1 | 1) => {
     const index = mainLines.findIndex((item) => item.id === line.id);
     if (line.backgroundOf || index + direction < 0 || index + direction >= mainLines.length) return;
@@ -601,7 +598,7 @@ export function EditorWorkspace(props: Props) {
           onSelect={(shift, toggle) => selectLine(line, shift, toggle)} onMove={(direction) => moveLine(line, direction)}>
           <div className={styles.lineHeader}><span>L{ordinalById.get(line.backgroundOf ?? line.id)} · {line.backgroundOf ? '背景' : '主唱'}</span></div>
           <div className={styles.words}>{line.words.map((word) => wordView(line, word))}</div>
-          {!line.backgroundOf && <div className={styles.sublyrics}><div><strong>翻译</strong>{line.translations.map((item, index) => <div key={index}><DraftInput value={item.text} label={`翻译 ${index + 1}`} onCommit={(text) => sublyric(line, index, text)} /><small>{item.language ?? '未指定语言'}</small></div>)}<button onClick={() => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items: [...line.translations, { language: null, text: '' }] })}>添加</button></div></div>}
+          {!line.backgroundOf && <TranslationEditor items={line.translations} apply={items => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items })} />}
           {!line.backgroundOf && <div className={styles.romanizationTracks}>
             {displayed.romanizationTracks.map((track, trackIndex) => {
               const contents = track.contents.filter((content) => content.lineId === line.id);
