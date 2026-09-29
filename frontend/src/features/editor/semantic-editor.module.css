@@ -229,3 +229,9 @@
 .iconButton:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .iconButton:disabled { opacity: .5; }
 .translationRow small { flex-basis: 100%; color: var(--danger); }
+
+.inlineAdd { display: inline-flex; align-items: center; min-height: 32px; }
+.line .inlineAdd button { color: var(--muted); background: transparent; border-color: transparent; min-width: 32px; min-height: 32px; font-size: 18px; }
+.line .inlineAdd button:hover { color: var(--blue); background: var(--blue-soft); }
+.inlineAdd input { width: 14ch; min-width: 0; }
+.inlineAdd :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }

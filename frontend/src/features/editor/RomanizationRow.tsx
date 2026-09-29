@@ -1,5 +1,6 @@
 import type { LyricCommand } from '../../domain/lyric-commands';
 import type { RomanizationContent, RomanizationTrack } from '../../domain/lyric-document';
+import { InlineAdd } from './InlineAdd';
 import { DraftInput, TimePair } from './EditorFields';
 import styles from './semantic-editor.module.css';
 
@@ -17,10 +18,11 @@ type Props = {
 
 export function RomanizationRow({ track, content, selectedContent, selectedUnitIds, placeholder, placeholderUnitIds, selectContent, selectUnit, apply }: Props) {
   const setContent = (next: RomanizationContent) => apply({ type: 'set-romanization-content', trackId: track.id, content: next });
-  const insertUnit = () => {
-    if (content.kind !== 'timed') return;
-    const unit = { id: crypto.randomUUID(), text: '', beginUs: null, endUs: null };
-    if (setContent({ ...content, units: [...content.units, unit] })) selectUnit(unit.id);
+  const insertUnit = (text: string) => {
+    if (content.kind !== 'timed') return false;
+    const unit = { id: crypto.randomUUID(), text, beginUs: null, endUs: null };
+    if (!setContent({ ...content, units: [...content.units, unit] })) return false;
+    selectUnit(unit.id); return true;
   };
   return <section className={`${styles.romanizationRow} ${selectedContent ? styles.selectedLine : ''}`}
     data-romanization-content-id={content.id} data-drag-placeholder={placeholder ? '' : undefined} tabIndex={0} aria-label={`音译内容 ${track.language ?? '未指定语言'}`}
@@ -39,7 +41,7 @@ export function RomanizationRow({ track, content, selectedContent, selectedUnitI
           onSplit={(at) => apply({ type: 'split-romanization-unit', trackId: track.id, contentId: content.id, unitId: unit.id, at })} />
         <TimePair begin={unit.beginUs} end={unit.endUs} label={`音译单元 ${index + 1}`} onCommit={(beginUs, endUs) => setContent({ ...content, units: content.units.map((item) => item.id === unit.id ? { ...item, beginUs, endUs } : item) })} />
       </div>)}
-      <button onClick={insertUnit}>添加音译单元</button>
+      <InlineAdd label="添加音译单元" commit={insertUnit} />
     </div>}
   </section>;
 }

@@ -15,7 +15,7 @@ export function LyricWord(props: Props) {
     data-drag-placeholder={props.placeholder ? '' : undefined} data-word-id={props.id} tabIndex={0}
     onFocus={(event) => { if (event.target === event.currentTarget) props.onSelect(false, false); }}
     onMouseDown={(event) => {
-      if (event.shiftKey || event.ctrlKey || event.metaKey) { event.preventDefault(); select(event); }
+      if (!(event.target as Element).closest('input,textarea,[data-ruby-id],button') && (event.shiftKey || event.ctrlKey || event.metaKey)) { event.preventDefault(); select(event); }
     }}
     onClick={(event) => {
       if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !(event.target as Element).closest('[data-ruby-id],button')) select(event);

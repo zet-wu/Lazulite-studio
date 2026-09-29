@@ -9,6 +9,7 @@ import { copySelection, cutSelection, invertIds, moveWordsAcrossLine, pastePlain
 import { LyricList } from './LyricList';
 import { LyricLine as LyricLineView } from './LyricLine';
 import { LyricWord as LyricWordView } from './LyricWord';
+import { InlineAdd } from './InlineAdd';
 import { DraftInput, TimePair } from './EditorFields';
 import { ColumnSeparator } from './ColumnSeparator';
 import { OutlineRow } from './OutlineRow';
@@ -106,7 +107,6 @@ export function EditorWorkspace(props: Props) {
   };
   const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | null>(null);
   const [message, setMessage] = useState('');
-  const [editingWordId, setEditingWordId] = useState<string | null>(null);
   const [segmentationOpen, setSegmentationOpen] = useState(false);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number } | null>(null);
@@ -483,14 +483,16 @@ export function EditorWorkspace(props: Props) {
       requestAddSerial={rubyShortcut?.wordId === word.id ? rubyShortcut.serial : undefined} />
     <div className={styles.wordMain}>
       <DraftInput value={word.text} label={`词 ${word.text}`} onFocus={() => selectWord(line, word)}
-        readOnly={editingWordId !== word.id} onEdit={() => setEditingWordId(word.id)} onExit={() => setEditingWordId(null)}
         onCommit={(text) => {
           const shortcut = text.endsWith('|');
           const next = shortcut ? text.slice(0, -1) : text;
           if (!next) { setMessage('Ruby 快捷输入需要正文'); return; }
           if (dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text: next }) && shortcut) setRubyShortcut({ wordId: word.id, serial: ++rubyShortcutSerial.current });
         }}
-        onSplit={(at) => dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at: utf16ToCodePoint(word.text, at) })}
+        onSplit={(at, draft) => dispatch({ type: 'batch', commands: [
+          { type: 'edit-word', lineId: line.id, wordId: word.id, text: draft },
+          { type: 'split-word', lineId: line.id, wordId: word.id, at: utf16ToCodePoint(draft, at) },
+        ] })}
         onMove={(direction) => moveWord(line, word, direction)} onNavigate={(direction) => navigateWord(word.id, direction)}
         inputRef={(node) => { if (node) { wordInputs.current.set(word.id, node); if (pendingFocus.current === word.id) { pendingFocus.current = null; node.focus(); } } else wordInputs.current.delete(word.id); }} />
     </div>
@@ -606,7 +608,14 @@ export function EditorWorkspace(props: Props) {
           playhead={props.playheadLineId === line.id}
           onSelect={(shift, toggle) => selectLine(line, shift, toggle)} onMove={(direction) => moveLine(line, direction)}>
           <div className={styles.lineHeader}><span>L{ordinalById.get(line.backgroundOf ?? line.id)} · {line.backgroundOf ? '背景' : '主唱'}</span></div>
-          <div className={styles.words}>{line.words.map((word) => wordView(line, word))}</div>
+          <div className={styles.words}>{line.words.map((word) => wordView(line, word))}
+            <InlineAdd label="添加词" commit={text => {
+              const word = createWord(text);
+              if (!dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word })) return false;
+              setSelection({ kind: 'words', lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id });
+              props.onSelectLine?.(line.id); props.onSelectUnit?.(line.id, word.id, null); return true;
+            }} />
+          </div>
           {!line.backgroundOf && <TranslationEditor items={line.translations} apply={items => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items })} />}
           {!line.backgroundOf && <div className={styles.romanizationTracks}>
             {displayed.romanizationTracks.map((track, trackIndex) => {
