@@ -18,7 +18,7 @@ export type SegmentOptions = {
 };
 export const DEFAULT_SEGMENT_OPTIONS: SegmentOptions = {
   splitCjk: true, western: 'word', language: 'en-us', punctuation: 'merge',
-  whitespace: 'next', punctuationWeight: 0.2, ignore: [], rules: [],
+  whitespace: 'separate', punctuationWeight: 0.2, ignore: [], rules: [],
 };
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
@@ -92,7 +92,8 @@ export function segmentText(text: string, options: SegmentOptions, divide?: (tex
       if (options.whitespace === 'previous' && result.length) result[result.length - 1] += token;
       else prefix += token;
     } else if (isPunctuation(token) && options.punctuation === 'merge') {
-      if (/[（(「『“‘]$/u.test(token) || !result.length || prefix) prefix += token;
+      if (options.whitespace === 'separate' && result.length && isSpace(result.at(-1)!)) result.push(token);
+      else if (/[（(「『“‘]$/u.test(token) || !result.length || prefix) prefix += token;
       else result[result.length - 1] += token;
     } else {
       result.push(prefix + token);

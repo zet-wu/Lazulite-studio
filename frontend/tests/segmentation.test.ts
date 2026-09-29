@@ -8,7 +8,7 @@ describe('E3 segmentation', () => {
     const options = { ...DEFAULT_SEGMENT_OPTIONS, ignore: ['東京'], rules: [{ source: 'hello', parts: ['hel', 'lo'] }] };
     const text = '東京  hello,世界 𝄞e\u0301';
     const parts = segmentText(text, options);
-    expect(parts).toEqual(['東京', '  hel', 'lo,', '世', '界', ' 𝄞e\u0301']);
+    expect(parts).toEqual(['東京', '  ', 'hel', 'lo,', '世', '界', ' ', '𝄞', 'e\u0301']);
     expect(parts.join('')).toBe(text);
     expect(() => segmentText('e\u0301', { ...options, rules: [{ source: 'e\u0301', parts: ['e', '\u0301'] }] })).toThrow(/字符/);
   });
@@ -87,4 +87,9 @@ it('keeps CJK variation selectors, combining marks and emoji sequences whole in 
   expect(parts.join('')).toBe(text);
   expect(parts.some(part => part.includes('e\u0301'))).toBe(true);
   expect(parts.some(part => part.includes('👩‍👩‍👧‍👦'))).toBe(true);
+});
+
+it('defaults to independent whitespace words for western lyrics, including punctuation after spaces', () => {
+  expect(segmentText('I still love you', DEFAULT_SEGMENT_OPTIONS)).toEqual(['I', ' ', 'still', ' ', 'love', ' ', 'you']);
+  expect(segmentText('a  , b', DEFAULT_SEGMENT_OPTIONS)).toEqual(['a', '  ', ',', ' ', 'b']);
 });

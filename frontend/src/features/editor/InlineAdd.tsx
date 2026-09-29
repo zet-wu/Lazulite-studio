@@ -12,7 +12,7 @@ export function InlineAdd({ label, commit }: { label: string; commit: (text: str
     if (finished.current || composing.current) return;
     finished.current = true;
     const text = input.current!.value;
-    if (!text.trim() || commit(text)) { setActive(false); setDraft(''); }
+    if (!text.length || commit(text)) { setActive(false); setDraft(''); }
     else finished.current = false;
   };
   return <span className={styles.inlineAdd} onClick={event => event.stopPropagation()}>

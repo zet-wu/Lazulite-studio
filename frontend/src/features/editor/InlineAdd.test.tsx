@@ -17,9 +17,12 @@ it('keeps IME drafts through mouseleave, submits once on Enter/blur and cancels 
   fireEvent.change(input, { target: { value: 'cancel' } }); fireEvent.keyDown(input, { key: 'Escape' }); fireEvent.blur(input);
   expect(commit).toHaveBeenCalledOnce();
   fireEvent.click(screen.getByRole('button')); input = screen.getByRole('textbox');
-  fireEvent.change(input, { target: { value: '　 ' } }); fireEvent.blur(input);
+  fireEvent.blur(input);
   expect(screen.queryByRole('textbox')).toBeNull(); expect(commit).toHaveBeenCalledOnce();
   fireEvent.click(screen.getByRole('button')); input = screen.getByRole('textbox');
   fireEvent.change(input, { target: { value: ' next ' } }); fireEvent.blur(input);
   expect(commit).toHaveBeenLastCalledWith(' next ');
+  fireEvent.click(screen.getByRole('button')); input = screen.getByRole('textbox');
+  fireEvent.change(input, { target: { value: '　 ' } }); fireEvent.keyDown(input, { key: 'Enter' });
+  expect(commit).toHaveBeenLastCalledWith('　 ');
 });

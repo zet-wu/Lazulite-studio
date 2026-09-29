@@ -93,7 +93,7 @@ it('splits from the word menu with default graphemes and preserved spaces, openi
   fireEvent.contextMenu(container.querySelector('[data-word-id]')!);
   fireEvent.click(screen.getByRole('menuitem', { name: '拆分词' }));
   expect(apply.mock.calls[0][0]).toMatchObject({ type: 'segment-words', changes: [{ words: [
-    { text: '中', beginUs: 0 }, { text: '文' }, { text: ' I' }, { text: '  still' }, { text: ' e\u0301', endUs: 1_000_000 },
+    { text: '中', beginUs: 0 }, { text: '文' }, { text: ' ' }, { text: 'I' }, { text: '  ' }, { text: 'still' }, { text: ' ' }, { text: 'e\u0301', endUs: 1_000_000 },
   ] }] });
   word.text = 'internationalization';
   rerender(<MemoryRouter><EditorWorkspace title="分词" document={{ ...lyric }} apply={apply}
