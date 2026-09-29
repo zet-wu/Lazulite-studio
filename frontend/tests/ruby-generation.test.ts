@@ -158,3 +158,22 @@ it('automatic expansion retains link, assignment, reading and empty-generation g
   expect(() => rubyGenerationCommand(document, document, rows, {}, new Set(), new Set())).toThrow('行尾链接');
   expect(line.beginUs).toBe(1_000_000); expect(line.words[0].rubyUnits).toHaveLength(0);
 });
+
+it('filters empty and whitespace Ruby sources without changing source times or creating an empty command', () => {
+  const document = createLyricDocument('歌'), line = document.lines[0];
+  line.words[0].beginUs = 1_000_000; line.words[0].endUs = 2_000_000;
+  document.romanizationTracks = [{ id: 'track', language: null, contents: [{ id: 'c', lineId: line.id, kind: 'timed', units: [
+    { id: 'empty', text: '', beginUs: 0, endUs: 3_000_000 },
+    { id: 'space', text: ' \t\n　', beginUs: 0, endUs: 3_000_000 },
+    { id: 'normal', text: 'uta', beginUs: 1_000_000, endUs: 2_000_000 },
+  ] }, { id: 'plain', lineId: line.id, kind: 'plain', text: '   ' }] }];
+  const snapshot = structuredClone(document);
+  const rows = proposeRuby(rubySourceRows(document, 'track', ['c', 'plain']), 'hiragana');
+  expect(rows.map(row => row.unitId)).toEqual(['normal']);
+  const state = executeLyricCommand(createLyricEditorState(document), rubyGenerationCommand(document, document, rows, {}, new Set(), new Set()));
+  expect(state.present.lines[0].words[0].beginUs).toBe(1_000_000);
+  expect(state.present.romanizationTracks).toEqual(snapshot.romanizationTracks);
+  expect(rubySourceRows(document, 'track', ['plain'])).toEqual([]);
+  expect(() => rubyGenerationCommand(document, document, [], {}, new Set(), new Set())).toThrow();
+  expect(document).toEqual(snapshot);
+});

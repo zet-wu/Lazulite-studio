@@ -83,3 +83,16 @@ it('P4 target changes clear only affected groups and regroup defaults before ski
   expect(skips[1]).toBeChecked();
   expect(skips[2]).not.toBeChecked();
 });
+
+it('shows a compact empty state without proposal rows or an enabled submit for whitespace sources', () => {
+  const lyric = createLyricDocument('歌'), line = lyric.lines[0];
+  lyric.romanizationTracks = [{ id: 'track', language: null, contents: [{ id: 'c', lineId: line.id, kind: 'timed', units: [
+    { id: 'empty', text: '', beginUs: 0, endUs: 1_000_000 }, { id: 'space', text: '　 ', beginUs: 0, endUs: 1_000_000 },
+  ] }] }];
+  const apply = vi.fn();
+  render(<RubyGenerationDialog document={lyric} lineIds={[line.id]} apply={apply} close={vi.fn()} />);
+  expect(screen.getByRole('status')).toHaveTextContent('没有可生成的音译单元');
+  expect(screen.queryByText('空单元')).toBeNull();
+  expect(screen.getByRole('button', { name: '生成 Ruby' })).toBeDisabled();
+  expect(apply).not.toHaveBeenCalled();
+});

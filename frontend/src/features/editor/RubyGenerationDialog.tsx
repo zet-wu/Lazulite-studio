@@ -107,6 +107,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
           </div>;
         }} />
         {existingWords.length > 0 && <fieldset className={styles.rubyGenerationChoices}><legend>已有 Ruby</legend>{existingWords.map(({ word }) => <label key={word.id}><input type="checkbox" checked={overwrite.has(word.id)} onChange={(event) => setOverwrite((current) => { const next = new Set(current); if (event.target.checked) next.add(word.id); else next.delete(word.id); return next; })} />覆盖「{word.text}」现有 Ruby 及其对齐结果</label>)}</fieldset>}
+        {!rows.length && <p role="status">没有可生成的音译单元</p>}
         {allSkipped && <p role="status">所有单元均跳过，无需生成</p>}
         {(issue || message) && <p role="alert">{message || issue}</p>}
       </>}

@@ -29,7 +29,7 @@ export function rubySourceRows(document: LyricDocument, trackId: string, content
     const units = content.kind === 'plain'
       ? [{ id: null, text: content.text, beginUs: null, endUs: null }]
       : content.units.map((unit) => ({ ...unit }));
-    return units.map((unit) => {
+    return units.filter((unit) => sourceReading(unit.text)).map((unit) => {
       const ranked = unit.beginUs !== null && unit.endUs !== null && unit.beginUs < unit.endUs
         ? line.words.map((word) => ({ id: word.id, amount: overlap(unit.beginUs!, unit.endUs!, word) })).filter((item) => item.amount > 0).sort((left, right) => right.amount - left.amount)
         : [];
