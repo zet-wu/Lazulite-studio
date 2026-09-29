@@ -8,4 +8,6 @@
 
 媒体服务请求已经接入，播放时钟与交互在 `features/MediaTransport.tsx`；PCM 窗口由频谱 Worker 按需读取。`lyric-formats.ts` 用参考工具同版本格式库解析/生成 LRC、ESLRC、QRC、YRC、LYS 和 ASS；AMLL 预览投影在 `domain/preview-adapter.ts`，不回写语义文档。
 
-适配器不决定用户是否接受机器结果。音译使用有序文档轨道；AMLL 的逐词音译仅为预览时的临时投影。本轮执行及验证边界见[Phase 4 方案](../../../../lyric-workflow/docs/studio/plans/phase4-ruby-background-timeline-remediation.md)。
+适配器不决定用户是否接受机器结果。音译使用有序文档轨道；AMLL 的逐词音译仅为预览时的临时投影。本轮执行及验证边界见[Phase 6 方案](../../../../lyric-workflow/docs/studio/plans/phase6-editing-remediation.md)。
+
+翻译导入及序列化排除空正文，保留每条语言与xml:lang；多歌手agentRefs按原顺序读取/连接IDREFS，草稿及最终交换沿用相同语义。
