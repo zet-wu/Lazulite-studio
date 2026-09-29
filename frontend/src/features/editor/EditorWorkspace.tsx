@@ -431,6 +431,8 @@ export function EditorWorkspace(props: Props) {
       actions = [
         { label: '前插行', run: () => { const index = mainLines.findIndex((item) => item.id === id); dispatch({ type: 'insert-line', afterLineId: mainLines[index - 1]?.id ?? null }); } },
         { label: '后插行', run: () => dispatch({ type: 'insert-line', afterLineId: id }) },
+        ...(!line.backgroundOf && document.romanizationTracks.some(track => track.contents.some(content => content.lineId === line.id))
+          ? [{ label: '从音译生成 Ruby…', run: () => setRubyGeneration({ lineIds: effective.ids.filter(id => mainIds.includes(id)) }) }] : []),
         { label: '添加词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') }) },
         { label: '行上移', disabled: Boolean(line.backgroundOf) || mainLines[0]?.id === line.id, run: () => moveLine(line, -1) },
         { label: '行下移', disabled: Boolean(line.backgroundOf) || mainLines.at(-1)?.id === line.id, run: () => moveLine(line, 1) },

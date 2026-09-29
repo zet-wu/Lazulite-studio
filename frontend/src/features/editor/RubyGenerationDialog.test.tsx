@@ -96,3 +96,23 @@ it('shows a compact empty state without proposal rows or an enabled submit for w
   expect(screen.getByRole('button', { name: '生成 Ruby' })).toBeDisabled();
   expect(apply).not.toHaveBeenCalled();
 });
+
+it('counts only selected contents with nonempty source rows as tracks and content checks change', () => {
+  const lyric = createLyricDocument('歌');
+  lyric.lines.push({ ...lyric.lines[0], id: 'second', words: [createWord('雪')] });
+  lyric.lines.push({ ...lyric.lines[0], id: 'third', words: [createWord('雨')] });
+  lyric.romanizationTracks = [{ id: 'a', language: 'en', contents: [
+    { id: 'c1', lineId: lyric.lines[0].id, kind: 'plain', text: 'uta' },
+    { id: 'c2', lineId: 'second', kind: 'plain', text: 'yuki' },
+  ] }, { id: 'b', language: 'ja', contents: [{ id: 'c3', lineId: 'third', kind: 'plain', text: 'ame' }] }];
+  render(<RubyGenerationDialog document={lyric} lineIds={lyric.lines.map(line => line.id)} apply={vi.fn()} close={vi.fn()} />);
+  expect(screen.getByText('生成 2 / 3 行')).toBeVisible();
+  fireEvent.click(screen.getByText('音译内容', { selector: 'summary' }));
+  fireEvent.click(screen.getByLabelText(/L2 · yuki/));
+  expect(screen.getByText('生成 1 / 3 行')).toBeVisible();
+  fireEvent.change(screen.getByLabelText('音译轨道'), { target: { value: 'b' } });
+  expect(screen.getByText('生成 1 / 3 行')).toBeVisible();
+  fireEvent.click(screen.getByLabelText(/L3 · ame/));
+  expect(screen.getByText('生成 0 / 3 行')).toBeVisible();
+  expect(screen.getByRole('button', { name: '生成 Ruby' })).toBeDisabled();
+});

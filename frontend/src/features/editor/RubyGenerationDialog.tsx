@@ -74,7 +74,8 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : '生成 Ruby 失败'); }
   };
   const ordinals = new Map(sourceDocument.lines.filter(line => !line.backgroundOf).map((line, index) => [line.id, index + 1]));
-  return <SettingsDialog title="从音译生成 Ruby" subtitle={lineIds.length === 1 ? `L${ordinals.get(lineIds[0])}` : `${lineIds.length} 行`} close={close} actions={<><button onClick={close}>取消</button><button disabled={!preview} onClick={submit}>生成 Ruby</button></>}>
+  const generatedLines = new Set(sourceRows.map(row => row.lineId)).size;
+  return <SettingsDialog title="从音译生成 Ruby" subtitle={lineIds.length === 1 && generatedLines === 1 ? `L${ordinals.get(lineIds[0])}` : `生成 ${generatedLines} / ${lineIds.length} 行`} close={close} actions={<><button onClick={close}>取消</button><button disabled={!preview} onClick={submit}>生成 Ruby</button></>}>
     <div className={styles.rubyGeneration}>
       {stale ? <p role="alert">文档已变化，旧提案不能应用。<button onClick={refresh}>重新生成提案</button></p> : <>
         <div className={styles.rubyGenerationOptions}><label>音译轨道 <select value={trackId} onChange={(event) => selectTrack(event.target.value)}>{tracks.map((track, index) => <option key={track.id} value={track.id}>轨道 {index + 1} · {track.language ?? '未指定语言'}</option>)}</select></label>
