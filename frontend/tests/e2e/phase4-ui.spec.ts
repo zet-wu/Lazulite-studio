@@ -121,6 +121,7 @@ test('UI empty document and background tail append both remain usable after undo
 });
 
 test('UI word to empty line, Ruby and romanization drags use the same insertion slots', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/editor');
   await page.locator('input[type=file]').setInputFiles({ name: 'ruby.ttml', mimeType: 'application/xml', buffer: await readFile('../tests/fixtures/ttml/phase2-multitrack.ttml') });
   const line = page.locator('main section[data-line-id="line-a"]'), units = line.locator('[data-romanization-content-id]').first().locator('[data-romanization-unit-id]');

@@ -85,7 +85,7 @@ test('imports rich TTML, saves Ruby and reopens it from the project route', asyn
   await page.getByRole('link', { name: 'Lazulite Studio' }).click();
   await page.getByRole('link', { name: /星の手紙/ }).click();
   await expect(page.getByRole('textbox', { name: '读音 今日', exact: true }).first()).toHaveValue('きよう');
-  await expect(page.getByRole('textbox', { name: '翻译 1' })).toHaveValue('今天 也唱歌');
+  await expect(page.getByRole('textbox', { name: '翻译 1', exact: true })).toHaveValue('今天 也唱歌');
   await openFileMenu(page);
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '下载草稿' }).click();
