@@ -42,9 +42,9 @@ test('generates Ruby explicitly from one track and preserves source content on u
   const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
   await expect(dialog).toContainText('fu');
   await expect(dialog).toContainText('0.999s');
-  await expect(dialog.getByRole('button', { name: '应用（一次撤销）' })).toBeDisabled();
-  await dialog.getByLabel('确认同时扩展上述词/行时间').check();
-  await dialog.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await expect(dialog.getByRole('button', { name: '生成 Ruby', exact: true })).toBeEnabled();
+  await expect(dialog.getByLabel('确认同时扩展上述词/行时间')).toHaveCount(0);
+  await dialog.getByRole('button', { name: '生成 Ruby', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '读音 二人' })).toHaveCount(3);
   await expect(line.locator('[data-romanization-content-id]')).toHaveCount(3);
   await page.getByRole('button', { name: '撤销' }).click();
@@ -65,7 +65,7 @@ test('keeps metadata, singers and the auxiliary page in their current locations'
   await page.getByRole('button', { name: '项目辅助' }).click();
   await expect(page.getByRole('heading', { name: '项目辅助' })).toBeVisible();
   await page.getByRole('button', { name: '编辑', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '歌词编辑' })).toBeVisible();
+  await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
 });
 
 test('shows one lyric scroller at 80 and 81 lines without horizontal page overflow', async ({ page }) => {
@@ -106,12 +106,13 @@ test('moves a word through its context menu and by direct mouse drag', async ({ 
   const line = page.locator('main section[data-line-id="L1"]');
   const words = line.locator('[data-word-id]');
   await words.first().click({ button: 'right', position: { x: 2, y: 2 } });
-  await expect(page.getByRole('menu', { name: '词 · 今日' })).toBeVisible();
+  await expect(page.getByRole('menu', { name: '词操作' })).toBeVisible();
   await page.getByRole('menuitem', { name: '词后移' }).click();
   await expect(words.first().getByRole('textbox', { name: '词  も歌う', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '撤销' }).click();
   await expect(words.first().getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
-  await words.first().dragTo(words.nth(1), { sourcePosition: { x: 2, y: 2 }, targetPosition: { x: 2, y: 2 } });
+  const targetBox = (await words.nth(1).boundingBox())!;
+  await words.first().dragTo(words.nth(1), { sourcePosition: { x: 2, y: 2 }, targetPosition: { x: targetBox.width - 2, y: 2 } });
   await expect(words.first().getByRole('textbox', { name: '词  も歌う', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '撤销' }).click();
   await expect(words.first().getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();

@@ -4,15 +4,15 @@ import styles from './semantic-editor.module.css';
 type Props = {
   id: string;
   selected: boolean;
-  dropTarget: boolean;
+  placeholder?: boolean;
   onSelect: (shift: boolean, toggle: boolean) => void;
   children: ReactNode;
 };
 
 export function LyricWord(props: Props) {
   const select = (event: MouseEvent<HTMLDivElement>) => props.onSelect(event.shiftKey, event.ctrlKey || event.metaKey);
-  return <div className={`${styles.word} ${props.selected ? styles.selectedWord : ''} ${props.dropTarget ? styles.dropWord : ''}`}
-    data-word-id={props.id} tabIndex={0}
+  return <div className={`${styles.word} ${props.selected ? styles.selectedWord : ''}`}
+    data-drag-placeholder={props.placeholder ? '' : undefined} data-word-id={props.id} tabIndex={0}
     onFocus={(event) => { if (event.target === event.currentTarget) props.onSelect(false, false); }}
     onMouseDown={(event) => {
       if (event.shiftKey || event.ctrlKey || event.metaKey) { event.preventDefault(); select(event); }

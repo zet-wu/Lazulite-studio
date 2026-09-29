@@ -68,7 +68,7 @@ it('rejects an occupied preceding main row without searching farther back or cha
   expect(apply).not.toHaveBeenCalled();
   expect(screen.getByRole('alert')).toHaveTextContent('前一主行已有背景');
   expect(screen.getByLabelText('背景歌词')).not.toBeChecked();
-  expect(screen.getByText('已选行：源行')).toBeVisible();
+  expect(screen.getByText('已选行：L3')).toBeVisible();
 });
 
 it('dispatches exactly one attachment to the nearest main row, skipping background rows', () => {

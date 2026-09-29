@@ -9,13 +9,13 @@ type Props = {
   lineId: string;
   word: LyricWord;
   selectedRubyIds: string[];
-  dropTargetId: string | null;
+  placeholderIds?: Set<string>;
   onSelectRuby: (id: string, shift?: boolean, toggle?: boolean) => void;
   apply: (command: LyricCommand) => boolean;
   requestAddSerial?: number;
 };
 
-export function RubyWordEditor({ lineId, word, selectedRubyIds, dropTargetId, onSelectRuby, apply, requestAddSerial }: Props) {
+export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, onSelectRuby, apply, requestAddSerial }: Props) {
   const [editingRubyId, setEditingRubyId] = useState<string | null>(null);
   const [newAfter, setNewAfter] = useState<string | null | undefined>(undefined);
   const [newReading, setNewReading] = useState('');
@@ -51,7 +51,7 @@ export function RubyWordEditor({ lineId, word, selectedRubyIds, dropTargetId, on
     if (apply({ type: 'batch', commands })) pendingFocus.current = previous.id;
   };
   return <div className={styles.rubyEditor} aria-label={`Ruby ${word.text}`}>
-    {word.rubyUnits.length > 0 && <div className={styles.rubyAbove}>{word.rubyUnits.map((unit, index) => <div key={unit.id} data-ruby-id={unit.id} tabIndex={0} className={`${styles.rubyTile} ${selectedRubyIds.includes(unit.id) ? styles.selectedRuby : ''} ${dropTargetId === unit.id ? styles.dropWord : ''}`}
+    {word.rubyUnits.length > 0 && <div className={styles.rubyAbove}>{word.rubyUnits.map((unit, index) => <div key={unit.id} data-ruby-id={unit.id} data-drag-placeholder={placeholderIds?.has(unit.id) ? '' : undefined} tabIndex={0} className={`${styles.rubyTile} ${selectedRubyIds.includes(unit.id) ? styles.selectedRuby : ''}`}
       onClick={(event) => { event.stopPropagation(); onSelectRuby(unit.id, event.shiftKey, event.ctrlKey || event.metaKey); }}
       onFocus={(event) => { if (event.target === event.currentTarget) onSelectRuby(unit.id); }}>
       <DraftInput value={unit.reading} label={`读音 ${word.text}`} onFocus={() => onSelectRuby(unit.id)}

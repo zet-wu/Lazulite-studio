@@ -78,7 +78,7 @@ test('P4-04/05 grouped skips, manual generation, history and checkpoint with bou
   await expect(dialog.getByRole('status')).toContainText('所有单元均跳过');
   await page.screenshot({ path: test.info().outputPath('ruby-default-skips.png') });
   await skips.nth(0).uncheck(); await skips.nth(1).uncheck();
-  await dialog.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await dialog.getByRole('button', { name: '生成 Ruby', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(2);
   await expect(line.getByRole('textbox', { name: '读音 か', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '撤销', exact: true }).click();

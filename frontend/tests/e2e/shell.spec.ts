@@ -11,12 +11,12 @@ test('opens a project, selects a line and keeps edit navigation visible', async 
   await page.getByPlaceholder('搜索项目').fill('星の手紙');
   await page.getByRole('link', { name: /星の手紙/ }).click();
   await page.locator('[data-outline-drag]').nth(1).click();
-  await expect(page.getByText('已选行：遠い星を見上げて')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '歌词编辑' })).toBeVisible();
+  await expect(page.getByText('已选行：L2')).toBeVisible();
+  await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '项目辅助' }).click();
   await expect(page.getByRole('heading', { name: '项目辅助' })).toBeVisible();
   await page.getByRole('button', { name: '编辑', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '歌词编辑' })).toBeVisible();
+  await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
 });
 
 test('keeps one A/B snapshot and five layers while collapsing the timeline', async ({ page }) => {
@@ -57,7 +57,7 @@ test('zooms a long waveform and leaves the editor responsive', async ({ page }) 
   await expect(page.getByRole('button', { name: '时间轴行 L1' })).toBeVisible();
   await page.getByRole('button', { name: '后移窗口' }).click();
   await page.getByRole('button', { name: '前移窗口' }).click();
-  await expect(page.getByRole('heading', { name: '歌词编辑' })).toBeVisible();
+  await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
 });
 
 test('saves a semantic project edit and reopens the saved revision', async ({ page }) => {
@@ -98,7 +98,7 @@ test('previews the current lyrics and returns to editing', async ({ page }) => {
   await expect(page.getByRole('region', { name: '动态歌词预览' })).toBeVisible();
   await expect(page.getByText('夜の風が静かに吹く').first()).toBeVisible();
   await page.getByRole('button', { name: '编辑', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '歌词编辑' })).toBeVisible();
+  await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
 });
 
 test('keeps the sync cursor separate from lyric undo', async ({ page }) => {

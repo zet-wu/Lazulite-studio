@@ -12,7 +12,7 @@ export function EditorContextMenu({ x, y, title, actions, close }: { x: number; 
     return () => window.removeEventListener('pointerdown', dismiss);
   }, [close]);
   return <div ref={ref} role="menu" aria-label={title} className={styles.contextMenu}
-    style={{ left: Math.min(x, window.innerWidth - 230), top: Math.min(y, window.innerHeight - Math.min(420, actions.length * 34 + 44)) }}
+    style={{ left: Math.max(8, Math.min(x, window.innerWidth - 230)), top: Math.min(y, window.innerHeight - Math.min(420, actions.length * 34 + 10)) }}
     onKeyDown={(event) => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -22,7 +22,7 @@ export function EditorContextMenu({ x, y, title, actions, close }: { x: number; 
         items[(index + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
       }
     }}>
-    <strong>{title}</strong>{actions.map((item, index) => <button key={`${index}:${item.label}`} role="menuitem" disabled={item.disabled}
+    {actions.map((item, index) => <button key={`${index}:${item.label}`} role="menuitem" disabled={item.disabled}
       onClick={() => { item.run(); close(); }}>{item.label}</button>)}
   </div>;
 }

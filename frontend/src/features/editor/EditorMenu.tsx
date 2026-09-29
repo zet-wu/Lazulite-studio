@@ -48,7 +48,7 @@ export function EditorMenu(props: Props) {
     <span>{props.saving ? '保存中' : props.dirty ? '未保存' : '已保存'}</span>
     <div className={styles.actions}>
       <TopMenu id="file" title="文件" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
-        {props.onOpen && <label>导入歌词<input type="file" accept=".ttml,.xml,.txt,.lrc,.eslrc,.qrc,.yrc,.lys" hidden ref={fileInput} onChange={(event) => {
+        {props.onOpen && <label tabIndex={0} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); fileInput.current?.click(); } }}>导入歌词<input type="file" accept=".ttml,.xml,.txt,.lrc,.eslrc,.qrc,.yrc,.lys" hidden ref={fileInput} onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) props.onOpen?.(file);
           event.target.value = '';
@@ -62,12 +62,12 @@ export function EditorMenu(props: Props) {
         </select><button onClick={() => props.onExportFormat?.(format)}>导出所选格式</button></>}
         {props.onPublish && <button onClick={props.onPublish}>发布与下载</button>}
       </TopMenu>
-      <button onClick={props.onSave} disabled={props.saving}>保存</button>
+      <button className={styles.primaryButton} onClick={props.onSave} disabled={props.saving}>保存</button>
       <button onClick={props.undo} disabled={!props.canUndo}>撤销</button>
       <button onClick={props.redo} disabled={!props.canRedo}>重做</button>
       <TopMenu id="view" title="视图" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
-        <button aria-pressed={props.outlineVisible} onClick={props.onToggleOutline}>显示大纲</button>
-        <button aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}>显示属性栏</button>
+        <button aria-label="显示大纲" aria-pressed={props.outlineVisible} onClick={props.onToggleOutline}>显示大纲</button>
+        <button aria-label="显示属性栏" aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}>显示属性栏</button>
         <button onClick={() => setDark((value) => !value)}>{dark ? '日间模式' : '夜间模式'}</button>
       </TopMenu>
       <TopMenu id="settings" title="设置" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>

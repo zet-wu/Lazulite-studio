@@ -111,7 +111,7 @@ test('P3-03 renders all 2000 visible timed rows and keeps the canvas and loop co
   await page.locator('input[type=file]').last().setInputFiles({ name: 'dense.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml(2000)) });
   await expect(page.getByRole('button', { name: /^时间轴行 / })).toHaveCount(2000);
   await expect(page.getByRole('button', { name: '循环当前行' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '歌词编辑' })).toBeVisible();
+  await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
   expect(await page.locator('main section[data-line-id]').count()).toBeLessThan(80);
   const plots = page.locator('[data-track-lane]').first().locator('../..');
   expect(await plots.evaluate(e => e.scrollHeight)).toBeGreaterThan(300);
@@ -183,6 +183,7 @@ test('P3-05 attaches, rebinds, detaches and restores a stable background relatio
   await expect(background).not.toBeChecked();
   await background.check();
   await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByText('检查点已保存', { exact: true })).toBeVisible();
   page.once('dialog', d => d.accept());
   await page.reload();
   await page.locator('[data-outline-drag]').nth(1).click();
@@ -264,7 +265,7 @@ test('P3-08 top menus are mutually exclusive and dismiss with pointer, outside, 
   await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
   await page.getByRole('button', { name: '关闭元数据编辑' }).click();
   await menu('view').locator('summary').click();
-  await page.getByRole('heading', { name: '歌词编辑' }).click();
+  await page.getByLabel('歌词列表', { exact: true }).click();
   await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
 });
 

@@ -5,6 +5,7 @@ import styles from './semantic-editor.module.css';
 
 type Props = {
   lines: LyricLine[];
+  append?: () => void;
   renderLine: (line: LyricLine, index: number) => ReactNode;
   locate: { id: string; serial: number } | null;
 };
@@ -60,6 +61,10 @@ function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate,
   }, [locate, lines, mountTarget, scrollRef]);
 }
 
+function AppendLine({ append }: { append?: () => void }) {
+  return append ? <button className={styles.appendLine} aria-label="新增歌词行" onClick={append}>＋</button> : null;
+}
+
 function VirtualLyricList(props: ListProps) {
   const { lines, renderLine } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -92,13 +97,14 @@ function VirtualLyricList(props: ListProps) {
         {renderLine(lines[row.index], row.index)}
       </div>)}
     </div>
+    <AppendLine append={props.append} />
   </div>;
 }
 
 function NormalLyricList(props: ListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   useLocate(scrollRef, props);
-  return <div ref={scrollRef} className={styles.lyricScroller} aria-label="歌词列表">{props.lines.map(props.renderLine)}</div>;
+  return <div ref={scrollRef} className={styles.lyricScroller} aria-label="歌词列表">{props.lines.map(props.renderLine)}<AppendLine append={props.append} /></div>;
 }
 
 export function LyricList(props: Props) {

@@ -21,6 +21,7 @@ type Props = MenuState & {
   canCreateRubyBase: boolean;
   canGenerateRuby: boolean;
   openRubyGeneration: () => void;
+  openTracks: () => void;
 };
 
 export function EditorRibbon(props: Props) {
@@ -38,11 +39,11 @@ export function EditorRibbon(props: Props) {
     <TopMenu id="tools" title="编辑工具" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
       <button disabled={!props.canMoveUp} onClick={props.moveUp}>词移上行</button>
       <button disabled={!props.canMoveDown} onClick={props.moveDown}>词移下行</button>
+      <button onClick={props.openTracks}>管理音译轨道…</button>
       <button onClick={props.openSegmentation}>分词…</button>
       <button onClick={props.openBatchTools}>批处理…</button>
       <button disabled={!props.canCreateRubyBase} onClick={props.createRubyBase}>合并为 Ruby base…</button>
       <button disabled={!props.canGenerateRuby} onClick={props.openRubyGeneration}>从音译生成 Ruby…</button>
     </TopMenu>
-    <small>空白处拖动排序；右键打开对象菜单。</small>
   </div>;
 }
