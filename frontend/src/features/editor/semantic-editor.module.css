@@ -235,3 +235,6 @@
 .line .inlineAdd button:hover { color: var(--blue); background: var(--blue-soft); }
 .inlineAdd input { width: 14ch; min-width: 0; }
 .inlineAdd :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.selectedRomanization { background: var(--blue-soft); border-color: var(--blue); box-shadow: inset 0 0 0 1px var(--blue); }
+.romanizationRow:focus-visible, .romanizationUnit:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }

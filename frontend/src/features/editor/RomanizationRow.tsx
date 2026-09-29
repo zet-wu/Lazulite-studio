@@ -24,7 +24,7 @@ export function RomanizationRow({ track, content, selectedContent, selectedUnitI
     if (!setContent({ ...content, units: [...content.units, unit] })) return false;
     selectUnit(unit.id); return true;
   };
-  return <section className={`${styles.romanizationRow} ${selectedContent ? styles.selectedLine : ''}`}
+  return <section className={`${styles.romanizationRow} ${selectedContent ? styles.selectedRomanization : ''}`}
     data-romanization-content-id={content.id} data-drag-placeholder={placeholder ? '' : undefined} tabIndex={0} aria-label={`音译内容 ${track.language ?? '未指定语言'}`}
     onClick={(event) => { event.stopPropagation(); if (!(event.target as Element).closest('[data-romanization-unit-id],button,input')) selectContent(event.shiftKey, event.ctrlKey || event.metaKey); }}
     onFocus={(event) => { if (event.target === event.currentTarget) selectContent(); }}>
