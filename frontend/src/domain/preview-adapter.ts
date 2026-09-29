@@ -21,7 +21,7 @@ function previewRomanization(line: LyricLine, content: RomanizationContent | und
   return { text, words };
 }
 
-/** AMLL accepts fully timed words; romanization mapping stays a temporary preview projection. */
+/** Pure whitespace uses AMLL’s independent 0–0 text nodes; all timings remain a preview projection. */
 export function toAmllLines(document: LyricDocument, showTranslation: boolean, showRomanization: boolean, trackId?: string | null): PreviewLine[] {
   const leadAgent = document.agents.find((agent) => document.lines.some((line) => !line.backgroundOf && line.agentRefs.includes(agent.id)))?.id;
   return document.lines.flatMap((line) => {
@@ -32,9 +32,9 @@ export function toAmllLines(document: LyricDocument, showTranslation: boolean, s
     const contents = document.romanizationTracks.filter((track) => !trackId || track.id === trackId)
       .flatMap((track) => track.contents.filter((content) => content.lineId === line.id));
     const roman = showRomanization ? previewRomanization(line, contents[0]) : { text: '', words: new Map<string, string>() };
-    const words: AmllLine['words'] = timedWords.length ? timedWords.map((word) => ({
+    const words: AmllLine['words'] = timedWords.length ? line.words.filter((word) => valid(word.beginUs, word.endUs) || /^\s+$/u.test(word.text)).map((word) => ({
       word: word.text,
-      startTime: milliseconds(word.beginUs!), endTime: milliseconds(word.endUs!),
+      startTime: /^\s+$/u.test(word.text) ? 0 : milliseconds(word.beginUs!), endTime: /^\s+$/u.test(word.text) ? 0 : milliseconds(word.endUs!),
       romanWord: roman.words.get(word.id) || undefined, obscene: word.obscene,
       ruby: word.rubyUnits.filter((unit) => valid(unit.beginUs, unit.endUs)).map((unit) => ({ word: unit.reading, startTime: milliseconds(unit.beginUs!), endTime: milliseconds(unit.endUs!) })),
     })) : [{ word: lineText(line), startTime: milliseconds(begin), endTime: milliseconds(end!) }];

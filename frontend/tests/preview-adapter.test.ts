@@ -42,3 +42,21 @@ it('P4 projects independent background before, after and beyond its parent witho
     expect(JSON.stringify(document)).toBe(snapshot);
   }
 });
+
+it('preserves independent spaces in order as 0–0 AMLL words, skips untimed ordinary text and leaves fallback intact', () => {
+  const document = createLyricDocument(), line = createLine(''); document.lines = [line];
+  line.beginUs = 0; line.endUs = 4_000_000;
+  line.words = [' ', 'I', '  ', 'still', ' ', 'love', '\t', 'you', '　', 'untimed'].map((text, index) => ({
+    ...createLine(text).words[0], beginUs: /\S/u.test(text) && text !== 'untimed' ? index * 100_000 : null,
+    endUs: /\S/u.test(text) && text !== 'untimed' ? (index + 1) * 100_000 : null,
+  }));
+  const before = structuredClone(document);
+  for (const translation of [true, false]) for (const romanization of [true, false]) {
+    const words = toAmllLines(document, translation, romanization)[0].lyric.words;
+    expect(words.map(word => word.word).join('')).toBe(' I  still love\tyou　');
+    expect(words.filter(word => /^\s+$/u.test(word.word)).every(word => word.startTime === 0 && word.endTime === 0)).toBe(true);
+  }
+  expect(document).toEqual(before);
+  line.words.forEach(word => { word.beginUs = null; word.endUs = null; });
+  expect(toAmllLines(document, false, false)[0].lyric.words[0].word).toBe(' I  still love\tyou　untimed');
+});
