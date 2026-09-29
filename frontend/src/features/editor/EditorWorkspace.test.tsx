@@ -82,3 +82,25 @@ it('dispatches exactly one attachment to the nearest main row, skipping backgrou
   fireEvent.click(screen.getByLabelText('背景歌词'));
   expect(apply).toHaveBeenCalledExactlyOnceWith({ type: 'set-background-of', lineId: lyric.lines[3].id, parentLineId: lyric.lines[2].id });
 });
+
+it('splits from the word menu with default graphemes and preserved spaces, opening advanced tools for a long word', () => {
+  const lyric = createLyricDocument('中文 I  still e\u0301'), word = lyric.lines[0].words[0];
+  word.beginUs = 0; word.endUs = 1_000_000;
+  const apply = vi.fn();
+  const { container, rerender } = render(<MemoryRouter><EditorWorkspace title="分词" document={lyric} apply={apply}
+    undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
+    onSave={() => {}} onDraft={() => {}} onFinal={() => {}} /></MemoryRouter>);
+  fireEvent.contextMenu(container.querySelector('[data-word-id]')!);
+  fireEvent.click(screen.getByRole('menuitem', { name: '拆分词', exact: true }));
+  expect(apply.mock.calls[0][0]).toMatchObject({ type: 'segment-words', changes: [{ words: [
+    { text: '中', beginUs: 0 }, { text: '文' }, { text: ' I' }, { text: '  still' }, { text: ' e\u0301', endUs: 1_000_000 },
+  ] }] });
+  word.text = 'internationalization';
+  rerender(<MemoryRouter><EditorWorkspace title="分词" document={{ ...lyric }} apply={apply}
+    undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
+    onSave={() => {}} onDraft={() => {}} onFinal={() => {}} /></MemoryRouter>);
+  fireEvent.contextMenu(container.querySelector('[data-word-id]')!);
+  fireEvent.click(screen.getByRole('menuitem', { name: '拆分词', exact: true }));
+  expect(screen.getByRole('dialog', { name: '分词', exact: true })).toBeVisible();
+  expect(apply).toHaveBeenCalledOnce();
+});

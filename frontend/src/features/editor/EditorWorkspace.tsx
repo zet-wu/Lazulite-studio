@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent as ReactMo
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord } from '../../domain/lyric-document';
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
+import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, segmentText } from '../../domain/segmentation';
 import { distributeRubyTime, splitReadingMora } from '../../domain/ruby-editing';
 import { copySelection, cutSelection, invertIds, moveWordsAcrossLine, pastePlain, pasteRich, selectIds, selectionLineId, type EditorClipboard, type EditorSelection } from './editing-actions';
 import { LyricList } from './LyricList';
@@ -407,7 +408,13 @@ export function EditorWorkspace(props: Props) {
       actions = [
         { label: '前插词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words[index - 1]?.id ?? null, word: createWord('新词') }) },
         { label: '后插词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: word.id, word: createWord('新词') }) },
-        { label: '拆分词', disabled: Array.from(word.text).length < 2, run: () => dispatch({ type: 'split-word', lineId: line.id, wordId: word.id, at: Math.floor(Array.from(word.text).length / 2) }) },
+        { label: '拆分词', disabled: Array.from(word.text).length < 2, run: () => {
+          try {
+            const parts = segmentText(word.text, DEFAULT_SEGMENT_OPTIONS);
+            if (parts.length < 2) { setSegmentationOpen(true); return; }
+            dispatch({ type: 'segment-words', changes: [{ lineId: line.id, wordId: word.id, words: distributeSegmentTime(word, parts, DEFAULT_SEGMENT_OPTIONS.punctuationWeight) }] });
+          } catch (cause) { setMessage((cause as Error).message); }
+        } },
         { label: '合并前一词', disabled: index === 0, run: () => dispatch({ type: 'merge-words', lineId: line.id, firstWordId: line.words[index - 1].id, secondWordId: word.id }) },
         { label: '词前移', disabled: index === 0, run: () => moveWord(line, word, -1) },
         { label: '词后移', disabled: index === line.words.length - 1, run: () => moveWord(line, word, 1) },

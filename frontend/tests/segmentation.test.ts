@@ -80,3 +80,11 @@ describe('E3 segmentation', () => {
     expect(undoLyricCommand(state).present).toBe(document);
   });
 });
+
+it('keeps CJK variation selectors, combining marks and emoji sequences whole in the default shortcut', () => {
+  const text = '葛\u{E0100}飾 e\u0301 👩‍👩‍👧‍👦', parts = segmentText(text, DEFAULT_SEGMENT_OPTIONS);
+  expect(parts[0]).toBe('葛\u{E0100}');
+  expect(parts.join('')).toBe(text);
+  expect(parts.some(part => part.includes('e\u0301'))).toBe(true);
+  expect(parts.some(part => part.includes('👩‍👩‍👧‍👦'))).toBe(true);
+});
