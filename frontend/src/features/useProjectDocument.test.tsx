@@ -130,8 +130,8 @@ describe("useProjectDocument save lifecycle", () => {
     const track = before.romanizationTracks[0];
     const content = track.contents[0];
     const rows = proposeRuby(rubySourceRows(before, track.id, [content.id]), "hiragana");
-    const proposal = rubyGenerationCommand(before, before, rows, {}, new Set(), new Set(), true);
-    act(() => result.current.apply(proposal.command));
+    const proposal = rubyGenerationCommand(before, before, rows, {}, new Set(), new Set());
+    act(() => result.current.apply(proposal));
     expect(result.current.dirty).toBe(true);
     const generated = result.current.document;
     expect(generated.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(["ふ", "た", "り"]);

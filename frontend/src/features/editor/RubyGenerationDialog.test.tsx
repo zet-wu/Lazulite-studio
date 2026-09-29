@@ -6,7 +6,7 @@ import { RubyGenerationDialog } from './RubyGenerationDialog';
 
 afterEach(cleanup);
 
-it('previews the time extension and submits one command only after confirmation', () => {
+it('automatically extends time in one command without confirmation', () => {
   const lyric = createLyricDocument('粉');
   const line = lyric.lines[0];
   line.beginUs = 1_000_000; line.endUs = 2_000_000;
@@ -17,10 +17,9 @@ it('previews the time extension and submits one command only after confirmation'
   const apply = vi.fn((_command: LyricCommand) => true);
   const close = vi.fn();
   const { rerender } = render(<RubyGenerationDialog document={lyric} lineIds={[line.id]} apply={apply} close={close} />);
-  expect(screen.getAllByText(/1s–2s → 0.999s–2s/)).toHaveLength(2);
-  const submit = screen.getByRole('button', { name: '应用（一次撤销）' });
-  expect(submit).toBeDisabled();
-  fireEvent.click(screen.getByLabelText('确认同时扩展上述词/行时间'));
+  expect(screen.queryByText(/时间包络扩展/)).toBeNull();
+  const submit = screen.getByRole('button', { name: '生成 Ruby' });
+  expect(screen.queryByLabelText('确认同时扩展上述词/行时间')).toBeNull();
   expect(submit).toBeEnabled();
   fireEvent.click(submit);
   expect(apply).toHaveBeenCalledOnce();
@@ -31,7 +30,7 @@ it('previews the time extension and submits one command only after confirmation'
   const changed = { ...lyric };
   rerender(<RubyGenerationDialog document={changed} lineIds={[line.id]} apply={apply} close={close} />);
   expect(screen.getByText(/文档已变化/)).toBeVisible();
-  expect(screen.queryByRole('button', { name: '应用（一次撤销）' })).toBeNull();
+  expect(screen.getByRole('button', { name: '生成 Ruby' })).toBeDisabled();
 });
 
 it('P4 default skips are visible, false overrides persist, output resets and all skipped creates no command', () => {
@@ -43,7 +42,7 @@ it('P4 default skips are visible, false overrides persist, output resets and all
   const apply = vi.fn(() => true);
   const { rerender } = render(<RubyGenerationDialog document={lyric} lineIds={[line.id]} apply={apply} close={vi.fn()} />);
   const skip = screen.getByLabelText('跳过生成');
-  const submit = screen.getByRole('button', { name: '应用（一次撤销）' });
+  const submit = screen.getByRole('button', { name: '生成 Ruby' });
   expect(skip).toBeChecked();
   expect(screen.getByRole('status')).toHaveTextContent('所有单元均跳过');
   expect(screen.queryByRole('alert')).toBeNull();

@@ -9,8 +9,8 @@ test('generates Ruby, saves through FastAPI and reopens the complete current dra
   await content.getByText('音译 · ja-Latn').click({ button: 'right' });
   await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
   const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
-  await dialog.getByLabel('确认同时扩展上述词/行时间').check();
-  await dialog.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await expect(dialog.getByLabel('确认同时扩展上述词/行时间')).toHaveCount(0);
+  await dialog.getByRole('button', { name: '生成 Ruby', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '读音 二人', exact: true })).toHaveCount(3);
   const savedResponse = page.waitForResponse((response) => response.url().endsWith('/api/v1/projects/phase2/document') && response.request().method() === 'PUT');
   await page.getByRole('button', { name: '保存', exact: true }).click();

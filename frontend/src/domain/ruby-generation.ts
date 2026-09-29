@@ -92,9 +92,7 @@ const envelope = (base: Envelope, begins: TimeUs[], ends: TimeUs[]): Envelope =>
   return { beginUs: starts.length ? Math.min(...starts) : null, endUs: finishes.length ? Math.max(...finishes) : null };
 };
 
-export type RubyGenerationPreview = { command: LyricCommand; extensions: Array<{ kind: 'line' | 'word'; lineId: string; wordId?: string; before: Envelope; after: Envelope }> };
-
-export function rubyGenerationCommand(document: LyricDocument, sourceDocument: LyricDocument, rows: RubyProposalRow[], readings: Record<string, string>, skipped: Set<string>, overwriteWordIds: Set<string>, allowExtension: boolean): RubyGenerationPreview {
+export function rubyGenerationCommand(document: LyricDocument, sourceDocument: LyricDocument, rows: RubyProposalRow[], readings: Record<string, string>, skipped: Set<string>, overwriteWordIds: Set<string>): LyricCommand {
   if (document !== sourceDocument) throw new Error('文档已变化，请重新生成提案');
   const byWord = new Map<string, RubyProposalRow[]>();
   for (const row of rows) {
@@ -109,7 +107,6 @@ export function rubyGenerationCommand(document: LyricDocument, sourceDocument: L
   }
   if (!byWord.size) throw new Error('没有可应用的 Ruby');
   const commands: Extract<LyricCommand, { type: 'set-line-time' | 'set-word-time' | 'set-ruby-units' }>[] = [];
-  const extensions: RubyGenerationPreview['extensions'] = [];
   for (const line of document.lines) {
     const groups = line.words.map((word) => ({ word, rows: byWord.get(`${line.id}:${word.id}`) ?? [] })).filter((group) => group.rows.length);
     if (!groups.length) continue;
@@ -117,7 +114,6 @@ export function rubyGenerationCommand(document: LyricDocument, sourceDocument: L
       if (word.rubyUnits.length && !overwriteWordIds.has(word.id)) throw new Error(`词「${word.text}」已有 Ruby，请显式选择覆盖`);
       const units: RubyUnit[] = rows.map((row) => ({ id: crypto.randomUUID(), reading: row.reading!, beginUs: row.beginUs, endUs: row.endUs }));
       const next = envelope(word, [...word.rubyUnits.map((unit) => unit.beginUs), ...units.map((unit) => unit.beginUs)], [...word.rubyUnits.map((unit) => unit.endUs), ...units.map((unit) => unit.endUs)]);
-      if (next.beginUs !== word.beginUs || next.endUs !== word.endUs) extensions.push({ kind: 'word', lineId: line.id, wordId: word.id, before: { beginUs: word.beginUs, endUs: word.endUs }, after: next });
       return { word, units, next };
     });
     const lineNext = envelope(line,
@@ -125,7 +121,6 @@ export function rubyGenerationCommand(document: LyricDocument, sourceDocument: L
       [...line.words.map((word) => word.endUs), ...proposedWords.map((item) => item.next.endUs)]);
     if (lineNext.beginUs !== line.beginUs || lineNext.endUs !== line.endUs) {
       if (line.endLink || document.lines.some((item) => item.endLink?.targetLineId === line.id)) throw new Error('行尾链接会受时间扩展影响，请先处理链接');
-      extensions.push({ kind: 'line', lineId: line.id, before: { beginUs: line.beginUs, endUs: line.endUs }, after: lineNext });
       commands.push({ type: 'set-line-time', lineId: line.id, ...lineNext });
     }
     for (const { word, units, next } of proposedWords) {
@@ -133,6 +128,5 @@ export function rubyGenerationCommand(document: LyricDocument, sourceDocument: L
       commands.push({ type: 'set-ruby-units', lineId: line.id, wordId: word.id, units, overwrite: overwriteWordIds.has(word.id) });
     }
   }
-  if (extensions.length && !allowExtension) throw new Error('请确认词/行时间包络扩展');
-  return { command: { type: 'batch', commands }, extensions };
+  return { type: 'batch', commands };
 }
