@@ -24,6 +24,7 @@ import { RomanizationRow } from './RomanizationRow';
 import { LineSplitDialog } from './LineSplitDialog';
 import { SyncPanel } from './SyncPanel';
 import { MetadataPanel } from './MetadataPanel';
+import { SingerSelection } from './SingerSelection';
 import { SingerDialog } from './SingerDialog';
 import { SettingsDialog } from './SettingsDialog';
 import { EditorContextMenu, type ContextAction } from './EditorContextMenu';
@@ -170,8 +171,6 @@ export function EditorWorkspace(props: Props) {
   const selectedMainLines = selectedLine?.backgroundOf ? [] : selection?.kind === 'lines' && selection.ids.length
     ? mainLines.filter((line) => selection.ids.includes(line.id))
     : selectedLine && !selectedLine.backgroundOf ? [selectedLine] : [];
-  const selectedAgents = selectedMainLines.map((line) => line.agentRefs[0] ?? '');
-  const agentValue = selectedAgents.every((value) => value === selectedAgents[0]) ? selectedAgents[0] ?? '' : '__mixed__';
   const selectedWordLineIndexes = selection?.kind === 'words'
     ? document.lines.flatMap((line, index) => line.words.some((word) => selection.ids.includes(word.id)) ? [index] : []) : [];
   const rubyBaseLine = selection?.kind === 'words' && selection.ids.length > 1 ? document.lines.find((line) => line.words.some((word) => word.id === selection.ids[0])) : undefined;
@@ -642,10 +641,7 @@ export function EditorWorkspace(props: Props) {
         <TimePair begin={selectedLine.beginUs} end={selectedLine.endUs} label={`行 ${selectedLine.id}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginUs, endUs })} />
         {selectedMainLines.length > 0 && <>
           <label><input type="checkbox" checked={selectedMainLines.every((line) => line.ignoreSync)} onChange={(event) => dispatch({ type: 'batch', commands: selectedMainLines.map((line) => ({ type: 'set-ignore-sync', lineId: line.id, ignoreSync: event.target.checked })) })} /> 跳过打轴</label>
-          <label>歌手 <select value={agentValue} onChange={(event) => dispatch({ type: 'batch', commands: selectedMainLines.map((line) => ({ type: 'set-line-agents', lineId: line.id, agentRefs: event.target.value ? [event.target.value] : [] })) })}>
-            {agentValue === '__mixed__' && <option value="__mixed__" disabled>混合值</option>}
-            <option value="">未指定</option>{document.agents.map((agent) => <option value={agent.id} key={agent.id}>{agent.name ?? agent.id}</option>)}
-          </select></label>
+          <SingerSelection agents={document.agents} lines={selectedMainLines} apply={dispatch} />
         </>}
         {selection?.kind !== 'lines' || selection.ids.length <= 1 ? <>
           <label><input type="checkbox" checked={Boolean(selectedLine.backgroundOf)} onChange={(event) => {
