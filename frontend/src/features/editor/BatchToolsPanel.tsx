@@ -1,3 +1,4 @@
+import { SettingsDialog } from './SettingsDialog';
 import { useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { replaceWords, shiftLineTimes, smoothWordTimes, syncLineTimes } from '../../domain/batch-editing';
@@ -65,8 +66,7 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
       if (apply(command)) { setMessage(summary); if (operation !== 'link') close(); }
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : '批量操作失败'); }
   };
-  return <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><section className={styles.dialog} role="dialog" aria-modal="true" aria-label="批处理" onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
-    <div className={styles.dialogHeader}><h2>批处理</h2><button aria-label="关闭批处理" onClick={close}>×</button></div>
+  return <SettingsDialog title="批处理" close={close} actions={<><button onClick={close}>关闭</button><button onClick={run}>{operation === 'link' && current?.endLink ? '取消链接' : '应用（一次撤销）'}</button></>}>
     <div className={styles.dialogTabs}>{([['replace', '替换'], ['shift', '时间偏移'], ['smooth', '音节平滑'], ['sync', '同步行时间'], ['link', '结束时间链接']] as const).map(([value, label]) => <button key={value} className={operation === value ? styles.activeTab : ''} onClick={() => { setOperation(value); setMessage(''); }}>{label}</button>)}</div>
     {operation !== 'link' && <div className={styles.dialogControls}>
       <label>范围<select value={scope} onChange={(event) => setScope(event.target.value)}><option value="current">当前行（含背景）</option><option value="selected">选中词或行</option><option value="range">指定行范围</option><option value="all">全文</option></select></label>
@@ -76,7 +76,7 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
       {operation === 'smooth' && <label>相邻词间隙或重叠阈值（毫秒）<input type="number" min="0" step="1" value={thresholdMs} onChange={(event) => setThresholdMs(event.target.value)} /></label>}
     </div>}
     <p className={styles.toolHint}>{operation === 'replace' ? `目标：${wordIds.length} 词；只替换词内文本，带 Ruby/附属属性的词需单独处理。` : operation === 'shift' ? `目标：${targets.length} 行；行、词、Ruby 和对齐一起平移，负值越界时整次取消。` : operation === 'smooth' ? `目标：${targets.length} 行；仅填平阈值内的 CJK 相邻词边界，Ruby/对齐边界保持原样。` : operation === 'sync' ? `目标：${targets.length} 行；行首尾取已定时间词的包络，未定词不变；改变已链接行的结束时间会取消链接。` : current?.endLink ? `当前行链接到 ${current.endLink.targetLineId}；取消后恢复原结束时间。` : '将当前主唱行结束时间链接到下一主唱行的开始时间；词和 Ruby 时间不变。'}</p>
-    <div className={styles.dialogActions}><button onClick={close}>关闭</button><button onClick={run}>{operation === 'link' && current?.endLink ? '取消链接' : '应用（一次撤销）'}</button></div>
+
     {message && <p role="alert">{message}</p>}
-  </section></div>;
+  </SettingsDialog>;
 }

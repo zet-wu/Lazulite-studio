@@ -1,3 +1,4 @@
+import { SettingsDialog } from './SettingsDialog';
 import { useState } from 'react';
 import type { LyricLine, RomanizationContent, RomanizationTrack } from '../../domain/lyric-document';
 import { lineText } from '../../domain/lyric-document';
@@ -16,9 +17,7 @@ export function LineSplitDialog({ line, background, attached, close, submit }: {
   const [rightIds, setRightIds] = useState<string[]>([]);
   const [backgroundTarget, setBackgroundTarget] = useState<'left' | 'right'>('right');
   const boundary = line.words.findIndex((word) => word.id === beforeWordId);
-  return <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <section className={styles.dialog} role="dialog" aria-modal="true" aria-label="拆分歌词行" onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
-      <div className={styles.dialogHeader}><h2>拆分歌词行</h2><button aria-label="关闭拆分歌词行" onClick={close}>×</button></div>
+  return <SettingsDialog title="拆分歌词行" close={close} actions={<><button onClick={close}>取消</button><button disabled={!beforeWordId} onClick={() => { if (submit(beforeWordId, rightIds, background ? backgroundTarget : null)) close(); }}>应用（一次撤销）</button></>}>
       <label>从该词开始新行 <select autoFocus value={beforeWordId} onChange={(event) => setBeforeWordId(event.target.value)}>
         {line.words.slice(1).map((word, index) => <option key={word.id} value={word.id}>{index + 2} · {word.text}</option>)}
       </select></label>
@@ -31,7 +30,6 @@ export function LineSplitDialog({ line, background, attached, close, submit }: {
       </label>)}</fieldset>}
       {background && <label>背景歌词「{lineText(background)}」归属 <select value={backgroundTarget} onChange={(event) => setBackgroundTarget(event.target.value as 'left' | 'right')}><option value="left">左行</option><option value="right">右行</option></select></label>}
       <p>音译文字与时间保持原值；拆分只改变所属主行。</p>
-      <div className={styles.dialogActions}><button onClick={close}>取消</button><button disabled={!beforeWordId} onClick={() => { if (submit(beforeWordId, rightIds, background ? backgroundTarget : null)) close(); }}>应用（一次撤销）</button></div>
-    </section>
-  </div>;
+
+    </SettingsDialog>;
 }

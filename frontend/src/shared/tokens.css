@@ -37,3 +37,28 @@ button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .48; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+/* Compact desktop roles shared by editor surfaces and controls. */
+:root {
+  --surface-container: #f3f5fa;
+  --surface-high: #e7ecf5;
+  --on-primary: #fff;
+  --state-hover: color-mix(in srgb, var(--blue) 9%, transparent);
+  --state-pressed: color-mix(in srgb, var(--blue) 16%, transparent);
+  --control-radius: 6px;
+  --surface-radius: 10px;
+  --label-size: 12px;
+  --body-size: 13px;
+  --lyric-size: 16px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 20px;
+}
+:root[data-theme='dark'] {
+  --surface-container: #222e40;
+  --surface-high: #2d3a50;
+  --on-primary: #102c61;
+}
+button, input, select, textarea { font-family: inherit; }
+button:not(:disabled):hover { background-image: linear-gradient(var(--state-hover), var(--state-hover)); }
+button:not(:disabled):active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }

@@ -1,3 +1,4 @@
+import { SettingsDialog } from './SettingsDialog';
 import { useEffect, useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { lineText, type LyricDocument, type LyricWord } from '../../domain/lyric-document';
@@ -87,9 +88,7 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
       if (apply({ type: 'segment-words', changes })) close();
     } catch (cause) { setError(cause instanceof Error ? cause.message : '应用分词失败'); }
   };
-  return <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <section className={styles.dialog} role="dialog" aria-modal="true" aria-label="分词" onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
-      <div className={styles.dialogHeader}><h2>分词</h2><button aria-label="关闭分词" onClick={close}>×</button></div>
+  return <SettingsDialog title="分词" close={close} actions={<><button onClick={() => void buildPreview()}>生成预览</button><button disabled={!preview.some((item) => item.parts.length > 1 && !item.blocked)} onClick={commit}>应用（一次撤销）</button></>}>
       <div className={styles.dialogTabs}>{(['manual', 'auto', 'advanced'] as const).map((item) => <button key={item} className={mode === item ? styles.activeTab : ''} onClick={() => { setMode(item); setPreview([]); }}>{item === 'manual' ? '手动' : item === 'auto' ? '自动' : '高级'}</button>)}</div>
       {mode === 'manual' ? <div>
         <p>当前词：{activeWord?.text ?? '请在画布选择一个词'}</p>
@@ -115,9 +114,8 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
           {testOutput && <p>测试结果：{testOutput}</p>}
         </>}
       </div>}
-      <div className={styles.dialogActions}><button onClick={() => void buildPreview()}>生成预览</button><button disabled={!preview.some((item) => item.parts.length > 1 && !item.blocked)} onClick={commit}>应用（一次撤销）</button></div>
+
       {error && <p role="alert">{error}</p>}
       {preview.length > 0 && <div className={styles.segmentPreview}><strong>预览：{preview.filter((item) => item.parts.length > 1 && !item.blocked).length} 词将切分</strong>{preview.map((item) => <div key={item.word.id}><small>{lineText(document.lines.find((line) => line.id === item.lineId)!)}</small><span>{item.word.text} → {item.parts.join(' │ ')}</span>{item.blocked && <em>含 Ruby 或附属属性，保留原词</em>}</div>)}</div>}
-    </section>
-  </div>;
+    </SettingsDialog>;
 }
