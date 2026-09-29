@@ -16,6 +16,8 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   await page.getByRole('button', { name: '重做', exact: true }).click();
   await line.getByRole('button', { name: '添加词', exact: true }).click();
   await line.getByRole('textbox', { name: '添加词', exact: true }).fill('追加'); await line.getByRole('textbox', { name: '添加词', exact: true }).press('Enter');
+  await line.getByRole('button', { name: '添加词', exact: true }).click();
+  await line.getByRole('textbox', { name: '添加词', exact: true }).fill('  '); await line.getByRole('textbox', { name: '添加词', exact: true }).press('Enter');
   await line.locator('[data-romanization-content-id]').first().locator('strong').click({ button: 'right' });
   await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
   const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
@@ -30,13 +32,15 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   await expect(line.getByRole('button', { name: '删除翻译', exact: true })).toHaveCount(1);
   await expect(line.getByLabel('词 追加开始秒数')).toHaveValue('');
   await expect(line.getByLabel('读音 I', { exact: true })).toHaveValue('ai');
+  await expect(line.locator('[data-word-id]').last().locator('[class*="wordMain"] input')).toHaveValue('  ');
   const semantic = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
     const document = codec.parseLyricTtml(xml);
-    return { agents: document.lines.map(line => line.agentRefs), translations: document.lines[0].translations, units: document.romanizationTracks[0].contents[0] };
+    return { agents: document.lines.map(line => line.agentRefs), translations: document.lines[0].translations, appended: document.lines[0].words.slice(-2).map(word => ({ text: word.text, beginUs: word.beginUs, endUs: word.endUs })), units: document.romanizationTracks[0].contents[0] };
   }, saved.document.ttml);
   expect(semantic.agents.slice(0, 2)).toEqual([['v1', 'v2'], ['v2', 'v1']]);
   expect(semantic.translations).toEqual([{ text: 'song', language: 'ja' }]);
+  expect(semantic.appended).toEqual([{ text: '追加', beginUs: null, endUs: null }, { text: '  ', beginUs: null, endUs: null }]);
   expect(semantic.units).toMatchObject({ kind: 'timed', units: [{ text: 'ai', beginUs: 1_000_000 }, { text: '', beginUs: 0, endUs: 6_000_000 }, { text: '  ', beginUs: 0, endUs: 6_000_000 }] });
   await page.locator('[data-top-menu="file"] summary').click();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: '最终 TTML', exact: true }).click();
@@ -48,6 +52,7 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   await expect(page.getByLabel('歌手 另一歌手', { exact: true })).toBeChecked();
   const refs = await page.evaluate(async xml => { const path = '/src/adapters/ttml/lyric-codec.ts'; return (await import(path)).parseLyricTtml(xml).lines.map((line: { agentRefs: string[] }) => line.agentRefs); }, xml);
   expect(refs.slice(0, 2)).toEqual([['v1', 'v2'], ['v2', 'v1']]);
+  await expect(line.locator('[data-word-id]').last().locator('[class*="wordMain"] input')).toHaveValue('  ');
   await writeFile(test.info().outputPath('roundtrip.json'), JSON.stringify(semantic));
 });
 
