@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-2026-09-28 更新至 Phase 4。本文描述实际架构；执行依据见[Phase 4方案](../../lyric-workflow/docs/studio/plans/phase4-ruby-background-timeline-remediation.md)，实际验证与开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
+2026-09-29 更新至 Phase 4 人工审阅后的 UI 整改。本文描述实际架构；执行依据见[UI 整改方案](../../lyric-workflow/docs/studio/plans/phase4-ui-interaction-remediation.md)，实际验证与开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
 
 ## 1. 应用与目录
 
@@ -24,13 +24,17 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 其他路由为 `/projects`、`/projects/:projectId/export`、`/login`、`/settings`。编辑器当前提供编辑/打轴/预览及一级“项目辅助”占位；大纲、歌词列表、属性各自滚动；大纲点击在栏上委托，未变化行用memo复用，元数据与歌手分别在设置弹窗中编辑。两侧独立显隐，默认190px/250px，范围160–360px/200–420px；6px分隔条支持指针捕获、取消、键盘8/32px、双击默认。拖动直接预览grid几何，仅分隔条更新自身ARIA，松手才提交工作区偏好；单一localStorage偏好不进入文档/history，resize仅限制渲染宽度；普通/虚拟列表共用显式ID/serial定位：远端先挂载，再按真实卡片矩形平滑居中，超高卡片靠顶；有界校准，新请求及用户滚动取消，尊重reduced-motion，不抢焦点。EditorMenu与EditorRibbon共用单一activeMenuId；受控details保留输入挂载，跨菜单互斥，命令/外点/Escape关闭（Escape回触发器），离开200ms关闭并保护菜单内键盘焦点；文件cancel监听独立清理。
 
+界面以共享语义 tokens 定义明暗表面、主次操作及内容/标签层级；菜单使用无框整行项。SettingsDialog 统一标题、滚动内容和固定操作区，兼顾焦点圈定及返回。大纲/属性标题独立固定，大纲行号与歌词分列，属性用主行号及背景标识；中栏不再设标题工具栏，轨道管理移入编辑工具。LyricList 在普通/虚拟内容的真实末尾渲染追加按钮，空文档同样可新增空白主行，选中并请求定位。
+
+`editor/object-drag.ts` 管理单对象指针会话。合法非输入区按下即抑制原生选字并捕获指针，歌词输入仍保留原生选区；副本只更新 DOM 坐标。二维矩形命中计算明确前驱槽位，只在槽位/复制模式变化时用纯命令生成临时文档投影，独立于实际文档/history。预览中的对象保留真实尺寸作占位，mounted 对象作 FLIP translate 动画，reduced-motion 禁用动画；虚拟行继续由 TanStack 挂载、测量和定位。松手提交同一槽位命令一次；取消、失捕、文档变化及卸载清理副本/捕获/占位。行组、词跨行及附属单元范围复用领域限制，行/词复制保留源对象。
+
 ## 3. 权威文档与事务
 
 `LyricDocument`（`studio-lyric-v5`）为唯一可写歌词文档，含 lines、romanizationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs、翻译与时间链接；词含 text、时间、Ruby 单元、对齐单元、空拍等。音译轨道按主行 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
 
 时间使用绝对整数微秒/null；拆分坐标使用 code point 并检查 grapheme 边界。`lyric-commands.ts` 提供纯函数事务与 256 次历史。背景勾选时原子附属最近的前一主行，前行已占用即拒绝，不向更早或后方寻找；下拉仅建立关系后启用，显示动态Lx，value保留稳定ID。内容、链接及各单元自身时间由单一命令校验；背景建立/改绑及主行拆分归属允许父背景各自独立绝对时间，不截短背景或扩展父行。selection、focus、播放时钟不作为歌词权威内容；批量操作一次入历史，最终改动经 codec 保存。
 
-词级与行级旧音译字段已移除，预览临时派生逐词音译与二侧歌手状态。音译轨道在主行下作为独立附属内容编辑；“从音译生成 Ruby”只在显式提交时把提案写入 Ruby，源轨道继续保留。候选判断采用10ms边缘容差：最大重叠>10ms才滤除其他≤10ms候选，全短/多候选仍人工。假名转换整词连接后与正文NFC相同，派生默认跳过；手动boolean覆盖保留用户取消，目标/输出/源变化按事件重算。对话框使用“跳过生成”，全跳过禁用应用，不新增空历史；>80行使用已有TanStack Virtual，仅挂载可见提案，全部状态以稳定row key保留，源/覆盖列表有界滚动。旧格式数据直接丢弃，不设迁移或双写。
+词级与行级旧音译字段已移除，预览临时派生逐词音译与二侧歌手状态。音译轨道在主行下作为独立附属内容编辑；“从音译生成 Ruby”只在显式提交时把提案写入 Ruby，源轨道继续保留。候选判断采用10ms边缘容差：最大重叠>10ms才滤除其他≤10ms候选，全短/多候选仍人工。假名转换整词连接后与正文NFC相同，派生默认跳过；手动boolean覆盖保留用户取消，目标/输出/源变化按事件重算。对话框使用“跳过生成”，全跳过禁用应用，不新增空历史；>80行使用已有TanStack Virtual，仅挂载可见提案，全部状态以稳定row key保留，源选择按需展开，覆盖列表有界滚动。生成不再要求时间扩展同意，也不保留扩展展示明细；必要的词/行包络计算仍与 Ruby 写入组成同一 batch，保留源时间、覆盖选择、过期及行尾链接检查。旧格式数据直接丢弃，不设迁移或双写。
 
 ## 4. 格式与保存
 
