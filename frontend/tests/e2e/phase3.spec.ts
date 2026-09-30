@@ -260,7 +260,7 @@ test('P3-08 top menus are mutually exclusive and dismiss with pointer, outside, 
   await page.keyboard.press('Escape');
   await expect(menu('file')).not.toHaveAttribute('open');
   await expect(menu('file').locator('summary')).toBeFocused();
-  await menu('settings').locator('summary').click();
+  await menu('lyrics-settings').locator('summary').click();
   await page.getByRole('button', { name: '元数据编辑' }).click();
   await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
   await page.getByRole('button', { name: '关闭元数据编辑' }).click();

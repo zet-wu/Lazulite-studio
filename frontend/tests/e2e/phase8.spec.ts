@@ -91,6 +91,7 @@ for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) t
   const overflow = await dialog.evaluate(e => e.scrollWidth > e.clientWidth); expect(overflow).toBe(false);
   await input.blur(); await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
   const area = dialog.getByLabel('L1音译', { exact: true }), initial = (await area.boundingBox())!.height;
+  expect((await area.boundingBox())!.width).toBeGreaterThan((await dialog.locator('[data-roman-proposal]').boundingBox())!.width * .9);
   await area.fill('very long ordinary romanization '.repeat(100)); expect((await area.boundingBox())!.height).toBeGreaterThan(initial * 2);
   expect(await area.evaluate(e => e.scrollHeight > e.clientHeight + 2)).toBe(false);
   await dialog.getByLabel('输出', { exact: true }).selectOption('timed'); await page.mouse.move(1, 1);
@@ -136,4 +137,15 @@ test('P8 rejected linked-target batch leaves document, history and selected IDs 
   await outline.nth(1).click({ button: 'right' }); await page.getByRole('menuitem', { name: '删除所选行（2）' }).click();
   await expect(page.getByRole('alert')).toContainText('original line end excludes a word'); await expect(outline).toHaveCount(3);
   await expect(page.getByText('行已选 2', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+});
+
+test('P8 merging timed fragments preserves generated separator spaces and native text keys', async ({ page }) => {
+  await load(page); const dialog = await generate(page); await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
+  await dialog.getByRole('button', { name: '生成音译', exact: true }).click();
+  await edge(page, 'main [data-romanization-unit-id]', 1, { button: 'right' }); await page.getByRole('menuitem', { name: '合并前一单元', exact: true }).click();
+  const input = page.getByLabel('音译单元 1', { exact: true }); await expect(input).toHaveValue('ga k ');
+  await expect(page.getByLabel('音译单元 1开始秒数')).toHaveValue('0'); await expect(page.getByLabel('音译单元 1结束秒数')).toHaveValue('2');
+  await input.click(); await input.press('ControlOrMeta+A'); await input.press('Backspace'); await expect(input).toHaveValue('');
+  await expect(page.locator('main [data-romanization-unit-id]')).toHaveCount(3);
+  await input.press('Escape'); await expect(input).toHaveValue('ga k ');
 });

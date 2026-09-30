@@ -84,7 +84,7 @@ export function RomanizationGenerationDialog({ document, lineIds, apply, close }
             const byWord = new Map<string, Array<{ unit: GeneratedUnit; index: number }>>();
             if (row.kind === 'timed') row.groups.forEach((unit, index) => { const list = byWord.get(unit.wordId) ?? []; list.push({ unit, index }); byWord.set(unit.wordId, list); });
             return <div key={row.lineId} ref={item ? virtualizer.measureElement : undefined} data-index={item?.index} data-roman-proposal={row.lineId}
-            style={item ? { position: 'absolute', width: '100%', transform: `translateY(${item.start}px)` } : undefined} className={styles.rubyGenerationRow}>
+            style={item ? { position: 'absolute', width: '100%', transform: `translateY(${item.start}px)` } : undefined} className={`${styles.rubyGenerationRow} ${styles.romanGenerationRow}`}>
             <label>L{ordinals.get(row.lineId)} <select aria-label={`L${ordinals.get(row.lineId)}生成内容`} value={targetFor(row.lineId)} onChange={event => setTargets(current => ({ ...current, [row.lineId]: event.target.value }))}>
               <option value="skip">跳过 · 保留已有</option><option value="append">添加新内容</option>
               {track?.contents.filter(content => content.lineId === row.lineId).map(content => <option key={content.id} value={content.id}>替换 · {content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</option>)}

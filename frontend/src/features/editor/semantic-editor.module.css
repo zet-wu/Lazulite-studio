@@ -261,3 +261,5 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .page .rubyGeneration :is(input, textarea).romanPreviewInput.romanPreviewHint { border: 1px dashed var(--danger); }
 .page .rubyGeneration :is(input, textarea).romanPreviewInput.romanPreviewHint:hover, .page .rubyGeneration :is(input, textarea).romanPreviewInput.romanPreviewHint:focus { border-color: var(--danger); }
 .romanGenerationError { border: 1px solid var(--danger); padding: 8px; border-radius: 4px; color: var(--danger); }
+
+.romanGenerationRow { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
