@@ -1,11 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { phase6Ttml } from '../fixtures/phase6';
-const xml = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><div>
-<p xml:id="kana" begin="0" end="4"><span begin="0" end="4" tts:ruby="container"><span tts:ruby="base">学校</span><span tts:ruby="textContainer"><span tts:ruby="text" begin="0" end="1">が</span><span tts:ruby="text" begin="1" end="2">っ</span><span tts:ruby="text" begin="2" end="3">こ</span><span tts:ruby="text" begin="3" end="4">う</span></span></span></p>
-<p xml:id="context" begin="4" end="6"><span begin="4" end="5">しん</span><span begin="5" end="6">よう</span></p>
-<p xml:id="missing" begin="6" end="8"><span begin="6" end="8">漢字</span></p>
-</div></body></tt>`;
+import { phase7Ttml as xml } from '../fixtures/phase7';
 async function load(page: Page, text = xml) {
   await page.goto('/editor');
   await page.locator('input[type=file]').setInputFiles({ name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(text) });
@@ -17,6 +13,7 @@ test('P7 Ruby generation is batch scoped, confirms context, repairs missing read
   await page.getByRole('menuitem', { name: '从 Ruby 生成音译…' }).click();
   const dialog = page.getByRole('dialog', { name: '从 Ruby 生成音译', exact: true });
   await expect(dialog).toContainText('生成 3 / 3 行');
+  await page.screenshot({ path: test.info().outputPath('romanization-proposal.png') });
   await expect(dialog.getByLabel('L1词组 1音译')).toHaveValue('gakkou');
   await expect(dialog.getByLabel('L2词组 1音译')).toHaveValue("shin'you");
   await expect(dialog.getByRole('button', { name: '生成音译', exact: true })).toBeDisabled();

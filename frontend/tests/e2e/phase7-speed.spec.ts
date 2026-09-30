@@ -47,7 +47,7 @@ test('P7 actual transport measures audible 440Hz signal across all required rate
     ffmpeg.stdout.on('data', chunk => chunks.push(chunk));
     let error = ''; ffmpeg.stderr.on('data', chunk => { error += String(chunk); });
     await new Promise<void>((resolve, reject) => { ffmpeg.on('error', reject); ffmpeg.on('close', code => code === 0 ? resolve() : reject(new Error(error))); });
-    const buffer = Buffer.concat(chunks), values = [];
+    const buffer = Buffer.concat(chunks), values: number[] = [];
     for (let i = Math.max(0, buffer.length - 48000); i < buffer.length; i += 2) values.push(buffer.readInt16LE(i) / 32768);
     const rms = Math.sqrt(values.reduce((sum, x) => sum + x * x, 0) / values.length);
     const crossings = values.flatMap((value, index) => index > 0 && values[index - 1] <= 0 && value > 0 ? [index] : []);
