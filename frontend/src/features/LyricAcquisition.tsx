@@ -1,6 +1,9 @@
+import { NetworkLyrics } from './NetworkLyrics';
+import type { Source } from '../adapters/http/lyric-sources';
+import { decodeKrcFile } from '../adapters/source-codec';
 import { useRef, useState } from 'react';
 import { detectLyricFormat, importLyricFile, type LyricFormat } from '../adapters/lyric-formats';
-import { lineText, type LyricDocument } from '../domain/lyric-document';
+import { type LyricDocument } from '../domain/lyric-document';
 import type { LyricCommand } from '../domain/lyric-commands';
 import styles from './acquisition.module.css';
 
@@ -34,7 +37,7 @@ export function LyricAcquisition({ document, apply, onImported, onNew }: { docum
       if (file.size > 4_000_000) throw new Error('歌词文件不能超过 4 MB');
       const kind = detectLyricFormat(file.name);
       if (kind === 'ass') throw new Error('ASS 目前仅支持导出');
-      const content = await file.text();
+      const content = kind === 'krc' ? await decodeKrcFile(file) : await file.text();
       if (serial === request.current) parse(content, kind);
     } catch (e) { if (serial === request.current) setMessage(`解析失败：${e instanceof Error ? e.message : e}`); }
   };
@@ -46,10 +49,11 @@ export function LyricAcquisition({ document, apply, onImported, onNew }: { docum
   };
   return <div className={styles.page}>
     <section className={styles.pane}><h2>歌词获取</h2><div className={styles.tabs} role="tablist" aria-label="歌词来源">
-      {[['file', '文件'], ['text', '文本']].map(([id, label]) => <button key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; setTab(id); setIncoming(null); setMessage(''); }}>{label}</button>)}
+      {[['netease','网易云音乐'],['qqmusic','QQ 音乐'],['kugou','酷狗'],['amll','AMLL DB'],['file', '文件'], ['text', '文本']].map(([id, label]) => <button key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; setTab(id); setIncoming(null); setMessage(''); }}>{label}</button>)}
     </div>
-      {tab === 'file' && <><p className={styles.hint}>选择歌词后预览，确认导入才会替换当前歌词。</p><button onClick={() => fileInput.current?.click()}>选择歌词文件</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
-      {tab === 'text' && <><label>文本格式 <select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</select></label><textarea aria-label="待导入歌词文本" value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button onClick={() => parse(text, format)}>预览文本</button></>}
+      {!['file','text'].includes(tab) && <NetworkLyrics key={tab} source={tab as Source} document={document} apply={apply} stage={stage} clear={() => setIncoming(null)} />}
+      {tab === 'file' && <><p className={styles.hint}>选择歌词后预览，确认导入才会替换当前歌词。</p><button onClick={() => fileInput.current?.click()}>选择歌词文件</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
+      {tab === 'text' && <><label>文本格式 <select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</select></label><textarea aria-label="待导入歌词文本" value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button onClick={() => parse(text, format)}>预览文本</button></>}
       {onNew && <button onClick={onNew}>新建空白歌词</button>}
       {message && <p role="status">{message}</p>}
     </section>
