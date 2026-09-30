@@ -539,7 +539,9 @@ def create_app(
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
     api.include_router(build_dictionary_router(ReadingDictionary(db), auth=auth, write=write, project_exists=project))
     api.include_router(build_router(DocumentService(revisions), auth=auth, write=write, project_exists=project))
-    api.include_router(build_publish_router(job_service, auth=auth, write=write, project_row=project))
+    from .lyric_sources import build_sources_router
+    api.include_router(build_sources_router(write=write))
+    api.include_router(build_publish_router(job_service, auth=auth, write=write, project_row=project, asset_path=asset_path_for_project))
     api.include_router(build_review_router(db, auth=auth, write=write, project_exists=project, stamp=stamp))
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
     app.include_router(api)

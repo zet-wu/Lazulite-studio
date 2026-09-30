@@ -71,6 +71,6 @@ def test_publish_rejects_existing_stpp(tmp_path: Path) -> None:
     try:
         publish_stpp(first, TTML, second)
     except ValueError as error:
-        assert "already contains" in str(error)
+        assert "select an existing" in str(error)
     else:
         raise AssertionError("existing stpp track was accepted")

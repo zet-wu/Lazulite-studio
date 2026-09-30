@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import FileResponse
@@ -12,10 +12,13 @@ class PublishRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     revision: str = Field(min_length=1)
     asset_id: str = Field(min_length=1)
+    lrc_kind: Literal['lrc', 'elrc']
+    lrc_text: str = Field(min_length=1, max_length=4_000_000)
+    target_track_id: int | None = Field(default=None, gt=0)
 
 
 def build_publish_router(service, *, auth: Callable, write: Callable,
-                         project_row: Callable[[str], object]):
+                         project_row: Callable[[str], object], asset_path: Callable):
     router = APIRouter()
 
     def project(pid):
@@ -36,10 +39,33 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
         if not found:
             raise HTTPException(422, {"code": "publish_input_invalid", "message": "revision does not belong to project", "retryable": False})
 
+    @router.get("/projects/{pid}/packaging")
+    def packaging(pid: str, _: object = Depends(auth)):
+        from mutagen import File
+        from mutagen.mp4 import MP4
+        from mutagen.mp3 import MP3
+        from mutagen.flac import FLAC
+        from .publishing import stpp_tracks
+        row = project(pid)
+        path = Path(asset_path(pid))
+        media = File(path)
+        tracks, error = [], None
+        if isinstance(media, MP4):
+            try: tracks = stpp_tracks(path)
+            except ValueError as exc: error = str(exc)
+        return {'asset_id':row[2], 'supported':isinstance(media,(MP4,MP3,FLAC)) and not error,
+                'container':'mp4' if isinstance(media,MP4) else 'mp3' if isinstance(media,MP3) else 'flac' if isinstance(media,FLAC) else None,
+                'tracks':tracks,'error':error}
+
     @router.post("/projects/{pid}/publish", status_code=202)
     def publish(pid: str, body: PublishRequest,
                 subject: str = Depends(write), idem: str | None = Header(default=None, alias="Idempotency-Key")):
         validate(pid, body)
+        import re
+        if len(body.lrc_text.encode('utf-8')) > 4_000_000 or not all(re.match(r'^\[\d+:\d{2}\.\d{3}\]', line) for line in body.lrc_text.splitlines()) or '\x00' in body.lrc_text:
+            raise HTTPException(422, {'code':'invalid_lrc','message':'兼容歌词格式或大小无效','retryable':False})
+        if body.lrc_kind == 'lrc' and re.search(r'<\d+:\d{2}\.\d{3}>',body.lrc_text):
+            raise HTTPException(422, {'code':'invalid_lrc','message':'普通 LRC 不能包含扩展时间标签','retryable':False})
         try:
             return service.create(pid, "publish", body.model_dump(), idem_key=idem, subject=subject)
         except ValueError as exc:
@@ -59,7 +85,7 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
             available = job["status"] == "succeeded" and passed and bool(path) and Path(path).is_file()
             status = "unavailable" if job["status"] == "succeeded" and (not path or not Path(path).is_file()) else job["status"]
             items.append({"id": job["id"], "revision": request.get("revision"), "asset_id": request.get("asset_id"),
-                          "status": status, "created_at": job["created_at"], "stale": request.get("revision") != prow[3],
+                          "lrc_kind": request.get("lrc_kind"), "target_track_id": request.get("target_track_id"), "status": status, "created_at": job["created_at"], "stale": request.get("revision") != prow[3],
                           "report": report, "download_url": f"/api/v1/projects/{pid}/exports/{job['id']}/download" if available else None,
                           "error": job["error"]})
         return {"schema_version": "studio-export-list-v1", "items": items}

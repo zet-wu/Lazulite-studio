@@ -71,11 +71,9 @@ def validate_publish_ttml(path: str | Path, max_duration: float | None = None) -
     def collect(element, inherited=(None, None)):
         local_begin = _time(element.get("begin")) if element.get("begin") is not None else None
         local_end = _time(element.get("end")) if element.get("end") is not None else None
-        offset = inherited[0] or 0
+        offset = 0
         begin = offset + local_begin if local_begin is not None else inherited[0]
         end = offset + local_end if local_end is not None else inherited[1]
-        if inherited[1] is not None and ((begin is not None and begin > inherited[1]) or (end is not None and end > inherited[1])):
-            raise PublishInvalid("child timing exceeds parent interval")
         parent_times[id(element)] = (begin, end)
         for child in list(element):
             collect(child, (begin, end))
@@ -94,7 +92,7 @@ def validate_publish_ttml(path: str | Path, max_duration: float | None = None) -
     for element in root.iter():
         if element.attrib.get("timeContainer") not in (None, "par"):
             raise PublishInvalid("unsupported timeContainer")
-        if "dur" in element.attrib:
+        if "dur" in element.attrib and element.tag != f"{{{TTML_NS}}}body":
             raise PublishInvalid("unsupported TTML clock parameter")
         time_base = element.attrib.get(f"{{{TTP_NS}}}timeBase")
         if time_base not in (None, "media"):
@@ -103,7 +101,8 @@ def validate_publish_ttml(path: str | Path, max_duration: float | None = None) -
         if any(key in {f"{{{TTP_NS}}}{name}" for name in unsupported_clock} for key in element.attrib):
             raise PublishInvalid("unsupported TTML clock parameter")
         if f"{{{STUDIO_NS}}}null" in element.attrib:
-            raise PublishInvalid("draft timing null is not publishable")
+            if not (element.tag == f"{{{TTML_NS}}}span" and not list(element) and (element.text or '').isspace()):
+                raise PublishInvalid("draft timing null is not publishable")
         begin, end = element.get("begin"), element.get("end")
         if begin is not None or end is not None:
             if begin is None or end is None:
@@ -137,10 +136,26 @@ class PublishRunner:
             raise PublishInvalid("revision not found")
         source = Path(row[0])
         asset = Path(self.asset_path(project_id))
+        from mutagen import File
+        from mutagen.mp4 import MP4
         from .publishing import media_duration_us
-        validate_publish_ttml(source, media_duration_us(asset) / 1_000_000)
+        from .packaging import package_media
+        media = File(asset)
+        ttml = None
+        if isinstance(media, MP4):
+            validate_publish_ttml(source, media_duration_us(asset) / 1_000_000)
+            # Strip editor-only attributes without changing timing or lyric content.
+            tree = ET.parse(source)
+            for element in tree.iter():
+                for key in list(element.attrib):
+                    if key.startswith('{'+STUDIO_NS+'}'): del element.attrib[key]
+            ttml = ET.tostring(tree.getroot(), encoding='utf-8')
         output = self.output_root / f"{uuid.uuid4().hex}{asset.suffix or '.mp4'}"
-        result = self.publisher.publish(source, asset, output)
+        try:
+            result = package_media(asset, output, ttml, request['lrc_text'], request.get('target_track_id'))
+        except Exception:
+            output.unlink(missing_ok=True)
+            raise
         result = dict(result or {})
         # Keep output ownership in the service; a publisher result cannot
         # redirect downloads to an arbitrary path.

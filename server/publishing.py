@@ -185,21 +185,35 @@ def media_duration_us(path: Path) -> int:
     return (duration * 1_000_000) // timescale
 
 
-def _has_stpp(moov: bytes) -> bool:
+def stpp_tracks(source: Path) -> list[dict]:
+    item = next((x for x in _scan_top(source) if x[0] == b"moov"), None)
+    if item is None: raise PublishingError("input has no moov")
+    return _tracks(_read_payload(source, *item[1:]))
+
+
+def _tracks(moov):
+    result = []
     for typ, trak, _, _ in _boxes(moov):
-        if typ != b"trak":
-            continue
-        mdia = _find(trak, b"mdia")
-        if not mdia or (_find(mdia, b"hdlr") or b"")[8:12] != b"subt":
-            continue
-        stbl = _find(_find(mdia, b"minf") or b"", b"stbl")
-        stsd = _find(stbl or b"", b"stsd")
-        if stsd and len(stsd) >= 8 and any(entry_type == b"stpp" for entry_type, _, _, _ in _boxes(stsd[8:])):
-            return True
-    return False
+        if typ != b"trak": continue
+        mdia = _find(trak, b"mdia") or b""
+        stbl = _find(_find(mdia, b"minf") or b"", b"stbl") or b""
+        stsd = _find(stbl, b"stsd") or b""
+        if not stsd or not any(k == b"stpp" for k, *_ in _boxes(stsd[8:])): continue
+        tkhd = _find(trak, b"tkhd")
+        track_id = struct.unpack_from(">I", tkhd, 20 if tkhd[0] == 1 else 12)[0]
+        mdhd, hdlr = _find(mdia, b"mdhd"), _find(mdia, b"hdlr")
+        code = struct.unpack_from(">H", mdhd, 32 if mdhd[0] == 1 else 20)[0]
+        language = ''.join(chr(((code >> shift) & 31) + 96) for shift in (10, 5, 0))
+        result.append({"track_id": track_id, "language": language, "name": hdlr[24:].rstrip(b"\0").decode('utf-8', errors='replace') if hdlr else ''})
+    return result
 
 
-def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str = "ffprobe") -> PublishReport:
+def _trak_id(trak):
+    tkhd = _find(trak, b"tkhd")
+    return struct.unpack_from(">I", tkhd, 20 if tkhd[0] == 1 else 12)[0]
+
+
+def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str = "ffprobe", target_track_id: int | None = None) -> PublishReport:
     source, output = Path(source), Path(output)
     if not source.is_file():
         raise PublishingError("source media is missing")
@@ -222,8 +236,11 @@ def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str 
     movie_timescale, movie_duration = _movie_clock(moov)
     if _find(moov, b"mvex") is not None:
         raise PublishingError("fragmented MP4 is not supported")
-    if _has_stpp(moov):
-        raise PublishingError("input already contains a subt/stpp track")
+    tracks = _tracks(moov)
+    if tracks and target_track_id not in {t['track_id'] for t in tracks}:
+        raise PublishingError("select an existing STPP track ID")
+    if not tracks and target_track_id is not None:
+        raise PublishingError("target STPP track no longer exists")
     # Keep every original top-level box and append the sample. Existing chunk
     # offsets remain valid because their media bytes are never moved.
     # The old moov is replaced by same-sized free space. Thus all original
@@ -234,7 +251,7 @@ def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str 
     if movie_duration <= 0 or movie_timescale <= 0:
         raise PublishingError("media has no finite movie duration")
     track_duration = (movie_duration * 1000 + movie_timescale - 1) // movie_timescale
-    track = _stpp_track(len(sample), mdat_offset, _track_id(moov), track_duration, movie_timescale)
+    track = _stpp_track(len(sample), mdat_offset, (target_track_id or _track_id(moov)), track_duration, movie_timescale)
     # Update mvhd next_track_ID while preserving all other metadata.
     mvhd = _find(moov, b"mvhd")
     next_id_offset = 108 if mvhd and mvhd[0] == 1 else 96
@@ -243,6 +260,8 @@ def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str 
         if typ == b"mvhd":
             body_start = pos + size - len(body)
             updated_moov[body_start + next_id_offset:body_start + next_id_offset + 4] = struct.pack(">I", _track_id(moov) + 1)
+    if target_track_id is not None:
+        updated_moov = bytearray(b''.join(_box(k, body) for k, body, _, _ in _boxes(bytes(updated_moov)) if not (k == b'trak' and _trak_id(body) == target_track_id)))
     new_moov = _box(b"moov", bytes(updated_moov) + track)
     replacement = _box(b"free", b"\0" * (old_moov_raw_size - 8))
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -267,7 +286,7 @@ def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str 
         raise PublishingError("audio track changed during publish")
     if metadata_before != metadata_after:
         raise PublishingError("metadata changed during publish")
-    embedded = extract_stpp(output)
+    embedded = extract_stpp(output, target_track_id or _track_id(moov))
     if embedded != sample:
         raise PublishingError("stpp round-trip sample mismatch")
     source_size = source.stat().st_size
@@ -277,7 +296,7 @@ def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str 
     return PublishReport(output, audio_after[0].get("codec_name"), len(audio_after), True, "subt", "stpp", 1, hashlib.sha256(sample).hexdigest(), True)
 
 
-def extract_stpp(path: Path) -> bytes:
+def extract_stpp(path: Path, track_id: int | None = None) -> bytes:
     """Read the first single-sample ``subt``/``stpp`` track from *path*."""
     path = Path(path)
     top = list(_scan_top(path))
@@ -287,6 +306,8 @@ def extract_stpp(path: Path) -> bytes:
     moov = _read_payload(path, moov_item[1], moov_item[2], moov_item[3])
     for typ, trak, _, _ in _boxes(moov):
         if typ != b"trak":
+            continue
+        if track_id is not None and _trak_id(trak) != track_id:
             continue
         mdia = _find(trak, b"mdia")
         if not mdia or (_find(mdia, b"hdlr") or b"")[8:12] != b"subt":

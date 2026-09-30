@@ -82,8 +82,14 @@ export function useProjectDocument(
     },
     [commit],
   );
-  const save = useCallback(async () => {
-    if (inFlight.current || conflict || !dirty) return;
+  const save = useCallback(async (forPackaging = false) => {
+    if (inFlight.current || conflict) {
+      if (forPackaging) throw new Error(conflict ? '保存冲突，请先处理' : '正在保存，请完成后重试打包');
+      return;
+    }
+    if (forPackaging && pending.current) throw new Error('上次保存尚未确认，请先重试保存再打包');
+    const captured = stateRef.current.present;
+    if (!dirty) return { revision, document: captured };
     inFlight.current = true;
     setSaving(true);
     try {
@@ -120,11 +126,13 @@ export function useProjectDocument(
           result.revision,
         ));
       }
+      return { revision: result.revision, document: captured };
     } catch (caught) {
       if ((caught as { status?: number }).status === 412) setConflict(true);
       setError(
         caught instanceof Error ? caught.message : "保存失败，修改已保留",
       );
+      if (forPackaging) throw caught;
     } finally {
       inFlight.current = false;
       setSaving(false);
@@ -208,6 +216,7 @@ export function useProjectDocument(
     recovery,
     apply,
     save,
+    saveForPackaging: () => save(true),
     recover: restore,
     restore,
     discardRecovery,

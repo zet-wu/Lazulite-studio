@@ -53,12 +53,11 @@ type Props = {
   saving?: boolean;
   error?: string | null;
   onSave: () => void;
-  onOpen?: (file: File) => void;
   onNew?: () => void;
   onDraft: () => void;
   onFinal: () => void;
   onExportFormat?: (format: LyricFormat) => void;
-  onPublish?: () => void;
+  saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument } | undefined>;
   selectedLineId?: string | null;
   playheadLineId?: string | null;
   onSelectLine?: (id: string) => void;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { studioApi, studioS4, type Asset } from '../adapters/http/client';
 import { serializeLyricTtml } from '../adapters/ttml/lyric-codec';
 import { exportLyricFile, type LyricFormat } from '../adapters/lyric-formats';
@@ -28,7 +28,6 @@ export function Workspace({ projectId }: { projectId: string }) {
 
 function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }: { projectId: string; title: string; initialTtml: string; initialRevision: string; asset: Asset | null }) {
   const transport = useRef<TransportHandle>(null);
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const editor = useProjectDocument(projectId, initialTtml, initialRevision, undefined,
     async (xml, base, operationId, sequence, etag) => {
@@ -65,7 +64,7 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
   return <div className={styles.editorShell}><EditorWorkspace embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
     onSave={() => void editor.save()} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat}
-    onPublish={() => { if (editor.dirty || editor.conflict || editor.saving) setMessage('请先保存后发布'); else navigate(`/projects/${projectId}/export`); }}
+    saveForPackaging={editor.saveForPackaging}
     selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
     onSelectRomanization={(trackId, contentId) => setSelectedRomanization({ trackId, contentId })}
     onSelectUnit={(lineId, wordId, rubyId) => setSelectedUnit(wordId ? { lineId, wordId, rubyId } : null)} />

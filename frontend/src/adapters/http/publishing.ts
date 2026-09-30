@@ -15,6 +15,8 @@ export type ExportItem = {
   id: string;
   revision: string;
   asset_id: string;
+  lrc_kind?: 'lrc' | 'elrc';
+  target_track_id?: number | null;
   status:
     | "queued"
     | "running"
@@ -58,6 +60,8 @@ const asExport = (value: unknown): ExportItem | null => {
   return {
     id: value.id,
     revision: value.revision,
+    lrc_kind: value.lrc_kind as ExportItem['lrc_kind'],
+    target_track_id: value.target_track_id as number | null,
     asset_id: value.asset_id,
     status: value.status as ExportItem["status"],
     created_at: value.created_at,
@@ -126,6 +130,7 @@ export const publishingApi = {
     projectId: string,
     revision: string,
     assetId: string,
+    options: { lrc_kind: 'lrc' | 'elrc'; lrc_text: string; target_track_id: number | null },
   ): Promise<PublishJob> =>
     parse(
       await fetch(`${root}/projects/${encodeURIComponent(projectId)}/publish`, {
@@ -135,7 +140,7 @@ export const publishingApi = {
           "Content-Type": "application/json",
           "Idempotency-Key": crypto.randomUUID(),
         }),
-        body: JSON.stringify({ revision, asset_id: assetId }),
+        body: JSON.stringify({ revision, asset_id: assetId, ...options }),
       }),
       (value) =>
         isObject(value) && typeof value.id === "string"

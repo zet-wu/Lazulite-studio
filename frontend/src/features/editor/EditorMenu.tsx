@@ -10,7 +10,6 @@ type Props = MenuState & {
   saving?: boolean;
   canUndo: boolean;
   canRedo: boolean;
-  onOpen?: (file: File) => void;
   onNew?: () => void;
   onSave: () => void;
   undo: () => void;
@@ -22,7 +21,6 @@ type Props = MenuState & {
   onDraft: () => void;
   onFinal: () => void;
   onExportFormat?: (format: LyricFormat) => void;
-  onPublish?: () => void;
 };
 
 export function EditorMenu(props: Props) {

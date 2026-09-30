@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { publishingApi } from "./publishing";
-import { validatePublishDocument } from "../../features/ExportPage";
+import { parseLyricTtml } from "../ttml/lyric-codec";
+import { validatePublishDocument as validate } from "../publish-validation";
+const validatePublishDocument = (xml: string) => validate(parseLyricTtml(xml));
 
 describe("publishing adapter", () => {
   afterEach(() => vi.unstubAllGlobals());

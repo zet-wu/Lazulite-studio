@@ -15,7 +15,6 @@ import { ProjectList } from "../features/ProjectList";
 import { Workspace } from "../features/Workspace";
 import { LocalEditor } from "../features/editor/LocalEditor";
 import { ApiError, studioApi } from "../adapters/http/client";
-import { ExportPage } from "../features/ExportPage";
 import styles from "./app.module.css";
 
 const queryClient = new QueryClient({
@@ -189,7 +188,6 @@ function ProtectedRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/projects" element={<ProjectList />} />
         <Route path="/projects/:projectId/edit" element={<WorkspaceRoute />} />
-        <Route path="/projects/:projectId/export" element={<ExportPage />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/projects" replace />} />
       </Routes>
