@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { phase7Ttml } from '../fixtures/phase7';
 for (const kind of ['plain', 'timed']) test(`P8 ${kind} manual result and placeholders persist in real service and final TTML`, async ({ page }) => {
@@ -33,4 +33,31 @@ for (const kind of ['plain', 'timed']) test(`P8 ${kind} manual result and placeh
   await page.locator('input[type=file]').last().setInputFiles({ name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
   await expect(page.getByLabel(kind === 'timed' ? '音译单元 1' : '音译 ja-Latn', { exact: true }).first()).toHaveValue(' manual  ');
   await writeFile(test.info().outputPath(`phase8-${kind}-roundtrip.json`), JSON.stringify({ draft, final }, null, 2));
+});
+
+test('Generation mode survives project reload and stays isolated across projects', async ({ page }) => {
+  async function open(page: Page) {
+    await page.locator('[data-outline-drag]').first().click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
+    return page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
+  }
+  await page.goto('/projects/phase4-background/edit'); let dialog = await open(page);
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('plain');
+  await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
+  await dialog.getByLabel('L1单元 1音译').fill('discarded');
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await page.reload(); dialog = await open(page);
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
+  await expect(dialog.getByLabel('L1单元 1音译')).not.toHaveValue('discarded');
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await page.goto('/projects/phase2/edit'); dialog = await open(page);
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('plain');
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await page.goto('/projects/phase4-background/edit'); dialog = await open(page);
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
+  await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await page.reload(); dialog = await open(page);
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('plain');
 });

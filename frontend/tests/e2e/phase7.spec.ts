@@ -24,6 +24,8 @@ test('P7 generated source timing remains batch scoped with local replacement and
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '重做', exact: true }).click();
   await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
+  await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
   await dialog.getByLabel('目标轨道').selectOption({ label: '轨道 1 · ja-Latn' });
   await expect(dialog.getByLabel('L1生成内容')).toHaveValue('skip');
   await expect(dialog.getByRole('button', { name: '生成音译', exact: true })).toBeDisabled();

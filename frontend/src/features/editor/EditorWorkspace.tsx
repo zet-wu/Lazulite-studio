@@ -40,6 +40,7 @@ const PreviewMode = lazy(() => import('./PreviewMode').then((module) => ({ defau
 
 type Props = {
   title: string;
+  projectId?: string;
   document: LyricDocument;
   apply: (command: LyricCommand) => void;
   undo: () => void;
@@ -707,7 +708,8 @@ export function EditorWorkspace(props: Props) {
     })()}
     {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
     {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
-    {romanizationGeneration && <RomanizationGenerationDialog document={document} lineIds={romanizationGeneration} apply={dispatch} close={() => setRomanizationGeneration(null)} />}
+    {romanizationGeneration && <RomanizationGenerationDialog document={document} lineIds={romanizationGeneration}
+      preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} apply={dispatch} close={() => setRomanizationGeneration(null)} />}
     {rubyGeneration && <RubyGenerationDialog document={document} lineIds={rubyGeneration.lineIds} initialTrackId={rubyGeneration.trackId} initialContentId={rubyGeneration.contentId}
       apply={dispatch} close={() => setRubyGeneration(null)} />}
     {rubyBaseOpen && <SettingsDialog title="整体 Ruby" close={() => setRubyBaseOpen(false)} actions={<><button onClick={() => setRubyBaseOpen(false)}>取消</button><button disabled={!rubyBaseReading} onClick={createRubyBase}>应用</button></>}>

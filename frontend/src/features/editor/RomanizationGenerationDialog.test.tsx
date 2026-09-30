@@ -9,10 +9,10 @@ vi.mock('../../domain/romanization-generation', async importOriginal => {
   return { ...actual, proposeRomanization: vi.fn(actual.proposeRomanization) };
 });
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
 it('generates only at entry and mode change, blocks a changed source without replacing manual text', () => {
   const doc = createLyricDocument('きゃ'), apply = vi.fn(() => true), close = vi.fn();
-  const props = { document: doc, lineIds: [doc.lines[0].id], apply, close };
+  const props = { document: doc, lineIds: [doc.lines[0].id], preferenceScope: 'project:first', apply, close };
   const view = render(<RomanizationGenerationDialog {...props} />);
   expect(proposeRomanization).toHaveBeenCalledTimes(1);
   fireEvent.change(screen.getByLabelText('L1音译'), { target: { value: 'manual' } });
@@ -29,8 +29,30 @@ it('generates only at entry and mode change, blocks a changed source without rep
 it('submits an active manual ordinary field even when the source has no reading', () => {
   const doc = createLyricDocument('漢字');
   const apply = vi.fn(command => { const next = executeLyricCommand(createLyricEditorState(doc), command).present; expect(next.romanizationTracks[0].contents[0]).toMatchObject({ text: '  manual  ' }); expect(next.lines).toEqual(doc.lines); return true; });
-  const close = vi.fn(); render(<RomanizationGenerationDialog document={doc} lineIds={[doc.lines[0].id]} apply={apply} close={close} />);
+  const close = vi.fn(); render(<RomanizationGenerationDialog document={doc} lineIds={[doc.lines[0].id]} preferenceScope="project:first" apply={apply} close={close} />);
   fireEvent.change(screen.getByLabelText('L1音译'), { target: { value: '  manual  ' } });
   fireEvent.click(screen.getByRole('button', { name: '生成音译' })); expect(apply).toHaveBeenCalledOnce(); expect(close).toHaveBeenCalledOnce();
   expect(proposeRomanization).toHaveBeenCalledTimes(1);
+});
+
+it('remembers output per project after cancellation and generates once in the restored mode', () => {
+  const doc = createLyricDocument('かな'), apply = vi.fn(() => true), close = vi.fn();
+  const props = { document: doc, lineIds: [doc.lines[0].id], preferenceScope: 'project:first', apply, close };
+  let view = render(<RomanizationGenerationDialog {...props} />);
+  fireEvent.change(screen.getByLabelText('输出'), { target: { value: 'timed' } });
+  fireEvent.change(screen.getByLabelText('L1单元 1音译'), { target: { value: 'discarded' } });
+  fireEvent.click(screen.getByRole('button', { name: '取消' }));
+  expect(apply).not.toHaveBeenCalled(); view.unmount(); vi.clearAllMocks();
+  view = render(<RomanizationGenerationDialog {...props} />);
+  expect(screen.getByLabelText('输出')).toHaveValue('timed');
+  expect(screen.getByLabelText('L1单元 1音译')).toHaveValue('kana');
+  expect(proposeRomanization).toHaveBeenCalledExactlyOnceWith(doc, props.lineIds, 'timed');
+  view.unmount(); vi.clearAllMocks();
+  view = render(<RomanizationGenerationDialog {...props} preferenceScope="project:second" />);
+  expect(screen.getByLabelText('输出')).toHaveValue('plain');
+  expect(proposeRomanization).toHaveBeenCalledExactlyOnceWith(doc, props.lineIds, 'plain'); view.unmount();
+  view = render(<RomanizationGenerationDialog {...props} />);
+  fireEvent.change(screen.getByLabelText('输出'), { target: { value: 'plain' } }); view.unmount();
+  render(<RomanizationGenerationDialog {...props} />);
+  expect(screen.getByLabelText('输出')).toHaveValue('plain');
 });

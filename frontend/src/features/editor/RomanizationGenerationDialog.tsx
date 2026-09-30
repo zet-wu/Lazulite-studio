@@ -71,13 +71,14 @@ function TimedWordPreview({ word, units, lineLabel, change, focus }: {
     })}
   </div>;
 }
-export function RomanizationGenerationDialog({ document, lineIds, apply, close }: {
-  document: LyricDocument; lineIds: string[]; apply: (command: LyricCommand) => boolean; close: () => void;
+export function RomanizationGenerationDialog({ document, lineIds, preferenceScope, apply, close }: {
+  document: LyricDocument; lineIds: string[]; preferenceScope: string; apply: (command: LyricCommand) => boolean; close: () => void;
 }) {
   const [source] = useState(document);
   const [sourceIds] = useState(lineIds);
-  const [kind, setKind] = useState<RomanizationKind>('plain');
-  const [rows, setRows] = useState<RomanizationProposal[]>(() => proposeRomanization(source, sourceIds, 'plain'));
+  const modeStorage = `lazulite-romanization-mode:${preferenceScope}`;
+  const [kind, setKind] = useState<RomanizationKind>(() => localStorage.getItem(modeStorage) === 'timed' ? 'timed' : 'plain');
+  const [rows, setRows] = useState<RomanizationProposal[]>(() => proposeRomanization(source, sourceIds, kind));
   const [trackId, setTrackId] = useState('');
   const [targets, setTargets] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
@@ -116,6 +117,7 @@ export function RomanizationGenerationDialog({ document, lineIds, apply, close }
         <label>输出 <select aria-label="输出" aria-describedby="romanization-mode-help" value={kind} onChange={event => {
           const next = event.target.value as RomanizationKind;
           setKind(next); setRows(proposeRomanization(source, sourceIds, next)); setMessage(''); setFocusedRow(null);
+          localStorage.setItem(modeStorage, next);
         }}><option value="plain">普通文本</option><option value="timed">按源分词定时</option></select></label>
       </div>
       <small id="romanization-mode-help">切换输出会重新生成，清除本窗口的文字修改</small>

@@ -71,7 +71,7 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     try { download(exportLyricFile(editor.document, format), `${title}.${format}`); setMessage(''); }
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
   };
-  return <div className={styles.editorShell}><EditorWorkspace embedded title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
+  return <div className={styles.editorShell}><EditorWorkspace embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
     onSave={() => void editor.save()} onOpen={(file) => void openFile(file)} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat}
     onPublish={() => { if (editor.dirty || editor.conflict || editor.saving) setMessage('请先保存后发布'); else navigate(`/projects/${projectId}/export`); }}
