@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { TranslationEditor } from './TranslationEditor';
-afterEach(cleanup);
+beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }));
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 it('keeps new and invalid language drafts local, commits valid input and exposes an accessible trash button', () => {
   const apply = vi.fn(() => true);

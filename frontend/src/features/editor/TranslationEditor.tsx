@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { SubLyric } from '../../domain/lyric-document';
 import { validateLanguageTag } from '../../domain/sublyrics';
 import { Icon } from '../../shared/Icon';
@@ -10,6 +10,14 @@ function TranslationRow({ item, index, commit, remove, fresh = false }: {
   const [text, setText] = useState(item.text);
   const [language, setLanguage] = useState(item.language ?? '');
   const [error, setError] = useState('');
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const element = textRef.current!;
+    const resize = () => { element.style.height = '0px'; element.style.height = `${element.scrollHeight}px`; };
+    resize();
+    const observer = new ResizeObserver(resize); observer.observe(element);
+    return () => observer.disconnect();
+  }, [text]);
   const composing = useRef(false);
   const cancelled = useRef(false);
   useEffect(() => { setText(item.text); setLanguage(item.language ?? ''); setError(''); }, [item]);
@@ -25,14 +33,14 @@ function TranslationRow({ item, index, commit, remove, fresh = false }: {
   return <div className={styles.translationRow} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
     onKeyDown={event => {
       if (composing.current || event.nativeEvent.isComposing) return;
-      if (event.key === 'Enter') { event.preventDefault(); (event.target as HTMLInputElement).blur(); }
+      if (event.key === 'Enter') { event.preventDefault(); (event.target as HTMLInputElement | HTMLTextAreaElement).blur(); }
       if (event.key === 'Escape') {
         event.stopPropagation(); cancelled.current = true;
         setText(item.text); setLanguage(item.language ?? ''); setError('');
-        (event.target as HTMLInputElement).blur(); if (fresh) remove();
+        (event.target as HTMLInputElement | HTMLTextAreaElement).blur(); if (fresh) remove();
       }
     }}>
-    <input autoFocus={fresh} aria-label={`翻译 ${index + 1}`} value={text} onChange={event => setText(event.target.value)} onBlur={submit} />
+    <textarea ref={textRef} rows={1} autoFocus={fresh} aria-label={`翻译 ${index + 1}`} value={text} onChange={event => setText(event.target.value)} onBlur={submit} />
     <input className={styles.translationLanguage} aria-label={`翻译 ${index + 1}语言`} placeholder="未指定语言" value={language} aria-invalid={Boolean(error)} onChange={event => setLanguage(event.target.value)} onBlur={submit} />
     <button className={styles.iconButton} aria-label="删除翻译" onMouseDown={event => event.preventDefault()} onClick={remove}><Icon name="trash" /></button>
     {error && <small role="alert">{error}</small>}

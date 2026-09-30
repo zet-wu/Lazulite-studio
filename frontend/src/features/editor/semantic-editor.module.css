@@ -242,3 +242,10 @@
 .singerSelection { min-width: 0; border: 1px solid var(--line); border-radius: 5px; margin: 0 0 12px; padding: 6px; font-size: 12px; }
 .singerSelection label { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
 .singerSelection small { display: block; color: var(--muted); margin-bottom: 4px; }
+
+.splitPreview { display: grid; gap: 8px; margin-block: 10px; }
+.splitPreview section { padding: 10px 12px; border-left: 3px solid var(--blue); background: var(--canvas); min-width: 0; }
+.splitPreview p { font-size: 1.1rem; margin: 5px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.splitPreview small { display: block; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.sublyrics > div { min-width: 0; width: 100%; }
+.sublyrics .translationRow textarea { flex: 1 1 100%; width: 100%; min-width: 0; min-height: 28px; max-height: calc(6lh + 10px); resize: none; box-sizing: border-box; font: inherit; line-height: 1.4; overflow-y: auto; }

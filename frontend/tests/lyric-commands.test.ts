@@ -135,10 +135,10 @@ describe('semantic lyric commands', () => {
     ] });
     const original = createLyricEditorState(document);
     const withBackground = executeLyricCommand(original, { type: 'set-background-of', lineId: bg.id, parentLineId: main.id });
-    expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', contentIdsForNewLine: ['second'], backgroundTarget: null })).toThrow(/背景歌词归属/);
-    const leftAssigned = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', contentIdsForNewLine: ['second'], backgroundTarget: 'left' });
+    expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIndicesForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: null })).toThrow(/背景歌词归属/);
+    const leftAssigned = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIndicesForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: 'left' });
     expect(leftAssigned.present.lines.find(line => line.id === bg.id)).toMatchObject({ backgroundOf: main.id, beginUs: bg.beginUs, endUs: bg.endUs });
-    const split = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', contentIdsForNewLine: ['second'], backgroundTarget: 'right' });
+    const split = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIndicesForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: 'right' });
     expect(split.present.lines.map((line) => [line.id, line.backgroundOf])).toEqual([[main.id, null], ['right', null], ['bg', 'right']]);
     expect(split.present.romanizationTracks[0].contents.map((content) => [content.id, content.lineId])).toEqual([['first', main.id], ['second', 'right']]);
     expect(undoLyricCommand(split).present).toBe(withBackground.present);

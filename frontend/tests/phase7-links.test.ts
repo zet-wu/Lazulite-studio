@@ -15,7 +15,7 @@ it('splits linked lines preserving incoming links, cancellation state, target up
   const doc = fixture(); doc.lines[3].endUs = 0; doc.lines[3].beginUs = 0;
   doc.lines[3].endLink = { targetLineId: 'a', originalEndUs: 0 };
   const before = createLyricEditorState(doc);
-  const split = executeLyricCommand(before, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: [], backgroundTarget: null });
+  const split = executeLyricCommand(before, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', translationIndicesForNewLine: [], contentIdsForNewLine: [], backgroundTarget: null });
   expect(split.present.lines[0]).toMatchObject({ id: 'a', endUs: 1_000_000, endLink: null });
   expect(split.present.lines[1].endLink).toEqual(doc.lines[0].endLink);
   expect(split.present.lines.at(-1)!.endLink!.targetLineId).toBe('a');
@@ -49,4 +49,19 @@ it('reports all real conflicts with source ordinals and safely rebinds identical
   expect(safe.present.lines.at(-1)!.endLink!.targetLineId).toBe('a');
   doc.lines[0].endLink = { targetLineId: 'c', originalEndUs: 2_000_000 };
   expect(lineStructureIssues(doc, doc.lines[0], doc.lines[1])).toEqual(['L1行尾链接 → L3在合并范围外']);
+});
+it('assigns translations independently with romanization and background in one split and roundtrip', () => {
+  const doc = fixture();
+  doc.lines[0].translations = [{ text: 'one', language: 'en' }, { text: '二', language: 'zh-Hans' }, { text: '三', language: 'ja' }];
+  doc.lines.splice(1, 0, { ...createLine('声', 'bg'), backgroundOf: 'a' });
+  doc.romanizationTracks = [{ id: 't', language: 'ja-Latn', contents: [{ id: 'r', lineId: 'a', kind: 'plain', text: 'a' }] }];
+  const state = createLyricEditorState(doc);
+  const result = executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: ['r'], translationIndicesForNewLine: [1, 2], backgroundTarget: 'right' });
+  expect(result.present.lines[0].translations).toEqual([doc.lines[0].translations[0]]);
+  expect(result.present.lines[1].translations).toEqual(doc.lines[0].translations.slice(1));
+  expect(result.present.lines[2].backgroundOf).toBe('new');
+  expect(result.present.romanizationTracks[0].contents[0].lineId).toBe('new');
+  for (const draft of [true, false]) expect(parseLyricTtml(serializeLyricTtml(result.present, { draft })).lines[1].translations).toEqual(doc.lines[0].translations.slice(1));
+  expect(undoLyricCommand(result).present).toBe(doc);
+  expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: [], translationIndicesForNewLine: [3], backgroundTarget: 'left' })).toThrow('翻译分配条目不存在');
 });

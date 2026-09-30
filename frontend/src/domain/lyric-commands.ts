@@ -12,7 +12,7 @@ type AtomicLyricCommand =
   | { type: 'set-background-of'; lineId: string; parentLineId: string | null }
   | { type: 'delete-line'; lineId: string }
   | { type: 'move-line'; lineId: string; afterLineId: string | null }
-  | { type: 'split-line'; lineId: string; beforeWordId: string; newLineId: string; contentIdsForNewLine: string[]; backgroundTarget: 'left' | 'right' | null }
+  | { type: 'split-line'; lineId: string; beforeWordId: string; newLineId: string; contentIdsForNewLine: string[]; translationIndicesForNewLine: number[]; backgroundTarget: 'left' | 'right' | null }
   | { type: 'merge-lines'; firstLineId: string; secondLineId: string }
   | { type: 'insert-word'; lineId: string; afterWordId: string | null; word: LyricWord }
   | { type: 'delete-word'; lineId: string; wordId: string }
@@ -190,13 +190,15 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (wordIndex <= 0) throw new Error('请选择非首词作为拆行边界');
       const attached = document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === line.id));
       if (command.contentIdsForNewLine.some((id) => !attached.some((content) => content.id === id))) throw new Error('音译内容分配目标不存在');
+      if (command.translationIndicesForNewLine.some(index => !Number.isInteger(index) || index < 0 || index >= line.translations.length)) throw new Error('翻译分配条目不存在');
+      const translationIndices = new Set(command.translationIndicesForNewLine);
       const background = document.lines.find((item) => item.backgroundOf === line.id);
       if (background && !command.backgroundTarget) throw new Error('请指定背景歌词归属');
       const leftWords = line.words.slice(0, wordIndex), rightWords = line.words.slice(wordIndex);
       const leftEnd = leftWords.every(word => word.endUs !== null) ? Math.max(...leftWords.map(word => word.endUs!)) : null;
       const rightBegin = rightWords[0].beginUs;
-      const left = { ...line, words: leftWords, endUs: leftEnd, endLink: null };
-      const right: LyricLine = { ...line, id: command.newLineId, words: rightWords, beginUs: rightBegin, translations: [] };
+      const left = { ...line, words: leftWords, endUs: leftEnd, endLink: null, translations: line.translations.filter((_, index) => !translationIndices.has(index)) };
+      const right: LyricLine = { ...line, id: command.newLineId, words: rightWords, beginUs: rightBegin, translations: line.translations.filter((_, index) => translationIndices.has(index)) };
       validTime(left.beginUs, left.endUs);
       validTime(right.beginUs, right.endUs);
       left.words.forEach((word) => wordFitsLine(word, left));

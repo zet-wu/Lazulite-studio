@@ -12,7 +12,6 @@ export function lineStructureIssues(document: LyricDocument, first: LyricLine, s
   if (!second) {
     if (first.backgroundOf) issues.push(`${label(first)}不能直接拆分`);
     if (first.words.length < 2) issues.push(`${label(first)}没有可拆分的词边界`);
-    if (first.translations.length) issues.push(`${label(first)}有翻译`);
     return issues;
   }
   const main = document.lines.filter(item => !item.backgroundOf);
