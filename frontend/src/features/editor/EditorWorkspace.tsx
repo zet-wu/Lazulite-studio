@@ -1,3 +1,4 @@
+import { lineStructureIssues } from '../../domain/line-structure';
 import { useObjectDrag, type DragSource } from './object-drag';
 import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
@@ -442,7 +443,7 @@ export function EditorWorkspace(props: Props) {
         { label: '添加词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') }) },
         { label: '行上移', disabled: Boolean(line.backgroundOf) || mainLines[0]?.id === line.id, run: () => moveLine(line, -1) },
         { label: '行下移', disabled: Boolean(line.backgroundOf) || mainLines.at(-1)?.id === line.id, run: () => moveLine(line, 1) },
-        { label: '拆分行…', disabled: Boolean(line.backgroundOf) || line.words.length < 2, run: () => setSplitLineId(line.id) },
+        { label: '拆分行…', disabled: Boolean(line.backgroundOf) || line.words.length < 2, run: () => { const issues = lineStructureIssues(document, line); if (issues.length) setMessage(issues.join('；')); else setSplitLineId(line.id); } },
         { label: '合并下一行', disabled: Boolean(line.backgroundOf) || mainLines.at(-1)?.id === line.id, run: () => {
           const next = mainLines[mainLines.findIndex((item) => item.id === line.id) + 1];
           if (next) dispatch({ type: 'merge-lines', firstLineId: line.id, secondLineId: next.id });

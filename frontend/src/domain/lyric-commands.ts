@@ -1,3 +1,4 @@
+import { lineStructureIssues } from './line-structure';
 import { nonemptyTranslations } from './sublyrics';
 import { createLine, createWord, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type SubLyric, type TimeUs } from './lyric-document';
 import { splitAtGrapheme } from './text-boundaries';
@@ -182,7 +183,8 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     case 'split-line': {
       const index = lineIndex(document, command.lineId);
       const line = document.lines[index];
-      if (line.backgroundOf || line.endLink || line.translations.length) throw new Error('此行有背景属性、行尾链接或翻译，请先处理');
+      const issues = lineStructureIssues(document, line);
+      if (issues.length) throw new Error(issues.join('；'));
       if (document.lines.some((item) => item.id === command.newLineId)) throw new Error('新行 ID 已存在');
       const wordIndex = line.words.findIndex((word) => word.id === command.beforeWordId);
       if (wordIndex <= 0) throw new Error('请选择非首词作为拆行边界');
@@ -191,10 +193,10 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const background = document.lines.find((item) => item.backgroundOf === line.id);
       if (background && !command.backgroundTarget) throw new Error('请指定背景歌词归属');
       const leftWords = line.words.slice(0, wordIndex), rightWords = line.words.slice(wordIndex);
-      const leftEnd = leftWords.at(-1)?.endUs ?? null;
+      const leftEnd = leftWords.every(word => word.endUs !== null) ? Math.max(...leftWords.map(word => word.endUs!)) : null;
       const rightBegin = rightWords[0].beginUs;
-      const left = { ...line, words: leftWords, endUs: leftEnd };
-      const right: LyricLine = { ...line, id: command.newLineId, words: rightWords, beginUs: rightBegin, endLink: null, translations: [] };
+      const left = { ...line, words: leftWords, endUs: leftEnd, endLink: null };
+      const right: LyricLine = { ...line, id: command.newLineId, words: rightWords, beginUs: rightBegin, translations: [] };
       validTime(left.beginUs, left.endUs);
       validTime(right.beginUs, right.endUs);
       left.words.forEach((word) => wordFitsLine(word, left));
@@ -214,14 +216,12 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const firstIndex = lineIndex(document, command.firstLineId);
       const secondIndex = lineIndex(document, command.secondLineId);
       const first = document.lines[firstIndex], second = document.lines[secondIndex];
-      if (first.backgroundOf || second.backgroundOf || document.lines.filter((line) => !line.backgroundOf).findIndex((line) => line.id === first.id) + 1 !== document.lines.filter((line) => !line.backgroundOf).findIndex((line) => line.id === second.id)) throw new Error('只能合并相邻主行');
-      if (document.lines.some((line) => line.backgroundOf === first.id || line.backgroundOf === second.id)) throw new Error('请先处理背景歌词关系');
-      if (first.endLink || second.endLink || document.lines.some((line) => line.endLink?.targetLineId === second.id)) throw new Error('请先处理行尾链接');
-      if (first.translations.length || second.translations.length || first.songPart !== second.songPart || first.agentRefs.join(' ') !== second.agentRefs.join(' ')) throw new Error('请先处理翻译、歌曲段落或歌手差异');
-      const merged: LyricLine = { ...first, words: [...first.words, ...second.words], beginUs: first.beginUs ?? second.beginUs, endUs: second.endUs ?? first.endUs };
+      const issues = lineStructureIssues(document, first, second);
+      if (issues.length) throw new Error(issues.join('；'));
+      const merged: LyricLine = { ...first, words: [...first.words, ...second.words], beginUs: first.beginUs ?? second.beginUs, endUs: second.endUs ?? first.endUs, endLink: second.endLink };
       validTime(merged.beginUs, merged.endUs);
       merged.words.forEach((word) => wordFitsLine(word, merged));
-      const lines = document.lines.filter((line) => line.id !== second.id).map((line) => line.id === first.id ? merged : line);
+      const lines = document.lines.filter((line) => line.id !== second.id).map((line) => line.id === first.id ? merged : line.endLink?.targetLineId === second.id ? { ...line, endLink: { ...line.endLink, targetLineId: first.id } } : line);
       const romanizationTracks = document.romanizationTracks.map((track) => {
         const secondContents = track.contents.filter((content) => content.lineId === second.id).map((content) => ({ ...content, lineId: first.id }));
         const contents = track.contents.filter((content) => content.lineId !== second.id);
