@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createLyricDocument } from '../../domain/lyric-document';
 import { executeLyricCommand, createLyricEditorState } from '../../domain/lyric-commands';
 import { RomanizationGenerationDialog } from './RomanizationGenerationDialog';
@@ -8,7 +8,8 @@ vi.mock('../../domain/romanization-generation', async importOriginal => {
   const actual = await importOriginal<typeof import('../../domain/romanization-generation')>();
   return { ...actual, proposeRomanization: vi.fn(actual.proposeRomanization) };
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 it('generates only at entry and mode change, blocks a changed source without replacing manual text', () => {
   const doc = createLyricDocument('きゃ'), apply = vi.fn(() => true), close = vi.fn();
   const props = { document: doc, lineIds: [doc.lines[0].id], apply, close };

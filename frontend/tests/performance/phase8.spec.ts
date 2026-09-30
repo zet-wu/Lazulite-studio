@@ -35,9 +35,11 @@ test('P8 production one long word retains all 512 Ruby-derived inputs without ho
     return {
       maxUnitCenterDifference: Math.max(...sources.map(source => Math.abs(center(source.firstElementChild!) - center(inputs.get(source.getAttribute('data-source-unit'))!)))),
       bodyCenterDifference: Math.abs(box.x + box.width / 2 - center(word)),
+      maxSourceInputDistance: Math.max(...sources.map(source => inputs.get(source.getAttribute('data-source-unit'))!.getBoundingClientRect().top - source.getBoundingClientRect().top)),
     };
   });
   expect(alignment.maxUnitCenterDifference).toBeLessThan(1); expect(alignment.bodyCenterDifference).toBeLessThan(1);
+  expect(alignment.maxSourceInputDistance).toBeLessThan(100);
   const geometry = await dialog.evaluate(e => ({ width: e.clientWidth, scroll: e.scrollWidth })); expect(geometry.scroll).toBeLessThanOrEqual(geometry.width);
   await page.screenshot({ path: test.info().outputPath('long-proposal.png') });
   await dialog.locator('[class*=dialogBody]').evaluate(e => { e.scrollTop = 0; });

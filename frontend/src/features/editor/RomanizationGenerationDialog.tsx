@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
-import type { LyricDocument } from '../../domain/lyric-document';
+import type { LyricDocument, LyricWord } from '../../domain/lyric-document';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { prepareRomanization, proposeRomanization, romanizationGenerationCommand, type RomanizationKind, type GeneratedUnit, type RomanizationProposal } from '../../domain/romanization-generation';
 import { SettingsDialog } from './SettingsDialog';
@@ -29,6 +29,47 @@ function ProposalText({ text, hint, label, multiline, change, focus }: {
     },
   };
   return multiline ? <textarea {...common} ref={area} rows={1} /> : <input {...common} style={{ width: `${Math.max(3, Math.min(32, Array.from(text).length + 1))}ch` }} />;
+}
+
+function TimedWordPreview({ word, units, lineLabel, change, focus }: {
+  word: LyricWord; units: Array<{ unit: GeneratedUnit; index: number }>; lineLabel: string;
+  change: (text: string, key: string) => void; focus: (active: boolean) => void;
+}) {
+  const root = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = root.current!, text = body.current!;
+    const slots = Array.from(element.querySelectorAll<HTMLElement>('[data-preview-unit]'));
+    // Keep the inputs mounted when wrapping changes, including during IME input.
+    const layout = () => {
+      const firstTop = slots[0]?.offsetTop;
+      const readingHeight = Math.max(16, ...slots.map(slot => slot.querySelector<HTMLElement>('[data-source-unit]')!.offsetHeight));
+      element.style.setProperty('--roman-reading-height', `${readingHeight}px`);
+      element.style.setProperty('--roman-body-height', `${text.offsetHeight}px`);
+      slots.forEach(slot => slot.toggleAttribute('data-first-preview-row', slot.offsetTop === firstTop));
+    };
+    layout();
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame); frame = requestAnimationFrame(layout);
+    });
+    [element, text, ...slots].forEach(item => observer.observe(item));
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+  }, [word, units.length]);
+  const readings = new Map(word.rubyUnits.map(unit => [unit.id, unit.reading]));
+  return <div ref={root} className={`${styles.romanPreviewWord} ${styles.romanPreviewTimedWord}`} data-source-word={word.id}
+    style={{ minWidth: `min(100%, ${Array.from(word.text).length * 22}px)` }}>
+    <div ref={body} className={styles.romanPreviewBody}>{word.text}</div>
+    {units.map(({ unit, index }) => {
+      const reading = readings.get(unit.key) ?? '';
+      const inputWidth = Math.max(3, Math.min(32, Array.from(unit.text).length + 1));
+      const width = `min(32ch, max(${Array.from(reading).length * 12}px, ${inputWidth}ch))`;
+      return <div key={unit.key} className={styles.romanPreviewSlot} style={{ width }} data-preview-unit={unit.key}>
+        <div data-source-unit={unit.key}><div className={styles.romanPreviewReading}>{reading}</div></div>
+        <div data-generated-unit={unit.key}><ProposalText text={unit.text} hint={unit.hint} label={`${lineLabel}单元 ${index + 1}音译`}
+          change={text => change(text, unit.key)} focus={focus} /></div>
+      </div>;
+    })}
+  </div>;
 }
 export function RomanizationGenerationDialog({ document, lineIds, apply, close }: {
   document: LyricDocument; lineIds: string[]; apply: (command: LyricCommand) => boolean; close: () => void;
@@ -90,29 +131,13 @@ export function RomanizationGenerationDialog({ document, lineIds, apply, close }
               {track?.contents.filter(content => content.lineId === row.lineId).map(content => <option key={content.id} value={content.id}>替换 · {content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</option>)}
             </select></label>
             <div className={styles.romanPreviewWords}>
-              {lines.get(row.lineId)!.words.map(word => {
-                const readings = new Map(word.rubyUnits.map(unit => [unit.id, unit.reading]));
-                const units = (byWord.get(word.id) ?? []).map(({ unit, index }) => {
-                  const reading = readings.get(unit.key) ?? '';
-                  // The source and its input share the same slot width and wrapping.
-                  const inputWidth = Math.max(3, Math.min(32, Array.from(unit.text).length + 1));
-                  const width = `min(32ch, max(${Array.from(reading).length * 12}px, ${inputWidth}ch))`;
-                  return { unit, index, reading, width };
-                });
-                return <div key={word.id} className={styles.romanPreviewWord} data-source-word={word.id}>
-                  {row.kind === 'timed' ? <div className={styles.romanPreviewUnits} data-source-readings>
-                    {units.map(({ unit, reading, width }) => <div key={unit.key} className={styles.romanPreviewSlot} style={{ width }} data-source-unit={unit.key}>
-                      <div className={styles.romanPreviewReading}>{reading}</div>
-                    </div>)}
-                  </div> : <div className={styles.romanPreviewReading}>{word.rubyUnits.map(unit => unit.reading).join(' ')}</div>}
+              {lines.get(row.lineId)!.words.map(word => row.kind === 'timed'
+                ? <TimedWordPreview key={word.id} word={word} units={byWord.get(word.id) ?? []} lineLabel={`L${ordinals.get(row.lineId)}`}
+                  change={(text, key) => changeText(row.lineId, text, key)} focus={active => setFocusedRow(active ? row.lineId : null)} />
+                : <div key={word.id} className={styles.romanPreviewWord} data-source-word={word.id}>
+                  <div className={styles.romanPreviewReading}>{word.rubyUnits.map(unit => unit.reading).join(' ')}</div>
                   <div className={styles.romanPreviewBody}>{word.text}</div>
-                  {row.kind === 'timed' && <div className={styles.romanPreviewUnits} data-generated-inputs>{units.map(({ unit, index, width }) => <div key={unit.key}
-                    className={styles.romanPreviewSlot} style={{ width }} data-generated-unit={unit.key}>
-                    <ProposalText text={unit.text} hint={unit.hint} label={`L${ordinals.get(row.lineId)}单元 ${index + 1}音译`}
-                      change={text => changeText(row.lineId, text, unit.key)} focus={active => setFocusedRow(active ? row.lineId : null)} />
-                  </div>)}</div>}
-                </div>;
-              })}
+                </div>)}
             </div>
             {row.kind === 'plain' && <ProposalText multiline text={row.text} hint={row.hint} label={`L${ordinals.get(row.lineId)}音译`}
               change={text => changeText(row.lineId, text)} focus={active => setFocusedRow(active ? row.lineId : null)} />}
