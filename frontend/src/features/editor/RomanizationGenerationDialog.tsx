@@ -90,13 +90,29 @@ export function RomanizationGenerationDialog({ document, lineIds, apply, close }
               {track?.contents.filter(content => content.lineId === row.lineId).map(content => <option key={content.id} value={content.id}>替换 · {content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</option>)}
             </select></label>
             <div className={styles.romanPreviewWords}>
-              {lines.get(row.lineId)!.words.map(word => <div key={word.id} className={styles.romanPreviewWord} data-source-word={word.id}>
-                <div className={styles.romanPreviewReading}>{word.rubyUnits.map(unit => unit.reading).join(' ')}</div>
-                <div className={styles.romanPreviewBody}>{word.text}</div>
-                {row.kind === 'timed' && <div className={styles.romanPreviewUnits}>{(byWord.get(word.id) ?? []).map(({ unit, index }) => <ProposalText key={unit.key}
-                  text={unit.text} hint={unit.hint} label={`L${ordinals.get(row.lineId)}单元 ${index + 1}音译`}
-                  change={text => changeText(row.lineId, text, unit.key)} focus={active => setFocusedRow(active ? row.lineId : null)} />)}</div>}
-              </div>)}
+              {lines.get(row.lineId)!.words.map(word => {
+                const readings = new Map(word.rubyUnits.map(unit => [unit.id, unit.reading]));
+                const units = (byWord.get(word.id) ?? []).map(({ unit, index }) => {
+                  const reading = readings.get(unit.key) ?? '';
+                  // The source and its input share the same slot width and wrapping.
+                  const inputWidth = Math.max(3, Math.min(32, Array.from(unit.text).length + 1));
+                  const width = `min(32ch, max(${Array.from(reading).length * 12}px, ${inputWidth}ch))`;
+                  return { unit, index, reading, width };
+                });
+                return <div key={word.id} className={styles.romanPreviewWord} data-source-word={word.id}>
+                  {row.kind === 'timed' ? <div className={styles.romanPreviewUnits} data-source-readings>
+                    {units.map(({ unit, reading, width }) => <div key={unit.key} className={styles.romanPreviewSlot} style={{ width }} data-source-unit={unit.key}>
+                      <div className={styles.romanPreviewReading}>{reading}</div>
+                    </div>)}
+                  </div> : <div className={styles.romanPreviewReading}>{word.rubyUnits.map(unit => unit.reading).join(' ')}</div>}
+                  <div className={styles.romanPreviewBody}>{word.text}</div>
+                  {row.kind === 'timed' && <div className={styles.romanPreviewUnits} data-generated-inputs>{units.map(({ unit, index, width }) => <div key={unit.key}
+                    className={styles.romanPreviewSlot} style={{ width }} data-generated-unit={unit.key}>
+                    <ProposalText text={unit.text} hint={unit.hint} label={`L${ordinals.get(row.lineId)}单元 ${index + 1}音译`}
+                      change={text => changeText(row.lineId, text, unit.key)} focus={active => setFocusedRow(active ? row.lineId : null)} />
+                  </div>)}</div>}
+                </div>;
+              })}
             </div>
             {row.kind === 'plain' && <ProposalText multiline text={row.text} hint={row.hint} label={`L${ordinals.get(row.lineId)}音译`}
               change={text => changeText(row.lineId, text)} focus={active => setFocusedRow(active ? row.lineId : null)} />}

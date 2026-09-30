@@ -26,10 +26,22 @@ test('P8 production one long word retains all 512 Ruby-derived inputs without ho
   await expect(dialog.getByRole('textbox')).toHaveCount(512); await expect(dialog.locator('[data-source-word]')).toHaveCount(1);
   expect((await dialog.getByText('長い正文', { exact: true }).boundingBox())!.height).toBeLessThan(40);
   const openedMs = Date.now() - start; await dialog.getByLabel('L1单元 512音译').fill('tail');
+  const alignment = await dialog.locator('[data-source-word]').evaluate(word => {
+    const center = (element: Element) => { const box = element.getBoundingClientRect(); return box.x + box.width / 2; };
+    const sources = Array.from(word.querySelectorAll('[data-source-unit]'));
+    const inputs = new Map(Array.from(word.querySelectorAll('[data-generated-unit]')).map(input => [input.getAttribute('data-generated-unit'), input.firstElementChild!]));
+    const body = document.createRange(); body.selectNodeContents(word.querySelector('[class*=romanPreviewBody]')!);
+    const box = body.getBoundingClientRect();
+    return {
+      maxUnitCenterDifference: Math.max(...sources.map(source => Math.abs(center(source.firstElementChild!) - center(inputs.get(source.getAttribute('data-source-unit'))!)))),
+      bodyCenterDifference: Math.abs(box.x + box.width / 2 - center(word)),
+    };
+  });
+  expect(alignment.maxUnitCenterDifference).toBeLessThan(1); expect(alignment.bodyCenterDifference).toBeLessThan(1);
   const geometry = await dialog.evaluate(e => ({ width: e.clientWidth, scroll: e.scrollWidth })); expect(geometry.scroll).toBeLessThanOrEqual(geometry.width);
   await page.screenshot({ path: test.info().outputPath('long-proposal.png') });
   await dialog.locator('[class*=dialogBody]').evaluate(e => { e.scrollTop = 0; });
   await page.screenshot({ path: test.info().outputPath('long-proposal-top.png') });
   await dialog.getByRole('button', { name: '生成音译', exact: true }).click(); await expect(page.getByLabel('音译单元 512', { exact: true })).toHaveValue('tail');
-  await writeFile(test.info().outputPath('long-proposal.json'), JSON.stringify({ openedMs, sourceWords: 1, sourceUnits: 512, geometry }, null, 2));
+  await writeFile(test.info().outputPath('long-proposal.json'), JSON.stringify({ openedMs, sourceWords: 1, sourceUnits: 512, geometry, alignment }, null, 2));
 });
