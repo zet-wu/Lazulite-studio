@@ -52,13 +52,13 @@ test('generates Ruby explicitly from one track and preserves source content on u
   await expect(line.locator('[data-romanization-content-id]')).toHaveCount(3);
 });
 
-test('keeps metadata, singers and the auxiliary page in their current locations', async ({ page }) => {
+test('opens lyric metadata and singers in edit mode and keeps the auxiliary page', async ({ page }) => {
   await importTtml(page);
-  await openMenu(page, '设置');
+  await openMenu(page, '歌词设置');
   await page.getByRole('button', { name: '元数据编辑' }).click();
   await expect(page.getByRole('dialog', { name: '元数据编辑' })).toBeVisible();
   await page.getByRole('button', { name: '关闭元数据编辑' }).click();
-  await openMenu(page, '设置');
+  await openMenu(page, '歌词设置');
   await page.getByRole('button', { name: '歌手管理' }).click();
   await expect(page.getByRole('dialog', { name: '歌手管理' })).toBeVisible();
   await page.getByRole('button', { name: '关闭歌手管理' }).click();

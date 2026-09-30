@@ -24,7 +24,7 @@ test('UI append is empty, after the document, selected, reversible and keyboard 
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(page.locator('[data-outline-drag]')).toHaveCount(3);
   await expect(page.getByRole('heading', { name: '歌词编辑' })).toHaveCount(0);
-  await page.locator('[data-top-menu="tools"] summary').click();
+  await page.locator('[data-top-menu="lyrics-settings"] summary').click();
   await page.getByRole('button', { name: '管理音译轨道…' }).click();
   await expect(page.getByRole('dialog', { name: '音译轨道管理' })).toBeVisible();
 });

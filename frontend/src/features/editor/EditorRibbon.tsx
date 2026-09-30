@@ -25,6 +25,8 @@ type Props = MenuState & {
   canGenerateRomanization: boolean;
   openRomanizationGeneration: () => void;
   openTracks: () => void;
+  openMetadata: () => void;
+  openSingers: () => void;
 };
 
 export function EditorRibbon(props: Props) {
@@ -43,12 +45,16 @@ export function EditorRibbon(props: Props) {
     <TopMenu id="tools" title="编辑工具" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
       <button disabled={!props.canMoveUp} onClick={props.moveUp}>词移上行</button>
       <button disabled={!props.canMoveDown} onClick={props.moveDown}>词移下行</button>
-      <button onClick={props.openTracks}>管理音译轨道…</button>
       <button onClick={props.openSegmentation}>分词…</button>
       <button onClick={props.openBatchTools}>批处理…</button>
       <button disabled={!props.canCreateRubyBase} onClick={props.createRubyBase}>合并为 Ruby base…</button>
       <button disabled={!props.canGenerateRomanization} onClick={props.openRomanizationGeneration}>生成日文罗马字音译…</button>
       <button disabled={!props.canGenerateRuby} onClick={props.openRubyGeneration}>从音译生成 Ruby…</button>
+    </TopMenu>
+    <TopMenu id="lyrics-settings" title="歌词设置" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
+      <button onClick={props.openMetadata}>元数据编辑</button>
+      <button onClick={props.openSingers}>歌手管理</button>
+      <button onClick={props.openTracks}>管理音译轨道…</button>
     </TopMenu>
   </div>;
 }

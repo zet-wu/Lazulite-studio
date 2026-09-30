@@ -22,8 +22,6 @@ type Props = MenuState & {
   onDraft: () => void;
   onFinal: () => void;
   onExportFormat?: (format: LyricFormat) => void;
-  onMetadata: () => void;
-  onSingers: () => void;
   onPublish?: () => void;
 };
 
@@ -69,10 +67,6 @@ export function EditorMenu(props: Props) {
         <button aria-label="显示大纲" aria-pressed={props.outlineVisible} onClick={props.onToggleOutline}>显示大纲</button>
         <button aria-label="显示属性栏" aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}>显示属性栏</button>
         <button onClick={() => setDark((value) => !value)}>{dark ? '日间模式' : '夜间模式'}</button>
-      </TopMenu>
-      <TopMenu id="settings" title="设置" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
-        <button onClick={props.onMetadata}>元数据编辑</button>
-        <button onClick={props.onSingers}>歌手管理</button>
       </TopMenu>
     </div>
   </header>;

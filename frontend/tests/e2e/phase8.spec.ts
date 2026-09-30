@@ -96,3 +96,20 @@ for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) t
   await dialog.getByLabel('输出', { exact: true }).selectOption('timed'); await page.mouse.move(1, 1);
   await page.screenshot({ path: test.info().outputPath(`romanization-${width}-${theme}.png`) });
 });
+test('P8 lyric settings are unique in edit mode, menus dismiss and keyboard reaches all dialogs', async ({ page }) => {
+  await load(page);
+  await expect(page.locator('[data-top-menu="settings"]')).toHaveCount(0);
+  const settings = page.locator('[data-top-menu="lyrics-settings"] summary');
+  await settings.focus(); await settings.press('Enter'); await expect(settings).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('button', { name: '元数据编辑', exact: true }).focus(); await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: '元数据编辑', exact: true })).toBeVisible(); await page.keyboard.press('Escape'); await expect(settings).toHaveAttribute('aria-expanded', 'false');
+  for (const [entry, title] of [['歌手管理', '歌手管理'], ['管理音译轨道…', '音译轨道管理']]) {
+    await settings.click(); await page.getByRole('button', { name: entry, exact: true }).click(); await expect(page.getByRole('dialog', { name: title, exact: true })).toBeVisible(); await page.keyboard.press('Escape');
+  }
+  await settings.click(); await page.locator('[data-top-menu="tools"] summary').click(); await expect(settings).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('button', { name: '管理音译轨道…', exact: true })).toBeHidden();
+  for (const mode of ['打轴', '预览']) {
+    await page.getByRole('button', { name: mode, exact: true }).click(); await expect(settings).toHaveCount(0);
+  }
+  await page.getByRole('button', { name: '编辑', exact: true }).click(); await expect(settings).toHaveAttribute('aria-expanded', 'false');
+});
