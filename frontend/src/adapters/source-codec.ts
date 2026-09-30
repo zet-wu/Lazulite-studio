@@ -11,7 +11,7 @@ export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc'): Lyri
   for (const raw of text.split(/\r?\n/)) {
     const row = raw.match(/^\[(\d+),(\d+)\](.*)$/); if (!row) continue;
     const start = Number(row[1]), line = createLine(''); line.beginUs = time(start + offset); line.endUs = time(start + Number(row[2]) + offset);
-    const pattern = kind === 'krc' ? /<(\d+),(\d+),\d+>([^<]*)/g : kind === 'yrc' ? /\((\d+),(\d+),\d+\)([^()]*)/g : /([^()]*?)\((\d+),(\d+)\)/g;
+    const pattern = kind === 'krc' ? /<(\d+),(\d+),\d+>([\s\S]*?)(?=<\d+,\d+,\d+>|$)/g : kind === 'yrc' ? /\((\d+),(\d+),\d+\)([\s\S]*?)(?=\(\d+,\d+,\d+\)|$)/g : /([\s\S]*?)\((\d+),(\d+)\)/g;
     let consumed = 0;
     for (const m of row[3].matchAll(pattern)) {
       if (m.index !== consumed) throw new Error('逐词标签之间含无法解析的文字');
@@ -21,7 +21,7 @@ export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc'): Lyri
     if (consumed !== row[3].length || !line.words.length) throw new Error('逐词歌词标签不完整');
     d.lines.push(line);
   }
-  if (!d.lines.length) throw new Error('未解析出逐词歌词');
+  if (!d.lines.length || d.lines.length > 20000) throw new Error('未解析出逐词歌词或行数超过 20000');
   if (kind === 'krc') {
     const language = text.match(/^\[language:([^\]]+)\]/m)?.[1];
     if (language) {
@@ -76,7 +76,7 @@ export function parseLrcSource(text: string): LyricDocument {
       d.lines.push(line);
     }
   }
-  if (!d.lines.length) throw new Error('未解析出 LRC 歌词');
+  if (!d.lines.length || d.lines.length > 20000) throw new Error('未解析出 LRC 歌词或行数超过 20000');
   return d;
 }
 export function attachSidecar(d: LyricDocument, text: string, kind: 'translation' | 'romanization'): string[] {

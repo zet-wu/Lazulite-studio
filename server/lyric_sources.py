@@ -90,9 +90,9 @@ class Sources:
             if data.get('code', 200) != 200: raise ValueError(f"网易云搜索失败：{data.get('code')}")
             return [Candidate(source=source, id=str(s['id']), title=s['name'], artists=[a['name'] for a in s.get('ar', s.get('artists', []))], album=s.get('al', s.get('album', {})).get('name', ''), duration_ms=s.get('dt', s.get('duration'))) for s in data.get('result', {}).get('songs', [])]
         if source == 'qqmusic':
-            data = self.request('https://c.y.qq.com/soso/fcgi-bin/client_search_cp', params={'format':'json', 'w':query, 'p':1, 'n':20, 'platform':'yqq.json'})
+            data = self.request('https://c.y.qq.com/splcloud/fcgi-bin/smartbox_new.fcg', params={'format':'json', 'key':query})
             if data.get('code', 0) != 0: raise ValueError(f"QQ 搜索失败：{data.get('code')}")
-            return [Candidate(source=source, id=str(s.get('songmid') or s['songid']), songmid=s.get('songmid') or None, songid=str(s['songid']) if s.get('songid') else None, title=s['songname'], artists=[a['name'] for a in s.get('singer', [])], album=s.get('albumname',''), duration_ms=s.get('interval',0)*1000) for s in data.get('data',{}).get('song',{}).get('list',[])]
+            return [Candidate(source=source, id=str(s.get('mid') or s['id']), songmid=s.get('mid') or None, songid=str(s['id']) if s.get('id') else None, title=s['name'], artists=[s.get('singer','')], album=s.get('albumname','')) for s in data.get('data',{}).get('song',{}).get('itemlist',[])]
         if source == 'kugou':
             data = self.request('https://mobiles.kugou.com/api/v3/search/song', params={'format':'json','keyword':query,'page':1,'pagesize':20,'showtype':14,'plat':0,'sver':5,'correct':1,'api_ver':1,'version':9108})
             if data.get('status', 1) != 1: raise ValueError('酷狗搜索失败')
@@ -114,7 +114,7 @@ class Sources:
         return candidate
 
     def fetch(self, c):
-        metadata = {k: v for k,v in {'musicName':[c.title] if c.title else [], 'artists':c.artists, 'album':[c.album] if c.album else []}.items() if v}
+        metadata = {k: v for k,v in {'title':[c.title] if c.title else [], 'artist':c.artists, 'album':[c.album] if c.album else []}.items() if v}
         extra = {}
         if c.source == 'netease':
             if not c.id.isdigit(): raise ValueError('网易云歌曲 ID 必须为数字字符串')

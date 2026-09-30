@@ -22,3 +22,6 @@
 .results { display: flex; flex-direction: column; gap: 8px; overflow: auto; }
 .results button { text-align: left; }
 .results small { display: block; color: var(--muted); margin-top: 4px; }
+
+.tableWrap { overflow: auto; min-height: 0; flex: 1; }
+.actions { flex-shrink: 0; }

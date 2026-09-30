@@ -60,7 +60,7 @@ export function LocalEditor() {
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
   };
   const exportFormat = (format: LyricFormat) => {
-    try { download(exportLyricFile(state.present, format), name.replace(/\.[^.]*$/, '') + '.' + format); setMessage(null); }
+    try { download(exportLyricFile(state.present, format), name.replace(/\.[^.]*$/, '') + '.' + (format === 'elrc' ? 'extended.lrc' : format)); setMessage(null); }
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
   };
   const createNew = async () => {
@@ -73,6 +73,6 @@ export function LocalEditor() {
   };
   return <EditorWorkspace title={name} document={state.present} apply={apply} undo={() => commitState(undoLyricCommand(stateRef.current))} redo={() => commitState(redoLyricCommand(stateRef.current))}
     canUndo={state.past.length > 0} canRedo={state.future.length > 0} dirty={dirty} saving={saving} error={message}
-    onSave={() => void save()} onNew={() => void createNew()}
+    onSave={() => void save()} onImportName={setName} onNew={() => void createNew()}
     onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat} />;
 }

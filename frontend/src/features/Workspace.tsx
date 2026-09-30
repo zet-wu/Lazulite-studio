@@ -58,7 +58,7 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
   };
   const exportFormat = (format: LyricFormat) => {
-    try { download(exportLyricFile(editor.document, format), `${title}.${format}`); setMessage(''); }
+    try { download(exportLyricFile(editor.document, format), `${title}.${format === 'elrc' ? 'extended.lrc' : format}`); setMessage(''); }
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
   };
   return <div className={styles.editorShell}><EditorWorkspace embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}

@@ -4,7 +4,7 @@ import type { LyricDocument } from '../domain/lyric-document';
 import type { LyricCommand } from '../domain/lyric-commands';
 import styles from './acquisition.module.css';
 export function NetworkLyrics({ source, document, apply, stage, clear }: { source: Source; document: LyricDocument; apply: (c: LyricCommand) => void; stage: (d: LyricDocument) => void; clear: () => void }) {
- const [query, setQuery] = useState(() => [...(document.metadata.musicName ?? []), ...(document.metadata.artists ?? [])].join(' '));
+ const [query, setQuery] = useState(() => [...(document.metadata.title ?? []), ...(document.metadata.artist ?? [])].join(' '));
  const [rows, setRows] = useState<Candidate[]>([]), [selected, setSelected] = useState<Candidate | null>(null);
  const [message, setMessage] = useState(''), [busy, setBusy] = useState(false), [searched, setSearched] = useState(false);
  const [badges, setBadges] = useState<Record<string, string[]>>({});
