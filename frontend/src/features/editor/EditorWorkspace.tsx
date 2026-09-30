@@ -7,7 +7,7 @@ import { createLine, createWord, lineText, type LyricDocument, type LyricLine, t
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, segmentText } from '../../domain/segmentation';
 import { distributeRubyTime, splitReadingMora } from '../../domain/ruby-editing';
-import { copySelection, cutSelection, invertIds, moveWordsAcrossLine, pastePlain, pasteRich, selectIds, selectionLineId, type EditorClipboard, type EditorSelection } from './editing-actions';
+import { copySelection, cutSelection, deleteSelection, invertIds, moveWordsAcrossLine, pastePlain, pasteRich, selectIds, selectionLineId, type EditorClipboard, type EditorSelection } from './editing-actions';
 import { LyricList } from './LyricList';
 import { LyricLine as LyricLineView } from './LyricLine';
 import { LyricWord as LyricWordView } from './LyricWord';
@@ -257,9 +257,18 @@ export function EditorWorkspace(props: Props) {
       clipboardToken.current = crypto.randomUUID();
       const available = current.kind !== 'lines' ? current.lineId : mainIds.filter((id) => !current.ids.includes(id)).at(-1);
       setSelection(available ? { kind: 'lines', ids: [available], anchorId: available, activeId: available } : { kind: 'lines', ids: [], anchorId: '', activeId: '' });
+      mainRef.current?.focus({ preventScroll: true });
       return next;
     }
     return null;
+  };
+  const removeSelection = (current = selection) => {
+    if (!current?.ids.length) return;
+    if (dispatch(deleteSelection(document, current))) {
+      const available = current.kind === 'lines' ? mainIds.find(id => !current.ids.includes(id)) : current.lineId;
+      setSelection(available ? { kind: 'lines', ids: [available], anchorId: available, activeId: available } : null);
+      mainRef.current?.focus({ preventScroll: true });
+    }
   };
   const paste = (next: EditorClipboard | null, plain?: string, target?: EditorSelection) => {
     if (!next && !plain) return;
@@ -363,7 +372,7 @@ export function EditorWorkspace(props: Props) {
           dispatch({ type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: word.rubyUnits.flatMap((item) => item.id === unit.id ? distributed : [item]), overwrite: true });
         } },
         { label: '重分配读音时间', run: () => dispatch({ type: 'redistribute-ruby-time', lineId: line.id, wordId: word.id }) },
-        { label: '删除读音', run: () => dispatch({ type: 'delete-ruby', lineId: line.id, wordId: word.id, rubyId }) },
+        { label: effective.ids.length > 1 ? `删除所选读音（${effective.ids.length}）` : '删除读音', run: () => removeSelection(effective) },
       ];
     } else if (romanContentId) {
       const track = document.romanizationTracks.find((item) => item.contents.some((content) => content.id === romanContentId));
@@ -381,7 +390,7 @@ export function EditorWorkspace(props: Props) {
           { label: '合并前一单元', disabled: index === 0, run: () => dispatch({ type: 'merge-romanization-units', trackId: track.id, contentId: content.id, firstUnitId: content.units[index - 1].id, secondUnitId: unit.id }) },
           { label: '向前移动', disabled: index === 0, run: () => dispatch({ type: 'move-romanization-unit', trackId: track.id, contentId: content.id, unitId: unit.id, afterUnitId: content.units[index - 2]?.id ?? null }) },
           { label: '向后移动', disabled: index === content.units.length - 1, run: () => dispatch({ type: 'move-romanization-unit', trackId: track.id, contentId: content.id, unitId: unit.id, afterUnitId: content.units[index + 1].id }) },
-          { label: '删除单元', run: () => dispatch({ type: 'set-romanization-content', trackId: track.id, content: { ...content, units: content.units.filter((item) => item.id !== unit.id) } }) },
+          { label: effective.ids.length > 1 ? `删除所选单元（${effective.ids.length}）` : '删除单元', run: () => removeSelection(effective) },
         ];
       } else {
         effective = selection?.kind === 'romanization-content' && selection.trackId === track.id && selection.ids.includes(content.id) ? { ...selection, activeId: content.id, contentId: content.id }
@@ -395,7 +404,7 @@ export function EditorWorkspace(props: Props) {
           { label: '音译内容前移', disabled: siblingIndex === 0, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: track.contents[previousGlobal - 1]?.id ?? null }) },
           { label: '音译内容后移', disabled: siblingIndex === siblings.length - 1, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: siblings[siblingIndex + 1].id }) },
           { label: '转移到其他主行…', disabled: mainLines.length < 2, run: () => setContentTransfer({ trackId: track.id, contentId: content.id, targetLineId: mainLines.find((item) => item.id !== line.id)?.id ?? '' }) },
-          { label: '删除内容', run: () => dispatch({ type: 'delete-romanization-content', trackId: track.id, contentId: content.id }) },
+          { label: effective.ids.length > 1 ? `删除所选内容（${effective.ids.length}）` : '删除内容', run: () => removeSelection(effective) },
           { label: '从音译生成 Ruby…', run: () => setRubyGeneration({ lineIds: [line.id], trackId: track.id, contentId: content.id }) },
           { label: '管理轨道…', run: () => setSettingsDialog('tracks') },
           { label: '轨道前移', run: () => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: -1 }) },
@@ -430,7 +439,7 @@ export function EditorWorkspace(props: Props) {
         } },
         { label: '添加 Ruby', run: () => { const reading = window.prompt('读音'); if (reading) dispatch({ type: 'add-ruby', lineId: line.id, wordId: word.id, reading }); } },
         { label: '重分配读音时间', disabled: word.rubyUnits.length === 0, run: () => dispatch({ type: 'redistribute-ruby-time', lineId: line.id, wordId: word.id }) },
-        { label: '删除词', run: () => dispatch({ type: 'delete-word', lineId: line.id, wordId: word.id }) },
+        { label: effective.ids.length > 1 ? `删除所选词（${effective.ids.length}）` : '删除词', run: () => removeSelection(effective) },
       ];
     } else {
       const id = line.backgroundOf ?? line.id;
@@ -452,7 +461,7 @@ export function EditorWorkspace(props: Props) {
           if (next) dispatch({ type: 'merge-lines', firstLineId: line.id, secondLineId: next.id });
         } },
         { label: '分词…', run: () => setSegmentationOpen(true) },
-        { label: '删除行', run: () => dispatch({ type: 'delete-line', lineId: line.id }) },
+        { label: effective.ids.length > 1 ? `删除所选行（${effective.ids.length}）` : '删除行', run: () => removeSelection(effective) },
       ];
     }
     const shared: ContextAction[] = [
@@ -466,11 +475,13 @@ export function EditorWorkspace(props: Props) {
     setContextMenu({ x, y, title, actions: [...shared, ...actions], target: target.closest<HTMLElement>('[data-ruby-id], [data-romanization-unit-id], [data-romanization-content-id], [data-word-id], [data-line-id]') ?? target });
     return true;
   };
-  const closeContext = () => { const target = contextMenu?.target; setContextMenu(null); target?.focus(); };
+  const closeContext = () => { const target = contextMenu?.target; setContextMenu(null); if (target?.isConnected) target.focus(); else mainRef.current?.focus(); };
   const navigateWord = (wordId: string, direction: -1 | 1) => {
     const order = document.lines.flatMap((line) => line.words.map((word) => ({ lineId: line.id, wordId: word.id })));
     const target = order[order.findIndex((item) => item.wordId === wordId) + direction];
     if (!target) return;
+    const line = document.lines.find(line => line.id === target.lineId)!;
+    selectWord(line, line.words.find(word => word.id === target.wordId)!);
     const input = wordInputs.current.get(target.wordId);
     if (input) input.focus();
     else {
@@ -503,6 +514,8 @@ export function EditorWorkspace(props: Props) {
     <label className={styles.emptyBeat}>空拍 <input type="number" min="0" max="32" aria-label={`词 ${word.text}空拍数`} value={word.emptyBeat} onChange={(event) => dispatch({ type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: Number(event.target.value) })} /></label>
   </LyricWordView>;
   return <div ref={pageRef} className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`}
+    onPointerDownCapture={() => { pageRef.current!.dataset.pointerFocus = ''; }}
+    onKeyDownCapture={() => { delete pageRef.current!.dataset.pointerFocus; }}
     onPointerDown={(event) => {
       if (mode !== 'edit' || event.pointerType !== 'mouse' || event.button !== 0 || event.shiftKey) return;
       const element = event.target as Element;
@@ -583,7 +596,7 @@ export function EditorWorkspace(props: Props) {
     {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canPaste={Boolean(clipboard)}
       canMoveUp={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes[0] > 0}
       canMoveDown={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes.at(-1) !== document.lines.length - 1}
-      copy={() => { copy(); }} cut={() => { cut(); }} paste={() => paste(clipboard)}
+      copy={() => { copy(); }} cut={() => { cut(); }} remove={() => removeSelection()} paste={() => paste(clipboard)}
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}

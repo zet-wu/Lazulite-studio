@@ -9,6 +9,7 @@ type Props = MenuState & {
   canMoveDown: boolean;
   copy: () => void;
   cut: () => void;
+  remove: () => void;
   paste: () => void;
   selectAll: () => void;
   invertSelection: () => void;
@@ -33,6 +34,7 @@ export function EditorRibbon(props: Props) {
     <TopMenu id="clipboard" title="选择与剪贴" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
       <button onClick={props.copy} disabled={selection?.ids.length === 0}>复制</button>
       <button onClick={props.cut} disabled={selection?.ids.length === 0}>剪切</button>
+      <button onClick={props.remove} disabled={!selection?.ids.length}>删除</button>
       <button onClick={props.paste} disabled={!props.canPaste}>粘贴</button>
       <button onClick={props.selectAll}>全选</button>
       <button onClick={props.invertSelection}>反选</button>

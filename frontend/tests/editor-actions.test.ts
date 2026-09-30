@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
 import { createLine, createLyricDocument, lineText } from '../src/domain/lyric-document';
-import { copySelection, cutSelection, moveWordsAcrossLine, pastePlain, pasteRich, selectIds } from '../src/features/editor/editing-actions';
+import { copySelection, cutSelection, deleteSelection, moveWordsAcrossLine, pastePlain, pasteRich, selectIds } from '../src/features/editor/editing-actions';
 
 describe('editor selection and clipboard', () => {
   it('selects ordered ranges and toggles without disturbing document order', () => {
@@ -123,4 +123,15 @@ describe('editor selection and clipboard', () => {
     expect(pasted.present.lines[1].words[1].rubyUnits[0].reading).toBe('きょう');
     expect(undoLyricCommand(pasted).present).toBe(document);
   });
+});
+
+it('batch deletion rejects a linked target atomically after an earlier deletion', () => {
+  const doc = createLyricDocument('前');
+  const linked = doc.lines[0]; linked.beginUs = 0; linked.endUs = 3000;
+  linked.words[0].beginUs = 0; linked.words[0].endUs = 2000;
+  linked.endLink = { targetLineId: 'target', originalEndUs: 1000 };
+  doc.lines.push(createLine('先删', 'first'), createLine('目标', 'target'));
+  const state = createLyricEditorState(doc), before = structuredClone(doc);
+  expect(() => executeLyricCommand(state, deleteSelection(doc, { kind: 'lines', ids: ['first', 'target'], anchorId: 'first', activeId: 'target' }))).toThrow('original line end excludes a word');
+  expect(state.present).toEqual(before); expect(state.past).toHaveLength(0);
 });

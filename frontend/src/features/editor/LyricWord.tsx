@@ -13,12 +13,9 @@ export function LyricWord(props: Props) {
   const select = (event: MouseEvent<HTMLDivElement>) => props.onSelect(event.shiftKey, event.ctrlKey || event.metaKey);
   return <div className={`${styles.word} ${props.selected ? styles.selectedWord : ''}`}
     data-drag-placeholder={props.placeholder ? '' : undefined} data-word-id={props.id} tabIndex={0}
-    onFocus={(event) => { if (event.target === event.currentTarget) props.onSelect(false, false); }}
-    onMouseDown={(event) => {
-      if (!(event.target as Element).closest('input,textarea,[data-ruby-id],button') && (event.shiftKey || event.ctrlKey || event.metaKey)) { event.preventDefault(); select(event); }
-    }}
+    onFocus={(event) => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus]')) props.onSelect(false, false); }}
     onClick={(event) => {
-      if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !(event.target as Element).closest('[data-ruby-id],button')) select(event);
+      if (!(event.target as Element).closest('[data-ruby-id],button')) select(event);
     }}
     >
     {props.children}

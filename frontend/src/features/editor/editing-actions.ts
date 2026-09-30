@@ -61,7 +61,7 @@ export function copySelection(document: LyricDocument, selection: EditorSelectio
   return { kind: 'lines', groups, text: groups.map(({ line }) => lineText(line)).join('\n') };
 }
 
-export function cutSelection(document: LyricDocument, selection: EditorSelection): LyricCommand {
+export function deleteSelection(document: LyricDocument, selection: EditorSelection): LyricCommand {
   if (selection.kind === 'ruby') return { type: 'batch', commands: selection.ids.map((rubyId) => ({ type: 'delete-ruby', lineId: selection.lineId, wordId: selection.wordId, rubyId })) };
   if (selection.kind === 'romanization-content') return { type: 'batch', commands: selection.ids.map((contentId) => ({ type: 'delete-romanization-content', trackId: selection.trackId, contentId })) };
   if (selection.kind === 'romanization-unit') {
@@ -73,6 +73,9 @@ export function cutSelection(document: LyricDocument, selection: EditorSelection
     ? document.lines.flatMap((line) => line.words.filter((word) => selection.ids.includes(word.id)).map((word) => ({ type: 'delete-word' as const, lineId: line.id, wordId: word.id })))
     : selection.ids.map((lineId) => ({ type: 'delete-line', lineId })) };
 }
+
+// Cutting uses the same atomic deletion as direct object deletion.
+export const cutSelection = deleteSelection;
 
 function expandedLineTime(target: LyricLine, words: LyricWord[]) {
   const starts = words.map((word) => word.beginUs).filter((value): value is number => value !== null);

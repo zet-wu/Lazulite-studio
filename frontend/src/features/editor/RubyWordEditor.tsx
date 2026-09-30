@@ -53,7 +53,7 @@ export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, 
   return <div className={styles.rubyEditor} aria-label={`Ruby ${word.text}`}>
     {word.rubyUnits.length > 0 && <div className={styles.rubyAbove}>{word.rubyUnits.map((unit, index) => <div key={unit.id} data-ruby-id={unit.id} data-drag-placeholder={placeholderIds?.has(unit.id) ? '' : undefined} tabIndex={0} className={`${styles.rubyTile} ${selectedRubyIds.includes(unit.id) ? styles.selectedRuby : ''}`}
       onClick={(event) => { event.stopPropagation(); onSelectRuby(unit.id, event.shiftKey, event.ctrlKey || event.metaKey); }}
-      onFocus={(event) => { if (event.target === event.currentTarget) onSelectRuby(unit.id); }}>
+      onFocus={(event) => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus]')) onSelectRuby(unit.id); }}>
       <DraftInput value={unit.reading} label={`读音 ${word.text}`} onFocus={() => onSelectRuby(unit.id)}
         readOnly={editingRubyId !== unit.id} onEdit={() => setEditingRubyId(unit.id)} onExit={() => setEditingRubyId(null)}
         onCommit={(reading) => apply({ type: 'edit-ruby', lineId, wordId: word.id, rubyId: unit.id, reading })}
