@@ -252,8 +252,8 @@
 
 .romanPreviewWords { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 8px; padding: 16px 0 4px; }
 .romanPreviewWord { display: flex; flex-direction: column; gap: 5px; max-width: 100%; min-width: 0; }
-.romanPreviewWord ruby { font-size: 22px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
-.romanPreviewWord rt { font-size: 12px; font-weight: 400; color: var(--muted); }
+.romanPreviewBody { font-size: 22px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.romanPreviewReading { font-size: 12px; min-height: 1em; font-weight: 400; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .romanPreviewUnits { display: flex; flex-wrap: wrap; gap: 2px; max-width: 100%; }
 .page .rubyGeneration :is(input, textarea).romanPreviewInput { box-sizing: border-box; border: 1px solid transparent; background: transparent; color: var(--muted); padding: 4px; min-width: 3ch; max-width: 100%; border-radius: 4px; font: inherit; }
 textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-height: 34px; }

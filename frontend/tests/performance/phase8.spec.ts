@@ -24,6 +24,7 @@ test('P8 production one long word retains all 512 Ruby-derived inputs without ho
   await page.locator('[data-outline-drag]').first().click({ button: 'right' }); const start = Date.now(); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true }); await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
   await expect(dialog.getByRole('textbox')).toHaveCount(512); await expect(dialog.locator('[data-source-word]')).toHaveCount(1);
+  expect((await dialog.getByText('長い正文', { exact: true }).boundingBox())!.height).toBeLessThan(40);
   const openedMs = Date.now() - start; await dialog.getByLabel('L1单元 512音译').fill('tail');
   const geometry = await dialog.evaluate(e => ({ width: e.clientWidth, scroll: e.scrollWidth })); expect(geometry.scroll).toBeLessThanOrEqual(geometry.width);
   await page.screenshot({ path: test.info().outputPath('long-proposal.png') });

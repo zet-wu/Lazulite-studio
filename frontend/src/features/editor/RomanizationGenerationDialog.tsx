@@ -91,7 +91,8 @@ export function RomanizationGenerationDialog({ document, lineIds, apply, close }
             </select></label>
             <div className={styles.romanPreviewWords}>
               {lines.get(row.lineId)!.words.map(word => <div key={word.id} className={styles.romanPreviewWord} data-source-word={word.id}>
-                <ruby>{word.text}<rt>{word.rubyUnits.map(unit => unit.reading).join(' ')}</rt></ruby>
+                <div className={styles.romanPreviewReading}>{word.rubyUnits.map(unit => unit.reading).join(' ')}</div>
+                <div className={styles.romanPreviewBody}>{word.text}</div>
                 {row.kind === 'timed' && <div className={styles.romanPreviewUnits}>{(byWord.get(word.id) ?? []).map(({ unit, index }) => <ProposalText key={unit.key}
                   text={unit.text} hint={unit.hint} label={`L${ordinals.get(row.lineId)}单元 ${index + 1}音译`}
                   change={text => changeText(row.lineId, text, unit.key)} focus={active => setFocusedRow(active ? row.lineId : null)} />)}</div>}
