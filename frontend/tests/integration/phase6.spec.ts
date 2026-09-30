@@ -1,10 +1,11 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { phase6Ttml } from '../fixtures/phase6';
 
 test('P6 real FastAPI preserves translations, multiple singer order, source blanks and untimed inline additions through draft/final reopening', async ({ page }) => {
   await page.goto('/projects/phase4-background/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'phase6.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase6Ttml()) });
+  await importLyrics(page, { name: 'phase6.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase6Ttml()) });
   const line = page.locator('main section[data-line-id="english"]');
   await expect(line.getByLabel('翻译 1', { exact: true })).toHaveValue('song');
   await line.getByLabel('翻译 1语言', { exact: true }).fill('ja'); await line.getByLabel('翻译 1语言', { exact: true }).press('Enter');
@@ -42,10 +43,10 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   expect(semantic.translations).toEqual([{ text: 'song', language: 'ja' }]);
   expect(semantic.appended).toEqual([{ text: '追加', beginUs: null, endUs: null }, { text: '  ', beginUs: null, endUs: null }]);
   expect(semantic.units).toMatchObject({ kind: 'timed', units: [{ text: 'ai', beginUs: 1_000_000 }, { text: '', beginUs: 0, endUs: 6_000_000 }, { text: '  ', beginUs: 0, endUs: 6_000_000 }] });
-  await page.locator('[data-top-menu="file"] summary').click();
+  await page.getByRole('button', { name: '文件打包', exact: true }).click();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: '最终 TTML', exact: true }).click();
   const xml = await readFile(await (await download).path(), 'utf8');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await expect(line.getByLabel('翻译 1语言', { exact: true })).toHaveValue('ja');
   await page.locator('[data-outline-drag]').nth(1).click();
   await expect(page.getByLabel('歌手 主唱', { exact: true })).toBeChecked();
@@ -60,14 +61,14 @@ test('P6 original review I still love you keeps independent visible spaces after
   test.skip(!process.env.STUDIO_REVIEW_TTML, 'Provide the original review TTML explicitly.');
   const original = await readFile(process.env.STUDIO_REVIEW_TTML!, 'utf8');
   await page.goto('/projects/phase4-background/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'review.ttml', mimeType: 'application/xml', buffer: Buffer.from(original) });
+  await importLyrics(page, { name: 'review.ttml', mimeType: 'application/xml', buffer: Buffer.from(original) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(38);
   await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   await page.reload();
   const saved = await (await page.request.get('/api/v1/projects/phase4-background/document')).json();
   // The fixture media is only 132s; scrub the actual saved document with the local preview clock.
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'saved-original.ttml', mimeType: 'application/xml', buffer: Buffer.from(saved.document.ttml) });
+  await importLyrics(page, { name: 'saved-original.ttml', mimeType: 'application/xml', buffer: Buffer.from(saved.document.ttml) });
   await page.getByRole('button', { name: '预览', exact: true }).click();
   await page.getByRole('slider', { name: '试听位置', exact: true }).evaluate((element: HTMLInputElement) => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(element, '223000');

@@ -1,9 +1,10 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { phase7Ttml } from '../fixtures/phase7';
 for (const kind of ['plain', 'timed']) test(`P8 ${kind} manual result and placeholders persist in real service and final TTML`, async ({ page }) => {
   await page.goto('/projects/phase4-background/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'phase8.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
+  await importLyrics(page, { name: 'phase8.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
   const outline = page.locator('[data-outline-drag]'); await expect(outline).toHaveCount(3);
   await outline.first().click(); await outline.last().click({ modifiers: ['Shift'] }); await outline.first().click({ button: 'right' });
   await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
@@ -27,10 +28,10 @@ for (const kind of ['plain', 'timed']) test(`P8 ${kind} manual result and placeh
     { kind, units: [{ text: ' ', beginUs: 6e6, endUs: 8e6 }] },
   ]);
   await page.reload(); await expect(outline).toHaveCount(3);
-  await page.locator('[data-top-menu="file"] summary').click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '最终 TTML', exact: true }).click();
+  await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '最终 TTML', exact: true }).click();
   const finalXml = await readFile(await (await download).path(), 'utf8'), final = await semantics(finalXml);
   expect(final).toEqual(draft); expect(finalXml).toContain('transliterations'); expect(finalXml).not.toContain('x-roman'); expect(finalXml).not.toContain('studio:');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
+  await importLyrics(page, { name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
   await expect(page.getByLabel(kind === 'timed' ? '音译单元 1' : '音译 ja-Latn', { exact: true }).first()).toHaveValue(' manual  ');
   await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue(kind);

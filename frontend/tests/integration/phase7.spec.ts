@@ -1,3 +1,4 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { phase7Ttml } from '../fixtures/phase7';
@@ -15,7 +16,7 @@ test('P7 linked split, translation ownership and generated timed track persist t
     state = commands.executeLyricCommand(state, { type: 'link-line-end', lineId: 'context', targetLineId: 'missing' });
     return codec.serializeLyricTtml(state.present, { draft: true });
   }, phase7Ttml);
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   const outline = page.locator('[data-outline-drag]'); await expect(outline).toHaveCount(3);
   await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   const generation = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
@@ -35,11 +36,11 @@ test('P7 linked split, translation ownership and generated timed track persist t
   expect(draft.lines[2]).toMatchObject({ endLink: { targetLineId: 'missing', originalEndUs: 6e6 }, translations: [{ language: 'zh-Hans', text: '后行' }] });
   expect(draft.tracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ kind: 'timed', units: [{ text: 'ga ', beginUs: 0, endUs: 1e6 }, { text: 'k ', beginUs: 1e6, endUs: 2e6 }, { text: 'ko ', beginUs: 2e6, endUs: 3e6 }, { text: 'u', beginUs: 3e6, endUs: 4e6 }] }] });
   await page.reload(); await expect(outline).toHaveCount(4);
-  await page.locator('[data-top-menu="file"] summary').click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '最终 TTML', exact: true }).click();
+  await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '最终 TTML', exact: true }).click();
   const finalXml = await readFile(await (await download).path(), 'utf8'); const final = await semantics(finalXml);
   expect(final.lines.map(({ endLink: _link, ...line }) => line)).toEqual(draft.lines.map(({ endLink: _link, ...line }) => line));
   expect(final.lines.every(line => line.endLink === null)).toBe(true);
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
+  await importLyrics(page, { name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
   await expect(page.getByLabel('音译单元 1', { exact: true })).toHaveValue('ga ');
   await writeFile(test.info().outputPath('roundtrip.json'), JSON.stringify({ draft, final }, null, 2));
 });

@@ -1,13 +1,15 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
 async function importTtml(page: Page, name = 'reference-apple-metadata') {
   await page.goto('/editor');
   const source = await readFile(`../tests/fixtures/ttml/${name}.ttml`);
-  await page.locator('input[type="file"]').setInputFiles({ name: `${name}.ttml`, mimeType: 'application/xml', buffer: source });
+  await importLyrics(page, { name: `${name}.ttml`, mimeType: 'application/xml', buffer: source });
 }
 
 async function openMenu(page: Page, title: string) {
+  if (title === '文件') { await page.getByRole('button', { name: '文件打包', exact: true }).click(); return; }
   const summary = page.locator('summary').filter({ hasText: title }).first();
   if (await summary.locator('..').getAttribute('open') === null) await summary.click();
 }
@@ -72,7 +74,7 @@ test('shows one lyric scroller at 80 and 81 lines without horizontal page overfl
   await page.goto('/editor');
   for (const count of [80, 81]) {
     const text = Array.from({ length: count }, (_, index) => `${index + 1} ${'长词'.repeat(24)}`).join('\n');
-    await page.locator('input[type="file"]').setInputFiles({ name: `rows-${count}.txt`, mimeType: 'text/plain', buffer: Buffer.from(text) });
+    await importLyrics(page, { name: `rows-${count}.txt`, mimeType: 'text/plain', buffer: Buffer.from(text) });
     await expect(page.locator('[data-outline-drag]')).toHaveCount(count);
     for (const width of [1280, 1440, 1920]) {
       await page.setViewportSize({ width, height: 800 });
@@ -122,7 +124,7 @@ test('virtualizes 2000 lines and locates the last line from the outline', async 
   test.setTimeout(60_000);
   await page.goto('/editor');
   const text = Array.from({ length: 2000 }, (_, index) => `词${index} ${'長'.repeat(index % 6)}`).join('\n');
-  await page.locator('input[type="file"]').setInputFiles({ name: 'long.txt', mimeType: 'text/plain', buffer: Buffer.from(text) });
+  await importLyrics(page, { name: 'long.txt', mimeType: 'text/plain', buffer: Buffer.from(text) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(2000);
   expect(await page.locator('main section[data-line-id]').count()).toBeLessThan(80);
   await page.locator('[data-outline-drag]').last().click();

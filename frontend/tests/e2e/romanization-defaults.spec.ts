@@ -1,3 +1,4 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Page } from '@playwright/test';
 import { phase7Ttml } from '../fixtures/phase7';
 
@@ -9,13 +10,13 @@ async function generate(page: Page) {
 
 test('Local file mode survives reopening and reload, without sharing across filenames', async ({ page }) => {
   await page.goto('/editor');
-  const load = (name: string) => page.locator('input[type=file]').setInputFiles({ name, mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
+  const load = (name: string) => importLyrics(page, { name, mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
   await load('first.ttml'); let dialog = await generate(page);
   await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('plain');
   await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
   await dialog.getByLabel('L1单元 1音译').fill('discarded');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   dialog = await generate(page);
   await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
   await expect(dialog.getByLabel('L1单元 1音译')).toHaveValue('ga ');
@@ -44,7 +45,7 @@ test('First ja-Latn track is reused, populated lines stay skipped and new remain
     ];
     return codec.serializeLyricTtml(doc, { draft: true });
   }, phase7Ttml);
-  await page.locator('input[type=file]').setInputFiles({ name: 'tracks.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'tracks.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   let dialog = await generate(page);
   await expect(dialog.getByLabel('目标轨道')).toHaveValue('first-ja');
   await expect(dialog.getByLabel('L1生成内容')).toHaveValue('append');

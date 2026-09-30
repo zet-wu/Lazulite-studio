@@ -1,9 +1,10 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
 import { timelineTtml, listText, overlapTtml, performanceTtml } from '../fixtures/phase3';
 
 test('P3-01 uses the same physical plot for waveform and lyric tracks', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'synthetic.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
+  await importLyrics(page, { name: 'synthetic.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
   const wave = page.getByRole('slider', { name: '波形进度' });
   await expect(page.getByRole('button', { name: '时间轴行 L1', exact: true })).toBeVisible();
   const w = (await wave.boundingBox())!, lane = (await page.locator('[data-track-lane]').first().boundingBox())!;
@@ -14,7 +15,7 @@ test('P3-01 uses the same physical plot for waveform and lyric tracks', async ({
 
 test('P3-07 locates the last row of a normal list', async ({ page }) => {
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: '80.txt', mimeType: 'text/plain', buffer: Buffer.from(listText(80)) });
+  await importLyrics(page, { name: '80.txt', mimeType: 'text/plain', buffer: Buffer.from(listText(80)) });
   await page.locator('[data-outline-drag]').last().click();
   await expect.poll(() => page.getByLabel('歌词列表').evaluate(e => e.scrollTop)).toBeGreaterThan(0);
 });
@@ -23,7 +24,7 @@ for (const dpr of [1, 1.25, 2]) test(`P3-01 plot geometry and inverse pointer ma
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: dpr });
   const page = await context.newPage();
   await page.goto('http://127.0.0.1:5174/projects/sample-project/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'synthetic.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
+  await importLyrics(page, { name: 'synthetic.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(4);
   await page.locator('[data-outline-drag]').first().click();
   await page.getByRole('button', { name: '循环当前行' }).click();
@@ -61,7 +62,7 @@ for (const dpr of [1, 1.25, 2]) test(`P3-01 plot geometry and inverse pointer ma
 
 test('P3-04 constrains long inspector controls and aligns checkbox labels', async ({ page }) => {
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
+  await importLyrics(page, { name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
   await page.locator('[data-outline-drag]').first().click();
   const inspector = page.locator('aside').filter({ has: page.getByRole('heading', { name: '属性', exact: true }) });
   await expect.poll(() => inspector.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
@@ -71,7 +72,7 @@ test('P3-04 constrains long inspector controls and aligns checkbox labels', asyn
 
 for (const kind of ['行', '词', 'Ruby']) test(`P3-03 edits each overlapping ${kind} interval and undoes once`, async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'overlap.ttml', mimeType: 'application/xml', buffer: Buffer.from(overlapTtml()) });
+  await importLyrics(page, { name: 'overlap.ttml', mimeType: 'application/xml', buffer: Buffer.from(overlapTtml()) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(4);
   await page.locator('[data-outline-drag]').first().click();
   await page.getByLabel('吸附', { exact: true }).uncheck();
@@ -108,7 +109,7 @@ for (const kind of ['行', '词', 'Ruby']) test(`P3-03 edits each overlapping ${
 
 test('P3-03 renders all 2000 visible timed rows and keeps the canvas and loop controls usable', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'dense.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml(2000)) });
+  await importLyrics(page, { name: 'dense.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml(2000)) });
   await expect(page.getByRole('button', { name: /^时间轴行 / })).toHaveCount(2000);
   await expect(page.getByRole('button', { name: '循环当前行' })).toBeVisible();
   await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
@@ -119,7 +120,7 @@ test('P3-03 renders all 2000 visible timed rows and keeps the canvas and loop co
 
 for (const count of [80, 81, 2000]) test(`P3-07 measured locate ${count} rows keeps other scrollers and focus`, async ({ page }) => {
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'rows.txt', mimeType: 'text/plain', buffer: Buffer.from(listText(count)) });
+  await importLyrics(page, { name: 'rows.txt', mimeType: 'text/plain', buffer: Buffer.from(listText(count)) });
   const outline = page.locator('[data-outline-drag]');
   await expect(outline).toHaveCount(count);
   await outline.nth(count - 5).click();
@@ -142,7 +143,7 @@ for (const count of [80, 81, 2000]) test(`P3-07 measured locate ${count} rows ke
 test('P3-07 reduced motion and wheel cancel use only the lyric scroller', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'rows.txt', mimeType: 'text/plain', buffer: Buffer.from(listText(81)) });
+  await importLyrics(page, { name: 'rows.txt', mimeType: 'text/plain', buffer: Buffer.from(listText(81)) });
   await page.locator('[data-outline-drag]').nth(60).click();
   const scroller = page.getByLabel('歌词列表');
   await expect.poll(() => scroller.evaluate(e => e.scrollTop)).toBeGreaterThan(1000);
@@ -156,7 +157,7 @@ test('P3-07 reduced motion and wheel cancel use only the lyric scroller', async 
 
 test('P3-05 attaches, rebinds, detaches and restores a stable background relation', async ({ page }) => {
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'bg.ttml', mimeType: 'application/xml', buffer: Buffer.from(overlapTtml()) });
+  await importLyrics(page, { name: 'bg.ttml', mimeType: 'application/xml', buffer: Buffer.from(overlapTtml()) });
   const outline = page.locator('[data-outline-drag]');
   await outline.first().click();
   const background = page.getByLabel('背景歌词', { exact: true });
@@ -227,7 +228,7 @@ test('P3-06 columns resize independently, cancel, reset and persist outside lyri
 
 test('P3-04 inspector remains usable at its 200px minimum with long text', async ({ page }) => {
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
+  await importLyrics(page, { name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(timelineTtml()) });
   const separator = page.getByRole('separator', { name: '属性栏宽度' });
   await separator.focus();
   for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowRight');
@@ -252,14 +253,10 @@ test('P3-08 top menus are mutually exclusive and dismiss with pointer, outside, 
   await expect(menu('tools')).toHaveAttribute('open', '');
   await page.mouse.move(2, 2);
   await expect(menu('tools')).not.toHaveAttribute('open');
-  await menu('file').locator('summary').click();
-  await page.getByLabel('导出格式').focus();
-  await page.getByLabel('导出格式').selectOption('txt');
-  await page.mouse.move(2, 2); await page.waitForTimeout(250);
-  await expect(menu('file')).toHaveAttribute('open', ''); // select retains keyboard focus
+  await menu('view').locator('summary').click();
   await page.keyboard.press('Escape');
-  await expect(menu('file')).not.toHaveAttribute('open');
-  await expect(menu('file').locator('summary')).toBeFocused();
+  await expect(menu('view')).not.toHaveAttribute('open');
+  await expect(menu('view').locator('summary')).toBeFocused();
   await menu('lyrics-settings').locator('summary').click();
   await page.getByRole('button', { name: '元数据编辑' }).click();
   await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
@@ -271,22 +268,19 @@ test('P3-08 top menus are mutually exclusive and dismiss with pointer, outside, 
 
 test('P3-08 file input survives cancellation, same-file reselection and format export', async ({ page }) => {
   await page.goto('/editor');
-  const summary = page.locator('[data-top-menu="file"] summary');
-  await summary.click();
+  await page.getByRole('button', { name: '歌词获取', exact: true }).click();
   await page.locator('input[type=file]').dispatchEvent('cancel');
-  await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
   for (let i = 0; i < 2; i++) {
-    await page.locator('input[type=file]').setInputFiles({ name: 'same.txt', mimeType: 'text/plain', buffer: Buffer.from('合成歌词') });
+    await importLyrics(page, { name: 'same.txt', mimeType: 'text/plain', buffer: Buffer.from('合成歌词') });
     await expect(page.getByRole('textbox', { name: '词 合成歌词', exact: true })).toBeVisible();
-    expect(await page.locator('input[type=file]').inputValue()).toBe('');
   }
-  await summary.click();
+  await page.getByRole('button', { name: '文件打包', exact: true }).click();
   await page.getByLabel('导出格式').selectOption('txt');
-  await expect(page.locator('[data-top-menu="file"]')).toHaveAttribute('open', '');
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出所选格式' }).click();
   expect((await download).suggestedFilename()).toMatch(/\.txt$/);
-  await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
+  await expect(page.locator('[data-top-menu="file"]')).toHaveCount(0);
+
 });
 
 for (const dpr of [1, 1.25, 2]) test(`P3-09 spectrum has no unloaded seam DPR ${dpr}`, async ({ browser }) => {
@@ -360,7 +354,7 @@ test('P3-01 canvases rebuild when DPR changes without a CSS resize', async ({ pa
 
 test('P4-06 narrow blocks use existing zoom then normal endpoints without adding height', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'narrow.ttml', mimeType: 'application/xml', buffer: Buffer.from('<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="narrow" begin="2" end="2.001"><span begin="2" end="2.001">窄</span></p></div></body></tt>') });
+  await importLyrics(page, { name: 'narrow.ttml', mimeType: 'application/xml', buffer: Buffer.from('<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="narrow" begin="2" end="2.001"><span begin="2" end="2.001">窄</span></p></div></body></tt>') });
   const bar = page.getByRole('button', { name: '时间轴行 L1', exact: true });
   await expect(bar).toBeVisible();
   expect((await bar.locator('[data-time-color]').boundingBox())!.width).toBeLessThan(1);
@@ -441,7 +435,7 @@ for (const count of [80, 83]) test(`P3-07 variable Ruby/transliteration height a
   let xml = performanceTtml(count).replace(new RegExp(`<text for="p${bg}">[\\s\\S]*?</text>`), '');
   xml = xml.replace(`<p xml:id="p${parent}" begin="${(parent * .3).toFixed(3)}" end="${(parent * .3 + .29).toFixed(3)}">`, `<p xml:id="p${parent}" begin="${(parent * .3).toFixed(3)}" end="${(bg * .3 + .29).toFixed(3)}">`);
   xml = xml.replace('</transliteration>', `${Array.from({ length: 12 }, (_, i) => `<text for="p40">合成变高附属${i}</text>`).join('')}</transliteration>`);
-  await page.locator('input[type=file]').setInputFiles({ name: 'variable.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'variable.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   const outline = page.locator('[data-outline-drag]');
   await expect(outline).toHaveCount(count);
   await outline.last().click(); await page.getByLabel('背景歌词', { exact: true }).check();

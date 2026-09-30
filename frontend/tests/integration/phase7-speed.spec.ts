@@ -1,8 +1,9 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { phase7Ttml } from '../fixtures/phase7';
 test('P7 native extreme and normal rates keep media highlight and precise A/B loop synchronized', async ({ page }) => {
-  await page.goto('/projects/phase3-media/edit'); await page.locator('input[type=file]').last().setInputFiles({ name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
+  await page.goto('/projects/phase3-media/edit'); await importLyrics(page, { name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
   await page.locator('[data-outline-drag]').first().click(); await page.getByRole('button', { name: '循环当前行', exact: true }).click();
   const historyBefore = await page.getByRole('button', { name: '撤销', exact: true }).isEnabled();
   const audio = page.locator('audio'), results = [];

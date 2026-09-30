@@ -1,9 +1,10 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 
 async function load(page: Page, count = 3) {
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'rows.txt', mimeType: 'text/plain', buffer: Buffer.from(Array.from({ length: count }, (_, i) => `行${i + 1}`).join('\n')) });
+  await importLyrics(page, { name: 'rows.txt', mimeType: 'text/plain', buffer: Buffer.from(Array.from({ length: count }, (_, i) => `行${i + 1}`).join('\n')) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(count);
 }
 async function begin(page: Page, from: Locator, to: Locator, after = true) {
@@ -39,7 +40,7 @@ test('UI drag displays an insertion placeholder, commits once and cancels withou
   expect(await page.evaluate(() => getSelection()?.toString())).toBe('');
   await page.keyboard.press('Escape'); await page.mouse.up();
   expect(await rows.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-line-id')))).toEqual(ids);
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await begin(page, rows.first(), rows.nth(1));
   await expect(page.locator('main [data-drag-placeholder]')).toHaveCount(1);
   const preview = await rows.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-line-id')));
@@ -49,7 +50,7 @@ test('UI drag displays an insertion placeholder, commits once and cancels withou
   await expect(page.locator('[data-drag-placeholder]')).toHaveCount(0);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   expect(await rows.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-line-id')))).toEqual(ids);
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   const input = rows.first().getByRole('textbox', { name: '词 行1', exact: true });
   await input.dblclick(); await input.press('ControlOrMeta+A');
   expect(await input.evaluate((node: HTMLInputElement) => node.selectionEnd! - node.selectionStart!)).toBe(2);
@@ -90,7 +91,7 @@ test('UI virtual append remains at the true end and long-document drag stays vir
 
 for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) test(`UI surfaces ${theme} ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 }); await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'ruby.ttml', mimeType: 'application/xml', buffer: await readFile('../tests/fixtures/ttml/phase2-multitrack.ttml') });
+  await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: await readFile('../tests/fixtures/ttml/phase2-multitrack.ttml') });
   await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
   await page.screenshot({ path: test.info().outputPath('editor.png') });
   await page.locator('[data-top-menu="tools"] summary').click();
@@ -123,7 +124,7 @@ test('UI empty document and background tail append both remain usable after undo
 test('UI word to empty line, Ruby and romanization drags use the same insertion slots', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'ruby.ttml', mimeType: 'application/xml', buffer: await readFile('../tests/fixtures/ttml/phase2-multitrack.ttml') });
+  await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: await readFile('../tests/fixtures/ttml/phase2-multitrack.ttml') });
   const line = page.locator('main section[data-line-id="line-a"]'), units = line.locator('[data-romanization-content-id]').first().locator('[data-romanization-unit-id]');
   const ids = await units.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-romanization-unit-id')));
   const a = (await units.last().boundingBox())!, b = (await units.first().boundingBox())!;
@@ -134,7 +135,7 @@ test('UI word to empty line, Ruby and romanization drags use the same insertion 
   // Contents remain within their existing track; an out-of-track target is invalid.
   const contents = line.locator('[data-romanization-content-id]');
   await begin(page, contents.first(), contents.nth(1)); await page.mouse.up();
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await contents.first().getByText('音译 · ja-Latn').click({ button: 'right' });
   await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
   await page.getByRole('button', { name: '生成 Ruby', exact: true }).click();
@@ -170,7 +171,7 @@ test('UI pointercancel and lost capture restore layout, modifiers preserve objec
     await page.locator('[data-object-drag]').dispatchEvent(event, { pointerId: 1 }); await page.mouse.up();
     await expect(page.locator('[data-drag-placeholder]')).toHaveCount(0);
     await expect(rows.first()).toHaveAttribute('aria-label', '歌词行 行1');
-    await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   }
   const outline = page.locator('[data-outline-drag]');
   await outline.first().click(); await outline.last().click({ modifiers: ['Shift'] });
@@ -182,7 +183,7 @@ test('UI pointercancel and lost capture restore layout, modifiers preserve objec
 test('UI wrapped words preview their actual first slot and virtual edge scrolling cleans up', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 }); await page.goto('/editor');
   const xml = `<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="wrap">${Array.from({ length: 9 }, (_, i) => `<span>词${i}</span>`).join('')}</p></div></body></tt>`;
-  await page.locator('input[type=file]').setInputFiles({ name: 'wrap.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'wrap.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   const words = page.locator('main [data-word-id]'); await expect(words).toHaveCount(9);
   const a = (await words.last().boundingBox())!, b = (await words.first().boundingBox())!;
   expect(a.y).toBeGreaterThan(b.y);
@@ -202,5 +203,5 @@ test('UI wrapped words preview their actual first slot and virtual edge scrollin
   const top = await scroll.evaluate(node => node.scrollTop);
   await page.waitForTimeout(100); expect(await scroll.evaluate(node => node.scrollTop)).toBe(top);
   await expect(page.locator('[data-drag-placeholder]')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
 });

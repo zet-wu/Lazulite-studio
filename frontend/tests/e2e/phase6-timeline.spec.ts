@@ -1,3 +1,4 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
 
 const xml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div>' +
@@ -5,7 +6,7 @@ const xml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div>' +
 
 test('P6 timeline snap affects line moves and boundary resize while later touching lines reuse the lowest free lane', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'snap.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'snap.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   const lines = page.locator('[data-outline-drag]'); await expect(lines).toHaveCount(6);
   for (let i = 0; i < 3; i++) await page.getByRole('button', { name: '放大波形', exact: true }).click();
   const third = page.getByRole('button', { name: '时间轴行 L3', exact: true });

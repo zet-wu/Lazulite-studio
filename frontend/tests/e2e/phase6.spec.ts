@@ -1,10 +1,11 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { phase6Ttml } from '../fixtures/phase6';
 
 async function load(page: Page, xml = phase6Ttml()) {
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'phase6.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'phase6.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await expect(page.locator('main [data-line-id="english"]')).toBeVisible();
 }
 const row = (page: Page, id = 'english') => page.locator(`main section[data-line-id="${id}"]`);
@@ -49,12 +50,12 @@ test('P6 inline addition, native text selection, IME, cancellation and one histo
   await expect(page.getByText('词已选 1', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '词 新增', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await add.click(); input = line.getByRole('textbox', { name: '添加词', exact: true });
   await input.fill('cancel'); await input.press('Escape');
   await add.click(); input = line.getByRole('textbox', { name: '添加词', exact: true });
   await input.blur();
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   const word = line.getByRole('textbox', { name: '词 still', exact: true });
   await word.click(); await word.press('ControlOrMeta+A');
   expect(await word.evaluate((e: HTMLInputElement) => e.selectionEnd! - e.selectionStart!)).toBe(5);
@@ -174,10 +175,11 @@ test('P6 western splitting and inline space-only words preserve independent whit
   await line.getByRole('textbox', { name: '添加词', exact: true }).fill('  '); await line.getByRole('textbox', { name: '添加词', exact: true }).press('Enter');
   await expect(line.locator('[data-word-id]')).toHaveCount(8);
   await expect(line.locator('[data-word-id]').last().locator('[class*="wordMain"] input')).toHaveValue('  ');
-  await page.locator('[data-top-menu="file"] summary').click(); const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '下载草稿', exact: true }).click();
   const xml = await (await import('node:fs/promises')).readFile(await (await download).path(), 'utf8');
   expect(xml).toContain('>  </span>');
+  await page.getByRole('button', { name: '编辑', exact: true }).click();
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(line.locator('[data-word-id]')).toHaveCount(7);
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(line.locator('[data-word-id]')).toHaveCount(1);
 });

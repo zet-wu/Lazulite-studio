@@ -1,10 +1,11 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { phase6Ttml } from '../fixtures/phase6';
 import { phase7Ttml as xml } from '../fixtures/phase7';
 async function load(page: Page, text = xml) {
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(text) });
+  await importLyrics(page, { name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(text) });
 }
 test('P7 generated source timing remains batch scoped with local replacement and one undo', async ({ page }) => {
   await load(page);
@@ -21,7 +22,7 @@ test('P7 generated source timing remains batch scoped with local replacement and
   await expect(page.getByLabel('读音 学校', { exact: true }).first()).toHaveValue('が');
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(page.getByLabel('音译单元 1', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: '重做', exact: true }).click();
   await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
@@ -44,7 +45,7 @@ test('P7 split previews and assigns translations with cancellation and one undo'
   await dialog.getByLabel('翻译 2归属').selectOption('right');
   await expect(dialog.getByLabel('拆分结果').locator('section').last()).toContainText('译文');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行…' }).click();
   await dialog.getByLabel('翻译 2归属').selectOption('right'); await dialog.getByRole('button', { name: '应用', exact: true }).click();
   await expect(outline).toHaveCount(4);

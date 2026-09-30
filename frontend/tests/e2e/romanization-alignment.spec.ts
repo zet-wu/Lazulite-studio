@@ -1,3 +1,4 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Locator } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { largeKana, longRuby, mixedRubyKana } from '../fixtures/phase8';
@@ -25,7 +26,7 @@ for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) t
   await page.setViewportSize({ width, height: 1000 });
   await page.addInitScript(theme => localStorage.setItem('lazulite-editor-theme', theme), theme);
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'mixed.ttml', mimeType: 'application/xml', buffer: Buffer.from(mixedRubyKana) });
+  await importLyrics(page, { name: 'mixed.ttml', mimeType: 'application/xml', buffer: Buffer.from(mixedRubyKana) });
   await page.locator('[data-outline-drag]').first().click({ button: 'right' });
   await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
@@ -57,7 +58,7 @@ for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) t
 for (const [name, xml, count] of [['Ruby', longRuby(64), 64], ['kana', largeKana(1, 80), 80]] as const) test(`Long ${name} wraps source and romanization together`, async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'wrap.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'wrap.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await page.locator('[data-outline-drag]').first().click({ button: 'right' });
   await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });

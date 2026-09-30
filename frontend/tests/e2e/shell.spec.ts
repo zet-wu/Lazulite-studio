@@ -1,9 +1,9 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
 async function openFileMenu(page: Page) {
-  const summary = page.locator('summary').filter({ hasText: '文件' }).first();
-  if (await summary.locator('..').getAttribute('open') === null) await summary.click();
+  await page.getByRole('button', { name: '文件打包', exact: true }).click();
 }
 
 test('opens a project, selects a line and keeps edit navigation visible', async ({ page }) => {
@@ -75,7 +75,7 @@ test('saves a semantic project edit and reopens the saved revision', async ({ pa
 test('imports rich TTML, saves Ruby and reopens it from the project route', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   const source = await readFile('../tests/fixtures/ttml/reference-apple-metadata.ttml');
-  await page.locator('input[type="file"]').last().setInputFiles({ name: 'reference.ttml', mimeType: 'application/ttml+xml', buffer: source });
+  await importLyrics(page, { name: 'reference.ttml', mimeType: 'application/ttml+xml', buffer: source });
   const ruby = page.getByRole('textbox', { name: '读音 今日', exact: true }).first();
   await ruby.dblclick();
   await ruby.fill('きよう');

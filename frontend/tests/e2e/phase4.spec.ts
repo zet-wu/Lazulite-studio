@@ -1,3 +1,4 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { performanceTtml } from '../fixtures/phase3';
@@ -38,7 +39,7 @@ for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) {
 
 test('P4-02 playing color is visible on ordinary and true narrow widths', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'phase4.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase4Ttml()) });
+  await importLyrics(page, { name: 'phase4.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase4Ttml()) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(3);
   const audio = page.locator('audio');
   await audio.evaluate((e: HTMLAudioElement) => { e.currentTime = 2; e.dispatchEvent(new Event('seeked')); });
@@ -61,7 +62,7 @@ test('P4-02 playing color is visible on ordinary and true narrow widths', async 
 test('P4-04/05 grouped skips, manual generation, history and checkpoint with bounded layout', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(rubyTtml()) });
+  await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(rubyTtml()) });
   const line = page.locator('main section[data-line-id="kana"]');
   await expect(line.locator('[data-romanization-content-id]')).toBeVisible();
   const source = await line.locator('[data-romanization-content-id] input').evaluateAll(nodes => nodes.map(n => (n as HTMLInputElement).value));
@@ -94,7 +95,7 @@ test('P4-04/05 grouped skips, manual generation, history and checkpoint with bou
 
 test('P4-06 wheel zoom keeps clipped edges uneditable and pointercancel leaves no transaction', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'phase4.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase4Ttml()) });
+  await importLyrics(page, { name: 'phase4.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase4Ttml()) });
   const bar = page.getByRole('button', { name: '时间轴行 L1', exact: true });
   await expect(bar).toBeVisible();
   await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 2; e.dispatchEvent(new Event('seeked')); });
@@ -122,7 +123,7 @@ test('P4-08 large proposal scroll preserves manual choices while mounting only v
   await page.goto('/editor');
   const xml = performanceTtml(2000).replace(/<text for="p(\d+)"><span begin="[^"]*" end="[^"]*">rom<\/span><\/text>/g, (_, i) =>
     `<text for="p${i}"><span begin="${(Number(i) * .3).toFixed(3)}" end="${(Number(i) * .3 + .024).toFixed(3)}">ko</span></text>`);
-  await page.locator('input[type=file]').setInputFiles({ name: 'large-ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'large-ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(2000);
   await page.locator('[data-outline-drag]').first().click();
   await page.locator('[data-top-menu="clipboard"] summary').click(); await page.getByRole('button', { name: '全选', exact: true }).click();

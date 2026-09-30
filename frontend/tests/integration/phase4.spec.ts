@@ -1,3 +1,4 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
 import { phase4Ttml } from '../fixtures/phase4';
 
@@ -5,7 +6,7 @@ test('P4-01/02 native media crosses intervals, pauses, seeks and keeps playing t
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, recordVideo: { dir: test.info().outputPath('media-video') } });
   const page = await context.newPage();
   await page.goto('http://127.0.0.1:5175/projects/phase3-media/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'phase4.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase4Ttml()) });
+  await importLyrics(page, { name: 'phase4.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase4Ttml()) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(3);
   const audio = page.locator('audio');
   const ordinary = page.getByRole('button', { name: '时间轴行 L1', exact: true });
@@ -42,7 +43,7 @@ test('P4-01/02 native media crosses intervals, pauses, seeks and keeps playing t
 test('P4-07 independent background saves, exchanges and is visible after its parent ends', async ({ page }) => {
   const { backgroundTtml } = await import('../fixtures/phase4');
   await page.goto('/projects/phase4-background/edit');
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'background.ttml', mimeType: 'application/xml', buffer: Buffer.from(backgroundTtml()) });
+  await importLyrics(page, { name: 'background.ttml', mimeType: 'application/xml', buffer: Buffer.from(backgroundTtml()) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(2);
   await page.locator('[data-outline-drag]').nth(1).click();
   await page.getByLabel('背景歌词', { exact: true }).check();
@@ -66,11 +67,11 @@ test('P4-07 independent background saves, exchanges and is visible after its par
   await expect(background).toHaveClass(/bgWrapperActive/);
   await page.getByRole('button', { name: '暂停', exact: true }).click();
   await page.getByRole('button', { name: '编辑', exact: true }).click();
-  await page.locator('[data-top-menu="file"] summary').click();
+  await page.getByRole('button', { name: '文件打包', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '最终 TTML' }).click();
   const path = (await (await download).path())!;
-  await page.locator('input[type=file]').last().setInputFiles(path);
+  await importLyrics(page, { name: 'reopened.ttml', mimeType: 'application/ttml+xml', buffer: await (await import('node:fs/promises')).readFile(path) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(2);
   await page.locator('[data-outline-drag]').nth(1).click();
   await expect(page.getByLabel('背景歌词', { exact: true })).toBeChecked();
@@ -101,7 +102,7 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
   }, raw);
   expect(prepared.parentTime).toEqual([6_426_000, 8_155_000]);
   expect(prepared.backgroundTime).toEqual([8_155_000, 129_984_000]);
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'review-working-copy.ttml', mimeType: 'application/xml', buffer: Buffer.from(prepared.xml) });
+  await importLyrics(page, { name: 'review-working-copy.ttml', mimeType: 'application/xml', buffer: Buffer.from(prepared.xml) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(prepared.lineCount);
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
@@ -122,7 +123,7 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
     await page.getByRole('button', { name: '暂停', exact: true }).click();
   }
   await page.getByRole('button', { name: '编辑', exact: true }).click();
-  await page.locator('[data-top-menu="file"] summary').click();
+  await page.getByRole('button', { name: '文件打包', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '最终 TTML' }).click();
   const finalXml = await readFile((await (await download).path())!, 'utf8');
@@ -139,7 +140,7 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
     expect(result.words).toEqual(prepared.words);
     if (xml === saved.document.ttml) expect(result.bgId).toBe(prepared.backgroundId);
   }
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'review-final-reopen.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
+  await importLyrics(page, { name: 'review-final-reopen.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
   await page.getByRole('button', { name: '预览', exact: true }).click();
   await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 65; });
   await page.getByRole('button', { name: '播放', exact: true }).click();

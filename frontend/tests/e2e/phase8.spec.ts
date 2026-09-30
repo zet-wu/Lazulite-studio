@@ -1,9 +1,10 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Page } from '@playwright/test';
 import { phase7Ttml } from '../fixtures/phase7';
 import { phase6Ttml } from '../fixtures/phase6';
 export async function load(page: Page, xml = phase7Ttml) {
   await page.goto('/editor');
-  await page.locator('input[type=file]').setInputFiles({ name: 'phase8.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'phase8.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
 }
 async function edge(page: Page, selector: string, index: number, options: { button?: 'right'; modifiers?: ('Shift' | 'Control' | 'Meta')[] } = {}) {
   await page.locator(selector).nth(index).click({ position: { x: 3, y: 3 }, ...options });
@@ -18,7 +19,7 @@ test('P8 real Ruby range, passive right focus, batch delete and one undo', async
   await page.getByRole('menuitem', { name: '删除所选读音（2）' }).click();
   await expect(page.locator('[data-ruby-id]')).toHaveCount(2);
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.locator('[data-ruby-id]')).toHaveCount(4);
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
 });
 test('P8 cross-line word range, right-click outside and clipboard remains after direct deletion', async ({ page }) => {
   await load(page);
@@ -132,11 +133,11 @@ test('P8 rejected linked-target batch leaves document, history and selected IDs 
     const doc = codec.parseLyricTtml(xml); doc.lines[0].endLink = { targetLineId: 'missing', originalEndUs: 2e6 }; doc.lines[0].endUs = 6e6;
     return codec.serializeLyricTtml(doc, { draft: true });
   }, phase7Ttml);
-  await page.locator('input[type=file]').setInputFiles({ name: 'links.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'links.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   const outline = page.locator('[data-outline-drag]'); await outline.nth(1).click(); await outline.nth(2).click({ modifiers: ['Shift'] });
   await outline.nth(1).click({ button: 'right' }); await page.getByRole('menuitem', { name: '删除所选行（2）' }).click();
   await expect(page.getByRole('alert')).toContainText('original line end excludes a word'); await expect(outline).toHaveCount(3);
-  await expect(page.getByText('行已选 2', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await expect(page.getByText('行已选 2', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
 });
 
 test('P8 merging timed fragments preserves generated separator spaces and native text keys', async ({ page }) => {
