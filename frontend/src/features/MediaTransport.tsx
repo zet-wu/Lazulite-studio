@@ -1,3 +1,5 @@
+import { PlaybackSpeed } from './PlaybackSpeed';
+import { normalizePlaybackSpeed, playbackSpeedKey, savedPlaybackSpeed } from '../domain/playback-speed';
 import {
   forwardRef,
   useCallback,
@@ -81,7 +83,12 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   );
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [rate, setRate] = useState(1);
+  const [rate, setRate] = useState(savedPlaybackSpeed);
+  const changeRate = useCallback((value: number) => {
+    const next = normalizePlaybackSpeed(value);
+    setRate(next); localStorage.setItem(playbackSpeedKey, String(next));
+    if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = next; }
+  }, []);
   const [start, setStart] = useState(0);
   const [span, setSpan] = useState(0);
 
@@ -288,8 +295,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   }, [activeLoop, readPosition, seekTo]);
 
   useEffect(() => {
-    if (audio.current) audio.current.playbackRate = rate;
-  }, [rate]);
+    if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; }
+  }, [rate, asset?.id, projectId]);
   useEffect(() => {
     const c = canvas.current;
     if (!c) return;
@@ -495,6 +502,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     <footer className={`${styles.footer} ${expanded ? styles.expanded : styles.collapsed}`} onKeyDown={keyDown}>
       <audio
         ref={audio}
+        onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; } }}
         preload="metadata"
         src={asset ? studioApi.audioUrl(projectId) : undefined}
       />
@@ -583,21 +591,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       {visible.spectrum && asset && <SpectrogramCanvas assetIdentity={`${asset.id}:${asset.asset_hash}`} projectId={projectId} startUs={startUs} endUs={endUs} durationUs={durationUs} />}
       </div>
       <div className={styles.controls}>
-        <select
-          disabled={disabled}
-          value={rate}
-          onChange={(e) => {
-            const n = Number(e.target.value);
-            setRate(n);
-            if (audio.current) audio.current.playbackRate = n;
-          }}
-          aria-label="播放速度"
-        >
-          <option value="0.5">0.5×</option>
-          <option value="0.75">0.75×</option>
-          <option value="1">1×</option>
-          <option value="1.25">1.25×</option>
-        </select>
+        <PlaybackSpeed rate={rate} disabled={disabled} change={changeRate} />
         <button
           disabled={disabled}
           onClick={() => {

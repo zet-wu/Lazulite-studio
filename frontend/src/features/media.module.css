@@ -134,3 +134,7 @@
 .trackPlaying:not(.narrowHit)::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2px #f0a42b; pointer-events: none; }
 .trackSelected .narrowColor { background: #518ae2; }
 .trackPlaying .narrowColor { box-shadow: inset 0 0 0 2px #f0a42b; }
+.playbackSpeed { display: inline-flex; align-items: center; gap: 6px; }
+.playbackSpeed label { display: inline-flex; align-items: center; gap: 4px; }
+.playbackSpeed input { width: 130px; accent-color: var(--blue); }
+.playbackSpeed output { font-variant-numeric: tabular-nums; min-width: 5ch; }
