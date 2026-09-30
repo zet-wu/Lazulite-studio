@@ -66,7 +66,7 @@ function checkAttributes(node: Element, allowed: string[]) {
   for (const attribute of Array.from(node.attributes)) {
     if (attribute.namespaceURI === 'http://www.w3.org/2000/xmlns/') continue;
     if (attribute.namespaceURI === null && allowed.includes(attribute.localName)) continue;
-    if (attribute.namespaceURI === XML && ['id', 'lang'].includes(attribute.localName)) continue;
+    if (attribute.namespaceURI === XML && ['id', 'lang', 'space'].includes(attribute.localName)) continue;
     if (attribute.namespaceURI === TTS && attribute.localName === 'ruby') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'role') continue;
@@ -105,7 +105,7 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   const id = `${lineId}:word:${index}`;
   if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) {
     const text = node.nodeValue ?? '';
-    if (!text.trim() && /[\r\n]/.test(text)) return null;
+    if (!text.trim() && /[\r\n]/.test(text) && (node.parentElement?.closest('[xml\\:space]')?.getAttributeNS(XML, 'space') !== 'preserve')) return null;
     return text ? createWord(text, id) : null;
   }
   if (node.nodeType !== Node.ELEMENT_NODE) throw new Error('Unsupported TTML line child');
@@ -382,6 +382,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   const draft = options.draft === true;
   const xml = new DOMParser().parseFromString(`<tt xmlns="${TTML}" xmlns:tts="${TTS}" xmlns:ttm="${TTM}" xmlns:amll="${AMLL}"${draft ? ` xmlns:studio="${STUDIO}"` : ''}><body/></tt>`, 'application/xml');
   const root = xml.documentElement;
+  root.setAttributeNS(XML, 'xml:space', 'preserve');
   if (document.language) root.setAttributeNS(XML, 'xml:lang', document.language);
   if (document.agents.length || Object.keys(document.metadata).length || document.romanizationTracks.length) {
     const head = xml.createElementNS(TTML, 'head');
@@ -486,6 +487,10 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     if (line.agentRefs.length) p.setAttributeNS(TTM, 'ttm:agent', line.agentRefs.join(' '));
     const appendWord = (parent: Element, word: LyricWord, text: string) => {
       if (word.obscene) throw new Error(`Word ${word.id} has fields not yet mapped to TTML`);
+      if (!draft && /^\s+$/.test(text) && word.beginUs === null && word.endUs === null && !word.rubyUnits.length && !word.alignmentUnits.length && !word.emptyBeat) {
+        parent.appendChild(xml.createTextNode(text));
+        return;
+      }
       const span = xml.createElementNS(TTML, 'span');
       if (draft) span.setAttributeNS(STUDIO, 'studio:id', word.id);
       if (draft && word.emptyBeat) span.setAttributeNS(STUDIO, 'studio:emptyBeat', String(word.emptyBeat));
@@ -532,5 +537,5 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     }
     div.appendChild(p);
   }
-  return new XMLSerializer().serializeToString(xml);
+  return new XMLSerializer().serializeToString(xml).replace(/>([\s]+)</g, (_, whitespace: string) => `>${whitespace.replace(/\r/g, '&#13;').replace(/\n/g, '&#10;')}<`);
 }
