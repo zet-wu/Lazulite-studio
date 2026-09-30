@@ -220,7 +220,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const first = document.lines[firstIndex], second = document.lines[secondIndex];
       const issues = lineStructureIssues(document, first, second);
       if (issues.length) throw new Error(issues.join('；'));
-      const merged: LyricLine = { ...first, words: [...first.words, ...second.words], beginUs: first.beginUs ?? second.beginUs, endUs: second.endUs ?? first.endUs, endLink: second.endLink };
+      const merged: LyricLine = { ...first, words: [...first.words, ...second.words], beginUs: first.beginUs ?? second.beginUs, endUs: second.endUs ?? first.endUs, endLink: second.endLink && ![first.id, second.id].includes(second.endLink.targetLineId) ? second.endLink : null };
       validTime(merged.beginUs, merged.endUs);
       merged.words.forEach((word) => wordFitsLine(word, merged));
       const lines = document.lines.filter((line) => line.id !== second.id).map((line) => line.id === first.id ? merged : line.endLink?.targetLineId === second.id ? { ...line, endLink: { ...line.endLink, targetLineId: first.id } } : line);

@@ -22,12 +22,10 @@ export function lineStructureIssues(document: LyricDocument, first: LyricLine, s
   }
   if (first.songPart !== second.songPart) issues.push(`${label(first)}与${label(second)}歌曲段落不同`);
   if (first.agentRefs.join(' ') !== second.agentRefs.join(' ')) issues.push(`${label(first)}与${label(second)}歌手不同`);
-  if (first.endLink && first.endLink.targetLineId !== second.id) {
+  if (first.endLink && ![first.id, second.id].includes(first.endLink.targetLineId)) {
     const target = document.lines.find(item => item.id === first.endLink!.targetLineId)!;
     issues.push(`${label(first)}行尾链接 → ${label(target)}在合并范围外`);
   }
-  // A last-line link back into the range would become a self-link.
-  if (second.endLink && [first.id, second.id].includes(second.endLink.targetLineId)) issues.push(`${label(second)}行尾链接指向合并范围内的开始边界`);
   const mergedBegin = first.beginUs ?? second.beginUs;
   for (const source of document.lines) {
     if (source.id === first.id || source.id === second.id || source.endLink?.targetLineId !== second.id) continue;

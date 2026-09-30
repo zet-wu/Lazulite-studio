@@ -35,7 +35,7 @@ it('merges the internal chain and inherits the last external link and original e
   expect(undoLyricCommand(result).present).toBe(doc);
 });
 it('reports all real conflicts with source ordinals and safely rebinds identical starts', () => {
-  const doc = fixture(); doc.lines[3].endLink = { targetLineId: 'b', originalEndUs: 8_000_000 }; doc.lines[3].endUs = 2_000_000;
+  const doc = fixture(); doc.lines[3].endLink = { targetLineId: 'b', originalEndUs: 8_000_000 }; doc.lines[3].endUs = 2_000_000; doc.lines[3].beginUs = 0;
   doc.lines[0].translations = [{ language: 'en', text: 'a' }]; doc.lines[1].translations = [{ language: 'ja', text: 'b' }];
   doc.lines[1].agentRefs = ['v2']; doc.lines[1].songPart = 'verse';
   const issues = lineStructureIssues(doc, doc.lines[0], doc.lines[1]);
@@ -64,4 +64,13 @@ it('assigns translations independently with romanization and background in one s
   for (const draft of [true, false]) expect(parseLyricTtml(serializeLyricTtml(result.present, { draft })).lines[1].translations).toEqual(doc.lines[0].translations.slice(1));
   expect(undoLyricCommand(result).present).toBe(doc);
   expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: [], translationIndicesForNewLine: [3], backgroundTarget: 'left' })).toThrow('翻译分配条目不存在');
+});
+
+it('eliminates every internal end link when coincident boundaries merge', () => {
+  const doc = fixture();
+  doc.lines[0].words = []; doc.lines[0].beginUs = 0; doc.lines[0].endUs = 0;
+  doc.lines[1].beginUs = 0; doc.lines[1].endUs = 0; doc.lines[1].endLink = { targetLineId: 'a', originalEndUs: 1 };
+  const result = executeLyricCommand(createLyricEditorState(doc), { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' });
+  expect(result.present.lines[0].endLink).toBeNull();
+  expect(undoLyricCommand(result).present).toBe(doc);
 });
