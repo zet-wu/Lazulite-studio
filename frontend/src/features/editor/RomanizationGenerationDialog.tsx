@@ -79,7 +79,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   const modeStorage = `lazulite-romanization-mode:${preferenceScope}`;
   const [kind, setKind] = useState<RomanizationKind>(() => localStorage.getItem(modeStorage) === 'timed' ? 'timed' : 'plain');
   const [rows, setRows] = useState<RomanizationProposal[]>(() => proposeRomanization(source, sourceIds, kind));
-  const [trackId, setTrackId] = useState('');
+  const [trackId, setTrackId] = useState(() => source.romanizationTracks.find(track => track.language === 'ja-Latn')?.id ?? '');
   const [targets, setTargets] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [focusedRow, setFocusedRow] = useState<string | null>(null);

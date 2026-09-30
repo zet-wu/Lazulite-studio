@@ -56,3 +56,32 @@ it('remembers output per project after cancellation and generates once in the re
   render(<RomanizationGenerationDialog {...props} />);
   expect(screen.getByLabelText('输出')).toHaveValue('plain');
 });
+
+it('defaults to the first ja-Latn track, appends missing content and skips existing content', () => {
+  const doc = createLyricDocument('かな'), lineId = doc.lines[0].id;
+  doc.romanizationTracks = [
+    { id: 'english', language: 'en-Latn', contents: [] },
+    { id: 'first', language: 'ja-Latn', contents: [] },
+    { id: 'second', language: 'ja-Latn', contents: [] },
+  ];
+  let result = doc;
+  const apply = vi.fn(command => { result = executeLyricCommand(createLyricEditorState(doc), command).present; return true; });
+  const props = { document: doc, lineIds: [lineId], preferenceScope: 'project:first', apply, close: vi.fn() };
+  let view = render(<RomanizationGenerationDialog {...props} />);
+  expect(screen.getByLabelText('目标轨道')).toHaveValue('first');
+  expect(screen.getByLabelText('L1生成内容')).toHaveValue('append');
+  fireEvent.change(screen.getByLabelText('L1音译'), { target: { value: 'manual' } });
+  fireEvent.click(screen.getByRole('button', { name: '生成音译' }));
+  expect(result.romanizationTracks).toHaveLength(3);
+  expect(result.romanizationTracks[1].contents[0]).toMatchObject({ lineId, kind: 'plain', text: 'manual' });
+  expect(result.romanizationTracks[0]).toEqual(doc.romanizationTracks[0]);
+  expect(result.romanizationTracks[2]).toEqual(doc.romanizationTracks[2]);
+  expect(result.lines).toEqual(doc.lines); view.unmount();
+  view = render(<RomanizationGenerationDialog {...props} document={result} />);
+  expect(screen.getByLabelText('目标轨道')).toHaveValue('first');
+  expect(screen.getByLabelText('L1生成内容')).toHaveValue('skip');
+  expect(screen.getByRole('button', { name: '生成音译' })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('目标轨道'), { target: { value: '' } });
+  expect(screen.getByLabelText('L1生成内容')).toHaveValue('append');
+  expect(screen.getByRole('button', { name: '生成音译' })).toBeEnabled();
+});

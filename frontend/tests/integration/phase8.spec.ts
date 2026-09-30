@@ -32,6 +32,11 @@ for (const kind of ['plain', 'timed']) test(`P8 ${kind} manual result and placeh
   expect(final).toEqual(draft); expect(finalXml).toContain('transliterations'); expect(finalXml).not.toContain('x-roman'); expect(finalXml).not.toContain('studio:');
   await page.locator('input[type=file]').last().setInputFiles({ name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
   await expect(page.getByLabel(kind === 'timed' ? '音译单元 1' : '音译 ja-Latn', { exact: true }).first()).toHaveValue(' manual  ');
+  await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue(kind);
+  expect(await dialog.getByLabel('目标轨道').inputValue()).not.toBe('');
+  await expect(dialog.getByLabel('L1生成内容')).toHaveValue('skip');
+  await expect(dialog.getByRole('button', { name: '生成音译', exact: true })).toBeDisabled();
   await writeFile(test.info().outputPath(`phase8-${kind}-roundtrip.json`), JSON.stringify({ draft, final }, null, 2));
 });
 
