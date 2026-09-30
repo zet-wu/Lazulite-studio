@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { studioApi, studioS4, type Asset } from '../adapters/http/client';
 import { serializeLyricTtml } from '../adapters/ttml/lyric-codec';
-import { detectLyricFormat, exportLyricFile, importLyricFile, type LyricFormat } from '../adapters/lyric-formats';
+import { exportLyricFile, type LyricFormat } from '../adapters/lyric-formats';
 import type { LyricLine } from '../domain/lyric-document';
 import { MediaTransport, type TransportHandle } from './MediaTransport';
 import { EditorWorkspace } from './editor/EditorWorkspace';
@@ -58,22 +58,13 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     try { download(serializeLyricTtml(editor.document, { draft }), `${title}${draft ? '.draft' : ''}.ttml`); setMessage(''); }
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
   };
-  const openFile = async (file: File) => {
-    if (editor.dirty && !window.confirm('当前修改尚未保存，确定导入其他歌词吗？')) return;
-    try {
-      const format = detectLyricFormat(file.name);
-      if (format === 'ass') throw new Error('ASS 目前仅支持导出');
-      editor.apply({ type: 'replace-document', document: importLyricFile(await file.text(), format) });
-      setMessage('歌词已导入，请检查后保存');
-    } catch (error) { setMessage(error instanceof Error ? error.message : '导入失败'); }
-  };
   const exportFormat = (format: LyricFormat) => {
     try { download(exportLyricFile(editor.document, format), `${title}.${format}`); setMessage(''); }
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
   };
   return <div className={styles.editorShell}><EditorWorkspace embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
-    onSave={() => void editor.save()} onOpen={(file) => void openFile(file)} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat}
+    onSave={() => void editor.save()} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat}
     onPublish={() => { if (editor.dirty || editor.conflict || editor.saving) setMessage('请先保存后发布'); else navigate(`/projects/${projectId}/export`); }}
     selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
     onSelectRomanization={(trackId, contentId) => setSelectedRomanization({ trackId, contentId })}
