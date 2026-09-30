@@ -10,6 +10,178 @@
     }
   ],
   "paths": {
+      "/lyric-sources/search": {
+        "post": {
+          "operationId": "lyricSourceSearch",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LyricSearchRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Authenticated provider response with original lyric format",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Session required"
+            },
+            "429": {
+              "description": "Provider concurrency limit"
+            },
+            "502": {
+              "description": "Upstream network or payload error"
+            }
+          }
+        }
+      },
+      "/lyric-sources/fetch": {
+        "post": {
+          "operationId": "lyricSourceFetch",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LyricSourceCandidate"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Authenticated provider response with original lyric format",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Session required"
+            },
+            "429": {
+              "description": "Provider concurrency limit"
+            },
+            "502": {
+              "description": "Upstream network or payload error"
+            }
+          }
+        }
+      },
+      "/lyric-sources/resolve": {
+        "post": {
+          "operationId": "lyricSourceResolve",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LyricSourceCandidate"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Authenticated provider response with original lyric format",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Session required"
+            },
+            "429": {
+              "description": "Provider concurrency limit"
+            },
+            "502": {
+              "description": "Upstream network or payload error"
+            }
+          }
+        }
+      },
+      "/projects/{projectId}/packaging": {
+        "get": {
+          "operationId": "getPackagingInfo",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "projectId",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Container and stable STPP track IDs",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "asset_id": {
+                        "type": "string"
+                      },
+                      "supported": {
+                        "type": "boolean"
+                      },
+                      "container": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "tracks": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "track_id": {
+                              "type": "integer"
+                            },
+                            "language": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "error": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
     "/session": {
       "get": {
         "operationId": "getSession",
@@ -550,6 +722,156 @@
       }
     },
     "schemas": {
+      "LyricSearchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "enum": [
+              "netease",
+              "qqmusic",
+              "kugou",
+              "amll"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "query": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "query"
+        ],
+        "title": "Search",
+        "type": "object"
+      },
+      "LyricSourceCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "enum": [
+              "netease",
+              "qqmusic",
+              "kugou",
+              "amll"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[\\w.:-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Title",
+            "type": "string"
+          },
+          "artists": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Artists",
+            "type": "array"
+          },
+          "album": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Album",
+            "type": "string"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Duration Ms"
+          },
+          "songmid": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "pattern": "^[A-Za-z0-9]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Songmid"
+          },
+          "songid": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "pattern": "^\\d+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Songid"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ncm-lyrics",
+                  "qq-lyrics",
+                  "apple-lyrics",
+                  "spotify-lyrics",
+                  "raw-lyrics",
+                  "ttml"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Platform"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "maxLength": 180,
+                "pattern": "^[A-Za-z0-9_-]+\\.ttml$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File"
+          }
+        },
+        "required": [
+          "source",
+          "id"
+        ],
+        "title": "Candidate",
+        "type": "object"
+      },
       "LoginRequest": {
         "type": "object",
         "required": ["password"],
@@ -761,15 +1083,60 @@
         "additionalProperties": false
       },
       "PublishRequest": {
-        "type": "object",
-        "required": ["revision", "asset_id"],
         "additionalProperties": false,
-        "properties": { "revision": { "type": "string" }, "asset_id": { "type": "string" } }
+        "properties": {
+          "revision": {
+            "minLength": 1,
+            "title": "Revision",
+            "type": "string"
+          },
+          "asset_id": {
+            "minLength": 1,
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "lrc_kind": {
+            "enum": [
+              "lrc",
+              "elrc"
+            ],
+            "title": "Lrc Kind",
+            "type": "string"
+          },
+          "lrc_text": {
+            "maxLength": 4000000,
+            "minLength": 1,
+            "title": "Lrc Text",
+            "type": "string"
+          },
+          "target_track_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Track Id"
+          }
+        },
+        "required": [
+          "revision",
+          "asset_id",
+          "lrc_kind",
+          "lrc_text"
+        ],
+        "title": "PublishRequest",
+        "type": "object"
       },
       "Export": {
         "type": "object",
         "required": ["id", "revision", "asset_id", "status", "created_at", "stale", "report", "download_url", "error"],
         "properties": {
+          "lrc_kind": { "enum": ["lrc", "elrc"] }, "target_track_id": { "type": ["integer", "null"] },
           "id": { "type": "string" }, "revision": { "type": "string" }, "asset_id": { "type": "string" }, "status": { "type": "string" }, "created_at": { "type": "string" }, "stale": { "type": "boolean" }, "report": { "anyOf": [{ "$ref": "#/components/schemas/PublishReport" }, { "type": "null" }] }, "download_url": { "type": ["string", "null"] }, "error": { "type": ["object", "null"] }
         }
       },
