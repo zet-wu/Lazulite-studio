@@ -2,7 +2,7 @@
 
 `editor/EditorWorkspace.tsx` 与菜单、Ribbon、歌词列表、行词交互组件是本地 `/editor` 与项目路由共用的语义编辑界面，可修改行、词、Ruby、时间、翻译、音译、背景、歌手和常见元数据。`editor/LocalEditor.tsx` 负责本地文件与当前版本检查点；`Workspace.tsx` 负责项目加载、revision 保存、候选、任务、词典、审核及媒体入口。两者调用同一领域命令与 TTML codec。
 
-`useProjectDocument.ts` 管理撤销重做、串行保存、冲突和本地恢复。`CandidatePanel` 与 `JobCandidatePanel` 将候选转为一次领域事务，不直接改服务器文档。`MediaTransport` 保留播放和波形控制，`ExportPage` 下载或发布已保存的语义文档。
+`useProjectDocument.ts` 管理撤销重做、串行保存、冲突和本地恢复。`CandidatePanel` 与 `JobCandidatePanel` 将候选转为一次领域事务，不直接改服务器文档。`MediaTransport` 保留播放和波形控制，`PackagingPanel` 下载当前歌词，`MusicPackaging` 保存确切快照后创建媒体打包任务。
 
 `editor/editing-actions.ts` 负责有序选择、带 Ruby/时间/对齐的内部剪贴板、共用原子选区删除、纯文本插入和跨行词事务；`SegmentationPanel` 与 `BatchToolsPanel` 调用相同命令历史。`SyncPanel` 使用播放器时钟连续打轴，`TimelineTracks` 提交拖动事务，`PreviewMode` 延迟加载 AMLL 并读取当前草稿。音译附属行和显式 Ruby 提案已接入。普通与超过80行的虚拟列表共用显式定位、真实高度校准和取消语义；时间轴三类区间独立分轨、共享绘图区，窄区间使用既有缩放后普通端点编辑，不设专属工具行。实际状态与剩余差距见[当前状态](../../../../lyric-workflow/docs/studio/current-state.md)。
 
@@ -27,3 +27,5 @@ Phase 7：LineSplitDialog上下预览与逐条翻译归属，TranslationEditor�
 音译生成的输出模式是浏览器偏好：项目路由按实际projectId、本地编辑按文件名保存至localStorage，切换模式时更新，取消仍记忆；打开时直接按记忆模式生成一次。仅保存模式，不保留上次手工提案，也不写入歌词文档或撤销历史。
 
 目标轨道每次打开默认选择文档顺序中的第一条ja-Latn，无匹配轨道时默认新建；仍可明确新建或选择其他匹配轨道。默认选中已有轨道时，有内容的源行仍跳过、缺少内容的行可追加，不自动覆盖已有音译。
+
+`LyricAcquisition` 提供文件/文本/网络候选预览与逐键整组元数据选择，确认导入一次事务。`NetworkLyrics` 丢弃过期响应、显示真实粒度并支持网易/QQ 歌曲 ID 独立关联。`useProjectDocument.saveForPackaging` 返回被保存的 document 与 revision，后续编辑不能冒充已保存快照。

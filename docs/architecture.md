@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-2026-09-30 更新至 Phase 6 人工审阅后的 Phase 7 整改。本文描述实际架构；执行依据见[编辑整改方案](../../lyric-workflow/docs/studio/plans/phase7-review-remediation.md)，实际验证与开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
+2026-10-01 更新至歌词获取与文件打包。执行依据见[本轮方案](../../lyric-workflow/docs/studio-search-release-review/Review-phase0/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
 
 ## 1. 应用与目录
 
@@ -22,7 +22,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 `/editor` 由 LocalEditor 管本地文件与检查点，`/projects/:projectId/edit` 由 Workspace 管项目；两者使用同一个 EditorWorkspace、领域命令和 codec。项目路由有音频服务与保存冲突处理；本地路由没有同等媒体资产能力。
 
-其他路由为 `/projects`、`/projects/:projectId/export`、`/login`、`/settings`。编辑器当前提供编辑/打轴/预览及一级“项目辅助”占位；大纲、歌词列表、属性各自滚动；大纲点击在栏上委托，未变化行用memo复用，元数据、歌手与音译轨道通过编辑模式的“歌词设置”进入既有弹窗。两侧独立显隐，默认190px/250px，范围160–360px/200–420px；6px分隔条支持指针捕获、取消、键盘8/32px、双击默认。拖动直接预览grid几何，仅分隔条更新自身ARIA，松手才提交工作区偏好；单一localStorage偏好不进入文档/history，resize仅限制渲染宽度；普通/虚拟列表共用显式ID/serial定位：远端先挂载，再按真实卡片矩形平滑居中，超高卡片靠顶；有界校准，新请求及用户滚动取消，尊重reduced-motion，不抢焦点。EditorMenu与EditorRibbon共用单一activeMenuId；受控details保留输入挂载，跨菜单互斥，命令/外点/Escape关闭（Escape回触发器），离开200ms关闭并保护菜单内键盘焦点；文件cancel监听独立清理。
+其他路由为 `/projects`、`/login`、`/settings`。编辑器提供歌词获取/编辑/打轴/预览/文件打包及末尾“项目辅助”占位；大纲、歌词列表、属性各自滚动；大纲点击在栏上委托，未变化行用memo复用，元数据、歌手与音译轨道通过编辑模式的“歌词设置”进入既有弹窗。两侧独立显隐，默认190px/250px，范围160–360px/200–420px；6px分隔条支持指针捕获、取消、键盘8/32px、双击默认。拖动直接预览grid几何，仅分隔条更新自身ARIA，松手才提交工作区偏好；单一localStorage偏好不进入文档/history，resize仅限制渲染宽度；普通/虚拟列表共用显式ID/serial定位：远端先挂载，再按真实卡片矩形平滑居中，超高卡片靠顶；有界校准，新请求及用户滚动取消，尊重reduced-motion，不抢焦点。EditorMenu与EditorRibbon共用单一activeMenuId；受控details保留输入挂载，跨菜单互斥，命令/外点/Escape关闭（Escape回触发器），离开200ms关闭并保护菜单内键盘焦点；文件菜单已移除，导入在歌词获取、导出在文件打包。
 
 界面以共享语义 tokens 定义明暗表面、主次操作及内容/标签层级；菜单使用无框整行项。SettingsDialog 统一标题、滚动内容和固定操作区，兼顾焦点圈定及返回。大纲/属性标题独立固定，大纲行号与歌词分列，属性用主行号及背景标识；中栏不再设标题工具栏，元数据、歌手和轨道管理统一放在编辑工具旁的“歌词设置”，打轴/预览不显示此入口。LyricList 在普通/虚拟内容的真实末尾渲染追加按钮，空文档同样可新增空白主行，选中并请求定位。
 
@@ -52,7 +52,7 @@ RomanizationGenerationDialog自有静态正文/Ruby对照布局，无播放遮�
 
 `adapters/ttml/lyric-codec.ts` 解析为语义文档并规范化导出，旧 XML 保留树模型已移除。支持常见词/Ruby/背景、行内和 iTunes sidecar 附属内容、当前草稿辅助属性，以及 AMLL 无命名空间子节点和绝对分钟时间修复；x-bg保留自身begin/end，解析用外层容器校验而不要求位于父p内；body dur计入背景结束时间，草稿studio:id保持背景ID。最终导出中，无时间且无Ruby/对齐/空拍的纯空白词写为原始文本节点，xml:space保留连续/首尾/换行空白；草稿仍用span保存稳定ID和未定端点。预览0–0空白只属于播放投影。未知不支持内容会报错，不宣称任意 TTML 可无损编辑。
 
-`lyric-formats.ts` 支持文本、LRC/ESLRC/QRC/YRC/LYS 双向与 ASS 导出。低表达力格式不能携带全部 Ruby/元数据或多条音译轨道。预览动态正文使用有效完整时间，独立纯空白词按原顺序以0–0 AMLL word投影；其他未定时正文不进入动态预览，整行无定时词沿用正文回退，不修改文档。isDuet 从歌手引用派生；引用包含主唱时显示主唱侧，否则显示另一侧，无法可视化多歌手合唱。StudioLyricPlayer使用AMLL的单一DOM播放器，关闭自动时间改写，仅把父/背景显示组活跃区设为两行时间并集，保持各行及词/Ruby输入时间。
+`lyric-formats.ts` 支持文本、LRC/扩展 LRC/ESLRC/QRC/YRC/LYS 双向、KRC 导入与 ASS 导出。`source-codec.ts` 解析原始 QRC/YRC/KRC 和附属内容；本地二进制 KRC 在浏览器解压。`lrc.ts` 统一普通/尖括号扩展 LRC 下载和内嵌文本：只取主行正文，未知结束不猜测，重叠主行保留且仅在已知区间并集外清屏。低表达力格式不能携带全部 Ruby/元数据或多条音译轨道。预览动态正文使用有效完整时间，独立纯空白词按原顺序以0–0 AMLL word投影；其他未定时正文不进入动态预览，整行无定时词沿用正文回退，不修改文档。isDuet 从歌手引用派生；引用包含主唱时显示主唱侧，否则显示另一侧，无法可视化多歌手合唱。StudioLyricPlayer使用AMLL的单一DOM播放器，关闭自动时间改写，仅把父/背景显示组活跃区设为两行时间并集，保持各行及词/Ruby输入时间。
 
 项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存当前格式检查点；FastAPI 接受 TTML envelope，不接收浏览器对象图。修订以不可变文件与 DB 指针提交。候选只能由用户应用。
 
@@ -66,7 +66,13 @@ PlaybackSpeed提供0.1–2×即时滑条、0.05步长、累积并规范化滚轮
 
 服务为登录用户共享项目库的单工作台，显式配置会话/网关模式。任务状态持久化，SSE 提供变化，结果从资源接口读取。reading、词典与实验 forced 的可用性取决于配置；HTTP 通过不代表模型质量。
 
-发布读取已保存修订，为受支持非分片 MP4/M4A 添加单 sample STPP 并回读校验后下载。MusicBox 消费端的已知限制仍在；本次不改发布实现。
+`LyricAcquisition` 组合文件、文本和四网络来源，静态预览分页并展示 Ruby/翻译/音译。元数据每键选择原值或待导入完整列表，选择空侧删除；文档变化时重新对照。确认用一次 replace-document 事务，正文/歌手/音译整体替换，撤销全部恢复。`NetworkLyrics` 按请求序号及 AbortController 丢弃过期结果，歌曲 ID 关联独立成一次事务。网易 ID 和 QQ songmid 是字符串数组追加去重，酷狗/AMLL 不提供 ID 关联。
+
+`lyric_sources.py` 在服务端处理固定四源检索、原始载荷取回和 QRC/KRC 解密解压；登录/CSRF、并发、超时及载荷上限在边界执行。前端唯一 codec 生成文档和实际内容徽章，服务不提前降为 LRC。
+
+`PackagingPanel` 在原工作区提供草稿/最终 TTML、兼容歌词及媒体打包；`MusicPackaging` 捕获当前 document，先校验并保存，再用返回的确切 revision 创建任务。保存中继续编辑保持 dirty，旧任务不会代表新草稿；冲突/未确认恢复阻止创建。任务绑定 revision/asset/LRC 类型与文本/STPP track ID，成功报告才开放下载。
+
+`packaging.py` 通过 Mutagen 写 MP3 的 USLT::eng、FLAC 的 LYRICS、MP4 的 ©lyr；`publishing.py` 为非分片 MP4/M4A 添加或替换单 sample STPP。已有 STPP 必须显式选稳定 track ID，其他轨道和标签保留。对音频 packet hash、非目标标签/FLAC 元数据块、MP4 原 mdat 与去除地址差异的轨道结构、两部分歌词分别回读验证。源资产不覆盖、不转码；产物按任务独立保存。外部播放器兼容性仍需单独验证。
 
 ## 6. 文档与依赖边界
 
