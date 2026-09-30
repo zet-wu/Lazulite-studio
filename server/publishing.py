@@ -282,7 +282,7 @@ def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str 
     metadata_after = (after.get("format") or {}).get("tags", {})
     if not audio_before:
         raise PublishingError("media has no audio track")
-    if len(audio_before) != len(audio_after) or audio_before != audio_after:
+    if len(audio_before) != len(audio_after) or [{k:v for k,v in stream.items() if k != "index"} for stream in audio_before] != [{k:v for k,v in stream.items() if k != "index"} for stream in audio_after]:
         raise PublishingError("audio track changed during publish")
     if metadata_before != metadata_after:
         raise PublishingError("metadata changed during publish")

@@ -26,7 +26,8 @@ def tag_snapshot(media):
     if isinstance(media, MP3):
         return {k:deepcopy(v) for k,v in (media.tags or {}).items() if k != 'USLT::eng'}, list(getattr(media.tags,'unknown_frames',[]))
     key = '\xa9lyr' if isinstance(media, MP4) else 'lyrics'
-    return {k:deepcopy(v) for k,v in (media.tags or {}).items() if k.lower() != key}, deepcopy(getattr(media,'pictures',[]))
+    extra = [(block.code, block.write()) for block in media.metadata_blocks if block.code not in (1, 4)] if isinstance(media, FLAC) else []
+    return {k:deepcopy(v) for k,v in (media.tags or {}).items() if k.lower() != key}, extra
 
 
 def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str, target_track_id=None):
@@ -37,7 +38,8 @@ def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str, targ
     if not before_audio: raise ValueError('源文件没有音轨')
     if isinstance(media, MP4):
         if ttml is None: raise ValueError('MP4 打包需要完整 TTML')
-        report = publish_stpp(source,ttml,output,target_track_id=target_track_id)
+        before_tracks, before_mdats = mp4_snapshot(source, target_track_id)
+        publish_stpp(source,ttml,output,target_track_id=target_track_id)
     else:
         if target_track_id is not None: raise ValueError('此容器没有 STPP 轨道')
         shutil.copyfile(source, output)
@@ -59,6 +61,40 @@ def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str, targ
     if actual != lrc: raise ValueError('歌词标签回读不一致')
     if before_audio != packet_hashes(output): raise ValueError('音频载荷回读不一致')
     if isinstance(checked,MP4):
+        after_tracks, after_mdats = mp4_snapshot(output, target_track_id)
+        if any(after_tracks.get(key) != value for key, value in before_tracks.items()) or after_mdats[:len(before_mdats)] != before_mdats:
+            raise ValueError('非目标轨道或原始媒体数据回读不一致')
         target = target_track_id or max(t['track_id'] for t in stpp_tracks(output))
         if extract_stpp(output,target) != ttml: raise ValueError('STPP 回读不一致')
     return {'report':{'passed':True,'audio_preserved':True,'metadata_preserved':True,'lyrics_preserved':True,'audio_streams':len(before_audio),'subtitle_codec':'stpp' if isinstance(checked,MP4) else None,'ttml_sha256':hashlib.sha256(ttml).hexdigest() if ttml else None}}
+
+
+def mp4_snapshot(path, excluded_track_id=None):
+    """Preserve every original mdat and non-target track, allowing chunk relocation."""
+    import struct
+    from .publishing import _scan_top, _read_payload, _boxes, _find, _trak_id, _box
+    top = list(_scan_top(path))
+    moov_box = next(item for item in top if item[0] == b'moov')
+    moov = _read_payload(path, *moov_box[1:])
+    def normalize(payload):
+        parts = []
+        for kind, body, _, _ in _boxes(payload):
+            if kind in (b'stco', b'co64'):
+                # Same ordered chunks; their absolute offsets change when tags grow.
+                parts.append(_box(b'co64', body[:8]))
+            else:
+                parts.append(_box(kind, normalize(body) if kind in (b'mdia', b'minf', b'stbl') else body))
+        return b''.join(parts)
+    tracks = {_trak_id(body): normalize(body) for kind, body, _, _ in _boxes(moov)
+              if kind == b'trak' and _trak_id(body) != excluded_track_id}
+    mdats = []
+    with path.open('rb') as stream:
+        for kind, pos, size, header in top:
+            if kind != b'mdat': continue
+            stream.seek(pos + header); remaining = size - header; digest = hashlib.sha256()
+            while remaining:
+                chunk = stream.read(min(remaining, 1024 * 1024))
+                if not chunk: raise ValueError('媒体载荷截断')
+                remaining -= len(chunk); digest.update(chunk)
+            mdats.append(digest.hexdigest())
+    return tracks, mdats

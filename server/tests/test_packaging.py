@@ -35,3 +35,22 @@ def test_preserves_media_tags_cover_and_lyrics(tmp_path,extension,codec):
         assert extract_stpp(out2,tracks[0]['track_id'])==TTML.replace(b'synthetic',b'updated')
         assert len(stpp_tracks(out2))==1
         with pytest.raises(ValueError): package_media(out,out2,TTML,LRC,999)
+
+
+def test_two_stpp_tracks_preserves_unselected_sample(tmp_path):
+    from server.publishing import _scan_top,_read_payload,_stpp_track,_box,_movie_clock
+    import struct
+    source=tmp_path/'source.m4a'; first=tmp_path/'first.m4a'; output=tmp_path/'output.m4a'
+    subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','sine=duration=1','-c:a','aac',str(source)],check=True)
+    publish_stpp(source,TTML,first)
+    item=next(x for x in _scan_top(first) if x[0]==b'moov')
+    moov=_read_payload(first,*item[1:]); timescale,_=_movie_clock(moov)
+    sample=TTML.replace(b'synthetic',b'untouched')
+    track=_stpp_track(len(sample),first.stat().st_size+8,99,1000,timescale)
+    with first.open('r+b') as f:
+        f.seek(item[1]);f.write(_box(b'free',b'\0'*(item[2]-8)))
+        f.seek(0,2);f.write(_box(b'mdat',sample));f.write(_box(b'moov',moov+track))
+    assert len(stpp_tracks(first))==2
+    package_media(first,output,TTML.replace(b'synthetic',b'updated'),LRC,2)
+    assert extract_stpp(output,99)==sample
+    assert extract_stpp(output,2)==TTML.replace(b'synthetic',b'updated')

@@ -25,7 +25,7 @@ from .db import Database
 from .documents import DocumentService, build_router
 from .job_routes import create_job_router
 from .jobs import JobService
-from .publish import PublishRunner, StppPublisher
+from .publish import PublishRunner, MediaPublisher
 from .publish_routes import build_publish_router
 from .engine import configured_engine
 from .forced import configured_forced_runner, prepare_forced_request
@@ -65,7 +65,7 @@ def create_app(
         configured_engine_instance.forced_runner = configured_forced_runner()
     configured_reading_proposer = reading_proposer or SudachiReadingProposer()
     if publisher is None:
-        publisher = StppPublisher()
+        publisher = MediaPublisher()
     reading_runner = ReadingJobRunner(db, configured_reading_proposer)
     api = APIRouter(prefix="/api/v1")
 

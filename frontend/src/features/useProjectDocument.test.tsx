@@ -144,3 +144,17 @@ describe("useProjectDocument save lifecycle", () => {
     expect(reopened.result.current.document.lines[0].beginUs).toBe(999_000);
   });
 });
+
+it('packaging returns the captured revision while later edits remain dirty', async () => {
+ let resolve!: (v:{revision:string})=>void;
+ saveMock.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));
+ const {result}=renderHook(hook);
+ act(()=>result.current.apply({type:'edit-word',lineId:'a',wordId:'a:word:0',text:'captured'}));
+ let pending!:ReturnType<typeof result.current.saveForPackaging>;
+ act(()=>{pending=result.current.saveForPackaging();});
+ act(()=>result.current.apply({type:'edit-word',lineId:'a',wordId:'a:word:0',text:'newer'}));
+ await act(async()=>{resolve({revision:'packaged'});await pending;});
+ const saved=await pending;
+ expect(saved?.revision).toBe('packaged'); expect(saved?.document.lines[0].words[0].text).toBe('captured');
+ expect(result.current.document.lines[0].words[0].text).toBe('newer'); expect(result.current.dirty).toBe(true);
+});

@@ -1,7 +1,4 @@
-"""S7 publication boundary.
-
-The muxer is injected so the HTTP/job layer does not know about STPP details.
-"""
+"""Immutable revision validation and verified media packaging job boundary."""
 from __future__ import annotations
 
 import math
@@ -21,21 +18,11 @@ class PublishInvalid(ValueError):
     pass
 
 
-class StppPublisher:
-    """Adapter around the low-level muxer supplied by ``server.publishing``."""
-    def publish(self, revision_path: Path, asset_path: Path, output: Path) -> dict[str, Any]:
-        from .publishing import publish_stpp
-        report = publish_stpp(asset_path, Path(revision_path).read_bytes(), output)
-        passed = (report.audio_streams > 0 and report.audio_bytes_preserved and report.metadata_preserved and
-                  report.subtitle_handler == "subt" and report.subtitle_codec == "stpp" and
-                  report.sample_count == 1 and output.is_file())
-        return {"report": {"passed": passed, "audio_streams": report.audio_streams,
-                            "audio_preserved": report.audio_bytes_preserved,
-                            "metadata_preserved": report.metadata_preserved,
-                            "subtitle_handler": report.subtitle_handler,
-                            "subtitle_codec": report.subtitle_codec,
-                            "sample_count": report.sample_count,
-                            "ttml_sha256": report.ttml_sha256}}
+class MediaPublisher:
+    """Single container-writing boundary, injectable in the persistent job runner."""
+    def publish(self, ttml: bytes | None, asset_path: Path, output: Path, lrc: str, target_track_id: int | None):
+        from .packaging import package_media
+        return package_media(asset_path, output, ttml, lrc, target_track_id)
 
 
 def _time(value: str | None) -> float | None:
@@ -47,7 +34,9 @@ def _time(value: str | None) -> float | None:
             return float(value[:-2]) / 1000
         if value.endswith("s"):
             return float(value[:-1])
+        if ':' not in value: return float(value)
         parts = value.split(":")
+        if len(parts) == 2: return int(parts[0]) * 60 + float(parts[1])
         if len(parts) == 3:
             return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
     except (TypeError, ValueError):
@@ -134,12 +123,14 @@ class PublishRunner:
             row = c.execute("SELECT ttml_path FROM revisions WHERE id=? AND project_id=?", (revision, project_id)).fetchone()
         if not row:
             raise PublishInvalid("revision not found")
+        with self.revisions.db.connect() as c:
+            bound = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (project_id,)).fetchone()
+        if not bound or bound[0] != request['asset_id']: raise PublishInvalid('bound asset changed')
         source = Path(row[0])
         asset = Path(self.asset_path(project_id))
         from mutagen import File
         from mutagen.mp4 import MP4
         from .publishing import media_duration_us
-        from .packaging import package_media
         media = File(asset)
         ttml = None
         if isinstance(media, MP4):
@@ -152,7 +143,7 @@ class PublishRunner:
             ttml = ET.tostring(tree.getroot(), encoding='utf-8')
         output = self.output_root / f"{uuid.uuid4().hex}{asset.suffix or '.mp4'}"
         try:
-            result = package_media(asset, output, ttml, request['lrc_text'], request.get('target_track_id'))
+            result = self.publisher.publish(ttml, asset, output, request['lrc_text'], request.get('target_track_id'))
         except Exception:
             output.unlink(missing_ok=True)
             raise

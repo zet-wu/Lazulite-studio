@@ -5,3 +5,4 @@ pytest==8.3.4
 httpx[socks]==0.28.1
 SudachiPy==0.6.10
 sudachidict_core==20250129
+mutagen==1.48.1

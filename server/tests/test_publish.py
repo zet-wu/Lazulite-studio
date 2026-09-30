@@ -91,3 +91,27 @@ def test_publish_http_validation_and_download_auth_gate(tmp_path):
     clock = _save(client, headers, pid, bad, '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0s" end="1s" dur="1s">x</p></body></tt>')
     clock_job = client.post(f"/api/v1/projects/{pid}/publish", json={"revision": clock, "asset_id": asset, "lrc_kind":"lrc", "lrc_text":"[00:00.000]hello\n[00:01.000]\n"}, headers={**headers, "idempotency-key": "clock"}).json()["id"]
     assert _wait(client, clock_job)["error"]["code"] == "publish_failed"
+
+
+def test_packaging_options_are_part_of_job_identity_and_output(tmp_path):
+    from io import BytesIO
+    from mutagen.mp4 import MP4
+    settings = Settings("pw", False, "http://studio")
+    with TestClient(create_app(tmp_path, settings), base_url="https://studio") as client:
+        headers = _headers(client, settings)
+        pid, asset = _project(client, headers, tmp_path)
+        initial = client.get(f"/api/v1/projects/{pid}/document").json()["revision"]
+        revision = _save(client, headers, pid, initial, '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0s" end="1s">hello</p></body></tt>')
+        ordinary = {"revision":revision, "asset_id":asset, "lrc_kind":"lrc", "lrc_text":"[00:00.000]hello\n[00:01.000]\n"}
+        extended = {**ordinary, "lrc_kind":"elrc", "lrc_text":"[00:00.000]hello<00:01.000>\n[00:01.000]\n"}
+        url = f"/api/v1/projects/{pid}/publish"
+        first = client.post(url,json=ordinary,headers={**headers,"idempotency-key":"options"}).json()
+        assert client.post(url,json=extended,headers={**headers,"idempotency-key":"options"}).status_code == 409
+        second = client.post(url,json=extended,headers={**headers,"idempotency-key":"extended"}).json()
+        assert first["id"] != second["id"]
+        for job, body in [(first,ordinary),(second,extended)]:
+            assert _wait(client,job["id"])["status"] == "succeeded"
+            response = client.get(f"/api/v1/projects/{pid}/exports/{job['id']}/download")
+            assert MP4(BytesIO(response.content))["\xa9lyr"] == [body["lrc_text"]]
+        assert client.post(url,json={**extended,"lrc_kind":"lrc"},headers=headers).status_code == 422
+        assert client.post(url,json={**ordinary,"asset_id":"other"},headers=headers).status_code == 422
