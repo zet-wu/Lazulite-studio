@@ -12,4 +12,5 @@ Lazulite Studio 处于初期开发阶段。优先把当前功能做好，保持�
 - **提交规范。** 提交标题使用中文，应简短，并且一次提交只聚焦一项改动，不要把大幅重构合并到一次提交里。
 
 - **文档归属。** 开发方案、过程、人工审阅、验收和证据统一写入 `/home/wangzeyu/wangzeyu-nvme1/lyric-workflow/docs/studio/`；原始审阅材料位于其 `../Review-phase1/`、`../Review-phase2/`、`../Review-phase3/`、`../Review-phase4/`、`../Review-phase5/`、`../Review-phase6/`；当前依据为 Phase 6 人工审阅报告、最终讨论结论与 Phase 7 整改方案。本仓库仅保留 AGENTS.md、项目及模块架构说明；不再向 `docs/` 添加实施/验收文档或截图。可执行测试夹具留在代码仓库，测试临时输出不作为正式验收归档。
+- **前端设计。** 采用统一设计语言，以 Material Design 的层级和语义角色为方向，以 Material Design 3 作为具体设计参考，形成适合 Studio 的紧凑桌面样式。
 - **当前目标平台。** Windows 和 macOS 桌面浏览器，采用鼠标和键盘。当前不开发或验收移动端/触屏适配；与历史方案冲突时，以人工审阅讨论结论和当前整改方案为准。
