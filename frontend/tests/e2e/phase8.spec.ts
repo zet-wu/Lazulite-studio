@@ -45,3 +45,54 @@ test('P8 Ctrl and Cmd toggle timed units and content delete preserves native typ
   await edge(page, units, 1, { button: 'right' }); await page.getByRole('menuitem', { name: '删除所选单元（3）' }).click(); await expect(page.locator(units)).toHaveCount(0);
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.locator(units)).toHaveCount(3);
 });
+async function generate(page: Page) {
+  await page.locator('[data-outline-drag]').first().click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
+  return page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
+}
+test('P8 mode regenerates once; unfocused and active edits, Escape and IME stay within proposal', async ({ page }) => {
+  await load(page); const dialog = await generate(page);
+  const plain = dialog.getByLabel('L1音译', { exact: true }); await expect(plain).toHaveValue('ga k ko u');
+  await plain.fill('manual'); await plain.press('Escape'); await expect(plain).toHaveValue('ga k ko u'); await expect(dialog).toBeVisible();
+  await plain.dispatchEvent('compositionstart'); await plain.fill(' composing '); await plain.press('Enter'); await expect(plain).toBeFocused();
+  const composingValue = await plain.inputValue(); await plain.press('Escape'); await expect(plain).toHaveValue(composingValue); await expect(dialog).toBeVisible();
+  await plain.dispatchEvent('compositionend'); await plain.press('Enter');
+  await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
+  const first = dialog.getByLabel('L1单元 1音译'); await expect(first).toHaveValue('ga ');
+  await first.fill(' changed  '); await dialog.getByLabel('目标轨道').selectOption(''); await expect(first).toHaveValue(' changed  ');
+  await dialog.getByLabel('输出', { exact: true }).selectOption('plain'); await expect(plain).toHaveValue('ga k ko u');
+  await plain.fill('not blurred'); await dialog.getByRole('button', { name: '生成音译', exact: true }).click();
+  await expect(page.getByLabel('音译 ja-Latn', { exact: true })).toHaveValue('not blurred');
+  await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.getByLabel('音译 ja-Latn', { exact: true })).toHaveCount(0);
+});
+test('P8 placeholders and special fragments stay nonblocking; manual blank preserves a timed unit', async ({ page }) => {
+  await load(page); await page.locator('[data-outline-drag]').last().click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
+  const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
+  await dialog.getByLabel('输出', { exact: true }).selectOption('timed'); const input = dialog.getByLabel('L3单元 1音译');
+  await expect(input).toHaveValue(' '); expect(await input.evaluate(e => getComputedStyle(e).borderTopStyle)).toBe('dashed');
+  await input.focus(); await input.blur(); expect(await input.evaluate(e => getComputedStyle(e).borderTopStyle)).toBe('dashed');
+  await expect(dialog.getByRole('button', { name: '生成音译', exact: true })).toBeEnabled();
+  await input.fill('kanji'); expect(await input.evaluate(e => getComputedStyle(e).borderTopStyle)).toBe('solid');
+  await input.fill(''); await dialog.getByRole('button', { name: '生成音译', exact: true }).click();
+  await expect(page.getByLabel('音译单元 1', { exact: true })).toHaveValue(' ');
+  await expect(page.getByLabel('音译单元 1开始秒数')).toHaveValue('6'); await expect(page.getByLabel('音译单元 1结束秒数')).toHaveValue('8');
+});
+for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) test(`P8 static proposal layout at ${width} ${theme}`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 });
+  await page.addInitScript(theme => localStorage.setItem('lazulite-editor-theme', theme), theme);
+  await load(page); const dialog = await generate(page); await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
+  await expect(dialog.locator('[data-source-word]')).toHaveCount(1); await expect(dialog.getByRole('textbox')).toHaveCount(4);
+  const input = dialog.getByLabel('L1单元 1音译'); await page.mouse.move(1, 1);
+  const before = await input.boundingBox(); expect(await input.evaluate(e => getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  await input.focus(); await page.mouse.move(1, 1); expect(await input.evaluate(e => getComputedStyle(e).borderTopColor)).not.toBe('rgba(0, 0, 0, 0)');
+  expect(await input.boundingBox()).toEqual(before);
+  await input.fill('very long editable romanization '.repeat(20));
+  const overflow = await dialog.evaluate(e => e.scrollWidth > e.clientWidth); expect(overflow).toBe(false);
+  await input.blur(); await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
+  const area = dialog.getByLabel('L1音译', { exact: true }), initial = (await area.boundingBox())!.height;
+  await area.fill('very long ordinary romanization '.repeat(100)); expect((await area.boundingBox())!.height).toBeGreaterThan(initial * 2);
+  expect(await area.evaluate(e => e.scrollHeight > e.clientHeight + 2)).toBe(false);
+  await dialog.getByLabel('输出', { exact: true }).selectOption('timed'); await page.mouse.move(1, 1);
+  await page.screenshot({ path: test.info().outputPath(`romanization-${width}-${theme}.png`) });
+});

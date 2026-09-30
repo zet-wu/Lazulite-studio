@@ -17,8 +17,8 @@ test('P7 linked split, translation ownership and generated timed track persist t
   }, phase7Ttml);
   await page.locator('input[type=file]').last().setInputFiles({ name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   const outline = page.locator('[data-outline-drag]'); await expect(outline).toHaveCount(3);
-  await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '从 Ruby 生成音译…' }).click();
-  const generation = page.getByRole('dialog', { name: '从 Ruby 生成音译', exact: true });
+  await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
+  const generation = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
   await generation.getByLabel('输出', { exact: true }).selectOption('timed'); await generation.getByRole('button', { name: '生成音译', exact: true }).click();
   await outline.nth(1).click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行…' }).click();
   const split = page.getByRole('dialog', { name: '拆分歌词行', exact: true });
@@ -33,14 +33,14 @@ test('P7 linked split, translation ownership and generated timed track persist t
   expect(draft.lines[0].endLink).toEqual({ targetLineId: 'context', originalEndUs: 4e6 });
   expect(draft.lines[1]).toMatchObject({ endLink: null, endUs: 5e6, translations: [{ language: 'en', text: 'first' }] });
   expect(draft.lines[2]).toMatchObject({ endLink: { targetLineId: 'missing', originalEndUs: 6e6 }, translations: [{ language: 'zh-Hans', text: '后行' }] });
-  expect(draft.tracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ kind: 'timed', units: [{ text: 'gakkou', beginUs: 0, endUs: 4e6 }] }] });
+  expect(draft.tracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ kind: 'timed', units: [{ text: 'ga ', beginUs: 0, endUs: 1e6 }, { text: 'k ', beginUs: 1e6, endUs: 2e6 }, { text: 'ko ', beginUs: 2e6, endUs: 3e6 }, { text: 'u', beginUs: 3e6, endUs: 4e6 }] }] });
   await page.reload(); await expect(outline).toHaveCount(4);
   await page.locator('[data-top-menu="file"] summary').click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '最终 TTML', exact: true }).click();
   const finalXml = await readFile(await (await download).path(), 'utf8'); const final = await semantics(finalXml);
   expect(final.lines.map(({ endLink: _link, ...line }) => line)).toEqual(draft.lines.map(({ endLink: _link, ...line }) => line));
   expect(final.lines.every(line => line.endLink === null)).toBe(true);
   await page.locator('input[type=file]').last().setInputFiles({ name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
-  await expect(page.getByLabel('音译单元 1', { exact: true })).toHaveValue('gakkou');
+  await expect(page.getByLabel('音译单元 1', { exact: true })).toHaveValue('ga ');
   await writeFile(test.info().outputPath('roundtrip.json'), JSON.stringify({ draft, final }, null, 2));
 });
 

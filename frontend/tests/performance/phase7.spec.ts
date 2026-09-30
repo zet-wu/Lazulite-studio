@@ -16,14 +16,14 @@ test('P7 production 2000-row translation draft and kana proposal keep bounded mo
   await text.press('Escape'); await main.evaluate(e => { e.scrollTop = 0; });
   await outline.first().click(); await outline.last().click({ modifiers: ['Shift'] });
   await page.locator('[data-top-menu="tools"] summary').click();
-  const began = Date.now(); await page.getByRole('button', { name: '从 Ruby 生成音译…', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: '从 Ruby 生成音译', exact: true }); await expect(dialog).toContainText('生成 2000 / 2000 行');
+  const began = Date.now(); await page.getByRole('button', { name: '生成日文罗马字音译…', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true }); await expect(dialog).toContainText('生成 2000 / 2000 行');
   const openedMs = Date.now() - began;
   const mounted = await page.locator('[data-roman-proposal]').count(); expect(mounted).toBeGreaterThan(0); expect(mounted).toBeLessThan(30);
   await dialog.locator('[data-proposal-count]').evaluate(e => { e.scrollTop = e.scrollHeight; });
-  await expect(dialog.getByLabel('L2000词组 1音译')).toHaveValue('ka');
+  await expect(dialog.getByLabel('L2000音译')).toHaveValue('ka ka ka ka ka ka ka ka ka ka');
   await dialog.getByRole('button', { name: '取消', exact: true }).click(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
-  await page.locator('[data-top-menu="tools"] summary').click(); await page.getByRole('button', { name: '从 Ruby 生成音译…', exact: true }).click();
+  await page.locator('[data-top-menu="tools"] summary').click(); await page.getByRole('button', { name: '生成日文罗马字音译…', exact: true }).click();
   const applied = Date.now(); await dialog.getByRole('button', { name: '生成音译', exact: true }).click();
   await expect(dialog).toHaveCount(0); const appliedMs = Date.now() - applied;
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();

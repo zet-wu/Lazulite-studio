@@ -4,7 +4,9 @@ import type { LyricCommand } from './lyric-commands';
 
 export type RomanizationKind = 'plain' | 'timed';
 export type GeneratedUnit = { key: string; wordId: string; text: string; beginUs: TimeUs; endUs: TimeUs; hint: string };
-export type RomanizationProposal = { lineId: string; kind: RomanizationKind; text: string; hint: string; groups: GeneratedUnit[] };
+type PlainProposal = { lineId: string; kind: 'plain'; text: string; hint: string };
+type TimedProposal = { lineId: string; kind: 'timed'; groups: GeneratedUnit[] };
+export type RomanizationProposal = PlainProposal | TimedProposal;
 type SourceUnit = GeneratedUnit & { reading: string };
 const smallKana = /^[ゃゅょぁぃぅぇぉゎ]$/;
 const kana = /^[ぁ-ゖァ-ヺー\s]+$/;
@@ -86,11 +88,14 @@ function generateLine(line: LyricLine): GeneratedUnit[] {
   // A separator belongs to the preceding real unit; it has no separate timing.
   return groups.map((unit, index) => ({ ...unit, text: index + 1 < groups.length && /\S$/.test(unit.text) && /^\S/.test(groups[index + 1].text) ? `${unit.text} ` : unit.text }));
 }
+export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: 'timed'): TimedProposal[];
+export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind?: 'plain'): PlainProposal[];
+export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: RomanizationKind): RomanizationProposal[];
 export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: RomanizationKind = 'plain'): RomanizationProposal[] {
   const selected = new Set(lineIds);
   return document.lines.filter(line => selected.has(line.id) && !line.backgroundOf).map(line => {
     const groups = generateLine(line);
-    return { lineId: line.id, kind, text: groups.map(unit => unit.text).join('') || ' ', hint: groups.some(unit => unit.hint) ? '自动结果有空转换或特殊分片，可修正或保留' : '', groups: kind === 'timed' ? groups : [] };
+    return kind === 'timed' ? { lineId: line.id, kind, groups } : { lineId: line.id, kind, text: groups.map(unit => unit.text).join('') || ' ', hint: groups.some(unit => unit.hint) ? '自动结果有空转换或特殊分片，可修正或保留' : '' };
   });
 }
 export type RomanizationChoices = { trackId: string | null; targets: Record<string, string> };
@@ -98,8 +103,10 @@ export function prepareRomanization(document: LyricDocument, source: LyricDocume
   if (document !== source) throw new Error('文档已变化，请重新打开生成窗口');
   const track = choices.trackId === null ? null : document.romanizationTracks.find(item => item.id === choices.trackId);
   if (choices.trackId !== null && (!track || track.language !== 'ja-Latn')) throw new Error('请选择 ja-Latn 音译轨道');
+  const byLine = new Map<string, RomanizationContent[]>();
+  for (const content of track?.contents ?? []) { const list = byLine.get(content.lineId) ?? []; list.push(content); byLine.set(content.lineId, list); }
   const prepared = rows.flatMap(row => {
-    const existing = track?.contents.filter(content => content.lineId === row.lineId) ?? [];
+    const existing = byLine.get(row.lineId) ?? [];
     const target = choices.targets[row.lineId] ?? (existing.length ? 'skip' : 'append');
     if (target === 'skip') return [];
     if (target !== 'append' && !existing.some(content => content.id === target)) throw new Error('替换的音译内容不存在');
@@ -117,5 +124,6 @@ export function romanizationGenerationCommand(document: LyricDocument, source: L
     const trackId = crypto.randomUUID();
     return { type: 'batch', commands: [{ type: 'add-romanization-track', track: { id: trackId, language: 'ja-Latn', contents: [] } }, ...contents.map(content => ({ type: 'insert-romanization-content' as const, trackId, content }))] };
   }
-  return { type: 'batch', commands: contents.map(content => ({ type: track.contents.some(item => item.id === content.id) ? 'set-romanization-content' as const : 'insert-romanization-content' as const, trackId: track.id, content })) };
+  const existingIds = new Set(track.contents.map(content => content.id));
+  return { type: 'batch', commands: contents.map(content => ({ type: existingIds.has(content.id) ? 'set-romanization-content' as const : 'insert-romanization-content' as const, trackId: track.id, content })) };
 }
