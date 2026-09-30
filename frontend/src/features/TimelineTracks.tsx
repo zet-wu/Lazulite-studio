@@ -35,17 +35,20 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
   const line = document.lines.find((item) => item.id === selectedLineId && !item.backgroundOf) ?? document.lines.find((item) => !item.backgroundOf);
   const romanTrack = document.romanizationTracks.find((track) => track.id === selectedRomanization?.trackId);
   const romanContent = romanTrack?.contents.find((content) => content.id === selectedRomanization?.contentId && content.lineId === line?.id);
-  const allTimedLines = mainLines.filter(item => timed(item.beginUs, item.endUs));
-  const allLines = allTimedLines.filter((item) => timed(item.beginUs, item.endUs) && item.endUs! >= startUs && item.beginUs! <= endUs);
-  const backgrounds = document.lines.filter((item) => item.backgroundOf && timed(item.beginUs, item.endUs) && item.endUs! >= startUs && item.beginUs! <= endUs);
-  const overview = allLines;
-  const allWords = line?.words.filter(word => timed(word.beginUs, word.endUs)) ?? [];
-  const allRubies = allWords.flatMap(word => word.rubyUnits.filter(unit => timed(unit.beginUs, unit.endUs)).map(unit => ({ word, unit })));
-  const lineLayout = useMemo(() => packIntervals(document.lines.filter(item => !item.backgroundOf && timed(item.beginUs, item.endUs)).map(item => ({ key: item.id, beginUs: item.beginUs!, endUs: item.endUs! }))), [document]);
-  const wordLayout = useMemo(() => packIntervals(allWords.map(item => ({ key: item.id, beginUs: item.beginUs!, endUs: item.endUs! }))), [line]);
-  const rubyLayout = useMemo(() => packIntervals(allRubies.map(({ unit }) => ({ key: unit.id, beginUs: unit.beginUs!, endUs: unit.endUs! }))), [line]);
-  const words = line?.words.filter((word) => timed(word.beginUs, word.endUs) && word.endUs! >= startUs && word.beginUs! <= endUs) ?? [];
-  const rubies = words.flatMap((word) => word.rubyUnits.filter((unit) => timed(unit.beginUs, unit.endUs) && unit.endUs! >= startUs && unit.beginUs! <= endUs).map((unit) => ({ word, unit })));
+  const intersects = (begin: number | null, end: number | null) => timed(begin, end) && end! > startUs && begin! < endUs;
+  const overview = mainLines.filter(item => intersects(item.beginUs, item.endUs));
+  const backgrounds = document.lines.filter(item => item.backgroundOf && intersects(item.beginUs, item.endUs));
+  const words = line?.words.filter(word => intersects(word.beginUs, word.endUs)) ?? [];
+  const rubies = line?.words.flatMap(word => word.rubyUnits.filter(unit => intersects(unit.beginUs, unit.endUs)).map(unit => ({ word, unit }))) ?? [];
+  const currentLayouts = useMemo(() => ({
+    line: packIntervals(overview.map(item => ({ key: item.id, beginUs: item.beginUs!, endUs: item.endUs! }))),
+    word: packIntervals(words.map(item => ({ key: item.id, beginUs: item.beginUs!, endUs: item.endUs! }))),
+    ruby: packIntervals(rubies.map(({ unit }) => ({ key: unit.id, beginUs: unit.beginUs!, endUs: unit.endUs! }))),
+  }), [document, line, startUs, endUs]);
+  const frozenLayouts = useRef(currentLayouts);
+  const editing = drag && !['pan', 'select'].includes(drag.side);
+  if (!editing) frozenLayouts.current = currentLayouts;
+  const { line: lineLayout, word: wordLayout, ruby: rubyLayout } = editing ? frozenLayouts.current : currentLayouts;
   const gaps = line?.words.flatMap((word, index) => {
     const right = line.words[index + 1];
     return right && word.endUs !== null && right.beginUs !== null && word.endUs !== right.beginUs ? [{ left: word, right, beginUs: Math.min(word.endUs, right.beginUs), endUs: Math.max(word.endUs, right.beginUs), overlap: word.endUs > right.beginUs }] : [];
@@ -72,6 +75,7 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
     const lane = (event.currentTarget.closest('[data-track-lane]') ?? tracksRef.current!.querySelector('[data-track-lane]')) as HTMLElement;
     const next = { target, side, x: event.clientX, current: event.clientX, width: lane.getBoundingClientRect().width, originalUs };
     event.currentTarget.setPointerCapture(event.pointerId);
+    frozenLayouts.current = currentLayouts;
     dragRef.current = next; setDrag(next);
   };
   const move = (event: PointerEvent<HTMLElement>) => {
@@ -114,7 +118,7 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
     const narrow = (Math.min(endUs, propsEndUs) - clippedBegin) / spanUs * plotWidth < 16;
     return <div key={key} data-timeline-key={key}
       className={`${styles.trackBar} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${positionUs >= beginUs && positionUs < endUs ? styles.trackPlaying : ''}`} role="button" tabIndex={0} aria-label={label}
-      style={{ left: pct(clippedBegin), width: `${(right - clippedBegin) / spanUs * 100}%`, top: 1 + layout.lanes.get(key)! * 22, height: 20 }}
+      style={{ left: pct(clippedBegin), width: `${(right - clippedBegin) / spanUs * 100}%`, top: 1 + (layout.lanes.get(key) ?? 0) * 22, height: 20 }}
       onPointerDown={(event) => begin(event, target, 'move', beginUs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { dragRef.current = null; setDrag(null); }}
       onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); if (target.kind === 'line') onSelectLine(target.lineId); } }}>
       {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanUs * plotWidth }} /><span className={styles.narrowMarker} title="窄区间，请用时间轴缩放后调整边界" /></>}
@@ -137,11 +141,11 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
     } catch (cause) { onError(cause instanceof Error ? cause.message : '无法闭合空隙'); }
   };
   return <div ref={tracksRef} className={styles.tracks} aria-label="可编辑时间轴">
-    {visible.line && row('行', overview.map((item) => bar({ kind: 'line', lineId: item.id }, `时间轴行 L${ordinalById.get(item.id)}`, item.beginUs!, item.endUs!, selectedLines.includes(item.id) || item.id === line?.id)), false, lineLayout.laneCount)}
+    {visible.line && row('行', overview.filter(item => !editing || lineLayout.lanes.has(item.id)).map((item) => bar({ kind: 'line', lineId: item.id }, `时间轴行 L${ordinalById.get(item.id)}`, item.beginUs!, item.endUs!, selectedLines.includes(item.id) || item.id === line?.id)), false, lineLayout.laneCount)}
     {visible.line && backgrounds.length > 0 && row('背景', backgrounds.map((item) => <span key={item.id} className={`${styles.trackBar} ${styles.backgroundBar}`} aria-label={`L${ordinalById.get(item.backgroundOf!)} 背景歌词`} style={{ left: pct(item.beginUs!), width: `${(item.endUs! - item.beginUs!) / spanUs * 100}%` }}>L{ordinalById.get(item.backgroundOf!)} · 背景</span>))}
     {visible.word && line && (romanContent ? row(`音译`, romanContent.kind === 'timed' ? romanContent.units.filter((unit) => timed(unit.beginUs, unit.endUs) && unit.endUs! >= startUs && unit.beginUs! <= endUs).map((unit) => <span key={unit.id} className={`${styles.trackBar} ${styles.romanTrackBar}`} aria-label={`L${ordinalById.get(line.id)} 音译 ${romanTrack?.language ?? '未指定语言'} ${unit.text}`} style={{ left: pct(unit.beginUs!), width: `${(unit.endUs! - unit.beginUs!) / spanUs * 100}%` }}>{unit.text}</span>) : null)
-      : row('词', words.map((word) => bar({ kind: 'word', lineId: line.id, wordId: word.id }, `时间轴词 ${word.text}`, word.beginUs!, word.endUs!, selectedWords.includes(word.id))), true, wordLayout.laneCount))}
-    {visible.ruby && line && row('Ruby', rubies.map(({ word, unit }) => bar({ kind: 'ruby', lineId: line.id, wordId: word.id, rubyId: unit.id }, `时间轴Ruby ${unit.reading}`, unit.beginUs!, unit.endUs!)), false, rubyLayout.laneCount)}
+      : row('词', words.filter(word => !editing || wordLayout.lanes.has(word.id)).map((word) => bar({ kind: 'word', lineId: line.id, wordId: word.id }, `时间轴词 ${word.text}`, word.beginUs!, word.endUs!, selectedWords.includes(word.id))), true, wordLayout.laneCount))}
+    {visible.ruby && line && row('Ruby', rubies.filter(({ unit }) => !editing || rubyLayout.lanes.has(unit.id)).map(({ word, unit }) => bar({ kind: 'ruby', lineId: line.id, wordId: word.id, rubyId: unit.id }, `时间轴Ruby ${unit.reading}`, unit.beginUs!, unit.endUs!)), false, rubyLayout.laneCount)}
     {visible.gap && line && row('空隙', gaps.map(({ left, right, beginUs, endUs, overlap }) => <button key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`}
       style={{ left: pct(beginUs), width: `${Math.max(1, (endUs - beginUs) / spanUs * 100)}%` }} title={overlap ? '消除重叠' : '闭合空隙'} onClick={() => closeGap(left, right)}>{overlap ? '重叠' : '空隙'}</button>))}
   </div>;

@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const xml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div>' +
   [[0,2], [1,3], [5,6], [6,7], [7,8], [8,9]].map(([begin,end], i) => `<p xml:id="t${i}" begin="${begin}" end="${end}"><span begin="${begin}" end="${end}">行${i}</span></p>`).join('') + '</div></body></tt>';
 
-test('P6 timeline snap affects line moves and boundary resize while global overlap keeps later touching lines in alternating lanes', async ({ page }) => {
+test('P6 timeline snap affects line moves and boundary resize while later touching lines reuse the lowest free lane', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   await page.locator('input[type=file]').last().setInputFiles({ name: 'snap.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   const lines = page.locator('[data-outline-drag]'); await expect(lines).toHaveCount(6);
@@ -11,7 +11,7 @@ test('P6 timeline snap affects line moves and boundary resize while global overl
   const third = page.getByRole('button', { name: '时间轴行 L3', exact: true });
   const fourth = page.getByRole('button', { name: '时间轴行 L4', exact: true });
   expect(await third.evaluate(e => e.style.top)).toBe('1px');
-  expect(await fourth.evaluate(e => e.style.top)).toBe('23px');
+  expect(await fourth.evaluate(e => e.style.top)).toBe('1px');
   await lines.nth(4).click();
   const start = page.getByRole('textbox', { name: '行 t4开始秒数', exact: true });
   const bar = page.getByRole('button', { name: '时间轴行 L5', exact: true });

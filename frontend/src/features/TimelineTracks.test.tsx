@@ -19,3 +19,25 @@ it('uses half-open independent intervals across line, word and Ruby at seek and 
   }
   vi.unstubAllGlobals();
 });
+
+it('packs only visible intervals, retains crossing objects and freezes editing lanes until cancellation', async () => {
+  const { fireEvent, cleanup } = await import('@testing-library/react'); cleanup();
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  const { createLine } = await import('../domain/lyric-document');
+  const document = createLyricDocument();
+  document.lines = [[0, 3], [1, 4], [5, 6], [6, 7]].map(([beginUs, endUs], i) => ({ ...createLine('', String(i)), beginUs: beginUs * 1e6, endUs: endUs * 1e6 }));
+  const props = { document, selectedLineId: '2', selectedRomanization: null, startUs: 0, endUs: 8e6, positionUs: 0, bpm: 0, snap: false, visible: { line: true, word: false, ruby: false, gap: false }, apply: vi.fn(), onSelectLine: vi.fn(), onPan: vi.fn(), onError: vi.fn() };
+  const { rerender } = render(<TimelineTracks {...props} />);
+  const bar = screen.getByRole('button', { name: '时间轴行 L3' });
+  const lane = bar.parentElement!;
+  expect(lane.style.height).toBe('44px'); expect(bar.style.top).toBe('1px');
+  bar.setPointerCapture = vi.fn();
+  fireEvent.pointerDown(bar, { clientX: 100, pointerId: 1 });
+  rerender(<TimelineTracks {...props} startUs={5.5e6} endUs={7e6} />);
+  expect(lane.style.height).toBe('44px'); expect(bar.style.top).toBe('1px');
+  fireEvent.keyDown(window, { key: 'Escape' });
+  expect(lane.style.height).toBe('22px');
+  expect(screen.getByRole('button', { name: '时间轴行 L3' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '时间轴行 L1' })).not.toBeInTheDocument();
+  cleanup(); vi.unstubAllGlobals();
+});

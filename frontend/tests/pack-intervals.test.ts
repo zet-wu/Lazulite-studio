@@ -12,3 +12,8 @@ it('packs exact, partial and triple overlap, reuses touching endpoints determini
   expect(packIntervals([]).laneCount).toBe(0);
   expect(packIntervals([{ key: 'a', beginUs: 0, endUs: 1 }, { key: 'b', beginUs: 1, endUs: 2 }]).laneCount).toBe(1);
 });
+
+it('returns later touching intervals to lane zero after an earlier overlap', () => {
+  const result = packIntervals([[0, 2], [1, 3], [5, 6], [6, 7], [7, 8]].map(([beginUs, endUs], i) => ({ key: String(i), beginUs, endUs })));
+  expect([...result.lanes.values()]).toEqual([0, 1, 0, 0, 0]);
+});
