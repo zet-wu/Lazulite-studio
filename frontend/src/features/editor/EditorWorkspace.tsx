@@ -1,3 +1,4 @@
+import { RomanizationGenerationDialog } from './RomanizationGenerationDialog';
 import { lineStructureIssues } from '../../domain/line-structure';
 import { useObjectDrag, type DragSource } from './object-drag';
 import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
@@ -117,6 +118,7 @@ export function EditorWorkspace(props: Props) {
   const [rubyBaseReading, setRubyBaseReading] = useState('');
   const [splitLineId, setSplitLineId] = useState<string | null>(null);
   const [contentTransfer, setContentTransfer] = useState<{ trackId: string; contentId: string; targetLineId: string } | null>(null);
+  const [romanizationGeneration, setRomanizationGeneration] = useState<string[] | null>(null);
   const [rubyGeneration, setRubyGeneration] = useState<{ lineIds: string[]; trackId?: string; contentId?: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; title: string; actions: ContextAction[]; target: HTMLElement } | null>(null);
   const [locate, setLocate] = useState<{ id: string; serial: number } | null>(null);
@@ -440,6 +442,7 @@ export function EditorWorkspace(props: Props) {
         { label: '后插行', run: () => dispatch({ type: 'insert-line', afterLineId: id }) },
         ...(!line.backgroundOf && document.romanizationTracks.some(track => track.contents.some(content => content.lineId === line.id))
           ? [{ label: '从音译生成 Ruby…', run: () => setRubyGeneration({ lineIds: effective.ids.filter(id => mainIds.includes(id)) }) }] : []),
+        ...(!line.backgroundOf ? [{ label: '从 Ruby 生成音译…', run: () => setRomanizationGeneration(effective.ids.filter(id => mainIds.includes(id))) }] : []),
         { label: '添加词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') }) },
         { label: '行上移', disabled: Boolean(line.backgroundOf) || mainLines[0]?.id === line.id, run: () => moveLine(line, -1) },
         { label: '行下移', disabled: Boolean(line.backgroundOf) || mainLines.at(-1)?.id === line.id, run: () => moveLine(line, 1) },
@@ -586,7 +589,7 @@ export function EditorWorkspace(props: Props) {
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
       canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)}
       canGenerateRuby={selectedMainLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
-      openTracks={() => setSettingsDialog('tracks')} openRubyGeneration={() => setRubyGeneration({ lineIds: selectedMainLines.map((line) => line.id) })} />}
+      canGenerateRomanization={selectedMainLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(selectedMainLines.map(line => line.id))} openTracks={() => setSettingsDialog('tracks')} openRubyGeneration={() => setRubyGeneration({ lineIds: selectedMainLines.map((line) => line.id) })} />}
     {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} onClick={event => {
       const button = (event.target as Element).closest('[data-outline-drag]');
       if (!button) return;
@@ -691,6 +694,7 @@ export function EditorWorkspace(props: Props) {
     })()}
     {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
     {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
+    {romanizationGeneration && <RomanizationGenerationDialog document={document} lineIds={romanizationGeneration} apply={dispatch} close={() => setRomanizationGeneration(null)} />}
     {rubyGeneration && <RubyGenerationDialog document={document} lineIds={rubyGeneration.lineIds} initialTrackId={rubyGeneration.trackId} initialContentId={rubyGeneration.contentId}
       apply={dispatch} close={() => setRubyGeneration(null)} />}
     {rubyBaseOpen && <SettingsDialog title="整体 Ruby" close={() => setRubyBaseOpen(false)} actions={<><button onClick={() => setRubyBaseOpen(false)}>取消</button><button disabled={!rubyBaseReading} onClick={createRubyBase}>应用</button></>}>

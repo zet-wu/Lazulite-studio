@@ -21,6 +21,8 @@ type Props = MenuState & {
   canCreateRubyBase: boolean;
   canGenerateRuby: boolean;
   openRubyGeneration: () => void;
+  canGenerateRomanization: boolean;
+  openRomanizationGeneration: () => void;
   openTracks: () => void;
 };
 
@@ -43,6 +45,7 @@ export function EditorRibbon(props: Props) {
       <button onClick={props.openSegmentation}>分词…</button>
       <button onClick={props.openBatchTools}>批处理…</button>
       <button disabled={!props.canCreateRubyBase} onClick={props.createRubyBase}>合并为 Ruby base…</button>
+      <button disabled={!props.canGenerateRomanization} onClick={props.openRomanizationGeneration}>从 Ruby 生成音译…</button>
       <button disabled={!props.canGenerateRuby} onClick={props.openRubyGeneration}>从音译生成 Ruby…</button>
     </TopMenu>
   </div>;
