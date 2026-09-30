@@ -4,7 +4,7 @@
 
 `useProjectDocument.ts` 管理撤销重做、串行保存、冲突和本地恢复。`CandidatePanel` 与 `JobCandidatePanel` 将候选转为一次领域事务，不直接改服务器文档。`MediaTransport` 保留播放和波形控制，`ExportPage` 下载或发布已保存的语义文档。
 
-`editor/editing-actions.ts` 负责有序选择、带 Ruby/时间/对齐的内部剪贴板、纯文本插入和跨行词事务；`SegmentationPanel` 与 `BatchToolsPanel` 调用相同命令历史。`SyncPanel` 使用播放器时钟连续打轴，`TimelineTracks` 提交拖动事务，`PreviewMode` 延迟加载 AMLL 并读取当前草稿。音译附属行和显式 Ruby 提案已接入。普通与超过80行的虚拟列表共用显式定位、真实高度校准和取消语义；时间轴三类区间独立分轨、共享绘图区，窄区间使用既有缩放后普通端点编辑，不设专属工具行。实际状态与剩余差距见[当前状态](../../../../lyric-workflow/docs/studio/current-state.md)。
+`editor/editing-actions.ts` 负责有序选择、带 Ruby/时间/对齐的内部剪贴板、共用原子选区删除、纯文本插入和跨行词事务；`SegmentationPanel` 与 `BatchToolsPanel` 调用相同命令历史。`SyncPanel` 使用播放器时钟连续打轴，`TimelineTracks` 提交拖动事务，`PreviewMode` 延迟加载 AMLL 并读取当前草稿。音译附属行和显式 Ruby 提案已接入。普通与超过80行的虚拟列表共用显式定位、真实高度校准和取消语义；时间轴三类区间独立分轨、共享绘图区，窄区间使用既有缩放后普通端点编辑，不设专属工具行。实际状态与剩余差距见[当前状态](../../../../lyric-workflow/docs/studio/current-state.md)。
 
 `SpectrogramCanvas` 按资产身份持有有界强度LRU、2个在途请求与独立Worker生命周期；固定384×96/FFT512、两侧样本上下文、整数设备像素边界，取消/错误/过期结果显式处理。
 
@@ -16,4 +16,6 @@ SettingsDialog 统一固定标题/操作区与滚动内容，分词、批处理�
 
 Phase 6：`InlineAdd`统一行末词/音译单元的本地新增草稿，支持IME、Enter/blur去重和Esc（只有空字符串取消，允许新增纯空格词）；输入焦点复用虚拟列表保留行。词正文单击即可编辑，非输入卡片仍拖动，词右键默认分词复用现有领域算法。`TranslationEditor`提供正文、语言校验及垃圾桶删除；`SingerSelection`用复选和混合状态按成员修改歌手引用。主行右键Ruby复用多行对话框，范围按实际非空源统计。音译内容选中使用专用范围高亮，预览空白是独立AMLL文本节点；合唱保存多引用，预览仍仅两侧表达。
 
-Phase 7：LineSplitDialog上下预览与逐条翻译归属，TranslationEditor自动高度textarea（六行上限）接入既有实测变高列表。TimelineTracks在视窗相交集合上分轨，编辑拖动冻结轨号/高度。RomanizationGenerationDialog复用主行多选，按稳定行/词组key保留人工读音、音译和跨词确认，超过80行虚拟挂载；目标轨道既有内容默认跳过，支持具体替换。PlaybackSpeed管理即时滑条、滚轮、键盘及1×恢复；MediaTransport始终原生保持音高，换媒体重施，HTMLMediaElement仍是唯一媒体时钟。
+Phase 7：LineSplitDialog上下预览与逐条翻译归属，TranslationEditor自动高度textarea（六行上限）接入既有实测变高列表。TimelineTracks在视窗相交集合上分轨，编辑拖动冻结轨号/高度。RomanizationGenerationDialog复用主行多选，自有只读正文/Ruby与可编辑音译静态排版；普通按行、定时按源单元直接修正文字。打开/模式切换生成一次，应用当前结果，删除旧读音覆盖/跨词确认状态；非阻塞虚线和实际阻塞实线区分。超过80行有界挂载并保留活动输入行；目标既有内容默认跳过，支持明确局部替换。PlaybackSpeed管理即时滑条、滚轮、键盘及1×恢复；MediaTransport始终原生保持音高，换媒体重施，HTMLMediaElement仍是唯一媒体时钟。
+
+编辑模式的“歌词设置”集中元数据、歌手和音译轨道，编辑工具只保留选区操作。EditorWorkspace的pointerFocus标记区分鼠标被动焦点与键盘定位；右键保留已选对象范围，五类删除使用有效选区，不写剪贴板。LocalEditor先同步执行命令再提交状态，失败不进入React渲染或历史；输入原生文本菜单继续保留。
