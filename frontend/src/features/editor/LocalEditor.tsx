@@ -17,6 +17,8 @@ function download(xml: string, name: string) {
 
 export function LocalEditor() {
   const [state, setState] = useState(() => createLyricEditorState(createLyricDocument()));
+  const stateRef = useRef(state);
+  const commitState = (next: typeof state) => { stateRef.current = next; setState(next); };
   const [clean, setClean] = useState<LyricDocument>(state.present);
   const [name, setName] = useState('未命名.ttml');
   const [message, setMessage] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export function LocalEditor() {
     void createRecoveryAdapter().readCheckpoint('local').then((record) => {
       if (!active || !record || touched.current) return;
       if (window.confirm('发现本地检查点，是否恢复？')) {
-        setState(record.state);
+        commitState(record.state);
         setClean(record.state.present);
         setName('恢复的草稿.ttml');
       }
@@ -40,7 +42,10 @@ export function LocalEditor() {
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
-  const apply = (command: LyricCommand) => { touched.current = true; setState((current) => executeLyricCommand(current, command)); };
+  const apply = (command: LyricCommand) => {
+    const next = executeLyricCommand(stateRef.current, command);
+    touched.current = true; commitState(next);
+  };
   const save = async () => {
     try {
       setSaving(true);
@@ -58,7 +63,7 @@ export function LocalEditor() {
       const parsed = importLyricFile(await file.text(), format);
       await createRecoveryAdapter().clear('local');
       touched.current = true;
-      setState(createLyricEditorState(parsed));
+      commitState(createLyricEditorState(parsed));
       setClean(parsed);
       setName(file.name);
       setMessage(null);
@@ -77,10 +82,10 @@ export function LocalEditor() {
     try {
       await createRecoveryAdapter().clear('local');
       const next = createLyricDocument();
-      touched.current = true; setState(createLyricEditorState(next)); setClean(next); setName('未命名.ttml'); setMessage(null);
+      touched.current = true; commitState(createLyricEditorState(next)); setClean(next); setName('未命名.ttml'); setMessage(null);
     } catch (error) { setMessage(error instanceof Error ? error.message : '新建失败'); }
   };
-  return <EditorWorkspace title={name} document={state.present} apply={apply} undo={() => setState(undoLyricCommand)} redo={() => setState(redoLyricCommand)}
+  return <EditorWorkspace title={name} document={state.present} apply={apply} undo={() => commitState(undoLyricCommand(stateRef.current))} redo={() => commitState(redoLyricCommand(stateRef.current))}
     canUndo={state.past.length > 0} canRedo={state.future.length > 0} dirty={dirty} saving={saving} error={message}
     onSave={() => void save()} onOpen={(file) => void open(file)} onNew={() => void createNew()}
     onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat} />;

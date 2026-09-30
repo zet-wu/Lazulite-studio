@@ -113,3 +113,27 @@ test('P8 lyric settings are unique in edit mode, menus dismiss and keyboard reac
   }
   await page.getByRole('button', { name: '编辑', exact: true }).click(); await expect(settings).toHaveAttribute('aria-expanded', 'false');
 });
+test('P8 line and content ranges delete fully and restore with one undo', async ({ page }) => {
+  await load(page, phase6Ttml());
+  const content = 'main [data-line-id="english"] [data-romanization-content-id]';
+  await edge(page, content, 0); await edge(page, content, 1, { modifiers: ['Shift'] });
+  await expect(page.getByText('音译内容已选 2', { exact: true })).toBeVisible();
+  await edge(page, content, 0, { button: 'right' }); await page.getByRole('menuitem', { name: '删除所选内容（2）' }).click(); await expect(page.locator(content)).toHaveCount(1);
+  await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.locator(content)).toHaveCount(3);
+  const outline = page.locator('[data-outline-drag]'); await outline.first().click(); await outline.nth(1).click({ modifiers: ['Shift'] });
+  await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '删除所选行（2）' }).click(); await expect(outline).toHaveCount(1);
+  await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(outline).toHaveCount(3);
+});
+test('P8 rejected linked-target batch leaves document, history and selected IDs intact', async ({ page }) => {
+  await page.goto('/editor');
+  const xml = await page.evaluate(async xml => {
+    const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
+    const doc = codec.parseLyricTtml(xml); doc.lines[0].endLink = { targetLineId: 'missing', originalEndUs: 2e6 }; doc.lines[0].endUs = 6e6;
+    return codec.serializeLyricTtml(doc, { draft: true });
+  }, phase7Ttml);
+  await page.locator('input[type=file]').setInputFiles({ name: 'links.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  const outline = page.locator('[data-outline-drag]'); await outline.nth(1).click(); await outline.nth(2).click({ modifiers: ['Shift'] });
+  await outline.nth(1).click({ button: 'right' }); await page.getByRole('menuitem', { name: '删除所选行（2）' }).click();
+  await expect(page.getByRole('alert')).toContainText('original line end excludes a word'); await expect(outline).toHaveCount(3);
+  await expect(page.getByText('行已选 2', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+});
