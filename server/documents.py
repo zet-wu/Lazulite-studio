@@ -18,7 +18,7 @@ from .revisions import IdempotencyConflict, RevisionConflict, RevisionStore
 TTML_NS = "http://www.w3.org/ns/ttml"
 MAX_TTML_BYTES = 2 * 1024 * 1024
 _DOCTYPE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.I)
-_TIME = re.compile(r"^(?:\d+(?:\.\d+)?(?:ms|s)?|\d+:\d{2}:\d{2}(?:\.\d+)?)$")
+_TIME = re.compile(r"^(?:\d+(?:\.\d+)?(?:ms|s)?|\d+:\d{2}(?::\d{2})?(?:\.\d+)?)$")
 _LRC = re.compile(r"\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\](.*)$")
 _LRC_TAGS = re.compile(r"\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]")
 
@@ -79,7 +79,8 @@ def validate_ttml(ttml: str) -> str:
                 return float(value[:-1])
             if ":" not in value:
                 return float(value)
-            h, m, rest = value.split(":")
+            parts = value.split(":")
+            h, m, rest = parts if len(parts) == 3 else ["0", *parts]
             return int(h) * 3600 + int(m) * 60 + float(rest)
         if element.tag == f"{{{TTML_NS}}}tt" or element.tag.startswith(f"{{{TTML_NS}}}"):
             b, e = seconds(begin), seconds(end)
@@ -123,11 +124,11 @@ class DocumentService:
         validate_ttml(ttml)
         digest = hashlib.sha256(ttml.encode()).hexdigest()
         return {
-            "schema_version": "studio-document-v1",
+            "schema_version": "studio-document-v2",
             "project_id": project_id,
             "revision": rev,
             "etag": f'"{rev}"',
-            "document": {"schema_version": "studio-document-content-v1", "ttml": ttml},
+            "document": {"schema_version": "studio-document-content-v2", "ttml": ttml},
             "sha256": digest,
         }
 
@@ -137,7 +138,7 @@ class DocumentService:
 
     def save(self, body: DocumentEnvelope, *, if_match: str | None,
              operation_id: str | None, subject: str = "local") -> dict:
-        if body.schema_version != "studio-document-v1" or body.document.schema_version != "studio-document-content-v1":
+        if body.schema_version != "studio-document-v2" or body.document.schema_version != "studio-document-content-v2":
             raise HTTPException(422, {"code": "document_schema_unsupported", "message": "unsupported document schema version", "retryable": False})
         if not body.project_id:
             raise ValueError("project_id is required")
@@ -216,16 +217,16 @@ def build_router(service: DocumentService, *, auth: Callable, write: Callable,
                 fmt = "text" if content_type == "text/plain" else "lrc"
                 lines = []
                 if fmt == "text":
-                    lines = [{"begin_us": None, "end_us": None, "text": raw_line} for raw_line in text.splitlines() if raw_line.strip()]
+                    lines = [{"begin_ms": None, "end_ms": None, "text": raw_line} for raw_line in text.splitlines() if raw_line.strip()]
                 else:
                     offsets = []
                     for raw_line in text.splitlines():
                         if raw_line.lower().startswith("[offset:"):
                             try:
-                                offsets.append(int(raw_line[8:].split("]", 1)[0]) * 1000)
+                                offsets.append(int(raw_line[8:].split("]", 1)[0]))
                             except ValueError:
                                 pass
-                    offset_us = offsets[-1] if offsets else 0
+                    offset_ms = offsets[-1] if offsets else 0
                     timed = []
                     for raw_line in text.splitlines():
                         if raw_line.lower().startswith("[offset:"):
@@ -238,12 +239,12 @@ def build_router(service: DocumentService, *, auth: Callable, write: Callable,
                             continue
                         for tag in tags:
                             fraction = (tag.group(3) or "").ljust(3, "0")
-                            begin = max(0, ((int(tag.group(1)) * 60 + int(tag.group(2))) * 1000000 + int(fraction) * 1000) + offset_us)
+                            begin = max(0, ((int(tag.group(1)) * 60 + int(tag.group(2))) * 1000 + int(fraction)) + offset_ms)
                             timed.append((begin, body))
                     timed.sort(key=lambda item: item[0])
                     for index, (begin, body) in enumerate(timed):
                         end = timed[index + 1][0] if index + 1 < len(timed) else None
-                        lines.append({"begin_us": begin, "end_us": end, "text": body})
+                        lines.append({"begin_ms": begin, "end_ms": end, "text": body})
                 candidate = {"format": fmt, "text": text, "lines": lines}
                 diagnostics = [{"code": "candidate_only", "message": "import is a candidate and was not saved"}]
             else:

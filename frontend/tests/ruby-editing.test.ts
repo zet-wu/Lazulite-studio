@@ -17,18 +17,18 @@ describe('E4 注音 editing', () => {
   it('inserts, splits, merges and redistributes independently timed 注音 units with one-step undo', () => {
     const document = createLyricDocument('今日');
     const line = document.lines[0], word = line.words[0];
-    line.beginUs = 1_000_000; line.endUs = 2_000_000;
-    word.beginUs = 1_000_000; word.endUs = 2_000_000;
+    line.beginMs = 1000; line.endMs = 2000;
+    word.beginMs = 1000; word.endMs = 2000;
     let state = createLyricEditorState(document);
     state = executeLyricCommand(state, { type: 'add-ruby', lineId: line.id, wordId: word.id, reading: 'きょう', rubyId: 'r1' });
     state = executeLyricCommand(state, { type: 'split-ruby', lineId: line.id, wordId: word.id, rubyId: 'r1', at: 2, newRubyId: 'r2' });
     state = executeLyricCommand(state, { type: 'redistribute-ruby-time', lineId: line.id, wordId: word.id });
-    expect(state.present.lines[0].words[0].rubyUnits.map((unit) => [unit.reading, unit.beginUs, unit.endUs])).toEqual([
-      ['きょ', 1_000_000, 1_500_000], ['う', 1_500_000, 2_000_000],
+    expect(state.present.lines[0].words[0].rubyUnits.map((unit) => [unit.reading, unit.beginMs, unit.endMs])).toEqual([
+      ['きょ', 1000, 1500], ['う', 1500, 2000],
     ]);
     const beforeMerge = state.present;
     state = executeLyricCommand(state, { type: 'merge-ruby', lineId: line.id, wordId: word.id, firstRubyId: 'r1', secondRubyId: 'r2' });
-    expect(state.present.lines[0].words[0].rubyUnits).toEqual([{ id: 'r1', reading: 'きょう', beginUs: 1_000_000, endUs: 2_000_000 }]);
+    expect(state.present.lines[0].words[0].rubyUnits).toEqual([{ id: 'r1', reading: 'きょう', beginMs: 1000, endMs: 2000 }]);
     expect(undoLyricCommand(state).present).toBe(beforeMerge);
     const inserted = executeLyricCommand(state, { type: 'insert-ruby', lineId: line.id, wordId: word.id, afterRubyId: null, reading: '新', rubyId: 'head' });
     expect(inserted.present.lines[0].words[0].rubyUnits[0].id).toBe('head');
@@ -51,20 +51,20 @@ describe('E4 注音 editing', () => {
   it('generates 注音 without overwriting manual units and survives TTML draft/final round trips', () => {
     const document = createLyricDocument('宇宙');
     const line = document.lines[0], word = line.words[0];
-    line.beginUs = 3_000_000; line.endUs = 4_000_000;
-    word.beginUs = 3_000_000; word.endUs = 4_000_000;
+    line.beginMs = 3000; line.endMs = 4000;
+    word.beginMs = 3000; word.endMs = 4000;
     const units = makeRubyUnits(word, splitReadingMora(readingFromRomanization('sora')));
     const state = executeLyricCommand(createLyricEditorState(document), { type: 'set-ruby-units', lineId: line.id, wordId: word.id, units });
     expect(state.present.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['そ', 'ら']);
     expect(() => executeLyricCommand(state, { type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: makeRubyUnits(word, ['う']) })).toThrow(/手动 注音/);
     for (const draft of [true, false]) {
       const reopened = parseLyricTtml(serializeLyricTtml(state.present, { draft }));
-      expect(reopened.lines[0].words[0].rubyUnits.map((unit) => [unit.reading, unit.beginUs, unit.endUs])).toEqual([
-        ['そ', 3_000_000, 3_500_000], ['ら', 3_500_000, 4_000_000],
+      expect(reopened.lines[0].words[0].rubyUnits.map((unit) => [unit.reading, unit.beginMs, unit.endMs])).toEqual([
+        ['そ', 3000, 3500], ['ら', 3500, 4000],
       ]);
     }
-    expect(distributeRubyTime({ ...word, endUs: null }, units).map((unit) => [unit.beginUs, unit.endUs])).toEqual([
-      [3_000_000, null], [null, null],
+    expect(distributeRubyTime({ ...word, endMs: null }, units).map((unit) => [unit.beginMs, unit.endMs])).toEqual([
+      [3000, null], [null, null],
     ]);
   });
 });

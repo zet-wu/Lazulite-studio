@@ -97,8 +97,8 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
     state = commands.executeLyricCommand(state, { type: 'set-sublyrics', lineId: background.id, kind: 'translations', items: [] });
     state = commands.executeLyricCommand(state, { type: 'set-background-of', lineId: background.id, parentLineId: parent.id });
     return { xml: codec.serializeLyricTtml(state.present, { draft: true }), parentId: parent.id, backgroundId: background.id,
-      parentTime: [parent.beginUs, parent.endUs], backgroundTime: [background.beginUs, background.endUs],
-      words: background.words.map(w => [w.text, w.beginUs, w.endUs]), lineCount: document.lines.length };
+      parentTime: [parent.beginMs, parent.endMs], backgroundTime: [background.beginMs, background.endMs],
+      words: background.words.map(w => [w.text, w.beginMs, w.endMs]), lineCount: document.lines.length };
   }, raw);
   expect(prepared.parentTime).toEqual([6_426_000, 8_155_000]);
   expect(prepared.backgroundTime).toEqual([8_155_000, 129_984_000]);
@@ -132,7 +132,7 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
       const codecPath = '/src/adapters/ttml/lyric-codec.ts';
       const codec = await import(codecPath) as typeof import('../../src/adapters/ttml/lyric-codec');
       const document = codec.parseLyricTtml(xml), parent = document.lines[1], bg = document.lines[2];
-      return { parentTime: [parent.beginUs, parent.endUs], bgTime: [bg.beginUs, bg.endUs], bgParent: bg.backgroundOf, parentId: parent.id, bgId: bg.id, words: bg.words.map(w => [w.text, w.beginUs, w.endUs]) };
+      return { parentTime: [parent.beginMs, parent.endMs], bgTime: [bg.beginMs, bg.endMs], bgParent: bg.backgroundOf, parentId: parent.id, bgId: bg.id, words: bg.words.map(w => [w.text, w.beginMs, w.endMs]) };
     }, xml);
     expect(result.parentTime).toEqual(prepared.parentTime);
     expect(result.bgTime).toEqual(prepared.backgroundTime);

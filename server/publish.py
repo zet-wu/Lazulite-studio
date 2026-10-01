@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 from .projection import _plain
+from .time_units import milliseconds, clock
 
 TTML_NS = "http://www.w3.org/ns/ttml"
 TTP_NS = "http://www.w3.org/ns/ttml#parameter"
@@ -76,7 +77,7 @@ def validate_publish_ttml(path: str | Path, max_duration: float | None = None) -
             raise PublishInvalid(f"line {index + 1} requires complete begin/end timing")
         if end <= begin:
             raise PublishInvalid(f"line {index + 1} has invalid timing")
-        if max_duration is not None and end > max_duration + 1e-6:
+        if max_duration is not None and milliseconds(end) > milliseconds(max_duration):
             raise PublishInvalid("lyrics exceed source audio duration")
     for element in root.iter():
         if element.attrib.get("timeContainer") not in (None, "par"):
@@ -133,11 +134,11 @@ class PublishRunner:
         asset = Path(self.asset_path(project_id))
         from mutagen import File
         from mutagen.mp4 import MP4
-        from .publishing import media_duration_us
+        from .publishing import media_duration_ms
         media = File(asset)
         ttml = None
         if isinstance(media, MP4):
-            validate_publish_ttml(source, media_duration_us(asset) / 1_000_000)
+            validate_publish_ttml(source, media_duration_ms(asset) / 1_000)
             tree = ET.parse(source)
             root = tree.getroot()
             # Convert only validated, fully untimed whitespace spans to text in place.
@@ -151,6 +152,9 @@ class PublishRunner:
                         parent.remove(child)
                     else: previous = child
             for element in root.iter():
+                for name in ('begin', 'end', 'dur'):
+                    if element.get(name) is not None:
+                        element.set(name, clock(milliseconds(_time(element.get(name)))))
                 for key in list(element.attrib):
                     if key.startswith('{'+STUDIO_NS+'}'): del element.attrib[key]
             ttml = ET.tostring(root, encoding='utf-8')

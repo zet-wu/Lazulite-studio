@@ -1,5 +1,5 @@
 import { toKana } from 'wanakana';
-import type { LyricWord, RubyUnit, TimeUs } from './lyric-document';
+import type { LyricWord, RubyUnit, TimeMs } from './lyric-document';
 
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 const smallKana = /^[ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ]$/u;
@@ -27,7 +27,7 @@ export function splitReadingMora(reading: string): string[] {
   return parts;
 }
 
-function boundary(begin: TimeUs, end: TimeUs, position: number, total: number): TimeUs {
+function boundary(begin: TimeMs, end: TimeMs, position: number, total: number): TimeMs {
   if (position === 0) return begin;
   if (position === total) return end;
   if (begin === null || end === null) return null;
@@ -40,15 +40,15 @@ export function distributeRubyTime(word: LyricWord, units: RubyUnit[]): RubyUnit
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   let elapsed = 0;
   return units.map((unit, index) => {
-    const beginUs = boundary(word.beginUs, word.endUs, elapsed, total);
+    const beginMs = boundary(word.beginMs, word.endMs, elapsed, total);
     elapsed += weights[index];
-    const endUs = boundary(word.beginUs, word.endUs, elapsed, total);
-    return { ...unit, beginUs, endUs };
+    const endMs = boundary(word.beginMs, word.endMs, elapsed, total);
+    return { ...unit, beginMs, endMs };
   });
 }
 
 export function makeRubyUnits(word: LyricWord, readings: string[]): RubyUnit[] {
   if (!readings.length || readings.some((reading) => !reading)) throw new Error('读音单元不能为空');
-  const units = readings.map((reading) => ({ id: crypto.randomUUID(), reading, beginUs: null, endUs: null }));
+  const units = readings.map((reading) => ({ id: crypto.randomUUID(), reading, beginMs: null, endMs: null }));
   return distributeRubyTime(word, units);
 }

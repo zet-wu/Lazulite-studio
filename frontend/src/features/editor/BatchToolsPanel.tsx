@@ -38,13 +38,13 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
         command = result.command; summary = `替换 ${result.count} 处`;
       } else if (operation === 'shift') {
         const amount = Number(amountMs);
-        if (!Number.isFinite(amount) || !Number.isSafeInteger(amount * 1000)) throw new Error('请输入有效的毫秒偏移量');
-        command = shiftLineTimes(document, targets.map((line) => line.id), amount * 1000);
+        if (!Number.isFinite(amount) || !Number.isSafeInteger(Math.round(amount))) throw new Error('请输入有效的毫秒偏移量');
+        command = shiftLineTimes(document, targets.map((line) => line.id), Math.round(amount));
         summary = `移动 ${targets.length} 行，词、注音 和对齐时间一同移动`;
       } else if (operation === 'smooth') {
         const amount = Number(thresholdMs);
-        if (!Number.isFinite(amount) || !Number.isSafeInteger(amount * 1000)) throw new Error('请输入有效的毫秒阈值');
-        const result = smoothWordTimes(document, targets.map((line) => line.id), amount * 1000);
+        if (!Number.isFinite(amount) || !Number.isSafeInteger(Math.round(amount))) throw new Error('请输入有效的毫秒阈值');
+        const result = smoothWordTimes(document, targets.map((line) => line.id), Math.round(amount));
         if (!result.count) throw new Error('范围内没有可平滑的 CJK 相邻词边界；含 注音 的边界会跳过');
         command = result.command; summary = `平滑 ${result.count} 处词边界`;
       } else if (operation === 'sync') {

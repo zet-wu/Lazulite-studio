@@ -141,7 +141,7 @@ describe("useProjectDocument save lifecycle", () => {
     const reopened = renderHook(() => useProjectDocument("p", savedXml, "r2", '"r2"', saveMock));
     expect(reopened.result.current.document.romanizationTracks).toEqual(generated.romanizationTracks);
     expect(reopened.result.current.document.lines[0].words[0].rubyUnits).toEqual(generated.lines[0].words[0].rubyUnits);
-    expect(reopened.result.current.document.lines[0].beginUs).toBe(999_000);
+    expect(reopened.result.current.document.lines[0].beginMs).toBe(999);
   });
 });
 

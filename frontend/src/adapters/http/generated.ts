@@ -514,12 +514,12 @@ export interface components {
             filename: string;
             content_type: string;
             size_bytes: number;
-            duration_us: number | null;
+            duration_ms: number | null;
             /** @enum {string} */
             status: "ready";
             asset_hash: string;
-            source_start_us: number;
-            proxy_offset_us: number;
+            source_start_ms: number;
+            proxy_offset_ms: number;
         };
         WaveformWindow: {
             /** @constant */
@@ -528,9 +528,9 @@ export interface components {
             asset_hash: string;
             version: string;
             level: number;
-            start_us: number;
-            end_us: number;
-            bucket_us: number;
+            start_ms: number;
+            end_ms: number;
+            bucket_ms: number;
             minimum: number[];
             maximum: number[];
         };
@@ -747,8 +747,8 @@ export interface components {
             line_id: string;
             start?: number | null;
             end?: number | null;
-            begin_us?: number | null;
-            end_us?: number | null;
+            begin_ms?: number | null;
+            end_ms?: number | null;
             similarity?: number | null;
             score?: number | null;
             timing_source: string;
@@ -762,8 +762,8 @@ export interface components {
             text: string;
             start: number | null;
             end: number | null;
-            start_us: number | null;
-            end_us: number | null;
+            start_ms: number | null;
+            end_ms: number | null;
             /** @enum {string} */
             granularity: "subword" | "word" | "character" | "mora" | "phoneme";
             confidence: number | null;
@@ -774,8 +774,8 @@ export interface components {
             language?: string | null;
             start?: number | null;
             end?: number | null;
-            begin_us?: number | null;
-            end_us?: number | null;
+            begin_ms?: number | null;
+            end_ms?: number | null;
             confidence?: number | null;
             timed_text?: Record<string, never>[];
         } & {
@@ -806,7 +806,7 @@ export interface components {
         };
         DocumentEnvelope: {
             /** @constant */
-            schema_version: "studio-document-v1";
+            schema_version: "studio-document-v2";
             project_id: string;
             revision: string | null;
             etag?: string;
@@ -814,7 +814,7 @@ export interface components {
             client_seq?: number | null;
             document: {
                 /** @constant */
-                schema_version: "studio-document-content-v1";
+                schema_version: "studio-document-content-v2";
                 ttml: string;
             };
         };
@@ -838,7 +838,7 @@ export interface components {
                 ttml?: string;
                 text?: string;
                 lines?: {
-                    begin_us: number | null;
+                    begin_ms: number | null;
                     text: string;
                 }[];
             };
@@ -856,8 +856,8 @@ export interface components {
             lines: {
                 id: string;
                 text: string;
-                begin_us: number | null;
-                end_us: number | null;
+                begin_ms: number | null;
+                end_ms: number | null;
             }[];
             read_only_reasons: string[];
         };
@@ -895,8 +895,8 @@ export interface components {
         ProjectId: string;
         Cursor: string;
         Level: number;
-        StartUs: number;
-        EndUs: number;
+        StartMs: number;
+        EndMs: number;
         Revision: string;
         IfMatch: string;
         IdempotencyKey: string;
@@ -1803,8 +1803,8 @@ export interface operations {
         parameters: {
             query?: {
                 level?: components["parameters"]["Level"];
-                start_us?: components["parameters"]["StartUs"];
-                end_us?: components["parameters"]["EndUs"];
+                start_ms?: components["parameters"]["StartMs"];
+                end_ms?: components["parameters"]["EndMs"];
             };
             header?: never;
             path: {
@@ -1829,9 +1829,9 @@ export interface operations {
     getPcmWindow: {
         parameters: {
             query: {
-                start_us: number;
-                /** @description Exclusive end, at most 4,020,000 microseconds after start_us (including FFT context) */
-                end_us: number;
+                start_ms: number;
+                /** @description Exclusive end, at most 4,020,000 milliseconds after start_ms (including FFT context) */
+                end_ms: number;
             };
             header?: never;
             path: {

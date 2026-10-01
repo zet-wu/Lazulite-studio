@@ -1,21 +1,21 @@
 /** The semantic editor document. Transport, XML trees and playback stay outside it. */
-export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v5' as const;
+export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v6' as const;
 
-export type TimeUs = number | null;
+export type TimeMs = number | null;
 
 export type RubyUnit = {
   id: string;
   reading: string;
-  beginUs: TimeUs;
-  endUs: TimeUs;
+  beginMs: TimeMs;
+  endMs: TimeMs;
 };
 
 export type AlignmentUnit = {
   id: string;
   kind: 'word' | 'mora' | 'phoneme';
   text: string;
-  beginUs: TimeUs;
-  endUs: TimeUs;
+  beginMs: TimeMs;
+  endMs: TimeMs;
   readingStart: number | null;
   readingEnd: number | null;
   rubyUnitId: string | null;
@@ -24,8 +24,8 @@ export type AlignmentUnit = {
 export type LyricWord = {
   id: string;
   text: string;
-  beginUs: TimeUs;
-  endUs: TimeUs;
+  beginMs: TimeMs;
+  endMs: TimeMs;
   rubyUnits: RubyUnit[];
   alignmentUnits: AlignmentUnit[];
   obscene: boolean;
@@ -33,7 +33,7 @@ export type LyricWord = {
 };
 
 export type SubLyric = { language: string | null; text: string };
-export type RomanizationUnit = { id: string; text: string; beginUs: TimeUs; endUs: TimeUs };
+export type RomanizationUnit = { id: string; text: string; beginMs: TimeMs; endMs: TimeMs };
 export type RomanizationContent = { id: string; lineId: string } & (
   | { kind: 'plain'; text: string }
   | { kind: 'timed'; units: RomanizationUnit[] }
@@ -43,9 +43,9 @@ export type RomanizationTrack = { id: string; language: string | null; contents:
 export type LyricLine = {
   id: string;
   words: LyricWord[];
-  beginUs: TimeUs;
-  endUs: TimeUs;
-  endLink: { targetLineId: string; originalEndUs: TimeUs } | null;
+  beginMs: TimeMs;
+  endMs: TimeMs;
+  endLink: { targetLineId: string; originalEndMs: TimeMs } | null;
   agentRefs: string[];
   backgroundOf: string | null;
   songPart: string | null;
@@ -72,13 +72,13 @@ export const lineText = (line: LyricLine) => line.words.map((word) => word.text)
 export const rubyReading = (word: LyricWord) => word.rubyUnits.map((unit) => unit.reading).join('');
 
 export function createWord(text: string, id: string = crypto.randomUUID()): LyricWord {
-  return { id, text, beginUs: null, endUs: null, rubyUnits: [], alignmentUnits: [], obscene: false, emptyBeat: 0 };
+  return { id, text, beginMs: null, endMs: null, rubyUnits: [], alignmentUnits: [], obscene: false, emptyBeat: 0 };
 }
 
 export function createLine(text: string, id: string = `line-${crypto.randomUUID()}`): LyricLine {
   return {
     id, words: text ? [createWord(text, `${id}:word:0`)] : [],
-    beginUs: null, endUs: null, endLink: null, agentRefs: [], backgroundOf: null, songPart: null,
+    beginMs: null, endMs: null, endLink: null, agentRefs: [], backgroundOf: null, songPart: null,
     translations: [], ignoreSync: false,
   };
 }

@@ -118,11 +118,11 @@ def create_app(
             "filename": row[4] or "",
             "content_type": row[3],
             "size_bytes": row[2],
-            "duration_us": metadata.get("proxy_duration_us"),
+            "duration_ms": metadata.get("proxy_duration_ms"),
             "status": "ready" if row[5] else "processing",
             "asset_hash": row[1],
-            "source_start_us": row[7] or 0,
-            "proxy_offset_us": metadata.get("proxy_offset_us", 0),
+            "source_start_ms": row[7] or 0,
+            "proxy_offset_ms": metadata.get("proxy_offset_ms", 0),
         }
 
     @api.get("/session")
@@ -241,8 +241,8 @@ def create_app(
                     {
                         "codec": asset.probe.codec,
                         "container": asset.probe.container,
-                        "proxy_offset_us": proxy.offset_us,
-                        "proxy_duration_us": proxy.duration_us,
+                        "proxy_offset_ms": proxy.offset_ms,
+                        "proxy_duration_ms": proxy.duration_ms,
                     }
                 )
                 if not existing:
@@ -255,8 +255,8 @@ def create_app(
                             asset.probe.mime_type,
                             asset.original_name,
                             1,
-                            asset.probe.duration_us,
-                            asset.probe.start_us,
+                            asset.probe.duration_ms,
+                            asset.probe.start_ms,
                             asset.probe.sample_rate,
                             asset.probe.channels,
                             metadata,
@@ -463,14 +463,14 @@ def create_app(
     def waveform(
         pid: str,
         level: int = 0,
-        start_us: int = 0,
-        end_us: int = 1_000_000,
+        start_ms: int = 0,
+        end_ms: int = 1_000,
         _: object = Depends(auth),
     ):
         _, a = asset_for(pid)
         try:
             asset = asset_model(a)
-            peaks = media.peaks(asset, level=level, start_us=start_us, end_us=end_us)
+            peaks = media.peaks(asset, level=level, start_ms=start_ms, end_ms=end_ms)
         except MediaError as exc:
             fail("waveform_invalid", str(exc), 422)
         return {
@@ -479,21 +479,21 @@ def create_app(
             "asset_hash": peaks.asset_hash,
             "version": peaks.version,
             "level": level,
-            "start_us": peaks.start_us,
-            "end_us": peaks.end_us,
-            "bucket_us": peaks.bucket_us,
+            "start_ms": peaks.start_ms,
+            "end_ms": peaks.end_ms,
+            "bucket_ms": peaks.bucket_ms,
             "minimum": peaks.minimum,
             "maximum": peaks.maximum,
         }
 
     @api.get("/projects/{pid}/pcm")
-    def pcm_window(pid: str, start_us: int, end_us: int, _: object = Depends(auth)):
-        """Read a PCM proxy window of at most 4,020,000 microseconds (FFT context included)."""
+    def pcm_window(pid: str, start_ms: int, end_ms: int, _: object = Depends(auth)):
+        """Read a PCM proxy window of at most 4,020,000 milliseconds (FFT context included)."""
         _, row = asset_for(pid)
         if not row:
             fail("audio_not_found", "audio not found", 404)
         try:
-            data, rate, channels = media.pcm_window(asset_model(row), start_us=start_us, end_us=end_us)
+            data, rate, channels = media.pcm_window(asset_model(row), start_ms=start_ms, end_ms=end_ms)
         except MediaError as exc:
             fail("pcm_invalid", str(exc), 422)
         return Response(data, media_type="application/octet-stream", headers={"X-Sample-Rate": str(rate), "X-Channels": str(channels), "Cache-Control": "private, max-age=60"})

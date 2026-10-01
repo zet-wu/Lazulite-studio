@@ -86,11 +86,11 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
             "filename",
             "content_type",
             "size_bytes",
-            "duration_us",
+            "duration_ms",
             "status",
             "asset_hash",
-            "source_start_us",
-            "proxy_offset_us",
+            "source_start_ms",
+            "proxy_offset_ms",
         )
     ) <= set(asset)
     assert asset["schema_version"] == "studio-asset-v1" and asset["status"] == "ready"
@@ -144,12 +144,12 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
     assert lyrics.status_code == 200 and lyrics.headers["etag"] == f'"{revision}"'
     audio = client.get(f"/api/v1/projects/{pid}/audio", headers={"range": "bytes=0-9"})
     assert audio.status_code == 206 and len(audio.content) == 10
-    pcm = client.get(f"/api/v1/projects/{pid}/pcm?start_us=0&end_us=500000")
+    pcm = client.get(f"/api/v1/projects/{pid}/pcm?start_ms=0&end_ms=500")
     assert pcm.status_code == 200 and pcm.headers["x-sample-rate"] == "48000"
     assert pcm.headers["x-channels"] == "2" and len(pcm.content) == 96_000
-    assert client.get(f"/api/v1/projects/{pid}/pcm?start_us=0&end_us=4020000").status_code == 200
-    assert client.get(f"/api/v1/projects/{pid}/pcm?start_us=0&end_us=4020001").status_code == 422
-    assert client.get(f"/api/v1/projects/{pid}/pcm?start_us=0&end_us=5000000").status_code == 422
+    assert client.get(f"/api/v1/projects/{pid}/pcm?start_ms=0&end_ms=4020").status_code == 200
+    assert client.get(f"/api/v1/projects/{pid}/pcm?start_ms=0&end_ms=4021").status_code == 422
+    assert client.get(f"/api/v1/projects/{pid}/pcm?start_ms=0&end_ms=5000").status_code == 422
     assert (
         client.get(
             f"/api/v1/projects/{pid}/audio", headers={"range": "bytes=-10"}
@@ -172,7 +172,7 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
     )
     waveform = client.get(
         f"/api/v1/projects/{pid}/waveform",
-        params={"level": 0, "start_us": 0, "end_us": 100000},
+        params={"level": 0, "start_ms": 0, "end_ms": 100},
     ).json()
     assert (
         waveform["schema_version"] == "studio-waveform-v1"

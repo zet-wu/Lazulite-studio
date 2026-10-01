@@ -21,7 +21,7 @@ it('removes blank translations at command/import/export boundaries and restores 
   expect(serializeLyricTtml(blank)).not.toContain('x-translation');
   const xml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><p>行<span ttm:role="x-translation"> </span></p></body></tt>';
   expect(parseLyricTtml(xml).lines[0].translations).toEqual([]);
-  state.present.lines[1].endLink = { targetLineId: document.lines[0].id, originalEndUs: null };
+  state.present.lines[1].endLink = { targetLineId: document.lines[0].id, originalEndMs: null };
   expect(() => executeLyricCommand(state, { type: 'set-background-of', lineId: line.id, parentLineId: document.lines[0].id })).toThrow(/行尾链接/);
 });
 
@@ -37,5 +37,5 @@ it('preserves language and singer order through draft/final TTML and rejects inv
     expect(reopened.lines[0].agentRefs).toEqual(['v2', 'v1']);
   }
   for (const tag of ['zh-Hans', 'en-US', 'ja', 'x-song']) expect(() => validateLanguageTag(tag)).not.toThrow();
-  for (const tag of ['en_US', 'a', 'en-', '中文']) expect(() => validateLanguageTag(tag)).toThrow(/语言标签/);
+  for (const tag of ['en_MS', 'a', 'en-', '中文']) expect(() => validateLanguageTag(tag)).toThrow(/语言标签/);
 });

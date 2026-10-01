@@ -10,7 +10,7 @@ describe('semantic lyric commands', () => {
     const wordId = line.words[0].id;
     let state = createLyricEditorState(document);
     state = executeLyricCommand(state, { type: 'split-word', lineId: line.id, wordId, at: 2, newWordId: 'after-today' });
-    expect(state.present.lines[0].words.map((word) => [word.id, word.text, word.beginUs])).toEqual([
+    expect(state.present.lines[0].words.map((word) => [word.id, word.text, word.beginMs])).toEqual([
       [wordId, '今日', null], ['after-today', ' も歌う', null],
     ]);
     expect(lineText(state.present.lines[0])).toBe('今日 も歌う');
@@ -26,11 +26,11 @@ describe('semantic lyric commands', () => {
     state = executeLyricCommand(state, { type: 'split-word', lineId, wordId: firstId, at: 2, newWordId: 'rest' });
     state = executeLyricCommand(state, { type: 'add-ruby', lineId, wordId: firstId, reading: 'きょう', rubyId: 'reading' });
     state = executeLyricCommand(state, { type: 'split-ruby', lineId, wordId: firstId, rubyId: 'reading', at: 2, newRubyId: 'reading-tail' });
-    state = executeLyricCommand(state, { type: 'set-word-time', lineId, wordId: 'rest', beginUs: 1_000_000, endUs: 2_000_000 });
+    state = executeLyricCommand(state, { type: 'set-word-time', lineId, wordId: 'rest', beginMs: 1000, endMs: 2000 });
     state = executeLyricCommand(state, { type: 'edit-word', lineId, wordId: 'rest', text: 'も唄う' });
     expect(state.present.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['きょ', 'う']);
-    expect(state.present.lines[0].words[1]).toMatchObject({ text: 'も唄う', beginUs: 1_000_000, endUs: 2_000_000 });
-    expect(undoLyricCommand(state).present.lines[0].words[1]).toMatchObject({ text: 'も歌う', beginUs: 1_000_000 });
+    expect(state.present.lines[0].words[1]).toMatchObject({ text: 'も唄う', beginMs: 1000, endMs: 2000 });
+    expect(undoLyricCommand(state).present.lines[0].words[1]).toMatchObject({ text: 'も歌う', beginMs: 1000 });
     expect(() => executeLyricCommand(state, { type: 'split-word', lineId, wordId: firstId, at: 1 })).toThrow(/拆分带注音的正文/);
   });
 
@@ -38,8 +38,8 @@ describe('semantic lyric commands', () => {
     const document = createLyricDocument('歌');
     const line = document.lines[0], word = line.words[0];
     word.rubyUnits = [
-      { id: 'one', reading: 'う', beginUs: 100_000, endUs: 200_000 },
-      { id: 'two', reading: 'た', beginUs: 200_000, endUs: 300_000 },
+      { id: 'one', reading: 'う', beginMs: 100, endMs: 200 },
+      { id: 'two', reading: 'た', beginMs: 200, endMs: 300 },
     ];
     const state = createLyricEditorState(document);
     const moved = executeLyricCommand(state, { type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId: 'two', afterRubyId: null });
@@ -99,8 +99,8 @@ describe('semantic lyric commands', () => {
     const document = createLyricDocument('二人');
     const lineId = document.lines[0].id;
     document.romanizationTracks.push({ id: 'track', language: 'ja-Latn', contents: [{ id: 'content', lineId, kind: 'timed', units: [
-      { id: 'fu', text: 'fu ', beginUs: 999_000, endUs: 1_500_000 },
-      { id: 'tari', text: 'tari', beginUs: 1_500_000, endUs: 3_001_000 },
+      { id: 'fu', text: 'fu ', beginMs: 999, endMs: 1500 },
+      { id: 'tari', text: 'tari', beginMs: 1500, endMs: 3001 },
     ] }] });
     let state = createLyricEditorState(document);
     state = executeLyricCommand(state, { type: 'split-romanization-unit', trackId: 'track', contentId: 'content', unitId: 'tari', at: 2 });
@@ -108,7 +108,7 @@ describe('semantic lyric commands', () => {
     expect(content.kind).toBe('timed');
     if (content.kind !== 'timed') return;
     expect(content.units.map((unit) => unit.text)).toEqual(['fu ', 'ta', 'ri']);
-    expect(content.units[2].endUs).toBe(3_001_000);
+    expect(content.units[2].endMs).toBe(3001);
     const moved = executeLyricCommand(state, { type: 'move-romanization-unit', trackId: 'track', contentId: 'content', unitId: content.units[2].id, afterUnitId: null });
     const reordered = moved.present.romanizationTracks[0].contents[0];
     if (reordered.kind !== 'timed') return;
@@ -123,11 +123,11 @@ describe('semantic lyric commands', () => {
     const document = createLyricDocument('前後');
     const main = document.lines[0];
     main.words = [createWord('前', 'front'), createWord('後', 'back')];
-    main.beginUs = 0; main.endUs = 2_000_000;
-    main.words[0].beginUs = 0; main.words[0].endUs = 1_000_000;
-    main.words[1].beginUs = 1_000_000; main.words[1].endUs = 2_000_000;
+    main.beginMs = 0; main.endMs = 2000;
+    main.words[0].beginMs = 0; main.words[0].endMs = 1000;
+    main.words[1].beginMs = 1000; main.words[1].endMs = 2000;
     const bg = createLine('和声', 'bg');
-    bg.beginUs = 1_200_000; bg.endUs = 1_800_000;
+    bg.beginMs = 1200; bg.endMs = 1800;
     document.lines.push(bg);
     document.romanizationTracks.push({ id: 'track', language: 'ja-Latn', contents: [
       { id: 'first', lineId: main.id, kind: 'plain', text: 'mae' },
@@ -137,7 +137,7 @@ describe('semantic lyric commands', () => {
     const withBackground = executeLyricCommand(original, { type: 'set-background-of', lineId: bg.id, parentLineId: main.id });
     expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIndicesForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: null })).toThrow(/背景歌词归属/);
     const leftAssigned = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIndicesForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: 'left' });
-    expect(leftAssigned.present.lines.find(line => line.id === bg.id)).toMatchObject({ backgroundOf: main.id, beginUs: bg.beginUs, endUs: bg.endUs });
+    expect(leftAssigned.present.lines.find(line => line.id === bg.id)).toMatchObject({ backgroundOf: main.id, beginMs: bg.beginMs, endMs: bg.endMs });
     const split = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIndicesForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: 'right' });
     expect(split.present.lines.map((line) => [line.id, line.backgroundOf])).toEqual([[main.id, null], ['right', null], ['bg', 'right']]);
     expect(split.present.romanizationTracks[0].contents.map((content) => [content.id, content.lineId])).toEqual([['first', main.id], ['second', 'right']]);
@@ -185,13 +185,13 @@ describe('semantic lyric commands', () => {
     document.lines.push(second);
     let state = createLyricEditorState(document);
     state = executeLyricCommand(state, { type: 'add-ruby', lineId: first.id, wordId: first.words[0].id, reading: 'きょう', rubyId: 'ruby' });
-    state = executeLyricCommand(state, { type: 'set-ruby-time', lineId: first.id, wordId: first.words[0].id, rubyId: 'ruby', beginUs: 100_000, endUs: 800_000 });
-    expect(state.present.lines[0].words[0]).toMatchObject({ beginUs: 100_000, endUs: 800_000 });
+    state = executeLyricCommand(state, { type: 'set-ruby-time', lineId: first.id, wordId: first.words[0].id, rubyId: 'ruby', beginMs: 100, endMs: 800 });
+    expect(state.present.lines[0].words[0]).toMatchObject({ beginMs: 100, endMs: 800 });
     const beforeMove = state.present;
     state = executeLyricCommand(state, { type: 'move-word', lineId: first.id, wordId: first.words[0].id, toLineId: second.id, afterWordId: null });
     expect(state.present.lines[1].words[0]).toBe(beforeMove.lines[0].words[0]);
     expect(undoLyricCommand(state).present).toBe(beforeMove);
-    expect(() => executeLyricCommand(state, { type: 'set-ruby-time', lineId: second.id, wordId: first.words[0].id, rubyId: 'ruby', beginUs: 0, endUs: 800_000 })).toThrow(/超出正文词/);
+    expect(() => executeLyricCommand(state, { type: 'set-ruby-time', lineId: second.id, wordId: first.words[0].id, rubyId: 'ruby', beginMs: 0, endMs: 800 })).toThrow(/超出正文词/);
   });
 
   it('applies several edits as one undo step and rejects a failed batch atomically', () => {
@@ -218,35 +218,35 @@ describe('semantic lyric commands', () => {
 it.each(['child', 'translation', 'link', 'referenced'])('P3-05 rejects background %s without modifying document or history', reason => {
   const document = createLyricDocument('主唱');
   const main = document.lines[0], source = createLine('源歌词', 'source');
-  main.beginUs = 1_000_000; main.endUs = 10_000_000;
-  source.beginUs = 2_000_000; source.endUs = 3_000_000;
+  main.beginMs = 1000; main.endMs = 10000;
+  source.beginMs = 2000; source.endMs = 3000;
   document.lines.push(source);
   if (reason === 'child') document.lines.push({ ...createLine('子背景', 'child'), backgroundOf: source.id });
   if (reason === 'translation') source.translations.push({ language: 'zh', text: '译文保留' });
-  if (reason === 'link') source.endLink = { targetLineId: main.id, originalEndUs: source.endUs };
-  if (reason === 'referenced') main.endLink = { targetLineId: source.id, originalEndUs: main.endUs };
+  if (reason === 'link') source.endLink = { targetLineId: main.id, originalEndMs: source.endMs };
+  if (reason === 'referenced') main.endLink = { targetLineId: source.id, originalEndMs: main.endMs };
   const snapshot = structuredClone(document), state = createLyricEditorState(document);
   expect(() => executeLyricCommand(state, { type: 'set-background-of', lineId: source.id, parentLineId: main.id })).toThrow();
   expect(state.present).toEqual(snapshot);
   expect(state.past).toHaveLength(0);
 });
 
-it.each([[0, 500_000], [2_000_000, 5_000_000], [0, 5_000_000], [null, null]])('P4 background %s–%s preserves independent time on attach/rebind/detach and undo', (beginUs, endUs) => {
+it.each([[0, 500], [2000, 5000], [0, 5000], [null, null]])('P4 background %s–%s preserves independent time on attach/rebind/detach and undo', (beginMs, endMs) => {
   const document = createLyricDocument('主行');
   const main = document.lines[0], source = createLine('背景', 'bg'), another = createLine('另一主行', 'another');
-  main.beginUs = 1_000_000; main.endUs = 2_000_000;
-  source.beginUs = beginUs; source.endUs = endUs;
-  source.words[0].beginUs = beginUs; source.words[0].endUs = endUs;
-  source.words[0].rubyUnits = [{ id: 'r', reading: '背景音', beginUs, endUs }];
+  main.beginMs = 1000; main.endMs = 2000;
+  source.beginMs = beginMs; source.endMs = endMs;
+  source.words[0].beginMs = beginMs; source.words[0].endMs = endMs;
+  source.words[0].rubyUnits = [{ id: 'r', reading: '背景音', beginMs, endMs }];
   document.lines.push(source, another);
   const original = createLyricEditorState(document);
   const attached = executeLyricCommand(original, { type: 'set-background-of', lineId: source.id, parentLineId: main.id });
   expect(attached.present.lines[0]).toBe(main);
-  expect(attached.present.lines[1]).toMatchObject({ backgroundOf: main.id, beginUs, endUs, words: source.words });
+  expect(attached.present.lines[1]).toMatchObject({ backgroundOf: main.id, beginMs, endMs, words: source.words });
   expect(attached.past).toHaveLength(1);
   expect(undoLyricCommand(attached).present).toBe(document);
   const rebound = executeLyricCommand(attached, { type: 'set-background-of', lineId: source.id, parentLineId: another.id });
-  expect(rebound.present.lines.find(line => line.id === source.id)).toMatchObject({ backgroundOf: another.id, beginUs, endUs, words: source.words });
+  expect(rebound.present.lines.find(line => line.id === source.id)).toMatchObject({ backgroundOf: another.id, beginMs, endMs, words: source.words });
   const detached = executeLyricCommand(rebound, { type: 'set-background-of', lineId: source.id, parentLineId: null });
-  expect(detached.present.lines.find(line => line.id === source.id)).toMatchObject({ backgroundOf: null, beginUs, endUs, words: source.words });
+  expect(detached.present.lines.find(line => line.id === source.id)).toMatchObject({ backgroundOf: null, beginMs, endMs, words: source.words });
 });

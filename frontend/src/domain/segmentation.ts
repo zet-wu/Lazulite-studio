@@ -114,13 +114,13 @@ export function distributeSegmentTime(word: LyricWord, parts: string[], punctuat
   if (word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error(`词“${word.text}”包含注音或附属属性，请先手动处理`);
   const weights = parts.map((part) => graphemes(part).reduce((total, item) => total + (isSpace(item) ? 0 : isPunctuation(item) ? punctuationWeight : 1), 0));
   const sum = weights.reduce((a, b) => a + b, 0);
-  const begin = word.beginUs, end = word.endUs;
+  const begin = word.beginMs, end = word.endMs;
   let cumulative = 0;
   return parts.map((part, index) => {
     const start = begin === null || end === null ? index === 0 ? begin : null : begin + Math.round((end - begin) * cumulative / (sum || parts.length));
     cumulative += sum ? weights[index] : 1;
     const finish = begin === null || end === null ? index === parts.length - 1 ? end : null : index === parts.length - 1 ? end : begin + Math.round((end - begin) * cumulative / (sum || parts.length));
-    return { ...createWord(part, index === 0 ? word.id : crypto.randomUUID()), beginUs: start, endUs: finish };
+    return { ...createWord(part, index === 0 ? word.id : crypto.randomUUID()), beginMs: start, endMs: finish };
   });
 }
 

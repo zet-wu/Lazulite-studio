@@ -23,8 +23,8 @@ export const SCHEMA_VERSION = {
 } as const;
 
 export function isDocumentEnvelope(value: unknown): value is DocumentEnvelope {
-  return object(value) && value.schema_version === "studio-document-v1" && string(value.project_id) &&
-    string(value.revision) && object(value.document) && value.document.schema_version === "studio-document-content-v1" &&
+  return object(value) && value.schema_version === "studio-document-v2" && string(value.project_id) &&
+    string(value.revision) && object(value.document) && value.document.schema_version === "studio-document-content-v2" &&
     string(value.document.ttml) && string(value.sha256);
 }
 export function isImportCandidate(value: unknown): value is ImportProposal {
@@ -129,11 +129,11 @@ export function isDocumentShell(value: unknown): value is DocumentShell {
         object(line) &&
         string(line.id) &&
         string(line.text) &&
-        nonNegativeIntegerOrNull(line.begin_us) &&
-        nonNegativeIntegerOrNull(line.end_us) &&
-        (line.begin_us === null ||
-          line.end_us === null ||
-          line.begin_us <= line.end_us),
+        nonNegativeIntegerOrNull(line.begin_ms) &&
+        nonNegativeIntegerOrNull(line.end_ms) &&
+        (line.begin_ms === null ||
+          line.end_ms === null ||
+          line.begin_ms <= line.end_ms),
     )
   );
 }
@@ -163,13 +163,13 @@ export function isAsset(value: unknown): value is Asset {
     string(value.filename) &&
     string(value.content_type) &&
     Number.isSafeInteger(value.size_bytes) &&
-    (value.duration_us === null ||
-      (Number.isSafeInteger(value.duration_us) &&
-        Number(value.duration_us) >= 0)) &&
+    (value.duration_ms === null ||
+      (Number.isSafeInteger(value.duration_ms) &&
+        Number(value.duration_ms) >= 0)) &&
     value.status === "ready" &&
     string(value.asset_hash) &&
-    Number.isSafeInteger(value.source_start_us) &&
-    Number.isSafeInteger(value.proxy_offset_us)
+    Number.isSafeInteger(value.source_start_ms) &&
+    Number.isSafeInteger(value.proxy_offset_ms)
   );
 }
 
@@ -177,10 +177,10 @@ export function isWaveformWindow(value: unknown): value is WaveformWindow {
   if (!object(value)) return false;
   const min = value.minimum;
   const max = value.maximum;
-  const start = value.start_us;
-  const end = value.end_us;
+  const start = value.start_ms;
+  const end = value.end_ms;
   const level = value.level;
-  const bucket = value.bucket_us;
+  const bucket = value.bucket_ms;
   return (
     value.schema_version === SCHEMA_VERSION.waveform &&
     string(value.asset_id) &&

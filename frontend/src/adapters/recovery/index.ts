@@ -1,9 +1,9 @@
 import type { LyricEditorState } from '../../domain/lyric-commands';
 import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
-const DATABASE = 'lazulite-studio-recovery-v5';
+const DATABASE = 'lazulite-studio-recovery-v6';
 const STORE = 'projects';
-const RECORD_VERSION = 5;
+const RECORD_VERSION = 6;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {

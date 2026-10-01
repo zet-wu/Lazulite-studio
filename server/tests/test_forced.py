@@ -29,7 +29,7 @@ def test_forced_projection_keeps_codepoint_ruby_range(tmp_path):
     assert line["reading_spans"][0]["base_end"] == 5
 
 
-def test_forced_runner_preserves_microseconds_and_source_range(monkeypatch):
+def test_forced_runner_preserves_milliseconds_and_source_range(monkeypatch):
     class FakeAligner:
         def align(self, audio, *, request):
             assert audio.sample_rate == 16_000
@@ -46,9 +46,9 @@ def test_forced_runner_preserves_microseconds_and_source_range(monkeypatch):
         "line_id": "L", "text": "きょう", "audio_origin": 1.0, "audio_end": 2.0,
         "source_range": [7, 9],
     })
-    assert result["units"][0]["start_us"] == 1_250_000
+    assert result["units"][0]["start_ms"] == 1250
     assert result["units"][0]["source_range"] == [7, 9]
-    assert result["evidence"]["units"][0]["end_us"] == 1_500_000
+    assert result["evidence"]["units"][0]["end_ms"] == 1500
 
 
 def test_unconfigured_forced_runner_is_explicitly_unavailable():
@@ -72,7 +72,7 @@ def test_forced_http_requires_confirmation_and_returns_bound_result(tmp_path):
     pid = project["id"]
     document = client.get(f"/api/v1/projects/{pid}/document").json(); etag = client.get(f"/api/v1/projects/{pid}/document").headers["etag"]
     ttml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div begin="1s"><p xml:id="L" begin="0s" end="1s">歌</p></div></body></tt>'
-    saved = client.put(f"/api/v1/projects/{pid}/document", json={"schema_version":"studio-document-v1","project_id":pid,"revision":document["revision"],"document":{"schema_version":"studio-document-content-v1","ttml":ttml}}, headers={**headers,"if-match":etag})
+    saved = client.put(f"/api/v1/projects/{pid}/document", json={"schema_version":"studio-document-v2","project_id":pid,"revision":document["revision"],"document":{"schema_version":"studio-document-content-v2","ttml":ttml}}, headers={**headers,"if-match":etag})
     revision = saved.json()["revision"]
     body = {"revision": revision, "asset_id": asset["id"], "line_id": "L"}
     assert client.post(f"/api/v1/projects/{pid}/jobs/forced_align", json={"params":body}, headers=headers).status_code == 422
@@ -91,6 +91,6 @@ def test_forced_http_requires_confirmation_and_returns_bound_result(tmp_path):
     assert result["units"][0]["start"] == 1.1
     changed = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><div begin="1s"><p xml:id="L" begin="0s" end="1s"><span tts:ruby="container"><span tts:ruby="base">歌</span><span tts:ruby="text">うた</span></span></p></div></body></tt>'
     current = client.get(f"/api/v1/projects/{pid}/document")
-    updated = client.put(f"/api/v1/projects/{pid}/document", json={"schema_version":"studio-document-v1","project_id":pid,"revision":current.json()["revision"],"document":{"schema_version":"studio-document-content-v1","ttml":changed}}, headers={**headers,"if-match":current.headers["etag"]})
+    updated = client.put(f"/api/v1/projects/{pid}/document", json={"schema_version":"studio-document-v2","project_id":pid,"revision":current.json()["revision"],"document":{"schema_version":"studio-document-content-v2","ttml":changed}}, headers={**headers,"if-match":current.headers["etag"]})
     new_body = {"revision": updated.json()["revision"], "asset_id": asset["id"], "line_id": "L", "coordinate_space": "ruby", "ruby_id": "ui-ruby", "base_range": [0, 1]}
     assert client.post(f"/api/v1/projects/{pid}/jobs/forced_align", json={"params":new_body}, headers=headers).status_code == 422

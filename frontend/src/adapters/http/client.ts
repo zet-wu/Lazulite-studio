@@ -235,20 +235,20 @@ export const studioApi = {
     ),
   getWaveform: (
     projectId: string,
-    startUs = 0,
-    endUs?: number,
+    startMs = 0,
+    endMs?: number,
     level = 8,
     signal?: AbortSignal,
   ) =>
     request(
-      `/projects/${encodeURIComponent(projectId)}/waveform?level=${level}&start_us=${startUs}${endUs == null ? "" : `&end_us=${endUs}`}`,
+      `/projects/${encodeURIComponent(projectId)}/waveform?level=${level}&start_ms=${startMs}${endMs == null ? "" : `&end_ms=${endMs}`}`,
       isWaveformWindow,
       signal,
     ),
   audioUrl: (projectId: string) =>
     `${API_ROOT}/projects/${encodeURIComponent(projectId)}/audio`,
-  getPcmWindow: async (projectId: string, startUs: number, endUs: number, signal?: AbortSignal) => {
-    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/pcm?start_us=${startUs}&end_us=${endUs}`, { credentials: 'include', signal });
+  getPcmWindow: async (projectId: string, startMs: number, endMs: number, signal?: AbortSignal) => {
+    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/pcm?start_ms=${startMs}&end_ms=${endMs}`, { credentials: 'include', signal });
     if (!response.ok) throw new Error(`PCM window request failed: ${response.status}`);
     const rate = Number(response.headers.get('x-sample-rate'));
     const channels = Number(response.headers.get('x-channels'));
@@ -260,7 +260,7 @@ export const studioApi = {
 export type StudioPaths = paths;
 
 export type SaveDocumentResult = components["schemas"]["DocumentSaveResponse"];
-export type ImportLine = { id?: string; text: string; begin_us?: number | null; end_us?: number | null; changed?: boolean };
+export type ImportLine = { id?: string; text: string; begin_ms?: number | null; end_ms?: number | null; changed?: boolean };
 export type ImportProposal = { schema_version: string; project_id: string; input_revision: string | null; candidate: { format: "ttml" | "lrc" | "text"; ttml?: string; text?: string; lines?: ImportLine[] }; diagnostics: Array<{ code?: string; message?: string }>; saved: false };
 export type JobResult = components["schemas"]["JobResult"];
 const s4 = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
@@ -277,6 +277,6 @@ export const studioS4 = {
     if (!isDocumentEnvelope(body) || !body.revision) throw new ApiError(502, { code: "invalid_response", message: "文档响应无有效 revision", request_id: "", retryable: false });
     return { ...body, revision: body.revision, etag: response.headers.get("ETag") ?? undefined };
   },
-  saveRichDocument: async (projectId: string, ttml: string, baseRevision: string, operationId: string, seq: number, etag?: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/document`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag ?? `"${baseRevision}"`, "Idempotency-Key": operationId }, body: JSON.stringify({ schema_version: "studio-document-v1", project_id: projectId, revision: baseRevision, client_seq: seq, document: { schema_version: "studio-document-content-v1", ttml } }) }); if (!isDocumentEnvelope(result) || !result.revision) throw new ApiError(502, { code: "invalid_response", message: "保存响应无有效 revision", request_id: "", retryable: false }); return { revision: result.revision, etag: `"${result.revision}"` }; },
+  saveRichDocument: async (projectId: string, ttml: string, baseRevision: string, operationId: string, seq: number, etag?: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/document`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag ?? `"${baseRevision}"`, "Idempotency-Key": operationId }, body: JSON.stringify({ schema_version: "studio-document-v2", project_id: projectId, revision: baseRevision, client_seq: seq, document: { schema_version: "studio-document-content-v2", ttml } }) }); if (!isDocumentEnvelope(result) || !result.revision) throw new ApiError(502, { code: "invalid_response", message: "保存响应无有效 revision", request_id: "", retryable: false }); return { revision: result.revision, etag: `"${result.revision}"` }; },
   importLyrics: async (projectId: string, revision: string, filename: string, content: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/imports?revision=${encodeURIComponent(revision)}`, { method: 'POST', headers: { 'Content-Type': filename.endsWith("ttml") || filename.endsWith("xml") ? "application/ttml+xml" : filename.endsWith(".lrc") ? "text/lrc" : "text/plain", 'Idempotency-Key': crypto.randomUUID() }, body: content }); if (!isImportCandidate(result)) throw new ApiError(502, { code: "invalid_response", message: "导入响应格式无效", request_id: "", retryable: false }); return result; },
 };

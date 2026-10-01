@@ -10,9 +10,9 @@ export type LyricFormat = 'ttml' | 'txt' | 'lrc' | 'elrc' | 'eslrc' | 'qrc' | 'k
 const parseTimed = { elrc: parseLrc, lrc: parseLrc, eslrc: parseEslrc, qrc: parseQrc, yrc: parseYrc, lys: parseLys };
 const stringifyTimed = { lrc: stringifyLrc, eslrc: stringifyEslrc, qrc: stringifyQrc, yrc: stringifyYrc, lys: stringifyLys, ass: stringifyAss };
 const maximumSize = 4_000_000;
-const microseconds = (ms: number): number => {
+const milliseconds = (ms: number): number => {
   if (!Number.isFinite(ms) || ms < 0) throw new Error('歌词时间无效');
-  return Math.round(ms * 1000);
+  return Math.round(ms);
 };
 
 export function detectLyricFormat(name: string): LyricFormat {
@@ -42,10 +42,10 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
     if (item.isBG && mainId) line.backgroundOf = mainId;
     else mainId = line.id;
     line.agentRefs = item.isDuet ? ['v2'] : ['v1'];
-    line.beginUs = microseconds(item.startTime); line.endUs = microseconds(item.endTime);
-    if (line.endUs < line.beginUs) throw new Error('歌词时间倒序');
-    line.words = item.words.map((word) => ({ ...createWord(word.word), beginUs: microseconds(word.startTime), endUs: microseconds(word.endTime) }));
-    const romanUnits = item.words.filter((word) => word.romanWord !== undefined).map((word) => ({ id: crypto.randomUUID(), text: word.romanWord ?? '', beginUs: microseconds(word.startTime), endUs: microseconds(word.endTime) }));
+    line.beginMs = milliseconds(item.startTime); line.endMs = milliseconds(item.endTime);
+    if (line.endMs < line.beginMs) throw new Error('歌词时间倒序');
+    line.words = item.words.map((word) => ({ ...createWord(word.word), beginMs: milliseconds(word.startTime), endMs: milliseconds(word.endTime) }));
+    const romanUnits = item.words.filter((word) => word.romanWord !== undefined).map((word) => ({ id: crypto.randomUUID(), text: word.romanWord ?? '', beginMs: milliseconds(word.startTime), endMs: milliseconds(word.endTime) }));
     if (romanUnits.length) timedTrack.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'timed', units: romanUnits });
     line.translations = item.translatedLyric ? [{ language: null, text: item.translatedLyric }] : [];
     if (item.romanLyric) plainTrack.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: item.romanLyric });
@@ -65,14 +65,14 @@ export function exportLyricFile(document: LyricDocument, format: LyricFormat): s
   if (format === 'lrc' || format === 'elrc') return renderLrc(document, format).text;
   const preview = new Map(toAmllLines(document, false, true).map((item) => [item.id, item.lyric]));
   const lines: FormatLine[] = document.lines.map((line) => {
-    if (line.beginUs === null || line.endUs === null || line.endUs <= line.beginUs) throw new Error('导出前请补全每行时间');
+    if (line.beginMs === null || line.endMs === null || line.endMs <= line.beginMs) throw new Error('导出前请补全每行时间');
     const words = line.words.map((word, index) => {
-      const begin = word.beginUs ?? (line.words.length === 1 ? line.beginUs : null);
-      const end = word.endUs ?? (line.words.length === 1 ? line.endUs : null);
+      const begin = word.beginMs ?? (line.words.length === 1 ? line.beginMs : null);
+      const end = word.endMs ?? (line.words.length === 1 ? line.endMs : null);
       if (begin === null || end === null || end <= begin) throw new Error('导出前请补全逐词时间');
-      return { word: word.text, startTime: Math.round(begin / 1000), endTime: Math.round(end / 1000), romanWord: preview.get(line.id)?.words[index]?.romanWord };
+      return { word: word.text, startTime: begin, endTime: end, romanWord: preview.get(line.id)?.words[index]?.romanWord };
     });
-    return { words, startTime: Math.round(line.beginUs / 1000), endTime: Math.round(line.endUs / 1000),
+    return { words, startTime: line.beginMs, endTime: line.endMs,
       translatedLyric: line.translations.map((item) => item.text).join(' / '), romanLyric: preview.get(line.id)?.romanLyric ?? '', isBG: Boolean(line.backgroundOf), isDuet: preview.get(line.id)?.isDuet ?? false };
   });
   return stringifyTimed[format](lines);

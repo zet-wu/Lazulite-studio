@@ -11,9 +11,9 @@ it('uses the selected target and stops the completed line without writing the ne
   const document = createLyricDocument('今日');
   document.lines.push(createLine('明日'));
   const units = syncUnits(document);
-  let timeUs = 1_000_000;
+  let timeMs = 1000;
   let state = createLyricEditorState(document);
-  const transport = { current: { getPositionUs: () => timeUs, getPlaybackRate: () => 1, isPlaying: () => false, seekUs() {}, play() {}, pause() {}, audition() {} } satisfies TransportHandle };
+  const transport = { current: { getPositionMs: () => timeMs, getPlaybackRate: () => 1, isPlaying: () => false, seekMs() {}, play() {}, pause() {}, audition() {} } satisfies TransportHandle };
   function Harness() {
     const [cursor, setCursor] = useState(units[0]);
     const [doc, setDoc] = useState(document);
@@ -26,7 +26,7 @@ it('uses the selected target and stops the completed line without writing the ne
   fireEvent.keyDown(screen.getByRole('spinbutton', { name: /输入偏移/ }), { code: 'KeyS' });
   expect(state.past).toHaveLength(0);
   fireEvent.keyDown(window, { code: 'KeyS' });
-  timeUs = 2_000_000;
+  timeMs = 2000;
   fireEvent.keyDown(window, { code: 'KeyD' });
   expect(screen.getByText('本行已完成')).toBeVisible();
   expect(state.present.lines[1]).toEqual(document.lines[1]);
@@ -35,5 +35,5 @@ it('uses the selected target and stops the completed line without writing the ne
   fireEvent.click(screen.getByRole('button', { name: '下一行' }));
   expect(screen.getByText('L2 · 单元 1 / 1')).toBeVisible();
   fireEvent.keyDown(window, { code: 'KeyS' });
-  expect(state.present.lines[1].words[0].beginUs).toBe(2_000_000);
+  expect(state.present.lines[1].words[0].beginMs).toBe(2000);
 });

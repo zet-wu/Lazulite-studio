@@ -70,7 +70,7 @@ export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, 
         onSplit={(at, draft) => split(unit, at, draft)}
         onMergePrevious={index > 0 ? (draft) => merge(unit, word.rubyUnits[index - 1], draft) : undefined}
         inputRef={(node) => { if (node) { inputs.current.set(unit.id, node); if (pendingFocus.current === unit.id) { pendingFocus.current = null; node.focus(); } } else inputs.current.delete(unit.id); }} />
-      <TimePair begin={unit.beginUs} end={unit.endUs} label={`读音 ${unit.reading}`} onCommit={(beginUs, endUs) => apply({ type: 'set-ruby-time', lineId, wordId: word.id, rubyId: unit.id, beginUs, endUs })} />
+      <TimePair begin={unit.beginMs} end={unit.endMs} label={`读音 ${unit.reading}`} onCommit={(beginMs, endMs) => apply({ type: 'set-ruby-time', lineId, wordId: word.id, rubyId: unit.id, beginMs, endMs })} />
     </div>{newAfter === unit.id && slot}</Fragment>)}</div>}
     {error && <small role="alert">{error}</small>}
   </div>;

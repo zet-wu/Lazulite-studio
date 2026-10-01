@@ -9,10 +9,10 @@ afterEach(cleanup);
 it('automatically extends time in one command without confirmation', () => {
   const lyric = createLyricDocument('粉');
   const line = lyric.lines[0];
-  line.beginUs = 1_000_000; line.endUs = 2_000_000;
-  line.words[0].beginUs = 1_000_000; line.words[0].endUs = 2_000_000;
+  line.beginMs = 1000; line.endMs = 2000;
+  line.words[0].beginMs = 1000; line.words[0].endMs = 2000;
   lyric.romanizationTracks.push({ id: 'latin', language: 'ja-Latn', contents: [{ id: 'content', lineId: line.id, kind: 'timed', units: [
-    { id: 'ko', text: 'ko', beginUs: 999_000, endUs: 2_000_000 },
+    { id: 'ko', text: 'ko', beginMs: 999, endMs: 2000 },
   ] }] });
   const apply = vi.fn((_command: LyricCommand) => true);
   const close = vi.fn();
@@ -36,9 +36,9 @@ it('automatically extends time in one command without confirmation', () => {
 it('P4 default skips are visible, false overrides persist, output resets and all skipped creates no command', () => {
   const lyric = createLyricDocument('が');
   const line = lyric.lines[0];
-  line.beginUs = 0; line.endUs = 1_000_000;
-  line.words[0].beginUs = 0; line.words[0].endUs = 1_000_000;
-  lyric.romanizationTracks.push({ id: 'latin', language: 'ja', contents: [{ id: 'c', lineId: line.id, kind: 'timed', units: [{ id: 'ga', text: 'ga', beginUs: 0, endUs: 1_000_000 }] }] });
+  line.beginMs = 0; line.endMs = 1000;
+  line.words[0].beginMs = 0; line.words[0].endMs = 1000;
+  lyric.romanizationTracks.push({ id: 'latin', language: 'ja', contents: [{ id: 'c', lineId: line.id, kind: 'timed', units: [{ id: 'ga', text: 'ga', beginMs: 0, endMs: 1000 }] }] });
   const apply = vi.fn(() => true);
   const { rerender } = render(<RubyGenerationDialog document={lyric} lineIds={[line.id]} apply={apply} close={vi.fn()} />);
   const skip = screen.getByLabelText('跳过生成');
@@ -66,10 +66,10 @@ it('P4 default skips are visible, false overrides persist, output resets and all
 
 it('P4 target changes clear only affected groups and regroup defaults before skipping', () => {
   const lyric = createLyricDocument('合成'), line = lyric.lines[0];
-  line.beginUs = 0; line.endUs = 3_000_000;
-  line.words = ['が', 'な', 'か'].map((text, i) => ({ ...createWord(text), beginUs: i * 1_000_000, endUs: (i + 1) * 1_000_000 }));
+  line.beginMs = 0; line.endMs = 3000;
+  line.words = ['が', 'な', 'か'].map((text, i) => ({ ...createWord(text), beginMs: i * 1000, endMs: (i + 1) * 1000 }));
   lyric.romanizationTracks.push({ id: 'track', language: 'ja', contents: [{ id: 'c', lineId: line.id, kind: 'timed',
-    units: ['ga', 'na', 'ka'].map((text, i) => ({ id: 'u' + i, text, beginUs: i * 1_000_000, endUs: (i + 1) * 1_000_000 })) }] });
+    units: ['ga', 'na', 'ka'].map((text, i) => ({ id: 'u' + i, text, beginMs: i * 1000, endMs: (i + 1) * 1000 })) }] });
   const apply = vi.fn(() => true);
   render(<RubyGenerationDialog document={lyric} lineIds={lyric.lines.map(line => line.id)} apply={apply} close={vi.fn()} />);
   const skips = screen.getAllByLabelText('跳过生成');
@@ -87,7 +87,7 @@ it('P4 target changes clear only affected groups and regroup defaults before ski
 it('shows a compact empty state without proposal rows or an enabled submit for whitespace sources', () => {
   const lyric = createLyricDocument('歌'), line = lyric.lines[0];
   lyric.romanizationTracks = [{ id: 'track', language: null, contents: [{ id: 'c', lineId: line.id, kind: 'timed', units: [
-    { id: 'empty', text: '', beginUs: 0, endUs: 1_000_000 }, { id: 'space', text: '　 ', beginUs: 0, endUs: 1_000_000 },
+    { id: 'empty', text: '', beginMs: 0, endMs: 1000 }, { id: 'space', text: '　 ', beginMs: 0, endMs: 1000 },
   ] }] }];
   const apply = vi.fn();
   render(<RubyGenerationDialog document={lyric} lineIds={[line.id]} apply={apply} close={vi.fn()} />);

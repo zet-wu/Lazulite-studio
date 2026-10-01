@@ -14,7 +14,7 @@ export const handlers = [
   http.get(`${root}/session`, () => scenario() === 'expired' ? error(401, 'session_expired', '登录已过期') : response(session)),
   http.get(`${root}/capabilities`, () => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : response(capabilities)),
   http.get(`${root}/projects`, () => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : scenario() === 'empty' ? response({ schema_version: 'studio-project-list-v1', items: [], next_cursor: null }) : response(projects)),
-  http.get(`${root}/projects/:projectId`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'long' ? { ...sampleProject, asset: { ...sampleProject.asset, duration_us: 1_800_000_000 } } : sampleProject) : error(404, 'project_not_found', '项目不存在')),
+  http.get(`${root}/projects/:projectId`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'long' ? { ...sampleProject, asset: { ...sampleProject.asset, duration_ms: 1_800_000 } } : sampleProject) : error(404, 'project_not_found', '项目不存在')),
   http.get(`${root}/projects/:projectId/jobs`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(jobs) : error(404, 'project_not_found', '项目不存在')),
   http.get(`${root}/projects/:projectId/exports`, ({ params }) => params.projectId === 'sample-project' ? response(exports) : error(404, 'project_not_found', '项目不存在')),
   http.post(`${root}/projects/:projectId/publish`, async ({ params, request }) => {
@@ -30,19 +30,19 @@ export const handlers = [
   http.get(`${root}/projects/:projectId/waveform`, ({ params, request }) => {
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
     const query = new URL(request.url).searchParams;
-    const bucket_us = 10_000 * 2 ** Number(query.get('level') ?? 8);
-    const start_us = Math.floor(Number(query.get('start_us') ?? 0) / bucket_us) * bucket_us;
-    const end_us = Math.ceil(Number(query.get('end_us') ?? 120_000_000) / bucket_us) * bucket_us;
-    const maximum = Array.from({ length: Math.max(0, (end_us - start_us) / bucket_us) }, (_, index) => (Math.floor((start_us + index * bucket_us) / 500_000) !== Math.floor((start_us + (index - 1) * bucket_us) / 500_000) ? 0.8 : 0.1));
-    return response({ schema_version: 'studio-waveform-v1', asset_id: 'sample-asset', asset_hash: 'sample', version: 'peaks-v1', level: Number(query.get('level') ?? 8), start_us, end_us, bucket_us, minimum: maximum.map((value) => -value), maximum });
+    const bucket_ms = 10 * 2 ** Number(query.get('level') ?? 8);
+    const start_ms = Math.floor(Number(query.get('start_ms') ?? 0) / bucket_ms) * bucket_ms;
+    const end_ms = Math.ceil(Number(query.get('end_ms') ?? 120_000) / bucket_ms) * bucket_ms;
+    const maximum = Array.from({ length: Math.max(0, (end_ms - start_ms) / bucket_ms) }, (_, index) => (Math.floor((start_ms + index * bucket_ms) / 500) !== Math.floor((start_ms + (index - 1) * bucket_ms) / 500) ? 0.8 : 0.1));
+    return response({ schema_version: 'studio-waveform-v1', asset_id: 'sample-asset', asset_hash: 'sample', version: 'peaks-v1', level: Number(query.get('level') ?? 8), start_ms, end_ms, bucket_ms, minimum: maximum.map((value) => -value), maximum });
   }),
   http.get(`${root}/projects/:projectId/pcm`, ({ params, request }) => {
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
     const query = new URL(request.url).searchParams;
-    const start = Number(query.get('start_us') ?? 0), end = Number(query.get('end_us') ?? 0);
-    if (end <= start || end - start > 4_020_000) return error(422, 'invalid_range', 'PCM 范围无效');
+    const start = Number(query.get('start_ms') ?? 0), end = Number(query.get('end_ms') ?? 0);
+    if (end <= start || end - start > 4_020) return error(422, 'invalid_range', 'PCM 范围无效');
     const rate = 48_000;
-    const pcm = Int16Array.from({ length: Math.round(end / 1_000_000 * rate) - Math.round(start / 1_000_000 * rate) }, (_, index) => Math.round(Math.sin(2 * Math.PI * 440 * (index + Math.round(start / 1_000_000 * rate)) / rate) * 9000));
+    const pcm = Int16Array.from({ length: Math.round(end / 1_000 * rate) - Math.round(start / 1_000 * rate) }, (_, index) => Math.round(Math.sin(2 * Math.PI * 440 * (index + Math.round(start / 1_000 * rate)) / rate) * 9000));
     return new HttpResponse(pcm.buffer, { headers: { 'content-type': 'application/octet-stream', 'x-sample-rate': String(rate), 'x-channels': '1' } });
   }),
   http.get(`${root}/projects/:projectId/reading-dictionary`, ({ params }) => params.projectId === 'sample-project' ? response(readingDictionary) : error(404, 'project_not_found', '项目不存在')),
@@ -80,7 +80,7 @@ export const handlers = [
     const content = await request.text();
     const candidate = request.headers.get('content-type')?.includes('ttml')
       ? { format: 'ttml', ttml: content }
-      : { format: 'text', text: content, lines: content.split(/\r?\n/).filter(Boolean).map((text, index) => ({ id: `import-${index}`, text, begin_us: null, end_us: null })) };
+      : { format: 'text', text: content, lines: content.split(/\r?\n/).filter(Boolean).map((text, index) => ({ id: `import-${index}`, text, begin_ms: null, end_ms: null })) };
     return response({ schema_version: 'studio-import-v1', project_id: 'sample-project', input_revision: currentDocument.revision, candidate, diagnostics: [], saved: false });
   }),
   http.get(`${root}/projects/:projectId/review`, ({ params }) => params.projectId === 'sample-project' ? response({ schema_version: 'studio-review-v1', project_id: 'sample-project', version: 1, items: [] }) : error(404, 'project_not_found', '项目不存在')),

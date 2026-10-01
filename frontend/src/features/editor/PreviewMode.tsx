@@ -26,7 +26,7 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
     const update = () => {
       const current = transport.current;
       if (current) {
-        (player.current?.lyricPlayer as StudioLyricPlayer | undefined)?.syncMedia(current.getPositionUs() / 1000, current.getPlaybackRate(), current.isPlaying());
+        (player.current?.lyricPlayer as StudioLyricPlayer | undefined)?.syncMedia(current.getPositionMs(), current.getPlaybackRate(), current.isPlaying());
         const next = current.isPlaying();
         if (next !== lastPlaying) { lastPlaying = next; setPlaying(next); }
       }
@@ -53,7 +53,7 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
           if (!matched) return;
           const startTime = matched.lyric.startTime;
           onSelectLine?.(matched.id);
-          if (transport) transport.current?.seekUs(startTime * 1000);
+          if (transport) transport.current?.seekMs(startTime);
           else setLocalTime(startTime);
         }} />
     </div> : <p className={styles.toolHint}>为歌词设置时间后可播放动态预览。未定时间仍保留在草稿中。</p>}

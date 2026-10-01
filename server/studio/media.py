@@ -27,8 +27,8 @@ class MediaError(ValueError):
 
 @dataclass(frozen=True)
 class MediaProbe:
-    duration_us: int | None
-    start_us: int
+    duration_ms: int | None
+    start_ms: int
     sample_rate: int | None
     channels: int | None
     codec: str | None
@@ -50,18 +50,18 @@ class Asset:
 class Proxy:
     path: Path
     mime_type: str
-    source_start_us: int
-    offset_us: int
-    duration_us: int | None
+    source_start_ms: int
+    offset_ms: int
+    duration_ms: int | None
 
 
 @dataclass(frozen=True)
 class PeakWindow:
     asset_hash: str
     version: str
-    start_us: int
-    end_us: int
-    bucket_us: int
+    start_ms: int
+    end_ms: int
+    bucket_ms: int
     minimum: tuple[float, ...]
     maximum: tuple[float, ...]
 
@@ -80,7 +80,7 @@ def probe_media(path: Path, *, ffprobe: str = "ffprobe") -> MediaProbe:
 
     def integer_time(value: object) -> int | None:
         try:
-            return round(float(value) * 1_000_000) if value not in (None, "N/A") else None
+            return round(float(value) * 1_000) if value not in (None, "N/A") else None
         except (TypeError, ValueError):
             return None
 
@@ -90,8 +90,8 @@ def probe_media(path: Path, *, ffprobe: str = "ffprobe") -> MediaProbe:
         start = integer_time(data.get("format", {}).get("start_time")) or 0
     rate = stream.get("sample_rate")
     return MediaProbe(
-        duration_us=duration,
-        start_us=start,
+        duration_ms=duration,
+        start_ms=start,
         sample_rate=int(rate) if rate and str(rate).isdigit() else None,
         channels=int(stream["channels"]) if stream.get("channels") else None,
         codec=stream.get("codec_name"),
@@ -161,41 +161,41 @@ class MediaService:
         # Studio time starts at the first decoded sample, including source
         # silence and codec priming. The original container PTS is diagnostic.
         with wave.open(str(target), "rb") as audio:
-            duration_us = round(audio.getnframes() * 1_000_000 / audio.getframerate())
-        return Proxy(target, "audio/wav", asset.probe.start_us, 0, duration_us)
+            duration_ms = round(audio.getnframes() * 1_000 / audio.getframerate())
+        return Proxy(target, "audio/wav", asset.probe.start_ms, 0, duration_ms)
 
-    def pcm_window(self, asset: Asset, *, start_us: int, end_us: int) -> tuple[bytes, int, int]:
+    def pcm_window(self, asset: Asset, *, start_ms: int, end_ms: int) -> tuple[bytes, int, int]:
         """Read at most 4.02 seconds from the PCM proxy, including FFT context."""
-        if start_us < 0 or end_us <= start_us or end_us - start_us > 4_020_000:
+        if start_ms < 0 or end_ms <= start_ms or end_ms - start_ms > 4_020:
             raise MediaError("invalid PCM window")
         proxy = self.playback_proxy(asset)
         with wave.open(str(proxy.path), "rb") as audio:
             rate = audio.getframerate()
-            first = round(start_us * rate / 1_000_000)
-            last = min(audio.getnframes(), round(end_us * rate / 1_000_000))
+            first = round(start_ms * rate / 1_000)
+            last = min(audio.getnframes(), round(end_ms * rate / 1_000))
             if first >= last:
                 raise MediaError("PCM window is outside the audio")
             audio.setpos(first)
             return audio.readframes(last - first), rate, audio.getnchannels()
 
-    def peaks(self, asset: Asset, *, level: int, start_us: int, end_us: int) -> PeakWindow:
-        if level < 0 or level > 15 or end_us <= start_us:
+    def peaks(self, asset: Asset, *, level: int, start_ms: int, end_ms: int) -> PeakWindow:
+        if level < 0 or level > 15 or end_ms <= start_ms:
             raise MediaError("invalid waveform window")
-        bucket_us = 10_000 * (2**level)
-        start_us = max(start_us, 0)
-        duration = self.playback_proxy(asset).duration_us
-        end_us = min(end_us, duration) if duration is not None else end_us
-        if end_us <= start_us:
-            return PeakWindow(asset.content_hash, "peaks-v1", start_us, end_us, bucket_us, (), ())
+        bucket_ms = 10 * (2**level)
+        start_ms = max(start_ms, 0)
+        duration = self.playback_proxy(asset).duration_ms
+        end_ms = min(end_ms, duration) if duration is not None else end_ms
+        if end_ms <= start_ms:
+            return PeakWindow(asset.content_hash, "peaks-v1", start_ms, end_ms, bucket_ms, (), ())
         self._ensure_peak_files(asset)
         path = self.root / "proxies" / f"{asset.content_hash}.peaks-v1" / f"l{level}.peaks"
-        aligned_start = (start_us // bucket_us) * bucket_us
-        aligned_end = math.ceil(end_us / bucket_us) * bucket_us
-        count = (aligned_end - aligned_start) // bucket_us
+        aligned_start = (start_ms // bucket_ms) * bucket_ms
+        aligned_end = math.ceil(end_ms / bucket_ms) * bucket_ms
+        count = (aligned_end - aligned_start) // bucket_ms
         minimum: list[float] = []
         maximum: list[float] = []
         with path.open("rb") as source:
-            source.seek((aligned_start // bucket_us) * 8)
+            source.seek((aligned_start // bucket_ms) * 8)
             for _ in range(count):
                 record = source.read(8)
                 if len(record) != 8:
@@ -203,7 +203,7 @@ class MediaService:
                 else:
                     low, high = struct.unpack("<ff", record)
                     minimum.append(low); maximum.append(high)
-        return PeakWindow(asset.content_hash, "peaks-v1", aligned_start, aligned_end, bucket_us, tuple(minimum), tuple(maximum))
+        return PeakWindow(asset.content_hash, "peaks-v1", aligned_start, aligned_end, bucket_ms, tuple(minimum), tuple(maximum))
 
     def _ensure_peak_files(self, asset: Asset) -> None:
         target = self.root / "proxies" / f"{asset.content_hash}.peaks-v1"

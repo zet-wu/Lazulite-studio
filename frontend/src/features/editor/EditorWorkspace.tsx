@@ -392,7 +392,7 @@ export function EditorWorkspace(props: Props) {
         { label: '按音拍拆分', disabled: splitReadingMora(unit.reading).length < 2, run: () => {
           if (word.alignmentUnits.some((item) => item.rubyUnitId)) { setMessage('带对齐结果的读音不能自动拆分'); return; }
           const parts = splitReadingMora(unit.reading).map((reading, partIndex) => ({ ...unit, id: partIndex ? crypto.randomUUID() : unit.id, reading }));
-          const distributed = distributeRubyTime({ ...word, beginUs: unit.beginUs, endUs: unit.endUs }, parts);
+          const distributed = distributeRubyTime({ ...word, beginMs: unit.beginMs, endMs: unit.endMs }, parts);
           dispatch({ type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: word.rubyUnits.flatMap((item) => item.id === unit.id ? distributed : [item]), overwrite: true });
         } },
         { label: '重分配读音时间', run: () => dispatch({ type: 'redistribute-ruby-time', lineId: line.id, wordId: word.id }) },
@@ -424,7 +424,7 @@ export function EditorWorkspace(props: Props) {
         const siblingIndex = siblings.findIndex((item) => item.id === content.id);
         const previousGlobal = siblingIndex > 0 ? track.contents.findIndex((item) => item.id === siblings[siblingIndex - 1].id) : -1;
         actions = [
-          { label: '分词并定时', disabled: content.kind === 'timed', run: () => { if (content.kind === 'plain') dispatch({ type: 'set-romanization-content', trackId: track.id, content: { ...content, kind: 'timed', units: (content.text.match(/\S+\s*|\s+/gu) ?? []).map((text) => ({ id: crypto.randomUUID(), text, beginUs: null, endUs: null })) } }); } },
+          { label: '分词并定时', disabled: content.kind === 'timed', run: () => { if (content.kind === 'plain') dispatch({ type: 'set-romanization-content', trackId: track.id, content: { ...content, kind: 'timed', units: (content.text.match(/\S+\s*|\s+/gu) ?? []).map((text) => ({ id: crypto.randomUUID(), text, beginMs: null, endMs: null })) } }); } },
           { label: '音译内容前移', disabled: siblingIndex === 0, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: track.contents[previousGlobal - 1]?.id ?? null }) },
           { label: '音译内容后移', disabled: siblingIndex === siblings.length - 1, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: siblings[siblingIndex + 1].id }) },
           { label: '转移到其他主行…', disabled: mainLines.length < 2, run: () => setContentTransfer({ trackId: track.id, contentId: content.id, targetLineId: mainLines.find((item) => item.id !== line.id)?.id ?? '' }) },
@@ -534,7 +534,7 @@ export function EditorWorkspace(props: Props) {
         onMove={(direction) => moveWord(line, word, direction)} onNavigate={(direction) => navigateWord(word.id, direction)}
         inputRef={(node) => { if (node) { wordInputs.current.set(word.id, node); if (pendingFocus.current === word.id) { pendingFocus.current = null; node.focus(); } } else wordInputs.current.delete(word.id); }} />
     </div>
-    <TimePair begin={word.beginUs} end={word.endUs} label={`词 ${word.text}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginUs, endUs })} />
+    <TimePair begin={word.beginMs} end={word.endMs} label={`词 ${word.text}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginMs, endMs })} />
     <label className={styles.emptyBeat}>空拍 <input type="number" min="0" max="32" aria-label={`词 ${word.text}空拍数`} value={word.emptyBeat} onChange={(event) => dispatch({ type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: Number(event.target.value) })} /></label>
   </LyricWordView>;
   return <div ref={pageRef} className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`}
@@ -680,7 +680,7 @@ export function EditorWorkspace(props: Props) {
       {columns.inspectorVisible && separator('inspector')}{columns.inspectorVisible && <aside ref={inspectorRef} className={styles.inspector}><h2>属性</h2><div className={styles.panelBody}>{selectedLine && <>
         <p>已选行：{selection?.kind === 'lines' && selection.ids.length > 1 ? `${selection.ids.length} 行` : `L${ordinalById.get(selectedLine.backgroundOf ?? selectedLine.id)}${selectedLine.backgroundOf ? ' · 背景' : ''}`}</p>
         {selection?.kind === 'lines' && selection.ids.length > 1 && <p className={styles.fieldContext}>当前行 L{ordinalById.get(selectedLine.backgroundOf ?? selectedLine.id)}</p>}
-        <TimePair begin={selectedLine.beginUs} end={selectedLine.endUs} label={`行 ${selectedLine.id}`} onCommit={(beginUs, endUs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginUs, endUs })} />
+        <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />
         {selectedMainLines.length > 0 && <>
           <label><input type="checkbox" checked={selectedMainLines.every((line) => line.ignoreSync)} onChange={(event) => dispatch({ type: 'batch', commands: selectedMainLines.map((line) => ({ type: 'set-ignore-sync', lineId: line.id, ignoreSync: event.target.checked })) })} /> 跳过打轴</label>
           <SingerSelection agents={document.agents} lines={selectedMainLines} apply={dispatch} />

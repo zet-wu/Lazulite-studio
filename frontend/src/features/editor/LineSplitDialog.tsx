@@ -24,9 +24,9 @@ export function LineSplitDialog({ line, background, attached, close, submit }: {
       </select></label>
       <div className={styles.splitPreview} aria-label="拆分结果">{[false, true].map(isRight => {
         const words = isRight ? line.words.slice(boundary) : line.words.slice(0, boundary);
-        const end = isRight ? line.endUs : words.every(word => word.endUs !== null) ? Math.max(...words.map(word => word.endUs!)) : null;
-        const begin = isRight ? words[0]?.beginUs ?? null : line.beginUs;
-        const time = (value: number | null) => value === null ? '未定' : `${(value / 1e6).toFixed(3)}s`;
+        const end = isRight ? line.endMs : words.every(word => word.endMs !== null) ? Math.max(...words.map(word => word.endMs!)) : null;
+        const begin = isRight ? words[0]?.beginMs ?? null : line.beginMs;
+        const time = (value: number | null) => value === null ? '未定' : `${(value / 1e3).toFixed(3)}s`;
         return <section key={String(isRight)}><small>{isRight ? '后行' : '前行'} · {time(begin)} – {time(end)}</small>
           <p>{words.map(word => word.text).join('')}</p>
           {line.translations.filter((_, index) => rightTranslations.includes(index) === isRight).map((item, index) => <small key={index}>{item.language ?? '未指定语言'} · {item.text}</small>)}

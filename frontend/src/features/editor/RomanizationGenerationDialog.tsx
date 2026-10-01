@@ -146,7 +146,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
           </div>; })}
         </div>
       </div>
-      {kind === 'timed' && rows.some(row => row.kind === 'timed' && targetFor(row.lineId) !== 'skip' && row.groups.some(unit => unit.beginUs === null || unit.endUs === null)) && <small>源时间未定，生成后请在画布补全；最终定时导出要求完整时间。</small>}
+      {kind === 'timed' && rows.some(row => row.kind === 'timed' && targetFor(row.lineId) !== 'skip' && row.groups.some(unit => unit.beginMs === null || unit.endMs === null)) && <small>源时间未定，生成后请在画布补全；最终定时导出要求完整时间。</small>}
       {(message || issue) && <p role="alert" className={styles.romanGenerationError}>{message || issue}</p>}
     </div>
   </SettingsDialog>;

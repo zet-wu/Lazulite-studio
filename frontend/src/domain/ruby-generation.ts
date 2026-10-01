@@ -1,22 +1,22 @@
 import { toHiragana, toKatakana } from 'wanakana';
 import type { LyricCommand } from './lyric-commands';
-import type { LyricDocument, LyricLine, LyricWord, RomanizationContent, RubyUnit, TimeUs } from './lyric-document';
+import type { LyricDocument, LyricLine, LyricWord, RomanizationContent, RubyUnit, TimeMs } from './lyric-document';
 
 export type RubyOutput = 'roman' | 'hiragana' | 'katakana';
 export type RubySourceRow = {
   key: string; lineId: string; trackId: string; contentId: string; unitId: string | null;
-  sourceText: string; beginUs: TimeUs; endUs: TimeUs;
+  sourceText: string; beginMs: TimeMs; endMs: TimeMs;
   candidates: string[]; suggestedWordId: string | null; defaultWordId: string | null;
 };
 export type RubyProposalRow = RubySourceRow & { wordId: string | null; reading: string | null; conversionIssue: string | null };
 
-export const RUBY_OVERLAP_TOLERANCE_US = 10_000;
+export const RUBY_OVERLAP_TOLERANCE_MS = 10;
 
 const kana = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
 const sourceReading = (text: string) => text.replace(/\s+/gu, '');
 const convert = (value: string, output: RubyOutput) => output === 'roman' ? value : output === 'hiragana' ? toHiragana(value) : toKatakana(value);
-const overlap = (begin: number, end: number, word: LyricWord) => word.beginUs === null || word.endUs === null ? 0
-  : Math.max(0, Math.min(end, word.endUs) - Math.max(begin, word.beginUs));
+const overlap = (begin: number, end: number, word: LyricWord) => word.beginMs === null || word.endMs === null ? 0
+  : Math.max(0, Math.min(end, word.endMs) - Math.max(begin, word.beginMs));
 
 export function rubySourceRows(document: LyricDocument, trackId: string, contentIds: string[]): RubySourceRow[] {
   const track = document.romanizationTracks.find((item) => item.id === trackId);
@@ -27,16 +27,16 @@ export function rubySourceRows(document: LyricDocument, trackId: string, content
     const line = document.lines.find((item) => item.id === content.lineId && !item.backgroundOf);
     if (!line) throw new Error('音译主行已不存在');
     const units = content.kind === 'plain'
-      ? [{ id: null, text: content.text, beginUs: null, endUs: null }]
+      ? [{ id: null, text: content.text, beginMs: null, endMs: null }]
       : content.units.map((unit) => ({ ...unit }));
     return units.filter((unit) => sourceReading(unit.text)).map((unit) => {
-      const ranked = unit.beginUs !== null && unit.endUs !== null && unit.beginUs < unit.endUs
-        ? line.words.map((word) => ({ id: word.id, amount: overlap(unit.beginUs!, unit.endUs!, word) })).filter((item) => item.amount > 0).sort((left, right) => right.amount - left.amount)
+      const ranked = unit.beginMs !== null && unit.endMs !== null && unit.beginMs < unit.endMs
+        ? line.words.map((word) => ({ id: word.id, amount: overlap(unit.beginMs!, unit.endMs!, word) })).filter((item) => item.amount > 0).sort((left, right) => right.amount - left.amount)
         : [];
-      const substantial = ranked[0]?.amount > RUBY_OVERLAP_TOLERANCE_US;
-      const candidates = substantial ? ranked.filter(item => item.amount > RUBY_OVERLAP_TOLERANCE_US) : ranked;
+      const substantial = ranked[0]?.amount > RUBY_OVERLAP_TOLERANCE_MS;
+      const candidates = substantial ? ranked.filter(item => item.amount > RUBY_OVERLAP_TOLERANCE_MS) : ranked;
       return { key: `${content.id}:${unit.id ?? 'plain'}`, lineId: line.id, trackId, contentId: content.id, unitId: unit.id,
-        sourceText: unit.text, beginUs: unit.beginUs, endUs: unit.endUs,
+        sourceText: unit.text, beginMs: unit.beginMs, endMs: unit.endMs,
         candidates: candidates.map((item) => item.id), suggestedWordId: candidates[0]?.id ?? null, defaultWordId: substantial && candidates.length === 1 ? candidates[0].id : null };
     });
   });
@@ -85,11 +85,11 @@ export function defaultRubySkips(document: LyricDocument, rows: RubyProposalRow[
   return skipped;
 }
 
-type Envelope = { beginUs: TimeUs; endUs: TimeUs };
-const envelope = (base: Envelope, begins: TimeUs[], ends: TimeUs[]): Envelope => {
-  const starts = [base.beginUs, ...begins].filter((value): value is number => value !== null);
-  const finishes = [base.endUs, ...ends].filter((value): value is number => value !== null);
-  return { beginUs: starts.length ? Math.min(...starts) : null, endUs: finishes.length ? Math.max(...finishes) : null };
+type Envelope = { beginMs: TimeMs; endMs: TimeMs };
+const envelope = (base: Envelope, begins: TimeMs[], ends: TimeMs[]): Envelope => {
+  const starts = [base.beginMs, ...begins].filter((value): value is number => value !== null);
+  const finishes = [base.endMs, ...ends].filter((value): value is number => value !== null);
+  return { beginMs: starts.length ? Math.min(...starts) : null, endMs: finishes.length ? Math.max(...finishes) : null };
 };
 
 export function rubyGenerationCommand(document: LyricDocument, sourceDocument: LyricDocument, rows: RubyProposalRow[], readings: Record<string, string>, skipped: Set<string>, overwriteWordIds: Set<string>): LyricCommand {
@@ -112,19 +112,19 @@ export function rubyGenerationCommand(document: LyricDocument, sourceDocument: L
     if (!groups.length) continue;
     const proposedWords = groups.map(({ word, rows }) => {
       if (word.rubyUnits.length && !overwriteWordIds.has(word.id)) throw new Error(`词「${word.text}」已有 注音，请显式选择覆盖`);
-      const units: RubyUnit[] = rows.map((row) => ({ id: crypto.randomUUID(), reading: row.reading!, beginUs: row.beginUs, endUs: row.endUs }));
-      const next = envelope(word, [...word.rubyUnits.map((unit) => unit.beginUs), ...units.map((unit) => unit.beginUs)], [...word.rubyUnits.map((unit) => unit.endUs), ...units.map((unit) => unit.endUs)]);
+      const units: RubyUnit[] = rows.map((row) => ({ id: crypto.randomUUID(), reading: row.reading!, beginMs: row.beginMs, endMs: row.endMs }));
+      const next = envelope(word, [...word.rubyUnits.map((unit) => unit.beginMs), ...units.map((unit) => unit.beginMs)], [...word.rubyUnits.map((unit) => unit.endMs), ...units.map((unit) => unit.endMs)]);
       return { word, units, next };
     });
     const lineNext = envelope(line,
-      [...line.words.map((word) => word.beginUs), ...proposedWords.map((item) => item.next.beginUs)],
-      [...line.words.map((word) => word.endUs), ...proposedWords.map((item) => item.next.endUs)]);
-    if (lineNext.beginUs !== line.beginUs || lineNext.endUs !== line.endUs) {
+      [...line.words.map((word) => word.beginMs), ...proposedWords.map((item) => item.next.beginMs)],
+      [...line.words.map((word) => word.endMs), ...proposedWords.map((item) => item.next.endMs)]);
+    if (lineNext.beginMs !== line.beginMs || lineNext.endMs !== line.endMs) {
       if (line.endLink || document.lines.some((item) => item.endLink?.targetLineId === line.id)) throw new Error('行尾链接会受时间扩展影响，请先处理链接');
       commands.push({ type: 'set-line-time', lineId: line.id, ...lineNext });
     }
     for (const { word, units, next } of proposedWords) {
-      if (next.beginUs !== word.beginUs || next.endUs !== word.endUs) commands.push({ type: 'set-word-time', lineId: line.id, wordId: word.id, ...next });
+      if (next.beginMs !== word.beginMs || next.endMs !== word.endMs) commands.push({ type: 'set-word-time', lineId: line.id, wordId: word.id, ...next });
       commands.push({ type: 'set-ruby-units', lineId: line.id, wordId: word.id, units, overwrite: overwriteWordIds.has(word.id) });
     }
   }

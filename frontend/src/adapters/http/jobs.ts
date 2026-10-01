@@ -80,8 +80,8 @@ export type FetchResult = {
 };
 export type AlignmentLine = {
   line_id: string;
-  begin_us?: number | null;
-  end_us?: number | null;
+  begin_ms?: number | null;
+  end_ms?: number | null;
   similarity?: number | null;
   score?: number | null;
   timing_source?: string | null;
@@ -94,8 +94,8 @@ export type TranscribeResult = {
   binding?: JobBinding;
   segments: Array<{
     text: string;
-    begin_us?: number | null;
-    end_us?: number | null;
+    begin_ms?: number | null;
+    end_ms?: number | null;
     confidence?: number | null;
     confidence_kind?: string | null;
     issues?: string[];
@@ -132,8 +132,8 @@ export type ForcedAlignmentUnit = {
   input_range: [number, number];
   source_range?: [number, number];
   text: string;
-  start_us: number | null;
-  end_us: number | null;
+  start_ms: number | null;
+  end_ms: number | null;
   granularity: "word" | "character" | "mora" | "phoneme";
   confidence: number | null;
   ruby_id?: string | null;
@@ -237,8 +237,8 @@ const isResult = (value: unknown): value is JobResult => {
         (item) =>
           isRecord(item) &&
           typeof item.text === "string" &&
-          nullableNumber(item.begin_us) &&
-          nullableNumber(item.end_us) &&
+          nullableNumber(item.begin_ms) &&
+          nullableNumber(item.end_ms) &&
           nullableNumber(item.confidence),
       )
     );
@@ -249,8 +249,8 @@ const isResult = (value: unknown): value is JobResult => {
         (item) =>
           isRecord(item) &&
           typeof item.line_id === "string" &&
-          nullableNumber(item.begin_us) &&
-          nullableNumber(item.end_us) &&
+          nullableNumber(item.begin_ms) &&
+          nullableNumber(item.end_ms) &&
           nullableNumber(item.score) &&
           nullableNumber(item.similarity),
       )
@@ -281,8 +281,8 @@ const isResult = (value: unknown): value is JobResult => {
           Array.isArray(unit.input_range) &&
           unit.input_range.length === 2 &&
           typeof unit.text === "string" &&
-          nullableNumber(unit.start_us) &&
-          nullableNumber(unit.end_us) &&
+          nullableNumber(unit.start_ms) &&
+          nullableNumber(unit.end_ms) &&
           ["word", "character", "mora", "phoneme"].includes(
             String(unit.granularity),
           ) &&

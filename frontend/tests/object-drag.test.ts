@@ -21,21 +21,21 @@ it('uses explicit first/last slots for moves and copies, retaining backgrounds a
 
 it('places words at the first slot for move/copy and expands a different target line', () => {
   const document = createLyricDocument('A'), first = document.lines[0]; first.words.push(createWord('B'));
-  first.words[1].beginUs = 0; first.words[1].endUs = 3_000_000;
-  const second = createLine('C'); second.beginUs = 1_000_000; second.endUs = 2_000_000;
+  first.words[1].beginMs = 0; first.words[1].endMs = 3000;
+  const second = createLine('C'); second.beginMs = 1000; second.endMs = 2000;
   document.lines.push(second);
   for (const copy of [false, true]) for (const target of [first, second]) {
     const result = dragCommand(document, { kind: 'word', lineId: first.id, wordId: first.words[1].id }, { lineId: target.id, afterId: null }, copy);
     const state = executeLyricCommand(createLyricEditorState(document), result.command);
     expect(state.present.lines.find(line => line.id === target.id)!.words[0].text).toBe('B');
     expect(undoLyricCommand(state).present).toBe(document);
-    if (target === second) expect(state.present.lines[1]).toMatchObject({ beginUs: 0, endUs: 3_000_000 });
+    if (target === second) expect(state.present.lines[1]).toMatchObject({ beginMs: 0, endMs: 3000 });
   }
 });
 
 it('reorders same-track contents and timed units without modifying their times or text', () => {
   const document = createLyricDocument('正文'), line = document.lines[0];
-  const units = [{ id: 'a', text: 'a', beginUs: 0, endUs: 100_000 }, { id: 'b', text: 'b', beginUs: 100_000, endUs: 200_000 }];
+  const units = [{ id: 'a', text: 'a', beginMs: 0, endMs: 100 }, { id: 'b', text: 'b', beginMs: 100, endMs: 200 }];
   document.romanizationTracks.push({ id: 'track', language: 'ja', contents: [
     { id: 'first', lineId: line.id, kind: 'timed', units }, { id: 'last', lineId: line.id, kind: 'plain', text: 'plain' },
   ] });

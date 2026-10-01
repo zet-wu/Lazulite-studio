@@ -23,15 +23,15 @@ describe('E3 segmentation', () => {
   it('preserves the timed interval and undoes a multiword change once', () => {
     const document = createLyricDocument('你好 world!');
     const line = document.lines[0];
-    line.beginUs = 1_000_000; line.endUs = 2_000_000;
-    line.words[0].beginUs = 1_000_000; line.words[0].endUs = 2_000_000;
+    line.beginMs = 1000; line.endMs = 2000;
+    line.words[0].beginMs = 1000; line.words[0].endMs = 2000;
     const parts = segmentText(line.words[0].text, DEFAULT_SEGMENT_OPTIONS);
     const words = distributeSegmentTime(line.words[0], parts, DEFAULT_SEGMENT_OPTIONS.punctuationWeight);
     const state = executeLyricCommand(createLyricEditorState(document), { type: 'segment-word', lineId: line.id, wordId: line.words[0].id, words });
     expect(state.present.lines[0].words.map((word) => word.text)).toEqual(parts);
-    expect(state.present.lines[0].words[0].beginUs).toBe(1_000_000);
-    expect(state.present.lines[0].words.at(-1)?.endUs).toBe(2_000_000);
-    expect(state.present.lines[0].words.every((word, index) => index === 0 || word.beginUs === state.present.lines[0].words[index - 1].endUs)).toBe(true);
+    expect(state.present.lines[0].words[0].beginMs).toBe(1000);
+    expect(state.present.lines[0].words.at(-1)?.endMs).toBe(2000);
+    expect(state.present.lines[0].words.every((word, index) => index === 0 || word.beginMs === state.present.lines[0].words[index - 1].endMs)).toBe(true);
     expect(lineText(state.present.lines[0])).toBe('你好 world!');
     expect(undoLyricCommand(state).present).toBe(document);
   });
@@ -39,19 +39,19 @@ describe('E3 segmentation', () => {
   it('keeps known endpoints on a partly untimed word and preserves repeated spaces', () => {
     const document = createLyricDocument('a  b');
     const word = document.lines[0].words[0];
-    word.beginUs = 500_000;
+    word.beginMs = 500;
     const parts = segmentText(word.text, { ...DEFAULT_SEGMENT_OPTIONS, whitespace: 'separate', punctuation: 'separate' });
     expect(parts).toEqual(['a', '  ', 'b']);
     const words = distributeSegmentTime(word, parts, 0.2);
-    expect(words.map((item) => [item.beginUs, item.endUs])).toEqual([[500_000, null], [null, null], [null, null]]);
-    word.beginUs = null; word.endUs = 900_000;
-    expect(distributeSegmentTime(word, parts, 0.2).map((item) => [item.beginUs, item.endUs])).toEqual([[null, null], [null, null], [null, 900_000]]);
+    expect(words.map((item) => [item.beginMs, item.endMs])).toEqual([[500, null], [null, null], [null, null]]);
+    word.beginMs = null; word.endMs = 900;
+    expect(distributeSegmentTime(word, parts, 0.2).map((item) => [item.beginMs, item.endMs])).toEqual([[null, null], [null, null], [null, 900]]);
   });
 
   it('leaves an untimed 注音 word intact and merges adjacent plain words', () => {
     const document = createLyricDocument('今日も');
     const line = document.lines[0], word = line.words[0];
-    word.rubyUnits.push({ id: 'r', reading: 'きょう', beginUs: null, endUs: null });
+    word.rubyUnits.push({ id: 'r', reading: 'きょう', beginMs: null, endMs: null });
     expect(segmentationPreview(document, [word.id], DEFAULT_SEGMENT_OPTIONS)[0].blocked).toBe(true);
     expect(() => distributeSegmentTime(word, ['今', '日も'], 0.2)).toThrow(/注音/);
     word.rubyUnits = [];

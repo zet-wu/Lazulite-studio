@@ -33,11 +33,11 @@ export const sampleProject = {
     filename: "hoshi.m4a",
     content_type: "audio/mp4",
     size_bytes: 1024,
-    duration_us: 120000000,
+    duration_ms: 120000,
     status: "ready" as const,
     asset_hash: "demo-hash",
-    source_start_us: 0,
-    proxy_offset_us: 0,
+    source_start_ms: 0,
+    proxy_offset_ms: 0,
   },
 };
 export const exports = {
@@ -69,12 +69,12 @@ export const jobs: JobList = {
   ],
 };
 export const document: DocumentEnvelope = {
-  schema_version: "studio-document-v1",
+  schema_version: "studio-document-v2",
   project_id: "sample-project",
   revision: "sample-r1",
   sha256: "demo",
   document: {
-    schema_version: "studio-document-content-v1",
+    schema_version: "studio-document-content-v2",
     ttml: '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="line-1" begin="0s" end="5s">夜の風が静かに吹く</p><p xml:id="line-2" begin="5s" end="10s">遠い星を見上げて</p><p xml:id="line-3" begin="10s" end="15s">白い月が道を照らす</p><p xml:id="line-4" begin="15s" end="20s">小さな願いを抱いて</p><p xml:id="line-5" begin="20s" end="25s">朝の光へ歩き出す</p><p xml:id="line-6" begin="25s" end="30s">星の手紙を胸に</p></div></body></tt>',
   },
 };

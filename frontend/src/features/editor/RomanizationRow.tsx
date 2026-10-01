@@ -20,7 +20,7 @@ export function RomanizationRow({ track, content, selectedContent, selectedUnitI
   const setContent = (next: RomanizationContent) => apply({ type: 'set-romanization-content', trackId: track.id, content: next });
   const insertUnit = (text: string) => {
     if (content.kind !== 'timed') return false;
-    const unit = { id: crypto.randomUUID(), text, beginUs: null, endUs: null };
+    const unit = { id: crypto.randomUUID(), text, beginMs: null, endMs: null };
     if (!setContent({ ...content, units: [...content.units, unit] })) return false;
     selectUnit(unit.id); return true;
   };
@@ -32,14 +32,14 @@ export function RomanizationRow({ track, content, selectedContent, selectedUnitI
     </div>
     {content.kind === 'plain' ? <div className={styles.romanizationPlain}>
       <DraftInput value={content.text} label={`音译 ${track.language ?? '未指定语言'}`} onFocus={selectContent} onCommit={(text) => setContent({ ...content, text })} />
-      <button onClick={() => setContent({ ...content, kind: 'timed', units: (content.text.match(/\S+\s*|\s+/gu) ?? []).map((text) => ({ id: crypto.randomUUID(), text, beginUs: null, endUs: null })) })}>分词并定时</button>
+      <button onClick={() => setContent({ ...content, kind: 'timed', units: (content.text.match(/\S+\s*|\s+/gu) ?? []).map((text) => ({ id: crypto.randomUUID(), text, beginMs: null, endMs: null })) })}>分词并定时</button>
     </div> : <div className={styles.romanizationUnits}>
       {content.units.map((unit, index) => <div key={unit.id} data-romanization-unit-id={unit.id} data-drag-placeholder={placeholderUnitIds?.has(unit.id) ? '' : undefined} className={`${styles.romanizationUnit} ${selectedUnitIds.includes(unit.id) ? styles.selectedWord : ''}`}
         tabIndex={0} onClick={(event) => { event.stopPropagation(); selectUnit(unit.id, event.shiftKey, event.ctrlKey || event.metaKey); }} onFocus={(event) => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus]')) selectUnit(unit.id); }}>
         <DraftInput value={unit.text} label={`音译单元 ${index + 1}`} onFocus={() => selectUnit(unit.id)}
           onCommit={(text) => setContent({ ...content, units: content.units.map((item) => item.id === unit.id ? { ...item, text } : item) })}
           onSplit={(at) => apply({ type: 'split-romanization-unit', trackId: track.id, contentId: content.id, unitId: unit.id, at })} />
-        <TimePair begin={unit.beginUs} end={unit.endUs} label={`音译单元 ${index + 1}`} onCommit={(beginUs, endUs) => setContent({ ...content, units: content.units.map((item) => item.id === unit.id ? { ...item, beginUs, endUs } : item) })} />
+        <TimePair begin={unit.beginMs} end={unit.endMs} label={`音译单元 ${index + 1}`} onCommit={(beginMs, endMs) => setContent({ ...content, units: content.units.map((item) => item.id === unit.id ? { ...item, beginMs, endMs } : item) })} />
       </div>)}
       <InlineAdd label="添加音译单元" commit={insertUnit} />
     </div>}

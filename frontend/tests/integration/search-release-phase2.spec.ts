@@ -24,7 +24,7 @@ test('inline annotation and bounded timing survive real save, reopen, undo and r
   const xml = (await (await page.request.get('/api/v1/projects/phase4-background/document')).json()).document.ttml;
   const values = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
-    return codec.parseLyricTtml(xml).lines.map(line => ({ begin: line.beginUs, end: line.endUs }));
+    return codec.parseLyricTtml(xml).lines.map(line => ({ begin: line.beginMs, end: line.endMs }));
   }, xml);
   expect(values[0]).toEqual({ begin: 0, end: 4_000_000 });
   expect(values[1]).toEqual({ begin: 4_000_000, end: 6_000_000 });

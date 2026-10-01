@@ -173,8 +173,8 @@ def _movie_clock(moov: bytes) -> tuple[int, int]:
     return struct.unpack_from(">II", mvhd, 12)
 
 
-def media_duration_us(path: Path) -> int:
-    """Return the movie duration clock in microseconds for publish validation."""
+def media_duration_ms(path: Path) -> int:
+    """Return the movie duration clock in milliseconds for publish validation."""
     path = Path(path)
     item = next((item for item in _scan_top(path) if item[0] == b"moov"), None)
     if item is None:
@@ -182,7 +182,7 @@ def media_duration_us(path: Path) -> int:
     timescale, duration = _movie_clock(_read_payload(path, item[1], item[2], item[3]))
     if timescale <= 0:
         raise PublishingError("movie has invalid timescale")
-    return (duration * 1_000_000) // timescale
+    return (duration * 1_000) // timescale
 
 
 def stpp_tracks(source: Path) -> list[dict]:

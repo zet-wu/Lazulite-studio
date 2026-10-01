@@ -2,19 +2,18 @@ export const SPECTRUM_WIDTH = 384;
 export const SPECTRUM_HEIGHT = 96;
 export const FFT_SIZE = 512;
 const SIZE = FFT_SIZE;
-export const SPECTRUM_WINDOW_US = 4_000_000;
+export const SPECTRUM_WINDOW_MS = 4_000;
 export const PROXY_SAMPLE_RATE = 48_000;
-export type SpectrumWindow = { coreStartUs: number; coreEndUs: number; requestStartUs: number; requestEndUs: number; durationUs: number };
+export type SpectrumWindow = { coreStartMs: number; coreEndMs: number; requestStartMs: number; requestEndMs: number; durationMs: number };
 
-// Nearest integer microsecond lies within 0.024 sample of a 48kHz frame,
-// avoiding the Python round / JS Math.round half-sample disagreement.
-export const sampleTimestamp = (frame: number) => Math.round(frame * 1e6 / PROXY_SAMPLE_RATE);
-export function spectrumWindow(coreStartUs: number, coreEndUs: number, durationUs: number): SpectrumWindow {
-  const first = Math.round(coreStartUs * PROXY_SAMPLE_RATE / 1e6);
-  const last = Math.round(coreEndUs * PROXY_SAMPLE_RATE / 1e6);
-  return { coreStartUs, coreEndUs, durationUs,
-    requestStartUs: sampleTimestamp(Math.max(0, first - SIZE / 2)),
-    requestEndUs: Math.min(durationUs, sampleTimestamp(last + SIZE / 2)),
+// Requests enclose the FFT context on integer milliseconds; samples remain frames.
+export const sampleTimestamp = (frame: number) => Math.floor(frame * 1000 / PROXY_SAMPLE_RATE);
+export function spectrumWindow(coreStartMs: number, coreEndMs: number, durationMs: number): SpectrumWindow {
+  const first = Math.round(coreStartMs * PROXY_SAMPLE_RATE / 1e3);
+  const last = Math.round(coreEndMs * PROXY_SAMPLE_RATE / 1e3);
+  return { coreStartMs, coreEndMs, durationMs,
+    requestStartMs: sampleTimestamp(Math.max(0, first - SIZE / 2)),
+    requestEndMs: Math.min(durationMs, Math.ceil((last + SIZE / 2) * 1000 / PROXY_SAMPLE_RATE)),
   };
 }
 
@@ -48,10 +47,10 @@ export function computeSpectrogram(pcm: Int16Array, rate: number, channels: numb
   const output = new Uint8Array(SPECTRUM_WIDTH * SPECTRUM_HEIGHT);
   if (!frames) return output;
   if (window && rate !== PROXY_SAMPLE_RATE) throw new Error('PCM代理采样率必须为48kHz');
-  const requestFirst = window ? Math.round(window.requestStartUs * rate / 1e6) : 0;
-  const coreFirst = window ? Math.round(window.coreStartUs * rate / 1e6) : 0;
-  const coreLast = window ? Math.round(window.coreEndUs * rate / 1e6) : frames;
-  const mediaLast = window ? Math.round(window.durationUs * rate / 1e6) : frames;
+  const requestFirst = window ? Math.round(window.requestStartMs * rate / 1e3) : 0;
+  const coreFirst = window ? Math.round(window.coreStartMs * rate / 1e3) : 0;
+  const coreLast = window ? Math.round(window.coreEndMs * rate / 1e3) : frames;
+  const mediaLast = window ? Math.round(window.durationMs * rate / 1e3) : frames;
   const real = new Float32Array(SIZE), imaginary = new Float32Array(SIZE);
   const high = Math.min(8000, rate / 2);
   for (let column = 0; column < SPECTRUM_WIDTH; column++) {

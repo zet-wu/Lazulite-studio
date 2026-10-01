@@ -24,6 +24,9 @@ def _seconds(value: str | None) -> float | None:
     match = re.fullmatch(r"([0-9]+):([0-9]{2}):([0-9]{2}(?:\.[0-9]+)?)", value.strip())
     if match and int(match.group(2)) < 60 and float(match.group(3)) < 60:
         return float(match.group(1)) * 3600 + int(match.group(2)) * 60 + float(match.group(3))
+    match = re.fullmatch(r"([0-9]+):([0-9]{2}(?:\.[0-9]+)?)", value.strip())
+    if match and float(match.group(2)) < 60:
+        return int(match.group(1)) * 60 + float(match.group(2))
     return None
 
 def _timing(node: ET.Element, parent_begin: float, parent_end: float | None) -> tuple[float, float | None]:
@@ -43,7 +46,7 @@ def _timing(node: ET.Element, parent_begin: float, parent_end: float | None) -> 
     def position(raw: str | None, parsed: float | None) -> float | None:
         if parsed is None:
             return None
-        return parsed if raw is not None and re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", raw.strip()) else parent_begin + parsed
+        return parsed if raw is not None and re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", raw.strip()) or raw is not None and ":" in raw else parent_begin + parsed
     absolute_begin = position(begin_raw, begin) if begin_raw is not None else parent_begin
     assert absolute_begin is not None
     candidates = [x for x in (parent_end, position(end_raw, end), absolute_begin + dur if dur is not None else None) if x is not None]

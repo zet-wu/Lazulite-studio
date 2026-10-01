@@ -22,7 +22,7 @@ def test_document_save_retry_and_cas_preserves_unknown(tmp_path):
     client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
     headers = {"origin": "http://studio", "idempotency-key": "save-1", "if-match": client.get("/api/v1/projects/p/document").headers["etag"]}
     ttml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:x="urn:example"><body><div><p begin="0s" end="1s">Hi<x:mark/></p></div></body></tt>'
-    body = {"schema_version": "studio-document-v1", "project_id": "p", "revision": headers["if-match"].strip('"'), "client_seq": 3, "document": {"schema_version": "studio-document-content-v1", "ttml": ttml}}
+    body = {"schema_version": "studio-document-v2", "project_id": "p", "revision": headers["if-match"].strip('"'), "client_seq": 3, "document": {"schema_version": "studio-document-content-v2", "ttml": ttml}}
     first = client.put("/api/v1/projects/p/document", json=body, headers=headers)
     assert first.status_code == 200 and first.json()["saved"]["client_seq"] == 3
     assert client.put("/api/v1/projects/p/document", json=body, headers=headers).json()["revision"] == first.json()["revision"]
@@ -38,8 +38,8 @@ def test_semantic_editor_ttml_saves_and_reopens_with_clean_main_lyrics(tmp_path)
     ttml = source.read_text(encoding="utf-8").replace("きょ</span>", "きよう</span>")
     before = client.get("/api/v1/projects/p/document")
     revision = before.json()["revision"]
-    body = {"schema_version": "studio-document-v1", "project_id": "p", "revision": revision,
-            "document": {"schema_version": "studio-document-content-v1", "ttml": ttml}}
+    body = {"schema_version": "studio-document-v2", "project_id": "p", "revision": revision,
+            "document": {"schema_version": "studio-document-content-v2", "ttml": ttml}}
     saved = client.put("/api/v1/projects/p/document", json=body, headers={
         "origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "semantic-edit"})
     assert saved.status_code == 200
@@ -57,14 +57,14 @@ def test_e3_draft_end_link_survives_real_project_save(tmp_path):
     client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
     ttml = ('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft">'
             '<body><div><p xml:id="a" begin="1" end="3" '
-            'studio:endLink=\'{"targetLineId":"b","originalEndUs":2500000}\'>'
+            'studio:endLink=\'{"targetLineId":"b","originalEndMs":2500}\'>'
             '<span begin="1" end="2">中文</span></p>'
             '<p xml:id="b" begin="3" end="4"><span begin="3" end="4">下一句</span></p>'
             '</div></body></tt>')
     before = client.get("/api/v1/projects/p/document")
     saved = client.put("/api/v1/projects/p/document", json={
-        "schema_version": "studio-document-v1", "project_id": "p", "revision": before.json()["revision"],
-        "document": {"schema_version": "studio-document-content-v1", "ttml": ttml}},
+        "schema_version": "studio-document-v2", "project_id": "p", "revision": before.json()["revision"],
+        "document": {"schema_version": "studio-document-content-v2", "ttml": ttml}},
         headers={"origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "e3-end-link"})
     assert saved.status_code == 200
     reopened = client.get("/api/v1/projects/p/document")
@@ -77,7 +77,7 @@ def test_import_is_candidate_and_does_not_change_revision(tmp_path):
     client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
     before = client.get("/api/v1/projects/p/document")
     out = client.post("/api/v1/projects/p/imports?revision=" + before.json()["revision"], content="[00:01.25]hello\n", headers={"origin": "http://studio", "content-type": "text/lrc"})
-    assert out.status_code == 200 and out.json()["saved"] is False and out.json()["candidate"]["lines"][0]["begin_us"] == 1250000
+    assert out.status_code == 200 and out.json()["saved"] is False and out.json()["candidate"]["lines"][0]["begin_ms"] == 1250
     assert client.get("/api/v1/projects/p/document").json()["revision"] == before.json()["revision"]
 
 
@@ -89,7 +89,7 @@ def test_import_lrc_multiple_tags_metadata_offset_and_plain_text(tmp_path):
     out = client.post(f"/api/v1/projects/p/imports?revision={revision}", content=lrc, headers={"origin": "http://studio", "content-type": "text/lrc"})
     assert out.status_code == 200
     assert out.json()["input_revision"] == revision
-    assert [(x["begin_us"], x["end_us"], x["text"]) for x in out.json()["candidate"]["lines"]] == [(2_000_000, 3_000_000, "hello"), (3_000_000, 4_000_000, "hello"), (4_000_000, None, "world")]
+    assert [(x["begin_ms"], x["end_ms"], x["text"]) for x in out.json()["candidate"]["lines"]] == [(2000, 3000, "hello"), (3000, 4000, "hello"), (4000, None, "world")]
     plain = client.post(f"/api/v1/projects/p/imports?revision={revision}", content="[00:01.00]literal\n", headers={"origin": "http://studio", "content-type": "text/plain"})
     assert plain.json()["candidate"]["lines"][0]["text"] == "[00:01.00]literal"
     missing = client.post("/api/v1/projects/p/imports?revision=missing", content="x", headers={"origin": "http://studio", "content-type": "text/plain"})
@@ -110,14 +110,14 @@ def test_review_tracks_only_changed_line_and_save_is_atomic(tmp_path):
     patch_headers = {"origin": "http://studio", "if-match": f'"{review["version"]}"'}
     confirmed = client.patch("/api/v1/projects/p/review", json={"line_id": "a", "document_revision": doc["revision"], "confirmed": True}, headers=patch_headers)
     assert confirmed.status_code == 200
-    body = {"schema_version": "studio-document-v1", "project_id": "p", "revision": doc["revision"], "document": {"schema_version": "studio-document-content-v1", "ttml": xml.replace('>B</p>', '>B2</p>')}}
+    body = {"schema_version": "studio-document-v2", "project_id": "p", "revision": doc["revision"], "document": {"schema_version": "studio-document-content-v2", "ttml": xml.replace('>B</p>', '>B2</p>')}}
     changed = client.put("/api/v1/projects/p/document", json=body, headers={"origin": "http://studio", "if-match": f'"{doc["revision"]}"', "idempotency-key": "change-b"})
     assert changed.status_code == 200
     items = {x["line_id"]: x for x in client.get("/api/v1/projects/p/review").json()["items"]}
     assert items["a"]["status"] == "confirmed" and items["a"]["revision"] == changed.json()["revision"]
     old_patch = client.patch("/api/v1/projects/p/review", json={"line_id": "a", "document_revision": doc["revision"], "confirmed": True}, headers={"origin": "http://studio", "if-match": '"1"'})
     assert old_patch.status_code == 412
-    newer = {**body, "revision": changed.json()["revision"], "document": {"schema_version": "studio-document-content-v1", "ttml": xml.replace('>A</p>', '>A2</p>').replace('>B</p>', '>B2</p>')}}
+    newer = {**body, "revision": changed.json()["revision"], "document": {"schema_version": "studio-document-content-v2", "ttml": xml.replace('>A</p>', '>A2</p>').replace('>B</p>', '>B2</p>')}}
     saved = client.put("/api/v1/projects/p/document", json=newer, headers={"origin": "http://studio", "if-match": f'"{changed.json()["revision"]}"', "idempotency-key": "change-a"})
     assert saved.status_code == 200
     items = {x["line_id"]: x for x in client.get("/api/v1/projects/p/review").json()["items"]}

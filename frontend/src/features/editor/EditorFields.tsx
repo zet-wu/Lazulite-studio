@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import type { TimeUs } from '../../domain/lyric-document';
+import type { TimeMs } from '../../domain/lyric-document';
 import styles from './semantic-editor.module.css';
 
-function seconds(value: TimeUs) { return value === null ? '' : String(value / 1_000_000); }
-function parseSeconds(value: string): TimeUs {
+function seconds(value: TimeMs) { return value === null ? '' : String(value / 1_000); }
+function parseSeconds(value: string): TimeMs {
   if (!value.trim()) return null;
   if (!/^\d+(?:\.\d+)?$/.test(value.trim())) throw new Error('时间必须是非负秒数');
-  const number = Math.round(Number(value) * 1_000_000);
-  if (!Number.isSafeInteger(number)) throw new Error('时间超出微秒精度范围');
+  const number = Math.round(Number(value) * 1_000);
+  if (!Number.isSafeInteger(number)) throw new Error('时间超出毫秒精度范围');
   return number;
 }
 
@@ -31,7 +31,7 @@ export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSpl
     }} />;
 }
 
-export function TimePair({ begin, end, label, onCommit }: { begin: TimeUs; end: TimeUs; label: string; onCommit: (begin: TimeUs, end: TimeUs) => void }) {
+export function TimePair({ begin, end, label, onCommit }: { begin: TimeMs; end: TimeMs; label: string; onCommit: (begin: TimeMs, end: TimeMs) => void }) {
   const [start, setStart] = useState(seconds(begin));
   const [finish, setFinish] = useState(seconds(end));
   const [error, setError] = useState('');
@@ -39,6 +39,7 @@ export function TimePair({ begin, end, label, onCommit }: { begin: TimeUs; end: 
   const commit = () => {
     try {
       const nextBegin = parseSeconds(start), nextEnd = parseSeconds(finish);
+      setStart(seconds(nextBegin)); setFinish(seconds(nextEnd));
       setError('');
       if (nextBegin !== begin || nextEnd !== end) onCommit(nextBegin, nextEnd);
     } catch (failure) { setError(failure instanceof Error ? failure.message : '时间格式错误'); }

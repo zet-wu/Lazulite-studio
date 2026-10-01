@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS search_conditions (
 CREATE TABLE IF NOT EXISTS assets (
  id TEXT PRIMARY KEY, sha256 TEXT NOT NULL UNIQUE, size INTEGER NOT NULL,
  mime TEXT NOT NULL, filename TEXT, playable INTEGER NOT NULL DEFAULT 0,
- duration_us INTEGER, start_us INTEGER, sample_rate INTEGER, channels INTEGER,
+ duration_ms INTEGER, start_ms INTEGER, sample_rate INTEGER, channels INTEGER,
  metadata TEXT, created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS revisions (

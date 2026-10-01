@@ -26,10 +26,10 @@ export function lineStructureIssues(document: LyricDocument, first: LyricLine, s
     const target = document.lines.find(item => item.id === first.endLink!.targetLineId)!;
     issues.push(`${label(first)}行尾链接 → ${label(target)}在合并范围外`);
   }
-  const mergedBegin = first.beginUs ?? second.beginUs;
+  const mergedBegin = first.beginMs ?? second.beginMs;
   for (const source of document.lines) {
     if (source.id === first.id || source.id === second.id || source.endLink?.targetLineId !== second.id) continue;
-    if (mergedBegin !== second.beginUs) issues.push(`${label(source)}行尾链接 → ${label(second)}的开始边界将在合并后消失`);
+    if (mergedBegin !== second.beginMs) issues.push(`${label(source)}行尾链接 → ${label(second)}的开始边界将在合并后消失`);
   }
   return issues;
 }

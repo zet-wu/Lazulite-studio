@@ -8,8 +8,8 @@ describe('E5 sync editing', () => {
   it('advances 注音 before ordinary words and skips background and ignored lines', () => {
     const document = createLyricDocument('今日');
     document.lines[0].words[0].rubyUnits = [
-      { id: 'r1', reading: 'きょ', beginUs: null, endUs: null },
-      { id: 'r2', reading: 'う', beginUs: null, endUs: null },
+      { id: 'r1', reading: 'きょ', beginMs: null, endMs: null },
+      { id: 'r2', reading: 'う', beginMs: null, endMs: null },
     ];
     document.lines[0].words.push(createWord('も', 'also'));
     const background = createLine('響く', 'background'); background.backgroundOf = document.lines[0].id;
@@ -28,30 +28,30 @@ describe('E5 sync editing', () => {
     const document = createLyricDocument('今日');
     const line = document.lines[0], word = line.words[0];
     word.rubyUnits = [
-      { id: 'r1', reading: 'きょ', beginUs: null, endUs: null },
-      { id: 'r2', reading: 'う', beginUs: null, endUs: null },
+      { id: 'r1', reading: 'きょ', beginMs: null, endMs: null },
+      { id: 'r2', reading: 'う', beginMs: null, endMs: null },
     ];
     const [first, second] = syncUnits(document);
-    let state = executeLyricCommand(createLyricEditorState(document), { type: 'sync-stamp', cursor: first, action: 'start', timeUs: 1_000_000 });
+    let state = executeLyricCommand(createLyricEditorState(document), { type: 'sync-stamp', cursor: first, action: 'start', timeMs: 1000 });
     const beforeNext = state.present;
-    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: first, action: 'next', timeUs: 1_500_000 });
+    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: first, action: 'next', timeMs: 1500 });
     expect(state.present.lines[0].words[0].rubyUnits).toEqual([
-      { id: 'r1', reading: 'きょ', beginUs: 1_000_000, endUs: 1_500_000 },
-      { id: 'r2', reading: 'う', beginUs: 1_500_000, endUs: null },
+      { id: 'r1', reading: 'きょ', beginMs: 1000, endMs: 1500 },
+      { id: 'r2', reading: 'う', beginMs: 1500, endMs: null },
     ]);
-    expect(state.present.lines[0]).toMatchObject({ beginUs: 1_000_000, endUs: 1_500_000 });
+    expect(state.present.lines[0]).toMatchObject({ beginMs: 1000, endMs: 1500 });
     expect(undoLyricCommand(state).present).toBe(beforeNext);
-    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: second, action: 'end', timeUs: 2_000_000 });
-    expect(state.present.lines[0].words[0]).toMatchObject({ beginUs: 1_000_000, endUs: 2_000_000 });
+    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: second, action: 'end', timeMs: 2000 });
+    expect(state.present.lines[0].words[0]).toMatchObject({ beginMs: 1000, endMs: 2000 });
   });
 
   it('does not write an end before a start or alter the document after rejection', () => {
     const document = createLyricDocument('今日');
     const cursor = syncUnits(document)[0];
-    expect(() => stampSync(document, cursor, 'next', 1_000_000)).toThrow(/先为当前单元打起始轴/);
-    const started = stampSync(document, cursor, 'start', 2_000_000);
-    expect(() => stampSync(started, cursor, 'end', 1_000_000)).toThrow(/早于起始轴/);
-    expect(document.lines[0].words[0].beginUs).toBeNull();
+    expect(() => stampSync(document, cursor, 'next', 1000)).toThrow(/先为当前单元打起始轴/);
+    const started = stampSync(document, cursor, 'start', 2000);
+    expect(() => stampSync(started, cursor, 'end', 1000)).toThrow(/早于起始轴/);
+    expect(document.lines[0].words[0].beginMs).toBeNull();
   });
 
   it('keeps skip and empty-beat settings in drafts and omits them from final TTML', () => {
@@ -73,59 +73,59 @@ describe('E5 sync editing', () => {
   it('takes a short song through every 注音 and word and reopens the final TTML', () => {
     const document = createLyricDocument('今日');
     document.lines[0].words[0].rubyUnits = [
-      { id: 'r1', reading: 'きょ', beginUs: null, endUs: null },
-      { id: 'r2', reading: 'う', beginUs: null, endUs: null },
+      { id: 'r1', reading: 'きょ', beginMs: null, endMs: null },
+      { id: 'r2', reading: 'う', beginMs: null, endMs: null },
     ];
     document.lines.push(createLine('宇宙', 'second'));
     const units = syncUnits(document);
     let state = createLyricEditorState(document);
-    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[0], action: 'start', timeUs: 1_000_000 });
-    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[0], action: 'next', timeUs: 1_500_000 });
-    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[1], action: 'next', timeUs: 2_000_000 });
-    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[2], action: 'end', timeUs: 3_000_000 });
+    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[0], action: 'start', timeMs: 1000 });
+    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[0], action: 'next', timeMs: 1500 });
+    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[1], action: 'next', timeMs: 2000 });
+    state = executeLyricCommand(state, { type: 'sync-stamp', cursor: units[2], action: 'end', timeMs: 3000 });
     const reopened = parseLyricTtml(serializeLyricTtml(state.present));
-    expect(reopened.lines.map((line) => [line.beginUs, line.endUs])).toEqual([[1_000_000, 2_000_000], [2_000_000, 3_000_000]]);
-    expect(reopened.lines[0].words[0].rubyUnits.map((unit) => [unit.beginUs, unit.endUs])).toEqual([[1_000_000, 1_500_000], [1_500_000, 2_000_000]]);
-    expect(reopened.lines[1].words[0]).toMatchObject({ beginUs: 2_000_000, endUs: 3_000_000 });
+    expect(reopened.lines.map((line) => [line.beginMs, line.endMs])).toEqual([[1000, 2000], [2000, 3000]]);
+    expect(reopened.lines[0].words[0].rubyUnits.map((unit) => [unit.beginMs, unit.endMs])).toEqual([[1000, 1500], [1500, 2000]]);
+    expect(reopened.lines[1].words[0]).toMatchObject({ beginMs: 2000, endMs: 3000 });
   });
 });
 
 it('preserves line margins and its unchanged link, and limits line-mode successors atomically', () => {
   const document = createLyricDocument('one');
   const line = document.lines[0];
-  line.beginUs = 0; line.endUs = 10_000_000;
-  line.words[0].beginUs = 2_000_000; line.words[0].endUs = 8_000_000;
-  const next = createLine('two'); next.beginUs = 10_000_000;
+  line.beginMs = 0; line.endMs = 10000;
+  line.words[0].beginMs = 2000; line.words[0].endMs = 8000;
+  const next = createLine('two'); next.beginMs = 10000;
   document.lines.push(next);
-  line.endLink = { targetLineId: next.id, originalEndUs: 10_000_000 };
+  line.endLink = { targetLineId: next.id, originalEndMs: 10000 };
   const cursor = syncUnits(document)[0];
   let state = createLyricEditorState(document);
-  state = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeUs: 3_000_000 });
-  expect(state.present.lines[0]).toMatchObject({ beginUs: 0, endUs: 10_000_000, endLink: line.endLink });
+  state = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 3000 });
+  expect(state.present.lines[0]).toMatchObject({ beginMs: 0, endMs: 10000, endLink: line.endLink });
   const before = state.present;
-  state = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'next', timeUs: 7_000_000, mode: 'line' });
+  state = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'next', timeMs: 7000, mode: 'line' });
   expect(state.present.lines[1]).toEqual(next);
-  expect(state.present.lines[0]).toMatchObject({ beginUs: 0, endUs: 10_000_000, endLink: line.endLink });
+  expect(state.present.lines[0]).toMatchObject({ beginMs: 0, endMs: 10000, endLink: line.endLink });
   expect(undoLyricCommand(state).present).toBe(before);
-  const outside = stampSync(state.present, cursor, 'end', 12_000_000, 'line');
-  expect(outside.lines[0]).toMatchObject({ beginUs: 0, endUs: 12_000_000, endLink: null });
+  const outside = stampSync(state.present, cursor, 'end', 12000, 'line');
+  expect(outside.lines[0]).toMatchObject({ beginMs: 0, endMs: 12000, endLink: null });
 });
 
 it('updates incoming line links and rejects an excluded word without changing document or history', () => {
   const document = createLyricDocument('source');
   const source = document.lines[0];
-  source.beginUs = 0; source.endUs = 10_000_000;
-  source.words[0].beginUs = 0; source.words[0].endUs = 8_000_000;
-  const target = createLine('target'); target.beginUs = 10_000_000; target.endUs = 20_000_000;
-  target.words[0].beginUs = 12_000_000; target.words[0].endUs = 18_000_000;
-  source.endLink = { targetLineId: target.id, originalEndUs: 8_000_000 };
+  source.beginMs = 0; source.endMs = 10000;
+  source.words[0].beginMs = 0; source.words[0].endMs = 8000;
+  const target = createLine('target'); target.beginMs = 10000; target.endMs = 20000;
+  target.words[0].beginMs = 12000; target.words[0].endMs = 18000;
+  source.endLink = { targetLineId: target.id, originalEndMs: 8000 };
   document.lines.push(target);
   const state = createLyricEditorState(document), cursor = syncUnits(document)[1];
-  const accepted = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeUs: 9_000_000 });
-  expect(accepted.present.lines[0]).toMatchObject({ endUs: 9_000_000, endLink: source.endLink });
-  expect(accepted.present.lines[1].beginUs).toBe(9_000_000);
+  const accepted = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 9000 });
+  expect(accepted.present.lines[0]).toMatchObject({ endMs: 9000, endLink: source.endLink });
+  expect(accepted.present.lines[1].beginMs).toBe(9000);
   expect(undoLyricCommand(accepted).present).toBe(document);
-  expect(() => executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeUs: 7_000_000 })).toThrow(/关联行/);
+  expect(() => executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 7000 })).toThrow(/关联行/);
   expect(state.present).toBe(document); expect(state.past).toHaveLength(0);
-  expect(source.endUs).toBe(10_000_000); expect(target.beginUs).toBe(10_000_000);
+  expect(source.endMs).toBe(10000); expect(target.beginMs).toBe(10000);
 });

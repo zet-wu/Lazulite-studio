@@ -28,8 +28,8 @@ def _project(client, headers, tmp_path):
 
 
 def _save(client, headers, pid, revision, text):
-    body = {"schema_version": "studio-document-v1", "project_id": pid, "revision": revision,
-            "document": {"schema_version": "studio-document-content-v1", "ttml": text}}
+    body = {"schema_version": "studio-document-v2", "project_id": pid, "revision": revision,
+            "document": {"schema_version": "studio-document-content-v2", "ttml": text}}
     out = client.put(f"/api/v1/projects/{pid}/document", json=body, headers={**headers, "if-match": f'"{revision}"', "idempotency-key": revision + "-save"})
     assert out.status_code == 200
     return out.json()["revision"]

@@ -6,7 +6,7 @@ import { defaultRubySkips, proposeRuby, rubyGenerationCommand, rubySourceRows, t
 import { SettingsDialog } from './SettingsDialog';
 import styles from './semantic-editor.module.css';
 
-const time = (value: number | null) => value === null ? '未定' : `${(value / 1e6).toFixed(6).replace(/0+$/, '').replace(/\.$/, '')}s`;
+const time = (value: number | null) => value === null ? '未定' : `${(value / 1e3).toFixed(6).replace(/0+$/, '').replace(/\.$/, '')}s`;
 const firstContents = (document: LyricDocument, trackId: string, lineIds: string[], preferred?: string) => {
   const contents = document.romanizationTracks.find((track) => track.id === trackId)?.contents.filter((content) => lineIds.includes(content.lineId)) ?? [];
   if (preferred && contents.some((content) => content.id === preferred)) return [preferred];
@@ -90,7 +90,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
           const line = sourceDocument.lines.find((item) => item.id === row.lineId)!;
           const selected = Object.hasOwn(assignments, row.key) ? assignments[row.key] ?? '' : row.defaultWordId ?? '';
           return <div className={styles.rubyGenerationRow}>
-            <strong>{row.sourceText || '空单元'}</strong><small>{time(row.beginUs)} – {time(row.endUs)} · L{ordinals.get(line.id)}</small>
+            <strong>{row.sourceText || '空单元'}</strong><small>{time(row.beginMs)} – {time(row.endMs)} · L{ordinals.get(line.id)}</small>
             <label>目标词 <select value={selected} disabled={skipped.has(row.key)} onChange={(event) => { const nextWordId = event.target.value || null;
                 setSkipOverrides(current => Object.fromEntries(Object.entries(current).filter(([key]) => {
                   const affected = rows.find(item => item.key === key)!;
@@ -103,7 +103,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
             <label><input type="checkbox" checked={skipped.has(row.key)} onChange={(event) => setSkipOverrides(current => ({ ...current, [row.key]: event.target.checked }))} /> 跳过生成</label>
             {row.candidates.length === 1 && !row.defaultWordId && <small>重叠不超过 10ms；需人工指定。</small>}
             {row.candidates.length > 1 && <small>跨词重叠；建议：{line.words.find((word) => word.id === row.suggestedWordId)?.text}，仍需人工指定。</small>}
-            {!row.candidates.length && <small>{row.beginUs === null || row.endUs === null ? '源时间未定' : '没有正重叠词'}；需人工指定。</small>}
+            {!row.candidates.length && <small>{row.beginMs === null || row.endMs === null ? '源时间未定' : '没有正重叠词'}；需人工指定。</small>}
             {row.conversionIssue && <small role="alert">{row.conversionIssue}</small>}
           </div>;
         }} />

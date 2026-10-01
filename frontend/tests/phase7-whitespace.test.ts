@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { createLyricDocument, createLine, createWord, lineText } from '../src/domain/lyric-document';
 import { serializeLyricTtml, parseLyricTtml } from '../src/adapters/ttml/lyric-codec';
 it('exports literal untimed whitespace text nodes, preserving edges and draft word identity', () => {
-  const doc = createLyricDocument(); doc.lines[0].words = ['  ', 'A', ' \n ', 'B', '\t '].map((text, i) => ({ ...createWord(text, `w${i}`), beginUs: text.trim() ? i * 1e6 : null, endUs: text.trim() ? (i + 1) * 1e6 : null }));
+  const doc = createLyricDocument(); doc.lines[0].words = ['  ', 'A', ' \n ', 'B', '\t '].map((text, i) => ({ ...createWord(text, `w${i}`), beginMs: text.trim() ? i * 1e3 : null, endMs: text.trim() ? (i + 1) * 1e3 : null }));
   const before = structuredClone(doc);
   const xml = serializeLyricTtml(doc), parsed = new DOMParser().parseFromString(xml, 'application/xml');
   const nodes = Array.from(parsed.querySelector('p')!.childNodes);
@@ -15,25 +15,25 @@ it('exports literal untimed whitespace text nodes, preserving edges and draft wo
 it('keeps timed, partially timed and annotated whitespace spans with their own fields', () => {
   const doc = createLyricDocument();
   doc.lines[0].words = [
-    { ...createWord(' ', 'timed'), beginUs: 1, endUs: 2 },
-    { ...createWord(' ', 'partial'), beginUs: 3 },
-    { ...createWord(' ', 'ruby'), rubyUnits: [{ id: 'r', reading: 'く', beginUs: null, endUs: null }] },
+    { ...createWord(' ', 'timed'), beginMs: 1, endMs: 2 },
+    { ...createWord(' ', 'partial'), beginMs: 3 },
+    { ...createWord(' ', 'ruby'), rubyUnits: [{ id: 'r', reading: 'く', beginMs: null, endMs: null }] },
     { ...createWord(' ', 'beat'), emptyBeat: 1 },
-    { ...createWord(' ', 'align'), alignmentUnits: [{ id: 'align', kind: 'word' as const, text: ' ', beginUs: null, endUs: null, readingStart: null, readingEnd: null, rubyUnitId: null }] },
+    { ...createWord(' ', 'align'), alignmentUnits: [{ id: 'align', kind: 'word' as const, text: ' ', beginMs: null, endMs: null, readingStart: null, readingEnd: null, rubyUnitId: null }] },
   ];
   const xml = new DOMParser().parseFromString(serializeLyricTtml(doc), 'application/xml');
   expect(xml.querySelector('p')!.children).toHaveLength(5);
-  expect(xml.querySelector('p')!.children[0].getAttribute('begin')).toBe('0.000001');
+  expect(xml.querySelector('p')!.children[0].getAttribute('begin')).toBe('00:00.001');
   expect(xml.querySelector('p')!.children[1].hasAttribute('end')).toBe(false);
 });
 it('pure transliteration emits only fully untimed whitespace as text, keeping internal units',()=>{
- const d=createLyricDocument(); const line=createLine('正文'); line.beginUs=0;line.endUs=2000000;d.lines=[line];
+ const d=createLyricDocument(); const line=createLine('正文'); line.beginMs=0;line.endMs=2000;d.lines=[line];
  d.romanizationTracks=[{id:'track',language:'ja-Latn',contents:[{id:'content',lineId:line.id,kind:'timed',units:[
- {id:'u1',text:'a',beginUs:0,endUs:1000000}, {id:'space',text:'  ',beginUs:null,endUs:null},{id:'u2',text:' ',beginUs:1000000,endUs:2000000}]}]}];
+ {id:'u1',text:'a',beginMs:0,endMs:1000}, {id:'space',text:'  ',beginMs:null,endMs:null},{id:'u2',text:' ',beginMs:1000,endMs:2000}]}]}];
  const saved=JSON.stringify(d); const pure=serializeLyricTtml(d);const xml=new DOMParser().parseFromString(pure,'application/xml');
  const text=xml.getElementsByTagNameNS('http://music.apple.com/lyric-ttml-internal','text')[0];
  expect(text.children).toHaveLength(2); expect(text.textContent).toBe('a   ');expect(pure).not.toContain('studio:');expect(JSON.stringify(d)).toBe(saved);
  const content=d.romanizationTracks[0].contents[0];if(content.kind!=='timed')throw new Error('fixture');
- content.units[1].endUs=1000000; expect(()=>serializeLyricTtml(d)).toThrow('needs timing');
- content.units[1].endUs=null; content.units[1].text='word';expect(()=>serializeLyricTtml(d)).toThrow('needs timing');
+ content.units[1].endMs=1000; expect(()=>serializeLyricTtml(d)).toThrow('needs timing');
+ content.units[1].endMs=null; content.units[1].text='word';expect(()=>serializeLyricTtml(d)).toThrow('needs timing');
 });

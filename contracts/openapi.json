@@ -769,8 +769,8 @@
         "parameters": [
           { "$ref": "#/components/parameters/ProjectId" },
           { "$ref": "#/components/parameters/Level" },
-          { "$ref": "#/components/parameters/StartUs" },
-          { "$ref": "#/components/parameters/EndUs" }
+          { "$ref": "#/components/parameters/StartMs" },
+          { "$ref": "#/components/parameters/EndMs" }
         ],
         "responses": {
           "200": {
@@ -790,8 +790,8 @@
         "operationId": "getPcmWindow",
         "parameters": [
           { "$ref": "#/components/parameters/ProjectId" },
-          { "name": "start_us", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 0 } },
-          { "name": "end_us", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 }, "description": "Exclusive end, at most 4,020,000 microseconds after start_us (including FFT context)" }
+          { "name": "start_ms", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 0 } },
+          { "name": "end_ms", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 }, "description": "Exclusive end, at most 4,020,000 milliseconds after start_ms (including FFT context)" }
         ],
         "responses": {
           "200": {
@@ -856,14 +856,14 @@
         "required": false,
         "schema": { "type": "integer", "minimum": 0, "default": 8 }
       },
-      "StartUs": {
-        "name": "start_us",
+      "StartMs": {
+        "name": "start_ms",
         "in": "query",
         "required": false,
         "schema": { "type": "integer", "minimum": 0 }
       },
-      "EndUs": {
-        "name": "end_us",
+      "EndMs": {
+        "name": "end_ms",
         "in": "query",
         "required": false,
         "schema": { "type": "integer", "minimum": 0 }
@@ -1112,11 +1112,11 @@
           "filename",
           "content_type",
           "size_bytes",
-          "duration_us",
+          "duration_ms",
           "status",
           "asset_hash",
-          "source_start_us",
-          "proxy_offset_us"
+          "source_start_ms",
+          "proxy_offset_ms"
         ],
         "properties": {
           "schema_version": { "const": "studio-asset-v1" },
@@ -1124,11 +1124,11 @@
           "filename": { "type": "string" },
           "content_type": { "type": "string" },
           "size_bytes": { "type": "integer", "minimum": 0 },
-          "duration_us": { "type": ["integer", "null"], "minimum": 0 },
+          "duration_ms": { "type": ["integer", "null"], "minimum": 0 },
           "status": { "type": "string", "enum": ["ready"] },
           "asset_hash": { "type": "string" },
-          "source_start_us": { "type": "integer" },
-          "proxy_offset_us": { "type": "integer" }
+          "source_start_ms": { "type": "integer" },
+          "proxy_offset_ms": { "type": "integer" }
         }
       },
       "WaveformWindow": {
@@ -1139,9 +1139,9 @@
           "asset_hash",
           "version",
           "level",
-          "start_us",
-          "end_us",
-          "bucket_us",
+          "start_ms",
+          "end_ms",
+          "bucket_ms",
           "minimum",
           "maximum"
         ],
@@ -1151,9 +1151,9 @@
           "asset_hash": { "type": "string" },
           "version": { "type": "string" },
           "level": { "type": "integer", "minimum": 0, "maximum": 15 },
-          "start_us": { "type": "integer", "minimum": 0 },
-          "end_us": { "type": "integer", "minimum": 0 },
-          "bucket_us": { "type": "integer", "minimum": 1 },
+          "start_ms": { "type": "integer", "minimum": 0 },
+          "end_ms": { "type": "integer", "minimum": 0 },
+          "bucket_ms": { "type": "integer", "minimum": 1 },
           "minimum": {
             "type": "array",
             "items": { "type": "number", "minimum": -1, "maximum": 1 }
@@ -1603,9 +1603,9 @@
       },
       "SearchCandidate": { "type": "object", "required": ["source", "candidate_id", "title", "match_score"], "properties": { "source": { "type": "string" }, "candidate_id": { "type": "string" }, "title": { "type": "string" }, "artist": { "type": ["string", "null"] }, "album": { "type": ["string", "null"] }, "duration": { "type": ["number", "null"] }, "match_score": { "type": "number" }, "raw": { "type": "object" } } },
       "FetchedLyric": { "type": "object", "required": ["candidate", "provider_rank", "line_count", "lines"], "properties": { "candidate": { "$ref": "#/components/schemas/SearchCandidate" }, "provider_rank": { "type": "integer" }, "line_count": { "type": "integer" }, "lines": { "type": "array", "items": { "type": "object", "required": ["id", "text"], "properties": { "id": { "type": "string" }, "text": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] } } } } } },
-      "AlignedLine": { "type": "object", "required": ["line_id", "timing_source"], "properties": { "line_id": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "begin_us": { "type": ["integer", "null"] }, "end_us": { "type": ["integer", "null"] }, "similarity": { "type": ["number", "null"] }, "score": { "type": ["number", "null"] }, "timing_source": { "type": "string" }, "source_segment_ids": { "type": "array", "items": { "type": "string" } }, "issues": { "type": "array", "items": { "type": "string" } } } },
-      "ForcedAlignmentUnit": { "type": "object", "required": ["line_id", "input_range", "text", "start", "end", "start_us", "end_us", "granularity", "confidence"], "properties": { "line_id": { "type": "string" }, "input_range": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } }, "source_range": { "type": "array", "items": { "type": "integer" } }, "text": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "start_us": { "type": ["integer", "null"] }, "end_us": { "type": ["integer", "null"] }, "granularity": { "type": "string", "enum": ["subword", "word", "character", "mora", "phoneme"] }, "confidence": { "type": ["number", "null"] } } },
-      "TranscriptionSegment": { "type": "object", "required": ["source_segment_id", "text"], "properties": { "source_segment_id": { "type": "string" }, "text": { "type": "string" }, "language": { "type": ["string", "null"] }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "begin_us": { "type": ["integer", "null"] }, "end_us": { "type": ["integer", "null"] }, "confidence": { "type": ["number", "null"] }, "timed_text": { "type": "array", "items": { "type": "object" } } }, "additionalProperties": true },
+      "AlignedLine": { "type": "object", "required": ["line_id", "timing_source"], "properties": { "line_id": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "begin_ms": { "type": ["integer", "null"] }, "end_ms": { "type": ["integer", "null"] }, "similarity": { "type": ["number", "null"] }, "score": { "type": ["number", "null"] }, "timing_source": { "type": "string" }, "source_segment_ids": { "type": "array", "items": { "type": "string" } }, "issues": { "type": "array", "items": { "type": "string" } } } },
+      "ForcedAlignmentUnit": { "type": "object", "required": ["line_id", "input_range", "text", "start", "end", "start_ms", "end_ms", "granularity", "confidence"], "properties": { "line_id": { "type": "string" }, "input_range": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } }, "source_range": { "type": "array", "items": { "type": "integer" } }, "text": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "start_ms": { "type": ["integer", "null"] }, "end_ms": { "type": ["integer", "null"] }, "granularity": { "type": "string", "enum": ["subword", "word", "character", "mora", "phoneme"] }, "confidence": { "type": ["number", "null"] } } },
+      "TranscriptionSegment": { "type": "object", "required": ["source_segment_id", "text"], "properties": { "source_segment_id": { "type": "string" }, "text": { "type": "string" }, "language": { "type": ["string", "null"] }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "begin_ms": { "type": ["integer", "null"] }, "end_ms": { "type": ["integer", "null"] }, "confidence": { "type": ["number", "null"] }, "timed_text": { "type": "array", "items": { "type": "object" } } }, "additionalProperties": true },
       "Job": {
         "type": "object",
         "required": ["schema_version", "id", "project_id", "kind", "status", "request", "result_available", "state_version"],
@@ -1656,7 +1656,7 @@
         "type": "object",
         "required": ["schema_version", "project_id", "revision", "document"],
         "properties": {
-          "schema_version": { "const": "studio-document-v1" },
+          "schema_version": { "const": "studio-document-v2" },
           "project_id": { "type": "string" },
           "revision": { "type": ["string", "null"] },
           "etag": { "type": "string" },
@@ -1666,7 +1666,7 @@
             "type": "object",
             "required": ["schema_version", "ttml"],
             "properties": {
-              "schema_version": { "const": "studio-document-content-v1" },
+              "schema_version": { "const": "studio-document-content-v2" },
               "ttml": { "type": "string", "maxLength": 2097152 }
             },
             "additionalProperties": false
@@ -1688,7 +1688,7 @@
         "type": "object", "required": ["schema_version", "project_id", "input_revision", "candidate", "diagnostics", "saved"],
         "properties": {
           "schema_version": { "const": "studio-import-v1" }, "project_id": { "type": "string" }, "input_revision": { "type": ["string", "null"] },
-          "candidate": { "type": "object", "required": ["format"], "properties": { "format": { "enum": ["ttml", "lrc", "text"] }, "ttml": { "type": "string" }, "text": { "type": "string" }, "lines": { "type": "array", "items": { "type": "object", "required": ["begin_us", "text"], "properties": { "begin_us": { "type": ["integer", "null"] }, "text": { "type": "string" } } } } } },
+          "candidate": { "type": "object", "required": ["format"], "properties": { "format": { "enum": ["ttml", "lrc", "text"] }, "ttml": { "type": "string" }, "text": { "type": "string" }, "lines": { "type": "array", "items": { "type": "object", "required": ["begin_ms", "text"], "properties": { "begin_ms": { "type": ["integer", "null"] }, "text": { "type": "string" } } } } } },
           "diagnostics": { "type": "array", "items": { "type": "object" } }, "saved": { "const": false }
         }
       },
@@ -1723,7 +1723,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["id", "text", "begin_us", "end_us"],
+              "required": ["id", "text", "begin_ms", "end_ms"],
               "properties": {
                 "id": {
                   "type": "string"
@@ -1731,11 +1731,11 @@
                 "text": {
                   "type": "string"
                 },
-                "begin_us": {
+                "begin_ms": {
                   "type": ["integer", "null"],
                   "minimum": 0
                 },
-                "end_us": {
+                "end_ms": {
                   "type": ["integer", "null"],
                   "minimum": 0
                 }

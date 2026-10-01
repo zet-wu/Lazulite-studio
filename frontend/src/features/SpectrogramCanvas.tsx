@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { studioApi } from '../adapters/http/client';
-import { SPECTRUM_HEIGHT, SPECTRUM_WIDTH, SPECTRUM_WINDOW_US, spectrumWindow } from '../domain/spectrogram';
+import { SPECTRUM_HEIGHT, SPECTRUM_WIDTH, SPECTRUM_WINDOW_MS, spectrumWindow } from '../domain/spectrogram';
 import { useCanvasMetrics } from './useCanvasMetrics';
 import { SpectrumCache } from './spectrum-cache';
 import styles from './media.module.css';
 
-type Props = { projectId: string; assetIdentity: string; startUs: number; endUs: number; durationUs: number };
+type Props = { projectId: string; assetIdentity: string; startMs: number; endMs: number; durationMs: number };
 type Request = { token: number; controller: AbortController; began: number; posted: boolean };
 type Result = { id: number; token: number; pixels: Uint8Array; computeMs: number; error?: string };
 
 export function SpectrogramCanvas(props: Props) {
-  return <AssetSpectrum key={`${props.projectId}:${props.assetIdentity}:${props.durationUs}:fft512-${SPECTRUM_WIDTH}x${SPECTRUM_HEIGHT}`} {...props} />;
+  return <AssetSpectrum key={`${props.projectId}:${props.assetIdentity}:${props.durationMs}:fft512-${SPECTRUM_WIDTH}x${SPECTRUM_HEIGHT}`} {...props} />;
 }
 
-function AssetSpectrum({ projectId, startUs, endUs, durationUs }: Props) {
+function AssetSpectrum({ projectId, startMs, endMs, durationMs }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const worker = useRef<Worker | null>(null);
   const cache = useRef(new SpectrumCache());
@@ -26,9 +26,9 @@ function AssetSpectrum({ projectId, startUs, endUs, durationUs }: Props) {
   const [revision, setRevision] = useState(0);
   const [retry, setRetry] = useState(0);
   const [error, setError] = useState('');
-  const visible = endUs > startUs && endUs - startUs <= 20_000_000;
-  const firstTile = Math.floor(startUs / SPECTRUM_WINDOW_US) * SPECTRUM_WINDOW_US;
-  const lastTile = Math.ceil(endUs / SPECTRUM_WINDOW_US) * SPECTRUM_WINDOW_US;
+  const visible = endMs > startMs && endMs - startMs <= 20_000;
+  const firstTile = Math.floor(startMs / SPECTRUM_WINDOW_MS) * SPECTRUM_WINDOW_MS;
+  const lastTile = Math.ceil(endMs / SPECTRUM_WINDOW_MS) * SPECTRUM_WINDOW_MS;
   const { width, ratio } = useCanvasMetrics(canvas, visible);
   const changed = () => setRevision(value => value + 1);
 
@@ -39,9 +39,9 @@ function AssetSpectrum({ projectId, startUs, endUs, durationUs }: Props) {
       if (cache.current.get(first) || pending.current.has(first) || failed.current.has(first)) continue;
       if (pending.current.size >= 2) break;
       const request: Request = { token: ++nextToken.current, controller: new AbortController(), began: performance.now(), posted: false };
-      const window = spectrumWindow(first, Math.min(first + SPECTRUM_WINDOW_US, durationUs), durationUs);
+      const window = spectrumWindow(first, Math.min(first + SPECTRUM_WINDOW_MS, durationMs), durationMs);
       pending.current.set(first, request);
-      void studioApi.getPcmWindow(projectId, window.requestStartUs, window.requestEndUs, request.controller.signal).then(({ pcm, rate, channels }) => {
+      void studioApi.getPcmWindow(projectId, window.requestStartMs, window.requestEndMs, request.controller.signal).then(({ pcm, rate, channels }) => {
         if (pending.current.get(first) !== request || !wanted.current.includes(first)) return;
         stats.current.requestMs = [...stats.current.requestMs.slice(-127), performance.now() - request.began];
         request.posted = true;
@@ -66,7 +66,7 @@ function AssetSpectrum({ projectId, startUs, endUs, durationUs }: Props) {
       pending.current.delete(result.id);
       if (result.error) { failed.current.set(result.id, result.error); }
       else {
-        cache.current.set({ startUs: result.id, endUs: Math.min(result.id + SPECTRUM_WINDOW_US, durationUs), pixels: result.pixels });
+        cache.current.set({ startMs: result.id, endMs: Math.min(result.id + SPECTRUM_WINDOW_MS, durationMs), pixels: result.pixels });
         stats.current.completed++;
         stats.current.computeMs = [...stats.current.computeMs.slice(-127), result.computeMs];
       }
@@ -83,10 +83,10 @@ function AssetSpectrum({ projectId, startUs, endUs, durationUs }: Props) {
       for (const request of pending.current.values()) request.controller.abort();
       pending.current.clear();
     };
-  }, [durationUs, retry]);
+  }, [durationMs, retry]);
 
   useEffect(() => {
-    wanted.current = visible ? Array.from({ length: Math.max(0, (lastTile - firstTile) / SPECTRUM_WINDOW_US) }, (_, index) => firstTile + index * SPECTRUM_WINDOW_US).filter(first => first < durationUs) : [];
+    wanted.current = visible ? Array.from({ length: Math.max(0, (lastTile - firstTile) / SPECTRUM_WINDOW_MS) }, (_, index) => firstTile + index * SPECTRUM_WINDOW_MS).filter(first => first < durationMs) : [];
     for (const first of failed.current.keys()) if (!wanted.current.includes(first)) failed.current.delete(first);
     const cancelWorker = [...pending.current].some(([first, request]) => request.posted && !wanted.current.includes(first));
     if (cancelWorker) {
@@ -99,7 +99,7 @@ function AssetSpectrum({ projectId, startUs, endUs, durationUs }: Props) {
       pump.current();
     }
     changed();
-  }, [durationUs, firstTile, lastTile, visible, retry]);
+  }, [durationMs, firstTile, lastTile, visible, retry]);
 
   useEffect(() => {
     const element = canvas.current;
@@ -107,9 +107,9 @@ function AssetSpectrum({ projectId, startUs, endUs, durationUs }: Props) {
     element.width = Math.max(1, Math.round(width * ratio)); element.height = Math.round(72 * ratio);
     const context = element.getContext('2d')!;
     context.fillStyle = '#101622'; context.fillRect(0, 0, element.width, element.height);
-    const x = (time: number) => Math.round((time - startUs) / (endUs - startUs) * element.width);
+    const x = (time: number) => Math.round((time - startMs) / (endMs - startMs) * element.width);
     for (const first of wanted.current) {
-      const last = Math.min(first + SPECTRUM_WINDOW_US, durationUs), left = x(first), right = x(last);
+      const last = Math.min(first + SPECTRUM_WINDOW_MS, durationMs), left = x(first), right = x(last);
       const tile = cache.current.get(first);
       if (!tile) {
         context.fillStyle = failed.current.has(first) ? '#502933' : '#24354b';
@@ -128,7 +128,7 @@ function AssetSpectrum({ projectId, startUs, endUs, durationUs }: Props) {
       offscreen.getContext('2d')!.putImageData(image, 0, 0);
       context.drawImage(offscreen, left, 0, right - left, element.height);
     }
-  }, [endUs, revision, startUs, visible, width, ratio]);
+  }, [endMs, revision, startMs, visible, width, ratio]);
 
   if (!visible) return <p className={styles.spectrumHint}>放大到 20 秒以内显示声谱图</p>;
   const displayError = error || wanted.current.map(first => failed.current.get(first)).find(Boolean);

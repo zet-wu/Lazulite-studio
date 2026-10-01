@@ -1,5 +1,5 @@
 import { createLyricDocument, createLine, createWord, lineText, type LyricDocument, type LyricLine, type RomanizationTrack } from '../domain/lyric-document';
-const time = (ms: number) => { if (!Number.isFinite(ms) || ms < 0) throw new Error('歌词时间无效'); return Math.round(ms * 1000); };
+const time = (ms: number) => { if (!Number.isFinite(ms) || ms < 0) throw new Error('歌词时间无效'); return Math.round(ms); };
 export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc', onSidecarIssue: () => void = () => {}): LyricDocument {
   if (kind === 'qrc' && text.trim().startsWith('<')) {
     const xml = new DOMParser().parseFromString(text, 'application/xml');
@@ -14,13 +14,13 @@ export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc', onSid
       if (raw.trim() && !/^\[[a-zA-Z]+:.*\]$/.test(raw.trim())) throw new Error(`第 ${index+1} 行正文格式无效`);
       continue;
     }
-    const start = Number(row[1]), line = createLine(''); line.beginUs = time(start + offset); line.endUs = time(start + Number(row[2]) + offset);
+    const start = Number(row[1]), line = createLine(''); line.beginMs = time(start + offset); line.endMs = time(start + Number(row[2]) + offset);
     const pattern = kind === 'krc' ? /<(\d+),(\d+),\d+>([\s\S]*?)(?=<\d+,\d+,\d+>|$)/g : kind === 'yrc' ? /\((\d+),(\d+),\d+\)([\s\S]*?)(?=\(\d+,\d+,\d+\)|$)/g : /([\s\S]*?)\((\d+),(\d+)\)/g;
     let consumed = 0;
     for (const m of row[3].matchAll(pattern)) {
       if (m.index !== consumed) throw new Error('逐词标签之间含无法解析的文字');
       const wordText = kind === 'qrc' ? m[1] : m[3], begin = Number(kind === 'qrc' ? m[2] : m[1]) + (kind === 'krc' ? start : 0) + offset, duration = Number(kind === 'qrc' ? m[3] : m[2]);
-      line.words.push({ ...createWord(wordText), beginUs: time(begin), endUs: time(begin + duration) }); consumed = m.index + m[0].length;
+      line.words.push({ ...createWord(wordText), beginMs: time(begin), endMs: time(begin + duration) }); consumed = m.index + m[0].length;
     }
     if (consumed !== row[3].length || !line.words.length) throw new Error('逐词歌词标签不完整');
     d.lines.push(line);
@@ -42,7 +42,7 @@ export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc', onSid
             const line = d.lines[i];
             if (!line || !Array.isArray(values) || values.some(v => typeof v !== 'string')) { onSidecarIssue(); return; }
             if (part.type === 1) { if (values.join('')) line.translations.push({ language: null, text: values.join('') }); }
-            else if (values.length === line.words.length) track.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'timed', units: values.map((v, j) => ({ id: crypto.randomUUID(), text: v, beginUs: line.words[j].beginUs, endUs: line.words[j].endUs })) });
+            else if (values.length === line.words.length) track.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'timed', units: values.map((v, j) => ({ id: crypto.randomUUID(), text: v, beginMs: line.words[j].beginMs, endMs: line.words[j].endMs })) });
             else if (values.join('')) track.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: values.join('') });
           });
           if (track.contents.length) d.romanizationTracks.push(track);
@@ -71,17 +71,17 @@ export function parseLrcSource(text: string): LyricDocument {
     if (!heads.length) continue;
     const body = raw.slice(heads.at(-1)!.index! + heads.at(-1)![0].length);
     for (const h of heads) {
-      const line = createLine(''); line.beginUs = clock(h[1], h[2]);
-      let begin = line.beginUs, pos = 0;
+      const line = createLine(''); line.beginMs = clock(h[1], h[2]);
+      let begin = line.beginMs, pos = 0;
       for (const marker of body.matchAll(/<(\d+):(\d+(?:\.\d+)?)>/g)) {
         const end = clock(marker[1], marker[2]); if (end < begin) throw new Error('扩展 LRC 词时间倒序');
-        const value = body.slice(pos, marker.index); if (value) line.words.push({ ...createWord(value), beginUs: begin, endUs: end });
+        const value = body.slice(pos, marker.index); if (value) line.words.push({ ...createWord(value), beginMs: begin, endMs: end });
         begin = end; pos = marker.index! + marker[0].length;
       }
-      if (body.slice(pos)) line.words.push({ ...createWord(body.slice(pos)), beginUs: begin, endUs: null });
+      if (body.slice(pos)) line.words.push({ ...createWord(body.slice(pos)), beginMs: begin, endMs: null });
       // Empty events are format boundaries, not editable lyric lines.
-      if (!body) { const prev = d.lines.at(-1); if (prev && prev.endUs === null) prev.endUs = line.beginUs; continue; }
-      if (pos === body.length) line.endUs = begin;
+      if (!body) { const prev = d.lines.at(-1); if (prev && prev.endMs === null) prev.endMs = line.beginMs; continue; }
+      if (pos === body.length) line.endMs = begin;
       d.lines.push(line);
     }
   }
@@ -93,18 +93,18 @@ export function attachSidecar(d: LyricDocument, text: string, kind: 'translation
   const timed = /^\[\d+,\d+\].*\(\d+,\d+\)/m.test(text);
   const side = timed ? parseWordFormat(text, 'qrc') : parseLrcSource(text), issues: string[] = [];
   const track: RomanizationTrack = { id: crypto.randomUUID(), language: null, contents: [] };
-  const mains = d.lines.filter(l=>!l.backgroundOf && l.beginUs !== null).slice().sort((a,b)=>a.beginUs!-b.beginUs!);
+  const mains = d.lines.filter(l=>!l.backgroundOf && l.beginMs !== null).slice().sort((a,b)=>a.beginMs!-b.beginMs!);
   const counts = new Map<number,number>();
-  for (const main of mains) counts.set(main.beginUs!, (counts.get(main.beginUs!) ?? 0)+1);
+  for (const main of mains) counts.set(main.beginMs!, (counts.get(main.beginMs!) ?? 0)+1);
   let cursor = 0;
   for (const line of side.lines) {
-    const start = line.beginUs!;
-    while (cursor < mains.length && mains[cursor].beginUs! < start - 750000) ++cursor;
+    const start = line.beginMs!;
+    while (cursor < mains.length && mains[cursor].beginMs! < start - 750) ++cursor;
     const main = mains[cursor];
-    if (!main || Math.abs(main.beginUs! - start) > 750000 || counts.get(main.beginUs!)! > 1) { issues.push('附属行无唯一对应'); continue; }
+    if (!main || Math.abs(main.beginMs! - start) > 750 || counts.get(main.beginMs!)! > 1) { issues.push('附属行无唯一对应'); continue; }
     ++cursor;
     if (kind === 'translation') main.translations.push({ language: null, text: lineText(line) });
-    else track.contents.push(timed ? { id: crypto.randomUUID(), lineId: main.id, kind: 'timed', units: line.words.map(w => ({ id: crypto.randomUUID(), text: w.text, beginUs: w.beginUs, endUs: w.endUs })) } : { id: crypto.randomUUID(), lineId: main.id, kind: 'plain', text: lineText(line) });
+    else track.contents.push(timed ? { id: crypto.randomUUID(), lineId: main.id, kind: 'timed', units: line.words.map(w => ({ id: crypto.randomUUID(), text: w.text, beginMs: w.beginMs, endMs: w.endMs })) } : { id: crypto.randomUUID(), lineId: main.id, kind: 'plain', text: lineText(line) });
   }
   if (track.contents.length) d.romanizationTracks.push(track);
   return issues;

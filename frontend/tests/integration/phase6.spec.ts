@@ -37,12 +37,12 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   const semantic = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
     const document = codec.parseLyricTtml(xml);
-    return { agents: document.lines.map(line => line.agentRefs), translations: document.lines[0].translations, appended: document.lines[0].words.slice(-2).map(word => ({ text: word.text, beginUs: word.beginUs, endUs: word.endUs })), units: document.romanizationTracks[0].contents[0] };
+    return { agents: document.lines.map(line => line.agentRefs), translations: document.lines[0].translations, appended: document.lines[0].words.slice(-2).map(word => ({ text: word.text, beginMs: word.beginMs, endMs: word.endMs })), units: document.romanizationTracks[0].contents[0] };
   }, saved.document.ttml);
   expect(semantic.agents.slice(0, 2)).toEqual([['v1', 'v2'], ['v2', 'v1']]);
   expect(semantic.translations).toEqual([{ text: 'song', language: 'ja' }]);
-  expect(semantic.appended).toEqual([{ text: '追加', beginUs: null, endUs: null }, { text: '  ', beginUs: null, endUs: null }]);
-  expect(semantic.units).toMatchObject({ kind: 'timed', units: [{ text: 'ai', beginUs: 1_000_000 }, { text: '', beginUs: 0, endUs: 6_000_000 }, { text: '  ', beginUs: 0, endUs: 6_000_000 }] });
+  expect(semantic.appended).toEqual([{ text: '追加', beginMs: null, endMs: null }, { text: '  ', beginMs: null, endMs: null }]);
+  expect(semantic.units).toMatchObject({ kind: 'timed', units: [{ text: 'ai', beginMs: 1_000_000 }, { text: '', beginMs: 0, endMs: 6_000_000 }, { text: '  ', beginMs: 0, endMs: 6_000_000 }] });
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
   const xml = await readFile(await (await download).path(), 'utf8');

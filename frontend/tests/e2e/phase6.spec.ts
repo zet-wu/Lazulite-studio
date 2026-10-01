@@ -75,9 +75,9 @@ test('P6 inline addition, native text selection, IME, cancellation and one histo
 test('P6 translation languages, trash, clear, background and singer mixed editing preserve history', async ({ page }) => {
   await load(page);
   const line = row(page);
-  await line.getByLabel('翻译 1语言', { exact: true }).fill('en_US'); await line.getByLabel('翻译 1语言', { exact: true }).blur();
+  await line.getByLabel('翻译 1语言', { exact: true }).fill('en_MS'); await line.getByLabel('翻译 1语言', { exact: true }).blur();
   await expect(line.getByRole('alert')).toContainText('语言标签格式无效');
-  await expect(line.getByLabel('翻译 1语言', { exact: true })).toHaveValue('en_US');
+  await expect(line.getByLabel('翻译 1语言', { exact: true })).toHaveValue('en_MS');
   await line.getByLabel('翻译 1语言', { exact: true }).fill('ja'); await line.getByLabel('翻译 1语言', { exact: true }).press('Enter');
   await expect(line.getByRole('alert')).toHaveCount(0);
   await line.getByRole('button', { name: '删除翻译', exact: true }).first().click();

@@ -44,9 +44,9 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
   const unitLine = editor.document.lines.find((item) => item.id === selectedUnit?.lineId);
   const unitWord = unitLine?.words.find((item) => item.id === selectedUnit?.wordId);
   const unitRuby = unitWord?.rubyUnits.find((item) => item.id === selectedUnit?.rubyId);
-  const unitBegin = unitRuby?.beginUs ?? unitWord?.beginUs;
-  const unitEnd = unitRuby?.endUs ?? unitWord?.endUs;
-  const unitRange = unitBegin != null && unitEnd != null ? { begin_us: unitBegin, end_us: unitEnd } : undefined;
+  const unitBegin = unitRuby?.beginMs ?? unitWord?.beginMs;
+  const unitEnd = unitRuby?.endMs ?? unitWord?.endMs;
+  const unitRange = unitBegin != null && unitEnd != null ? { begin_ms: unitBegin, end_ms: unitEnd } : undefined;
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
       if (editor.dirty || editor.saving || editor.conflict) { event.preventDefault(); event.returnValue = ''; }
@@ -67,11 +67,11 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     onSelectUnit={(lineId, wordId, rubyId) => setSelectedUnit(wordId ? { lineId, wordId, rubyId } : null)} />
     {editor.recovery.available && <aside>发现本地草稿 <button onClick={() => void editor.restore().catch((error) => setMessage(error.message))}>恢复</button><button onClick={() => void editor.discardRecovery().catch((error) => setMessage(error.message))}>丢弃</button></aside>}
     {editor.conflict && <aside role="alert">服务器已有新版本，本地修改已保留。<button onClick={() => { setOutputIssues([]); try { exportFormat('ttml'); } catch(e) { if(e instanceof DocumentOutputError)setOutputIssues(e.issues); else setMessage(e instanceof Error ? e.message : '下载失败'); } }}>下载本地 TTML</button>{outputIssues.length>0 && <p>有 {outputIssues.length} 项需要处理，请到文件打包查看定位列表。</p>}<button onClick={() => { if (window.confirm('重新加载服务器版本并清除本地检查点？')) void editor.discardRecovery().then(() => window.location.reload()); }}>重新加载服务器</button></aside>}
-    <MediaTransport ref={transport} projectId={projectId} selectedLine={line ? { begin_us: line.beginUs, end_us: line.endUs } : undefined} loopRange={unitRange} asset={asset}
+    <MediaTransport ref={transport} projectId={projectId} selectedLine={line ? { begin_ms: line.beginMs, end_ms: line.endMs } : undefined} loopRange={unitRange} asset={asset}
       document={editor.document} selectedLineId={line?.id ?? null} selectedRomanization={selectedRomanization} onTimelineCommand={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }}
       onSelectLine={(id) => { setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
-      onPosition={(positionUs) => {
-        const active = editor.document.lines.find((item) => !item.backgroundOf && item.beginUs !== null && item.endUs !== null && item.beginUs <= positionUs && positionUs < item.endUs)?.id ?? null;
+      onPosition={(positionMs) => {
+        const active = editor.document.lines.find((item) => !item.backgroundOf && item.beginMs !== null && item.endMs !== null && item.beginMs <= positionMs && positionMs < item.endMs)?.id ?? null;
         setPlayheadLineId((current) => current === active ? current : active);
       }} /></div>;
 }

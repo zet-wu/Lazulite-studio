@@ -78,9 +78,9 @@ export function deleteSelection(document: LyricDocument, selection: EditorSelect
 export const cutSelection = deleteSelection;
 
 function expandedLineTime(target: LyricLine, words: LyricWord[]) {
-  const starts = words.map((word) => word.beginUs).filter((value): value is number => value !== null);
-  const ends = words.map((word) => word.endUs).filter((value): value is number => value !== null);
-  return { beginUs: target.beginUs === null ? null : Math.min(target.beginUs, ...starts), endUs: target.endUs === null ? null : Math.max(target.endUs, ...ends) };
+  const starts = words.map((word) => word.beginMs).filter((value): value is number => value !== null);
+  const ends = words.map((word) => word.endMs).filter((value): value is number => value !== null);
+  return { beginMs: target.beginMs === null ? null : Math.min(target.beginMs, ...starts), endMs: target.endMs === null ? null : Math.max(target.endMs, ...ends) };
 }
 
 export function moveWordsAcrossLine(document: LyricDocument, selection: Extract<EditorSelection, { kind: 'words' }>, targetLineId: string, afterWordId?: string | null): LyricCommand {
@@ -89,9 +89,9 @@ export function moveWordsAcrossLine(document: LyricDocument, selection: Extract<
   if (selected.some(({ line }) => line.id === target.id)) throw new Error('目标行必须不同于所选词所在行');
   const words = selected.map(({ word }) => word);
   if (!selected.length) throw new Error('请先选择词块');
-  const { beginUs, endUs } = expandedLineTime(target, words);
+  const { beginMs, endMs } = expandedLineTime(target, words);
   const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'move-word' }>> = [];
-  if (beginUs !== target.beginUs || endUs !== target.endUs) commands.push({ type: 'set-line-time', lineId: target.id, beginUs, endUs });
+  if (beginMs !== target.beginMs || endMs !== target.endMs) commands.push({ type: 'set-line-time', lineId: target.id, beginMs, endMs });
   let after = afterWordId === undefined ? target.words.at(-1)?.id ?? null : afterWordId;
   for (const { line, word } of selected) {
     commands.push({ type: 'move-word', lineId: line.id, wordId: word.id, toLineId: target.id, afterWordId: after });
@@ -122,7 +122,7 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
     let afterRubyId = selection.activeId;
     for (const unit of copied) {
       commands.push({ type: 'insert-ruby', lineId: selection.lineId, wordId: word.id, afterRubyId, reading: unit.reading, rubyId: unit.id });
-      if (unit.beginUs !== null || unit.endUs !== null) commands.push({ type: 'set-ruby-time', lineId: selection.lineId, wordId: word.id, rubyId: unit.id, beginUs: unit.beginUs, endUs: unit.endUs });
+      if (unit.beginMs !== null || unit.endMs !== null) commands.push({ type: 'set-ruby-time', lineId: selection.lineId, wordId: word.id, rubyId: unit.id, beginMs: unit.beginMs, endMs: unit.endMs });
       afterRubyId = unit.id;
     }
     return { command: { type: 'batch', commands },
@@ -152,8 +152,8 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
     const afterWordId = selection?.kind === 'words' && currentLine.words.some((word) => word.id === selection.activeId) ? selection.activeId : currentLine.words.at(-1)?.id ?? null;
     const words = clipboard.words.map(cloneWord);
     const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'insert-word' }>> = [];
-    const { beginUs, endUs } = expandedLineTime(currentLine, words);
-    if (beginUs !== currentLine.beginUs || endUs !== currentLine.endUs) commands.push({ type: 'set-line-time', lineId: currentLine.id, beginUs, endUs });
+    const { beginMs, endMs } = expandedLineTime(currentLine, words);
+    if (beginMs !== currentLine.beginMs || endMs !== currentLine.endMs) commands.push({ type: 'set-line-time', lineId: currentLine.id, beginMs, endMs });
     let after = afterWordId;
     for (const word of words) { commands.push({ type: 'insert-word', lineId: currentLine.id, afterWordId: after, word }); after = word.id; }
     return { command: { type: 'batch', commands }, selection: { kind: 'words', lineId: currentLine.id, ids: words.map((word) => word.id), anchorId: words[0].id, activeId: words.at(-1)!.id } };
@@ -193,7 +193,7 @@ export function pastePlain(document: LyricDocument, text: string, selection: Edi
   if (selection?.kind === 'romanization-unit') {
     const content = document.romanizationTracks.find((track) => track.id === selection.trackId)?.contents.find((item) => item.id === selection.contentId);
     if (!content || content.kind !== 'timed') throw new Error('请选择定时音译内容');
-    const unit = { id: crypto.randomUUID(), text, beginUs: null, endUs: null };
+    const unit = { id: crypto.randomUUID(), text, beginMs: null, endMs: null };
     const units = content.units.slice();
     const after = units.findIndex((item) => item.id === selection.activeId);
     units.splice(after + 1, 0, unit);

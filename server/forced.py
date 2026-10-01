@@ -1,5 +1,6 @@
 """Explicit, experimental forced-alignment boundary for Studio jobs."""
 from __future__ import annotations
+from .time_units import milliseconds
 
 import os
 from pathlib import Path
@@ -82,8 +83,8 @@ class ForcedAlignmentRunner:
             item = {
                 "line_id": unit.line_id, "input_range": list(unit.input_range), "text": unit.text,
                 "start": unit.start, "end": unit.end,
-                "start_us": round(unit.start * 1_000_000) if unit.start is not None else None,
-                "end_us": round(unit.end * 1_000_000) if unit.end is not None else None,
+                "start_ms": milliseconds(unit.start) if unit.start is not None else None,
+                "end_ms": milliseconds(unit.end) if unit.end is not None else None,
                 "granularity": unit.granularity, "confidence": unit.confidence,
             }
             if request.get("source_range") is not None:

@@ -1,9 +1,9 @@
 import { toHiragana, toRomaji } from 'wanakana';
-import type { LyricDocument, LyricLine, RomanizationContent, TimeUs } from './lyric-document';
+import type { LyricDocument, LyricLine, RomanizationContent, TimeMs } from './lyric-document';
 import type { LyricCommand } from './lyric-commands';
 
 export type RomanizationKind = 'plain' | 'timed';
-export type GeneratedUnit = { key: string; wordId: string; text: string; beginUs: TimeUs; endUs: TimeUs; hint: string };
+export type GeneratedUnit = { key: string; wordId: string; text: string; beginMs: TimeMs; endMs: TimeMs; hint: string };
 type PlainProposal = { lineId: string; kind: 'plain'; text: string; hint: string };
 type TimedProposal = { lineId: string; kind: 'timed'; groups: GeneratedUnit[] };
 export type RomanizationProposal = PlainProposal | TimedProposal;
@@ -18,8 +18,8 @@ const converted = (reading: string) => {
 
 function generateLine(line: LyricLine): GeneratedUnit[] {
   const sources: SourceUnit[] = line.words.flatMap(word => word.rubyUnits.length
-    ? word.rubyUnits.map(unit => ({ key: unit.id, wordId: word.id, reading: unit.reading, text: '', beginUs: unit.beginUs, endUs: unit.endUs, hint: '' }))
-    : [{ key: word.id, wordId: word.id, reading: word.text, text: '', beginUs: word.beginUs, endUs: word.endUs, hint: '' }]);
+    ? word.rubyUnits.map(unit => ({ key: unit.id, wordId: word.id, reading: unit.reading, text: '', beginMs: unit.beginMs, endMs: unit.endMs, hint: '' }))
+    : [{ key: word.id, wordId: word.id, reading: word.text, text: '', beginMs: word.beginMs, endMs: word.endMs, hint: '' }]);
   // Keep an owner for every normalized kana. Unknown positions remain in the sequence
   // so neither consonant nor vowel context can cross a missing reading.
   const chars = sources.flatMap((source, owner) => {
@@ -119,7 +119,7 @@ export function romanizationGenerationCommand(document: LyricDocument, source: L
   const { track, prepared } = prepareRomanization(document, source, rows, choices);
   const contents: RomanizationContent[] = prepared.map(({ row, target }) => row.kind === 'plain'
     ? { id: target === 'append' ? crypto.randomUUID() : target, lineId: row.lineId, kind: 'plain', text: row.text || ' ' }
-    : { id: target === 'append' ? crypto.randomUUID() : target, lineId: row.lineId, kind: 'timed', units: row.groups.map(({ text, beginUs, endUs }) => ({ text: text || ' ', beginUs, endUs, id: crypto.randomUUID() })) });
+    : { id: target === 'append' ? crypto.randomUUID() : target, lineId: row.lineId, kind: 'timed', units: row.groups.map(({ text, beginMs, endMs }) => ({ text: text || ' ', beginMs, endMs, id: crypto.randomUUID() })) });
   if (!track) {
     const trackId = crypto.randomUUID();
     return { type: 'batch', commands: [{ type: 'add-romanization-track', track: { id: trackId, language: 'ja-Latn', contents: [] } }, ...contents.map(content => ({ type: 'insert-romanization-content' as const, trackId, content }))] };

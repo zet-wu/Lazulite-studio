@@ -1,4 +1,4 @@
-export type Interval = { key: string; beginUs: number; endUs: number };
+export type Interval = { key: string; beginMs: number; endMs: number };
 
 function minHeap<T>(before: (a: T, b: T) => boolean) {
   const heap: T[] = [];
@@ -31,14 +31,14 @@ function minHeap<T>(before: (a: T, b: T) => boolean) {
 
 /** Exact interval partitioning, reusing the lowest free lane. O(n log n). */
 export function packIntervals(intervals: readonly Interval[]) {
-  const busy = minHeap<{ endUs: number; lane: number }>((a, b) => a.endUs < b.endUs || a.endUs === b.endUs && a.lane < b.lane);
+  const busy = minHeap<{ endMs: number; lane: number }>((a, b) => a.endMs < b.endMs || a.endMs === b.endMs && a.lane < b.lane);
   const free = minHeap<number>((a, b) => a < b);
   const lanes = new Map<string, number>();
   let laneCount = 0;
-  for (const item of [...intervals].sort((a, b) => a.beginUs - b.beginUs || a.endUs - b.endUs || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))) {
-    while (busy.peek() && busy.peek().endUs <= item.beginUs) free.push(busy.pop().lane);
+  for (const item of [...intervals].sort((a, b) => a.beginMs - b.beginMs || a.endMs - b.endMs || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))) {
+    while (busy.peek() && busy.peek().endMs <= item.beginMs) free.push(busy.pop().lane);
     const lane = free.peek() === undefined ? laneCount++ : free.pop();
-    lanes.set(item.key, lane); busy.push({ endUs: item.endUs, lane });
+    lanes.set(item.key, lane); busy.push({ endMs: item.endMs, lane });
   }
   return { lanes, laneCount };
 }

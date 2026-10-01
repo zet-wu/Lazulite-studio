@@ -2,6 +2,7 @@
 backends are deliberately injected so an unconfigured installation reports a
 capability error instead of returning fabricated transcription."""
 from __future__ import annotations
+from .time_units import milliseconds
 
 from pathlib import Path
 import os
@@ -89,8 +90,8 @@ class LazuliteEngine:
             output = {"kind": "transcribe", "engine": self.identity(), "segments": [
                 {"source_segment_id": x.source_segment_id, "text": x.text, "language": x.language,
                  "start": x.start, "end": x.end,
-                 "begin_us": round(x.start * 1_000_000) if x.start is not None else None,
-                 "end_us": round(x.end * 1_000_000) if x.end is not None else None,
+                 "begin_ms": milliseconds(x.start) if x.start is not None else None,
+                 "end_ms": milliseconds(x.end) if x.end is not None else None,
                  "confidence": x.confidence,
                  "confidence_kind": x.confidence_kind,
                  "timed_text": [{"text": t.text, "start": t.start, "end": t.end,
@@ -105,8 +106,8 @@ class LazuliteEngine:
                 aligned = align_lines(LyricDocument(lines), transcription, analysis)
                 output["kind"] = "line_align"
                 output["lines"] = [{"line_id": x.line_id, "start": x.start, "end": x.end,
-                    "begin_us": round(x.start * 1_000_000) if x.start is not None else None,
-                    "end_us": round(x.end * 1_000_000) if x.end is not None else None,
+                    "begin_ms": milliseconds(x.start) if x.start is not None else None,
+                    "end_ms": milliseconds(x.end) if x.end is not None else None,
                     "similarity": x.similarity, "score": x.score, "timing_source": x.timing_source,
                     "source_segment_ids": list(x.source_segment_ids), "issues": list(x.issues)} for x in aligned.lines]
                 output["reliable"] = aligned.reliable

@@ -7,14 +7,14 @@ it('uses half-open independent intervals across line, word and 注音 at seek an
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   const document = createLyricDocument('合成');
   const line = document.lines[0], word = line.words[0];
-  line.beginUs = 1_000_000; line.endUs = 4_000_000;
-  word.beginUs = 2_000_000; word.endUs = 3_000_000;
-  word.rubyUnits = [{ id: 'ruby', reading: 'ごうせい', beginUs: 2_000_000, endUs: 2_001_000 }];
-  const props = { document, selectedLineId: line.id, selectedRomanization: null, startUs: 0, endUs: 5_000_000, bpm: 0, snap: false,
+  line.beginMs = 1000; line.endMs = 4000;
+  word.beginMs = 2000; word.endMs = 3000;
+  word.rubyUnits = [{ id: 'ruby', reading: 'ごうせい', beginMs: 2000, endMs: 2001 }];
+  const props = { document, selectedLineId: line.id, selectedRomanization: null, startMs: 0, endMs: 5000, bpm: 0, snap: false,
     visible: { line: true, word: true, ruby: true, gap: false }, apply: vi.fn(), onSelectLine: vi.fn(), onPan: vi.fn(), onError: vi.fn() };
-  const { rerender } = render(<TimelineTracks {...props} positionUs={0} />);
-  for (const [positionUs, expected] of [[1_000_000, [true, false, false]], [2_000_000, [true, true, true]], [2_001_000, [true, true, false]], [3_000_000, [true, false, false]], [4_000_000, [false, false, false]]] as const) {
-    rerender(<TimelineTracks {...props} positionUs={positionUs} />);
+  const { rerender } = render(<TimelineTracks {...props} positionMs={0} />);
+  for (const [positionMs, expected] of [[1000, [true, false, false]], [2000, [true, true, true]], [2001, [true, true, false]], [3000, [true, false, false]], [4000, [false, false, false]]] as const) {
+    rerender(<TimelineTracks {...props} positionMs={positionMs} />);
     for (const [index, kind] of ['行', '词', '注音'].entries()) expect(screen.getByRole('button', { name: new RegExp(`^时间轴${kind} `) }).className.includes('trackPlaying')).toBe(expected[index]);
   }
   vi.unstubAllGlobals();
@@ -25,15 +25,15 @@ it('packs only visible intervals, retains crossing objects and freezes editing l
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   const { createLine } = await import('../domain/lyric-document');
   const document = createLyricDocument();
-  document.lines = [[0, 3], [1, 4], [5, 6], [6, 7]].map(([beginUs, endUs], i) => ({ ...createLine('', String(i)), beginUs: beginUs * 1e6, endUs: endUs * 1e6 }));
-  const props = { document, selectedLineId: '2', selectedRomanization: null, startUs: 0, endUs: 8e6, positionUs: 0, bpm: 0, snap: false, visible: { line: true, word: false, ruby: false, gap: false }, apply: vi.fn(), onSelectLine: vi.fn(), onPan: vi.fn(), onError: vi.fn() };
+  document.lines = [[0, 3], [1, 4], [5, 6], [6, 7]].map(([beginMs, endMs], i) => ({ ...createLine('', String(i)), beginMs: beginMs * 1e3, endMs: endMs * 1e3 }));
+  const props = { document, selectedLineId: '2', selectedRomanization: null, startMs: 0, endMs: 8e3, positionMs: 0, bpm: 0, snap: false, visible: { line: true, word: false, ruby: false, gap: false }, apply: vi.fn(), onSelectLine: vi.fn(), onPan: vi.fn(), onError: vi.fn() };
   const { rerender } = render(<TimelineTracks {...props} />);
   const bar = screen.getByRole('button', { name: '时间轴行 L3' });
   const lane = bar.parentElement!;
   expect(lane.style.height).toBe('44px'); expect(bar.style.top).toBe('1px');
   bar.setPointerCapture = vi.fn();
   fireEvent.pointerDown(bar, { clientX: 100, pointerId: 1 });
-  rerender(<TimelineTracks {...props} startUs={5.5e6} endUs={7e6} />);
+  rerender(<TimelineTracks {...props} startMs={5.5e3} endMs={7e3} />);
   expect(lane.style.height).toBe('44px'); expect(bar.style.top).toBe('1px');
   fireEvent.keyDown(window, { key: 'Escape' });
   expect(lane.style.height).toBe('22px');

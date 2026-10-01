@@ -12,8 +12,8 @@ it('selects 注音 independently and opens its card menu while leaving input con
   const lyric = createLyricDocument('歌');
   const line = lyric.lines[0], word = line.words[0];
   word.rubyUnits = [
-    { id: 'r1', reading: 'う', beginUs: null, endUs: null },
-    { id: 'r2', reading: 'た', beginUs: null, endUs: null },
+    { id: 'r1', reading: 'う', beginMs: null, endMs: null },
+    { id: 'r2', reading: 'た', beginMs: null, endMs: null },
   ];
   const apply = vi.fn();
   const { container } = render(<MemoryRouter><EditorWorkspace title="测试" document={lyric} apply={apply}
@@ -85,7 +85,7 @@ it('dispatches exactly one attachment to the nearest main row, skipping backgrou
 
 it('splits from the word menu with default graphemes and preserved spaces, opening advanced tools for a long word', () => {
   const lyric = createLyricDocument('中文 I  still e\u0301'), word = lyric.lines[0].words[0];
-  word.beginUs = 0; word.endUs = 1_000_000;
+  word.beginMs = 0; word.endMs = 1000;
   const apply = vi.fn();
   const { container, rerender } = render(<MemoryRouter><EditorWorkspace title="分词" document={lyric} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
@@ -93,7 +93,7 @@ it('splits from the word menu with default graphemes and preserved spaces, openi
   fireEvent.contextMenu(container.querySelector('[data-word-id]')!);
   fireEvent.click(screen.getByRole('menuitem', { name: '拆分词' }));
   expect(apply.mock.calls[0][0]).toMatchObject({ type: 'segment-words', changes: [{ words: [
-    { text: '中', beginUs: 0 }, { text: '文' }, { text: ' ' }, { text: 'I' }, { text: '  ' }, { text: 'still' }, { text: ' ' }, { text: 'e\u0301', endUs: 1_000_000 },
+    { text: '中', beginMs: 0 }, { text: '文' }, { text: ' ' }, { text: 'I' }, { text: '  ' }, { text: 'still' }, { text: ' ' }, { text: 'e\u0301', endMs: 1000 },
   ] }] });
   word.text = 'internationalization';
   rerender(<MemoryRouter><EditorWorkspace title="分词" document={{ ...lyric }} apply={apply}

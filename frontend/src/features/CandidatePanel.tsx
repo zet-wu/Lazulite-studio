@@ -10,9 +10,9 @@ export function proposalDocument(proposal: ImportProposal): LyricDocument {
   const document = createLyricDocument();
   document.lines = source.map((item) => {
     const line = createLine(item.text, item.id || `line-${crypto.randomUUID()}`);
-    line.beginUs = item.begin_us ?? null;
-    line.endUs = item.end_us ?? null;
-    if (line.words.length) { line.words[0].beginUs = line.beginUs; line.words[0].endUs = line.endUs; }
+    line.beginMs = item.begin_ms ?? null;
+    line.endMs = item.end_ms ?? null;
+    if (line.words.length) { line.words[0].beginMs = line.beginMs; line.words[0].endMs = line.endMs; }
     return line;
   });
   return document;

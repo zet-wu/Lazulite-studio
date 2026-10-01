@@ -33,9 +33,9 @@ def test_import_proxy_preserves_source_and_maps_nonzero_origin(tmp_path: Path) -
     proxy = service.playback_proxy(asset)
 
     assert asset.path.exists()
-    assert asset.probe.start_us > 1_900_000
+    assert asset.probe.start_ms > 1900
     assert proxy.mime_type == "audio/wav"
-    assert proxy.offset_us == 0
+    assert proxy.offset_ms == 0
     assert proxy.path.stat().st_size > 44
     with wave.open(str(proxy.path), "rb") as decoded:
         values = struct.unpack("<%dh" % (decoded.getnframes() * decoded.getnchannels()), decoded.readframes(decoded.getnframes()))
@@ -48,11 +48,11 @@ def test_peaks_are_windowed_and_versioned(tmp_path: Path) -> None:
     _make_nonzero_m4a(source)
     service = MediaService(tmp_path / "store")
     asset = service.import_asset(source)
-    peaks = service.peaks(asset, level=0, start_us=345_000, end_us=365_000)
+    peaks = service.peaks(asset, level=0, start_ms=345, end_ms=365)
 
     assert peaks.asset_hash == asset.content_hash
     assert peaks.version == "peaks-v1"
-    assert peaks.start_us == 340_000 and peaks.end_us == 370_000
+    assert peaks.start_ms == 340 and peaks.end_ms == 370
     assert len(peaks.minimum) == 3
     assert max(peaks.maximum) > 0.2
 
@@ -66,8 +66,8 @@ def test_alac_mp4_proxy_has_same_studio_origin(tmp_path: Path) -> None:
         service = MediaService(tmp_path / codec)
         asset = service.import_asset(source)
         proxy = service.playback_proxy(asset)
-        assert proxy.offset_us == 0
-        assert proxy.duration_us is not None and proxy.duration_us > 450_000
+        assert proxy.offset_ms == 0
+        assert proxy.duration_ms is not None and proxy.duration_ms > 450
 
 
 def test_pcm_window_context_limit_and_exact_sample_coordinates(tmp_path: Path) -> None:
@@ -80,17 +80,17 @@ def test_pcm_window_context_limit_and_exact_sample_coordinates(tmp_path: Path) -
         output.writeframes(b"\x00\x00\x00\x00" * (48000 * 9 + 123))
     service = MediaService(tmp_path / "store")
     asset = service.import_asset(source)
-    for first, last in [(0, 4_000_000), (3_994_667, 8_005_333), (0, 4_020_000)]:
-        data, rate, channels = service.pcm_window(asset, start_us=first, end_us=last)
+    for first, last in [(0, 4000), (3994, 8006), (0, 4020)]:
+        data, rate, channels = service.pcm_window(asset, start_ms=first, end_ms=last)
         assert rate == 48000 and channels == 2
-        assert len(data) == (round(last * rate / 1e6) - round(first * rate / 1e6)) * 4
+        assert len(data) == (round(last * rate / 1e3) - round(first * rate / 1e3)) * 4
     with pytest.raises(MediaError):
-        service.pcm_window(asset, start_us=0, end_us=4_020_001)
+        service.pcm_window(asset, start_ms=0, end_ms=4021)
     for frame in (1, 2, 255, 256, 191744, 192256):
-        timestamp = round(frame * 1e6 / 48000)
-        assert round(timestamp * 48000 / 1e6) == frame
+        timestamp = round(frame * 1e3 / 48000)
+        assert abs(timestamp * 48000 / 1e3 - frame) <= 24
     # A request past the real tail is clipped to the proxy sample count.
-    data, _, _ = service.pcm_window(asset, start_us=9_000_000, end_us=9_500_000)
+    data, _, _ = service.pcm_window(asset, start_ms=9000, end_ms=9500)
     assert len(data) == 123 * 4
-    data, _, _ = service.pcm_window(asset, start_us=0, end_us=5_334)
-    assert len(data) == 256 * 4
+    data, _, _ = service.pcm_window(asset, start_ms=0, end_ms=6)
+    assert len(data) == 288 * 4

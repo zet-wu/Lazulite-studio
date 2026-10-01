@@ -1,44 +1,44 @@
 import type { LyricCommand } from './lyric-commands';
-import type { AlignmentUnit, LyricDocument, LyricLine, LyricWord, RubyUnit, TimeUs } from './lyric-document';
+import type { AlignmentUnit, LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
 
 const safe = (value: number) => Number.isSafeInteger(value) && value >= 0;
 const cjkSyllable = (text: string) => /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+$/u.test(text);
-const shifted = (value: TimeUs, delta: number): TimeUs => {
+const shifted = (value: TimeMs, delta: number): TimeMs => {
   if (value === null) return null;
   const result = value + delta;
   if (!safe(result)) throw new Error('时间偏移超出有效范围；请减小偏移量');
   return result;
 };
 
-export function shiftLineTimes(document: LyricDocument, lineIds: string[], deltaUs: number): LyricCommand {
-  if (!Number.isSafeInteger(deltaUs)) throw new Error('时间偏移必须是整数微秒');
+export function shiftLineTimes(document: LyricDocument, lineIds: string[], deltaMs: number): LyricCommand {
+  if (!Number.isSafeInteger(deltaMs)) throw new Error('时间偏移必须是整数毫秒');
   const selected = new Set(lineIds);
   for (const line of document.lines) if (line.backgroundOf && selected.has(line.backgroundOf)) selected.add(line.id);
   const shiftedLines = document.lines.map((line): LyricLine => {
     if (!selected.has(line.id)) return line;
-    return { ...line, beginUs: shifted(line.beginUs, deltaUs), endUs: shifted(line.endUs, deltaUs),
-      endLink: line.endLink ? { ...line.endLink, originalEndUs: shifted(line.endLink.originalEndUs, deltaUs) } : null,
-      words: line.words.map((word): LyricWord => ({ ...word, beginUs: shifted(word.beginUs, deltaUs), endUs: shifted(word.endUs, deltaUs),
-        rubyUnits: word.rubyUnits.map((unit): RubyUnit => ({ ...unit, beginUs: shifted(unit.beginUs, deltaUs), endUs: shifted(unit.endUs, deltaUs) })),
-        alignmentUnits: word.alignmentUnits.map((unit): AlignmentUnit => ({ ...unit, beginUs: shifted(unit.beginUs, deltaUs), endUs: shifted(unit.endUs, deltaUs) })),
+    return { ...line, beginMs: shifted(line.beginMs, deltaMs), endMs: shifted(line.endMs, deltaMs),
+      endLink: line.endLink ? { ...line.endLink, originalEndMs: shifted(line.endLink.originalEndMs, deltaMs) } : null,
+      words: line.words.map((word): LyricWord => ({ ...word, beginMs: shifted(word.beginMs, deltaMs), endMs: shifted(word.endMs, deltaMs),
+        rubyUnits: word.rubyUnits.map((unit): RubyUnit => ({ ...unit, beginMs: shifted(unit.beginMs, deltaMs), endMs: shifted(unit.endMs, deltaMs) })),
+        alignmentUnits: word.alignmentUnits.map((unit): AlignmentUnit => ({ ...unit, beginMs: shifted(unit.beginMs, deltaMs), endMs: shifted(unit.endMs, deltaMs) })),
       })) };
   });
   const lines = shiftedLines.map((line) => {
     if (!line.endLink) return line;
     const target = shiftedLines.find((item) => item.id === line.endLink!.targetLineId)!;
-    const endUs = target.beginUs;
-    if (endUs === null || line.beginUs !== null && endUs < line.beginUs || line.words.some((word) => word.endUs !== null && word.endUs > endUs)) throw new Error('偏移后链接的行结束时间不能覆盖词块');
-    return endUs === line.endUs ? line : { ...line, endUs };
+    const endMs = target.beginMs;
+    if (endMs === null || line.beginMs !== null && endMs < line.beginMs || line.words.some((word) => word.endMs !== null && word.endMs > endMs)) throw new Error('偏移后链接的行结束时间不能覆盖词块');
+    return endMs === line.endMs ? line : { ...line, endMs };
   });
   const romanizationTracks = document.romanizationTracks.map((track) => ({ ...track, contents: track.contents.map((content) =>
     selected.has(content.lineId) && content.kind === 'timed'
-      ? { ...content, units: content.units.map((unit) => ({ ...unit, beginUs: shifted(unit.beginUs, deltaUs), endUs: shifted(unit.endUs, deltaUs) })) }
+      ? { ...content, units: content.units.map((unit) => ({ ...unit, beginMs: shifted(unit.beginMs, deltaMs), endMs: shifted(unit.endMs, deltaMs) })) }
       : content) }));
   return { type: 'replace-document', document: { ...document, lines, romanizationTracks } };
 }
 
-export function smoothWordTimes(document: LyricDocument, lineIds: string[], thresholdUs: number): { command: LyricCommand; count: number } {
-  if (!safe(thresholdUs)) throw new Error('平滑阈值必须是非负整数微秒');
+export function smoothWordTimes(document: LyricDocument, lineIds: string[], thresholdMs: number): { command: LyricCommand; count: number } {
+  if (!safe(thresholdMs)) throw new Error('平滑阈值必须是非负整数毫秒');
   const selected = new Set(lineIds);
   let count = 0;
   const lines = document.lines.map((line) => {
@@ -47,12 +47,12 @@ export function smoothWordTimes(document: LyricDocument, lineIds: string[], thre
     for (let index = 0; index < words.length - 1; index++) {
       const left = words[index], right = words[index + 1];
       if (!cjkSyllable(left.text) || !cjkSyllable(right.text)) continue;
-      if (left.endUs === null || right.beginUs === null || Math.abs(right.beginUs - left.endUs) > thresholdUs || left.endUs === right.beginUs) continue;
+      if (left.endMs === null || right.beginMs === null || Math.abs(right.beginMs - left.endMs) > thresholdMs || left.endMs === right.beginMs) continue;
       if (left.rubyUnits.length || right.rubyUnits.length || left.alignmentUnits.length || right.alignmentUnits.length) continue;
-      const middle = Math.round((left.endUs + right.beginUs) / 2);
-      if (left.beginUs !== null && middle < left.beginUs || right.endUs !== null && middle > right.endUs) continue;
-      words[index] = { ...left, endUs: middle };
-      words[index + 1] = { ...right, beginUs: middle };
+      const middle = Math.round((left.endMs + right.beginMs) / 2);
+      if (left.beginMs !== null && middle < left.beginMs || right.endMs !== null && middle > right.endMs) continue;
+      words[index] = { ...left, endMs: middle };
+      words[index + 1] = { ...right, beginMs: middle };
       count++;
     }
     return words.every((word, index) => word === line.words[index]) ? line : { ...line, words };
@@ -63,10 +63,10 @@ export function smoothWordTimes(document: LyricDocument, lineIds: string[], thre
 export function syncLineTimes(document: LyricDocument, lineIds: string[]): LyricCommand {
   const selected = new Set(lineIds);
   const commands = document.lines.filter((line) => selected.has(line.id)).flatMap((line) => {
-    const starts = line.words.map((word) => word.beginUs).filter((value): value is number => value !== null);
-    const ends = line.words.map((word) => word.endUs).filter((value): value is number => value !== null);
+    const starts = line.words.map((word) => word.beginMs).filter((value): value is number => value !== null);
+    const ends = line.words.map((word) => word.endMs).filter((value): value is number => value !== null);
     if (!starts.length && !ends.length) return [];
-    return [{ type: 'set-line-time' as const, lineId: line.id, beginUs: starts.length ? Math.min(...starts) : line.beginUs, endUs: ends.length ? Math.max(...ends) : line.endUs }];
+    return [{ type: 'set-line-time' as const, lineId: line.id, beginMs: starts.length ? Math.min(...starts) : line.beginMs, endMs: ends.length ? Math.max(...ends) : line.endMs }];
   });
   return { type: 'batch', commands };
 }

@@ -43,7 +43,7 @@ for (const dpr of [1, 1.25, 2]) test(`P3-01 plot geometry and inverse pointer ma
     const b = (await page.getByRole('slider', { name: '循环 B 边界' }).boundingBox())!;
     expect(Math.abs(a.x + a.width / 2 - bar.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(b.x + b.width / 2 - bar.x - bar.width)).toBeLessThanOrEqual(1);
-    const rects = await page.locator('[data-tick-us]').evaluateAll(nodes => nodes.map(n => ({ us: Number(n.getAttribute('data-tick-us')), x: n.getBoundingClientRect().x + n.getBoundingClientRect().width / 2 })));
+    const rects = await page.locator('[data-tick-ms]').evaluateAll(nodes => nodes.map(n => ({ us: Number(n.getAttribute('data-tick-ms')), x: n.getBoundingClientRect().x + n.getBoundingClientRect().width / 2 })));
     const span = 15; // sample asset duration 120 / 2^3
     for (const tick of rects) expect(Math.abs(tick.x - bar.x - (tick.us - 1_123_000) / (5_985_000 - 1_123_000) * bar.width)).toBeLessThanOrEqual(1);
     const canvas = page.locator('canvas').first();

@@ -12,9 +12,9 @@ it('keeps new and invalid language drafts local, commits valid input and exposes
   fireEvent.change(language, { target: { value: 'en' } }); fireEvent.blur(language);
   expect(apply).not.toHaveBeenCalled();
   fireEvent.change(text, { target: { value: 'song' } });
-  fireEvent.change(language, { target: { value: 'en_US' } }); fireEvent.blur(language);
+  fireEvent.change(language, { target: { value: 'en_MS' } }); fireEvent.blur(language);
   expect(screen.getByRole('alert')).toHaveTextContent('语言标签格式无效');
-  expect(language).toHaveValue('en_US'); expect(apply).not.toHaveBeenCalled();
+  expect(language).toHaveValue('en_MS'); expect(apply).not.toHaveBeenCalled();
   fireEvent.change(language, { target: { value: 'zh-Hans' } }); fireEvent.blur(language);
   expect(apply).toHaveBeenCalledExactlyOnceWith([{ language: 'zh-Hans', text: 'song' }]);
 });

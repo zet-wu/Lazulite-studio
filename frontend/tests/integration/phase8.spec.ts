@@ -17,15 +17,15 @@ for (const kind of ['plain', 'timed']) test(`P8 ${kind} manual result and placeh
   const semantics = (xml: string) => page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
     const doc = codec.parseLyricTtml(xml);
-    return { lines: doc.lines.map(line => ({ text: line.words.map(word => word.text).join(''), words: line.words.map(word => ({ text: word.text, beginUs: word.beginUs, endUs: word.endUs, ruby: word.rubyUnits.map(({ reading, beginUs, endUs }) => ({ reading, beginUs, endUs })) })) })), contents: doc.romanizationTracks[0].contents.map(content => content.kind === 'plain' ? { kind: content.kind, text: content.text } : { kind: content.kind, units: content.units.map(({ text, beginUs, endUs }) => ({ text, beginUs, endUs })) }) };
+    return { lines: doc.lines.map(line => ({ text: line.words.map(word => word.text).join(''), words: line.words.map(word => ({ text: word.text, beginMs: word.beginMs, endMs: word.endMs, ruby: word.rubyUnits.map(({ reading, beginMs, endMs }) => ({ reading, beginMs, endMs })) })) })), contents: doc.romanizationTracks[0].contents.map(content => content.kind === 'plain' ? { kind: content.kind, text: content.text } : { kind: content.kind, units: content.units.map(({ text, beginMs, endMs }) => ({ text, beginMs, endMs })) }) };
   }, xml);
   const draft = await semantics(saved.document.ttml);
   expect(draft.lines.map(line => line.text)).toEqual(['学校', 'しんよう', '漢字']);
   if (kind === 'plain') expect(draft.contents).toEqual([{ kind, text: ' manual  ' }, { kind, text: 'shin you' }, { kind, text: ' ' }]);
   else expect(draft.contents).toEqual([
-    { kind, units: [{ text: ' manual  ', beginUs: 0, endUs: 1e6 }, { text: 'k ', beginUs: 1e6, endUs: 2e6 }, { text: 'ko ', beginUs: 2e6, endUs: 3e6 }, { text: 'u', beginUs: 3e6, endUs: 4e6 }] },
-    { kind, units: [{ text: 'shin ', beginUs: 4e6, endUs: 5e6 }, { text: 'you', beginUs: 5e6, endUs: 6e6 }] },
-    { kind, units: [{ text: ' ', beginUs: 6e6, endUs: 8e6 }] },
+    { kind, units: [{ text: ' manual  ', beginMs: 0, endMs: 1e6 }, { text: 'k ', beginMs: 1e6, endMs: 2e6 }, { text: 'ko ', beginMs: 2e6, endMs: 3e6 }, { text: 'u', beginMs: 3e6, endMs: 4e6 }] },
+    { kind, units: [{ text: 'shin ', beginMs: 4e6, endMs: 5e6 }, { text: 'you', beginMs: 5e6, endMs: 6e6 }] },
+    { kind, units: [{ text: ' ', beginMs: 6e6, endMs: 8e6 }] },
   ]);
   await page.reload(); await expect(outline).toHaveCount(3);
   await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
