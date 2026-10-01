@@ -16,6 +16,13 @@ MAX_BYTES = 4_000_000
 KRC_KEY = b'@Gaw^2tGQ61-\xce\xd2ni'
 QRC_KEY = b'!@#)(*$%123ZXC!@!@#)(NHL'
 
+class SourceDecodeError(ValueError):
+    pass
+
+def decode_body(decoder, value):
+    try: return decoder(value)
+    except (ValueError, UnicodeError, zlib.error) as exc: raise SourceDecodeError('歌词解码失败，请重试或选择其他候选') from exc
+
 
 def inflate(data):
     decoder = zlib.decompressobj()
@@ -125,17 +132,18 @@ class Sources:
             extra = {'translation':(r.get('ytlrc' if kind == 'yrc' else 'tlyric') or r.get('tlyric') or {}).get('lyric',''), 'romanization':(r.get('yromalrc' if kind == 'yrc' else 'romalrc') or r.get('romalrc') or {}).get('lyric','')}
             metadata['ncmMusicId'] = [c.id]
         elif c.source == 'qqmusic':
-            c = self.resolve(c)
             r = self.request('https://u.y.qq.com/cgi-bin/musicu.fcg', body={'req_0':{'module':'music.musichallSong.PlayLyricInfo','method':'GetPlayLyricInfo','param':{'songMID':c.songmid or '', 'songID':int(c.songid or '0'), 'crypt':1,'type':1,'lrc_t':0,'qrc':1,'qrc_t':0,'trans':1,'trans_t':0,'roma':1,'roma_t':0}},'loginUin':'0','comm':{'uin':'0','format':'json','ct':24,'cv':0}})
             if r.get('code') != 0 or r.get('req_0',{}).get('code') != 0: raise ValueError('QQ 取词请求失败')
             r = r['req_0'].get('data',{})
-            content = decode_qq(r.get('lyric'))
+            content = decode_body(decode_qq, r.get('lyric'))
             if not content and c.songmid:
                 r = self.request('https://i.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg', params={'songmid':c.songmid,'format':'json','nobase64':1},)
                 if r.get('retcode',r.get('code',0)) != 0: raise ValueError('QQ 逐行取词失败')
-                content = decode_qq(r.get('lyric'))
+                content = decode_body(decode_qq, r.get('lyric'))
             kind = 'qrc' if re.search(r'^\[\d+,\d+\].*\(\d+,\d+\)',content,re.M) else 'lrc'
-            extra = {'translation':decode_qq(r.get('trans')), 'romanization':decode_qq(r.get('roma'))}
+            for key, field in (('translation', 'trans'), ('romanization', 'roma')):
+                try: extra[key] = decode_qq(r.get(field))
+                except (ValueError, UnicodeError, zlib.error): extra['partial'] = True
             if c.songmid: metadata['qqMusicId'] = [c.songmid]
         elif c.source == 'kugou':
             r = self.request('https://lyrics.kugou.com/search', params={'ver':1,'man':'yes','client':'pc','keyword':c.title,'hash':c.id,'duration':c.duration_ms or ''})
@@ -145,7 +153,7 @@ class Sources:
             r = self.request('https://lyrics.kugou.com/download',params={'ver':1,'client':'pc','id':str(lyric['id']),'accesskey':lyric['accesskey'],'fmt':'krc','charset':'utf8'})
             kind = 'lrc' if r.get('fmt','').lower() == 'lrc' else 'krc'
             raw = base64.b64decode(r.get('content',''),validate=True)
-            content = decode_krc(raw) if kind == 'krc' else raw.decode('utf-8')
+            content = decode_body(decode_krc, raw) if kind == 'krc' else decode_body(lambda v: v.decode('utf-8'), raw)
         else:
             if not c.platform or not c.file: raise ValueError('AMLL 候选缺少文件标识')
             kind, content = 'ttml', self.request(f'{AMLL_BASE}/{c.platform}/{c.file}',text=True)
@@ -160,6 +168,8 @@ def build_sources_router(*, write, sources=None):
         semaphore = sources.limits[source]
         if not semaphore.acquire(blocking=False): raise HTTPException(429, {'code':'source_busy','message':'此来源正在处理较多请求，请稍后重试','retryable':True})
         try: return action()
+        except SourceDecodeError as exc:
+            raise HTTPException(502, {'code':'source_decode','message':str(exc),'retryable':True}) from exc
         except httpx.HTTPError as exc:
             raise HTTPException(502, {'code':'source_network','message':f'来源网络请求失败：{type(exc).__name__}','retryable':True}) from exc
         except (ValueError, KeyError, TypeError, zlib.error) as exc:

@@ -18,3 +18,16 @@ it('selects entire metadata lists and permits empty-side deletion', () => {
  const choices=defaultChoices(a,b); expect(choices.artists).toBe('current'); expect(choices.incoming).toBe('incoming');
  expect(selectedMetadata(a,b,{...choices,only:'incoming'})).toEqual({artists:[' A ','B'],album:['old'],incoming:['y']});
 });
+it('sidecar 750 ms matching is inclusive, monotonic, one to one and rejects same-start ambiguity',()=>{
+ const p=parsePayload({empty:false,format:'qrc',content:'[1000,500]甲(1000,500)\n[3000,500]乙(3000,500)',metadata:{},translation:'[00:01.750]one\n[00:03.751]outside',romanization:'[1750,500]a(1750,500)'});
+ expect(p.partial).toBe(true);expect(p.document.lines[0].translations[0].text).toBe('one');expect(p.document.lines[1].translations).toEqual([]);
+ const content=p.document.romanizationTracks[0].contents[0];expect(content.kind==='timed' && content.units[0].beginUs).toBe(1750000);
+ const ambiguous=parsePayload({empty:false,format:'qrc',content:'[1000,500]甲(1000,500)\n[1000,500]乙(1000,500)',metadata:{},translation:'[00:01]ambiguous'});
+ expect(ambiguous.document.lines.every(l=>!l.translations.length)).toBe(true);expect(ambiguous.partial).toBe(true);
+});
+it('malformed optional blocks do not block body; malformed body and empty body still fail',()=>{
+ const p=parsePayload({empty:false,format:'krc',content:'[language:broken]\n[1000,500]<0,500,0>甲',metadata:{},translation:'broken'});
+ expect(p.document.lines).toHaveLength(1);expect(p.partial).toBe(true);expect(p.badges).toContain('KRC');
+ expect(()=>parsePayload({empty:false,format:'qrc',content:'[1000,500]甲(1000,500)\nbroken body',metadata:{}})).toThrow('正文格式');
+ expect(()=>parsePayload({empty:false,format:'lrc',content:'[00:01] ',metadata:{}})).toThrow('可用正文');
+});

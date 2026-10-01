@@ -21,7 +21,7 @@ export function detectLyricFormat(name: string): LyricFormat {
   throw new Error('不支持此文件格式');
 }
 
-export function importLyricFile(content: string, format: Exclude<LyricFormat, 'ass'>): LyricDocument {
+export function importLyricFile(content: string, format: Exclude<LyricFormat, 'ass'>, onSidecarIssue?: () => void): LyricDocument {
   if (new TextEncoder().encode(content).length > maximumSize) throw new Error('歌词文件不能超过 4 MB');
   if (format === 'ttml') return parseLyricTtml(content);
   if (format === 'txt') {
@@ -29,7 +29,7 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
     if (!text.length || text.length > 20_000) throw new Error('歌词行数无效');
     return { ...createLyricDocument(), lines: text.map((value) => createLine(value)) };
   }
-  if (format === 'krc' || format === 'yrc' || format === 'qrc') return parseWordFormat(content, format);
+  if (format === 'krc' || format === 'yrc' || format === 'qrc') return parseWordFormat(content, format, onSidecarIssue);
   if (format === 'lrc' || format === 'elrc') return parseLrcSource(content);
   const parsed = parseTimed[format](content);
   if (!parsed.length || parsed.length > 20_000) throw new Error('未解析出歌词行或行数过多');

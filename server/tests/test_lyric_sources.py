@@ -43,3 +43,10 @@ def test_upstream_failure_is_not_empty():
     s=Sources(httpx.MockTransport(lambda request: httpx.Response(429)))
     with pytest.raises(httpx.HTTPStatusError): s.search('netease','x')
     with pytest.raises(ValueError): Candidate(source='amll',id='x',file='../secret.ttml')
+
+def test_qq_optional_decode_failure_keeps_body():
+    service = Sources()
+    service.request = lambda *args, **kwargs: {'code': 0, 'req_0': {'code': 0, 'data': {'lyric': '[1000,500]body(1000,500)', 'trans': 'badbase64', 'roma': '[00:01]roma'}}}
+    payload = service.fetch(Candidate(source='qqmusic', id='1', songmid='mid', songid='1'))
+    assert payload['format'] == 'qrc' and payload['content'] == '[1000,500]body(1000,500)'
+    assert payload['partial'] is True and payload['romanization'] == '[00:01]roma'

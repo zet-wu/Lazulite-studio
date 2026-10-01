@@ -1,6 +1,6 @@
 import { createLyricDocument, createLine, createWord, lineText, type LyricDocument, type LyricLine, type RomanizationTrack } from '../domain/lyric-document';
 const time = (ms: number) => { if (!Number.isFinite(ms) || ms < 0) throw new Error('歌词时间无效'); return Math.round(ms * 1000); };
-export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc'): LyricDocument {
+export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc', onSidecarIssue: () => void = () => {}): LyricDocument {
   if (kind === 'qrc' && text.trim().startsWith('<')) {
     const xml = new DOMParser().parseFromString(text, 'application/xml');
     const content = xml.querySelector('[LyricContent]')?.getAttribute('LyricContent');
@@ -8,8 +8,12 @@ export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc'): Lyri
   }
   const d = createLyricDocument(); d.lines = [];
   const offset = Number(text.match(/^\[offset:([+-]?\d+)\]/m)?.[1] ?? 0);
-  for (const raw of text.split(/\r?\n/)) {
-    const row = raw.match(/^\[(\d+),(\d+)\](.*)$/); if (!row) continue;
+  for (const [index, raw] of text.split(/\r?\n/).entries()) {
+    const row = raw.match(/^\[(\d+),(\d+)\](.*)$/);
+    if (!row) {
+      if (raw.trim() && !/^\[[a-zA-Z]+:.*\]$/.test(raw.trim())) throw new Error(`第 ${index+1} 行正文格式无效`);
+      continue;
+    }
     const start = Number(row[1]), line = createLine(''); line.beginUs = time(start + offset); line.endUs = time(start + Number(row[2]) + offset);
     const pattern = kind === 'krc' ? /<(\d+),(\d+),\d+>([\s\S]*?)(?=<\d+,\d+,\d+>|$)/g : kind === 'yrc' ? /\((\d+),(\d+),\d+\)([\s\S]*?)(?=\(\d+,\d+,\d+\)|$)/g : /([\s\S]*?)\((\d+),(\d+)\)/g;
     let consumed = 0;
@@ -25,20 +29,25 @@ export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc'): Lyri
   if (kind === 'krc') {
     const language = text.match(/^\[language:([^\]]+)\]/m)?.[1];
     if (language) {
-      const payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(language), c => c.charCodeAt(0))));
-      for (const part of payload.content ?? []) {
-        if (part.type !== 0 && part.type !== 1) continue;
-        if (!Array.isArray(part.lyricContent) || part.lyricContent.length !== d.lines.length) throw new Error('KRC 附属内容行数与正文不符');
-        const track: RomanizationTrack = { id: crypto.randomUUID(), language: null, contents: [] };
-        part.lyricContent.forEach((values: string[], i: number) => {
-          if (!Array.isArray(values) || values.some(v => typeof v !== 'string')) throw new Error('KRC 附属内容无效');
-          const line = d.lines[i];
-          if (part.type === 1) { if (values.join('')) line.translations.push({ language: null, text: values.join('') }); }
-          else if (values.length === line.words.length) track.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'timed', units: values.map((v, j) => ({ id: crypto.randomUUID(), text: v, beginUs: line.words[j].beginUs, endUs: line.words[j].endUs })) });
-          else track.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: values.join('') });
-        });
-        if (track.contents.length) d.romanizationTracks.push(track);
-      }
+      // Only this optional language block is recoverable; body parsing above is strict.
+      try {
+        const payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(language), c => c.charCodeAt(0))));
+        if (!Array.isArray(payload.content)) throw new Error('KRC 附属块格式无效');
+        for (const part of payload.content) {
+          if (part.type !== 0 && part.type !== 1) { onSidecarIssue(); continue; }
+          if (!Array.isArray(part.lyricContent)) { onSidecarIssue(); continue; }
+          if (part.lyricContent.length !== d.lines.length) onSidecarIssue();
+          const track: RomanizationTrack = { id: crypto.randomUUID(), language: null, contents: [] };
+          part.lyricContent.forEach((values: unknown, i: number) => {
+            const line = d.lines[i];
+            if (!line || !Array.isArray(values) || values.some(v => typeof v !== 'string')) { onSidecarIssue(); return; }
+            if (part.type === 1) { if (values.join('')) line.translations.push({ language: null, text: values.join('') }); }
+            else if (values.length === line.words.length) track.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'timed', units: values.map((v, j) => ({ id: crypto.randomUUID(), text: v, beginUs: line.words[j].beginUs, endUs: line.words[j].endUs })) });
+            else if (values.join('')) track.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: values.join('') });
+          });
+          if (track.contents.length) d.romanizationTracks.push(track);
+        }
+      } catch (error) { if (!(error instanceof Error)) throw error; onSidecarIssue(); }
     }
   }
   return d;
@@ -84,10 +93,16 @@ export function attachSidecar(d: LyricDocument, text: string, kind: 'translation
   const timed = /^\[\d+,\d+\].*\(\d+,\d+\)/m.test(text);
   const side = timed ? parseWordFormat(text, 'qrc') : parseLrcSource(text), issues: string[] = [];
   const track: RomanizationTrack = { id: crypto.randomUUID(), language: null, contents: [] };
+  const mains = d.lines.filter(l=>!l.backgroundOf && l.beginUs !== null).slice().sort((a,b)=>a.beginUs!-b.beginUs!);
+  const counts = new Map<number,number>();
+  for (const main of mains) counts.set(main.beginUs!, (counts.get(main.beginUs!) ?? 0)+1);
+  let cursor = 0;
   for (const line of side.lines) {
-    const matches = d.lines.filter(main => main.beginUs === line.beginUs);
-    if (matches.length !== 1) { issues.push(`附属歌词 ${line.beginUs! / 1000000}s 无唯一对应主行：${lineText(line)}`); continue; }
-    const main = matches[0];
+    const start = line.beginUs!;
+    while (cursor < mains.length && mains[cursor].beginUs! < start - 750000) ++cursor;
+    const main = mains[cursor];
+    if (!main || Math.abs(main.beginUs! - start) > 750000 || counts.get(main.beginUs!)! > 1) { issues.push('附属行无唯一对应'); continue; }
+    ++cursor;
     if (kind === 'translation') main.translations.push({ language: null, text: lineText(line) });
     else track.contents.push(timed ? { id: crypto.randomUUID(), lineId: main.id, kind: 'timed', units: line.words.map(w => ({ id: crypto.randomUUID(), text: w.text, beginUs: w.beginUs, endUs: w.endUs })) } : { id: crypto.randomUUID(), lineId: main.id, kind: 'plain', text: lineText(line) });
   }
