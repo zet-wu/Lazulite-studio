@@ -63,5 +63,19 @@ export function stampSync(document: LyricDocument, cursor: SyncCursor, action: S
     changes.set(current.lineId, updateUnit(read(current.lineId), current, 'endUs', timeUs));
     if (next) changes.set(next.lineId, updateUnit(read(next.lineId), next, 'beginUs', timeUs));
   }
-  return { ...document, lines: document.lines.map((line) => changes.get(line.id) ?? line) };
+  const lines = document.lines.map((line) => changes.get(line.id) ?? line);
+  // A linked end follows the target start, but never excludes the source words.
+  // Validate the whole result before exposing the single timing transaction.
+  return { ...document, lines: lines.map(line => {
+    if (!line.endLink || !changes.has(line.endLink.targetLineId)) return line;
+    const target = changes.get(line.endLink.targetLineId)!;
+    const original = document.lines.find(item => item.id === target.id)!;
+    if (target.beginUs === original.beginUs) return line;
+    const endUs = target.beginUs;
+    if (endUs === null || line.beginUs !== null && line.beginUs > endUs || line.words.some(word => word.endUs !== null && word.endUs > endUs)) {
+      throw new Error('打轴会使关联行终点早于行起点或排除已有词，请先处理行尾链接');
+    }
+    return { ...line, endUs };
+  }) };
+
 }

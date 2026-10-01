@@ -110,3 +110,22 @@ it('preserves line margins and its unchanged link, and limits line-mode successo
   const outside = stampSync(state.present, cursor, 'end', 12_000_000, 'line');
   expect(outside.lines[0]).toMatchObject({ beginUs: 0, endUs: 12_000_000, endLink: null });
 });
+
+it('updates incoming line links and rejects an excluded word without changing document or history', () => {
+  const document = createLyricDocument('source');
+  const source = document.lines[0];
+  source.beginUs = 0; source.endUs = 10_000_000;
+  source.words[0].beginUs = 0; source.words[0].endUs = 8_000_000;
+  const target = createLine('target'); target.beginUs = 10_000_000; target.endUs = 20_000_000;
+  target.words[0].beginUs = 12_000_000; target.words[0].endUs = 18_000_000;
+  source.endLink = { targetLineId: target.id, originalEndUs: 8_000_000 };
+  document.lines.push(target);
+  const state = createLyricEditorState(document), cursor = syncUnits(document)[1];
+  const accepted = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeUs: 9_000_000 });
+  expect(accepted.present.lines[0]).toMatchObject({ endUs: 9_000_000, endLink: source.endLink });
+  expect(accepted.present.lines[1].beginUs).toBe(9_000_000);
+  expect(undoLyricCommand(accepted).present).toBe(document);
+  expect(() => executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeUs: 7_000_000 })).toThrow(/关联行/);
+  expect(state.present).toBe(document); expect(state.past).toHaveLength(0);
+  expect(source.endUs).toBe(10_000_000); expect(target.beginUs).toBe(10_000_000);
+});
