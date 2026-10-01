@@ -7,10 +7,11 @@ it('allows disjoint arrow scopes but rejects global and fixed conflicts with exa
   expect(bindingError('play', defaultBindings.previous, defaultBindings)).toContain('冲突');
   expect(bindingError('start', { ...defaultBindings.start, ctrl: true }, defaultBindings)).toContain('固定');
   expect(matchesBinding(new KeyboardEvent('keydown', { code: 'KeyS', shiftKey: true }), defaultBindings.start)).toBe(false);
-  const custom = captureBinding(new KeyboardEvent('keydown', { code: 'KeyG', metaKey: true, shiftKey: true }));
+  const custom = captureBinding(new KeyboardEvent('keydown', { code: 'KeyG', altKey: true, shiftKey: true }));
   expect(bindingError('start', custom, defaultBindings)).toBeNull();
-  expect(formatBinding(custom, true)).toBe('⌘ + ⇧ + G');
-  expect(formatBinding(custom, false)).toBe('Win + Shift + G');
+  expect(bindingError('start', { ...custom, alt: false, meta: true }, defaultBindings)).toContain('系统/浏览器');
+  expect(formatBinding(custom, true)).toBe('⌥ + ⇧ + G');
+  expect(formatBinding(custom, false)).toBe('Alt + Shift + G');
 });
 it('migrates valid old keys and rejects fixed or overlapping legacy bindings', () => {
   localStorage.clear();

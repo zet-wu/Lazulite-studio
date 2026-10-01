@@ -24,7 +24,7 @@ const same = (a: Binding, b: Binding) => a.code === b.code && a.ctrl === b.ctrl 
 export function bindingError(action: ShortcutAction, binding: Binding, bindings: Bindings): string | null {
   if (!/^(Key[A-Z]|Digit[0-9]|Arrow(Left|Right|Up|Down)|Home|End|Space|F[1-9][0-9]?|Numpad[0-9])$/.test(binding.code)) return '此按键保留给文本或控件操作';
   if (/^F/.test(binding.code) || (binding.alt && (/^Arrow/.test(binding.code) || binding.code === 'Space')) ||
-    ((binding.ctrl || binding.meta) && /^(Key[ACVXSZYWLNTRPQHJKOFDB]|Digit[0-9]|Space|Arrow.*|Home|End)$/.test(binding.code)) ||
+    ((binding.ctrl || binding.meta) && /^(Key[ACVXSZYWLNTRPQHJKOFDBEGUIM]|Digit[0-9]|Space|Arrow.*|Home|End)$/.test(binding.code)) ||
     (binding.ctrl && binding.alt)) return '此组合键用于固定操作或系统/浏览器，不能可靠接管';
   const scope = shortcutActions[action][0];
   for (const other of Object.keys(shortcutActions) as ShortcutAction[]) {
