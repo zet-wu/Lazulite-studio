@@ -1,4 +1,5 @@
 import { parseWordFormat, parseLrcSource } from './source-codec';
+import { assertOutputDocument } from './output-validation';
 import { renderLrc } from './lrc';
 import { parseEslrc, parseLrc, parseLys, parseQrc, parseYrc, stringifyAss, stringifyEslrc, stringifyLrc, stringifyLys, stringifyQrc, stringifyYrc, type LyricLine as FormatLine } from '@applemusic-like-lyrics/lyric';
 import { createLine, createLyricDocument, createWord, type LyricDocument, type RomanizationTrack } from '../domain/lyric-document';
@@ -56,9 +57,10 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
     romanizationTracks: [timedTrack, plainTrack].filter((track) => track.contents.length) };
 }
 
-export function exportLyricFile(document: LyricDocument, format: LyricFormat, draft = false): string {
+export function exportLyricFile(document: LyricDocument, format: LyricFormat): string {
   if (format === 'krc') throw new Error('KRC 目前仅支持导入');
-  if (format === 'ttml') return serializeLyricTtml(document, { draft });
+  assertOutputDocument(document,format);
+  if (format === 'ttml') return serializeLyricTtml(document);
   if (format === 'txt') return document.lines.filter((line) => !line.backgroundOf).map((line) => line.words.map((word) => word.text).join('')).join('\n') + '\n';
   if (format === 'lrc' || format === 'elrc') return renderLrc(document, format).text;
   const preview = new Map(toAmllLines(document, false, true).map((item) => [item.id, item.lyric]));

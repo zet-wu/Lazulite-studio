@@ -1,3 +1,4 @@
+import { assertOutputDocument, visibleLineOrdinals } from './output-validation';
 import { lineText, type LyricDocument, type LyricLine } from '../domain/lyric-document';
 export type LrcKind = 'lrc' | 'elrc';
 const ms = (us: number) => Math.round(us / 1000);
@@ -16,7 +17,9 @@ function extended(line: LyricLine, ordinal: number): string {
 }
 /** Pure export projection: inferred ends never become source times. */
 export function renderLrc(document: LyricDocument, kind: LrcKind = 'lrc'): { text: string; overlapLines: number[] } {
-  const rows = document.lines.map((line, index) => ({ line, ordinal: index + 1 })).filter(({ line }) => !line.backgroundOf);
+  assertOutputDocument(document,kind);
+  const ordinals=visibleLineOrdinals(document);
+  const rows = document.lines.map((line) => ({ line, ordinal: ordinals.get(line.id)! })).filter(({ line }) => !line.backgroundOf);
   for (const { line, ordinal } of rows) {
     if (line.beginUs === null) throw new Error(`第 ${ordinal} 行缺少开始时间`);
     if (line.endUs !== null && ms(line.endUs) < ms(line.beginUs)) throw new Error(`第 ${ordinal} 行结束早于开始`);

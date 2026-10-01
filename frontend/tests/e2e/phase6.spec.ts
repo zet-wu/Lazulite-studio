@@ -176,9 +176,9 @@ test('P6 western splitting and inline space-only words preserve independent whit
   await expect(line.locator('[data-word-id]')).toHaveCount(8);
   await expect(line.locator('[data-word-id]').last().locator('[class*="wordMain"] input')).toHaveValue('  ');
   await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '下载草稿', exact: true }).click();
+  await page.getByRole('button', { name: '下载歌词', exact: true }).click();
   const xml = await (await import('node:fs/promises')).readFile(await (await download).path(), 'utf8');
-  expect(xml).toContain('>  </span>');
+  expect(xml).toContain('  '); expect(xml).not.toContain('studio:');
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(line.locator('[data-word-id]')).toHaveCount(7);
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(line.locator('[data-word-id]')).toHaveCount(1);

@@ -1,0 +1,23 @@
+import { expect, test } from 'vitest';
+import { collectOutputIssues } from '../src/adapters/output-validation';
+import { createLyricDocument, createLine, createWord } from '../src/domain/lyric-document';
+test('issues use visible main/background ordinals, stable object IDs and duplicate track numbers',()=>{
+ const d=createLyricDocument(),main=createLine('x'), bg=createLine('bg'),next=createLine('next');bg.backgroundOf=main.id;d.lines=[main,bg,next];
+ main.words[0].rubyUnits=[{id:'ruby',reading:'r',beginUs:null,endUs:null}];
+ d.romanizationTracks=['t1','t2'].map(id=>({id,language:'ja-Latn',contents:[{id:`${id}c`,lineId:next.id,kind:'timed',units:[{id:`${id}u`,text:'text',beginUs:null,endUs:null}]}]}));
+ const issues=collectOutputIssues(d,'publish');
+ expect(issues.some(i=>i.lineId===bg.id && i.message.startsWith('第 1 行 · 背景'))).toBe(true);
+ expect(issues.find(i=>i.rubyId==='ruby')?.missing).toEqual(['begin','end']);
+ expect(issues.find(i=>i.trackId==='t2')?.message).toBe('第 2 行 · ja-Latn 轨道 2 音译第 1 单元：缺少开始和结束时间');
+ expect(issues.every(i=>!i.message.includes(main.id) && !i.message.includes('text'))).toBe(true);
+ expect(collectOutputIssues(d,'lrc').every(i=>i.kind==='line' && i.lineId!==bg.id)).toBe(true);
+ expect(collectOutputIssues(d,'ttml').map(i=>i.kind)).toEqual(['romanization-unit','romanization-unit']);
+});
+test('blank romanization exception is precise and format validation ignores unwritten tracks',()=>{
+ const d=createLyricDocument('x');d.lines[0].beginUs=0;d.lines[0].endUs=1000000;
+ d.lines[0].words=[{...createWord('x'),beginUs:0,endUs:1000000}];
+ d.romanizationTracks=[{id:'t',language:null,contents:[{id:'c',lineId:d.lines[0].id,kind:'timed',units:[{id:'u',text:' ',beginUs:null,endUs:null}]}]}];
+ expect(collectOutputIssues(d,'publish')).toEqual([]);
+ const c=d.romanizationTracks[0].contents[0];if(c.kind!=='timed')throw new Error('fixture');c.units[0].beginUs=0;
+ expect(collectOutputIssues(d,'ttml')[0].missing).toEqual(['end']);expect(collectOutputIssues(d,'lrc')).toEqual([]);
+});

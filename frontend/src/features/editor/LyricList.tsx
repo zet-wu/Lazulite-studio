@@ -7,7 +7,7 @@ type Props = {
   lines: LyricLine[];
   append?: () => void;
   renderLine: (line: LyricLine, index: number) => ReactNode;
-  locate: { id: string; serial: number } | null;
+  locate: { id: string; serial: number; focus?: string } | null;
 };
 
 /** Only explicit requests scroll this container. At most two measured corrections. */
@@ -16,16 +16,18 @@ type ListProps = Props & { handled: RefObject<number | null> };
 function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate, handled }: ListProps, mountTarget?: (index: number | null) => void) {
   useEffect(() => {
     if (!locate || handled.current === locate.serial) return;
-    handled.current = locate.serial;
     const scroller = scrollRef.current!;
     const index = lines.findIndex(line => line.id === locate.id);
     if (index < 0) return;
     mountTarget?.(index);
     let frame = 0, attempts = 0, corrections = 0, previous = NaN, stable = 0, settledAt = 0;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let focused = false;
     const targetTop = () => {
-      const target = [...scroller.querySelectorAll<HTMLElement>('[data-line-id]')].find(node => node.dataset.lineId === locate.id);
+      const line = [...scroller.querySelectorAll<HTMLElement>('[data-line-id]')].find(node => node.dataset.lineId === locate.id);
+      const target = locate.focus ? line?.querySelector<HTMLElement>(locate.focus) ?? (locate.focus === ':scope' ? line : null) : line;
       if (!target) return null;
+      if (locate.focus && !focused) { target.focus({ preventScroll: true }); focused = true; handled.current = locate.serial; }
       const row = target.getBoundingClientRect(), view = scroller.getBoundingClientRect();
       const raw = scroller.scrollTop + row.top - view.top - (row.height >= view.height ? 0 : (view.height - row.height) / 2);
       return Math.max(0, Math.min(scroller.scrollHeight - scroller.clientHeight, raw));
@@ -39,6 +41,7 @@ function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate,
         if (corrections === 0 && (stable >= 2 || attempts >= 12)) {
           mountTarget?.(null); // Supersede the virtualizer's coarse index reconciliation.
           scroller.scrollTo({ top, behavior: reduced ? 'instant' : 'smooth' });
+          handled.current = locate.serial;
           corrections++; settledAt = now + (reduced ? 32 : 650);
         } else if (corrections === 1 && now >= settledAt) {
           if (Math.abs(scroller.scrollTop - top) > 1) scroller.scrollTo({ top, behavior: reduced ? 'instant' : 'smooth' });

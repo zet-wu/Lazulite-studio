@@ -20,7 +20,7 @@ it.each(['lrc', 'eslrc', 'qrc', 'yrc', 'lys'] as const)('exports and imports %s 
 
 it('exports ASS and rejects an untimed final file', () => {
   const document = createLyricDocument('歌');
-  expect(() => exportLyricFile(document, 'ass')).toThrow(/补全每行时间/);
+  expect(() => exportLyricFile(document, 'ass')).toThrow(/第 1 行：缺少开始和结束时间/);
   document.lines[0].beginUs = 1_000_000; document.lines[0].endUs = 2_000_000;
   expect(exportLyricFile(document, 'ass')).toContain('[Events]');
 });

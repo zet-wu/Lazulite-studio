@@ -277,7 +277,7 @@ test('P3-08 file input survives cancellation, same-file reselection and format e
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
   await page.getByLabel('导出格式').selectOption('txt');
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '导出所选格式' }).click();
+  await page.getByRole('button', { name: '下载歌词' }).click();
   expect((await download).suggestedFilename()).toMatch(/\.txt$/);
   await expect(page.locator('[data-top-menu="file"]')).toHaveCount(0);
 

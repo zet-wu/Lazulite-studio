@@ -28,7 +28,7 @@ test('edits and exports a rich local draft with canvas undo and redo', async ({ 
   await expect(page.getByRole('textbox', { name: '词 今日改', exact: true })).toBeVisible();
   await openMenu(page, '文件');
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '下载草稿' }).click();
+  await page.getByRole('button', { name: '下载歌词' }).click();
   const xml = await readFile(await (await download).path(), 'utf8');
   expect(xml).toContain('今日改');
   expect(xml).toContain('きょ');

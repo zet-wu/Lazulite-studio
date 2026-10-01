@@ -44,7 +44,7 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   expect(semantic.appended).toEqual([{ text: '追加', beginUs: null, endUs: null }, { text: '  ', beginUs: null, endUs: null }]);
   expect(semantic.units).toMatchObject({ kind: 'timed', units: [{ text: 'ai', beginUs: 1_000_000 }, { text: '', beginUs: 0, endUs: 6_000_000 }, { text: '  ', beginUs: 0, endUs: 6_000_000 }] });
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
-  const download = page.waitForEvent('download'); await page.getByRole('button', { name: '最终 TTML', exact: true }).click();
+  const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
   const xml = await readFile(await (await download).path(), 'utf8');
   await importLyrics(page, { name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await expect(line.getByLabel('翻译 1语言', { exact: true })).toHaveValue('ja');

@@ -90,7 +90,10 @@ def validate_publish_ttml(path: str | Path, max_duration: float | None = None) -
         if any(key in {f"{{{TTP_NS}}}{name}" for name in unsupported_clock} for key in element.attrib):
             raise PublishInvalid("unsupported TTML clock parameter")
         if f"{{{STUDIO_NS}}}null" in element.attrib:
-            if not (element.tag == f"{{{TTML_NS}}}span" and not list(element) and (element.text or '').isspace()):
+            if not (element.tag in (f"{{{TTML_NS}}}span", "{http://music.apple.com/lyric-ttml-internal}span")
+                    and not list(element) and (element.text or '').isspace()
+                    and set(element.get(f"{{{STUDIO_NS}}}null", '').split()) == {'begin', 'end'}
+                    and element.get('begin') is None and element.get('end') is None):
                 raise PublishInvalid("draft timing null is not publishable")
         begin, end = element.get("begin"), element.get("end")
         if begin is not None or end is not None:
@@ -135,12 +138,22 @@ class PublishRunner:
         ttml = None
         if isinstance(media, MP4):
             validate_publish_ttml(source, media_duration_us(asset) / 1_000_000)
-            # Strip editor-only attributes without changing timing or lyric content.
             tree = ET.parse(source)
-            for element in tree.iter():
+            root = tree.getroot()
+            # Convert only validated, fully untimed whitespace spans to text in place.
+            for parent in root.iter():
+                previous = None
+                for child in list(parent):
+                    if child.get(f"{{{STUDIO_NS}}}null") is not None and (child.text or '').isspace() and not list(child):
+                        text = (child.text or '') + (child.tail or '')
+                        if previous is None: parent.text = (parent.text or '') + text
+                        else: previous.tail = (previous.tail or '') + text
+                        parent.remove(child)
+                    else: previous = child
+            for element in root.iter():
                 for key in list(element.attrib):
                     if key.startswith('{'+STUDIO_NS+'}'): del element.attrib[key]
-            ttml = ET.tostring(tree.getroot(), encoding='utf-8')
+            ttml = ET.tostring(root, encoding='utf-8')
         output = self.output_root / f"{uuid.uuid4().hex}{asset.suffix or '.mp4'}"
         try:
             result = self.publisher.publish(ttml, asset, output, request['lrc_text'], request.get('target_track_id'))

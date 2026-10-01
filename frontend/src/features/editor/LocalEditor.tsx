@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRecoveryAdapter } from '../../adapters/recovery';
-import { serializeLyricTtml } from '../../adapters/ttml/lyric-codec';
 import { exportLyricFile, type LyricFormat } from '../../adapters/lyric-formats';
 import { createLyricEditorState, executeLyricCommand, redoLyricCommand, undoLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
 import { createLyricDocument, type LyricDocument } from '../../domain/lyric-document';
@@ -55,13 +54,8 @@ export function LocalEditor() {
     } catch (error) { setMessage(error instanceof Error ? error.message : '保存检查点失败'); }
     finally { setSaving(false); }
   };
-  const exportFile = (draft: boolean) => {
-    try { download(serializeLyricTtml(state.present, { draft }), name.replace(/\.ttml$/i, '') + (draft ? '.draft.ttml' : '.ttml')); setMessage(null); }
-    catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
-  };
   const exportFormat = (format: LyricFormat) => {
-    try { download(exportLyricFile(state.present, format), name.replace(/\.[^.]*$/, '') + '.' + (format === 'elrc' ? 'extended.lrc' : format)); setMessage(null); }
-    catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
+    download(exportLyricFile(state.present, format), name.replace(/\.[^.]*$/, '') + '.' + (format === 'elrc' ? 'extended.lrc' : format));
   };
   const createNew = async () => {
     if (dirty && !window.confirm('当前修改尚未保存，确定新建吗？')) return;
@@ -74,5 +68,5 @@ export function LocalEditor() {
   return <EditorWorkspace title={name} document={state.present} apply={apply} undo={() => commitState(undoLyricCommand(stateRef.current))} redo={() => commitState(redoLyricCommand(stateRef.current))}
     canUndo={state.past.length > 0} canRedo={state.future.length > 0} dirty={dirty} saving={saving} error={message}
     onSave={() => void save()} onImportName={setName} onNew={() => void createNew()}
-    onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat} />;
+    onExportFormat={exportFormat} />;
 }

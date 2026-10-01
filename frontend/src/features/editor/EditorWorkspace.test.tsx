@@ -18,7 +18,7 @@ it('selects Ruby independently and opens its card menu while leaving input conte
   const apply = vi.fn();
   const { container } = render(<MemoryRouter><EditorWorkspace title="测试" document={lyric} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
-    onSave={() => {}} onDraft={() => {}} onFinal={() => {}} /></MemoryRouter>);
+    onSave={() => {}} /></MemoryRouter>);
   const tile = container.querySelector<HTMLElement>('[data-ruby-id="r1"]')!;
   fireEvent.click(tile);
   expect(screen.getByText('Ruby已选 1')).toBeVisible();
@@ -35,7 +35,7 @@ it('routes desktop history shortcuts only outside inputs, dialogs and IME compos
   const undo = vi.fn(), redo = vi.fn(), onSave = vi.fn();
   const { container } = render(<MemoryRouter><EditorWorkspace title="测试" document={lyric} apply={() => {}}
     undo={undo} redo={redo} canUndo canRedo dirty onSave={onSave}
-    onDraft={() => {}} onFinal={() => {}} /></MemoryRouter>);
+    /></MemoryRouter>);
   const line = container.querySelector<HTMLElement>('[data-line-id]')!;
   const word = screen.getByRole('textbox', { name: '词 歌' });
   fireEvent.keyDown(line, { key: 'z', ctrlKey: true });
@@ -62,7 +62,7 @@ it('rejects an occupied preceding main row without searching farther back or cha
   const apply = vi.fn();
   render(<MemoryRouter><EditorWorkspace title="背景" document={lyric} selectedLineId={lyric.lines[3].id} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
-    onSave={() => {}} onDraft={() => {}} onFinal={() => {}} /></MemoryRouter>);
+    onSave={() => {}} /></MemoryRouter>);
   expect(screen.getByLabelText('所属主行')).toBeDisabled();
   fireEvent.click(screen.getByLabelText('背景歌词'));
   expect(apply).not.toHaveBeenCalled();
@@ -78,7 +78,7 @@ it('dispatches exactly one attachment to the nearest main row, skipping backgrou
   const apply = vi.fn();
   render(<MemoryRouter><EditorWorkspace title="背景" document={lyric} selectedLineId={lyric.lines[3].id} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
-    onSave={() => {}} onDraft={() => {}} onFinal={() => {}} /></MemoryRouter>);
+    onSave={() => {}} /></MemoryRouter>);
   fireEvent.click(screen.getByLabelText('背景歌词'));
   expect(apply).toHaveBeenCalledExactlyOnceWith({ type: 'set-background-of', lineId: lyric.lines[3].id, parentLineId: lyric.lines[2].id });
 });
@@ -89,7 +89,7 @@ it('splits from the word menu with default graphemes and preserved spaces, openi
   const apply = vi.fn();
   const { container, rerender } = render(<MemoryRouter><EditorWorkspace title="分词" document={lyric} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
-    onSave={() => {}} onDraft={() => {}} onFinal={() => {}} /></MemoryRouter>);
+    onSave={() => {}} /></MemoryRouter>);
   fireEvent.contextMenu(container.querySelector('[data-word-id]')!);
   fireEvent.click(screen.getByRole('menuitem', { name: '拆分词' }));
   expect(apply.mock.calls[0][0]).toMatchObject({ type: 'segment-words', changes: [{ words: [
@@ -98,7 +98,7 @@ it('splits from the word menu with default graphemes and preserved spaces, openi
   word.text = 'internationalization';
   rerender(<MemoryRouter><EditorWorkspace title="分词" document={{ ...lyric }} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
-    onSave={() => {}} onDraft={() => {}} onFinal={() => {}} /></MemoryRouter>);
+    onSave={() => {}} /></MemoryRouter>);
   fireEvent.contextMenu(container.querySelector('[data-word-id]')!);
   fireEvent.click(screen.getByRole('menuitem', { name: '拆分词' }));
   expect(screen.getByRole('dialog', { name: '分词' })).toBeVisible();

@@ -435,6 +435,9 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
           else {
             if (!draft && !content.units.length) throw new Error(`Timed transliteration ${content.id} has no units`);
             for (const unit of content.units) {
+              if (!draft && /^\s+$/.test(unit.text) && unit.beginUs === null && unit.endUs === null) {
+                textNode.appendChild(xml.createTextNode(unit.text)); continue;
+              }
               if (!draft && (unit.beginUs === null || unit.endUs === null)) throw new Error(`Transliteration unit ${unit.id} needs timing`);
               const span = xml.createElementNS(ITUNES, 'span');
               if (draft) span.setAttributeNS(STUDIO, 'studio:id', unit.id);

@@ -18,8 +18,6 @@ type Props = MenuState & {
   inspectorVisible: boolean;
   onToggleOutline: () => void;
   onToggleInspector: () => void;
-  onDraft: () => void;
-  onFinal: () => void;
   onExportFormat?: (format: LyricFormat) => void;
 };
 

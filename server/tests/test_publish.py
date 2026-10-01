@@ -115,3 +115,34 @@ def test_packaging_options_are_part_of_job_identity_and_output(tmp_path):
             assert MP4(BytesIO(response.content))["\xa9lyr"] == [body["lrc_text"]]
         assert client.post(url,json={**extended,"lrc_kind":"lrc"},headers=headers).status_code == 422
         assert client.post(url,json={**ordinary,"asset_id":"other"},headers=headers).status_code == 422
+
+
+def test_publish_untimed_transliteration_whitespace_copy_and_missing_endpoint(tmp_path):
+    from pathlib import Path
+    import xml.etree.ElementTree as ET
+    from server.publishing import extract_stpp
+    settings = Settings('pw', False, 'http://studio')
+    with TestClient(create_app(tmp_path, settings), base_url='https://studio') as client:
+        headers = _headers(client, settings); pid, asset = _project(client, headers, tmp_path)
+        initial = client.get(f'/api/v1/projects/{pid}/document').json()['revision']
+        xml = '''<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><head><metadata><iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><transliterations><transliteration xml:lang="ja-Latn"><text for="L1"><span begin="0s" end="0.4s">a</span><span studio:null="begin end">  </span><span begin="0.4s" end="1s"> </span></text></transliteration></transliterations></iTunesMetadata></metadata></head><body><p xml:id="L1" begin="0s" end="1s">hello</p></body></tt>'''
+        revision = _save(client, headers, pid, initial, xml)
+        body = {'revision': revision, 'asset_id': asset, 'lrc_kind': 'lrc', 'lrc_text': '[00:00.000]hello\n[00:01.000]\n'}
+        job = client.post(f'/api/v1/projects/{pid}/publish', json=body, headers=headers).json()['id']
+        assert _wait(client, job)['status'] == 'succeeded'
+        source = client.get(f'/api/v1/projects/{pid}/lyrics').text
+        assert source == xml
+        from server.db import Database
+        with Database(tmp_path / 'studio.sqlite3').connect() as c:
+            import json
+            result = json.loads(c.execute('SELECT result_json FROM jobs WHERE id=?', (job,)).fetchone()[0])
+        pure = extract_stpp(Path(result['output_path']))
+        root = ET.fromstring(pure)
+        text = root.find('.//{http://music.apple.com/lyric-ttml-internal}text')
+        assert ''.join(text.itertext()) == 'a   ' and len(list(text)) == 2
+        assert all(not k.startswith('{urn:lazulite:studio:draft}') for element in root.iter() for k in element.attrib)
+        for invalid in (xml.replace('studio:null="begin end">  ', 'studio:null="end" begin="0.4s">  '), xml.replace('studio:null="begin end">  ', 'studio:null="begin end">real')):
+            bad = _save(client, headers, pid, revision, invalid); revision = bad
+            job = client.post(f'/api/v1/projects/{pid}/publish', json={**body, 'revision': bad}, headers=headers).json()['id']
+            assert _wait(client, job)['status'] == 'failed'
+            assert client.get(f'/api/v1/projects/{pid}/exports/{job}/download').status_code == 409

@@ -69,7 +69,7 @@ test('P4-07 independent background saves, exchanges and is visible after its par
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '最终 TTML' }).click();
+  await page.getByRole('button', { name: '下载歌词' }).click();
   const path = (await (await download).path())!;
   await importLyrics(page, { name: 'reopened.ttml', mimeType: 'application/ttml+xml', buffer: await (await import('node:fs/promises')).readFile(path) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(2);
@@ -125,7 +125,7 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '最终 TTML' }).click();
+  await page.getByRole('button', { name: '下载歌词' }).click();
   const finalXml = await readFile((await (await download).path())!, 'utf8');
   for (const xml of [saved.document.ttml, finalXml]) {
     const result = await page.evaluate(async xml => {

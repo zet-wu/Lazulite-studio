@@ -36,7 +36,7 @@ test('P7 linked split, translation ownership and generated timed track persist t
   expect(draft.lines[2]).toMatchObject({ endLink: { targetLineId: 'missing', originalEndUs: 6e6 }, translations: [{ language: 'zh-Hans', text: '后行' }] });
   expect(draft.tracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ kind: 'timed', units: [{ text: 'ga ', beginUs: 0, endUs: 1e6 }, { text: 'k ', beginUs: 1e6, endUs: 2e6 }, { text: 'ko ', beginUs: 2e6, endUs: 3e6 }, { text: 'u', beginUs: 3e6, endUs: 4e6 }] }] });
   await page.reload(); await expect(outline).toHaveCount(4);
-  await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '最终 TTML', exact: true }).click();
+  await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
   const finalXml = await readFile(await (await download).path(), 'utf8'); const final = await semantics(finalXml);
   expect(final.lines.map(({ endLink: _link, ...line }) => line)).toEqual(draft.lines.map(({ endLink: _link, ...line }) => line));
   expect(final.lines.every(line => line.endLink === null)).toBe(true);

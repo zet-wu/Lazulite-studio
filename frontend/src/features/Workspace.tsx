@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { studioApi, studioS4, type Asset } from '../adapters/http/client';
-import { serializeLyricTtml } from '../adapters/ttml/lyric-codec';
+import { DocumentOutputError, type OutputIssue } from '../adapters/output-validation';
 import { exportLyricFile, type LyricFormat } from '../adapters/lyric-formats';
 import type { LyricLine } from '../domain/lyric-document';
 import { MediaTransport, type TransportHandle } from './MediaTransport';
@@ -36,6 +36,7 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     });
   const [selectedLineId, setSelectedLineId] = useState<string | null>(params.get('line'));
   const [message, setMessage] = useState('');
+  const [outputIssues,setOutputIssues] = useState<OutputIssue[]>([]);
   const [playheadLineId, setPlayheadLineId] = useState<string | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<{ lineId: string; wordId: string; rubyId: string | null } | null>(null);
   const [selectedRomanization, setSelectedRomanization] = useState<{ trackId: string; contentId: string } | null>(null);
@@ -54,23 +55,18 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     return () => window.removeEventListener('beforeunload', warn);
   }, [editor.dirty, editor.saving, editor.conflict]);
   if (editor.deleted) return <main><p role="alert">项目已删除，不能继续保存或恢复。</p><a href="/projects">返回项目列表</a></main>;
-  const exportFile = (draft: boolean) => {
-    try { download(serializeLyricTtml(editor.document, { draft }), `${title}${draft ? '.draft' : ''}.ttml`); setMessage(''); }
-    catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
-  };
   const exportFormat = (format: LyricFormat) => {
-    try { download(exportLyricFile(editor.document, format), `${title}.${format === 'elrc' ? 'extended.lrc' : format}`); setMessage(''); }
-    catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }
+    download(exportLyricFile(editor.document, format), `${title}.${format === 'elrc' ? 'extended.lrc' : format}`);
   };
   return <div className={styles.editorShell}><EditorWorkspace embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
-    canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} error={message || editor.error}
-    onSave={() => void editor.save()} onDraft={() => exportFile(true)} onFinal={() => exportFile(false)} onExportFormat={exportFormat}
+    canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} outputIssues={outputIssues} error={message || editor.error}
+    onSave={() => void editor.save()} onExportFormat={exportFormat}
     saveForPackaging={editor.saveForPackaging}
     selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
     onSelectRomanization={(trackId, contentId) => setSelectedRomanization({ trackId, contentId })}
     onSelectUnit={(lineId, wordId, rubyId) => setSelectedUnit(wordId ? { lineId, wordId, rubyId } : null)} />
     {editor.recovery.available && <aside>发现本地草稿 <button onClick={() => void editor.restore().catch((error) => setMessage(error.message))}>恢复</button><button onClick={() => void editor.discardRecovery().catch((error) => setMessage(error.message))}>丢弃</button></aside>}
-    {editor.conflict && <aside role="alert">服务器已有新版本，本地修改已保留。<button onClick={() => exportFile(true)}>下载本地草稿</button><button onClick={() => { if (window.confirm('重新加载服务器版本并清除本地检查点？')) void editor.discardRecovery().then(() => window.location.reload()); }}>重新加载服务器</button></aside>}
+    {editor.conflict && <aside role="alert">服务器已有新版本，本地修改已保留。<button onClick={() => { setOutputIssues([]); try { exportFormat('ttml'); } catch(e) { if(e instanceof DocumentOutputError)setOutputIssues(e.issues); else setMessage(e instanceof Error ? e.message : '下载失败'); } }}>下载本地 TTML</button>{outputIssues.length>0 && <p>有 {outputIssues.length} 项需要处理，请到文件打包查看定位列表。</p>}<button onClick={() => { if (window.confirm('重新加载服务器版本并清除本地检查点？')) void editor.discardRecovery().then(() => window.location.reload()); }}>重新加载服务器</button></aside>}
     <MediaTransport ref={transport} projectId={projectId} selectedLine={line ? { begin_us: line.beginUs, end_us: line.endUs } : undefined} loopRange={unitRange} asset={asset}
       document={editor.document} selectedLineId={line?.id ?? null} selectedRomanization={selectedRomanization} onTimelineCommand={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }}
       onSelectLine={(id) => { setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}

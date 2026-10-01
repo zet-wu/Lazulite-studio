@@ -41,3 +41,7 @@
 :global([data-theme=dark]) .badgeRed { background: #512b36; color: #ffb9c1; }
 .previewError { display: flex; align-items: start; gap: 8px; overflow-wrap: anywhere; font-size: 13px; }
 .previewError span { min-width: 0; flex: 1; }
+.outputIssues { font-size: 13px; }
+.outputIssues p { margin: 4px 0; }
+.outputIssues ul { margin: 0; padding-left: 20px; max-height: 28vh; overflow: auto; }
+.outputIssues button { text-align: left; color: var(--blue); border: 0; background: transparent; padding: 4px 0; }

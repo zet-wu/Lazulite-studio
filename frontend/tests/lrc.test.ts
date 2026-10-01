@@ -16,6 +16,6 @@ it('does not infer ends or include background', () => {
 });
 it('rejects internal overlap only in extended LRC', () => {
  const a = line('', 1000, 5000); a.words = [{ ...createWord('甲'), beginUs: 1000000, endUs: 3000000 }, { ...createWord('乙'), beginUs: 2000000, endUs: null }];
- expect(() => renderLrc(doc(a), 'elrc')).toThrow('第 1 行第 2 单元'); expect(renderLrc(doc(a)).text).toContain('甲乙');
+ expect(() => renderLrc(doc(a), 'elrc')).toThrow('第 1 行第 2 词'); expect(renderLrc(doc(a)).text).toContain('甲乙');
 });
 it('rounds before gap comparisons', () => { expect(renderLrc(doc(line('甲', 1000, 2000.4), line('乙', 2000.49, 3000))).text).toBe('[00:01.000]甲\n[00:02.000]乙\n[00:03.000]\n'); });

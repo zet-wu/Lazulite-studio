@@ -1,3 +1,4 @@
+import { visibleLineOrdinals, type OutputIssue } from '../../adapters/output-validation';
 import { AcquisitionStore } from '../../acquisition-store';
 import { useSearchConditions } from '../useSearchConditions';
 import { LyricAcquisition } from '../LyricAcquisition';
@@ -54,11 +55,10 @@ type Props = {
   dirty: boolean;
   saving?: boolean;
   error?: string | null;
+  outputIssues?: OutputIssue[];
   onSave: () => void;
   onNew?: () => void;
   onImportName?: (name: string) => void;
-  onDraft: () => void;
-  onFinal: () => void;
   onExportFormat?: (format: LyricFormat) => void;
   saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument } | undefined>;
   selectedLineId?: string | null;
@@ -129,9 +129,9 @@ export function EditorWorkspace(props: Props) {
   const [romanizationGeneration, setRomanizationGeneration] = useState<string[] | null>(null);
   const [rubyGeneration, setRubyGeneration] = useState<{ lineIds: string[]; trackId?: string; contentId?: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; title: string; actions: ContextAction[]; target: HTMLElement } | null>(null);
-  const [locate, setLocate] = useState<{ id: string; serial: number } | null>(null);
+  const [locate, setLocate] = useState<{ id: string; serial: number; focus?: string } | null>(null);
   const locateSerial = useRef(0);
-  const requestLocate = (id: string) => setLocate({ id, serial: ++locateSerial.current });
+  const requestLocate = (id: string, focus?: string) => setLocate({ id, focus, serial: ++locateSerial.current });
   const pendingFocus = useRef<string | null>(null);
   useEffect(() => {
     setSelection((current) => {
@@ -176,7 +176,7 @@ export function EditorWorkspace(props: Props) {
   const activeLineId = selectionLineId(selection) ?? props.selectedLineId;
   const selectedLine = document.lines.find((line) => line.id === activeLineId) ?? document.lines[0];
   const mainLines = document.lines.filter((line) => !line.backgroundOf);
-  const ordinalById = new Map(mainLines.map((line, index) => [line.id, index + 1]));
+  const ordinalById = visibleLineOrdinals(document);
   const mainIds = mainLines.map((line) => line.id);
   const occupiedParents = new Set(document.lines.filter(line => line.backgroundOf && line.id !== selectedLine?.id).map(line => line.backgroundOf));
   const selectedMainLines = selectedLine?.backgroundOf ? [] : selection?.kind === 'lines' && selection.ids.length
@@ -239,6 +239,24 @@ export function EditorWorkspace(props: Props) {
     setSelection({ kind: 'romanization-unit', lineId, trackId, contentId, ids, anchorId: shift || toggle ? previous?.anchorId ?? unitId : unitId, activeId: unitId });
     props.onSelectLine?.(lineId);
     props.onSelectRomanization?.(trackId, contentId);
+  };
+  const locateIssue = (issue: OutputIssue) => {
+    const line=document.lines.find(l=>l.id===issue.lineId);
+    if(!line)return;
+    setMode('edit');
+    let focus=':scope';
+    if(issue.kind==='word' || issue.kind==='ruby') {
+      const word=line.words.find(w=>w.id===issue.wordId); if(!word)return;
+      if(issue.rubyId) { selectRuby(line,word,issue.rubyId); focus=`[data-ruby-id="${CSS.escape(issue.rubyId)}"]`; }
+      else { selectWord(line,word); focus=`[data-word-id="${CSS.escape(word.id)}"]`; }
+    } else if(issue.kind==='romanization-unit') {
+      selectRomanizationUnit(line.id,issue.trackId!,issue.contentId!,issue.unitId!);
+      focus=`[data-romanization-unit-id="${CSS.escape(issue.unitId!)}"]`;
+    } else if(issue.kind==='romanization-content') {
+      selectRomanizationContent(line.id,issue.trackId!,issue.contentId!);
+      focus=`[data-romanization-content-id="${CSS.escape(issue.contentId!)}"]`;
+    } else selectLine(line);
+    requestLocate(line.id,focus);
   };
   const dispatch = (command: LyricCommand) => {
     try { apply(command); setMessage(''); return true; }
@@ -598,7 +616,7 @@ export function EditorWorkspace(props: Props) {
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
     <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['edit','编辑'],['sync','打轴'],['preview','预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
     {mode === 'acquire' && <LyricAcquisition store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
-    {mode === 'package' && <PackagingPanel {...props} />}
+    {mode === 'package' && <PackagingPanel {...props} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
     {mode === 'auxiliary' && <section className={styles.auxiliaryPlaceholder}><h1>项目辅助</h1><p>候选、任务、词典与审核流程将在后续阶段整理到此处。歌词文档与播放器保持当前状态。</p></section>}
     {mode === 'preview' && <Suspense fallback={<p>正在载入预览…</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={props.onSelectLine} /></Suspense>}
     {mode === 'sync' && <SyncPanel document={document} currentLineId={selectedLine?.id ?? null} apply={dispatch} transport={props.transport}
