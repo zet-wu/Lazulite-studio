@@ -1,7 +1,6 @@
-import { OutputIssues } from './OutputIssues';
-import { collectOutputIssues, DocumentOutputError, type OutputIssue } from '../adapters/output-validation';
+import { collectOutputIssues, uniqueOutputIssues, DocumentOutputError, type OutputIssue } from '../adapters/output-validation';
 import { jobsApi } from '../adapters/http/jobs';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { publishingApi } from '../adapters/http/publishing';
 import { requestHeaders } from '../adapters/http/client';
@@ -11,20 +10,20 @@ import { validatePublishDocument } from '../adapters/publish-validation';
 import styles from './acquisition.module.css';
 type Info = { filename: string; format_label: string; asset_id: string; supported: boolean; container: string | null; tracks: { track_id: number; language: string; name: string }[]; error: string | null };
 const active = new Set(['queued','running','processing','cancel_requested']);
-export function MusicPackaging({ projectId, document, saveForPackaging, locateIssue }: { locateIssue: (issue: OutputIssue)=>void; projectId: string; document: LyricDocument; saveForPackaging: () => Promise<{ revision: string; document: LyricDocument } | undefined> }) {
+export function MusicPackaging({ projectId, document, saveForPackaging, onIssues }: { onIssues: (issues: OutputIssue[])=>void; projectId: string; document: LyricDocument; saveForPackaging: () => Promise<{ revision: string; document: LyricDocument } | undefined> }) {
  const client = useQueryClient();
  const info = useQuery({ queryKey:['packaging',projectId], queryFn:async (): Promise<Info> => { const r=await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/packaging`,{headers:requestHeaders(),credentials:'include'}); if (!r.ok) throw new Error('无法读取源文件打包信息'); return r.json(); } });
  const exports = useQuery({ queryKey:['exports',projectId], queryFn:()=>publishingApi.list(projectId), refetchInterval:q=>q.state.data?.items.some(i=>active.has(i.status)) ? 1500 : false });
  const [kind,setKind] = useState<LrcKind>('lrc'), [track,setTrack] = useState<number | null>(null), [busy,setBusy] = useState(false), [message,setMessage] = useState('');
- const [issues,setIssues] = useState<OutputIssue[]>([]);
+ useEffect(()=>{onIssues([]);},[kind,track,document,onIssues]);
  const [captured,setCaptured] = useState<LyricDocument | null>(null);
  const publish = async () => {
    if (!info.data || busy) return;
-   setBusy(true); setMessage(''); setIssues([]);
+   setBusy(true); setMessage(''); onIssues([]);
    try {
      const snapshot = document, target = track, asset = info.data.asset_id;
      const problems=[...collectOutputIssues(snapshot,kind),...(info.data.container === 'mp4' ? collectOutputIssues(snapshot,'publish') : [])];
-     const unique=problems.filter((issue,i)=>problems.findIndex(p=>p.message===issue.message)===i);
+     const unique=uniqueOutputIssues(problems);
      if(unique.length)throw new DocumentOutputError(unique);
      const lrc=renderLrc(snapshot,kind).text;
      if (info.data.container === 'mp4') validatePublishDocument(snapshot);
@@ -33,7 +32,7 @@ export function MusicPackaging({ projectId, document, saveForPackaging, locateIs
      setCaptured(snapshot);
      await publishingApi.publish(projectId,saved.revision,asset,{lrc_kind:kind,lrc_text:lrc,target_track_id:target});
      setMessage(`已提交打包，修订 ${saved.revision}`); await client.invalidateQueries({queryKey:['exports',projectId]});
-   } catch(e) { if(e instanceof DocumentOutputError)setIssues(e.issues);else setMessage(e instanceof Error ? e.message : '打包失败'); }
+   } catch(e) { if(e instanceof DocumentOutputError)onIssues(uniqueOutputIssues(e.issues));else setMessage(e instanceof Error ? e.message : '打包失败'); }
    finally { setBusy(false); }
  };
  return <>
@@ -45,7 +44,6 @@ export function MusicPackaging({ projectId, document, saveForPackaging, locateIs
  {info.isError && <p role="alert">读取失败 <button onClick={()=>void info.refetch()}>重试</button></p>}
  {info.data && !info.data.supported && <p role="alert">{info.data.error ?? '源音频格式不支持打包；可下载歌词文件。'}</p>}
  <button onClick={()=>void publish()} disabled={busy || !info.data?.supported || Boolean(info.data.tracks.length && !track)}>{busy ? '保存并提交中…' : '保存并打包'}</button>
- <OutputIssues issues={issues} locate={locateIssue} />
  {message && <p role="status">{message}</p>}{captured && captured !== document && <p>当前歌词有较新修改，已提交任务使用之前捕获的修订。</p>}
  <h2>历史产物</h2>{exports.isError && <p>记录读取失败 <button onClick={()=>void exports.refetch()}>重试</button></p>}
  {exports.data?.items.map(item=>{
