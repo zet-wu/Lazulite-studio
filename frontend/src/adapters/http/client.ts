@@ -202,6 +202,7 @@ export const studioApi = {
     sourceAssetId: string,
     idempotencyKey: string,
     signal?: AbortSignal,
+    sourceFilename?: string,
   ) =>
     mutate(
       "/projects",
@@ -212,7 +213,7 @@ export const studioApi = {
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ name, source_asset_id: sourceAssetId }),
+        body: JSON.stringify({ name, source_asset_id: sourceAssetId, source_filename: sourceFilename }),
       },
       isProjectSummary,
     ),

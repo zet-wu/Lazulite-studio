@@ -25,3 +25,7 @@
 
 .tableWrap { overflow: auto; min-height: 0; flex: 1; }
 .actions { flex-shrink: 0; }
+
+.searchFields { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; flex-shrink: 0; }
+.searchFields label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; min-width: 0; }
+.searchFields input { min-width: 0; width: 100%; box-sizing: border-box; }

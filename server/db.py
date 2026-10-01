@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS projects (
  id TEXT PRIMARY KEY, name TEXT NOT NULL, source_asset_id TEXT, current_revision TEXT,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS search_conditions (
+ project_id TEXT PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL, album TEXT NOT NULL,
+ FOREIGN KEY(project_id) REFERENCES projects(id)
+);
 CREATE TABLE IF NOT EXISTS assets (
  id TEXT PRIMARY KEY, sha256 TEXT NOT NULL UNIQUE, size INTEGER NOT NULL,
  mime TEXT NOT NULL, filename TEXT, playable INTEGER NOT NULL DEFAULT 0,

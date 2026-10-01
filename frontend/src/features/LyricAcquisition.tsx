@@ -1,3 +1,4 @@
+import type { useSearchConditions } from './useSearchConditions';
 import { NetworkLyrics } from './NetworkLyrics';
 import type { Source } from '../adapters/http/lyric-sources';
 import { decodeKrcFile } from '../adapters/source-codec';
@@ -17,7 +18,7 @@ export function selectedMetadata(current: LyricDocument, incoming: LyricDocument
     return values?.length ? [[key, [...values]]] : [];
   }));
 }
-export function LyricAcquisition({ document, apply, onImported, onNew, onImportName }: { document: LyricDocument; apply: (command: LyricCommand) => void; onImported: () => void; onNew?: () => void; onImportName?: (name: string) => void }) {
+export function LyricAcquisition({ searchConditions, document, apply, onImported, onNew, onImportName }: { searchConditions: ReturnType<typeof useSearchConditions>; document: LyricDocument; apply: (command: LyricCommand) => void; onImported: () => void; onNew?: () => void; onImportName?: (name: string) => void }) {
   const [tab, setTab] = useState('file');
   const [text, setText] = useState('');
   const [format, setFormat] = useState<Exclude<LyricFormat, 'ass'>>('txt');
@@ -53,7 +54,7 @@ export function LyricAcquisition({ document, apply, onImported, onNew, onImportN
     <section className={styles.pane}><h2>歌词获取</h2><div className={styles.tabs} role="tablist" aria-label="歌词来源">
       {[['netease','网易云音乐'],['qqmusic','QQ 音乐'],['kugou','酷狗'],['amll','AMLL DB'],['file', '文件'], ['text', '文本']].map(([id, label]) => <button key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; setTab(id); setFilename(null); setIncoming(null); setMessage(''); }}>{label}</button>)}
     </div>
-      {!['file','text'].includes(tab) && <NetworkLyrics key={tab} source={tab as Source} document={document} apply={apply} stage={stage} clear={() => setIncoming(null)} />}
+      {!['file','text'].includes(tab) && <NetworkLyrics searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} stage={stage} clear={() => setIncoming(null)} />}
       {tab === 'file' && <><p className={styles.hint}>选择歌词后预览，确认导入才会替换当前歌词。</p><button onClick={() => fileInput.current?.click()}>选择歌词文件</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
       {tab === 'text' && <><label>文本格式 <select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</select></label><textarea aria-label="待导入歌词文本" value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button onClick={() => parse(text, format)}>预览文本</button></>}
       {onNew && <button onClick={onNew}>新建空白歌词</button>}

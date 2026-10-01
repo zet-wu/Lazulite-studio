@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from .auth import Settings
 from .db import Database
+from .search_conditions import SearchConditions, initial_conditions, read_conditions
 from .documents import DocumentService, build_router
 from .job_routes import create_job_router
 from .jobs import JobService
@@ -107,6 +108,7 @@ def create_app(
     class ProjectCreate(BaseModel):
         name: str = Field(min_length=1, max_length=200)
         source_asset_id: str
+        source_filename: str | None = Field(default=None, max_length=1000)
 
     def asset_dto(row):
         metadata = json.loads(row[10] or "{}")
@@ -313,6 +315,8 @@ def create_app(
                 "INSERT INTO projects VALUES(?,?,?,?,?,?)",
                 (pid, name, body.source_asset_id, rev, t, t),
             )
+            conditions = initial_conditions(root / "assets" / asset[1][:2] / asset[1], body.source_filename or asset[4])
+            c.execute("INSERT INTO search_conditions VALUES(?,?,?,?)", (pid, conditions['title'], conditions['artist'], conditions['album']))
             c.execute(
                 "INSERT INTO revisions VALUES(?,?,?,?,?)",
                 (rev, pid, None, str(path), t),
@@ -396,6 +400,20 @@ def create_app(
             "document_status": "draft",
             "asset": asset_dto(a) if a else None,
         }
+
+    @api.get("/projects/{pid}/search-conditions")
+    def get_search_conditions(pid: str, _: object = Depends(auth)):
+        project(pid)
+        with db.connect() as c:
+            return read_conditions(c, pid)
+
+    @api.put("/projects/{pid}/search-conditions")
+    def put_search_conditions(pid: str, body: SearchConditions, _: object = Depends(write)):
+        with db.transaction() as c:
+            if not c.execute("SELECT 1 FROM projects WHERE id=?", (pid,)).fetchone():
+                fail("project_not_found", "项目不存在", 404)
+            c.execute("INSERT INTO search_conditions VALUES(?,?,?,?) ON CONFLICT(project_id) DO UPDATE SET title=excluded.title,artist=excluded.artist,album=excluded.album", (pid, body.title, body.artist, body.album))
+        return body.model_dump()
 
     @api.delete("/projects/{pid}")
     def remove_project(pid: str, _: object = Depends(write)):

@@ -1,10 +1,11 @@
+import type { useSearchConditions } from './useSearchConditions';
 import { useEffect, useRef, useState } from 'react';
 import { parsePayload, sourceRequest, type Candidate, type Payload, type Source } from '../adapters/http/lyric-sources';
 import type { LyricDocument } from '../domain/lyric-document';
 import type { LyricCommand } from '../domain/lyric-commands';
 import styles from './acquisition.module.css';
-export function NetworkLyrics({ source, document, apply, stage, clear }: { source: Source; document: LyricDocument; apply: (c: LyricCommand) => void; stage: (d: LyricDocument) => void; clear: () => void }) {
- const [query, setQuery] = useState(() => [...(document.metadata.title ?? []), ...(document.metadata.artist ?? [])].join(' '));
+export function NetworkLyrics({ searchConditions, source, document, apply, stage, clear }: { searchConditions: ReturnType<typeof useSearchConditions>; source: Source; document: LyricDocument; apply: (c: LyricCommand) => void; stage: (d: LyricDocument) => void; clear: () => void }) {
+ const query = searchConditions.values.title;
  const [rows, setRows] = useState<Candidate[]>([]), [selected, setSelected] = useState<Candidate | null>(null);
  const [message, setMessage] = useState(''), [busy, setBusy] = useState(false), [searched, setSearched] = useState(false);
  const [badges, setBadges] = useState<Record<string, string[]>>({});
@@ -39,8 +40,10 @@ export function NetworkLyrics({ source, document, apply, stage, clear }: { sourc
    try { apply({ type: 'set-metadata', key, values: [...old, id] }); setMessage('歌曲 ID 已关联，可撤销'); }
    catch (e) { setMessage(e instanceof Error ? e.message : '关联失败'); }
  };
- return <><form className={styles.actions} onSubmit={e => { e.preventDefault(); void search(); }}><input aria-label="搜索歌曲" value={query} onChange={e => { invalidate(); setQuery(e.target.value); setRows([]); setSelected(null); setSearched(false); }} /><button disabled={!query.trim()}>搜索</button></form>
- <p className={styles.hint}>在线获取需要已认证服务。选择候选后读取实际歌词属性。</p>
+ return <><form className={styles.searchFields} onSubmit={e => { e.preventDefault(); void search(); }}>
+ {(['title','artist','album'] as const).map((field, i) => <label key={field}>{['标题','艺术家','专辑'][i]}<input aria-label={['搜索标题','搜索艺术家','搜索专辑'][i]} maxLength={2000} disabled={!searchConditions.ready} value={searchConditions.values[field]} onChange={e => searchConditions.change(field,e.target.value)} /></label>)}
+ <button disabled={!searchConditions.ready || !query.trim()}>搜索</button></form>
+ {searchConditions.error && <p role="alert">{searchConditions.error} <button onClick={() => void searchConditions.retry()}>重试保存条件</button></p>}
  <div className={styles.results}>{rows.map(c => <button key={c.id} aria-pressed={selected?.id === c.id} onClick={() => void fetchCandidate(c)}>{c.title}<small>{c.artists.join(' / ')} · {c.album}{c.duration_ms ? ` · ${(c.duration_ms / 1000).toFixed(0)} 秒` : ''}</small><small>{badges[c.id]?.join(' · ') ?? '尚未获取歌词'}</small></button>)}</div>
  {busy && <p role="status">正在请求… <button onClick={invalidate}>取消请求</button></p>}{searched && !rows.length && <p>没有搜索结果</p>}{message && <p role="status">{message}</p>}
  <div className={styles.actions}><button disabled={!id} onClick={link}>仅关联歌曲 ID</button>{selected && <button onClick={() => void fetchCandidate(selected)}>重新取词</button>}</div>

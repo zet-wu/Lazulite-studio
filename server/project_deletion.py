@@ -37,7 +37,7 @@ def delete_project(db, root: Path, pid: str):
                     staged.append((path, destination))
             for job in jobs:
                 c.execute('DELETE FROM job_events WHERE job_id=?', (job[0],))
-            for table in ('job_idempotency', 'jobs', 'reading_dictionary', 'review_confirmations', 'review_versions'):
+            for table in ('search_conditions', 'job_idempotency', 'jobs', 'reading_dictionary', 'review_confirmations', 'review_versions'):
                 c.execute(f'DELETE FROM {table} WHERE project_id=?', (pid,))
             for identity in [pid, *(r[0] for r in revisions)]:
                 c.execute("DELETE FROM idempotency WHERE json_extract(response,'$.id')=? OR json_extract(response,'$.project_id')=?", (identity, pid))

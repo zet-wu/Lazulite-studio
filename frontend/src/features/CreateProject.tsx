@@ -90,6 +90,7 @@ export function CreateProject({
         uploaded.id,
         key,
         active.signal,
+        file?.name,
       );
       if (token.current !== current) return;
       setStatus("done");
