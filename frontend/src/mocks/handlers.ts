@@ -6,8 +6,11 @@ const scenario = () => new URL(location.href).searchParams.get('scenario') ?? 'n
 const response = <T>(body: T) => scenario() === 'loading' ? new Promise<never>(() => undefined) : HttpResponse.json(body as Record<string, unknown>);
 const error = (status: number, code: string, message: string, retryable = false) => HttpResponse.json({ code, message, request_id: `mock-${status}`, retryable }, { status });
 let currentDocument = document;
+let searchConditions={title:'',artist:'',album:''};
 
 export const handlers = [
+  http.get(`${root}/projects/:projectId/search-conditions`, () => response(searchConditions)),
+  http.put(`${root}/projects/:projectId/search-conditions`, async ({request}) => { searchConditions=await request.json() as typeof searchConditions; return response(searchConditions); }),
   http.get(`${root}/session`, () => scenario() === 'expired' ? error(401, 'session_expired', '登录已过期') : response(session)),
   http.get(`${root}/capabilities`, () => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : response(capabilities)),
   http.get(`${root}/projects`, () => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : scenario() === 'empty' ? response({ schema_version: 'studio-project-list-v1', items: [], next_cursor: null }) : response(projects)),

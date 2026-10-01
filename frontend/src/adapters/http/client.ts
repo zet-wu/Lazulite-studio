@@ -217,7 +217,7 @@ export const studioApi = {
       },
       isProjectSummary,
     ),
-  deleteProject: (projectId: string) => s4<{ deleted: string }>(`/projects/${encodeURIComponent(projectId)}`, { method: 'DELETE' }),
+  deleteProject: (projectId: string) => mutate(`/projects/${encodeURIComponent(projectId)}`, { method: 'DELETE' }, (value: unknown): value is {deleted: string} => !!value && typeof value === 'object' && typeof (value as {deleted?: unknown}).deleted === 'string'),
   getCapabilities: () => request("/capabilities", isCapabilities),
   listProjects: (cursor?: string) =>
     request(

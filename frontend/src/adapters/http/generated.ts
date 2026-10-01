@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/projects/{projectId}/search-conditions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSearchConditions"];
+        put: operations["saveSearchConditions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/lyric-sources/search": {
         parameters: {
             query?: never;
@@ -489,6 +505,7 @@ export interface components {
         CreateProjectRequest: {
             name: string;
             source_asset_id: string;
+            source_filename?: string | null;
         };
         Asset: {
             /** @constant */
@@ -597,6 +614,11 @@ export interface components {
             report: components["schemas"]["PublishReport"] | null;
             download_url: string | null;
             error: Record<string, never> | null;
+            asset_filename?: string | null;
+            filename?: string | null;
+            container?: string | null;
+            format_label?: string | null;
+            track_id?: number | null;
         };
         ExportList: {
             /** @constant */
@@ -608,10 +630,12 @@ export interface components {
             audio_streams: number;
             audio_preserved: boolean;
             metadata_preserved: boolean;
-            subtitle_handler: string;
-            subtitle_codec: string;
-            sample_count: number;
-            ttml_sha256: string;
+            subtitle_handler?: string;
+            subtitle_codec: string | null;
+            sample_count?: number;
+            ttml_sha256: string | null;
+            lyrics_preserved: boolean;
+            track_id: number | null;
         };
         JobCreate: {
             /** @enum {string} */
@@ -884,6 +908,68 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getSearchConditions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 项目保存的最终搜索字符串 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        title: string;
+                        artist: string;
+                        album: string;
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    saveSearchConditions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title: string;
+                    artist: string;
+                    album: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 项目保存的最终搜索字符串 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        title: string;
+                        artist: string;
+                        album: string;
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     lyricSourceSearch: {
         parameters: {
             query?: never;
@@ -948,7 +1034,17 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": {
+                        empty: boolean;
+                        format?: string;
+                        content?: string;
+                        metadata?: {
+                            [key: string]: string[];
+                        };
+                        translation?: string;
+                        romanization?: string;
+                        partial?: boolean;
+                    };
                 };
             };
             /** @description Session required */
@@ -1046,6 +1142,9 @@ export interface operations {
                             name?: string;
                         }[];
                         error?: string | null;
+                        filename?: string;
+                        format_label?: string;
+                        extension?: string | null;
                     };
                 };
             };

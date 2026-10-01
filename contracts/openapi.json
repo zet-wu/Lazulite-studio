@@ -10,6 +10,124 @@
     }
   ],
   "paths": {
+    "/projects/{projectId}/search-conditions": {
+      "get": {
+        "operationId": "getSearchConditions",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "项目保存的最终搜索字符串",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "title",
+                    "artist",
+                    "album"
+                  ],
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "artist": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "album": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveSearchConditions",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "项目保存的最终搜索字符串",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "title",
+                    "artist",
+                    "album"
+                  ],
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "artist": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "album": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "title",
+                  "artist",
+                  "album"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "artist": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "album": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
       "/lyric-sources/search": {
         "post": {
           "operationId": "lyricSourceSearch",
@@ -47,41 +165,73 @@
         }
       },
       "/lyric-sources/fetch": {
-        "post": {
-          "operationId": "lyricSourceFetch",
-          "requestBody": {
-            "required": true,
+      "post": {
+        "operationId": "lyricSourceFetch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LyricSourceCandidate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated provider response with original lyric format",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LyricSourceCandidate"
+                  "type": "object",
+                  "required": [
+                    "empty"
+                  ],
+                  "properties": {
+                    "empty": {
+                      "type": "boolean"
+                    },
+                    "format": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "translation": {
+                      "type": "string"
+                    },
+                    "romanization": {
+                      "type": "string"
+                    },
+                    "partial": {
+                      "type": "boolean"
+                    }
+                  }
                 }
               }
             }
           },
-          "responses": {
-            "200": {
-              "description": "Authenticated provider response with original lyric format",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "type": "object"
-                  }
-                }
-              }
-            },
-            "401": {
-              "description": "Session required"
-            },
-            "429": {
-              "description": "Provider concurrency limit"
-            },
-            "502": {
-              "description": "Upstream network or payload error"
-            }
+          "401": {
+            "description": "Session required"
+          },
+          "429": {
+            "description": "Provider concurrency limit"
+          },
+          "502": {
+            "description": "Upstream network or payload error"
           }
         }
-      },
+      }
+    },
       "/lyric-sources/resolve": {
         "post": {
           "operationId": "lyricSourceResolve",
@@ -119,61 +269,72 @@
         }
       },
       "/projects/{projectId}/packaging": {
-        "get": {
-          "operationId": "getPackagingInfo",
-          "parameters": [
-            {
-              "in": "path",
-              "name": "projectId",
-              "required": true,
-              "schema": {
-                "type": "string"
-              }
+      "get": {
+        "operationId": "getPackagingInfo",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
-          ],
-          "responses": {
-            "200": {
-              "description": "Container and stable STPP track IDs",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "type": "object",
-                    "properties": {
-                      "asset_id": {
-                        "type": "string"
-                      },
-                      "supported": {
-                        "type": "boolean"
-                      },
-                      "container": {
-                        "type": [
-                          "string",
-                          "null"
-                        ]
-                      },
-                      "tracks": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "track_id": {
-                              "type": "integer"
-                            },
-                            "language": {
-                              "type": "string"
-                            },
-                            "name": {
-                              "type": "string"
-                            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Container and stable STPP track IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asset_id": {
+                      "type": "string"
+                    },
+                    "supported": {
+                      "type": "boolean"
+                    },
+                    "container": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "tracks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "track_id": {
+                            "type": "integer"
+                          },
+                          "language": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
                           }
                         }
-                      },
-                      "error": {
-                        "type": [
-                          "string",
-                          "null"
-                        ]
                       }
+                    },
+                    "error": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "filename": {
+                      "type": "string"
+                    },
+                    "format_label": {
+                      "type": "string"
+                    },
+                    "extension": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   }
                 }
@@ -181,7 +342,8 @@
             }
           }
         }
-      },
+      }
+    },
     "/session": {
       "get": {
         "operationId": "getSession",
@@ -921,10 +1083,25 @@
       },
       "CreateProjectRequest": {
         "type": "object",
-        "required": ["name", "source_asset_id"],
+        "required": [
+          "name",
+          "source_asset_id"
+        ],
         "properties": {
-          "name": { "type": "string", "minLength": 1 },
-          "source_asset_id": { "type": "string" }
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_asset_id": {
+            "type": "string"
+          },
+          "source_filename": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          }
         }
       },
       "Asset": {
@@ -1173,10 +1350,100 @@
       },
       "Export": {
         "type": "object",
-        "required": ["id", "revision", "asset_id", "status", "created_at", "stale", "report", "download_url", "error"],
+        "required": [
+          "id",
+          "revision",
+          "asset_id",
+          "status",
+          "created_at",
+          "stale",
+          "report",
+          "download_url",
+          "error"
+        ],
         "properties": {
-          "lrc_kind": { "enum": ["lrc", "elrc"] }, "target_track_id": { "type": ["integer", "null"] },
-          "id": { "type": "string" }, "revision": { "type": "string" }, "asset_id": { "type": "string" }, "status": { "type": "string" }, "created_at": { "type": "string" }, "stale": { "type": "boolean" }, "report": { "anyOf": [{ "$ref": "#/components/schemas/PublishReport" }, { "type": "null" }] }, "download_url": { "type": ["string", "null"] }, "error": { "type": ["object", "null"] }
+          "lrc_kind": {
+            "enum": [
+              "lrc",
+              "elrc"
+            ]
+          },
+          "target_track_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "asset_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublishReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "download_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "asset_filename": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "filename": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "container": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "format_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "track_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
         }
       },
       "ExportList": {
@@ -1185,9 +1452,56 @@
       },
       "PublishReport": {
         "type": "object",
-        "required": ["passed", "audio_streams", "audio_preserved", "metadata_preserved", "subtitle_handler", "subtitle_codec", "sample_count", "ttml_sha256"],
+        "required": [
+          "passed",
+          "audio_streams",
+          "audio_preserved",
+          "metadata_preserved",
+          "lyrics_preserved",
+          "subtitle_codec",
+          "track_id",
+          "ttml_sha256"
+        ],
         "properties": {
-          "passed": { "type": "boolean" }, "audio_streams": { "type": "integer" }, "audio_preserved": { "type": "boolean" }, "metadata_preserved": { "type": "boolean" }, "subtitle_handler": { "type": "string" }, "subtitle_codec": { "type": "string" }, "sample_count": { "type": "integer" }, "ttml_sha256": { "type": "string" }
+          "passed": {
+            "type": "boolean"
+          },
+          "audio_streams": {
+            "type": "integer"
+          },
+          "audio_preserved": {
+            "type": "boolean"
+          },
+          "metadata_preserved": {
+            "type": "boolean"
+          },
+          "subtitle_handler": {
+            "type": "string"
+          },
+          "subtitle_codec": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sample_count": {
+            "type": "integer"
+          },
+          "ttml_sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lyrics_preserved": {
+            "type": "boolean"
+          },
+          "track_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
         }
       },
       "JobCreate": {

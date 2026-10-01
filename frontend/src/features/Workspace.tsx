@@ -21,7 +21,7 @@ export function Workspace({ projectId }: { projectId: string }) {
   const envelope = useQuery({ queryKey: ['document-envelope', projectId], queryFn: () => studioS4.getDocumentEnvelope(projectId), refetchOnMount: 'always', refetchOnWindowFocus: false });
   const project = useQuery({ queryKey: ['project', projectId], queryFn: () => studioApi.getProject(projectId) });
   if (envelope.isLoading || envelope.isFetching) return <main>正在加载歌词…</main>;
-  if (envelope.isError || !envelope.data) return <main><p role="alert">无法打开项目文档</p><button onClick={() => void envelope.refetch()}>重试</button></main>;
+  if (envelope.isError || !envelope.data) return <main><p role="alert">{(envelope.error as {status?:number})?.status === 404 ? '项目不存在或已删除' : '无法打开项目文档'}</p><button onClick={() => void envelope.refetch()}>重试</button></main>;
   return <ProjectEditor key={`${projectId}:${envelope.data.revision}`} projectId={projectId} title={project.data?.name ?? '歌词项目'} initialTtml={envelope.data.document.ttml}
     initialRevision={envelope.data.revision ?? ''} asset={project.data?.asset ?? null} />;
 }

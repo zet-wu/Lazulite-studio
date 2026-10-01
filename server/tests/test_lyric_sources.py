@@ -50,3 +50,11 @@ def test_qq_optional_decode_failure_keeps_body():
     payload = service.fetch(Candidate(source='qqmusic', id='1', songmid='mid', songid='1'))
     assert payload['format'] == 'qrc' and payload['content'] == '[1000,500]body(1000,500)'
     assert payload['partial'] is True and payload['romanization'] == '[00:01]roma'
+
+
+def test_kugou_invalid_base64_is_a_decode_failure():
+    from server.lyric_sources import SourceDecodeError
+    service = Sources()
+    service.request = lambda url, **kwargs: {'candidates': [{'id': '1', 'accesskey': 'key'}]} if '/search' in url else {'content': 'invalid!'}
+    with pytest.raises(SourceDecodeError):
+        service.fetch(Candidate(source='kugou', id='1'))

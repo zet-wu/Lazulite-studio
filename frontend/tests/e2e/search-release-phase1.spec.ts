@@ -59,3 +59,34 @@ for(const width of [1280,1440,1920])for(const theme of ['light','dark'])test(`ne
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(1);
  await page.screenshot({path:test.info().outputPath(`network-${width}-${theme}.png`)});
 });
+
+
+test('packaging error links focus body, background and Ruby with visible main numbering',async({page})=>{
+ await page.goto('/projects/sample-project/edit');
+ await page.getByRole('button',{name:'歌词获取',exact:true}).waitFor();
+ await page.evaluate(()=>{const original=window.fetch;window.fetch=async(input,init)=>String(input).endsWith('/packaging') ? Response.json({filename:'synthetic.m4a',format_label:'M4A（MP4 容器）',asset_id:'asset-1',container:'mp4',supported:true,tracks:[],error:null}) : original(input,init);});
+ const rubyXml=issueXml.replace('<span begin="2" end="4">正文</span>','<span studio:id="rubyword" begin="2" end="4" tts:ruby="container"><span tts:ruby="base">正文</span><span tts:ruby="textContainer"><span studio:id="ruby1" studio:null="begin end" tts:ruby="text">よみ</span></span></span>');
+ await importLyrics(page,file(rubyXml));
+ const targets=[
+  ['第 1 行第 1 词：缺少开始和结束时间','[data-word-id="word1"]'],
+  ['第 1 行 · 背景：缺少结束时间','[data-line-id="bg"]'],
+  ['第 1 行 · 背景第 1 词：缺少开始和结束时间','[data-word-id="bgword"]'],
+  ['第 2 行第 1 词第 1 读音单元：缺少开始和结束时间','[data-ruby-id="ruby1"]'],
+ ];
+ for(const [name,selector] of targets){
+  await page.getByRole('button',{name:'文件打包',exact:true}).click();
+  await page.getByRole('button',{name:'保存并打包',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('有 6 项需要处理');
+  const link=page.getByRole('button',{name,exact:true});await link.focus();await page.keyboard.press('Enter');
+  await expect(page.locator('main '+selector)).toBeFocused();
+ }
+});
+
+test('output issue mounts a distant virtual row and transfers keyboard focus',async({page})=>{
+ await page.goto('/editor');
+ const lines=Array.from({length:82},(_,i)=>`<p xml:id="virtual${i}" begin="${i*2}" ${i===81 ? 'studio:null="end"' : `end="${i*2+1}"`}><span begin="${i*2}" end="${i*2+1}">word${i}</span></p>`).join('');
+ await importLyrics(page,file(`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body>${lines}</body></tt>`));
+ await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('qrc');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
+ const link=page.getByRole('button',{name:'第 82 行：缺少结束时间',exact:true});await link.focus();await page.keyboard.press('Enter');
+ const row=page.locator('main [data-line-id="virtual81"]');await expect(row).toBeFocused();await expect(row).toBeInViewport();
+});

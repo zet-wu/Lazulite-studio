@@ -152,7 +152,7 @@ class Sources:
             lyric = min(candidates,key=lambda x: abs(x.get('duration',0)-(c.duration_ms or 0)))
             r = self.request('https://lyrics.kugou.com/download',params={'ver':1,'client':'pc','id':str(lyric['id']),'accesskey':lyric['accesskey'],'fmt':'krc','charset':'utf8'})
             kind = 'lrc' if r.get('fmt','').lower() == 'lrc' else 'krc'
-            raw = base64.b64decode(r.get('content',''),validate=True)
+            raw = decode_body(lambda value: base64.b64decode(value, validate=True), r.get('content',''))
             content = decode_body(decode_krc, raw) if kind == 'krc' else decode_body(lambda v: v.decode('utf-8'), raw)
         else:
             if not c.platform or not c.file: raise ValueError('AMLL 候选缺少文件标识')

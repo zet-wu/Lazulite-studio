@@ -48,3 +48,18 @@ test('interaction holds row order and active selection while incremental candida
  expect(store.getSnapshot().sources.netease.rows).toEqual(['z','a']);
  store.setInteracting('netease',false);expect(store.getSnapshot().sources.netease.rows).toEqual(['a','z']);expect(store.getSnapshot().sources.netease.selected).toBe('z');store.dispose();
 });
+
+test('a selected queued candidate starts before background work and reuses its in-flight check',async()=>{
+ const fetches:{source:Source,id:string,gate:ReturnType<typeof deferred>}[]=[];
+ const store=new AcquisitionStore((async(action:string,body:any)=>{
+  if(action==='search')return{items:Array.from({length:6},(_,i)=>row(body.source,String(i)))};
+  const gate=deferred();fetches.push({source:body.source,id:body.id,gate});return gate.promise;
+ }) as any);
+ store.setTab('netease');store.search({title:'Song',artist:'',album:''});await tick();
+ expect(fetches).toHaveLength(2);
+ store.select('netease','5');store.select('netease','5');
+ fetches[0].gate.resolve({empty:false,format:'lrc',content:'[00:01]word',metadata:{}});await tick();
+ expect(fetches[2].source+fetches[2].id).toBe('netease5');
+ store.select('netease','5');await tick();expect(fetches.filter(f=>f.id==='5'&&f.source==='netease')).toHaveLength(1);
+ store.dispose();for(const f of fetches)f.gate.resolve({empty:true});await tick();
+});
