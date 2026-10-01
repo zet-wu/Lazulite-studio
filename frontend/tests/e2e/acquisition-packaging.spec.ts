@@ -38,7 +38,7 @@ test('stale candidate response never replaces a newer selection and ID associati
    };
  });
  await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.getByRole('tab',{name:'网易云音乐'}).click();
- await page.getByRole('textbox',{name:'搜索歌曲'}).fill('synthetic');await page.getByRole('button',{name:'搜索',exact:true}).click();
+ await page.getByRole('textbox',{name:'搜索标题'}).fill('synthetic');await page.getByRole('button',{name:'搜索',exact:true}).click();
  await page.getByRole('button',{name:/候选1/}).click();await page.getByRole('button',{name:/候选2/}).click();
  await expect(page.getByText('歌词2',{exact:true})).toBeVisible();await page.evaluate(()=>(window as unknown as {release:()=>void}).release());await expect(page.getByText('歌词1',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'仅关联歌曲 ID'}).click();await expect(page.getByText('歌曲 ID 已关联，可撤销')).toBeVisible();

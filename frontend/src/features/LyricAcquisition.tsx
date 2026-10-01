@@ -1,8 +1,9 @@
 import type { useSearchConditions } from './useSearchConditions';
-import { NetworkLyrics } from './NetworkLyrics';
+import { AcquisitionStore } from '../acquisition-store';
+import { NetworkLyrics, checkLabels } from './NetworkLyrics';
 import type { Source } from '../adapters/http/lyric-sources';
 import { decodeKrcFile } from '../adapters/source-codec';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { detectLyricFormat, importLyricFile, type LyricFormat } from '../adapters/lyric-formats';
 import { type LyricDocument } from '../domain/lyric-document';
 import type { LyricCommand } from '../domain/lyric-commands';
@@ -18,8 +19,13 @@ export function selectedMetadata(current: LyricDocument, incoming: LyricDocument
     return values?.length ? [[key, [...values]]] : [];
   }));
 }
-export function LyricAcquisition({ searchConditions, document, apply, onImported, onNew, onImportName }: { searchConditions: ReturnType<typeof useSearchConditions>; document: LyricDocument; apply: (command: LyricCommand) => void; onImported: () => void; onNew?: () => void; onImportName?: (name: string) => void }) {
-  const [tab, setTab] = useState('file');
+export function LyricAcquisition({ store, searchConditions, document, apply, onImported, onNew, onImportName }: { store: AcquisitionStore; searchConditions: ReturnType<typeof useSearchConditions>; document: LyricDocument; apply: (command: LyricCommand) => void; onImported: () => void; onNew?: () => void; onImportName?: (name: string) => void }) {
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const tab = snapshot.tab;
+  const network = tab !== 'file' && tab !== 'text';
+  const selected = network && snapshot.sources[tab].selected ? snapshot.sources[tab].records[snapshot.sources[tab].selected!] : null;
+  const networkPreview = network ? store.preview(tab) : null;
+  const [dismissed, setDismissed] = useState(false);
   const [text, setText] = useState('');
   const [format, setFormat] = useState<Exclude<LyricFormat, 'ass'>>('txt');
   const [incoming, setIncoming] = useState<LyricDocument | null>(null);
@@ -31,6 +37,10 @@ export function LyricAcquisition({ searchConditions, document, apply, onImported
   const fileInput = useRef<HTMLInputElement>(null);
   const request = useRef(0);
   const stage = (next: LyricDocument) => { setIncoming(next); setPreviewPage(0); setBase(document); setChoices(defaultChoices(document, next)); setMessage(''); };
+  useEffect(() => {
+    if (networkPreview) stage(networkPreview); else if (network) setIncoming(null);
+  }, [networkPreview, tab]);
+  useEffect(() => setDismissed(false), [tab, selected?.candidate.id, selected?.error]);
   const parse = (content: string, kind: Exclude<LyricFormat, 'ass'>) => {
     try { stage(importLyricFile(content, kind)); } catch (e) { setIncoming(null); setMessage(`解析失败：${e instanceof Error ? e.message : e}`); }
   };
@@ -47,20 +57,23 @@ export function LyricAcquisition({ searchConditions, document, apply, onImported
   const confirm = () => {
     if (!incoming) return;
     if (base !== document) { setBase(document); setChoices(defaultChoices(document, incoming)); setMessage('当前歌词已变化，已重新对照元数据，请检查后再次导入。'); return; }
-    try { apply({ type: 'replace-document', document: { ...incoming, metadata: selectedMetadata(base, incoming, choices) } }); setIncoming(null); if (filename) onImportName?.(filename); onImported(); }
+    try { apply({ type: 'replace-document', document: { ...incoming, metadata: selectedMetadata(base, incoming, choices) } }); setIncoming(null); store.cancelAll(); if (filename) onImportName?.(filename); onImported(); }
     catch (e) { setMessage(e instanceof Error ? e.message : '导入失败'); }
   };
   return <div className={styles.page}>
     <section className={styles.pane}><h2>歌词获取</h2><div className={styles.tabs} role="tablist" aria-label="歌词来源">
-      {[['netease','网易云音乐'],['qqmusic','QQ 音乐'],['kugou','酷狗'],['amll','AMLL DB'],['file', '文件'], ['text', '文本']].map(([id, label]) => <button key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; setTab(id); setFilename(null); setIncoming(null); setMessage(''); }}>{label}</button>)}
+      {[['netease','网易云音乐'],['qqmusic','QQ 音乐'],['kugou','酷狗'],['amll','AMLL DB'],['file', '文件'], ['text', '文本']].map(([id, label]) => <button key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; store.setTab(id as typeof tab); setFilename(null); setIncoming(null); setMessage(''); }}>{label}</button>)}
     </div>
-      {!['file','text'].includes(tab) && <NetworkLyrics searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} stage={stage} clear={() => setIncoming(null)} />}
+      {!['file','text'].includes(tab) && <NetworkLyrics store={store} searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} />}
       {tab === 'file' && <><p className={styles.hint}>选择歌词后预览，确认导入才会替换当前歌词。</p><button onClick={() => fileInput.current?.click()}>选择歌词文件</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
       {tab === 'text' && <><label>文本格式 <select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</select></label><textarea aria-label="待导入歌词文本" value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button onClick={() => parse(text, format)}>预览文本</button></>}
       {onNew && <button onClick={onNew}>新建空白歌词</button>}
       {message && <p role="status">{message}</p>}
     </section>
-    <section className={styles.pane}><h2>预览与导入</h2>{incoming ? <>
+    <section className={styles.pane}><h2>预览与导入</h2>
+      {selected && selected.error && !dismissed && <div className={styles.previewError} role="status"><span>{checkLabels[selected.status]}：{selected.error.slice(0,160)}</span><button aria-label="关闭候选提示" onClick={()=>setDismissed(true)}>×</button></div>}
+      {selected && ['pending','fetching','parsing'].includes(selected.status) && <p role="status">{checkLabels[selected.status]}…</p>}
+      {incoming ? <>
       <div className={styles.preview}>{incoming.lines.slice(previewPage * 100, (previewPage + 1) * 100).map(line => <p key={line.id}>{line.words.map(word => word.rubyUnits.length ? <ruby key={word.id}>{word.text}<rt>{word.rubyUnits.map(u => u.reading).join('')}</rt></ruby> : word.text)}{line.translations.map((t, i) => <small key={i}>{t.text}</small>)}{incoming.romanizationTracks.flatMap(track => track.contents.filter(c => c.lineId === line.id).map(c => <small key={c.id}>{c.kind === 'plain' ? c.text : c.units.map(u => u.text).join('')}</small>))}</p>)}</div>
       {incoming.lines.length > 100 && <div className={styles.actions}><button disabled={previewPage === 0} onClick={() => setPreviewPage(p => p - 1)}>上一页</button><span>第 {previewPage + 1} / {Math.ceil(incoming.lines.length / 100)} 页</span><button disabled={(previewPage + 1) * 100 >= incoming.lines.length} onClick={() => setPreviewPage(p => p + 1)}>下一页</button></div>}
       <p className={styles.hint}>每键选择一侧完整值列表。选择空白侧会删除该键；正文、歌手与音译轨道整体替换。</p>

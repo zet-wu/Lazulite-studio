@@ -19,7 +19,7 @@
 .table button { width: 100%; min-height: 38px; text-align: left; padding: 0; border: 0; overflow-wrap: anywhere; }
 .table button span { display: block; padding: 8px; white-space: pre-wrap; }
 .table button span + span { border-top: 1px solid var(--line); }
-.results { display: flex; flex-direction: column; gap: 8px; overflow: auto; }
+.results { flex: 1; min-height: 120px; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
 .results button { text-align: left; }
 .results small { display: block; color: var(--muted); margin-top: 4px; }
 
@@ -29,3 +29,15 @@
 .searchFields { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; flex-shrink: 0; }
 .searchFields label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; min-width: 0; }
 .searchFields input { min-width: 0; width: 100%; box-sizing: border-box; }
+
+.sourceStates { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.badges span { border-radius: 12px; padding: 3px 8px; font-size: 12px; }
+.badgeBlue { background: #e0edff; color: #164a8c; }
+.badgeYellow { background: #fff1c2; color: #694800; }
+.badgeRed { background: #ffe4e5; color: #982234; }
+:global([data-theme=dark]) .badgeBlue { background: #193653; color: #acd0ff; }
+:global([data-theme=dark]) .badgeYellow { background: #514019; color: #ffdc80; }
+:global([data-theme=dark]) .badgeRed { background: #512b36; color: #ffb9c1; }
+.previewError { display: flex; align-items: start; gap: 8px; overflow-wrap: anywhere; font-size: 13px; }
+.previewError span { min-width: 0; flex: 1; }
