@@ -105,12 +105,12 @@ test('keeps the sync cursor separate from lyric undo', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   await page.getByRole('button', { name: '打轴', exact: true }).click();
   const panel = page.getByRole('region', { name: '连续打轴' });
-  await expect(panel.getByText('打轴 1/6')).toBeVisible();
+  await expect(panel.getByText('L1 · 单元 1 / 1')).toBeVisible();
   await panel.getByRole('button', { name: '起始轴' }).click();
   await panel.getByRole('button', { name: '连续轴' }).click();
-  await expect(panel.getByText('打轴 2/6')).toBeVisible();
+  await expect(panel.getByText('L2 · 单元 1 / 1')).toBeVisible();
   await page.getByRole('button', { name: '撤销' }).click();
-  await expect(panel.getByText('打轴 2/6')).toBeVisible();
+  await expect(panel.getByText('L2 · 单元 1 / 1')).toBeVisible();
 });
 
 test('moves a timed word on the timeline and undoes the move', async ({ page }) => {

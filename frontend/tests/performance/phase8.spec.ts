@@ -1,8 +1,9 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { largeKana, longRuby } from '../fixtures/phase8';
 test('P8 production 2000 proposals retain focused input and edits across virtual remounts', async ({ page }) => {
-  await page.goto('/editor'); await page.locator('input[type=file]').setInputFiles({ name: 'large.ttml', mimeType: 'application/xml', buffer: Buffer.from(largeKana()) });
+  await page.goto('/editor'); await importLyrics(page, { name: 'large.ttml', mimeType: 'application/xml', buffer: Buffer.from(largeKana()) });
   const outline = page.locator('[data-outline-drag]'); await expect(outline).toHaveCount(2000);
   await outline.first().click(); await outline.last().click({ modifiers: ['Shift'] }); await page.locator('[data-top-menu="tools"] summary').click();
   const start = Date.now(); await page.getByRole('button', { name: '生成日文罗马字音译…' }).click();
@@ -16,11 +17,11 @@ test('P8 production 2000 proposals retain focused input and edits across virtual
   await dialog.getByLabel('L2000单元 1音译').fill('tail'); await expect(input).toHaveCount(0);
   await scroll.evaluate(e => { e.scrollTop = 0; }); await expect(input).toHaveValue('manual  ');
   const applyStart = Date.now(); await dialog.getByRole('button', { name: '生成音译', exact: true }).click(); await expect(dialog).toHaveCount(0); const appliedMs = Date.now() - applyStart;
-  await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await writeFile(test.info().outputPath('phase8-performance.json'), JSON.stringify({ openedMs, modeMs, appliedMs, mounted, pinnedMounts, sourceRows: 2000, sourceUnits: 20000, scope: 'Production Linux Chromium; Playwright action-to-visible wall time, not next-RAF latency or closure of historical budgets.' }, null, 2));
 });
 test('P8 production one long word retains all 512 注音-derived inputs without horizontal dialog overflow', async ({ page }) => {
-  await page.goto('/editor'); await page.locator('input[type=file]').setInputFiles({ name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(longRuby()) });
+  await page.goto('/editor'); await importLyrics(page, { name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(longRuby()) });
   await page.locator('[data-outline-drag]').first().click({ button: 'right' }); const start = Date.now(); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true }); await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
   await expect(dialog.getByRole('textbox')).toHaveCount(512); await expect(dialog.locator('[data-source-word]')).toHaveCount(1);

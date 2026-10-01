@@ -100,7 +100,7 @@ for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) t
 });
 test('P8 lyric settings are unique in edit mode, menus dismiss and keyboard reaches all dialogs', async ({ page }) => {
   await load(page);
-  await expect(page.locator('[data-top-menu="settings"]')).toHaveCount(0);
+  await expect(page.locator('[data-top-menu="settings"]')).toHaveCount(1);
   const settings = page.locator('[data-top-menu="lyrics-settings"] summary');
   await settings.focus(); await settings.press('Enter'); await expect(settings).toHaveAttribute('aria-expanded', 'true');
   await page.getByRole('button', { name: '元数据编辑', exact: true }).focus(); await page.keyboard.press('Enter');

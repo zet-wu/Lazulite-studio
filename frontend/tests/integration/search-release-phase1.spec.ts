@@ -22,10 +22,9 @@ test('real creation tags, cleared conditions and cross-window deletion cannot re
  await importLyrics(page,{name:'recovery.txt',mimeType:'text/plain',buffer:Buffer.from('recoverable')});
  const list=await context.newPage();await list.goto('/projects');
  const row=list.getByRole('link',{name:/删除审阅合成项目/}).locator('..');
- await row.getByLabel('删除审阅合成项目 项目操作').click();
  let dismiss=true;list.on('dialog',dialog=>dismiss ? dialog.dismiss() : dialog.accept());
- await row.getByRole('button',{name:'删除项目'}).click();await expect(list.getByRole('link',{name:/删除审阅合成项目/})).toBeVisible();
- dismiss=false;await row.getByRole('button',{name:'删除项目'}).click();await expect(list.getByRole('link',{name:/删除审阅合成项目/})).toHaveCount(0);
+ await row.getByRole('button',{name:'删除项目 删除审阅合成项目'}).click();await expect(list.getByRole('link',{name:/删除审阅合成项目/})).toBeVisible();
+ dismiss=false;await row.getByRole('button',{name:'删除项目 删除审阅合成项目'}).click();await expect(list.getByRole('link',{name:/删除审阅合成项目/})).toHaveCount(0);
  await expect(page.getByRole('alert')).toContainText('项目已删除');await expect(page.getByRole('button',{name:'保存',exact:true})).toHaveCount(0);
  const status=await page.evaluate(async id=>(await fetch(`/api/v1/projects/${id}/document`)).status,projectId);expect(status).toBe(404);
  await expect.poll(()=>page.evaluate(async id=>{const modulePath='/src/adapters/recovery/index.ts'; const {createRecoveryAdapter}=await import(modulePath) as typeof import('../../src/adapters/recovery');return createRecoveryAdapter().readCheckpoint(id);},projectId)).toBeNull();
