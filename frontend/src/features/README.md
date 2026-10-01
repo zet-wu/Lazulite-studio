@@ -31,3 +31,6 @@ Phase 7：LineSplitDialog上下预览与逐条翻译归属，TranslationEditor�
 `LyricAcquisition` 提供文件/文本/网络候选预览与逐键整组元数据选择，确认导入一次事务。`NetworkLyrics` 丢弃过期响应、显示真实粒度并支持网易/QQ 歌曲 ID 独立关联。`useProjectDocument.saveForPackaging` 返回被保存的 document 与 revision，后续编辑不能冒充已保存快照。
 
 `AcquisitionStore` 由 EditorWorkspace 持有最近四源检索、稳定候选及有限预览缓存；`useSearchConditions` 串行保存独立最终字符串。搜索与取词共享每源额度，后台不选择或导入。`OutputIssues` 连接稳定对象 ID 与显式滚动/焦点；歌词下载统一纯 TTML 或所选兼容格式。项目删除广播使已开编辑器失效并清理恢复。
+
+
+当前注音输入统一单击/Tab 编辑与行内新增；`SingerDialog` 自有表单替代系统输入弹窗。`SyncPanel` 从工作区活动选择读取唯一目标，显示可见行号与行内序号，支持本行停止。`shortcuts.ts` 与 `ShortcutDialog` 统一 12 项本机绑定及焦点冲突路由，编辑/打轴默认等高。`StudioLyricPlayer` 用公开行元素的动画标识同步媒体倍率与相位；`MediaTransport` 视窗投影独立于媒体位置事件。项目列表使用直接删除按钮。
