@@ -282,3 +282,8 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .syncExtras[open] { flex-basis: 100%; }
 .syncPanel:has(.syncExtras[open]), .syncPanel:has(> [role="alert"]) { flex-wrap: wrap; }
 .syncBindings > label { display: grid; grid-template-columns: minmax(180px, 1fr) 150px auto; gap: 8px; align-items: center; }
+
+.syncQuote { display: flex; gap: 4px; }
+.syncQuote > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.syncQuote > b { flex-shrink: 0; max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+.syncTime { font-family: ui-monospace, monospace; }

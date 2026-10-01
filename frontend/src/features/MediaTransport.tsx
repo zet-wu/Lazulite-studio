@@ -422,7 +422,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       e.preventDefault(); return;
     }
     if (
-      !asset ||
+      !asset || e.defaultPrevented ||
       e.nativeEvent.isComposing ||
       e.repeat ||
       shortcutInput(e.target)

@@ -21,18 +21,23 @@ export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, 
   const [newReading, setNewReading] = useState('');
   const [error, setError] = useState('');
   const newInput = useRef<HTMLInputElement>(null);
+  const composing = useRef(false);
+  const finished = useRef(false);
   const inputs = useRef(new Map<string, HTMLInputElement>());
   const pendingFocus = useRef<string | null>(null);
   useEffect(() => {
-    if (requestAddSerial !== undefined) { setNewAfter(requestAfterRubyId === undefined ? word.rubyUnits.at(-1)?.id ?? null : requestAfterRubyId); setNewReading(''); }
+    if (requestAddSerial !== undefined) { finished.current = false; setNewAfter(requestAfterRubyId === undefined ? word.rubyUnits.at(-1)?.id ?? null : requestAfterRubyId); setNewReading(''); }
   }, [requestAddSerial]);
   useEffect(() => { if (newAfter !== undefined) newInput.current?.focus(); }, [newAfter, requestAddSerial]);
   const add = () => {
-    if (!newReading.trim()) { setNewAfter(undefined); setNewReading(''); return; }
+    if (composing.current || finished.current) return;
+    const reading = newInput.current?.value ?? newReading;
+    finished.current = true;
+    if (!reading.trim()) { setNewAfter(undefined); setNewReading(''); return; }
     const id = crypto.randomUUID();
-    if (apply({ type: 'insert-ruby', lineId, wordId: word.id, afterRubyId: newAfter ?? null, reading: newReading, rubyId: id })) {
+    if (apply({ type: 'insert-ruby', lineId, wordId: word.id, afterRubyId: newAfter ?? null, reading, rubyId: id })) {
       setNewAfter(undefined); setNewReading(''); setError(''); pendingFocus.current = id; onSelectRuby(id);
-    } else setError('添加失败，请检查读音后重试');
+    } else { finished.current = false; setError('添加失败，请检查读音后重试'); }
   };
   const split = (unit: RubyUnit, atUtf16: number, draft: string) => {
     try {
@@ -52,8 +57,10 @@ export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, 
   };
   const slot = newAfter !== undefined && <div className={styles.rubyTile} key="new-reading"><input ref={newInput} aria-label={`新增读音 ${word.text}`} value={newReading}
     onChange={event => setNewReading(event.target.value)} onBlur={add}
+    onCompositionStart={() => { composing.current = true; }}
+    onCompositionEnd={event => { composing.current = false; if (event.currentTarget !== window.document.activeElement) add(); }}
     onClick={event => event.stopPropagation()}
-    onKeyDown={event => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); } if (event.key === 'Escape') { event.preventDefault(); setNewAfter(undefined); setNewReading(''); } }} /></div>;
+    onKeyDown={event => { if (event.nativeEvent.isComposing || composing.current) return; if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); } if (event.key === 'Escape') { event.preventDefault(); finished.current = true; setNewAfter(undefined); setNewReading(''); } }} /></div>;
   return <div className={styles.rubyEditor} aria-label={`注音 ${word.text}`}>
     {(word.rubyUnits.length > 0 || slot) && <div className={styles.rubyAbove}>{newAfter === null && slot}{word.rubyUnits.map((unit, index) => <Fragment key={unit.id}><div key={unit.id} data-ruby-id={unit.id} data-drag-placeholder={placeholderIds?.has(unit.id) ? '' : undefined} tabIndex={0} className={`${styles.rubyTile} ${selectedRubyIds.includes(unit.id) ? styles.selectedRuby : ''}`}
       onClick={(event) => { event.stopPropagation(); onSelectRuby(unit.id, event.shiftKey, event.ctrlKey || event.metaKey); }}

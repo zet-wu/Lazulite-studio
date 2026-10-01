@@ -42,8 +42,9 @@ export function readBindings(): Bindings {
     const candidate = { ...result, ...value } as Bindings;
     for (const action of Object.keys(shortcutActions) as ShortcutAction[]) {
       const binding = candidate[action];
-      if (!binding || typeof binding.code !== 'string' || !['ctrl', 'meta', 'alt', 'shift'].every(key => typeof binding[key as keyof Binding] === 'boolean') || bindingError(action, binding, candidate)) return result;
+      if (!binding || typeof binding.code !== 'string' || !['ctrl', 'meta', 'alt', 'shift'].every(key => typeof binding[key as keyof Binding] === 'boolean')) return result;
     }
+    if ((Object.keys(shortcutActions) as ShortcutAction[]).some(action => bindingError(action, candidate[action], candidate))) return result;
     return candidate;
   }
   try {
@@ -77,5 +78,6 @@ export function formatBinding(binding: Binding, mac = /Mac/.test(navigator.platf
   return [binding.ctrl && (mac ? '⌃' : 'Ctrl'), binding.meta && (mac ? '⌘' : 'Win'), binding.alt && (mac ? '⌥' : 'Alt'), binding.shift && (mac ? '⇧' : 'Shift'), names[binding.code] ?? binding.code.replace(/^Key|^Digit/, '')].filter(Boolean).join(' + ');
 }
 export function shortcutInput(target: EventTarget | null) {
+  if (document.querySelector('[role="dialog"], [role="menu"], details[data-top-menu][open]')) return true;
   return target instanceof Element && Boolean(target.closest('input, textarea, select, button, a, summary, [contenteditable="true"], [role="dialog"], [role="menu"], [role="separator"], [data-top-menu]'));
 }

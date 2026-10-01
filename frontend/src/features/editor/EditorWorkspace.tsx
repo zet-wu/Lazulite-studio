@@ -81,6 +81,7 @@ export function EditorWorkspace(props: Props) {
   const [acquisitionStore] = useState(() => new AcquisitionStore());
   useEffect(() => { acquisitionStore.activate(); return () => acquisitionStore.dispose(); }, [acquisitionStore]);
   const [selection, setSelection] = useState<EditorSelection | null>(null);
+  const [syncTargetVersion, setSyncTargetVersion] = useState(0);
   const [clipboard, setClipboard] = useState<EditorClipboard | null>(null);
   const clipboardToken = useRef('');
   const pageRef = useRef<HTMLDivElement>(null);
@@ -192,6 +193,7 @@ export function EditorWorkspace(props: Props) {
   const selectedWordLineIndexes = selection?.kind === 'words'
     ? document.lines.flatMap((line, index) => line.words.some((word) => selection.ids.includes(word.id)) ? [index] : []) : [];
   const selectLine = (line: LyricLine, shift = false, toggle = false) => {
+    setSyncTargetVersion(value => value + 1);
     const id = line.backgroundOf ?? line.id;
     const previous = selection?.kind === 'lines' ? selection : null;
     const ids = selectIds(mainIds, previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
@@ -200,6 +202,7 @@ export function EditorWorkspace(props: Props) {
     props.onSelectUnit?.(line.id, null, null);
   };
   const selectWord = (line: LyricLine, word: LyricWord, shift = false, toggle = false) => {
+    setSyncTargetVersion(value => value + 1);
     const previous = selection?.kind === 'words' ? selection : null;
     const order = document.lines.flatMap((item) => item.words.map((value) => value.id));
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? word.id, word.id, shift, toggle);
@@ -208,6 +211,7 @@ export function EditorWorkspace(props: Props) {
     props.onSelectUnit?.(line.id, word.id, null);
   };
   const selectRuby = (line: LyricLine, word: LyricWord, rubyId: string, shift = false, toggle = false) => {
+    setSyncTargetVersion(value => value + 1);
     const previous = selection?.kind === 'ruby' && selection.wordId === word.id ? selection : null;
     const order = word.rubyUnits.map((unit) => unit.id);
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? rubyId, rubyId, shift, toggle);
@@ -216,6 +220,7 @@ export function EditorWorkspace(props: Props) {
     props.onSelectUnit?.(line.id, word.id, rubyId);
   };
   const selectRomanizationContent = (lineId: string, trackId: string, contentId: string, shift = false, toggle = false) => {
+    setSyncTargetVersion(value => value + 1);
     const previous = selection?.kind === 'romanization-content' && selection.trackId === trackId && selection.lineId === lineId ? selection : null;
     const order = document.romanizationTracks.find((track) => track.id === trackId)?.contents.filter((content) => content.lineId === lineId).map((content) => content.id) ?? [];
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? contentId, contentId, shift, toggle);
@@ -224,6 +229,7 @@ export function EditorWorkspace(props: Props) {
     props.onSelectRomanization?.(trackId, contentId);
   };
   const selectRomanizationUnit = (lineId: string, trackId: string, contentId: string, unitId: string, shift = false, toggle = false) => {
+    setSyncTargetVersion(value => value + 1);
     const previous = selection?.kind === 'romanization-unit' && selection.contentId === contentId ? selection : null;
     const content = document.romanizationTracks.find((track) => track.id === trackId)?.contents.find((item) => item.id === contentId);
     const order = content?.kind === 'timed' ? content.units.map((unit) => unit.id) : [];
@@ -455,7 +461,7 @@ export function EditorWorkspace(props: Props) {
           const target = document.lines[document.lines.indexOf(line) + 1];
           if (target) dispatch(moveWordsAcrossLine(document, effective as Extract<EditorSelection, { kind: 'words' }>, target.id));
         } },
-        { label: '添加 注音', run: () => { setRubyShortcut({ wordId: word.id, serial: ++rubyShortcutSerial.current }); } },
+        { label: '添加注音', run: () => { setRubyShortcut({ wordId: word.id, serial: ++rubyShortcutSerial.current }); } },
         { label: '重分配读音时间', disabled: word.rubyUnits.length === 0, run: () => dispatch({ type: 'redistribute-ruby-time', lineId: line.id, wordId: word.id }) },
         { label: effective.ids.length > 1 ? `删除所选词（${effective.ids.length}）` : '删除词', run: () => removeSelection(effective) },
       ];
@@ -519,7 +525,7 @@ export function EditorWorkspace(props: Props) {
           const shortcut = text.endsWith('|');
           const next = shortcut ? text.slice(0, -1) : text;
           if (!next) { setMessage('注音 快捷输入需要正文'); return; }
-          if (dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text: next }) && shortcut) setRubyShortcut({ wordId: word.id, serial: ++rubyShortcutSerial.current });
+          if ((next === word.text || dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text: next })) && shortcut) setRubyShortcut({ wordId: word.id, serial: ++rubyShortcutSerial.current });
         }}
         onSplit={(at, draft) => dispatch({ type: 'batch', commands: [
           { type: 'edit-word', lineId: line.id, wordId: word.id, text: draft },
@@ -611,7 +617,7 @@ export function EditorWorkspace(props: Props) {
     {mode === 'package' && <PackagingPanel {...props} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
     {mode === 'auxiliary' && <section className={styles.auxiliaryPlaceholder}><h1>项目辅助</h1><p>候选、任务、词典与审核流程将在后续阶段整理到此处。歌词文档与播放器保持当前状态。</p></section>}
     {mode === 'preview' && <Suspense fallback={<p>正在载入预览…</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={props.onSelectLine} /></Suspense>}
-    {mode === 'sync' && <SyncPanel document={document} cursor={syncCursor} apply={dispatch} transport={props.transport}
+    {mode === 'sync' && <SyncPanel document={document} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
       onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
     {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canPaste={Boolean(clipboard)}
       canMoveUp={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes[0] > 0}

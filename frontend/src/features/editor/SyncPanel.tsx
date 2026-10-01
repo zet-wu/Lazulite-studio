@@ -7,9 +7,9 @@ import { visibleLineOrdinals } from '../../adapters/output-validation';
 import type { TransportHandle } from '../MediaTransport';
 import styles from './semantic-editor.module.css';
 
-type Props = { document: LyricDocument; cursor: SyncCursor | null; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
+type Props = { document: LyricDocument; cursor: SyncCursor | null; targetVersion?: number; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
 
-export function SyncPanel({ document, cursor, apply, transport, onCursor }: Props) {
+export function SyncPanel({ document, cursor, targetVersion, apply, transport, onCursor }: Props) {
   const units = useMemo(() => syncUnits(document), [document]);
   const [mode, setMode] = useState<SyncMode>('continuous');
   const [completed, setCompleted] = useState(false);
@@ -24,7 +24,7 @@ export function SyncPanel({ document, cursor, apply, transport, onCursor }: Prop
   const ruby = word?.rubyUnits.find((item) => item.id === active?.rubyUnitId);
   const beginUs = ruby ? ruby.beginUs : word?.beginUs ?? null;
   const endUs = ruby ? ruby.endUs : word?.endUs ?? null;
-  useEffect(() => { setEmptyBeats(0); setCompleted(false); setError(''); }, [cursor?.lineId, cursor?.wordId, cursor?.rubyUnitId]);
+  useEffect(() => { setEmptyBeats(0); setCompleted(false); setError(''); }, [cursor?.lineId, cursor?.wordId, cursor?.rubyUnitId, targetVersion]);
   const lineUnits = units.filter(unit => unit.lineId === active?.lineId);
   const lineIndex = syncIndex(lineUnits, active);
   const lineNumber = line ? visibleLineOrdinals(document).get(line.id) : null;
@@ -72,9 +72,10 @@ export function SyncPanel({ document, cursor, apply, transport, onCursor }: Prop
   };
   return <section className={styles.syncPanel} aria-label="连续打轴">
     <strong>{active ? `L${lineNumber} · 单元 ${lineIndex + 1} / ${lineUnits.length}` : '当前选择不参与打轴'}</strong>
-    <span className={styles.syncQuote}>{word?.text}{ruby && <b> → {ruby.reading}</b>}</span>
+    <span className={styles.syncQuote}><span>{word?.text}</span>{ruby && <b> → {ruby.reading}</b>}</span>
     <small className={styles.syncTime}>{beginUs === null ? '—' : (beginUs / 1e6).toFixed(3)}–{endUs === null ? '—' : (endUs / 1e6).toFixed(3)} s</small>
     <select aria-label="打轴模式" value={mode} onChange={event => { setMode(event.target.value as SyncMode); setCompleted(false); }}><option value="continuous">连续</option><option value="line">本行</option></select>
+    {emptyBeats > 0 && <small>空拍 {emptyBeats}/{word?.emptyBeat}</small>}
     {completed && <small role="status">本行已完成</small>}
     <div className={styles.syncButtons}>
       <button disabled={index <= 0} onClick={() => moveTo(index - 1)}>上一单元</button>

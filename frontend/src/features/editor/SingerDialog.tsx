@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import type { LyricDocument } from '../../domain/lyric-document';
 import { DraftInput } from './EditorFields';
@@ -7,6 +7,8 @@ import styles from './semantic-editor.module.css';
 
 export function SingerDialog({ document, apply, close }: { document: LyricDocument; apply: (command: LyricCommand) => boolean; close: () => void }) {
   const [adding, setAdding] = useState(false);
+  const addButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (!adding) addButton.current?.focus(); }, [adding]);
   const [id, setId] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
@@ -23,6 +25,6 @@ export function SingerDialog({ document, apply, close }: { document: LyricDocume
       if (apply({ type: 'set-agents', agents: [...document.agents, { id, name: name || null, type: null }] })) cancel();
       else setError('添加失败，请检查歌手信息');
     }}><label>歌手 ID<input autoFocus value={id} onChange={event => setId(event.target.value)} /></label><label>歌手名称<input value={name} onChange={event => setName(event.target.value)} /></label><button type="submit">添加</button><button type="button" onClick={cancel}>取消新增</button>{error && <p role="alert">{error}</p>}</form>
-      : <button onClick={() => setAdding(true)}>添加歌手</button>}
+      : <button ref={addButton} onClick={() => setAdding(true)}>添加歌手</button>}
   </div></SettingsDialog>;
 }
