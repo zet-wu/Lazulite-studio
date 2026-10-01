@@ -200,3 +200,39 @@ def test_actual_format_controls_output_suffix_and_bound_history(tmp_path, kind, 
         assert item['asset_id'] == asset['id'] and item['asset_filename'] == info['filename']
         assert item['filename'].endswith(f'.{kind}') and item['report']['lyrics_preserved'] is True
         assert bool(item['track_id']) == (kind == 'm4a')
+
+@pytest.mark.parametrize('suffix', ['m4a', 'mp4'])
+def test_cover_audio_preserves_suffix_and_project_download_history(tmp_path, suffix):
+    from mutagen.mp4 import MP4, MP4Cover
+    from urllib.parse import unquote
+    source = tmp_path / 'covered.m4a'
+    _m4a(source)
+    cover = tmp_path / 'cover.png'
+    subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=32x32', '-frames:v', '1', str(cover)], check=True)
+    media = MP4(source); media['covr'] = [MP4Cover(cover.read_bytes(), imageformat=MP4Cover.FORMAT_PNG)]; media.save()
+    settings = Settings('pw', False, 'http://studio')
+    app = create_app(tmp_path / 'data', settings)
+    with TestClient(app, base_url='https://studio') as client:
+        headers = _headers(client, settings)
+        asset = client.post('/api/v1/assets', files={'file': (f'原音频.{suffix}', source.read_bytes(), 'audio/mp4')}, headers=headers).json()
+        pid = client.post('/api/v1/projects', json={'name': '中文 日本語:/曲?', 'source_asset_id': asset['id']}, headers=headers).json()['id']
+        info = client.get(f'/api/v1/projects/{pid}/packaging').json()
+        assert info['extension'] == f'.{suffix}'
+        assert info['format_label'] == 'M4A（MP4 容器）'
+        revision = client.get(f'/api/v1/projects/{pid}/document').json()['revision']
+        revision = _save(client, headers, pid, revision, '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0" end="1">hello</p></body></tt>')
+        body = {'revision': revision, 'asset_id': asset['id'], 'lrc_kind': 'lrc', 'lrc_text': '[00:00.000]hello\n[00:01.000]\n'}
+        for _ in range(2):
+            job = client.post(f'/api/v1/projects/{pid}/publish', json=body, headers=headers).json()['id']
+            assert _wait(client, job)['status'] == 'succeeded'
+        items = client.get(f'/api/v1/projects/{pid}/exports').json()['items']
+        assert len(items) == 2
+        assert len(list((tmp_path / 'data' / 'exports').iterdir())) == 2
+        for item in items:
+            assert item['filename'] == f'中文 日本語__曲_.{suffix}'
+            response = client.get(item['download_url'])
+            assert response.status_code == 200
+            assert item['filename'] in unquote(response.headers['content-disposition'])
+            output = tmp_path / f'download.{suffix}'; output.write_bytes(response.content)
+            assert MP4(output)['covr'][0] == cover.read_bytes()
+            assert item['report']['passed'] is True

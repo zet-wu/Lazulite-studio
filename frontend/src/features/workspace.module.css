@@ -891,6 +891,7 @@
 .editorShell { display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 100dvh; overflow: hidden; }
 
 .projectMainLink { display: flex; gap: 16px; align-items: center; flex: 1; min-width: 0; color: inherit; text-decoration: none; }
-.projectMenu { position: relative; }
-.projectMenu summary { cursor: pointer; padding: 8px 12px; list-style: none; }
-.projectMenu button { position: absolute; right: 0; z-index: 2; white-space: nowrap; background: var(--surface); }
+
+.projectDelete { align-self: center; display: grid; place-items: center; width: 32px; height: 32px; margin: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--danger, #ba1a1a); cursor: pointer; }
+.projectDelete:hover { background: var(--state-hover); }
+.projectDelete:disabled { opacity: .5; cursor: wait; }

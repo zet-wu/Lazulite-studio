@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { studioApi } from "../adapters/http/client";
 import { clearProjectLocalData, announceProjectDeleted } from "../adapters/project-lifecycle";
+import { Icon } from "../shared/Icon";
 import { CreateProject } from "./CreateProject";
 import styles from "./workspace.module.css";
 
@@ -126,8 +127,7 @@ export function ProjectList() {
               </span>
               <span className={styles.rowArrow}>›</span>
             </Link>
-            <details className={styles.projectMenu}><summary aria-label={`${project.name} 项目操作`}>⋮</summary>
-              <button disabled={deleting === project.id} onClick={async () => {
+            <button className={styles.projectDelete} aria-label={`删除项目 ${project.name}`} title={`删除项目 ${project.name}`} disabled={deleting === project.id} onClick={async () => {
                 if (!window.confirm(`删除项目“${project.name}”？将删除歌词修订、任务和产物。原始上传文件和共享音频保留。`)) return;
                 setDeleting(project.id); setDeleteError("");
                 try {
@@ -138,8 +138,7 @@ export function ProjectList() {
                   setExtra([]); setNextCursor(undefined); await query.refetch();
                 } catch (error) { setDeleteError(error instanceof Error ? error.message : "删除失败，请重试"); }
                 finally { setDeleting(null); }
-              }}>删除项目</button>
-            </details></div>
+              }}><Icon name="trash" /></button></div>
           ))}
         </section>
       ) : (

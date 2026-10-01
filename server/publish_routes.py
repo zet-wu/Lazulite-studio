@@ -56,7 +56,7 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
             try: tracks = stpp_tracks(path)
             except ValueError as exc: error = str(exc)
         from .media_format import describe_media
-        return {'filename': asset[0], **describe_media(path, media), 'asset_id':row[2], 'supported':isinstance(media,(MP4,MP3,FLAC)) and not error,
+        return {'filename': asset[0], **describe_media(path, media, asset[0]), 'asset_id':row[2], 'supported':isinstance(media,(MP4,MP3,FLAC)) and not error,
                 'tracks':tracks,'error':error}
 
     @router.post("/projects/{pid}/publish", status_code=202)
@@ -108,6 +108,6 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
             raise HTTPException(409, {"code": "export_unavailable", "message": "export is not available", "retryable": False})
         if not path.is_file():
             raise HTTPException(410, {"code": "export_unavailable", "message": "export file is unavailable", "retryable": False})
-        return FileResponse(path, media_type="application/octet-stream", filename=path.name)
+        return FileResponse(path, media_type="application/octet-stream", filename=result.get("filename") or path.name)
 
     return router

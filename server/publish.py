@@ -127,7 +127,7 @@ class PublishRunner:
         if not row:
             raise PublishInvalid("revision not found")
         with self.revisions.db.connect() as c:
-            bound = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (project_id,)).fetchone()
+            bound = c.execute('SELECT p.source_asset_id,p.name,a.filename FROM projects p JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?', (project_id,)).fetchone()
         if not bound or bound[0] != request['asset_id']: raise PublishInvalid('bound asset changed')
         source = Path(row[0])
         asset = Path(self.asset_path(project_id))
@@ -154,8 +154,8 @@ class PublishRunner:
                 for key in list(element.attrib):
                     if key.startswith('{'+STUDIO_NS+'}'): del element.attrib[key]
             ttml = ET.tostring(root, encoding='utf-8')
-        from .media_format import describe_media
-        format_info = describe_media(asset, media)
+        from .media_format import describe_media, download_filename
+        format_info = describe_media(asset, media, bound[2])
         if format_info['extension'] is None: raise PublishInvalid('源文件格式不支持打包')
         output = self.output_root / f"{uuid.uuid4().hex}{format_info['extension']}"
         try:
@@ -165,7 +165,7 @@ class PublishRunner:
             if result["report"].get("passed") is not True:
                 raise PublishInvalid("publisher report did not pass")
             result.update(format_info)
-            result["filename"] = output.name
+            result["filename"] = download_filename(bound[1], format_info["extension"])
             # The service owns the output path, including cleanup on failure/cancel.
             result["output_path"] = str(output)
         except Exception:
