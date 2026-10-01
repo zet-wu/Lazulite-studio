@@ -6,7 +6,7 @@ import type { LyricFormat } from '../adapters/lyric-formats';
 import { renderLrc } from '../adapters/lrc';
 import type { LyricDocument } from '../domain/lyric-document';
 import styles from './acquisition.module.css';
-export function PackagingPanel(props: { document: LyricDocument; onExportFormat?: (format: LyricFormat) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument } | undefined>; projectId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
+export function PackagingPanel(props: { document: LyricDocument; dirty?: boolean; onExportFormat?: (format: LyricFormat) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument } | undefined>; projectId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
  const [blocking,setBlocking] = useState<OutputIssue[]>([]), [message,setMessage] = useState('');
  const [format, setFormat] = useState<LyricFormat>('ttml');
  useEffect(()=>{setBlocking([]);setMessage('');},[props.document,props.projectId,format]);
@@ -22,5 +22,5 @@ export function PackagingPanel(props: { document: LyricDocument; onExportFormat?
  catch(e) { if(e instanceof DocumentOutputError)setBlocking(uniqueOutputIssues(e.issues)); else setMessage(e instanceof Error ? e.message : '导出失败'); }
  }}>下载歌词</button></div>{message && <p role="alert">{message}</p>}
  {overlap.length > 0 && <details><summary>包含重叠主行，LRC 播放器可能无法同时显示全部声部</summary><p>涉及行：{overlap.join('、')}。TTML 保留并行结构。</p></details>}
- <h2>音乐文件</h2>{props.projectId && props.saveForPackaging ? <MusicPackaging key={props.projectId} onIssues={setBlocking} projectId={props.projectId} document={props.document} saveForPackaging={props.saveForPackaging} /> : <p>音乐打包需要关联项目音频，请从项目列表打开带音频的项目。</p>}</section></div>;
+ <h2>音乐文件</h2>{props.projectId && props.saveForPackaging ? <MusicPackaging dirty={props.dirty} key={props.projectId} onIssues={setBlocking} projectId={props.projectId} document={props.document} saveForPackaging={props.saveForPackaging} /> : <p>音乐打包需要关联项目音频，请从项目列表打开带音频的项目。</p>}</section></div>;
 }

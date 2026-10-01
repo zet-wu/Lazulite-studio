@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Callable, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
+from urllib.parse import quote
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -76,6 +77,7 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
     @router.get("/projects/{pid}/exports")
     def exports(pid: str, _: object = Depends(auth)):
         prow = project(pid)
+        service.reconcile_exports()
         with service.db.connect() as c:
             assets = {row['id']: row['filename'] for row in c.execute("SELECT id,filename FROM assets")}
             rows = c.execute("SELECT id FROM jobs WHERE project_id=? AND kind='publish' ORDER BY created_at DESC", (pid,)).fetchall()
@@ -85,8 +87,8 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
             report = result.get("report")
             path = result.get("output_path")
             passed = isinstance(report, dict) and report.get("passed") is True
-            available = job["status"] == "succeeded" and passed and bool(path) and Path(path).is_file()
-            status = "unavailable" if job["status"] == "succeeded" and (not path or not Path(path).is_file()) else job["status"]
+            available = not result.get("superseded") and job["status"] == "succeeded" and passed and bool(path) and Path(path).is_file()
+            status = "superseded" if result.get("superseded") else "unavailable" if job["status"] == "succeeded" and (not path or not Path(path).is_file()) else job["status"]
             items.append({"filename": result.get('filename'), "asset_filename": assets.get(request.get('asset_id')),
                           "container": result.get('container'), "format_label": result.get('format_label'), "track_id": report.get('track_id') if isinstance(report,dict) else None,
                           "id": job["id"], "revision": request.get("revision"), "asset_id": request.get("asset_id"),
@@ -101,13 +103,29 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
         job = service.get(job_id)
         if not job or job["project_id"] != pid or job["kind"] != "publish":
             raise HTTPException(404, {"code": "export_not_found", "message": "export not found", "retryable": False})
-        result = service.result(job_id) or {}; report = result.get("report") or {}
-        path = Path(result.get("output_path", ""))
-        passed = report.get("passed") is True
-        if job["status"] != "succeeded" or not passed:
-            raise HTTPException(409, {"code": "export_unavailable", "message": "export is not available", "retryable": False})
-        if not path.is_file():
-            raise HTTPException(410, {"code": "export_unavailable", "message": "export file is unavailable", "retryable": False})
-        return FileResponse(path, media_type="application/octet-stream", filename=result.get("filename") or path.name)
+        with service._lock:
+            result = service.result(job_id) or {}; report = result.get("report") or {}
+            if result.get('superseded'):
+                raise HTTPException(410, {"code":"export_replaced","message":"此产物已被较新的成功产物替换","retryable":False})
+            if job['status'] != 'succeeded' or report.get('passed') is not True:
+                raise HTTPException(409, {"code":"export_unavailable","message":"export is not available","retryable":False})
+            path = Path(result.get('output_path', ''))
+            try:
+                handle = path.open('rb')
+            except (FileNotFoundError, IsADirectoryError):
+                raise HTTPException(410, {"code":"export_unavailable","message":"export file is unavailable","retryable":False})
+        # Open before releasing the switching lock. POSIX keeps the inode alive;
+        # Windows defers deletion until this handle closes. Retry in either case.
+        def chunks():
+            try:
+                while block := handle.read(256 * 1024):
+                    yield block
+            finally:
+                handle.close()
+                service.reconcile_exports()
+        filename = result.get('filename') or path.name
+        return StreamingResponse(chunks(), media_type='application/octet-stream', headers={
+            'Content-Disposition': "attachment; filename*=UTF-8''" + quote(filename),
+        })
 
     return router

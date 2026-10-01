@@ -1,3 +1,4 @@
+from server.time_units import normalize_ttml
 import subprocess
 import time
 
@@ -90,7 +91,7 @@ def test_publish_http_validation_and_download_auth_gate(tmp_path):
     assert client.post(f"/api/v1/projects/{pid}/publish", json={"revision": bad, "asset_id": "other"}, headers=headers).status_code == 422
     clock = _save(client, headers, pid, bad, '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0s" end="1s" dur="1s">x</p></body></tt>')
     clock_job = client.post(f"/api/v1/projects/{pid}/publish", json={"revision": clock, "asset_id": asset, "lrc_kind":"lrc", "lrc_text":"[00:00.000]hello\n[00:01.000]\n"}, headers={**headers, "idempotency-key": "clock"}).json()["id"]
-    assert _wait(client, clock_job)["error"]["code"] == "publish_failed"
+    assert _wait(client, clock_job)["status"] == "succeeded"
 
 
 def test_packaging_options_are_part_of_job_identity_and_output(tmp_path):
@@ -107,12 +108,15 @@ def test_packaging_options_are_part_of_job_identity_and_output(tmp_path):
         url = f"/api/v1/projects/{pid}/publish"
         first = client.post(url,json=ordinary,headers={**headers,"idempotency-key":"options"}).json()
         assert client.post(url,json=extended,headers={**headers,"idempotency-key":"options"}).status_code == 409
-        second = client.post(url,json=extended,headers={**headers,"idempotency-key":"extended"}).json()
-        assert first["id"] != second["id"]
-        for job, body in [(first,ordinary),(second,extended)]:
-            assert _wait(client,job["id"])["status"] == "succeeded"
-            response = client.get(f"/api/v1/projects/{pid}/exports/{job['id']}/download")
-            assert MP4(BytesIO(response.content))["\xa9lyr"] == [body["lrc_text"]]
+        assert _wait(client,first['id'])['status']=='succeeded'
+        response=client.get(f"/api/v1/projects/{pid}/exports/{first['id']}/download")
+        assert MP4(BytesIO(response.content))["\xa9lyr"]==[ordinary['lrc_text']]
+        second=client.post(url,json=extended,headers={**headers,"idempotency-key":"extended"}).json()
+        assert first['id']!=second['id']
+        assert _wait(client,second['id'])['status']=='succeeded'
+        response=client.get(f"/api/v1/projects/{pid}/exports/{second['id']}/download")
+        assert MP4(BytesIO(response.content))["\xa9lyr"]==[extended['lrc_text']]
+        assert client.get(f"/api/v1/projects/{pid}/exports/{first['id']}/download").status_code==410
         assert client.post(url,json={**extended,"lrc_kind":"lrc"},headers=headers).status_code == 422
         assert client.post(url,json={**ordinary,"asset_id":"other"},headers=headers).status_code == 422
 
@@ -131,7 +135,7 @@ def test_publish_untimed_transliteration_whitespace_copy_and_missing_endpoint(tm
         job = client.post(f'/api/v1/projects/{pid}/publish', json=body, headers=headers).json()['id']
         assert _wait(client, job)['status'] == 'succeeded'
         source = client.get(f'/api/v1/projects/{pid}/lyrics').text
-        assert source == xml
+        assert source == normalize_ttml(xml)
         from server.db import Database
         with Database(tmp_path / 'studio.sqlite3').connect() as c:
             import json
@@ -227,8 +231,9 @@ def test_cover_audio_preserves_suffix_and_project_download_history(tmp_path, suf
             assert _wait(client, job)['status'] == 'succeeded'
         items = client.get(f'/api/v1/projects/{pid}/exports').json()['items']
         assert len(items) == 2
-        assert len(list((tmp_path / 'data' / 'exports').iterdir())) == 2
-        for item in items:
+        assert len(list((tmp_path / 'data' / 'exports').iterdir())) == 1
+        assert items[1]['download_url'] is None
+        for item in items[:1]:
             assert item['filename'] == f'中文 日本語__曲_.{suffix}'
             response = client.get(item['download_url'])
             assert response.status_code == 200

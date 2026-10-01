@@ -20,12 +20,47 @@ class JobService:
     """Durable single-slot executor. Every lifecycle transition is committed before notification."""
     def __init__(self, db: Database, *, engine=None, asset_path=None, reading_runner=None, publish_runner=None):
         self.db, self.engine, self.asset_path, self.reading_runner, self.publish_runner = db, engine or LazuliteEngine(), asset_path, reading_runner, publish_runner
-        self._lock = threading.Lock(); self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="studio-job")
+        self._lock = threading.RLock(); self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="studio-job")
         with db.transaction() as c:
             rows = c.execute("SELECT id FROM jobs WHERE status IN ('queued','running','cancel_requested')").fetchall()
             for row in rows:
                 t = now(); c.execute("UPDATE jobs SET status='interrupted',updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=?", (t,t,row[0]))
                 self._event(c,row[0],"state","interrupted",None,None,"服务重启，中断了未完成任务")
+
+        self.reconcile_exports(startup=True)
+
+    def reconcile_exports(self, *, startup=False):
+        """Retire historical successes; retry deferred deletion without claiming success."""
+        with self._lock:
+            with self.db.transaction() as c:
+                rows = c.execute("SELECT id,project_id,result_json FROM jobs WHERE kind='publish' AND status='succeeded' ORDER BY finished_at DESC,created_at DESC,id DESC").fetchall()
+                seen = set()
+                for row in rows:
+                    result = json.loads(row['result_json'] or '{}')
+                    if result.get('superseded') or result.get('report', {}).get('passed') is not True:
+                        continue
+                    if row['project_id'] in seen:
+                        result['superseded'] = True
+                        c.execute('UPDATE jobs SET result_json=? WHERE id=?', (json.dumps(result), row['id']))
+                    else:
+                        seen.add(row['project_id'])
+            with self.db.connect() as c:
+                records = c.execute("SELECT status,result_json FROM jobs WHERE kind='publish'").fetchall()
+            keep, obsolete = set(), set()
+            for row in records:
+                result = json.loads(row['result_json'] or '{}')
+                if result.get('output_path'):
+                    path = Path(result['output_path'])
+                    (keep if row['status'] == 'succeeded' and not result.get('superseded') and result.get('report', {}).get('passed') is True else obsolete).add(path)
+            # Only at startup: no worker can still be writing an unrecorded temporary file.
+            root = getattr(self.publish_runner, 'output_root', None)
+            if startup and root:
+                obsolete.update(path for path in Path(root).iterdir() if path.is_file() and path not in keep)
+            for path in obsolete - keep:
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    logger.warning('Export cleanup deferred: %s', path)
 
     def _event(self,c,jid,kind,stage,completed,total,message):
         seq=c.execute("SELECT COALESCE(MAX(seq),0)+1 FROM job_events WHERE job_id=?",(jid,)).fetchone()[0]
@@ -40,6 +75,8 @@ class JobService:
                 if old:
                     if old[0]!=digest: raise ValueError("idempotency key was used for another request")
                     return self.get(old[1])
+            if kind == 'publish' and c.execute("SELECT 1 FROM jobs WHERE project_id=? AND kind='publish' AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone():
+                raise ValueError('此项目已有活动打包任务，请等待完成或取消')
             jid=uuid.uuid4().hex; t=now()
             c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at,state_version) VALUES(?,?,?,?,?,?,?,0)",(jid,project_id,kind,"queued",json.dumps(request, ensure_ascii=False),t,t))
             self._event(c,jid,"state","queued",0,1,"任务已排队")
@@ -52,6 +89,8 @@ class JobService:
             row=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
             if not row or row[3] != "queued": return
             t=now(); c.execute("UPDATE jobs SET status='running',started_at=?,updated_at=?,state_version=state_version+1 WHERE id=?",(t,t,jid)); self._event(c,jid,"state","running",0,1,"任务开始")
+        result = None
+        published = False
         try:
             with self.db.connect() as c: record=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
             if not record: return
@@ -78,20 +117,33 @@ class JobService:
             result["binding"] = {"project_id": record[1], "asset_id": bound_asset,
                                  "revision": bound_revision,
                                  "revision_sha256": revision_hash}
-            with self.db.transaction() as c:
+            with self._lock, self.db.transaction() as c:
                 cancelled = c.execute('SELECT cancel_requested FROM jobs WHERE id=?', (jid,)).fetchone()
                 if kind == 'publish' and cancelled[0]:
-                    Path(result['output_path']).unlink(missing_ok=True)
                     t = now()
                     c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=?", (t,t,jid))
                     self._event(c,jid,'state','cancelled',None,None,'打包已取消')
                     return
+                if kind == 'publish':
+                    for old in c.execute("SELECT id,result_json FROM jobs WHERE project_id=? AND kind='publish' AND status='succeeded'", (record[1],)).fetchall():
+                        previous = json.loads(old['result_json'] or '{}')
+                        previous['superseded'] = True
+                        c.execute('UPDATE jobs SET result_json=? WHERE id=?', (json.dumps(previous),old['id']))
                 t=now(); c.execute("UPDATE jobs SET status='succeeded',result_json=?,engine_json=?,updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps(result,ensure_ascii=False),json.dumps(result.get("engine",{})),t,t,jid)); self._event(c,jid,"state","succeeded",1,1,"任务完成")
+            published = True
+            if kind == 'publish': self.reconcile_exports()
         except (PublishInvalid, PublishingError) as exc: self._finish_error(jid, "publish_failed", str(exc))
         except (EngineUnavailable, ReadingUnavailable, ForcedUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
         except Exception as exc:
             logger.exception("job %s failed", jid)
             self._finish_error(jid, "engine_error", "Lazulite engine failed; inspect server logs")
+
+        finally:
+            if not published and isinstance(result, dict) and result.get('output_path') and record[2] == 'publish':
+                try:
+                    Path(result['output_path']).unlink(missing_ok=True)
+                except OSError:
+                    logger.warning('Unpublished export cleanup deferred: %s',result['output_path'])
 
     def _finish_error(self,jid,code,message):
         with self.db.transaction() as c:

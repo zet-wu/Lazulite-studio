@@ -33,7 +33,8 @@ export type ExportItem = {
     | "failed"
     | "cancelled"
     | "interrupted"
-    | "unavailable";
+    | "unavailable"
+    | "superseded";
   created_at: string;
   stale: boolean;
   report: PublishReport | null;
