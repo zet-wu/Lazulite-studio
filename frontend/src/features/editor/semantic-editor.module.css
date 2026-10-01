@@ -269,3 +269,16 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .romanGenerationError { border: 1px solid var(--danger); padding: 8px; border-radius: 4px; color: var(--danger); }
 
 .romanGenerationRow { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+
+/* Both modes share the compact default row; only explicit extras expand. */
+.ribbon, .syncPanel { min-height: 41px; box-sizing: border-box; padding: 7px 16px; gap: 6px; font-size: 12px; line-height: 16px; }
+.syncPanel { flex-wrap: nowrap; }
+.syncPanel button, .syncPanel select, .syncExtras summary { font: inherit; padding: 4px 6px; white-space: nowrap; }
+.syncButtons { flex-wrap: nowrap; }
+.syncQuote { flex: 1; min-width: 40px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; background: var(--state-hover); border-radius: 4px; padding: 2px 6px; }
+.syncTime { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.syncPanel > strong { white-space: nowrap; }
+.syncExtras > div { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px; }
+.syncExtras[open] { flex-basis: 100%; }
+.syncPanel:has(.syncExtras[open]), .syncPanel:has(> [role="alert"]) { flex-wrap: wrap; }
+.syncBindings > label { display: grid; grid-template-columns: minmax(180px, 1fr) 150px auto; gap: 8px; align-items: center; }

@@ -1,3 +1,4 @@
+import { matchesBinding, shortcutInput, useShortcuts } from './shortcuts';
 import { PlaybackSpeed } from './PlaybackSpeed';
 import { normalizePlaybackSpeed, playbackSpeedKey, savedPlaybackSpeed } from '../domain/playback-speed';
 import {
@@ -68,6 +69,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   onTimelineCommand,
   onSelectLine,
 }: Props, ref) {
+  const keys = useShortcuts();
   const audio = useRef<HTMLAudioElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const head = useRef<HTMLSpanElement>(null);
@@ -202,7 +204,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       auditionEnd.current = endUs / 1_000_000;
       if (audio.current?.paused) play();
     },
-  }), [asset, play, seekTo]);
+  }), [asset, play, seekTo, readPosition, rate]);
 
   useEffect(() => {
     const d = asset?.duration_us ? asset.duration_us / 1e6 : 0;
@@ -412,15 +414,6 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     loopDrag.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
-  const interactive = (target: EventTarget | null) => {
-    const el = target as HTMLElement | null;
-    return Boolean(
-      el &&
-        (el.isContentEditable ||
-          ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(el.tagName) ||
-          el.closest("[role=button]")),
-    );
-  };
   const keyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape' && (panDrag.current || loopDrag.current)) {
       if (panDrag.current) setStart(panDrag.current.startUs / 1e6);
@@ -432,18 +425,13 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       !asset ||
       e.nativeEvent.isComposing ||
       e.repeat ||
-      interactive(e.target)
+      shortcutInput(e.target)
     )
       return;
-    if (["Home", "End", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+    const action = (['seekStart', 'seekEnd', 'seekBack', 'seekForward'] as const).find(action => matchesBinding(e.nativeEvent, keys[action]));
+    if (action) {
       e.preventDefault();
-      seekTo(
-        e.key === "Home"
-          ? 0
-          : e.key === "End"
-            ? duration
-            : positionRef.current + (e.key === "ArrowRight" ? 1 : -1),
-      );
+      seekTo(action === 'seekStart' ? 0 : action === 'seekEnd' ? duration : readPosition() + (action === 'seekForward' ? 1 : -1));
     }
   };
   useEffect(() => {
@@ -455,12 +443,12 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         e.preventDefault(); return;
       }
       if (
-        e.key === " " &&
+        matchesBinding(e, keys.play) &&
         !e.defaultPrevented &&
         !e.isComposing &&
         !e.repeat &&
         asset &&
-        !interactive(e.target)
+        !shortcutInput(e.target)
       ) {
         e.preventDefault();
         play();
@@ -468,7 +456,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [asset, play]);
+  }, [asset, play, keys]);
   const disabled = !asset;
   const retryMedia = () => {
     audio.current?.load();
@@ -505,7 +493,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const tickStep = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((value) => span / value <= maxTicks) ?? 600;
   const ticks = span > 0 ? Array.from({ length: Math.min(maxTicks + 1, Math.max(0, Math.floor(end / tickStep) - Math.ceil(start / tickStep) + 1)) }, (_, index) => (Math.ceil(start / tickStep) + index) * tickStep) : [];
   return (
-    <footer className={`${styles.footer} ${expanded ? styles.expanded : styles.collapsed}`} onKeyDown={keyDown}>
+    <footer data-transport className={`${styles.footer} ${expanded ? styles.expanded : styles.collapsed}`} onKeyDown={keyDown}>
       <audio
         ref={audio}
         onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; } }}
@@ -541,7 +529,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         <span className={styles.viewportRange}>视窗 {fmt(start)} – {fmt(end)}</span>
         <div className={styles.visibility} aria-label="时间轴图层">
           {(['line', 'word', 'ruby', 'gap', 'spectrum'] as const).map((key) => <button key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
-            {({ line: '行', word: '词', ruby: 'Ruby', gap: '空隙', spectrum: '声谱图' })[key]}
+            {({ line: '行', word: '词', ruby: '注音', gap: '空隙', spectrum: '声谱图' })[key]}
           </button>)}
         </div>
         </>}
