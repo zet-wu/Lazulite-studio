@@ -53,6 +53,7 @@ function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [editor.dirty, editor.saving, editor.conflict]);
+  if (editor.deleted) return <main><p role="alert">项目已删除，不能继续保存或恢复。</p><a href="/projects">返回项目列表</a></main>;
   const exportFile = (draft: boolean) => {
     try { download(serializeLyricTtml(editor.document, { draft }), `${title}${draft ? '.draft' : ''}.ttml`); setMessage(''); }
     catch (error) { setMessage(error instanceof Error ? error.message : '导出失败'); }

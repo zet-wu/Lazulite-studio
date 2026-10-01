@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { listenProjectDeletion, clearProjectLocalData } from "../adapters/project-lifecycle";
 import { createRecoveryAdapter } from "../adapters/recovery";
 import { parseLyricTtml, serializeLyricTtml } from "../adapters/ttml/lyric-codec";
 import {
@@ -25,6 +26,8 @@ export function useProjectDocument(
   saveDocument: Save,
 ) {
   const identity = projectId;
+  const deletedRef = useRef(false);
+  const [deleted, setDeleted] = useState(false);
   const [state, setState] = useState<LyricEditorState>(() =>
     createLyricEditorState(parseLyricTtml(initialTtml)),
   );
@@ -56,7 +59,8 @@ export function useProjectDocument(
   }, []);
   const checkpoint = useCallback(
     async (next: LyricEditorState) => {
-      await enqueueRecovery(() => createRecoveryAdapter().save(projectId, identity, next, revision));
+      if (deletedRef.current) return;
+      await enqueueRecovery(async () => { if (!deletedRef.current) await createRecoveryAdapter().save(projectId, identity, next, revision); });
     },
     [enqueueRecovery, identity, projectId, revision],
   );
@@ -83,6 +87,7 @@ export function useProjectDocument(
     [commit],
   );
   const save = useCallback(async (forPackaging = false) => {
+    if (deletedRef.current) { if (forPackaging) throw new Error("项目已删除"); return; }
     if (inFlight.current || conflict) {
       if (forPackaging) throw new Error(conflict ? '保存冲突，请先处理' : '正在保存，请完成后重试打包');
       return;
@@ -110,6 +115,7 @@ export function useProjectDocument(
         request.seq,
         etag,
       );
+      if (deletedRef.current) return;
       setRevision(result.revision);
       setEtag(result.etag);
       setError(null);
@@ -128,6 +134,7 @@ export function useProjectDocument(
       }
       return { revision: result.revision, document: captured };
     } catch (caught) {
+      if ((caught as { status?: number }).status === 404) { deletedRef.current = true; setDeleted(true); }
       if ((caught as { status?: number }).status === 412) setConflict(true);
       setError(
         caught instanceof Error ? caught.message : "保存失败，修改已保留",
@@ -139,13 +146,13 @@ export function useProjectDocument(
     }
   }, [conflict, dirty, enqueueRecovery, etag, identity, projectId, revision, saveDocument]);
   useEffect(() => {
-    if (!dirty || error || conflict) return;
+    if (!dirty || error || conflict || deleted) return;
     const timer = window.setTimeout(() => void save(), 700);
     return () => window.clearTimeout(timer);
-  }, [conflict, dirty, error, save]);
+  }, [conflict, deleted, dirty, error, save]);
   const history = useCallback(
     (change: (s: LyricEditorState) => LyricEditorState) => {
-      if (conflict) return;
+      if (conflict || deletedRef.current) return;
       const next = change(stateRef.current);
       if (next !== stateRef.current) {
         stateRef.current = next;
@@ -157,13 +164,14 @@ export function useProjectDocument(
   );
   const apply = useCallback(
     (command: LyricCommand) => {
-      if (conflict) return false;
+      if (conflict || deletedRef.current) return false;
       dispatch(command);
       return true;
     },
     [conflict, dispatch],
   );
   const recover = useCallback(async () => {
+    if (deletedRef.current) return false;
     const adapter = createRecoveryAdapter();
     const record = await adapter.readCheckpoint(projectId);
     const recovered = await adapter.load(projectId, identity);
@@ -205,7 +213,15 @@ export function useProjectDocument(
     if (ok) setRecovery({ available: false });
     return ok;
   }, [recover]);
+  useEffect(() => listenProjectDeletion(projectId, () => {
+    deletedRef.current = true; setDeleted(true);
+    void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError("项目已删除，本地数据清理失败"));
+  }), [enqueueRecovery, projectId]);
+  useEffect(() => {
+    if (deleted) void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError("项目已删除，本地数据清理失败"));
+  }, [deleted, enqueueRecovery, projectId]);
   return {
+    deleted,
     document: state.present,
     state,
     revision,

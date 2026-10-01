@@ -397,6 +397,11 @@ def create_app(
             "asset": asset_dto(a) if a else None,
         }
 
+    @api.delete("/projects/{pid}")
+    def remove_project(pid: str, _: object = Depends(write)):
+        from .project_deletion import delete_project
+        return delete_project(db, root, pid)
+
     @api.get("/projects/{pid}/lyrics")
     def lyrics(pid: str, revision: str | None = None, _: object = Depends(auth)):
         r = project(pid)

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { studioApi } from "../adapters/http/client";
+import { clearProjectLocalData, announceProjectDeleted } from "../adapters/project-lifecycle";
 import { CreateProject } from "./CreateProject";
 import styles from "./workspace.module.css";
 
@@ -24,6 +25,8 @@ export function ProjectList() {
   );
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
   const projects = [...(query.data?.items ?? []), ...extra];
   const visible = useMemo(
     () =>
@@ -100,14 +103,12 @@ export function ProjectList() {
           <option value="name">名称</option>
         </select>
       </div>
+      {deleteError && <p role="alert">{deleteError}</p>}
       {visible.length ? (
         <section className={styles.projectList} aria-label="项目列表">
           {visible.map((project) => (
-            <Link
-              to={withScenario(`/projects/${project.id}/edit`)}
-              className={styles.projectRow}
-              key={project.id}
-            >
+            <div className={styles.projectRow} key={project.id}>
+            <Link to={withScenario(`/projects/${project.id}/edit`)} className={styles.projectMainLink}>
               <div className={styles.projectGlyph}>♪</div>
               <div className={styles.projectMain}>
                 <strong>{project.name}</strong>
@@ -125,6 +126,20 @@ export function ProjectList() {
               </span>
               <span className={styles.rowArrow}>›</span>
             </Link>
+            <details className={styles.projectMenu}><summary aria-label={`${project.name} 项目操作`}>⋮</summary>
+              <button disabled={deleting === project.id} onClick={async () => {
+                if (!window.confirm(`删除项目“${project.name}”？将删除歌词修订、任务和产物。原始上传文件和共享音频保留。`)) return;
+                setDeleting(project.id); setDeleteError("");
+                try {
+                  await studioApi.deleteProject(project.id);
+                  announceProjectDeleted(project.id);
+                  try { await clearProjectLocalData(project.id); }
+                  catch { setDeleteError("项目已删除，本地恢复数据清理失败。重新打开也无法保存到已删除项目。"); }
+                  setExtra([]); setNextCursor(undefined); await query.refetch();
+                } catch (error) { setDeleteError(error instanceof Error ? error.message : "删除失败，请重试"); }
+                finally { setDeleting(null); }
+              }}>删除项目</button>
+            </details></div>
           ))}
         </section>
       ) : (

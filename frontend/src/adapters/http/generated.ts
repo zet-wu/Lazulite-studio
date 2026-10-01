@@ -4,6 +4,70 @@
  */
 
 export interface paths {
+    "/lyric-sources/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["lyricSourceSearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lyric-sources/fetch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["lyricSourceFetch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lyric-sources/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["lyricSourceResolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/packaging": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPackagingInfo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/session": {
         parameters: {
             query?: never;
@@ -78,7 +142,7 @@ export interface paths {
         get: operations["getProject"];
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["deleteProject"];
         options?: never;
         head?: never;
         patch?: never;
@@ -356,74 +420,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/lyric-sources/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["lyricSourceSearch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/lyric-sources/fetch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["lyricSourceFetch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/lyric-sources/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["lyricSourceResolve"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects/{projectId}/packaging": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getPackagingInfo"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Search */
+        LyricSearchRequest: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "netease" | "qqmusic" | "kugou" | "amll";
+            /** Query */
+            query: string;
+        };
+        /** Candidate */
+        LyricSourceCandidate: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "netease" | "qqmusic" | "kugou" | "amll";
+            /** Id */
+            id: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Artists */
+            artists?: string[];
+            /**
+             * Album
+             * @default
+             */
+            album: string;
+            /**
+             * Duration Ms
+             * @default null
+             */
+            duration_ms: number | null;
+            /**
+             * Songmid
+             * @default null
+             */
+            songmid: string | null;
+            /**
+             * Songid
+             * @default null
+             */
+            songid: string | null;
+            /**
+             * Platform
+             * @default null
+             */
+            platform: ("ncm-lyrics" | "qq-lyrics" | "apple-lyrics" | "spotify-lyrics" | "raw-lyrics" | "ttml") | null;
+            /**
+             * File
+             * @default null
+             */
+            file: string | null;
+        };
         LoginRequest: {
             username?: string;
             /** Format: password */
@@ -528,6 +585,9 @@ export interface components {
             target_track_id: number | null;
         };
         Export: {
+            /** @enum {unknown} */
+            lrc_kind?: "lrc" | "elrc";
+            target_track_id?: number | null;
             id: string;
             revision: string;
             asset_id: string;
@@ -537,9 +597,6 @@ export interface components {
             report: components["schemas"]["PublishReport"] | null;
             download_url: string | null;
             error: Record<string, never> | null;
-            /** @enum {unknown} */
-            lrc_kind?: "lrc" | "elrc";
-            target_track_id?: number | null;
         };
         ExportList: {
             /** @constant */
@@ -780,63 +837,6 @@ export interface components {
             }[];
             read_only_reasons: string[];
         };
-        /** Search */
-        LyricSearchRequest: {
-            /**
-             * Source
-             * @enum {string}
-             */
-            source: "netease" | "qqmusic" | "kugou" | "amll";
-            /** Query */
-            query: string;
-        };
-        /** Candidate */
-        LyricSourceCandidate: {
-            /**
-             * Source
-             * @enum {string}
-             */
-            source: "netease" | "qqmusic" | "kugou" | "amll";
-            /** Id */
-            id: string;
-            /**
-             * Title
-             * @default
-             */
-            title: string;
-            /** Artists */
-            artists?: string[];
-            /**
-             * Album
-             * @default
-             */
-            album: string;
-            /**
-             * Duration Ms
-             * @default null
-             */
-            duration_ms: number | null;
-            /**
-             * Songmid
-             * @default null
-             */
-            songmid: string | null;
-            /**
-             * Songid
-             * @default null
-             */
-            songid: string | null;
-            /**
-             * Platform
-             * @default null
-             */
-            platform: ("ncm-lyrics" | "qq-lyrics" | "apple-lyrics" | "spotify-lyrics" | "raw-lyrics" | "ttml") | null;
-            /**
-             * File
-             * @default null
-             */
-            file: string | null;
-        };
     };
     responses: {
         /** @description Session expired */
@@ -884,6 +884,173 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    lyricSourceSearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LyricSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Authenticated provider response with original lyric format */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Provider concurrency limit */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upstream network or payload error */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    lyricSourceFetch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LyricSourceCandidate"];
+            };
+        };
+        responses: {
+            /** @description Authenticated provider response with original lyric format */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Provider concurrency limit */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upstream network or payload error */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    lyricSourceResolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LyricSourceCandidate"];
+            };
+        };
+        responses: {
+            /** @description Authenticated provider response with original lyric format */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Provider concurrency limit */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upstream network or payload error */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getPackagingInfo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Container and stable STPP track IDs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        asset_id?: string;
+                        supported?: boolean;
+                        container?: string | null;
+                        tracks?: {
+                            track_id?: number;
+                            language?: string;
+                            name?: string;
+                        }[];
+                        error?: string | null;
+                    };
+                };
+            };
+        };
+    };
     getSession: {
         parameters: {
             query?: never;
@@ -1071,6 +1238,44 @@ export interface operations {
             };
             404: components["responses"]["NotFound"];
             default: components["responses"]["Error"];
+        };
+    };
+    deleteProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 项目及其记录已删除 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        deleted: string;
+                    };
+                };
+            };
+            /** @description 项目不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 项目仍有未结束任务 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listJobs: {
@@ -1626,173 +1831,6 @@ export interface operations {
             409: components["responses"]["Error"];
             410: components["responses"]["Error"];
             default: components["responses"]["Error"];
-        };
-    };
-    lyricSourceSearch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LyricSearchRequest"];
-            };
-        };
-        responses: {
-            /** @description Authenticated provider response with original lyric format */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            /** @description Session required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Provider concurrency limit */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Upstream network or payload error */
-            502: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    lyricSourceFetch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LyricSourceCandidate"];
-            };
-        };
-        responses: {
-            /** @description Authenticated provider response with original lyric format */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            /** @description Session required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Provider concurrency limit */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Upstream network or payload error */
-            502: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    lyricSourceResolve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LyricSourceCandidate"];
-            };
-        };
-        responses: {
-            /** @description Authenticated provider response with original lyric format */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            /** @description Session required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Provider concurrency limit */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Upstream network or payload error */
-            502: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    getPackagingInfo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Container and stable STPP track IDs */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        asset_id?: string;
-                        supported?: boolean;
-                        container?: string | null;
-                        tracks?: {
-                            track_id?: number;
-                            language?: string;
-                            name?: string;
-                        }[];
-                        error?: string | null;
-                    };
-                };
-            };
         };
     };
 }
