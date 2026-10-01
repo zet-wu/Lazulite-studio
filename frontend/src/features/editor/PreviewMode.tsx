@@ -26,7 +26,7 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
     const update = () => {
       const current = transport.current;
       if (current) {
-        player.current?.lyricPlayer?.setCurrentTime(Math.round(current.getPositionUs() / 1000));
+        (player.current?.lyricPlayer as StudioLyricPlayer | undefined)?.syncMedia(current.getPositionUs() / 1000, current.getPlaybackRate(), current.isPlaying());
         const next = current.isPlaying();
         if (next !== lastPlaying) { lastPlaying = next; setPlaying(next); }
       }

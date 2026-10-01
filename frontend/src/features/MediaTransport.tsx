@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -47,6 +48,7 @@ type Props = {
 
 export type TransportHandle = {
   getPositionUs: () => number;
+  getPlaybackRate: () => number;
   isPlaying: () => boolean;
   seekUs: (timeUs: number) => void;
   play: () => void;
@@ -149,22 +151,25 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         : positionRef.current,
     [asset],
   );
+  const projectHead = useCallback((current: number) => {
+    const { start, span } = viewportRef.current;
+    if (!head.current) return;
+    head.current.style.left = `${span ? (current - start) / span * 100 : 0}%`;
+    head.current.style.display = current >= start && current <= start + span ? 'block' : 'none';
+  }, []);
+  useLayoutEffect(() => { projectHead(readPosition()); }, [start, span, expanded, readPosition, projectHead]);
   const updateDom = useCallback(
     (raw: number) => {
-      const { start: viewStart, span: viewSpan, duration: mediaDuration } = viewportRef.current;
+      const { duration: mediaDuration } = viewportRef.current;
       const current = Math.max(0, Math.min(mediaDuration || raw, raw));
       positionRef.current = current;
       if (clock.current)
         clock.current.textContent = `${fmt(current)} / ${fmt(mediaDuration)}`;
       slider.current?.setAttribute("aria-valuenow", String(current));
-      if (head.current)
-        head.current.style.left = `${viewSpan ? ((current - viewStart) / viewSpan) * 100 : 0}%`;
-      if (head.current)
-        head.current.style.display =
-          current >= viewStart && current <= viewStart + viewSpan ? "block" : "none";
+      projectHead(current);
       onPosition?.(Math.round(current * 1_000_000));
     },
-    [onPosition],
+    [onPosition, projectHead],
   );
   const seekTo = useCallback(
     (raw: number) => {
@@ -185,7 +190,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     else audio.current.pause();
   }, [asset]);
   useImperativeHandle(ref, () => ({
-    getPositionUs: () => Math.round(positionRef.current * 1_000_000),
+    getPositionUs: () => Math.round(readPosition() * 1_000_000),
+    getPlaybackRate: () => audio.current?.playbackRate ?? rate,
     isPlaying: () => Boolean(audio.current && !audio.current.paused),
     seekUs: (timeUs) => { auditionEnd.current = null; seekTo(timeUs / 1_000_000); },
     play: () => { if (audio.current?.paused) play(); },

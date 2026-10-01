@@ -13,7 +13,7 @@ it('uses the selected target and stops the completed line without writing the ne
   const units = syncUnits(document);
   let timeUs = 1_000_000;
   let state = createLyricEditorState(document);
-  const transport = { current: { getPositionUs: () => timeUs, isPlaying: () => false, seekUs() {}, play() {}, pause() {}, audition() {} } satisfies TransportHandle };
+  const transport = { current: { getPositionUs: () => timeUs, getPlaybackRate: () => 1, isPlaying: () => false, seekUs() {}, play() {}, pause() {}, audition() {} } satisfies TransportHandle };
   function Harness() {
     const [cursor, setCursor] = useState(units[0]);
     const [doc, setDoc] = useState(document);
