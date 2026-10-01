@@ -81,8 +81,8 @@ def probe_media(path: Path, *, ffprobe: str = "ffprobe") -> MediaProbe:
 
     def integer_time(value: object) -> int | None:
         try:
-            return milliseconds(value) if value not in (None, "N/A") else None
-        except (TypeError, ValueError):
+            return math.floor(float(value) * 1000 + 0.5) if value not in (None, "N/A") else None
+        except (TypeError, ValueError, OverflowError):
             return None
 
     duration = integer_time(stream.get("duration")) or integer_time(data.get("format", {}).get("duration"))

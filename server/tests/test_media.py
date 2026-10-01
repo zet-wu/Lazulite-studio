@@ -94,3 +94,16 @@ def test_pcm_window_context_limit_and_exact_sample_coordinates(tmp_path: Path) -
     assert len(data) == 123 * 4
     data, _, _ = service.pcm_window(asset, start_ms=0, end_ms=6)
     assert len(data) == 288 * 4
+
+
+def test_native_negative_media_origin_is_preserved_in_milliseconds(monkeypatch):
+    import json
+    from types import SimpleNamespace
+    from server.studio.media import probe_media
+    monkeypatch.setattr(subprocess, 'run', lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps({
+        'streams': [{'codec_type':'audio','start_time':'-0.012','duration':'1.0005','sample_rate':'48000','channels':2}],
+        'format': {'format_name':'wav'},
+    })))
+    probe=probe_media(Path('native.wav'))
+    assert probe.start_ms == -12
+    assert probe.duration_ms == 1001
