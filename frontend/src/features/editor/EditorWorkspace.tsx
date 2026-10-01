@@ -29,6 +29,7 @@ import { RubyWordEditor } from './RubyWordEditor';
 import { TranslationEditor } from './TranslationEditor';
 import { RomanizationRow } from './RomanizationRow';
 import { LineSplitDialog } from './LineSplitDialog';
+import { syncUnits } from '../../domain/sync-editing';
 import { SyncPanel } from './SyncPanel';
 import { MetadataPanel } from './MetadataPanel';
 import { SingerSelection } from './SingerSelection';
@@ -175,6 +176,14 @@ export function EditorWorkspace(props: Props) {
   }, [document]);
   const activeLineId = selectionLineId(selection) ?? props.selectedLineId;
   const selectedLine = document.lines.find((line) => line.id === activeLineId) ?? document.lines[0];
+  // The active canvas selection is the single source of the timing target.
+  const syncCursor = syncUnits(document).find(unit => {
+    if (!selection) return unit.lineId === selectedLine?.id;
+    if (selection.kind === 'lines') return unit.lineId === selection.activeId;
+    if (selection.kind === 'words') return unit.wordId === selection.activeId;
+    if (selection.kind === 'ruby') return unit.wordId === selection.wordId && unit.rubyUnitId === selection.activeId;
+    return false;
+  }) ?? null;
   const mainLines = document.lines.filter((line) => !line.backgroundOf);
   const ordinalById = visibleLineOrdinals(document);
   const mainIds = mainLines.map((line) => line.id);
@@ -619,8 +628,8 @@ export function EditorWorkspace(props: Props) {
     {mode === 'package' && <PackagingPanel {...props} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
     {mode === 'auxiliary' && <section className={styles.auxiliaryPlaceholder}><h1>项目辅助</h1><p>候选、任务、词典与审核流程将在后续阶段整理到此处。歌词文档与播放器保持当前状态。</p></section>}
     {mode === 'preview' && <Suspense fallback={<p>正在载入预览…</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={props.onSelectLine} /></Suspense>}
-    {mode === 'sync' && <SyncPanel document={document} currentLineId={selectedLine?.id ?? null} apply={dispatch} transport={props.transport}
-      onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id); }} />}
+    {mode === 'sync' && <SyncPanel document={document} cursor={syncCursor} apply={dispatch} transport={props.transport}
+      onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
     {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canPaste={Boolean(clipboard)}
       canMoveUp={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes[0] > 0}
       canMoveDown={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes.at(-1) !== document.lines.length - 1}

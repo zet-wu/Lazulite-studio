@@ -3,7 +3,7 @@ import { nonemptyTranslations } from './sublyrics';
 import { createLine, createWord, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type SubLyric, type TimeUs } from './lyric-document';
 import { splitAtGrapheme } from './text-boundaries';
 import { distributeRubyTime, splitReadingMora } from './ruby-editing';
-import { stampSync, type SyncAction, type SyncCursor } from './sync-editing';
+import { stampSync, type SyncAction, type SyncCursor, type SyncMode } from './sync-editing';
 
 const MAX_HISTORY = 256;
 
@@ -42,7 +42,7 @@ type AtomicLyricCommand =
   | { type: 'set-metadata'; key: string; values: string[] }
   | { type: 'set-language'; language: string | null }
   | { type: 'set-agents'; agents: LyricAgent[] }
-  | { type: 'sync-stamp'; cursor: SyncCursor; action: SyncAction; timeUs: number }
+  | { type: 'sync-stamp'; cursor: SyncCursor; action: SyncAction; timeUs: number; mode?: SyncMode }
   | { type: 'replace-document'; document: LyricDocument }
   | { type: 'split-word'; lineId: string; wordId: string; at: number; newWordId?: string }
   | { type: 'edit-word'; lineId: string; wordId: string; text: string }
@@ -127,7 +127,7 @@ function wordFitsLine(word: LyricWord, line: LyricLine) {
 
 function applyStructure(document: LyricDocument, command: AtomicLyricCommand): LyricDocument | null {
   switch (command.type) {
-    case 'sync-stamp': return stampSync(document, command.cursor, command.action, command.timeUs);
+    case 'sync-stamp': return stampSync(document, command.cursor, command.action, command.timeUs, command.mode);
     case 'insert-line': {
       const line = command.line ?? createLine('');
       if (document.lines.some((item) => item.id === line.id)) throw new Error(`Line id already exists: ${line.id}`);

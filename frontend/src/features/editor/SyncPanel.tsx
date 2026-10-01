@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import type { LyricDocument } from '../../domain/lyric-document';
-import { syncIndex, syncUnits, type SyncAction, type SyncCursor } from '../../domain/sync-editing';
+import { syncIndex, syncUnits, type SyncAction, type SyncMode, type SyncCursor } from '../../domain/sync-editing';
+import { visibleLineOrdinals } from '../../adapters/output-validation';
 import type { TransportHandle } from '../MediaTransport';
 import styles from './semantic-editor.module.css';
 
 type KeyAction = SyncAction | 'previous' | 'following' | 'previousLine' | 'followingLine';
 const defaults: Record<KeyAction, string> = { start: 'KeyS', next: 'KeyD', end: 'KeyF', previous: 'ArrowLeft', following: 'ArrowRight', previousLine: 'ArrowUp', followingLine: 'ArrowDown' };
 const labels: Record<KeyAction, string> = { start: '起始轴', next: '连续轴', end: '结束轴', previous: '上一单元', following: '下一单元', previousLine: '上一行', followingLine: '下一行' };
-type Props = { document: LyricDocument; currentLineId: string | null; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
+type Props = { document: LyricDocument; cursor: SyncCursor | null; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
 
 function initialBindings(): Record<KeyAction, string> {
   const stored = localStorage.getItem('lazulite-sync-keys');
@@ -19,37 +20,44 @@ function initialBindings(): Record<KeyAction, string> {
   } catch { return defaults; }
 }
 
-export function SyncPanel({ document, currentLineId, apply, transport, onCursor }: Props) {
+export function SyncPanel({ document, cursor, apply, transport, onCursor }: Props) {
   const units = useMemo(() => syncUnits(document), [document]);
-  const [cursor, setCursor] = useState<SyncCursor | null>(() => units.find((unit) => unit.lineId === currentLineId) ?? units[0] ?? null);
+  const [mode, setMode] = useState<SyncMode>('continuous');
+  const [completed, setCompleted] = useState(false);
   const [keys, setKeys] = useState(initialBindings);
   const [offsetMs, setOffsetMs] = useState(0);
   const [emptyBeats, setEmptyBeats] = useState(0);
   const [error, setError] = useState('');
   const index = syncIndex(units, cursor);
-  const active = index >= 0 ? units[index] : units[0] ?? null;
+  const active = index >= 0 ? units[index] : null;
   const line = document.lines.find((item) => item.id === active?.lineId);
   const word = line?.words.find((item) => item.id === active?.wordId);
   const ruby = word?.rubyUnits.find((item) => item.id === active?.rubyUnitId);
-  const beginUs = ruby?.beginUs ?? word?.beginUs ?? null;
-  const endUs = ruby?.endUs ?? word?.endUs ?? null;
-  useEffect(() => { if (active && index < 0) setCursor(active); }, [active, index]);
+  const beginUs = ruby ? ruby.beginUs : word?.beginUs ?? null;
+  const endUs = ruby ? ruby.endUs : word?.endUs ?? null;
+  useEffect(() => { setEmptyBeats(0); setCompleted(false); setError(''); }, [cursor?.lineId, cursor?.wordId, cursor?.rubyUnitId]);
+  const lineUnits = units.filter(unit => unit.lineId === active?.lineId);
+  const lineIndex = syncIndex(lineUnits, active);
+  const lineNumber = line ? visibleLineOrdinals(document).get(line.id) : null;
   const moveTo = (at: number) => {
     const next = units[at];
     if (!next) return;
-    setCursor(next); setEmptyBeats(0); setError(''); onCursor(next);
+    setCompleted(false); setEmptyBeats(0); setError(''); onCursor(next);
   };
   const previousLine = () => { const before = units.slice(0, index).reverse().find((unit) => unit.lineId !== active?.lineId); if (before) moveTo(units.findIndex((unit) => unit.lineId === before.lineId)); };
   const followingLine = () => { const at = units.findIndex((unit, position) => position > index && unit.lineId !== active?.lineId); if (at >= 0) moveTo(at); };
   const stamp = (action: SyncAction) => {
-    if (!active) return;
+    if (!active || completed) return;
     const clock = transport?.current;
     if (!clock) { setError('请先连接项目音频'); return; }
     const timeUs = Math.max(0, clock.getPositionUs() + Math.round(offsetMs * 1_000));
     if (action === 'next' && !active.rubyUnitId && word && emptyBeats < word.emptyBeat) { setEmptyBeats((value) => value + 1); return; }
-    if (apply({ type: 'sync-stamp', cursor: active, action, timeUs })) {
+    if (apply({ type: 'sync-stamp', cursor: active, action, timeUs, mode })) {
       setError('');
-      if (action !== 'start') moveTo(Math.min(units.length - 1, index + 1));
+      if (action !== 'start') {
+        if (mode === 'line' && lineIndex === lineUnits.length - 1) setCompleted(true);
+        else moveTo(Math.min(units.length - 1, index + 1));
+      }
     }
   };
   const setBinding = (action: KeyAction, code: string) => {
@@ -79,14 +87,17 @@ export function SyncPanel({ document, currentLineId, apply, transport, onCursor 
     transport?.current?.audition(start, before ? beginUs : endUs + 600_000);
   };
   return <section className={styles.syncPanel} aria-label="连续打轴">
-    <strong>打轴 {units.length ? `${Math.max(0, index) + 1}/${units.length}` : '无可打轴单元'}</strong>
-    <span>{word ? `${word.text}${ruby ? ` → ${ruby.reading}` : ''}` : '请选择歌词词块'} · {beginUs === null ? '—' : (beginUs / 1e6).toFixed(3)}–{endUs === null ? '—' : (endUs / 1e6).toFixed(3)} s</span>
+    <strong>{active ? `L${lineNumber} · 单元 ${lineIndex + 1} / ${lineUnits.length}` : '当前选择不参与打轴'}</strong>
+    <span className={styles.syncQuote}>{word?.text}{ruby && <b> → {ruby.reading}</b>}</span>
+    <small className={styles.syncTime}>{beginUs === null ? '—' : (beginUs / 1e6).toFixed(3)}–{endUs === null ? '—' : (endUs / 1e6).toFixed(3)} s</small>
+    <select aria-label="打轴模式" value={mode} onChange={event => { setMode(event.target.value as SyncMode); setCompleted(false); }}><option value="continuous">连续</option><option value="line">本行</option></select>
+    {completed && <small role="status">本行已完成</small>}
     <div className={styles.syncButtons}>
       <button disabled={index <= 0} onClick={() => moveTo(index - 1)}>上一单元</button>
       <button disabled={!units.slice(0, index).some((unit) => unit.lineId !== active?.lineId)} onClick={previousLine}>上一行</button>
-      <button disabled={!active} onClick={() => stamp('start')}>起始轴</button>
-      <button disabled={!active} onClick={() => stamp('next')}>连续轴</button>
-      <button disabled={!active} onClick={() => stamp('end')}>结束轴</button>
+      <button disabled={!active || completed} onClick={() => stamp('start')}>起始轴</button>
+      <button disabled={!active || completed} onClick={() => stamp('next')}>连续轴</button>
+      <button disabled={!active || completed} onClick={() => stamp('end')}>结束轴</button>
       <button disabled={index < 0 || index >= units.length - 1} onClick={() => moveTo(index + 1)}>下一单元</button>
       <button disabled={!units.some((unit, position) => position > index && unit.lineId !== active?.lineId)} onClick={followingLine}>下一行</button>
       <button disabled={beginUs === null} onClick={() => { if (beginUs !== null) transport?.current?.seekUs(beginUs); }}>回听定位</button>

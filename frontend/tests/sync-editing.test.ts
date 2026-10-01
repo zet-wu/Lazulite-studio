@@ -89,3 +89,24 @@ describe('E5 sync editing', () => {
     expect(reopened.lines[1].words[0]).toMatchObject({ beginUs: 2_000_000, endUs: 3_000_000 });
   });
 });
+
+it('preserves line margins and its unchanged link, and limits line-mode successors atomically', () => {
+  const document = createLyricDocument('one');
+  const line = document.lines[0];
+  line.beginUs = 0; line.endUs = 10_000_000;
+  line.words[0].beginUs = 2_000_000; line.words[0].endUs = 8_000_000;
+  const next = createLine('two'); next.beginUs = 10_000_000;
+  document.lines.push(next);
+  line.endLink = { targetLineId: next.id, originalEndUs: 10_000_000 };
+  const cursor = syncUnits(document)[0];
+  let state = createLyricEditorState(document);
+  state = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeUs: 3_000_000 });
+  expect(state.present.lines[0]).toMatchObject({ beginUs: 0, endUs: 10_000_000, endLink: line.endLink });
+  const before = state.present;
+  state = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'next', timeUs: 7_000_000, mode: 'line' });
+  expect(state.present.lines[1]).toEqual(next);
+  expect(state.present.lines[0]).toMatchObject({ beginUs: 0, endUs: 10_000_000, endLink: line.endLink });
+  expect(undoLyricCommand(state).present).toBe(before);
+  const outside = stampSync(state.present, cursor, 'end', 12_000_000, 'line');
+  expect(outside.lines[0]).toMatchObject({ beginUs: 0, endUs: 12_000_000, endLink: null });
+});

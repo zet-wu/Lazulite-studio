@@ -1,6 +1,7 @@
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit } from './lyric-document';
 
 export type SyncCursor = { lineId: string; wordId: string; rubyUnitId: string | null };
+export type SyncMode = 'continuous' | 'line';
 export type SyncAction = 'start' | 'next' | 'end';
 
 export function syncUnits(document: LyricDocument): SyncCursor[] {
@@ -38,18 +39,19 @@ function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginUs' | 'endU
   words[index] = assign(words[index], cursor.rubyUnitId, side, timeUs);
   const starts = words.map((word) => word.beginUs).filter((value): value is number => value !== null);
   const ends = words.map((word) => word.endUs).filter((value): value is number => value !== null);
-  const beginUs = starts.length ? Math.min(...starts) : line.beginUs;
-  const endUs = ends.length ? Math.max(...ends) : line.endUs;
+  const beginUs = starts.length ? Math.min(...starts, ...(line.beginUs === null ? [] : [line.beginUs])) : line.beginUs;
+  const endUs = ends.length ? Math.max(...ends, ...(line.endUs === null ? [] : [line.endUs])) : line.endUs;
   return { ...line, words, beginUs, endUs, endLink: endUs === line.endUs ? line.endLink : null };
 }
 
-export function stampSync(document: LyricDocument, cursor: SyncCursor, action: SyncAction, timeUs: number): LyricDocument {
+export function stampSync(document: LyricDocument, cursor: SyncCursor, action: SyncAction, timeUs: number, mode: SyncMode = 'continuous'): LyricDocument {
   if (!Number.isSafeInteger(timeUs) || timeUs < 0) throw new Error('打轴时间必须是非负整数微秒');
   const units = syncUnits(document);
   const index = syncIndex(units, cursor);
   if (index < 0) throw new Error('打轴游标已失效');
   const current = units[index];
-  const next = action === 'next' ? units[index + 1] : null;
+  const successor = units[index + 1];
+  const next = action === 'next' && (mode === 'continuous' || successor?.lineId === current.lineId) ? successor : null;
   const changes = new Map<string, LyricLine>();
   const read = (id: string) => changes.get(id) ?? document.lines.find((line) => line.id === id)!;
   if (action === 'start') changes.set(current.lineId, updateUnit(read(current.lineId), current, 'beginUs', timeUs));
