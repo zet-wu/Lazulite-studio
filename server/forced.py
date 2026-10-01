@@ -31,10 +31,10 @@ def prepare_forced_request(line: dict[str, Any], params: dict[str, Any], *, conf
     if coordinate_space == "ruby":
         ruby_id, base_range = params.get("ruby_id"), params.get("base_range")
         if not ruby_id or not base_range or len(base_range) != 2:
-            raise ValueError("Ruby forced alignment requires explicit ruby_id and base_range")
+            raise ValueError("注音强制对齐需要明确的注音标识与正文范围")
         matches = [span for span in spans if [span["base_start"], span["base_end"]] == [int(base_range[0]), int(base_range[1])]]
         if len(matches) != 1:
-            raise ValueError("Ruby base_range does not match a unique Ruby span in revision")
+            raise ValueError("注音正文范围无法匹配当前修订中的唯一注音对象")
         params["text"] = matches[0]["reading"]; params["source_range"] = list(base_range)
     params["reading_spans"] = []
     params["audio_origin"] = float(line["begin"]); params["audio_end"] = float(line["end"])

@@ -96,7 +96,7 @@ function editWord(document: LyricDocument, lineId: string, wordId: string, updat
 
 function updateRuby(word: LyricWord, rubyId: string, update: (unit: RubyUnit) => RubyUnit[]): LyricWord {
   const index = word.rubyUnits.findIndex((unit) => unit.id === rubyId);
-  if (index < 0) throw new Error(`注音 unit not found: ${rubyId}`);
+  if (index < 0) throw new Error(`注音单元不存在： ${rubyId}`);
   const units = word.rubyUnits.slice();
   const replacement = update(units[index]);
   if (replacement.length === 1 && replacement[0] === units[index]) return word;
@@ -542,7 +542,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
   return structured ?? editWord(document, wordCommand.lineId, wordCommand.wordId, (word, line) => {
     switch (wordCommand.type) {
       case 'split-word': {
-        if (word.rubyUnits.length) throw new Error('Splitting a 注音 base requires an explicit reading split');
+        if (word.rubyUnits.length) throw new Error('拆分带注音的正文前，请先明确拆分读音');
         if (word.obscene || word.emptyBeat || word.alignmentUnits.length) throw new Error('Splitting a word with attached properties requires explicit redistribution');
         const [left, right] = splitAtGrapheme(word.text, wordCommand.at);
         const newId = wordCommand.newWordId ?? crypto.randomUUID();
@@ -560,20 +560,20 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
         validTime(wordCommand.beginUs, wordCommand.endUs);
         if (line.beginUs !== null && wordCommand.beginUs !== null && wordCommand.beginUs < line.beginUs) throw new Error('Word starts before line');
         if (line.endUs !== null && wordCommand.endUs !== null && wordCommand.endUs > line.endUs) throw new Error('Word ends after line');
-        if (word.rubyUnits.some((unit) => wordCommand.beginUs !== null && unit.beginUs !== null && unit.beginUs < wordCommand.beginUs || wordCommand.endUs !== null && unit.endUs !== null && unit.endUs > wordCommand.endUs)) throw new Error('Word time cannot exclude a 注音 unit');
+        if (word.rubyUnits.some((unit) => wordCommand.beginUs !== null && unit.beginUs !== null && unit.beginUs < wordCommand.beginUs || wordCommand.endUs !== null && unit.endUs !== null && unit.endUs > wordCommand.endUs)) throw new Error('正文词时间不能排除注音单元');
         return [word.beginUs === wordCommand.beginUs && word.endUs === wordCommand.endUs ? word : { ...word, beginUs: wordCommand.beginUs, endUs: wordCommand.endUs }];
       case 'add-ruby': {
-        if (!wordCommand.reading) throw new Error('注音 reading must be non-empty');
+        if (!wordCommand.reading) throw new Error('注音读音不能为空');
         const id = wordCommand.rubyId ?? crypto.randomUUID();
-        if (word.rubyUnits.some((unit) => unit.id === id)) throw new Error('注音 unit id already exists');
+        if (word.rubyUnits.some((unit) => unit.id === id)) throw new Error('注音单元标识重复');
         return [{ ...word, rubyUnits: [...word.rubyUnits, { id, reading: wordCommand.reading, beginUs: null, endUs: null }] }];
       }
       case 'insert-ruby': {
-        if (!wordCommand.reading) throw new Error('注音 reading must be non-empty');
+        if (!wordCommand.reading) throw new Error('注音读音不能为空');
         const id = wordCommand.rubyId ?? crypto.randomUUID();
-        if (word.rubyUnits.some((unit) => unit.id === id)) throw new Error('注音 unit id already exists');
+        if (word.rubyUnits.some((unit) => unit.id === id)) throw new Error('注音单元标识重复');
         const after = wordCommand.afterRubyId === null ? -1 : word.rubyUnits.findIndex((unit) => unit.id === wordCommand.afterRubyId);
-        if (wordCommand.afterRubyId !== null && after < 0) throw new Error('注音 insertion anchor not found');
+        if (wordCommand.afterRubyId !== null && after < 0) throw new Error('注音插入位置已不存在');
         const rubyUnits = word.rubyUnits.slice();
         rubyUnits.splice(after + 1, 0, { id, reading: wordCommand.reading, beginUs: null, endUs: null });
         return [{ ...word, rubyUnits }];
@@ -602,11 +602,11 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
       }
       case 'set-ruby-units': {
         if (word.rubyUnits.length && !wordCommand.overwrite) throw new Error('已有手动 注音，需明确选择覆盖');
-        if (!wordCommand.units.length || wordCommand.units.some((unit) => !unit.reading)) throw new Error('注音 reading must be non-empty');
-        if (new Set(wordCommand.units.map((unit) => unit.id)).size !== wordCommand.units.length) throw new Error('注音 unit id already exists');
+        if (!wordCommand.units.length || wordCommand.units.some((unit) => !unit.reading)) throw new Error('注音读音不能为空');
+        if (new Set(wordCommand.units.map((unit) => unit.id)).size !== wordCommand.units.length) throw new Error('注音单元标识重复');
         for (const unit of wordCommand.units) {
           validTime(unit.beginUs, unit.endUs);
-          if (word.beginUs !== null && unit.beginUs !== null && unit.beginUs < word.beginUs || word.endUs !== null && unit.endUs !== null && unit.endUs > word.endUs) throw new Error('注音 unit time exceeds word');
+          if (word.beginUs !== null && unit.beginUs !== null && unit.beginUs < word.beginUs || word.endUs !== null && unit.endUs !== null && unit.endUs > word.endUs) throw new Error('注音单元时间超出正文词');
         }
         return [{ ...word, rubyUnits: wordCommand.units, alignmentUnits: word.alignmentUnits.filter((unit) => !unit.rubyUnitId) }];
       }
@@ -621,12 +621,12 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
           if (word.alignmentUnits.some((item) => item.rubyUnitId === unit.id)) throw new Error('带对齐结果的读音不能直接拆分');
           const [left, right] = splitAtGrapheme(unit.reading, wordCommand.at);
           const id = wordCommand.newRubyId ?? crypto.randomUUID();
-          if (word.rubyUnits.some((item) => item.id === id)) throw new Error('注音 unit id already exists');
+          if (word.rubyUnits.some((item) => item.id === id)) throw new Error('注音单元标识重复');
           const middle = splitTime(unit.beginUs, unit.endUs, splitReadingMora(left).length, splitReadingMora(unit.reading).length);
           return [{ ...unit, reading: left, endUs: middle }, { id, reading: right, beginUs: middle, endUs: unit.endUs }];
         })];
       case 'edit-ruby': {
-        if (!wordCommand.reading) throw new Error('注音 reading must be non-empty');
+        if (!wordCommand.reading) throw new Error('注音读音不能为空');
         const updated = updateRuby(word, wordCommand.rubyId, (unit) => wordCommand.reading === unit.reading ? [unit] : [{ ...unit, reading: wordCommand.reading }]);
         return [updated === word ? word : { ...updated, alignmentUnits: word.alignmentUnits.filter((unit) => unit.rubyUnitId !== wordCommand.rubyId) }];
       }
@@ -634,7 +634,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
         return [{ ...updateRuby(word, wordCommand.rubyId, () => []), alignmentUnits: word.alignmentUnits.filter((unit) => unit.rubyUnitId !== wordCommand.rubyId) }];
       case 'set-ruby-time': {
         validTime(wordCommand.beginUs, wordCommand.endUs);
-        if (word.beginUs !== null && wordCommand.beginUs !== null && wordCommand.beginUs < word.beginUs || word.endUs !== null && wordCommand.endUs !== null && wordCommand.endUs > word.endUs) throw new Error('注音 unit time exceeds word');
+        if (word.beginUs !== null && wordCommand.beginUs !== null && wordCommand.beginUs < word.beginUs || word.endUs !== null && wordCommand.endUs !== null && wordCommand.endUs > word.endUs) throw new Error('注音单元时间超出正文词');
         const updated = updateRuby(word, wordCommand.rubyId, (unit) => unit.beginUs === wordCommand.beginUs && unit.endUs === wordCommand.endUs ? [unit] : [{ ...unit, beginUs: wordCommand.beginUs, endUs: wordCommand.endUs }]);
         if (updated === word) return [word];
         const beginUs = word.beginUs ?? (updated.rubyUnits.every((unit) => unit.beginUs !== null) ? Math.min(...updated.rubyUnits.map((unit) => unit.beginUs!)) : null);

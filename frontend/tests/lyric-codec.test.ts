@@ -111,7 +111,7 @@ describe('semantic TTML codec', () => {
       ['きょ', 0, 500_000], ['う', 500_000, 1_000_000],
     ]);
     const state = createLyricEditorState(document);
-    expect(() => executeLyricCommand(state, { type: 'set-word-time', lineId: document.lines[0].id, wordId: document.lines[0].words[0].id, beginUs: 600_000, endUs: 1_000_000 })).toThrow(/注音 unit/);
+    expect(() => executeLyricCommand(state, { type: 'set-word-time', lineId: document.lines[0].id, wordId: document.lines[0].words[0].id, beginUs: 600_000, endUs: 1_000_000 })).toThrow(/注音单元/);
     expect(document.lines[0].translations).toEqual([{ language: 'zh', text: '今天也唱歌' }]);
     expect(document.romanizationTracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ lineId: document.lines[0].id, kind: 'plain', text: 'kyou mo utau' }] });
     expect(document.lines[1]).toMatchObject({ backgroundOf: document.lines[0].id, beginUs: 500_000, endUs: 1_800_000 });

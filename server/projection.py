@@ -90,7 +90,7 @@ def project_ttml(path: str | Path) -> list[dict[str, str]]:
 
 
 def project_ttml_for_forced(path: str | Path, selected_line_id: str | None = None) -> list[dict[str, object]]:
-    """Project confirmed lyric text and Ruby spans using Unicode code points.
+    """Project confirmed lyric text and 注音 spans using Unicode code points.
 
     This deliberately shares the plain-text rules with ``project_ttml`` and
     never exposes annotation text as engine input.
@@ -145,16 +145,16 @@ def project_ttml_for_forced(path: str | Path, selected_line_id: str | None = Non
                         start = len("".join(text_parts))
                         def ruby_text(value: ET.Element) -> str:
                             if not value.tag.startswith("{" + TTML + "}") or value.tag.rsplit("}", 1)[-1] != "span":
-                                raise ValueError("unsupported Ruby child")
+                                raise ValueError("不支持的注音子节点")
                             if any(not child.tag.startswith("{" + TTML + "}") or child.tag.rsplit("}", 1)[-1] != "span" for child in value.iter()):
-                                raise ValueError("unsupported Ruby annotation subtree")
+                                raise ValueError("不支持的注音读音结构")
                             return "".join(_content(part) for part in value.itertext())
                         base = ruby_text(base_node)
                         reading = ruby_text(reading_node)
                         append_text(base)
                         spans.append({"ruby_id": f"{line_id}:ruby-{len(spans)}", "base_start": start, "base_end": start + len(base), "base": base, "reading": reading})
                     else:
-                        raise ValueError("unsupported Ruby container: base and text are required")
+                        raise ValueError("注音容器缺少正文或读音")
                     return
                 if local_name == "br":
                     append_text("\n")

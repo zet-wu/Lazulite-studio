@@ -31,7 +31,7 @@ describe('semantic lyric commands', () => {
     expect(state.present.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['きょ', 'う']);
     expect(state.present.lines[0].words[1]).toMatchObject({ text: 'も唄う', beginUs: 1_000_000, endUs: 2_000_000 });
     expect(undoLyricCommand(state).present.lines[0].words[1]).toMatchObject({ text: 'も歌う', beginUs: 1_000_000 });
-    expect(() => executeLyricCommand(state, { type: 'split-word', lineId, wordId: firstId, at: 1 })).toThrow(/注音 base/);
+    expect(() => executeLyricCommand(state, { type: 'split-word', lineId, wordId: firstId, at: 1 })).toThrow(/拆分带注音的正文/);
   });
 
   it('reorders 注音 only within its word while preserving unit identity and timing', () => {
@@ -191,7 +191,7 @@ describe('semantic lyric commands', () => {
     state = executeLyricCommand(state, { type: 'move-word', lineId: first.id, wordId: first.words[0].id, toLineId: second.id, afterWordId: null });
     expect(state.present.lines[1].words[0]).toBe(beforeMove.lines[0].words[0]);
     expect(undoLyricCommand(state).present).toBe(beforeMove);
-    expect(() => executeLyricCommand(state, { type: 'set-ruby-time', lineId: second.id, wordId: first.words[0].id, rubyId: 'ruby', beginUs: 0, endUs: 800_000 })).toThrow(/exceeds word/);
+    expect(() => executeLyricCommand(state, { type: 'set-ruby-time', lineId: second.id, wordId: first.words[0].id, rubyId: 'ruby', beginUs: 0, endUs: 800_000 })).toThrow(/超出正文词/);
   });
 
   it('applies several edits as one undo step and rejects a failed batch atomically', () => {

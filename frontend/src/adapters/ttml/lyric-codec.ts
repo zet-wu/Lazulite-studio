@@ -122,16 +122,16 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
     const text = textOnly(element, 'Word');
     return text ? { ...createWord(text, wordId), beginUs, endUs, alignmentUnits, emptyBeat } : null;
   }
-  if (rubyKind !== 'container') throw new Error(`Unsupported 注音 type: ${rubyKind}`);
+  if (rubyKind !== 'container') throw new Error(`不支持的注音类型： ${rubyKind}`);
   const parts = Array.from(element.children);
-  if (parts.length !== 2 || parts.some((part) => !is(part, TTML, 'span'))) throw new Error('注音 container requires one base and one reading span');
+  if (parts.length !== 2 || parts.some((part) => !is(part, TTML, 'span'))) throw new Error('注音容器须包含一组正文和读音');
   const base = parts.find((part) => attr(part, TTS, 'ruby') === 'base');
   const reading = parts.find((part) => ['text', 'textContainer'].includes(attr(part, TTS, 'ruby') ?? ''));
-  if (!base || !reading) throw new Error('注音 container requires base and text spans');
+  if (!base || !reading) throw new Error('注音容器缺少正文或读音');
   checkAttributes(base, []);
   checkAttributes(reading, []);
   const text = textOnly(base, '注音 base');
-  if (!text) throw new Error('注音 base must be non-empty');
+  if (!text) throw new Error('注音正文不能为空');
   const rubyUnits: RubyUnit[] = [];
   let unitIndex = 0;
   for (const child of Array.from(reading.childNodes)) {
@@ -141,17 +141,17 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
       if (value) rubyUnits.push({ id: `${wordId}:ruby:${unitIndex++}`, reading: value, beginUs: null, endUs: null });
       continue;
     }
-    if (child.nodeType !== Node.ELEMENT_NODE || !is(child as Element, TTML, 'span')) throw new Error('Unsupported 注音 reading child');
+    if (child.nodeType !== Node.ELEMENT_NODE || !is(child as Element, TTML, 'span')) throw new Error('不支持的注音读音节点');
     const part = child as Element;
     checkAttributes(part, ['begin', 'end', 'dur']);
-    if (attr(reading, TTS, 'ruby') === 'textContainer' && attr(part, TTS, 'ruby') !== 'text') throw new Error('注音 textContainer requires text spans');
+    if (attr(reading, TTS, 'ruby') === 'textContainer' && attr(part, TTS, 'ruby') !== 'text') throw new Error('注音读音容器须包含读音单元');
     const value = textOnly(part, '注音 reading unit');
-    if (!value) throw new Error('注音 reading unit must be non-empty');
+    if (!value) throw new Error('注音读音单元不能为空');
     const [unitBegin, unitEnd] = boundaries(part, lineStart, lineEnd, absoluteTimes);
     rubyUnits.push({ id: attr(part, STUDIO, 'id') ?? `${wordId}:ruby:${unitIndex}`, reading: value, beginUs: unitBegin, endUs: unitEnd });
     unitIndex++;
   }
-  if (!rubyUnits.length) throw new Error('注音 reading must be non-empty');
+  if (!rubyUnits.length) throw new Error('注音读音不能为空');
   return {
     ...createWord(text, wordId),
     beginUs: beginUs ?? (rubyUnits.every((unit) => unit.beginUs !== null) ? Math.min(...rubyUnits.map((unit) => unit.beginUs!)) : null),
