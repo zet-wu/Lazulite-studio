@@ -29,3 +29,5 @@ Phase 7：LineSplitDialog上下预览与逐条翻译归属，TranslationEditor�
 目标轨道每次打开默认选择文档顺序中的第一条ja-Latn，无匹配轨道时默认新建；仍可明确新建或选择其他匹配轨道。默认选中已有轨道时，有内容的源行仍跳过、缺少内容的行可追加，不自动覆盖已有音译。
 
 `LyricAcquisition` 提供文件/文本/网络候选预览与逐键整组元数据选择，确认导入一次事务。`NetworkLyrics` 丢弃过期响应、显示真实粒度并支持网易/QQ 歌曲 ID 独立关联。`useProjectDocument.saveForPackaging` 返回被保存的 document 与 revision，后续编辑不能冒充已保存快照。
+
+`AcquisitionStore` 由 EditorWorkspace 持有最近四源检索、稳定候选及有限预览缓存；`useSearchConditions` 串行保存独立最终字符串。搜索与取词共享每源额度，后台不选择或导入。`OutputIssues` 连接稳定对象 ID 与显式滚动/焦点；歌词下载统一纯 TTML 或所选兼容格式。项目删除广播使已开编辑器失效并清理恢复。
