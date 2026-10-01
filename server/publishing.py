@@ -182,7 +182,7 @@ def media_duration_ms(path: Path) -> int:
     timescale, duration = _movie_clock(_read_payload(path, item[1], item[2], item[3]))
     if timescale <= 0:
         raise PublishingError("movie has invalid timescale")
-    return (duration * 1_000) // timescale
+    return (duration * 2000 + timescale) // (2 * timescale)
 
 
 def stpp_tracks(source: Path) -> list[dict]:

@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 from .projection import _plain
-from .time_units import milliseconds, clock
+from .time_units import milliseconds, clock, serialize_ttml
 
 TTML_NS = "http://www.w3.org/ns/ttml"
 TTP_NS = "http://www.w3.org/ns/ttml#parameter"
@@ -157,7 +157,7 @@ class PublishRunner:
                         element.set(name, clock(milliseconds(_time(element.get(name)))))
                 for key in list(element.attrib):
                     if key.startswith('{'+STUDIO_NS+'}'): del element.attrib[key]
-            ttml = ET.tostring(root, encoding='utf-8')
+            ttml = serialize_ttml(root).encode('utf-8')
         from .media_format import describe_media, download_filename
         format_info = describe_media(asset, media, bound[2])
         if format_info['extension'] is None: raise PublishInvalid('源文件格式不支持打包')

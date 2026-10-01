@@ -3,13 +3,13 @@ import type { JobResult, ReadingProposal } from '../adapters/http/jobs';
 import { createLine, createLyricDocument, lineText, type AlignmentUnit, type LyricDocument, type LyricLine, type LyricWord } from '../domain/lyric-document';
 import type { LyricCommand } from '../domain/lyric-commands';
 
-function candidateDocument(lines: Array<{ text?: string; id?: string; start?: number | null; end?: number | null; begin_ms?: number | null; end_ms?: number | null }>): LyricDocument {
+function candidateDocument(lines: Array<{ text?: string; id?: string; begin_ms?: number | null; end_ms?: number | null }>): LyricDocument {
   if (!lines.length) throw new Error('候选没有歌词行');
   const document = createLyricDocument();
   document.lines = lines.map((item, index) => {
     const line = createLine(item.text ?? '', item.id || `proposal-${index + 1}`);
-    line.beginMs = item.begin_ms ?? (item.start == null ? null : Math.round(item.start * 1_000));
-    line.endMs = item.end_ms ?? (item.end == null ? null : Math.round(item.end * 1_000));
+    line.beginMs = item.begin_ms ?? null;
+    line.endMs = item.end_ms ?? null;
     if (line.words.length) { line.words[0].beginMs = line.beginMs; line.words[0].endMs = line.endMs; }
     return line;
   });

@@ -51,7 +51,7 @@ test('P4-07 independent background saves, exchanges and is visible after its par
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   const saved = await (await page.request.get('/api/v1/projects/phase4-background/document')).json();
-  expect(saved.document.ttml).toContain('dur="5"');
+  expect(saved.document.ttml).toContain('dur="00:05.000"');
   await page.reload();
   await page.locator('[data-outline-drag]').nth(1).click();
   await expect(page.getByLabel('所属主行')).toHaveValue('parent');
@@ -100,8 +100,8 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
       parentTime: [parent.beginMs, parent.endMs], backgroundTime: [background.beginMs, background.endMs],
       words: background.words.map(w => [w.text, w.beginMs, w.endMs]), lineCount: document.lines.length };
   }, raw);
-  expect(prepared.parentTime).toEqual([6_426_000, 8_155_000]);
-  expect(prepared.backgroundTime).toEqual([8_155_000, 129_984_000]);
+  expect(prepared.parentTime).toEqual([6426, 8155]);
+  expect(prepared.backgroundTime).toEqual([8155, 129984]);
   await importLyrics(page, { name: 'review-working-copy.ttml', mimeType: 'application/xml', buffer: Buffer.from(prepared.xml) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(prepared.lineCount);
   await page.getByRole('button', { name: '保存', exact: true }).click();

@@ -73,8 +73,8 @@ export type FetchResult = {
     lines?: Array<{
       id?: string;
       text: string;
-      start?: number | null;
-      end?: number | null;
+      begin_ms?: number | null;
+      end_ms?: number | null;
     }>;
   }>;
 };

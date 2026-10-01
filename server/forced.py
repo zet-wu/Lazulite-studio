@@ -1,6 +1,6 @@
 """Explicit, experimental forced-alignment boundary for Studio jobs."""
 from __future__ import annotations
-from .time_units import milliseconds
+from .time_units import milliseconds, time_fields
 
 import os
 from pathlib import Path
@@ -38,7 +38,7 @@ def prepare_forced_request(line: dict[str, Any], params: dict[str, Any], *, conf
             raise ValueError("注音正文范围无法匹配当前修订中的唯一注音对象")
         params["text"] = matches[0]["reading"]; params["source_range"] = list(base_range)
     params["reading_spans"] = []
-    params["audio_origin"] = float(line["begin"]); params["audio_end"] = float(line["end"])
+    params["audio_origin_ms"] = milliseconds(line["begin"]); params["audio_end_ms"] = milliseconds(line["end"])
 
 
 class ForcedAlignmentRunner:
@@ -65,12 +65,12 @@ class ForcedAlignmentRunner:
         start, end = request.get("input_range", [0, len(text)])
         spans = tuple(ReadingSpan(line_id, int(x["base_start"]), int(x["base_end"]), str(x["reading"])) for x in request.get("reading_spans", []))
         forced_request = ForcedAlignmentRequest(
-            line_id, text, request.get("language", "ja"), float(request.get("audio_origin", 0)),
+            line_id, text, request.get("language", "ja"), request.get("audio_origin_ms", 0) / 1000,
             (int(start), int(end)), request.get("input_granularity", "word"), spans,
         )
         audio = decode_audio(asset_path)
-        origin = float(request.get("audio_origin", 0))
-        audio_end = request.get("audio_end")
+        origin = request.get("audio_origin_ms", 0) / 1000
+        audio_end = None if request.get("audio_end_ms") is None else request["audio_end_ms"] / 1000
         if audio_end is None or not (0 <= origin < float(audio_end) <= audio.duration):
             raise ValueError("forced alignment audio window is outside the decoded asset")
         if audio_end is not None:
@@ -82,9 +82,7 @@ class ForcedAlignmentRunner:
         for unit in result.units:
             item = {
                 "line_id": unit.line_id, "input_range": list(unit.input_range), "text": unit.text,
-                "start": unit.start, "end": unit.end,
-                "start_ms": milliseconds(unit.start) if unit.start is not None else None,
-                "end_ms": milliseconds(unit.end) if unit.end is not None else None,
+                **time_fields(unit.start,unit.end,start_key="start_ms"),
                 "granularity": unit.granularity, "confidence": unit.confidence,
             }
             if request.get("source_range") is not None:
@@ -101,8 +99,8 @@ class ForcedAlignmentRunner:
             "evidence": {"backend": result.backend.name, "model_id": result.backend.model_id,
                          "revision": result.backend.revision, "request": {
                              "line_id": line_id, "text": text, "input_range": [int(start), int(end)],
-                             "reading_spans": request.get("reading_spans", []), "audio_origin": float(request.get("audio_origin", 0)),
-                             "audio_end": request.get("audio_end"), "coordinate_space": request.get("coordinate_space", "text"),
+                             "reading_spans": request.get("reading_spans", []), "audio_origin_ms": request.get("audio_origin_ms", 0),
+                             "audio_end_ms": request.get("audio_end_ms"), "coordinate_space": request.get("coordinate_space", "text"),
                              "ruby_id": request.get("ruby_id"), "source_range": request.get("source_range"),
                          }, "units": units},
             "engine": {"name": result.backend.name, "model_id": result.backend.model_id,

@@ -49,6 +49,8 @@ class RevisionStore:
         subject: str = "local",
         client_seq: int | None = None,
     ) -> dict:
+        from .time_units import normalize_ttml
+        ttml = normalize_ttml(ttml)
         digest = hashlib.sha256(ttml.encode()).hexdigest()
         request_hash = hashlib.sha256(
             json.dumps(

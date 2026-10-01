@@ -5,6 +5,7 @@ files are disposable and carry the source clock origin in their metadata.
 """
 
 from __future__ import annotations
+from ..time_units import milliseconds
 
 import hashlib
 import json
@@ -80,7 +81,7 @@ def probe_media(path: Path, *, ffprobe: str = "ffprobe") -> MediaProbe:
 
     def integer_time(value: object) -> int | None:
         try:
-            return round(float(value) * 1_000) if value not in (None, "N/A") else None
+            return milliseconds(value) if value not in (None, "N/A") else None
         except (TypeError, ValueError):
             return None
 
@@ -161,7 +162,7 @@ class MediaService:
         # Studio time starts at the first decoded sample, including source
         # silence and codec priming. The original container PTS is diagnostic.
         with wave.open(str(target), "rb") as audio:
-            duration_ms = round(audio.getnframes() * 1_000 / audio.getframerate())
+            duration_ms = milliseconds(audio.getnframes() / audio.getframerate())
         return Proxy(target, "audio/wav", asset.probe.start_ms, 0, duration_ms)
 
     def pcm_window(self, asset: Asset, *, start_ms: int, end_ms: int) -> tuple[bytes, int, int]:

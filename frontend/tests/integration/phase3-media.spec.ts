@@ -20,7 +20,7 @@ test('P3-05/11 saves a background relation through FastAPI and reopens its stabl
 test('P3-01/02/09 uses proxy sample zero with nonzero source PTS and plays a precise loop', async ({ page }) => {
   await page.goto('/projects/phase3-media/edit');
   const project = await (await page.request.get('/api/v1/projects/phase3-media')).json();
-  expect(project.asset.source_start_ms).toBeGreaterThan(1_900_000);
+  expect(project.asset.source_start_ms).toBeGreaterThan(1900);
   expect(project.asset.proxy_offset_ms).toBe(0);
   await page.locator('[data-outline-drag]').first().click();
   await page.getByRole('button', { name: '循环当前行' }).click();

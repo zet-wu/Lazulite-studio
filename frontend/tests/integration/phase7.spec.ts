@@ -31,10 +31,10 @@ test('P7 linked split, translation ownership and generated timed track persist t
     const doc = parseLyricTtml(xml); return { lines: doc.lines.map(line => ({ id: line.id, beginMs: line.beginMs, endMs: line.endMs, endLink: line.endLink, translations: line.translations, text: line.words.map(w => w.text).join(''), reading: line.words.flatMap(w => w.rubyUnits.map(r => r.reading)) })), tracks: doc.romanizationTracks };
   }, xml);
   const draft = await semantics(saved.document.ttml);
-  expect(draft.lines[0].endLink).toEqual({ targetLineId: 'context', originalEndMs: 4e6 });
-  expect(draft.lines[1]).toMatchObject({ endLink: null, endMs: 5e6, translations: [{ language: 'en', text: 'first' }] });
-  expect(draft.lines[2]).toMatchObject({ endLink: { targetLineId: 'missing', originalEndMs: 6e6 }, translations: [{ language: 'zh-Hans', text: '后行' }] });
-  expect(draft.tracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ kind: 'timed', units: [{ text: 'ga ', beginMs: 0, endMs: 1e6 }, { text: 'k ', beginMs: 1e6, endMs: 2e6 }, { text: 'ko ', beginMs: 2e6, endMs: 3e6 }, { text: 'u', beginMs: 3e6, endMs: 4e6 }] }] });
+  expect(draft.lines[0].endLink).toEqual({ targetLineId: 'context', originalEndMs: 4e3 });
+  expect(draft.lines[1]).toMatchObject({ endLink: null, endMs: 5e3, translations: [{ language: 'en', text: 'first' }] });
+  expect(draft.lines[2]).toMatchObject({ endLink: { targetLineId: 'missing', originalEndMs: 6e3 }, translations: [{ language: 'zh-Hans', text: '后行' }] });
+  expect(draft.tracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ kind: 'timed', units: [{ text: 'ga ', beginMs: 0, endMs: 1e3 }, { text: 'k ', beginMs: 1e3, endMs: 2e3 }, { text: 'ko ', beginMs: 2e3, endMs: 3e3 }, { text: 'u', beginMs: 3e3, endMs: 4e3 }] }] });
   await page.reload(); await expect(outline).toHaveCount(4);
   await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
   const finalXml = await readFile(await (await download).path(), 'utf8'); const final = await semantics(finalXml);

@@ -1,4 +1,5 @@
 from pathlib import Path
+from server.time_units import normalize_ttml
 
 from server.db import Database
 from server.revisions import IdempotencyConflict, RevisionConflict, RevisionStore
@@ -73,7 +74,7 @@ def test_initial_revision_is_idempotent_and_recovery_replaces_stale_draft(
     store.recover()
     assert (
         draft.read_text()
-        == '<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>'
+        == normalize_ttml('<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>')
     )
     original_materialize = store.materialize_current
     store.materialize_current = lambda _: (_ for _ in ()).throw(OSError("disk full"))

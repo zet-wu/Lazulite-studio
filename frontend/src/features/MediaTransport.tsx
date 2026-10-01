@@ -133,14 +133,14 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     selectedLine.end_ms != null &&
     selectedLine.begin_ms >= 0 &&
     selectedLine.end_ms > selectedLine.begin_ms &&
-    selectedLine.end_ms <= duration * 1e3;
+    selectedLine.end_ms <= durationMs;
   const validUnit = Boolean(
     loopRange &&
       Number.isSafeInteger(loopRange.begin_ms) &&
       Number.isSafeInteger(loopRange.end_ms) &&
       loopRange.begin_ms >= 0 &&
       loopRange.begin_ms < loopRange.end_ms &&
-      loopRange.end_ms <= duration * 1e3,
+      loopRange.end_ms <= durationMs,
   );
   const activeLoop = useCallback(() => {
     const range = activeLoopRange(loop, durationMs);

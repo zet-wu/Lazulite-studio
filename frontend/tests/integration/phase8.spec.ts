@@ -23,9 +23,9 @@ for (const kind of ['plain', 'timed']) test(`P8 ${kind} manual result and placeh
   expect(draft.lines.map(line => line.text)).toEqual(['学校', 'しんよう', '漢字']);
   if (kind === 'plain') expect(draft.contents).toEqual([{ kind, text: ' manual  ' }, { kind, text: 'shin you' }, { kind, text: ' ' }]);
   else expect(draft.contents).toEqual([
-    { kind, units: [{ text: ' manual  ', beginMs: 0, endMs: 1e6 }, { text: 'k ', beginMs: 1e6, endMs: 2e6 }, { text: 'ko ', beginMs: 2e6, endMs: 3e6 }, { text: 'u', beginMs: 3e6, endMs: 4e6 }] },
-    { kind, units: [{ text: 'shin ', beginMs: 4e6, endMs: 5e6 }, { text: 'you', beginMs: 5e6, endMs: 6e6 }] },
-    { kind, units: [{ text: ' ', beginMs: 6e6, endMs: 8e6 }] },
+    { kind, units: [{ text: ' manual  ', beginMs: 0, endMs: 1e3 }, { text: 'k ', beginMs: 1e3, endMs: 2e3 }, { text: 'ko ', beginMs: 2e3, endMs: 3e3 }, { text: 'u', beginMs: 3e3, endMs: 4e3 }] },
+    { kind, units: [{ text: 'shin ', beginMs: 4e3, endMs: 5e3 }, { text: 'you', beginMs: 5e3, endMs: 6e3 }] },
+    { kind, units: [{ text: ' ', beginMs: 6e3, endMs: 8e3 }] },
   ]);
   await page.reload(); await expect(outline).toHaveCount(3);
   await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();

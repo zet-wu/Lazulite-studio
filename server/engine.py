@@ -2,7 +2,7 @@
 backends are deliberately injected so an unconfigured installation reports a
 capability error instead of returning fabricated transcription."""
 from __future__ import annotations
-from .time_units import milliseconds
+from .time_units import time_fields
 
 from pathlib import Path
 import os
@@ -89,12 +89,10 @@ class LazuliteEngine:
                 request=TranscriptionRequest(language=params.get("language"), include_timing=True))
             output = {"kind": "transcribe", "engine": self.identity(), "segments": [
                 {"source_segment_id": x.source_segment_id, "text": x.text, "language": x.language,
-                 "start": x.start, "end": x.end,
-                 "begin_ms": milliseconds(x.start) if x.start is not None else None,
-                 "end_ms": milliseconds(x.end) if x.end is not None else None,
+                 **time_fields(x.start, x.end),
                  "confidence": x.confidence,
                  "confidence_kind": x.confidence_kind,
-                 "timed_text": [{"text": t.text, "start": t.start, "end": t.end,
+                 "timed_text": [{"text": t.text, **time_fields(t.start,t.end),
                                  "granularity": t.granularity, "source": t.source} for t in x.timed_text]}
                 for x in transcription.segments], "diagnostics": list(analysis.diagnostics)}
             if kind in {"line_align", "align"}:
@@ -105,9 +103,8 @@ class LazuliteEngine:
                     raise ValueError("行对齐需要服务端从 revision 投影出的 lines")
                 aligned = align_lines(LyricDocument(lines), transcription, analysis)
                 output["kind"] = "line_align"
-                output["lines"] = [{"line_id": x.line_id, "start": x.start, "end": x.end,
-                    "begin_ms": milliseconds(x.start) if x.start is not None else None,
-                    "end_ms": milliseconds(x.end) if x.end is not None else None,
+                output["lines"] = [{"line_id": x.line_id,
+                    **time_fields(x.start, x.end),
                     "similarity": x.similarity, "score": x.score, "timing_source": x.timing_source,
                     "source_segment_ids": list(x.source_segment_ids), "issues": list(x.issues)} for x in aligned.lines]
                 output["reliable"] = aligned.reliable
@@ -123,7 +120,7 @@ class LazuliteEngine:
     def _fetched(self, x):
         return {"candidate": self._candidate(x.candidate), "provider_rank": x.provider_rank,
                 "line_count": x.lyric_line_count,
-                "lines": [{"id": l.id, "text": l.text, "start": l.source_start, "end": l.source_end}
+                "lines": [{"id": l.id, "text": l.text, **time_fields(l.source_start,l.source_end)}
                           for l in x.lyrics.document.lines]}
 
 def configured_engine() -> LazuliteEngine:

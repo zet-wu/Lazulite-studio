@@ -43,7 +43,7 @@ def test_forced_runner_preserves_milliseconds_and_source_range(monkeypatch):
     from lazulite.models.audio import AudioBuffer
     monkeypatch.setattr("lazulite.audio.io.decode_audio", lambda path: AudioBuffer(np.zeros((1, 32000), dtype=np.float32), 16000, "sha256:x"))
     result = ForcedAlignmentRunner(FakeAligner()).run("clip.wav", {
-        "line_id": "L", "text": "きょう", "audio_origin": 1.0, "audio_end": 2.0,
+        "line_id": "L", "text": "きょう", "audio_origin_ms": 1000, "audio_end_ms": 2000,
         "source_range": [7, 9],
     })
     assert result["units"][0]["start_ms"] == 1250
@@ -88,7 +88,7 @@ def test_forced_http_requires_confirmation_and_returns_bound_result(tmp_path):
     assert snapshot["status"] == "succeeded"
     result = client.get(f"/api/v1/jobs/{job_id}/result").json()
     assert result["binding"]["revision"] == revision and result["binding"]["asset_id"] == asset["id"]
-    assert result["units"][0]["start"] == 1.1
+    assert result["units"][0]["start_ms"] == 1100
     changed = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><div begin="1s"><p xml:id="L" begin="0s" end="1s"><span tts:ruby="container"><span tts:ruby="base">歌</span><span tts:ruby="text">うた</span></span></p></div></body></tt>'
     current = client.get(f"/api/v1/projects/{pid}/document")
     updated = client.put(f"/api/v1/projects/{pid}/document", json={"schema_version":"studio-document-v2","project_id":pid,"revision":current.json()["revision"],"document":{"schema_version":"studio-document-content-v2","ttml":changed}}, headers={**headers,"if-match":current.headers["etag"]})

@@ -1,3 +1,4 @@
+from server.time_units import normalize_ttml
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -26,7 +27,7 @@ def test_document_save_retry_and_cas_preserves_unknown(tmp_path):
     first = client.put("/api/v1/projects/p/document", json=body, headers=headers)
     assert first.status_code == 200 and first.json()["saved"]["client_seq"] == 3
     assert client.put("/api/v1/projects/p/document", json=body, headers=headers).json()["revision"] == first.json()["revision"]
-    assert client.get("/api/v1/projects/p/document").json()["document"]["ttml"] == ttml
+    assert client.get("/api/v1/projects/p/document").json()["document"]["ttml"] == normalize_ttml(ttml)
     stale = {**headers, "idempotency-key": "save-2"}
     assert client.put("/api/v1/projects/p/document", json=body, headers=stale).status_code == 412
 
@@ -45,11 +46,11 @@ def test_semantic_editor_ttml_saves_and_reopens_with_clean_main_lyrics(tmp_path)
     assert saved.status_code == 200
     reopened = client.get("/api/v1/projects/p/document")
     assert reopened.json()["revision"] == saved.json()["revision"]
-    assert reopened.json()["document"]["ttml"] == ttml
+    assert reopened.json()["document"]["ttml"] == normalize_ttml(ttml)
     assert "きよう" in reopened.json()["document"]["ttml"]
     lyrics = client.get("/api/v1/projects/p/lyrics")
     assert lyrics.status_code == 200
-    assert lyrics.text == ttml
+    assert lyrics.text == normalize_ttml(ttml)
 
 
 def test_e3_draft_end_link_survives_real_project_save(tmp_path):
@@ -68,7 +69,7 @@ def test_e3_draft_end_link_survives_real_project_save(tmp_path):
         headers={"origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "e3-end-link"})
     assert saved.status_code == 200
     reopened = client.get("/api/v1/projects/p/document")
-    assert reopened.json()["document"]["ttml"] == ttml
+    assert reopened.json()["document"]["ttml"] == normalize_ttml(ttml)
     assert reopened.json()["revision"] == saved.json()["revision"]
 
 

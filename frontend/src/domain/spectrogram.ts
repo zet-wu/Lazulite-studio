@@ -50,7 +50,7 @@ export function computeSpectrogram(pcm: Int16Array, rate: number, channels: numb
   const requestFirst = window ? Math.round(window.requestStartMs * rate / 1e3) : 0;
   const coreFirst = window ? Math.round(window.coreStartMs * rate / 1e3) : 0;
   const coreLast = window ? Math.round(window.coreEndMs * rate / 1e3) : frames;
-  const mediaLast = window ? Math.round(window.durationMs * rate / 1e3) : frames;
+  const mediaLast = window ? window.requestEndMs >= window.durationMs ? requestFirst + frames : Math.round(window.durationMs * rate / 1e3) : frames;
   const real = new Float32Array(SIZE), imaginary = new Float32Array(SIZE);
   const high = Math.min(8000, rate / 2);
   for (let column = 0; column < SPECTRUM_WIDTH; column++) {
