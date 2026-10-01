@@ -154,19 +154,22 @@ class PublishRunner:
                 for key in list(element.attrib):
                     if key.startswith('{'+STUDIO_NS+'}'): del element.attrib[key]
             ttml = ET.tostring(root, encoding='utf-8')
-        output = self.output_root / f"{uuid.uuid4().hex}{asset.suffix or '.mp4'}"
+        from .media_format import describe_media
+        format_info = describe_media(asset, media)
+        if format_info['extension'] is None: raise PublishInvalid('源文件格式不支持打包')
+        output = self.output_root / f"{uuid.uuid4().hex}{format_info['extension']}"
         try:
-            result = self.publisher.publish(ttml, asset, output, request['lrc_text'], request.get('target_track_id'))
+            result = dict(self.publisher.publish(ttml, asset, output, request['lrc_text'], request.get('target_track_id')) or {})
+            if not isinstance(result.get("report"), dict) or "passed" not in result["report"]:
+                raise PublishInvalid("publisher did not return a complete report")
+            if result["report"].get("passed") is not True:
+                raise PublishInvalid("publisher report did not pass")
+            result.update(format_info)
+            result["filename"] = output.name
+            # The service owns the output path, including cleanup on failure/cancel.
+            result["output_path"] = str(output)
         except Exception:
             output.unlink(missing_ok=True)
             raise
-        result = dict(result or {})
-        # Keep output ownership in the service; a publisher result cannot
-        # redirect downloads to an arbitrary path.
-        result["output_path"] = str(output)
-        if not isinstance(result.get("report"), dict) or "passed" not in result["report"]:
-            raise PublishInvalid("publisher did not return a complete report")
-        if result["report"].get("passed") is not True:
-            raise PublishInvalid("publisher report did not pass")
         result["binding"] = {"project_id": project_id, "revision": revision, "asset_id": request["asset_id"]}
         return result

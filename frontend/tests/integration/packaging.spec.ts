@@ -10,6 +10,8 @@ test('real saved editor snapshot produces a verified music file and does not res
  await expect(page.locator('header').getByText('已保存',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'保存并打包'}).click();
  await expect(page.getByRole('link',{name:'下载音乐文件'}).first()).toBeVisible({timeout:15000});
+ await expect(page.getByText(/源文件：.*M4A/)).toBeVisible();
+ await expect(page.getByText(/已写入 STPP · 普通 LRC/)).toBeVisible();
  await page.screenshot({path:test.info().outputPath('packaging-success.png')});
  const download=page.waitForEvent('download');await page.getByRole('link',{name:'下载音乐文件'}).first().click();expect((await download).suggestedFilename()).toMatch(/\.(m4a|mp4)$/);
  await page.getByRole('button',{name:'编辑',exact:true}).click();await page.getByRole('button',{name:'撤销',exact:true}).click();

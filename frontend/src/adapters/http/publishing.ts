@@ -2,6 +2,8 @@ import { ApiError, requestHeaders } from "./client";
 
 export type PublishReport = {
   passed?: boolean;
+  lyrics_preserved?: boolean;
+  track_id?: number | null;
   audio_streams?: number;
   audio_preserved?: boolean;
   metadata_preserved?: boolean;
@@ -15,6 +17,11 @@ export type ExportItem = {
   id: string;
   revision: string;
   asset_id: string;
+  asset_filename?: string;
+  filename?: string;
+  container?: string | null;
+  format_label?: string | null;
+  track_id?: number | null;
   lrc_kind?: 'lrc' | 'elrc';
   target_track_id?: number | null;
   status:
@@ -58,6 +65,11 @@ const asExport = (value: unknown): ExportItem | null => {
   )
     return null;
   return {
+    asset_filename: value.asset_filename as string | undefined,
+    filename: value.filename as string | undefined,
+    container: value.container as string | null,
+    format_label: value.format_label as string | null,
+    track_id: value.track_id as number | null,
     id: value.id,
     revision: value.revision,
     lrc_kind: value.lrc_kind as ExportItem['lrc_kind'],

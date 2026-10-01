@@ -38,7 +38,7 @@ def _save(client, headers, pid, revision, text):
 def _wait(client, job):
     for _ in range(100):
         value = client.get(f"/api/v1/jobs/{job}").json()
-        if value["status"] in {"succeeded", "failed"}:
+        if value["status"] in {"succeeded", "failed", "cancelled"}:
             return value
         time.sleep(0.02)
     raise AssertionError("publish job did not finish")
@@ -146,3 +146,57 @@ def test_publish_untimed_transliteration_whitespace_copy_and_missing_endpoint(tm
             job = client.post(f'/api/v1/projects/{pid}/publish', json={**body, 'revision': bad}, headers=headers).json()['id']
             assert _wait(client, job)['status'] == 'failed'
             assert client.get(f'/api/v1/projects/{pid}/exports/{job}/download').status_code == 409
+
+
+def test_running_publish_cancel_removes_output_blocks_delete_until_worker_finishes(tmp_path):
+    import threading
+    from server.publish import MediaPublisher
+    class BlockingPublisher(MediaPublisher):
+        def __init__(self): self.started = threading.Event(); self.release = threading.Event()
+        def publish(self, *args):
+            self.started.set(); assert self.release.wait(5)
+            return super().publish(*args)
+    publisher = BlockingPublisher()
+    settings = Settings('pw', False, 'http://studio')
+    with TestClient(create_app(tmp_path, settings, publisher=publisher), base_url='https://studio') as client:
+        headers = _headers(client, settings);pid, asset = _project(client, headers, tmp_path)
+        initial = client.get(f'/api/v1/projects/{pid}/document').json()['revision']
+        revision = _save(client, headers, pid, initial, '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0" end="1">test</p></body></tt>')
+        body = {'revision': revision, 'asset_id': asset, 'lrc_kind': 'lrc', 'lrc_text': '[00:00.000]test\n'}
+        job = client.post(f'/api/v1/projects/{pid}/publish', json=body, headers=headers).json()['id']
+        assert publisher.started.wait(2)
+        assert client.post(f'/api/v1/jobs/{job}/cancel', headers=headers).json()['status'] == 'cancel_requested'
+        assert client.delete(f'/api/v1/projects/{pid}', headers=headers).status_code == 409
+        publisher.release.set()
+        assert _wait(client, job)['status'] == 'cancelled'
+        exports = client.get(f'/api/v1/projects/{pid}/exports').json()['items']
+        assert exports[0]['download_url'] is None and not list((tmp_path / 'exports').iterdir())
+        assert client.get(f'/api/v1/projects/{pid}/exports/{job}/download').status_code == 409
+        assert client.delete(f'/api/v1/projects/{pid}', headers=headers).status_code == 200
+
+
+import pytest
+@pytest.mark.parametrize('kind,codec', [('mp3','libmp3lame'),('flac','flac'),('m4a','aac')])
+def test_actual_format_controls_output_suffix_and_bound_history(tmp_path, kind, codec):
+    settings = Settings('pw', False, 'http://studio')
+    audio = tmp_path / f'source.{kind}'
+    subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','sine=frequency=440:duration=1','-c:a',codec,str(audio)],check=True)
+    with TestClient(create_app(tmp_path / 'data', settings), base_url='https://studio') as client:
+        headers = _headers(client, settings)
+        asset = client.post('/api/v1/assets', files={'file': ('misleading.flac' if kind != 'flac' else 'misleading.mp3',audio.read_bytes(),'audio/mpeg')}, headers=headers).json()
+        pid = client.post('/api/v1/projects', json={'name':'different project name','source_asset_id':asset['id']}, headers=headers).json()['id']
+        info = client.get(f'/api/v1/projects/{pid}/packaging').json()
+        assert info['container'] == ('mp4' if kind == 'm4a' else kind)
+        assert info['extension'] == f'.{kind}'
+        initial = client.get(f'/api/v1/projects/{pid}/document').json()['revision']
+        # MP3/FLAC only write LRC and must not validate these unwritten transliterations.
+        side = '' if kind == 'm4a' else '<head><metadata><iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><transliterations><transliteration><text for="L1"><span xmlns:studio="urn:lazulite:studio:draft" studio:null="begin end">unfinished</span></text></transliteration></transliterations></iTunesMetadata></metadata></head>'
+        revision = _save(client,headers,pid,initial,f'<tt xmlns="http://www.w3.org/ns/ttml">{side}<body><p xml:id="L1" begin="0" end="1">hello</p></body></tt>')
+        body = {'revision':revision,'asset_id':asset['id'],'lrc_kind':'lrc','lrc_text':'[00:00.000]hello\n[00:01.000]\n'}
+        job = client.post(f'/api/v1/projects/{pid}/publish', json=body,headers=headers).json()['id']
+        assert _wait(client,job)['status'] == 'succeeded'
+        item = client.get(f'/api/v1/projects/{pid}/exports').json()['items'][0]
+        assert item['container'] == info['container'] and item['format_label'] == info['format_label']
+        assert item['asset_id'] == asset['id'] and item['asset_filename'] == info['filename']
+        assert item['filename'].endswith(f'.{kind}') and item['report']['lyrics_preserved'] is True
+        assert bool(item['track_id']) == (kind == 'm4a')

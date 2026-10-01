@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json, threading, uuid, hashlib, logging
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
@@ -78,6 +79,13 @@ class JobService:
                                  "revision": bound_revision,
                                  "revision_sha256": revision_hash}
             with self.db.transaction() as c:
+                cancelled = c.execute('SELECT cancel_requested FROM jobs WHERE id=?', (jid,)).fetchone()
+                if kind == 'publish' and cancelled[0]:
+                    Path(result['output_path']).unlink(missing_ok=True)
+                    t = now()
+                    c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=?", (t,t,jid))
+                    self._event(c,jid,'state','cancelled',None,None,'打包已取消')
+                    return
                 t=now(); c.execute("UPDATE jobs SET status='succeeded',result_json=?,engine_json=?,updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps(result,ensure_ascii=False),json.dumps(result.get("engine",{})),t,t,jid)); self._event(c,jid,"state","succeeded",1,1,"任务完成")
         except (PublishInvalid, PublishingError) as exc: self._finish_error(jid, "publish_failed", str(exc))
         except (EngineUnavailable, ReadingUnavailable, ForcedUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))

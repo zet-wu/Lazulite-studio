@@ -47,14 +47,16 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
         from mutagen.flac import FLAC
         from .publishing import stpp_tracks
         row = project(pid)
+        with service.db.connect() as c:
+            asset = c.execute('SELECT filename FROM assets WHERE id=?', (row[2],)).fetchone()
         path = Path(asset_path(pid))
         media = File(path)
         tracks, error = [], None
         if isinstance(media, MP4):
             try: tracks = stpp_tracks(path)
             except ValueError as exc: error = str(exc)
-        return {'asset_id':row[2], 'supported':isinstance(media,(MP4,MP3,FLAC)) and not error,
-                'container':'mp4' if isinstance(media,MP4) else 'mp3' if isinstance(media,MP3) else 'flac' if isinstance(media,FLAC) else None,
+        from .media_format import describe_media
+        return {'filename': asset[0], **describe_media(path, media), 'asset_id':row[2], 'supported':isinstance(media,(MP4,MP3,FLAC)) and not error,
                 'tracks':tracks,'error':error}
 
     @router.post("/projects/{pid}/publish", status_code=202)
@@ -75,6 +77,7 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
     def exports(pid: str, _: object = Depends(auth)):
         prow = project(pid)
         with service.db.connect() as c:
+            assets = {row['id']: row['filename'] for row in c.execute("SELECT id,filename FROM assets")}
             rows = c.execute("SELECT id FROM jobs WHERE project_id=? AND kind='publish' ORDER BY created_at DESC", (pid,)).fetchall()
         items = []
         for row in rows:
@@ -84,7 +87,9 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
             passed = isinstance(report, dict) and report.get("passed") is True
             available = job["status"] == "succeeded" and passed and bool(path) and Path(path).is_file()
             status = "unavailable" if job["status"] == "succeeded" and (not path or not Path(path).is_file()) else job["status"]
-            items.append({"id": job["id"], "revision": request.get("revision"), "asset_id": request.get("asset_id"),
+            items.append({"filename": result.get('filename'), "asset_filename": assets.get(request.get('asset_id')),
+                          "container": result.get('container'), "format_label": result.get('format_label'), "track_id": report.get('track_id') if isinstance(report,dict) else None,
+                          "id": job["id"], "revision": request.get("revision"), "asset_id": request.get("asset_id"),
                           "lrc_kind": request.get("lrc_kind"), "target_track_id": request.get("target_track_id"), "status": status, "created_at": job["created_at"], "stale": request.get("revision") != prow[3],
                           "report": report, "download_url": f"/api/v1/projects/{pid}/exports/{job['id']}/download" if available else None,
                           "error": job["error"]})
