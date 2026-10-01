@@ -236,3 +236,15 @@ def test_cover_audio_preserves_suffix_and_project_download_history(tmp_path, suf
             output = tmp_path / f'download.{suffix}'; output.write_bytes(response.content)
             assert MP4(output)['covr'][0] == cover.read_bytes()
             assert item['report']['passed'] is True
+
+
+def test_video_classification_and_portable_download_names(tmp_path):
+    from mutagen import File
+    from server.media_format import describe_media, download_filename
+    source = tmp_path / 'video.mp4'
+    subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=32x32:d=1', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-c:v', 'mpeg4', '-c:a', 'aac', '-shortest', str(source)], check=True)
+    assert describe_media(source, File(source), 'wrong.m4a')['extension'] == '.mp4'
+    assert describe_media(source, File(source), 'video.mp4')['format_label'] == 'MP4'
+    assert download_filename('CON', '.mp3') == '_CON.mp3'
+    assert download_filename(' . ', '.flac') == '未命名项目.flac'
+    assert len(download_filename('歌' * 200, '.mp4').encode()) < 255
