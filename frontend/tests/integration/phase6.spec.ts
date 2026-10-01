@@ -20,10 +20,10 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   await line.getByRole('button', { name: '添加词', exact: true }).click();
   await line.getByRole('textbox', { name: '添加词', exact: true }).fill('  '); await line.getByRole('textbox', { name: '添加词', exact: true }).press('Enter');
   await line.locator('[data-romanization-content-id]').first().locator('strong').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
+  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
   await expect(dialog.getByLabel('目标词')).toHaveCount(1); await dialog.getByLabel('字符输出').selectOption('roman');
-  await dialog.getByRole('button', { name: '生成 Ruby', exact: true }).click();
+  await dialog.getByRole('button', { name: '生成 注音', exact: true }).click();
   const put = page.waitForResponse(response => response.url().endsWith('/api/v1/projects/phase4-background/document') && response.request().method() === 'PUT');
   await page.getByRole('button', { name: '保存', exact: true }).click(); expect((await put).status()).toBe(200);
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();

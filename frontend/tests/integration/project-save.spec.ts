@@ -1,16 +1,16 @@
 import { expect, test } from '@playwright/test';
 
-test('generates Ruby, saves through FastAPI and reopens the complete current draft', async ({ page }) => {
+test('generates 注音, saves through FastAPI and reopens the complete current draft', async ({ page }) => {
   await page.goto('/projects/phase2/edit');
   const line = page.locator('main section[data-line-id="line-a"]');
   await expect(line.getByRole('textbox', { name: '词 二人', exact: true })).toBeVisible();
   const content = line.locator('[data-romanization-content-id]').first();
   const source = await content.locator('input').evaluateAll((items) => items.map((item) => (item as HTMLInputElement).value));
   await content.getByText('音译 · ja-Latn').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
+  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
   await expect(dialog.getByLabel('确认同时扩展上述词/行时间')).toHaveCount(0);
-  await dialog.getByRole('button', { name: '生成 Ruby', exact: true }).click();
+  await dialog.getByRole('button', { name: '生成 注音', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '读音 二人', exact: true })).toHaveCount(3);
   const savedResponse = page.waitForResponse((response) => response.url().endsWith('/api/v1/projects/phase2/document') && response.request().method() === 'PUT');
   await page.getByRole('button', { name: '保存', exact: true }).click();

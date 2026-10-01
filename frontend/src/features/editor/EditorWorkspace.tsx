@@ -121,10 +121,8 @@ export function EditorWorkspace(props: Props) {
   const [message, setMessage] = useState('');
   const [segmentationOpen, setSegmentationOpen] = useState(false);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
-  const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number } | null>(null);
+  const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number; afterRubyId?: string | null } | null>(null);
   const rubyShortcutSerial = useRef(0);
-  const [rubyBaseOpen, setRubyBaseOpen] = useState(false);
-  const [rubyBaseReading, setRubyBaseReading] = useState('');
   const [splitLineId, setSplitLineId] = useState<string | null>(null);
   const [contentTransfer, setContentTransfer] = useState<{ trackId: string; contentId: string; targetLineId: string } | null>(null);
   const [romanizationGeneration, setRomanizationGeneration] = useState<string[] | null>(null);
@@ -193,21 +191,6 @@ export function EditorWorkspace(props: Props) {
     : selectedLine && !selectedLine.backgroundOf ? [selectedLine] : [];
   const selectedWordLineIndexes = selection?.kind === 'words'
     ? document.lines.flatMap((line, index) => line.words.some((word) => selection.ids.includes(word.id)) ? [index] : []) : [];
-  const rubyBaseLine = selection?.kind === 'words' && selection.ids.length > 1 ? document.lines.find((line) => line.words.some((word) => word.id === selection.ids[0])) : undefined;
-  const rubyBaseWords = rubyBaseLine && selection?.kind === 'words' ? rubyBaseLine.words.filter((word) => selection.ids.includes(word.id)) : [];
-  const canCreateRubyBase = Boolean(rubyBaseLine && rubyBaseWords.length === selection?.ids.length && rubyBaseWords.length > 1 &&
-    rubyBaseLine.words.findIndex((word) => word.id === rubyBaseWords[0].id) + rubyBaseWords.length - 1 === rubyBaseLine.words.findIndex((word) => word.id === rubyBaseWords.at(-1)?.id));
-  const createRubyBase = () => {
-    if (!canCreateRubyBase || !rubyBaseLine || !rubyBaseReading) return;
-    const firstId = rubyBaseWords[0].id;
-    if (dispatch({ type: 'batch', commands: [
-      { type: 'merge-ruby-base', lineId: rubyBaseLine.id, wordIds: rubyBaseWords.map((word) => word.id) },
-      { type: 'add-ruby', lineId: rubyBaseLine.id, wordId: firstId, reading: rubyBaseReading },
-    ] })) {
-      setSelection({ kind: 'words', lineId: rubyBaseLine.id, ids: [firstId], anchorId: firstId, activeId: firstId });
-      setRubyBaseOpen(false); setRubyBaseReading('');
-    }
-  };
   const selectLine = (line: LyricLine, shift = false, toggle = false) => {
     const id = line.backgroundOf ?? line.id;
     const previous = selection?.kind === 'lines' ? selection : null;
@@ -393,9 +376,9 @@ export function EditorWorkspace(props: Props) {
       if (!unit) return false;
       effective = selection?.kind === 'ruby' && selection.wordId === word.id && selection.ids.includes(rubyId) ? { ...selection, activeId: rubyId }
         : { kind: 'ruby', lineId: line.id, wordId: word.id, ids: [rubyId], anchorId: rubyId, activeId: rubyId };
-      title = 'Ruby 操作';
+      title = '注音 操作';
       actions = [
-        { label: '添加读音', run: () => { const reading = window.prompt('读音'); if (reading) dispatch({ type: 'insert-ruby', lineId: line.id, wordId: word.id, afterRubyId: rubyId, reading }); } },
+        { label: '添加读音', run: () => { setRubyShortcut({ wordId: word.id, afterRubyId: rubyId, serial: ++rubyShortcutSerial.current }); } },
         { label: '拆分读音', disabled: Array.from(unit.reading).length < 2, run: () => dispatch({ type: 'split-ruby', lineId: line.id, wordId: word.id, rubyId, at: Math.floor(Array.from(unit.reading).length / 2) }) },
         { label: '合并前一读音', disabled: index === 0, run: () => dispatch({ type: 'merge-ruby', lineId: line.id, wordId: word.id, firstRubyId: word.rubyUnits[index - 1].id, secondRubyId: rubyId }) },
         { label: '向前移动', disabled: index === 0, run: () => dispatch({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId, afterRubyId: word.rubyUnits[index - 2]?.id ?? null }) },
@@ -440,7 +423,7 @@ export function EditorWorkspace(props: Props) {
           { label: '音译内容后移', disabled: siblingIndex === siblings.length - 1, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: siblings[siblingIndex + 1].id }) },
           { label: '转移到其他主行…', disabled: mainLines.length < 2, run: () => setContentTransfer({ trackId: track.id, contentId: content.id, targetLineId: mainLines.find((item) => item.id !== line.id)?.id ?? '' }) },
           { label: effective.ids.length > 1 ? `删除所选内容（${effective.ids.length}）` : '删除内容', run: () => removeSelection(effective) },
-          { label: '从音译生成 Ruby…', run: () => setRubyGeneration({ lineIds: [line.id], trackId: track.id, contentId: content.id }) },
+          { label: '从音译生成 注音…', run: () => setRubyGeneration({ lineIds: [line.id], trackId: track.id, contentId: content.id }) },
           { label: '管理轨道…', run: () => setSettingsDialog('tracks') },
           { label: '轨道前移', run: () => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: -1 }) },
           { label: '轨道后移', run: () => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: 1 }) },
@@ -472,7 +455,7 @@ export function EditorWorkspace(props: Props) {
           const target = document.lines[document.lines.indexOf(line) + 1];
           if (target) dispatch(moveWordsAcrossLine(document, effective as Extract<EditorSelection, { kind: 'words' }>, target.id));
         } },
-        { label: '添加 Ruby', run: () => { const reading = window.prompt('读音'); if (reading) dispatch({ type: 'add-ruby', lineId: line.id, wordId: word.id, reading }); } },
+        { label: '添加 注音', run: () => { setRubyShortcut({ wordId: word.id, serial: ++rubyShortcutSerial.current }); } },
         { label: '重分配读音时间', disabled: word.rubyUnits.length === 0, run: () => dispatch({ type: 'redistribute-ruby-time', lineId: line.id, wordId: word.id }) },
         { label: effective.ids.length > 1 ? `删除所选词（${effective.ids.length}）` : '删除词', run: () => removeSelection(effective) },
       ];
@@ -485,7 +468,7 @@ export function EditorWorkspace(props: Props) {
         { label: '前插行', run: () => { const index = mainLines.findIndex((item) => item.id === id); dispatch({ type: 'insert-line', afterLineId: mainLines[index - 1]?.id ?? null }); } },
         { label: '后插行', run: () => dispatch({ type: 'insert-line', afterLineId: id }) },
         ...(!line.backgroundOf && document.romanizationTracks.some(track => track.contents.some(content => content.lineId === line.id))
-          ? [{ label: '从音译生成 Ruby…', run: () => setRubyGeneration({ lineIds: effective.ids.filter(id => mainIds.includes(id)) }) }] : []),
+          ? [{ label: '从音译生成 注音…', run: () => setRubyGeneration({ lineIds: effective.ids.filter(id => mainIds.includes(id)) }) }] : []),
         ...(!line.backgroundOf ? [{ label: '生成日文罗马字音译…', run: () => setRomanizationGeneration(effective.ids.filter(id => mainIds.includes(id))) }] : []),
         { label: '添加词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') }) },
         { label: '行上移', disabled: Boolean(line.backgroundOf) || mainLines[0]?.id === line.id, run: () => moveLine(line, -1) },
@@ -529,13 +512,13 @@ export function EditorWorkspace(props: Props) {
     onSelect={(shift, toggle) => selectWord(line, word, shift, toggle)}>
     <RubyWordEditor lineId={line.id} word={word} placeholderIds={drag.placeholders?.kind === 'ruby' ? drag.placeholders.ids : undefined} selectedRubyIds={selection?.kind === 'ruby' && selection.wordId === word.id ? selection.ids : []}
       onSelectRuby={(rubyId, shift, toggle) => selectRuby(line, word, rubyId, shift, toggle)} apply={dispatch}
-      requestAddSerial={rubyShortcut?.wordId === word.id ? rubyShortcut.serial : undefined} />
+      requestAddSerial={rubyShortcut?.wordId === word.id ? rubyShortcut.serial : undefined} requestAfterRubyId={rubyShortcut?.wordId === word.id ? rubyShortcut.afterRubyId : undefined} />
     <div className={styles.wordMain}>
       <DraftInput value={word.text} label={`词 ${word.text}`} onFocus={() => selectWord(line, word)}
         onCommit={(text) => {
           const shortcut = text.endsWith('|');
           const next = shortcut ? text.slice(0, -1) : text;
-          if (!next) { setMessage('Ruby 快捷输入需要正文'); return; }
+          if (!next) { setMessage('注音 快捷输入需要正文'); return; }
           if (dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text: next }) && shortcut) setRubyShortcut({ wordId: word.id, serial: ++rubyShortcutSerial.current });
         }}
         onSplit={(at, draft) => dispatch({ type: 'batch', commands: [
@@ -637,7 +620,6 @@ export function EditorWorkspace(props: Props) {
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
-      canCreateRubyBase={canCreateRubyBase} createRubyBase={() => setRubyBaseOpen(true)}
       canGenerateRuby={selectedMainLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
       canGenerateRomanization={selectedMainLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(selectedMainLines.map(line => line.id))} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: selectedMainLines.map((line) => line.id) })} />}
     {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} onClick={event => {
@@ -748,9 +730,6 @@ export function EditorWorkspace(props: Props) {
       preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} apply={dispatch} close={() => setRomanizationGeneration(null)} />}
     {rubyGeneration && <RubyGenerationDialog document={document} lineIds={rubyGeneration.lineIds} initialTrackId={rubyGeneration.trackId} initialContentId={rubyGeneration.contentId}
       apply={dispatch} close={() => setRubyGeneration(null)} />}
-    {rubyBaseOpen && <SettingsDialog title="整体 Ruby" close={() => setRubyBaseOpen(false)} actions={<><button onClick={() => setRubyBaseOpen(false)}>取消</button><button disabled={!rubyBaseReading} onClick={createRubyBase}>应用</button></>}>
-      <p>{rubyBaseWords.map(word => word.text).join('')}</p><label>读音 <input autoFocus value={rubyBaseReading} onChange={event => setRubyBaseReading(event.target.value)} onKeyDown={event => { if (!event.nativeEvent.isComposing && event.key === 'Enter') createRubyBase(); }} /></label>
-    </SettingsDialog>}
     {splitLineId && document.lines.find((line) => line.id === splitLineId) && <LineSplitDialog key={splitLineId} line={document.lines.find((line) => line.id === splitLineId)!}
       background={document.lines.find((line) => line.backgroundOf === splitLineId) ?? null}
       attached={document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === splitLineId).map((content) => ({ track, content })))}

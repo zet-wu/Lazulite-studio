@@ -123,7 +123,7 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
       onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); if (target.kind === 'line') onSelectLine(target.lineId); } }}>
       {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanUs * plotWidth }} /><span className={styles.narrowMarker} title="窄区间，请用时间轴缩放后调整边界" /></>}
       {!narrow && beginUs >= startUs && <span className={styles.trackHandle} aria-label={`${label}开始边界`} onPointerDown={(event) => begin(event, target, 'beginUs', beginUs)} onPointerMove={move} onPointerUp={finish} />}
-      <span className={styles.trackBarText}>{label.replace(/^时间轴(?:行|词|Ruby) /, '')}</span>
+      <span className={styles.trackBarText}>{label.replace(/^时间轴(?:行|词|注音) /, '')}</span>
       {!narrow && endUs <= propsEndUs && <span className={styles.trackHandle} aria-label={`${label}结束边界`} onPointerDown={(event) => begin(event, target, 'endUs', endUs)} onPointerMove={move} onPointerUp={finish} />}
     </div>;
   };
@@ -145,7 +145,7 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
     {visible.line && backgrounds.length > 0 && row('背景', backgrounds.map((item) => <span key={item.id} className={`${styles.trackBar} ${styles.backgroundBar}`} aria-label={`L${ordinalById.get(item.backgroundOf!)} 背景歌词`} style={{ left: pct(item.beginUs!), width: `${(item.endUs! - item.beginUs!) / spanUs * 100}%` }}>L{ordinalById.get(item.backgroundOf!)} · 背景</span>))}
     {visible.word && line && (romanContent ? row(`音译`, romanContent.kind === 'timed' ? romanContent.units.filter((unit) => timed(unit.beginUs, unit.endUs) && unit.endUs! >= startUs && unit.beginUs! <= endUs).map((unit) => <span key={unit.id} className={`${styles.trackBar} ${styles.romanTrackBar}`} aria-label={`L${ordinalById.get(line.id)} 音译 ${romanTrack?.language ?? '未指定语言'} ${unit.text}`} style={{ left: pct(unit.beginUs!), width: `${(unit.endUs! - unit.beginUs!) / spanUs * 100}%` }}>{unit.text}</span>) : null)
       : row('词', words.filter(word => !editing || wordLayout.lanes.has(word.id)).map((word) => bar({ kind: 'word', lineId: line.id, wordId: word.id }, `时间轴词 ${word.text}`, word.beginUs!, word.endUs!, selectedWords.includes(word.id))), true, wordLayout.laneCount))}
-    {visible.ruby && line && row('Ruby', rubies.filter(({ unit }) => !editing || rubyLayout.lanes.has(unit.id)).map(({ word, unit }) => bar({ kind: 'ruby', lineId: line.id, wordId: word.id, rubyId: unit.id }, `时间轴Ruby ${unit.reading}`, unit.beginUs!, unit.endUs!)), false, rubyLayout.laneCount)}
+    {visible.ruby && line && row('注音', rubies.filter(({ unit }) => !editing || rubyLayout.lanes.has(unit.id)).map(({ word, unit }) => bar({ kind: 'ruby', lineId: line.id, wordId: word.id, rubyId: unit.id }, `时间轴注音 ${unit.reading}`, unit.beginUs!, unit.endUs!)), false, rubyLayout.laneCount)}
     {visible.gap && line && row('空隙', gaps.map(({ left, right, beginUs, endUs, overlap }) => <button key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`}
       style={{ left: pct(beginUs), width: `${Math.max(1, (endUs - beginUs) / spanUs * 100)}%` }} title={overlap ? '消除重叠' : '闭合空隙'} onClick={() => closeGap(left, right)}>{overlap ? '重叠' : '空隙'}</button>))}
   </div>;

@@ -9,12 +9,12 @@ export async function load(page: Page, xml = phase7Ttml) {
 async function edge(page: Page, selector: string, index: number, options: { button?: 'right'; modifiers?: ('Shift' | 'Control' | 'Meta')[] } = {}) {
   await page.locator(selector).nth(index).click({ position: { x: 3, y: 3 }, ...options });
 }
-test('P8 real Ruby range, passive right focus, batch delete and one undo', async ({ page }) => {
+test('P8 real 注音 range, passive right focus, batch delete and one undo', async ({ page }) => {
   await load(page);
   await edge(page, '[data-ruby-id]', 0); await edge(page, '[data-ruby-id]', 1, { modifiers: ['Shift'] });
-  await expect(page.getByText('Ruby已选 2', { exact: true })).toBeVisible();
+  await expect(page.getByText('注音已选 2', { exact: true })).toBeVisible();
   await page.getByLabel('读音 学校', { exact: true }).nth(1).click({ button: 'right' });
-  await expect(page.getByText('Ruby已选 2', { exact: true })).toBeVisible();
+  await expect(page.getByText('注音已选 2', { exact: true })).toBeVisible();
   await edge(page, '[data-ruby-id]', 0, { button: 'right' });
   await page.getByRole('menuitem', { name: '删除所选读音（2）' }).click();
   await expect(page.locator('[data-ruby-id]')).toHaveCount(2);

@@ -70,7 +70,7 @@ test('P3-04 constrains long inspector controls and aligns checkbox labels', asyn
   expect(await page.getByLabel('背景歌词').evaluate(e => getComputedStyle(e.parentElement!).display)).toBe('inline-flex');
 });
 
-for (const kind of ['行', '词', 'Ruby']) test(`P3-03 edits each overlapping ${kind} interval and undoes once`, async ({ page }) => {
+for (const kind of ['行', '词', '注音']) test(`P3-03 edits each overlapping ${kind} interval and undoes once`, async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   await importLyrics(page, { name: 'overlap.ttml', mimeType: 'application/xml', buffer: Buffer.from(overlapTtml()) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(4);
@@ -427,7 +427,7 @@ test('P3-10 rapid panning terminates obsolete worker jobs instead of queuing the
 });
 
 
-for (const count of [80, 83]) test(`P3-07 variable Ruby/transliteration height and background locate ${count} rows`, async ({ browser }) => {
+for (const count of [80, 83]) test(`P3-07 variable 注音/transliteration height and background locate ${count} rows`, async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, recordVideo: { dir: test.info().outputPath('locate-video') } });
   const page = await context.newPage();
   await page.goto('http://127.0.0.1:5174/editor');

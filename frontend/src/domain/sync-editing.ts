@@ -22,7 +22,7 @@ function assign(word: LyricWord, rubyUnitId: string | null, side: 'beginUs' | 'e
     return { ...word, [side]: timeUs, [other]: word[other] !== null && (side === 'beginUs' ? word[other] < timeUs : word[other] > timeUs) ? null : word[other] };
   }
   const index = word.rubyUnits.findIndex((unit) => unit.id === rubyUnitId);
-  if (index < 0) throw new Error('打轴 Ruby 单元已不存在');
+  if (index < 0) throw new Error('打轴 注音 单元已不存在');
   const rubyUnits = word.rubyUnits.slice();
   const unit = rubyUnits[index];
   const other = side === 'beginUs' ? 'endUs' : 'beginUs';

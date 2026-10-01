@@ -118,7 +118,7 @@ describe("useProjectDocument save lifecycle", () => {
     expect(result.current.conflict).toBe(true);
   });
 
-  it("saves generated Ruby with its source tracks and reopens the same semantics", async () => {
+  it("saves generated 注音 with its source tracks and reopens the same semantics", async () => {
     const source = readFileSync("../tests/fixtures/ttml/phase2-multitrack.ttml", "utf8");
     let savedXml = "";
     saveMock.mockImplementation(async (xml: string) => {

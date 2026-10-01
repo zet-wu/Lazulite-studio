@@ -29,7 +29,7 @@ it('maps a reading candidate to the matching semantic word', () => {
   expect(state.present.lines[0].words[1]).toBe(document.lines[0].words[1]);
 });
 
-it('merges adjacent words into one Ruby base for a reading candidate', () => {
+it('merges adjacent words into one 注音 base for a reading candidate', () => {
   const document = parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="line"><span>宇</span><span>宙</span><span>へ</span></p></body></tt>');
   const result: ReadingResult = { kind: 'reading', binding: { revision: 'r1', asset_id: 'asset' }, proposals: [{ line_id: 'line', proposal_id: 'p1', base_start: 0, base_end: 2, base: '宇宙', reading: 'そら', source: 'dictionary', needs_review: true }] };
   let state = createLyricEditorState(document);
@@ -40,7 +40,7 @@ it('merges adjacent words into one Ruby base for a reading candidate', () => {
   expect(state.present.lines[0].words[1]).toBe(document.lines[0].words[2]);
 });
 
-it('maps forced Ruby timing to a Ruby unit without touching another word', () => {
+it('maps forced 注音 timing to a 注音 unit without touching another word', () => {
   const document = parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="line"><span tts:ruby="container"><span tts:ruby="base">今日</span><span tts:ruby="textContainer"><span tts:ruby="text">きょう</span></span></span><span>宇宙</span></p></body></tt>');
   const word = document.lines[0].words[0];
   const ruby = word.rubyUnits[0];

@@ -19,7 +19,7 @@ test('P8 production 2000 proposals retain focused input and edits across virtual
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
   await writeFile(test.info().outputPath('phase8-performance.json'), JSON.stringify({ openedMs, modeMs, appliedMs, mounted, pinnedMounts, sourceRows: 2000, sourceUnits: 20000, scope: 'Production Linux Chromium; Playwright action-to-visible wall time, not next-RAF latency or closure of historical budgets.' }, null, 2));
 });
-test('P8 production one long word retains all 512 Ruby-derived inputs without horizontal dialog overflow', async ({ page }) => {
+test('P8 production one long word retains all 512 注音-derived inputs without horizontal dialog overflow', async ({ page }) => {
   await page.goto('/editor'); await page.locator('input[type=file]').setInputFiles({ name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(longRuby()) });
   await page.locator('[data-outline-drag]').first().click({ button: 'right' }); const start = Date.now(); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true }); await dialog.getByLabel('输出', { exact: true }).selectOption('timed');

@@ -5,7 +5,7 @@ import { stampSync, syncUnits } from '../src/domain/sync-editing';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 
 describe('E5 sync editing', () => {
-  it('advances Ruby before ordinary words and skips background and ignored lines', () => {
+  it('advances 注音 before ordinary words and skips background and ignored lines', () => {
     const document = createLyricDocument('今日');
     document.lines[0].words[0].rubyUnits = [
       { id: 'r1', reading: 'きょ', beginUs: null, endUs: null },
@@ -24,7 +24,7 @@ describe('E5 sync editing', () => {
     ]);
   });
 
-  it('stamps one Ruby edge and the next start in one undoable transaction', () => {
+  it('stamps one 注音 edge and the next start in one undoable transaction', () => {
     const document = createLyricDocument('今日');
     const line = document.lines[0], word = line.words[0];
     word.rubyUnits = [
@@ -70,7 +70,7 @@ describe('E5 sync editing', () => {
     expect(undoLyricCommand(state).present).toBe(document);
   });
 
-  it('takes a short song through every Ruby and word and reopens the final TTML', () => {
+  it('takes a short song through every 注音 and word and reopens the final TTML', () => {
     const document = createLyricDocument('今日');
     document.lines[0].words[0].rubyUnits = [
       { id: 'r1', reading: 'きょ', beginUs: null, endUs: null },

@@ -48,7 +48,7 @@ function readingCommands(document: LyricDocument, proposal: ReadingProposal): { 
   if (!words || words.some((word) => word.rubyUnits.length)) return null;
   if (words.length > 1 && words.some((word) => word.alignmentUnits.length || word.obscene || word.emptyBeat)) return null;
   const commands: Extract<LyricCommand, { type: 'batch' }>['commands'] = [];
-  if (words.length > 1) commands.push({ type: 'merge-ruby-base', lineId: line.id, wordIds: words.map((word) => word.id) });
+  for (const word of words.slice(1)) commands.push({ type: 'merge-words', lineId: line.id, firstWordId: words[0].id, secondWordId: word.id });
   commands.push({ type: 'add-ruby', lineId: line.id, wordId: words[0].id, reading: proposal.reading });
   return { commands, wordIds: words.map((word) => word.id) };
 }
@@ -105,7 +105,7 @@ export function JobCandidatePanel({ result, currentRevision, currentAssetId, dir
           if (word && unit.granularity === 'word') commands.push({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginUs: unit.start_us, endUs: unit.end_us });
         }
         for (const { lineId, word, units } of attachments.values()) commands.push({ type: 'set-word-alignments', lineId, wordId: word.id, units });
-        if (!commands.length) throw new Error('没有与词块或 Ruby 单元对应的时间候选');
+        if (!commands.length) throw new Error('没有与词块或 注音 单元对应的时间候选');
         onApply({ type: 'batch', commands });
         setMessage(`已应用 ${commands.length} 个时间单元；未匹配的片段未修改。`);
         return;

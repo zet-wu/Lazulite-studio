@@ -116,6 +116,6 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
       </div>}
 
       {error && <p role="alert">{error}</p>}
-      {preview.length > 0 && <div className={styles.segmentPreview}><strong>预览：{preview.filter((item) => item.parts.length > 1 && !item.blocked).length} 词将切分</strong>{preview.map((item) => <div key={item.word.id}><small>{lineText(document.lines.find((line) => line.id === item.lineId)!)}</small><span>{item.word.text} → {item.parts.join(' │ ')}</span>{item.blocked && <em>含 Ruby 或附属属性，保留原词</em>}</div>)}</div>}
+      {preview.length > 0 && <div className={styles.segmentPreview}><strong>预览：{preview.filter((item) => item.parts.length > 1 && !item.blocked).length} 词将切分</strong>{preview.map((item) => <div key={item.word.id}><small>{lineText(document.lines.find((line) => line.id === item.lineId)!)}</small><span>{item.word.text} → {item.parts.join(' │ ')}</span>{item.blocked && <em>含 注音 或附属属性，保留原词</em>}</div>)}</div>}
     </SettingsDialog>;
 }

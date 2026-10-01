@@ -22,7 +22,7 @@ async function geometry(dialog: Locator) {
   }));
 }
 
-for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) test(`Ruby and kana preview align at ${width} ${theme}`, async ({ page }) => {
+for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) test(`注音 and kana preview align at ${width} ${theme}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 });
   await page.addInitScript(theme => localStorage.setItem('lazulite-editor-theme', theme), theme);
   await page.goto('/editor');
@@ -55,7 +55,7 @@ for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) t
   await writeFile(test.info().outputPath('alignment.json'), JSON.stringify({ width, theme, plain, timed, edited }, null, 2));
 });
 
-for (const [name, xml, count] of [['Ruby', longRuby(64), 64], ['kana', largeKana(1, 80), 80]] as const) test(`Long ${name} wraps source and romanization together`, async ({ page }) => {
+for (const [name, xml, count] of [['注音', longRuby(64), 64], ['kana', largeKana(1, 80), 80]] as const) test(`Long ${name} wraps source and romanization together`, async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/editor');
   await importLyrics(page, { name: 'wrap.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
@@ -82,7 +82,7 @@ for (const [name, xml, count] of [['Ruby', longRuby(64), 64], ['kana', largeKana
   const rows = await checkRows();
   const input = dialog.getByLabel('L1单元 1音译'); await input.fill('long manual input '.repeat(10));
   await expect(input).toBeFocused(); await checkRows();
-  if (name === 'Ruby') await expect(dialog.getByText('長い正文', { exact: true })).toHaveCount(1);
+  if (name === '注音') await expect(dialog.getByText('長い正文', { exact: true })).toHaveCount(1);
   await dialog.getByLabel(`L1单元 ${count}音译`).fill('tail'); await checkRows();
   await page.mouse.move(1, 1); await page.screenshot({ path: test.info().outputPath(`alternating-${name}.png`) });
   await writeFile(test.info().outputPath(`alternating-${name}.json`), JSON.stringify({ count, rows }, null, 2));

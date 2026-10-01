@@ -58,7 +58,7 @@ export function proposeRuby(rows: RubySourceRow[], output: RubyOutput, assignmen
     const valid = source.every(Boolean) && pieces.join('') === joined && (output === 'roman' || pieces.every((part) => kana.test(part)));
     for (let index = 0; index < group.length; index++) {
       group[index].reading = valid ? pieces[index] : null;
-      group[index].conversionIssue = valid ? null : `整组转换：${joined || '空'}；请手动确认每个 Ruby 的拆分`;
+      group[index].conversionIssue = valid ? null : `整组转换：${joined || '空'}；请手动确认每个 注音 的拆分`;
     }
   }
   return proposed;
@@ -99,19 +99,19 @@ export function rubyGenerationCommand(document: LyricDocument, sourceDocument: L
     if (skipped.has(row.key)) continue;
     if (!row.wordId) throw new Error(`音译「${row.sourceText}」尚未指定目标词`);
     const reading = readings[row.key] ?? row.reading;
-    if (!reading?.trim()) throw new Error(`音译「${row.sourceText}」尚未确认 Ruby 读音`);
+    if (!reading?.trim()) throw new Error(`音译「${row.sourceText}」尚未确认 注音 读音`);
     const line = document.lines.find((item) => item.id === row.lineId);
     if (!line?.words.some((word) => word.id === row.wordId)) throw new Error('目标词已变化，请重新生成提案');
     const key = `${row.lineId}:${row.wordId}`;
     byWord.set(key, [...(byWord.get(key) ?? []), { ...row, reading: reading.trim() }]);
   }
-  if (!byWord.size) throw new Error('没有可应用的 Ruby');
+  if (!byWord.size) throw new Error('没有可应用的 注音');
   const commands: Extract<LyricCommand, { type: 'set-line-time' | 'set-word-time' | 'set-ruby-units' }>[] = [];
   for (const line of document.lines) {
     const groups = line.words.map((word) => ({ word, rows: byWord.get(`${line.id}:${word.id}`) ?? [] })).filter((group) => group.rows.length);
     if (!groups.length) continue;
     const proposedWords = groups.map(({ word, rows }) => {
-      if (word.rubyUnits.length && !overwriteWordIds.has(word.id)) throw new Error(`词「${word.text}」已有 Ruby，请显式选择覆盖`);
+      if (word.rubyUnits.length && !overwriteWordIds.has(word.id)) throw new Error(`词「${word.text}」已有 注音，请显式选择覆盖`);
       const units: RubyUnit[] = rows.map((row) => ({ id: crypto.randomUUID(), reading: row.reading!, beginUs: row.beginUs, endUs: row.endUs }));
       const next = envelope(word, [...word.rubyUnits.map((unit) => unit.beginUs), ...units.map((unit) => unit.beginUs)], [...word.rubyUnits.map((unit) => unit.endUs), ...units.map((unit) => unit.endUs)]);
       return { word, units, next };

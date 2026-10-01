@@ -35,18 +35,18 @@ test('edits and exports a rich local draft with canvas undo and redo', async ({ 
   expect(xml).toContain('今天 也唱歌');
 });
 
-test('generates Ruby explicitly from one track and preserves source content on undo', async ({ page }) => {
+test('generates 注音 explicitly from one track and preserves source content on undo', async ({ page }) => {
   await importTtml(page, 'phase2-multitrack');
   const line = page.locator('main section[data-line-id="line-a"]');
   await expect(line.locator('[data-romanization-content-id]')).toHaveCount(3);
   await line.locator('[data-romanization-content-id]').first().getByText('音译 · ja-Latn').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
+  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
   await expect(dialog).toContainText('fu');
   await expect(dialog).toContainText('0.999s');
-  await expect(dialog.getByRole('button', { name: '生成 Ruby', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeEnabled();
   await expect(dialog.getByLabel('确认同时扩展上述词/行时间')).toHaveCount(0);
-  await dialog.getByRole('button', { name: '生成 Ruby', exact: true }).click();
+  await dialog.getByRole('button', { name: '生成 注音', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '读音 二人' })).toHaveCount(3);
   await expect(line.locator('[data-romanization-content-id]')).toHaveCount(3);
   await page.getByRole('button', { name: '撤销' }).click();
@@ -132,12 +132,12 @@ test('virtualizes 2000 lines and locates the last line from the outline', async 
   expect(await page.locator('main section[data-line-id]').count()).toBeLessThan(80);
 });
 
-test('selects and reorders Ruby independently of its base word', async ({ page }) => {
+test('selects and reorders 注音 independently of its base word', async ({ page }) => {
   await importTtml(page);
   const word = page.locator('main section[data-line-id="L1"] [data-word-id]').first();
   const rubies = word.locator('[data-ruby-id]');
   await rubies.first().click();
-  await expect(page.getByText('Ruby已选 1')).toBeVisible();
+  await expect(page.getByText('注音已选 1')).toBeVisible();
   await rubies.first().click({ button: 'right', position: { x: 2, y: 2 } });
   await page.getByRole('menuitem', { name: '向后移动' }).click();
   await expect(rubies.first().getByRole('textbox', { name: '读音 今日', exact: true })).toHaveValue('う');

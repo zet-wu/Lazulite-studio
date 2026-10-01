@@ -4,7 +4,7 @@ import { toAmllLines } from '../src/domain/preview-adapter';
 import { parseLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { readFileSync } from 'node:fs';
 
-it('maps timed Ruby, translations, background and duet without mutating a draft', () => {
+it('maps timed 注音, translations, background and duet without mutating a draft', () => {
   const document = createLyricDocument('歌');
   document.agents = [{ id: 'v1', name: null, type: 'person' }, { id: 'v2', name: null, type: 'person' }];
   const main = document.lines[0]; main.beginUs = 1_000_000; main.endUs = 2_000_000; main.agentRefs = ['v2'];

@@ -11,18 +11,17 @@ function parseSeconds(value: string): TimeUs {
   return number;
 }
 
-export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSplit, onMergePrevious, onMove, onNavigate, inputRef, readOnly, onEdit, onExit }: { value: string; label: string; placeholder?: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number, draft: string) => void; onMergePrevious?: (draft: string) => void; onMove?: (direction: -1 | 1) => void; onNavigate?: (direction: -1 | 1) => void; inputRef?: (node: HTMLInputElement | null) => void; readOnly?: boolean; onEdit?: () => void; onExit?: () => void }) {
+export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSplit, onMergePrevious, onMove, onNavigate, inputRef }: { value: string; label: string; placeholder?: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number, draft: string) => void; onMergePrevious?: (draft: string) => void; onMove?: (direction: -1 | 1) => void; onNavigate?: (direction: -1 | 1) => void; inputRef?: (node: HTMLInputElement | null) => void }) {
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   const cancelled = useRef(false);
   useEffect(() => setDraft(value), [value]);
-  return <input ref={(node) => { ref.current = node; inputRef?.(node); }} aria-label={label} placeholder={placeholder} value={draft} readOnly={readOnly} onChange={(event) => { cancelled.current = false; setDraft(event.target.value); }} onFocus={() => { if (!ref.current?.closest('[data-pointer-focus]')) onFocus?.(); }} onDoubleClick={onEdit}
+  return <input ref={(node) => { ref.current = node; inputRef?.(node); }} aria-label={label} placeholder={placeholder} value={draft} onChange={(event) => { cancelled.current = false; setDraft(event.target.value); }} onFocus={() => { if (!ref.current?.closest('[data-pointer-focus]')) onFocus?.(); }}
     onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
-    onBlur={() => { onExit?.(); if (cancelled.current) { cancelled.current = false; return; } if (draft !== value) onCommit(draft); }}
+    onBlur={() => { if (cancelled.current) { cancelled.current = false; return; } if (draft !== value) onCommit(draft); }}
     onKeyDown={(event) => {
       if (composing.current) return;
-      if (readOnly && (event.key === 'Enter' || event.key === 'F2')) { event.preventDefault(); onEdit?.(); return; }
       if (event.key === 'Enter') ref.current?.blur();
       if (event.key === 'Escape') { cancelled.current = true; setDraft(value); ref.current?.blur(); }
       if (event.key === 'F8' && onSplit) { event.preventDefault(); cancelled.current = true; onSplit(ref.current?.selectionStart ?? 0, draft); }

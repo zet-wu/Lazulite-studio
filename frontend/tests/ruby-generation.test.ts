@@ -3,7 +3,7 @@ import { createLyricEditorState, executeLyricCommand, undoLyricCommand, redoLyri
 import { createLyricDocument, createWord } from '../src/domain/lyric-document';
 import { defaultRubySkips, proposeRuby, rubyGenerationCommand, rubySourceRows } from '../src/domain/ruby-generation';
 
-describe('explicit transliteration to Ruby', () => {
+describe('explicit transliteration to 注音', () => {
   it('copies ko/na and yu/ki with independent time and extends the parent envelope once', () => {
     const document = createLyricDocument('粉雪');
     const line = document.lines[0];
@@ -73,7 +73,7 @@ describe('explicit transliteration to Ruby', () => {
   });
 });
 
-describe('P4 Ruby candidate tolerance and grouped defaults', () => {
+describe('P4 注音 candidate tolerance and grouped defaults', () => {
   function fixture(beginUs: number | null, endUs: number | null) {
     const document = createLyricDocument('合成');
     const line = document.lines[0];
@@ -159,7 +159,7 @@ it('automatic expansion retains link, assignment, reading and empty-generation g
   expect(line.beginUs).toBe(1_000_000); expect(line.words[0].rubyUnits).toHaveLength(0);
 });
 
-it('filters empty and whitespace Ruby sources without changing source times or creating an empty command', () => {
+it('filters empty and whitespace 注音 sources without changing source times or creating an empty command', () => {
   const document = createLyricDocument('歌'), line = document.lines[0];
   line.words[0].beginUs = 1_000_000; line.words[0].endUs = 2_000_000;
   document.romanizationTracks = [{ id: 'track', language: null, contents: [{ id: 'c', lineId: line.id, kind: 'timed', units: [

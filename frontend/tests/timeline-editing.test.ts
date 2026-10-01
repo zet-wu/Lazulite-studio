@@ -21,7 +21,7 @@ describe('E6 timeline editing', () => {
     return document;
   };
 
-  it('moves a line with its Ruby, alignment and background in one undo step', () => {
+  it('moves a line with its 注音, alignment and background in one undo step', () => {
     const document = sample();
     const word = document.lines[0].words[0];
     word.alignmentUnits = [{ id: 'm1', kind: 'mora', text: 'きょ', beginUs: 1_000_000, endUs: 1_500_000, readingStart: 0, readingEnd: 2, rubyUnitId: 'r1' }];
@@ -33,7 +33,7 @@ describe('E6 timeline editing', () => {
     expect(undoLyricCommand(state).present).toBe(document);
   });
 
-  it('resizes a Ruby edge and updates its parent without changing another word', () => {
+  it('resizes a 注音 edge and updates its parent without changing another word', () => {
     const document = sample();
     const target = { kind: 'ruby' as const, lineId: document.lines[0].id, wordId: document.lines[0].words[0].id, rubyId: 'r2' };
     const changed = resizeTimeline(document, target, 'endUs', 3_500_000);

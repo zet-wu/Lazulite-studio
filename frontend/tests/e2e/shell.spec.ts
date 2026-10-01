@@ -22,7 +22,7 @@ test('opens a project, selects a line and keeps edit navigation visible', async 
 test('keeps one A/B snapshot and five layers while collapsing the timeline', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   const layers = page.getByLabel('时间轴图层');
-  for (const name of ['行', '词', 'Ruby', '空隙']) await expect(layers.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
+  for (const name of ['行', '词', '注音', '空隙']) await expect(layers.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(layers.getByRole('button', { name: '声谱图' })).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: '循环当前行' }).click();
   await expect(page.getByRole('slider', { name: '循环 A 边界' })).toHaveAttribute('aria-valuenow', '0');
@@ -72,7 +72,7 @@ test('saves a semantic project edit and reopens the saved revision', async ({ pa
   await expect(page.getByRole('textbox', { name: '词 夜の風が静かに歌う', exact: true })).toBeVisible();
 });
 
-test('imports rich TTML, saves Ruby and reopens it from the project route', async ({ page }) => {
+test('imports rich TTML, saves 注音 and reopens it from the project route', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   const source = await readFile('../tests/fixtures/ttml/reference-apple-metadata.ttml');
   await importLyrics(page, { name: 'reference.ttml', mimeType: 'application/ttml+xml', buffer: source });

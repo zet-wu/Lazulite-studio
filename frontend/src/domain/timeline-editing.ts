@@ -60,10 +60,10 @@ export function moveTimeline(document: LyricDocument, targets: TimelineTarget[],
         words[index] = moveWord(word, deltaUs);
       } else {
         const rubyIndex = word.rubyUnits.findIndex((unit) => unit.id === target.rubyId);
-        if (rubyIndex < 0) throw new Error('时间轴 Ruby 已不存在');
+        if (rubyIndex < 0) throw new Error('时间轴 注音 已不存在');
         const rubyUnits = word.rubyUnits.slice();
         const unit = rubyUnits[rubyIndex];
-        if (unit.beginUs === null || unit.endUs === null) throw new Error('请先为 Ruby 设置完整时间');
+        if (unit.beginUs === null || unit.endUs === null) throw new Error('请先为 注音 设置完整时间');
         rubyUnits[rubyIndex] = { ...unit, beginUs: changed(unit.beginUs, deltaUs), endUs: changed(unit.endUs, deltaUs) };
         words[index] = { ...word, rubyUnits,
           beginUs: envelope(rubyUnits.map((item) => item.beginUs), true), endUs: envelope(rubyUnits.map((item) => item.endUs), false),
@@ -93,11 +93,11 @@ export function resizeTimeline(document: LyricDocument, target: TimelineTarget, 
       const beginUs = side === 'beginUs' ? timeUs : word.beginUs;
       const endUs = side === 'endUs' ? timeUs : word.endUs;
       valid(beginUs, endUs);
-      if (word.rubyUnits.some((unit) => beginUs !== null && unit.beginUs !== null && unit.beginUs < beginUs || endUs !== null && unit.endUs !== null && unit.endUs > endUs)) throw new Error('词边界不能排除 Ruby');
+      if (word.rubyUnits.some((unit) => beginUs !== null && unit.beginUs !== null && unit.beginUs < beginUs || endUs !== null && unit.endUs !== null && unit.endUs > endUs)) throw new Error('词边界不能排除 注音');
       words[index] = { ...word, beginUs, endUs };
     } else {
       const rubyIndex = word.rubyUnits.findIndex((unit) => unit.id === target.rubyId);
-      if (rubyIndex < 0) throw new Error('时间轴 Ruby 已不存在');
+      if (rubyIndex < 0) throw new Error('时间轴 注音 已不存在');
       const rubyUnits = word.rubyUnits.slice();
       const unit: RubyUnit = { ...rubyUnits[rubyIndex], [side]: timeUs };
       valid(unit.beginUs, unit.endUs);

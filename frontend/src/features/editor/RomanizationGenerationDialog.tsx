@@ -109,7 +109,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   return <SettingsDialog title="生成日文罗马字音译" subtitle={`生成 ${rows.filter(row => targetFor(row.lineId) !== 'skip').length} / ${sourceIds.length} 行`} close={close}
     actions={<><button onClick={close}>取消</button><button disabled={Boolean(issue)} onClick={submit}>生成音译</button></>}>
     <div className={styles.rubyGeneration}>
-      <small>使用 Ruby 读音及假名正文</small>
+      <small>使用 注音 读音及假名正文</small>
       <div className={styles.rubyGenerationOptions}>
         <label>目标轨道 <select aria-label="目标轨道" value={trackId} onChange={event => { setTrackId(event.target.value); setTargets({}); setMessage(''); }}><option value="">新建 · ja-Latn</option>
           {source.romanizationTracks.filter(track => track.language === 'ja-Latn').map(track => <option key={track.id} value={track.id}>轨道 {source.romanizationTracks.indexOf(track) + 1} · ja-Latn</option>)}

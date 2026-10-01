@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest';
 import { createLyricDocument } from '../domain/lyric-document';
 import { TimelineTracks } from './TimelineTracks';
 
-it('uses half-open independent intervals across line, word and Ruby at seek and paused positions', () => {
+it('uses half-open independent intervals across line, word and 注音 at seek and paused positions', () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   const document = createLyricDocument('合成');
   const line = document.lines[0], word = line.words[0];
@@ -15,7 +15,7 @@ it('uses half-open independent intervals across line, word and Ruby at seek and 
   const { rerender } = render(<TimelineTracks {...props} positionUs={0} />);
   for (const [positionUs, expected] of [[1_000_000, [true, false, false]], [2_000_000, [true, true, true]], [2_001_000, [true, true, false]], [3_000_000, [true, false, false]], [4_000_000, [false, false, false]]] as const) {
     rerender(<TimelineTracks {...props} positionUs={positionUs} />);
-    for (const [index, kind] of ['行', '词', 'Ruby'].entries()) expect(screen.getByRole('button', { name: new RegExp(`^时间轴${kind} `) }).className.includes('trackPlaying')).toBe(expected[index]);
+    for (const [index, kind] of ['行', '词', '注音'].entries()) expect(screen.getByRole('button', { name: new RegExp(`^时间轴${kind} `) }).className.includes('trackPlaying')).toBe(expected[index]);
   }
   vi.unstubAllGlobals();
 });

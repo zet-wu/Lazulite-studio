@@ -47,7 +47,7 @@ test('P4-02 playing color is visible on ordinary and true narrow widths', async 
     await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
     for (const index of [0, 1]) {
       await page.locator('[data-outline-drag]').nth(index).click();
-      for (const kind of ['行', '词', 'Ruby']) {
+      for (const kind of ['行', '词', '注音']) {
         const bar = page.getByRole('button', { name: new RegExp(`^时间轴${kind} `) }).nth(kind === '行' ? index : 0);
         await bar.focus();
         const color = index === 1 ? bar.locator('[data-time-color]') : bar;
@@ -67,8 +67,8 @@ test('P4-04/05 grouped skips, manual generation, history and checkpoint with bou
   await expect(line.locator('[data-romanization-content-id]')).toBeVisible();
   const source = await line.locator('[data-romanization-content-id] input').evaluateAll(nodes => nodes.map(n => (n as HTMLInputElement).value));
   await line.getByText('音译 · ja-Latn').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
+  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
   const skips = dialog.getByLabel('跳过生成');
   await expect(skips).toHaveCount(3);
   for (const skip of await skips.all()) {
@@ -79,7 +79,7 @@ test('P4-04/05 grouped skips, manual generation, history and checkpoint with bou
   await expect(dialog.getByRole('status')).toContainText('所有单元均跳过');
   await page.screenshot({ path: test.info().outputPath('ruby-default-skips.png') });
   await skips.nth(0).uncheck(); await skips.nth(1).uncheck();
-  await dialog.getByRole('button', { name: '生成 Ruby', exact: true }).click();
+  await dialog.getByRole('button', { name: '生成 注音', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(2);
   await expect(line.getByRole('textbox', { name: '读音 か', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
@@ -127,7 +127,7 @@ test('P4-08 large proposal scroll preserves manual choices while mounting only v
   await expect(page.locator('[data-outline-drag]')).toHaveCount(2000);
   await page.locator('[data-outline-drag]').first().click();
   await page.locator('[data-top-menu="clipboard"] summary').click(); await page.getByRole('button', { name: '全选', exact: true }).click();
-  await page.locator('[data-top-menu="tools"] summary').click(); await page.getByRole('button', { name: '从音译生成 Ruby…', exact: true }).click();
+  await page.locator('[data-top-menu="tools"] summary').click(); await page.getByRole('button', { name: '从音译生成 注音…', exact: true }).click();
   const dialog = page.locator('[role=dialog]');
   const rows = dialog.locator('[data-proposal-count]');
   await expect(rows).toHaveAttribute('data-proposal-count', '2000');
@@ -140,7 +140,7 @@ test('P4-08 large proposal scroll preserves manual choices while mounting only v
     await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
     return last.isVisible();
   }, { timeout: 20_000 }).toBe(true);
-  await last.getByLabel('目标 Ruby').fill('手动末行');
+  await last.getByLabel('目标 注音').fill('手动末行');
   await rows.evaluate(e => { e.scrollTop = 0; });
   await expect(first.getByLabel('跳过生成')).toBeChecked();
   await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
@@ -148,7 +148,7 @@ test('P4-08 large proposal scroll preserves manual choices while mounting only v
     await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
     return last.isVisible();
   }, { timeout: 20_000 }).toBe(true);
-  await expect(last.getByLabel('目标 Ruby')).toHaveValue('手动末行');
+  await expect(last.getByLabel('目标 注音')).toHaveValue('手动末行');
   expect(await dialog.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: test.info().outputPath('large-ruby-visible-rows.png') });
 });

@@ -71,11 +71,11 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
     try {
       const result = rubyGenerationCommand(document, sourceDocument, rows, readings, skipped, overwrite);
       if (apply(result)) close();
-    } catch (cause) { setMessage(cause instanceof Error ? cause.message : '生成 Ruby 失败'); }
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : '生成 注音 失败'); }
   };
   const ordinals = new Map(sourceDocument.lines.filter(line => !line.backgroundOf).map((line, index) => [line.id, index + 1]));
   const generatedLines = new Set(sourceRows.map(row => row.lineId)).size;
-  return <SettingsDialog title="从音译生成 Ruby" subtitle={lineIds.length === 1 && generatedLines === 1 ? `L${ordinals.get(lineIds[0])}` : `生成 ${generatedLines} / ${lineIds.length} 行`} close={close} actions={<><button onClick={close}>取消</button><button disabled={!preview} onClick={submit}>生成 Ruby</button></>}>
+  return <SettingsDialog title="从音译生成 注音" subtitle={lineIds.length === 1 && generatedLines === 1 ? `L${ordinals.get(lineIds[0])}` : `生成 ${generatedLines} / ${lineIds.length} 行`} close={close} actions={<><button onClick={close}>取消</button><button disabled={!preview} onClick={submit}>生成 注音</button></>}>
     <div className={styles.rubyGeneration}>
       {stale ? <p role="alert">文档已变化，旧提案不能应用。<button onClick={refresh}>重新生成提案</button></p> : <>
         <div className={styles.rubyGenerationOptions}><label>音译轨道 <select value={trackId} onChange={(event) => selectTrack(event.target.value)}>{tracks.map((track, index) => <option key={track.id} value={track.id}>轨道 {index + 1} · {track.language ?? '未指定语言'}</option>)}</select></label>
@@ -99,7 +99,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
                 setAssignments((current) => ({ ...current, [row.key]: nextWordId })); setReadings((current) => { const next = { ...current }; delete next[row.key]; return next; }); }}>
               <option value="">待人工分配</option>{line.words.map((word) => <option key={word.id} value={word.id}>{word.text}{row.candidates.includes(word.id) ? ' · 时间重叠' : ''}</option>)}
             </select></label>
-            <label>目标 Ruby <input value={readings[row.key] ?? row.reading ?? ''} disabled={skipped.has(row.key)} onChange={(event) => setReadings((current) => ({ ...current, [row.key]: event.target.value }))} /></label>
+            <label>目标 注音 <input value={readings[row.key] ?? row.reading ?? ''} disabled={skipped.has(row.key)} onChange={(event) => setReadings((current) => ({ ...current, [row.key]: event.target.value }))} /></label>
             <label><input type="checkbox" checked={skipped.has(row.key)} onChange={(event) => setSkipOverrides(current => ({ ...current, [row.key]: event.target.checked }))} /> 跳过生成</label>
             {row.candidates.length === 1 && !row.defaultWordId && <small>重叠不超过 10ms；需人工指定。</small>}
             {row.candidates.length > 1 && <small>跨词重叠；建议：{line.words.find((word) => word.id === row.suggestedWordId)?.text}，仍需人工指定。</small>}
@@ -107,7 +107,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
             {row.conversionIssue && <small role="alert">{row.conversionIssue}</small>}
           </div>;
         }} />
-        {existingWords.length > 0 && <fieldset className={styles.rubyGenerationChoices}><legend>已有 Ruby</legend>{existingWords.map(({ word }) => <label key={word.id}><input type="checkbox" checked={overwrite.has(word.id)} onChange={(event) => setOverwrite((current) => { const next = new Set(current); if (event.target.checked) next.add(word.id); else next.delete(word.id); return next; })} />覆盖「{word.text}」现有 Ruby 及其对齐结果</label>)}</fieldset>}
+        {existingWords.length > 0 && <fieldset className={styles.rubyGenerationChoices}><legend>已有 注音</legend>{existingWords.map(({ word }) => <label key={word.id}><input type="checkbox" checked={overwrite.has(word.id)} onChange={(event) => setOverwrite((current) => { const next = new Set(current); if (event.target.checked) next.add(word.id); else next.delete(word.id); return next; })} />覆盖「{word.text}」现有 注音 及其对齐结果</label>)}</fieldset>}
         {!rows.length && <p role="status">没有可生成的音译单元</p>}
         {allSkipped && <p role="status">所有单元均跳过，无需生成</p>}
         {(issue || message) && <p role="alert">{message || issue}</p>}

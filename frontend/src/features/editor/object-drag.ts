@@ -150,7 +150,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     const allowedIds = new Set(ids);
     nodes = nodes.filter(node => allowedIds.has(node.getAttribute(attribute(source))!));
     if (!nodes.length) return { lineId, afterId: null };
-    // Nearest rectangle in both axes handles wrapped words/Ruby instead of assuming one horizontal row.
+    // Nearest rectangle in both axes handles wrapped words/注音 instead of assuming one horizontal row.
     const vertical = source.kind === 'line' || source.kind === 'romanization-content';
     const ranked = nodes.map(node => {
       // Read layout, not an in-flight FLIP animation's visual position.

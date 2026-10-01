@@ -18,7 +18,7 @@ describe('semantic lyric commands', () => {
     expect(redoLyricCommand(undoLyricCommand(state)).present).toBe(state.present);
   });
 
-  it('keeps word timing when editing neighboring text and splits Ruby reading once', () => {
+  it('keeps word timing when editing neighboring text and splits 注音 reading once', () => {
     const document = createLyricDocument('今日も歌う');
     const lineId = document.lines[0].id;
     const firstId = document.lines[0].words[0].id;
@@ -31,10 +31,10 @@ describe('semantic lyric commands', () => {
     expect(state.present.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['きょ', 'う']);
     expect(state.present.lines[0].words[1]).toMatchObject({ text: 'も唄う', beginUs: 1_000_000, endUs: 2_000_000 });
     expect(undoLyricCommand(state).present.lines[0].words[1]).toMatchObject({ text: 'も歌う', beginUs: 1_000_000 });
-    expect(() => executeLyricCommand(state, { type: 'split-word', lineId, wordId: firstId, at: 1 })).toThrow(/Ruby base/);
+    expect(() => executeLyricCommand(state, { type: 'split-word', lineId, wordId: firstId, at: 1 })).toThrow(/注音 base/);
   });
 
-  it('reorders Ruby only within its word while preserving unit identity and timing', () => {
+  it('reorders 注音 only within its word while preserving unit identity and timing', () => {
     const document = createLyricDocument('歌');
     const line = document.lines[0], word = line.words[0];
     word.rubyUnits = [
@@ -178,7 +178,7 @@ describe('semantic lyric commands', () => {
     expect(() => executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: null, word: createWord('重', first.id) })).toThrow(/already exists/);
   });
 
-  it('moves a timed Ruby word across lines without changing its identity or timing', () => {
+  it('moves a timed 注音 word across lines without changing its identity or timing', () => {
     const document = createLyricDocument('今日');
     const first = document.lines[0];
     const second = createLine('明日', 'second');

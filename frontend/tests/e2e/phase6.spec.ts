@@ -10,13 +10,13 @@ async function load(page: Page, xml = phase6Ttml()) {
 }
 const row = (page: Page, id = 'english') => page.locator(`main section[data-line-id="${id}"]`);
 
-test('P6 Ruby main-row right click preserves multi-selection and updates content/track coverage', async ({ page }) => {
+test('P6 注音 main-row right click preserves multi-selection and updates content/track coverage', async ({ page }) => {
   await load(page);
   const outline = page.locator('[data-outline-drag]');
   await outline.first().click(); await outline.last().click({ modifiers: ['Shift'] });
   await outline.first().click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
+  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
   await expect(dialog).toContainText('生成 2 / 3 行');
   await expect(dialog.getByLabel('目标词')).toHaveCount(2);
   await expect(dialog.getByText('空单元', { exact: true })).toHaveCount(0);
@@ -26,14 +26,14 @@ test('P6 Ruby main-row right click preserves multi-selection and updates content
   await dialog.locator('summary').click();
   await dialog.locator('fieldset input[type=checkbox]').first().uncheck();
   await expect(dialog).toContainText('生成 0 / 3 行');
-  await expect(dialog.getByRole('button', { name: '生成 Ruby', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeDisabled();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await outline.nth(1).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
+  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
   await expect(dialog).toContainText('生成 2 / 3 行');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await outline.last().click(); await outline.first().click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
+  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
   await expect(dialog).toContainText('L1');
 });
 

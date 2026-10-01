@@ -37,5 +37,5 @@ test('UI production pointer preview with 2000 rich rows remains bounded', async 
   const p95 = (values: number[]) => values.slice().sort((a, b) => a - b)[Math.floor(values.length * .95)];
   expect(result.mounted).toBeLessThan(80); expect(result.maxPlaceholders).toBeGreaterThan(0);
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
-  await writeFile(test.info().outputPath('ui-drag-performance.json'), JSON.stringify({ ...result, frameP95Ms: p95(result.frames), pointerToTwoRafP95Ms: p95(result.events), scope: 'Production local editor, 2000 rows/20000 words with Ruby and timed romanization; real Playwright mouse through outline, pointer event to two RAF; no media; not OS/DPR acceptance' }, null, 2));
+  await writeFile(test.info().outputPath('ui-drag-performance.json'), JSON.stringify({ ...result, frameP95Ms: p95(result.frames), pointerToTwoRafP95Ms: p95(result.events), scope: 'Production local editor, 2000 rows/20000 words with 注音 and timed romanization; real Playwright mouse through outline, pointer event to two RAF; no media; not OS/DPR acceptance' }, null, 2));
 });

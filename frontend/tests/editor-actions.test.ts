@@ -11,7 +11,7 @@ describe('editor selection and clipboard', () => {
     expect(selectIds(order, ['b', 'c'], 'b', 'b', false, true)).toEqual(['c']);
   });
 
-  it('copies a Ruby word with timing and alignment while assigning fresh linked IDs', () => {
+  it('copies a 注音 word with timing and alignment while assigning fresh linked IDs', () => {
     const document = createLyricDocument('今日');
     const line = document.lines[0];
     line.beginUs = 0; line.endUs = 2_000_000;
@@ -32,7 +32,7 @@ describe('editor selection and clipboard', () => {
     expect(undoLyricCommand(state).present).toBe(document);
   });
 
-  it('copies a selected Ruby unit without clearing existing alignment references', () => {
+  it('copies a selected 注音 unit without clearing existing alignment references', () => {
     const document = createLyricDocument('歌');
     const line = document.lines[0], word = line.words[0];
     line.beginUs = 0; line.endUs = 1_000_000;
@@ -99,7 +99,7 @@ describe('editor selection and clipboard', () => {
     expect(withLines.lines.map(lineText)).toEqual(['前', '第一', '第二']);
   });
 
-  it('moves timed Ruby words into a neighboring line without losing their timing', () => {
+  it('moves timed 注音 words into a neighboring line without losing their timing', () => {
     const document = createLyricDocument('今日');
     document.lines[0].beginUs = 0; document.lines[0].endUs = 1_000_000;
     const word = document.lines[0].words[0];

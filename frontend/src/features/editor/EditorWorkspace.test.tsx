@@ -8,7 +8,7 @@ vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 
 afterEach(() => { cleanup(); localStorage.clear(); });
 
-it('selects Ruby independently and opens its card menu while leaving input context native', () => {
+it('selects 注音 independently and opens its card menu while leaving input context native', () => {
   const lyric = createLyricDocument('歌');
   const line = lyric.lines[0], word = line.words[0];
   word.rubyUnits = [
@@ -21,7 +21,7 @@ it('selects Ruby independently and opens its card menu while leaving input conte
     onSave={() => {}} /></MemoryRouter>);
   const tile = container.querySelector<HTMLElement>('[data-ruby-id="r1"]')!;
   fireEvent.click(tile);
-  expect(screen.getByText('Ruby已选 1')).toBeVisible();
+  expect(screen.getByText('注音已选 1')).toBeVisible();
   fireEvent.contextMenu(tile, { clientX: 20, clientY: 30 });
   fireEvent.click(screen.getByRole('menuitem', { name: '向后移动' }));
   expect(apply).toHaveBeenCalledWith({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId: 'r1', afterRubyId: 'r2' });

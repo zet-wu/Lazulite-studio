@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { performanceTtml } from '../fixtures/phase3';
 
-test('P4 production large Ruby proposals and native playing response', async ({ page }) => {
+test('P4 production large 注音 proposals and native playing response', async ({ page }) => {
   test.setTimeout(240_000);
   await page.addInitScript(() => {
     const longTasks: number[] = [];
@@ -19,7 +19,7 @@ test('P4 production large Ruby proposals and native playing response', async ({ 
   await page.getByRole('button', { name: '全选', exact: true }).click();
   await page.locator('[data-top-menu="tools"] summary').click();
   const began = performance.now();
-  await page.getByRole('button', { name: '从音译生成 Ruby…', exact: true }).click();
+  await page.getByRole('button', { name: '从音译生成 注音…', exact: true }).click();
   const dialog = page.locator('[role=dialog]');
   const rowContainer = dialog.locator('[class*="rubyGenerationRows"]').first();
   const virtualized = await rowContainer.getAttribute('data-proposal-count') !== null;
@@ -30,7 +30,7 @@ test('P4 production large Ruby proposals and native playing response', async ({ 
   const proposalOpenMs = performance.now() - began;
   let started = performance.now();
   await dialog.getByLabel('字符输出').selectOption('katakana');
-  await expect(dialog.getByLabel('目标 Ruby').first()).toHaveValue('コ');
+  await expect(dialog.getByLabel('目标 注音').first()).toHaveValue('コ');
   const outputChangeMs = performance.now() - started;
   const skipChangeMs = await dialog.evaluate(async e => {
     const checkbox = Array.from(e.querySelectorAll('label')).find(label => /跳过生成|此单元不生成/.test(label.textContent ?? ''))!.querySelector('input')!;

@@ -38,7 +38,7 @@ describe('semantic TTML codec', () => {
     }
   });
 
-  it('imports, splits Ruby, edits a neighboring word, undoes, saves and reopens', () => {
+  it('imports, splits 注音, edits a neighboring word, undoes, saves and reopens', () => {
     const imported = parseLyricTtml(simple);
     const lineId = imported.lines[0].id;
     const firstId = imported.lines[0].words[0].id;
@@ -57,7 +57,7 @@ describe('semantic TTML codec', () => {
     expect(reopened.lines[0].beginUs).toBeNull();
   });
 
-  it('keeps relative line, word and Ruby times in microseconds', () => {
+  it('keeps relative line, word and 注音 times in microseconds', () => {
     const xml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><div begin="1.5s"><p xml:id="relative" begin="250ms" end="2s"><span begin="0s" end="1s" tts:ruby="container"><span tts:ruby="base">今日</span><span tts:ruby="text"><span begin="0s" end="500ms">きょ</span><span begin="500ms" end="1s">う</span></span></span></p></div></body></tt>';
     const document = parseLyricTtml(xml);
     expect(document.lines[0]).toMatchObject({ beginUs: 1_750_000, endUs: 3_500_000 });
@@ -102,7 +102,7 @@ describe('semantic TTML codec', () => {
     expect(() => parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><p><x-translation>translation</x-translation></p></body></tt>')).toThrow(/Unsupported TTML line child/);
   });
 
-  it('reads the reference tool Ruby, translation, romanization and background sample', () => {
+  it('reads the reference tool 注音, translation, romanization and background sample', () => {
     const source = readFileSync('../tests/fixtures/ttml/reference-rich.ttml', 'utf8');
     const document = parseLyricTtml(source);
     expect(document.lines).toHaveLength(2);
@@ -111,7 +111,7 @@ describe('semantic TTML codec', () => {
       ['きょ', 0, 500_000], ['う', 500_000, 1_000_000],
     ]);
     const state = createLyricEditorState(document);
-    expect(() => executeLyricCommand(state, { type: 'set-word-time', lineId: document.lines[0].id, wordId: document.lines[0].words[0].id, beginUs: 600_000, endUs: 1_000_000 })).toThrow(/Ruby unit/);
+    expect(() => executeLyricCommand(state, { type: 'set-word-time', lineId: document.lines[0].id, wordId: document.lines[0].words[0].id, beginUs: 600_000, endUs: 1_000_000 })).toThrow(/注音 unit/);
     expect(document.lines[0].translations).toEqual([{ language: 'zh', text: '今天也唱歌' }]);
     expect(document.romanizationTracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ lineId: document.lines[0].id, kind: 'plain', text: 'kyou mo utau' }] });
     expect(document.lines[1]).toMatchObject({ backgroundOf: document.lines[0].id, beginUs: 500_000, endUs: 1_800_000 });

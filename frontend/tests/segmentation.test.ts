@@ -48,7 +48,7 @@ describe('E3 segmentation', () => {
     expect(distributeSegmentTime(word, parts, 0.2).map((item) => [item.beginUs, item.endUs])).toEqual([[null, null], [null, null], [null, 900_000]]);
   });
 
-  it('leaves an untimed Ruby word intact and merges adjacent plain words', () => {
+  it('leaves an untimed 注音 word intact and merges adjacent plain words', () => {
     const document = createLyricDocument('今日も');
     const line = document.lines[0], word = line.words[0];
     word.rubyUnits.push({ id: 'r', reading: 'きょう', beginUs: null, endUs: null });

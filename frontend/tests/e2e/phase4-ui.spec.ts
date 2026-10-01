@@ -95,9 +95,9 @@ for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) t
   await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
   await page.screenshot({ path: test.info().outputPath('editor.png') });
   await page.locator('[data-top-menu="tools"] summary').click();
-  await page.getByRole('button', { name: '从音译生成 Ruby…' }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 Ruby' });
-  await expect(dialog.getByRole('button', { name: '生成 Ruby', exact: true })).toBeInViewport();
+  await page.getByRole('button', { name: '从音译生成 注音…' }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
+  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeInViewport();
   await expect(dialog.getByText(/与正文相同|时间包络|原音译轨道会保留|切换字符输出将/)).toHaveCount(0);
   expect(await dialog.evaluate(node => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: test.info().outputPath('ruby.png') });
@@ -121,7 +121,7 @@ test('UI empty document and background tail append both remain usable after undo
   await expect(page.getByLabel('背景歌词', { exact: true })).not.toBeChecked();
 });
 
-test('UI word to empty line, Ruby and romanization drags use the same insertion slots', async ({ page }) => {
+test('UI word to empty line, 注音 and romanization drags use the same insertion slots', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/editor');
   await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: await readFile('../tests/fixtures/ttml/phase2-multitrack.ttml') });
@@ -137,8 +137,8 @@ test('UI word to empty line, Ruby and romanization drags use the same insertion 
   await begin(page, contents.first(), contents.nth(1)); await page.mouse.up();
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await contents.first().getByText('音译 · ja-Latn').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 Ruby…' }).click();
-  await page.getByRole('button', { name: '生成 Ruby', exact: true }).click();
+  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
+  await page.getByRole('button', { name: '生成 注音', exact: true }).click();
   const rubies = line.locator('[data-ruby-id]');
   const r = (await rubies.last().boundingBox())!, t = (await rubies.first().boundingBox())!;
   await page.mouse.move(r.x + 2, r.y + 2); await page.mouse.down(); await page.mouse.move(t.x + 2, t.y + 2, { steps: 5 });

@@ -4,7 +4,7 @@ import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '.
 import { createLyricDocument, createWord } from '../src/domain/lyric-document';
 import { distributeRubyTime, makeRubyUnits, readingFromRomanization, splitReadingMora } from '../src/domain/ruby-editing';
 
-describe('E4 Ruby editing', () => {
+describe('E4 注音 editing', () => {
   it('converts romaji and separates mora without breaking yoon, sokuon, long vowels or emoji graphemes', () => {
     expect(readingFromRomanization('kyou')).toBe('きょう');
     expect(splitReadingMora('きょう')).toEqual(['きょ', 'う']);
@@ -14,7 +14,7 @@ describe('E4 Ruby editing', () => {
     expect(() => readingFromRomanization('hello 😊')).toThrow(/假名/);
   });
 
-  it('inserts, splits, merges and redistributes independently timed Ruby units with one-step undo', () => {
+  it('inserts, splits, merges and redistributes independently timed 注音 units with one-step undo', () => {
     const document = createLyricDocument('今日');
     const line = document.lines[0], word = line.words[0];
     line.beginUs = 1_000_000; line.endUs = 2_000_000;
@@ -34,12 +34,12 @@ describe('E4 Ruby editing', () => {
     expect(inserted.present.lines[0].words[0].rubyUnits[0].id).toBe('head');
   });
 
-  it('merges contiguous words into a single Ruby base and keeps the rest of the line shared', () => {
+  it('merges contiguous words into a single 注音 base and keeps the rest of the line shared', () => {
     const document = createLyricDocument('今');
     const line = document.lines[0];
     line.words.push(createWord('日', 'day'), createWord('も', 'also'));
     const state = executeLyricCommand(createLyricEditorState(document), { type: 'batch', commands: [
-      { type: 'merge-ruby-base', lineId: line.id, wordIds: [line.words[0].id, 'day'] },
+      { type: 'merge-words', lineId: line.id, firstWordId: line.words[0].id, secondWordId: 'day' },
       { type: 'add-ruby', lineId: line.id, wordId: line.words[0].id, reading: 'きょう', rubyId: 'reading' },
     ] });
     expect(state.present.lines[0].words.map((word) => word.text)).toEqual(['今日', 'も']);
@@ -48,7 +48,7 @@ describe('E4 Ruby editing', () => {
     expect(undoLyricCommand(state).present).toBe(document);
   });
 
-  it('generates Ruby without overwriting manual units and survives TTML draft/final round trips', () => {
+  it('generates 注音 without overwriting manual units and survives TTML draft/final round trips', () => {
     const document = createLyricDocument('宇宙');
     const line = document.lines[0], word = line.words[0];
     line.beginUs = 3_000_000; line.endUs = 4_000_000;
@@ -56,7 +56,7 @@ describe('E4 Ruby editing', () => {
     const units = makeRubyUnits(word, splitReadingMora(readingFromRomanization('sora')));
     const state = executeLyricCommand(createLyricEditorState(document), { type: 'set-ruby-units', lineId: line.id, wordId: word.id, units });
     expect(state.present.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['そ', 'ら']);
-    expect(() => executeLyricCommand(state, { type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: makeRubyUnits(word, ['う']) })).toThrow(/手动 Ruby/);
+    expect(() => executeLyricCommand(state, { type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: makeRubyUnits(word, ['う']) })).toThrow(/手动 注音/);
     for (const draft of [true, false]) {
       const reopened = parseLyricTtml(serializeLyricTtml(state.present, { draft }));
       expect(reopened.lines[0].words[0].rubyUnits.map((unit) => [unit.reading, unit.beginUs, unit.endUs])).toEqual([

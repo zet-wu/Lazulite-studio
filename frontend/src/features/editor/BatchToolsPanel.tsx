@@ -40,12 +40,12 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
         const amount = Number(amountMs);
         if (!Number.isFinite(amount) || !Number.isSafeInteger(amount * 1000)) throw new Error('请输入有效的毫秒偏移量');
         command = shiftLineTimes(document, targets.map((line) => line.id), amount * 1000);
-        summary = `移动 ${targets.length} 行，词、Ruby 和对齐时间一同移动`;
+        summary = `移动 ${targets.length} 行，词、注音 和对齐时间一同移动`;
       } else if (operation === 'smooth') {
         const amount = Number(thresholdMs);
         if (!Number.isFinite(amount) || !Number.isSafeInteger(amount * 1000)) throw new Error('请输入有效的毫秒阈值');
         const result = smoothWordTimes(document, targets.map((line) => line.id), amount * 1000);
-        if (!result.count) throw new Error('范围内没有可平滑的 CJK 相邻词边界；含 Ruby 的边界会跳过');
+        if (!result.count) throw new Error('范围内没有可平滑的 CJK 相邻词边界；含 注音 的边界会跳过');
         command = result.command; summary = `平滑 ${result.count} 处词边界`;
       } else if (operation === 'sync') {
         command = syncLineTimes(document, targets.map((line) => line.id));
@@ -75,7 +75,7 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
       {operation === 'shift' && <label>偏移毫秒（负数为提前）<input type="number" step="1" value={amountMs} onChange={(event) => setAmountMs(event.target.value)} /></label>}
       {operation === 'smooth' && <label>相邻词间隙或重叠阈值（毫秒）<input type="number" min="0" step="1" value={thresholdMs} onChange={(event) => setThresholdMs(event.target.value)} /></label>}
     </div>}
-    <p className={styles.toolHint}>{operation === 'replace' ? `目标：${wordIds.length} 词；只替换词内文本，带 Ruby/附属属性的词需单独处理。` : operation === 'shift' ? `目标：${targets.length} 行；行、词、Ruby 和对齐一起平移，负值越界时整次取消。` : operation === 'smooth' ? `目标：${targets.length} 行；仅填平阈值内的 CJK 相邻词边界，Ruby/对齐边界保持原样。` : operation === 'sync' ? `目标：${targets.length} 行；行首尾取已定时间词的包络，未定词不变；改变已链接行的结束时间会取消链接。` : current?.endLink ? `当前行链接到 ${current.endLink.targetLineId}；取消后恢复原结束时间。` : '将当前主唱行结束时间链接到下一主唱行的开始时间；词和 Ruby 时间不变。'}</p>
+    <p className={styles.toolHint}>{operation === 'replace' ? `目标：${wordIds.length} 词；只替换词内文本，带 注音/附属属性的词需单独处理。` : operation === 'shift' ? `目标：${targets.length} 行；行、词、注音 和对齐一起平移，负值越界时整次取消。` : operation === 'smooth' ? `目标：${targets.length} 行；仅填平阈值内的 CJK 相邻词边界，注音/对齐边界保持原样。` : operation === 'sync' ? `目标：${targets.length} 行；行首尾取已定时间词的包络，未定词不变；改变已链接行的结束时间会取消链接。` : current?.endLink ? `当前行链接到 ${current.endLink.targetLineId}；取消后恢复原结束时间。` : '将当前主唱行结束时间链接到下一主唱行的开始时间；词和 注音 时间不变。'}</p>
 
     {message && <p role="alert">{message}</p>}
   </SettingsDialog>;

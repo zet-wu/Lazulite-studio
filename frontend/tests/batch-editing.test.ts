@@ -5,7 +5,7 @@ import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '.
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
 
 describe('E3 batch editing', () => {
-  it('shifts a selected line, Ruby and alignments without touching other lines or losing null time', () => {
+  it('shifts a selected line, 注音 and alignments without touching other lines or losing null time', () => {
     const document = createLyricDocument('今日');
     const line = document.lines[0], word = line.words[0];
     line.beginUs = 500_000; line.endUs = 1_000_000;
@@ -34,7 +34,7 @@ describe('E3 batch editing', () => {
     expect(undoLyricCommand(synced).present).toBe(state.present);
   });
 
-  it('replaces selected text in one undo and rejects a Ruby base change', () => {
+  it('replaces selected text in one undo and rejects a 注音 base change', () => {
     const document = createLyricDocument('hello hello');
     const line = document.lines[0], word = line.words[0];
     const result = replaceWords(document, [word.id], 'hello', 'hi');

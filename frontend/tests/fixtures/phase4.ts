@@ -1,4 +1,4 @@
-/** Synthetic text with independent line/word/Ruby intervals; no commercial lyrics. */
+/** Synthetic text with independent line/word/注音 intervals; no commercial lyrics. */
 export const phase4Ttml = () => `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><div>
 <p xml:id="ordinary" begin="1" end="3"><span tts:ruby="container" begin="1" end="3"><span tts:ruby="base">普通</span><span tts:ruby="textContainer"><span tts:ruby="text" begin="1" end="3">ふつう</span></span></span></p>
 <p xml:id="narrow" begin="2" end="2.001"><span tts:ruby="container" begin="2" end="2.001"><span tts:ruby="base">窄</span><span tts:ruby="textContainer"><span tts:ruby="text" begin="2" end="2.001">せまい</span></span></span></p>

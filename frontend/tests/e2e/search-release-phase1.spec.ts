@@ -61,7 +61,7 @@ for(const width of [1280,1440,1920])for(const theme of ['light','dark'])test(`ne
 });
 
 
-test('packaging error links focus body, background and Ruby with visible main numbering',async({page})=>{
+test('packaging error links focus body, background and 注音 with visible main numbering',async({page})=>{
  await page.goto('/projects/sample-project/edit');
  await page.getByRole('button',{name:'歌词获取',exact:true}).waitFor();
  await page.evaluate(()=>{const original=window.fetch;window.fetch=async(input,init)=>String(input).endsWith('/packaging') ? Response.json({filename:'synthetic.m4a',format_label:'M4A（MP4 容器）',asset_id:'asset-1',container:'mp4',supported:true,tracks:[],error:null}) : original(input,init);});
