@@ -1,7 +1,9 @@
 # Shared：通用界面与工具
 
-当前包含 `Icon.tsx` 和 `tokens.css`，供应用与功能组件复用。布局样式主要位于各组件的 CSS Modules。
+当前包含 `Icon.tsx`、`Controls.tsx` 和 `tokens.css`，供应用与功能组件复用。布局样式主要位于各组件的 CSS Modules。
 
 这里只放无业务依赖的 UI 与工具，不引用项目、歌词、任务或后端类型。领域时间校验和文本坐标规则仍由 domain 管理；按真实复用需求提取公共组件，不预建通用组件框架。
 
 tokens.css 为紧凑桌面定义表面层次、强调色上的文本、hover/pressed 状态层、文字角色与间距/圆角；明暗主题使用相同语义角色。Editor 的按钮、无框菜单、固定面板标题与对话框复用这些变量，不依赖额外组件库。
+
+按钮以 data-role 显式声明 primary/secondary/inline/danger/danger-primary，选中另用 aria-pressed 或 aria-current。IconButton 使用统一 SVG、可访问名称、悬停和键盘提示；BooleanField 复用真实 checkbox，单行用 switch，批量支持 indeterminate。
