@@ -1,26 +1,25 @@
 import { test, expect } from '@playwright/test';
-test('vocal processing adopts explicitly, shares history, assigns and reopens a complete project', async ({page})=>{
+test('vocal processing adopts automatically, shares history, assigns and reopens a complete project', async ({page})=>{
  await page.goto('/projects/phase0-packaging/edit');
  await page.getByRole('button',{name:'音频处理',exact:true}).click();
  await expect(page.getByRole('heading',{name:'大纲',exact:true})).toBeVisible();
- await page.getByRole('button',{name:'进行人声分离及声学分析',exact:true}).click();
- const adopt=page.getByRole('button',{name:'采用',exact:true}).first();await expect(adopt).toBeEnabled({timeout:30000});
+ await page.getByRole('button',{name:'进行人声分离和声学分析',exact:true}).click();
+ await expect(page.locator('[data-segment-id]').first()).toBeVisible({timeout:30000});
  let envelope=await (await page.request.get('/api/v1/projects/phase0-packaging/document')).json();
- expect(envelope.document.acoustics.analysisId).toBeNull();
- await adopt.click();
+
  await expect(page.locator('[data-segment-id]').first()).toBeVisible();
  await page.locator('[data-vocal-tracks] [data-segment-id]').first().click();
  await page.getByRole('button',{name:'分配',exact:true}).click();
  await expect.poll(async()=>{const e=await (await page.request.get('/api/v1/projects/phase0-packaging/document')).json();return e.document.lyrics.draftTtml;}).not.toBe(envelope.document.lyrics.draftTtml);
  envelope=await (await page.request.get('/api/v1/projects/phase0-packaging/document')).json();
  expect(envelope.document.acoustics.analysisId).toBeTruthy();
- await page.getByRole('button',{name:'新增人声片段',exact:true}).click();
+ await page.getByRole('button',{name:'新建人声片段',exact:true}).click();
  const lane=page.locator('[data-vocal-lane]');const box=(await lane.boundingBox())!;
  await page.mouse.move(box.x+box.width*.8,box.y+12);await page.mouse.down();await page.mouse.move(box.x+box.width*.65,box.y+12,{steps:5});await page.mouse.up();
  await expect(page.locator('[data-segment-id]')).toHaveCount(2);
  await page.keyboard.press('Control+z');await expect(page.locator('[data-segment-id]')).toHaveCount(1);
  await page.keyboard.press('Control+Shift+z');await expect(page.locator('[data-segment-id]')).toHaveCount(2);
- await page.getByRole('button',{name:'新增人声片段',exact:true}).click();await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'取消新增',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'新增人声片段',exact:true})).toBeFocused();await expect(page.getByText('拖动框选新增片段，Esc 取消')).toHaveCount(0);
+ await page.getByRole('button',{name:'新建人声片段',exact:true}).click();await page.keyboard.press('Tab');await expect(page.locator('[data-vocal-focus]')).toBeFocused();await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'新建人声片段',exact:true})).toBeFocused();await expect(page.getByText('拖动框选新增片段，Esc 取消')).toHaveCount(0);
  await page.getByLabel('播放音源',{exact:true}).selectOption({index:1});await expect(page.getByText('正在加载音源…')).toHaveCount(0);
  await page.getByLabel('波形／声谱图音源',{exact:true}).selectOption('');
  await expect(page.locator('audio')).toHaveCount(1);
@@ -39,16 +38,19 @@ async function newProject(page: import('@playwright/test').Page, xml: string) {
  const before=await (await page.request.get(`/api/v1/projects/${pid}/document`)).json();
  const saved=await page.request.put(`/api/v1/projects/${pid}/document`,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:pid,revision:before.revision,document:{...before.document,lyrics:{draftTtml:xml}}}});expect(saved.ok()).toBeTruthy();
  await page.goto(`/projects/${pid}/edit`);await page.getByRole('button',{name:'音频处理',exact:true}).click();
+ await page.getByRole('button',{name:'进行人声分离和声学分析',exact:true}).click();
+ await expect(page.locator('[data-segment-id]').first()).toBeVisible({timeout:30000});
  return pid;
 }
 test('segment edits cancel atomically, merge/delete preserve assigned lyrics, drag assignment matches button',async({page})=>{
  const pid=await newProject(page,'<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="unknown">未知行</p><p xml:id="second">第二行</p></div></body></tt>');
- const add=async(a:number,b:number)=>{await page.getByRole('button',{name:'新增人声片段',exact:true}).click();const box=(await page.locator('[data-vocal-lane]').boundingBox())!;await page.mouse.move(box.x+box.width*a,box.y+12);await page.mouse.down();await page.mouse.move(box.x+box.width*b,box.y+12,{steps:4});await page.mouse.up();};
+ await page.locator('[data-segment-id]').first().click({button:'right'});await page.getByRole('menuitem',{name:'删除选中片段'}).click();
+ const add=async(a:number,b:number)=>{await page.getByRole('button',{name:'新建人声片段',exact:true}).click();const box=(await page.locator('[data-vocal-lane]').boundingBox())!;await page.mouse.move(box.x+box.width*a,box.y+12);await page.mouse.down();await page.mouse.move(box.x+box.width*b,box.y+12,{steps:4});await page.mouse.up();};
  await add(.2,.4);await expect(page.locator('[data-segment-id]')).toHaveCount(1);
- await page.getByRole('button',{name:'新增人声片段',exact:true}).click();await page.locator('[data-vocal-lane]').click({position:{x:10,y:10}});await expect(page.locator('[data-segment-id]')).toHaveCount(1);
+ await page.getByRole('button',{name:'新建人声片段',exact:true}).click();await page.locator('[data-vocal-lane]').click({position:{x:10,y:10}});await expect(page.locator('[data-segment-id]')).toHaveCount(1);
  const first=page.locator('[data-segment-id]').first();const original=await first.getAttribute('aria-label');const box=(await first.boundingBox())!;
  await page.mouse.move(box.x+box.width*.5,box.y+12);await page.mouse.down();await page.mouse.move(box.x+box.width*.5+40,box.y+12,{steps:3});await page.keyboard.press('Escape');await page.mouse.up();await expect(first).toHaveAttribute('aria-label',original!);
- const bounds=async()=>((await first.getAttribute('aria-label'))!.match(/\d+/g)!).map(Number);
+ const bounds=async()=>((await first.getAttribute('aria-label'))!.match(/\d+/g)!).map(Number).slice(1);
  const initial=await bounds();
  for(const side of [1,2]){
   const edge=(await first.locator('span').nth(side).boundingBox())!;
@@ -56,7 +58,7 @@ test('segment edits cancel atomically, merge/delete preserve assigned lyrics, dr
   const changed=await bounds();expect(changed[side-1]).toBeGreaterThan(initial[side-1]);expect(changed[2-side]).toBe(initial[2-side]);
   await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(first).toHaveAttribute('aria-label',original!);
  }
- await page.getByRole('button',{name:'拖动分配 L1',exact:true}).dragTo(first);
+ await page.getByRole('complementary',{name:'音频处理大纲'}).locator('[draggable]').first().dragTo(first);
  await expect(page.getByRole('complementary',{name:'音频处理大纲'})).not.toContainText('未定起点 – 未定终点\n↗');
  await expect.poll(async()=>{const e=await(await page.request.get(`/api/v1/projects/${pid}/document`)).json();return e.document.lyrics.draftTtml;}).toContain('begin=');
  const assigned=(await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.lyrics.draftTtml;
@@ -80,7 +82,11 @@ test('audio layouts use one timeline at desktop widths in both themes',async({pa
 
 test('real Demucs audio preserves position rate loop and pause across independent sources',async({page})=>{
  test.skip(!process.env.STUDIO_VOCAL_REAL_ROOT,'Requires an explicitly supplied real Demucs result');
- await page.goto('/projects/real-vocal/edit');await page.getByRole('button',{name:'音频处理',exact:true}).click();await page.getByRole('button',{name:'采用',exact:true}).click();
+ const before=await(await page.request.get('/api/v1/projects/real-vocal/document')).json();
+ const result=(await(await page.request.get('/api/v1/projects/real-vocal/vocals')).json()).items.find((r:{status:string})=>r.status==='ready');
+ expect(result).toBeTruthy();
+ const saved=await page.request.put('/api/v1/projects/real-vocal/document',{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:'real-vocal',revision:before.revision,document:{...before.document,acoustics:{analysisId:result.id,segments:result.segments}}}});expect(saved.ok()).toBeTruthy();
+ await page.goto('/projects/real-vocal/edit');await page.getByRole('button',{name:'音频处理',exact:true}).click();
  await expect(page.locator('[data-segment-id]').first()).toBeVisible();
  await page.locator('audio').evaluate((el:HTMLAudioElement)=>{el.currentTime=20;});
  await page.getByRole('slider',{name:'播放速度',exact:true}).fill('0.75');
@@ -110,7 +116,7 @@ test('real Demucs audio preserves position rate loop and pause across independen
 test('out of range assignment preserves lyrics and points to hidden offending units',async({page})=>{
  const pid=await newProject(page,'<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="long" begin="00:01.000" end="00:08.000"><span begin="00:01.000" end="00:08.000">长行</span></p></body></tt>');
  const before=(await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.lyrics.draftTtml;
- await page.getByRole('button',{name:'新增人声片段',exact:true}).click();const box=(await page.locator('[data-vocal-lane]').boundingBox())!;
+ await page.getByRole('button',{name:'新建人声片段',exact:true}).click();const box=(await page.locator('[data-vocal-lane]').boundingBox())!;
  await page.mouse.move(box.x+box.width*.7,box.y+12);await page.mouse.down();await page.mouse.move(box.x+box.width*.8,box.y+12);await page.mouse.up();
  await page.getByRole('button',{name:'分配',exact:true}).click();
  await expect(page.getByRole('complementary',{name:'音频处理大纲'})).toContainText('未修改歌词或链接');

@@ -30,8 +30,9 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
     if(!open)return;
     const outside=(e:PointerEvent)=>{if(!list.current?.contains(e.target as Node)&&e.target!==ref.current)setOpen(false);};
     const resize=()=>setOpen(false);
-    window.addEventListener('pointerdown',outside);window.addEventListener('resize',resize);
-    return()=>{window.removeEventListener('pointerdown',outside);window.removeEventListener('resize',resize);};
+    const scroll=(e:Event)=>{if(!list.current?.contains(e.target as Node))setOpen(false);};
+    window.addEventListener('pointerdown',outside);window.addEventListener('resize',resize);window.addEventListener('scroll',scroll,true);
+    return()=>{window.removeEventListener('pointerdown',outside);window.removeEventListener('resize',resize);window.removeEventListener('scroll',scroll,true);};
   },[open]);
   return <><select {...props} ref={ref} className={`studio-select ${props.className??''}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open?id:undefined} aria-activedescendant={open?`${id}-${active}`:undefined}
     onPointerDown={e=>{props.onPointerDown?.(e);if(e.button===0&&!e.defaultPrevented){e.preventDefault();ref.current?.focus();if(open)close();else show();}}}
@@ -48,5 +49,5 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
         const index=enabled.indexOf(active);
         setActive(e.key==='Home'?enabled[0]:e.key==='End'?enabled.at(-1)!:enabled[Math.max(0,Math.min(enabled.length-1,index+(e.key==='ArrowDown'?1:-1)))]??active);
       } else if(open&&e.key.length===1){e.preventDefault();const index=options.findIndex(o=>!o.disabled&&o.text.toLocaleLowerCase().startsWith(e.key.toLocaleLowerCase()));if(index>=0)setActive(index);}
-    }}/>{open&&createPortal(<div ref={list} id={id} role="listbox" aria-label={props['aria-label']??ref.current?.labels?.[0]?.textContent??'选项'} className="studio-select-list" style={rect} onPointerDown={e=>e.preventDefault()}>{options.map((o,i)=><div key={i} id={`${id}-${i}`} data-index={i} role="option" aria-selected={o.selected} aria-disabled={o.disabled} data-active={active===i} onPointerMove={()=>{if(!o.disabled)setActive(i);}} onClick={()=>choose(i)}>{o.text}</div>)}</div>,document.body)}</>;
+    }}/>{open&&createPortal(<div ref={list} id={id} role="listbox" aria-label={props['aria-label']??ref.current?.labels?.[0]?.textContent??'选项'} className="studio-select-list" style={rect} onPointerDown={e=>{e.preventDefault();e.stopPropagation();}}>{options.map((o,i)=><div key={i} id={`${id}-${i}`} data-index={i} role="option" aria-selected={o.selected} aria-disabled={o.disabled} data-active={active===i} onPointerMove={()=>{if(!o.disabled)setActive(i);}} onClick={e=>{e.stopPropagation();choose(i);}}>{o.text}</div>)}</div>,ref.current?.closest('[role="dialog"]')??document.body)}</>;
 }

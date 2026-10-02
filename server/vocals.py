@@ -84,6 +84,7 @@ class VocalRunner:
         emit('stage', 'analyzing', None, None, '正在分析持久人声的能量与核心片段')
         samples, rate = sf.read(str(vocal_path), dtype='float32', always_2d=True)
         audio = AudioBuffer(samples.T, rate, params['asset_id'])
+        metadata.update(analysis_source_sha256=hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), runtime={'numpy': np.__version__, 'soundfile': sf.__version__})
         config = VocalConfig()
         analysis = analyze_vocals(audio, config=config)
         mono = samples.mean(axis=1)
