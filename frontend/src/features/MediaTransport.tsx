@@ -1,3 +1,5 @@
+import { Select } from '../shared/Select';
+import { useAudioReview } from './AudioReviewContext';
 import { createPortal } from 'react-dom';
 import { VocalTracks } from './VocalTracks';
 import { vocalApi } from '../adapters/http/client';
@@ -16,7 +18,6 @@ import {
   useState,
   type KeyboardEvent,
   type PointerEvent,
-  type WheelEvent,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -71,7 +72,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   projectId,
   selectedLine,
   asset,
-  loopRange,
+  loopRange: lyricLoopRange,
   onPosition,
   document,
   selectedLineId,
@@ -79,6 +80,10 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   onTimelineCommand,
   onSelectLine,
 }: Props, ref) {
+  const ui=useAudioReview();
+  const segment=ui?.selected.length===1?acoustics?.segments.find(s=>s.id===ui.selected[0]):undefined;
+  const loopRange=ui?.segmentTarget?(segment?{begin_ms:segment.beginMs,end_ms:segment.endMs}:undefined):lyricLoopRange;
+  const plotsRef=useRef<HTMLDivElement>(null);
   const keys = useShortcuts();
   const results = useQuery({ queryKey:['vocals',projectId], queryFn:()=>vocalApi.list(projectId), refetchInterval:3000, enabled:!!asset });
   const [playbackVocal,setPlaybackVocal] = useState<string | null>(null);
@@ -118,7 +123,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [snap, setSnap] = useState(true);
   const [bottomExpanded, setExpanded] = useState(true);
   const expanded = !!timelineHost || bottomExpanded;
-  const [visible, setVisible] = useState({ line: true, word: true, ruby: true, gap: true, spectrum: false, wave: true });
+  const [visible, setVisible] = useState({ line: true, word: true, ruby: true, gap: true, spectrum: false, wave: true, energy:true, segments:true });
   const { width, ratio } = useCanvasMetrics(canvas, expanded, timelineHost);
   const [follow, setFollow] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
@@ -374,15 +379,22 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     };
     moveAnimation.current = requestAnimationFrame(frame);
   };
-  const wheelView = (event: WheelEvent<HTMLDivElement>) => {
-    if (!asset || event.ctrlKey || event.metaKey) return;
-    if ((event.target as Element).closest('input,select,button')) return;
-    const rect = slider.current?.getBoundingClientRect() ?? event.currentTarget.getBoundingClientRect();
-    const delta = (event.deltaY || event.deltaX) * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1);
-    if (zoomAt(Math.exp(delta * 0.001), (event.clientX - rect.left) / rect.width)) event.preventDefault();
-  };
+  useEffect(()=>{
+    const node=plotsRef.current;if(!node)return;
+    const wheel=(event:globalThis.WheelEvent)=>{
+      if(!asset||event.ctrlKey||event.metaKey||ui?.adding)return;
+      const target=event.target as Element;
+      if(!target.closest('[data-wheel-zoom]')||target.closest('input,select,button,[role="combobox"]'))return;
+      event.preventDefault();
+      const rect=slider.current!.getBoundingClientRect();
+      const delta=(event.deltaY||event.deltaX)*(event.deltaMode===1?16:event.deltaMode===2?rect.height:1);
+      zoomAt(Math.exp(delta*.001),(event.clientX-rect.left)/rect.width);
+    };
+    node.addEventListener('wheel',wheel,{passive:false});
+    return()=>node.removeEventListener('wheel',wheel);
+  });
   const beginPan = (event: PointerEvent<HTMLElement>) => {
-    if (!asset || event.button !== 0 || (event.target as Element).closest('[data-loop-handle]')) return;
+    if (ui?.adding || !asset || event.button !== 0 || (event.target as Element).closest('[data-loop-handle]')) return;
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }
     const rect = event.currentTarget.getBoundingClientRect();
     panDrag.current = { x: event.clientX, startMs, left: rect.left, width: rect.width, pointerId: event.pointerId, started: false };
@@ -523,21 +535,17 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         <IconButton data-role="secondary" disabled={disabled} icon="minus" label="缩小波形" onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}/>
         <span className={styles.viewportRange}>视窗 {fmt(start)} – {fmt(end)}</span>
         <div className={styles.visibility} aria-label="时间轴图层">
-          {(['line', 'word', 'ruby', 'gap', 'wave', 'spectrum'] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
-            {({ line: '行', word: '词', ruby: '注音', gap: '空隙', wave: '波形', spectrum: '声谱图' })[key]}
+          {(['line', 'word', 'ruby', 'gap', 'wave', 'spectrum', ...(timelineHost?['energy','segments'] as const:[])] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
+            {({ line: '行', word: '词', ruby: '注音', gap: '空隙', wave: '波形', spectrum: '声谱图', energy:'能量',segments:'片段' })[key]}
           </button>)}
         </div>
 </>);
-  const plots = (
-      <div id="timeline-plots" className={styles.timelinePlots} onWheel={wheelView}>
-      {timelineHost && <div className={styles.header}>{viewportTools}</div>}
-      <label>波形／声谱图音源 <select aria-label="波形／声谱图音源" value={graphicVocal??''} onChange={e=>setGraphicChoice(e.target.value||null)}><option value="">原曲</option>{results.data?.items.map((r,i)=><option key={r.id} value={r.id}>人声 {results.data.items.length-i}</option>)}</select></label>
+  const acousticPlots=(<>
       <div className={styles.ruler} aria-label="时间标尺" onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={() => { panDrag.current = null; }}>{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
-      {timelineHost && acoustics && onAcoustics && onAssign && <VocalTracks projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} positionMs={Math.round(position*1000)} selectedLineId={selectedLineId??null} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()}/>}
       <div
-        ref={slider}
+        data-wheel-zoom ref={slider}
         className={styles.waveWrap}
-        style={visible.wave ? undefined : { height: 0, overflow: 'hidden', border: 0, minHeight: 0 }}
+        style={visible.wave || ui?.adding ? undefined : { height: 0, overflow: 'hidden', border: 0, minHeight: 0 }}
         onPointerDown={beginPan}
         onPointerMove={movePan}
         onPointerUp={endPan}
@@ -569,12 +577,19 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         {bandA != null && bandB != null && (bandB >= start && bandB <= end || loopDrag.current?.side === 'b') && <span data-loop-handle="b" className={styles.loopHandle} role="slider" tabIndex={0} aria-label="循环 B 边界" aria-valuemin={bandA} aria-valuemax={duration} aria-valuenow={bandB}
           style={{ left: `${Math.max(0, Math.min(100, ((bandB - start) / span) * 100))}%` }} onPointerDown={(event) => beginLoopDrag(event, 'b')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={(event) => endLoopDrag(event, true)} />}
       </div>
-      {document && onTimelineCommand && onSelectLine && <>
+  </>);
+  const plots = (
+      <div id="timeline-plots" ref={plotsRef} className={styles.timelinePlots}>
         <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
           <button data-role="secondary" onClick={tapBpm}>Tap</button><button data-role="secondary" disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label><small>{bpmStatus || '拖动色块调整；Shift 点击行块选范围并成组移动；词轨空白可框选。'}</small></div>
+      {timelineHost && <div className={styles.header}>{viewportTools}</div>}
+      <label className={styles.sourceLabel}>波形／声谱图音源 <Select aria-label="波形／声谱图音源" value={graphicVocal??''} onChange={e=>setGraphicChoice(e.target.value||null)}><option value="">原曲</option>{results.data?.items.map((r,i)=><option key={r.id} value={r.id}>人声 {results.data.items.length-i}</option>)}</Select></label>
+      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} positionMs={Math.round(position*1000)} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?' 背景':''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document?.lines.flatMap(l=>[l,...l.words,...l.words.flatMap(w=>w.rubyUnits)]).flatMap(u=>[u.beginMs,u.endMs]).filter((t):t is number=>t!==null&&t>=startMs&&t<=endMs)??[]} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
+      {document && onTimelineCommand && onSelectLine && <>
+
         <TimelineTracks document={document} selectedLineId={selectedLineId ?? null} selectedRomanization={selectedRomanization ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
           visible={visible}
-          apply={onTimelineCommand} onSelectLine={onSelectLine} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setError} />
+          apply={onTimelineCommand} onSelectLine={id=>{ui?.setSegmentTarget(false);onSelectLine(id);}} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setError} />
       </>}
       {visible.spectrum && asset && <SpectrogramCanvas vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
       </div>
@@ -590,7 +605,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       <div className={styles.header}>
         <IconButton data-role="secondary" className={styles.play} disabled={disabled} icon={playing ? 'pause' : 'play'} label={playing ? '暂停' : '播放'} onClick={play}/>
         <span ref={clock}>{fmt(position)} / {fmt(duration)}</span>
-        <label>播放音源 <select aria-label="播放音源" value={playbackVocal??''} onChange={e=>{const el=audio.current; switching.current={position:el?.currentTime??0,playing:!!el&&!el.paused};el?.pause();setLoadingSource(true);setPlaybackVocal(e.target.value||null);}}><option value="">原曲</option>{results.data?.items.map((r,i)=><option key={r.id} value={r.id}>人声 {results.data.items.length-i}</option>)}</select></label>
+        <label>播放音源 <Select aria-label="播放音源" value={playbackVocal??''} onChange={e=>{const el=audio.current; switching.current={position:el?.currentTime??0,playing:!!el&&!el.paused};el?.pause();setLoadingSource(true);setPlaybackVocal(e.target.value||null);}}><option value="">原曲</option>{results.data?.items.map((r,i)=><option key={r.id} value={r.id}>人声 {results.data.items.length-i}</option>)}</Select></label>
         {loadingSource&&<span role="status">正在加载音源…</span>}
         {expanded && !timelineHost && viewportTools}
         {!timelineHost && <button data-role="secondary" className={`icon-button ${styles.timelineToggle}`} aria-label={expanded ? "收起时间轴" : "展开时间轴"} title={expanded ? "收起时间轴" : "展开时间轴"} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>

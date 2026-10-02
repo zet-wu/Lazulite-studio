@@ -9,6 +9,7 @@ export type JobKind =
   | "reading"
   | "forced_align";
 export type JobRequest = {
+  retry_analysis_id?: string;
   revision: string;
   asset_id: string;
   title?: string;

@@ -1,3 +1,5 @@
+import { Select } from '../../shared/Select';
+import { useAudioReview } from '../AudioReviewContext';
 import { VocalPanel } from '../VocalPanel';
 import { VOCAL_LINE_MIME } from '../VocalTracks';
 import vocalStyles from '../vocal.module.css';
@@ -86,6 +88,7 @@ function isTextInput(target: EventTarget) {
 }
 
 export function EditorWorkspace(props: Props) {
+  const audioReview = useAudioReview();
   const { document, apply } = props;
   const searchConditions = useSearchConditions(props.projectId);
   const [acquisitionStore] = useState(() => new AcquisitionStore());
@@ -639,14 +642,13 @@ export function EditorWorkspace(props: Props) {
     <EditorMenu {...props} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} />
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
     <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['audio','音频处理'],['edit','编辑'],['sync','打轴'],['preview','预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
-    {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.project.sourceAssetId ? <div className={vocalStyles.audioLayout}>
-      <aside className={vocalStyles.outline} aria-label="音频处理大纲"><h2>大纲</h2>{document.lines.map(line => <div className={vocalStyles.outlineItem} key={line.id}>
+    {props.projectId && props.project && props.applyProject && props.project.sourceAssetId && <VocalPanel visible={mode==='audio'} projectId={props.projectId} project={props.project} apply={props.applyProject} durationMs={props.audioDurationMs??0}/>}
+    {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.project.sourceAssetId ? <div className={vocalStyles.audioLayout} style={{gridTemplateColumns:columns.outlineVisible?`${rendered.outline}px minmax(0,1fr)`:"minmax(0,1fr)"}}>
+      {columns.outlineVisible && <aside className={styles.outline} aria-label="音频处理大纲"><h2>大纲</h2><div className={styles.panelBody}>{document.lines.map(line => <div key={line.id} draggable onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed="copy";const ghost=e.currentTarget.cloneNode(true) as HTMLElement;ghost.style.cssText="position:fixed;left:-10000px;opacity:.6;width:220px";window.document.body.appendChild(ghost);e.dataTransfer.setDragImage(ghost,20,16);setTimeout(()=>ghost.remove(),0);}}>
         <div onClick={() => selectLine(line)}><OutlineRow line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} selected={selectedLine?.id===line.id}/></div>
-        <button data-role="inline" draggable aria-label={`拖动分配 L${ordinalById.get(line.backgroundOf ?? line.id)}${line.backgroundOf?' 背景':''}`} onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed='copy';}}>↗</button>
-        <small>{line.beginMs===null?'未定起点':`${(line.beginMs/1000).toFixed(3)} s`} – {line.endMs===null?'未定终点':`${(line.endMs/1000).toFixed(3)} s`}</small>
         {props.assignmentError?.lineId===line.id && <div role="alert" className={vocalStyles.error}>{props.assignmentError.message}{assignmentIssues.map((issue,i)=><button data-role="secondary" key={i} onClick={()=>locateIssue(issue)}>定位{issue.kind==='ruby'?'注音':issue.kind==='word'?'词':issue.kind==='romanization-unit'?'音译单元':'行'}{i+1}</button>)}</div>}
-      </div>)}</aside>
-      <main className={vocalStyles.main}><VocalPanel projectId={props.projectId} project={props.project} apply={props.applyProject} durationMs={props.audioDurationMs ?? 0}/><div className={vocalStyles.host} ref={props.onTimelineHost}/></main>
+      </div>)}</div></aside>}
+      <main className={vocalStyles.main}><div ref={audioReview.setStatusHost}/><div hidden={!audioReview.timelineReady} className={vocalStyles.host} ref={props.onTimelineHost}/></main>
     </div> : <section className={styles.auxiliaryPlaceholder}><h1>人声分离与声学分析</h1><p>请先在项目列表上传音频并建立项目，再进行人声处理。当前本地歌词可继续编辑和导出。</p><a href="/projects">前往项目列表</a></section>)}
     {mode === 'acquire' && <LyricAcquisition store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
     {mode === 'package' && <PackagingPanel {...props} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
@@ -729,11 +731,11 @@ export function EditorWorkspace(props: Props) {
             if (document.lines.some(line => line.backgroundOf === preceding.id)) { setMessage('前一主行已有背景歌词，请先处理所属关系'); return; }
             dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: preceding.id });
           }} />
-          <label>所属主行 <select disabled={!selectedLine.backgroundOf} value={selectedLine.backgroundOf ?? ''} onChange={(event) => {
+          <label>所属主行 <Select disabled={!selectedLine.backgroundOf} value={selectedLine.backgroundOf ?? ''} onChange={(event) => {
             if (selectedLine.backgroundOf) dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: event.target.value });
           }}>
             <option value="">请选择</option>{mainLines.filter((line) => line.id !== selectedLine.id && !occupiedParents.has(line.id)).map((line) => <option key={line.id} value={line.id}>L{ordinalById.get(line.id)}</option>)}
-          </select></label>
+          </Select></label>
           {selectedLine.backgroundOf && <p>歌手继承自所属主行：{document.lines.find((line) => line.id === selectedLine.backgroundOf)?.agentRefs.map((id) => document.agents.find((agent) => agent.id === id)?.name ?? id).join('、') || '未指定'}</p>}
         </> : null}
       </>}
@@ -758,9 +760,9 @@ export function EditorWorkspace(props: Props) {
           const afterContentId = track.contents.filter((item) => item.lineId === contentTransfer.targetLineId).at(-1)?.id ?? null;
           if (dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: contentTransfer.targetLineId, afterContentId })) setContentTransfer(null);
         }}>应用（一次撤销）</button></>}><p>{content.kind === 'plain' ? content.text : content.units.map((unit) => unit.text).join('')}</p>
-        <label>目标主行 <select value={contentTransfer.targetLineId} onChange={(event) => setContentTransfer({ ...contentTransfer, targetLineId: event.target.value })}>
+        <label>目标主行 <Select value={contentTransfer.targetLineId} onChange={(event) => setContentTransfer({ ...contentTransfer, targetLineId: event.target.value })}>
           {mainLines.filter((line) => line.id !== content.lineId).map((line) => <option key={line.id} value={line.id}>{lineText(line) || '空行'}</option>)}
-        </select></label>
+        </Select></label>
         <p>文字与独立时间保持原值，主行引用会改变。</p>
 
       </SettingsDialog>;

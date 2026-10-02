@@ -1,30 +1,34 @@
 .panel { padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 12px; }
 .panel p { color: var(--muted); margin: 6px 0; }
-.toolbar, .task { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.task { margin-top: 5px; }
 .audioLayout { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 0; flex: 1; overflow: hidden; }
-.outline { overflow: auto; border-right: 1px solid var(--line); padding: 8px; }
 .main { min-width: 0; overflow: auto; }
 .host { --timeline-label-width: 36px; --timeline-gap: 5px; padding: 12px; }
 .host :global(#timeline-plots) { max-height: none; }
-.outlineItem { display: grid; grid-template-columns: minmax(0,1fr) 26px; gap: 3px; margin-bottom: 5px; }
-.outlineItem small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
 .segmentRow { display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 5px; margin: 8px 0; position: relative; }
-.lane { position: relative; min-height: 40px; background: var(--panel); border: 1px solid var(--line); touch-action: none; overflow: hidden; }
-.segment { position: absolute; height: 28px; min-width: 0; padding: 0; border: 1px solid var(--primary, #3367ab); border-radius: 3px; background: var(--blue-soft, #dae8ff); color: var(--ink); cursor: grab; overflow: hidden; }
+.lane { position: relative; min-height: 26px; background: var(--panel); border: 1px solid var(--line); touch-action: none; overflow: hidden; }
+.segment.segment[data-role] { min-height:18px; font-size:10px; position: absolute; height: 18px; min-width: 0; padding: 0; border: 1px solid var(--vocal-ink); border-radius: 3px; background: var(--vocal-fill); color: var(--ink); cursor: grab; overflow: hidden; }
 .segment > span:first-child { white-space: nowrap; }
 .segment[aria-pressed=true] { outline: 2px solid var(--primary, #3367ab); outline-offset: -3px; }
-.edge { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; background: #547daf66; }
+.edge { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; background: color-mix(in srgb,var(--vocal-ink) 35%,transparent); }
 .begin { left: 0; } .end { right: 0; }
-.newRange { position: absolute; top: 0; bottom: 0; background: #547daf55; pointer-events: none; }
+.newRange { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb,var(--vocal-fill) 65%,transparent); pointer-events: none; }
 .segmentTools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
 .energy { display: block; width: 100%; height: 55px; }
 .menu { position: fixed; z-index: 80; display: grid; padding: 6px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 3px 16px #0003; }
-.adding { position: relative; z-index: 102; background: var(--panel); }
-:global(body.vocal-adding) :global([aria-label='时间标尺']) { position: relative; z-index: 102; background: var(--panel); }
-.veil { position: fixed; inset: 0; z-index: 100; background: #7775; backdrop-filter: blur(2px); }
+.veil { position: fixed; inset: 0; z-index: 100; background: #7775; backdrop-filter: blur(3px); pointer-events:none; animation: vocalFade .16s ease-out; transition:opacity .16s ease-out; }
+@keyframes vocalFade { from { opacity:0; } to { opacity:1; } }
+@media(prefers-reduced-motion:reduce) { .veil { animation:none; transition:none; } }
 .error { border: 2px solid #c62828; padding: 5px; }
 
 :global([data-assignment-error]) { outline: 2px solid #c62828 !important; box-shadow: 0 0 7px #c6282870; animation: assignmentPulse 1.2s ease-in-out 3; }
 @keyframes assignmentPulse { 50% { box-shadow: 0 0 2px #c6282820; } }
 @media (prefers-reduced-motion: reduce) { :global([data-assignment-error]) { animation: none; box-shadow: none; } }
+
+:global(:root) { --vocal-ink:#896644; --vocal-fill:#dfcbb3; }
+:global([data-theme="dark"]) { --vocal-ink:#d5b18c; --vocal-fill:#594633; }
+.segmentRow > strong { font-size:10px; color:var(--muted); align-self:center; }
+.segmentRow { grid-template-columns:var(--timeline-label-width,36px) minmax(0,1fr); gap:var(--timeline-gap,5px); }
+.energyFrame { position:relative; border:1px solid var(--line); border-radius:4px; background:var(--panel); height:55px; color:var(--vocal-ink); overflow:hidden; }
+.scale { position:absolute; top:2px; left:5px; font-size:10px; color:var(--muted); pointer-events:none; }
+.energyError { position:absolute; inset:10px; }
+:global([data-vocal-focus]):focus { outline:none; }

@@ -1,3 +1,4 @@
+import { AudioReviewProvider, useAudioReview } from './AudioReviewContext';
 import { assignVocalSegment, AssignmentError } from '../domain/vocal-editing';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -24,11 +25,12 @@ export function Workspace({ projectId }: { projectId: string }) {
   const project = useQuery({ queryKey: ['project', projectId], queryFn: () => studioApi.getProject(projectId) });
   if (envelope.isLoading || envelope.isFetching) return <main>正在加载歌词…</main>;
   if (envelope.isError || !envelope.data) return <main><p role="alert">{(envelope.error as {status?:number})?.status === 404 ? '项目不存在或已删除' : '无法打开项目文档'}</p><button data-role="secondary" onClick={() => void envelope.refetch()}>重试</button></main>;
-  return <ProjectEditor key={`${projectId}:${envelope.data.revision}`} projectId={projectId} title={project.data?.name ?? '歌词项目'} initialSnapshot={envelope.data.document}
-    initialRevision={envelope.data.revision ?? ''} asset={project.data?.asset ?? null} />;
+  return <AudioReviewProvider><ProjectEditor key={`${projectId}:${envelope.data.revision}`} projectId={projectId} title={project.data?.name ?? '歌词项目'} initialSnapshot={envelope.data.document}
+    initialRevision={envelope.data.revision ?? ''} asset={project.data?.asset ?? null} /></AudioReviewProvider>;
 }
 
 function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, asset }: { projectId: string; title: string; initialSnapshot: ProjectSnapshot; initialRevision: string; asset: Asset | null }) {
+  const audioReview=useAudioReview();
   const transport = useRef<TransportHandle>(null);
   const [timelineHost, setTimelineHost] = useState<HTMLDivElement | null>(null);
   const [assignmentError, setAssignmentError] = useState<AssignmentError | null>(null);
@@ -66,21 +68,21 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
     if(event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || !(event.ctrlKey||event.metaKey) || (event.target as Element).closest('input,textarea,select,[role="dialog"]'))return;
     if(event.key.toLowerCase()==='z'){event.preventDefault();if(event.shiftKey)editor.redo();else editor.undo();}
     if(event.key.toLowerCase()==='s'){event.preventDefault();void editor.save();}
-  }}><EditorWorkspace project={editor.project} applyProject={editor.applyProject} audioDurationMs={asset?.duration_ms ?? 0} onTimelineHost={setTimelineHost} assignmentError={assignmentError} embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
+  }}><EditorWorkspace project={editor.project} applyProject={command=>{if(editor.conflict)throw new Error('保存冲突，请先处理');editor.applyProject(command);}} audioDurationMs={asset?.duration_ms ?? 0} onTimelineHost={setTimelineHost} assignmentError={assignmentError} embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} outputIssues={outputIssues} error={message || editor.error}
     onSave={() => void editor.save()} onExportFormat={exportFormat}
     saveForPackaging={editor.saveForPackaging}
-    selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
+    selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={transport} onSelectLine={(id) => { audioReview.setSegmentTarget(false); setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
     onSelectRomanization={(trackId, contentId) => setSelectedRomanization({ trackId, contentId })}
-    onSelectUnit={(lineId, wordId, rubyId) => setSelectedUnit(wordId ? { lineId, wordId, rubyId } : null)} />
+    onSelectUnit={(lineId, wordId, rubyId) => {audioReview.setSegmentTarget(false);setSelectedUnit(wordId ? { lineId, wordId, rubyId } : null);}} />
     {editor.recovery.available && <aside>发现本地草稿 <button data-role="secondary" onClick={() => void editor.restore().catch((error) => setMessage(error.message))}>恢复</button><button data-role="secondary" onClick={() => void editor.discardRecovery().catch((error) => setMessage(error.message))}>丢弃</button></aside>}
     {editor.conflict && <aside role="alert">服务器已有新版本，本地修改已保留。<button data-role="secondary" onClick={() => { setOutputIssues([]); try { exportFormat('ttml'); } catch(e) { if(e instanceof DocumentOutputError)setOutputIssues(e.issues); else setMessage(e instanceof Error ? e.message : '下载失败'); } }}>下载本地 TTML</button>{outputIssues.length>0 && <p>有 {outputIssues.length} 项需要处理，请到文件打包查看定位列表。</p>}<button data-role="secondary" onClick={() => { if (window.confirm('重新加载服务器版本并清除本地检查点？')) void editor.discardRecovery().then(() => window.location.reload()); }}>重新加载服务器</button></aside>}
-    <MediaTransport timelineHost={timelineHost} acoustics={editor.project.acoustics} onAcoustics={acoustics=>editor.applyProject({type:'acoustics',acoustics,durationMs:asset?.duration_ms??0})} onAssign={(lineId,segment)=>{
+    <MediaTransport timelineHost={timelineHost} acoustics={editor.project.acoustics} onAcoustics={acoustics=>{if(editor.conflict)throw new Error('保存冲突，请先处理');editor.applyProject({type:'acoustics',acoustics,durationMs:asset?.duration_ms??0});}} onAssign={(lineId,segment)=>{
       try { const lyrics=assignVocalSegment(editor.document,lineId,segment,asset?.duration_ms??0); if(!editor.apply({type:'replace-document',document:lyrics}))throw new Error('保存冲突，请先处理');setAssignmentError(null); }
       catch(e){if(e instanceof AssignmentError)setAssignmentError(e);throw e;}
     }} ref={transport} projectId={projectId} selectedLine={line ? { begin_ms: line.beginMs, end_ms: line.endMs } : undefined} loopRange={unitRange} asset={asset}
       document={editor.document} selectedLineId={line?.id ?? null} selectedRomanization={selectedRomanization} onTimelineCommand={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }}
-      onSelectLine={(id) => { setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
+      onSelectLine={(id) => { audioReview.setSegmentTarget(false); setSelectedLineId(id); setSelectedUnit(null); setSelectedRomanization(null); setParams((current) => { current.set('line', id); return current; }, { replace: true }); }}
       onPosition={(positionMs) => {
         const active = editor.document.lines.find((item) => !item.backgroundOf && item.beginMs !== null && item.endMs !== null && item.beginMs <= positionMs && positionMs < item.endMs)?.id ?? null;
         setPlayheadLineId((current) => current === active ? current : active);
