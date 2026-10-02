@@ -37,3 +37,11 @@ it('renames metadata without changing values or order and rejects collisions', (
  expect(undoLyricCommand(next).present).toBe(doc);
  expect(()=>executeLyricCommand(state,{type:'rename-metadata',key:'title',nextKey:'artist'})).toThrow();
 });
+it('declaration order changes preview baseline only for directly referenced main-line singers', async () => {
+ const { toAmllLines } = await import('../src/domain/preview-adapter');
+ const doc=parseLyricTtml(source);
+ doc.lines[0].agentRefs=['role'];
+ const original=toAmllLines(doc,true,true);
+ const moved={...doc,agents:[doc.agents[1],doc.agents[0]]};
+ expect(toAmllLines(moved,true,true)).toEqual(original);
+});

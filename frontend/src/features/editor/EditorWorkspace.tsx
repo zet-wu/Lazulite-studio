@@ -2,6 +2,7 @@ import { visibleLineOrdinals, type OutputIssue } from '../../adapters/output-val
 import { AcquisitionStore } from '../../acquisition-store';
 import { useSearchConditions } from '../useSearchConditions';
 import { LyricAcquisition } from '../LyricAcquisition';
+import { BooleanField, IconButton } from '../../shared/Controls';
 import { PackagingPanel } from '../PackagingPanel';
 import { RomanizationGenerationDialog } from './RomanizationGenerationDialog';
 import { lineStructureIssues } from '../../domain/line-structure';
@@ -238,7 +239,9 @@ export function EditorWorkspace(props: Props) {
     props.onSelectLine?.(lineId);
     props.onSelectRomanization?.(trackId, contentId);
   };
+  const [focusAgent,setFocusAgent] = useState<string>();
   const locateIssue = (issue: OutputIssue) => {
+    if(issue.kind === 'agent') { setMode('edit'); setFocusAgent(issue.agentId); setSettingsDialog('singers'); return; }
     const line=document.lines.find(l=>l.id===issue.lineId);
     if(!line)return;
     setMode('edit');
@@ -612,7 +615,7 @@ export function EditorWorkspace(props: Props) {
   }}>
     <EditorMenu {...props} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} />
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
-    <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['edit','编辑'],['sync','打轴'],['preview','预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
+    <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['edit','编辑'],['sync','打轴'],['preview','预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button data-role="secondary" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
     {mode === 'acquire' && <LyricAcquisition store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
     {mode === 'package' && <PackagingPanel {...props} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
     {mode === 'auxiliary' && <section className={styles.auxiliaryPlaceholder}><h1>项目辅助</h1><p>候选、任务、词典与审核流程将在后续阶段整理到此处。歌词文档与播放器保持当前状态。</p></section>}
@@ -664,7 +667,7 @@ export function EditorWorkspace(props: Props) {
               return <div key={track.id}>
                 <div className={styles.romanizationTrackHeader}>
                   <span>L{ordinalById.get(line.id)} · 音译轨道 {trackIndex + 1} · {track.language ?? '未指定语言'}</span>
-                  <button onClick={() => dispatch({ type: 'insert-romanization-content', trackId: track.id, content: { id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: '' } })}>添加音译</button>
+                  <button data-role="secondary" onClick={() => dispatch({ type: 'insert-romanization-content', trackId: track.id, content: { id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: '' } })}>添加音译</button>
                 </div>
                 {contents.map((content) => <RomanizationRow key={content.id} track={track} content={content}
                     placeholder={drag.isPlaceholder('romanization-content', content.id)} placeholderUnitIds={drag.placeholders?.kind === 'romanization-unit' ? drag.placeholders.ids : undefined}
@@ -682,18 +685,18 @@ export function EditorWorkspace(props: Props) {
         {selection?.kind === 'lines' && selection.ids.length > 1 && <p className={styles.fieldContext}>当前行 L{ordinalById.get(selectedLine.backgroundOf ?? selectedLine.id)}</p>}
         <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />
         {selectedMainLines.length > 0 && <>
-          <label><input type="checkbox" checked={selectedMainLines.every((line) => line.ignoreSync)} onChange={(event) => dispatch({ type: 'batch', commands: selectedMainLines.map((line) => ({ type: 'set-ignore-sync', lineId: line.id, ignoreSync: event.target.checked })) })} /> 跳过打轴</label>
+          <BooleanField label="跳过打轴" switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={selectedMainLines.every(line => line.ignoreSync)} mixed={selectedMainLines.some(line => line.ignoreSync) && !selectedMainLines.every(line => line.ignoreSync)} onChange={checked => dispatch({type:'batch', commands:selectedMainLines.map(line=>({type:'set-ignore-sync',lineId:line.id,ignoreSync:checked}))})}/>
           <SingerSelection agents={document.agents} lines={selectedMainLines} apply={dispatch} />
         </>}
         {selection?.kind !== 'lines' || selection.ids.length <= 1 ? <>
-          <label><input type="checkbox" checked={Boolean(selectedLine.backgroundOf)} onChange={(event) => {
-            if (!event.target.checked) { dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: null }); return; }
+          <BooleanField label="背景歌词" switchControl checked={Boolean(selectedLine.backgroundOf)} onChange={(checked) => {
+            if (!checked) { dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: null }); return; }
             const index = document.lines.findIndex(line => line.id === selectedLine.id);
             const preceding = document.lines.slice(0, index).filter(line => !line.backgroundOf).at(-1);
             if (!preceding) { setMessage('此行之前没有主行，不能设为背景歌词'); return; }
             if (document.lines.some(line => line.backgroundOf === preceding.id)) { setMessage('前一主行已有背景歌词，请先处理所属关系'); return; }
             dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: preceding.id });
-          }} /> 背景歌词</label>
+          }} />
           <label>所属主行 <select disabled={!selectedLine.backgroundOf} value={selectedLine.backgroundOf ?? ''} onChange={(event) => {
             if (selectedLine.backgroundOf) dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: event.target.value });
           }}>
@@ -704,22 +707,22 @@ export function EditorWorkspace(props: Props) {
       </>}
       </div></aside>}</div>}
     {settingsDialog === 'metadata' && <SettingsDialog title="元数据编辑" close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} /></SettingsDialog>}
-    {settingsDialog === 'singers' && <SingerDialog document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
+    {settingsDialog === 'singers' && <SingerDialog focusAgent={focusAgent} document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'tracks' && <SettingsDialog title="音译轨道管理" close={() => setSettingsDialog(null)}><div className={styles.trackManager}>
       {document.romanizationTracks.map((track, index) => <div key={track.id}><strong>轨道 {index + 1}</strong>
         <DraftInput value={track.language ?? ''} label={`音译轨道 ${index + 1} 语言`} placeholder="语言" onCommit={(language) => dispatch({ type: 'set-romanization-track-language', trackId: track.id, language: language || null })} />
         <span>{track.contents.length} 项</span>
-        <button disabled={index === 0} onClick={() => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: -1 })}>上移</button>
-        <button disabled={index === document.romanizationTracks.length - 1} onClick={() => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: 1 })}>下移</button>
-        <button onClick={() => dispatch({ type: 'delete-romanization-track', trackId: track.id })}>删除</button>
+        <IconButton icon="up" label="上移音译轨道" data-role="inline" disabled={index === 0} onClick={() => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: -1 })}/>
+        <IconButton icon="down" label="下移音译轨道" data-role="inline" disabled={index === document.romanizationTracks.length - 1} onClick={() => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: 1 })}/>
+        <IconButton icon="trash" label="删除音译轨道" data-role="danger" onClick={() => dispatch({ type: 'delete-romanization-track', trackId: track.id })}/>
       </div>)}
-      <button onClick={() => dispatch({ type: 'add-romanization-track', track: { id: crypto.randomUUID(), language: null, contents: [] } })}>新增轨道</button>
+      <IconButton icon="add" label="新增轨道音译轨道" data-role="inline" onClick={() => dispatch({ type: 'add-romanization-track', track: { id: crypto.randomUUID(), language: null, contents: [] } })}/>
     </div></SettingsDialog>}
     {contentTransfer && (() => {
       const track = document.romanizationTracks.find((item) => item.id === contentTransfer.trackId);
       const content = track?.contents.find((item) => item.id === contentTransfer.contentId);
       if (!track || !content) return null;
-      return <SettingsDialog title="转移音译内容" close={() => setContentTransfer(null)} actions={<><button onClick={() => setContentTransfer(null)}>取消</button><button onClick={() => {
+      return <SettingsDialog title="转移音译内容" close={() => setContentTransfer(null)} actions={<><button data-role="secondary" onClick={() => setContentTransfer(null)}>取消</button><button data-role="secondary" onClick={() => {
           const afterContentId = track.contents.filter((item) => item.lineId === contentTransfer.targetLineId).at(-1)?.id ?? null;
           if (dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: contentTransfer.targetLineId, afterContentId })) setContentTransfer(null);
         }}>应用（一次撤销）</button></>}><p>{content.kind === 'plain' ? content.text : content.units.map((unit) => unit.text).join('')}</p>

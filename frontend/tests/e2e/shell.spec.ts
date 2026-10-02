@@ -86,6 +86,11 @@ test('imports rich TTML, saves 注音 and reopens it from the project route', as
   await page.getByRole('link', { name: /星の手紙/ }).click();
   await expect(page.getByRole('textbox', { name: '读音 今日', exact: true }).first()).toHaveValue('きよう');
   await expect(page.getByRole('textbox', { name: '翻译 1', exact: true })).toHaveValue('今天 也唱歌');
+  await page.locator('[data-top-menu="lyrics-settings"] summary').click();
+  await page.getByRole('button', { name: '歌手管理', exact: true }).click();
+  await page.getByLabel('歌手 v1 type').selectOption('person');
+  await page.getByLabel('歌手 v2 type').selectOption('person');
+  await page.getByRole('button', { name: '关闭歌手管理' }).click();
   await openFileMenu(page);
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '下载歌词' }).click();

@@ -123,7 +123,7 @@ test('invalid timing selections and control/menu focus cannot stamp another obje
   await expect(page.getByLabel('读音 っ开始秒数')).toHaveValue('1');
   await edge(page, '[data-ruby-id]', 1); await page.locator('[data-top-menu="settings"] summary').click(); await page.keyboard.press('KeyS');
   await expect(page.getByLabel('读音 っ开始秒数')).toHaveValue('1'); await page.keyboard.press('Escape');
-  await page.getByRole('checkbox', { name: '跳过打轴' }).check(); await edge(page, '[data-ruby-id]', 1);
+  await page.getByRole('switch', { name: '跳过打轴' }).check(); await edge(page, '[data-ruby-id]', 1);
   await expect(panel).toContainText('当前选择不参与打轴'); await expect(panel.getByRole('button', { name: '起始轴' })).toBeDisabled();
   await page.keyboard.press('KeyD'); await expect(page.getByLabel('词 しん开始秒数')).toHaveValue('4');
 });
@@ -131,13 +131,14 @@ test('singer form validates locally and reading draft protects composition and e
   await load(page);
   await page.locator('[data-top-menu="lyrics-settings"] summary').click(); await page.getByRole('button', { name: '歌手管理', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '歌手管理' }); await dialog.getByRole('button', { name: '添加歌手' }).click();
-  await dialog.getByLabel('歌手 ID', { exact: true }).fill('bad id'); await dialog.getByRole('button', { name: '添加', exact: true }).click(); await expect(dialog.getByRole('alert')).toBeVisible();
-  await dialog.getByLabel('歌手 ID', { exact: true }).fill('singer'); await dialog.getByLabel('歌手名称', { exact: true }).fill('歌手'); await dialog.getByRole('button', { name: '添加', exact: true }).click();
-  await expect(dialog.getByRole('textbox', { name: '歌手 singer', exact: true })).toHaveValue('歌手'); await page.keyboard.press('Escape');
+  await dialog.getByLabel('歌手 ID', { exact: true }).fill('bad id'); await dialog.getByLabel('歌手 ID', { exact: true }).press('Enter'); await expect(dialog.getByRole('alert')).toBeVisible();
+  await dialog.getByLabel('歌手 ID', { exact: true }).fill('singer'); await dialog.getByLabel('歌手 ID', { exact: true }).press('Enter'); await dialog.getByLabel('歌手 singer', { exact: true }).fill('歌手'); await dialog.getByLabel('歌手 singer', { exact: true }).press('Enter');
+  await expect(dialog.getByRole('textbox', { name: '歌手 singer', exact: true })).toHaveValue('歌手'); await dialog.getByRole('button', { name: '关闭歌手管理' }).click();
   const word = page.getByRole('textbox', { name: '词 学校', exact: true }); await word.click(); await page.keyboard.press('End'); await page.keyboard.type('|'); await page.keyboard.press('Enter');
   const draft = page.getByLabel('新增读音 学校'); await expect(draft).toBeFocused();
   await draft.dispatchEvent('compositionstart'); await draft.fill('かな'); await draft.press('Enter'); await expect(draft).toBeVisible(); await expect(page.locator('[data-ruby-id]')).toHaveCount(4);
   await draft.dispatchEvent('compositionend'); await draft.press('Escape'); await expect(draft).toHaveCount(0);
+  await page.getByRole('button', { name: '撤销', exact: true }).click(); // Name edit.
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await page.locator('[data-top-menu="lyrics-settings"] summary').click(); await page.getByRole('button', { name: '歌手管理', exact: true }).click();
   await expect(dialog.getByRole('textbox', { name: '歌手 singer', exact: true })).toHaveCount(0);

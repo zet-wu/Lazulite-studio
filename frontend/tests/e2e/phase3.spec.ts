@@ -67,7 +67,7 @@ test('P3-04 constrains long inspector controls and aligns checkbox labels', asyn
   const inspector = page.locator('aside').filter({ has: page.getByRole('heading', { name: '属性', exact: true }) });
   await expect.poll(() => inspector.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
   await expect(page.getByLabel('所属主行').locator('option').nth(1)).toHaveText('L2');
-  expect(await page.getByLabel('背景歌词').evaluate(e => getComputedStyle(e.parentElement!).display)).toBe('inline-flex');
+  expect(await page.getByLabel('背景歌词').evaluate(e => getComputedStyle(e.parentElement!).display)).toMatch(/^(inline-)?flex$/);
 });
 
 for (const kind of ['行', '词', '注音']) test(`P3-03 edits each overlapping ${kind} interval and undoes once`, async ({ page }) => {

@@ -26,6 +26,11 @@ test('edits and exports a rich local draft with canvas undo and redo', async ({ 
   await expect(page.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+Shift+Z');
   await expect(page.getByRole('textbox', { name: '词 今日改', exact: true })).toBeVisible();
+  await openMenu(page, '歌词设置');
+  await page.getByRole('button', { name: '歌手管理', exact: true }).click();
+  await page.getByLabel('歌手 v1 type').selectOption('person');
+  await page.getByLabel('歌手 v2 type').selectOption('person');
+  await page.getByRole('button', { name: '关闭歌手管理' }).click();
   await openMenu(page, '文件');
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '下载歌词' }).click();

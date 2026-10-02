@@ -71,12 +71,6 @@
 .inspector label { display: grid; gap: 4px; margin-bottom: 12px; font-size: 12px; }
 .inspector input, .inspector select, .word input, .times input, .sublyrics input { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 4px; font: inherit; }
 .inspector button { margin-bottom: 12px; }
-.metadataPanel textarea { box-sizing: border-box; width: 100%; min-height: 45px; resize: vertical; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 4px; font: inherit; }
-.metadataPanel { display: grid; gap: 10px; }
-.metadataPanel label { display: grid; gap: 4px; }
-.metadataPanel input, .singerList input { min-width: 0; padding: 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
-.singerList { display: grid; gap: 10px; margin-top: 14px; }
-.singerList > div { display: grid; grid-template-columns: minmax(5ch, auto) minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .trackManager { display: grid; gap: 10px; margin-top: 14px; }
 .trackManager > div { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
 .trackManager input { min-width: 0; width: 11ch; padding: 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
@@ -176,8 +170,6 @@
 .dialogBody { min-height: 0; overflow: auto; padding: 16px 20px; font-size: var(--body-size); }
 .dialog button, .line button, .inspector button { border-color: transparent; background: transparent; color: var(--blue); border-radius: var(--control-radius); }
 .dialogActions > button { min-height: 32px; padding: 6px 14px; }
-.dialogActions > button:last-child { background-color: var(--blue); color: var(--on-primary); }
-.dialogActions > button:first-child:not(:last-child) { background-color: transparent; color: var(--blue); }
 .dialogTabs button { background: var(--surface-container); }
 .dialogTabs .activeTab { background: var(--blue-soft); color: var(--blue); }
 .settingsMenu summary, .ribbonMenu summary { border: 0; background: transparent; color: var(--ink); border-radius: var(--control-radius); }
@@ -208,7 +200,7 @@
 @media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto; } }
 
 .page { font-size: var(--body-size); }
-.page input:not([type="checkbox"]):not([type="range"]), .page select, .page textarea { border: 1px solid var(--line); border-radius: var(--control-radius); color: var(--ink); background-color: var(--panel); padding: 4px 6px; }
+.page :where(input:not([type="checkbox"]):not([type="range"]), select, textarea) { border: 1px solid var(--line); border-radius: var(--control-radius); color: var(--ink); background-color: var(--panel); padding: 4px 6px; }
 .page .wordMain input[readonly] { border-color: transparent; background-color: transparent; }
 .romanizationUnit > input, .romanizationPlain > input, .rubyTile > input { font-size: 15px; }
 .romanizationHeader strong { font-size: var(--label-size); font-weight: 500; }
@@ -291,3 +283,10 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 /* AMLL 0.5.2 splits emphasized Ruby bases into character spans. Keep those
    inline while the reading above and optional romanization below stay stacked. */
 .previewPlayer [class~="FmKaba_wordWithRuby"] > [class~="FmKaba_wordBody"] { display: block; text-align: center; }
+
+.inspector .panelBody { display:flex; flex-direction:column; gap:12px; }
+.inspector .panelBody > p { margin:0; }
+
+.inspector .panelBody > label, .inspector .panelBody > fieldset { margin:0; }
+.inspector .singerSelection label { display:flex; }
+.syncPanel button[data-role][data-role] { min-height:26px; padding:4px 6px; }
