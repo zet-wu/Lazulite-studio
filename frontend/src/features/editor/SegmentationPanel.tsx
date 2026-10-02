@@ -88,11 +88,11 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
       if (apply({ type: 'segment-words', changes })) close();
     } catch (cause) { setError(cause instanceof Error ? cause.message : '应用分词失败'); }
   };
-  return <SettingsDialog title="分词" close={close} actions={<><button onClick={() => void buildPreview()}>生成预览</button><button disabled={!preview.some((item) => item.parts.length > 1 && !item.blocked)} onClick={commit}>应用（一次撤销）</button></>}>
-      <div className={styles.dialogTabs}>{(['manual', 'auto', 'advanced'] as const).map((item) => <button key={item} className={mode === item ? styles.activeTab : ''} onClick={() => { setMode(item); setPreview([]); }}>{item === 'manual' ? '手动' : item === 'auto' ? '自动' : '高级'}</button>)}</div>
+  return <SettingsDialog title="分词" close={close} actions={<><button data-role="secondary" onClick={() => void buildPreview()}>生成预览</button><button data-role="primary" disabled={!preview.some((item) => item.parts.length > 1 && !item.blocked)} onClick={commit}>应用（一次撤销）</button></>}>
+      <div className={styles.dialogTabs}>{(['manual', 'auto', 'advanced'] as const).map((item) => <button data-role="secondary" key={item} className={mode === item ? styles.activeTab : ''} onClick={() => { setMode(item); setPreview([]); }}>{item === 'manual' ? '手动' : item === 'auto' ? '自动' : '高级'}</button>)}</div>
       {mode === 'manual' ? <div>
         <p>当前词：{activeWord?.text ?? '请在画布选择一个词'}</p>
-        <div className={styles.manualGraphemes} aria-label="字符切分边界">{chars.map((char, index) => <span key={index}><span>{char}</span>{index < chars.length - 1 && <button aria-label={`切分边界 ${index + 1}`} aria-pressed={manualBoundaries.includes(index + 1)} onClick={() => {
+        <div className={styles.manualGraphemes} aria-label="字符切分边界">{chars.map((char, index) => <span key={index}><span>{char}</span>{index < chars.length - 1 && <button data-role="secondary" aria-label={`切分边界 ${index + 1}`} aria-pressed={manualBoundaries.includes(index + 1)} onClick={() => {
           const next = manualBoundaries.includes(index + 1) ? manualBoundaries.filter((value) => value !== index + 1) : [...manualBoundaries, index + 1];
           setManualBoundaries(next);
           if (activeWord && manualLine) { const parts = manualParts(activeWord, next); setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.alignmentUnits.length || activeWord.obscene || activeWord.emptyBeat) }]); }
@@ -110,7 +110,7 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
           <label>忽略列表（每行一个）<textarea value={ignoreText} onChange={(event) => { setIgnoreText(event.target.value); setPreview([]); }} /></label>
           <label>自定义规则（每行 原文=部分|部分）<textarea value={ruleText} onChange={(event) => { setRuleText(event.target.value); setPreview([]); }} /></label>
           <label>测试输入<input aria-label="分词测试输入" value={testInput} placeholder="输入任意短句" onChange={(event) => { setTestInput(event.target.value); setTestOutput(''); }} /></label>
-          <button onClick={() => void testRule()}>测试规则</button>
+          <button data-role="secondary" onClick={() => void testRule()}>测试规则</button>
           {testOutput && <p>测试结果：{testOutput}</p>}
         </>}
       </div>}

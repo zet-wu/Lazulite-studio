@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/Icon';
 import { useRef, useState } from 'react';
 import styles from './semantic-editor.module.css';
 
@@ -24,6 +25,6 @@ export function InlineAdd({ label, commit }: { label: string; commit: (text: str
         if (composing.current || event.nativeEvent.isComposing) return;
         if (event.key === 'Enter') { event.preventDefault(); submit(); }
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finished.current = true; setActive(false); setDraft(''); }
-      }} /> : <button aria-label={label} onClick={() => { finished.current = false; setActive(true); }}>＋</button>}
+      }} /> : <button data-role="inline" className="icon-button" title={label} data-tooltip={label} aria-label={label} onClick={() => { finished.current = false; setActive(true); }}><Icon name="add"/></button>}
   </span>;
 }

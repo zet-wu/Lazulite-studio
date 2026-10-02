@@ -37,7 +37,7 @@ class ErrorBoundary extends Component<
       <div className={styles.errorPage}>
         <h1>页面遇到问题</h1>
         <p>工作区无法继续显示，请重新打开当前页面。</p>
-        <button onClick={() => location.reload()}>重新加载</button>
+        <button data-role="secondary" onClick={() => location.reload()}>重新加载</button>
       </div>
     ) : (
       this.props.children
@@ -60,15 +60,15 @@ function DemoBanner() {
   };
   return (
     <div className={`${styles.demoBanner} ${open ? styles.demoOpen : ""}`}>
-      <button onClick={() => setOpen(!open)}>演示模式 · 合成数据</button>
+      <button data-role="secondary" onClick={() => setOpen(!open)}>演示模式 · 合成数据</button>
       <span>当前：{scenario || "正常"}</span>
       {open && (
         <>
-          <button onClick={() => pick("")}>正常</button>
-          <button onClick={() => pick("loading")}>加载中</button>
-          <button onClick={() => pick("empty")}>空项目</button>
-          <button onClick={() => pick("error")}>错误</button>
-          <button onClick={() => pick("expired")}>会话过期</button>
+          <button data-role="secondary" onClick={() => pick("")}>正常</button>
+          <button data-role="secondary" onClick={() => pick("loading")}>加载中</button>
+          <button data-role="secondary" onClick={() => pick("empty")}>空项目</button>
+          <button data-role="secondary" onClick={() => pick("error")}>错误</button>
+          <button data-role="secondary" onClick={() => pick("expired")}>会话过期</button>
         </>
       )}
     </div>
@@ -124,12 +124,12 @@ function Login() {
             />
           </label>
           {error && <p className={styles.loginError}>{error}</p>}
-          <button className={styles.loginButton} disabled={busy || !password}>
+          <button data-role="secondary" className={styles.loginButton} disabled={busy || !password}>
             {busy ? "登录中…" : "登录"}
           </button>
         </form>
         {import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCKS === "true" ? (
-          <button className={styles.loginButton} onClick={returnToDemo}>
+          <button data-role="secondary" className={styles.loginButton} onClick={returnToDemo}>
             返回模拟工作台
           </button>
         ) : null}
@@ -152,7 +152,7 @@ function Settings() {
       ) : query.isError ? (
         <>
           <p>服务能力暂时不可用。</p>
-          <button onClick={() => query.refetch()}>重试</button>
+          <button data-role="secondary" onClick={() => query.refetch()}>重试</button>
         </>
       ) : query.data ? (
         <section>
@@ -209,7 +209,7 @@ function SessionGate({ children }: { children: ReactNode }) {
       <main className={styles.centerState}>
         <strong>服务暂时不可用</strong>
         <p>会话服务没有响应。</p>
-        <button onClick={() => query.refetch()}>重试</button>
+        <button data-role="secondary" onClick={() => query.refetch()}>重试</button>
         <Link to="/editor">打开本地 TTML</Link>
       </main>
     );

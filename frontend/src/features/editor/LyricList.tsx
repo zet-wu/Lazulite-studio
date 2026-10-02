@@ -65,7 +65,7 @@ function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate,
 }
 
 function AppendLine({ append }: { append?: () => void }) {
-  return append ? <button className={styles.appendLine} aria-label="新增歌词行" onClick={append}>＋</button> : null;
+  return append ? <button data-role="secondary" className={styles.appendLine} aria-label="新增歌词行" onClick={append}>＋</button> : null;
 }
 
 function VirtualLyricList(props: ListProps) {

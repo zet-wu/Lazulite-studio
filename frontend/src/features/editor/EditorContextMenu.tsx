@@ -22,7 +22,7 @@ export function EditorContextMenu({ x, y, title, actions, close }: { x: number; 
         items[(index + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
       }
     }}>
-    {actions.map((item, index) => <button key={`${index}:${item.label}`} role="menuitem" disabled={item.disabled}
+    {actions.map((item, index) => <button data-role="inline" key={`${index}:${item.label}`} role="menuitem" disabled={item.disabled}
       onClick={() => { item.run(); close(); }}>{item.label}</button>)}
   </div>;
 }

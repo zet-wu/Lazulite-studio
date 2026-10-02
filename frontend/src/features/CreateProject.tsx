@@ -116,7 +116,7 @@ export function CreateProject({
 
   return (
     <>
-      <button className={styles.primary} onClick={open}>
+      <button data-role="secondary" className={styles.primary} onClick={open}>
         ＋ 新建项目
       </button>
       <dialog
@@ -193,7 +193,7 @@ export function CreateProject({
             </p>
           )}
           <div className={styles.actions}>
-            <button
+            <button data-role="secondary"
               type="button"
               className={styles.secondary}
               onClick={close}
@@ -202,7 +202,7 @@ export function CreateProject({
               取消
             </button>
             {status === "uploading" ? (
-              <button
+              <button data-role="secondary"
                 key="cancel-upload"
                 type="button"
                 className={styles.secondary}
@@ -214,7 +214,7 @@ export function CreateProject({
                 取消上传
               </button>
             ) : (
-              <button
+              <button data-role="primary"
                 key="submit-project"
                 type="submit"
                 className={styles.primary}

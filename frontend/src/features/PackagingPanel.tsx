@@ -17,7 +17,7 @@ export function PackagingPanel(props: { title?: string; document: LyricDocument;
  return <div className={styles.page}><section className={styles.pane}><h2>TTML 校验</h2>
  <OutputIssues issues={issues} highlighted={blocking} locate={props.locateIssue} />{!issues.length && <p>当前检查未发现问题。</p>}
  </section><section className={styles.pane}><h2>歌词下载</h2><div className={styles.downloadRow}>
- <label>导出格式 <select aria-label="导出格式" value={format} onChange={e => setFormat(e.target.value as LyricFormat)}>{[['ttml','TTML'],['txt','纯文本'],['lrc','普通 LRC'],['elrc','扩展 LRC（尖括号）'],['eslrc','ESLRC（正文后方括号）'],['qrc','QRC'],['yrc','YRC'],['lys','LYS'],['ass','ASS']].map(([id,label]) => <option key={id} value={id}>{label}</option>)}</select></label><button onClick={() => {
+ <label>导出格式 <select aria-label="导出格式" value={format} onChange={e => setFormat(e.target.value as LyricFormat)}>{[['ttml','TTML'],['txt','纯文本'],['lrc','普通 LRC'],['elrc','扩展 LRC（尖括号）'],['eslrc','ESLRC（正文后方括号）'],['qrc','QRC'],['yrc','YRC'],['lys','LYS'],['ass','ASS']].map(([id,label]) => <option key={id} value={id}>{label}</option>)}</select></label><button data-role="secondary" onClick={() => {
  setBlocking([]); setMessage('');
  try { const problems=collectOutputIssues(props.document,format); if(problems.length)throw new DocumentOutputError(problems); props.onExportFormat?.(format); }
  catch(e) { if(e instanceof DocumentOutputError)setBlocking(uniqueOutputIssues(e.issues)); else setMessage(e instanceof Error ? e.message : '导出失败'); }

@@ -49,14 +49,14 @@ export function ReadingDictionaryPanel({ projectId }: { projectId: string }) {
       <div className={styles.dictionaryForm}>
         <input value={surface} onChange={(event) => setSurface(event.target.value)} placeholder="正文" aria-label="词典正文" />
         <input value={reading} onChange={(event) => setReading(event.target.value)} placeholder="读音" aria-label="词典读音" />
-        <button onClick={() => void save()}>{editing ? "更新" : "添加"}</button>
-        {editing && <button onClick={clear}>取消</button>}
+        <button data-role="secondary" onClick={() => void save()}>{editing ? "更新" : "添加"}</button>
+        {editing && <button data-role="secondary" onClick={clear}>取消</button>}
       </div>
       {items.length === 0 ? <p className={styles.note}>暂无词典项</p> : items.map((entry) => (
         <div className={styles.dictionaryRow} key={entry.id}>
           <span>{entry.surface}</span><span>→ {entry.reading}</span>
-          <button onClick={() => { setEditing(entry.id); setSurface(entry.surface); setReading(entry.reading); }}>编辑</button>
-          <button onClick={() => void remove(entry)}>删除</button>
+          <button data-role="secondary" onClick={() => { setEditing(entry.id); setSurface(entry.surface); setReading(entry.reading); }}>编辑</button>
+          <button data-role="secondary" onClick={() => void remove(entry)}>删除</button>
         </div>
       ))}
       {message && <p className={styles.message} role="status">{message}</p>}

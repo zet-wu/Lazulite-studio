@@ -42,7 +42,7 @@ function TranslationRow({ item, index, commit, remove, fresh = false }: {
     }}>
     <textarea ref={textRef} rows={1} autoFocus={fresh} aria-label={`翻译 ${index + 1}`} value={text} onChange={event => setText(event.target.value)} onBlur={submit} />
     <input className={styles.translationLanguage} aria-label={`翻译 ${index + 1}语言`} placeholder="未指定语言" value={language} aria-invalid={Boolean(error)} onChange={event => setLanguage(event.target.value)} onBlur={submit} />
-    <button className={styles.iconButton} aria-label="删除翻译" onMouseDown={event => event.preventDefault()} onClick={remove}><Icon name="trash" /></button>
+    <button data-role="danger" className={styles.iconButton} aria-label="删除翻译" onMouseDown={event => event.preventDefault()} onClick={remove}><Icon name="trash" /></button>
     {error && <small role="alert">{error}</small>}
   </div>;
 }
@@ -57,6 +57,6 @@ export function TranslationEditor({ items, apply }: { items: SubLyric[]; apply: 
     {adding && <TranslationRow item={emptyTranslation} index={items.length} fresh remove={() => setAdding(false)} commit={item => {
       if (item.text.trim() && apply([...items, item])) setAdding(false);
     }} />}
-    <button disabled={adding} onClick={() => setAdding(true)}>添加</button>
+    <button data-role="secondary" disabled={adding} onClick={() => setAdding(true)}>添加</button>
   </div></div>;
 }

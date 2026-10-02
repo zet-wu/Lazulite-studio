@@ -31,6 +31,6 @@ export function CandidatePanel({ proposal, currentRevision, dirty, document, onA
     {parsed?.error && <p role="alert">{parsed.error}</p>}
     {proposal.diagnostics.map((item, index) => <p key={index}>{item.message ?? item.code}</p>)}
     <ol>{parsed?.document?.lines.map((line, index) => <li key={line.id}>{lineText(document.lines[index] ?? createLine(''))} → {lineText(line)}</li>)}</ol>
-    <button disabled={stale || !parsed?.document} onClick={() => { if (parsed?.document) onApply(parsed.document); }}>人工应用</button>
+    <button data-role="secondary" disabled={stale || !parsed?.document} onClick={() => { if (parsed?.document) onApply(parsed.document); }}>人工应用</button>
   </section>;
 }

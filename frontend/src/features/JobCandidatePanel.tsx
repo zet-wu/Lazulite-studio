@@ -121,7 +121,7 @@ export function JobCandidatePanel({ result, currentRevision, currentAssetId, dir
     {result.kind === 'line_align' && <ol>{result.lines.map((item) => <li key={item.line_id}>{item.line_id}: {item.begin_ms == null ? '未定' : `${item.begin_ms / 1e3}s`}–{item.end_ms == null ? '未定' : `${item.end_ms / 1e3}s`}</li>)}</ol>}
     {result.kind === 'reading' && <ol>{result.proposals.map((item) => <li key={item.proposal_id}>{item.base} → {item.reading} · {readingCommands(document, item) ? '可应用' : '需先分词或已有读音'}</li>)}</ol>}
     {result.kind === 'forced_align' && <ol>{result.units.map((item, index) => <li key={index}>{item.text} · {item.granularity} · {item.start_ms == null ? '未定' : `${item.start_ms / 1e3}s`}</li>)}</ol>}
-    {result.kind !== 'search' && <button disabled={stale} onClick={apply}>人工应用候选</button>}
+    {result.kind !== 'search' && <button data-role="secondary" disabled={stale} onClick={apply}>人工应用候选</button>}
     {message && <p role="status">{message}</p>}
   </section>;
 }

@@ -501,39 +501,39 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         src={asset ? studioApi.audioUrl(projectId) : undefined}
       />
       <div className={styles.header}>
-        <button className={styles.play} disabled={disabled} aria-label={playing ? '暂停' : '播放'} onClick={play}>{playGlyph}</button>
+        <button data-role="secondary" className={styles.play} disabled={disabled} aria-label={playing ? '暂停' : '播放'} onClick={play}>{playGlyph}</button>
         <span ref={clock}>{fmt(position)} / {fmt(duration)}</span>
         {expanded && <>
-        <button
+        <button data-role="secondary"
           disabled={disabled}
           onClick={() => { setFollow(false); setStart(0); setSpan(duration); }}
         >
           全曲
         </button>
-        <button
+        <button data-role="secondary"
           disabled={disabled}
           aria-label="前移窗口"
           onClick={() => move(-1)}
         >
           ‹
         </button>
-        <button
+        <button data-role="secondary"
           disabled={disabled}
           aria-label="后移窗口"
           onClick={() => move(1)}
         >
           ›
         </button>
-        <button disabled={disabled} aria-label="放大波形" onClick={() => zoomAt(0.5, span ? (positionRef.current - start) / span : 0.5)}>＋</button>
-        <button disabled={disabled} aria-label="缩小波形" onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}>−</button>
+        <button data-role="secondary" disabled={disabled} aria-label="放大波形" onClick={() => zoomAt(0.5, span ? (positionRef.current - start) / span : 0.5)}>＋</button>
+        <button data-role="secondary" disabled={disabled} aria-label="缩小波形" onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}>−</button>
         <span className={styles.viewportRange}>视窗 {fmt(start)} – {fmt(end)}</span>
         <div className={styles.visibility} aria-label="时间轴图层">
-          {(['line', 'word', 'ruby', 'gap', 'spectrum'] as const).map((key) => <button key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
+          {(['line', 'word', 'ruby', 'gap', 'spectrum'] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
             {({ line: '行', word: '词', ruby: '注音', gap: '空隙', spectrum: '声谱图' })[key]}
           </button>)}
         </div>
         </>}
-        <button className={styles.timelineToggle} aria-label={expanded ? "收起时间轴" : "展开时间轴"} title={expanded ? "收起时间轴" : "展开时间轴"} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>
+        <button data-role="secondary" className={styles.timelineToggle} aria-label={expanded ? "收起时间轴" : "展开时间轴"} title={expanded ? "收起时间轴" : "展开时间轴"} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>
           <svg width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d={expanded ? "M1 1h10L6 7z" : "M1 7h10L6 1z"} fill="currentColor" /></svg>
         </button>
       </div>
@@ -577,7 +577,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       </div>
       {document && onTimelineCommand && onSelectLine && <>
         <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
-          <button onClick={tapBpm}>Tap</button><button disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label><small>{bpmStatus || '拖动色块调整；Shift 点击行块选范围并成组移动；词轨空白可框选。'}</small></div>
+          <button data-role="secondary" onClick={tapBpm}>Tap</button><button data-role="secondary" disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label><small>{bpmStatus || '拖动色块调整；Shift 点击行块选范围并成组移动；词轨空白可框选。'}</small></div>
         <TimelineTracks document={document} selectedLineId={selectedLineId ?? null} selectedRomanization={selectedRomanization ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
           visible={visible}
           apply={onTimelineCommand} onSelectLine={onSelectLine} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setError} />
@@ -586,7 +586,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       </div>
       <div className={styles.controls}>
         <PlaybackSpeed rate={rate} disabled={disabled} change={changeRate} />
-        <button
+        <button data-role="secondary"
           disabled={disabled}
           onClick={() => {
             const aMs = Math.round(readPosition() * 1e3);
@@ -596,7 +596,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         >
           A {bandA == null ? "--:--.---" : fmt(bandA)}
         </button>
-        <button
+        <button data-role="secondary"
           disabled={disabled || loop.aMs == null}
           onClick={() => {
             const bMs = Math.round(readPosition() * 1e3);
@@ -606,7 +606,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         >
           B {bandB == null ? "--:--.---" : fmt(bandB)}
         </button>
-        <button
+        <button data-role="secondary"
           disabled={
             disabled || loop.aMs == null || loop.bMs == null || loop.bMs <= loop.aMs
           }
@@ -615,27 +615,27 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         >
           循环 A/B
         </button>
-        <button disabled={disabled || loop.aMs === null || loop.bMs === null} onClick={() => { if (loop.aMs !== null && loop.bMs !== null) { setFollow(false); setStart(Math.max(0, Math.min(duration - span, loop.aMs / 1e3))); } }}>定位 A/B</button>
-        <button
+        <button data-role="secondary" disabled={disabled || loop.aMs === null || loop.bMs === null} onClick={() => { if (loop.aMs !== null && loop.bMs !== null) { setFollow(false); setStart(Math.max(0, Math.min(duration - span, loop.aMs / 1e3))); } }}>定位 A/B</button>
+        <button data-role="secondary"
           disabled={disabled || !validLine}
           onClick={() => setLoop(captureLoop(selectedLine!.begin_ms!, selectedLine!.end_ms!, durationMs))}
         >
           循环当前行
         </button>
-        <button
+        <button data-role="secondary"
           disabled={disabled || !validUnit}
           onClick={() => setLoop(captureLoop(loopRange!.begin_ms, loopRange!.end_ms, durationMs))}
         >
           循环当前单元
         </button>
         {error ? (
-          <button className={styles.error} onClick={retryMedia}>
+          <button data-role="secondary" className={styles.error} onClick={retryMedia}>
             {error} · 重试
           </button>
         ) : !asset ? (
           <span className={styles.note}>未连接媒体</span>
         ) : waveform.isError ? (
-          <button className={styles.error} onClick={() => waveform.refetch()}>
+          <button data-role="secondary" className={styles.error} onClick={() => waveform.refetch()}>
             波形加载失败 · 重试
           </button>
         ) : null}

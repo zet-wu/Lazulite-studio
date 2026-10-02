@@ -75,9 +75,9 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
   };
   const ordinals = new Map(sourceDocument.lines.filter(line => !line.backgroundOf).map((line, index) => [line.id, index + 1]));
   const generatedLines = new Set(sourceRows.map(row => row.lineId)).size;
-  return <SettingsDialog title="从音译生成 注音" subtitle={lineIds.length === 1 && generatedLines === 1 ? `L${ordinals.get(lineIds[0])}` : `生成 ${generatedLines} / ${lineIds.length} 行`} close={close} actions={<><button onClick={close}>取消</button><button disabled={!preview} onClick={submit}>生成 注音</button></>}>
+  return <SettingsDialog title="从音译生成 注音" subtitle={lineIds.length === 1 && generatedLines === 1 ? `L${ordinals.get(lineIds[0])}` : `生成 ${generatedLines} / ${lineIds.length} 行`} close={close} actions={<><button data-role="secondary" onClick={close}>取消</button><button data-role="primary" disabled={!preview} onClick={submit}>生成 注音</button></>}>
     <div className={styles.rubyGeneration}>
-      {stale ? <p role="alert">文档已变化，旧提案不能应用。<button onClick={refresh}>重新生成提案</button></p> : <>
+      {stale ? <p role="alert">文档已变化，旧提案不能应用。<button data-role="secondary" onClick={refresh}>重新生成提案</button></p> : <>
         <div className={styles.rubyGenerationOptions}><label>音译轨道 <select value={trackId} onChange={(event) => selectTrack(event.target.value)}>{tracks.map((track, index) => <option key={track.id} value={track.id}>轨道 {index + 1} · {track.language ?? '未指定语言'}</option>)}</select></label>
           <label>字符输出 <select value={output} onChange={(event) => { setOutput(event.target.value as RubyOutput); setReadings({}); setSkipOverrides({}); setMessage(''); }}><option value="roman">保持罗马字</option><option value="hiragana">转换为平假名</option><option value="katakana">转换为片假名</option></select></label></div>
         <details className={styles.sourceChoices}><summary>音译内容</summary><fieldset className={styles.rubyGenerationChoices}><legend>选取具体音译内容</legend>{contents.map((content) => {

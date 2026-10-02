@@ -66,8 +66,8 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
       if (apply(command)) { setMessage(summary); if (operation !== 'link') close(); }
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : '批量操作失败'); }
   };
-  return <SettingsDialog title="批处理" close={close} actions={<><button onClick={close}>关闭</button><button onClick={run}>{operation === 'link' && current?.endLink ? '取消链接' : '应用（一次撤销）'}</button></>}>
-    <div className={styles.dialogTabs}>{([['replace', '替换'], ['shift', '时间偏移'], ['smooth', '音节平滑'], ['sync', '同步行时间'], ['link', '结束时间链接']] as const).map(([value, label]) => <button key={value} className={operation === value ? styles.activeTab : ''} onClick={() => { setOperation(value); setMessage(''); }}>{label}</button>)}</div>
+  return <SettingsDialog title="批处理" close={close} actions={<><button data-role="secondary" onClick={close}>关闭</button><button data-role="primary" onClick={run}>{operation === 'link' && current?.endLink ? '取消链接' : '应用（一次撤销）'}</button></>}>
+    <div className={styles.dialogTabs}>{([['replace', '替换'], ['shift', '时间偏移'], ['smooth', '音节平滑'], ['sync', '同步行时间'], ['link', '结束时间链接']] as const).map(([value, label]) => <button data-role="secondary" key={value} className={operation === value ? styles.activeTab : ''} onClick={() => { setOperation(value); setMessage(''); }}>{label}</button>)}</div>
     {operation !== 'link' && <div className={styles.dialogControls}>
       <label>范围<select value={scope} onChange={(event) => setScope(event.target.value)}><option value="current">当前行（含背景）</option><option value="selected">选中词或行</option><option value="range">指定行范围</option><option value="all">全文</option></select></label>
       {scope === 'range' && <div className={styles.inlineFields}><label>从第 <input type="number" min="1" max={document.lines.length} value={from} onChange={(event) => setFrom(Number(event.target.value))} /> 行</label><label>到第 <input type="number" min="1" max={document.lines.length} value={to} onChange={(event) => setTo(Number(event.target.value))} /> 行</label></div>}

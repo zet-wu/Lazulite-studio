@@ -9,6 +9,6 @@ export function OutputIssues({ issues, locate, highlighted = [] }: { issues: Out
  if (!issues.length) return null;
  return <div ref={root} className={styles.outputIssues} role={keys.size ? "alert" : "status"}><p>{keys.size ? `本次操作有 ${keys.size} 项需要处理` : `有 ${issues.length} 项需要处理：`}</p><ul>{issues.map(issue=>{
   const key=outputIssueKey(issue), blocking=keys.has(key);
-  return <li key={key} data-blocking={blocking}><button aria-label={issue.message} aria-description={blocking ? "本次操作受阻，需要处理" : undefined} onClick={()=>locate(issue)}>{blocking && <span aria-hidden="true">⚠ </span>}{issue.message}</button></li>;
+  return <li key={key} data-blocking={blocking}><button data-role="secondary" aria-label={issue.message} aria-description={blocking ? "本次操作受阻，需要处理" : undefined} onClick={()=>locate(issue)}>{blocking && <span aria-hidden="true">⚠ </span>}{issue.message}</button></li>;
  })}</ul></div>;
 }

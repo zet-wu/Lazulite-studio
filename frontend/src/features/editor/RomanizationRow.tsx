@@ -32,7 +32,7 @@ export function RomanizationRow({ track, content, selectedContent, selectedUnitI
     </div>
     {content.kind === 'plain' ? <div className={styles.romanizationPlain}>
       <DraftInput value={content.text} label={`音译 ${track.language ?? '未指定语言'}`} onFocus={selectContent} onCommit={(text) => setContent({ ...content, text })} />
-      <button onClick={() => setContent({ ...content, kind: 'timed', units: (content.text.match(/\S+\s*|\s+/gu) ?? []).map((text) => ({ id: crypto.randomUUID(), text, beginMs: null, endMs: null })) })}>分词并定时</button>
+      <button data-role="secondary" onClick={() => setContent({ ...content, kind: 'timed', units: (content.text.match(/\S+\s*|\s+/gu) ?? []).map((text) => ({ id: crypto.randomUUID(), text, beginMs: null, endMs: null })) })}>分词并定时</button>
     </div> : <div className={styles.romanizationUnits}>
       {content.units.map((unit, index) => <div key={unit.id} data-romanization-unit-id={unit.id} data-drag-placeholder={placeholderUnitIds?.has(unit.id) ? '' : undefined} className={`${styles.romanizationUnit} ${selectedUnitIds.includes(unit.id) ? styles.selectedWord : ''}`}
         tabIndex={0} onClick={(event) => { event.stopPropagation(); selectUnit(unit.id, event.shiftKey, event.ctrlKey || event.metaKey); }} onFocus={(event) => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus]')) selectUnit(unit.id); }}>

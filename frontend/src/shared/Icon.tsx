@@ -1,7 +1,10 @@
-type IconName = "chevron" | "search" | "play" | "pause" | "dots" | "back" | "trash";
+type IconName = "chevron" | "search" | "play" | "pause" | "dots" | "back" | "trash" | "add" | "up" | "down";
 
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, string> = {
+    add: "M8 3v10M3 8h10",
+    up: "m3 10 5-5 5 5Z",
+    down: "m3 6 5 5 5-5Z",
     chevron: "M6 4l4 4-4 4",
     search: "m11 11 4 4m-1.8-6.3A4.5 4.5 0 1 1 4.5 4.5a4.5 4.5 0 0 1 8.7 0Z",
     play: "m6 4 9 4-9 4Z",

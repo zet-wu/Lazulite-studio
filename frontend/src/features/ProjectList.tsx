@@ -54,7 +54,7 @@ export function ProjectList() {
       <main className={styles.centerState}>
         <strong>项目暂时不可用</strong>
         <p className={styles.muted}>服务没有返回项目列表。</p>
-        <button className={styles.primary} onClick={() => query.refetch()}>
+        <button data-role="secondary" className={styles.primary} onClick={() => query.refetch()}>
           重试
         </button>
       </main>
@@ -127,7 +127,7 @@ export function ProjectList() {
               </span>
               <span className={styles.rowArrow}>›</span>
             </Link>
-            <button className={styles.projectDelete} aria-label={`删除项目 ${project.name}`} title={`删除项目 ${project.name}`} disabled={deleting === project.id} onClick={async () => {
+            <button data-role="danger" className={styles.projectDelete} aria-label={`删除项目 ${project.name}`} title={`删除项目 ${project.name}`} disabled={deleting === project.id} onClick={async () => {
                 if (!window.confirm(`删除项目“${project.name}”？将删除歌词修订、任务和产物。原始上传文件和共享音频保留。`)) return;
                 setDeleting(project.id); setDeleteError("");
                 try {
@@ -148,7 +148,7 @@ export function ProjectList() {
         </div>
       )}
       {(nextCursor !== undefined ? nextCursor : query.data?.next_cursor) && (
-        <button
+        <button data-role="secondary"
           className={styles.loadMore}
           disabled={loadingMore}
           onClick={async () => {

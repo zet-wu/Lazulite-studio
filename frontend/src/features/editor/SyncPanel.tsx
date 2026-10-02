@@ -78,25 +78,25 @@ export function SyncPanel({ document, cursor, targetVersion, apply, transport, o
     <span className={styles.syncQuote}><span>{word?.text}</span>{ruby && <b> → {ruby.reading}</b>}</span>
     <small className={styles.syncTime}>{beginMs === null ? '—' : (beginMs / 1e3).toFixed(3)}–{endMs === null ? '—' : (endMs / 1e3).toFixed(3)} s</small>
     <select aria-label="打轴模式" value={mode} onChange={event => { setMode(event.target.value as SyncMode); setCompleted(false); }}><option value="continuous">连续</option><option value="line">本行</option></select>
-    {offsetMs !== 0 && <small>输入偏移 {offsetMs} ms <button onClick={() => setOffsetMs(0)}>归零</button></small>}
+    {offsetMs !== 0 && <small>输入偏移 {offsetMs} ms <button data-role="secondary" onClick={() => setOffsetMs(0)}>归零</button></small>}
     {emptyBeats > 0 && <small>空拍 {emptyBeats}/{word?.emptyBeat}</small>}
     {completed && <small role="status">本行已完成</small>}
     <div className={styles.syncButtons}>
-      <button disabled={index <= 0} onClick={() => moveTo(index - 1)}>上一单元</button>
-      <button disabled={!units.slice(0, index).some((unit) => unit.lineId !== active?.lineId)} onClick={previousLine}>上一行</button>
-      <button disabled={!active || completed} onClick={() => stamp('start')}>起始轴</button>
-      <button disabled={!active || completed} onClick={() => stamp('next')}>连续轴</button>
-      <button disabled={!active || completed} onClick={() => stamp('end')}>结束轴</button>
-      <button disabled={index < 0 || index >= units.length - 1} onClick={() => moveTo(index + 1)}>下一单元</button>
-      <button disabled={!units.some((unit, position) => position > index && unit.lineId !== active?.lineId)} onClick={followingLine}>下一行</button>
+      <button data-role="secondary" disabled={index <= 0} onClick={() => moveTo(index - 1)}>上一单元</button>
+      <button data-role="secondary" disabled={!units.slice(0, index).some((unit) => unit.lineId !== active?.lineId)} onClick={previousLine}>上一行</button>
+      <button data-role="secondary" disabled={!active || completed} onClick={() => stamp('start')}>起始轴</button>
+      <button data-role="secondary" disabled={!active || completed} onClick={() => stamp('next')}>连续轴</button>
+      <button data-role="secondary" disabled={!active || completed} onClick={() => stamp('end')}>结束轴</button>
+      <button data-role="secondary" disabled={index < 0 || index >= units.length - 1} onClick={() => moveTo(index + 1)}>下一单元</button>
+      <button data-role="secondary" disabled={!units.some((unit, position) => position > index && unit.lineId !== active?.lineId)} onClick={followingLine}>下一行</button>
     </div>
     <details className={styles.syncExtras}><summary>回听与校准</summary><div>
-      <button disabled={beginMs === null} onClick={() => { if (beginMs !== null) transport?.current?.seekMs(beginMs); }}>回听定位</button>
-      <button disabled={beginMs === null} onClick={() => audition(true)}>听前段</button>
-      <button disabled={endMs === null} onClick={() => audition(false)}>听后段</button>
+      <button data-role="secondary" disabled={beginMs === null} onClick={() => { if (beginMs !== null) transport?.current?.seekMs(beginMs); }}>回听定位</button>
+      <button data-role="secondary" disabled={beginMs === null} onClick={() => audition(true)}>听前段</button>
+      <button data-role="secondary" disabled={endMs === null} onClick={() => audition(false)}>听后段</button>
     {word && word.emptyBeat > 0 && !active?.rubyUnitId && <small>空拍 {emptyBeats}/{word.emptyBeat}：连续轴先计数，再落点</small>}
     <label>输入偏移（毫秒） <input type="number" value={offsetMs} onChange={(event) => setOffsetMs(Math.round(Number(event.target.value)))} /></label>
-    <button disabled={beginMs === null || !transport?.current} onClick={() => { if (beginMs !== null && transport?.current) setOffsetMs(Math.round((beginMs - transport.current.getPositionMs()) )); }}>按当前起点校准</button>
+    <button data-role="secondary" disabled={beginMs === null || !transport?.current} onClick={() => { if (beginMs !== null && transport?.current) setOffsetMs(Math.round((beginMs - transport.current.getPositionMs()) )); }}>按当前起点校准</button>
     </div></details>
     {error && <p role="alert">{error}</p>}
   </section>;

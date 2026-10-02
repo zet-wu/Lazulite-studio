@@ -18,7 +18,7 @@ export function LineSplitDialog({ line, background, attached, close, submit }: {
   const [rightIds, setRightIds] = useState<string[]>([]);
   const [backgroundTarget, setBackgroundTarget] = useState<'left' | 'right'>('right');
   const boundary = line.words.findIndex((word) => word.id === beforeWordId);
-  return <SettingsDialog title="拆分歌词行" close={close} actions={<><button onClick={close}>取消</button><button disabled={!beforeWordId} onClick={() => { if (submit(beforeWordId, rightIds, background ? backgroundTarget : null, rightTranslations)) close(); }}>应用</button></>}>
+  return <SettingsDialog title="拆分歌词行" close={close} actions={<><button data-role="secondary" onClick={close}>取消</button><button data-role="primary" disabled={!beforeWordId} onClick={() => { if (submit(beforeWordId, rightIds, background ? backgroundTarget : null, rightTranslations)) close(); }}>应用</button></>}>
       <label>从该词开始新行 <select autoFocus value={beforeWordId} onChange={(event) => setBeforeWordId(event.target.value)}>
         {line.words.slice(1).map((word, index) => <option key={word.id} value={word.id}>{index + 2} · {word.text}</option>)}
       </select></label>

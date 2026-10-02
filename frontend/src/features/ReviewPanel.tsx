@@ -57,7 +57,7 @@ export function ReviewPanel({
     return (
       <aside aria-label="审核">
         <p>审核状态读取失败</p>
-        <button onClick={() => query.refetch()}>重试</button>
+        <button data-role="secondary" onClick={() => query.refetch()}>重试</button>
       </aside>
     );
   if (!lineId)
@@ -82,13 +82,13 @@ export function ReviewPanel({
         placeholder="备注"
       />
       {dirty && <p>有未保存编辑，保存后才能确认。</p>}
-      <button
+      <button data-role="secondary"
         disabled={dirty || query.isLoading || busy}
         onClick={() => save(true)}
       >
         确认
       </button>
-      <button
+      <button data-role="secondary"
         disabled={dirty || query.isLoading || busy}
         onClick={() => save(false)}
       >

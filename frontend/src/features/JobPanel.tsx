@@ -209,7 +209,7 @@ export function JobPanel({
               "forced_align",
             ] as JobKind[]
           ).map((kind) => (
-            <button
+            <button data-role="secondary"
               key={kind}
               disabled={disabled(kind)}
               onClick={() => void create(kind)}
@@ -306,7 +306,7 @@ export function JobPanel({
               {["queued", "running", "cancel_requested"].includes(
                 job.status,
               ) && (
-                <button
+                <button data-role="secondary"
                   className={styles.cancel}
                   onClick={() => void cancel(job)}
                 >
@@ -314,7 +314,7 @@ export function JobPanel({
                 </button>
               )}
               {job.status === "succeeded" && (
-                <button
+                <button data-role="secondary"
                   className={styles.cancel}
                   onClick={() => void fetchResult(job)}
                 >
@@ -341,7 +341,7 @@ function renderResult(
     return (
       <div>
         {result.items.map((candidate, index) => (
-          <button
+          <button data-role="secondary"
             className={styles.cancel}
             key={`${candidate.candidate_id ?? "candidate"}-${index}`}
             onClick={() => fetchCandidate(job, candidate)}
@@ -354,7 +354,7 @@ function renderResult(
     );
   if (result.kind === "fetch")
     return (
-      <button className={styles.cancel} onClick={() => onCandidate(result)}>
+      <button data-role="secondary" className={styles.cancel} onClick={() => onCandidate(result)}>
         查看候选差异
       </button>
     );
@@ -371,7 +371,7 @@ function renderResult(
             )
             .join("；")}
         </p>
-        <button className={styles.cancel} onClick={() => onCandidate(result)}>
+        <button data-role="secondary" className={styles.cancel} onClick={() => onCandidate(result)}>
           查看候选差异
         </button>
       </>
@@ -382,7 +382,7 @@ function renderResult(
         <p className={styles.hint}>
           读音候选 {result.proposals.length} 条，按行复核后应用。
         </p>
-        <button className={styles.cancel} onClick={() => onCandidate(result)}>
+        <button data-role="secondary" className={styles.cancel} onClick={() => onCandidate(result)}>
           查看读音候选
         </button>
       </>
@@ -393,7 +393,7 @@ function renderResult(
         <p className={styles.hint}>
           实验对齐 {result.units.length} 个片段，字符粒度仅展示。
         </p>
-        <button className={styles.cancel} onClick={() => onCandidate(result)}>
+        <button data-role="secondary" className={styles.cancel} onClick={() => onCandidate(result)}>
           查看实验候选
         </button>
       </>
@@ -410,7 +410,7 @@ function renderResult(
           )
           .join("；")}
       </p>
-      <button className={styles.cancel} onClick={() => onCandidate(result)}>
+      <button data-role="secondary" className={styles.cancel} onClick={() => onCandidate(result)}>
         查看候选差异
       </button>
     </>

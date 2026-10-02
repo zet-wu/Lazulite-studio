@@ -24,6 +24,6 @@ export function PlaybackSpeed({ rate, disabled, change }: { rate: number; disabl
   return <div ref={area} className={styles.playbackSpeed} aria-label="速度控件">
     <label>速度 <input type="range" aria-label="播放速度" aria-valuetext={`${rate.toFixed(2)}倍`} min="0.1" max="2" step="0.05" value={rate} disabled={disabled} onChange={event => { remainder.current = 0; change(normalizePlaybackSpeed(Number(event.target.value))); }} /></label>
     <output aria-live="off">{rate.toFixed(2)}×</output>
-    <button disabled={disabled || rate === 1} aria-label="恢复 1 倍速度" onClick={() => { remainder.current = 0; change(1); }}>1×</button>
+    <button data-role="secondary" disabled={disabled || rate === 1} aria-label="恢复 1 倍速度" onClick={() => { remainder.current = 0; change(1); }}>1×</button>
   </div>;
 }
