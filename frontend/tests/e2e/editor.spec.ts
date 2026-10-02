@@ -93,7 +93,7 @@ test('shows one lyric scroller at 80 and 81 lines without horizontal page overfl
   }
 });
 
-test('stores and restores a local checkpoint with undo history', async ({ page }) => {
+test('restores a local project checkpoint without persisting the undo stack', async ({ page }) => {
   await importTtml(page);
   const word = page.getByRole('textbox', { name: '词 今日', exact: true });
   await word.dblclick();
@@ -104,8 +104,7 @@ test('stores and restores a local checkpoint with undo history', async ({ page }
   page.once('dialog', (dialog) => dialog.accept());
   await page.reload();
   await expect(page.getByRole('textbox', { name: '词 检查点文字', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '撤销' }).click();
-  await expect(page.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '撤销' })).toBeDisabled();
 });
 
 test('moves a word through its context menu and by direct mouse drag', async ({ page }) => {

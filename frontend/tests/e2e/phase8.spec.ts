@@ -126,7 +126,7 @@ test('P8 line and content ranges delete fully and restore with one undo', async 
   await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '删除所选行（2）' }).click(); await expect(outline).toHaveCount(1);
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(outline).toHaveCount(3);
 });
-test('P8 rejected linked-target batch leaves document, history and selected IDs intact', async ({ page }) => {
+test('linked-target deletion freezes current ends and restores all rows on undo', async ({ page }) => {
   await page.goto('/editor');
   const xml = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
@@ -136,8 +136,9 @@ test('P8 rejected linked-target batch leaves document, history and selected IDs 
   await importLyrics(page, { name: 'links.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   const outline = page.locator('[data-outline-drag]'); await outline.nth(1).click(); await outline.nth(2).click({ modifiers: ['Shift'] });
   await outline.nth(1).click({ button: 'right' }); await page.getByRole('menuitem', { name: '删除所选行（2）' }).click();
-  await expect(page.getByRole('alert')).toContainText('original line end excludes a word'); await expect(outline).toHaveCount(3);
-  await expect(page.getByText('行已选 2', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
+  await expect(outline).toHaveCount(1);
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(outline).toHaveCount(3);
 });
 
 test('P8 merging timed fragments preserves generated separator spaces and native text keys', async ({ page }) => {

@@ -20,7 +20,7 @@ test('vocal processing adopts explicitly, shares history, assigns and reopens a 
  await expect(page.locator('[data-segment-id]')).toHaveCount(2);
  await page.keyboard.press('Control+z');await expect(page.locator('[data-segment-id]')).toHaveCount(1);
  await page.keyboard.press('Control+Shift+z');await expect(page.locator('[data-segment-id]')).toHaveCount(2);
- await page.getByRole('button',{name:'新增人声片段',exact:true}).click();await page.keyboard.press('Escape');await expect(page.getByText('拖动框选新增片段，Esc 取消')).toHaveCount(0);
+ await page.getByRole('button',{name:'新增人声片段',exact:true}).click();await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'取消新增',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'新增人声片段',exact:true})).toBeFocused();await expect(page.getByText('拖动框选新增片段，Esc 取消')).toHaveCount(0);
  await page.getByLabel('播放音源',{exact:true}).selectOption({index:1});await expect(page.getByText('正在加载音源…')).toHaveCount(0);
  await page.getByLabel('波形／声谱图音源',{exact:true}).selectOption('');
  await expect(page.locator('audio')).toHaveCount(1);
@@ -68,4 +68,46 @@ test('audio layouts use one timeline at desktop widths in both themes',async({pa
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
   await page.screenshot({path:test.info().outputPath(`vocal-${width}-${theme}.png`)});
  }
+});
+
+test('real Demucs audio preserves position rate loop and pause across independent sources',async({page})=>{
+ test.skip(!process.env.STUDIO_VOCAL_REAL_ROOT,'Requires an explicitly supplied real Demucs result');
+ await page.goto('/projects/real-vocal/edit');await page.getByRole('button',{name:'音频处理',exact:true}).click();await page.getByRole('button',{name:'采用',exact:true}).click();
+ await expect(page.locator('[data-segment-id]').first()).toBeVisible();
+ await page.locator('audio').evaluate((el:HTMLAudioElement)=>{el.currentTime=20;});
+ await page.getByRole('slider',{name:'播放速度',exact:true}).fill('0.75');
+ await page.getByRole('button',{name:/^A /}).click();
+ await page.locator('audio').evaluate((el:HTMLAudioElement)=>{el.currentTime=24;});await page.getByRole('button',{name:/^B /}).click();
+ await page.getByLabel('播放音源',{exact:true}).selectOption('actual-demucs');
+ await expect.poll(()=>page.locator('audio').evaluate((el:HTMLAudioElement)=>el.readyState)).toBeGreaterThan(0);
+ await expect.poll(()=>page.locator('audio').evaluate((el:HTMLAudioElement)=>el.currentTime)).toBeCloseTo(24,1);
+ expect(await page.locator('audio').evaluate((el:HTMLAudioElement)=>el.paused)).toBeTruthy();
+ expect(await page.locator('audio').evaluate((el:HTMLAudioElement)=>el.playbackRate)).toBe(.75);
+ await expect(page.getByRole('button',{name:/^A 00:20/})).toBeVisible();await expect(page.getByRole('button',{name:/^B 00:24/})).toBeVisible();
+ await page.getByRole('button',{name:'播放',exact:true}).click();await expect.poll(()=>page.locator('audio').evaluate((el:HTMLAudioElement)=>el.paused)).toBeFalsy();
+ await page.getByLabel('播放音源',{exact:true}).selectOption('');await expect.poll(()=>page.locator('audio').evaluate((el:HTMLAudioElement)=>el.paused)).toBeFalsy();
+ await page.getByRole('button',{name:'暂停',exact:true}).click();
+ await page.getByLabel('波形／声谱图音源',{exact:true}).selectOption('actual-demucs');
+ for(let i=0;i<5;i++)await page.getByRole('button',{name:'放大波形',exact:true}).click();
+ await page.getByRole('button',{name:'声谱图',exact:true}).click();
+ await expect(page.getByText('能量加载失败 · 重试')).toHaveCount(0);
+ await expect(page.locator('[aria-label="人声能量"] polyline')).not.toHaveAttribute('points','',{timeout:20000});
+ await expect.poll(async()=>page.locator('[data-spectrum-ready]').evaluate(el=>Number(el.getAttribute('data-spectrum-ready'))>0&&el.getAttribute('data-spectrum-ready')===el.getAttribute('data-spectrum-wanted'))).toBe(true);
+ await page.locator('[aria-label="声谱图"]').scrollIntoViewIfNeeded();await page.screenshot({path:test.info().outputPath('real-vocal-spectrum.png')});
+ await page.route('**/audio?vocal=actual-demucs',route=>route.abort());
+ await page.getByLabel('播放音源',{exact:true}).selectOption('actual-demucs');await expect(page.getByText('所选音源无法播放，请重试 · 重试')).toBeVisible();
+ await expect(page.getByLabel('播放音源',{exact:true})).toHaveValue('actual-demucs');
+});
+
+test('out of range assignment preserves lyrics and points to hidden offending units',async({page})=>{
+ const pid=await newProject(page,'<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="long" begin="00:01.000" end="00:08.000"><span begin="00:01.000" end="00:08.000">长行</span></p></body></tt>');
+ const before=(await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.lyrics.draftTtml;
+ await page.getByRole('button',{name:'新增人声片段',exact:true}).click();const box=(await page.locator('[data-vocal-lane]').boundingBox())!;
+ await page.mouse.move(box.x+box.width*.7,box.y+12);await page.mouse.down();await page.mouse.move(box.x+box.width*.8,box.y+12);await page.mouse.up();
+ await page.getByRole('button',{name:'分配',exact:true}).click();
+ await expect(page.getByRole('complementary',{name:'音频处理大纲'})).toContainText('未修改歌词或链接');
+ await page.emulateMedia({reducedMotion:'reduce'});await page.getByRole('button',{name:'定位词2',exact:true}).click();
+ await expect(page.locator('main [data-word-id][data-assignment-error]')).toBeVisible();
+ expect(await page.locator('main [data-word-id][data-assignment-error]').evaluate(e=>getComputedStyle(e).animationName)).toBe('none');
+ expect((await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.lyrics.draftTtml).toBe(before);
 });

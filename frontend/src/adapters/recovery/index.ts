@@ -1,4 +1,4 @@
-import { createProjectEditorState, type ProjectEditorState, type ProjectDocument } from '../../domain/project-document';
+import { createProjectEditorState, validateSegments, type ProjectEditorState, type ProjectDocument } from '../../domain/project-document';
 import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
 const DATABASE = 'lazulite-studio-recovery-project-v1';
@@ -53,7 +53,11 @@ const isState = (value: unknown): value is ProjectEditorState => {
     if (!document || typeof document !== 'object') return false;
     const project = document as ProjectDocument;
     if (project.schemaVersion !== 'studio-project-v1' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
+    if (project.sourceAssetId !== null && typeof project.sourceAssetId !== 'string') return false;
+    if (project.acoustics.analysisId !== null && typeof project.acoustics.analysisId !== 'string') return false;
+    try { validateSegments(project.acoustics.segments, Number.MAX_SAFE_INTEGER); } catch { return false; }
     const item = project.lyrics as LyricDocument;
+    if (!item || typeof item !== 'object') return false;
     return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.romanizationTracks) && Array.isArray(item.agents)
       && !!item.metadata && typeof item.metadata === 'object'
       && item.lines.every((line) => !!line && typeof line.id === 'string' && Array.isArray(line.words)
@@ -89,7 +93,7 @@ export function createRecoveryAdapter(): RecoveryAdapter {
       if (!isRecord(record) || record.projectId !== projectId || record.documentIdentity !== documentIdentity) {
         throw new Error('Local recovery checkpoint is incompatible or belongs to another document');
       }
-      return record.state;
+      return createProjectEditorState(record.state.present);
     },
     async clear(projectId) {
       await transaction('readwrite', (store) => store.delete(keyFor(projectId)));

@@ -8,7 +8,7 @@ from server.app import create_app
 from server.auth import Settings
 from server.db import Database
 from server.revisions import RevisionStore
-from server.tests.media_fixture import add_media_project
+from server.tests.media_fixture import add_media_project, add_real_vocal_fixture
 
 
 def create_browser_app():
@@ -30,6 +30,7 @@ def create_browser_app():
         '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="1" end="2">合成占位</p></body></tt>')
     add_media_project(root, db, store, 'phase0-packaging', audio, ttml)
     from server.tests.test_vocals import Separator
+    add_real_vocal_fixture(root, db, store)
     app = create_app(root, Settings(None, True, "http://127.0.0.1:5175"), separator_factory=Separator)
     app.add_event_handler("shutdown", temporary.cleanup)
     return app

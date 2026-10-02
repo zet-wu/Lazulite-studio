@@ -118,7 +118,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [snap, setSnap] = useState(true);
   const [bottomExpanded, setExpanded] = useState(true);
   const expanded = !!timelineHost || bottomExpanded;
-  const [visible, setVisible] = useState({ line: true, word: true, ruby: true, gap: true, spectrum: false });
+  const [visible, setVisible] = useState({ line: true, word: true, ruby: true, gap: true, spectrum: false, wave: true });
   const { width, ratio } = useCanvasMetrics(canvas, expanded, timelineHost);
   const [follow, setFollow] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
@@ -523,8 +523,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         <IconButton data-role="secondary" disabled={disabled} icon="minus" label="缩小波形" onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}/>
         <span className={styles.viewportRange}>视窗 {fmt(start)} – {fmt(end)}</span>
         <div className={styles.visibility} aria-label="时间轴图层">
-          {(['line', 'word', 'ruby', 'gap', 'spectrum'] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
-            {({ line: '行', word: '词', ruby: '注音', gap: '空隙', spectrum: '声谱图' })[key]}
+          {(['line', 'word', 'ruby', 'gap', 'wave', 'spectrum'] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
+            {({ line: '行', word: '词', ruby: '注音', gap: '空隙', wave: '波形', spectrum: '声谱图' })[key]}
           </button>)}
         </div>
 </>);
@@ -537,6 +537,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       <div
         ref={slider}
         className={styles.waveWrap}
+        style={visible.wave ? undefined : { height: 0, overflow: 'hidden', border: 0, minHeight: 0 }}
         onPointerDown={beginPan}
         onPointerMove={movePan}
         onPointerUp={endPan}
@@ -582,7 +583,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     <footer data-transport className={`${styles.footer} ${expanded && !timelineHost ? styles.expanded : styles.collapsed}`} onKeyDown={keyDown}>
       <audio
         ref={audio}
-        onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; const captured=switching.current; if(captured){audio.current.currentTime=captured.position; switching.current=null;setLoadingSource(false);if(captured.playing)void audio.current.play().catch(e=>setError(e.message));} } }}
+        onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; const captured=switching.current; if(captured){audio.current.currentTime=captured.position; switching.current=null;setLoadingSource(false);if(captured.playing)void audio.current.play().catch(e=>{if(e.name!=='AbortError')setError('所选音源无法播放，请重试');});} } }}
         preload="metadata"
         src={asset ? studioApi.audioUrl(projectId, playbackVocal) : undefined}
       />

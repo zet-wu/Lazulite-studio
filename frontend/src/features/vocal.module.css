@@ -12,6 +12,7 @@
 .segmentRow { display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 5px; margin: 8px 0; position: relative; }
 .lane { position: relative; min-height: 40px; background: var(--panel); border: 1px solid var(--line); touch-action: none; overflow: hidden; }
 .segment { position: absolute; height: 28px; min-width: 0; padding: 0; border: 1px solid var(--primary, #3367ab); border-radius: 3px; background: var(--blue-soft, #dae8ff); color: var(--ink); cursor: grab; overflow: hidden; }
+.segment > span:first-child { white-space: nowrap; }
 .segment[aria-pressed=true] { outline: 2px solid var(--primary, #3367ab); outline-offset: -3px; }
 .edge { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; background: #547daf66; }
 .begin { left: 0; } .end { right: 0; }

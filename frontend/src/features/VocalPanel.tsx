@@ -19,7 +19,7 @@ export function VocalPanel({ projectId, project, apply, durationMs }: { projectI
     catch(e) { setError(e instanceof Error ? e.message : '无法创建人声任务'); }
     finally { setBusy(false); }
   };
-  const status = { queued: '排队中', running: '处理中', cancel_requested: '正在取消，等待当前阶段结束', cancelled: '已取消', failed: '失败', interrupted: '服务重启，任务已中断', succeeded: '已完成，等待采用' };
+  const status = { queued: '排队中', running: '处理中', cancel_requested: '正在取消，等待当前阶段结束', cancelled: '已取消', failed: '失败', interrupted: '服务重启，任务已中断', succeeded: '已完成' };
   return <section className={styles.panel} aria-label="人声分离与声学分析">
     <div className={styles.toolbar}><strong>人声分离与声学分析</strong><button data-role="primary" disabled={busy || !!active} onClick={() => void run()}>进行人声分离及声学分析</button></div>
     <p>人声片段来自声学分析，供人工定位参考；采用结果不会修改歌词时间。</p>

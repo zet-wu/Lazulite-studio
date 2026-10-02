@@ -1073,6 +1073,15 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "vocal",
+            "in": "query",
+            "required": false,
+            "description": "当前项目已注册的人声结果 ID；省略为原曲。",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1106,6 +1115,15 @@
           },
           {
             "$ref": "#/components/parameters/EndMs"
+          },
+          {
+            "name": "vocal",
+            "in": "query",
+            "required": false,
+            "description": "当前项目已注册的人声结果 ID；省略为原曲。",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1150,6 +1168,15 @@
               "minimum": 1
             },
             "description": "Exclusive end, at most 4,020,000 milliseconds after start_ms (including FFT context)"
+          },
+          {
+            "name": "vocal",
+            "in": "query",
+            "required": false,
+            "description": "当前项目已注册的人声结果 ID；省略为原曲。",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1297,7 +1324,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/VocalResults"
+                }
               }
             }
           },
@@ -1371,7 +1400,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/VocalEnergyWindow"
+                }
               }
             }
           },
@@ -1416,8 +1447,11 @@
           "200": {
             "description": "Successful Response",
             "content": {
-              "application/json": {
-                "schema": {}
+              "audio/flac": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
               }
             }
           },
@@ -2270,13 +2304,13 @@
               "align",
               "line_align",
               "reading",
-              "forced_align"
+              "forced_align",
+              "vocal"
             ]
           },
           "params": {
             "type": "object",
             "required": [
-              "revision",
               "asset_id"
             ],
             "properties": {
@@ -2352,9 +2386,13 @@
                   "string",
                   "null"
                 ]
+              },
+              "retry_analysis_id": {
+                "type": "string"
               }
             },
-            "additionalProperties": true
+            "additionalProperties": true,
+            "description": "歌词任务必须带 revision；vocal 只绑定源资产，可用 retry_analysis_id 重试已有分离结果的分析。模型和设备取服务配置。"
           }
         },
         "additionalProperties": false
@@ -3336,6 +3374,153 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VocalResult": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "source_asset_id",
+          "duration_ms",
+          "gain",
+          "peak_before_gain",
+          "sample_rate",
+          "channels",
+          "frames",
+          "format",
+          "quantization",
+          "model",
+          "analysis_version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "separated"
+            ]
+          },
+          "source_asset_id": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "gain": {
+            "type": "number"
+          },
+          "peak_before_gain": {
+            "type": "number"
+          },
+          "sample_rate": {
+            "type": "integer"
+          },
+          "channels": {
+            "type": "integer"
+          },
+          "frames": {
+            "type": "integer"
+          },
+          "format": {
+            "type": "string"
+          },
+          "quantization": {
+            "type": "string"
+          },
+          "model": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "analysis_version": {
+            "type": "string"
+          },
+          "analysis_source_sha256": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "analysis_config": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "energy_hop_ms": {
+            "type": "number"
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VocalSegment"
+            }
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "VocalResults": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VocalResult"
+            }
+          }
+        }
+      },
+      "VocalEnergyWindow": {
+        "type": "object",
+        "required": [
+          "start_ms",
+          "step_ms",
+          "values"
+        ],
+        "properties": {
+          "start_ms": {
+            "type": "number"
+          },
+          "step_ms": {
+            "type": "number"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "VocalSegment": {
+        "type": "object",
+        "required": [
+          "id",
+          "beginMs",
+          "endMs"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "beginMs": {
+            "type": "integer"
+          },
+          "endMs": {
+            "type": "integer"
+          }
+        }
       }
     }
   }

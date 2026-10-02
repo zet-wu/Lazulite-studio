@@ -283,8 +283,8 @@ export const studioS4 = {
   importLyrics: async (projectId: string, revision: string, filename: string, content: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/imports?revision=${encodeURIComponent(revision)}`, { method: 'POST', headers: { 'Content-Type': filename.endsWith("ttml") || filename.endsWith("xml") ? "application/ttml+xml" : filename.endsWith(".lrc") ? "text/lrc" : "text/plain", 'Idempotency-Key': crypto.randomUUID() }, body: content }); if (!isImportCandidate(result)) throw new ApiError(502, { code: "invalid_response", message: "导入响应格式无效", request_id: "", retryable: false }); return result; },
 };
 
-export type VocalResult = { id: string; status: 'ready' | 'separated'; source_asset_id: string; duration_ms: number; segments?: import('../../domain/project-document').VocalSegment[]; gain: number; diagnostics?: string[] };
+export type VocalResult = components['schemas']['VocalResult'];
 export const vocalApi = {
-  list: (pid: string) => s4<{ items: VocalResult[] }>(`/projects/${encodeURIComponent(pid)}/vocals`),
-  energy: (pid: string, rid: string, start: number, end: number) => s4<{ start_ms: number; step_ms: number; values: number[] }>(`/projects/${encodeURIComponent(pid)}/vocals/${encodeURIComponent(rid)}/energy?start_ms=${start}&end_ms=${end}&buckets=1000`),
+  list: (pid: string) => s4<components['schemas']['VocalResults']>(`/projects/${encodeURIComponent(pid)}/vocals`),
+  energy: (pid: string, rid: string, start: number, end: number, signal?: AbortSignal) => s4<components['schemas']['VocalEnergyWindow']>(`/projects/${encodeURIComponent(pid)}/vocals/${encodeURIComponent(rid)}/energy?start_ms=${start}&end_ms=${end}&buckets=1000`, { signal }),
 };

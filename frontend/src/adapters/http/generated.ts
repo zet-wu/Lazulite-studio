@@ -690,9 +690,10 @@ export interface components {
         };
         JobCreate: {
             /** @enum {string} */
-            kind: "search" | "fetch" | "transcribe" | "align" | "line_align" | "reading" | "forced_align";
+            kind: "search" | "fetch" | "transcribe" | "align" | "line_align" | "reading" | "forced_align" | "vocal";
+            /** @description 歌词任务必须带 revision；vocal 只绑定源资产，可用 retry_analysis_id 重试已有分离结果的分析。模型和设备取服务配置。 */
             params: {
-                revision: string;
+                revision?: string;
                 asset_id: string;
                 line_ids?: string[];
                 line_id?: string;
@@ -708,6 +709,7 @@ export interface components {
                 title?: string | null;
                 artist?: string | null;
                 album?: string | null;
+                retry_analysis_id?: string;
             } & {
                 [key: string]: unknown;
             };
@@ -936,6 +938,47 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        VocalResult: {
+            id: string;
+            /** @enum {string} */
+            status: "ready" | "separated";
+            source_asset_id: string;
+            duration_ms: number;
+            gain: number;
+            peak_before_gain: number;
+            sample_rate: number;
+            channels: number;
+            frames: number;
+            format: string;
+            quantization: string;
+            model: {
+                [key: string]: unknown;
+            };
+            analysis_version: string;
+            analysis_source_sha256?: string;
+            runtime?: {
+                [key: string]: string;
+            };
+            analysis_config?: {
+                [key: string]: unknown;
+            };
+            energy_hop_ms?: number;
+            segments?: components["schemas"]["VocalSegment"][];
+            diagnostics?: string[];
+        };
+        VocalResults: {
+            items: components["schemas"]["VocalResult"][];
+        };
+        VocalEnergyWindow: {
+            start_ms: number;
+            step_ms: number;
+            values: number[];
+        };
+        VocalSegment: {
+            id: string;
+            beginMs: number;
+            endMs: number;
         };
     };
     responses: {
@@ -1842,7 +1885,10 @@ export interface operations {
     };
     getAudio: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 当前项目已注册的人声结果 ID；省略为原曲。 */
+                vocal?: string;
+            };
             header?: never;
             path: {
                 projectId: components["parameters"]["ProjectId"];
@@ -1881,6 +1927,8 @@ export interface operations {
                 level?: components["parameters"]["Level"];
                 start_ms?: components["parameters"]["StartMs"];
                 end_ms?: components["parameters"]["EndMs"];
+                /** @description 当前项目已注册的人声结果 ID；省略为原曲。 */
+                vocal?: string;
             };
             header?: never;
             path: {
@@ -1908,6 +1956,8 @@ export interface operations {
                 start_ms: number;
                 /** @description Exclusive end, at most 4,020,000 milliseconds after start_ms (including FFT context) */
                 end_ms: number;
+                /** @description 当前项目已注册的人声结果 ID；省略为原曲。 */
+                vocal?: string;
             };
             header?: never;
             path: {
@@ -2025,7 +2075,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["VocalResults"];
                 };
             };
             /** @description Validation Error */
@@ -2061,7 +2111,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["VocalEnergyWindow"];
                 };
             };
             /** @description Validation Error */
@@ -2093,7 +2143,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "audio/flac": string;
                 };
             };
             /** @description Validation Error */

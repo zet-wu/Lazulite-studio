@@ -8,7 +8,7 @@ from server.app import create_app
 from server.auth import Settings
 from server.db import Database
 from server.revisions import RevisionStore
-from server.tests.media_fixture import add_media_project
+from server.tests.media_fixture import add_media_project, add_real_vocal_fixture
 
 
 def create_performance_app():
@@ -23,6 +23,7 @@ def create_performance_app():
         sources["real"] = Path(os.environ["STUDIO_PERF_AUDIO"])
     for project_id, source in sources.items():
         add_media_project(root, db, store, project_id, source, '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1" end="5"><span begin="1" end="5">合成歌词</span></p></div></body></tt>')
+    add_real_vocal_fixture(root, db, store)
     app = create_app(root, Settings(None, True, "http://127.0.0.1:5176"))
     app.add_event_handler("shutdown", temporary.cleanup)
     return app
