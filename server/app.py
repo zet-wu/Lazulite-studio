@@ -525,7 +525,7 @@ def create_app(
                 if not isinstance(params['retry_analysis_id'], str): fail('job_input_invalid', '分析结果标识无效', 422)
                 try: result, _ = vocal_runner.get(pid, params['retry_analysis_id'])
                 except KeyError: fail('job_input_invalid', '可重用人声不存在', 422)
-                if result['source_asset_id'] != row[2] or result['status'] != 'separated': fail('job_input_invalid', '只可重试当前源音频的未完成分析', 422)
+                if result['source_asset_id'] != row[2] or result['status'] not in {'separated', 'ready'}: fail('job_input_invalid', '只可分析当前源音频的人声结果', 422)
             params['model_name'] = os.getenv('STUDIO_VOCAL_MODEL', 'htdemucs')
             params['device'] = os.getenv('STUDIO_VOCAL_DEVICE', 'cpu')
             return

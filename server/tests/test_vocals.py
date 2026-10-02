@@ -101,5 +101,24 @@ def test_analysis_failure_is_retryable_and_restart_retains_ready_products(tmp_pa
     orphan=tmp_path/'vocals'/'p'/'orphan';orphan.mkdir();(orphan/'temporary').write_text('partial')
     runner=VocalRunner(db,tmp_path/'vocals')
     assert not orphan.exists()
-    assert runner.get('p',result['id'])[0]['status']=='ready'
+    assert runner.get('p',retry['id'])[0]['status']=='ready'
     assert (tmp_path/'vocals'/'p'/result['id']/'vocals.flac').is_file()
+
+
+def test_ready_reanalysis_preserves_old_result(tmp_path):
+    client, db = setup(tmp_path)
+    with client:
+        asset = client.get('/api/v1/projects/p/document').json()['document']['sourceAssetId']
+        def run(reuse=None):
+            params = {'asset_id': asset}
+            if reuse: params['retry_analysis_id'] = reuse
+            job = client.post('/api/v1/projects/p/jobs/vocal', json={'params': params}, headers={'origin':'http://studio'}).json()
+            assert wait(client, job['id'])['status'] == 'succeeded'
+            return job['id']
+        old = run()
+        directory = tmp_path/'vocals'/'p'/old
+        before = {p.name: p.read_bytes() for p in directory.iterdir()}
+        new = run(old)
+        assert new != old
+        assert before == {p.name: p.read_bytes() for p in directory.iterdir()}
+        assert (tmp_path/'vocals'/'p'/new/'vocals.flac').read_bytes() == before['vocals.flac']

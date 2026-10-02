@@ -153,7 +153,7 @@ class JobService:
             self._finish_error(jid, "engine_error", "Lazulite engine failed; inspect server logs")
 
         finally:
-            if record and record[2] == 'vocal': self.vocal_runner.clean_unregistered(record[1], request.get('retry_analysis_id') or jid)
+            if record and record[2] == 'vocal': self.vocal_runner.clean_unregistered(record[1], jid)
             if not published and isinstance(result, dict) and result.get('output_path') and record[2] == 'publish':
                 try:
                     Path(result['output_path']).unlink(missing_ok=True)

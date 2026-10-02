@@ -34,15 +34,21 @@ class VocalRunner:
         def boundary():
             if cancelled(): raise VocalCancelled()
         boundary()
-        result_id = params.get('retry_analysis_id') or job_id
+        result_id = job_id
         directory = self.root / project_id / result_id
         directory.mkdir(parents=True, exist_ok=True)
         vocal_path = directory / 'vocals.flac'
         if params.get('retry_analysis_id'):
             with self.db.connect() as c:
-                row = c.execute('SELECT metadata_json FROM vocal_results WHERE id=? AND project_id=? AND source_asset_id=?', (result_id, project_id, params['asset_id'])).fetchone()
-            if not row or not vocal_path.is_file(): raise ValueError('可重用人声不存在')
+                row = c.execute('SELECT metadata_json,directory FROM vocal_results WHERE id=? AND project_id=? AND source_asset_id=?', (params['retry_analysis_id'], project_id, params['asset_id'])).fetchone()
+            if not row: raise ValueError('可重用人声不存在')
+            shutil.copyfile(Path(row[1]) / 'vocals.flac', vocal_path)
             metadata = json.loads(row[0])
+            for key in ('segments', 'diagnostics', 'analysis_config', 'energy_hop_ms'):
+                metadata.pop(key, None)
+            metadata.update(id=result_id, reused_from=params['retry_analysis_id'])
+            with self.db.transaction() as c:
+                c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', str(directory), json.dumps(metadata)))
         else:
             emit('stage', 'separating', None, None, '正在分离人声；取消将在阶段结束后生效')
             try:
