@@ -287,3 +287,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .syncQuote > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .syncQuote > b { flex-shrink: 0; max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
 .syncTime { font-family: ui-monospace, monospace; }
+
+/* AMLL 0.5.2 splits emphasized Ruby bases into character spans. Keep those
+   inline while the reading above and optional romanization below stay stacked. */
+.previewPlayer [class~="FmKaba_wordWithRuby"] > [class~="FmKaba_wordBody"] { display: block; text-align: center; }
