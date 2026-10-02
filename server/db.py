@@ -24,6 +24,11 @@ CREATE TABLE IF NOT EXISTS revisions (
  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, parent_id TEXT, project_path TEXT NOT NULL,
  created_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id)
 );
+CREATE TABLE IF NOT EXISTS vocal_results (
+ id TEXT PRIMARY KEY, project_id TEXT NOT NULL, source_asset_id TEXT NOT NULL,
+ status TEXT NOT NULL, directory TEXT NOT NULL, metadata_json TEXT NOT NULL,
+ FOREIGN KEY(project_id) REFERENCES projects(id)
+);
 CREATE TABLE IF NOT EXISTS idempotency (
  key TEXT PRIMARY KEY, subject TEXT NOT NULL, request_hash TEXT NOT NULL, response TEXT NOT NULL, created_at TEXT NOT NULL
 );

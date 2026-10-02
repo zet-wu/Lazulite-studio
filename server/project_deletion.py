@@ -27,6 +27,14 @@ def delete_project(db, root: Path, pid: str):
                     if (root / 'exports').resolve() not in path.parents:
                         raise ValueError('产物路径不属于项目存储')
                     files.append(path)
+            vocal_rows = c.execute('SELECT id,directory FROM vocal_results WHERE project_id=?', (pid,)).fetchall()
+            for vocal in vocal_rows:
+                directory = Path(vocal['directory'])
+                if (root / 'vocals').resolve() not in directory.resolve().parents: raise ValueError('人声产物路径无效')
+                files.extend(p for p in directory.rglob('*') if p.is_file())
+                files.extend(p for p in (root / 'proxies').glob(f"vocal-{vocal['id']}*") if p.is_file())
+                files.extend(p for p in (root / 'proxies' / f"vocal-{vocal['id']}.peaks-v1").glob('*') if p.is_file())
+            c.execute('DELETE FROM vocal_results WHERE project_id=?', (pid,))
             # Assets and their shared proxies stay in the content addressed store.
             # No asset is removed while uploads, other projects or readers may use it.
             trash.mkdir(parents=True)

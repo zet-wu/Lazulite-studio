@@ -11,6 +11,7 @@ from .reading import ReadingUnavailable
 from .forced import ForcedUnavailable
 from .publish import PublishInvalid
 from .publishing import PublishingError
+from .vocals import VocalCancelled
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +19,9 @@ def now(): return datetime.now(timezone.utc).isoformat()
 
 class JobService:
     """Durable single-slot executor. Every lifecycle transition is committed before notification."""
-    def __init__(self, db: Database, *, engine=None, asset_path=None, reading_runner=None, publish_runner=None):
+    def __init__(self, db: Database, *, engine=None, asset_path=None, reading_runner=None, publish_runner=None, vocal_runner=None):
         self.db, self.engine, self.asset_path, self.reading_runner, self.publish_runner = db, engine or LazuliteEngine(), asset_path, reading_runner, publish_runner
+        self.vocal_runner = vocal_runner
         self._lock = threading.RLock(); self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="studio-job")
         with db.transaction() as c:
             rows = c.execute("SELECT id FROM jobs WHERE status IN ('queued','running','cancel_requested')").fetchall()
@@ -75,6 +77,9 @@ class JobService:
                 if old:
                     if old[0]!=digest: raise ValueError("idempotency key was used for another request")
                     return self.get(old[1])
+            if kind == 'vocal':
+                active = c.execute("SELECT id FROM jobs WHERE project_id=? AND kind='vocal' AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone()
+                if active: return self.get(active[0])
             if kind == 'publish' and c.execute("SELECT 1 FROM jobs WHERE project_id=? AND kind='publish' AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone():
                 raise ValueError('此项目已有活动打包任务，请等待完成或取消')
             jid=uuid.uuid4().hex; t=now()
@@ -95,7 +100,10 @@ class JobService:
             with self.db.connect() as c: record=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
             if not record: return
             request=json.loads(record[4]); kind=record[2]
-            if kind == "reading":
+            if kind == "vocal":
+                result = self.vocal_runner.run(record[1], self.asset_path(record[1]), request, jid,
+                    lambda *x: self.emit(jid, *x), lambda: self.get(jid)['status'] == 'cancel_requested')
+            elif kind == "reading":
                 if self.reading_runner is None:
                     raise ReadingUnavailable("未配置读音后端")
                 result = self.reading_runner.run(record[1], request)
@@ -105,21 +113,22 @@ class JobService:
                 result = self.publish_runner.run(record[1], request)
             else:
                 result=self.engine.run(kind, asset_path=self.asset_path(record[1]) if self.asset_path else None, params=request, emit=lambda *x:self.emit(jid,*x))
-            with self.db.connect() as c:
-                project = c.execute("SELECT source_asset_id,current_revision FROM projects WHERE id=?", (record[1],)).fetchone()
-                bound_revision = request.get("revision")
-                bound_asset = request.get("asset_id")
-                rev = c.execute("SELECT project_path FROM revisions WHERE id=? AND project_id=?", (bound_revision, record[1])).fetchone()
-                if not rev:
-                    raise RuntimeError("bound revision disappeared")
-                with open(rev[0], "rb") as source:
-                    revision_hash = hashlib.sha256(source.read()).hexdigest()
-            result["binding"] = {"project_id": record[1], "asset_id": bound_asset,
-                                 "revision": bound_revision,
-                                 "revision_sha256": revision_hash}
+            if kind != "vocal":
+                with self.db.connect() as c:
+                    project = c.execute("SELECT source_asset_id,current_revision FROM projects WHERE id=?", (record[1],)).fetchone()
+                    bound_revision = request.get("revision")
+                    bound_asset = request.get("asset_id")
+                    rev = c.execute("SELECT project_path FROM revisions WHERE id=? AND project_id=?", (bound_revision, record[1])).fetchone()
+                    if not rev:
+                        raise RuntimeError("bound revision disappeared")
+                    with open(rev[0], "rb") as source:
+                        revision_hash = hashlib.sha256(source.read()).hexdigest()
+                result["binding"] = {"project_id": record[1], "asset_id": bound_asset,
+                                     "revision": bound_revision,
+                                     "revision_sha256": revision_hash}
             with self._lock, self.db.transaction() as c:
                 cancelled = c.execute('SELECT cancel_requested FROM jobs WHERE id=?', (jid,)).fetchone()
-                if kind == 'publish' and cancelled[0]:
+                if kind in {'publish', 'vocal'} and cancelled[0]:
                     t = now()
                     c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=?", (t,t,jid))
                     self._event(c,jid,'state','cancelled',None,None,'打包已取消')
@@ -132,6 +141,11 @@ class JobService:
                 t=now(); c.execute("UPDATE jobs SET status='succeeded',result_json=?,engine_json=?,updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps(result,ensure_ascii=False),json.dumps(result.get("engine",{})),t,t,jid)); self._event(c,jid,"state","succeeded",1,1,"任务完成")
             published = True
             if kind == 'publish': self.reconcile_exports()
+        except VocalCancelled:
+            with self.db.transaction() as c:
+                t = now()
+                c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=?", (t,t,jid))
+                self._event(c,jid,'state','cancelled',None,None,'人声任务已在阶段边界停止')
         except (PublishInvalid, PublishingError) as exc: self._finish_error(jid, "publish_failed", str(exc))
         except (EngineUnavailable, ReadingUnavailable, ForcedUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
         except Exception as exc:
@@ -165,7 +179,8 @@ class JobService:
     def get(self,jid):
         with self.db.connect() as c: row=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
         if not row: return None
-        return {"schema_version":"studio-job-v1","id":row[0],"project_id":row[1],"kind":row[2],"status":row[3],"request":json.loads(row[4]),"result_available":row[5] is not None,"error":json.loads(row[6]) if row[6] else None,"engine":json.loads(row[7]) if row[7] else None,"created_at":row[8],"updated_at":row[9],"state_version":row[13]}
+        with self.db.connect() as c: stage = c.execute("SELECT stage FROM job_events WHERE job_id=? AND kind='stage' ORDER BY seq DESC LIMIT 1", (jid,)).fetchone()
+        return {"stage": stage[0] if stage else None, "schema_version":"studio-job-v1","id":row[0],"project_id":row[1],"kind":row[2],"status":row[3],"request":json.loads(row[4]),"result_available":row[5] is not None,"error":json.loads(row[6]) if row[6] else None,"engine":json.loads(row[7]) if row[7] else None,"created_at":row[8],"updated_at":row[9],"state_version":row[13]}
 
     def events(self,jid,after=0):
         with self.db.connect() as c: rows=c.execute("SELECT * FROM job_events WHERE job_id=? AND seq>? ORDER BY seq",(jid,after)).fetchall()

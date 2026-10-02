@@ -128,43 +128,43 @@
         }
       }
     },
-      "/lyric-sources/search": {
-        "post": {
-          "operationId": "lyricSourceSearch",
-          "requestBody": {
-            "required": true,
+    "/lyric-sources/search": {
+      "post": {
+        "operationId": "lyricSourceSearch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LyricSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated provider response with original lyric format",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LyricSearchRequest"
+                  "type": "object"
                 }
               }
             }
           },
-          "responses": {
-            "200": {
-              "description": "Authenticated provider response with original lyric format",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "type": "object"
-                  }
-                }
-              }
-            },
-            "401": {
-              "description": "Session required"
-            },
-            "429": {
-              "description": "Provider concurrency limit"
-            },
-            "502": {
-              "description": "Upstream network or payload error"
-            }
+          "401": {
+            "description": "Session required"
+          },
+          "429": {
+            "description": "Provider concurrency limit"
+          },
+          "502": {
+            "description": "Upstream network or payload error"
           }
         }
-      },
-      "/lyric-sources/fetch": {
+      }
+    },
+    "/lyric-sources/fetch": {
       "post": {
         "operationId": "lyricSourceFetch",
         "requestBody": {
@@ -232,43 +232,43 @@
         }
       }
     },
-      "/lyric-sources/resolve": {
-        "post": {
-          "operationId": "lyricSourceResolve",
-          "requestBody": {
-            "required": true,
+    "/lyric-sources/resolve": {
+      "post": {
+        "operationId": "lyricSourceResolve",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LyricSourceCandidate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated provider response with original lyric format",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LyricSourceCandidate"
+                  "type": "object"
                 }
               }
             }
           },
-          "responses": {
-            "200": {
-              "description": "Authenticated provider response with original lyric format",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "type": "object"
-                  }
-                }
-              }
-            },
-            "401": {
-              "description": "Session required"
-            },
-            "429": {
-              "description": "Provider concurrency limit"
-            },
-            "502": {
-              "description": "Upstream network or payload error"
-            }
+          "401": {
+            "description": "Session required"
+          },
+          "429": {
+            "description": "Provider concurrency limit"
+          },
+          "502": {
+            "description": "Upstream network or payload error"
           }
         }
-      },
-      "/projects/{projectId}/packaging": {
+      }
+    },
+    "/projects/{projectId}/packaging": {
       "get": {
         "operationId": "getPackagingInfo",
         "parameters": [
@@ -372,7 +372,9 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
             }
           }
         },
@@ -381,11 +383,15 @@
             "description": "Authenticated session",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Session" }
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/Error" }
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       },
       "delete": {
@@ -395,11 +401,15 @@
             "description": "Signed out",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Session" }
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/Error" }
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -453,7 +463,9 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateProjectRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
             }
           }
         },
@@ -462,11 +474,15 @@
             "description": "Created project",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ProjectSummary" }
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectSummary"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/Error" }
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -479,9 +495,14 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["file"],
+                "required": [
+                  "file"
+                ],
                 "properties": {
-                  "file": { "type": "string", "format": "binary" }
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
                 }
               }
             }
@@ -492,11 +513,15 @@
             "description": "Uploaded asset",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Asset" }
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/Error" }
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -594,17 +619,40 @@
       "post": {
         "operationId": "createJob",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/IdempotencyKey" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
         ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobCreate" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobCreate"
+              }
+            }
+          }
         },
         "responses": {
-          "202": { "description": "Queued job", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } } },
-          "409": { "$ref": "#/components/responses/Error" },
-          "default": { "$ref": "#/components/responses/Error" }
+          "202": {
+            "description": "Queued job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -612,40 +660,154 @@
       "post": {
         "operationId": "createTypedJob",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "name": "kind", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "$ref": "#/components/parameters/IdempotencyKey" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
         ],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobParams" } } } },
-        "responses": { "202": { "description": "Queued job", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobParams"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/jobs/{jobId}": {
       "get": {
         "operationId": "getJob",
-        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
-        "responses": { "200": { "description": "Job snapshot", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/jobs/{jobId}/cancel": {
       "post": {
         "operationId": "cancelJob",
-        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
-        "responses": { "200": { "description": "Cancellation state", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/jobs/{jobId}/result": {
       "get": {
         "operationId": "getJobResult",
-        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
-        "responses": { "200": { "description": "Job result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobResult" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/jobs/{jobId}/events": {
       "get": {
         "operationId": "streamJobEvents",
-        "parameters": [{ "$ref": "#/components/parameters/JobId" }, { "name": "after_seq", "in": "query", "schema": { "type": "integer", "minimum": 0 } }],
-        "responses": { "200": { "description": "Server sent events", "content": { "text/event-stream": { "schema": { "type": "string" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobId"
+          },
+          {
+            "name": "after_seq",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server sent events",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/projects/{projectId}/document": {
@@ -678,65 +840,195 @@
       "put": {
         "operationId": "putDocument",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/IfMatch" },
-          { "$ref": "#/components/parameters/IdempotencyKey" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
         ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentEnvelope" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentEnvelope"
+              }
+            }
+          }
         },
         "responses": {
-          "200": { "description": "Committed document", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentSaveResponse" } } } },
-          "409": { "$ref": "#/components/responses/Error" },
-          "412": { "$ref": "#/components/responses/Error" },
-          "428": { "$ref": "#/components/responses/Error" },
-          "default": { "$ref": "#/components/responses/Error" }
+          "200": {
+            "description": "Committed document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentSaveResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
     "/projects/{projectId}/reading-dictionary": {
       "get": {
         "operationId": "listReadingDictionary",
-        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
         "responses": {
-          "200": { "description": "Project reading dictionary", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReadingDictionary" } } } },
-          "default": { "$ref": "#/components/responses/Error" }
+          "200": {
+            "description": "Project reading dictionary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadingDictionary"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       },
       "post": {
         "operationId": "createReadingDictionaryEntry",
-        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DictionaryEntryInput" } } } },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DictionaryEntryInput"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": { "description": "Created dictionary entry", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DictionaryEntry" } } } },
-          "default": { "$ref": "#/components/responses/Error" }
+          "201": {
+            "description": "Created dictionary entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryEntry"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
     "/projects/{projectId}/reading-dictionary/{entryId}": {
       "put": {
         "operationId": "updateReadingDictionaryEntry",
-        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }, { "name": "entryId", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DictionaryEntryInput" } } } },
-        "responses": { "200": { "description": "Updated dictionary entry", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DictionaryEntry" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "entryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DictionaryEntryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated dictionary entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryEntry"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       },
       "delete": {
         "operationId": "deleteReadingDictionaryEntry",
-        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }, { "name": "entryId", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "204": { "description": "Deleted dictionary entry" }, "default": { "$ref": "#/components/responses/Error" } }
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "entryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted dictionary entry"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/projects/{projectId}/lyrics": {
       "get": {
         "operationId": "getLyrics",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/Revision" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/Revision"
+          }
         ],
         "responses": {
-          "200": { "description": "Committed TTML" },
-          "default": { "$ref": "#/components/responses/Error" }
+          "200": {
+            "description": "Committed TTML"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -744,22 +1036,58 @@
       "post": {
         "operationId": "importCandidate",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/Revision" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/Revision"
+          }
         ],
-        "requestBody": { "required": true, "content": { "text/plain": {}, "application/ttml+xml": {} } },
-        "responses": { "200": { "description": "Candidate import; never saved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportCandidate" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/plain": {},
+            "application/ttml+xml": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Candidate import; never saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportCandidate"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/projects/{projectId}/audio": {
       "get": {
         "operationId": "getAudio",
-        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
         "responses": {
-          "200": { "description": "Playable audio" },
-          "206": { "description": "Partial audio" },
-          "416": { "description": "Range not satisfiable" },
-          "default": { "$ref": "#/components/responses/Error" }
+          "200": {
+            "description": "Playable audio"
+          },
+          "206": {
+            "description": "Partial audio"
+          },
+          "416": {
+            "description": "Range not satisfiable"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -767,21 +1095,33 @@
       "get": {
         "operationId": "getWaveform",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/Level" },
-          { "$ref": "#/components/parameters/StartMs" },
-          { "$ref": "#/components/parameters/EndMs" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/Level"
+          },
+          {
+            "$ref": "#/components/parameters/StartMs"
+          },
+          {
+            "$ref": "#/components/parameters/EndMs"
+          }
         ],
         "responses": {
           "200": {
             "description": "Waveform window",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/WaveformWindow" }
+                "schema": {
+                  "$ref": "#/components/schemas/WaveformWindow"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/Error" }
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -789,20 +1129,58 @@
       "get": {
         "operationId": "getPcmWindow",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "name": "start_ms", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 0 } },
-          { "name": "end_ms", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 }, "description": "Exclusive end, at most 4,020,000 milliseconds after start_ms (including FFT context)" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "start_ms",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "end_ms",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Exclusive end, at most 4,020,000 milliseconds after start_ms (including FFT context)"
+          }
         ],
         "responses": {
           "200": {
             "description": "Interleaved 16-bit PCM samples from the playback proxy",
             "headers": {
-              "X-Sample-Rate": { "schema": { "type": "integer", "minimum": 1000 } },
-              "X-Channels": { "schema": { "type": "integer", "minimum": 1 } }
+              "X-Sample-Rate": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1000
+                }
+              },
+              "X-Channels": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
             },
-            "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
           },
-          "default": { "$ref": "#/components/responses/Error" }
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -810,25 +1188,250 @@
       "post": {
         "operationId": "publishProject",
         "parameters": [
-          { "$ref": "#/components/parameters/ProjectId" },
-          { "$ref": "#/components/parameters/IdempotencyKey" }
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
         ],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PublishRequest" } } } },
-        "responses": { "202": { "description": "Queued publication", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } } }, "409": { "$ref": "#/components/responses/Error" }, "default": { "$ref": "#/components/responses/Error" } }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued publication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/projects/{projectId}/exports": {
       "get": {
         "operationId": "listExports",
-        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }],
-        "responses": { "200": { "description": "Publication exports", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExportList" } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Publication exports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportList"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/projects/{projectId}/exports/{jobId}/download": {
       "get": {
         "operationId": "downloadExport",
-        "parameters": [{ "$ref": "#/components/parameters/ProjectId" }, { "$ref": "#/components/parameters/JobId" }],
-        "responses": { "200": { "description": "STPP file" }, "409": { "$ref": "#/components/responses/Error" }, "410": { "$ref": "#/components/responses/Error" }, "default": { "$ref": "#/components/responses/Error" } }
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/JobId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "STPP file"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/projects/{pid}/vocals": {
+      "get": {
+        "summary": "Results",
+        "operationId": "results_api_v1_projects__pid__vocals_get",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{pid}/vocals/{rid}/energy": {
+      "get": {
+        "summary": "Energy",
+        "operationId": "energy_api_v1_projects__pid__vocals__rid__energy_get",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pid"
+            }
+          },
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          },
+          {
+            "name": "start_ms",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Start Ms"
+            }
+          },
+          {
+            "name": "end_ms",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "End Ms"
+            }
+          },
+          {
+            "name": "buckets",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1000,
+              "title": "Buckets"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{pid}/vocals/{rid}/file": {
+      "get": {
+        "summary": "File",
+        "operationId": "file_api_v1_projects__pid__vocals__rid__file_get",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pid"
+            }
+          },
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -854,40 +1457,62 @@
         "name": "level",
         "in": "query",
         "required": false,
-        "schema": { "type": "integer", "minimum": 0, "default": 8 }
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 8
+        }
       },
       "StartMs": {
         "name": "start_ms",
         "in": "query",
         "required": false,
-        "schema": { "type": "integer", "minimum": 0 }
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "EndMs": {
         "name": "end_ms",
         "in": "query",
         "required": false,
-        "schema": { "type": "integer", "minimum": 0 }
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "Revision": {
         "name": "revision",
         "in": "query",
         "required": false,
-        "schema": { "type": "string" }
+        "schema": {
+          "type": "string"
+        }
       },
       "IfMatch": {
         "name": "If-Match",
         "in": "header",
         "required": true,
-        "schema": { "type": "string" }
+        "schema": {
+          "type": "string"
+        }
       },
       "IdempotencyKey": {
         "name": "Idempotency-Key",
         "in": "header",
         "required": false,
-        "schema": { "type": "string" }
+        "schema": {
+          "type": "string"
+        }
       },
       "JobId": {
-        "name": "jobId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 }
+        "name": "jobId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "responses": {
@@ -1075,10 +1700,17 @@
       },
       "LoginRequest": {
         "type": "object",
-        "required": ["password"],
+        "required": [
+          "password"
+        ],
         "properties": {
-          "username": { "type": "string" },
-          "password": { "type": "string", "format": "password" }
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "format": "password"
+          }
         }
       },
       "CreateProjectRequest": {
@@ -1119,16 +1751,44 @@
           "proxy_offset_ms"
         ],
         "properties": {
-          "schema_version": { "const": "studio-asset-v1" },
-          "id": { "type": "string" },
-          "filename": { "type": "string" },
-          "content_type": { "type": "string" },
-          "size_bytes": { "type": "integer", "minimum": 0 },
-          "duration_ms": { "type": ["integer", "null"], "minimum": 0 },
-          "status": { "type": "string", "enum": ["ready"] },
-          "asset_hash": { "type": "string" },
-          "source_start_ms": { "type": "integer" },
-          "proxy_offset_ms": { "type": "integer" }
+          "schema_version": {
+            "const": "studio-asset-v1"
+          },
+          "id": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "content_type": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready"
+            ]
+          },
+          "asset_hash": {
+            "type": "string"
+          },
+          "source_start_ms": {
+            "type": "integer"
+          },
+          "proxy_offset_ms": {
+            "type": "integer"
+          }
         }
       },
       "WaveformWindow": {
@@ -1146,27 +1806,61 @@
           "maximum"
         ],
         "properties": {
-          "schema_version": { "const": "studio-waveform-v1" },
-          "asset_id": { "type": "string" },
-          "asset_hash": { "type": "string" },
-          "version": { "type": "string" },
-          "level": { "type": "integer", "minimum": 0, "maximum": 15 },
-          "start_ms": { "type": "integer", "minimum": 0 },
-          "end_ms": { "type": "integer", "minimum": 0 },
-          "bucket_ms": { "type": "integer", "minimum": 1 },
+          "schema_version": {
+            "const": "studio-waveform-v1"
+          },
+          "asset_id": {
+            "type": "string"
+          },
+          "asset_hash": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 15
+          },
+          "start_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bucket_ms": {
+            "type": "integer",
+            "minimum": 1
+          },
           "minimum": {
             "type": "array",
-            "items": { "type": "number", "minimum": -1, "maximum": 1 }
+            "items": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            }
           },
           "maximum": {
             "type": "array",
-            "items": { "type": "number", "minimum": -1, "maximum": 1 }
+            "items": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            }
           }
         }
       },
       "Error": {
         "type": "object",
-        "required": ["code", "message", "request_id", "retryable"],
+        "required": [
+          "code",
+          "message",
+          "request_id",
+          "retryable"
+        ],
         "properties": {
           "code": {
             "type": "string"
@@ -1184,7 +1878,11 @@
       },
       "Session": {
         "type": "object",
-        "required": ["schema_version", "authenticated", "user"],
+        "required": [
+          "schema_version",
+          "authenticated",
+          "user"
+        ],
         "properties": {
           "schema_version": {
             "const": "studio-session-v1"
@@ -1193,7 +1891,10 @@
             "type": "boolean"
           },
           "user": {
-            "type": ["object", "null"],
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "id": {
                 "type": "string"
@@ -1202,13 +1903,20 @@
                 "type": "string"
               }
             },
-            "required": ["id", "name"]
+            "required": [
+              "id",
+              "name"
+            ]
           }
         }
       },
       "Capability": {
         "type": "object",
-        "required": ["id", "enabled", "reason"],
+        "required": [
+          "id",
+          "enabled",
+          "reason"
+        ],
         "properties": {
           "id": {
             "type": "string"
@@ -1217,7 +1925,10 @@
             "type": "boolean"
           },
           "reason": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "experimental": {
             "type": "boolean"
@@ -1226,7 +1937,10 @@
       },
       "Capabilities": {
         "type": "object",
-        "required": ["schema_version", "items"],
+        "required": [
+          "schema_version",
+          "items"
+        ],
         "properties": {
           "schema_version": {
             "const": "studio-capabilities-v1"
@@ -1264,19 +1978,31 @@
           },
           "document_status": {
             "type": "string",
-            "enum": ["empty", "draft", "ready"]
+            "enum": [
+              "empty",
+              "draft",
+              "ready"
+            ]
           },
           "asset": {
             "anyOf": [
-              { "$ref": "#/components/schemas/Asset" },
-              { "type": "null" }
+              {
+                "$ref": "#/components/schemas/Asset"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         }
       },
       "ProjectList": {
         "type": "object",
-        "required": ["schema_version", "items", "next_cursor"],
+        "required": [
+          "schema_version",
+          "items",
+          "next_cursor"
+        ],
         "properties": {
           "schema_version": {
             "const": "studio-project-list-v1"
@@ -1288,14 +2014,24 @@
             }
           },
           "next_cursor": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
       "JobParams": {
         "type": "object",
-        "required": ["params"],
-        "properties": { "params": { "type": "object", "additionalProperties": true } },
+        "required": [
+          "params"
+        ],
+        "properties": {
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
         "additionalProperties": false
       },
       "PublishRequest": {
@@ -1447,8 +2183,22 @@
         }
       },
       "ExportList": {
-        "type": "object", "required": ["schema_version", "items"],
-        "properties": { "schema_version": { "const": "studio-export-list-v1" }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/Export" } } }
+        "type": "object",
+        "required": [
+          "schema_version",
+          "items"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "studio-export-list-v1"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Export"
+            }
+          }
+        }
       },
       "PublishReport": {
         "type": "object",
@@ -1506,26 +2256,103 @@
       },
       "JobCreate": {
         "type": "object",
-        "required": ["kind", "params"],
+        "required": [
+          "kind",
+          "params"
+        ],
         "properties": {
-            "kind": { "type": "string", "enum": ["search", "fetch", "transcribe", "align", "line_align", "reading", "forced_align"] },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "search",
+              "fetch",
+              "transcribe",
+              "align",
+              "line_align",
+              "reading",
+              "forced_align"
+            ]
+          },
           "params": {
             "type": "object",
-            "required": ["revision", "asset_id"],
+            "required": [
+              "revision",
+              "asset_id"
+            ],
             "properties": {
-              "revision": { "type": "string" },
-              "asset_id": { "type": "string" },
-              "line_ids": { "type": "array", "items": { "type": "string" } },
-              "line_id": { "type": "string" },
-              "input_granularity": { "type": "string", "enum": ["word", "mora", "phoneme"] },
-              "language": { "type": ["string", "null"] },
-              "coordinate_space": { "type": "string", "enum": ["text", "ruby"] },
-              "ruby_id": { "type": "string" },
-              "base_range": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } },
-              "granularity": { "type": "string", "enum": ["word", "mora", "phoneme"] },
-              "title": { "type": ["string", "null"] },
-              "artist": { "type": ["string", "null"] },
-              "album": { "type": ["string", "null"] }
+              "revision": {
+                "type": "string"
+              },
+              "asset_id": {
+                "type": "string"
+              },
+              "line_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "line_id": {
+                "type": "string"
+              },
+              "input_granularity": {
+                "type": "string",
+                "enum": [
+                  "word",
+                  "mora",
+                  "phoneme"
+                ]
+              },
+              "language": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "coordinate_space": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "ruby"
+                ]
+              },
+              "ruby_id": {
+                "type": "string"
+              },
+              "base_range": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "integer"
+                }
+              },
+              "granularity": {
+                "type": "string",
+                "enum": [
+                  "word",
+                  "mora",
+                  "phoneme"
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "artist": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "album": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
             },
             "additionalProperties": true
           }
@@ -1534,90 +2361,575 @@
       },
       "JobEvent": {
         "type": "object",
-        "required": ["schema_version", "job_id", "seq", "kind", "state_version"],
+        "required": [
+          "schema_version",
+          "job_id",
+          "seq",
+          "kind",
+          "state_version"
+        ],
         "properties": {
-          "schema_version": { "const": "studio-job-event-v1" }, "job_id": { "type": "string" },
-          "seq": { "type": "integer", "minimum": 1 }, "kind": { "type": "string" },
-          "stage": { "type": ["string", "null"] }, "completed": { "type": ["integer", "null"] },
-          "total": { "type": ["integer", "null"] }, "message": { "type": ["string", "null"] },
-          "state_version": { "type": "integer", "minimum": 0 }, "created_at": { "type": "string" }
+          "schema_version": {
+            "const": "studio-job-event-v1"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string"
+          },
+          "stage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completed": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "total": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "created_at": {
+            "type": "string"
+          }
         }
       },
       "JobResult": {
         "type": "object",
-        "required": ["schema_version", "job_id", "binding"],
+        "required": [
+          "schema_version",
+          "job_id",
+          "binding"
+        ],
         "properties": {
-          "schema_version": { "const": "studio-job-result-v1" }, "job_id": { "type": "string" },
-          "binding": { "type": "object", "required": ["project_id", "asset_id", "revision"], "properties": {
-            "project_id": { "type": "string" }, "asset_id": { "type": "string" }, "revision": { "type": "string" }, "revision_sha256": { "type": ["string", "null"] }
-          } },
-          "items": { "type": "array", "items": { "anyOf": [
-            { "$ref": "#/components/schemas/SearchCandidate" },
-            { "$ref": "#/components/schemas/FetchedLyric" },
-            { "$ref": "#/components/schemas/AlignedLine" },
-            { "$ref": "#/components/schemas/TranscriptionSegment" },
-            { "$ref": "#/components/schemas/ReadingProposal" },
-            { "$ref": "#/components/schemas/ForcedAlignmentUnit" }
-          ] } }
-          ,"proposals": { "type": "array", "items": { "$ref": "#/components/schemas/ReadingProposal" } },
-          "units": { "type": "array", "items": { "$ref": "#/components/schemas/ForcedAlignmentUnit" } },
-          "evidence": { "type": "object", "additionalProperties": true }
+          "schema_version": {
+            "const": "studio-job-result-v1"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "binding": {
+            "type": "object",
+            "required": [
+              "project_id",
+              "asset_id",
+              "revision"
+            ],
+            "properties": {
+              "project_id": {
+                "type": "string"
+              },
+              "asset_id": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "string"
+              },
+              "revision_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SearchCandidate"
+                },
+                {
+                  "$ref": "#/components/schemas/FetchedLyric"
+                },
+                {
+                  "$ref": "#/components/schemas/AlignedLine"
+                },
+                {
+                  "$ref": "#/components/schemas/TranscriptionSegment"
+                },
+                {
+                  "$ref": "#/components/schemas/ReadingProposal"
+                },
+                {
+                  "$ref": "#/components/schemas/ForcedAlignmentUnit"
+                }
+              ]
+            }
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadingProposal"
+            }
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForcedAlignmentUnit"
+            }
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": true
+          }
         },
         "additionalProperties": true
       },
       "DictionaryEntryInput": {
         "type": "object",
-        "required": ["surface", "reading"],
+        "required": [
+          "surface",
+          "reading"
+        ],
         "properties": {
-          "surface": { "type": "string", "minLength": 1 },
-          "reading": { "type": "string", "minLength": 1 }
+          "surface": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reading": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "DictionaryEntry": {
         "allOf": [
-          { "$ref": "#/components/schemas/DictionaryEntryInput" },
-          { "type": "object", "required": ["schema_version", "project_id", "id", "updated_at"], "properties": {
-            "schema_version": { "const": "studio-reading-dictionary-entry-v1" },
-            "project_id": { "type": "string" }, "id": { "type": "string" }, "updated_at": { "type": "string", "format": "date-time" }
-          } }
+          {
+            "$ref": "#/components/schemas/DictionaryEntryInput"
+          },
+          {
+            "type": "object",
+            "required": [
+              "schema_version",
+              "project_id",
+              "id",
+              "updated_at"
+            ],
+            "properties": {
+              "schema_version": {
+                "const": "studio-reading-dictionary-entry-v1"
+              },
+              "project_id": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
         ]
       },
       "ReadingDictionary": {
         "type": "object",
-        "required": ["schema_version", "project_id", "items"],
+        "required": [
+          "schema_version",
+          "project_id",
+          "items"
+        ],
         "properties": {
-          "schema_version": { "const": "studio-reading-dictionary-v1" },
-          "project_id": { "type": "string" },
-          "items": { "type": "array", "items": { "$ref": "#/components/schemas/DictionaryEntry" } }
+          "schema_version": {
+            "const": "studio-reading-dictionary-v1"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DictionaryEntry"
+            }
+          }
         }
       },
       "ReadingProposal": {
         "type": "object",
-        "required": ["line_id", "proposal_id", "base_start", "base_end", "base", "reading", "source", "needs_review"],
+        "required": [
+          "line_id",
+          "proposal_id",
+          "base_start",
+          "base_end",
+          "base",
+          "reading",
+          "source",
+          "needs_review"
+        ],
         "properties": {
-          "line_id": { "type": "string" }, "proposal_id": { "type": "string" },
-          "base_start": { "type": "integer", "minimum": 0 }, "base_end": { "type": "integer", "minimum": 1 },
-          "base": { "type": "string" }, "reading": { "type": "string", "minLength": 1 },
-          "source": { "type": "string", "enum": ["dictionary", "sudachi"] }, "needs_review": { "type": "boolean" }
+          "line_id": {
+            "type": "string"
+          },
+          "proposal_id": {
+            "type": "string"
+          },
+          "base_start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "base_end": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "base": {
+            "type": "string"
+          },
+          "reading": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "dictionary",
+              "sudachi"
+            ]
+          },
+          "needs_review": {
+            "type": "boolean"
+          }
         }
       },
-      "SearchCandidate": { "type": "object", "required": ["source", "candidate_id", "title", "match_score"], "properties": { "source": { "type": "string" }, "candidate_id": { "type": "string" }, "title": { "type": "string" }, "artist": { "type": ["string", "null"] }, "album": { "type": ["string", "null"] }, "duration": { "type": ["number", "null"] }, "match_score": { "type": "number" }, "raw": { "type": "object" } } },
-      "FetchedLyric": { "type": "object", "required": ["candidate", "provider_rank", "line_count", "lines"], "properties": { "candidate": { "$ref": "#/components/schemas/SearchCandidate" }, "provider_rank": { "type": "integer" }, "line_count": { "type": "integer" }, "lines": { "type": "array", "items": { "type": "object", "required": ["id", "text"], "properties": { "id": { "type": "string" }, "text": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] } } } } } },
-      "AlignedLine": { "type": "object", "required": ["line_id", "timing_source"], "properties": { "line_id": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "begin_ms": { "type": ["integer", "null"] }, "end_ms": { "type": ["integer", "null"] }, "similarity": { "type": ["number", "null"] }, "score": { "type": ["number", "null"] }, "timing_source": { "type": "string" }, "source_segment_ids": { "type": "array", "items": { "type": "string" } }, "issues": { "type": "array", "items": { "type": "string" } } } },
-      "ForcedAlignmentUnit": { "type": "object", "required": ["line_id", "input_range", "text", "start", "end", "start_ms", "end_ms", "granularity", "confidence"], "properties": { "line_id": { "type": "string" }, "input_range": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } }, "source_range": { "type": "array", "items": { "type": "integer" } }, "text": { "type": "string" }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "start_ms": { "type": ["integer", "null"] }, "end_ms": { "type": ["integer", "null"] }, "granularity": { "type": "string", "enum": ["subword", "word", "character", "mora", "phoneme"] }, "confidence": { "type": ["number", "null"] } } },
-      "TranscriptionSegment": { "type": "object", "required": ["source_segment_id", "text"], "properties": { "source_segment_id": { "type": "string" }, "text": { "type": "string" }, "language": { "type": ["string", "null"] }, "start": { "type": ["number", "null"] }, "end": { "type": ["number", "null"] }, "begin_ms": { "type": ["integer", "null"] }, "end_ms": { "type": ["integer", "null"] }, "confidence": { "type": ["number", "null"] }, "timed_text": { "type": "array", "items": { "type": "object" } } }, "additionalProperties": true },
+      "SearchCandidate": {
+        "type": "object",
+        "required": [
+          "source",
+          "candidate_id",
+          "title",
+          "match_score"
+        ],
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "candidate_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "artist": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "album": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "duration": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "match_score": {
+            "type": "number"
+          },
+          "raw": {
+            "type": "object"
+          }
+        }
+      },
+      "FetchedLyric": {
+        "type": "object",
+        "required": [
+          "candidate",
+          "provider_rank",
+          "line_count",
+          "lines"
+        ],
+        "properties": {
+          "candidate": {
+            "$ref": "#/components/schemas/SearchCandidate"
+          },
+          "provider_rank": {
+            "type": "integer"
+          },
+          "line_count": {
+            "type": "integer"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "text"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "start": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "end": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "AlignedLine": {
+        "type": "object",
+        "required": [
+          "line_id",
+          "timing_source"
+        ],
+        "properties": {
+          "line_id": {
+            "type": "string"
+          },
+          "start": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "end": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "begin_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "end_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "similarity": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "score": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "timing_source": {
+            "type": "string"
+          },
+          "source_segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ForcedAlignmentUnit": {
+        "type": "object",
+        "required": [
+          "line_id",
+          "input_range",
+          "text",
+          "start",
+          "end",
+          "start_ms",
+          "end_ms",
+          "granularity",
+          "confidence"
+        ],
+        "properties": {
+          "line_id": {
+            "type": "string"
+          },
+          "input_range": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "integer"
+            }
+          },
+          "source_range": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "text": {
+            "type": "string"
+          },
+          "start": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "end": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "start_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "end_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "subword",
+              "word",
+              "character",
+              "mora",
+              "phoneme"
+            ]
+          },
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      },
+      "TranscriptionSegment": {
+        "type": "object",
+        "required": [
+          "source_segment_id",
+          "text"
+        ],
+        "properties": {
+          "source_segment_id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "end": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "begin_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "end_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "timed_text": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
       "Job": {
         "type": "object",
-        "required": ["schema_version", "id", "project_id", "kind", "status", "request", "result_available", "state_version"],
+        "required": [
+          "schema_version",
+          "id",
+          "project_id",
+          "kind",
+          "status",
+          "request",
+          "result_available",
+          "state_version"
+        ],
         "properties": {
-          "schema_version": { "const": "studio-job-v1" },
+          "schema_version": {
+            "const": "studio-job-v1"
+          },
           "id": {
             "type": "string"
           },
           "kind": {
             "type": "string"
           },
-          "project_id": { "type": "string" },
+          "project_id": {
+            "type": "string"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -1629,17 +2941,43 @@
               "cancelled"
             ]
           },
-          "request": { "type": "object", "additionalProperties": true },
-          "result_available": { "type": "boolean" },
-          "error": { "type": ["object", "null"] },
-          "engine": { "type": ["object", "null"] },
-          "created_at": { "type": "string" }, "updated_at": { "type": "string" },
-          "state_version": { "type": "integer", "minimum": 0 }
+          "request": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "result_available": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "engine": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       },
       "JobList": {
         "type": "object",
-        "required": ["schema_version", "items"],
+        "required": [
+          "schema_version",
+          "items"
+        ],
         "properties": {
           "schema_version": {
             "const": "studio-job-list-v1"
@@ -1766,20 +3104,122 @@
       },
       "DocumentSaveResponse": {
         "allOf": [
-          { "$ref": "#/components/schemas/DocumentEnvelope" },
-          { "type": "object", "required": ["saved"], "properties": {
-            "saved": { "type": "object", "required": ["id", "etag", "sha256", "created_at"], "properties": {
-              "id": { "type": "string" }, "etag": { "type": "string" }, "sha256": { "type": "string" }, "created_at": { "type": "string" }, "client_seq": { "type": ["integer", "null"] }
-            } }
-          } }
+          {
+            "$ref": "#/components/schemas/DocumentEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "saved"
+            ],
+            "properties": {
+              "saved": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "etag",
+                  "sha256",
+                  "created_at"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "etag": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "client_seq": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
         ]
       },
       "ImportCandidate": {
-        "type": "object", "required": ["schema_version", "project_id", "input_revision", "candidate", "diagnostics", "saved"],
+        "type": "object",
+        "required": [
+          "schema_version",
+          "project_id",
+          "input_revision",
+          "candidate",
+          "diagnostics",
+          "saved"
+        ],
         "properties": {
-          "schema_version": { "const": "studio-import-v1" }, "project_id": { "type": "string" }, "input_revision": { "type": ["string", "null"] },
-          "candidate": { "type": "object", "required": ["format"], "properties": { "format": { "enum": ["ttml", "lrc", "text"] }, "ttml": { "type": "string" }, "text": { "type": "string" }, "lines": { "type": "array", "items": { "type": "object", "required": ["begin_ms", "text"], "properties": { "begin_ms": { "type": ["integer", "null"] }, "text": { "type": "string" } } } } } },
-          "diagnostics": { "type": "array", "items": { "type": "object" } }, "saved": { "const": false }
+          "schema_version": {
+            "const": "studio-import-v1"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "input_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "candidate": {
+            "type": "object",
+            "required": [
+              "format"
+            ],
+            "properties": {
+              "format": {
+                "enum": [
+                  "ttml",
+                  "lrc",
+                  "text"
+                ]
+              },
+              "ttml": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "begin_ms",
+                    "text"
+                  ],
+                  "properties": {
+                    "begin_ms": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "saved": {
+            "const": false
+          }
         }
       },
       "DocumentShell": {
@@ -1813,7 +3253,12 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["id", "text", "begin_ms", "end_ms"],
+              "required": [
+                "id",
+                "text",
+                "begin_ms",
+                "end_ms"
+              ],
               "properties": {
                 "id": {
                   "type": "string"
@@ -1822,11 +3267,17 @@
                   "type": "string"
                 },
                 "begin_ms": {
-                  "type": ["integer", "null"],
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
                   "minimum": 0
                 },
                 "end_ms": {
-                  "type": ["integer", "null"],
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
                   "minimum": 0
                 }
               }
@@ -1839,6 +3290,52 @@
             }
           }
         }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       }
     }
   }

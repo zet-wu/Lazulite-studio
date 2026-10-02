@@ -1,0 +1,3 @@
+# Optional real vocal separation runtime
+demucs==4.0.1
+soundfile==0.13.1

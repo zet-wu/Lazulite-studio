@@ -47,7 +47,7 @@ def stamp():
 
 def create_app(
     data_dir: str | Path | None = None, settings: Settings | None = None, engine=None,
-    reading_proposer=None, forced_aligner=None, publisher=None,
+    reading_proposer=None, forced_aligner=None, publisher=None, separator_factory=None,
 ) -> FastAPI:
     cfg = settings or Settings.from_env()
     if not cfg.origin or (not cfg.trusted_gateway and not cfg.password):
@@ -60,6 +60,9 @@ def create_app(
     db, media = Database(root / "studio.sqlite3"), MediaService(root)
     revisions = RevisionStore(db, root / "revisions")
     revisions.recover()
+    from .vocals import VocalRunner
+    from .vocal_routes import build_vocal_router, vocal_asset
+    vocal_runner = VocalRunner(db, root / 'vocals', separator_factory)
     configured_engine_instance = engine or configured_engine()
     if forced_aligner is not None:
         from .forced import ForcedAlignmentRunner
@@ -452,17 +455,18 @@ def create_app(
         )
 
     @api.get("/projects/{pid}/audio")
-    def audio(pid: str, _: object = Depends(auth)):
+    def audio(pid: str, vocal: str | None = None, _: object = Depends(auth)):
         r, a = asset_for(pid)
         if not a:
             fail("audio_not_found", "audio not found", 404)
-        asset = asset_model(a)
+        asset = vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(a)
         proxy = media.playback_proxy(asset)
         return FileResponse(proxy.path, media_type=proxy.mime_type)
 
     @api.get("/projects/{pid}/waveform")
     def waveform(
         pid: str,
+        vocal: str | None = None,
         level: int = 0,
         start_ms: int = 0,
         end_ms: int = 1_000,
@@ -470,7 +474,7 @@ def create_app(
     ):
         _, a = asset_for(pid)
         try:
-            asset = asset_model(a)
+            asset = vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(a)
             peaks = media.peaks(asset, level=level, start_ms=start_ms, end_ms=end_ms)
         except MediaError as exc:
             fail("waveform_invalid", str(exc), 422)
@@ -488,13 +492,13 @@ def create_app(
         }
 
     @api.get("/projects/{pid}/pcm")
-    def pcm_window(pid: str, start_ms: int, end_ms: int, _: object = Depends(auth)):
+    def pcm_window(pid: str, start_ms: int, end_ms: int, vocal: str | None = None, _: object = Depends(auth)):
         """Read a PCM proxy window of at most 4,020,000 milliseconds (FFT context included)."""
         _, row = asset_for(pid)
         if not row:
             fail("audio_not_found", "audio not found", 404)
         try:
-            data, rate, channels = media.pcm_window(asset_model(row), start_ms=start_ms, end_ms=end_ms)
+            data, rate, channels = media.pcm_window(vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(row), start_ms=start_ms, end_ms=end_ms)
         except MediaError as exc:
             fail("pcm_invalid", str(exc), 422)
         return Response(data, media_type="application/octet-stream", headers={"X-Sample-Rate": str(rate), "X-Channels": str(channels), "Cache-Control": "private, max-age=60"})
@@ -513,6 +517,17 @@ def create_app(
         return root / "assets" / row[1][:2] / row[1]
 
     def validate_job_request(pid, kind, params):
+        if kind == 'vocal':
+            row = project(pid)
+            if not row[2] or params.get('asset_id') != row[2]: fail('job_input_invalid', '人声任务需要当前项目源音频', 422)
+            if set(params) - {'asset_id', 'retry_analysis_id'}: fail('job_input_invalid', '人声参数由服务配置', 422)
+            if params.get('retry_analysis_id'):
+                try: result, _ = vocal_runner.get(pid, params['retry_analysis_id'])
+                except KeyError: fail('job_input_invalid', '可重用人声不存在', 422)
+                if result['source_asset_id'] != row[2] or result['status'] != 'separated': fail('job_input_invalid', '只可重试当前源音频的未完成分析', 422)
+            params['model_name'] = os.getenv('STUDIO_VOCAL_MODEL', 'htdemucs')
+            params['device'] = os.getenv('STUDIO_VOCAL_DEVICE', 'cpu')
+            return
         if kind == "publish":
             fail("publish_endpoint_required", "publish jobs must use /projects/{pid}/publish", 422)
         # Automated proposals must identify the immutable inputs they bind to.
@@ -559,8 +574,9 @@ def create_app(
             return c.execute("SELECT 1 FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone() is not None
 
     publish_runner = PublishRunner(revisions, asset_path_for_project, root / "exports", publisher=publisher)
-    job_service = JobService(db, engine=configured_engine_instance, asset_path=asset_path_for_project, reading_runner=reading_runner, publish_runner=publish_runner)
+    job_service = JobService(db, engine=configured_engine_instance, asset_path=asset_path_for_project, reading_runner=reading_runner, publish_runner=publish_runner, vocal_runner=vocal_runner)
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
+    api.include_router(build_vocal_router(vocal_runner, auth=auth, project_exists=project))
     api.include_router(build_dictionary_router(ReadingDictionary(db), auth=auth, write=write, project_exists=project))
     api.include_router(build_router(DocumentService(revisions), auth=auth, write=write, project_exists=project))
     from .lyric_sources import build_sources_router
