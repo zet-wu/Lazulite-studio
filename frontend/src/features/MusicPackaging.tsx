@@ -1,3 +1,4 @@
+import { usePreference } from './editor/use-preference';
 import { collectOutputIssues, uniqueOutputIssues, DocumentOutputError, type OutputIssue } from '../adapters/output-validation';
 import { jobsApi } from '../adapters/http/jobs';
 import { useEffect, useState } from 'react';
@@ -14,7 +15,7 @@ export function MusicPackaging({ projectId, document, saveForPackaging, onIssues
  const client = useQueryClient();
  const info = useQuery({ queryKey:['packaging',projectId], queryFn:async (): Promise<Info> => { const r=await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/packaging`,{headers:requestHeaders(),credentials:'include'}); if (!r.ok) throw new Error('无法读取源文件打包信息'); return r.json(); } });
  const exports = useQuery({ queryKey:['exports',projectId], queryFn:()=>publishingApi.list(projectId), refetchInterval:q=>q.state.data?.items.some(i=>active.has(i.status)) ? 1500 : false });
- const [kind,setKind] = useState<LrcKind>('lrc'), [track,setTrack] = useState<number | null>(null), [busy,setBusy] = useState(false), [message,setMessage] = useState('');
+ const [kind,setKind] = usePreference<LrcKind>(`studio:packaging:project:${projectId}`, 'lrc', (v): v is LrcKind => v === 'lrc' || v === 'elrc'), [track,setTrack] = useState<number | null>(null), [busy,setBusy] = useState(false), [message,setMessage] = useState('');
  useEffect(()=>{onIssues([]);},[kind,track,document,onIssues]);
  const [captured,setCaptured] = useState<LyricDocument | null>(null);
  const recent=exports.data?.items.find(item=>item.status==='succeeded' && item.download_url);

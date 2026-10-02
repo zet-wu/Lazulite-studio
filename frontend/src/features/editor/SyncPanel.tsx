@@ -1,3 +1,4 @@
+import { usePreference } from './use-preference';
 import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import type { LyricDocument } from '../../domain/lyric-document';
@@ -7,14 +8,14 @@ import { visibleLineOrdinals } from '../../adapters/output-validation';
 import type { TransportHandle } from '../MediaTransport';
 import styles from './semantic-editor.module.css';
 
-type Props = { document: LyricDocument; cursor: SyncCursor | null; targetVersion?: number; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
+type Props = { preferenceScope?: string; document: LyricDocument; cursor: SyncCursor | null; targetVersion?: number; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
 
-export function SyncPanel({ document, cursor, targetVersion, apply, transport, onCursor }: Props) {
+export function SyncPanel({ document, cursor, targetVersion, apply, transport, onCursor, preferenceScope = 'local:untitled' }: Props) {
   const units = useMemo(() => syncUnits(document), [document]);
-  const [mode, setMode] = useState<SyncMode>('continuous');
+  const [mode, setMode] = usePreference<SyncMode>('studio:sync-mode', 'continuous', (v): v is SyncMode => v === 'continuous' || v === 'line');
   const [completed, setCompleted] = useState(false);
   const keys = useShortcuts();
-  const [offsetMs, setOffsetMs] = useState(0);
+  const [offsetMs, setOffsetMs] = usePreference<number>(`studio:sync-offset:${preferenceScope}`, 0, (v): v is number => Number.isSafeInteger(v));
   const [emptyBeats, setEmptyBeats] = useState(0);
   const [error, setError] = useState('');
   const index = syncIndex(units, cursor);
@@ -77,6 +78,7 @@ export function SyncPanel({ document, cursor, targetVersion, apply, transport, o
     <span className={styles.syncQuote}><span>{word?.text}</span>{ruby && <b> → {ruby.reading}</b>}</span>
     <small className={styles.syncTime}>{beginMs === null ? '—' : (beginMs / 1e3).toFixed(3)}–{endMs === null ? '—' : (endMs / 1e3).toFixed(3)} s</small>
     <select aria-label="打轴模式" value={mode} onChange={event => { setMode(event.target.value as SyncMode); setCompleted(false); }}><option value="continuous">连续</option><option value="line">本行</option></select>
+    {offsetMs !== 0 && <small>输入偏移 {offsetMs} ms <button onClick={() => setOffsetMs(0)}>归零</button></small>}
     {emptyBeats > 0 && <small>空拍 {emptyBeats}/{word?.emptyBeat}</small>}
     {completed && <small role="status">本行已完成</small>}
     <div className={styles.syncButtons}>
@@ -93,7 +95,7 @@ export function SyncPanel({ document, cursor, targetVersion, apply, transport, o
       <button disabled={beginMs === null} onClick={() => audition(true)}>听前段</button>
       <button disabled={endMs === null} onClick={() => audition(false)}>听后段</button>
     {word && word.emptyBeat > 0 && !active?.rubyUnitId && <small>空拍 {emptyBeats}/{word.emptyBeat}：连续轴先计数，再落点</small>}
-    <label>输入偏移（毫秒） <input type="number" value={offsetMs} onChange={(event) => setOffsetMs(Number(event.target.value))} /></label>
+    <label>输入偏移（毫秒） <input type="number" value={offsetMs} onChange={(event) => setOffsetMs(Math.round(Number(event.target.value)))} /></label>
     <button disabled={beginMs === null || !transport?.current} onClick={() => { if (beginMs !== null && transport?.current) setOffsetMs(Math.round((beginMs - transport.current.getPositionMs()) )); }}>按当前起点校准</button>
     </div></details>
     {error && <p role="alert">{error}</p>}

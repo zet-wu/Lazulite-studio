@@ -1,3 +1,4 @@
+import { usePreference } from './editor/use-preference';
 import { OutputIssues } from './OutputIssues';
 import { collectOutputIssues, uniqueOutputIssues, DocumentOutputError, type OutputIssue } from '../adapters/output-validation';
 import { MusicPackaging } from './MusicPackaging';
@@ -6,9 +7,9 @@ import type { LyricFormat } from '../adapters/lyric-formats';
 import { renderLrc } from '../adapters/lrc';
 import type { LyricDocument } from '../domain/lyric-document';
 import styles from './acquisition.module.css';
-export function PackagingPanel(props: { document: LyricDocument; dirty?: boolean; onExportFormat?: (format: LyricFormat) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument } | undefined>; projectId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
+export function PackagingPanel(props: { title?: string; document: LyricDocument; dirty?: boolean; onExportFormat?: (format: LyricFormat) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument } | undefined>; projectId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
  const [blocking,setBlocking] = useState<OutputIssue[]>([]), [message,setMessage] = useState('');
- const [format, setFormat] = useState<LyricFormat>('ttml');
+ const [format, setFormat] = usePreference<LyricFormat>(`studio:download:${props.projectId ? `project:${props.projectId}` : `local:${props.title}`}`, 'ttml', (v): v is LyricFormat => typeof v === 'string' && ['ttml','txt','lrc','elrc','eslrc','qrc','yrc','lys','ass'].includes(v));
  useEffect(()=>{setBlocking([]);setMessage('');},[props.document,props.projectId,format]);
  const issues=uniqueOutputIssues([...collectOutputIssues(props.document,'ttml'),...collectOutputIssues(props.document,'publish'),...blocking]);
  let overlap: number[] = [];
