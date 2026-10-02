@@ -17,7 +17,6 @@ export function shiftLineTimes(document: LyricDocument, lineIds: string[], delta
   const shiftedLines = document.lines.map((line): LyricLine => {
     if (!selected.has(line.id)) return line;
     return { ...line, beginMs: shifted(line.beginMs, deltaMs), endMs: shifted(line.endMs, deltaMs),
-      endLink: line.endLink ? { ...line.endLink, originalEndMs: shifted(line.endLink.originalEndMs, deltaMs) } : null,
       words: line.words.map((word): LyricWord => ({ ...word, beginMs: shifted(word.beginMs, deltaMs), endMs: shifted(word.endMs, deltaMs),
         rubyUnits: word.rubyUnits.map((unit): RubyUnit => ({ ...unit, beginMs: shifted(unit.beginMs, deltaMs), endMs: shifted(unit.endMs, deltaMs) })),
         alignmentUnits: word.alignmentUnits.map((unit): AlignmentUnit => ({ ...unit, beginMs: shifted(unit.beginMs, deltaMs), endMs: shifted(unit.endMs, deltaMs) })),

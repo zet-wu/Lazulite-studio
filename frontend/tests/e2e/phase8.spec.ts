@@ -130,7 +130,7 @@ test('P8 rejected linked-target batch leaves document, history and selected IDs 
   await page.goto('/editor');
   const xml = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
-    const doc = codec.parseLyricTtml(xml); doc.lines[0].endLink = { targetLineId: 'missing', originalEndMs: 2e3 }; doc.lines[0].endMs = 6e3;
+    const doc = codec.parseLyricTtml(xml); doc.lines[0].endLink = { targetLineId: 'missing'}; doc.lines[0].endMs = 6e3;
     return codec.serializeLyricTtml(doc, { draft: true });
   }, phase7Ttml);
   await importLyrics(page, { name: 'links.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });

@@ -21,7 +21,7 @@ it('removes blank translations at command/import/export boundaries and restores 
   expect(serializeLyricTtml(blank)).not.toContain('x-translation');
   const xml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><p>行<span ttm:role="x-translation"> </span></p></body></tt>';
   expect(parseLyricTtml(xml).lines[0].translations).toEqual([]);
-  state.present.lines[1].endLink = { targetLineId: document.lines[0].id, originalEndMs: null };
+  state.present.lines[1].endLink = { targetLineId: document.lines[0].id};
   expect(() => executeLyricCommand(state, { type: 'set-background-of', lineId: line.id, parentLineId: document.lines[0].id })).toThrow(/行尾链接/);
 });
 

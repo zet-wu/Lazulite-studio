@@ -223,8 +223,8 @@ it.each(['child', 'translation', 'link', 'referenced'])('P3-05 rejects backgroun
   document.lines.push(source);
   if (reason === 'child') document.lines.push({ ...createLine('子背景', 'child'), backgroundOf: source.id });
   if (reason === 'translation') source.translations.push({ language: 'zh', text: '译文保留' });
-  if (reason === 'link') source.endLink = { targetLineId: main.id, originalEndMs: source.endMs };
-  if (reason === 'referenced') main.endLink = { targetLineId: source.id, originalEndMs: main.endMs };
+  if (reason === 'link') source.endLink = { targetLineId: main.id};
+  if (reason === 'referenced') main.endLink = { targetLineId: source.id};
   const snapshot = structuredClone(document), state = createLyricEditorState(document);
   expect(() => executeLyricCommand(state, { type: 'set-background-of', lineId: source.id, parentLineId: main.id })).toThrow();
   expect(state.present).toEqual(snapshot);

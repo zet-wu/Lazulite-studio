@@ -97,7 +97,7 @@ it('preserves line margins and its unchanged link, and limits line-mode successo
   line.words[0].beginMs = 2000; line.words[0].endMs = 8000;
   const next = createLine('two'); next.beginMs = 10000;
   document.lines.push(next);
-  line.endLink = { targetLineId: next.id, originalEndMs: 10000 };
+  line.endLink = { targetLineId: next.id};
   const cursor = syncUnits(document)[0];
   let state = createLyricEditorState(document);
   state = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 3000 });
@@ -118,7 +118,7 @@ it('updates incoming line links and rejects an excluded word without changing do
   source.words[0].beginMs = 0; source.words[0].endMs = 8000;
   const target = createLine('target'); target.beginMs = 10000; target.endMs = 20000;
   target.words[0].beginMs = 12000; target.words[0].endMs = 18000;
-  source.endLink = { targetLineId: target.id, originalEndMs: 8000 };
+  source.endLink = { targetLineId: target.id};
   document.lines.push(target);
   const state = createLyricEditorState(document), cursor = syncUnits(document)[1];
   const accepted = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 9000 });

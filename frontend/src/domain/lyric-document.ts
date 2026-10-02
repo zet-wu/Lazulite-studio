@@ -45,7 +45,7 @@ export type LyricLine = {
   words: LyricWord[];
   beginMs: TimeMs;
   endMs: TimeMs;
-  endLink: { targetLineId: string; originalEndMs: TimeMs } | null;
+  endLink: { targetLineId: string } | null;
   agentRefs: string[];
   backgroundOf: string | null;
   songPart: string | null;

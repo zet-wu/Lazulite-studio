@@ -59,7 +59,7 @@ def test_e3_draft_end_link_survives_real_project_save(tmp_path):
     client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
     ttml = ('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft">'
             '<body><div><p xml:id="a" begin="1" end="3" '
-            'studio:endLink=\'{"targetLineId":"b","originalEndMs":2500}\'>'
+            'studio:endLink=\'{"targetLineId":"b"}\'>'
             '<span begin="1" end="2">中文</span></p>'
             '<p xml:id="b" begin="3" end="4"><span begin="3" end="4">下一句</span></p>'
             '</div></body></tt>')

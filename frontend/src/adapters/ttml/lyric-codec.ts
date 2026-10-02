@@ -118,9 +118,8 @@ function readEndLink(node: Element): LyricLine['endLink'] {
   if (raw === null) return null;
   let value: unknown;
   try { value = JSON.parse(raw); } catch { throw new Error('Invalid draft line end link'); }
-  if (!value || typeof value !== 'object' || typeof (value as { targetLineId?: unknown }).targetLineId !== 'string' ||
-    !((value as { originalEndMs?: unknown }).originalEndMs === null || Number.isSafeInteger((value as { originalEndMs?: unknown }).originalEndMs) && Number((value as { originalEndMs?: unknown }).originalEndMs) >= 0)) throw new Error('Invalid draft line end link');
-  return value as LyricLine['endLink'];
+  if (!value || typeof value !== 'object' || typeof (value as { targetLineId?: unknown }).targetLineId !== 'string') throw new Error('Invalid draft line end link');
+  return { targetLineId: (value as { targetLineId: string }).targetLineId };
 }
 
 function makeWord(node: Node, lineId: string, index: number, lineStart: number, lineEnd: TimeMs, absoluteTimes: boolean): LyricWord | null {

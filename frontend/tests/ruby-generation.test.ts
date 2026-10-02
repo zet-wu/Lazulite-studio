@@ -154,7 +154,7 @@ it('automatic expansion retains link, assignment, reading and empty-generation g
   expect(() => rubyGenerationCommand(document, document, rows, {}, new Set([rows[0].key]), new Set())).toThrow('没有可应用');
   expect(() => rubyGenerationCommand(document, document, [{ ...rows[0], wordId: null }], {}, new Set(), new Set())).toThrow('尚未指定');
   expect(() => rubyGenerationCommand(document, document, [{ ...rows[0], reading: null }], {}, new Set(), new Set())).toThrow('尚未确认');
-  line.endLink = { targetLineId: 'next', originalEndMs: 2000 };
+  line.endLink = { targetLineId: 'next'};
   expect(() => rubyGenerationCommand(document, document, rows, {}, new Set(), new Set())).toThrow('行尾链接');
   expect(line.beginMs).toBe(1000); expect(line.words[0].rubyUnits).toHaveLength(0);
 });

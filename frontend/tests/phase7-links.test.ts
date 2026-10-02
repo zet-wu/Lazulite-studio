@@ -7,13 +7,13 @@ function fixture() {
   const doc = createLyricDocument();
   doc.lines = ['a', 'b', 'c', 'incoming'].map((id, i) => ({ ...createLine(id, id), beginMs: i * 2000, endMs: (i + 1) * 2000, words: [] }));
   doc.lines[0].words = [0, 1].map(i => ({ ...createWord(String(i), `w${i}`), beginMs: i * 1000, endMs: (i + 1) * 1000 }));
-  doc.lines[0].endLink = { targetLineId: 'b', originalEndMs: 2500 };
-  doc.lines[1].endLink = { targetLineId: 'c', originalEndMs: 4500 };
+  doc.lines[0].endLink = { targetLineId: 'b'};
+  doc.lines[1].endLink = { targetLineId: 'c'};
   return doc;
 }
-it('splits linked lines preserving incoming links, cancellation state, target updates and atomic history', () => {
+it('splits linked lines preserving incoming links, current endpoint, target updates and atomic history', () => {
   const doc = fixture(); doc.lines[3].endMs = 0; doc.lines[3].beginMs = 0;
-  doc.lines[3].endLink = { targetLineId: 'a', originalEndMs: 0 };
+  doc.lines[3].endLink = { targetLineId: 'a'};
   const before = createLyricEditorState(doc);
   const split = executeLyricCommand(before, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', translationIndicesForNewLine: [], contentIdsForNewLine: [], backgroundTarget: null });
   expect(split.present.lines[0]).toMatchObject({ id: 'a', endMs: 1000, endLink: null });
@@ -24,18 +24,18 @@ it('splits linked lines preserving incoming links, cancellation state, target up
   expect(parseLyricTtml(serializeLyricTtml(split.present, { draft: true })).lines[1].endLink).toEqual(doc.lines[0].endLink);
   const moved = executeLyricCommand(split, { type: 'set-line-time', lineId: 'b', beginMs: 3000, endMs: 4000 });
   expect(moved.present.lines[1].endMs).toBe(3000);
-  expect(executeLyricCommand(moved, { type: 'unlink-line-end', lineId: 'new' }).present.lines[1].endMs).toBe(2500);
+  expect(executeLyricCommand(moved, { type: 'unlink-line-end', lineId: 'new' }).present.lines[1].endMs).toBe(3000);
   expect(serializeLyricTtml(split.present)).not.toContain('endLink');
 });
-it('merges the internal chain and inherits the last external link and original end', () => {
+it('merges the internal chain and inherits the last external link and current end', () => {
   const doc = fixture(), state = createLyricEditorState(doc);
   const result = executeLyricCommand(state, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' });
   expect(result.present.lines[0]).toMatchObject({ id: 'a', endMs: 4000, endLink: doc.lines[1].endLink });
-  expect(executeLyricCommand(result, { type: 'unlink-line-end', lineId: 'a' }).present.lines[0].endMs).toBe(4500);
+  expect(executeLyricCommand(result, { type: 'unlink-line-end', lineId: 'a' }).present.lines[0].endMs).toBe(4000);
   expect(undoLyricCommand(result).present).toBe(doc);
 });
 it('reports all real conflicts with source ordinals and safely rebinds identical starts', () => {
-  const doc = fixture(); doc.lines[3].endLink = { targetLineId: 'b', originalEndMs: 8000 }; doc.lines[3].endMs = 2000; doc.lines[3].beginMs = 0;
+  const doc = fixture(); doc.lines[3].endLink = { targetLineId: 'b'}; doc.lines[3].endMs = 2000; doc.lines[3].beginMs = 0;
   doc.lines[0].translations = [{ language: 'en', text: 'a' }]; doc.lines[1].translations = [{ language: 'ja', text: 'b' }];
   doc.lines[1].agentRefs = ['v2']; doc.lines[1].songPart = 'verse';
   const issues = lineStructureIssues(doc, doc.lines[0], doc.lines[1]);
@@ -47,7 +47,7 @@ it('reports all real conflicts with source ordinals and safely rebinds identical
   doc.lines[0].beginMs = 2000; doc.lines[0].words = [];
   const safe = executeLyricCommand(state, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' });
   expect(safe.present.lines.at(-1)!.endLink!.targetLineId).toBe('a');
-  doc.lines[0].endLink = { targetLineId: 'c', originalEndMs: 2000 };
+  doc.lines[0].endLink = { targetLineId: 'c'};
   expect(lineStructureIssues(doc, doc.lines[0], doc.lines[1])).toEqual(['L1行尾链接 → L3在合并范围外']);
 });
 it('assigns translations independently with romanization and background in one split and roundtrip', () => {
@@ -69,7 +69,7 @@ it('assigns translations independently with romanization and background in one s
 it('eliminates every internal end link when coincident boundaries merge', () => {
   const doc = fixture();
   doc.lines[0].words = []; doc.lines[0].beginMs = 0; doc.lines[0].endMs = 0;
-  doc.lines[1].beginMs = 0; doc.lines[1].endMs = 0; doc.lines[1].endLink = { targetLineId: 'a', originalEndMs: 1 };
+  doc.lines[1].beginMs = 0; doc.lines[1].endMs = 0; doc.lines[1].endLink = { targetLineId: 'a'};
   const result = executeLyricCommand(createLyricEditorState(doc), { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' });
   expect(result.present.lines[0].endLink).toBeNull();
   expect(undoLyricCommand(result).present).toBe(doc);

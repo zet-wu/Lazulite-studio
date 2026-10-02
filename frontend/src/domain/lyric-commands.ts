@@ -164,9 +164,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const removed = new Set(document.lines.filter((line) => line.id === command.lineId || line.backgroundOf === command.lineId).map((line) => line.id));
       const lines = document.lines.filter((line) => !removed.has(line.id)).map((line) => {
         if (!line.endLink || !removed.has(line.endLink.targetLineId)) return line;
-        const endMs = line.endLink.originalEndMs;
-        if (endMs !== null && line.words.some((word) => word.endMs !== null && word.endMs > endMs)) throw new Error('Cannot remove linked target: original line end excludes a word');
-        return { ...line, endMs, endLink: null };
+        return { ...line, endLink: null };
       });
       const romanizationTracks = document.romanizationTracks.map((track) => ({ ...track, contents: track.contents.filter((content) => !removed.has(content.lineId)) }));
       return { ...document, lines, romanizationTracks };
@@ -370,17 +368,15 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       validTime(line.beginMs, targetBegin);
       if (line.endLink?.targetLineId === target.id) return document;
       const lines = document.lines.slice();
-      lines[index] = { ...line, endMs: targetBegin, endLink: { targetLineId: target.id, originalEndMs: line.endLink?.originalEndMs ?? line.endMs } };
+      lines[index] = { ...line, endMs: targetBegin, endLink: { targetLineId: target.id } };
       return { ...document, lines };
     }
     case 'unlink-line-end': {
       const index = lineIndex(document, command.lineId);
       const line = document.lines[index];
       if (!line.endLink) return document;
-      const endMs = line.endLink.originalEndMs;
-      if (endMs !== null && line.words.some((word) => word.endMs !== null && word.endMs > endMs)) throw new Error('原结束时间早于当前词结束时间');
       const lines = document.lines.slice();
-      lines[index] = { ...line, endMs, endLink: null };
+      lines[index] = { ...line, endLink: null };
       return { ...document, lines };
     }
     case 'set-line-agents': {
