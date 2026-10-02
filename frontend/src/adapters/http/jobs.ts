@@ -292,6 +292,7 @@ const isResult = (value: unknown): value is JobResult => {
   return false;
 };
 export const jobsApi = {
+  createVocal: (projectId: string, asset_id: string, retry_analysis_id?: string) => call<Job>(`/projects/${encodeURIComponent(projectId)}/jobs/vocal`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ params: { asset_id, ...(retry_analysis_id ? {retry_analysis_id} : {}) } }) }),
   capabilities: () =>
     call<Capabilities>("/capabilities").then((value) =>
       validate<Capabilities>(value, isCapabilities, "能力"),

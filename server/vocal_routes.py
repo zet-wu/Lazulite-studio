@@ -21,8 +21,9 @@ def build_vocal_router(runner, *, auth, project_exists):
         try: row, metadata = runner.get(pid, rid)
         except KeyError: raise HTTPException(404, '分析结果不存在')
         if row['status'] != 'ready': raise HTTPException(409, '声学分析尚未完成')
-        if start_ms < 0 or end_ms <= start_ms or end_ms > metadata['duration_ms'] + 1 or not 1 <= buckets <= 4096:
+        if start_ms < 0 or end_ms <= start_ms or not 1 <= buckets <= 4096:
             raise HTTPException(422, '能量视窗无效')
+        end_ms = min(end_ms, metadata['duration_ms'])
         values = np.load(Path(row['directory']) / 'energy.npy', mmap_mode='r', allow_pickle=False)
         hop = metadata['energy_hop_ms']
         first, last = max(0, int(start_ms / hop)), min(len(values), math.ceil(end_ms / hop))

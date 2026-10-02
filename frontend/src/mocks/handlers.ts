@@ -9,6 +9,7 @@ let currentDocument = document;
 let searchConditions={title:'',artist:'',album:''};
 
 export const handlers = [
+  http.get(`${root}/projects/:projectId/vocals`, () => HttpResponse.json({items:[]})),
   http.get(`${root}/projects/:projectId/search-conditions`, () => response(searchConditions)),
   http.put(`${root}/projects/:projectId/search-conditions`, async ({request}) => { searchConditions=await request.json() as typeof searchConditions; return response(searchConditions); }),
   http.get(`${root}/session`, () => scenario() === 'expired' ? error(401, 'session_expired', '登录已过期') : response(session)),

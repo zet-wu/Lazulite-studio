@@ -240,16 +240,17 @@ export const studioApi = {
     endMs?: number,
     level = 8,
     signal?: AbortSignal,
+    vocal?: string | null,
   ) =>
     request(
-      `/projects/${encodeURIComponent(projectId)}/waveform?level=${level}&start_ms=${startMs}${endMs == null ? "" : `&end_ms=${endMs}`}`,
+      `/projects/${encodeURIComponent(projectId)}/waveform?level=${level}&start_ms=${startMs}${endMs == null ? "" : `&end_ms=${endMs}`}${vocal ? `&vocal=${encodeURIComponent(vocal)}` : ""}`,
       isWaveformWindow,
       signal,
     ),
-  audioUrl: (projectId: string) =>
-    `${API_ROOT}/projects/${encodeURIComponent(projectId)}/audio`,
-  getPcmWindow: async (projectId: string, startMs: number, endMs: number, signal?: AbortSignal) => {
-    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/pcm?start_ms=${startMs}&end_ms=${endMs}`, { credentials: 'include', signal });
+  audioUrl: (projectId: string, vocal?: string | null) =>
+    `${API_ROOT}/projects/${encodeURIComponent(projectId)}/audio${vocal ? `?vocal=${encodeURIComponent(vocal)}` : ""}`,
+  getPcmWindow: async (projectId: string, startMs: number, endMs: number, signal?: AbortSignal, vocal?: string | null) => {
+    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/pcm?start_ms=${startMs}&end_ms=${endMs}${vocal ? `&vocal=${encodeURIComponent(vocal)}` : ""}`, { credentials: 'include', signal });
     if (!response.ok) throw new Error(`PCM window request failed: ${response.status}`);
     const rate = Number(response.headers.get('x-sample-rate'));
     const channels = Number(response.headers.get('x-channels'));
@@ -280,4 +281,10 @@ export const studioS4 = {
   },
   saveRichDocument: async (projectId: string, document: ProjectSnapshot, baseRevision: string, operationId: string, seq: number, etag?: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/document`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag ?? `"${baseRevision}"`, "Idempotency-Key": operationId }, body: JSON.stringify({ schema_version: "studio-document-v3", project_id: projectId, revision: baseRevision, client_seq: seq, document }) }); if (!isDocumentEnvelope(result) || !result.revision) throw new ApiError(502, { code: "invalid_response", message: "保存响应无有效 revision", request_id: "", retryable: false }); return { revision: result.revision, etag: `"${result.revision}"` }; },
   importLyrics: async (projectId: string, revision: string, filename: string, content: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/imports?revision=${encodeURIComponent(revision)}`, { method: 'POST', headers: { 'Content-Type': filename.endsWith("ttml") || filename.endsWith("xml") ? "application/ttml+xml" : filename.endsWith(".lrc") ? "text/lrc" : "text/plain", 'Idempotency-Key': crypto.randomUUID() }, body: content }); if (!isImportCandidate(result)) throw new ApiError(502, { code: "invalid_response", message: "导入响应格式无效", request_id: "", retryable: false }); return result; },
+};
+
+export type VocalResult = { id: string; status: 'ready' | 'separated'; source_asset_id: string; duration_ms: number; segments?: import('../../domain/project-document').VocalSegment[]; gain: number; diagnostics?: string[] };
+export const vocalApi = {
+  list: (pid: string) => s4<{ items: VocalResult[] }>(`/projects/${encodeURIComponent(pid)}/vocals`),
+  energy: (pid: string, rid: string, start: number, end: number) => s4<{ start_ms: number; step_ms: number; values: number[] }>(`/projects/${encodeURIComponent(pid)}/vocals/${encodeURIComponent(rid)}/energy?start_ms=${start}&end_ms=${end}&buckets=1000`),
 };

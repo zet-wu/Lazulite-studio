@@ -14,7 +14,7 @@ class Separator:
     cache_identity = {'model': 'test-only', 'weights_sha256': 'test-weights'}
     def separate(self, audio):
         from lazulite.models.audio import AudioBuffer
-        samples = np.zeros((2, 88200), dtype=np.float32)
+        samples = np.zeros((2, round(audio.duration * 44100)), dtype=np.float32)
         samples[:, 22050:66150] = 1.5 * np.sin(np.arange(44100)*0.1)
         return AudioBuffer(samples, 44100, audio.source_id)
     def close(self): pass
@@ -78,3 +78,28 @@ def test_duplicate_and_boundary_cancel_keep_separated_audio(tmp_path):
         assert result['status'] == 'separated'
         retry = client.post('/api/v1/projects/p/jobs/vocal',json={'params':{'asset_id':asset,'retry_analysis_id':result['id']}},headers={'origin':'http://studio'}).json()
         assert wait(client,retry['id'])['status'] == 'succeeded'
+
+
+def test_analysis_failure_is_retryable_and_restart_retains_ready_products(tmp_path, monkeypatch):
+    import lazulite.audio.activity as activity
+    real = activity.analyze_vocals
+    client, db = setup(tmp_path)
+    with client:
+        before=client.get('/api/v1/projects/p/document').json()
+        request={'params':{'asset_id':before['document']['sourceAssetId']}}
+        def fail(*a,**k): raise RuntimeError('injected analysis failure')
+        monkeypatch.setattr(activity,'analyze_vocals',fail)
+        job=client.post('/api/v1/projects/p/jobs/vocal',json=request,headers={'origin':'http://studio'}).json()
+        assert wait(client,job['id'])['status']=='failed'
+        result=client.get('/api/v1/projects/p/vocals').json()['items'][0]
+        assert result['status']=='separated'
+        monkeypatch.setattr(activity,'analyze_vocals',real)
+        request['params']['retry_analysis_id']=result['id']
+        retry=client.post('/api/v1/projects/p/jobs/vocal',json=request,headers={'origin':'http://studio'}).json()
+        assert wait(client,retry['id'])['status']=='succeeded'
+    from server.vocals import VocalRunner
+    orphan=tmp_path/'vocals'/'p'/'orphan';orphan.mkdir();(orphan/'temporary').write_text('partial')
+    runner=VocalRunner(db,tmp_path/'vocals')
+    assert not orphan.exists()
+    assert runner.get('p',result['id'])[0]['status']=='ready'
+    assert (tmp_path/'vocals'/'p'/result['id']/'vocals.flac').is_file()

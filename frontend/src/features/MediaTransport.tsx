@@ -1,3 +1,7 @@
+import { createPortal } from 'react-dom';
+import { VocalTracks } from './VocalTracks';
+import { vocalApi } from '../adapters/http/client';
+import type { Acoustics, VocalSegment } from '../domain/project-document';
 import { IconButton } from '../shared/Controls';
 import { matchesBinding, shortcutInput, useShortcuts } from './shortcuts';
 import { PlaybackSpeed } from './PlaybackSpeed';
@@ -36,6 +40,10 @@ const fmt = (s: number) => {
 };
 const offset = (asset: Asset | null) => (asset?.proxy_offset_ms ?? 0) / 1e3;
 type Props = {
+  timelineHost?: HTMLDivElement | null;
+  acoustics?: Acoustics;
+  onAcoustics?: (acoustics: Acoustics) => void;
+  onAssign?: (lineId: string, segment: VocalSegment) => void;
   projectId: string;
   selectedLine?: { begin_ms: number | null; end_ms: number | null };
   asset: Asset | null;
@@ -59,6 +67,7 @@ export type TransportHandle = {
 };
 
 export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaTransport({
+  timelineHost, acoustics, onAcoustics, onAssign,
   projectId,
   selectedLine,
   asset,
@@ -71,6 +80,12 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   onSelectLine,
 }: Props, ref) {
   const keys = useShortcuts();
+  const results = useQuery({ queryKey:['vocals',projectId], queryFn:()=>vocalApi.list(projectId), refetchInterval:3000, enabled:!!asset });
+  const [playbackVocal,setPlaybackVocal] = useState<string | null>(null);
+  const [graphicChoice,setGraphicChoice] = useState<string | null | undefined>(undefined);
+  const graphicVocal = graphicChoice === undefined ? results.data?.items[0]?.id ?? null : graphicChoice;
+  const switching = useRef<{position:number;playing:boolean} | null>(null);
+  const [loadingSource,setLoadingSource] = useState(false);
   const audio = useRef<HTMLAudioElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const head = useRef<HTMLSpanElement>(null);
@@ -101,9 +116,10 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [error, setError] = useState("");
   const [bpm, setBpm] = useState(120);
   const [snap, setSnap] = useState(true);
-  const [expanded, setExpanded] = useState(true);
+  const [bottomExpanded, setExpanded] = useState(true);
+  const expanded = !!timelineHost || bottomExpanded;
   const [visible, setVisible] = useState({ line: true, word: true, ruby: true, gap: true, spectrum: false });
-  const { width, ratio } = useCanvasMetrics(canvas, expanded);
+  const { width, ratio } = useCanvasMetrics(canvas, expanded, timelineHost);
   const [follow, setFollow] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
   viewportRef.current = { start, span, duration, follow };
@@ -123,9 +139,9 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     ),
   );
   const waveform = useQuery({
-    queryKey: ["waveform", projectId, requestWindow.startMs, requestWindow.endMs, level],
+    queryKey: ["waveform", projectId, graphicVocal, requestWindow.startMs, requestWindow.endMs, level],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      studioApi.getWaveform(projectId, requestWindow.startMs, requestWindow.endMs, level, signal),
+      studioApi.getWaveform(projectId, requestWindow.startMs, requestWindow.endMs, level, signal, graphicVocal),
     enabled: Boolean(asset) && expanded && span > 0 && end > start,
     staleTime: 60000,
   });
@@ -236,7 +252,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       updateDom(range[0]);
       void el.play().catch(() => setError("媒体无法播放，请重试"));
     };
-    const onError = () => setError("媒体无法播放，请重试");
+    const onError = () => { setLoadingSource(false); setError("所选音源无法播放，请重试"); };
     const onPlay = () => {
       setPlaying(true);
       sync();
@@ -334,7 +350,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       });
     };
     draw();
-  }, [endMs, startMs, waveform.data, width, ratio]);
+  }, [endMs, startMs, waveform.data, width, ratio, timelineHost]);
   const zoomAt = (factor: number, fraction: number) => {
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }
     const next = zoomViewport({ startMs, spanMs: Math.round(span * 1e3) }, durationMs, factor, fraction);
@@ -360,7 +376,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   };
   const wheelView = (event: WheelEvent<HTMLDivElement>) => {
     if (!asset || event.ctrlKey || event.metaKey) return;
-    const rect = event.currentTarget.getBoundingClientRect();
+    if ((event.target as Element).closest('input,select,button')) return;
+    const rect = slider.current?.getBoundingClientRect() ?? event.currentTarget.getBoundingClientRect();
     const delta = (event.deltaY || event.deltaX) * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1);
     if (zoomAt(Math.exp(delta * 0.001), (event.clientX - rect.left) / rect.width)) event.preventDefault();
   };
@@ -493,18 +510,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const maxTicks = Math.max(2, Math.floor(width / 82));
   const tickStep = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((value) => span / value <= maxTicks) ?? 600;
   const ticks = span > 0 ? Array.from({ length: Math.min(maxTicks + 1, Math.max(0, Math.floor(end / tickStep) - Math.ceil(start / tickStep) + 1)) }, (_, index) => (Math.ceil(start / tickStep) + index) * tickStep) : [];
-  return (
-    <footer data-transport className={`${styles.footer} ${expanded ? styles.expanded : styles.collapsed}`} onKeyDown={keyDown}>
-      <audio
-        ref={audio}
-        onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; } }}
-        preload="metadata"
-        src={asset ? studioApi.audioUrl(projectId) : undefined}
-      />
-      <div className={styles.header}>
-        <IconButton data-role="secondary" className={styles.play} disabled={disabled} icon={playing ? 'pause' : 'play'} label={playing ? '暂停' : '播放'} onClick={play}/>
-        <span ref={clock}>{fmt(position)} / {fmt(duration)}</span>
-        {expanded && <>
+  const viewportTools = (<>
         <button data-role="secondary"
           disabled={disabled}
           onClick={() => { setFollow(false); setStart(0); setSpan(duration); }}
@@ -521,18 +527,16 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
             {({ line: '行', word: '词', ruby: '注音', gap: '空隙', spectrum: '声谱图' })[key]}
           </button>)}
         </div>
-        </>}
-        <button data-role="secondary" className={`icon-button ${styles.timelineToggle}`} aria-label={expanded ? "收起时间轴" : "展开时间轴"} title={expanded ? "收起时间轴" : "展开时间轴"} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>
-          <svg width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d={expanded ? "M1 1h10L6 7z" : "M1 7h10L6 1z"} fill="currentColor" /></svg>
-        </button>
-      </div>
-      {expanded && <>
-      <div id="timeline-plots" className={styles.timelinePlots}>
+</>);
+  const plots = (
+      <div id="timeline-plots" className={styles.timelinePlots} onWheel={wheelView}>
+      {timelineHost && <div className={styles.header}>{viewportTools}</div>}
+      <label>波形／声谱图音源 <select aria-label="波形／声谱图音源" value={graphicVocal??''} onChange={e=>setGraphicChoice(e.target.value||null)}><option value="">原曲</option>{results.data?.items.map((r,i)=><option key={r.id} value={r.id}>人声 {results.data.items.length-i}</option>)}</select></label>
       <div className={styles.ruler} aria-label="时间标尺" onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={() => { panDrag.current = null; }}>{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
+      {timelineHost && acoustics && onAcoustics && onAssign && <VocalTracks projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} positionMs={Math.round(position*1000)} selectedLineId={selectedLineId??null} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()}/>}
       <div
         ref={slider}
         className={styles.waveWrap}
-        onWheel={wheelView}
         onPointerDown={beginPan}
         onPointerMove={movePan}
         onPointerUp={endPan}
@@ -571,8 +575,29 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           visible={visible}
           apply={onTimelineCommand} onSelectLine={onSelectLine} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setError} />
       </>}
-      {visible.spectrum && asset && <SpectrogramCanvas assetIdentity={`${asset.id}:${asset.asset_hash}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
+      {visible.spectrum && asset && <SpectrogramCanvas vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
       </div>
+  );
+  return (
+    <footer data-transport className={`${styles.footer} ${expanded && !timelineHost ? styles.expanded : styles.collapsed}`} onKeyDown={keyDown}>
+      <audio
+        ref={audio}
+        onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; const captured=switching.current; if(captured){audio.current.currentTime=captured.position; switching.current=null;setLoadingSource(false);if(captured.playing)void audio.current.play().catch(e=>setError(e.message));} } }}
+        preload="metadata"
+        src={asset ? studioApi.audioUrl(projectId, playbackVocal) : undefined}
+      />
+      <div className={styles.header}>
+        <IconButton data-role="secondary" className={styles.play} disabled={disabled} icon={playing ? 'pause' : 'play'} label={playing ? '暂停' : '播放'} onClick={play}/>
+        <span ref={clock}>{fmt(position)} / {fmt(duration)}</span>
+        <label>播放音源 <select aria-label="播放音源" value={playbackVocal??''} onChange={e=>{const el=audio.current; switching.current={position:el?.currentTime??0,playing:!!el&&!el.paused};el?.pause();setLoadingSource(true);setPlaybackVocal(e.target.value||null);}}><option value="">原曲</option>{results.data?.items.map((r,i)=><option key={r.id} value={r.id}>人声 {results.data.items.length-i}</option>)}</select></label>
+        {loadingSource&&<span role="status">正在加载音源…</span>}
+        {expanded && !timelineHost && viewportTools}
+        {!timelineHost && <button data-role="secondary" className={`icon-button ${styles.timelineToggle}`} aria-label={expanded ? "收起时间轴" : "展开时间轴"} title={expanded ? "收起时间轴" : "展开时间轴"} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>
+          <svg width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d={expanded ? "M1 1h10L6 7z" : "M1 7h10L6 1z"} fill="currentColor" /></svg>
+        </button>}
+      </div>
+      {expanded && <>
+      {timelineHost ? createPortal(plots, timelineHost) : plots}
       <div className={styles.controls}>
         <PlaybackSpeed rate={rate} disabled={disabled} change={changeRate} />
         <button data-role="secondary"

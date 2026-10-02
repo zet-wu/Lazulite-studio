@@ -1,3 +1,7 @@
+import { VocalPanel } from '../VocalPanel';
+import { VOCAL_LINE_MIME } from '../VocalTracks';
+import vocalStyles from '../vocal.module.css';
+import type { ProjectDocument, ProjectCommand } from '../../domain/project-document';
 import { visibleLineOrdinals, type OutputIssue } from '../../adapters/output-validation';
 import { AcquisitionStore } from '../../acquisition-store';
 import { useSearchConditions } from '../useSearchConditions';
@@ -46,6 +50,11 @@ const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
 const PreviewMode = lazy(() => import('./PreviewMode').then((module) => ({ default: module.PreviewMode })));
 
 type Props = {
+  project?: ProjectDocument;
+  applyProject?: (command: ProjectCommand) => void;
+  audioDurationMs?: number;
+  onTimelineHost?: (host: HTMLDivElement | null) => void;
+  assignmentError?: { lineId: string; message: string; objectIds: string[] } | null;
   title: string;
   projectId?: string;
   document: LyricDocument;
@@ -87,7 +96,7 @@ export function EditorWorkspace(props: Props) {
   const clipboardToken = useRef('');
   const pageRef = useRef<HTMLDivElement>(null);
   const wordInputs = useRef(new Map<string, HTMLInputElement>());
-  const [mode, setMode] = useState<'acquire' | 'edit' | 'sync' | 'preview' | 'package' | 'auxiliary'>('edit');
+  const [mode, setMode] = useState<'audio' | 'acquire' | 'edit' | 'sync' | 'preview' | 'package' | 'auxiliary'>('edit');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [columns, setColumns] = useState(readColumnPreferences);
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -259,6 +268,20 @@ export function EditorWorkspace(props: Props) {
     } else selectLine(line);
     requestLocate(line.id,focus);
   };
+  const assignmentIssues: OutputIssue[] = props.assignmentError ? props.assignmentError.objectIds.map(id=>{
+    const line=document.lines.find(l=>l.id===props.assignmentError!.lineId);
+    const base={lineId:props.assignmentError!.lineId,missing:[],message:props.assignmentError!.message} satisfies Omit<OutputIssue,'kind'>;
+    const word=line?.words.find(w=>w.id===id||w.rubyUnits.some(u=>u.id===id)||w.alignmentUnits.some(u=>u.id===id));
+    if(word){const ruby=word.rubyUnits.find(u=>u.id===id);return {...base,kind:ruby?'ruby':'word',wordId:word.id,...(ruby?{rubyId:ruby.id}:{})} as OutputIssue;}
+    for(const track of document.romanizationTracks)for(const content of track.contents)if(content.lineId===line?.id&&content.kind==='timed'&&content.units.some(u=>u.id===id))return {...base,kind:'romanization-unit',trackId:track.id,contentId:content.id,unitId:id} as OutputIssue;
+    return {...base,kind:'line'} as OutputIssue;
+  }) : [];
+  useEffect(()=>{
+    if(!props.assignmentError)return;
+    const paint=()=>{for(const id of props.assignmentError!.objectIds)for(const attr of ['data-line-id','data-word-id','data-ruby-id','data-romanization-unit-id','data-timeline-key'])globalThis.document.querySelectorAll(`[${attr}="${CSS.escape(id)}"]`).forEach(el=>el.setAttribute('data-assignment-error',''));};
+    paint();const observer=new MutationObserver(paint);observer.observe(pageRef.current!,{childList:true,subtree:true});
+    return()=>{observer.disconnect();globalThis.document.querySelectorAll('[data-assignment-error]').forEach(el=>el.removeAttribute('data-assignment-error'));};
+  },[props.assignmentError,mode]);
   const dispatch = (command: LyricCommand) => {
     try { apply(command); setMessage(''); return true; }
     catch (error) { setMessage(error instanceof Error ? error.message : '编辑失败'); return false; }
@@ -615,7 +638,16 @@ export function EditorWorkspace(props: Props) {
   }}>
     <EditorMenu {...props} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} />
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
-    <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['edit','编辑'],['sync','打轴'],['preview','预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
+    <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['audio','音频处理'],['edit','编辑'],['sync','打轴'],['preview','预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
+    {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.project.sourceAssetId ? <div className={vocalStyles.audioLayout}>
+      <aside className={vocalStyles.outline} aria-label="音频处理大纲"><h2>大纲</h2>{document.lines.map(line => <div className={vocalStyles.outlineItem} key={line.id}>
+        <div onClick={() => selectLine(line)}><OutlineRow line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} selected={selectedLine?.id===line.id}/></div>
+        <button data-role="inline" draggable aria-label={`拖动分配 L${ordinalById.get(line.backgroundOf ?? line.id)}${line.backgroundOf?' 背景':''}`} onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed='copy';}}>↗</button>
+        <small>{line.beginMs===null?'未定起点':`${(line.beginMs/1000).toFixed(3)} s`} – {line.endMs===null?'未定终点':`${(line.endMs/1000).toFixed(3)} s`}</small>
+        {props.assignmentError?.lineId===line.id && <div role="alert" className={vocalStyles.error}>{props.assignmentError.message}{assignmentIssues.map((issue,i)=><button data-role="secondary" key={i} onClick={()=>locateIssue(issue)}>定位{issue.kind==='ruby'?'注音':issue.kind==='word'?'词':issue.kind==='romanization-unit'?'音译单元':'行'}{i+1}</button>)}</div>}
+      </div>)}</aside>
+      <main className={vocalStyles.main}><VocalPanel projectId={props.projectId} project={props.project} apply={props.applyProject} durationMs={props.audioDurationMs ?? 0}/><div className={vocalStyles.host} ref={props.onTimelineHost}/></main>
+    </div> : <section className={styles.auxiliaryPlaceholder}><h1>人声分离与声学分析</h1><p>请先在项目列表上传音频并建立项目，再进行人声处理。当前本地歌词可继续编辑和导出。</p><a href="/projects">前往项目列表</a></section>)}
     {mode === 'acquire' && <LyricAcquisition store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
     {mode === 'package' && <PackagingPanel {...props} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
     {mode === 'auxiliary' && <section className={styles.auxiliaryPlaceholder}><h1>项目辅助</h1><p>候选、任务、词典与审核流程将在后续阶段整理到此处。歌词文档与播放器保持当前状态。</p></section>}

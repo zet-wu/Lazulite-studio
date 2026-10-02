@@ -1,7 +1,7 @@
 import { useEffect, useState, type RefObject } from 'react';
 
 /** Resize and monitor moves between desktop displays with different DPR. */
-export function useCanvasMetrics(ref: RefObject<HTMLCanvasElement | null>, enabled = true) {
+export function useCanvasMetrics(ref: RefObject<HTMLCanvasElement | null>, enabled = true, mountIdentity?: unknown) {
   const [metrics, setMetrics] = useState({ width: 640, ratio: window.devicePixelRatio || 1 });
   useEffect(() => {
     const canvas = ref.current;
@@ -16,6 +16,6 @@ export function useCanvasMetrics(ref: RefObject<HTMLCanvasElement | null>, enabl
     const observer = new ResizeObserver(measure);
     observer.observe(canvas); watch(); measure();
     return () => { observer.disconnect(); resolution.removeEventListener('change', changed); };
-  }, [ref, enabled]);
+  }, [ref, enabled, mountIdentity]);
   return metrics;
 }
