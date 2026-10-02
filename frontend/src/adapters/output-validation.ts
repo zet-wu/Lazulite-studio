@@ -1,9 +1,10 @@
+import { AGENT_TYPES } from '../domain/lyric-document';
 import type { LyricDocument, LyricLine, TimeMs } from '../domain/lyric-document';
 import type { LyricFormat } from './lyric-formats';
 export type OutputIssue = {
-  kind: 'line' | 'word' | 'ruby' | 'romanization-content' | 'romanization-unit';
-  lineId: string; wordId?: string; rubyId?: string; trackId?: string; contentId?: string; unitId?: string;
-  code?: 'missing-time' | 'invalid-range' | 'unsupported-order' | 'empty-content';
+  kind: 'agent' | 'line' | 'word' | 'ruby' | 'romanization-content' | 'romanization-unit';
+  lineId: string; agentId?: string; wordId?: string; rubyId?: string; trackId?: string; contentId?: string; unitId?: string;
+  code?: 'invalid-agent-type' | 'missing-time' | 'invalid-range' | 'unsupported-order' | 'empty-content';
   missing: ('begin' | 'end')[]; message: string;
 };
 export class DocumentOutputError extends Error {
@@ -12,6 +13,7 @@ export class DocumentOutputError extends Error {
 export function visibleLineOrdinals(document: LyricDocument) { return new Map(document.lines.filter(l=>!l.backgroundOf).map((l,i)=>[l.id,i+1])); }
 export function collectOutputIssues(document: LyricDocument, target: LyricFormat | 'publish'): OutputIssue[] {
  const issues: OutputIssue[] = [], ordinals=visibleLineOrdinals(document);
+ if (target === 'ttml' || target === 'publish') for (const agent of document.agents) if (!AGENT_TYPES.some(type => type === agent.type)) issues.push({ kind: 'agent', lineId: '', agentId: agent.id, code: 'invalid-agent-type', missing: [], message: `歌手 ${agent.id}：${agent.type ? `非法 type ${agent.type}` : '缺少 type'}` });
  const label=(line: LyricLine)=>`第 ${ordinals.get(line.backgroundOf ?? line.id)} 行${line.backgroundOf ? ' · 背景' : ''}`;
  const add=(base: Omit<OutputIssue,'missing'|'message'>, prefix: string, begin: TimeMs, end: TimeMs, requireEnd: boolean, extra?: string)=>{
    const missing: OutputIssue['missing'] = [...(begin === null ? ['begin' as const] : []), ...(requireEnd && end === null ? ['end' as const] : [])];
@@ -61,7 +63,7 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
 export function assertOutputDocument(document: LyricDocument,target: LyricFormat | 'publish') { const issues=collectOutputIssues(document,target);if(issues.length)throw new DocumentOutputError(issues); }
 
 export function outputIssueKey(issue: OutputIssue) {
- return JSON.stringify([issue.kind,issue.lineId,issue.wordId,issue.rubyId,issue.trackId,issue.contentId,issue.unitId,issue.code ?? 'missing-time',issue.missing]);
+ return JSON.stringify([issue.kind,issue.agentId,issue.lineId,issue.wordId,issue.rubyId,issue.trackId,issue.contentId,issue.unitId,issue.code ?? 'missing-time',issue.missing]);
 }
 export function uniqueOutputIssues(issues: OutputIssue[]) {
  return [...new Map(issues.map(issue=>[outputIssueKey(issue),issue])).values()];

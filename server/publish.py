@@ -54,6 +54,9 @@ def validate_publish_ttml(path: str | Path, max_duration: float | None = None) -
         root = ET.parse(path).getroot()
     except (ET.ParseError, OSError, UnicodeError, ValueError) as exc:
         raise PublishInvalid("revision is not readable TTML") from exc
+    for agent in root.iter("{http://www.w3.org/ns/ttml#metadata}agent"):
+        if agent.get("type") not in {"person", "character", "group", "organization", "other"}:
+            raise PublishInvalid(f"歌手 {agent.get('{http://www.w3.org/XML/1998/namespace}id')}：缺失或非法 type")
     lines = root.findall(".//{%s}p" % TTML_NS)
     if not lines:
         raise PublishInvalid("lyrics must contain at least one line")

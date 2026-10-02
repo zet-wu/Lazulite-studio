@@ -53,7 +53,10 @@ export type LyricLine = {
   ignoreSync: boolean;
 };
 
+export const AGENT_TYPES = ['person', 'character', 'group', 'organization', 'other'] as const;
+
 export type LyricAgent = {
+  actorRef?: string;
   id: string;
   name: string | null;
   type: string | null;

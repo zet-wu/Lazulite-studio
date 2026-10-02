@@ -95,6 +95,9 @@ def validate_ttml(ttml: str) -> str:
         ref = element.attrib.get("{http://www.w3.org/ns/ttml#metadata}agent", "")
         if any(item not in agents for item in ref.split()):
             raise ValueError("unknown ttm:agent reference")
+    for element in root.iter("{http://www.w3.org/ns/ttml#metadata}actor"):
+        if element.attrib.get("agent") not in agents:
+            raise ValueError("unknown actor agent reference")
     studio_members = "{urn:lazulite:studio:draft}members"
     groups = {e.attrib.get("{http://www.w3.org/XML/1998/namespace}id"): e
               for e in root.iter() if e.tag == "{http://www.w3.org/ns/ttml#metadata}agent" and e.attrib.get(studio_members) is not None}

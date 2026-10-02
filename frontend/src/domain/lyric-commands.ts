@@ -41,6 +41,9 @@ type AtomicLyricCommand =
   | { type: 'set-metadata'; key: string; values: string[] }
   | { type: 'set-language'; language: string | null }
   | { type: 'set-agents'; agents: LyricAgent[] }
+  | { type: 'rename-agent'; id: string; nextId: string }
+  | { type: 'delete-agent'; id: string }
+  | { type: 'rename-metadata'; key: string; nextKey: string }
   | { type: 'sync-stamp'; cursor: SyncCursor; action: SyncAction; timeMs: number; mode?: SyncMode }
   | { type: 'replace-document'; document: LyricDocument }
   | { type: 'split-word'; lineId: string; wordId: string; at: number; newWordId?: string }
@@ -525,7 +528,24 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     case 'set-language':
       if (command.language !== null && !/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(command.language)) throw new Error('Invalid language tag');
       return { ...document, language: command.language };
+    case 'rename-metadata': {
+      if (!Object.hasOwn(document.metadata, command.key)) throw new Error('元数据键不存在');
+      if (command.key === command.nextKey) return document;
+      if (!/^[A-Za-z][\w.-]*$/.test(command.nextKey) || Object.hasOwn(document.metadata, command.nextKey)) throw new Error('元数据键非法或已存在');
+      return { ...document, metadata: Object.fromEntries(Object.entries(document.metadata).map(([key, values]) => [key === command.key ? command.nextKey : key, values])) };
+    }
+    case 'rename-agent': {
+      if (!document.agents.some(a => a.id === command.id)) throw new Error('歌手不存在');
+      if (command.id === command.nextId) return document;
+      if (!/^[A-Za-z_][\w.-]*$/.test(command.nextId) || document.agents.some(a => a.id === command.nextId)) throw new Error('歌手 ID 非法或已存在');
+      return { ...document, agents: document.agents.map(a => ({ ...a, id: a.id === command.id ? command.nextId : a.id, ...(a.actorRef === command.id ? { actorRef: command.nextId } : {}) })), lines: document.lines.map(l => ({ ...l, agentRefs: l.agentRefs.map(id => id === command.id ? command.nextId : id) })) };
+    }
+    case 'delete-agent': {
+      if (!document.agents.some(a => a.id === command.id)) throw new Error('歌手不存在');
+      return { ...document, agents: document.agents.filter(a => a.id !== command.id).map(a => { if (a.actorRef !== command.id) return a; const { actorRef: _, ...rest } = a; return rest; }), lines: document.lines.map(l => ({ ...l, agentRefs: l.agentRefs.filter(id => id !== command.id) })) };
+    }
     case 'set-agents':
+      if (command.agents.some(a => a.actorRef !== undefined && !command.agents.some(target => target.id === a.actorRef))) throw new Error('未知 actor 引用');
       if (command.agents.some((agent) => !/^[A-Za-z_][\w.-]*$/.test(agent.id)) || new Set(command.agents.map((agent) => agent.id)).size !== command.agents.length) throw new Error('Invalid or duplicate agent ID');
       if (document.lines.some((line) => line.agentRefs.some((ref) => !command.agents.some((agent) => agent.id === ref)))) throw new Error('An assigned agent cannot be removed');
       return { ...document, agents: command.agents };

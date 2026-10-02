@@ -13,6 +13,29 @@ const MAX_BYTES = 2 * 1024 * 1024;
 const attr = (node: Element, ns: string | null, name: string) => node.getAttributeNS(ns, name);
 const is = (node: Element, ns: string, name: string) => (node.namespaceURI === ns || ns === TTML && node.namespaceURI === null) && node.localName === name;
 
+function readAgent(node: Element): LyricAgent {
+  const id = attr(node, XML, 'id');
+  if (!id) throw new Error('歌手缺少 xml:id');
+  const strict = (element: Element, allowed: string[]) => {
+    for (const a of Array.from(element.attributes)) {
+      if (a.namespaceURI === 'http://www.w3.org/2000/xmlns/') continue;
+      if (allowed.includes(a.namespaceURI ? `{${a.namespaceURI}}${a.localName}` : a.localName)) continue;
+      throw new Error(`歌手 ${id} 的 ${element.localName} 包含不支持的属性 ${a.name}`);
+    }
+  };
+  strict(node, ['type', `{${XML}}id`]);
+  let name: string | null = null, actorRef: string | undefined;
+  for (const child of Array.from(node.children)) {
+    if (is(child, TTM, 'name') && name === null) { strict(child, []); name = textOnly(child, `歌手 ${id} 的 name`); }
+    else if (is(child, TTM, 'actor') && actorRef === undefined) {
+      strict(child, ['agent']);
+      actorRef = attr(child, null, 'agent') ?? '';
+      if (!/^[A-Za-z_][\w.-]*$/.test(actorRef) || child.children.length || child.textContent?.trim()) throw new Error(`歌手 ${id} 的 actor 需要单个 agent 引用且不支持子结构`);
+    } else throw new Error(`歌手 ${id} 包含不支持的结构或重复的 ${child.localName}`);
+  }
+  return { id, name, type: attr(node, null, 'type'), ...(actorRef === undefined ? {} : { actorRef }) };
+}
+
 function parseTime(value: string): number {
   const raw = value.trim();
   const decimalMs = (text: string) => {
@@ -245,21 +268,11 @@ export function parseLyricTtml(xml: string): LyricDocument {
     checkAttributes(head, []);
     for (const child of Array.from(head.children)) {
       if (is(child, TTM, 'agent')) {
-        checkAttributes(child, ['type']);
-        const id = attr(child, XML, 'id');
-        if (!id) throw new Error('Agent needs xml:id');
-        const nameNode = Array.from(child.children).find((item) => is(item, TTM, 'name'));
-        if (Array.from(child.children).some((item) => item !== nameNode)) throw new Error('Unsupported agent structure');
-        agents.push({ id, name: nameNode ? textOnly(nameNode, 'Agent name') : null, type: attr(child, null, 'type') });
+        agents.push(readAgent(child));
       } else if (is(child, TTML, 'metadata')) {
         for (const entry of Array.from(child.children)) {
           if (is(entry, TTM, 'agent')) {
-            checkAttributes(entry, ['type']);
-            const id = attr(entry, XML, 'id');
-            if (!id) throw new Error('Agent needs xml:id');
-            const name = Array.from(entry.children).find((item) => is(item, TTM, 'name'));
-            if (Array.from(entry.children).some((item) => item !== name)) throw new Error('Unsupported agent structure');
-            agents.push({ id, name: name ? textOnly(name, 'Agent name') : null, type: attr(entry, null, 'type') });
+            agents.push(readAgent(entry));
             continue;
           }
           if (is(entry, AMLL, 'meta')) {
@@ -374,6 +387,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
     for (const word of line.words) { quantize(word); word.rubyUnits.forEach(quantize); word.alignmentUnits.forEach(quantize); }
   }
   for (const track of romanizationTracks) for (const content of track.contents) if (content.kind === 'timed') content.units.forEach(quantize);
+  for (const agent of agents) if (agent.actorRef && !agents.some(a => a.id === agent.actorRef)) throw new Error(`歌手 ${agent.id} 的 actor 引用不存在：${agent.actorRef}`);
   return { schemaVersion: LYRIC_SCHEMA_VERSION, lines, romanizationTracks, agents, metadata, language: attr(root, XML, 'lang') };
 }
 
@@ -424,6 +438,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
         name.textContent = agent.name;
         entry.appendChild(name);
       }
+      if (agent.actorRef) { const actor = xml.createElementNS(TTM, 'ttm:actor'); actor.setAttribute('agent', agent.actorRef); entry.appendChild(actor); }
       metadataNode.appendChild(entry);
     }
     if (document.romanizationTracks.length) {
