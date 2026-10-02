@@ -30,7 +30,7 @@ test('P7 linked split, translation ownership and generated timed track persist t
     const path = '/src/adapters/ttml/lyric-codec.ts'; const { parseLyricTtml } = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
     const doc = parseLyricTtml(xml); return { lines: doc.lines.map(line => ({ id: line.id, beginMs: line.beginMs, endMs: line.endMs, endLink: line.endLink, translations: line.translations, text: line.words.map(w => w.text).join(''), reading: line.words.flatMap(w => w.rubyUnits.map(r => r.reading)) })), tracks: doc.romanizationTracks };
   }, xml);
-  const draft = await semantics(saved.document.ttml);
+  const draft = await semantics(saved.document.lyrics.draftTtml);
   expect(draft.lines[0].endLink).toEqual({ targetLineId: 'context', originalEndMs: 4e3 });
   expect(draft.lines[1]).toMatchObject({ endLink: null, endMs: 5e3, translations: [{ language: 'en', text: 'first' }] });
   expect(draft.lines[2]).toMatchObject({ endLink: { targetLineId: 'missing', originalEndMs: 6e3 }, translations: [{ language: 'zh-Hans', text: '后行' }] });

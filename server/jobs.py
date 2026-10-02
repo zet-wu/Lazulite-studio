@@ -109,7 +109,7 @@ class JobService:
                 project = c.execute("SELECT source_asset_id,current_revision FROM projects WHERE id=?", (record[1],)).fetchone()
                 bound_revision = request.get("revision")
                 bound_asset = request.get("asset_id")
-                rev = c.execute("SELECT ttml_path FROM revisions WHERE id=? AND project_id=?", (bound_revision, record[1])).fetchone()
+                rev = c.execute("SELECT project_path FROM revisions WHERE id=? AND project_id=?", (bound_revision, record[1])).fetchone()
                 if not rev:
                     raise RuntimeError("bound revision disappeared")
                 with open(rev[0], "rb") as source:

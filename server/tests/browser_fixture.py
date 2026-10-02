@@ -1,3 +1,4 @@
+from server.project_document import initial_project, read_lyrics
 """Temporary project server for the browser save/reopen integration test."""
 import subprocess
 from pathlib import Path
@@ -18,7 +19,7 @@ def create_browser_app():
     with db.transaction() as connection:
         connection.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)", ("phase2", "浏览器集成项目", None, None, "now", "now"))
     fixture = Path(__file__).resolve().parents[2] / "tests/fixtures/ttml/phase2-multitrack.ttml"
-    store.create("phase2", fixture.read_text(encoding="utf-8"), None)
+    store.create("phase2", initial_project(fixture.read_text(encoding="utf-8"), None), None)
     audio = root / 'offset.m4a'
     subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=8.123', '-af', 'asetpts=PTS+2/TB', '-c:a', 'aac', str(audio)], check=True)
     ttml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div>' + ''.join(f'<p xml:id="media-{i}" begin="1.123" end="3.985"><span begin="1.123" end="3.985">合成媒体行{i}</span></p>' for i in range(3)) + '</div></body></tt>'

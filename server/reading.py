@@ -1,5 +1,7 @@
 """Japanese reading proposals and the small project dictionary store."""
 from __future__ import annotations
+from io import StringIO
+from .project_document import read_lyrics
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -267,11 +269,11 @@ class ReadingJobRunner:
         revision = params.get("revision")
         with self.db.connect() as conn:
             row = conn.execute(
-                "SELECT ttml_path FROM revisions WHERE id=? AND project_id=?", (revision, project_id)
+                "SELECT project_path FROM revisions WHERE id=? AND project_id=?", (revision, project_id)
             ).fetchone()
         if not row:
             raise ValueError("reading revision not found")
-        projected = project_ttml(Path(row[0]))
+        projected = project_ttml(StringIO(read_lyrics(row[0])))
         selected = params.get("line_ids")
         if selected is not None:
             selected_set = set(selected)

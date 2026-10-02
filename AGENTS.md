@@ -8,10 +8,10 @@ Lazulite Studio 处于初期开发阶段。优先把当前功能做好，保持�
 - **保持单一实现。** 新实现接管功能后删除被替代的代码、无用类型、配置和测试，不长期并存新旧路径。
 - **简化代码，不削弱当前功能的正确性。** 撤销/重做、保存一致性、必要的输入校验和清楚的错误提示属于功能本身，应按实际需求保留。
 - **按行为验证。** 对有实际风险的编辑、序列化和保存行为补充针对性测试；不要为低影响改动堆砌测试或让测试固化已经废弃的设计。
-- **文档反映代码。** 完成功能时同步更新相关说明，区分已实现、已验证和计划内容。当前开发方案见 `../lyric-workflow/docs/studio-search-release-review/Review-phase4/plan.md`。
+- **文档反映代码。** 完成功能时同步更新相关说明，区分已实现、已验证和计划内容。当前开发方案见 `../lyric-workflow/docs/studio-vocal-review/Review-phase0/plan.md`。
 - **提交规范。** 提交标题使用中文，应简短，并且一次提交只聚焦一项改动，不要把大幅重构合并到一次提交里。
 
-- **文档归属。** 开发方案、过程、人工审阅、验收和证据统一放并列 lyric-workflow。本轮依据 `docs/studio-search-release-review/Review-phase4/plan.md`，实施在同目录 `implementation.md`，证据在 `docs/studio-search-release-review/evidence/phase4/`。此前编辑审阅位于 `docs/studio-edit-review/Review-phase1–7/`，未调整的语义约束继续有效。本仓库仅保留 AGENTS.md、项目及模块架构说明；可执行测试夹具随代码维护。
+- **文档归属。** 开发方案、过程、人工审阅、验收和证据统一放并列 lyric-workflow。本轮依据 `docs/studio-vocal-review/Review-phase0/plan.md`，实施在同目录 `implementation.md`，证据在 `docs/studio-vocal-review/evidence/phase0/`。此前编辑审阅位于 `docs/studio-edit-review/Review-phase1–7/`，未调整的语义约束继续有效。本仓库仅保留 AGENTS.md、项目及模块架构说明；可执行测试夹具随代码维护。
 - **前端设计。** 采用统一设计语言，以 Material Design 的层级和语义角色为方向，以 Material Design 3 作为具体设计参考，形成适合 Studio 的紧凑桌面样式。
 - **当前目标平台。** Windows 和 macOS 桌面浏览器，采用鼠标和键盘。当前不开发或验收移动端/触屏适配；与历史方案冲突时，以人工审阅讨论结论和当前整改方案为准。
 

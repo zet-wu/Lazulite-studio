@@ -70,8 +70,8 @@ export const handlers = [
   }),
   http.put(`${root}/projects/:projectId/document`, async ({ params, request }) => {
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
-    const body = await request.json() as { revision?: string; document?: { ttml?: string } };
-    currentDocument = { ...currentDocument, revision: 'sample-r2', document: { ...currentDocument.document, ttml: body.document?.ttml ?? currentDocument.document.ttml } };
+    const body = await request.json() as { revision?: string; document?: typeof currentDocument.document };
+    currentDocument = { ...currentDocument, revision: 'sample-r2', document: body.document ?? currentDocument.document };
     const next = currentDocument;
     return HttpResponse.json(next, { headers: { ETag: '"sample-r2"' } });
   }),

@@ -666,7 +666,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
 }
 
 export function executeLyricCommand(state: LyricEditorState, command: LyricCommand): LyricEditorState {
-  const next = command.type === 'batch' ? command.commands.reduce(applyAtomic, state.present) : applyAtomic(state.present, command);
+  const next = applyLyricCommand(state.present, command);
   if (next === state.present) return state;
   return { present: next, past: [...state.past.slice(-(MAX_HISTORY - 1)), state.present], future: [] };
 }
@@ -679,4 +679,8 @@ export function undoLyricCommand(state: LyricEditorState): LyricEditorState {
 export function redoLyricCommand(state: LyricEditorState): LyricEditorState {
   if (!state.future.length) return state;
   return { present: state.future[0], past: [...state.past, state.present], future: state.future.slice(1) };
+}
+
+export function applyLyricCommand(document: LyricDocument, command: LyricCommand): LyricDocument {
+  return command.type === 'batch' ? command.commands.reduce(applyAtomic, document) : applyAtomic(document, command);
 }

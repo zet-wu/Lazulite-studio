@@ -17,9 +17,9 @@ def delete_project(db, root: Path, pid: str):
                 raise HTTPException(404, {'code': 'project_not_found', 'message': '项目不存在', 'retryable': False})
             if c.execute("SELECT 1 FROM jobs WHERE project_id=? AND status IN ('queued','running','cancel_requested')", (pid,)).fetchone():
                 raise HTTPException(409, {'code': 'project_busy', 'message': '项目仍有任务运行，请先取消并等待任务结束', 'retryable': True})
-            revisions = c.execute('SELECT id,ttml_path FROM revisions WHERE project_id=?', (pid,)).fetchall()
+            revisions = c.execute('SELECT id,project_path FROM revisions WHERE project_id=?', (pid,)).fetchall()
             jobs = c.execute('SELECT id,result_json FROM jobs WHERE project_id=?', (pid,)).fetchall()
-            files = [Path(r[1]) for r in revisions] + [root / 'revisions' / f'{pid}.draft.ttml']
+            files = [Path(r[1]) for r in revisions] + [root / 'revisions' / f'{pid}.draft.json']
             for job in jobs:
                 result = json.loads(job[1]) if job[1] else {}
                 if result.get('output_path'):

@@ -8,13 +8,13 @@ test('P3-05/11 saves a background relation through FastAPI and reopens its stabl
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   const saved = await (await page.request.get('/api/v1/projects/phase3-media/document')).json();
-  expect(saved.document.ttml).toContain('x-bg');
+  expect(saved.document.lyrics.draftTtml).toContain('x-bg');
   await page.reload();
   await page.locator('[data-outline-drag]').nth(1).click();
   await expect(page.getByLabel('背景歌词', { exact: true })).toBeChecked();
   await expect(page.getByLabel('所属主行')).toHaveValue('media-0');
   const reopened = await (await page.request.get('/api/v1/projects/phase3-media/document')).json();
-  expect(reopened.document.ttml).toBe(saved.document.ttml);
+  expect(reopened.document.lyrics.draftTtml).toBe(saved.document.lyrics.draftTtml);
 });
 
 test('P3-01/02/09 uses proxy sample zero with nonzero source PTS and plays a precise loop', async ({ page }) => {

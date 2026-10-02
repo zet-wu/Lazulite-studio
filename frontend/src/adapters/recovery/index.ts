@@ -1,9 +1,9 @@
-import type { LyricEditorState } from '../../domain/lyric-commands';
+import { createProjectEditorState, type ProjectEditorState, type ProjectDocument } from '../../domain/project-document';
 import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
-const DATABASE = 'lazulite-studio-recovery-v6';
+const DATABASE = 'lazulite-studio-recovery-project-v1';
 const STORE = 'projects';
-const RECORD_VERSION = 6;
+const RECORD_VERSION = 1;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {
@@ -11,14 +11,14 @@ export type RecoveryRecord = {
   projectId: string;
   documentIdentity: string;
   savedAt: string;
-  state: LyricEditorState;
+  state: ProjectEditorState;
   baseRevision?: string;
 };
 
 export type RecoveryAdapter = {
-  save(slotKey: string, documentIdentity: string, state: LyricEditorState, baseRevision?: string): Promise<void>;
+  save(slotKey: string, documentIdentity: string, state: ProjectEditorState, baseRevision?: string): Promise<void>;
   readCheckpoint(slotKey: string): Promise<RecoveryRecord | null>;
-  load(slotKey: string, documentIdentity: string): Promise<LyricEditorState | null>;
+  load(slotKey: string, documentIdentity: string): Promise<ProjectEditorState | null>;
   clear(slotKey: string): Promise<void>;
   discard(slotKey: string): Promise<void>;
 };
@@ -46,12 +46,14 @@ const transaction = async <T>(mode: IDBTransactionMode, operation: (store: IDBOb
   });
 };
 
-const isState = (value: unknown): value is LyricEditorState => {
+const isState = (value: unknown): value is ProjectEditorState => {
   if (!value || typeof value !== 'object') return false;
-  const candidate = value as LyricEditorState;
+  const candidate = value as ProjectEditorState;
   const validDocument = (document: unknown) => {
     if (!document || typeof document !== 'object') return false;
-    const item = document as LyricDocument;
+    const project = document as ProjectDocument;
+    if (project.schemaVersion !== 'studio-project-v1' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
+    const item = project.lyrics as LyricDocument;
     return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.romanizationTracks) && Array.isArray(item.agents)
       && !!item.metadata && typeof item.metadata === 'object'
       && item.lines.every((line) => !!line && typeof line.id === 'string' && Array.isArray(line.words)
@@ -72,7 +74,7 @@ export function createRecoveryAdapter(): RecoveryAdapter {
   return {
     async save(projectId, documentIdentity, state, baseRevision) {
       if (!projectId || !documentIdentity || !isState(state)) throw new Error('Invalid recovery checkpoint');
-      const record: RecoveryRecord = { version: RECORD_VERSION, projectId, documentIdentity, savedAt: new Date().toISOString(), state, baseRevision };
+      const record: RecoveryRecord = { version: RECORD_VERSION, projectId, documentIdentity, savedAt: new Date().toISOString(), state: createProjectEditorState(state.present), baseRevision };
       await transaction('readwrite', (store) => store.put(record, keyFor(projectId)));
     },
     async readCheckpoint(projectId) {

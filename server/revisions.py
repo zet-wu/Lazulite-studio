@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .db import Database
 from .review_fingerprint import fingerprints
+from .project_document import initial_project, validate_project, read_project, read_lyrics
 
 INITIAL_TTML = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>'
 logger = logging.getLogger(__name__)
@@ -35,23 +36,27 @@ class RevisionStore:
     def create_initial(
         self, project_id: str, *, operation_id: str, subject: str = "local"
     ) -> dict:
-        return self.create(
-            project_id, INITIAL_TTML, None, operation_id=operation_id, subject=subject
-        )
+        with self.db.connect() as conn:
+            row = conn.execute('SELECT source_asset_id FROM projects WHERE id=?', (project_id,)).fetchone()
+        if row is None: raise KeyError(project_id)
+        return self.create(project_id, initial_project(INITIAL_TTML, row[0]), None,
+                           operation_id=operation_id, subject=subject)
 
     def create(
         self,
         project_id: str,
-        ttml: str,
+        snapshot: dict,
         base: str | None,
         *,
         operation_id: str | None = None,
         subject: str = "local",
         client_seq: int | None = None,
     ) -> dict:
-        from .time_units import normalize_ttml
-        ttml = normalize_ttml(ttml)
-        digest = hashlib.sha256(ttml.encode()).hexdigest()
+        with self.db.connect() as conn:
+            snapshot = validate_project(snapshot, conn, project_id)
+        ttml = snapshot['lyrics']['draftTtml']
+        encoded = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
+        digest = hashlib.sha256(encoded).hexdigest()
         request_hash = hashlib.sha256(
             json.dumps(
                 [subject, project_id, base, digest, client_seq], separators=(",", ":")
@@ -76,11 +81,11 @@ class RevisionStore:
             if row[0] != base:
                 raise RevisionConflict(row[0])
             revision = uuid.uuid4().hex
-            path = self.root / f"{revision}.ttml"
-            self._write_atomic(path, ttml.encode())
+            path = self.root / f"{revision}.json"
+            self._write_atomic(path, encoded)
             try:
                 conn.execute(
-                    "INSERT INTO revisions(id,project_id,parent_id,ttml_path,created_at) VALUES(?,?,?,?,?)",
+                    "INSERT INTO revisions(id,project_id,parent_id,project_path,created_at) VALUES(?,?,?,?,?)",
                     (revision, project_id, base, str(path), now),
                 )
                 if (
@@ -95,9 +100,9 @@ class RevisionStore:
                 # document makes prior confirmations stale atomically.
                 old_hashes = {}
                 if base:
-                    old_row = conn.execute("SELECT ttml_path FROM revisions WHERE id=?", (base,)).fetchone()
+                    old_row = conn.execute("SELECT project_path FROM revisions WHERE id=?", (base,)).fetchone()
                     if old_row:
-                        old_root = ET.parse(old_row[0]).getroot()
+                        old_root = ET.fromstring(read_lyrics(old_row[0]))
                         confirmed_ids = [row[0] for row in conn.execute("SELECT line_id FROM review_confirmations WHERE project_id=? AND status='confirmed'", (project_id,)).fetchall()]
                         old_fingerprints = fingerprints(old_root)
                         old_hashes = {line_id: old_fingerprints.get(line_id) for line_id in confirmed_ids}
@@ -139,11 +144,11 @@ class RevisionStore:
             )
         return result
 
-    def read(self, project_id: str, revision: str | None = None) -> tuple[str, str]:
-        """Read an immutable revision and return (revision id, UTF-8 TTML)."""
+    def read(self, project_id: str, revision: str | None = None) -> tuple[str, dict]:
+        """Read an immutable revision and return (revision id, project snapshot)."""
         with self.db.connect() as conn:
             row = conn.execute(
-                "SELECT p.current_revision, r.id, r.ttml_path FROM projects p "
+                "SELECT p.current_revision, r.id, r.project_path FROM projects p "
                 "JOIN revisions r ON r.project_id=p.id AND r.id=COALESCE(?, p.current_revision) "
                 "WHERE p.id=?",
                 (revision, project_id),
@@ -152,10 +157,10 @@ class RevisionStore:
             raise KeyError(project_id if revision is None else revision)
         path = Path(row[2]).resolve()
         root = self.root.resolve()
-        if root not in path.parents or path.suffix != ".ttml":
+        if root not in path.parents or path.suffix != ".json":
             raise ValueError("revision path is outside revision store")
         try:
-            return row[1], path.read_text(encoding="utf-8")
+            return row[1], read_project(path)
         except (OSError, UnicodeError) as exc:
             raise ValueError("revision cannot be read") from exc
 
@@ -175,7 +180,7 @@ class RevisionStore:
             temporary.unlink(missing_ok=True)
 
     def _materialize(self, project_id: str, source: Path) -> None:
-        destination = self.root / f"{project_id}.draft.ttml"
+        destination = self.root / f"{project_id}.draft.json"
         fd, name = tempfile.mkstemp(prefix=f".{project_id}.draft-", dir=self.root)
         temporary = Path(name)
         try:
@@ -192,7 +197,7 @@ class RevisionStore:
         """Materialize the revision currently pointed to, under the DB write lock."""
         with self.db.transaction() as conn:
             row = conn.execute(
-                "SELECT r.ttml_path FROM projects p JOIN revisions r ON r.id=p.current_revision WHERE p.id=?",
+                "SELECT r.project_path FROM projects p JOIN revisions r ON r.id=p.current_revision WHERE p.id=?",
                 (project_id,),
             ).fetchone()
             if row is None:
@@ -211,13 +216,13 @@ class RevisionStore:
         with self.db.connect() as conn:
             revisions = {
                 row[0]: row[1]
-                for row in conn.execute("SELECT id,ttml_path FROM revisions")
+                for row in conn.execute("SELECT id,project_path FROM revisions")
             }
             rows = conn.execute(
                 "SELECT id,current_revision FROM projects WHERE current_revision IS NOT NULL"
             ).fetchall()
-            for path in self.root.glob("*.ttml"):
-                if not path.name.endswith(".draft.ttml") and path.stem not in revisions:
+            for path in self.root.glob("*.json"):
+                if not path.name.endswith(".draft.json") and path.stem not in revisions:
                     path.unlink(missing_ok=True)
         for row in rows:
             self.materialize_current(row[0])

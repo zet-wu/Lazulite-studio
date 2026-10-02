@@ -17,7 +17,7 @@ test('generates 注音, saves through FastAPI and reopens the complete current d
   expect((await savedResponse).status()).toBe(200);
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   const saved = await (await page.request.get('/api/v1/projects/phase2/document')).json();
-  expect(saved.document.ttml).toContain('urn:lazulite:studio:draft');
+  expect(saved.document.lyrics.draftTtml).toContain('urn:lazulite:studio:draft');
   await page.reload();
   await expect(line.getByRole('textbox', { name: '读音 二人', exact: true })).toHaveCount(3);
   expect(await line.getByRole('textbox', { name: '读音 二人', exact: true }).evaluateAll((items) => items.map((item) => (item as HTMLInputElement).value))).toEqual(['ふ', 'た', 'り']);
@@ -26,5 +26,5 @@ test('generates 注音, saves through FastAPI and reopens the complete current d
   await expect(page.getByRole('textbox', { name: '行 line-a开始秒数' })).toHaveValue('0.999');
   const reopened = await (await page.request.get('/api/v1/projects/phase2/document')).json();
   expect(reopened.revision).toBe(saved.revision);
-  expect(reopened.document.ttml).toBe(saved.document.ttml);
+  expect(reopened.document.lyrics.draftTtml).toBe(saved.document.lyrics.draftTtml);
 });

@@ -21,7 +21,7 @@ test('inline annotation and bounded timing survive real save, reopen, undo and r
   await expect(page.getByLabel('词 しん开始秒数')).toHaveValue('4');
   await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   await page.reload(); await expect(page.getByLabel('读音 う结束秒数')).toHaveValue('3.5');
-  const xml = (await (await page.request.get('/api/v1/projects/phase4-background/document')).json()).document.ttml;
+  const xml = (await (await page.request.get('/api/v1/projects/phase4-background/document')).json()).document.lyrics.draftTtml;
   const values = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
     return codec.parseLyricTtml(xml).lines.map(line => ({ begin: line.beginMs, end: line.endMs }));

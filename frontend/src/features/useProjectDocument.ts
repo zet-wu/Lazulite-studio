@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listenProjectDeletion, clearProjectLocalData } from "../adapters/project-lifecycle";
 import { createRecoveryAdapter } from "../adapters/recovery";
-import { parseLyricTtml, serializeLyricTtml } from "../adapters/ttml/lyric-codec";
-import {
-  createLyricEditorState,
-  executeLyricCommand,
-  redoLyricCommand,
-  undoLyricCommand,
-  type LyricCommand,
-  type LyricEditorState,
-} from "../domain/lyric-commands";
+import { parseProject, serializeProject } from '../adapters/project-codec';
+import { createProjectEditorState, executeProjectCommand, redoProjectCommand, undoProjectCommand, type ProjectEditorState, type ProjectSnapshot, type ProjectCommand } from '../domain/project-document';
+import type { LyricCommand } from '../domain/lyric-commands';
 
 type Save = (
-  ttml: string,
+  snapshot: ProjectSnapshot,
   baseRevision: string,
   operationId: string,
   sequence: number,
@@ -20,7 +14,7 @@ type Save = (
 ) => Promise<{ revision: string; etag?: string }>;
 export function useProjectDocument(
   projectId: string,
-  initialTtml: string,
+  initialSnapshot: ProjectSnapshot,
   initialRevision: string,
   initialEtag: string | undefined,
   saveDocument: Save,
@@ -28,8 +22,8 @@ export function useProjectDocument(
   const identity = projectId;
   const deletedRef = useRef(false);
   const [deleted, setDeleted] = useState(false);
-  const [state, setState] = useState<LyricEditorState>(() =>
-    createLyricEditorState(parseLyricTtml(initialTtml)),
+  const [state, setState] = useState<ProjectEditorState>(() =>
+    createProjectEditorState(parseProject(initialSnapshot)),
   );
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -49,7 +43,7 @@ export function useProjectDocument(
     uuid: string;
     seq: number;
     base: string;
-    xml: string;
+    snapshot: ProjectSnapshot;
   } | null>(null);
   const recoveryQueue = useRef<Promise<void>>(Promise.resolve());
   const enqueueRecovery = useCallback((operation: () => Promise<void>) => {
@@ -58,14 +52,14 @@ export function useProjectDocument(
     return next;
   }, []);
   const checkpoint = useCallback(
-    async (next: LyricEditorState) => {
+    async (next: ProjectEditorState) => {
       if (deletedRef.current) return;
       await enqueueRecovery(async () => { if (!deletedRef.current) await createRecoveryAdapter().save(projectId, identity, next, revision); });
     },
     [enqueueRecovery, identity, projectId, revision],
   );
   const commit = useCallback(
-    (next: LyricEditorState) => {
+    (next: ProjectEditorState) => {
       ++sequence.current;
       setDirty(true);
       setError(null);
@@ -77,7 +71,7 @@ export function useProjectDocument(
   );
   const dispatch = useCallback(
     (command: LyricCommand) => {
-      const next = executeLyricCommand(stateRef.current, command);
+      const next = executeProjectCommand(stateRef.current, { type: 'lyrics', command });
       if (next !== stateRef.current) {
         stateRef.current = next;
         setState(next);
@@ -94,7 +88,7 @@ export function useProjectDocument(
     }
     if (forPackaging && pending.current) throw new Error('上次保存尚未确认，请先重试保存再打包');
     const captured = stateRef.current.present;
-    if (!dirty) return { revision, document: captured };
+    if (!dirty) return { revision, document: captured.lyrics };
     inFlight.current = true;
     setSaving(true);
     try {
@@ -103,13 +97,11 @@ export function useProjectDocument(
           uuid: crypto.randomUUID(),
           seq: sequence.current,
           base: revision,
-          xml: serializeLyricTtml(stateRef.current.present, {
-            draft: true,
-          }),
+          snapshot: serializeProject(stateRef.current.present),
         };
       const request = pending.current;
       const result = await saveDocument(
-        request.xml,
+        request.snapshot,
         request.base,
         request.uuid,
         request.seq,
@@ -132,7 +124,7 @@ export function useProjectDocument(
           result.revision,
         ));
       }
-      return { revision: result.revision, document: captured };
+      return { revision: result.revision, document: captured.lyrics };
     } catch (caught) {
       if ((caught as { status?: number }).status === 404) { deletedRef.current = true; setDeleted(true); }
       if ((caught as { status?: number }).status === 412) setConflict(true);
@@ -151,7 +143,7 @@ export function useProjectDocument(
     return () => window.clearTimeout(timer);
   }, [conflict, deleted, dirty, error, save]);
   const history = useCallback(
-    (change: (s: LyricEditorState) => LyricEditorState) => {
+    (change: (s: ProjectEditorState) => ProjectEditorState) => {
       if (conflict || deletedRef.current) return;
       const next = change(stateRef.current);
       if (next !== stateRef.current) {
@@ -222,7 +214,9 @@ export function useProjectDocument(
   }, [deleted, enqueueRecovery, projectId]);
   return {
     deleted,
-    document: state.present,
+    document: state.present.lyrics,
+    project: state.present,
+    applyProject: (command: ProjectCommand) => history(s => executeProjectCommand(s, command)),
     state,
     revision,
     dirty,
@@ -237,8 +231,8 @@ export function useProjectDocument(
     restore,
     discardRecovery,
     reloadRecovery: recover,
-    undo: () => history(undoLyricCommand),
-    redo: () => history(redoLyricCommand),
+    undo: () => history(undoProjectCommand),
+    redo: () => history(redoProjectCommand),
     canUndo: state.past.length > 0,
     canRedo: state.future.length > 0,
     clearConflict: () => setConflict(false),

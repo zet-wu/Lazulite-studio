@@ -1654,20 +1654,110 @@
       },
       "DocumentEnvelope": {
         "type": "object",
-        "required": ["schema_version", "project_id", "revision", "document"],
+        "required": [
+          "schema_version",
+          "project_id",
+          "revision",
+          "document"
+        ],
         "properties": {
-          "schema_version": { "const": "studio-document-v2" },
-          "project_id": { "type": "string" },
-          "revision": { "type": ["string", "null"] },
-          "etag": { "type": "string" },
-          "sha256": { "type": "string" },
-          "client_seq": { "type": ["integer", "null"], "minimum": 0 },
+          "schema_version": {
+            "const": "studio-document-v3"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "etag": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "client_seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
           "document": {
             "type": "object",
-            "required": ["schema_version", "ttml"],
+            "required": [
+              "schemaVersion",
+              "sourceAssetId",
+              "lyrics",
+              "acoustics"
+            ],
             "properties": {
-              "schema_version": { "const": "studio-document-content-v2" },
-              "ttml": { "type": "string", "maxLength": 2097152 }
+              "schemaVersion": {
+                "const": "studio-project-v1"
+              },
+              "sourceAssetId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lyrics": {
+                "type": "object",
+                "required": [
+                  "draftTtml"
+                ],
+                "properties": {
+                  "draftTtml": {
+                    "type": "string",
+                    "maxLength": 2097152
+                  }
+                },
+                "additionalProperties": false
+              },
+              "acoustics": {
+                "type": "object",
+                "required": [
+                  "analysisId",
+                  "segments"
+                ],
+                "properties": {
+                  "analysisId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "segments": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "beginMs",
+                        "endMs"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "beginMs": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "endMs": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
             },
             "additionalProperties": false
           }

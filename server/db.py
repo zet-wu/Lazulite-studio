@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS assets (
  metadata TEXT, created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS revisions (
- id TEXT PRIMARY KEY, project_id TEXT NOT NULL, parent_id TEXT, ttml_path TEXT NOT NULL,
+ id TEXT PRIMARY KEY, project_id TEXT NOT NULL, parent_id TEXT, project_path TEXT NOT NULL,
  created_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id)
 );
 CREATE TABLE IF NOT EXISTS idempotency (

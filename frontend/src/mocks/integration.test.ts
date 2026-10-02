@@ -16,14 +16,14 @@ describe('MSW contract scenarios over real request paths', () => {
     expect(list.items[0]?.id).toBe('sample-project');
     expect(project.name).toContain('星の手紙');
     expect(jobs.items[0]?.status).toBe('succeeded');
-    expect(document.document.ttml).toContain('line-6');
+    expect(document.document.lyrics.draftTtml).toContain('line-6');
   });
 
   it.each(['empty', 'error', 'expired'])('handles %s scenario with contract shaped response', async (value) => {
     scenario(value);
     if (value === 'empty') {
       await expect(studioApi.listProjects()).resolves.toMatchObject({ schema_version: 'studio-project-list-v1', items: [] });
-      await expect(studioApi.getDocument('sample-project')).resolves.toMatchObject({ document: { ttml: expect.stringContaining('<div/>') } });
+      await expect(studioApi.getDocument('sample-project')).resolves.toMatchObject({ document: { lyrics: { draftTtml: expect.stringContaining('<div/>') } } });
     }
     if (value === 'error') {
       await expect(studioApi.listProjects()).rejects.toMatchObject({ status: 503, body: { code: 'service_unavailable', retryable: true } });
@@ -39,11 +39,11 @@ describe('MSW contract scenarios over real request paths', () => {
 
   it('saves rich document through PUT and reopens the committed revision', async () => {
     const before = await studioS4.getDocumentEnvelope('sample-project');
-    const nextTtml = before.document.ttml.replace('夜の風が静かに吹く', '保存後の文字');
-    const saved = await studioS4.saveRichDocument('sample-project', nextTtml, before.revision, 'mock-save', 1, before.etag);
+    const nextTtml = before.document.lyrics.draftTtml.replace('夜の風が静かに吹く', '保存後の文字');
+    const saved = await studioS4.saveRichDocument('sample-project', { ...before.document, lyrics: { draftTtml: nextTtml } }, before.revision, 'mock-save', 1, before.etag);
     expect(saved.revision).toBe('sample-r2');
     const reopened = await studioS4.getDocumentEnvelope('sample-project');
     expect(reopened.revision).toBe(saved.revision);
-    expect(reopened.document.ttml).toContain('保存後の文字');
+    expect(reopened.document.lyrics.draftTtml).toContain('保存後の文字');
   });
 });

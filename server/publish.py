@@ -45,13 +45,13 @@ def _time(value: str | None) -> float | None:
     return None
 
 
-def validate_publish_ttml(path: str | Path, max_duration: float | None = None) -> dict[str, Any]:
+def validate_publish_ttml(path: str | Path, max_duration: float | None = None, *, xml: bool = False) -> dict[str, Any]:
     """Validate final-publish invariants; overlapping lines are intentional and allowed."""
     try:
         from .documents import validate_ttml
-        raw = Path(path).read_text(encoding="utf-8")
+        raw = str(path) if xml else Path(path).read_text(encoding="utf-8")
         validate_ttml(raw)
-        root = ET.parse(path).getroot()
+        root = ET.fromstring(raw)
     except (ET.ParseError, OSError, UnicodeError, ValueError) as exc:
         raise PublishInvalid("revision is not readable TTML") from exc
     for agent in root.iter("{http://www.w3.org/ns/ttml#metadata}agent"):
@@ -127,13 +127,14 @@ class PublishRunner:
         revision = request["revision"]
         _, _ = self.revisions.read(project_id, revision)
         with self.revisions.db.connect() as c:
-            row = c.execute("SELECT ttml_path FROM revisions WHERE id=? AND project_id=?", (revision, project_id)).fetchone()
+            row = c.execute("SELECT project_path FROM revisions WHERE id=? AND project_id=?", (revision, project_id)).fetchone()
         if not row:
             raise PublishInvalid("revision not found")
         with self.revisions.db.connect() as c:
             bound = c.execute('SELECT p.source_asset_id,p.name,a.filename FROM projects p JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?', (project_id,)).fetchone()
         if not bound or bound[0] != request['asset_id']: raise PublishInvalid('bound asset changed')
-        source = Path(row[0])
+        from .project_document import read_lyrics
+        source_xml = read_lyrics(row[0])
         asset = Path(self.asset_path(project_id))
         from mutagen import File
         from mutagen.mp4 import MP4
@@ -141,9 +142,8 @@ class PublishRunner:
         media = File(asset)
         ttml = None
         if isinstance(media, MP4):
-            validate_publish_ttml(source, media_duration_ms(asset) / 1_000)
-            tree = ET.parse(source)
-            root = tree.getroot()
+            validate_publish_ttml(source_xml, media_duration_ms(asset) / 1_000, xml=True)
+            root = ET.fromstring(source_xml)
             # Convert only validated, fully untimed whitespace spans to text in place.
             for parent in root.iter():
                 previous = None

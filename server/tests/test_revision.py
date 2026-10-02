@@ -1,3 +1,4 @@
+from server.project_document import initial_project, read_lyrics
 from pathlib import Path
 from server.time_units import normalize_ttml
 
@@ -13,24 +14,24 @@ def test_revision_cas_and_recovery(tmp_path: Path):
             "INSERT INTO projects VALUES(?,?,?,?,?,?)",
             ("p", "demo", None, None, "now", "now"),
         )
-    first = store.create("p", "<tt><p>one</p></tt>", None)
+    first = store.create("p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>one</p></tt>", None), None)
     try:
-        store.create("p", "<tt><p>bad</p></tt>", None)
+        store.create("p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>bad</p></tt>", None), None)
     except RevisionConflict as exc:
         assert exc.current == first["id"]
     else:
         raise AssertionError("CAS must reject stale base")
-    (tmp_path / "revisions" / "orphan.ttml").write_text("partial")
+    (tmp_path / "revisions" / "orphan.json").write_text("partial")
     store.recover()
-    assert not (tmp_path / "revisions" / "orphan.ttml").exists()
-    draft = tmp_path / "revisions" / "p.draft.ttml"
+    assert not (tmp_path / "revisions" / "orphan.json").exists()
+    draft = tmp_path / "revisions" / "p.draft.json"
     before = draft.read_text()
     with db.transaction() as conn:
         conn.execute(
             "CREATE TRIGGER reject_revision_update BEFORE UPDATE OF current_revision ON projects BEGIN SELECT RAISE(ABORT, 'blocked'); END"
         )
     try:
-        store.create("p", "<tt><p>blocked</p></tt>", first["id"])
+        store.create("p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>blocked</p></tt>", None), first["id"])
     except Exception:
         pass
     with db.connect() as conn:
@@ -58,7 +59,7 @@ def test_initial_revision_is_idempotent_and_recovery_replaces_stale_draft(
     try:
         store.create(
             "p",
-            "<tt><p>other</p></tt>",
+            initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>other</p></tt>", None),
             first["id"],
             operation_id="op-1",
             subject="user",
@@ -69,21 +70,21 @@ def test_initial_revision_is_idempotent_and_recovery_replaces_stale_draft(
         raise AssertionError("same operation must reject different content")
     with db.connect() as conn:
         assert conn.execute("SELECT count(*) FROM revisions").fetchone()[0] == 1
-    draft = tmp_path / "revisions" / "p.draft.ttml"
+    draft = tmp_path / "revisions" / "p.draft.json"
     draft.write_text("stale")
     store.recover()
     assert (
-        draft.read_text()
+        read_lyrics(draft)
         == normalize_ttml('<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>')
     )
     original_materialize = store.materialize_current
     store.materialize_current = lambda _: (_ for _ in ()).throw(OSError("disk full"))
     second = store.create(
-        "p", "<tt><p>two</p></tt>", first["id"], operation_id="op-2", subject="user"
+        "p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>two</p></tt>", None), first["id"], operation_id="op-2", subject="user"
     )
     store.materialize_current = original_materialize
     store.recover()
     assert second["id"] != first["id"]
-    assert draft.read_text() == "<tt><p>two</p></tt>"
+    assert "two" in read_lyrics(draft)
     with db.connect() as conn:
         assert conn.execute("SELECT count(*) FROM revisions").fetchone()[0] == 2

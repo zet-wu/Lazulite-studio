@@ -39,9 +39,10 @@ def build_router(db: Database, *, auth: Callable, write: Callable,
             version = current[0] if current else 0
             if if_match is None or if_match.strip('"') != str(version):
                 raise HTTPException(412, {"code": "review_conflict", "message": "review version is stale", "retryable": False})
-            path = c.execute("SELECT ttml_path FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone()[0]
+            path = c.execute("SELECT project_path FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone()[0]
             import xml.etree.ElementTree as ET
-            root = ET.parse(path).getroot()
+            from .project_document import read_lyrics
+            root = ET.fromstring(read_lyrics(path))
             content_hash = fingerprints(root).get(body.line_id)
             if content_hash is None:
                 raise HTTPException(422, {"code": "line_not_found", "message": "line does not exist in document", "retryable": False})

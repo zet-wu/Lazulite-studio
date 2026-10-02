@@ -14,7 +14,7 @@ test('actor references, declaration order and metadata survive actual revision r
  await page.getByLabel('内嵌歌词').selectOption('elrc');await page.getByRole('button',{name:'编辑',exact:true}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByLabel('内嵌歌词')).toHaveValue('elrc');await expect(page.getByLabel('导出格式')).toHaveValue('ttml');
  await page.getByRole('button',{name:'保存并打包'}).click();await expect.poll(()=>link.getAttribute('href'),{timeout:15000}).not.toBe(old);const music=page.waitForEvent('download');await link.click();const path=(await (await music).path())!;
  const embedded=execFileSync('server/.venv/bin/python',['-c','from server.publishing import extract_stpp; from pathlib import Path; import sys; sys.stdout.buffer.write(extract_stpp(Path(sys.argv[1])))',path],{cwd:'..',encoding:'utf8'});
- const saved=(await (await page.request.get('/api/v1/projects/phase0-packaging/document')).json()).document.ttml;
+ const saved=(await (await page.request.get('/api/v1/projects/phase0-packaging/document')).json()).document.lyrics.draftTtml;
  for(const text of [saved,xml,embedded]) {
   const data=await page.evaluate(text=>{const xml=new DOMParser().parseFromString(text,'application/xml'),ns='http://www.w3.org/ns/ttml#metadata';return {ids:Array.from(xml.getElementsByTagNameNS(ns,'agent')).map(a=>a.getAttribute('xml:id')),actor:xml.getElementsByTagNameNS(ns,'actor')[0]?.getAttribute('agent')};},text);
   expect(data).toEqual({ids:['performer','role'],actor:'performer'});expect(text).toContain('甲');expect(text).toContain('乙');

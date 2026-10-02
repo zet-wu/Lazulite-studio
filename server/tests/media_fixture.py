@@ -1,3 +1,4 @@
+from server.project_document import initial_project, read_lyrics
 """Media-backed projects in disposable test databases."""
 import json
 from pathlib import Path
@@ -14,4 +15,4 @@ def add_media_project(root: Path, db: Database, store: RevisionStore, project_id
     with db.transaction() as connection:
         connection.execute("INSERT OR IGNORE INTO assets VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", (asset.content_hash, asset.content_hash, asset.size, asset.probe.mime_type, asset.original_name, 1, asset.probe.duration_ms, asset.probe.start_ms, asset.probe.sample_rate, asset.probe.channels, metadata, "now"))
         connection.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)", (project_id, project_id, asset.content_hash, None, "now", "now"))
-    store.create(project_id, ttml, None)
+    store.create(project_id, initial_project(ttml, asset.content_hash), None)

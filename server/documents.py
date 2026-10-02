@@ -23,10 +23,7 @@ _LRC = re.compile(r"\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\](.*)$")
 _LRC_TAGS = re.compile(r"\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]")
 
 
-class DocumentBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    schema_version: str = Field(min_length=1, max_length=80)
-    ttml: str = Field(min_length=1, max_length=MAX_TTML_BYTES)
+from .project_document import ProjectSnapshot
 
 
 class DocumentEnvelope(BaseModel):
@@ -34,7 +31,7 @@ class DocumentEnvelope(BaseModel):
     schema_version: str = Field(min_length=1, max_length=80)
     project_id: str = Field(min_length=1, max_length=200)
     revision: str | None = None
-    document: DocumentBody
+    document: ProjectSnapshot
     client_seq: int | None = Field(default=None, ge=0)
 
 
@@ -123,15 +120,15 @@ class DocumentService:
         self.revisions = revisions
 
     def get(self, project_id: str, revision: str | None = None) -> dict:
-        rev, ttml = self.revisions.read(project_id, revision)
-        validate_ttml(ttml)
-        digest = hashlib.sha256(ttml.encode()).hexdigest()
+        rev, snapshot = self.revisions.read(project_id, revision)
+        import json
+        digest = hashlib.sha256(json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
         return {
-            "schema_version": "studio-document-v2",
+            "schema_version": "studio-document-v3",
             "project_id": project_id,
             "revision": rev,
             "etag": f'"{rev}"',
-            "document": {"schema_version": "studio-document-content-v2", "ttml": ttml},
+            "document": snapshot,
             "sha256": digest,
         }
 
@@ -141,7 +138,7 @@ class DocumentService:
 
     def save(self, body: DocumentEnvelope, *, if_match: str | None,
              operation_id: str | None, subject: str = "local") -> dict:
-        if body.schema_version != "studio-document-v2" or body.document.schema_version != "studio-document-content-v2":
+        if body.schema_version != "studio-document-v3":
             raise HTTPException(422, {"code": "document_schema_unsupported", "message": "unsupported document schema version", "retryable": False})
         if not body.project_id:
             raise ValueError("project_id is required")
@@ -154,8 +151,7 @@ class DocumentService:
         if body.revision is not None and body.revision != base:
             raise HTTPException(412, {"code": "revision_conflict", "message": "body revision does not match If-Match", "retryable": False})
         try:
-            ttml = validate_ttml(body.document.ttml)
-            result = self.revisions.create(body.project_id, ttml, base,
+            result = self.revisions.create(body.project_id, body.document.model_dump(), base,
                 operation_id=operation_id, subject=subject, client_seq=body.client_seq)
         except KeyError as exc:
             raise HTTPException(404, {"code": "project_not_found", "message": "project or revision not found", "retryable": False}) from exc

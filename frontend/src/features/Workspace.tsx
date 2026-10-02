@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { studioApi, studioS4, type Asset } from '../adapters/http/client';
 import { DocumentOutputError, type OutputIssue } from '../adapters/output-validation';
 import { exportLyricFile, type LyricFormat } from '../adapters/lyric-formats';
+import type { ProjectSnapshot } from '../domain/project-document';
 import type { LyricLine } from '../domain/lyric-document';
 import { MediaTransport, type TransportHandle } from './MediaTransport';
 import { EditorWorkspace } from './editor/EditorWorkspace';
@@ -22,14 +23,14 @@ export function Workspace({ projectId }: { projectId: string }) {
   const project = useQuery({ queryKey: ['project', projectId], queryFn: () => studioApi.getProject(projectId) });
   if (envelope.isLoading || envelope.isFetching) return <main>正在加载歌词…</main>;
   if (envelope.isError || !envelope.data) return <main><p role="alert">{(envelope.error as {status?:number})?.status === 404 ? '项目不存在或已删除' : '无法打开项目文档'}</p><button data-role="secondary" onClick={() => void envelope.refetch()}>重试</button></main>;
-  return <ProjectEditor key={`${projectId}:${envelope.data.revision}`} projectId={projectId} title={project.data?.name ?? '歌词项目'} initialTtml={envelope.data.document.ttml}
+  return <ProjectEditor key={`${projectId}:${envelope.data.revision}`} projectId={projectId} title={project.data?.name ?? '歌词项目'} initialSnapshot={envelope.data.document}
     initialRevision={envelope.data.revision ?? ''} asset={project.data?.asset ?? null} />;
 }
 
-function ProjectEditor({ projectId, title, initialTtml, initialRevision, asset }: { projectId: string; title: string; initialTtml: string; initialRevision: string; asset: Asset | null }) {
+function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, asset }: { projectId: string; title: string; initialSnapshot: ProjectSnapshot; initialRevision: string; asset: Asset | null }) {
   const transport = useRef<TransportHandle>(null);
   const [params, setParams] = useSearchParams();
-  const editor = useProjectDocument(projectId, initialTtml, initialRevision, undefined,
+  const editor = useProjectDocument(projectId, initialSnapshot, initialRevision, undefined,
     async (xml, base, operationId, sequence, etag) => {
       const saved = await studioS4.saveRichDocument(projectId, xml, base, operationId, sequence, etag);
       return { revision: saved.revision, etag: saved.etag };

@@ -1,3 +1,5 @@
+import json
+from server.project_document import initial_project
 import time
 import threading
 from fastapi.testclient import TestClient
@@ -34,8 +36,8 @@ def seed_project(db, root=None):
         conn.execute("INSERT INTO assets VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", ("a", "a" * 64, 1, "audio/wav", "demo.wav", 1, 1, 0, 16000, 1, "{}", "t"))
         conn.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)", ("p", "demo", "a", "r", "t", "t"))
         if root is not None:
-            path = root / "r.ttml"
-            path.write_text('<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>')
+            path = root / "r.json"
+            path.write_text(json.dumps(initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>', 'a')))
             conn.execute("INSERT INTO revisions VALUES(?,?,?,?,?)", ("r", "p", None, str(path), "t"))
 
 

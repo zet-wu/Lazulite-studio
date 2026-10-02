@@ -1,3 +1,7 @@
+import { createProjectDocument, type ProjectSnapshot } from '../domain/project-document';
+import { serializeProject } from '../adapters/project-codec';
+import { parseLyricTtml } from '../adapters/ttml/lyric-codec';
+const snapshot = (xml: string) => serializeProject(createProjectDocument(parseLyricTtml(xml)));
 import { act, renderHook } from "@testing-library/react";
 import { StrictMode } from "react";
 import { readFileSync } from "node:fs";
@@ -22,10 +26,10 @@ const XML =
 const hook = () =>
   useProjectDocument(
     "p",
-    XML,
+    snapshot(XML),
     "r1",
     undefined,
-    (xml: string, base: string, op: string, seq: number, etag?: string) =>
+    (xml: ProjectSnapshot, base: string, op: string, seq: number, etag?: string) =>
       saveMock(xml, base, op, seq, etag),
   );
 
@@ -69,7 +73,7 @@ describe("useProjectDocument save lifecycle", () => {
     await act(async () => resolve({ revision: "r2", etag: '"r2"' }));
     expect(result.current.dirty).toBe(true);
     const checkpoint = recovery.save.mock.calls.at(-1);
-    expect(checkpoint?.[2].present.lines[0].words[0].text).toBe("A2");
+    expect(checkpoint?.[2].present.lyrics.lines[0].words[0].text).toBe("A2");
     expect(checkpoint?.[3]).toBe("r2");
     await act(async () => result.current.save());
     expect(saveMock.mock.calls[1][1]).toBe("r2");
@@ -120,12 +124,12 @@ describe("useProjectDocument save lifecycle", () => {
 
   it("saves generated 注音 with its source tracks and reopens the same semantics", async () => {
     const source = readFileSync("../tests/fixtures/ttml/phase2-multitrack.ttml", "utf8");
-    let savedXml = "";
-    saveMock.mockImplementation(async (xml: string) => {
+    let savedXml: ProjectSnapshot;
+    saveMock.mockImplementation(async (xml: ProjectSnapshot) => {
       savedXml = xml;
       return { revision: "r2", etag: '"r2"' };
     });
-    const { result } = renderHook(() => useProjectDocument("p", source, "r1", undefined, saveMock));
+    const { result } = renderHook(() => useProjectDocument("p", snapshot(source), "r1", undefined, saveMock));
     const before = result.current.document;
     const track = before.romanizationTracks[0];
     const content = track.contents[0];

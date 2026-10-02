@@ -1,3 +1,5 @@
+from io import StringIO
+from .project_document import read_lyrics, initial_project
 import hashlib, json, os, secrets, tempfile, uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
@@ -309,8 +311,8 @@ def create_app(
                 fail("asset_not_found", "source asset not found", 404)
             pid, t = uuid.uuid4().hex, stamp()
             rev = uuid.uuid4().hex
-            path = root / "revisions" / f"{rev}.ttml"
-            revisions._write_atomic(path, INITIAL_TTML.encode())
+            path = root / "revisions" / f"{rev}.json"
+            revisions._write_atomic(path, json.dumps(initial_project(INITIAL_TTML, body.source_asset_id), ensure_ascii=False).encode())
             c.execute(
                 "INSERT INTO projects VALUES(?,?,?,?,?,?)",
                 (pid, name, body.source_asset_id, rev, t, t),
@@ -426,14 +428,13 @@ def create_app(
         rev = revision or r[3]
         with db.connect() as c:
             x = c.execute(
-                "SELECT ttml_path FROM revisions WHERE id=? AND project_id=?",
+                "SELECT project_path FROM revisions WHERE id=? AND project_id=?",
                 (rev, pid),
             ).fetchone()
         if not x:
             fail("revision_not_found", "revision not found", 404)
-        return FileResponse(
-            x[0], media_type="application/ttml+xml", headers={"ETag": f'"{rev}"'}
-        )
+        from .project_document import read_lyrics, initial_project
+        return Response(read_lyrics(x[0]), media_type="application/ttml+xml", headers={"ETag": f'"{rev}"'})
 
     def asset_for(pid):
         r = project(pid)
@@ -523,12 +524,12 @@ def create_app(
         if asset_id != row[2]:
             fail("job_input_invalid", "asset does not belong to project", 422)
         with db.connect() as c:
-            revision_row = c.execute("SELECT ttml_path FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone()
+            revision_row = c.execute("SELECT project_path FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone()
         if revision_row:
             try:
                 selected_forced = params.get("line_id") if kind in {"forced", "forced_align", "forced-alignment"} else None
-                projected = (project_ttml_for_forced(revision_row[0], selected_forced) if kind in {"forced", "forced_align", "forced-alignment"}
-                             else project_ttml(revision_row[0]))
+                projected = (project_ttml_for_forced(StringIO(read_lyrics(revision_row[0])), selected_forced) if kind in {"forced", "forced_align", "forced-alignment"}
+                             else project_ttml(StringIO(read_lyrics(revision_row[0]))))
                 selected = params.get("line_ids")
                 if selected is not None and any(item not in {line["id"] for line in projected} for item in selected):
                     fail("job_input_invalid", "selected line does not belong to revision", 422)

@@ -38,7 +38,7 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
     const document = codec.parseLyricTtml(xml);
     return { agents: document.lines.map(line => line.agentRefs), translations: document.lines[0].translations, appended: document.lines[0].words.slice(-2).map(word => ({ text: word.text, beginMs: word.beginMs, endMs: word.endMs })), units: document.romanizationTracks[0].contents[0] };
-  }, saved.document.ttml);
+  }, saved.document.lyrics.draftTtml);
   expect(semantic.agents.slice(0, 2)).toEqual([['v1', 'v2'], ['v2', 'v1']]);
   expect(semantic.translations).toEqual([{ text: 'song', language: 'ja' }]);
   expect(semantic.appended).toEqual([{ text: '追加', beginMs: null, endMs: null }, { text: '  ', beginMs: null, endMs: null }]);
@@ -68,7 +68,7 @@ test('P6 original review I still love you keeps independent visible spaces after
   const saved = await (await page.request.get('/api/v1/projects/phase4-background/document')).json();
   // The fixture media is only 132s; scrub the actual saved document with the local preview clock.
   await page.goto('/editor');
-  await importLyrics(page, { name: 'saved-original.ttml', mimeType: 'application/xml', buffer: Buffer.from(saved.document.ttml) });
+  await importLyrics(page, { name: 'saved-original.ttml', mimeType: 'application/xml', buffer: Buffer.from(saved.document.lyrics.draftTtml) });
   await page.getByRole('button', { name: '预览', exact: true }).click();
   await page.getByRole('slider', { name: '试听位置', exact: true }).evaluate((element: HTMLInputElement) => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(element, '223000');

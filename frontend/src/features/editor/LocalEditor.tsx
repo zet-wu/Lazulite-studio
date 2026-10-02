@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRecoveryAdapter } from '../../adapters/recovery';
 import { exportLyricFile, type LyricFormat } from '../../adapters/lyric-formats';
-import { createLyricEditorState, executeLyricCommand, redoLyricCommand, undoLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
-import { createLyricDocument, type LyricDocument } from '../../domain/lyric-document';
+import type { LyricCommand } from '../../domain/lyric-commands';
+import { createProjectDocument, createProjectEditorState, executeProjectCommand, redoProjectCommand, undoProjectCommand, type ProjectDocument } from '../../domain/project-document';
+import { createLyricDocument } from '../../domain/lyric-document';
 import { EditorWorkspace } from './EditorWorkspace';
 
 function download(xml: string, name: string) {
@@ -15,10 +16,10 @@ function download(xml: string, name: string) {
 }
 
 export function LocalEditor() {
-  const [state, setState] = useState(() => createLyricEditorState(createLyricDocument()));
+  const [state, setState] = useState(() => createProjectEditorState(createProjectDocument()));
   const stateRef = useRef(state);
   const commitState = (next: typeof state) => { stateRef.current = next; setState(next); };
-  const [clean, setClean] = useState<LyricDocument>(state.present);
+  const [clean, setClean] = useState<ProjectDocument>(state.present);
   const [name, setName] = useState('未命名.ttml');
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -42,7 +43,7 @@ export function LocalEditor() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
   const apply = (command: LyricCommand) => {
-    const next = executeLyricCommand(stateRef.current, command);
+    const next = executeProjectCommand(stateRef.current, { type: 'lyrics', command });
     touched.current = true; commitState(next);
   };
   const save = async () => {
@@ -55,17 +56,17 @@ export function LocalEditor() {
     finally { setSaving(false); }
   };
   const exportFormat = (format: LyricFormat) => {
-    download(exportLyricFile(state.present, format), name.replace(/\.[^.]*$/, '') + '.' + (format === 'elrc' ? 'extended.lrc' : format));
+    download(exportLyricFile(state.present.lyrics, format), name.replace(/\.[^.]*$/, '') + '.' + (format === 'elrc' ? 'extended.lrc' : format));
   };
   const createNew = async () => {
     if (dirty && !window.confirm('当前修改尚未保存，确定新建吗？')) return;
     try {
       await createRecoveryAdapter().clear('local');
-      const next = createLyricDocument();
-      touched.current = true; commitState(createLyricEditorState(next)); setClean(next); setName('未命名.ttml'); setMessage(null);
+      const next = createProjectDocument(createLyricDocument());
+      touched.current = true; commitState(createProjectEditorState(next)); setClean(next); setName('未命名.ttml'); setMessage(null);
     } catch (error) { setMessage(error instanceof Error ? error.message : '新建失败'); }
   };
-  return <EditorWorkspace title={name} document={state.present} apply={apply} undo={() => commitState(undoLyricCommand(stateRef.current))} redo={() => commitState(redoLyricCommand(stateRef.current))}
+  return <EditorWorkspace title={name} document={state.present.lyrics} apply={apply} undo={() => commitState(undoProjectCommand(stateRef.current))} redo={() => commitState(redoProjectCommand(stateRef.current))}
     canUndo={state.past.length > 0} canRedo={state.future.length > 0} dirty={dirty} saving={saving} error={message}
     onSave={() => void save()} onImportName={setName} onNew={() => void createNew()}
     onExportFormat={exportFormat} />;

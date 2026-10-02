@@ -19,7 +19,7 @@ for (const kind of ['plain', 'timed']) test(`P8 ${kind} manual result and placeh
     const doc = codec.parseLyricTtml(xml);
     return { lines: doc.lines.map(line => ({ text: line.words.map(word => word.text).join(''), words: line.words.map(word => ({ text: word.text, beginMs: word.beginMs, endMs: word.endMs, ruby: word.rubyUnits.map(({ reading, beginMs, endMs }) => ({ reading, beginMs, endMs })) })) })), contents: doc.romanizationTracks[0].contents.map(content => content.kind === 'plain' ? { kind: content.kind, text: content.text } : { kind: content.kind, units: content.units.map(({ text, beginMs, endMs }) => ({ text, beginMs, endMs })) }) };
   }, xml);
-  const draft = await semantics(saved.document.ttml);
+  const draft = await semantics(saved.document.lyrics.draftTtml);
   expect(draft.lines.map(line => line.text)).toEqual(['学校', 'しんよう', '漢字']);
   if (kind === 'plain') expect(draft.contents).toEqual([{ kind, text: ' manual  ' }, { kind, text: 'shin you' }, { kind, text: ' ' }]);
   else expect(draft.contents).toEqual([

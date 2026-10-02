@@ -806,7 +806,7 @@ export interface components {
         };
         DocumentEnvelope: {
             /** @constant */
-            schema_version: "studio-document-v2";
+            schema_version: "studio-document-v3";
             project_id: string;
             revision: string | null;
             etag?: string;
@@ -814,8 +814,19 @@ export interface components {
             client_seq?: number | null;
             document: {
                 /** @constant */
-                schema_version: "studio-document-content-v2";
-                ttml: string;
+                schemaVersion: "studio-project-v1";
+                sourceAssetId: string | null;
+                lyrics: {
+                    draftTtml: string;
+                };
+                acoustics: {
+                    analysisId: string | null;
+                    segments: {
+                        id: string;
+                        beginMs: number;
+                        endMs: number;
+                    }[];
+                };
             };
         };
         DocumentSaveResponse: components["schemas"]["DocumentEnvelope"] & {

@@ -31,7 +31,7 @@ def test_delete_project_removes_records_files_keeps_shared_asset(tmp_path):
     assert client.get(f'/api/v1/projects/{pid}/document').status_code == 404
     assert client.get(f'/api/v1/projects/{other}/audio').status_code == 200
     assert not output.exists() and not (tmp_path / 'revisions' / f'{revision}.ttml').exists()
-    assert not (tmp_path / 'revisions' / f'{pid}.draft.ttml').exists()
+    assert not (tmp_path / 'revisions' / f'{pid}.draft.json').exists()
     with db.connect() as c:
         assert c.execute('SELECT count(*) FROM jobs').fetchone()[0] == 0
         assert c.execute('SELECT count(*) FROM job_events').fetchone()[0] == 0
@@ -62,4 +62,4 @@ def test_delete_file_failure_restores_project(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, 'rename', fail_second)
     with pytest.raises(OSError): delete_project(db, tmp_path, pid)
     assert client.get(f'/api/v1/projects/{pid}/lyrics').status_code == 200
-    assert (tmp_path / 'revisions' / f'{pid}.draft.ttml').exists()
+    assert (tmp_path / 'revisions' / f'{pid}.draft.json').exists()

@@ -51,7 +51,7 @@ test('P4-07 independent background saves, exchanges and is visible after its par
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   const saved = await (await page.request.get('/api/v1/projects/phase4-background/document')).json();
-  expect(saved.document.ttml).toContain('dur="00:05.000"');
+  expect(saved.document.lyrics.draftTtml).toContain('dur="00:05.000"');
   await page.reload();
   await page.locator('[data-outline-drag]').nth(1).click();
   await expect(page.getByLabel('所属主行')).toHaveValue('parent');
@@ -127,7 +127,7 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '下载歌词' }).click();
   const finalXml = await readFile((await (await download).path())!, 'utf8');
-  for (const xml of [saved.document.ttml, finalXml]) {
+  for (const xml of [saved.document.lyrics.draftTtml, finalXml]) {
     const result = await page.evaluate(async xml => {
       const codecPath = '/src/adapters/ttml/lyric-codec.ts';
       const codec = await import(codecPath) as typeof import('../../src/adapters/ttml/lyric-codec');
@@ -138,7 +138,7 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
     expect(result.bgTime).toEqual(prepared.backgroundTime);
     expect(result.bgParent).toBe(result.parentId);
     expect(result.words).toEqual(prepared.words);
-    if (xml === saved.document.ttml) expect(result.bgId).toBe(prepared.backgroundId);
+    if (xml === saved.document.lyrics.draftTtml) expect(result.bgId).toBe(prepared.backgroundId);
   }
   await importLyrics(page, { name: 'review-final-reopen.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
   await page.getByRole('button', { name: '预览', exact: true }).click();
