@@ -48,6 +48,14 @@ test('segment edits cancel atomically, merge/delete preserve assigned lyrics, dr
  await page.getByRole('button',{name:'新增人声片段',exact:true}).click();await page.locator('[data-vocal-lane]').click({position:{x:10,y:10}});await expect(page.locator('[data-segment-id]')).toHaveCount(1);
  const first=page.locator('[data-segment-id]').first();const original=await first.getAttribute('aria-label');const box=(await first.boundingBox())!;
  await page.mouse.move(box.x+box.width*.5,box.y+12);await page.mouse.down();await page.mouse.move(box.x+box.width*.5+40,box.y+12,{steps:3});await page.keyboard.press('Escape');await page.mouse.up();await expect(first).toHaveAttribute('aria-label',original!);
+ const bounds=async()=>((await first.getAttribute('aria-label'))!.match(/\d+/g)!).map(Number);
+ const initial=await bounds();
+ for(const side of [1,2]){
+  const edge=(await first.locator('span').nth(side).boundingBox())!;
+  await page.mouse.move(edge.x+edge.width/2,edge.y+10);await page.mouse.down();await page.mouse.move(edge.x+edge.width/2+20,edge.y+10,{steps:3});await page.mouse.up();
+  const changed=await bounds();expect(changed[side-1]).toBeGreaterThan(initial[side-1]);expect(changed[2-side]).toBe(initial[2-side]);
+  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(first).toHaveAttribute('aria-label',original!);
+ }
  await page.getByRole('button',{name:'拖动分配 L1',exact:true}).dragTo(first);
  await expect(page.getByRole('complementary',{name:'音频处理大纲'})).not.toContainText('未定起点 – 未定终点\n↗');
  await expect.poll(async()=>{const e=await(await page.request.get(`/api/v1/projects/${pid}/document`)).json();return e.document.lyrics.draftTtml;}).toContain('begin=');
