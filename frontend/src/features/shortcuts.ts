@@ -77,7 +77,10 @@ export function formatBinding(binding: Binding, mac = /Mac/.test(navigator.platf
   const names: Record<string, string> = { ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Space: 'Space' };
   return [binding.ctrl && (mac ? '⌃' : 'Ctrl'), binding.meta && (mac ? '⌘' : 'Win'), binding.alt && (mac ? '⌥' : 'Alt'), binding.shift && (mac ? '⇧' : 'Shift'), names[binding.code] ?? binding.code.replace(/^Key|^Digit/, '')].filter(Boolean).join(' + ');
 }
-export function shortcutInput(target: EventTarget | null) {
+export function shortcutInput(target: EventTarget | null, code?: string) {
   if (document.querySelector('[role="dialog"], [role="menu"], details[data-top-menu][open]')) return true;
-  return target instanceof Element && Boolean(target.closest('input, textarea, select, button, a, summary, [contenteditable="true"], [role="dialog"], [role="menu"], [role="separator"], [data-top-menu]'));
+  // Buttons retain focus after a mouse click. Only their native activation keys
+  // take precedence over timing shortcuts; editable and composite controls always do.
+  if (target instanceof Element && target.closest('button') && (!code || code === 'Space' || code === 'Enter')) return true;
+  return target instanceof Element && Boolean(target.closest('input, textarea, select, a, summary, [contenteditable="true"], [role="dialog"], [role="menu"], [role="separator"], [data-top-menu]'));
 }

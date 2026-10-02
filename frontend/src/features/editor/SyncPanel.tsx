@@ -52,9 +52,11 @@ export function SyncPanel({ document, cursor, targetVersion, apply, transport, o
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || event.repeat) return;
-      if (shortcutInput(event.target) || event.target instanceof Element && event.target.closest('[data-transport]')) return;
+      if (shortcutInput(event.target, event.code)) return;
       const action = (['start', 'next', 'end', 'previous', 'following', 'previousLine', 'followingLine'] as const).find(action => matchesBinding(event, keys[action]));
       if (!action) return;
+      if (event.target instanceof Element && event.target.closest('[data-transport]')
+        && (!event.target.closest('button') || !['start', 'next', 'end'].includes(action))) return;
       event.preventDefault();
       if (action === 'previous') moveTo(index - 1);
       else if (action === 'following') moveTo(index + 1);
