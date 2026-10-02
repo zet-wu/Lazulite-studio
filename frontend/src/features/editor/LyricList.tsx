@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import type { LyricLine } from '../../domain/lyric-document';
+import { Icon } from '../../shared/Icon';
 import styles from './semantic-editor.module.css';
 
 type Props = {
@@ -65,7 +66,7 @@ function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate,
 }
 
 function AppendLine({ append }: { append?: () => void }) {
-  return append ? <button data-role="secondary" className={styles.appendLine} aria-label="新增歌词行" onClick={append}>＋</button> : null;
+  return append ? <button data-role="secondary" className={styles.appendLine} aria-label="新增歌词行" onClick={append}><Icon name="add"/></button> : null;
 }
 
 function VirtualLyricList(props: ListProps) {

@@ -42,7 +42,7 @@ function TranslationRow({ item, index, commit, remove, fresh = false }: {
     }}>
     <textarea ref={textRef} rows={1} autoFocus={fresh} aria-label={`翻译 ${index + 1}`} value={text} onChange={event => setText(event.target.value)} onBlur={submit} />
     <input className={styles.translationLanguage} aria-label={`翻译 ${index + 1}语言`} placeholder="未指定语言" value={language} aria-invalid={Boolean(error)} onChange={event => setLanguage(event.target.value)} onBlur={submit} />
-    <button data-role="danger" className={styles.iconButton} aria-label="删除翻译" onMouseDown={event => event.preventDefault()} onClick={remove}><Icon name="trash" /></button>
+    <button data-role="danger" className={`icon-button ${styles.iconButton}`} aria-label="删除翻译" onMouseDown={event => event.preventDefault()} onClick={remove}><Icon name="trash" /></button>
     {error && <small role="alert">{error}</small>}
   </div>;
 }

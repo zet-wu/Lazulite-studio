@@ -83,7 +83,7 @@
 .dialogHeader { flex: none; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--surface-container); }
 .dialogHeader h2 { margin: 0; font-size: 17px; font-weight: 600; }
 .dialogHeader > span { color: var(--muted); font-size: 12px; }
-.dialogHeader > button { margin-left: auto; width: 32px; height: 32px; padding: 0; font-size: 22px; border: 0; background: transparent; }
+.dialogHeader > button { margin-left: auto; }
 .dialog button { border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--ink); padding: 5px 9px; cursor: pointer; }
 .dialog button:disabled { opacity: .5; cursor: default; }
 .dialogTabs { margin: 14px 0; flex-wrap: wrap; }
@@ -166,7 +166,7 @@
 .outlineText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--body-size); }
 .outlineText:has(small) { padding-left: 8px; }
 .outlineText small, .fieldContext { color: var(--muted); font-size: var(--label-size); }
-.appendLine { display: block; width: 100%; min-height: 40px; margin: 0 0 10px; border: 0; border-radius: var(--control-radius); background: var(--surface-high); color: var(--blue); font-size: 24px; }
+.appendLine { display: flex; align-items:center; justify-content:center; width: 100%; min-height: 40px; margin: 0 0 10px; border: 0; border-radius: var(--control-radius); background: var(--surface-high); color: var(--blue); font-size: 24px; }
 .dialogBody { min-height: 0; overflow: auto; padding: 16px 20px; font-size: var(--body-size); }
 .dialog button, .line button, .inspector button { border-color: transparent; background: transparent; color: var(--blue); border-radius: var(--control-radius); }
 .dialogActions > button { min-height: 32px; padding: 6px 14px; }

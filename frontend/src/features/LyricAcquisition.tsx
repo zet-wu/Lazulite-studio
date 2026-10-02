@@ -1,3 +1,4 @@
+import { IconButton } from '../shared/Controls';
 import type { useSearchConditions } from './useSearchConditions';
 import { AcquisitionStore } from '../acquisition-store';
 import { NetworkLyrics, checkLabels } from './NetworkLyrics';
@@ -71,7 +72,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
       {message && <p role="status">{message}</p>}
     </section>
     <section className={styles.pane}><h2>预览与导入</h2>
-      {selected && selected.error && !dismissed && <div className={styles.previewError} role="status"><span>{checkLabels[selected.status]}：{selected.error.slice(0,160)}</span><button data-role="secondary" aria-label="关闭候选提示" onClick={()=>setDismissed(true)}>×</button></div>}
+      {selected && selected.error && !dismissed && <div className={styles.previewError} role="status"><span>{checkLabels[selected.status]}：{selected.error.slice(0,160)}</span><IconButton icon="close" data-role="secondary" label="关闭候选提示" onClick={()=>setDismissed(true)}/></div>}
       {selected && ['pending','fetching','parsing'].includes(selected.status) && <p role="status">{checkLabels[selected.status]}…</p>}
       {incoming ? <>
       <div className={styles.preview}>{incoming.lines.slice(previewPage * 100, (previewPage + 1) * 100).map(line => <p key={line.id}>{line.words.map(word => word.rubyUnits.length ? <ruby key={word.id}>{word.text}<rt>{word.rubyUnits.map(u => u.reading).join('')}</rt></ruby> : word.text)}{line.translations.map((t, i) => <small key={i}>{t.text}</small>)}{incoming.romanizationTracks.flatMap(track => track.contents.filter(c => c.lineId === line.id).map(c => <small key={c.id}>{c.kind === 'plain' ? c.text : c.units.map(u => u.text).join('')}</small>))}</p>)}</div>

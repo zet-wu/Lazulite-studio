@@ -127,7 +127,7 @@ export function ProjectList() {
               </span>
               <span className={styles.rowArrow}>›</span>
             </Link>
-            <button data-role="danger" className={styles.projectDelete} aria-label={`删除项目 ${project.name}`} title={`删除项目 ${project.name}`} disabled={deleting === project.id} onClick={async () => {
+            <button data-role="danger" className={`icon-button ${styles.projectDelete}`} aria-label={`删除项目 ${project.name}`} title={`删除项目 ${project.name}`} disabled={deleting === project.id} onClick={async () => {
                 if (!window.confirm(`删除项目“${project.name}”？将删除歌词修订、任务和产物。原始上传文件和共享音频保留。`)) return;
                 setDeleting(project.id); setDeleteError("");
                 try {

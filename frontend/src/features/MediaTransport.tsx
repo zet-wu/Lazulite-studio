@@ -1,3 +1,4 @@
+import { IconButton } from '../shared/Controls';
 import { matchesBinding, shortcutInput, useShortcuts } from './shortcuts';
 import { PlaybackSpeed } from './PlaybackSpeed';
 import { normalizePlaybackSpeed, playbackSpeedKey, savedPlaybackSpeed } from '../domain/playback-speed';
@@ -464,7 +465,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   };
   const bandA = loop.aMs === null ? null : loop.aMs / 1e3;
   const bandB = loop.bMs === null ? null : loop.bMs / 1e3;
-  const playGlyph = playing ? <svg width="13" height="14" viewBox="0 0 13 14" aria-hidden="true"><rect x="2" y="1" width="3" height="12" fill="currentColor" /><rect x="8" y="1" width="3" height="12" fill="currentColor" /></svg> : '▶';
+
   const tapBpm = () => {
     const now = performance.now();
     tapTimes.current = [...tapTimes.current.filter((value) => now - value < 3000), now].slice(-8);
@@ -501,7 +502,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         src={asset ? studioApi.audioUrl(projectId) : undefined}
       />
       <div className={styles.header}>
-        <button data-role="secondary" className={styles.play} disabled={disabled} aria-label={playing ? '暂停' : '播放'} onClick={play}>{playGlyph}</button>
+        <IconButton data-role="secondary" className={styles.play} disabled={disabled} icon={playing ? 'pause' : 'play'} label={playing ? '暂停' : '播放'} onClick={play}/>
         <span ref={clock}>{fmt(position)} / {fmt(duration)}</span>
         {expanded && <>
         <button data-role="secondary"
@@ -510,22 +511,10 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         >
           全曲
         </button>
-        <button data-role="secondary"
-          disabled={disabled}
-          aria-label="前移窗口"
-          onClick={() => move(-1)}
-        >
-          ‹
-        </button>
-        <button data-role="secondary"
-          disabled={disabled}
-          aria-label="后移窗口"
-          onClick={() => move(1)}
-        >
-          ›
-        </button>
-        <button data-role="secondary" disabled={disabled} aria-label="放大波形" onClick={() => zoomAt(0.5, span ? (positionRef.current - start) / span : 0.5)}>＋</button>
-        <button data-role="secondary" disabled={disabled} aria-label="缩小波形" onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}>−</button>
+        <IconButton data-role="secondary" disabled={disabled} icon="back" label="前移窗口" onClick={() => move(-1)}/>
+        <IconButton data-role="secondary" disabled={disabled} icon="chevron" label="后移窗口" onClick={() => move(1)}/>
+        <IconButton data-role="secondary" disabled={disabled} icon="add" label="放大波形" onClick={() => zoomAt(0.5, span ? (positionRef.current - start) / span : 0.5)}/>
+        <IconButton data-role="secondary" disabled={disabled} icon="minus" label="缩小波形" onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}/>
         <span className={styles.viewportRange}>视窗 {fmt(start)} – {fmt(end)}</span>
         <div className={styles.visibility} aria-label="时间轴图层">
           {(['line', 'word', 'ruby', 'gap', 'spectrum'] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
@@ -533,7 +522,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           </button>)}
         </div>
         </>}
-        <button data-role="secondary" className={styles.timelineToggle} aria-label={expanded ? "收起时间轴" : "展开时间轴"} title={expanded ? "收起时间轴" : "展开时间轴"} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>
+        <button data-role="secondary" className={`icon-button ${styles.timelineToggle}`} aria-label={expanded ? "收起时间轴" : "展开时间轴"} title={expanded ? "收起时间轴" : "展开时间轴"} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>
           <svg width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d={expanded ? "M1 1h10L6 7z" : "M1 7h10L6 1z"} fill="currentColor" /></svg>
         </button>
       </div>
