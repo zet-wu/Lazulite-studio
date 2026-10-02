@@ -3,7 +3,7 @@
 .management-table.management-table td { padding:6px; vertical-align:top; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
 .management-table.management-table td:first-child { font-family:ui-monospace,monospace; font-weight:600; }
 .management-table.management-table input,.management-table.management-table textarea,.management-table.management-table select { box-sizing:border-box; width:100%; min-width:0; margin:0; padding:6px; border:1px solid transparent; border-radius:var(--control-radius); background:transparent; color:var(--ink); font:inherit; }
-.management-table.management-table textarea { resize:vertical; min-height:32px; field-sizing:content; }
+.management-table.management-table textarea { resize:none; min-height:32px; field-sizing:content; }
 .management-table.management-table tr:hover :is(input,textarea,select),.management-table.management-table tr:focus-within :is(input,textarea,select),.management-table.management-table tr[data-draft] :is(input,textarea,select) { border-color:var(--line); background:var(--panel); }
 .management-table.management-table :is(input,textarea,select):focus { border-color:var(--blue); outline:2px solid var(--state-pressed); }
 .management-table.management-table .value-cell > div + div { border-top:1px solid var(--line); }
@@ -14,3 +14,5 @@
 .management-footer { display:flex; align-items:center; gap:12px; padding:10px 6px; color:var(--muted); font-size:12px; }
 .management-language { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
 .management-language input { max-width:180px; }
+
+.management-table.management-table .value-cell > [data-draft] textarea { border-color:var(--line); background:var(--panel); }

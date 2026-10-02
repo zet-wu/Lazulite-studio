@@ -288,5 +288,5 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .inspector .panelBody > p { margin:0; }
 
 .inspector .panelBody > label, .inspector .panelBody > fieldset { margin:0; }
-.inspector .singerSelection label { display:flex; }
+.inspector .singerSelection.singerSelection label { display:flex; gap:8px; min-height:26px; }
 .syncPanel button[data-role][data-role] { min-height:26px; padding:4px 6px; }
