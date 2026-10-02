@@ -1,3 +1,4 @@
+import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
 import { useEffect, useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
@@ -98,13 +99,13 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
           if (activeWord && manualLine) { const parts = manualParts(activeWord, next); setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.alignmentUnits.length || activeWord.obscene || activeWord.emptyBeat) }]); }
         }}>{manualBoundaries.includes(index + 1) ? '│' : '·'}</button>}</span>)}</div>
       </div> : <div className={styles.dialogControls}>
-        <label>应用范围<select value={scope} onChange={(event) => { setScope(event.target.value); setPreview([]); }}><option value="current">当前行</option><option value="selected">选中词或行</option><option value="range">指定行范围</option><option value="all">全文</option></select></label>
+        <label>应用范围<Select value={scope} onChange={(event) => { setScope(event.target.value); setPreview([]); }}><option value="current">当前行</option><option value="selected">选中词或行</option><option value="range">指定行范围</option><option value="all">全文</option></Select></label>
         {scope === 'range' && <div className={styles.inlineFields}><label>从第 <input type="number" min="1" max={document.lines.length} value={from} onChange={(event) => { setFrom(Number(event.target.value)); setPreview([]); }} /> 行</label><label>到第 <input type="number" min="1" max={document.lines.length} value={to} onChange={(event) => { setTo(Number(event.target.value)); setPreview([]); }} /> 行</label></div>}
         <label><input type="checkbox" checked={options.splitCjk} onChange={(event) => updateOption('splitCjk', event.target.checked)} /> CJK 按字符切分</label>
-        <label>西文处理<select value={options.western} onChange={(event) => updateOption('western', event.target.value as SegmentOptions['western'])}><option value="word">按词</option><option value="syllable">按语言音节</option></select></label>
-        {options.western === 'syllable' && <label>音节语言<select value={options.language} onChange={(event) => updateOption('language', event.target.value as SegmentOptions['language'])}>{SYLLABLE_LANGUAGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
-        <label>标点<select value={options.punctuation} onChange={(event) => updateOption('punctuation', event.target.value as SegmentOptions['punctuation'])}><option value="merge">并入相邻词</option><option value="separate">独立</option></select></label>
-        <label>空白<select value={options.whitespace} onChange={(event) => updateOption('whitespace', event.target.value as SegmentOptions['whitespace'])}><option value="next">并入后词</option><option value="previous">并入前词</option><option value="separate">独立保留</option></select></label>
+        <label>西文处理<Select value={options.western} onChange={(event) => updateOption('western', event.target.value as SegmentOptions['western'])}><option value="word">按词</option><option value="syllable">按语言音节</option></Select></label>
+        {options.western === 'syllable' && <label>音节语言<Select value={options.language} onChange={(event) => updateOption('language', event.target.value as SegmentOptions['language'])}>{SYLLABLE_LANGUAGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></label>}
+        <label>标点<Select value={options.punctuation} onChange={(event) => updateOption('punctuation', event.target.value as SegmentOptions['punctuation'])}><option value="merge">并入相邻词</option><option value="separate">独立</option></Select></label>
+        <label>空白<Select value={options.whitespace} onChange={(event) => updateOption('whitespace', event.target.value as SegmentOptions['whitespace'])}><option value="next">并入后词</option><option value="previous">并入前词</option><option value="separate">独立保留</option></Select></label>
         {mode === 'advanced' && <>
           <label>标点时间权重<input type="number" min="0" step="0.1" value={options.punctuationWeight} onChange={(event) => updateOption('punctuationWeight', Number(event.target.value))} /></label>
           <label>忽略列表（每行一个）<textarea value={ignoreText} onChange={(event) => { setIgnoreText(event.target.value); setPreview([]); }} /></label>

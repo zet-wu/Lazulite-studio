@@ -1,3 +1,4 @@
+import { Select } from '../../shared/Select';
 import '@applemusic-like-lyrics/core/style.css';
 import { LyricPlayer, type LyricPlayerRef } from '@applemusic-like-lyrics/react';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
@@ -40,7 +41,7 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
       <strong>动态预览</strong>
       <label><input type="checkbox" checked={showTranslation} onChange={(event) => setShowTranslation(event.target.checked)} /> 翻译</label>
       <label><input type="checkbox" checked={showRomanization} onChange={(event) => setShowRomanization(event.target.checked)} /> 音译</label>
-      {document.romanizationTracks.length > 1 && <label>预览音译轨道 <select value={romanizationTrackId ?? ''} onChange={(event) => setRomanizationTrackId(event.target.value || null)}><option value="">每行首条</option>{document.romanizationTracks.map((track, index) => <option key={track.id} value={track.id}>{index + 1} · {track.language ?? '未指定语言'}</option>)}</select></label>}
+      {document.romanizationTracks.length > 1 && <label>预览音译轨道 <Select value={romanizationTrackId ?? ''} onChange={(event) => setRomanizationTrackId(event.target.value || null)}><option value="">每行首条</option>{document.romanizationTracks.map((track, index) => <option key={track.id} value={track.id}>{index + 1} · {track.language ?? '未指定语言'}</option>)}</Select></label>}
       <label><input type="checkbox" checked={hidePassed} onChange={(event) => setHidePassed(event.target.checked)} /> 隐藏已播行</label>
       <label>词渐变宽度 <input type="range" min="0.05" max="1.5" step="0.05" value={fadeWidth} onChange={(event) => setFadeWidth(Number(event.target.value))} /></label>
       {!transport && <label>试听位置 <input type="range" min="0" max={duration} value={localTime} onChange={(event) => setLocalTime(Number(event.target.value))} /></label>}

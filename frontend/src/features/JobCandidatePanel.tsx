@@ -1,3 +1,4 @@
+import { Select } from '../shared/Select';
 import { useState } from 'react';
 import type { JobResult, ReadingProposal } from '../adapters/http/jobs';
 import { createLine, createLyricDocument, lineText, type AlignmentUnit, type LyricDocument, type LyricLine, type LyricWord } from '../domain/lyric-document';
@@ -116,7 +117,7 @@ export function JobCandidatePanel({ result, currentRevision, currentAssetId, dir
   return <section aria-label="任务候选"><h2>任务候选 · {result.kind}</h2>
     {stale && <p role="alert">结果绑定的 revision/asset 已过期，或有未保存编辑。</p>}
     {result.kind === 'search' && result.items.map((item, index) => <p key={index}>{item.title ?? '未知标题'} · {item.artist ?? '未知艺人'}</p>)}
-    {result.kind === 'fetch' && <><select aria-label="取词版本" value={selected} onChange={(event) => setSelected(Number(event.target.value))}>{result.items.map((item, index) => <option key={index} value={index}>{item.candidate?.title ?? `版本 ${index + 1}`}</option>)}</select><ol>{result.items[selected]?.lines?.map((line, index) => <li key={index}>{line.text}</li>)}</ol></>}
+    {result.kind === 'fetch' && <><Select aria-label="取词版本" value={selected} onChange={(event) => setSelected(Number(event.target.value))}>{result.items.map((item, index) => <option key={index} value={index}>{item.candidate?.title ?? `版本 ${index + 1}`}</option>)}</Select><ol>{result.items[selected]?.lines?.map((line, index) => <li key={index}>{line.text}</li>)}</ol></>}
     {result.kind === 'transcribe' && <ol>{result.segments.map((item, index) => <li key={index}>{item.text}</li>)}</ol>}
     {result.kind === 'line_align' && <ol>{result.lines.map((item) => <li key={item.line_id}>{item.line_id}: {item.begin_ms == null ? '未定' : `${item.begin_ms / 1e3}s`}–{item.end_ms == null ? '未定' : `${item.end_ms / 1e3}s`}</li>)}</ol>}
     {result.kind === 'reading' && <ol>{result.proposals.map((item) => <li key={item.proposal_id}>{item.base} → {item.reading} · {readingCommands(document, item) ? '可应用' : '需先分词或已有读音'}</li>)}</ol>}

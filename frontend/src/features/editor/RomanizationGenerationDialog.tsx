@@ -1,3 +1,4 @@
+import { Select } from '../../shared/Select';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import type { LyricDocument, LyricWord } from '../../domain/lyric-document';
@@ -111,14 +112,14 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
     <div className={styles.rubyGeneration}>
       <small>使用 注音 读音及假名正文</small>
       <div className={styles.rubyGenerationOptions}>
-        <label>目标轨道 <select aria-label="目标轨道" value={trackId} onChange={event => { setTrackId(event.target.value); setTargets({}); setMessage(''); }}><option value="">新建 · ja-Latn</option>
+        <label>目标轨道 <Select aria-label="目标轨道" value={trackId} onChange={event => { setTrackId(event.target.value); setTargets({}); setMessage(''); }}><option value="">新建 · ja-Latn</option>
           {source.romanizationTracks.filter(track => track.language === 'ja-Latn').map(track => <option key={track.id} value={track.id}>轨道 {source.romanizationTracks.indexOf(track) + 1} · ja-Latn</option>)}
-        </select></label>
-        <label>输出 <select aria-label="输出" aria-describedby="romanization-mode-help" value={kind} onChange={event => {
+        </Select></label>
+        <label>输出 <Select aria-label="输出" aria-describedby="romanization-mode-help" value={kind} onChange={event => {
           const next = event.target.value as RomanizationKind;
           setKind(next); setRows(proposeRomanization(source, sourceIds, next)); setMessage(''); setFocusedRow(null);
           localStorage.setItem(modeStorage, next);
-        }}><option value="plain">普通文本</option><option value="timed">按源分词定时</option></select></label>
+        }}><option value="plain">普通文本</option><option value="timed">按源分词定时</option></Select></label>
       </div>
       <small id="romanization-mode-help">切换输出会重新生成，清除本窗口的文字修改</small>
       <div ref={scroll} data-proposal-count={rows.length} className={`${styles.rubyGenerationRows} ${virtualized ? styles.rubyGenerationRowsVirtual : ''}`}>
@@ -128,10 +129,10 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
             if (row.kind === 'timed') row.groups.forEach((unit, index) => { const list = byWord.get(unit.wordId) ?? []; list.push({ unit, index }); byWord.set(unit.wordId, list); });
             return <div key={row.lineId} ref={item ? virtualizer.measureElement : undefined} data-index={item?.index} data-roman-proposal={row.lineId}
             style={item ? { position: 'absolute', width: '100%', transform: `translateY(${item.start}px)` } : undefined} className={`${styles.rubyGenerationRow} ${styles.romanGenerationRow}`}>
-            <label>L{ordinals.get(row.lineId)} <select aria-label={`L${ordinals.get(row.lineId)}生成内容`} value={targetFor(row.lineId)} onChange={event => setTargets(current => ({ ...current, [row.lineId]: event.target.value }))}>
+            <label>L{ordinals.get(row.lineId)} <Select aria-label={`L${ordinals.get(row.lineId)}生成内容`} value={targetFor(row.lineId)} onChange={event => setTargets(current => ({ ...current, [row.lineId]: event.target.value }))}>
               <option value="skip">跳过 · 保留已有</option><option value="append">添加新内容</option>
               {track?.contents.filter(content => content.lineId === row.lineId).map(content => <option key={content.id} value={content.id}>替换 · {content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</option>)}
-            </select></label>
+            </Select></label>
             <div className={styles.romanPreviewWords}>
               {lines.get(row.lineId)!.words.map(word => row.kind === 'timed'
                 ? <TimedWordPreview key={word.id} word={word} units={byWord.get(word.id) ?? []} lineLabel={`L${ordinals.get(row.lineId)}`}

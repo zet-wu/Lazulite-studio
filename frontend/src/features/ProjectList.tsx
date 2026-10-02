@@ -1,3 +1,4 @@
+import { Select } from '../shared/Select';
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
@@ -95,14 +96,14 @@ export function ProjectList() {
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
-        <select
+        <Select
           value={sort}
           onChange={(event) => setSort(event.target.value)}
           aria-label="排序"
         >
           <option value="recent">最近编辑</option>
           <option value="name">名称</option>
-        </select>
+        </Select>
       </div>
       {deleteError && <p role="alert">{deleteError}</p>}
       {visible.length ? (

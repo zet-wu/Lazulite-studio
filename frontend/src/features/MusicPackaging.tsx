@@ -1,3 +1,4 @@
+import { Select } from '../shared/Select';
 import { usePreference } from './editor/use-preference';
 import { collectOutputIssues, uniqueOutputIssues, DocumentOutputError, type OutputIssue } from '../adapters/output-validation';
 import { jobsApi } from '../adapters/http/jobs';
@@ -42,9 +43,9 @@ export function MusicPackaging({ projectId, document, saveForPackaging, onIssues
  return <>
  {info.data && <><p>源文件：{info.data.filename} · {info.data.format_label}</p><p className={styles.hint}>{info.data.container === 'mp4' ? `TTML → STPP 歌词轨道；${kind === 'elrc' ? '扩展' : '普通'} LRC → 歌词标签。${info.data.tracks.length ? track ? `覆盖轨道 ${track}` : '请选择覆盖轨道' : '新增 STPP 轨道'}` : info.data.container === 'mp3' ? 'LRC → ID3 USLT 歌词标签' : info.data.container === 'flac' ? 'LRC → FLAC LYRICS 歌词标签' : '此格式不支持打包'}。生成副本，不转码。</p></>}
 
- <label>内嵌歌词 <select value={kind} onChange={e=>setKind(e.target.value as LrcKind)}><option value="lrc">普通 LRC</option><option value="elrc">扩展 LRC（尖括号）</option></select></label>
+ <label>内嵌歌词 <Select value={kind} onChange={e=>setKind(e.target.value as LrcKind)}><option value="lrc">普通 LRC</option><option value="elrc">扩展 LRC（尖括号）</option></Select></label>
  {info.data?.container === 'mp3' && <p className={styles.hint}>目标：USLT，语言 eng，空描述；其他语言／描述保留。</p>}
- {info.data?.tracks.length ? <label>覆盖 STPP 轨道 <select aria-label="覆盖 STPP 轨道" value={track ?? ''} onChange={e=>setTrack(e.target.value ? Number(e.target.value) : null)}><option value="">请选择目标轨道</option>{info.data.tracks.map(t=><option key={t.track_id} value={t.track_id}>{t.track_id} · {t.language} · {t.name || '未命名'}</option>)}</select></label> : info.data?.container === 'mp4' ? <p className={styles.hint}>源文件没有 STPP，将新增歌词轨道。</p> : null}
+ {info.data?.tracks.length ? <label>覆盖 STPP 轨道 <Select aria-label="覆盖 STPP 轨道" value={track ?? ''} onChange={e=>setTrack(e.target.value ? Number(e.target.value) : null)}><option value="">请选择目标轨道</option>{info.data.tracks.map(t=><option key={t.track_id} value={t.track_id}>{t.track_id} · {t.language} · {t.name || '未命名'}</option>)}</Select></label> : info.data?.container === 'mp4' ? <p className={styles.hint}>源文件没有 STPP，将新增歌词轨道。</p> : null}
  {info.isError && <p role="alert">读取失败 <button data-role="secondary" onClick={()=>void info.refetch()}>重试</button></p>}
  {info.data && !info.data.supported && <p role="alert">{info.data.error ?? '源音频格式不支持打包；可下载歌词文件。'}</p>}
  <button data-role="primary" onClick={()=>void publish()} disabled={busy || Boolean(exports.data?.items.some(item=>active.has(item.status))) || !info.data?.supported || Boolean(info.data.tracks.length && !track)}>{busy ? '保存并提交中…' : '保存并打包'}</button>

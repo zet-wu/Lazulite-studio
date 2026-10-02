@@ -1,3 +1,4 @@
+import { Select } from '../../shared/Select';
 import { usePreference } from './use-preference';
 import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
@@ -77,7 +78,7 @@ export function SyncPanel({ document, cursor, targetVersion, apply, transport, o
     <strong>{active ? `L${lineNumber} · 单元 ${lineIndex + 1} / ${lineUnits.length}` : '当前选择不参与打轴'}</strong>
     <span className={styles.syncQuote}><span>{word?.text}</span>{ruby && <b> → {ruby.reading}</b>}</span>
     <small className={styles.syncTime}>{beginMs === null ? '—' : (beginMs / 1e3).toFixed(3)}–{endMs === null ? '—' : (endMs / 1e3).toFixed(3)} s</small>
-    <select aria-label="打轴模式" value={mode} onChange={event => { setMode(event.target.value as SyncMode); setCompleted(false); }}><option value="continuous">连续</option><option value="line">本行</option></select>
+    <Select aria-label="打轴模式" value={mode} onChange={event => { setMode(event.target.value as SyncMode); setCompleted(false); }}><option value="continuous">连续</option><option value="line">本行</option></Select>
     {offsetMs !== 0 && <small>输入偏移 {offsetMs} ms <button data-role="secondary" onClick={() => setOffsetMs(0)}>归零</button></small>}
     {emptyBeats > 0 && <small>空拍 {emptyBeats}/{word?.emptyBeat}</small>}
     {completed && <small role="status">本行已完成</small>}

@@ -1,3 +1,4 @@
+import { Select } from '../../shared/Select';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { LyricCommand } from '../../domain/lyric-commands';
@@ -78,8 +79,8 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
   return <SettingsDialog title="从音译生成 注音" subtitle={lineIds.length === 1 && generatedLines === 1 ? `L${ordinals.get(lineIds[0])}` : `生成 ${generatedLines} / ${lineIds.length} 行`} close={close} actions={<><button data-role="secondary" onClick={close}>取消</button><button data-role="primary" disabled={!preview} onClick={submit}>生成 注音</button></>}>
     <div className={styles.rubyGeneration}>
       {stale ? <p role="alert">文档已变化，旧提案不能应用。<button data-role="secondary" onClick={refresh}>重新生成提案</button></p> : <>
-        <div className={styles.rubyGenerationOptions}><label>音译轨道 <select value={trackId} onChange={(event) => selectTrack(event.target.value)}>{tracks.map((track, index) => <option key={track.id} value={track.id}>轨道 {index + 1} · {track.language ?? '未指定语言'}</option>)}</select></label>
-          <label>字符输出 <select value={output} onChange={(event) => { setOutput(event.target.value as RubyOutput); setReadings({}); setSkipOverrides({}); setMessage(''); }}><option value="roman">保持罗马字</option><option value="hiragana">转换为平假名</option><option value="katakana">转换为片假名</option></select></label></div>
+        <div className={styles.rubyGenerationOptions}><label>音译轨道 <Select value={trackId} onChange={(event) => selectTrack(event.target.value)}>{tracks.map((track, index) => <option key={track.id} value={track.id}>轨道 {index + 1} · {track.language ?? '未指定语言'}</option>)}</Select></label>
+          <label>字符输出 <Select value={output} onChange={(event) => { setOutput(event.target.value as RubyOutput); setReadings({}); setSkipOverrides({}); setMessage(''); }}><option value="roman">保持罗马字</option><option value="hiragana">转换为平假名</option><option value="katakana">转换为片假名</option></Select></label></div>
         <details className={styles.sourceChoices}><summary>音译内容</summary><fieldset className={styles.rubyGenerationChoices}><legend>选取具体音译内容</legend>{contents.map((content) => {
           const line = sourceDocument.lines.find((item) => item.id === content.lineId)!;
           return <label key={content.id}><input type="checkbox" checked={contentIds.includes(content.id)} onChange={(event) => { setContentIds((ids) => event.target.checked ? [...ids, content.id] : ids.filter((id) => id !== content.id)); resetChoices(); }} />
@@ -91,14 +92,14 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
           const selected = Object.hasOwn(assignments, row.key) ? assignments[row.key] ?? '' : row.defaultWordId ?? '';
           return <div className={styles.rubyGenerationRow}>
             <strong>{row.sourceText || '空单元'}</strong><small>{time(row.beginMs)} – {time(row.endMs)} · L{ordinals.get(line.id)}</small>
-            <label>目标词 <select value={selected} disabled={skipped.has(row.key)} onChange={(event) => { const nextWordId = event.target.value || null;
+            <label>目标词 <Select value={selected} disabled={skipped.has(row.key)} onChange={(event) => { const nextWordId = event.target.value || null;
                 setSkipOverrides(current => Object.fromEntries(Object.entries(current).filter(([key]) => {
                   const affected = rows.find(item => item.key === key)!;
                   return affected.lineId !== row.lineId || affected.wordId !== row.wordId && affected.wordId !== nextWordId;
                 })));
                 setAssignments((current) => ({ ...current, [row.key]: nextWordId })); setReadings((current) => { const next = { ...current }; delete next[row.key]; return next; }); }}>
               <option value="">待人工分配</option>{line.words.map((word) => <option key={word.id} value={word.id}>{word.text}{row.candidates.includes(word.id) ? ' · 时间重叠' : ''}</option>)}
-            </select></label>
+            </Select></label>
             <label>目标 注音 <input value={readings[row.key] ?? row.reading ?? ''} disabled={skipped.has(row.key)} onChange={(event) => setReadings((current) => ({ ...current, [row.key]: event.target.value }))} /></label>
             <label><input type="checkbox" checked={skipped.has(row.key)} onChange={(event) => setSkipOverrides(current => ({ ...current, [row.key]: event.target.checked }))} /> 跳过生成</label>
             {row.candidates.length === 1 && !row.defaultWordId && <small>重叠不超过 10ms；需人工指定。</small>}

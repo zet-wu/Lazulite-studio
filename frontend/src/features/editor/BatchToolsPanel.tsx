@@ -1,3 +1,4 @@
+import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
 import { useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
@@ -69,7 +70,7 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
   return <SettingsDialog title="批处理" close={close} actions={<><button data-role="secondary" onClick={close}>关闭</button><button data-role="primary" onClick={run}>{operation === 'link' && current?.endLink ? '取消链接' : '应用（一次撤销）'}</button></>}>
     <div className={styles.dialogTabs}>{([['replace', '替换'], ['shift', '时间偏移'], ['smooth', '音节平滑'], ['sync', '同步行时间'], ['link', '结束时间链接']] as const).map(([value, label]) => <button data-role="secondary" key={value} className={operation === value ? styles.activeTab : ''} onClick={() => { setOperation(value); setMessage(''); }}>{label}</button>)}</div>
     {operation !== 'link' && <div className={styles.dialogControls}>
-      <label>范围<select value={scope} onChange={(event) => setScope(event.target.value)}><option value="current">当前行（含背景）</option><option value="selected">选中词或行</option><option value="range">指定行范围</option><option value="all">全文</option></select></label>
+      <label>范围<Select value={scope} onChange={(event) => setScope(event.target.value)}><option value="current">当前行（含背景）</option><option value="selected">选中词或行</option><option value="range">指定行范围</option><option value="all">全文</option></Select></label>
       {scope === 'range' && <div className={styles.inlineFields}><label>从第 <input type="number" min="1" max={document.lines.length} value={from} onChange={(event) => setFrom(Number(event.target.value))} /> 行</label><label>到第 <input type="number" min="1" max={document.lines.length} value={to} onChange={(event) => setTo(Number(event.target.value))} /> 行</label></div>}
       {operation === 'replace' && <><label>查找<input value={search} onChange={(event) => setSearch(event.target.value)} /></label><label>替换为<input value={replacement} onChange={(event) => setReplacement(event.target.value)} /></label><label><input type="checkbox" checked={ignoreCase} onChange={(event) => setIgnoreCase(event.target.checked)} /> 忽略大小写</label></>}
       {operation === 'shift' && <label>偏移毫秒（负数为提前）<input type="number" step="1" value={amountMs} onChange={(event) => setAmountMs(event.target.value)} /></label>}

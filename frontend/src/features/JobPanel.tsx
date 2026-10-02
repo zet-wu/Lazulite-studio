@@ -1,3 +1,4 @@
+import { Select } from '../shared/Select';
 import { useEffect, useMemo, useState } from "react";
 import {
   jobsApi,
@@ -219,7 +220,7 @@ export function JobPanel({
           ))}{" "}
           <label>
             对齐粒度
-            <select
+            <Select
               aria-label="对齐粒度"
               value={granularity}
               onChange={(event) =>
@@ -229,11 +230,11 @@ export function JobPanel({
               <option value="word">词</option>
               <option value="mora">音拍</option>
               <option value="phoneme">音素</option>
-            </select>
+            </Select>
           </label>
           <label>
             对齐范围
-            <select
+            <Select
               aria-label="对齐范围"
               value={coordinateSpace}
               onChange={(event) =>
@@ -244,12 +245,12 @@ export function JobPanel({
               <option value="ruby" disabled={!rubyOptions.length}>
                 已确认读音
               </option>
-            </select>
+            </Select>
           </label>
           {coordinateSpace === "ruby" && (
             <label>
               读音
-              <select
+              <Select
                 aria-label="选择读音"
                 value={rubyId}
                 onChange={(event) => setRubyId(event.target.value)}
@@ -260,7 +261,7 @@ export function JobPanel({
                     {ruby.base} · {ruby.reading}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
         </div>

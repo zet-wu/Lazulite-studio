@@ -1,3 +1,4 @@
+import { Select } from '../shared/Select';
 import { IconButton } from '../shared/Controls';
 import type { useSearchConditions } from './useSearchConditions';
 import { AcquisitionStore } from '../acquisition-store';
@@ -67,7 +68,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
     </div>
       {!['file','text'].includes(tab) && <NetworkLyrics store={store} searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} />}
       {tab === 'file' && <><p className={styles.hint}>选择歌词后预览，确认导入才会替换当前歌词。</p><button data-role="secondary" onClick={() => fileInput.current?.click()}>选择歌词文件</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
-      {tab === 'text' && <><label>文本格式 <select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</select></label><textarea aria-label="待导入歌词文本" value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button data-role="secondary" onClick={() => parse(text, format)}>预览文本</button></>}
+      {tab === 'text' && <><label>文本格式 <Select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</Select></label><textarea aria-label="待导入歌词文本" value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button data-role="secondary" onClick={() => parse(text, format)}>预览文本</button></>}
       {onNew && <button data-role="secondary" onClick={onNew}>新建空白歌词</button>}
       {message && <p role="status">{message}</p>}
     </section>

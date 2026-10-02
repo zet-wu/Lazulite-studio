@@ -1,3 +1,4 @@
+import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
 import { useState } from 'react';
 import type { LyricLine, RomanizationContent, RomanizationTrack } from '../../domain/lyric-document';
@@ -19,9 +20,9 @@ export function LineSplitDialog({ line, background, attached, close, submit }: {
   const [backgroundTarget, setBackgroundTarget] = useState<'left' | 'right'>('right');
   const boundary = line.words.findIndex((word) => word.id === beforeWordId);
   return <SettingsDialog title="拆分歌词行" close={close} actions={<><button data-role="secondary" onClick={close}>取消</button><button data-role="primary" disabled={!beforeWordId} onClick={() => { if (submit(beforeWordId, rightIds, background ? backgroundTarget : null, rightTranslations)) close(); }}>应用</button></>}>
-      <label>从该词开始新行 <select autoFocus value={beforeWordId} onChange={(event) => setBeforeWordId(event.target.value)}>
+      <label>从该词开始新行 <Select autoFocus value={beforeWordId} onChange={(event) => setBeforeWordId(event.target.value)}>
         {line.words.slice(1).map((word, index) => <option key={word.id} value={word.id}>{index + 2} · {word.text}</option>)}
-      </select></label>
+      </Select></label>
       <div className={styles.splitPreview} aria-label="拆分结果">{[false, true].map(isRight => {
         const words = isRight ? line.words.slice(boundary) : line.words.slice(0, boundary);
         const end = isRight ? line.endMs : words.every(word => word.endMs !== null) ? Math.max(...words.map(word => word.endMs!)) : null;
@@ -36,17 +37,17 @@ export function LineSplitDialog({ line, background, attached, close, submit }: {
       })}</div>
       {line.translations.length > 0 && <fieldset><legend>翻译归属</legend>{line.translations.map((item, index) => <label key={index} className={styles.splitAssignment}>
         <span>{item.language ?? '未指定语言'} · {item.text}</span>
-        <select aria-label={`翻译 ${index + 1}归属`} value={rightTranslations.includes(index) ? 'right' : 'left'} onChange={event => setRightTranslations(indices => event.target.value === 'right' ? [...indices, index] : indices.filter(i => i !== index))}>
+        <Select aria-label={`翻译 ${index + 1}归属`} value={rightTranslations.includes(index) ? 'right' : 'left'} onChange={event => setRightTranslations(indices => event.target.value === 'right' ? [...indices, index] : indices.filter(i => i !== index))}>
           <option value="left">前行</option><option value="right">后行</option>
-        </select>
+        </Select>
       </label>)}</fieldset>}
       {attached.length > 0 && <fieldset><legend>音译内容归属</legend>{attached.map(({ track, content }) => <label key={content.id} className={styles.splitAssignment}>
         <span>{track.language ?? '未指定语言'} · {content.kind === 'plain' ? content.text : content.units.map((unit) => unit.text).join('')}</span>
-        <select value={rightIds.includes(content.id) ? 'right' : 'left'} onChange={(event) => setRightIds((ids) => event.target.value === 'right' ? [...ids, content.id] : ids.filter((id) => id !== content.id))}>
+        <Select value={rightIds.includes(content.id) ? 'right' : 'left'} onChange={(event) => setRightIds((ids) => event.target.value === 'right' ? [...ids, content.id] : ids.filter((id) => id !== content.id))}>
           <option value="left">前行</option><option value="right">后行</option>
-        </select>
+        </Select>
       </label>)}</fieldset>}
-      {background && <label>背景歌词「{lineText(background)}」归属 <select value={backgroundTarget} onChange={(event) => setBackgroundTarget(event.target.value as 'left' | 'right')}><option value="left">前行</option><option value="right">后行</option></select></label>}
+      {background && <label>背景歌词「{lineText(background)}」归属 <Select value={backgroundTarget} onChange={(event) => setBackgroundTarget(event.target.value as 'left' | 'right')}><option value="left">前行</option><option value="right">后行</option></Select></label>}
 
 
     </SettingsDialog>;
