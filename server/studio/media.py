@@ -16,6 +16,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
+import threading
 import wave
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -116,6 +117,8 @@ def _asset_path(root: Path, digest: str) -> Path:
 class MediaService:
     def __init__(self, root: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "ffprobe") -> None:
         self.root = Path(root)
+        self._proxy_lock = threading.RLock()
+        self._peaks_lock = threading.Lock()
         self.ffmpeg = ffmpeg
         self.ffprobe = ffprobe
         (self.root / "assets").mkdir(parents=True, exist_ok=True)
@@ -143,6 +146,10 @@ class MediaService:
         return Asset(digest, digest, destination, name, destination.stat().st_size, probe)
 
     def playback_proxy(self, asset: Asset) -> Proxy:
+        with self._proxy_lock:
+            return self._playback_proxy(asset)
+
+    def _playback_proxy(self, asset: Asset) -> Proxy:
         """Create a normalized PCM WAV; Studio time starts at decoded sample zero."""
         target = self.root / "proxies" / f"{asset.content_hash}.wav"
         if not target.exists():
@@ -207,6 +214,10 @@ class MediaService:
         return PeakWindow(asset.content_hash, "peaks-v1", aligned_start, aligned_end, bucket_ms, tuple(minimum), tuple(maximum))
 
     def _ensure_peak_files(self, asset: Asset) -> None:
+        with self._peaks_lock:
+            self._build_peak_files(asset)
+
+    def _build_peak_files(self, asset: Asset) -> None:
         target = self.root / "proxies" / f"{asset.content_hash}.peaks-v1"
         if target.is_dir():
             return

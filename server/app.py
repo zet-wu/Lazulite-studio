@@ -522,6 +522,7 @@ def create_app(
             if not row[2] or params.get('asset_id') != row[2]: fail('job_input_invalid', '人声任务需要当前项目源音频', 422)
             if set(params) - {'asset_id', 'retry_analysis_id'}: fail('job_input_invalid', '人声参数由服务配置', 422)
             if params.get('retry_analysis_id'):
+                if not isinstance(params['retry_analysis_id'], str): fail('job_input_invalid', '分析结果标识无效', 422)
                 try: result, _ = vocal_runner.get(pid, params['retry_analysis_id'])
                 except KeyError: fail('job_input_invalid', '可重用人声不存在', 422)
                 if result['source_asset_id'] != row[2] or result['status'] != 'separated': fail('job_input_invalid', '只可重试当前源音频的未完成分析', 422)

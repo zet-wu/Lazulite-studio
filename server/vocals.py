@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 from dataclasses import asdict
 from pathlib import Path
 import numpy as np
@@ -16,6 +17,11 @@ class VocalRunner:
         self.db, self.root = db, root
         self.root.mkdir(parents=True, exist_ok=True)
         self.separator_factory = separator_factory
+        # Startup has no live model worker. Discard only unregistered partial products.
+        with db.connect() as c:
+            known = {Path(row[0]).resolve() for row in c.execute('SELECT directory FROM vocal_results')}
+        for directory in self.root.glob('*/*'):
+            if directory.is_dir() and directory.resolve() not in known: shutil.rmtree(directory)
 
     def run(self, project_id, asset_path, params, job_id, emit, cancelled):
         try:
@@ -64,7 +70,7 @@ class VocalRunner:
                         'gain': gain, 'peak_before_gain': peak, 'sample_rate': vocals.sample_rate,
                         'channels': vocals.samples.shape[0], 'frames': vocals.samples.shape[1],
                         'duration_ms': milliseconds(vocals.duration), 'format': 'FLAC PCM_24',
-                        'quantization': 'float to signed 24-bit PCM', 'analysis_version': 'lazulite-vocal-core-v1', 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
+                        'quantization': 'float to signed 24-bit PCM', 'analysis_version': 'lazulite-vocal-core-v1', 'analysis_source_sha256': hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
             with self.db.transaction() as c:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', str(directory), json.dumps(metadata)))
             del audio, vocals
@@ -76,7 +82,11 @@ class VocalRunner:
         analysis = analyze_vocals(audio, config=config)
         mono = samples.mean(axis=1)
         frame, hop = max(1, round(config.frame_seconds * rate)), max(1, round(config.hop_seconds * rate))
-        rms = np.sqrt(np.mean(np.lib.stride_tricks.sliding_window_view(mono, frame)[::hop] ** 2, axis=1)) if len(mono) >= frame else np.array([], dtype=np.float32)
+        windows = np.lib.stride_tricks.sliding_window_view(mono, frame)[::hop] if len(mono) >= frame else np.empty((0, frame), dtype=np.float32)
+        rms = np.empty(len(windows), dtype=np.float32)
+        for first in range(0, len(windows), 512):
+            block = windows[first:first+512]
+            rms[first:first+512] = np.sqrt(np.mean(block * block, axis=1))
         # Persist the same RMS basis and parameters used by Lazulite gating.
         np.save(directory / 'energy.npy', rms.astype(np.float32), allow_pickle=False)
         metadata.update({'segments': [{'id': s.id, 'beginMs': milliseconds(s.core_start), 'endMs': milliseconds(s.core_end)} for s in analysis.segments],
@@ -92,3 +102,9 @@ class VocalRunner:
             row = c.execute('SELECT * FROM vocal_results WHERE id=? AND project_id=?', (result_id, project_id)).fetchone()
         if not row: raise KeyError(result_id)
         return row, json.loads(row['metadata_json'])
+
+    def clean_unregistered(self, project_id, result_id):
+        with self.db.connect() as c:
+            found = c.execute('SELECT 1 FROM vocal_results WHERE id=?', (result_id,)).fetchone()
+        directory = self.root / project_id / result_id
+        if not found and directory.is_dir(): shutil.rmtree(directory)

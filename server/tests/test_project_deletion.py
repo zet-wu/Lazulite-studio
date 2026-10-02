@@ -27,12 +27,20 @@ def test_delete_project_removes_records_files_keeps_shared_asset(tmp_path):
         c.execute("INSERT INTO job_idempotency VALUES(?,'key','hash','j')", (pid,))
         c.execute("INSERT INTO reading_dictionary VALUES('dict',?,'a','b','now')", (pid,))
         c.execute('INSERT INTO review_versions VALUES(?,1)', (pid,))
+        vocal = tmp_path / 'vocals' / pid / 'voice'; vocal.mkdir(parents=True)
+        (vocal / 'vocals.flac').write_bytes(b'flac')
+        (vocal / 'energy.npy').write_bytes(b'energy')
+        proxy = tmp_path / 'proxies' / 'vocal-voice.wav'; proxy.parent.mkdir(exist_ok=True); proxy.write_bytes(b'proxy')
+        peaks = tmp_path / 'proxies' / 'vocal-voice.peaks-v1'; peaks.mkdir(); (peaks / 'l0.peaks').write_bytes(b'peaks')
+        c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', ('voice',pid,asset['id'],'ready',str(vocal),'{}'))
     assert client.delete(f'/api/v1/projects/{pid}', headers=headers).status_code == 200
+    assert not list(vocal.glob('*')) and not proxy.exists() and not list(peaks.glob('*'))
     assert client.get(f'/api/v1/projects/{pid}/document').status_code == 404
     assert client.get(f'/api/v1/projects/{other}/audio').status_code == 200
-    assert not output.exists() and not (tmp_path / 'revisions' / f'{revision}.ttml').exists()
+    assert not output.exists() and not (tmp_path / 'revisions' / f'{revision}.json').exists()
     assert not (tmp_path / 'revisions' / f'{pid}.draft.json').exists()
     with db.connect() as c:
+        assert c.execute('SELECT count(*) FROM vocal_results').fetchone()[0] == 0
         assert c.execute('SELECT count(*) FROM jobs').fetchone()[0] == 0
         assert c.execute('SELECT count(*) FROM job_events').fetchone()[0] == 0
         assert c.execute('SELECT count(*) FROM assets').fetchone()[0] == 1
