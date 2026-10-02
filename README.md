@@ -1,8 +1,10 @@
 # Lazulite Studio
 
-面向本地音乐的歌词制作工作台。浏览器负责歌词编辑和试听；FastAPI 管理项目、媒体、不可变 TTML 修订、自动化候选及 MP4/M4A、MP3、FLAC 歌词打包。AMLL 只读取当前草稿作预览，不回写权威文档。
+面向本地音乐的歌词制作工作台。浏览器负责歌词编辑和试听；FastAPI 管理项目、媒体、不可变项目 JSON 修订、自动化候选及 MP4/M4A、MP3、FLAC 歌词打包。AMLL 只读取当前草稿作预览，不回写权威文档。
 
-工作区依次提供歌词获取、编辑、打轴、预览、文件打包与项目辅助。四源载荷保留原始歌词粒度，预览和元数据整组选择后一次导入；打包绑定已保存快照，并验证歌词、非目标内容和音频载荷。统一开发入口为根目录 `dev.py`，具体环境准备见运行手册。
+工作区依次提供歌词获取、音频处理、编辑、打轴、预览、文件打包与项目辅助。四源载荷保留原始歌词粒度，预览和元数据整组选择后一次导入；打包绑定已保存快照，并验证歌词、非目标内容和音频载荷。统一开发入口为根目录 `dev.py`，具体环境准备见运行手册。
+
+项目快照统一歌词和声学片段的保存、恢复与 256 次历史。音频处理接入持久 Demucs 人声/能量、明确采用、人工片段与行时间分配；原曲/人声的播放和图形独立选源，共用一个播放时钟。
 
 ## 架构入口
 
@@ -14,4 +16,4 @@
 
 ## 外部开发文档
 
-开发方案、审阅、过程记录、验收及证据统一保存在并列的 [lyric-workflow](../lyric-workflow/docs/studio/README.md)：[当前状态](../lyric-workflow/docs/studio/current-state.md)、[当前审阅整改方案](../lyric-workflow/docs/studio-search-release-review/Review-phase2/plan.md)、[前端运行](../lyric-workflow/docs/studio/development/frontend-development.md)、[服务端运行](../lyric-workflow/docs/studio/development/server-development.md)、[依赖许可](../lyric-workflow/docs/studio/reference/dependency-licenses.md)。本仓库不再保存开发过程文档；可执行测试夹具仍随源码维护。
+开发方案、审阅、过程记录、验收及证据统一保存在并列的 [lyric-workflow](../lyric-workflow/docs/studio/README.md)：[当前状态](../lyric-workflow/docs/studio/current-state.md)、[当前审阅整改方案](../lyric-workflow/docs/studio-vocal-review/Review-phase0/plan.md)、[前端运行](../lyric-workflow/docs/studio/development/frontend-development.md)、[服务端运行](../lyric-workflow/docs/studio/development/server-development.md)、[依赖许可](../lyric-workflow/docs/studio/reference/dependency-licenses.md)。本仓库不再保存开发过程文档；可执行测试夹具仍随源码维护。

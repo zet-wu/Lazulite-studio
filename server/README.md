@@ -1,8 +1,8 @@
 # Server 架构
 
-FastAPI 同源 API，SQLite 管理项目、资产索引、修订指针、任务和复核。文件存储管理源媒体、代理/peaks、不可变 TTML 与发布成品。
+FastAPI 同源 API，SQLite 管理项目、资产索引、修订指针、任务和复核。文件存储管理源媒体、代理/peaks、不可变项目 JSON 与发布成品。
 
-`app.py` 组合认证与路由；`documents.py/revisions.py` 管 TTML 与 CAS 保存；`jobs.py/job_routes.py` 管任务/SSE；`reading.py/review.py` 管读音词典和复核；`studio/media.py` 与 `media.py` 管音频窗口；`publish*.py/publishing.py` 管发布和回读。`projection.py` 为引擎构造正文投影，不把 Ruby 或 sidecar 当作正文。
+`app.py` 组合认证与路由；`documents.py/revisions.py/project_document.py` 管项目快照与 CAS 保存；`jobs.py/job_routes.py` 管任务/SSE；`reading.py/review.py` 管读音词典和复核；`studio/media.py` 与 `media.py` 管音频窗口；`publish*.py/publishing.py` 管发布和回读。`projection.py` 为引擎构造正文投影，不把 Ruby 或 sidecar 当作正文。
 
 服务是登录者共享项目库的单工作台；模型按配置开放。启动配置与验证命令见[服务端开发说明](../../lyric-workflow/docs/studio/development/server-development.md)，接口摘要见[契约说明](../../lyric-workflow/docs/studio/reference/service-contract.md)。
 
@@ -15,3 +15,5 @@ FastAPI 同源 API，SQLite 管理项目、资产索引、修订指针、任务�
 
 
 `time_units.py` 是秒数/高精度 TTML 到整数毫秒的服务边界；修订写入规范化时间，STPP 使用相同毫秒时钟及无前缀正文元素。当前资产数据库列和接口使用 `_ms`，旧开发库需要明确重建，不包含迁移器。`jobs.reconcile_exports` 保留各项目最近成功且报告通过的记录作为当前产物，退休标记与成功结果同事务提交；物理文件延迟删除可重试，任务记录不删除。`publish_routes` 先打开下载句柄再释放切换锁，以支持下载期间替换。
+
+`vocals.py` 管真实分离、PCM_24 FLAC/安全增益、能量与核心片段持久结果；`vocal_routes.py` 提供结果、能量窗口与下载。任务不绑定歌词修订，取消仅在真实阶段边界生效，分析失败可复用已分离文件。采用引用必须属于相同项目和资产；已注册结果保留至项目删除，未注册临时目录可清理。播放/图形接口以 vocal ID 选源，代理/peaks 冷构建去重。

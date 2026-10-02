@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-2026-10-02 更新至人工审阅 Phase 4 整改。执行依据见[本轮方案](../../lyric-workflow/docs/studio-search-release-review/Review-phase4/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
+2026-10-02 更新至人声处理 Phase 0。执行依据见[本轮方案](../../lyric-workflow/docs/studio-vocal-review/Review-phase0/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
 
 ## 1. 应用与目录
 
@@ -22,7 +22,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 `/editor` 由 LocalEditor 管本地文件与检查点，`/projects/:projectId/edit` 由 Workspace 管项目；两者使用同一个 EditorWorkspace、领域命令和 codec。项目路由有音频服务与保存冲突处理；本地路由没有同等媒体资产能力。
 
-其他路由为 `/projects`、`/login`、`/settings`。编辑器提供歌词获取/编辑/打轴/预览/文件打包及末尾“项目辅助”占位；大纲、歌词列表、属性各自滚动；大纲点击在栏上委托，未变化行用memo复用，元数据、歌手与音译轨道通过编辑模式的“歌词设置”进入既有弹窗。两侧独立显隐，默认190px/250px，范围160–360px/200–420px；6px分隔条支持指针捕获、取消、键盘8/32px、双击默认。拖动直接预览grid几何，仅分隔条更新自身ARIA，松手才提交工作区偏好；单一localStorage偏好不进入文档/history，resize仅限制渲染宽度；普通/虚拟列表共用显式ID/serial定位：远端先挂载，再按真实卡片矩形平滑居中，超高卡片靠顶；有界校准，新请求及用户滚动取消，尊重reduced-motion，普通定位不抢焦点；输出错误项的显式定位请求选中稳定对象并转移键盘焦点。EditorMenu与EditorRibbon共用单一activeMenuId；受控details保留输入挂载，跨菜单互斥，命令/外点/Escape关闭（Escape回触发器），离开200ms关闭并保护菜单内键盘焦点；文件菜单已移除，导入在歌词获取、导出在文件打包。
+其他路由为 `/projects`、`/login`、`/settings`。编辑器提供歌词获取/音频处理/编辑/打轴/预览/文件打包及末尾“项目辅助”占位；大纲、歌词列表、属性各自滚动；大纲点击在栏上委托，未变化行用memo复用，元数据、歌手与音译轨道通过编辑模式的“歌词设置”进入既有弹窗。两侧独立显隐，默认190px/250px，范围160–360px/200–420px；6px分隔条支持指针捕获、取消、键盘8/32px、双击默认。拖动直接预览grid几何，仅分隔条更新自身ARIA，松手才提交工作区偏好；单一localStorage偏好不进入文档/history，resize仅限制渲染宽度；普通/虚拟列表共用显式ID/serial定位：远端先挂载，再按真实卡片矩形平滑居中，超高卡片靠顶；有界校准，新请求及用户滚动取消，尊重reduced-motion，普通定位不抢焦点；输出错误项的显式定位请求选中稳定对象并转移键盘焦点。EditorMenu与EditorRibbon共用单一activeMenuId；受控details保留输入挂载，跨菜单互斥，命令/外点/Escape关闭（Escape回触发器），离开200ms关闭并保护菜单内键盘焦点；文件菜单已移除，导入在歌词获取、导出在文件打包。
 
 界面以共享语义 tokens 定义明暗表面、主次操作及内容/标签层级；菜单使用无框整行项。SettingsDialog 统一标题、滚动内容和固定操作区，兼顾焦点圈定及返回。大纲/属性标题独立固定，大纲行号与歌词分列，属性用主行号及背景标识；中栏不再设标题工具栏，元数据、歌手和轨道管理统一放在编辑工具旁的“歌词设置”，打轴/预览不显示此入口。LyricList 在普通/虚拟内容的真实末尾渲染追加按钮，空文档同样可新增空白主行，选中并请求定位。
 
@@ -34,11 +34,11 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 ## 3. 权威文档与事务
 
-`LyricDocument`（`studio-lyric-v6`）为唯一可写歌词文档，含 lines、romanizationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs、翻译与时间链接；词含 text、时间、Ruby 单元、对齐单元、空拍等。音译轨道按主行 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
+`ProjectDocument`（`studio-project-v1`）是唯一项目编辑状态，包含源资产 ID、结构化 lyrics 与 acoustics（采用结果 ID、片段副本）。其中 `LyricDocument`（`studio-lyric-v6`）为歌词部分，含 lines、romanizationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs、翻译与时间链接；词含 text、时间、Ruby 单元、对齐单元、空拍等。音译轨道按主行 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
 
-时间使用绝对整数毫秒/null；拆分坐标使用 code point 并检查 grapheme 边界。`lyric-commands.ts` 提供纯函数事务与 256 次历史。背景勾选时原子附属最近的前一主行，前行已占用即拒绝，不向更早或后方寻找；下拉仅建立关系后启用，显示动态Lx，value保留稳定ID。内容、链接及各单元自身时间由单一命令校验；背景建立/改绑及主行拆分归属允许父背景各自独立绝对时间，不截短背景或扩展父行。selection、focus、播放时钟不作为歌词权威内容；批量操作一次入历史，最终改动经 codec 保存。
+时间使用绝对整数毫秒/null；拆分坐标使用 code point 并检查 grapheme 边界。`lyric-commands.ts` 提供纯函数歌词事务；运行时只有 `project-document.ts` 提交 256 次项目历史，歌词与声学操作按实际顺序统一撤销。背景勾选时原子附属最近的前一主行，前行已占用即拒绝，不向更早或后方寻找；下拉仅建立关系后启用，显示动态Lx，value保留稳定ID。内容、链接及各单元自身时间由单一命令校验；背景建立/改绑及主行拆分归属允许父背景各自独立绝对时间，不截短背景或扩展父行。selection、focus、播放时钟不作为歌词权威内容；批量操作一次入历史，最终改动经 codec 保存。
 
-`line-structure.ts` 为拆合行提供共享实际阻塞原因和当前 Lx 对象标识。拆行前行保留ID、起点并清除结束链接，后行继承原结束/链接/取消时间，外部入链仍指前行；翻译按源数组索引逐条前/后分配，与音译/背景一次提交。合并消除内部边界链接并继承末行外链；外部指向第二行的入链仅在开始时间相同才改绑，否则明确阻塞。LineSplitDialog上下结果直接显示正文、时间和附属归属。
+`line-structure.ts` 为拆合行提供共享实际阻塞原因和当前 Lx 对象标识。拆行前行保留ID、起点并清除结束链接，后行继承原结束/链接，外部入链仍指前行；翻译按源数组索引逐条前/后分配，与音译/背景一次提交。合并消除内部边界链接并继承末行外链；外部指向第二行的入链仅在开始时间相同才改绑，否则明确阻塞。LineSplitDialog上下结果直接显示正文、时间和附属归属。
 
 `romanization-generation.ts` 按已有Ruby单元或无Ruby假名正文词生成ja-Latn，以行内带源归属的假名序列处理上下文。普通拼写复用wanakana，跨单元促音保留所属单元，拆开的拗音使用ky/ya类特殊分片；长音取行内前元音，未知读音隔断上下文，行末促音不借下一行。源单元数量/顺序及毫秒端点原样保留，不合时间包络、不猜新时间。相邻非空白片段的真实分隔空格附着前单元，源空白原样保存；空转换及手工清空使用空格占位，提示不进入文档。
 
@@ -54,7 +54,7 @@ RomanizationGenerationDialog自有静态正文/Ruby对照布局，无播放遮�
 
 `lyric-formats.ts` 支持文本、LRC/扩展 LRC/ESLRC/QRC/YRC/LYS 双向、KRC 导入与 ASS 导出。`source-codec.ts` 解析原始 QRC/YRC/KRC 和附属内容；本地二进制 KRC 在浏览器解压。`lrc.ts` 统一普通/尖括号扩展 LRC 下载和内嵌文本：只取主行正文，未知结束不猜测，重叠主行保留且仅在已知区间并集外清屏。低表达力格式不能携带全部 Ruby/元数据或多条音译轨道。预览动态正文使用有效完整时间，独立纯空白词按原顺序以0–0 AMLL word投影；其他未定时正文不进入动态预览，整行无定时词沿用正文回退，不修改文档。isDuet 从歌手引用派生；引用包含主唱时显示主唱侧，否则显示另一侧，无法可视化多歌手合唱。StudioLyricPlayer使用AMLL的单一DOM播放器，关闭自动时间改写，仅把父/背景显示组活跃区设为两行时间并集，保持各行及词/Ruby输入时间。
 
-项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存当前格式检查点；FastAPI 接受 TTML envelope，不接收浏览器对象图。修订以不可变文件与 DB 指针提交。候选只能由用户应用。
+项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存完整当前项目与基础修订，重开不恢复撤销栈。FastAPI 接受 `studio-document-v3` envelope，document 为 JSON 项目快照，lyrics 保存 draftTtml；修订以不可变 JSON 文件和 project_path 指针提交，不双写旧 TTML 修订。歌词导入仅替换 lyrics，声学数据保留；发布捕获完整快照并从确切修订提取歌词。复核只比较歌词语义。候选和人声分析只能由用户明确采用。
 
 ## 5. 媒体与服务
 
@@ -102,7 +102,7 @@ EditorWorkspace 持有 `AcquisitionStore` 与独立 `useSearchConditions`，切�
 
 ## 毫秒时间与输出生命周期
 
-唯一文档为 `studio-lyric-v6`：`TimeMs`、`beginMs/endMs`、链接原端点、打轴和 A/B 均为整数毫秒或 `null`。文档接口为 `studio-document-v2` / `studio-document-content-v2`，媒体与任务契约使用 `_ms`。恢复检查点使用独立 v6 数据库，旧检查点不再读取；没有旧结构转换或双写。媒体元素仍用秒，PCM 仍按样本帧，编码 timescale 不改。
+项目文档为 `studio-project-v1`，歌词部分仍为 `studio-lyric-v6`：`TimeMs`、`beginMs/endMs`、打轴和 A/B 均为整数毫秒或 `null`。行尾链接仅存 targetLineId，普通解除、分配解除和删除目标均冻结当前有效结束时间，不保留旧端点。文档接口为 `studio-document-v3`，媒体与任务契约使用 `_ms`。恢复检查点使用独立 project-v1 数据库，旧检查点不再读取；没有旧结构转换或双写。媒体元素仍用秒，PCM 仍按样本帧，编码 timescale 不改。
 
 TTML 解析先处理相对祖先得到实际端点，再按半毫秒向上舍入；时钟写法（包括带小时）为绝对时间。保存、下载与 STPP 使用三位毫秒时钟，零时长舍入不自动延长。`server/time_units.py` 在修订写入边界规范化，并保留正文及 Apple 头部元素的默认命名空间，避免外部消费者漏读带自动前缀的正文；Studio 草稿属性只在最终产物剥离。自动对齐/转写结果只向 Studio 暴露毫秒端点，引擎原生秒数在适配边界转换。
 
@@ -119,3 +119,16 @@ TTML 解析先处理相对祖先得到实际端点，再按半毫秒向上舍入
 `Controls` 提供统一 SVG 图标按钮、开关/三态复选框。按钮用显式 `data-role` 选择共享主题角色，不再根据 DOM 顺序推断主按钮。单行跳过与背景使用开关，多行跳过始终为三态复选框，歌手为集合复选框。
 
 `usePreference` 保存浏览器 UI 偏好：打轴模式全局，下载格式按稳定项目 ID/本地文件名，内嵌 LRC 格式和输入偏移按项目作用域；各键互相独立，变化即存，不进入 TTML、dirty 或历史。偏移非零可见且可归零，不恢复完成、空拍或运行状态。没有服务端偏好同步或旧数据迁移。
+
+
+## 人声处理与项目声学部分
+
+`VocalRunner` 经 Lazulite 的 DemucsSeparator 分离，服务配置固定模型/设备；任务绑定源资产，去重同项目活动任务。真实阶段只报告排队、分离、分析及终态，取消在阶段边界检查，运行阶段仍显示正在取消。服务启动将中断任务明确终结；分离已成功时保留 separated 结果，重试只执行分析。模型名称、实际 state_dict 权重哈希、配置、分析参数/代码哈希与运行库版本随产物记录。
+
+独立 `vocals/<project>/<result>` 保存 PCM_24 FLAC、energy.npy 和 analysis.json；写入前按峰值整曲等比例衰减，记录 gain 与量化，保留模型输出帧数/采样率/声道及开头静音。能量与 core 片段从同一持久 FLAC 计算。结果注册后随项目/任务记录保留，供未采用查看、重试、撤销和旧修订读取；失败的未注册目录在任务结束或下次启动删除，项目删除处理人声及其代理。波形冷构建和播放代理各自串行去重，窗口读取不重复全曲生成；没有按每代永久另存 WAV，代理可重建。
+
+`VocalPanel` 显示任务与可采用结果；采用只替换 analysisId/segments，不修改歌词。`VocalTracks` 使用窗口内区间分轨、拖动时冻结布局，松手一次提交，支持端点/平移、连续选择合并、删除和反向框选新增。新增暂停播放，遮罩隔离其他界面并限制键盘焦点，Esc/指针取消不提交。结果与当前副本分离，片段修改不跟随改写已分配歌词。
+
+音频处理复用大纲和稳定行 ID；`MediaTransport` 通过 portal 把唯一时间轴放到主区域，底部保留播放控制。播放音源与波形/声谱图音源独立，单一 audio 元素持有绝对时间、倍率及 A/B；加载失败明确显示，不切换回其他音源。频谱缓存身份包括人声结果 ID；能量、片段、波形等可独立显隐。
+
+`vocal-editing.ts` 供分配按钮、片段菜单和大纲独立拖放入口共用。行起点优先、仅终点次之；完全未定行取核心起止，内部已有时间却无行锚点则拒绝。正文、Ruby、对齐单元与定时音译全部已知端点同量平移，保留未知，背景独立。先校验所有端点范围，再原子解除所选行出链和全部入链，入链来源冻结当前结束时间；失败不给历史。错误经大纲与稳定对象定位反馈，低频红光尊重 reduced-motion。
