@@ -615,7 +615,7 @@ export function EditorWorkspace(props: Props) {
   }}>
     <EditorMenu {...props} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} />
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
-    <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['edit','编辑'],['sync','打轴'],['preview','预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button data-role="secondary" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
+    <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['edit','编辑'],['sync','打轴'],['preview','预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
     {mode === 'acquire' && <LyricAcquisition store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
     {mode === 'package' && <PackagingPanel {...props} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
     {mode === 'auxiliary' && <section className={styles.auxiliaryPlaceholder}><h1>项目辅助</h1><p>候选、任务、词典与审核流程将在后续阶段整理到此处。歌词文档与播放器保持当前状态。</p></section>}

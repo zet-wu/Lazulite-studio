@@ -120,9 +120,7 @@
 .rubyGenerationRow label { display: grid; gap: 3px; min-width: 0; }
 .rubyGenerationRow label:has([type="checkbox"]) { display: inline-flex; align-items: center; white-space: nowrap; }
 
-.modeTabs, .syncButtons { display: flex; flex-wrap: wrap; gap: 6px; }
-.modeTabs { padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.modeTabs button[aria-current="page"] { background: var(--blue-soft); border-color: var(--blue); }
+.syncButtons { display: flex; flex-wrap: wrap; gap: 6px; }
 .previewMode { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; background: var(--canvas); }
 .previewMode { flex: 1; min-height: 0; overflow-y: auto; }
 .previewSettings { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; font-size: 12px; }
@@ -130,7 +128,7 @@
 .previewPlayer { height: min(62dvh, 620px); min-height: 300px; border-radius: 10px; overflow: hidden; color: #fff; background: radial-gradient(circle at 25% 15%, #243f6b, #111622 65%); }
 .previewPlayer > div { height: 100%; }
 .syncPanel { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.syncPanel button, .modeTabs button { border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; background: var(--canvas); color: var(--ink); cursor: pointer; }
+.syncPanel button { border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; background: var(--canvas); color: var(--ink); cursor: pointer; }
 .syncPanel button:disabled { opacity: .5; cursor: default; }
 .syncPanel input { width: 7em; padding: 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--canvas); color: var(--ink); }
 .syncBindings { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; }
@@ -177,9 +175,12 @@
 .settingsMenu > div, .ribbonMenu > div, .contextMenu { background: var(--surface-container); border-radius: var(--surface-radius); }
 .settingsMenu > div button, .settingsMenu > div label, .ribbonMenu > div button { width: 100%; min-height: 32px; border: 0; background: transparent; color: var(--ink); border-radius: 4px; text-align: left; padding: 6px 10px; }
 .settingsMenu > div label:hover { background: var(--state-hover); }
-.modeTabs { gap: 0; }
-.modeTabs button { border: 0; background: transparent; border-radius: var(--control-radius); padding: 7px 18px; }
-.modeTabs button[aria-current="page"] { color: var(--blue); background: var(--blue-soft); box-shadow: inset 0 -2px var(--blue); }
+/* Mode navigation is a centered group, distinct from ordinary option controls. */
+.modeTabs { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px; padding:8px 12px; background:var(--panel); border-bottom:1px solid var(--line); }
+.modeTabs button[data-role] { border:1px solid transparent; background:transparent; border-radius:var(--control-radius); padding:7px 18px; font-size:14px; font-weight:600; line-height:20px; letter-spacing:.04em; color:var(--muted); }
+.modeTabs button[data-role]:hover { border-color:var(--line); color:var(--ink); }
+.modeTabs button[data-role]:focus-visible, .modeTabs button[data-role]:active { border-color:var(--blue); color:var(--blue); }
+.modeTabs button[data-role][aria-current="page"] { border-color:var(--blue); color:var(--blue); background:var(--blue-soft); box-shadow:inset 0 -2px var(--blue); }
 .wordMain input { font-size: var(--lyric-size); line-height: 1.45; }
 .rubyGenerationRow > strong { font-size: var(--lyric-size); font-weight: 500; }
 .rubyGenerationRow > small { color: var(--muted); font-variant-numeric: tabular-nums; }
