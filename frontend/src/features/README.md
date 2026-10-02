@@ -35,4 +35,6 @@ Phase 7：LineSplitDialog上下预览与逐条翻译归属，TranslationEditor�
 
 当前注音输入统一单击/Tab 编辑与行内新增；`SingerDialog` 自有表单替代系统输入弹窗。`SyncPanel` 从工作区活动选择读取唯一目标，显示可见行号与行内序号，支持本行停止。`shortcuts.ts` 与 `ShortcutDialog` 统一 12 项本机绑定及焦点冲突路由，编辑/打轴默认等高。`StudioLyricPlayer` 用公开行元素的动画标识同步媒体倍率与相位；`MediaTransport` 视窗投影独立于媒体位置事件。项目列表使用直接删除按钮。
 
-`VocalPanel` 管任务与显式采用，`VocalTracks` 管能量/片段窗口和原子人工编辑。音频处理使用共享大纲、唯一主时间轴 portal 与底部紧凑播放器；播放和图形独立选源。`useProjectDocument` 的运行状态与唯一历史提升到完整项目，歌词导入保留声学部分，检查点不持久化历史。
+`VocalPanel` 管理绑定任务、成功自动替换、声学冲突保护及失败返回，`VocalTracks` 管能量/片段窗口和原子人工编辑。音频处理使用共享大纲、唯一主时间轴 portal 与底部紧凑播放器；播放和图形独立选源。`useProjectDocument` 的运行状态与唯一历史提升到完整项目，歌词导入保留声学部分，检查点不持久化历史。
+
+AudioReviewContext 共享音频页片段选择、最近循环目标、临时新增和工具栏/状态容器。VocalTracks 将共用标尺、波形、能量和片段组成完整新增区；VocalFocus 用动态 SVG 渐变遮罩作用于真实 backdrop blur，并消费外围点击。片段按起点全局编号、22px 分轨、成组平移和统一吸附；能量上限按窗口向上取百分位且最低 0.01。MediaTransport 仅在波形/能量使用非被动原生 wheel 监听。共享 Select 保留原生表单与标签语义，使用统一列表弹层和键盘选择。

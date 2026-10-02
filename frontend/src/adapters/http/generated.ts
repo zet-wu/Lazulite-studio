@@ -691,7 +691,7 @@ export interface components {
         JobCreate: {
             /** @enum {string} */
             kind: "search" | "fetch" | "transcribe" | "align" | "line_align" | "reading" | "forced_align" | "vocal";
-            /** @description 歌词任务必须带 revision；vocal 只绑定源资产，可用 retry_analysis_id 重试已有分离结果的分析。模型和设备取服务配置。 */
+            /** @description 歌词任务必须带 revision；vocal 只绑定源资产，可用 retry_analysis_id 复用已有 separated/ready 人声重新分析；每次生成以任务 ID 标识的新结果，不覆盖旧结果。模型和设备取服务配置。 */
             params: {
                 revision?: string;
                 asset_id: string;
