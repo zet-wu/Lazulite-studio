@@ -29,7 +29,8 @@ class VocalRunner:
         except ImportError as exc:
             raise EngineUnavailable('缺少人声依赖，请安装 requirements-vocal.txt') from exc
         from lazulite.audio.io import decode_audio
-        from lazulite.audio.activity import analyze_vocals, VocalConfig
+        from lazulite.audio.activity import analyze_vocals, build_activity_profile, VocalConfig
+        import scipy
         from lazulite.models.audio import AudioBuffer
         def boundary():
             if cancelled(): raise VocalCancelled()
@@ -76,7 +77,7 @@ class VocalRunner:
                         'gain': gain, 'peak_before_gain': peak, 'sample_rate': vocals.sample_rate,
                         'channels': vocals.samples.shape[0], 'frames': vocals.samples.shape[1],
                         'duration_ms': milliseconds(vocals.duration), 'format': 'FLAC PCM_24',
-                        'quantization': 'float to signed 24-bit PCM', 'analysis_version': 'lazulite-vocal-core-v1', 'analysis_source_sha256': hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
+                        'quantization': 'float to signed 24-bit PCM', 'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'analysis_source_sha256': hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
             with self.db.transaction() as c:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', str(directory), json.dumps(metadata)))
             del audio, vocals
@@ -84,20 +85,17 @@ class VocalRunner:
         emit('stage', 'analyzing', None, None, '正在分析持久人声的能量与核心片段')
         samples, rate = sf.read(str(vocal_path), dtype='float32', always_2d=True)
         audio = AudioBuffer(samples.T, rate, params['asset_id'])
-        metadata.update(analysis_source_sha256=hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), runtime={'numpy': np.__version__, 'soundfile': sf.__version__})
+        metadata.update(analysis_source_sha256=hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), analysis_version='lazulite-vocal-core-v2-main-rms', runtime={'numpy': np.__version__, 'soundfile': sf.__version__, 'scipy': scipy.__version__})
         config = VocalConfig()
         analysis = analyze_vocals(audio, config=config)
-        mono = samples.mean(axis=1)
-        frame, hop = max(1, round(config.frame_seconds * rate)), max(1, round(config.hop_seconds * rate))
-        windows = np.lib.stride_tricks.sliding_window_view(mono, frame)[::hop] if len(mono) >= frame else np.empty((0, frame), dtype=np.float32)
-        rms = np.empty(len(windows), dtype=np.float32)
-        for first in range(0, len(windows), 512):
-            block = windows[first:first+512]
-            rms[first:first+512] = np.sqrt(np.mean(block * block, axis=1))
-        # Persist the same RMS basis and parameters used by Lazulite gating.
-        np.save(directory / 'energy.npy', rms.astype(np.float32), allow_pickle=False)
+        # Public Lazulite profile: centered frames of its main-vocal signal.
+        # main_rms has no temporal smoothing; activity/split_activity are different
+        # normalized, smoothed curves and are not the Studio energy display.
+        profile = build_activity_profile(audio, config=config)
+        np.save(directory / 'energy.npy', profile['main_rms'].astype(np.float32), allow_pickle=False)
+        del profile
         metadata.update({'segments': [{'id': s.id, 'beginMs': milliseconds(s.core_start), 'endMs': milliseconds(s.core_end)} for s in analysis.segments],
-                         'diagnostics': list(analysis.diagnostics), 'analysis_config': asdict(config), 'energy_hop_ms': hop * 1000 / rate})
+                         'diagnostics': list(analysis.diagnostics), 'analysis_config': asdict(config), 'energy_hop_ms': config.hop_length * 1000 / rate})
         boundary()
         (directory / 'analysis.json').write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf-8')
         with self.db.transaction() as c:

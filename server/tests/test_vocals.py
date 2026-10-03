@@ -122,3 +122,38 @@ def test_ready_reanalysis_preserves_old_result(tmp_path):
         assert new != old
         assert before == {p.name: p.read_bytes() for p in directory.iterdir()}
         assert (tmp_path/'vocals'/'p'/new/'vocals.flac').read_bytes() == before['vocals.flac']
+
+
+def test_current_lazulite_profile_is_unsmoothed_main_rms_with_centered_clock(tmp_path):
+    class Asymmetric(Separator):
+        def separate(self, audio):
+            from lazulite.models.audio import AudioBuffer
+            samples = np.zeros((2, 88200), dtype=np.float32)
+            samples[0, 0], samples[1, 0] = .5, .25
+            return AudioBuffer(samples, 44100, audio.source_id)
+    client, db = setup(tmp_path, Asymmetric)
+    with client:
+        asset = client.get('/api/v1/projects/p/document').json()['document']['sourceAssetId']
+        job = client.post('/api/v1/projects/p/jobs/vocal', json={'params': {'asset_id': asset}}, headers={'origin':'http://studio'}).json()
+        assert wait(client, job['id'])['status'] == 'succeeded'
+        result = client.get('/api/v1/projects/p/vocals').json()['items'][0]
+        directory = tmp_path/'vocals'/'p'/result['id']
+        from lazulite.audio.activity import VocalConfig, build_activity_profile
+        from lazulite.models.audio import AudioBuffer
+        samples, rate = sf.read(directory/'vocals.flac', dtype='float32', always_2d=True)
+        config = VocalConfig()
+        expected = build_activity_profile(AudioBuffer(samples.T, rate, asset), config=config)
+        values = np.load(directory/'energy.npy')
+        np.testing.assert_array_equal(values, expected['main_rms'])
+        # Independent onset check: center padding includes sample zero at t=0;
+        # asymmetric main extraction gives .25 rather than stereo mean .375.
+        assert np.isclose(values[0], .25 / np.sqrt(config.frame_length))
+        assert values[config.frame_length//(2*config.hop_length)+1] == 0
+        assert len(values) == len(samples)//config.hop_length+1
+        assert result['energy_hop_ms'] == config.hop_length * 1000 / rate
+        assert result['analysis_config']['frame_length'] == 2048
+        assert result['analysis_version'] == 'lazulite-vocal-core-v2-main-rms'
+        assert 'scipy' in result['runtime']
+        energy = client.get(f"/api/v1/projects/p/vocals/{result['id']}/energy?start_ms=0&end_ms=100&buckets=4096").json()
+        assert energy['start_ms'] == 0
+        assert energy['values'][0] == float(values[0])
