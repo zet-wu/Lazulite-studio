@@ -108,7 +108,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const slider = useRef<HTMLDivElement>(null);
   const raf = useRef<number | undefined>(undefined);
   const moveAnimation = useRef<number | null>(null);
-  const panDrag = useRef<{ x: number; startMs: number; left: number; width: number; pointerId: number; started: boolean } | null>(null);
+  const panDrag = useRef<{ x: number; startMs: number; left: number; width: number; pointerId: number; started: boolean; seek: boolean; element: HTMLElement } | null>(null);
   const loopDrag = useRef<{ side: 'a' | 'b'; original: LoopState; left: number; width: number; pointerId: number } | null>(null);
   const lastTrackPaint = useRef(0);
   const lastFollowPaint = useRef(0);
@@ -411,11 +411,13 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     node.addEventListener('wheel',wheel,{passive:false});
     return()=>node.removeEventListener('wheel',wheel);
   });
-  const beginPan = (event: PointerEvent<HTMLElement>) => {
-    if (ui?.adding || !asset || event.button !== 0 || (event.target as Element).closest('[data-loop-handle]')) return;
+  const beginPan = (event: PointerEvent<HTMLElement>, plot: HTMLElement, seek: boolean) => {
+    if (event.defaultPrevented || ui?.adding || !asset || event.button !== 0 || (event.target as Element).closest('[data-loop-handle], button, input, select')) return;
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }
-    const rect = event.currentTarget.getBoundingClientRect();
-    panDrag.current = { x: event.clientX, startMs, left: rect.left, width: rect.width, pointerId: event.pointerId, started: false };
+    const rect = plot.getBoundingClientRect();
+    plot.focus({ preventScroll: true });
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panDrag.current = { x: event.clientX, startMs, left: rect.left, width: rect.width, pointerId: event.pointerId, started: false, seek, element: event.currentTarget };
   };
   const movePan = (event: PointerEvent<HTMLElement>) => {
     const current = panDrag.current;
@@ -423,7 +425,6 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     if (!current.started) {
       if (Math.abs(event.clientX - current.x) < 4) return;
       current.started = true;
-      event.currentTarget.setPointerCapture(event.pointerId);
       setFollow(false);
     }
     event.preventDefault();
@@ -434,9 +435,15 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     const current = panDrag.current;
     panDrag.current = null;
     if (!current || current.pointerId !== event.pointerId) return;
-    if (current.started) {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    } else { setFollow(false); seekTo(start + (event.clientX - current.left) / current.width * span); }
+    if (!current.started && current.seek) { setFollow(false); seekTo(current.startMs / 1e3 + (event.clientX - current.left) / current.width * span); }
+    if (current.element.hasPointerCapture(current.pointerId)) current.element.releasePointerCapture(current.pointerId);
+  };
+  const cancelPan = () => {
+    const current = panDrag.current;
+    if (!current) return;
+    panDrag.current = null;
+    setStart(current.startMs / 1e3);
+    if (current.element.hasPointerCapture(current.pointerId)) current.element.releasePointerCapture(current.pointerId);
   };
   const beginLoopDrag = (event: PointerEvent<HTMLSpanElement>, side: 'a' | 'b') => {
     if (event.button !== 0) return;
@@ -464,7 +471,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   };
   const keyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape' && (panDrag.current || loopDrag.current)) {
-      if (panDrag.current) setStart(panDrag.current.startMs / 1e3);
+      cancelPan();
       if (loopDrag.current) setLoop(loopDrag.current.original);
       panDrag.current = null; loopDrag.current = null;
       e.preventDefault(); return;
@@ -473,7 +480,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       !asset || e.defaultPrevented ||
       e.nativeEvent.isComposing ||
       e.repeat ||
-      shortcutInput(e.target)
+      shortcutInput(e.target, e.code)
     )
       return;
     const action = (['seekStart', 'seekEnd', 'seekBack', 'seekForward'] as const).find(action => matchesBinding(e.nativeEvent, keys[action]));
@@ -485,7 +492,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape' && (panDrag.current || loopDrag.current)) {
-        if (panDrag.current) setStart(panDrag.current.startMs / 1e3);
+        cancelPan();
         if (loopDrag.current) setLoop(loopDrag.current.original);
         panDrag.current = null; loopDrag.current = null;
         e.preventDefault(); return;
@@ -559,17 +566,14 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         </div>
 </>);
   const acousticPlots=(<div>
-      <div className={styles.ruler} aria-label="时间标尺" onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={() => { panDrag.current = null; }}>{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
+      <div className={styles.ruler} aria-label="时间标尺" data-timeline-pan="seek" tabIndex={-1}>{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
       <div className={styles.waveRow}>
         <div className={styles.sourceLabel}><Select aria-label="波形／声谱图音源" title="波形／声谱图音源" value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">原曲</option>{vocalId && <option value="vocal">人声</option>}</Select></div>
       <div
         data-wheel-zoom ref={slider}
         className={styles.waveWrap}
         style={visible.wave || ui?.adding ? undefined : { height: 0, overflow: 'hidden', border: 0, minHeight: 0 }}
-        onPointerDown={beginPan}
-        onPointerMove={movePan}
-        onPointerUp={endPan}
-        onPointerCancel={() => { panDrag.current = null; }}
+        data-timeline-pan="seek"
         role="slider"
         tabIndex={disabled ? -1 : 0}
         aria-label="波形进度"
@@ -599,7 +603,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       </div></div>
   </div>);
   const plots = (
-      <div id="timeline-plots" ref={plotsRef} className={styles.timelinePlots}>
+      <div id="timeline-plots" ref={plotsRef} className={styles.timelinePlots}
+        onPointerDown={event => {
+          const plot = (event.target as Element).closest<HTMLElement>('[data-timeline-pan]');
+          if (plot) beginPan(event, plot, plot.dataset.timelinePan === 'seek');
+        }} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={cancelPan} onLostPointerCapture={cancelPan}>
         <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
           <button data-role="secondary" onClick={tapBpm}>Tap</button><button data-role="secondary" disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label>{bpmStatus && <small role="status">{bpmStatus}</small>}</div>
       {timelineHost && <div className={styles.header}>{viewportTools}</div>}
