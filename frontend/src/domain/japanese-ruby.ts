@@ -62,6 +62,13 @@ export function proposeJapaneseRuby(source: LyricDocument, ids: string[], ranges
       if (!Number.isInteger(range.base_start) || !Number.isInteger(range.base_end) || range.base_start < previous || range.base_end <= range.base_start || range.base_end > length(text) || slice(text, range.base_start, range.base_end) !== range.base) throw new Error('读音分析范围与原文不符');
       previous = range.base_end;
     }
+    // Anchor before projection: a token crossing user word boundaries is still useful.
+    const anchored = entries.flatMap(range => {
+      const values = mapReading(range.base, range.reading);
+      return runs(range.base).map((part, index) => ({ ...range, base: part.text,
+        base_start: range.base_start + part.start, base_end: range.base_start + part.end,
+        reading: values?.[index] ?? '' }));
+    });
     let offset = 0;
     const blocks = line.words.flatMap(word => {
       const start = offset; offset += length(word.text);
@@ -69,7 +76,7 @@ export function proposeJapaneseRuby(source: LyricDocument, ids: string[], ranges
       if (word.rubyUnits.length) return [block(0, length(word.text), rubyReading(word), true)];
       const boundaries = new Set([0]); let cp = 0;
       for (const item of segmenter.segment(word.text)) { cp += length(item.segment); boundaries.add(cp); }
-      const candidates = entries.filter(r => r.base_start >= start && r.base_end <= offset && boundaries.has(r.base_start - start) && boundaries.has(r.base_end - start));
+      const candidates = anchored.filter(r => r.base_start >= start && r.base_end <= offset && boundaries.has(r.base_start - start) && boundaries.has(r.base_end - start));
       const result: ReadingBlock[] = []; let cursor = 0;
       const append = (a: number, b: number, reading: string) => {
         const value = slice(word.text, a, b), parts = runs(value), mapped = mapReading(value, reading);
@@ -77,7 +84,16 @@ export function proposeJapaneseRuby(source: LyricDocument, ids: string[], ranges
       };
       for (const r of candidates) { const a = r.base_start - start, b = r.base_end - start; if (a > cursor) append(cursor, a, ''); append(a, b, r.reading); cursor = b; }
       if (cursor < length(word.text)) append(cursor, length(word.text), '');
-      return result;
+      // Fine dictionary boundaries serve existing words; do not force new kanji words.
+      const merged: ReadingBlock[] = [];
+      for (const item of result) {
+        const last = merged.at(-1);
+        if (last && last.end === item.start && last.editable === item.editable && Boolean(last.reading) === Boolean(item.reading)) {
+          last.end = item.end; last.text += item.text; last.reading += item.reading;
+          last.key = `${word.id}:${last.start}:${last.end}`;
+        } else merged.push(item);
+      }
+      return merged;
     });
     return { lineId: line.id, background: !!line.backgroundOf, blocks };
   });

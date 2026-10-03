@@ -15,6 +15,7 @@ from threading import Lock
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from .furigana import load_index, token_segments
 from .db import Database
 from .projection import project_ttml
 
@@ -80,8 +81,11 @@ class SudachiReadingProposer:
 
             self._tokenizer = dictionary.Dictionary().create()
             self._mode = tokenizer.Tokenizer.SplitMode.C
+            self._mode_a = tokenizer.Tokenizer.SplitMode.A
+            self._furigana = load_index()
         except Exception as exc:  # dependency/model data can be absent on a server
-            self.unavailable_reason = f"SudachiPy 不可用：{type(exc).__name__}"
+            self._tokenizer = None
+            self.unavailable_reason = f"日文读音资源不可用：{type(exc).__name__}: {exc}"
 
     @property
     def available(self) -> bool:
@@ -94,31 +98,18 @@ class SudachiReadingProposer:
         for line in lines:
             line_id, text = str(line["id"]), str(line.get("text", ""))
             with self._tokenizer_lock:
-                tokens = self._tokenizer.tokenize(text, self._mode)
-            for token in tokens:
-                start, end = token.begin(), token.end()
-                base = text[start:end]
-                if not _contains_japanese(base):
-                    continue
-                reading = dictionary.get(base)
-                source = "dictionary" if reading else "sudachi"
-                if not reading:
-                    reading = token.reading_form()
-                if not reading or reading == "*":
-                    continue
-                reading = _hiragana(reading)
-                if _hiragana(base) == reading:
-                    continue
-                output.append(ReadingProposal(
-                    line_id=line_id,
-                    proposal_id=_proposal_id(line_id, start, end, base, reading),
-                    base_start=start,
-                    base_end=end,
-                    base=base,
-                    reading=reading,
-                    source=source,
-                    needs_review=source != "dictionary",
-                ))
+                # Keep token reads and split(A) inside the tokenizer lock too.
+                for token in self._tokenizer.tokenize(text, self._mode):
+                    override = dictionary.get(token.surface())
+                    segments = [(token.begin(), token.end(), token.surface(), _hiragana(override))] if override else token_segments(token, self._furigana, self._mode_a, _hiragana)
+                    for start, end, base, reading in segments:
+                        if not _contains_japanese(base) or not reading or reading == '*' or _hiragana(base) == reading:
+                            continue
+                        output.append(ReadingProposal(
+                            line_id=line_id, proposal_id=_proposal_id(line_id, start, end, base, reading),
+                            base_start=start, base_end=end, base=base, reading=reading,
+                            source='dictionary' if override else 'sudachi', needs_review=not bool(override),
+                        ))
         return output
 
 

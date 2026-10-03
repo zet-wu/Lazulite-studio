@@ -47,3 +47,19 @@ it('rejects an inverted existing envelope atomically',()=>{
 it('applies all 2000 rows, including rows never mounted in the preview',()=>{
  const d=createLyricDocument();d.lines=Array.from({length:2000},(_,i)=>createLine('今日',`line${i}`));const rows=proposeJapaneseRuby(d,d.lines.map(l=>l.id),d.lines.map(l=>range('今日','きょう',l.id)));const command=japaneseRubyCommand(d,d,rows);if(command.type!=='replace-document')throw Error();expect(command.document.lines).toHaveLength(2000);expect(command.document.lines.every(l=>l.words[0].rubyUnits.map(u=>u.reading).join('|')==='きょ|う')).toBe(true);
 });
+it('anchors entire ranges before projection and coalesces fine kanji within existing words',()=>{
+ for(const texts of [['夜','空','見','上','げ'],['夜空','見上','げ'],['夜空','見上げ']]){
+  const d=createLyricDocument(),l=d.lines[0];l.words=texts.map(t=>createWord(t));
+  const rows=proposeJapaneseRuby(d,[l.id],[range('夜','よ',l.id),range('空','ぞら',l.id,1),range('見','み',l.id,2),range('上げ','あげ',l.id,3)]);
+  expect(rows[0].blocks.map(b=>[b.text,b.reading])).toEqual(texts[0]==='夜'?[['夜','よ'],['空','ぞら'],['見','み'],['上','あ'],['げ','']]:[['夜空','よぞら'],['見上','みあ'],['げ','']]);
+  const c=japaneseRubyCommand(d,d,rows);if(c.type!=='replace-document')throw Error();expect(c.document.lines[0].words.map(w=>w.text)).toEqual(texts[0]==='夜'?texts:['夜空','見上','げ']);
+ }
+ const d=createLyricDocument(),l=d.lines[0];l.words=['見上','げ'].map(t=>createWord(t));
+ expect(proposeJapaneseRuby(d,[l.id],[range('見上げ','みあげ',l.id)])[0].blocks.map(b=>b.reading)).toEqual(['みあ','']);
+});
+it('leaves indivisible compounds and split graphemes empty',()=>{
+ for(const [base,reading] of [['海原','うなばら'],['微笑','ほほえ'],['今日','きょう']]){
+  const d=createLyricDocument(),l=d.lines[0];l.words=Array.from(base).map(t=>createWord(t));expect(proposeJapaneseRuby(d,[l.id],[range(base,reading,l.id)])[0].blocks.every(b=>!b.reading)).toBe(true);
+ }
+ const d=createLyricDocument('漢\u{E0100}');const l=d.lines[0];expect(proposeJapaneseRuby(d,[l.id],[range('漢','かん',l.id),range('\u{E0100}','',l.id,1)])[0].blocks.map(b=>[b.text,b.reading])).toEqual([['漢\u{E0100}','']]);
+});
