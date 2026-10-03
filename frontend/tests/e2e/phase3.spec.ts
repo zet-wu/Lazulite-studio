@@ -114,7 +114,7 @@ test('P3-03 renders all 2000 visible timed rows and keeps the canvas and loop co
   await expect(page.getByRole('button', { name: '循环当前行' })).toBeVisible();
   await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
   expect(await page.locator('main section[data-line-id]').count()).toBeLessThan(80);
-  const plots = page.locator('[data-track-lane]').first().locator('../..');
+  const plots = page.locator('#timeline-plots');
   expect(await plots.evaluate(e => e.scrollHeight)).toBeGreaterThan(300);
 });
 

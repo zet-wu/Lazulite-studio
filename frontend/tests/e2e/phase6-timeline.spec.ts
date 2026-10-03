@@ -11,8 +11,8 @@ test('P6 timeline snap affects line moves and boundary resize while later touchi
   for (let i = 0; i < 3; i++) await page.getByRole('button', { name: '放大波形', exact: true }).click();
   const third = page.getByRole('button', { name: '时间轴行 L3', exact: true });
   const fourth = page.getByRole('button', { name: '时间轴行 L4', exact: true });
-  expect(await third.evaluate(e => e.style.top)).toBe('1px');
-  expect(await fourth.evaluate(e => e.style.top)).toBe('1px');
+  expect(await third.evaluate(e => getComputedStyle(e).top)).toBe('1px');
+  expect(await fourth.evaluate(e => getComputedStyle(e).top)).toBe('1px');
   await lines.nth(4).click();
   const start = page.getByRole('textbox', { name: '行 t4开始秒数', exact: true });
   const bar = page.getByRole('button', { name: '时间轴行 L5', exact: true });
