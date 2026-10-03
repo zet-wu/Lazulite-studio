@@ -539,12 +539,12 @@ export function EditorWorkspace(props: Props) {
     setContextMenu({ x, y, title, actions: [...shared, ...actions], target: target.closest<HTMLElement>('[data-ruby-id], [data-romanization-unit-id], [data-romanization-content-id], [data-word-id], [data-line-id]') ?? target });
     return true;
   };
-  const ownsClipboard = (target: EventTarget) => {
+  const ownsSelection = (target: EventTarget) => {
     if ((mode !== 'edit' && mode !== 'sync') || !selection?.ids.length || isTextInput(target)) return false;
     if (!(target instanceof Element) || target.closest('[role="dialog"], [role="menu"]')) return false;
-    if (window.getSelection()?.toString()) return false;
     return Boolean(outlineRef.current?.contains(target) || mainRef.current?.contains(target));
   };
+  const ownsClipboard = (target: EventTarget) => ownsSelection(target) && !window.getSelection()?.toString();
   const closeContext = () => { const target = contextMenu?.target; setContextMenu(null); if (target?.isConnected) target.focus(); else mainRef.current?.focus(); };
   const navigateWord = (wordId: string, direction: -1 | 1) => {
     const order = document.lines.flatMap((line) => line.words.map((word) => ({ lineId: line.id, wordId: word.id })));
@@ -647,6 +647,16 @@ export function EditorWorkspace(props: Props) {
       return;
     }
     if (isTextInput(event.target)) return;
+    if (event.key === 'Delete') {
+      if (!event.defaultPrevented && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey
+        && !drag.active() && !window.document.querySelector('[role="dialog"], [role="menu"], details[data-top-menu][open]')
+        && ownsSelection(event.target)) {
+        event.preventDefault();
+        try { removeSelection(); } catch (error) { setMessage(error instanceof Error ? error.message : '删除失败'); }
+      }
+      return;
+    }
+
     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
       event.preventDefault();
       // History may remove the focused object. Keep the next key in the editor.

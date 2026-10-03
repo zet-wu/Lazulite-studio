@@ -58,7 +58,8 @@ export function SyncPanel({ document, cursor, targetVersion, apply, transport, o
       const action = (['start', 'next', 'end', 'previous', 'following', 'previousLine', 'followingLine'] as const).find(action => matchesBinding(event, keys[action]));
       if (!action) return;
       if (event.target instanceof Element && event.target.closest('[data-transport]')
-        && (!event.target.closest('button') || !['start', 'next', 'end'].includes(action))) return;
+        && (!['start', 'next', 'end'].includes(action)
+          || (['seekStart', 'seekEnd', 'seekBack', 'seekForward'] as const).some(key => matchesBinding(event, keys[key])))) return;
       event.preventDefault();
       if (action === 'previous') moveTo(index - 1);
       else if (action === 'following') moveTo(index + 1);
