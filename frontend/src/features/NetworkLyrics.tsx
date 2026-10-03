@@ -38,8 +38,8 @@ export function NetworkLyrics({ store, searchConditions, source, document, apply
  </button>;})}</div>
  {state.failed.length>0 && <p role="status">{state.succeeded ? '部分搜索请求失败，已保留结果。' : '搜索失败。'} <button data-role="secondary" onClick={()=>store.retrySearch(source)}>重试此来源</button></p>}
  {!state.pending && !state.failed.length && !state.cancelled && snapshot.query && !state.rows.length && <p>没有搜索结果</p>}
- <div className={styles.actions}><button data-role="secondary" disabled={!id} onClick={link}>仅关联歌曲 ID</button>{selected && <button data-role="secondary" onClick={()=>store.refresh(source,selected.id)}>重新取词</button>}</div>
+ <div className={styles.actions}><button data-role="secondary" disabled={!id} onClick={link}>仅关联歌曲 ID</button><button data-role="secondary" disabled={!selected} onClick={()=>{if(selected)store.refresh(source,selected.id);}}>重新取词</button>
+ {!id && (source === 'kugou' || source === 'amll' || selected) && <span className={styles.hint}>{source === 'kugou' ? '酷狗不支持歌曲 ID 关联。' : source === 'amll' ? '平台 ID 从右侧元数据选择' : '候选缺少已确认的平台 ID，不能关联。'}</span>}</div>
  {message && <p role="status">{message}</p>}
- {!id && <p className={styles.hint}>{source === 'kugou' ? '酷狗不支持歌曲 ID 关联。' : source === 'amll' ? 'AMLL TTML 中已有的平台元数据由右侧表格选择。' : selected ? '候选缺少已确认的平台 ID，不能关联。' : '先选择歌曲候选。'}</p>}
  </>;
 }

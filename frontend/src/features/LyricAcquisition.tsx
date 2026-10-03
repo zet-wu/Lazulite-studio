@@ -67,7 +67,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
       {[['netease','网易云音乐'],['qqmusic','QQ 音乐'],['kugou','酷狗'],['amll','AMLL DB'],['file', '文件'], ['text', '文本']].map(([id, label]) => <button data-role="secondary" key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; store.setTab(id as typeof tab); setFilename(null); setIncoming(null); setMessage(''); }}>{label}</button>)}
     </div>
       {!['file','text'].includes(tab) && <NetworkLyrics store={store} searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} />}
-      {tab === 'file' && <><p className={styles.hint}>选择歌词后预览，确认导入才会替换当前歌词。</p><button data-role="secondary" onClick={() => fileInput.current?.click()}>选择歌词文件</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
+      {tab === 'file' && <><button data-role="secondary" onClick={() => fileInput.current?.click()}>选择歌词文件</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
       {tab === 'text' && <><label>文本格式 <Select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</Select></label><textarea aria-label="待导入歌词文本" value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button data-role="secondary" onClick={() => parse(text, format)}>预览文本</button></>}
       {onNew && <button data-role="secondary" onClick={onNew}>新建空白歌词</button>}
       {message && <p role="status">{message}</p>}
@@ -81,6 +81,6 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
       <p className={styles.hint}>每键选择一侧完整值列表。选择空白侧会删除该键；正文、歌手与音译轨道整体替换。</p>
       <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>键名</th><th>原值</th><th>待导入值</th></tr></thead><tbody>{Object.keys(choices).map(key => <tr key={key}><td>{key}{JSON.stringify(base.metadata[key]) === JSON.stringify(incoming.metadata[key]) && <small className={styles.hint}> · 一致</small>}</td>{(['current','incoming'] as const).map(side => <td key={side}><button data-role="secondary" aria-label={`${key} ${side === 'current' ? '原值' : '待导入值'}`} aria-pressed={choices[key] === side} onClick={() => setChoices({ ...choices, [key]: side })}>{(side === 'current' ? base : incoming).metadata[key]?.map((value, i) => <span key={i}>{value}</span>)}</button></td>)}</tr>)}</tbody></table></div>
       <div className={styles.actions}><button data-role="primary" onClick={confirm}>确认导入并替换歌词</button><button data-role="secondary" onClick={() => { setIncoming(null); setMessage(''); }}>取消</button></div>
-    </> : <p className={styles.hint}>选择文件或粘贴文本以查看歌词及元数据。</p>}</section>
+    </> : null}</section>
   </div>;
 }

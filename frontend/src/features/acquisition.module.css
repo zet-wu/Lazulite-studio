@@ -20,7 +20,7 @@
 .table button span { display: block; padding: 8px; white-space: pre-wrap; }
 .table button span + span { border-top: 1px solid var(--line); }
 .results { flex: 1; min-height: 120px; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
-.results button { text-align: left; }
+.results button { text-align: left; flex-shrink: 0; overflow-wrap: anywhere; }
 .results small { display: block; color: var(--muted); margin-top: 4px; }
 
 .tableWrap { overflow: auto; min-height: 0; flex: 1; }
