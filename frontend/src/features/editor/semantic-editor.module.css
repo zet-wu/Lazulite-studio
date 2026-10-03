@@ -40,6 +40,7 @@
 .lineHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .words { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; padding: 10px 0; }
 .word { min-width: 0; border: 1px solid var(--line); padding: 6px; border-radius: 5px; background: var(--canvas); }
+.word[data-ruby-drag-size] { box-sizing: border-box; width: var(--ruby-drag-width); min-height: var(--ruby-drag-height); flex-shrink: 0; }
 .selectedWord { border-color: var(--blue); background: var(--blue-soft); }
 .word:focus-within { outline: 2px solid var(--blue); outline-offset: 2px; }
 .wordMain { display: flex; gap: 3px; }
@@ -306,3 +307,20 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .japaneseRubyLabel { font-size: 12px; opacity: .75; }
 .japaneseRubyBlock small { font-size: 11px; }
 .japaneseRubyMissing { border: 1px solid var(--danger) !important; }
+
+/* Ruby insertion marks reserve no extra row or column while dragging. */
+.word[data-ruby-drag-size] { position: relative; }
+.word[data-ruby-drag-size] .rubyTile[data-drag-placeholder] {
+  position: relative; flex: 0 0 0; min-width: 0; width: 0; padding: 0; margin-right: -4px;
+  border: 0; align-self: stretch; background: none;
+}
+.word[data-ruby-drag-size] .rubyTile[data-drag-placeholder] > * { display: none; }
+.word[data-ruby-drag-size] .rubyTile[data-drag-placeholder]::after {
+  content: ''; position: absolute; left: -2px; top: 0; bottom: 0; width: 3px;
+  background: var(--blue); border-radius: 2px;
+}
+.word[data-ruby-drag-size] .rubyAbove:not(:has(> [data-ruby-id]:not([data-drag-placeholder]))) {
+  position: absolute; top: -5px; left: 6px; right: 6px; height: 5px;
+}
+.word[data-ruby-drag-size] .rubyAbove:not(:has(> [data-ruby-id]:not([data-drag-placeholder]))) > [data-drag-placeholder] { flex: 1; }
+.word[data-ruby-drag-size] .rubyAbove:not(:has(> [data-ruby-id]:not([data-drag-placeholder]))) > [data-drag-placeholder]::after { width: 100%; }

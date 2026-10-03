@@ -13,7 +13,8 @@ test('empty target receives selected group, preserves IDs/times, focus, undo and
  await load(page);const source=page.getByLabel('词 元',{exact:true}).locator('xpath=ancestor::*[@data-word-id]'),target=page.getByLabel('词 先',{exact:true}).locator('xpath=ancestor::*[@data-word-id]');
  const units=source.locator('[data-ruby-id]');const ids=await units.evaluateAll(es=>es.map(e=>e.getAttribute('data-ruby-id')));
  await units.first().click({position:{x:2,y:2}});await units.nth(1).click({modifiers:['Shift'],position:{x:2,y:2}});await expect(page.getByText('注音已选 2')).toBeVisible();
- await move(page,units.first(),target,false);await expect(target.locator('[data-drag-placeholder]')).toHaveCount(2);await page.mouse.up();
+ await move(page,units.first(),target,false);await expect(target.locator('[data-drag-placeholder]')).toHaveCount(2);await page.screenshot({path:'/tmp/ruby-cross-word-receiver.png'});await page.mouse.up();
+ await expect(page.locator('[data-ruby-drag-size]')).toHaveCount(0);
  await expect(target.locator('[data-ruby-id]')).toHaveCount(2);expect(await target.locator('[data-ruby-id]').evaluateAll(es=>es.map(e=>e.getAttribute('data-ruby-id')))).toEqual(ids.slice(0,2));
  await expect(target.locator('[data-ruby-id]').first()).toBeFocused();await expect(page.getByText('注音已选 2')).toBeVisible();await expect(source.locator('[data-ruby-id]')).toHaveCount(1);
  await expect(target.getByLabel('读音 あ开始秒数')).toHaveValue('0');await expect(target.getByLabel('读音 い结束秒数')).toHaveValue('0.2');
@@ -34,7 +35,7 @@ test('populated targets accept first, middle and last insertion; last unit can l
 test('cross lyric lines, background transfer, Esc and original position add no move history',async({page})=>{
  await load(page);const source=page.getByLabel('词 元',{exact:true}).locator('xpath=ancestor::*[@data-word-id]');
  for(const label of ['词 別','词 景']){const target=page.getByLabel(label,{exact:true}).locator('xpath=ancestor::*[@data-word-id]');await move(page,source.locator('[data-ruby-id]').first(),target);await expect(source.locator('[data-ruby-id]')).toHaveCount(3);await expect(target.locator('[data-ruby-id]')).toHaveCount(0);}
- const target=page.getByLabel('词 先',{exact:true}).locator('xpath=ancestor::*[@data-word-id]');await move(page,source.locator('[data-ruby-id]').first(),target,false);await page.keyboard.press('Escape');await page.mouse.up();await expect(target.locator('[data-ruby-id]')).toHaveCount(0);
+ const target=page.getByLabel('词 先',{exact:true}).locator('xpath=ancestor::*[@data-word-id]');await move(page,source.locator('[data-ruby-id]').first(),target,false);await page.keyboard.press('Escape');await page.mouse.up();await expect(page.locator('[data-ruby-drag-size]')).toHaveCount(0);await expect(target.locator('[data-ruby-id]')).toHaveCount(0);
  await move(page,source.locator('[data-ruby-id]').first(),source.locator('[data-ruby-id]').first());await expect(source.locator('[data-ruby-id]')).toHaveCount(3);
  // One undo is still the import, proving none of the attempted moves made history.
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.getByLabel('词 元',{exact:true})).toHaveCount(0);

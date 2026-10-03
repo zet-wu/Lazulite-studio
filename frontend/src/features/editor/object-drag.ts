@@ -65,6 +65,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
   const animations = useRef<Animation[]>([]);
   const oldRects = useRef(new Map<HTMLElement, DOMRect>());
   const suppressClick = useRef(false);
+  const sizedWords = useRef<HTMLElement[]>([]);
   const latest = useRef({ document, apply, select }); latest.current = { document, apply, select };
   const captureRects = () => {
     oldRects.current.clear();
@@ -95,6 +96,11 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     const current = session.current; session.current = null;
     animations.current.forEach(animation => animation.cancel()); animations.current = [];
     oldRects.current.clear();
+    for (const node of sizedWords.current) {
+      delete node.dataset.rubyDragSize;
+      node.style.removeProperty('--ruby-drag-width'); node.style.removeProperty('--ruby-drag-height');
+    }
+    sizedWords.current = [];
     if (current) { cancelAnimationFrame(current.frame); current.ghost?.remove(); }
     root.current?.removeAttribute('data-object-drag');
     if (current && root.current?.hasPointerCapture(current.id)) root.current.releasePointerCapture(current.id);
@@ -223,6 +229,17 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     current.x = x; current.y = y; current.copy = copy;
     if (!current.started && Math.hypot(x - current.originX, y - current.originY) >= 4) {
       current.started = true;
+      if (current.source.kind === 'ruby') {
+        // Keep words under the pointer while the preview changes Ruby ownership.
+        const line = current.node.closest('[data-line-id]');
+        const boxes = [...(line?.querySelectorAll<HTMLElement>('[data-word-id]') ?? [])].map(node => ({ node, rect: node.getBoundingClientRect() }));
+        sizedWords.current = boxes.map(({ node, rect }) => {
+          node.dataset.rubyDragSize = '';
+          node.style.setProperty('--ruby-drag-width', `${rect.width}px`);
+          node.style.setProperty('--ruby-drag-height', `${rect.height}px`);
+          return node;
+        });
+      }
       const ghost = current.node.cloneNode(true) as HTMLElement;
       ghost.removeAttribute('id'); ghost.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
       ghost.classList.add(styles.dragGhost); ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
