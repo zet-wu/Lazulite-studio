@@ -1,3 +1,4 @@
+import type { ReadingRange } from '../../domain/japanese-ruby';
 import { requestHeaders } from "./client";
 
 export type ReadingDictionaryEntry = {
@@ -66,6 +67,5 @@ export const readingApi = {
     }),
 };
 
-export type ReadingRange = { line_id: string; base_start: number; base_end: number; base: string; reading: string };
 export const analyzeReadings = (lines: Array<{ id: string; text: string }>, signal: AbortSignal) =>
   call<{ ranges: ReadingRange[] }>('/reading/analyze', { method: 'POST', body: JSON.stringify({ lines }), signal });

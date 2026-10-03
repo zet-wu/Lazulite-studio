@@ -10,6 +10,7 @@ from pathlib import Path
 import sqlite3
 from typing import Any, Mapping, Protocol, Sequence
 import uuid
+from threading import Lock
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -72,6 +73,7 @@ class SudachiReadingProposer:
 
     def __init__(self) -> None:
         self._tokenizer = None
+        self._tokenizer_lock = Lock()
         self.unavailable_reason: str | None = None
         try:
             from sudachipy import dictionary, tokenizer
@@ -91,7 +93,9 @@ class SudachiReadingProposer:
         output: list[ReadingProposal] = []
         for line in lines:
             line_id, text = str(line["id"]), str(line.get("text", ""))
-            for token in self._tokenizer.tokenize(text, self._mode):
+            with self._tokenizer_lock:
+                tokens = self._tokenizer.tokenize(text, self._mode)
+            for token in tokens:
                 start, end = token.begin(), token.end()
                 base = text[start:end]
                 if not _contains_japanese(base):

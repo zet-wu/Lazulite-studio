@@ -1,5 +1,5 @@
 import { toHiragana } from 'wanakana';
-import type { ReadingRange } from '../adapters/http/reading';
+export type ReadingRange = { line_id: string; base_start: number; base_end: number; base: string; reading: string };
 import { lineText, rubyReading, type LyricDocument, type LyricWord } from './lyric-document';
 import type { LyricCommand } from './lyric-commands';
 import { makeRubyUnits, splitReadingMora } from './ruby-editing';
@@ -26,17 +26,25 @@ function runs(text: string) {
 // Only accept a unique kana-anchor decomposition; never split a reading by character count.
 function mapReading(text: string, reading: string): string[] | null {
   const parts = runs(text), kana = Array.from(toHiragana(reading).normalize('NFC'));
+  if (!reading) return null;
+  if (parts.length === 1 && parts[0].kanji) return [reading];
   const solutions: string[][] = [];
+  const failed = new Set<string>();
   const visit = (index: number, offset: number, values: string[]) => {
     if (solutions.length > 1) return;
     if (index === parts.length) { if (offset === kana.length) solutions.push(values); return; }
+    const key = `${index}:${offset}`;
+    if (failed.has(key)) return;
+    const before = solutions.length;
     const part = parts[index];
     if (!part.kanji) {
       const anchor = Array.from(toHiragana(part.text).normalize('NFC'));
       if (anchor.every((c, i) => kana[offset + i] === c)) visit(index + 1, offset + anchor.length, [...values, '']);
     } else {
-      for (let end = offset + 1; end <= kana.length; end++) visit(index + 1, end, [...values, kana.slice(offset, end).join('')]);
+      if (offset >= kana.length) return;
+      for (let end = index === parts.length - 1 ? kana.length : offset + 1; end <= kana.length && solutions.length < 2; end++) visit(index + 1, end, [...values, kana.slice(offset, end).join('')]);
     }
+    if (solutions.length === before) failed.add(key);
   };
   if (reading) visit(0, 0, []);
   return solutions.length === 1 ? solutions[0] : null;
