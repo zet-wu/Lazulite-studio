@@ -13,7 +13,16 @@ def build_vocal_router(runner, *, auth, project_exists):
         with runner.db.connect() as c:
             rows = c.execute('SELECT id,status,metadata_json FROM vocal_results WHERE project_id=? ORDER BY rowid DESC', (pid,)).fetchall()
         import json
-        return {'items': [{**json.loads(r['metadata_json']), 'status': r['status']} for r in rows]}
+        items = []
+        signatures = {}
+        for row in rows:
+            metadata = json.loads(row['metadata_json'])
+            asset_id = metadata['source_asset_id']
+            if asset_id not in signatures: signatures[asset_id] = runner.separation_signature(asset_id)
+            available = runner.audio_available(pid, metadata)
+            state = 'missing' if not available else 'current' if metadata['separation_signature'] == signatures[asset_id] else 'outdated'
+            items.append({**metadata, 'status': row['status'], 'audio_id': metadata['audio_result_id'], 'audio_state': state})
+        return {'items': items}
 
     @router.get('/projects/{pid}/vocals/{rid}/energy')
     def energy(pid: str, rid: str, start_ms: int, end_ms: int, buckets: int = 1000, _=Depends(auth)):
@@ -36,16 +45,19 @@ def build_vocal_router(runner, *, auth, project_exists):
     @router.get('/projects/{pid}/vocals/{rid}/file')
     def file(pid: str, rid: str, _=Depends(auth)):
         project_exists(pid)
-        try: row, _ = runner.get(pid, rid)
+        try: row, metadata = runner.get(pid, rid)
         except KeyError: raise HTTPException(404, '人声结果不存在')
-        return FileResponse(Path(row['directory']) / 'vocals.flac', media_type='audio/flac')
+        path = runner.audio_path(pid, metadata)
+        if not path.is_file(): raise HTTPException(404, '人声文件不存在，请重新生成')
+        return FileResponse(path, media_type='audio/flac')
     return router
 
 def vocal_asset(runner, pid, rid):
     try: row, metadata = runner.get(pid, rid)
     except KeyError: raise HTTPException(404, '人声结果不存在')
-    path = Path(row['directory']) / 'vocals.flac'
+    path = runner.audio_path(pid, metadata)
     if not path.is_file(): raise HTTPException(404, '人声文件不存在')
     # The producer already persisted these properties for this immutable PCM FLAC.
     probe = MediaProbe(metadata['duration_ms'], 0, metadata['sample_rate'], metadata['channels'], 'flac', 'flac', 'audio/flac')
-    return Asset(rid, f'vocal-{rid}', path, 'vocals.flac', path.stat().st_size, probe)
+    audio_id = metadata['audio_result_id']
+    return Asset(audio_id, f'vocal-{audio_id}', path, 'vocals.flac', path.stat().st_size, probe)

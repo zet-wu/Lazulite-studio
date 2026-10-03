@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import inspect
+from importlib.metadata import version, PackageNotFoundError
 import shutil
 from dataclasses import asdict
 from pathlib import Path
@@ -17,6 +19,7 @@ class VocalRunner:
         self.db, self.root = db, root
         self.root.mkdir(parents=True, exist_ok=True)
         self.separator_factory = separator_factory
+        self._audio_checks = {}
         # Startup has no live model worker. Discard only unregistered partial products.
         with db.connect() as c:
             known = {Path(row[0]).resolve() for row in c.execute('SELECT directory FROM vocal_results')}
@@ -39,15 +42,30 @@ class VocalRunner:
         directory = self.root / project_id / result_id
         directory.mkdir(parents=True, exist_ok=True)
         vocal_path = directory / 'vocals.flac'
+        signature = self.separation_signature(params['asset_id'], params['model_name'], params['device'])
+        reuse = None
         if params.get('retry_analysis_id'):
+            row, candidate = self.get(project_id, params['retry_analysis_id'])
+            if row['source_asset_id'] != params['asset_id']: raise ValueError('人声来源不匹配')
+            if self.audio_available(project_id, candidate): reuse = (row, candidate)
+        else:
             with self.db.connect() as c:
-                row = c.execute('SELECT metadata_json,directory FROM vocal_results WHERE id=? AND project_id=? AND source_asset_id=?', (params['retry_analysis_id'], project_id, params['asset_id'])).fetchone()
-            if not row: raise ValueError('可重用人声不存在')
-            shutil.copyfile(Path(row[1]) / 'vocals.flac', vocal_path)
-            metadata = json.loads(row[0])
+                rows = c.execute('SELECT * FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id, params['asset_id'])).fetchall()
+            for row in rows:
+                candidate = json.loads(row['metadata_json'])
+                if candidate['separation_signature'] == signature and self.audio_available(project_id, candidate):
+                    reuse = (row, candidate)
+                    break
+        if reuse:
+            row, metadata = reuse
+            if not params.get('retry_analysis_id') and row['status'] == 'ready':
+                boundary()
+                return self.result(project_id, metadata)
+            vocal_path = self.audio_path(project_id, metadata)
+            audio_id = metadata['audio_result_id']
             for key in ('segments', 'diagnostics', 'analysis_config', 'energy_hop_ms'):
                 metadata.pop(key, None)
-            metadata.update(id=result_id, reused_from=params['retry_analysis_id'])
+            metadata.update(id=result_id, audio_result_id=audio_id)
             with self.db.transaction() as c:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', str(directory), json.dumps(metadata)))
         else:
@@ -78,6 +96,7 @@ class VocalRunner:
                         'channels': vocals.samples.shape[0], 'frames': vocals.samples.shape[1],
                         'duration_ms': milliseconds(vocals.duration), 'format': 'FLAC PCM_24',
                         'quantization': 'float to signed 24-bit PCM', 'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'analysis_source_sha256': hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
+            metadata.update(audio_result_id=result_id, separation_signature=signature, audio_sha256=self.file_hash(vocal_path))
             with self.db.transaction() as c:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', str(directory), json.dumps(metadata)))
             del audio, vocals
@@ -100,7 +119,59 @@ class VocalRunner:
         (directory / 'analysis.json').write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf-8')
         with self.db.transaction() as c:
             c.execute("UPDATE vocal_results SET status='ready',metadata_json=? WHERE id=?", (json.dumps(metadata, ensure_ascii=False), result_id))
-        return {'kind': 'vocal', 'analysis_id': result_id, 'binding': {'project_id': project_id, 'asset_id': params['asset_id']}, 'engine': metadata['model']}
+        return self.result(project_id, metadata)
+
+    @staticmethod
+    def result(project_id, metadata):
+        return {'kind': 'vocal', 'analysis_id': metadata['id'], 'binding': {'project_id': project_id, 'asset_id': metadata['source_asset_id']}, 'engine': metadata['model']}
+
+    @staticmethod
+    def file_hash(path):
+        with Path(path).open('rb') as source:
+            return hashlib.file_digest(source, 'sha256').hexdigest()
+
+    def separation_signature(self, asset_id, model_name=None, device=None):
+        from lazulite.audio import io, separation
+        from lazulite.audio.separation import DemucsConfig
+        config = asdict(DemucsConfig(model_name=model_name or os.getenv('STUDIO_VOCAL_MODEL', 'htdemucs'), device=device or os.getenv('STUDIO_VOCAL_DEVICE', 'cpu')))
+        with self.db.connect() as c:
+            source_hash = c.execute('SELECT sha256 FROM assets WHERE id=?', (asset_id,)).fetchone()[0]
+        # The fixed model catalogue is versioned with Demucs. Record loaded weight
+        # hashes separately for provenance; analysis source changes do not invalidate audio.
+        identity = {'source': source_hash, 'config': config, 'pcm_pipeline': 1,
+                    'implementation': [self.file_hash(inspect.getfile(module)) for module in (io, separation)]}
+        if self.separator_factory:
+            separator = self.separator_factory()
+            try: identity['separator'] = separator.cache_identity
+            finally: separator.close()
+        else:
+            identity['runtime'] = {}
+            for name in ('demucs', 'torch', 'soundfile'):
+                try: identity['runtime'][name] = version(name)
+                except PackageNotFoundError: identity['runtime'][name] = None
+        return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+
+    def audio_path(self, project_id, metadata):
+        owner, _ = self.get(project_id, metadata['audio_result_id'])
+        return Path(owner['directory']) / 'vocals.flac'
+
+    def audio_available(self, project_id, metadata):
+        import soundfile as sf
+        path = self.audio_path(project_id, metadata)
+        try:
+            stat = path.stat()
+            stamp = (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns, metadata['audio_sha256'])
+            cached = self._audio_checks.get(path)
+            if cached and cached[0] == stamp: return cached[1]
+            info = sf.info(path)
+            valid = (info.frames == metadata['frames'] and info.samplerate == metadata['sample_rate'] and info.channels == metadata['channels'])
+            if valid:
+                valid = self.file_hash(path) == metadata['audio_sha256']
+        except (OSError, sf.LibsndfileError):
+            return False
+        self._audio_checks[path] = (stamp, valid)
+        return valid
+
 
     def get(self, project_id, result_id):
         with self.db.connect() as c:

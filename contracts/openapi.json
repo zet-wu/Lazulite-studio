@@ -3390,7 +3390,9 @@
           "format",
           "quantization",
           "model",
-          "analysis_version"
+          "analysis_version",
+          "audio_id",
+          "audio_state"
         ],
         "properties": {
           "id": {
@@ -3464,6 +3466,17 @@
             "items": {
               "type": "string"
             }
+          },
+          "audio_id": {
+            "type": "string"
+          },
+          "audio_state": {
+            "type": "string",
+            "enum": [
+              "current",
+              "outdated",
+              "missing"
+            ]
           }
         }
       },

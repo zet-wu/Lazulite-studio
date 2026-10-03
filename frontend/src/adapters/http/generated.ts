@@ -966,6 +966,9 @@ export interface components {
             energy_hop_ms?: number;
             segments?: components["schemas"]["VocalSegment"][];
             diagnostics?: string[];
+            audio_id: string;
+            /** @enum {string} */
+            audio_state: "current" | "outdated" | "missing";
         };
         VocalResults: {
             items: components["schemas"]["VocalResult"][];

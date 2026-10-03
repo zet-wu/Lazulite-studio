@@ -28,11 +28,16 @@ export function VocalPanel({ projectId, project, apply, durationMs, visible }: {
   const tasks = jobs.data?.items.filter(j => j.kind === 'vocal') ?? [];
   const active = tasks.find(j => ['queued','running','cancel_requested'].includes(j.status));
   const latest = pending ? tasks.find(j=>j.id===pending.id) : tasks[0];
-  const result = results.data?.items.find(r=>r.id===latest?.id);
+  const completed = useQuery({queryKey:['vocal-result',latest?.id], queryFn:()=>vocalApi.jobResult(latest!.id), enabled:latest?.status==='succeeded'});
+  const result = results.data?.items.find(r=>r.id===(completed.data?.analysis_id ?? latest?.id));
+  const sourceResults = results.data?.items.filter(r=>r.source_asset_id===project.sourceAssetId) ?? [];
+  const currentAudio = sourceResults.find(r=>r.audio_state==='current') ?? sourceResults[0];
+  const repair = currentAudio?.audio_state==='missing';
+  const update = currentAudio?.audio_state==='outdated';
   const failure = latest && ['failed','cancelled','interrupted'].includes(latest.status);
   const conflict = pending && latest?.status==='succeeded' && !handled.current.has(pending.id) && pending.baseline!==JSON.stringify(project.acoustics);
   const ready = !!project.acoustics.analysisId || project.acoustics.segments.length>0;
-  const showing = busy || !!active || !!error || jobs.isError || results.isError || !!conflict || !!(failure && dismissed!==latest.id);
+  const showing = busy || !!active || !!error || jobs.isError || results.isError || completed.isError || !!conflict || !!(failure && dismissed!==latest.id);
   useEffect(()=>ui.setTimelineReady(ready && !showing),[ready,showing,ui.setTimelineReady]);
   const adopt = () => {
     if(!pending || !result || result.status!=='ready') return;
@@ -59,19 +64,20 @@ export function VocalPanel({ projectId, project, apply, durationMs, visible }: {
     {visible && <div className={editorStyles.ribbon} aria-label="音频操作">
       {ready && !showing && <div className={styles.segmentTools} ref={ui.setToolsHost}/>}
       {ready ? <TopMenu id="audio-analysis" title="音频分析" className={editorStyles.ribbonMenu} activeMenuId={menu} onMenuChange={setMenu}>
-        <button data-role="inline" disabled={busy||!!active} title="从原曲重做，替换全部片段及人工修正" onClick={()=>void run()}>重新分离并分析</button>
+        {(!currentAudio || repair || update) && <button data-role="inline" disabled={busy||!!active} title="生成可用人声并分析，替换全部片段及人工修正" onClick={()=>void run()}>{repair?'重新生成人声':update?'更新人声分离结果':'分离人声'}</button>}
+        {(repair||update) && <span>{repair?'人声文件缺失或损坏': '现有人声未匹配当前分离版本'}</span>}
         <button data-role="inline" disabled={busy||!!active||!project.acoustics.analysisId} title="复用现有人声，替换全部片段及人工修正" onClick={()=>void run(project.acoustics.analysisId!)}>重新进行声学分析</button>
         {project.acoustics.analysisId && <a href={download(project.acoustics.analysisId)} download>下载人声 FLAC</a>}
         {failure && <button data-role="inline" onClick={()=>setDismissed(null)}>查看最近处理结果</button>}
-      </TopMenu> : <button data-role="primary" disabled={busy||!!active} onClick={()=>void run()}>进行人声分离和声学分析</button>}
+      </TopMenu> : <button data-role="primary" disabled={busy||!!active} onClick={()=>void run()}>{repair?'重新生成人声':update?'更新人声分离结果':currentAudio?'使用已有人声':'分离人声'}</button>}
     </div>}
     {ui.statusHost && showing && createPortal(<section className={styles.panel} aria-label="音频处理状态">
       {latest && <p role="status">{status[latest.status]}{latest.stage ? ` · ${{separating:'分离人声',analyzing:'声学分析'}[latest.stage]??latest.stage}`:''}</p>}
-      {(error||latest?.error||jobs.isError||results.isError) && <p role="alert">{error||latest?.error?.message||'任务或结果读取失败'}</p>}
-      {(jobs.isError||results.isError) && <button data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();}}>重试读取</button>}
+      {(error||latest?.error||jobs.isError||results.isError||completed.isError) && <p role="alert">{error||latest?.error?.message||'任务或结果读取失败'}</p>}
+      {(jobs.isError||results.isError||completed.isError) && <button data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();if(completed.isError)void completed.refetch();}}>重试读取</button>}
       {active && <button data-role="secondary" disabled={active.status==='cancel_requested'} onClick={()=>void jobsApi.cancel(active.id).then(()=>jobs.refetch()).catch(e=>setError(e.message))}>取消任务</button>}
       {conflict && <p role="alert">声学内容已改变，本次结果已保留。<button data-role="primary" onClick={adopt}>替换当前片段</button></p>}
-      {!active && !busy && !conflict && !jobs.isError && !results.isError && <>
+      {!active && !busy && !conflict && !jobs.isError && !results.isError && !completed.isError && <>
         {ready && <IconButton icon="back" label="返回上次结果" onClick={()=>{setDismissed(latest?.id??null);setError('');}}/>}
         <button data-role="secondary" onClick={retry}>重试</button>
         {result && <a href={download(result.id)} download>下载本次人声 FLAC</a>}

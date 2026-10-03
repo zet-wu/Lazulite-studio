@@ -121,7 +121,39 @@ def test_ready_reanalysis_preserves_old_result(tmp_path):
         new = run(old)
         assert new != old
         assert before == {p.name: p.read_bytes() for p in directory.iterdir()}
-        assert (tmp_path/'vocals'/'p'/new/'vocals.flac').read_bytes() == before['vocals.flac']
+        assert not (tmp_path/'vocals'/'p'/new/'vocals.flac').exists()
+        assert client.get(f'/api/v1/projects/p/vocals/{new}/file').content == before['vocals.flac']
+        items = client.get('/api/v1/projects/p/vocals').json()['items']
+        assert {r['audio_id'] for r in items} == {old}
+        assert {r['audio_state'] for r in items} == {'current'}
+        assert client.get(f'/api/v1/projects/p/waveform?vocal={new}&level=0&start_ms=0&end_ms=500').status_code == 200
+
+
+def test_energy_windows_match_persisted_rms_and_vocal_reads_do_not_reprobe(tmp_path, monkeypatch):
+    client, db = setup(tmp_path)
+    with client:
+        asset = client.get('/api/v1/projects/p/document').json()['document']['sourceAssetId']
+        job = client.post('/api/v1/projects/p/jobs/vocal', json={'params': {'asset_id': asset}}, headers={'origin':'http://studio'}).json()
+        assert wait(client, job['id'])['status'] == 'succeeded'
+        result = client.get('/api/v1/projects/p/vocals').json()['items'][0]
+        rid = result['id']
+        values = np.load(tmp_path/'vocals'/'p'/rid/'energy.npy')
+        import math
+        for start, end, buckets in [(0,2000,10),(511,1411,7),(0,100,4096),(1900,2300,1),(2300,2400,5)]:
+            response = client.get(f'/api/v1/projects/p/vocals/{rid}/energy?start_ms={start}&end_ms={end}&buckets={buckets}')
+            assert response.status_code == 200
+            first = int(start/result['energy_hop_ms'])
+            last = min(len(values), math.ceil(min(end, result['duration_ms'])/result['energy_hop_ms']))
+            stride = max(1, math.ceil((last-first)/buckets))
+            expected = [float(np.max(values[i:min(i+stride,last)])) for i in range(first,last,stride)]
+            assert response.json()['values'] == expected
+        import server.studio.media as media
+        def unexpected(*args, **kwargs): raise AssertionError('immutable vocal metadata must not be probed again')
+        monkeypatch.setattr(media, 'probe_media', unexpected)
+        for start in (0, 100, 400):
+            response = client.get(f'/api/v1/projects/p/waveform?vocal={rid}&level=0&start_ms={start}&end_ms={start+500}')
+            assert response.status_code == 200 and response.json()['maximum']
+        assert client.get(f'/api/v1/projects/p/audio?vocal={rid}', headers={'range':'bytes=0-99'}).status_code == 206
 
 
 def test_current_lazulite_profile_is_unsmoothed_main_rms_with_centered_clock(tmp_path):
@@ -159,28 +191,66 @@ def test_current_lazulite_profile_is_unsmoothed_main_rms_with_centered_clock(tmp
         assert energy['values'][0] == float(values[0])
 
 
-def test_energy_windows_match_persisted_rms_and_vocal_reads_do_not_reprobe(tmp_path, monkeypatch):
+def test_cached_separation_reanalysis_repair_and_version_update(tmp_path, monkeypatch):
+    class Counted(Separator):
+        calls = 0
+        def separate(self, audio):
+            Counted.calls += 1
+            return super().separate(audio)
+    client, db = setup(tmp_path, Counted)
+    with client:
+        asset = client.get('/api/v1/projects/p/document').json()['document']['sourceAssetId']
+        def run(reuse=None):
+            params = {'asset_id': asset, **({'retry_analysis_id': reuse} if reuse else {})}
+            job = client.post('/api/v1/projects/p/jobs/vocal', json={'params': params}, headers={'origin':'http://studio'}).json()
+            assert wait(client, job['id'])['status'] == 'succeeded'
+            return client.get(f"/api/v1/jobs/{job['id']}/result").json()['analysis_id']
+        first = run()
+        assert run() == first and Counted.calls == 1
+        second = run(first)
+        assert second != first and Counted.calls == 1
+        assert len(list((tmp_path/'vocals').rglob('vocals.flac'))) == 1
+        assert run() == second
+        # Valid FLAC header but changed bytes must also invalidate the cached file.
+        path = tmp_path/'vocals'/'p'/first/'vocals.flac'
+        with path.open('ab') as f: f.write(b'corruption')
+        assert {r['audio_state'] for r in client.get('/api/v1/projects/p/vocals').json()['items']} == {'missing'}
+        repaired = run(second)
+        assert Counted.calls == 2 and repaired not in (first, second)
+        path = tmp_path/'vocals'/'p'/repaired/'vocals.flac'
+        path.unlink()
+        restored = run()
+        assert Counted.calls == 3
+        monkeypatch.setenv('STUDIO_VOCAL_MODEL', 'new-fixed-model')
+        assert client.get('/api/v1/projects/p/vocals').json()['items'][0]['audio_state'] == 'outdated'
+        updated = run()
+        assert updated != restored and Counted.calls == 4
+        assert (tmp_path/'vocals'/'p'/restored/'vocals.flac').exists()
+        assert client.get('/api/v1/projects/p/vocals').json()['items'][0]['audio_state'] == 'current'
+
+
+def test_restart_keeps_shared_audio_and_project_deletion_releases_it(tmp_path):
     client, db = setup(tmp_path)
     with client:
         asset = client.get('/api/v1/projects/p/document').json()['document']['sourceAssetId']
-        job = client.post('/api/v1/projects/p/jobs/vocal', json={'params': {'asset_id': asset}}, headers={'origin':'http://studio'}).json()
-        assert wait(client, job['id'])['status'] == 'succeeded'
-        result = client.get('/api/v1/projects/p/vocals').json()['items'][0]
-        rid = result['id']
-        values = np.load(tmp_path/'vocals'/'p'/rid/'energy.npy')
-        import math
-        for start, end, buckets in [(0,2000,10),(511,1411,7),(0,100,4096),(1900,2300,1),(2300,2400,5)]:
-            response = client.get(f'/api/v1/projects/p/vocals/{rid}/energy?start_ms={start}&end_ms={end}&buckets={buckets}')
-            assert response.status_code == 200
-            first = int(start/result['energy_hop_ms'])
-            last = min(len(values), math.ceil(min(end, result['duration_ms'])/result['energy_hop_ms']))
-            stride = max(1, math.ceil((last-first)/buckets))
-            expected = [float(np.max(values[i:min(i+stride,last)])) for i in range(first,last,stride)]
-            assert response.json()['values'] == expected
-        import server.studio.media as media
-        def unexpected(*args, **kwargs): raise AssertionError('immutable vocal metadata must not be probed again')
-        monkeypatch.setattr(media, 'probe_media', unexpected)
-        for start in (0, 100, 400):
-            response = client.get(f'/api/v1/projects/p/waveform?vocal={rid}&level=0&start_ms={start}&end_ms={start+500}')
-            assert response.status_code == 200 and response.json()['maximum']
-        assert client.get(f'/api/v1/projects/p/audio?vocal={rid}', headers={'range':'bytes=0-99'}).status_code == 206
+        def run(reuse=None):
+            params = {'asset_id': asset, **({'retry_analysis_id': reuse} if reuse else {})}
+            job = client.post('/api/v1/projects/p/jobs/vocal', json={'params': params}, headers={'origin':'http://studio'}).json()
+            assert wait(client, job['id'])['status'] == 'succeeded'
+            return job['id']
+        first = run()
+        second = run(first)
+    before = {str(p): p.read_bytes() for p in (tmp_path/'vocals').rglob('*') if p.is_file()}
+    from server.vocals import VocalRunner
+    runner = VocalRunner(db,tmp_path/'vocals',Separator)
+    for result_id in (first, second):
+        _, metadata = runner.get('p',result_id)
+        assert metadata['audio_result_id'] == first
+        assert metadata['separation_signature'] and metadata['audio_sha256']
+        assert runner.audio_path('p',metadata) == tmp_path/'vocals'/'p'/first/'vocals.flac'
+        assert runner.audio_available('p', metadata)
+    assert before == {str(p): p.read_bytes() for p in (tmp_path/'vocals').rglob('*') if p.is_file()}
+    with TestClient(create_app(tmp_path, Settings(None, True, 'http://studio'), separator_factory=Separator)) as client:
+        assert client.get(f'/api/v1/projects/p/vocals/{second}/file').status_code == 200
+        assert client.delete('/api/v1/projects/p',headers={'origin':'http://studio'}).status_code == 200
+    assert not list((tmp_path/'vocals').rglob('vocals.flac'))

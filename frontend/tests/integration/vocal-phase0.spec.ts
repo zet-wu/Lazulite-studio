@@ -3,7 +3,7 @@ test('vocal processing adopts automatically, shares history, assigns and reopens
  await page.goto('/projects/phase0-packaging/edit');
  await page.getByRole('button',{name:'音频处理',exact:true}).click();
  await expect(page.getByRole('heading',{name:'大纲',exact:true})).toBeVisible();
- await page.getByRole('button',{name:'进行人声分离和声学分析',exact:true}).click();
+ await page.getByRole('button',{name:'分离人声',exact:true}).click();
  await expect(page.locator('[data-segment-id]').first()).toBeVisible({timeout:30000});
  let envelope=await (await page.request.get('/api/v1/projects/phase0-packaging/document')).json();
 
@@ -38,7 +38,7 @@ async function newProject(page: import('@playwright/test').Page, xml: string) {
  const before=await (await page.request.get(`/api/v1/projects/${pid}/document`)).json();
  const saved=await page.request.put(`/api/v1/projects/${pid}/document`,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:pid,revision:before.revision,document:{...before.document,lyrics:{draftTtml:xml}}}});expect(saved.ok()).toBeTruthy();
  await page.goto(`/projects/${pid}/edit`);await page.getByRole('button',{name:'音频处理',exact:true}).click();
- await page.getByRole('button',{name:'进行人声分离和声学分析',exact:true}).click();
+ await page.getByRole('button',{name:'分离人声',exact:true}).click();
  await expect(page.locator('[data-segment-id]').first()).toBeVisible({timeout:30000});
  return pid;
 }

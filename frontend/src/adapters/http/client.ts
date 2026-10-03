@@ -285,6 +285,7 @@ export const studioS4 = {
 
 export type VocalResult = components['schemas']['VocalResult'];
 export const vocalApi = {
+  jobResult: (id: string) => s4<{kind: 'vocal'; analysis_id: string}>(`/jobs/${encodeURIComponent(id)}/result`),
   list: (pid: string) => s4<components['schemas']['VocalResults']>(`/projects/${encodeURIComponent(pid)}/vocals`),
   energy: (pid: string, rid: string, start: number, end: number, signal?: AbortSignal) => s4<components['schemas']['VocalEnergyWindow']>(`/projects/${encodeURIComponent(pid)}/vocals/${encodeURIComponent(rid)}/energy?start_ms=${start}&end_ms=${end}&buckets=1000`, { signal }),
 };

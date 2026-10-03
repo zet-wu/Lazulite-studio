@@ -4,7 +4,7 @@ async function setup(page:Page){
  const response=await page.request.post('/api/v1/projects',{headers:{origin:'http://127.0.0.1:5175'},data:{name:'Phase 1 人声',source_asset_id:asset}});
  const pid=(await response.json()).id;
  await page.goto(`/projects/${pid}/edit`);await page.getByRole('button',{name:'音频处理',exact:true}).click();
- await page.getByRole('button',{name:'进行人声分离和声学分析'}).click();
+ await page.getByRole('button',{name:'分离人声'}).click();
  await expect(page.locator('[data-segment-id]').first()).toBeVisible({timeout:30000});
  return pid;
 }

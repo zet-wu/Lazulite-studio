@@ -86,12 +86,22 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const plotsRef=useRef<HTMLDivElement>(null);
   const keys = useShortcuts();
   const results = useQuery({ queryKey:['vocals',projectId], queryFn:()=>vocalApi.list(projectId), refetchInterval:3000, enabled:!!asset });
-  const [playbackVocal,setPlaybackVocal] = useState<string | null>(null);
-  const [graphicChoice,setGraphicChoice] = useState<string | null | undefined>(undefined);
-  const graphicVocal = graphicChoice === undefined ? results.data?.items[0]?.id ?? null : graphicChoice;
+  const sourceResults = results.data?.items.filter(r=>r.source_asset_id===asset?.id && r.audio_state!=='missing') ?? [];
+  const vocalId = (sourceResults.find(r=>r.audio_state==='current') ?? sourceResults[0])?.audio_id ?? null;
+  const [playbackChoice,setPlaybackChoice] = useState(false);
+  const [graphicChoice,setGraphicChoice] = useState(true);
+  const [playbackVocal,setPlaybackVocal] = useState<string|null>(null);
+  const graphicVocal = graphicChoice ? vocalId : null;
   const switching = useRef<{position:number;playing:boolean} | null>(null);
   const [loadingSource,setLoadingSource] = useState(false);
   const audio = useRef<HTMLAudioElement>(null);
+  useEffect(()=>{
+    const next = playbackChoice ? vocalId : null;
+    if(next===playbackVocal) return;
+    const el=audio.current;
+    switching.current={position:el?.currentTime??0,playing:!!el&&!el.paused};
+    el?.pause();setLoadingSource(true);setPlaybackVocal(next);
+  },[playbackChoice,vocalId,playbackVocal]);
   const canvas = useRef<HTMLCanvasElement>(null);
   const head = useRef<HTMLSpanElement>(null);
   const clock = useRef<HTMLSpanElement>(null);
@@ -591,7 +601,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
           <button data-role="secondary" onClick={tapBpm}>Tap</button><button data-role="secondary" disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label><small>{bpmStatus || '拖动色块调整；Shift 点击行块选范围并成组移动；词轨空白可框选。'}</small></div>
       {timelineHost && <div className={styles.header}>{viewportTools}</div>}
-      <label className={styles.sourceLabel}>波形／声谱图音源 <Select aria-label="波形／声谱图音源" value={graphicVocal??''} onChange={e=>setGraphicChoice(e.target.value||null)}><option value="">原曲</option>{results.data?.items.map((r,i)=><option key={r.id} value={r.id}>人声 {results.data.items.length-i}</option>)}</Select></label>
+      <label className={styles.sourceLabel}>波形／声谱图音源 <Select aria-label="波形／声谱图音源" value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">原曲</option>{vocalId && <option value="vocal">人声</option>}</Select></label>
       {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} positionMs={Math.round(position*1000)} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?' 背景':''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document?.lines.flatMap(l=>[l,...l.words,...l.words.flatMap(w=>w.rubyUnits)]).flatMap(u=>[u.beginMs,u.endMs]).filter((t):t is number=>t!==null&&t>=startMs&&t<=endMs)??[]} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
       {document && onTimelineCommand && onSelectLine && <>
 
@@ -613,7 +623,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       <div className={styles.header}>
         <IconButton data-role="secondary" className={styles.play} disabled={disabled} icon={playing ? 'pause' : 'play'} label={playing ? '暂停' : '播放'} onClick={play}/>
         <span ref={clock}>{fmt(position)} / {fmt(duration)}</span>
-        <label>播放音源 <Select aria-label="播放音源" value={playbackVocal??''} onChange={e=>{const el=audio.current; switching.current={position:el?.currentTime??0,playing:!!el&&!el.paused};el?.pause();setLoadingSource(true);setPlaybackVocal(e.target.value||null);}}><option value="">原曲</option>{results.data?.items.map((r,i)=><option key={r.id} value={r.id}>人声 {results.data.items.length-i}</option>)}</Select></label>
+        <label>播放音源 <Select aria-label="播放音源" value={playbackVocal?'vocal':''} onChange={e=>setPlaybackChoice(e.target.value==='vocal')}><option value="">原曲</option>{vocalId && <option value="vocal">人声</option>}</Select></label>
         {loadingSource&&<span role="status">正在加载音源…</span>}
         {expanded && !timelineHost && viewportTools}
         {!timelineHost && <button data-role="secondary" className={`icon-button ${styles.timelineToggle}`} aria-label={expanded ? "收起时间轴" : "展开时间轴"} title={expanded ? "收起时间轴" : "展开时间轴"} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>
