@@ -8,8 +8,10 @@
 
 媒体服务请求已经接入，播放时钟与交互在 `features/MediaTransport.tsx`；PCM 窗口由频谱 Worker 按需读取。`lyric-formats.ts` 用参考工具同版本格式库解析/生成 LRC、ESLRC、QRC、YRC、LYS 和 ASS；AMLL 预览投影在 `domain/preview-adapter.ts`，不回写语义文档。
 
-适配器不决定用户是否接受机器结果。音译使用有序文档轨道；AMLL 的逐词音译仅为预览时的临时投影。本轮执行及验证边界见[当前方案](../../../../lyric-workflow/docs/studio-vocal-review/Review-phase0/plan.md)。
+适配器不决定用户是否接受机器结果。音译使用有序文档轨道；AMLL 的逐词音译仅为预览时的临时投影。本轮执行及验证边界见[当前方案](../../../../lyric-workflow/docs/studio-ruby-review/Review-phase0/plan.md)。
 
 翻译导入及序列化排除空正文，保留每条语言与xml:lang；多歌手agentRefs按原顺序读取/连接IDREFS，草稿及最终交换沿用相同语义。
 
 `project-codec.ts` 在保存边界将结构化歌词与 lyrics.draftTtml 互转；HTTP document v3 保存项目 JSON。人声列表/能量使用生成类型，媒体窗口按 vocal 结果 ID 选源，不接受客户端路径。
+
+`http/reading.ts` 发送当前所选行 ID 与原始正文到 `/reading/analyze`，不需要项目、修订或音译。响应范围为 Unicode code point，未覆盖区间显式返回空读音。草稿不再读写 `studio:alignments`；含该废弃属性的旧文件按不支持结构拒绝，不提供迁移层。
