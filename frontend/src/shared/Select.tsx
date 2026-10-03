@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type SelectHTMLAttributes } from 'react';
+import { useEffect, useLayoutEffect, useId, useRef, useState, type SelectHTMLAttributes } from 'react';
 import { createPortal } from 'react-dom';
 import './select.css';
 /** Native form/label semantics with a shared desktop listbox. */
@@ -13,11 +13,32 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   const close=()=>{setOpen(false);ref.current?.focus();};
   const show=()=>{
     if(props.disabled)return;
-    const r=ref.current!.getBoundingClientRect();
-    const below=innerHeight-r.bottom-8;
-    setRect({left:Math.min(r.left,innerWidth-Math.max(160,r.width)-8),top:below>=160?r.bottom+4:Math.max(8,r.top-284),width:Math.max(160,r.width),maxHeight:below>=160?Math.min(280,below):Math.min(280,r.top-12)});
     setActive(Math.max(0,ref.current!.selectedIndex));setOpen(true);
   };
+  useLayoutEffect(() => {
+    if (!open) return;
+    const trigger = ref.current!, popup = list.current!;
+    const r = trigger.getBoundingClientRect();
+    const width = Math.min(Math.max(160, r.width), Math.max(0, innerWidth - 16));
+    popup.style.width = `${width}px`;
+    const naturalHeight = popup.scrollHeight + popup.offsetHeight - popup.clientHeight;
+    const below = Math.max(0, innerHeight - r.bottom - 12);
+    const above = Math.max(0, r.top - 12);
+    const down = Math.min(280, naturalHeight) <= below || below >= above;
+    const maxHeight = Math.min(280, down ? below : above);
+    const height = Math.min(naturalHeight, maxHeight);
+    const next = {left:Math.max(8, Math.min(r.left, innerWidth-width-8)), top:down?r.bottom+4:Math.max(8,r.top-height-4), width, maxHeight};
+    setRect(current => Object.keys(next).every(key => current[key as keyof typeof next] === next[key as keyof typeof next]) ? current : next);
+    // A mode/layout change can move the anchor without a window resize or scroll.
+    let frame: number;
+    const track = () => {
+      const current = trigger.getBoundingClientRect();
+      if (current.x !== r.x || current.y !== r.y || current.width !== r.width || current.height !== r.height) setOpen(false);
+      else frame = requestAnimationFrame(track);
+    };
+    frame = requestAnimationFrame(track);
+    return () => cancelAnimationFrame(frame);
+  }, [open, props.children]);
   const choose=(index:number)=>{
     const select=ref.current!;if(select.options[index]?.disabled)return;
     select.selectedIndex=index;select.dispatchEvent(new Event('change',{bubbles:true}));close();
