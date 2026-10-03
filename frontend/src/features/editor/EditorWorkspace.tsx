@@ -117,15 +117,16 @@ export function EditorWorkspace(props: Props) {
     if (pane?.contains(pane.ownerDocument.activeElement)) mainRef.current?.focus();
     commitColumns({ ...columns, [`${side}Visible`]: !columns[`${side}Visible`] });
   };
-  const rendered = renderedColumns(columns, layoutWidth);
-  const template = (sizes: { outline: number; inspector: number }) => `${columns.outlineVisible ? `${sizes.outline}px 6px ` : ''}minmax(0, 1fr)${columns.inspectorVisible ? ` 6px ${sizes.inspector}px` : ''}`;
+  const layoutColumns = mode === 'audio' ? { ...columns, inspectorVisible: false } : columns;
+  const rendered = renderedColumns(layoutColumns, layoutWidth);
+  const template = (sizes: { outline: number; inspector: number }) => `${columns.outlineVisible ? `${sizes.outline}px 6px ` : ''}minmax(0, 1fr)${layoutColumns.inspectorVisible ? ` 6px ${sizes.inspector}px` : ''}`;
   const separator = (side: ColumnSide) => {
     const other = side === 'outline' ? 'inspector' : 'outline';
-    const maximum = Math.max(COLUMN_LIMITS[side].min, Math.min(COLUMN_LIMITS[side].max, layoutWidth - rendered[other] - (Number(columns.outlineVisible) + Number(columns.inspectorVisible)) * 6 - 480));
+    const maximum = Math.max(COLUMN_LIMITS[side].min, Math.min(COLUMN_LIMITS[side].max, layoutWidth - rendered[other] - (Number(columns.outlineVisible) + Number(layoutColumns.inspectorVisible)) * 6 - 480));
     return <ColumnSeparator side={side} width={rendered[side]} preferredWidth={columns[`${side}Width`]} maximum={maximum}
       onChange={width => {
         // Preview geometry directly; keep the 2000-row editor out of pointermove renders.
-        const preview = renderedColumns({ ...columns, [`${side}Width`]: width }, layoutWidth);
+        const preview = renderedColumns({ ...layoutColumns, [`${side}Width`]: width }, layoutWidth);
         layoutRef.current!.style.gridTemplateColumns = template(preview);
         return preview[side];
       }}
@@ -654,12 +655,13 @@ export function EditorWorkspace(props: Props) {
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
     <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['audio','音频处理'],['edit','编辑'],['sync','打轴'],['preview','预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
     {props.projectId && props.project && props.applyProject && props.project.sourceAssetId && <VocalPanel visible={mode==='audio'} projectId={props.projectId} project={props.project} apply={props.applyProject} durationMs={props.audioDurationMs??0}/>}
-    {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.project.sourceAssetId ? <div className={vocalStyles.audioLayout} style={{gridTemplateColumns:columns.outlineVisible?`${rendered.outline}px minmax(0,1fr)`:"minmax(0,1fr)"}}>
-      {columns.outlineVisible && <aside className={styles.outline} aria-label="音频处理大纲"><h2>大纲</h2><div className={styles.panelBody}>{document.lines.map(line => <div key={line.id} draggable onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed="copy";const ghost=e.currentTarget.cloneNode(true) as HTMLElement;ghost.style.cssText="position:fixed;left:-10000px;opacity:.6;width:220px";window.document.body.appendChild(ghost);e.dataTransfer.setDragImage(ghost,20,16);setTimeout(()=>ghost.remove(),0);}}>
+    {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.project.sourceAssetId ? <div ref={layoutRef} className={vocalStyles.audioLayout} style={{gridTemplateColumns:template(rendered)}}>
+      {columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} aria-label="音频处理大纲"><h2>大纲</h2><div className={styles.panelBody}>{document.lines.map(line => <div key={line.id} draggable onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed="copy";const ghost=e.currentTarget.cloneNode(true) as HTMLElement;ghost.style.cssText="position:fixed;left:-10000px;opacity:.6;width:220px";window.document.body.appendChild(ghost);e.dataTransfer.setDragImage(ghost,20,16);setTimeout(()=>ghost.remove(),0);}}>
         <div onClick={() => selectLine(line)}><OutlineRow line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} selected={selectedLine?.id===line.id}/></div>
         {props.assignmentError?.lineId===line.id && <div role="alert" className={vocalStyles.error}>{props.assignmentError.message}{assignmentIssues.map((issue,i)=><button data-role="secondary" key={i} onClick={()=>locateIssue(issue)}>定位{issue.kind==='ruby'?'注音':issue.kind==='word'?'词':issue.kind==='romanization-unit'?'音译单元':'行'}{i+1}</button>)}</div>}
       </div>)}</div></aside>}
-      <main className={vocalStyles.main}><div ref={audioReview.setStatusHost}/><div hidden={!audioReview.timelineReady} className={vocalStyles.host} ref={props.onTimelineHost}/></main>
+      {columns.outlineVisible && separator('outline')}
+      <main ref={mainRef} tabIndex={-1} className={vocalStyles.main}><div ref={audioReview.setStatusHost}/><div hidden={!audioReview.timelineReady} className={vocalStyles.host} ref={props.onTimelineHost}/></main>
     </div> : <section className={styles.auxiliaryPlaceholder}><h1>人声分离与声学分析</h1><p>请先在项目列表上传音频并建立项目，再进行人声处理。当前本地歌词可继续编辑和导出。</p><a href="/projects">前往项目列表</a></section>)}
     {mode === 'acquire' && <LyricAcquisition store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
     {mode === 'package' && <PackagingPanel {...props} externalIssues={props.outputIssues} locateIssue={locateIssue} />}

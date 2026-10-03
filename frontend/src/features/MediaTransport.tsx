@@ -560,6 +560,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
 </>);
   const acousticPlots=(<>
       <div className={styles.ruler} aria-label="时间标尺" onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={() => { panDrag.current = null; }}>{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
+      <div className={styles.waveRow}>
+        <div className={styles.sourceLabel}><Select aria-label="波形／声谱图音源" title="波形／声谱图音源" value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">原曲</option>{vocalId && <option value="vocal">人声</option>}</Select></div>
       <div
         data-wheel-zoom ref={slider}
         className={styles.waveWrap}
@@ -594,14 +596,14 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           style={{ left: `${Math.max(0, Math.min(100, ((bandA - start) / span) * 100))}%` }} onPointerDown={(event) => beginLoopDrag(event, 'a')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={(event) => endLoopDrag(event, true)} />}
         {bandA != null && bandB != null && (bandB >= start && bandB <= end || loopDrag.current?.side === 'b') && <span data-loop-handle="b" className={styles.loopHandle} role="slider" tabIndex={0} aria-label="循环 B 边界" aria-valuemin={bandA} aria-valuemax={duration} aria-valuenow={bandB}
           style={{ left: `${Math.max(0, Math.min(100, ((bandB - start) / span) * 100))}%` }} onPointerDown={(event) => beginLoopDrag(event, 'b')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={(event) => endLoopDrag(event, true)} />}
-      </div>
+      </div></div>
   </>);
   const plots = (
       <div id="timeline-plots" ref={plotsRef} className={styles.timelinePlots}>
         <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
-          <button data-role="secondary" onClick={tapBpm}>Tap</button><button data-role="secondary" disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label><small>{bpmStatus || '拖动色块调整；Shift 点击行块选范围并成组移动；词轨空白可框选。'}</small></div>
+          <button data-role="secondary" onClick={tapBpm}>Tap</button><button data-role="secondary" disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label>{bpmStatus && <small role="status">{bpmStatus}</small>}</div>
       {timelineHost && <div className={styles.header}>{viewportTools}</div>}
-      <label className={styles.sourceLabel}>波形／声谱图音源 <Select aria-label="波形／声谱图音源" value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">原曲</option>{vocalId && <option value="vocal">人声</option>}</Select></label>
+
       {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} positionMs={Math.round(position*1000)} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?' 背景':''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document?.lines.flatMap(l=>[l,...l.words,...l.words.flatMap(w=>w.rubyUnits)]).flatMap(u=>[u.beginMs,u.endMs]).filter((t):t is number=>t!==null&&t>=startMs&&t<=endMs)??[]} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
       {document && onTimelineCommand && onSelectLine && <>
 

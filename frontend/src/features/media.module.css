@@ -1,5 +1,5 @@
 .footer {
-  --timeline-label-width: 36px;
+  --timeline-label-width: 52px;
   --timeline-gap: 5px;
   display: grid;
   gap: 6px;
@@ -139,4 +139,7 @@
 .playbackSpeed input { width: 130px; accent-color: var(--blue); }
 .playbackSpeed output { font-variant-numeric: tabular-nums; min-width: 5ch; }
 
-.sourceLabel { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); margin:6px 0; }
+.waveRow { display:grid; grid-template-columns:var(--timeline-label-width) minmax(0,1fr); gap:var(--timeline-gap); align-items:start; }
+.waveRow .waveWrap { margin-left:0; }
+.sourceLabel { min-width:0; font-size:11px; }
+.sourceLabel select { width:100%; padding-inline:5px; }
