@@ -291,3 +291,5 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .inspector .panelBody > label, .inspector .panelBody > fieldset { margin:0; }
 .inspector .singerSelection.singerSelection label { display:flex; gap:8px; min-height:26px; }
 .syncPanel button[data-role][data-role] { min-height:26px; padding:4px 6px; }
+
+.ribbonMenu a[data-role="secondary"] { justify-content:flex-start; border-color:transparent; background-color:transparent; font-size:12px; }

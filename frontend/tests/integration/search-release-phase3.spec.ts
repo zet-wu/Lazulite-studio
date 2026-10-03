@@ -12,10 +12,10 @@ test('quantized save, download and actual STPP extraction agree with external pa
  await page.getByRole('button',{name:'文件打包',exact:true}).click();
  const lyrics=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
  const xml=await readFile((await (await lyrics).path())!,'utf8');
- const link=page.getByRole('link',{name:'下载音乐文件'}); const old=await link.count() ? await link.getAttribute('href') : null;
- await page.getByRole('button',{name:'保存并打包'}).click();await expect(page.getByRole('link',{name:'下载音乐文件'})).toBeVisible({timeout:15000});
- await expect.poll(()=>page.getByRole('link',{name:'下载音乐文件'}).getAttribute('href'),{timeout:15000}).not.toBe(old);
- const music=page.waitForEvent('download');await page.getByRole('link',{name:'下载音乐文件'}).click();
+ const link=page.getByRole('link',{name:'下载产物'}); const old=await link.count() ? await link.getAttribute('href') : null;
+ await page.getByRole('button',{name:'打包文件'}).click();await expect(page.getByRole('link',{name:'下载产物'})).toBeVisible({timeout:15000});
+ await expect.poll(()=>page.getByRole('link',{name:'下载产物'}).getAttribute('href'),{timeout:15000}).not.toBe(old);
+ const music=page.waitForEvent('download');await page.getByRole('link',{name:'下载产物'}).click();
  const path=(await (await music).path())!;
  const embedded=execFileSync('server/.venv/bin/python',['-c','from server.publishing import extract_stpp; from pathlib import Path; import sys; sys.stdout.buffer.write(extract_stpp(Path(sys.argv[1])))',path],{cwd:'..',encoding:'utf8'});
  for(const text of [xml,embedded]){

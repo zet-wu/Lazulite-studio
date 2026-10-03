@@ -67,7 +67,7 @@ export function VocalPanel({ projectId, project, apply, durationMs, visible }: {
         {(!currentAudio || repair || update) && <button data-role="inline" disabled={busy||!!active} title="生成可用人声并分析，替换全部片段及人工修正" onClick={()=>void run()}>{repair?'重新生成人声':update?'更新人声分离结果':'分离人声'}</button>}
         {(repair||update) && <span>{repair?'人声文件缺失或损坏': '现有人声未匹配当前分离版本'}</span>}
         <button data-role="inline" disabled={busy||!!active||!project.acoustics.analysisId} title="复用现有人声，替换全部片段及人工修正" onClick={()=>void run(project.acoustics.analysisId!)}>重新进行声学分析</button>
-        {project.acoustics.analysisId && <a href={download(project.acoustics.analysisId)} download>下载人声 FLAC</a>}
+        {project.acoustics.analysisId && <a data-role="secondary" href={download(project.acoustics.analysisId)} download>下载人声 FLAC</a>}
         {failure && <button data-role="inline" onClick={()=>setDismissed(null)}>查看最近处理结果</button>}
       </TopMenu> : <button data-role="primary" disabled={busy||!!active} onClick={()=>void run()}>{repair?'重新生成人声':update?'更新人声分离结果':currentAudio?'使用已有人声':'分离人声'}</button>}
     </div>}
@@ -80,7 +80,7 @@ export function VocalPanel({ projectId, project, apply, durationMs, visible }: {
       {!active && !busy && !conflict && !jobs.isError && !results.isError && !completed.isError && <>
         {ready && <IconButton icon="back" label="返回上次结果" onClick={()=>{setDismissed(latest?.id??null);setError('');}}/>}
         <button data-role="secondary" onClick={retry}>重试</button>
-        {result && <a href={download(result.id)} download>下载本次人声 FLAC</a>}
+        {result && <a data-role="secondary" href={download(result.id)} download>下载本次人声 FLAC</a>}
       </>}
     </section>,ui.statusHost)}
   </>;

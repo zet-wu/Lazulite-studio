@@ -10,9 +10,9 @@ test('actor references, declaration order and metadata survive actual revision r
  await page.getByLabel('歌手 ID actor',{exact:true}).fill('performer');await page.getByLabel('歌手 ID actor',{exact:true}).press('Enter');await page.getByRole('button',{name:'上移歌手 performer'}).click();await page.getByRole('button',{name:'关闭歌手管理'}).click();
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.locator('header').getByText('已保存',{exact:true})).toBeVisible();await page.reload();
  await page.getByRole('button',{name:'文件打包',exact:true}).click();const lyrics=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词'}).click();const xml=await readFile((await (await lyrics).path())!,'utf8');
- const link=page.getByRole('link',{name:'下载音乐文件'}),old=await link.count()?await link.getAttribute('href'):null;
+ const link=page.getByRole('link',{name:'下载产物'}),old=await link.count()?await link.getAttribute('href'):null;
  await page.getByLabel('内嵌歌词').selectOption('elrc');await page.getByRole('button',{name:'编辑',exact:true}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByLabel('内嵌歌词')).toHaveValue('elrc');await expect(page.getByLabel('导出格式')).toHaveValue('ttml');
- await page.getByRole('button',{name:'保存并打包'}).click();await expect.poll(()=>link.getAttribute('href'),{timeout:15000}).not.toBe(old);const music=page.waitForEvent('download');await link.click();const path=(await (await music).path())!;
+ await page.getByRole('button',{name:'打包文件'}).click();await expect.poll(()=>link.getAttribute('href'),{timeout:15000}).not.toBe(old);const music=page.waitForEvent('download');await link.click();const path=(await (await music).path())!;
  const embedded=execFileSync('server/.venv/bin/python',['-c','from server.publishing import extract_stpp; from pathlib import Path; import sys; sys.stdout.buffer.write(extract_stpp(Path(sys.argv[1])))',path],{cwd:'..',encoding:'utf8'});
  const saved=(await (await page.request.get('/api/v1/projects/phase0-packaging/document')).json()).document.lyrics.draftTtml;
  for(const text of [saved,xml,embedded]) {

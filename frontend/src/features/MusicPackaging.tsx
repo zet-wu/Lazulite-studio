@@ -48,7 +48,7 @@ export function MusicPackaging({ projectId, document, saveForPackaging, onIssues
  {info.data?.tracks.length ? <label>覆盖 STPP 轨道 <Select aria-label="覆盖 STPP 轨道" value={track ?? ''} onChange={e=>setTrack(e.target.value ? Number(e.target.value) : null)}><option value="">请选择目标轨道</option>{info.data.tracks.map(t=><option key={t.track_id} value={t.track_id}>{t.track_id} · {t.language} · {t.name || '未命名'}</option>)}</Select></label> : info.data?.container === 'mp4' ? <p className={styles.hint}>源文件没有 STPP，将新增歌词轨道。</p> : null}
  {info.isError && <p role="alert">读取失败 <button data-role="secondary" onClick={()=>void info.refetch()}>重试</button></p>}
  {info.data && !info.data.supported && <p role="alert">{info.data.error ?? '源音频格式不支持打包；可下载歌词文件。'}</p>}
- <button data-role="primary" onClick={()=>void publish()} disabled={busy || Boolean(exports.data?.items.some(item=>active.has(item.status))) || !info.data?.supported || Boolean(info.data.tracks.length && !track)}>{busy ? '保存并提交中…' : '保存并打包'}</button>
+ <div className={styles.actions}><button data-role="primary" onClick={()=>void publish()} disabled={busy || Boolean(exports.data?.items.some(item=>active.has(item.status))) || !info.data?.supported || Boolean(info.data.tracks.length && !track)}>{busy ? '保存并提交中…' : '打包文件'}</button>{recent?.download_url && !exports.isError ? <a data-role="secondary" href={recent.download_url}>下载产物</a> : <button data-role="secondary" disabled>下载产物</button>}</div>
  {message && <p role="status">{message}</p>}{captured && captured !== document && <p>当前歌词有较新修改，已提交任务使用之前捕获的修订。</p>}
  <h2>打包任务与最近产物</h2>{exports.isError && <p>记录读取失败 <button data-role="secondary" onClick={()=>void exports.refetch()}>重试</button></p>}
  {visible.map(item=>{
@@ -56,7 +56,7 @@ export function MusicPackaging({ projectId, document, saveForPackaging, onIssues
    const label=item.lrc_kind==='elrc' ? '扩展 LRC' : '普通 LRC';
    const result=active.has(item.status) ? '正在打包' : passed && item.report?.subtitle_codec==='stpp' ? `已写入 STPP · ${label}` : passed && item.report?.lyrics_preserved ? `已写入 ${label}` : item.status==='failed' ? '打包失败' : item.status==='cancelled' ? '已取消' : item.status==='unavailable' ? '产物不可用' : item.status==='interrupted' ? '打包中断' : item.status;
    return <article key={item.id}><h3>{item.id===recent?.id ? '最近产物' : '当前任务'}</h3>{item.id===recent?.id && dirty && <p>当前歌词有未保存修改，此产物不包含这些修改。</p>}<p>{item.asset_filename ?? '未记录源文件名'} · {item.format_label ?? '格式待确认'} · {result}{item.track_id ? ` · STPP 轨道 ${item.track_id}` : ''}</p><p className={styles.hint}>修订 {item.revision}{item.stale ? ' · 旧修订' : ''}{item.filename ? ` · ${item.filename}` : ''}</p>
-   {item.download_url && <a href={item.download_url}>下载音乐文件</a>}{active.has(item.status) && <button data-role="secondary" onClick={()=>void jobsApi.cancel(item.id).then(()=>client.invalidateQueries({queryKey:['exports',projectId]})).catch(e=>setMessage(e.message))}>取消任务</button>}<details><summary>回读报告</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{JSON.stringify(item.error ?? item.report,null,2)}</pre></details></article>;
+   {active.has(item.status) && <button data-role="secondary" onClick={()=>void jobsApi.cancel(item.id).then(()=>client.invalidateQueries({queryKey:['exports',projectId]})).catch(e=>setMessage(e.message))}>取消任务</button>}<details><summary>回读报告</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{JSON.stringify(item.error ?? item.report,null,2)}</pre></details></article>;
  })}
  {!exports.data?.items.length && <p className={styles.hint}>还没有打包产物。</p>}
  </>;
