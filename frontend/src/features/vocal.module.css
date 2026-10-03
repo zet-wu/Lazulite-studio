@@ -7,7 +7,7 @@
 .segmentRow { display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 5px; margin: 0; position: relative; }
 .lane { position: relative; min-height: var(--timeline-lane-height); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); touch-action: none; overflow: hidden; }
 .segment.segment[data-role] { min-height:var(--timeline-bar-height); font-size:10px; position: absolute; height: var(--timeline-bar-height); display:flex; align-items:center; min-width: 0; padding: 0; border: 0; box-shadow:inset 0 0 0 1px var(--vocal-ink); border-radius: 3px; background: var(--vocal-fill); color: var(--ink); cursor: grab; overflow: hidden; }
-.segment > span:first-child { white-space: nowrap; }
+.segment > span:first-child { margin-inline: 6px; min-width: 0; overflow: hidden; white-space: nowrap; pointer-events: none; }
 .segment[aria-pressed=true] { outline: 2px solid var(--primary, #3367ab); outline-offset: -3px; }
 .edge { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; background: color-mix(in srgb,var(--vocal-ink) 35%,transparent); }
 .begin { left: 0; } .end { right: 0; }
