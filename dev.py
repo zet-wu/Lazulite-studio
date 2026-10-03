@@ -31,6 +31,22 @@ def stop(process):
         process.wait()
 
 
+def probe_endpoint(opener, port, path):
+    started = time.monotonic()
+    try:
+        with opener.open(f'http://127.0.0.1:{port}{path}', timeout=1) as response:
+            return response.status < 500, time.monotonic() - started, f'HTTP {response.status}'
+    except urllib.error.HTTPError as error:
+        return error.code < 500, time.monotonic() - started, f'HTTP {error.code}'
+    except (OSError, urllib.error.URLError) as error:
+        return False, time.monotonic() - started, f'{type(error).__name__}: {error}'
+
+
+def health_expired(started, healthy, failed_since, now):
+    # Startup remains bounded; a live but briefly busy server gets a recovery window.
+    return (not healthy and now - started > 20) or any(now - since >= 30 for since in failed_since.values())
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--api-port', type=int, default=8000)
@@ -79,26 +95,31 @@ def main():
             threading.Thread(target=log, args=(name, p), daemon=True).start()
         print(f'打开 http://127.0.0.1:{args.web_port}；Ctrl+C 关闭两个服务。', flush=True)
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        def ready(port, path):
-            try:
-                with opener.open(f'http://127.0.0.1:{port}{path}', timeout=1) as response:
-                    return response.status < 500
-            except urllib.error.HTTPError as error:
-                return error.code < 500
-            except (OSError, urllib.error.URLError):
-                return False
         started = time.monotonic()
         healthy = False
-        failures = 0
+        failed_since = {}
+        failures = {}
+        endpoints = [('api', args.api_port, '/api/v1/session'), ('vite', args.web_port, '/')]
         while all(p.poll() is None for p in processes):
-            ok = ready(args.api_port, '/api/v1/session') and ready(args.web_port, '/')
-            if ok:
+            # Probe both endpoints: short-circuiting hides which process is overloaded.
+            for name, port, path in endpoints:
+                ok, elapsed, reason = probe_endpoint(opener, port, path)
+                now = time.monotonic()
+                if ok:
+                    if name in failed_since:
+                        print(f'[health] {name} {path} 已恢复，失败持续 {now-failed_since[name]:.1f}s', flush=True)
+                    failed_since.pop(name, None)
+                    failures.pop(name, None)
+                else:
+                    failed_since.setdefault(name, now)
+                    failures[name] = failures.get(name, 0) + 1
+                    if failures[name] == 1 or failures[name] % 5 == 0:
+                        print(f'[health] {name} http://127.0.0.1:{port}{path} 失败：{reason}；耗时 {elapsed:.3f}s，连续 {failures[name]} 次', flush=True)
+            now = time.monotonic()
+            if not failed_since:
                 healthy = True
-                failures = 0
-            elif healthy:
-                failures += 1
-            if (not healthy and time.monotonic() - started > 20) or failures >= 5:
-                print('服务启动失败或持续无响应，正在关闭进程树。', flush=True)
+            if health_expired(started, healthy, failed_since, now):
+                print(f'服务启动失败或持续无响应，正在关闭进程树。失败端点：{", ".join(failed_since)}', flush=True)
                 return 1
             time.sleep(1)
         print('服务进程意外退出，正在关闭另一进程。', flush=True)
