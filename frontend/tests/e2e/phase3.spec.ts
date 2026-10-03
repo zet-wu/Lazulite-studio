@@ -455,7 +455,7 @@ for (const count of [80, 83]) test(`P3-07 variable 注音/transliteration height
   expect((await middle.boundingBox())!.height).toBeLessThan((await scroller.boundingBox())!.height);
   await expect.poll(async () => {
     const r = (await middle.boundingBox())!, v = (await scroller.boundingBox())!;
-    return Math.abs(r.y + r.height / 2 - v.y - v.height / 2);
+    return r && v ? Math.abs(r.y + r.height / 2 - v.y - v.height / 2) : Infinity;
   }).toBeLessThan(3);
   await outline.last().click();
   const background = page.locator(`main section[data-line-id="p${bg}"]`);

@@ -41,3 +41,9 @@ it('roundtrips main/background ruby through draft and pure TTML',()=>{
  const d=createLyricDocument('今日');const l=d.lines[0];d.lines.push({...createLine('魂','bg'),backgroundOf:l.id});for(const l of d.lines){l.beginMs=0;l.endMs=1000;l.words[0].beginMs=0;l.words[0].endMs=1000;}
  const rows=proposeJapaneseRuby(d,d.lines.map(l=>l.id),[range('今日','きょう',l.id),range('魂','たましい','bg')]);const c=japaneseRubyCommand(d,d,rows);if(c.type!=='replace-document')throw Error();for(const draft of [false,true]){const reopened=parseLyricTtml(serializeLyricTtml(c.document,{draft}));expect(reopened.lines.map(l=>l.words[0].rubyUnits.map(u=>u.reading))).toEqual([['きょ','う'],['た','ま','し','い']]);expect(reopened.lines[1].backgroundOf).toBe(reopened.lines[0].id);}
 });
+it('rejects an inverted existing envelope atomically',()=>{
+ const d=createLyricDocument('今日');const l=d.lines[0];l.words[0].rubyUnits=[{id:'r1',reading:'きょ',beginMs:900,endMs:null},{id:'r2',reading:'う',beginMs:null,endMs:100}];const rows=proposeJapaneseRuby(d,[l.id],[]);rows[0].blocks[0].reading='こんにち';expect(()=>japaneseRubyCommand(d,d,rows)).toThrow('包络无效');expect(l.words[0].rubyUnits[0].reading).toBe('きょ');
+});
+it('applies all 2000 rows, including rows never mounted in the preview',()=>{
+ const d=createLyricDocument();d.lines=Array.from({length:2000},(_,i)=>createLine('今日',`line${i}`));const rows=proposeJapaneseRuby(d,d.lines.map(l=>l.id),d.lines.map(l=>range('今日','きょう',l.id)));const command=japaneseRubyCommand(d,d,rows);if(command.type!=='replace-document')throw Error();expect(command.document.lines).toHaveLength(2000);expect(command.document.lines.every(l=>l.words[0].rubyUnits.map(u=>u.reading).join('|')==='きょ|う')).toBe(true);
+});

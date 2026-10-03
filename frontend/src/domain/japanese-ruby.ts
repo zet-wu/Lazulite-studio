@@ -92,6 +92,7 @@ export function japaneseRubyCommand(current: LyricDocument, source: LyricDocumen
   if (current !== source) throw new Error('源文档已变化，请重新打开生成');
   if (!hasJapaneseRubyChanges(rows, source)) throw new Error('没有可应用的注音修改');
   const rowMap = new Map(rows.map(row => [row.lineId, row]));
+  if (rowMap.size !== rows.length || rows.some(row => !source.lines.some(line => line.id === row.lineId))) throw new Error('提案行标识不符');
   const lines = source.lines.map(line => {
     const row = rowMap.get(line.id); if (!row) return line;
     const groups = new Map<string, ReadingBlock[]>();
@@ -99,13 +100,16 @@ export function japaneseRubyCommand(current: LyricDocument, source: LyricDocumen
     const words = line.words.flatMap(word => {
       const blocks = groups.get(word.id);
       if (!blocks || blocks.map(b => b.text).join('') !== word.text) throw new Error('提案正文结构不完整');
+      const boundaries = new Set([0]); let end = 0;
+      for (const { segment } of segmenter.segment(word.text)) { end += length(segment); boundaries.add(end); }
       let cursor = 0;
-      for (const b of blocks) { if (b.start !== cursor || b.end <= b.start || slice(word.text, b.start, b.end) !== b.text) throw new Error('提案正文范围不符'); cursor = b.end; }
+      for (const b of blocks) { if (!boundaries.has(b.end) || b.start !== cursor || b.end <= b.start || slice(word.text, b.start, b.end) !== b.text) throw new Error('提案正文范围不符'); cursor = b.end; }
       if (word.rubyUnits.length) {
         if (blocks.length !== 1 || !blocks[0].existing) throw new Error('已有注音结构不符');
         const reading = blocks[0].reading;
         if (!reading.trim() || reading === rubyReading(word)) return [word];
         const starts = word.rubyUnits.flatMap(u => u.beginMs === null ? [] : [u.beginMs]), ends = word.rubyUnits.flatMap(u => u.endMs === null ? [] : [u.endMs]);
+        if (starts.length && ends.length && Math.min(...starts) > Math.max(...ends)) throw new Error('已有注音时间包络无效');
         return [{ ...word, rubyUnits: makeRubyUnits({ ...word, beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null }, splitReadingMora(reading)) }];
       }
       const accepted = blocks.filter(b => b.editable && b.reading.trim());

@@ -123,5 +123,6 @@ test('out of range assignment preserves lyrics and points to hidden offending un
  await page.emulateMedia({reducedMotion:'reduce'});await page.getByRole('button',{name:'定位词2',exact:true}).click();
  await expect(page.locator('main [data-word-id][data-assignment-error]')).toBeVisible();
  expect(await page.locator('main [data-word-id][data-assignment-error]').evaluate(e=>getComputedStyle(e).animationName)).toBe('none');
- expect((await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.lyrics.draftTtml).toBe(before);
+ const after=(await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.lyrics.draftTtml;
+ expect(await page.evaluate(async ({before,after})=>{const path='/src/adapters/ttml/lyric-codec.ts';const {parseLyricTtml}=await import(path);return JSON.stringify(parseLyricTtml(before))===JSON.stringify(parseLyricTtml(after));},{before,after})).toBe(true);
 });

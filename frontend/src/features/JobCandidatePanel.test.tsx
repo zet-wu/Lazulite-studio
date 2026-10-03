@@ -18,4 +18,3 @@ it('applies aligned line timing as one command and blocks stale results', () => 
   view.rerender(<JobCandidatePanel result={result} currentRevision="r2" currentAssetId="asset" dirty={false} document={document} onApply={() => undefined} />);
   expect(screen.getByRole('button', { name: '人工应用候选' })).toBeDisabled();
 });
-
