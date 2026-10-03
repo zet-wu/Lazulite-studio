@@ -25,8 +25,8 @@
 .inspector { border-right: 0; border-left: 1px solid var(--line); }
 .outline h2, .inspector h2 { flex: none; font-size: 13px; margin: 0; padding: 12px; border-bottom: 1px solid var(--line); background: var(--surface-container); }
 .outlineRow { display: flex; align-items: flex-start; height: 32px; }
-.outlineRow > button { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; color: var(--ink); padding: 8px 4px; overflow-wrap: anywhere; }
-.outlineRow > button.selected { background: var(--blue-soft); }
+.outlineRow > button[data-role][data-role] { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; color: var(--ink); padding: 8px 4px; overflow-wrap: anywhere; }
+.outlineRow > button[data-role][aria-pressed="true"] { background: var(--blue-soft); box-shadow: inset 3px 0 var(--blue); color: var(--ink); }
 .canvas { display: grid; grid-template-rows: minmax(0, 1fr); padding: 14px; min-width: 0; min-height: 0; overflow: hidden; }
 .lyricScroller { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .virtualContent { position: relative; width: 100%; }
@@ -159,7 +159,7 @@
 .rubyGenerationChoices { max-height: 18dvh; overflow-y: auto; align-content: flex-start; }
 
 .panelBody { min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px; }
-.outlineRow > button { display: grid; grid-template-columns: 4ch minmax(0, 1fr); gap: 6px; align-items: baseline; border-radius: var(--control-radius); }
+.outlineRow > button[data-role][data-role] { display: grid; grid-template-columns: 4ch minmax(0, 1fr); gap: 6px; align-items: baseline; border-radius: var(--control-radius); }
 .outlineNumber { color: var(--muted); font-size: var(--label-size); font-variant-numeric: tabular-nums; }
 .outlineText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--body-size); }
 .outlineText:has(small) { padding-left: 8px; }
