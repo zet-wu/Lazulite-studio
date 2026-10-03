@@ -19,7 +19,7 @@ export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSpl
   useEffect(() => setDraft(value), [value]);
   return <input ref={(node) => { ref.current = node; inputRef?.(node); }} aria-label={label} placeholder={placeholder} value={draft} onChange={(event) => { cancelled.current = false; setDraft(event.target.value); }} onFocus={() => { if (!ref.current?.closest('[data-pointer-focus]')) onFocus?.(); }}
     onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
-    onBlur={() => { if (cancelled.current) { cancelled.current = false; return; } if (draft !== value) onCommit(draft); }}
+    onBlur={() => { if (composing.current) return; if (cancelled.current) { cancelled.current = false; return; } if (draft !== value) onCommit(draft); }}
     onKeyDown={(event) => {
       if (composing.current) return;
       if (event.key === 'Enter') ref.current?.blur();
@@ -44,5 +44,5 @@ export function TimePair({ begin, end, label, onCommit }: { begin: TimeMs; end: 
       if (nextBegin !== begin || nextEnd !== end) onCommit(nextBegin, nextEnd);
     } catch (failure) { setError(failure instanceof Error ? failure.message : '时间格式错误'); }
   };
-  return <span className={styles.times}><input aria-label={`${label}开始秒数`} inputMode="decimal" value={start} onChange={(event) => setStart(event.target.value)} onBlur={commit} /><span>–</span><input aria-label={`${label}结束秒数`} inputMode="decimal" value={finish} onChange={(event) => setFinish(event.target.value)} onBlur={commit} />{error && <small role="alert">{error}</small>}</span>;
+  return <span className={styles.times}><input aria-label={`${label}开始秒数`} inputMode="decimal" aria-invalid={Boolean(error)} value={start} onChange={(event) => setStart(event.target.value)} onBlur={commit} /><span>–</span><input aria-label={`${label}结束秒数`} inputMode="decimal" aria-invalid={Boolean(error)} value={finish} onChange={(event) => setFinish(event.target.value)} onBlur={commit} />{error && <small role="alert">{error}</small>}</span>;
 }

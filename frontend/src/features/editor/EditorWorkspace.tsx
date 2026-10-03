@@ -1,3 +1,5 @@
+import { flushSync } from 'react-dom';
+import { JapaneseRubyDialog } from './JapaneseRubyDialog';
 import { Select } from '../../shared/Select';
 import { useAudioReview } from '../AudioReviewContext';
 import { VocalPanel } from '../VocalPanel';
@@ -141,6 +143,14 @@ export function EditorWorkspace(props: Props) {
   const [splitLineId, setSplitLineId] = useState<string | null>(null);
   const [contentTransfer, setContentTransfer] = useState<{ trackId: string; contentId: string; targetLineId: string } | null>(null);
   const [romanizationGeneration, setRomanizationGeneration] = useState<string[] | null>(null);
+  const [japaneseRuby, setJapaneseRuby] = useState<string[] | null>(null);
+  const canvasComposing = useRef(false), editRejected = useRef(false);
+  const openJapaneseRuby = (ids: string[]) => {
+    if (canvasComposing.current) { setMessage('请先完成输入法组合'); return; }
+    flushSync(() => { const active = window.document.activeElement; if (active instanceof HTMLElement) active.blur(); });
+    if (editRejected.current || pageRef.current?.querySelector('[aria-invalid="true"]')) { setMessage('请先修正当前无效输入'); return; }
+    if (ids.length) setJapaneseRuby(ids);
+  };
   const [rubyGeneration, setRubyGeneration] = useState<{ lineIds: string[]; trackId?: string; contentId?: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; title: string; actions: ContextAction[]; target: HTMLElement } | null>(null);
   const [locate, setLocate] = useState<{ id: string; serial: number; focus?: string } | null>(null);
@@ -151,7 +161,7 @@ export function EditorWorkspace(props: Props) {
     setSelection((current) => {
       if (!current) return current;
       if (current.kind === 'lines') {
-        const order = document.lines.filter((line) => !line.backgroundOf).map((line) => line.id);
+        const order = document.lines.map((line) => line.id);
         const ids = current.ids.filter((id) => order.includes(id));
         if (ids.length === current.ids.length && (current.activeId === '' || document.lines.some((line) => line.id === current.activeId))) return current;
         return { ...current, ids, anchorId: order.includes(current.anchorId) ? current.anchorId : ids[0] ?? '', activeId: document.lines.some((line) => line.id === current.activeId) ? current.activeId : ids.at(-1) ?? '' };
@@ -208,9 +218,9 @@ export function EditorWorkspace(props: Props) {
     ? document.lines.flatMap((line, index) => line.words.some((word) => selection.ids.includes(word.id)) ? [index] : []) : [];
   const selectLine = (line: LyricLine, shift = false, toggle = false) => {
     setSyncTargetVersion(value => value + 1);
-    const id = line.backgroundOf ?? line.id;
+    const id = line.id;
     const previous = selection?.kind === 'lines' ? selection : null;
-    const ids = selectIds(mainIds, previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
+    const ids = selectIds(document.lines.map(l => l.id), previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
     setSelection({ kind: 'lines', ids, anchorId: shift || toggle ? previous?.anchorId ?? id : id, activeId: line.id });
     props.onSelectLine?.(line.id);
     props.onSelectUnit?.(line.id, null, null);
@@ -287,8 +297,8 @@ export function EditorWorkspace(props: Props) {
     return()=>{observer.disconnect();globalThis.document.querySelectorAll('[data-assignment-error]').forEach(el=>el.removeAttribute('data-assignment-error'));};
   },[props.assignmentError,mode]);
   const dispatch = (command: LyricCommand) => {
-    try { apply(command); setMessage(''); return true; }
-    catch (error) { setMessage(error instanceof Error ? error.message : '编辑失败'); return false; }
+    try { apply(command); editRejected.current = false; setMessage(''); return true; }
+    catch (error) { editRejected.current = true; setMessage(error instanceof Error ? error.message : '编辑失败'); return false; }
   };
   const drag = useObjectDrag(document, pageRef, dispatch, setSelection);
   const displayed = drag.document;
@@ -496,10 +506,11 @@ export function EditorWorkspace(props: Props) {
       ];
     } else {
       const id = line.backgroundOf ?? line.id;
-      effective = selection?.kind === 'lines' && selection.ids.includes(id) ? { ...selection, activeId: line.id }
-        : { kind: 'lines', ids: [id], anchorId: id, activeId: line.id };
+      effective = selection?.kind === 'lines' && selection.ids.includes(line.id) ? { ...selection, activeId: line.id }
+        : { kind: 'lines', ids: [line.id], anchorId: line.id, activeId: line.id };
       title = '歌词行操作';
       actions = [
+        { label: '生成日文注音…', run: () => openJapaneseRuby(effective.ids) },
         { label: '前插行', run: () => { const index = mainLines.findIndex((item) => item.id === id); dispatch({ type: 'insert-line', afterLineId: mainLines[index - 1]?.id ?? null }); } },
         { label: '后插行', run: () => dispatch({ type: 'insert-line', afterLineId: id }) },
         ...(!line.backgroundOf && document.romanizationTracks.some(track => track.contents.some(content => content.lineId === line.id))
@@ -559,7 +570,7 @@ export function EditorWorkspace(props: Props) {
         onCommit={(text) => {
           const shortcut = text.endsWith('|');
           const next = shortcut ? text.slice(0, -1) : text;
-          if (!next) { setMessage('注音 快捷输入需要正文'); return; }
+          if (!next) { editRejected.current = true; setMessage('正文不能为空'); return; }
           if ((next === word.text || dispatch({ type: 'edit-word', lineId: line.id, wordId: word.id, text: next })) && shortcut) setRubyShortcut({ wordId: word.id, serial: ++rubyShortcutSerial.current });
         }}
         onSplit={(at, draft) => dispatch({ type: 'batch', commands: [
@@ -573,6 +584,8 @@ export function EditorWorkspace(props: Props) {
     <label className={styles.emptyBeat}>空拍 <input type="number" min="0" max="32" aria-label={`词 ${word.text}空拍数`} value={word.emptyBeat} onChange={(event) => dispatch({ type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: Number(event.target.value) })} /></label>
   </LyricWordView>;
   return <div ref={pageRef} className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`}
+    onInputCapture={() => { editRejected.current = false; }}
+    onCompositionStartCapture={() => { canvasComposing.current = true; }} onCompositionEndCapture={() => { canvasComposing.current = false; }}
     onPointerDownCapture={() => { pageRef.current!.dataset.pointerFocus = ''; }}
     onKeyDownCapture={() => { delete pageRef.current!.dataset.pointerFocus; }}
     onPointerDown={(event) => {
@@ -675,6 +688,7 @@ export function EditorWorkspace(props: Props) {
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
+      canGenerateJapaneseRuby={selection?.kind === 'lines' && selection.ids.length > 0} openJapaneseRuby={() => openJapaneseRuby(selection?.kind === 'lines' ? selection.ids : [])}
       canGenerateRuby={selectedMainLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
       canGenerateRomanization={selectedMainLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(selectedMainLines.map(line => line.id))} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: selectedMainLines.map((line) => line.id) })} />}
     {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} onClick={event => {
@@ -684,7 +698,7 @@ export function EditorWorkspace(props: Props) {
       selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); requestLocate(line.id);
     }}><h2>大纲</h2><div className={styles.panelBody}>
       {displayed.lines.map(line => <OutlineRow key={line.id} line={line} placeholder={drag.isPlaceholder('line', line.backgroundOf ?? line.id)} ordinal={ordinalById.get(line.backgroundOf ?? line.id)}
-        selected={selection?.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) : selectedLine?.id === line.id} />)}
+        selected={selection?.kind === 'lines' ? selection.ids.includes(line.id) : selectedLine?.id === line.id} />)}
     </div></aside>}{columns.outlineVisible && separator('outline')}
       <main ref={mainRef} tabIndex={-1} className={styles.canvas}>
         <LyricList lines={displayed.lines} locate={locate} append={() => {
@@ -694,7 +708,7 @@ export function EditorWorkspace(props: Props) {
             props.onSelectLine?.(line.id); requestLocate(line.id);
           }
         }} renderLine={(line) => <LyricLineView key={line.id} line={line} placeholder={drag.isPlaceholder('line', line.backgroundOf ?? line.id)}
-          selected={selection ? selection.kind === 'lines' ? selection.ids.includes(line.backgroundOf ?? line.id) : selection.kind === 'words' ? line.words.some((word) => selection.ids.includes(word.id)) : line.id === selection.lineId : selectedLine?.id === line.id}
+          selected={selection ? selection.kind === 'lines' ? selection.ids.includes(line.id) : selection.kind === 'words' ? line.words.some((word) => selection.ids.includes(word.id)) : line.id === selection.lineId : selectedLine?.id === line.id}
           playhead={props.playheadLineId === line.id}
           onSelect={(shift, toggle) => selectLine(line, shift, toggle)} onMove={(direction) => moveLine(line, direction)}>
           <div className={styles.lineHeader}><span>L{ordinalById.get(line.backgroundOf ?? line.id)} · {line.backgroundOf ? '背景' : '主唱'}</span></div>
@@ -783,6 +797,7 @@ export function EditorWorkspace(props: Props) {
     {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
     {romanizationGeneration && <RomanizationGenerationDialog document={document} lineIds={romanizationGeneration}
       preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} apply={dispatch} close={() => setRomanizationGeneration(null)} />}
+    {japaneseRuby && <JapaneseRubyDialog document={document} lineIds={japaneseRuby} apply={dispatch} close={() => setJapaneseRuby(null)} />}
     {rubyGeneration && <RubyGenerationDialog document={document} lineIds={rubyGeneration.lineIds} initialTrackId={rubyGeneration.trackId} initialContentId={rubyGeneration.contentId}
       apply={dispatch} close={() => setRubyGeneration(null)} />}
     {splitLineId && document.lines.find((line) => line.id === splitLineId) && <LineSplitDialog key={splitLineId} line={document.lines.find((line) => line.id === splitLineId)!}
