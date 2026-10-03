@@ -27,7 +27,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     }),
   });
   if (!response.ok) {
-    let message = `词典请求失败（${response.status}）`;
+    let message = `读音请求失败（${response.status}）`;
     try {
       const body = (await response.json()) as { message?: string };
       message = body.message ?? message;
@@ -65,3 +65,7 @@ export const readingApi = {
       method: "DELETE",
     }),
 };
+
+export type ReadingRange = { line_id: string; base_start: number; base_end: number; base: string; reading: string };
+export const analyzeReadings = (lines: Array<{ id: string; text: string }>, signal: AbortSignal) =>
+  call<{ ranges: ReadingRange[] }>('/reading/analyze', { method: 'POST', body: JSON.stringify({ lines }), signal });

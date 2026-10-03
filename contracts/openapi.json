@@ -1467,6 +1467,36 @@
           }
         }
       }
+    },
+    "/api/v1/reading/analyze": {
+      "post": {
+        "operationId": "analyzeCurrentReadings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadingSnapshot"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current text ranges in Unicode code points; empty reading marks uncovered text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadingAnalysis"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Reading service unavailable"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3534,6 +3564,94 @@
             "type": "integer"
           }
         }
+      },
+      "ReadingLine": {
+        "properties": {
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 100000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "ReadingLine",
+        "type": "object"
+      },
+      "ReadingSnapshot": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReadingLine"
+            },
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lines"
+        ],
+        "title": "ReadingSnapshot",
+        "type": "object"
+      },
+      "ReadingRange": {
+        "properties": {
+          "line_id": {
+            "title": "Line Id",
+            "type": "string"
+          },
+          "base_start": {
+            "title": "Base Start",
+            "type": "integer"
+          },
+          "base_end": {
+            "title": "Base End",
+            "type": "integer"
+          },
+          "base": {
+            "title": "Base",
+            "type": "string"
+          },
+          "reading": {
+            "title": "Reading",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_id",
+          "base_start",
+          "base_end",
+          "base",
+          "reading"
+        ],
+        "title": "ReadingRange",
+        "type": "object"
+      },
+      "ReadingAnalysis": {
+        "properties": {
+          "ranges": {
+            "items": {
+              "$ref": "#/components/schemas/ReadingRange"
+            },
+            "title": "Ranges",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ranges"
+        ],
+        "title": "ReadingAnalysis",
+        "type": "object"
       }
     }
   }

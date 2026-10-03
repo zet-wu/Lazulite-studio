@@ -33,7 +33,7 @@ from .publish_routes import build_publish_router
 from .engine import configured_engine
 from .forced import configured_forced_runner, prepare_forced_request
 from .projection import project_ttml, project_ttml_for_forced
-from .reading import ReadingJobRunner, ReadingDictionary, SudachiReadingProposer, build_dictionary_router
+from .reading import ReadingJobRunner, ReadingDictionary, SudachiReadingProposer, build_dictionary_router, build_analysis_router
 from .review import build_router as build_review_router
 from .revisions import INITIAL_TTML, RevisionStore
 from .studio.media import Asset, MediaError, MediaProbe, MediaService
@@ -578,6 +578,7 @@ def create_app(
     job_service = JobService(db, engine=configured_engine_instance, asset_path=asset_path_for_project, reading_runner=reading_runner, publish_runner=publish_runner, vocal_runner=vocal_runner)
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
     api.include_router(build_vocal_router(vocal_runner, auth=auth, project_exists=project))
+    api.include_router(build_analysis_router(configured_reading_proposer, write=write))
     api.include_router(build_dictionary_router(ReadingDictionary(db), auth=auth, write=write, project_exists=project))
     api.include_router(build_router(DocumentService(revisions), auth=auth, write=write, project_exists=project))
     from .lyric_sources import build_sources_router

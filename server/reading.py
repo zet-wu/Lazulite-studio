@@ -283,3 +283,63 @@ class ReadingJobRunner:
         identity = getattr(self.proposer, "identity", None)
         engine = identity() if callable(identity) else {"name": "reading", "build": "injected"}
         return {"kind": "reading", "engine": engine, "proposals": [item.as_dict() for item in proposals]}
+
+class ReadingLine(BaseModel):
+    id: str = Field(min_length=1, max_length=200)
+    text: str = Field(max_length=100000)
+
+
+class ReadingSnapshot(BaseModel):
+    lines: list[ReadingLine] = Field(min_length=1, max_length=10000)
+
+
+class ReadingRange(BaseModel):
+    line_id: str
+    base_start: int
+    base_end: int
+    base: str
+    reading: str
+
+
+class ReadingAnalysis(BaseModel):
+    ranges: list[ReadingRange]
+
+
+def analyze_snapshot(body: ReadingSnapshot, proposer: ReadingProposer) -> ReadingAnalysis:
+    """Analyze current text, with explicit empty readings for every uncovered range."""
+    lines = [line.model_dump() for line in body.lines]
+    if len({line.id for line in body.lines}) != len(lines):
+        raise ValueError('行标识重复')
+    if sum(len(line.text) for line in body.lines) > 1000000:
+        raise ValueError('本次正文过长，请减少所选行')
+    proposals = propose_readings(lines, proposer, {})
+    ranges = []
+    for line in body.lines:
+        offset = 0
+        for item in sorted((p for p in proposals if p.line_id == line.id), key=lambda p: p.base_start):
+            if item.base_start < offset:
+                raise ValueError('读音分析范围重叠')
+            if offset < item.base_start:
+                ranges.append(ReadingRange(line_id=line.id, base_start=offset, base_end=item.base_start, base=line.text[offset:item.base_start], reading=''))
+            # Unknown dictionary forms may repeat the original ideographs; never label those a reading.
+            reading = item.reading if all('ぁ' <= c <= 'ゖ' or c in 'ー゙゚' for c in item.reading) else ''
+            ranges.append(ReadingRange(line_id=line.id, base_start=item.base_start, base_end=item.base_end, base=item.base, reading=reading))
+            offset = item.base_end
+        if offset < len(line.text):
+            ranges.append(ReadingRange(line_id=line.id, base_start=offset, base_end=len(line.text), base=line.text[offset:], reading=''))
+    return ReadingAnalysis(ranges=ranges)
+
+
+def build_analysis_router(proposer: ReadingProposer, *, write) -> APIRouter:
+    router = APIRouter()
+
+    @router.post('/reading/analyze', response_model=ReadingAnalysis)
+    def analyze(body: ReadingSnapshot, _: object = Depends(write)):
+        try:
+            return analyze_snapshot(body, proposer)
+        except ReadingUnavailable as exc:
+            raise HTTPException(503, {'code': 'reading_unavailable', 'message': str(exc), 'retryable': True}) from exc
+        except ValueError as exc:
+            raise HTTPException(422, {'code': 'reading_invalid', 'message': str(exc), 'retryable': False}) from exc
+
+    return router

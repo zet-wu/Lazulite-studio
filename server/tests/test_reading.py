@@ -111,3 +111,25 @@ def test_http_reading_job_uses_server_projection_and_dictionary(tmp_path):
         result = client.get(f"/api/v1/jobs/{job['id']}/result").json()
         assert result["binding"]["revision"] == "r1"
         assert result["proposals"][0]["source"] == "dictionary"
+
+
+def test_current_snapshot_analysis_has_no_project_dependency():
+    from server.reading import ReadingSnapshot, analyze_snapshot
+    body = ReadingSnapshot(lines=[{'id': 'main', 'text': '𝄞今日 食べる'}, {'id': 'bg', 'text': '魂'}])
+    result = analyze_snapshot(body, SudachiReadingProposer())
+    assert [(r.base, r.reading) for r in result.ranges if r.reading] == [('今日', 'きょう'), ('食べる', 'たべる'), ('魂', 'たましい')]
+    assert result.ranges[0].base == '𝄞'
+    for line in body.lines:
+        assert ''.join(r.base for r in result.ranges if r.line_id == line.id) == line.text
+
+
+def test_snapshot_rejects_duplicate_ids_and_surfaces_failure():
+    import pytest
+    from server.reading import ReadingSnapshot, analyze_snapshot, ReadingUnavailable
+    with pytest.raises(ValueError, match='行标识重复'):
+        analyze_snapshot(ReadingSnapshot(lines=[{'id': 'a', 'text': '今日'}] * 2), SudachiReadingProposer())
+    class Unavailable:
+        def propose(self, lines, dictionary):
+            raise ReadingUnavailable('offline')
+    with pytest.raises(ReadingUnavailable):
+        analyze_snapshot(ReadingSnapshot(lines=[{'id': 'a', 'text': '今日'}]), Unavailable())

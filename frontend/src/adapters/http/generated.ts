@@ -487,6 +487,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reading/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["analyzeCurrentReadings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -982,6 +998,36 @@ export interface components {
             id: string;
             beginMs: number;
             endMs: number;
+        };
+        /** ReadingLine */
+        ReadingLine: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+        };
+        /** ReadingSnapshot */
+        ReadingSnapshot: {
+            /** Lines */
+            lines: components["schemas"]["ReadingLine"][];
+        };
+        /** ReadingRange */
+        ReadingRange: {
+            /** Line Id */
+            line_id: string;
+            /** Base Start */
+            base_start: number;
+            /** Base End */
+            base_end: number;
+            /** Base */
+            base: string;
+            /** Reading */
+            reading: string;
+        };
+        /** ReadingAnalysis */
+        ReadingAnalysis: {
+            /** Ranges */
+            ranges: components["schemas"]["ReadingRange"][];
         };
     };
     responses: {
@@ -2157,6 +2203,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    analyzeCurrentReadings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadingSnapshot"];
+            };
+        };
+        responses: {
+            /** @description Current text ranges in Unicode code points; empty reading marks uncovered text */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadingAnalysis"];
+                };
+            };
+            /** @description Reading service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
