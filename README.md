@@ -16,6 +16,8 @@
 
 ## 外部开发文档
 
-开发方案、审阅、过程记录、验收及证据统一保存在并列的 [lyric-workflow](../lyric-workflow/docs/studio/README.md)：[当前状态](../lyric-workflow/docs/studio/current-state.md)、[当前审阅整改方案](../lyric-workflow/docs/studio-ruby-review/Review-phase0/plan.md)、[前端运行](../lyric-workflow/docs/studio/development/frontend-development.md)、[服务端运行](../lyric-workflow/docs/studio/development/server-development.md)、[依赖许可](../lyric-workflow/docs/studio/reference/dependency-licenses.md)。本仓库不再保存开发过程文档；可执行测试夹具仍随源码维护。
+开发方案、审阅、过程记录、验收及证据统一保存在并列的 [lyric-workflow](../lyric-workflow/docs/studio/README.md)：[当前状态](../lyric-workflow/docs/studio/current-state.md)、[当前审阅整改方案](../lyric-workflow/docs/studio-ruby-review/Review-phase1/plan.md)、[前端运行](../lyric-workflow/docs/studio/development/frontend-development.md)、[服务端运行](../lyric-workflow/docs/studio/development/server-development.md)、[依赖许可](../lyric-workflow/docs/studio/reference/dependency-licenses.md)。本仓库不再保存开发过程文档；可执行测试夹具仍随源码维护。
 
 日文自动注音由当前画布快照调用 `/api/v1/reading/analyze`，主行和背景行独立选择，提供整行上下文、完整读音编辑和单次原子应用。允许词内拆分、不自动合词；未知或歧义位置留空。新注音按音拍分配整数毫秒时间，已有注音未改时保持原单元与时间。关联对齐字段及专用编辑逻辑已移除。
+
+日文自动注音以 Sudachi C 决定整行读音，使用一致 A 细分、随服务部署的 JmdictFurigana 精确词形/读音分段和唯一假名锚点投影原词。连续汉字不因词典更细而强制拆词。Ruby 支持同行跨词拖动及同源选中组，含空目标；保留 ID、读音和时间，选择与焦点随新归属。

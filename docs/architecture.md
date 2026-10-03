@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-2026-10-02 更新至人声处理 Phase 2。执行依据见[本轮方案](../../lyric-workflow/docs/studio-vocal-review/Review-phase2/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
+2026-10-03 更新至日文注音 Phase 1。执行依据见[本轮方案](../../lyric-workflow/docs/studio-ruby-review/Review-phase1/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
 
 ## 1. 应用与目录
 
@@ -157,3 +157,5 @@ TTML 解析先处理相对祖先得到实际端点，再按半毫秒向上舍入
 时间轴根节点持有共享布局变量：相邻轨道 4px、分层 22px、色块 20px 与顶部 1px。标尺和波形成组，人声组内与组外使用同一间距；歌词轨道包装使用 display:contents，隐藏后不占空行。变量定义于实际绘图区，兼顾音频主栏 portal 与展开底栏。图形音源在波形行垂直居中，普通标签按共享下拉的 1px 边框与 8px 内边距内缩文字；片段保持棕色语义及独立选中、焦点反馈。
 
 声谱图由 `spectrum-palette.ts` 提供固定 256 级显示查找表，从近黑深紫经紫红、橙色到浅黄。各整数强度的相对亮度严格递增，主题不改变数据颜色；FFT、强度范围、PCM 请求、缓存及加载/失败呈现继续由原实现负责，不进行视窗动态归一化。
+
+日文读音服务固定使用 Sudachi C＋一致 A 细分＋精确词典分段，前端先锚点再投影原词；完整分析片段不因跨用户词边界而提前丢弃。Ruby 同行跨词及选中组移动复用原子命令和拖动预览，保留独立端点、不隐式重新打轴；跨行（含主行与背景）由命令和界面共同拒绝。
