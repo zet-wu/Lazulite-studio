@@ -4,6 +4,7 @@ import { SPECTRUM_HEIGHT, SPECTRUM_WIDTH, SPECTRUM_WINDOW_MS, spectrumWindow } f
 import { useCanvasMetrics } from './useCanvasMetrics';
 import { SpectrumCache } from './spectrum-cache';
 import styles from './media.module.css';
+import { spectrumPalette } from './spectrum-palette';
 
 type Props = { vocal?: string | null; projectId: string; assetIdentity: string; startMs: number; endMs: number; durationMs: number };
 type Request = { token: number; controller: AbortController; began: number; posted: boolean };
@@ -118,10 +119,10 @@ function AssetSpectrum({ vocal, projectId, startMs, endMs, durationMs }: Props) 
       }
       const image = context.createImageData(SPECTRUM_WIDTH, SPECTRUM_HEIGHT);
       for (let index = 0; index < tile.pixels.length; index++) {
-        const value = tile.pixels[index] / 255;
-        image.data[index * 4] = Math.round(24 + 225 * value);
-        image.data[index * 4 + 1] = Math.round(35 + 145 * value * value);
-        image.data[index * 4 + 2] = Math.round(75 + 110 * (1 - value));
+        const color = spectrumPalette[tile.pixels[index]];
+        image.data[index * 4] = color[0];
+        image.data[index * 4 + 1] = color[1];
+        image.data[index * 4 + 2] = color[2];
         image.data[index * 4 + 3] = 255;
       }
       const offscreen = document.createElement('canvas'); offscreen.width = SPECTRUM_WIDTH; offscreen.height = SPECTRUM_HEIGHT;
