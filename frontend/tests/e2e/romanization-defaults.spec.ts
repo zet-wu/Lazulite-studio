@@ -12,7 +12,7 @@ test('Local file mode survives reopening and reload, without sharing across file
   await page.goto('/editor');
   const load = (name: string) => importLyrics(page, { name, mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
   await load('first.ttml'); let dialog = await generate(page);
-  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('plain');
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
   await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
   await dialog.getByLabel('L1单元 1音译').fill('discarded');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -22,7 +22,7 @@ test('Local file mode survives reopening and reload, without sharing across file
   await expect(dialog.getByLabel('L1单元 1音译')).toHaveValue('ga ');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await load('second.ttml'); dialog = await generate(page);
-  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('plain');
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await page.reload(); await load('first.ttml'); dialog = await generate(page);
   await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
@@ -52,6 +52,7 @@ test('First ja-Latn track is reused, populated lines stay skipped and new remain
   await dialog.getByLabel('目标轨道').selectOption('second-ja');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   dialog = await generate(page); await expect(dialog.getByLabel('目标轨道')).toHaveValue('first-ja');
+  await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
   await dialog.getByLabel('L1音译', { exact: true }).fill('first manual');
   await dialog.getByRole('button', { name: '生成音译', exact: true }).click();
   await expect(page.getByLabel('音译 ja-Latn', { exact: true })).toHaveCount(2);

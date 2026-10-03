@@ -53,6 +53,7 @@ async function generate(page: Page) {
 }
 test('P8 mode regenerates once; unfocused and active edits, Escape and IME stay within proposal', async ({ page }) => {
   await load(page); const dialog = await generate(page);
+  await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
   const plain = dialog.getByLabel('L1音译', { exact: true }); await expect(plain).toHaveValue('ga k ko u');
   await plain.fill('manual'); await plain.press('Escape'); await expect(plain).toHaveValue('ga k ko u'); await expect(dialog).toBeVisible();
   await plain.dispatchEvent('compositionstart'); await plain.fill(' composing '); await plain.press('Enter'); await expect(plain).toBeFocused();
@@ -91,6 +92,7 @@ for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) t
   await input.fill('very long editable romanization '.repeat(20));
   const overflow = await dialog.evaluate(e => e.scrollWidth > e.clientWidth); expect(overflow).toBe(false);
   await input.blur(); await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
+  await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
   const area = dialog.getByLabel('L1音译', { exact: true }), initial = (await area.boundingBox())!.height;
   expect((await area.boundingBox())!.width).toBeGreaterThan((await dialog.locator('[data-roman-proposal]').boundingBox())!.width * .9);
   await area.fill('very long ordinary romanization '.repeat(100)); expect((await area.boundingBox())!.height).toBeGreaterThan(initial * 2);

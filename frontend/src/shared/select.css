@@ -1,4 +1,4 @@
-select.studio-select { appearance:none; border:1px solid var(--line); border-radius:var(--control-radius,5px); background:var(--surface-container,var(--panel)); color:var(--ink); font:inherit; font-size:12px; min-height:26px; padding:3px 24px 3px 8px; cursor:pointer; background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%); background-position:calc(100% - 12px) 50%,calc(100% - 8px) 50%; background-size:4px 4px; background-repeat:no-repeat; }
+select.studio-select { appearance:none; border:1px solid var(--line); border-radius:var(--control-radius,5px); background:var(--surface-container,var(--panel)); color:var(--ink); font:inherit; font-size:12px; min-height:26px; padding:3px 8px; cursor:pointer; }
 select.studio-select:focus-visible { outline:2px solid var(--blue); outline-offset:1px; }
 select.studio-select:disabled { opacity:.5; cursor:default; }
 .studio-select-list { box-sizing:border-box; position:fixed; z-index:1000; overflow:auto; padding:4px; border:1px solid var(--line); border-radius:6px; background:var(--surface-container,var(--panel)); color:var(--ink); box-shadow:0 4px 16px #0003; font-size:12px; }
@@ -6,3 +6,12 @@ select.studio-select:disabled { opacity:.5; cursor:default; }
 .studio-select-list [aria-selected=true] { background:var(--blue-soft); }
 .studio-select-list [data-active=true] { outline:1px solid var(--blue); outline-offset:-1px; background:var(--state-hover,var(--blue-soft)); }
 .studio-select-list [aria-disabled=true] { opacity:.5; cursor:default; }
+
+.studio-select-trigger { display:inline-grid; min-width:0; max-width:100%; vertical-align:middle; }
+.studio-select-trigger > select, .studio-select-value { grid-area:1 / 1; min-width:0; width:100%; }
+select.studio-select-quoted { -webkit-text-fill-color:transparent; }
+.studio-select-value { pointer-events:none; align-self:center; padding:3px 8px; overflow:hidden; }
+.studio-select-quote { display:flex; gap:3px; min-width:0; align-items:baseline; }
+.studio-select-quote > span:first-child { flex-shrink:0; font-size:12px; font-weight:400; }
+.studio-lyric-quote { font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.studio-select-list .studio-lyric-quote { white-space:normal; overflow-wrap:anywhere; }

@@ -2,7 +2,12 @@ import { useEffect, useLayoutEffect, useId, useRef, useState, type SelectHTMLAtt
 import { createPortal } from 'react-dom';
 import './select.css';
 /** Native form/label semantics with a shared desktop listbox. */
-export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
+type Quote = { prefix: string; text: string };
+type Props = SelectHTMLAttributes<HTMLSelectElement> & { quotes?: Record<string, Quote> };
+function QuotedOption({ quote }: { quote: Quote }) {
+  return <span className="studio-select-quote" title={`${quote.prefix}${quote.text}`}><span>{quote.prefix}</span><span className="studio-lyric-quote">{quote.text}</span></span>;
+}
+export function Select({ quotes, ...props }: Props) {
   const ref=useRef<HTMLSelectElement>(null);
   const list=useRef<HTMLDivElement>(null);
   const id=useId();
@@ -55,7 +60,8 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
     window.addEventListener('pointerdown',outside);window.addEventListener('resize',resize);window.addEventListener('scroll',scroll,true);
     return()=>{window.removeEventListener('pointerdown',outside);window.removeEventListener('resize',resize);window.removeEventListener('scroll',scroll,true);};
   },[open]);
-  return <><select {...props} ref={ref} className={`studio-select ${props.className??''}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open?id:undefined} aria-activedescendant={open?`${id}-${active}`:undefined}
+  const selectedQuote = quotes?.[String(props.value)];
+  const trigger = <select {...props} title={selectedQuote ? `${selectedQuote.prefix}${selectedQuote.text}` : props.title} ref={ref} className={`studio-select ${selectedQuote?'studio-select-quoted':''} ${props.className??''}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open?id:undefined} aria-activedescendant={open?`${id}-${active}`:undefined}
     onPointerDown={e=>{props.onPointerDown?.(e);if(e.button===0&&!e.defaultPrevented){e.preventDefault();ref.current?.focus();if(open)close();else show();}}}
     onBlur={e=>{props.onBlur?.(e);setOpen(false);}}
     onKeyDown={e=>{
@@ -70,5 +76,6 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
         const index=enabled.indexOf(active);
         setActive(e.key==='Home'?enabled[0]:e.key==='End'?enabled.at(-1)!:enabled[Math.max(0,Math.min(enabled.length-1,index+(e.key==='ArrowDown'?1:-1)))]??active);
       } else if(open&&e.key.length===1){e.preventDefault();const index=options.findIndex(o=>!o.disabled&&o.text.toLocaleLowerCase().startsWith(e.key.toLocaleLowerCase()));if(index>=0)setActive(index);}
-    }}/>{open&&createPortal(<div ref={list} id={id} role="listbox" aria-label={props['aria-label']??ref.current?.labels?.[0]?.textContent??'选项'} className="studio-select-list" style={rect} onPointerDown={e=>{e.preventDefault();e.stopPropagation();}}>{options.map((o,i)=><div key={i} id={`${id}-${i}`} data-index={i} role="option" aria-selected={o.selected} aria-disabled={o.disabled} data-active={active===i} onPointerMove={()=>{if(!o.disabled)setActive(i);}} onClick={e=>{e.stopPropagation();choose(i);}}>{o.text}</div>)}</div>,ref.current?.closest('[role="dialog"]')??document.body)}</>;
+    }}/>;
+  return <>{quotes ? <span className="studio-select-trigger">{trigger}{selectedQuote && <span className="studio-select-value" aria-hidden="true"><QuotedOption quote={selectedQuote}/></span>}</span> : trigger}{open&&createPortal(<div ref={list} id={id} role="listbox" aria-label={props['aria-label']??ref.current?.labels?.[0]?.textContent??'选项'} className="studio-select-list" style={rect} onPointerDown={e=>{e.preventDefault();e.stopPropagation();}}>{options.map((o,i)=><div key={i} id={`${id}-${i}`} data-index={i} role="option" aria-selected={o.selected} aria-disabled={o.disabled} data-active={active===i} onPointerMove={()=>{if(!o.disabled)setActive(i);}} onClick={e=>{e.stopPropagation();choose(i);}} aria-label={o.text}>{quotes?.[o.value] ? <QuotedOption quote={quotes[o.value]}/> : o.text}</div>)}</div>,ref.current?.closest('[role="dialog"]')??document.body)}</>;
 }

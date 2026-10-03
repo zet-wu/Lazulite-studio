@@ -9,7 +9,7 @@ for (const kind of ['plain', 'timed']) test(`P8 ${kind} manual result and placeh
   await outline.first().click(); await outline.last().click({ modifiers: ['Shift'] }); await outline.first().click({ button: 'right' });
   await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
-  if (kind === 'timed') await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
+  await dialog.getByLabel('输出', { exact: true }).selectOption(kind);
   const label = kind === 'timed' ? 'L1单元 1音译' : 'L1音译'; await dialog.getByLabel(label, { exact: true }).fill(' manual  ');
   await dialog.getByRole('button', { name: '生成音译', exact: true }).click();
   await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByText('已保存', { exact: true })).toBeVisible();
@@ -48,7 +48,7 @@ test('Generation mode survives project reload and stays isolated across projects
     return page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
   }
   await page.goto('/projects/phase4-background/edit'); let dialog = await open(page);
-  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('plain');
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
   await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
   await dialog.getByLabel('L1单元 1音译').fill('discarded');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -58,7 +58,7 @@ test('Generation mode survives project reload and stays isolated across projects
   await expect(dialog.getByLabel('L1单元 1音译')).not.toHaveValue('discarded');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await page.goto('/projects/phase2/edit'); dialog = await open(page);
-  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('plain');
+  await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await page.goto('/projects/phase4-background/edit'); dialog = await open(page);
   await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');

@@ -78,7 +78,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   const [source] = useState(document);
   const [sourceIds] = useState(lineIds);
   const modeStorage = `lazulite-romanization-mode:${preferenceScope}`;
-  const [kind, setKind] = useState<RomanizationKind>(() => localStorage.getItem(modeStorage) === 'timed' ? 'timed' : 'plain');
+  const [kind, setKind] = useState<RomanizationKind>(() => localStorage.getItem(modeStorage) === 'plain' ? 'plain' : 'timed');
   const [rows, setRows] = useState<RomanizationProposal[]>(() => proposeRomanization(source, sourceIds, kind));
   const [trackId, setTrackId] = useState(() => source.romanizationTracks.find(track => track.language === 'ja-Latn')?.id ?? '');
   const [targets, setTargets] = useState<Record<string, string>>({});
@@ -110,8 +110,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   return <SettingsDialog title="生成日文罗马字音译" subtitle={`生成 ${rows.filter(row => targetFor(row.lineId) !== 'skip').length} / ${sourceIds.length} 行`} close={close}
     actions={<><button data-role="secondary" onClick={close}>取消</button><button data-role="primary" disabled={Boolean(issue)} onClick={submit}>生成音译</button></>}>
     <div className={styles.rubyGeneration}>
-      <small>使用 注音 读音及假名正文</small>
-      <div className={styles.rubyGenerationOptions}>
+      <div className={`${styles.rubyGenerationOptions} ${styles.romanGenerationOptions}`}>
         <label>目标轨道 <Select aria-label="目标轨道" value={trackId} onChange={event => { setTrackId(event.target.value); setTargets({}); setMessage(''); }}><option value="">新建 · ja-Latn</option>
           {source.romanizationTracks.filter(track => track.language === 'ja-Latn').map(track => <option key={track.id} value={track.id}>轨道 {source.romanizationTracks.indexOf(track) + 1} · ja-Latn</option>)}
         </Select></label>
@@ -119,9 +118,9 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
           const next = event.target.value as RomanizationKind;
           setKind(next); setRows(proposeRomanization(source, sourceIds, next)); setMessage(''); setFocusedRow(null);
           localStorage.setItem(modeStorage, next);
-        }}><option value="plain">普通文本</option><option value="timed">按源分词定时</option></Select></label>
+        }}><option value="plain">普通文本</option><option value="timed">定时音译</option></Select></label>
+        <small id="romanization-mode-help">切换输出将清除修改</small>
       </div>
-      <small id="romanization-mode-help">切换输出会重新生成，清除本窗口的文字修改</small>
       <div ref={scroll} data-proposal-count={rows.length} className={`${styles.rubyGenerationRows} ${virtualized ? styles.rubyGenerationRowsVirtual : ''}`}>
         <div style={virtualized ? { position: 'relative', height: virtualizer.getTotalSize() } : { display: 'grid', gap: 8 }}>
           {shown.map(({ row, item }) => {
@@ -129,7 +128,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
             if (row.kind === 'timed') row.groups.forEach((unit, index) => { const list = byWord.get(unit.wordId) ?? []; list.push({ unit, index }); byWord.set(unit.wordId, list); });
             return <div key={row.lineId} ref={item ? virtualizer.measureElement : undefined} data-index={item?.index} data-roman-proposal={row.lineId}
             style={item ? { position: 'absolute', width: '100%', transform: `translateY(${item.start}px)` } : undefined} className={`${styles.rubyGenerationRow} ${styles.romanGenerationRow}`}>
-            <label>L{ordinals.get(row.lineId)} <Select aria-label={`L${ordinals.get(row.lineId)}生成内容`} value={targetFor(row.lineId)} onChange={event => setTargets(current => ({ ...current, [row.lineId]: event.target.value }))}>
+            <label className={styles.romanTarget}>L{ordinals.get(row.lineId)} <Select quotes={Object.fromEntries((track?.contents.filter(content => content.lineId === row.lineId) ?? []).map(content => [content.id, { prefix: '替换 · ', text: content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('') }]))} aria-label={`L${ordinals.get(row.lineId)}生成内容`} value={targetFor(row.lineId)} onChange={event => setTargets(current => ({ ...current, [row.lineId]: event.target.value }))}>
               <option value="skip">跳过 · 保留已有</option><option value="append">添加新内容</option>
               {track?.contents.filter(content => content.lineId === row.lineId).map(content => <option key={content.id} value={content.id}>替换 · {content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</option>)}
             </Select></label>

@@ -292,4 +292,10 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .inspector .singerSelection.singerSelection label { display:flex; gap:8px; min-height:26px; }
 .syncPanel button[data-role][data-role] { min-height:26px; padding:4px 6px; }
 
+.romanGenerationOptions { align-items:center; }
+.romanGenerationOptions label { display:flex; align-items:center; }
+.romanGenerationOptions small { flex-basis:auto; }
+.romanGenerationRow label.romanTarget { display:flex; align-items:center; gap:8px; }
+.romanTarget > span { flex:1; }
+
 .ribbonMenu a[data-role="secondary"] { justify-content:flex-start; border-color:transparent; background-color:transparent; font-size:12px; }

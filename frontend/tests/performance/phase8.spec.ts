@@ -7,7 +7,7 @@ test('P8 production 2000 proposals retain focused input and edits across virtual
   const outline = page.locator('[data-outline-drag]'); await expect(outline).toHaveCount(2000);
   await outline.first().click(); await outline.last().click({ modifiers: ['Shift'] }); await page.locator('[data-top-menu="tools"] summary').click();
   const start = Date.now(); await page.getByRole('button', { name: '生成日文罗马字音译…' }).click();
-  const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true }); await expect(dialog.getByLabel('L1音译', { exact: true })).toHaveValue('ka ka ka ka ka ka ka ka ka ka');
+  const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true }); await dialog.getByLabel('输出', { exact: true }).selectOption('plain'); await expect(dialog.getByLabel('L1音译', { exact: true })).toHaveValue('ka ka ka ka ka ka ka ka ka ka');
   const openedMs = Date.now() - start, mounted = await dialog.locator('[data-roman-proposal]').count(); expect(mounted).toBeLessThan(30);
   const modeStart = Date.now(); await dialog.getByLabel('输出', { exact: true }).selectOption('timed'); await expect(dialog.getByLabel('L1单元 1音译')).toHaveValue('ka '); const modeMs = Date.now() - modeStart;
   const input = dialog.getByLabel('L1单元 1音译'); await input.fill('manual  ');

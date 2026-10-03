@@ -8,7 +8,7 @@ vi.mock('../../domain/romanization-generation', async importOriginal => {
   const actual = await importOriginal<typeof import('../../domain/romanization-generation')>();
   return { ...actual, proposeRomanization: vi.fn(actual.proposeRomanization) };
 });
-beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }));
+beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); localStorage.setItem('lazulite-romanization-mode:project:first', 'plain'); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
 it('generates only at entry and mode change, blocks a changed source without replacing manual text', () => {
   const doc = createLyricDocument('きゃ'), apply = vi.fn(() => true), close = vi.fn();
@@ -49,8 +49,8 @@ it('remembers output per project after cancellation and generates once in the re
   expect(proposeRomanization).toHaveBeenCalledExactlyOnceWith(doc, props.lineIds, 'timed');
   view.unmount(); vi.clearAllMocks();
   view = render(<RomanizationGenerationDialog {...props} preferenceScope="project:second" />);
-  expect(screen.getByLabelText('输出')).toHaveValue('plain');
-  expect(proposeRomanization).toHaveBeenCalledExactlyOnceWith(doc, props.lineIds, 'plain'); view.unmount();
+  expect(screen.getByLabelText('输出')).toHaveValue('timed');
+  expect(proposeRomanization).toHaveBeenCalledExactlyOnceWith(doc, props.lineIds, 'timed'); view.unmount();
   view = render(<RomanizationGenerationDialog {...props} />);
   fireEvent.change(screen.getByLabelText('输出'), { target: { value: 'plain' } }); view.unmount();
   render(<RomanizationGenerationDialog {...props} />);
@@ -84,4 +84,21 @@ it('defaults to the first ja-Latn track, appends missing content and skips exist
   fireEvent.change(screen.getByLabelText('目标轨道'), { target: { value: '' } });
   expect(screen.getByLabelText('L1生成内容')).toHaveValue('append');
   expect(screen.getByRole('button', { name: '生成音译' })).toBeEnabled();
+});
+
+it('uses timed output for missing or invalid preferences without inventing source times', () => {
+  const doc = createLyricDocument('かな');
+  for (const stored of [null, 'unknown']) {
+    const key = 'lazulite-romanization-mode:project:new';
+    if (stored === null) localStorage.removeItem(key); else localStorage.setItem(key, stored);
+    const apply = vi.fn(command => {
+      const result = executeLyricCommand(createLyricEditorState(doc), command).present;
+      expect(result.romanizationTracks[0].contents[0]).toMatchObject({kind:'timed', units:[{text:'kana',beginMs:null,endMs:null}]});
+      return true;
+    });
+    const view = render(<RomanizationGenerationDialog document={doc} lineIds={[doc.lines[0].id]} preferenceScope="project:new" apply={apply} close={vi.fn()} />);
+    expect(screen.getByLabelText('输出')).toHaveValue('timed');
+    fireEvent.click(screen.getByRole('button', {name:'生成音译'})); expect(apply).toHaveBeenCalledOnce();
+    view.unmount();
+  }
 });
