@@ -19,10 +19,9 @@ it('keeps timed, partially timed and annotated whitespace spans with their own f
     { ...createWord(' ', 'partial'), beginMs: 3 },
     { ...createWord(' ', 'ruby'), rubyUnits: [{ id: 'r', reading: 'く', beginMs: null, endMs: null }] },
     { ...createWord(' ', 'beat'), emptyBeat: 1 },
-    { ...createWord(' ', 'align'), alignmentUnits: [{ id: 'align', kind: 'word' as const, text: ' ', beginMs: null, endMs: null, readingStart: null, readingEnd: null, rubyUnitId: null }] },
   ];
   const xml = new DOMParser().parseFromString(serializeLyricTtml(doc), 'application/xml');
-  expect(xml.querySelector('p')!.children).toHaveLength(5);
+  expect(xml.querySelector('p')!.children).toHaveLength(4);
   expect(xml.querySelector('p')!.children[0].getAttribute('begin')).toBe('00:00.001');
   expect(xml.querySelector('p')!.children[1].hasAttribute('end')).toBe(false);
 });

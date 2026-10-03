@@ -61,7 +61,7 @@ const isState = (value: unknown): value is ProjectEditorState => {
     return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.romanizationTracks) && Array.isArray(item.agents)
       && !!item.metadata && typeof item.metadata === 'object'
       && item.lines.every((line) => !!line && typeof line.id === 'string' && Array.isArray(line.words)
-        && line.words.every((word) => !!word && typeof word.id === 'string' && typeof word.text === 'string' && Array.isArray(word.rubyUnits) && Array.isArray(word.alignmentUnits)));
+        && line.words.every((word) => !!word && typeof word.id === 'string' && typeof word.text === 'string' && Array.isArray(word.rubyUnits) ));
   };
   return !!candidate.present && Array.isArray(candidate.past) && Array.isArray(candidate.future)
     && candidate.past.length <= 256 && candidate.future.length <= 256

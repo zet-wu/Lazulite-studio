@@ -102,8 +102,7 @@ export function moveWordsAcrossLine(document: LyricDocument, selection: Extract<
 
 function cloneWord(word: LyricWord): LyricWord {
   const rubyIds = new Map(word.rubyUnits.map((unit) => [unit.id, crypto.randomUUID()]));
-  return { ...word, id: crypto.randomUUID(), rubyUnits: word.rubyUnits.map((unit) => ({ ...unit, id: rubyIds.get(unit.id)! })),
-    alignmentUnits: word.alignmentUnits.map((unit) => ({ ...unit, id: crypto.randomUUID(), rubyUnitId: unit.rubyUnitId ? rubyIds.get(unit.rubyUnitId) ?? null : null })) };
+  return { ...word, id: crypto.randomUUID(), rubyUnits: word.rubyUnits.map((unit) => ({ ...unit, id: rubyIds.get(unit.id)! })) };
 }
 
 function cloneLine(line: LyricLine, id: string, backgroundOf: string | null): LyricLine {

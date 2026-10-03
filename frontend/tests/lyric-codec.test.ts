@@ -179,14 +179,6 @@ describe('semantic TTML codec', () => {
     expect(undoLyricCommand(state).present).toBe(document);
   });
 
-  it('keeps attached mora timing in a draft without writing it to exchange TTML', () => {
-    const document = parseLyricTtml(simple);
-    const word = document.lines[0].words[0];
-    word.alignmentUnits.push({ id: 'mora-1', kind: 'mora', text: 'きょ', beginMs: 100, endMs: 300, readingStart: 0, readingEnd: 2, rubyUnitId: null });
-    const draft = serializeLyricTtml(document, { draft: true });
-    expect(parseLyricTtml(draft).lines[0].words[0].alignmentUnits).toEqual(word.alignmentUnits);
-    expect(serializeLyricTtml(document)).not.toContain('mora-1');
-  });
 });
 
 it.each(['draft', 'exchange'] as const)('P4 %s roundtrip preserves independent background and extends only body duration', mode => {

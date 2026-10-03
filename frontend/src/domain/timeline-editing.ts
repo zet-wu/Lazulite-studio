@@ -28,7 +28,6 @@ const include = (line: LyricLine, word: LyricWord): LyricLine => {
 const moveWord = (word: LyricWord, deltaMs: number): LyricWord => ({ ...word,
   beginMs: changed(word.beginMs, deltaMs), endMs: changed(word.endMs, deltaMs),
   rubyUnits: word.rubyUnits.map((unit) => ({ ...unit, beginMs: changed(unit.beginMs, deltaMs), endMs: changed(unit.endMs, deltaMs) })),
-  alignmentUnits: word.alignmentUnits.map((unit) => ({ ...unit, beginMs: changed(unit.beginMs, deltaMs), endMs: changed(unit.endMs, deltaMs) })),
 });
 
 function editTarget(document: LyricDocument, target: TimelineTarget, update: (line: LyricLine) => LyricLine): LyricDocument {
@@ -66,8 +65,7 @@ export function moveTimeline(document: LyricDocument, targets: TimelineTarget[],
         if (unit.beginMs === null || unit.endMs === null) throw new Error('请先为 注音 设置完整时间');
         rubyUnits[rubyIndex] = { ...unit, beginMs: changed(unit.beginMs, deltaMs), endMs: changed(unit.endMs, deltaMs) };
         words[index] = { ...word, rubyUnits,
-          beginMs: envelope(rubyUnits.map((item) => item.beginMs), true), endMs: envelope(rubyUnits.map((item) => item.endMs), false),
-          alignmentUnits: word.alignmentUnits.map((unit) => unit.rubyUnitId === target.rubyId ? { ...unit, beginMs: changed(unit.beginMs, deltaMs), endMs: changed(unit.endMs, deltaMs) } : unit) };
+          beginMs: envelope(rubyUnits.map((item) => item.beginMs), true), endMs: envelope(rubyUnits.map((item) => item.endMs), false), };
       }
       return include({ ...line, words }, words[index]);
     });

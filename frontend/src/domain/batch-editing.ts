@@ -1,5 +1,5 @@
 import type { LyricCommand } from './lyric-commands';
-import type { AlignmentUnit, LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
+import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
 
 const safe = (value: number) => Number.isSafeInteger(value) && value >= 0;
 const cjkSyllable = (text: string) => /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+$/u.test(text);
@@ -19,7 +19,6 @@ export function shiftLineTimes(document: LyricDocument, lineIds: string[], delta
     return { ...line, beginMs: shifted(line.beginMs, deltaMs), endMs: shifted(line.endMs, deltaMs),
       words: line.words.map((word): LyricWord => ({ ...word, beginMs: shifted(word.beginMs, deltaMs), endMs: shifted(word.endMs, deltaMs),
         rubyUnits: word.rubyUnits.map((unit): RubyUnit => ({ ...unit, beginMs: shifted(unit.beginMs, deltaMs), endMs: shifted(unit.endMs, deltaMs) })),
-        alignmentUnits: word.alignmentUnits.map((unit): AlignmentUnit => ({ ...unit, beginMs: shifted(unit.beginMs, deltaMs), endMs: shifted(unit.endMs, deltaMs) })),
       })) };
   });
   const lines = shiftedLines.map((line) => {
@@ -47,7 +46,7 @@ export function smoothWordTimes(document: LyricDocument, lineIds: string[], thre
       const left = words[index], right = words[index + 1];
       if (!cjkSyllable(left.text) || !cjkSyllable(right.text)) continue;
       if (left.endMs === null || right.beginMs === null || Math.abs(right.beginMs - left.endMs) > thresholdMs || left.endMs === right.beginMs) continue;
-      if (left.rubyUnits.length || right.rubyUnits.length || left.alignmentUnits.length || right.alignmentUnits.length) continue;
+      if (left.rubyUnits.length || right.rubyUnits.length) continue;
       const middle = Math.round((left.endMs + right.beginMs) / 2);
       if (left.beginMs !== null && middle < left.beginMs || right.endMs !== null && middle > right.endMs) continue;
       words[index] = { ...left, endMs: middle };
@@ -81,7 +80,7 @@ export function replaceWords(document: LyricDocument, wordIds: string[], search:
     if (!selected.has(word.id)) continue;
     const matches = word.text.match(pattern);
     if (!matches?.length) continue;
-    if (word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error(`词“${word.text}”含注音或附属属性，不能批量替换`);
+    if (word.rubyUnits.length || word.obscene || word.emptyBeat) throw new Error(`词“${word.text}”含注音或附属属性，不能批量替换`);
     const next = word.text.replace(pattern, () => replacement);
     count += matches.length;
     commands.push(next ? { type: 'edit-word', lineId: line.id, wordId: word.id, text: next } : { type: 'delete-word', lineId: line.id, wordId: word.id });

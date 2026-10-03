@@ -1,6 +1,6 @@
 import { lineStructureIssues } from './line-structure';
 import { nonemptyTranslations } from './sublyrics';
-import { createLine, createWord, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type SubLyric, type TimeMs } from './lyric-document';
+import { createLine, createWord, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type SubLyric, type TimeMs } from './lyric-document';
 import { splitAtGrapheme } from './text-boundaries';
 import { distributeRubyTime, splitReadingMora } from './ruby-editing';
 import { stampSync, type SyncAction, type SyncCursor, type SyncMode } from './sync-editing';
@@ -16,7 +16,6 @@ type AtomicLyricCommand =
   | { type: 'merge-lines'; firstLineId: string; secondLineId: string }
   | { type: 'insert-word'; lineId: string; afterWordId: string | null; word: LyricWord }
   | { type: 'delete-word'; lineId: string; wordId: string }
-  | { type: 'set-word-alignments'; lineId: string; wordId: string; units: AlignmentUnit[] }
   | { type: 'segment-word'; lineId: string; wordId: string; words: LyricWord[] }
   | { type: 'segment-words'; changes: Array<{ lineId: string; wordId: string; words: LyricWord[] }> }
   | { type: 'merge-words'; lineId: string; firstWordId: string; secondWordId: string }
@@ -258,16 +257,14 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       lines[index] = { ...line, words: line.words.filter((word) => word.id !== command.wordId) };
       return { ...document, lines };
     }
-    case 'set-word-alignments':
-      return editWord(document, command.lineId, command.wordId, (word) => [{ ...word, alignmentUnits: command.units }]);
     case 'segment-word':
       return editWord(document, command.lineId, command.wordId, (word, line) => {
         if (command.words.length < 2 || command.words.map((part) => part.text).join('') !== word.text || command.words[0].id !== word.id) throw new Error('分词必须保留原文和首词 ID');
-        if (word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
+        if (word.rubyUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
         const ids = command.words.map((part) => part.id);
         if (new Set(ids).size !== ids.length || ids.slice(1).some((id) => document.lines.some((item) => item.words.some((part) => part.id === id)))) throw new Error('分词 ID 重复');
         for (const part of command.words) {
-          if (!part.text || part.rubyUnits.length || part.alignmentUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
+          if (!part.text || part.rubyUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
           wordFitsLine(part, line);
         }
         if (command.words[0].beginMs !== word.beginMs || command.words.at(-1)?.endMs !== word.endMs) throw new Error('分词必须保留父词时间区间');
@@ -286,10 +283,10 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
           const change = changes.get(word.id);
           if (!change) return [word];
           if (change.lineId !== line.id || change.words.length < 2 || change.words[0].id !== word.id || change.words.map((part) => part.text).join('') !== word.text) throw new Error('分词目标或原文不匹配');
-          if (word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
+          if (word.rubyUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
           if (change.words[0].beginMs !== word.beginMs || change.words.at(-1)?.endMs !== word.endMs) throw new Error('分词必须保留父词时间区间');
           for (const [index, part] of change.words.entries()) {
-            if (!part.text || part.rubyUnits.length || part.alignmentUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
+            if (!part.text || part.rubyUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
             if (generatedIds.has(part.id) || index > 0 && originalIds.has(part.id)) throw new Error('分词 ID 重复');
             generatedIds.add(part.id);
             wordFitsLine(part, line);
@@ -308,7 +305,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const first = line.words.findIndex((word) => word.id === command.firstWordId);
       if (first < 0 || line.words[first + 1]?.id !== command.secondWordId) throw new Error('只能合并相邻词');
       const left = line.words[first], right = line.words[first + 1];
-      if ([left, right].some((word) => word.rubyUnits.length || word.alignmentUnits.length || word.obscene || word.emptyBeat)) throw new Error('带附属属性的词不能直接合并');
+      if ([left, right].some((word) => word.rubyUnits.length || word.obscene || word.emptyBeat)) throw new Error('带附属属性的词不能直接合并');
       const words = line.words.slice();
       const starts = [left.beginMs, right.beginMs].filter((value): value is number => value !== null);
       const ends = [left.endMs, right.endMs].filter((value): value is number => value !== null);
@@ -559,7 +556,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
     switch (wordCommand.type) {
       case 'split-word': {
         if (word.rubyUnits.length) throw new Error('拆分带注音的正文前，请先明确拆分读音');
-        if (word.obscene || word.emptyBeat || word.alignmentUnits.length) throw new Error('Splitting a word with attached properties requires explicit redistribution');
+        if (word.obscene || word.emptyBeat) throw new Error('Splitting a word with attached properties requires explicit redistribution');
         const [left, right] = splitAtGrapheme(word.text, wordCommand.at);
         const newId = wordCommand.newWordId ?? crypto.randomUUID();
         if (line.words.some((item) => item.id === newId)) throw new Error('Word id already exists');
@@ -571,7 +568,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
       }
       case 'edit-word':
         if (!wordCommand.text) throw new Error('Word text must be non-empty');
-        return [wordCommand.text === word.text ? word : { ...word, text: wordCommand.text, alignmentUnits: [] }];
+        return [wordCommand.text === word.text ? word : { ...word, text: wordCommand.text }];
       case 'set-word-time':
         validTime(wordCommand.beginMs, wordCommand.endMs);
         if (line.beginMs !== null && wordCommand.beginMs !== null && wordCommand.beginMs < line.beginMs) throw new Error('Word starts before line');
@@ -597,7 +594,6 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
       case 'merge-ruby': {
         const first = word.rubyUnits.findIndex((unit) => unit.id === wordCommand.firstRubyId);
         if (first < 0 || word.rubyUnits[first + 1]?.id !== wordCommand.secondRubyId) throw new Error('只能合并相邻读音单元');
-        if (word.alignmentUnits.some((unit) => unit.rubyUnitId === wordCommand.firstRubyId || unit.rubyUnitId === wordCommand.secondRubyId)) throw new Error('带对齐结果的读音单元不能直接合并');
         const left = word.rubyUnits[first], right = word.rubyUnits[first + 1];
         const starts = [left.beginMs, right.beginMs].filter((value): value is number => value !== null);
         const ends = [left.endMs, right.endMs].filter((value): value is number => value !== null);
@@ -624,18 +620,16 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
           validTime(unit.beginMs, unit.endMs);
           if (word.beginMs !== null && unit.beginMs !== null && unit.beginMs < word.beginMs || word.endMs !== null && unit.endMs !== null && unit.endMs > word.endMs) throw new Error('注音单元时间超出正文词');
         }
-        return [{ ...word, rubyUnits: wordCommand.units, alignmentUnits: word.alignmentUnits.filter((unit) => !unit.rubyUnitId) }];
+        return [{ ...word, rubyUnits: wordCommand.units }];
       }
       case 'redistribute-ruby-time':
-        if (word.alignmentUnits.some((unit) => unit.rubyUnitId)) throw new Error('带对齐结果的读音不能自动重分配时间');
         return [{ ...word, rubyUnits: distributeRubyTime(word, word.rubyUnits) }];
       case 'set-word-empty-beat':
         if (!Number.isSafeInteger(wordCommand.emptyBeat) || wordCommand.emptyBeat < 0 || wordCommand.emptyBeat > 32) throw new Error('空拍数必须是 0–32 的整数');
         return [word.emptyBeat === wordCommand.emptyBeat ? word : { ...word, emptyBeat: wordCommand.emptyBeat }];
       case 'split-ruby':
         return [updateRuby(word, wordCommand.rubyId, (unit) => {
-          if (word.alignmentUnits.some((item) => item.rubyUnitId === unit.id)) throw new Error('带对齐结果的读音不能直接拆分');
-          const [left, right] = splitAtGrapheme(unit.reading, wordCommand.at);
+            const [left, right] = splitAtGrapheme(unit.reading, wordCommand.at);
           const id = wordCommand.newRubyId ?? crypto.randomUUID();
           if (word.rubyUnits.some((item) => item.id === id)) throw new Error('注音单元标识重复');
           const middle = splitTime(unit.beginMs, unit.endMs, splitReadingMora(left).length, splitReadingMora(unit.reading).length);
@@ -644,10 +638,10 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
       case 'edit-ruby': {
         if (!wordCommand.reading) throw new Error('注音读音不能为空');
         const updated = updateRuby(word, wordCommand.rubyId, (unit) => wordCommand.reading === unit.reading ? [unit] : [{ ...unit, reading: wordCommand.reading }]);
-        return [updated === word ? word : { ...updated, alignmentUnits: word.alignmentUnits.filter((unit) => unit.rubyUnitId !== wordCommand.rubyId) }];
+        return [updated];
       }
       case 'delete-ruby':
-        return [{ ...updateRuby(word, wordCommand.rubyId, () => []), alignmentUnits: word.alignmentUnits.filter((unit) => unit.rubyUnitId !== wordCommand.rubyId) }];
+        return [{ ...updateRuby(word, wordCommand.rubyId, () => []) }];
       case 'set-ruby-time': {
         validTime(wordCommand.beginMs, wordCommand.endMs);
         if (word.beginMs !== null && wordCommand.beginMs !== null && wordCommand.beginMs < word.beginMs || word.endMs !== null && wordCommand.endMs !== null && wordCommand.endMs > word.endMs) throw new Error('注音单元时间超出正文词');

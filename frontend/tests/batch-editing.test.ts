@@ -11,11 +11,9 @@ describe('E3 batch editing', () => {
     line.beginMs = 500; line.endMs = 1000;
     word.beginMs = 500; word.endMs = 1000;
     word.rubyUnits = [{ id: 'r', reading: 'きょう', beginMs: 600, endMs: 900 }];
-    word.alignmentUnits = [{ id: 'a', kind: 'mora', text: 'きょ', beginMs: 600, endMs: null, readingStart: 0, readingEnd: 2, rubyUnitId: 'r' }];
     const untouched = createLine('明日', 'next'); document.lines.push(untouched);
     const state = executeLyricCommand(createLyricEditorState(document), shiftLineTimes(document, [line.id], 200));
     expect(state.present.lines[0].words[0].rubyUnits[0].beginMs).toBe(800);
-    expect(state.present.lines[0].words[0].alignmentUnits[0].endMs).toBeNull();
     expect(state.present.lines[1]).toBe(untouched);
     expect(undoLyricCommand(state).present).toBe(document);
     expect(() => shiftLineTimes(document, [line.id], -600)).toThrow(/偏移/);

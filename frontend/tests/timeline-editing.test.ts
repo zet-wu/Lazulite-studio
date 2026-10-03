@@ -24,11 +24,9 @@ describe('E6 timeline editing', () => {
   it('moves a line with its 注音, alignment and background in one undo step', () => {
     const document = sample();
     const word = document.lines[0].words[0];
-    word.alignmentUnits = [{ id: 'm1', kind: 'mora', text: 'きょ', beginMs: 1000, endMs: 1500, readingStart: 0, readingEnd: 2, rubyUnitId: 'r1' }];
     const moved = moveTimeline(document, [{ kind: 'line', lineId: document.lines[0].id }], 500);
     const state = executeLyricCommand(createLyricEditorState(document), { type: 'replace-document', document: moved });
     expect(state.present.lines[0].words[0].rubyUnits[0].beginMs).toBe(1500);
-    expect(state.present.lines[0].words[0].alignmentUnits[0].beginMs).toBe(1500);
     expect(state.present.lines[1].words[0].beginMs).toBe(2000);
     expect(undoLyricCommand(state).present).toBe(document);
   });

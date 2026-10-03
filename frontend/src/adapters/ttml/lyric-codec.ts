@@ -1,5 +1,5 @@
 import { nonemptyTranslations } from '../../domain/sublyrics';
-import { createWord, LYRIC_SCHEMA_VERSION, type AlignmentUnit, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationTrack, type RomanizationUnit, type RubyUnit, type TimeMs } from '../../domain/lyric-document';
+import { createWord, LYRIC_SCHEMA_VERSION, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationTrack, type RomanizationUnit, type RubyUnit, type TimeMs } from '../../domain/lyric-document';
 
 const TTML = 'http://www.w3.org/ns/ttml';
 const TTS = 'http://www.w3.org/ns/ttml#styling';
@@ -93,24 +93,9 @@ function checkAttributes(node: Element, allowed: string[]) {
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'role') continue;
     if (attribute.namespaceURI === ITUNES && ['key', 'timing', 'songPart'].includes(attribute.localName)) continue;
-    if (attribute.namespaceURI === STUDIO && ['id', 'kind', 'null', 'alignments', 'endLink', 'emptyBeat', 'ignoreSync'].includes(attribute.localName)) continue;
+    if (attribute.namespaceURI === STUDIO && ['id', 'kind', 'null', 'endLink', 'emptyBeat', 'ignoreSync'].includes(attribute.localName)) continue;
     throw new Error(`Unsupported TTML attribute ${attribute.name} on <${node.localName}>`);
   }
-}
-
-function readAlignments(node: Element): AlignmentUnit[] {
-  const raw = attr(node, STUDIO, 'alignments');
-  if (raw === null) return [];
-  let value: unknown;
-  try { value = JSON.parse(raw); } catch { throw new Error('Invalid draft word alignments'); }
-  const validTime = (part: unknown) => part === null || typeof part === 'number' && Number.isSafeInteger(part) && part >= 0;
-  if (!Array.isArray(value) || !value.every((item) => item && typeof item === 'object'
-    && typeof item.id === 'string' && ['word', 'mora', 'phoneme'].includes(item.kind)
-    && typeof item.text === 'string' && validTime(item.beginMs) && validTime(item.endMs)
-    && (item.readingStart === null || Number.isSafeInteger(item.readingStart) && item.readingStart >= 0)
-    && (item.readingEnd === null || Number.isSafeInteger(item.readingEnd) && item.readingEnd >= 0)
-    && (item.rubyUnitId === null || typeof item.rubyUnitId === 'string'))) throw new Error('Invalid draft word alignments');
-  return value as AlignmentUnit[];
 }
 
 function readEndLink(node: Element): LyricLine['endLink'] {
@@ -134,14 +119,13 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   if (!is(element, TTML, 'span')) throw new Error(`Unsupported TTML line child <${element.localName}>`);
   checkAttributes(element, ['begin', 'end', 'dur']);
   const wordId = attr(element, STUDIO, 'id') ?? id;
-  const alignmentUnits = readAlignments(element);
   const emptyBeat = Number(attr(element, STUDIO, 'emptyBeat') ?? 0);
   if (!Number.isSafeInteger(emptyBeat) || emptyBeat < 0 || emptyBeat > 32) throw new Error('Invalid draft empty beat count');
   const [beginMs, endMs] = boundaries(element, lineStart, lineEnd, absoluteTimes);
   const rubyKind = attr(element, TTS, 'ruby');
   if (!rubyKind) {
     const text = textOnly(element, 'Word');
-    return text ? { ...createWord(text, wordId), beginMs, endMs, alignmentUnits, emptyBeat } : null;
+    return text ? { ...createWord(text, wordId), beginMs, endMs, emptyBeat } : null;
   }
   if (rubyKind !== 'container') throw new Error(`不支持的注音类型： ${rubyKind}`);
   const parts = Array.from(element.children);
@@ -178,7 +162,6 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
     beginMs: beginMs ?? (rubyUnits.every((unit) => unit.beginMs !== null) ? Math.min(...rubyUnits.map((unit) => unit.beginMs!)) : null),
     endMs: endMs ?? (rubyUnits.every((unit) => unit.endMs !== null) ? Math.max(...rubyUnits.map((unit) => unit.endMs!)) : null),
     rubyUnits,
-    alignmentUnits,
     emptyBeat,
   };
 }
@@ -383,7 +366,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
   };
   for (const line of lines) {
     quantize(line);
-    for (const word of line.words) { quantize(word); word.rubyUnits.forEach(quantize); word.alignmentUnits.forEach(quantize); }
+    for (const word of line.words) { quantize(word); word.rubyUnits.forEach(quantize); }
   }
   for (const track of romanizationTracks) for (const content of track.contents) if (content.kind === 'timed') content.units.forEach(quantize);
   for (const agent of agents) if (agent.actorRef && !agents.some(a => a.id === agent.actorRef)) throw new Error(`歌手 ${agent.id} 的 actor 引用不存在：${agent.actorRef}`);
@@ -513,14 +496,13 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     if (line.agentRefs.length) p.setAttributeNS(TTM, 'ttm:agent', line.agentRefs.join(' '));
     const appendWord = (parent: Element, word: LyricWord, text: string) => {
       if (word.obscene) throw new Error(`Word ${word.id} has fields not yet mapped to TTML`);
-      if (!draft && /^\s+$/.test(text) && word.beginMs === null && word.endMs === null && !word.rubyUnits.length && !word.alignmentUnits.length && !word.emptyBeat) {
+      if (!draft && /^\s+$/.test(text) && word.beginMs === null && word.endMs === null && !word.rubyUnits.length && !word.emptyBeat) {
         parent.appendChild(xml.createTextNode(text));
         return;
       }
       const span = xml.createElementNS(TTML, 'span');
       if (draft) span.setAttributeNS(STUDIO, 'studio:id', word.id);
       if (draft && word.emptyBeat) span.setAttributeNS(STUDIO, 'studio:emptyBeat', String(word.emptyBeat));
-      if (draft && word.alignmentUnits.length) span.setAttributeNS(STUDIO, 'studio:alignments', JSON.stringify(word.alignmentUnits));
       setTime(span, word.beginMs, word.endMs, draft);
       if (!word.rubyUnits.length) span.textContent = text;
       else {

@@ -28,7 +28,7 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
    if(fullBody || lrc) add(base,prefix,line.beginMs,line.endMs,fullBody,line.beginMs!==null && line.endMs!==null && (fullBody ? line.endMs<=line.beginMs : line.endMs<line.beginMs) ? '结束时间必须晚于开始' : undefined);
    let boundary=line.beginMs === null ? null : line.beginMs;
    for(const [i,word] of line.words.entries()) {
-     const blank=/^\s+$/.test(word.text) && word.beginMs===null && word.endMs===null && !word.rubyUnits.length && !word.alignmentUnits.length && !word.emptyBeat;
+     const blank=/^\s+$/.test(word.text) && word.beginMs===null && word.endMs===null && !word.rubyUnits.length && !word.emptyBeat;
      if(blank)continue;
      const wordBase={kind:'word' as const,lineId:line.id,wordId:word.id},wordPrefix=`${prefix}第 ${i+1} 词`;
      const begin=fullBody && target!=='publish' && line.words.length===1 ? word.beginMs ?? line.beginMs : word.beginMs;

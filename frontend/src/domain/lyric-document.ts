@@ -10,24 +10,12 @@ export type RubyUnit = {
   endMs: TimeMs;
 };
 
-export type AlignmentUnit = {
-  id: string;
-  kind: 'word' | 'mora' | 'phoneme';
-  text: string;
-  beginMs: TimeMs;
-  endMs: TimeMs;
-  readingStart: number | null;
-  readingEnd: number | null;
-  rubyUnitId: string | null;
-};
-
 export type LyricWord = {
   id: string;
   text: string;
   beginMs: TimeMs;
   endMs: TimeMs;
   rubyUnits: RubyUnit[];
-  alignmentUnits: AlignmentUnit[];
   obscene: boolean;
   emptyBeat: number;
 };
@@ -75,7 +63,7 @@ export const lineText = (line: LyricLine) => line.words.map((word) => word.text)
 export const rubyReading = (word: LyricWord) => word.rubyUnits.map((unit) => unit.reading).join('');
 
 export function createWord(text: string, id: string = crypto.randomUUID()): LyricWord {
-  return { id, text, beginMs: null, endMs: null, rubyUnits: [], alignmentUnits: [], obscene: false, emptyBeat: 0 };
+  return { id, text, beginMs: null, endMs: null, rubyUnits: [], obscene: false, emptyBeat: 0 };
 }
 
 export function createLine(text: string, id: string = `line-${crypto.randomUUID()}`): LyricLine {

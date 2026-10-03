@@ -16,7 +16,6 @@ export function syncIndex(units: SyncCursor[], cursor: SyncCursor | null): numbe
 }
 
 function assign(word: LyricWord, rubyUnitId: string | null, side: 'beginMs' | 'endMs', timeMs: number): LyricWord {
-  if (word.alignmentUnits.length) throw new Error('带对齐结果的词需要先处理对齐时间');
   if (!rubyUnitId) {
     const other = side === 'beginMs' ? 'endMs' : 'beginMs';
     return { ...word, [side]: timeMs, [other]: word[other] !== null && (side === 'beginMs' ? word[other] < timeMs : word[other] > timeMs) ? null : word[other] };

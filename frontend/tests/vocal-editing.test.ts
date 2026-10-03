@@ -4,13 +4,13 @@ import { assignVocalSegment, AssignmentError, editSegments } from '../src/domain
 const segment = { id:'s', beginMs:30000, endMs:32000 };
 function fixture(){
  const doc=createLyricDocument('歌'), line=doc.lines[0];line.id='a';line.beginMs=10000;line.endMs=14000;
- line.words=[{...createWord('歌','w'),beginMs:11000,endMs:13000,rubyUnits:[{id:'r',reading:'うた',beginMs:11500,endMs:null}],alignmentUnits:[{id:'u',kind:'mora',text:'う',beginMs:null,endMs:12500,readingStart:null,readingEnd:null,rubyUnitId:'r'}]}];
+ line.words=[{...createWord('歌','w'),beginMs:11000,endMs:13000,rubyUnits:[{id:'r',reading:'うた',beginMs:11500,endMs:null}]}];
  doc.romanizationTracks=[{id:'t',language:'ja-Latn',contents:[{id:'c',lineId:'a',kind:'timed',units:[{id:'ru',text:'uta',beginMs:11500,endMs:13000}]}]}];
  return doc;
 }
 it('moves every known endpoint by the same delta without scaling or filling unknown ends',()=>{
  const doc=fixture(),next=assignVocalSegment(doc,'a',segment,60000);
- expect(next.lines[0]).toMatchObject({beginMs:30000,endMs:34000,words:[{beginMs:31000,endMs:33000,rubyUnits:[{beginMs:31500,endMs:null}],alignmentUnits:[{beginMs:null,endMs:32500}]}]});
+ expect(next.lines[0]).toMatchObject({beginMs:30000,endMs:34000,words:[{beginMs:31000,endMs:33000,rubyUnits:[{beginMs:31500,endMs:null}]}]});
  expect(next.romanizationTracks[0].contents[0]).toMatchObject({units:[{beginMs:31500,endMs:33000}]});
  doc.lines[0].endMs=null;expect(assignVocalSegment(doc,'a',segment,60000).lines[0].endMs).toBeNull();
  doc.lines[0].beginMs=null;doc.lines[0].endMs=14000;

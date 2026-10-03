@@ -275,7 +275,7 @@ export function EditorWorkspace(props: Props) {
   const assignmentIssues: OutputIssue[] = props.assignmentError ? props.assignmentError.objectIds.map(id=>{
     const line=document.lines.find(l=>l.id===props.assignmentError!.lineId);
     const base={lineId:props.assignmentError!.lineId,missing:[],message:props.assignmentError!.message} satisfies Omit<OutputIssue,'kind'>;
-    const word=line?.words.find(w=>w.id===id||w.rubyUnits.some(u=>u.id===id)||w.alignmentUnits.some(u=>u.id===id));
+    const word=line?.words.find(w=>w.id===id||w.rubyUnits.some(u=>u.id===id));
     if(word){const ruby=word.rubyUnits.find(u=>u.id===id);return {...base,kind:ruby?'ruby':'word',wordId:word.id,...(ruby?{rubyId:ruby.id}:{})} as OutputIssue;}
     for(const track of document.romanizationTracks)for(const content of track.contents)if(content.lineId===line?.id&&content.kind==='timed'&&content.units.some(u=>u.id===id))return {...base,kind:'romanization-unit',trackId:track.id,contentId:content.id,unitId:id} as OutputIssue;
     return {...base,kind:'line'} as OutputIssue;
@@ -420,7 +420,6 @@ export function EditorWorkspace(props: Props) {
         { label: '向前移动', disabled: index === 0, run: () => dispatch({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId, afterRubyId: word.rubyUnits[index - 2]?.id ?? null }) },
         { label: '向后移动', disabled: index === word.rubyUnits.length - 1, run: () => dispatch({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId, afterRubyId: word.rubyUnits[index + 1].id }) },
         { label: '按音拍拆分', disabled: splitReadingMora(unit.reading).length < 2, run: () => {
-          if (word.alignmentUnits.some((item) => item.rubyUnitId)) { setMessage('带对齐结果的读音不能自动拆分'); return; }
           const parts = splitReadingMora(unit.reading).map((reading, partIndex) => ({ ...unit, id: partIndex ? crypto.randomUUID() : unit.id, reading }));
           const distributed = distributeRubyTime({ ...word, beginMs: unit.beginMs, endMs: unit.endMs }, parts);
           dispatch({ type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: word.rubyUnits.flatMap((item) => item.id === unit.id ? distributed : [item]), overwrite: true });

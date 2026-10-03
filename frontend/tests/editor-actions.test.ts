@@ -18,7 +18,6 @@ describe('editor selection and clipboard', () => {
     const word = line.words[0];
     word.beginMs = 0; word.endMs = 1000;
     word.rubyUnits = [{ id: 'ruby', reading: 'きょう', beginMs: 0, endMs: 1000 }];
-    word.alignmentUnits = [{ id: 'mora', kind: 'mora', text: 'きょ', beginMs: 0, endMs: 500, readingStart: 0, readingEnd: 2, rubyUnitId: 'ruby' }];
     const selection = { kind: 'words' as const, lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id };
     const clipboard = copySelection(document, selection);
     const pasted = pasteRich(document, clipboard, selection);
@@ -28,7 +27,6 @@ describe('editor selection and clipboard', () => {
     expect(clone).toMatchObject({ text: '今日', beginMs: 0, endMs: 1000 });
     expect(clone.rubyUnits[0]).toMatchObject({ reading: 'きょう', beginMs: 0, endMs: 1000 });
     expect(clone.rubyUnits[0].id).not.toBe('ruby');
-    expect(clone.alignmentUnits[0].rubyUnitId).toBe(clone.rubyUnits[0].id);
     expect(undoLyricCommand(state).present).toBe(document);
   });
 
@@ -38,13 +36,11 @@ describe('editor selection and clipboard', () => {
     line.beginMs = 0; line.endMs = 1000;
     word.beginMs = 0; word.endMs = 1000;
     word.rubyUnits = [{ id: 'ruby', reading: 'うた', beginMs: 0, endMs: 1000 }];
-    word.alignmentUnits = [{ id: 'aligned', kind: 'mora', text: 'う', beginMs: 0, endMs: 500, readingStart: 0, readingEnd: 1, rubyUnitId: 'ruby' }];
     const selection = { kind: 'ruby' as const, lineId: line.id, wordId: word.id, ids: ['ruby'], anchorId: 'ruby', activeId: 'ruby' };
     const clipboard = copySelection(document, selection);
     const pasted = pasteRich(document, clipboard, selection);
     const state = executeLyricCommand(createLyricEditorState(document), pasted.command);
     const result = state.present.lines[0].words[0];
-    expect(result.alignmentUnits).toEqual(word.alignmentUnits);
     expect(result.rubyUnits.map((unit) => [unit.reading, unit.beginMs, unit.endMs])).toEqual([['うた', 0, 1000], ['うた', 0, 1000]]);
     expect(result.rubyUnits[1].id).not.toBe('ruby');
     expect(undoLyricCommand(state).present).toBe(document);
