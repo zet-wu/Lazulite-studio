@@ -157,3 +157,30 @@ def test_current_lazulite_profile_is_unsmoothed_main_rms_with_centered_clock(tmp
         energy = client.get(f"/api/v1/projects/p/vocals/{result['id']}/energy?start_ms=0&end_ms=100&buckets=4096").json()
         assert energy['start_ms'] == 0
         assert energy['values'][0] == float(values[0])
+
+
+def test_energy_windows_match_persisted_rms_and_vocal_reads_do_not_reprobe(tmp_path, monkeypatch):
+    client, db = setup(tmp_path)
+    with client:
+        asset = client.get('/api/v1/projects/p/document').json()['document']['sourceAssetId']
+        job = client.post('/api/v1/projects/p/jobs/vocal', json={'params': {'asset_id': asset}}, headers={'origin':'http://studio'}).json()
+        assert wait(client, job['id'])['status'] == 'succeeded'
+        result = client.get('/api/v1/projects/p/vocals').json()['items'][0]
+        rid = result['id']
+        values = np.load(tmp_path/'vocals'/'p'/rid/'energy.npy')
+        import math
+        for start, end, buckets in [(0,2000,10),(511,1411,7),(0,100,4096),(1900,2300,1),(2300,2400,5)]:
+            response = client.get(f'/api/v1/projects/p/vocals/{rid}/energy?start_ms={start}&end_ms={end}&buckets={buckets}')
+            assert response.status_code == 200
+            first = int(start/result['energy_hop_ms'])
+            last = min(len(values), math.ceil(min(end, result['duration_ms'])/result['energy_hop_ms']))
+            stride = max(1, math.ceil((last-first)/buckets))
+            expected = [float(np.max(values[i:min(i+stride,last)])) for i in range(first,last,stride)]
+            assert response.json()['values'] == expected
+        import server.studio.media as media
+        def unexpected(*args, **kwargs): raise AssertionError('immutable vocal metadata must not be probed again')
+        monkeypatch.setattr(media, 'probe_media', unexpected)
+        for start in (0, 100, 400):
+            response = client.get(f'/api/v1/projects/p/waveform?vocal={rid}&level=0&start_ms={start}&end_ms={start+500}')
+            assert response.status_code == 200 and response.json()['maximum']
+        assert client.get(f'/api/v1/projects/p/audio?vocal={rid}', headers={'range':'bytes=0-99'}).status_code == 206

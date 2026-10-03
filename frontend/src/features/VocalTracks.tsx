@@ -1,3 +1,5 @@
+import { waveformRequestWindow } from '../domain/timeline-viewport';
+import { visibleEnergy } from '../domain/energy-window';
 import { useAudioReview } from './AudioReviewContext';
 import { VocalFocus } from './VocalFocus';
 import { snapTime } from '../domain/timeline-editing';
@@ -26,7 +28,16 @@ export function VocalTracks(props: Props) {
   const visible = acoustics.segments.filter(s=>s.endMs>startMs && s.beginMs<endMs);
   const layout = useMemo(()=>packIntervals(visible.map(s=>({key:s.id,...s}))),[acoustics,startMs,endMs]);
   const frozen = useRef(layout); if (!drag) frozen.current = layout;
-  const energy = useQuery({queryKey:['vocal-energy',props.projectId,acoustics.analysisId,startMs,endMs],queryFn:({signal})=>vocalApi.energy(props.projectId,acoustics.analysisId!,startMs,endMs,signal),enabled:showEnergy && !!acoustics.analysisId && endMs>startMs,staleTime:60000});
+  const requestWindow = waveformRequestWindow({ startMs, spanMs: span }, durationMs);
+  const energy = useQuery({
+    queryKey: ['vocal-energy', props.projectId, acoustics.analysisId, span, requestWindow.startMs, requestWindow.endMs],
+    queryFn: ({signal}) => vocalApi.energy(props.projectId, acoustics.analysisId!, requestWindow.startMs, requestWindow.endMs, signal),
+    enabled: showEnergy && !!acoustics.analysisId && endMs > startMs,
+    staleTime: Infinity, gcTime: 0, retry: false,
+    // Keep one previous window while fetching, but never reuse a different source/resolution.
+    placeholderData: (data, query) => query?.queryKey[1] === props.projectId && query.queryKey[2] === acoustics.analysisId && query.queryKey[3] === span ? data : undefined,
+  });
+  const energyView = visibleEnergy(energy.data, startMs, endMs);
   const cancel = useCallback(() => { dragRef.current=null; setDrag(null); setAdding(false); setMenu(null); if(adding)requestAnimationFrame(()=>addButton.current?.focus()); },[adding,setAdding]);
   useEffect(()=>{
     const key = (e:KeyboardEvent)=>{if(e.key==='Escape'&&(dragRef.current||menu||adding)){ e.preventDefault(); cancel(); }};
@@ -35,7 +46,7 @@ export function VocalTracks(props: Props) {
   useEffect(()=>{if(dragRef.current && dragRef.current.document!==acoustics){dragRef.current=null;setDrag(null);}},[acoustics]);
   useEffect(()=>{setSelected(ids=>ids.filter(id=>acoustics.segments.some(s=>s.id===id)));},[acoustics,setSelected]);
   const sorted=useMemo(()=>[...acoustics.segments].sort((a,b)=>a.beginMs-b.beginMs||a.endMs-b.endMs||a.id.localeCompare(b.id)),[acoustics]);
-  const labels=new Map(sorted.map((s,i)=>[s.id,`S${i+1}`]));
+  const labels=useMemo(()=>new Map(sorted.map((s,i)=>[s.id,`S${i+1}`])),[sorted]);
   const snapAt=(time:number,d:Drag)=>{
     if(!props.snap)return Math.round(time);
     const beat=60000/props.bpm;
@@ -83,14 +94,14 @@ export function VocalTracks(props: Props) {
   const active=selected.length===1?acoustics.segments.find(s=>s.id===selected[0]):undefined;
   const preview=drag?candidate(drag):null;
   const pct=(time:number)=>(time-startMs)/span*100;
-  const upper=energy.data?Math.max(.01,Math.ceil((Math.max(0,...energy.data.values)*1.1-1e-12)*100)/100):null;
+  const upper=energyView?.upper??null;
   return <div data-vocal-tracks data-vocal-focus tabIndex={-1} onPointerDownCapture={e=>{if(adding&&e.currentTarget.contains(e.target as Node))begin(e);}} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel}>
     <VocalFocus active={adding} cancel={cancel}/>
     {toolsHost && createPortal(<><span data-vocal-hint>{adding?'拖动框选新建片段':[props.lineLabel,selected.length===1?labels.get(selected[0]):selected.length?`片段已选 ${selected.length}`:''].filter(Boolean).join(' → ')||'未选择'}</span><button data-role="primary" disabled={adding||!active||!props.selectedLineId} onClick={()=>assign(props.selectedLineId,active)}>分配</button><button data-role="secondary" ref={addButton} disabled={adding} onClick={()=>{props.pause();setAdding(true);setMenu(null);}}>新建人声片段</button></>,toolsHost)}
     {props.children}
     {error&&<p role="alert">{error}</p>}
     {showEnergy && <div className={styles.segmentRow}><strong>能量</strong><div className={styles.energyFrame} data-wheel-zoom>
-      <svg className={styles.energy} viewBox="0 0 1000 55" preserveAspectRatio="none" aria-label="人声能量"><polyline fill="none" stroke="currentColor" strokeWidth="1" points={upper?energy.data!.values.map((v,i)=>`${pct(energy.data!.start_ms+i*energy.data!.step_ms)*10},${54-v/upper*52}`).join(' '):''}/></svg>
+      <svg className={styles.energy} viewBox="0 0 1000 55" preserveAspectRatio="none" aria-label="人声能量"><polyline fill="none" stroke="currentColor" strokeWidth="1" points={upper?energyView!.values.map((v,i)=>`${pct(energyView!.start_ms+i*energyView!.step_ms)*10},${54-v/upper*52}`).join(' '):''}/></svg>
       {upper!==null && <small className={styles.scale}>{upper}</small>}
       {energy.isError && <button className={styles.energyError} data-role="inline" onClick={()=>void energy.refetch()}>能量加载失败 · 重试</button>}
     </div></div>}

@@ -101,6 +101,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const panDrag = useRef<{ x: number; startMs: number; left: number; width: number; pointerId: number; started: boolean } | null>(null);
   const loopDrag = useRef<{ side: 'a' | 'b'; original: LoopState; left: number; width: number; pointerId: number } | null>(null);
   const lastTrackPaint = useRef(0);
+  const lastFollowPaint = useRef(0);
   const positionRef = useRef(0);
   const auditionEnd = useRef<number | null>(null);
   const [duration, setDuration] = useState(
@@ -148,7 +149,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       studioApi.getWaveform(projectId, requestWindow.startMs, requestWindow.endMs, level, signal, graphicVocal),
     enabled: Boolean(asset) && expanded && span > 0 && end > start,
-    staleTime: 60000,
+    staleTime: Infinity, gcTime: 0, retry: false,
+    placeholderData: (data, query) => query?.queryKey[1] === projectId && query.queryKey[2] === graphicVocal && query.queryKey[5] === level ? data : undefined,
   });
   const validLine =
     selectedLine?.begin_ms != null &&
@@ -296,9 +298,12 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         lastTrackPaint.current = performance.now();
       }
       const view = viewportRef.current;
-      if (view.follow && view.span < view.duration) {
+      if (view.follow && view.span < view.duration && performance.now() - lastFollowPaint.current >= 32) {
         const target = Math.max(0, Math.min(view.duration - view.span, current - view.span * 0.35));
-        setStart((value) => Math.abs(target - value) < 0.001 ? target : value + (target - value) * 0.12);
+        const elapsed = Math.min(100, performance.now() - lastFollowPaint.current);
+        lastFollowPaint.current = performance.now();
+        const blend = 1 - Math.exp(-elapsed / 130);
+        setStart((value) => Math.abs(target - value) < 0.001 ? target : value + (target - value) * blend);
       }
       if (auditionEnd.current !== null && current >= auditionEnd.current) {
         auditionEnd.current = null;
@@ -333,8 +338,10 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     const draw = () => {
       const r = c.getBoundingClientRect();
       const scale = ratio;
-      c.width = Math.max(1, Math.round(r.width * scale));
-      c.height = Math.max(1, Math.round(r.height * scale));
+      const pixelWidth = Math.max(1, Math.round(r.width * scale));
+      const pixelHeight = Math.max(1, Math.round(r.height * scale));
+      if (c.width !== pixelWidth) c.width = pixelWidth;
+      if (c.height !== pixelHeight) c.height = pixelHeight;
       const ctx = c.getContext("2d");
       if (!ctx) return;
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -343,16 +350,17 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       if (!d || endMs <= startMs) return;
       ctx.strokeStyle = "#91aee4";
       const view = endMs - startMs;
+      ctx.beginPath();
       d.maximum.forEach((max, i) => {
+        if (d.start_ms + (i + 1) * d.bucket_ms < startMs || d.start_ms + i * d.bucket_ms > endMs) return;
         const min = d.minimum[i] ?? max;
         const x =
           ((d.start_ms + i * d.bucket_ms - startMs) / view) * r.width +
           Math.max(1, (d.bucket_ms / view) * r.width) / 2;
-        ctx.beginPath();
         ctx.moveTo(Math.round(x) + 0.5, ((1 - max) * r.height) / 2);
         ctx.lineTo(Math.round(x) + 0.5, ((1 - min) * r.height) / 2);
-        ctx.stroke();
       });
+      ctx.stroke();
     };
     draw();
   }, [endMs, startMs, waveform.data, width, ratio, timelineHost]);

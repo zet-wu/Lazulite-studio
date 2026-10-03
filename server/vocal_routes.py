@@ -3,7 +3,7 @@ import math
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
-from .studio.media import Asset, probe_media
+from .studio.media import Asset, MediaProbe
 
 def build_vocal_router(runner, *, auth, project_exists):
     router = APIRouter()
@@ -28,7 +28,9 @@ def build_vocal_router(runner, *, auth, project_exists):
         hop = metadata['energy_hop_ms']
         first, last = max(0, int(start_ms / hop)), min(len(values), math.ceil(end_ms / hop))
         stride = max(1, math.ceil((last-first) / buckets))
-        samples = [float(np.max(values[i:min(i+stride,last)])) for i in range(first,last,stride)]
+        # Vectorized reduction keeps a cancelled HTTP request from occupying a worker
+        # for a Python loop over thousands of buckets. Only the requested slice is read.
+        samples = np.maximum.reduceat(values[first:last], np.arange(0, last-first, stride)).tolist() if last > first else []
         return {'start_ms': first*hop, 'step_ms': stride*hop, 'values': samples}
 
     @router.get('/projects/{pid}/vocals/{rid}/file')
@@ -44,4 +46,6 @@ def vocal_asset(runner, pid, rid):
     except KeyError: raise HTTPException(404, '人声结果不存在')
     path = Path(row['directory']) / 'vocals.flac'
     if not path.is_file(): raise HTTPException(404, '人声文件不存在')
-    return Asset(rid, f'vocal-{rid}', path, 'vocals.flac', path.stat().st_size, probe_media(path))
+    # The producer already persisted these properties for this immutable PCM FLAC.
+    probe = MediaProbe(metadata['duration_ms'], 0, metadata['sample_rate'], metadata['channels'], 'flac', 'flac', 'audio/flac')
+    return Asset(rid, f'vocal-{rid}', path, 'vocals.flac', path.stat().st_size, probe)
