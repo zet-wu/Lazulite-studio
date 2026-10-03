@@ -250,3 +250,21 @@ it.each([[0, 500], [2000, 5000], [0, 5000], [null, null]])('P4 background %s–%
   const detached = executeLyricCommand(rebound, { type: 'set-background-of', lineId: source.id, parentLineId: null });
   expect(detached.present.lines.find(line => line.id === source.id)).toMatchObject({ backgroundOf: null, beginMs, endMs, words: source.words });
 });
+
+it('moves ruby groups within a line atomically, preserving identity and out-of-parent timing',()=>{
+ const d=createLyricDocument('元'),l=d.lines[0],source=l.words[0],target=createWord('先','target');l.words.push(target);target.beginMs=900;target.endMs=1000;
+ source.rubyUnits=[{id:'a',reading:'あ',beginMs:10,endMs:100},{id:'b',reading:'い',beginMs:100,endMs:200},{id:'c',reading:'う',beginMs:null,endMs:300}];
+ target.rubyUnits=[{id:'x',reading:'え',beginMs:950,endMs:990}];
+ const command={type:'move-ruby' as const,lineId:l.id,wordId:source.id,toWordId:target.id,rubyId:'c',rubyIds:['c','a'],afterRubyId:'x'};
+ const state=executeLyricCommand(createLyricEditorState(d),command);
+ expect(state.present.lines[0].words[0].rubyUnits.map(u=>u.id)).toEqual(['b']);
+ expect(state.present.lines[0].words[1].rubyUnits).toEqual([target.rubyUnits[0],source.rubyUnits[0],source.rubyUnits[2]]);
+ expect(state.present.lines[0].words[1]).toMatchObject({text:'先',beginMs:900,endMs:1000});
+ expect(undoLyricCommand(state).present).toBe(d);expect(redoLyricCommand(undoLyricCommand(state)).present).toBe(state.present);
+ const empty=executeLyricCommand(state,{...command,rubyId:'b',rubyIds:['b'],afterRubyId:null});expect(empty.present.lines[0].words[0].rubyUnits).toEqual([]);
+ const bg=createLine('背景','bg');bg.backgroundOf=l.id;d.lines.push(bg);
+ expect(()=>executeLyricCommand(createLyricEditorState(d),{...command,toWordId:bg.words[0].id})).toThrow('同一歌词行');
+ expect(()=>executeLyricCommand(createLyricEditorState(d),{...command,rubyIds:['missing']})).toThrow('不存在');
+ expect(()=>executeLyricCommand(createLyricEditorState(d),{...command,afterRubyId:'missing'})).toThrow('目标位置');
+ expect(executeLyricCommand(createLyricEditorState(d),{...command,toWordId:source.id,rubyId:'a',rubyIds:['a','b'],afterRubyId:null}).present).toBe(d);
+});

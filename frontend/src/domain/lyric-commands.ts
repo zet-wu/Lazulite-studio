@@ -51,7 +51,7 @@ type AtomicLyricCommand =
   | { type: 'add-ruby'; lineId: string; wordId: string; reading: string; rubyId?: string }
   | { type: 'insert-ruby'; lineId: string; wordId: string; afterRubyId: string | null; reading: string; rubyId?: string }
   | { type: 'merge-ruby'; lineId: string; wordId: string; firstRubyId: string; secondRubyId: string }
-  | { type: 'move-ruby'; lineId: string; wordId: string; rubyId: string; afterRubyId: string | null }
+  | { type: 'move-ruby'; lineId: string; wordId: string; rubyId: string; rubyIds?: string[]; toWordId?: string; afterRubyId: string | null }
   | { type: 'set-ruby-units'; lineId: string; wordId: string; units: RubyUnit[]; overwrite?: boolean }
   | { type: 'redistribute-ruby-time'; lineId: string; wordId: string }
   | { type: 'set-word-empty-beat'; lineId: string; wordId: string; emptyBeat: number }
@@ -61,7 +61,7 @@ type AtomicLyricCommand =
   | { type: 'set-ruby-time'; lineId: string; wordId: string; rubyId: string; beginMs: TimeMs; endMs: TimeMs };
 
 export type LyricCommand = AtomicLyricCommand | { type: 'batch'; commands: AtomicLyricCommand[] };
-type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'merge-ruby' | 'move-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
+type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'merge-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
 
 export type LyricEditorState = { present: LyricDocument; past: LyricDocument[]; future: LyricDocument[] };
 
@@ -542,6 +542,24 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (command.agents.some((agent) => !/^[A-Za-z_][\w.-]*$/.test(agent.id)) || new Set(command.agents.map((agent) => agent.id)).size !== command.agents.length) throw new Error('Invalid or duplicate agent ID');
       if (document.lines.some((line) => line.agentRefs.some((ref) => !command.agents.some((agent) => agent.id === ref)))) throw new Error('An assigned agent cannot be removed');
       return { ...document, agents: command.agents };
+    case 'move-ruby': {
+      const line = document.lines.find(line => line.id === command.lineId);
+      const source = line?.words.find(word => word.id === command.wordId);
+      const target = line?.words.find(word => word.id === (command.toWordId ?? command.wordId));
+      if (!line || !source || !target) throw new Error('读音只能移到同一歌词行中的正文词');
+      const ids = new Set(command.rubyIds ?? [command.rubyId]);
+      const units = source.rubyUnits.filter(unit => ids.has(unit.id));
+      if (!ids.has(command.rubyId) || !units.length || units.length !== ids.size) throw new Error('读音单元不存在');
+      if (source === target && command.afterRubyId !== null && ids.has(command.afterRubyId)) return document;
+      const remaining = target.rubyUnits.filter(unit => source !== target || !ids.has(unit.id));
+      const after = command.afterRubyId === null ? -1 : remaining.findIndex(unit => unit.id === command.afterRubyId);
+      if (command.afterRubyId !== null && after < 0) throw new Error('读音目标位置不存在');
+      remaining.splice(after + 1, 0, ...units);
+      if (source === target && remaining.every((unit, index) => unit === source.rubyUnits[index])) return document;
+      const words = line.words.map(word => word === target ? { ...word, rubyUnits: remaining }
+        : word === source ? { ...word, rubyUnits: word.rubyUnits.filter(unit => !ids.has(unit.id)) } : word);
+      return { ...document, lines: document.lines.map(item => item === line ? { ...line, words } : item) };
+    }
     case 'replace-document':
       return command.document;
     default:
@@ -599,17 +617,6 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
         const ends = [left.endMs, right.endMs].filter((value): value is number => value !== null);
         const rubyUnits = word.rubyUnits.slice();
         rubyUnits.splice(first, 2, { ...left, reading: left.reading + right.reading, beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null });
-        return [{ ...word, rubyUnits }];
-      }
-      case 'move-ruby': {
-        if (wordCommand.afterRubyId === wordCommand.rubyId) return [word];
-        const rubyUnits = word.rubyUnits.slice();
-        const index = rubyUnits.findIndex((unit) => unit.id === wordCommand.rubyId);
-        if (index < 0) throw new Error('读音单元不存在');
-        const [unit] = rubyUnits.splice(index, 1);
-        const after = wordCommand.afterRubyId === null ? -1 : rubyUnits.findIndex((item) => item.id === wordCommand.afterRubyId);
-        if (wordCommand.afterRubyId !== null && after < 0) throw new Error('读音目标位置不存在');
-        rubyUnits.splice(after + 1, 0, unit);
         return [{ ...word, rubyUnits }];
       }
       case 'set-ruby-units': {

@@ -604,7 +604,10 @@ export function EditorWorkspace(props: Props) {
         selectLine(clicked, false, toggle); if (element.closest('[data-outline-drag]')) requestLocate(clicked.id);
       }
       else if (source.kind === 'word') selectWord(line, line.words.find(word => word.id === source.wordId)!, false, toggle);
-      else if (source.kind === 'ruby') selectRuby(line, line.words.find(word => word.id === source.wordId)!, source.rubyId, false, toggle);
+      else if (source.kind === 'ruby') {
+        if (!toggle && selection?.kind === 'ruby' && selection.lineId === source.lineId && selection.wordId === source.wordId && selection.ids.includes(source.rubyId)) source.rubyIds = selection.ids;
+        else selectRuby(line, line.words.find(word => word.id === source.wordId)!, source.rubyId, false, toggle);
+      }
       else if (source.kind === 'romanization-content') selectRomanizationContent(line.id, source.trackId, source.contentId, false, toggle);
       else selectRomanizationUnit(line.id, source.trackId, source.contentId, source.unitId, false, toggle);
       drag.start(source, node, event.pointerId, event.clientX, event.clientY, event.altKey || event.ctrlKey && !event.metaKey);

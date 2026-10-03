@@ -5,14 +5,14 @@ import { copySelection, moveWordsAcrossLine, pasteRich, type EditorSelection } f
 import styles from './semantic-editor.module.css';
 
 export type DragSource = { kind: 'line'; lineId: string } | { kind: 'word'; lineId: string; wordId: string }
-  | { kind: 'ruby'; lineId: string; wordId: string; rubyId: string }
+  | { kind: 'ruby'; lineId: string; wordId: string; rubyId: string; rubyIds?: string[] }
   | { kind: 'romanization-content'; lineId: string; trackId: string; contentId: string }
   | { kind: 'romanization-unit'; lineId: string; trackId: string; contentId: string; unitId: string };
-export type DragSlot = { lineId: string; afterId: string | null };
+export type DragSlot = { lineId: string; wordId?: string; afterId: string | null };
 const attribute = (source: DragSource) => source.kind === 'line' ? 'data-line-id' : source.kind === 'word' ? 'data-word-id' : source.kind === 'ruby' ? 'data-ruby-id' : source.kind === 'romanization-content' ? 'data-romanization-content-id' : 'data-romanization-unit-id';
 const sourceId = (source: DragSource) => source.kind === 'line' ? source.lineId : source.kind === 'word' ? source.wordId : source.kind === 'ruby' ? source.rubyId : source.kind === 'romanization-content' ? source.contentId : source.unitId;
 export function dragSelection(source: DragSource): EditorSelection {
-  const id = sourceId(source), common = { ids: [id], anchorId: id, activeId: id };
+  const id = sourceId(source), common = { ids: source.kind === 'ruby' ? source.rubyIds ?? [id] : [id], anchorId: id, activeId: id };
   if (source.kind === 'line') return { kind: 'lines', ...common };
   if (source.kind === 'word') return { kind: 'words', lineId: source.lineId, ...common };
   return { ...source, ...common };
@@ -36,7 +36,11 @@ export function dragCommand(document: LyricDocument, source: DragSource, slot: D
   switch (source.kind) {
     case 'line': return { command: { type: 'move-line', lineId: source.lineId, afterLineId: slot.afterId }, selection };
     case 'word': return { command: source.lineId === slot.lineId ? { type: 'move-word', lineId: source.lineId, wordId: source.wordId, toLineId: slot.lineId, afterWordId: slot.afterId } : moveWordsAcrossLine(document, selection as Extract<EditorSelection, { kind: 'words' }>, slot.lineId, slot.afterId), selection: { ...selection, lineId: slot.lineId } as EditorSelection };
-    case 'ruby': return { command: { type: 'move-ruby', lineId: source.lineId, wordId: source.wordId, rubyId: source.rubyId, afterRubyId: slot.afterId }, selection };
+    case 'ruby': {
+      if (slot.lineId !== source.lineId) throw new Error('读音不能跨歌词行移动');
+      const wordId = slot.wordId ?? source.wordId;
+      return { command: { type: 'move-ruby', lineId: source.lineId, wordId: source.wordId, toWordId: wordId, rubyId: source.rubyId, rubyIds: source.rubyIds, afterRubyId: slot.afterId }, selection: { ...selection, wordId } as EditorSelection };
+    }
     case 'romanization-content': return { command: { type: 'move-romanization-content', trackId: source.trackId, contentId: source.contentId, lineId: source.lineId, afterContentId: slot.afterId }, selection };
     case 'romanization-unit': return { command: { type: 'move-romanization-unit', trackId: source.trackId, contentId: source.contentId, unitId: source.unitId, afterUnitId: slot.afterId }, selection };
   }
@@ -108,6 +112,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     const line = shown.lines.find(line => line.id === lineNode?.dataset.lineId);
     let nodes: HTMLElement[], ids: string[], container: HTMLElement | null;
     let lineId = line?.id ?? source.lineId;
+    let wordId: string | undefined;
     if (source.kind === 'line') {
       container = element.closest<HTMLElement>(`[aria-label="歌词列表"], .${styles.outline} .${styles.panelBody}`);
       if (!container) return null;
@@ -126,8 +131,9 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
       if (lineId !== source.lineId || !lineNode) return null;
       if (source.kind === 'ruby') {
         container = element.closest<HTMLElement>('[data-word-id]');
-        if (container?.dataset.wordId !== source.wordId) return null;
-        ids = line!.words.find(word => word.id === source.wordId)!.rubyUnits.map(unit => unit.id);
+        if (!container || !line) return null;
+        wordId = container.dataset.wordId;
+        ids = line.words.find(word => word.id === wordId)!.rubyUnits.map(unit => unit.id);
       } else {
         const track = shown.romanizationTracks.find(track => track.id === source.trackId)!;
         if (source.kind === 'romanization-content') {
@@ -144,12 +150,12 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
       }
       nodes = [...container!.querySelectorAll<HTMLElement>(`[${attribute(source)}]`)];
     }
-    const excluded = current.copy && (source.kind === 'line' || source.kind === 'word') ? new Set<string>() : new Set([sourceId(source)]);
+    const excluded = current.copy && (source.kind === 'line' || source.kind === 'word') ? new Set<string>() : new Set(source.kind === 'ruby' ? source.rubyIds ?? [source.rubyId] : [sourceId(source)]);
     current.preview?.placeholders.forEach(id => excluded.add(id));
     ids = ids.filter(id => !excluded.has(id));
     const allowedIds = new Set(ids);
     nodes = nodes.filter(node => allowedIds.has(node.getAttribute(attribute(source))!));
-    if (!nodes.length) return { lineId, afterId: null };
+    if (!nodes.length) return { lineId, wordId, afterId: null };
     // Nearest rectangle in both axes handles wrapped words/注音 instead of assuming one horizontal row.
     const vertical = source.kind === 'line' || source.kind === 'romanization-content';
     const ranked = nodes.map(node => {
@@ -167,7 +173,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     const id = node.getAttribute(attribute(source))!;
     const before = vertical ? current.y < rect.top + rect.height / 2 : current.y < rect.top || current.y <= rect.bottom && current.x < rect.left + rect.width / 2;
     if (source.kind === 'line') lineId = id;
-    return { lineId, afterId: before ? ids[ids.indexOf(id) - 1] ?? null : id };
+    return { lineId, wordId, afterId: before ? ids[ids.indexOf(id) - 1] ?? null : id };
   };
   const tick = () => {
     const current = session.current; if (!current?.started) return;
@@ -185,7 +191,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     const resolved = resolve(current);
     const slot = resolved === 'hold' && current.copy !== current.appliedCopy ? current.slot : resolved;
     if (slot !== 'hold') {
-      const key = slot ? `${slot.lineId}:${slot.afterId}:${current.copy}` : '';
+      const key = slot ? `${slot.lineId}:${slot.wordId}:${slot.afterId}:${current.copy}` : '';
       if (key !== current.key) {
         current.key = key; current.slot = slot; current.appliedCopy = current.copy;
         delete current.ghost!.dataset.dropError;
@@ -232,7 +238,13 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     if (current?.started) { cancelAnimationFrame(current.frame); tick(); }
     const result = current?.preview;
     cleanup(); setPreview(null);
-    if (result && latest.current.apply(result.command)) latest.current.select(result.selection);
+    if (result && latest.current.apply(result.command)) {
+      latest.current.select(result.selection);
+      if (result.selection.kind === 'ruby') {
+        const id = result.selection.activeId;
+        requestAnimationFrame(() => root.current?.querySelector<HTMLElement>(`[data-ruby-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: true }));
+      }
+    }
     window.setTimeout(() => { suppressClick.current = false; }, 0);
   };
   return { document: preview?.document ?? document, placeholders: preview ? { kind: preview.kind, ids: preview.placeholders } : null,
