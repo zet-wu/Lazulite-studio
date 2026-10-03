@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-2026-10-03 更新至日文注音 Phase 1。执行依据见[本轮方案](../../lyric-workflow/docs/studio-ruby-review/Review-phase1/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
+2026-10-03 更新至日文注音 Phase 2 时间轴整改。执行依据见[本轮方案](../../lyric-workflow/docs/studio-ruby-review/Review-phase2/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
 
 ## 1. 应用与目录
 
