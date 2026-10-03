@@ -558,7 +558,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           </button>)}
         </div>
 </>);
-  const acousticPlots=(<>
+  const acousticPlots=(<div>
       <div className={styles.ruler} aria-label="时间标尺" onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={() => { panDrag.current = null; }}>{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
       <div className={styles.waveRow}>
         <div className={styles.sourceLabel}><Select aria-label="波形／声谱图音源" title="波形／声谱图音源" value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">原曲</option>{vocalId && <option value="vocal">人声</option>}</Select></div>
@@ -597,7 +597,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         {bandA != null && bandB != null && (bandB >= start && bandB <= end || loopDrag.current?.side === 'b') && <span data-loop-handle="b" className={styles.loopHandle} role="slider" tabIndex={0} aria-label="循环 B 边界" aria-valuemin={bandA} aria-valuemax={duration} aria-valuenow={bandB}
           style={{ left: `${Math.max(0, Math.min(100, ((bandB - start) / span) * 100))}%` }} onPointerDown={(event) => beginLoopDrag(event, 'b')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={(event) => endLoopDrag(event, true)} />}
       </div></div>
-  </>);
+  </div>);
   const plots = (
       <div id="timeline-plots" ref={plotsRef} className={styles.timelinePlots}>
         <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>

@@ -30,13 +30,13 @@ it('packs only visible intervals, retains crossing objects and freezes editing l
   const { rerender } = render(<TimelineTracks {...props} />);
   const bar = screen.getByRole('button', { name: '时间轴行 L3' });
   const lane = bar.parentElement!;
-  expect(lane.style.height).toBe('44px'); expect(bar.style.top).toBe('1px');
+  expect(lane.style.height).toBe('calc(2 * var(--timeline-lane-height))'); expect(bar.style.top).toBe('calc(0 * var(--timeline-lane-height) + var(--timeline-bar-inset))');
   bar.setPointerCapture = vi.fn();
   fireEvent.pointerDown(bar, { clientX: 100, pointerId: 1 });
   rerender(<TimelineTracks {...props} startMs={5.5e3} endMs={7e3} />);
-  expect(lane.style.height).toBe('44px'); expect(bar.style.top).toBe('1px');
+  expect(lane.style.height).toBe('calc(2 * var(--timeline-lane-height))'); expect(bar.style.top).toBe('calc(0 * var(--timeline-lane-height) + var(--timeline-bar-inset))');
   fireEvent.keyDown(window, { key: 'Escape' });
-  expect(lane.style.height).toBe('22px');
+  expect(lane.style.height).toBe('calc(1 * var(--timeline-lane-height))');
   expect(screen.getByRole('button', { name: '时间轴行 L3' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '时间轴行 L1' })).not.toBeInTheDocument();
   cleanup(); vi.unstubAllGlobals();

@@ -4,9 +4,9 @@
 .main { min-width: 0; overflow: auto; }
 .host { --timeline-label-width: 52px; --timeline-gap: 5px; padding: 12px; }
 .host :global(#timeline-plots) { max-height: none; }
-.segmentRow { display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 5px; margin: 8px 0; position: relative; }
-.lane { position: relative; min-height: 26px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); touch-action: none; overflow: hidden; }
-.segment.segment[data-role] { min-height:18px; font-size:10px; position: absolute; height: 18px; min-width: 0; padding: 0; border: 1px solid var(--vocal-ink); border-radius: 3px; background: var(--vocal-fill); color: var(--ink); cursor: grab; overflow: hidden; }
+.segmentRow { display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 5px; margin: 0; position: relative; }
+.lane { position: relative; min-height: var(--timeline-lane-height); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); touch-action: none; overflow: hidden; }
+.segment.segment[data-role] { min-height:var(--timeline-bar-height); font-size:10px; position: absolute; height: var(--timeline-bar-height); display:flex; align-items:center; min-width: 0; padding: 0; border: 0; box-shadow:inset 0 0 0 1px var(--vocal-ink); border-radius: 3px; background: var(--vocal-fill); color: var(--ink); cursor: grab; overflow: hidden; }
 .segment > span:first-child { white-space: nowrap; }
 .segment[aria-pressed=true] { outline: 2px solid var(--primary, #3367ab); outline-offset: -3px; }
 .edge { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; background: color-mix(in srgb,var(--vocal-ink) 35%,transparent); }
@@ -26,9 +26,12 @@
 
 :global(:root) { --vocal-ink:#896644; --vocal-fill:#dfcbb3; }
 :global([data-theme="dark"]) { --vocal-ink:#d5b18c; --vocal-fill:#594633; }
-.segmentRow > strong { font-size:10px; color:var(--muted); align-self:center; }
+.segmentRow > strong { font-size:10px; color:var(--muted); align-self:center; padding-left:var(--timeline-label-inset); }
 .segmentRow { grid-template-columns:var(--timeline-label-width,36px) minmax(0,1fr); gap:var(--timeline-gap,5px); }
 .energyFrame { position:relative; box-shadow:inset 0 0 0 1px var(--line); border-radius:4px; background:var(--panel); height:55px; color:var(--vocal-ink); overflow:hidden; }
 .scale { position:absolute; top:2px; left:5px; font-size:10px; color:var(--muted); pointer-events:none; }
 .energyError { position:absolute; inset:10px; }
 :global([data-vocal-focus]):focus { outline:none; }
+
+.tracks { display:grid; gap:var(--timeline-row-gap); }
+.segment:focus-visible { outline:2px solid var(--blue); outline-offset:-2px; }

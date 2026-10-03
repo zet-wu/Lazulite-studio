@@ -118,7 +118,7 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
     const narrow = (Math.min(endMs, propsEndMs) - clippedBegin) / spanMs * plotWidth < 16;
     return <div key={key} data-timeline-key={key}
       className={`${styles.trackBar} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${positionMs >= beginMs && positionMs < endMs ? styles.trackPlaying : ''}`} role="button" tabIndex={0} aria-label={label}
-      style={{ left: pct(clippedBegin), width: `${(right - clippedBegin) / spanMs * 100}%`, top: 1 + (layout.lanes.get(key) ?? 0) * 22, height: 20 }}
+      style={{ left: pct(clippedBegin), width: `${(right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
       onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { dragRef.current = null; setDrag(null); }}
       onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); if (target.kind === 'line') onSelectLine(target.lineId); } }}>
       {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanMs * plotWidth }} /><span className={styles.narrowMarker} title="窄区间，请用时间轴缩放后调整边界" /></>}
@@ -127,7 +127,7 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
       {!narrow && endMs <= propsEndMs && <span className={styles.trackHandle} aria-label={`${label}结束边界`} onPointerDown={(event) => begin(event, target, 'endMs', endMs)} onPointerMove={move} onPointerUp={finish} />}
     </div>;
   };
-  const row = (name: string, content: React.ReactNode, selectable = false, laneCount = 1) => <div className={styles.trackRow} key={name}><strong>{name}</strong><div data-track-lane className={styles.trackLane} style={{ height: Math.max(1, laneCount) * 22 }}
+  const row = (name: string, content: React.ReactNode, selectable = false, laneCount = 1) => <div className={styles.trackRow} key={name}><strong>{name}</strong><div data-track-lane className={styles.trackLane} style={{ height: `calc(${Math.max(1, laneCount)} * var(--timeline-lane-height))` }}
     onPointerDown={(event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); begin(event, null, selectable && event.shiftKey ? 'select' : 'pan', selectable && event.shiftKey ? startMs + Math.round((event.clientX - rect.left) / rect.width * spanMs) : startMs); } }}
     onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { dragRef.current = null; setDrag(null); }}>
     {content}{drag && drag.side !== 'pan' && <span className={styles.dragGuide} style={{ left: pct(drag.originalMs + Math.round((drag.current - drag.x) / drag.width * spanMs)) }} />}</div></div>;
