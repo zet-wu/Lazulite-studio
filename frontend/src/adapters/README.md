@@ -15,3 +15,5 @@
 `project-codec.ts` 在保存边界将结构化歌词与 lyrics.draftTtml 互转；HTTP document v3 保存项目 JSON。人声列表/能量使用生成类型，媒体窗口按 vocal 结果 ID 选源，不接受客户端路径。
 
 `http/reading.ts` 发送当前所选行 ID 与原始正文到 `/reading/analyze`，不需要项目、修订或音译。响应范围为 Unicode code point，未覆盖区间显式返回空读音。草稿不再读写 `studio:alignments`；含该废弃属性的旧文件按不支持结构拒绝，不提供迁移层。
+
+背景正文解析先识别 x-translation／x-roman，不将附属内容送入正文词解析。背景歌手直接从 span 的 ttm:agent 读取并校验；缺省为空。翻译导出为正文背景内 x-translation；有序音译统一导出到头部，在父行 text for 下用 x-bg 区分背景，普通／定时内容沿用原始语言、时间和空白。相邻主行／背景内容共用 text，其他内容保留顺序及独立 text，只有背景时不创建主行内容；草稿保留内容 kind 和稳定 ID。导入也支持头部背景翻译与普通／定时内嵌音译。装饰括号只剥离背景正文或音译最外层一对。

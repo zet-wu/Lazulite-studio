@@ -95,3 +95,19 @@ test('segment end snapping projects the moved start and group bounds clamp every
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(first).toHaveAttribute('aria-label', /1000–3270/); await expect(second).toHaveAttribute('aria-label', /7000–14000/);
 });
+
+test('pointer cancel, hidden source and mode unmount clear a pending preview without editing', async ({ page }) => {
+  await loadTimeline(page, true);
+  const segment = page.locator('[data-segment-id="s1"]');
+  await drag(page, segment, .03); await guides(page);
+  await segment.dispatchEvent('pointercancel', { pointerId: 1 }); await page.mouse.up();
+  await expect(page.locator('[data-drag-guide]')).toHaveCount(0); await expect(segment).toHaveAttribute('aria-label', /1000–3000/);
+  await drag(page, segment, .03); await guides(page);
+  await page.getByRole('button', { name: '片段', exact: true }).evaluate((el: HTMLButtonElement) => el.click()); await page.mouse.up();
+  await expect(page.locator('[data-drag-guide]')).toHaveCount(0);
+  await page.getByRole('button', { name: '片段', exact: true }).click(); await expect(segment).toHaveAttribute('aria-label', /1000–3000/);
+  await drag(page, segment, .03); await guides(page);
+  await page.getByRole('button', { name: '编辑', exact: true }).evaluate((el: HTMLButtonElement) => el.click()); await page.mouse.up();
+  await expect(page.locator('[data-drag-guide]')).toHaveCount(0);
+  await page.getByRole('button', { name: '音频处理', exact: true }).click(); await expect(segment).toHaveAttribute('aria-label', /1000–3000/);
+});

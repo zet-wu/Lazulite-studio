@@ -58,3 +58,17 @@ test('background content transfer and clipboard deletion preserve its parent', a
   await expect(bg.getByRole('textbox', { name: '词 か', exact: true })).toHaveValue('か');
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(bg.locator('[data-romanization-content-id]')).toHaveCount(1);
 });
+
+test('AMLL renders background sublyrics while its singer layout remains a consumer projection', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await load(page);
+  await page.getByRole('button', { name: '收起时间轴', exact: true }).click();
+  await page.getByRole('button', { name: '预览', exact: true }).click();
+  const player = page.locator('.amll-lyric-player');
+  await expect(player.getByText('背景译文', { exact: true })).toBeInViewport(); await expect(player).toContainText('主行译文');
+  await expect(player).toContainText('ka'); await expect(player).toContainText('na');
+  const geometry = await player.evaluate(el => Array.from(el.querySelectorAll('*')).filter(node => node.childElementCount === 0 && ['主行译文', '背景译文'].includes(node.textContent ?? '')).map(node => ({ text: node.textContent, x: node.getBoundingClientRect().x, width: node.getBoundingClientRect().width, parentClass: node.parentElement?.className })));
+  const { writeFile } = await import('node:fs/promises');
+  await writeFile(test.info().outputPath('background-preview.json'), JSON.stringify(geometry, null, 2));
+  await page.screenshot({ path: test.info().outputPath('background-preview.png') });
+});
