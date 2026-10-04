@@ -8,9 +8,11 @@ export function validateLanguageTag(language: string | null): void {
 }
 
 export function nonemptyTranslations(items: SubLyric[]): SubLyric[] {
+  const contentIds = new Set<string>();
   return items.filter(item => item.kind === 'timed' || translationText(item).trim()).map(item => {
     validateLanguageTag(item.language);
-    if (!item.id || !['subtitle', 'replacement'].includes(item.purpose)) throw new Error('翻译标识或用途无效');
+    if (!item.id || contentIds.has(item.id) || !item.trackId || !Number.isSafeInteger(item.trackOrder) || item.trackOrder < 0 || !Number.isSafeInteger(item.contentOrder) || item.contentOrder < 0 || !['subtitle', 'replacement'].includes(item.purpose)) throw new Error('翻译标识或用途无效');
+    contentIds.add(item.id);
     if (item.kind === 'timed') {
       const ids = new Set<string>();
       for (const unit of item.units) {
