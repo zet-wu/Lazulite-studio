@@ -1,3 +1,5 @@
+import { plainTranslation } from '../domain/lyric-document';
+import { translationText } from '../domain/lyric-document';
 import { parseWordFormat, parseLrcSource } from './source-codec';
 import { assertOutputDocument } from './output-validation';
 import { renderLrc } from './lrc';
@@ -47,7 +49,7 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
     line.words = item.words.map((word) => ({ ...createWord(word.word), beginMs: milliseconds(word.startTime), endMs: milliseconds(word.endTime) }));
     const romanUnits = item.words.filter((word) => word.romanWord !== undefined).map((word) => ({ id: crypto.randomUUID(), text: word.romanWord ?? '', beginMs: milliseconds(word.startTime), endMs: milliseconds(word.endTime) }));
     if (romanUnits.length) timedTrack.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'timed', units: romanUnits });
-    line.translations = item.translatedLyric ? [{ language: null, text: item.translatedLyric }] : [];
+    line.translations = item.translatedLyric ? [plainTranslation(item.translatedLyric)] : [];
     if (item.romanLyric) plainTrack.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: item.romanLyric });
     return line;
   });
@@ -72,7 +74,7 @@ export function exportLyricFile(document: LyricDocument, format: LyricFormat): s
       return { word: word.text, startTime: begin, endTime: end, romanWord: preview.get(line.id)?.words[index]?.romanWord };
     });
     return { words, startTime: line.beginMs, endTime: line.endMs,
-      translatedLyric: line.translations.map((item) => item.text).join(' / '), romanLyric: preview.get(line.id)?.romanLyric ?? '', isBG: Boolean(line.backgroundOf), isDuet: preview.get(line.id)?.isDuet ?? false };
+      translatedLyric: line.translations.map(translationText).join(' / '), romanLyric: preview.get(line.id)?.romanLyric ?? '', isBG: Boolean(line.backgroundOf), isDuet: preview.get(line.id)?.isDuet ?? false };
   });
   return stringifyTimed[format](lines);
 }

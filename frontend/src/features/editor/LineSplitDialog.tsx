@@ -1,3 +1,4 @@
+import { translationText } from '../../domain/lyric-document';
 import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
 import { useState } from 'react';
@@ -30,13 +31,13 @@ export function LineSplitDialog({ line, background, attached, close, submit }: {
         const time = (value: number | null) => value === null ? '未定' : `${(value / 1e3).toFixed(3)}s`;
         return <section key={String(isRight)}><small>{isRight ? '后行' : '前行'} · {time(begin)} – {time(end)}</small>
           <p>{words.map(word => word.text).join('')}</p>
-          {line.translations.filter((_, index) => rightTranslations.includes(index) === isRight).map((item, index) => <small key={index}>{item.language ?? '未指定语言'} · {item.text}</small>)}
+          {line.translations.filter((_, index) => rightTranslations.includes(index) === isRight).map((item, index) => <small key={index}>{item.language ?? '未指定语言'} · {translationText(item)}</small>)}
           {attached.filter(({ content }) => rightIds.includes(content.id) === isRight).map(({ content, track }) => <small key={content.id}>{track.language ?? '未指定语言'} · {content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</small>)}
           {background && (backgroundTarget === 'right') === isRight && <small>背景 · {lineText(background)}</small>}
         </section>;
       })}</div>
       {line.translations.length > 0 && <fieldset><legend>翻译归属</legend>{line.translations.map((item, index) => <label key={index} className={styles.splitAssignment}>
-        <span>{item.language ?? '未指定语言'} · {item.text}</span>
+        <span>{item.language ?? '未指定语言'} · {translationText(item)}</span>
         <Select aria-label={`翻译 ${index + 1}归属`} value={rightTranslations.includes(index) ? 'right' : 'left'} onChange={event => setRightTranslations(indices => event.target.value === 'right' ? [...indices, index] : indices.filter(i => i !== index))}>
           <option value="left">前行</option><option value="right">后行</option>
         </Select>

@@ -1,5 +1,5 @@
 import { nonemptyTranslations } from '../../domain/sublyrics';
-import { createWord, LYRIC_SCHEMA_VERSION, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RomanizationUnit, type RubyUnit, type TimeMs } from '../../domain/lyric-document';
+import { plainTranslation, createWord, LYRIC_SCHEMA_VERSION, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RomanizationUnit, type RubyUnit, type TimeMs } from '../../domain/lyric-document';
 
 const TTML = 'http://www.w3.org/ns/ttml';
 const TTS = 'http://www.w3.org/ns/ttml#styling';
@@ -7,11 +7,12 @@ const TTM = 'http://www.w3.org/ns/ttml#metadata';
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const STUDIO = 'urn:lazulite:studio:draft';
 const ITUNES = 'http://music.apple.com/lyric-ttml-internal';
+const ITUNES_EXT = 'http://itunes.apple.com/lyric-ttml-extensions';
 const AMLL = 'http://www.example.com/ns/amll';
 const MAX_BYTES = 2 * 1024 * 1024;
 
-const attr = (node: Element, ns: string | null, name: string) => node.getAttributeNS(ns, name);
-const is = (node: Element, ns: string, name: string) => (node.namespaceURI === ns || ns === TTML && node.namespaceURI === null) && node.localName === name;
+const attr = (node: Element, ns: string | null, name: string) => node.getAttributeNS(ns, name) ?? (ns === ITUNES ? node.getAttributeNS(ITUNES_EXT, name) : null);
+const is = (node: Element, ns: string, name: string) => (node.namespaceURI === ns || ns === TTML && node.namespaceURI === null || ns === ITUNES && (node.namespaceURI === TTML || node.namespaceURI === null)) && node.localName === name;
 
 function readAgent(node: Element): LyricAgent {
   const id = attr(node, XML, 'id');
@@ -92,8 +93,8 @@ function checkAttributes(node: Element, allowed: string[]) {
     if (attribute.namespaceURI === TTS && attribute.localName === 'ruby') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'role') continue;
-    if (attribute.namespaceURI === ITUNES && ['key', 'timing', 'songPart'].includes(attribute.localName)) continue;
-    if (attribute.namespaceURI === STUDIO && ['id', 'kind', 'null', 'endLink', 'emptyBeat', 'ignoreSync'].includes(attribute.localName)) continue;
+    if ([ITUNES, ITUNES_EXT].includes(attribute.namespaceURI ?? '') && ['key', 'timing', 'songPart'].includes(attribute.localName)) continue;
+    if (attribute.namespaceURI === STUDIO && ['id', 'kind', 'null', 'endLink', 'emptyBeat', 'ignoreSync', 'order'].includes(attribute.localName)) continue;
     throw new Error(`Unsupported TTML attribute ${attribute.name} on <${node.localName}>`);
   }
 }
@@ -211,6 +212,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
   const agents: LyricAgent[] = [];
   const metadata: Record<string, string[]> = Object.create(null);
   const lines: LyricLine[] = [];
+  let translationTrackOrder = 0;
   const appleTranslations = new Map<string, LyricLine['translations']>();
   const romanizationTracks: RomanizationTrack[] = [];
   const backgroundContents: Array<{ parentId: string; content: RomanizationContent }> = [];
@@ -231,7 +233,12 @@ export function parseLyricTtml(xml: string): LyricDocument {
         }
         const translation = is(group, ITUNES, 'translations');
         if (!is(entry, ITUNES, translation ? 'translation' : 'transliteration')) throw new Error(`Unsupported iTunes sublyric <${entry.localName}>`);
-        checkAttributes(entry, []);
+        checkAttributes(entry, translation ? ['type'] : []);
+        const purpose = attr(entry, null, 'type') ?? 'subtitle';
+        const translationTrackId = attr(entry, STUDIO, 'id') ?? crypto.randomUUID();
+        const trackOrder = Number(attr(entry, STUDIO, 'order') ?? translationTrackOrder++);
+        let contentOrder = 0;
+        if (translation && purpose !== 'subtitle' && purpose !== 'replacement') throw new Error('Unsupported translation type');
         const track: RomanizationTrack | null = translation ? null : {
           id: attr(entry, STUDIO, 'id') ?? crypto.randomUUID(),
           language: attr(entry, XML, 'lang'), contents: [],
@@ -251,8 +258,11 @@ export function parseLyricTtml(xml: string): LyricDocument {
             if (part.background && !is(part.node, ITUNES, 'span')) throw new Error('Unsupported background sublyric node');
             checkAttributes(part.node, part.background ? [] : ['for']);
             if (translation) {
-              const value = { language: attr(entry, XML, 'lang'), text: textOnly(part.node, 'iTunes translation') };
-              if (part.background) { value.text = stripDecoration(value.text); backgroundTranslations.push({ parentId: lineId, value }); }
+              const content = readRomanization(part.node, lineId, absoluteTimes, part.node.namespaceURI ?? ITUNES);
+              if (part.background) stripContentDecoration(content);
+              const translationIdentity = { trackId: translationTrackId, trackOrder, contentOrder: Number(attr(part.node, STUDIO, 'order') ?? contentOrder++) };
+              const value: LyricLine['translations'][number] = content.kind === 'plain' ? { ...translationIdentity, id: content.id, language: attr(entry, XML, 'lang'), purpose: purpose as 'subtitle' | 'replacement', kind: 'plain', text: content.text } : { ...translationIdentity, id: content.id, language: attr(entry, XML, 'lang'), purpose: purpose as 'subtitle' | 'replacement', kind: 'timed', units: content.units };
+              if (part.background) { backgroundTranslations.push({ parentId: lineId, value }); }
               else { const values = appleTranslations.get(lineId) ?? []; values.push(value); appleTranslations.set(lineId, values); }
             } else {
               const content = readRomanization(part.node, lineId, absoluteTimes, ITUNES);
@@ -322,7 +332,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           if (role === 'x-translation' || role === 'x-roman') {
             checkAttributes(node as Element, []);
             const language = attr(node as Element, XML, 'lang');
-            if (role === 'x-translation') translations.push({ language, text: textOnly(node as Element, role) });
+            if (role === 'x-translation') translations.push({ ...plainTranslation(textOnly(node as Element, role), language), id: attr(node as Element, STUDIO, 'id') ?? crypto.randomUUID() });
             else inlineRomanizations.push({ language, content: readRomanization(node as Element, id, absoluteTimes, TTML) });
             continue;
           }
@@ -364,7 +374,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           if (role === 'x-translation' || role === 'x-roman') {
             checkAttributes(node as Element, []);
             const language = attr(node as Element, XML, 'lang');
-            if (role === 'x-translation') bgTranslations.push({ language, text: textOnly(node as Element, role) });
+            if (role === 'x-translation') bgTranslations.push({ ...plainTranslation(textOnly(node as Element, role), language), id: attr(node as Element, STUDIO, 'id') ?? crypto.randomUUID() });
             else {
               const content = readRomanization(node as Element, bgId, absoluteTimes, TTML);
               stripContentDecoration(content);
@@ -444,7 +454,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   const root = xml.documentElement;
   root.setAttributeNS(XML, 'xml:space', 'preserve');
   if (document.language) root.setAttributeNS(XML, 'xml:lang', document.language);
-  if (document.agents.length || Object.keys(document.metadata).length || document.romanizationTracks.length) {
+  if (document.agents.length || Object.keys(document.metadata).length || document.romanizationTracks.length || document.lines.some(line => line.translations.length)) {
     const head = xml.createElementNS(TTML, 'head');
     const metadataNode = xml.createElementNS(TTML, 'metadata');
     const songwriters = document.metadata.songwriter ?? [];
@@ -522,6 +532,39 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       }
       itunes.appendChild(group);
     }
+    if (document.lines.some(line => line.translations.length)) {
+      const group = xml.createElementNS(ITUNES, 'translations');
+      const entries = new Map<string, Element>();
+      const contents = document.lines.flatMap(line => nonemptyTranslations(line.translations).map(item => ({ line, item }))).sort((a, b) => a.item.trackOrder - b.item.trackOrder || a.item.contentOrder - b.item.contentOrder);
+      for (const { line, item } of contents) {
+        const key = JSON.stringify([item.trackId, item.language, item.purpose]);
+        const entry = entries.get(key) ?? xml.createElementNS(ITUNES, 'translation');
+        if (!entries.has(key)) { entries.set(key, entry); group.appendChild(entry); }
+        if (draft) { entry.setAttributeNS(STUDIO, 'studio:id', item.trackId); entry.setAttributeNS(STUDIO, 'studio:order', String(item.trackOrder)); }
+        entry.setAttribute('type', item.purpose);
+        if (item.language) entry.setAttributeNS(XML, 'xml:lang', item.language);
+        const parent = xml.createElementNS(ITUNES, 'text');
+        parent.setAttribute('for', line.backgroundOf ?? line.id);
+        const content = line.backgroundOf ? xml.createElementNS(ITUNES, 'span') : parent;
+        if (line.backgroundOf) content.setAttributeNS(TTM, 'ttm:role', 'x-bg');
+        if (draft) { content.setAttributeNS(STUDIO, 'studio:id', item.id); content.setAttributeNS(STUDIO, 'studio:kind', item.kind); content.setAttributeNS(STUDIO, 'studio:order', String(item.contentOrder)); }
+        if (item.kind === 'plain') content.textContent = line.backgroundOf ? `(${item.text})` : item.text;
+        else {
+          if (!draft && !item.units.length) throw new Error(`Translation ${item.id} has no units`);
+          if (line.backgroundOf) content.appendChild(xml.createTextNode('('));
+          for (const unit of item.units) {
+            if (!draft && (unit.beginMs === null || unit.endMs === null)) throw new Error(`Translation ${item.id} unit ${unit.id} needs timing`);
+            const node = xml.createElementNS(ITUNES, 'span');
+            if (draft) node.setAttributeNS(STUDIO, 'studio:id', unit.id);
+            setTime(node, unit.beginMs, unit.endMs, draft); node.textContent = unit.text; content.appendChild(node);
+          }
+          if (line.backgroundOf) content.appendChild(xml.createTextNode(')'));
+        }
+        if (line.backgroundOf) parent.appendChild(content);
+        entry.appendChild(parent);
+      }
+      itunes.appendChild(group);
+    }
     if (itunes.childNodes.length) metadataNode.appendChild(itunes);
     head.appendChild(metadataNode);
     root.insertBefore(head, root.firstChild);
@@ -590,13 +633,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       parent.appendChild(span);
     };
     for (const word of line.words) appendWord(p, word, word.text);
-    for (const item of nonemptyTranslations(line.translations)) {
-      const span = xml.createElementNS(TTML, 'span');
-      span.setAttributeNS(TTM, 'ttm:role', 'x-translation');
-      if (item.language) span.setAttributeNS(XML, 'xml:lang', item.language);
-      span.textContent = item.text;
-      p.appendChild(span);
-    }
+
     const bg = backgrounds.get(line.id);
     if (bg) {
       if (bg.ignoreSync) throw new Error(`Background vocal ${bg.id} has fields not yet mapped to TTML`);
@@ -606,13 +643,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       if (bg.agentRefs.length) span.setAttributeNS(TTM, 'ttm:agent', bg.agentRefs.join(' '));
       setTime(span, bg.beginMs, bg.endMs, draft);
       bg.words.forEach((word, index) => appendWord(span, word, `${index === 0 ? '(' : ''}${word.text}${index === bg.words.length - 1 ? ')' : ''}`));
-      for (const item of nonemptyTranslations(bg.translations)) {
-        const translation = xml.createElementNS(TTML, 'span');
-        translation.setAttributeNS(TTM, 'ttm:role', 'x-translation');
-        if (item.language) translation.setAttributeNS(XML, 'xml:lang', item.language);
-        translation.textContent = item.text;
-        span.appendChild(translation);
-      }
+
       p.appendChild(span);
     }
     div.appendChild(p);

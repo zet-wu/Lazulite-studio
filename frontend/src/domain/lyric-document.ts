@@ -1,5 +1,5 @@
 /** The semantic editor document. Transport, XML trees and playback stay outside it. */
-export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v6' as const;
+export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v7' as const;
 
 export type TimeMs = number | null;
 
@@ -20,7 +20,12 @@ export type LyricWord = {
   emptyBeat: number;
 };
 
-export type SubLyric = { language: string | null; text: string };
+export type SubLyric = { trackId: string; trackOrder: number; contentOrder: number; id: string; language: string | null; purpose: 'subtitle' | 'replacement' } & (
+  | { kind: 'plain'; text: string }
+  | { kind: 'timed'; units: RomanizationUnit[] }
+);
+export const translationText = (item: SubLyric) => item.kind === 'plain' ? item.text : item.units.map(unit => unit.text).join('');
+export const plainTranslation = (text: string, language: string | null = null): SubLyric => ({ trackId: crypto.randomUUID(), trackOrder: 0, contentOrder: 0, id: crypto.randomUUID(), language, purpose: 'subtitle', kind: 'plain', text });
 export type RomanizationUnit = { id: string; text: string; beginMs: TimeMs; endMs: TimeMs };
 export type RomanizationContent = { id: string; lineId: string } & (
   | { kind: 'plain'; text: string }

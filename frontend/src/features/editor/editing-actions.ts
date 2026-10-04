@@ -106,7 +106,7 @@ function cloneWord(word: LyricWord): LyricWord {
 }
 
 function cloneLine(line: LyricLine, id: string, backgroundOf: string | null): LyricLine {
-  return { ...line, id, backgroundOf, words: line.words.map(cloneWord), translations: line.translations.map((item) => ({ ...item })) };
+  return { ...line, id, backgroundOf, words: line.words.map(cloneWord), translations: line.translations.map(item => item.kind === 'plain' ? { ...item, id: crypto.randomUUID() } : { ...item, id: crypto.randomUUID(), units: item.units.map(unit => ({ ...unit, id: crypto.randomUUID() })) }) };
 }
 
 export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null): { command: LyricCommand; selection: EditorSelection } {

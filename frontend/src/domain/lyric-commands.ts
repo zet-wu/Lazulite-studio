@@ -396,7 +396,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const index = lineIndex(document, command.lineId);
       const lines = document.lines.slice();
       const items = nonemptyTranslations(command.items);
-      if (items.length === lines[index].translations.length && items.every((item, i) => item.text === lines[index].translations[i].text && item.language === lines[index].translations[i].language)) return document;
+      if (JSON.stringify(items) === JSON.stringify(lines[index].translations)) return document;
       lines[index] = { ...lines[index], [command.kind]: items };
       return { ...document, lines };
     }

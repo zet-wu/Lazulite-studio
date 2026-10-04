@@ -172,9 +172,9 @@ describe('semantic lyric commands', () => {
     const first = document.lines[0].words[0];
     let state = createLyricEditorState(document);
     state = executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: first.id, word: createWord(' も', 'next') });
-    state = executeLyricCommand(state, { type: 'set-sublyrics', lineId, kind: 'translations', items: [{ language: 'zh', text: '今天也' }] });
+    state = executeLyricCommand(state, { type: 'set-sublyrics', lineId, kind: 'translations', items: [{ trackId: 'translation-track-12331', trackOrder: 0, contentOrder: 0, id: 'translation-12331', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天也' }] });
     expect(lineText(state.present.lines[0])).toBe('今日 も');
-    expect(state.present.lines[0].translations[0].text).toBe('今天也');
+    expect((state.present.lines[0].translations[0] as { text: string }).text).toBe('今天也');
     expect(undoLyricCommand(state).present.lines[0].translations).toEqual([]);
     expect(undoLyricCommand(undoLyricCommand(state)).present).toBe(document);
     expect(() => executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: null, word: createWord('重', first.id) })).toThrow(/already exists/);
@@ -204,7 +204,7 @@ describe('semantic lyric commands', () => {
     const edited = executeLyricCommand(state, { type: 'batch', commands: [
       { type: 'split-word', lineId, wordId, at: 2, newWordId: 'rest' },
       { type: 'edit-word', lineId, wordId: 'rest', text: ' も歌う' },
-      { type: 'set-sublyrics', lineId, kind: 'translations', items: [{ language: 'zh', text: '今天也唱歌' }] },
+      { type: 'set-sublyrics', lineId, kind: 'translations', items: [{ trackId: 'translation-track-14585', trackOrder: 0, contentOrder: 0, id: 'translation-14585', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天也唱歌' }] },
     ] });
     expect(lineText(edited.present.lines[0])).toBe('今日 も歌う');
     expect(edited.past).toEqual([document]);

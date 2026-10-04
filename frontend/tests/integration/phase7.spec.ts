@@ -10,7 +10,7 @@ test('P7 linked split, translation ownership and generated timed track persist t
     const codec = await import(codecPath) as typeof import('../../src/adapters/ttml/lyric-codec');
     const commands = await import(commandPath) as typeof import('../../src/domain/lyric-commands');
     const doc = codec.parseLyricTtml(xml);
-    doc.lines[1].translations = [{ language: 'en', text: 'first' }, { language: 'zh-Hans', text: '后行' }];
+    doc.lines[1].translations = [{ trackId: 'translation-track-841', trackOrder: 0, contentOrder: 0, id: 'translation-841', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'first' }, { trackId: 'translation-track-876', trackOrder: 0, contentOrder: 0, id: 'translation-876', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh-Hans', text: '后行' }];
     let state = commands.createLyricEditorState(doc);
     state = commands.executeLyricCommand(state, { type: 'link-line-end', lineId: 'kana', targetLineId: 'context' });
     state = commands.executeLyricCommand(state, { type: 'link-line-end', lineId: 'context', targetLineId: 'missing' });
@@ -28,12 +28,12 @@ test('P7 linked split, translation ownership and generated timed track persist t
   const saved = await (await page.request.get('/api/v1/projects/phase4-background/document')).json();
   const semantics = async (xml: string) => page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const { parseLyricTtml } = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
-    const doc = parseLyricTtml(xml); return { lines: doc.lines.map(line => ({ id: line.id, beginMs: line.beginMs, endMs: line.endMs, endLink: line.endLink, translations: line.translations, text: line.words.map(w => w.text).join(''), reading: line.words.flatMap(w => w.rubyUnits.map(r => r.reading)) })), tracks: doc.romanizationTracks };
+    const doc = parseLyricTtml(xml); return { lines: doc.lines.map(line => ({ id: line.id, beginMs: line.beginMs, endMs: line.endMs, endLink: line.endLink, translations: line.translations.map(({id, trackId, trackOrder, contentOrder, ...item}) => item), text: line.words.map(w => w.text).join(''), reading: line.words.flatMap(w => w.rubyUnits.map(r => r.reading)) })), tracks: doc.romanizationTracks };
   }, xml);
   const draft = await semantics(saved.document.lyrics.draftTtml);
   expect(draft.lines[0].endLink).toEqual({ targetLineId: 'context'});
-  expect(draft.lines[1]).toMatchObject({ endLink: null, endMs: 5e3, translations: [{ language: 'en', text: 'first' }] });
-  expect(draft.lines[2]).toMatchObject({ endLink: { targetLineId: 'missing'}, translations: [{ language: 'zh-Hans', text: '后行' }] });
+  expect(draft.lines[1]).toMatchObject({ endLink: null, endMs: 5e3, translations: [{ purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'first' }] });
+  expect(draft.lines[2]).toMatchObject({ endLink: { targetLineId: 'missing'}, translations: [{ purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh-Hans', text: '后行' }] });
   expect(draft.tracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ kind: 'timed', units: [{ text: 'ga ', beginMs: 0, endMs: 1e3 }, { text: 'k ', beginMs: 1e3, endMs: 2e3 }, { text: 'ko ', beginMs: 2e3, endMs: 3e3 }, { text: 'u', beginMs: 3e3, endMs: 4e3 }] }] });
   await page.reload(); await expect(outline).toHaveCount(4);
   await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
@@ -52,7 +52,7 @@ test('P7 actual review export preserves semantic fields and emits untimed spaces
   const result = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
     const before = codec.parseLyricTtml(xml), output = codec.serializeLyricTtml(before), after = codec.parseLyricTtml(output);
-    const semantic = (doc: typeof before) => ({ lines: doc.lines.map(line => ({ text: line.words.map(word => word.text).join(''), beginMs: line.beginMs, endMs: line.endMs, agentRefs: line.agentRefs, translations: line.translations, words: line.words.map(({ id: _id, rubyUnits, ...word }) => ({ ...word, rubyUnits: rubyUnits.map(({ id: _id, ...unit }) => unit) })) })), tracks: doc.romanizationTracks.map(({ id: _id, contents, ...track }) => ({ ...track, contents: contents.map(({ id: _id, ...content }) => content.kind === 'plain' ? content : { ...content, units: content.units.map(({ id: _id, ...unit }) => unit) }) })) });
+    const semantic = (doc: typeof before) => ({ lines: doc.lines.map(line => ({ text: line.words.map(word => word.text).join(''), beginMs: line.beginMs, endMs: line.endMs, agentRefs: line.agentRefs, translations: line.translations.map(({id, trackId, trackOrder, contentOrder, ...item}) => item), words: line.words.map(({ id: _id, rubyUnits, ...word }) => ({ ...word, rubyUnits: rubyUnits.map(({ id: _id, ...unit }) => unit) })) })), tracks: doc.romanizationTracks.map(({ id: _id, contents, ...track }) => ({ ...track, contents: contents.map(({ id: _id, ...content }) => content.kind === 'plain' ? content : { ...content, units: content.units.map(({ id: _id, ...unit }) => unit) }) })) });
     const packingPath = '/src/domain/pack-intervals.ts'; const { packIntervals } = await import(packingPath) as typeof import('../../src/domain/pack-intervals');
     const intervals = before.lines.filter(line => !line.backgroundOf && line.beginMs !== null && line.endMs !== null && line.endMs > 266689000 && line.beginMs < 278949000).map(line => ({ key: line.id, beginMs: line.beginMs!, endMs: line.endMs! }));
     const packed = packIntervals(intervals);

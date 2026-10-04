@@ -22,7 +22,7 @@ def normalize_ttml(ttml):
     import re
     import xml.etree.ElementTree as ET
     root = ET.fromstring(ttml)
-    absolute = '{http://music.apple.com/lyric-ttml-internal}timing' in root.attrib
+    absolute = any(f'{{{namespace}}}timing' in root.attrib for namespace in ('http://music.apple.com/lyric-ttml-internal', 'http://itunes.apple.com/lyric-ttml-extensions'))
     def seconds(raw):
         if raw is None:
             return None

@@ -11,7 +11,7 @@ it('keeps actual YRC/QRC/KRC word clocks and whitespace', () => {
 it('does not invent ordinary LRC ends', () => { const d=importLyricFile('[00:01.00]甲\n[00:02.00]乙','lrc'); expect(d.lines.map(l=>l.endMs)).toEqual([null,null]); });
 it('retains sidecar translation and real QRC romanization clocks', () => {
  const p=parsePayload({empty:false,format:'qrc',content:'[1000,500]甲(1000,500)',metadata:{qqMusicId:['mid']},translation:'[00:01]translation',romanization:'[1000,500]jia(1000,500)'});
- expect(p.document.lines[0].translations[0].text).toBe('translation'); expect(p.document.romanizationTracks[0].contents[0].kind).toBe('timed'); expect(p.badges).toContain('音译');
+ expect((p.document.lines[0].translations[0] as { text: string }).text).toBe('translation'); expect(p.document.romanizationTracks[0].contents[0].kind).toBe('timed'); expect(p.badges).toContain('音译');
 });
 it('selects entire metadata lists and permits empty-side deletion', () => {
  const a={...createLyricDocument(), metadata:{artists:[' A ','B'],album:['old'],only:['x']}}, b={...createLyricDocument(),metadata:{artists:['C'],album:['new'],incoming:['y']}};
@@ -20,7 +20,7 @@ it('selects entire metadata lists and permits empty-side deletion', () => {
 });
 it('sidecar 750 ms matching is inclusive, monotonic, one to one and rejects same-start ambiguity',()=>{
  const p=parsePayload({empty:false,format:'qrc',content:'[1000,500]甲(1000,500)\n[3000,500]乙(3000,500)',metadata:{},translation:'[00:01.750]one\n[00:03.751]outside',romanization:'[1750,500]a(1750,500)'});
- expect(p.partial).toBe(true);expect(p.document.lines[0].translations[0].text).toBe('one');expect(p.document.lines[1].translations).toEqual([]);
+ expect(p.partial).toBe(true);expect((p.document.lines[0].translations[0] as { text: string }).text).toBe('one');expect(p.document.lines[1].translations).toEqual([]);
  const content=p.document.romanizationTracks[0].contents[0];expect(content.kind==='timed' && content.units[0].beginMs).toBe(1750);
  const ambiguous=parsePayload({empty:false,format:'qrc',content:'[1000,500]甲(1000,500)\n[1000,500]乙(1000,500)',metadata:{},translation:'[00:01]ambiguous'});
  expect(ambiguous.document.lines.every(l=>!l.translations.length)).toBe(true);expect(ambiguous.partial).toBe(true);

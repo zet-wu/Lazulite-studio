@@ -158,3 +158,29 @@ def test_acoustic_edit_is_saved_atomically_and_preserves_lyric_review(tmp_path):
     body['document']['sourceAssetId'] = 'wrong'
     assert client.put('/api/v1/projects/p/document', json=body, headers={'origin': 'http://studio', 'if-match': reopened['revision']}).status_code == 422
     assert client.get('/api/v1/projects/p/document').json()['revision'] == reopened['revision']
+
+
+def test_timed_translation_real_save_preserves_purpose_units_and_unknown_draft_time(tmp_path):
+    import xml.etree.ElementTree as ET
+    setup_project(tmp_path)
+    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
+    source = Path(__file__).resolve().parents[2] / "tests/fixtures/ttml/timeline-translation-external.ttml"
+    ttml = source.read_text(encoding="utf-8")
+    ttml = ttml.replace('xmlns:ttm=', 'xmlns:studio="urn:lazulite:studio:draft" xmlns:ttm=', 1)
+    ttml = ttml.replace('begin="500ms"', 'studio:id="translation-unit" studio:null="begin"', 1)
+    before = client.get("/api/v1/projects/p/document")
+    saved = client.put("/api/v1/projects/p/document", json={
+        "schema_version": "studio-document-v3", "project_id": "p", "revision": before.json()["revision"],
+        "document": initial_project(ttml, None)}, headers={
+        "origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "timed-translation"})
+    assert saved.status_code == 200
+    reopened = client.get("/api/v1/projects/p/document").json()["document"]["lyrics"]["draftTtml"]
+    root = ET.fromstring(reopened)
+    ns = '{http://music.apple.com/lyric-ttml-internal}'
+    tracks = list(root.iter(ns + 'translation'))
+    assert len(tracks) == 3 and tracks[0].get('type') == 'replacement'
+    first = tracks[0].find(ns + 'text').find(ns + 'span')
+    assert first.text == ' 黃金 ' and first.get('begin') is None
+    assert first.get('{urn:lazulite:studio:draft}id') == 'translation-unit'
+    assert first.get('{urn:lazulite:studio:draft}null') == 'begin'
+    assert first.get('end') == '00:01.250'

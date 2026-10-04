@@ -60,6 +60,21 @@ def validate_publish_ttml(path: str | Path, max_duration: float | None = None, *
     lines = root.findall(".//{%s}p" % TTML_NS)
     if not lines:
         raise PublishInvalid("lyrics must contain at least one line")
+    # Translation drafts never borrow body timing or become plain text on publication.
+    for translation in root.iter():
+        if translation.tag.rsplit('}', 1)[-1] != 'translation':
+            continue
+        if translation.get('type', 'subtitle') not in {'subtitle', 'replacement'}:
+            raise PublishInvalid('unsupported translation type')
+        for content in translation.iter():
+            if content.tag.rsplit('}', 1)[-1] not in {'text', 'span'}:
+                continue
+            is_background = content.get('{http://www.w3.org/ns/ttml#metadata}role') == 'x-bg'
+            if content.tag.rsplit('}', 1)[-1] == 'span' and not is_background:
+                if list(content) or content.get('begin') is None or content.get('end') is None or content.get(f'{{{STUDIO_NS}}}null'):
+                    raise PublishInvalid('translation unit requires complete timing')
+            if content.get(f'{{{STUDIO_NS}}}kind') == 'timed' and not list(content):
+                raise PublishInvalid('timed translation has no units')
     parent_times: dict[int, tuple[float | None, float | None]] = {}
     def collect(element, inherited=(None, None)):
         local_begin = _time(element.get("begin")) if element.get("begin") is not None else None

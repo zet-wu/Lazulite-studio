@@ -40,7 +40,7 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
     return { agents: document.lines.map(line => line.agentRefs), translations: document.lines[0].translations, appended: document.lines[0].words.slice(-2).map(word => ({ text: word.text, beginMs: word.beginMs, endMs: word.endMs })), units: document.romanizationTracks[0].contents[0] };
   }, saved.document.lyrics.draftTtml);
   expect(semantic.agents.slice(0, 2)).toEqual([['v1', 'v2'], ['v2', 'v1']]);
-  expect(semantic.translations).toEqual([{ text: 'song', language: 'ja' }]);
+  expect(semantic.translations).toMatchObject([{ purpose: 'subtitle' as const, kind: 'plain' as const,  text: 'song', language: 'ja' }]);
   expect(semantic.appended).toEqual([{ text: '追加', beginMs: null, endMs: null }, { text: '  ', beginMs: null, endMs: null }]);
   expect(semantic.units).toMatchObject({ kind: 'timed', units: [{ text: 'ai', beginMs: 1000 }, { text: '', beginMs: 0, endMs: 6000 }, { text: '  ', beginMs: 0, endMs: 6000 }] });
   await page.getByRole('button', { name: '文件打包', exact: true }).click();

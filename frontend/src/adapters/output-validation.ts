@@ -2,7 +2,7 @@ import { AGENT_TYPES } from '../domain/lyric-document';
 import type { LyricDocument, LyricLine, TimeMs } from '../domain/lyric-document';
 import type { LyricFormat } from './lyric-formats';
 export type OutputIssue = {
-  kind: 'agent' | 'line' | 'word' | 'ruby' | 'romanization-content' | 'romanization-unit';
+  kind: 'agent' | 'line' | 'word' | 'ruby' | 'romanization-content' | 'romanization-unit' | 'translation-content' | 'translation-unit';
   lineId: string; agentId?: string; wordId?: string; rubyId?: string; trackId?: string; contentId?: string; unitId?: string;
   code?: 'invalid-agent-type' | 'missing-time' | 'invalid-range' | 'unsupported-order' | 'empty-content';
   missing: ('begin' | 'end')[]; message: string;
@@ -57,6 +57,10 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
        }
      }
    }
+ }
+ if (target === 'ttml' || target === 'publish') for (const line of document.lines) for (const content of line.translations) if (content.kind === 'timed') {
+   if (!content.units.length) issues.push({ kind: 'translation-content', lineId: line.id, contentId: content.id, code: 'empty-content', missing: [], message: `${label(line)}翻译没有单元` });
+   for (const [index, unit] of content.units.entries()) add({ kind: 'translation-unit', lineId: line.id, contentId: content.id, unitId: unit.id }, `${label(line)}翻译第 ${index + 1} 单元`, unit.beginMs, unit.endMs, true, unit.beginMs !== null && unit.endMs !== null && unit.beginMs > unit.endMs ? '时间倒序' : undefined);
  }
  return issues;
 }

@@ -36,7 +36,7 @@ it('merges the internal chain and inherits the last external link and current en
 });
 it('reports all real conflicts with source ordinals and safely rebinds identical starts', () => {
   const doc = fixture(); doc.lines[3].endLink = { targetLineId: 'b'}; doc.lines[3].endMs = 2000; doc.lines[3].beginMs = 0;
-  doc.lines[0].translations = [{ language: 'en', text: 'a' }]; doc.lines[1].translations = [{ language: 'ja', text: 'b' }];
+  doc.lines[0].translations = [{ trackId: 'translation-track-2964', trackOrder: 0, contentOrder: 0, id: 'translation-2964', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'a' }]; doc.lines[1].translations = [{ trackId: 'translation-track-3025', trackOrder: 0, contentOrder: 0, id: 'translation-3025', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'ja', text: 'b' }];
   doc.lines[1].agentRefs = ['v2']; doc.lines[1].songPart = 'verse';
   const issues = lineStructureIssues(doc, doc.lines[0], doc.lines[1]);
   expect(issues).toHaveLength(5); expect(issues.join('；')).toContain('L4行尾链接 → L2');
@@ -52,7 +52,7 @@ it('reports all real conflicts with source ordinals and safely rebinds identical
 });
 it('assigns translations independently with romanization and background in one split and roundtrip', () => {
   const doc = fixture();
-  doc.lines[0].translations = [{ text: 'one', language: 'en' }, { text: '二', language: 'zh-Hans' }, { text: '三', language: 'ja' }];
+  doc.lines[0].translations = [{ trackId: 'translation-track-4196', trackOrder: 0, contentOrder: 0, id: 'translation-4196', purpose: 'subtitle' as const, kind: 'plain' as const,  text: 'one', language: 'en' }, { trackId: 'translation-track-4229', trackOrder: 0, contentOrder: 0, id: 'translation-4229', purpose: 'subtitle' as const, kind: 'plain' as const,  text: '二', language: 'zh-Hans' }, { trackId: 'translation-track-4265', trackOrder: 0, contentOrder: 0, id: 'translation-4265', purpose: 'subtitle' as const, kind: 'plain' as const,  text: '三', language: 'ja' }];
   doc.lines.splice(1, 0, { ...createLine('声', 'bg'), backgroundOf: 'a' });
   doc.romanizationTracks = [{ id: 't', language: 'ja-Latn', contents: [{ id: 'r', lineId: 'a', kind: 'plain', text: 'a' }] }];
   const state = createLyricEditorState(doc);
@@ -61,7 +61,7 @@ it('assigns translations independently with romanization and background in one s
   expect(result.present.lines[1].translations).toEqual(doc.lines[0].translations.slice(1));
   expect(result.present.lines[2].backgroundOf).toBe('new');
   expect(result.present.romanizationTracks[0].contents[0].lineId).toBe('new');
-  for (const draft of [true, false]) expect(parseLyricTtml(serializeLyricTtml(result.present, { draft })).lines[1].translations).toEqual(doc.lines[0].translations.slice(1));
+  for (const draft of [true, false]) expect(parseLyricTtml(serializeLyricTtml(result.present, { draft })).lines[1].translations).toEqual(doc.lines[0].translations.slice(1).map(item => ({ ...item, id: expect.any(String), trackId: expect.any(String), trackOrder: expect.any(Number), contentOrder: expect.any(Number) })));
   expect(undoLyricCommand(result).present).toBe(doc);
   expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: [], translationIndicesForNewLine: [3], backgroundTarget: 'left' })).toThrow('翻译分配条目不存在');
 });

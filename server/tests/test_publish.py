@@ -254,3 +254,15 @@ def test_video_classification_and_portable_download_names(tmp_path):
     assert download_filename('CON', '.mp3') == '_CON.mp3'
     assert download_filename(' . ', '.flac') == '未命名项目.flac'
     assert len(download_filename('歌' * 200, '.mp4').encode()) < 255
+
+
+def test_translation_publication_never_flattens_unknown_timing(tmp_path):
+    from pathlib import Path
+    from server.publish import validate_publish_ttml, PublishInvalid
+    import pytest
+    source = Path(__file__).resolve().parents[2] / 'tests/fixtures/ttml/timeline-translation-external.ttml'
+    xml = source.read_text(encoding='utf-8')
+    assert validate_publish_ttml(xml, xml=True)['passed']
+    for invalid in [xml.replace('begin="500ms"', '', 1), xml.replace('type="replacement"', 'type="other"', 1)]:
+        with pytest.raises(PublishInvalid):
+            validate_publish_ttml(invalid, xml=True)
