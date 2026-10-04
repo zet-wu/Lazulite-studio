@@ -89,3 +89,22 @@ describe('background content and independent singers', () => {
     expect(parseLyricTtml(serializeLyricTtml(state.present, { draft: true }))).toEqual(state.present);
   });
 });
+
+it('installed AMLL lyric library reads independent background sublyrics from final TTML', async () => {
+  const { parseTTML } = await import('@applemusic-like-lyrics/lyric');
+  const d = fixture();
+  d.romanizationTracks[0].contents.unshift({ id: 'main', lineId: 'L1', kind: 'plain', text: 'main roman' });
+  const consumer = parseTTML(serializeLyricTtml(d));
+  // AMLL trims sublyric edges; Studio's own roundtrip above preserves them.
+  expect(consumer.lines.find(line => line.isBG)).toMatchObject({ translatedLyric: '背景译文', romanLyric: 'ka na' });
+  expect(consumer.lines.find(line => !line.isBG)?.romanLyric).toBe('main roman');
+});
+
+it('imports timed inline background romanization and preserves whitespace-only main content beside it', () => {
+  const d = parseLyricTtml(xml('', bg.replace(' ka na </span>', '(<span begin="2.000" end="3.000">ka </span><span begin="3.000" end="5.000">na</span>)</span>')));
+  expect(d.romanizationTracks[0].contents[0]).toMatchObject({ kind: 'timed', units: [{ text: 'ka ', beginMs: 2000 }, { text: 'na', endMs: 5000 }] });
+  d.romanizationTracks[0].contents.unshift({ id: 'space', lineId: 'L1', kind: 'plain', text: '  \n ' });
+  const result = parseLyricTtml(serializeLyricTtml(d));
+  expect(result.romanizationTracks[0].contents[0]).toMatchObject({ kind: 'plain', text: '  \n ' });
+  expect(result.romanizationTracks[0].contents[1]).toMatchObject({ kind: 'timed', units: [{ text: 'ka ', beginMs: 2000 }, { text: 'na', endMs: 5000 }] });
+});

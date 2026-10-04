@@ -248,6 +248,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           const parts = [...((!background.length || main.children.length || Array.from(main.childNodes).some(node => node.nodeValue && (node.nodeValue.trim() || root.getAttributeNS(XML, 'space') === 'preserve' || !/[\r\n]/.test(node.nodeValue))) || attr(main, STUDIO, 'id') || attr(main, STUDIO, 'kind')) ? [{ node: main, background: false }] : []),
             ...background.map(node => ({ node, background: true }))];
           for (const part of parts) {
+            if (part.background && !is(part.node, ITUNES, 'span')) throw new Error('Unsupported background sublyric node');
             checkAttributes(part.node, part.background ? [] : ['for']);
             if (translation) {
               const value = { language: attr(entry, XML, 'lang'), text: textOnly(part.node, 'iTunes translation') };
@@ -312,7 +313,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
       const id = attr(child, XML, 'id') ?? attr(child, ITUNES, 'key') ?? `line-${lines.length + 1}`;
       const wordStart = beginMs ?? start;
       const translations: LyricLine['translations'] = [];
-      const inlineRomanizations: Array<{ language: string | null; text: string }> = [];
+      const inlineRomanizations: Array<{ language: string | null; content: RomanizationContent }> = [];
       let background: Element | null = null;
       const words: LyricWord[] = [];
       for (const [index, node] of Array.from(child.childNodes).entries()) {
@@ -320,8 +321,9 @@ export function parseLyricTtml(xml: string): LyricDocument {
           const role = attr(node as Element, TTM, 'role');
           if (role === 'x-translation' || role === 'x-roman') {
             checkAttributes(node as Element, []);
-            const value = { language: attr(node as Element, XML, 'lang'), text: textOnly(node as Element, role) };
-            (role === 'x-translation' ? translations : inlineRomanizations).push(value);
+            const language = attr(node as Element, XML, 'lang');
+            if (role === 'x-translation') translations.push({ language, text: textOnly(node as Element, role) });
+            else inlineRomanizations.push({ language, content: readRomanization(node as Element, id, absoluteTimes, TTML) });
             continue;
           }
           if (role === 'x-bg') {
@@ -346,7 +348,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           track = { id: crypto.randomUUID(), language: value.language, contents: [] };
           inlineRomanizationTracks.set(key, track);
         }
-        track.contents.push({ id: crypto.randomUUID(), lineId, kind: 'plain', text: value.text });
+        track.contents.push({ ...value.content, lineId });
       });
       addInline(inlineRomanizations, id);
       if (background) {
@@ -361,8 +363,13 @@ export function parseLyricTtml(xml: string): LyricDocument {
           const role = node.nodeType === Node.ELEMENT_NODE ? attr(node as Element, TTM, 'role') : null;
           if (role === 'x-translation' || role === 'x-roman') {
             checkAttributes(node as Element, []);
-            const value = { language: attr(node as Element, XML, 'lang'), text: textOnly(node as Element, role) };
-            (role === 'x-translation' ? bgTranslations : bgRomanizations).push(value);
+            const language = attr(node as Element, XML, 'lang');
+            if (role === 'x-translation') bgTranslations.push({ language, text: textOnly(node as Element, role) });
+            else {
+              const content = readRomanization(node as Element, bgId, absoluteTimes, TTML);
+              stripContentDecoration(content);
+              bgRomanizations.push({ language, content });
+            }
           } else {
             if (role) throw new Error(`Unsupported background role ${role}`);
             const word = makeWord(node, bgId, index, bgStart, bgEnd, absoluteTimes);

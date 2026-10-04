@@ -466,7 +466,7 @@ export function EditorWorkspace(props: Props) {
           { label: '分词并定时', disabled: content.kind === 'timed', run: () => { if (content.kind === 'plain') dispatch({ type: 'set-romanization-content', trackId: track.id, content: { ...content, kind: 'timed', units: (content.text.match(/\S+\s*|\s+/gu) ?? []).map((text) => ({ id: crypto.randomUUID(), text, beginMs: null, endMs: null })) } }); } },
           { label: '音译内容前移', disabled: siblingIndex === 0, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: track.contents[previousGlobal - 1]?.id ?? null }) },
           { label: '音译内容后移', disabled: siblingIndex === siblings.length - 1, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: siblings[siblingIndex + 1].id }) },
-          { label: '转移到其他主行…', disabled: mainLines.length < 2, run: () => setContentTransfer({ trackId: track.id, contentId: content.id, targetLineId: mainLines.find((item) => item.id !== line.id)?.id ?? '' }) },
+          { label: '转移到其他歌词行…', disabled: document.lines.length < 2, run: () => setContentTransfer({ trackId: track.id, contentId: content.id, targetLineId: document.lines.find((item) => item.id !== line.id)?.id ?? '' }) },
           { label: effective.ids.length > 1 ? `删除所选内容（${effective.ids.length}）` : '删除内容', run: () => removeSelection(effective) },
           { label: '从音译生成 注音…', run: () => setRubyGeneration({ lineIds: [line.id], trackId: track.id, contentId: content.id }) },
           { label: '管理轨道…', run: () => setSettingsDialog('tracks') },
@@ -733,13 +733,13 @@ export function EditorWorkspace(props: Props) {
               props.onSelectLine?.(line.id); props.onSelectUnit?.(line.id, word.id, null); return true;
             }} />
           </div>
-          {<TranslationEditor items={line.translations} apply={items => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items })} />}
-          {<div className={styles.romanizationTracks}>
+          <TranslationEditor items={line.translations} apply={items => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items })} />
+          <div className={styles.romanizationTracks}>
             {displayed.romanizationTracks.map((track, trackIndex) => {
               const contents = track.contents.filter((content) => content.lineId === line.id);
               return <div key={track.id}>
                 <div className={styles.romanizationTrackHeader}>
-                  <span>L{ordinalById.get(line.id)} · 音译轨道 {trackIndex + 1} · {track.language ?? '未指定语言'}</span>
+                  <span>L{ordinalById.get(line.backgroundOf ?? line.id)}{line.backgroundOf ? ' · 背景' : ''} · 音译轨道 {trackIndex + 1} · {track.language ?? '未指定语言'}</span>
                   <button data-role="secondary" onClick={() => dispatch({ type: 'insert-romanization-content', trackId: track.id, content: { id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: '' } })}>添加音译</button>
                 </div>
                 {contents.map((content) => <RomanizationRow key={content.id} track={track} content={content}
@@ -750,7 +750,7 @@ export function EditorWorkspace(props: Props) {
                     selectUnit={(unitId, shift, toggle) => selectRomanizationUnit(line.id, track.id, content.id, unitId, shift, toggle)} apply={dispatch} />)}
               </div>;
             })}
-          </div>}
+          </div>
         </LyricLineView>} />
       </main>
       {columns.inspectorVisible && separator('inspector')}{columns.inspectorVisible && <aside ref={inspectorRef} className={styles.inspector}><h2>属性</h2><div className={styles.panelBody}>{selectedLine && <>
@@ -798,10 +798,10 @@ export function EditorWorkspace(props: Props) {
           const afterContentId = track.contents.filter((item) => item.lineId === contentTransfer.targetLineId).at(-1)?.id ?? null;
           if (dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: contentTransfer.targetLineId, afterContentId })) setContentTransfer(null);
         }}>应用（一次撤销）</button></>}><p>{content.kind === 'plain' ? content.text : content.units.map((unit) => unit.text).join('')}</p>
-        <label>目标主行 <Select value={contentTransfer.targetLineId} onChange={(event) => setContentTransfer({ ...contentTransfer, targetLineId: event.target.value })}>
-          {mainLines.filter((line) => line.id !== content.lineId).map((line) => <option key={line.id} value={line.id}>{lineText(line) || '空行'}</option>)}
+        <label>目标歌词行 <Select value={contentTransfer.targetLineId} onChange={(event) => setContentTransfer({ ...contentTransfer, targetLineId: event.target.value })}>
+          {document.lines.filter((line) => line.id !== content.lineId).map((line) => <option key={line.id} value={line.id}>{line.backgroundOf ? '背景 · ' : ''}{lineText(line) || '空行'}</option>)}
         </Select></label>
-        <p>文字与独立时间保持原值，主行引用会改变。</p>
+        <p>文字与独立时间保持原值，所属行会改变。</p>
 
       </SettingsDialog>;
     })()}
