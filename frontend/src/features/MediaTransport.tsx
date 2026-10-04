@@ -1,3 +1,4 @@
+import { TimelineIndicators, TimelineIndicatorContext, type TimelinePreview } from './TimelineIndicators';
 import { Select } from '../shared/Select';
 import { useAudioReview } from './AudioReviewContext';
 import { createPortal } from 'react-dom';
@@ -103,7 +104,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     el?.pause();setLoadingSource(true);setPlaybackVocal(next);
   },[playbackChoice,vocalId,playbackVocal]);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const head = useRef<HTMLSpanElement>(null);
+  const [timelineError, setTimelineError] = useState('');
+  const [timelinePreview, publishTimelinePreview] = useState<TimelinePreview>(null);
   const clock = useRef<HTMLSpanElement>(null);
   const slider = useRef<HTMLDivElement>(null);
   const raf = useRef<number | undefined>(undefined);
@@ -189,11 +191,10 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   );
   const projectHead = useCallback((current: number) => {
     const { start, span } = viewportRef.current;
-    if (!head.current) return;
-    head.current.style.left = `${span ? (current - start) / span * 100 : 0}%`;
-    head.current.style.display = current >= start && current <= start + span ? 'block' : 'none';
+    plotsRef.current?.style.setProperty('--playhead-left', `${span ? (current - start) / span * 100 : 0}%`);
+    plotsRef.current?.style.setProperty('--playhead-display', current >= start && current <= start + span ? 'block' : 'none');
   }, []);
-  useLayoutEffect(() => { projectHead(readPosition()); }, [start, span, expanded, readPosition, projectHead]);
+  useLayoutEffect(() => { projectHead(readPosition()); }, [start, span, expanded, timelineHost, readPosition, projectHead]);
   const updateDom = useCallback(
     (raw: number) => {
       const { duration: mediaDuration } = viewportRef.current;
@@ -566,7 +567,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         </div>
 </>);
   const acousticPlots=(<div>
-      <div className={styles.ruler} aria-label="时间标尺" data-timeline-pan="seek" tabIndex={-1}>{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
+      <div className={styles.ruler} aria-label="时间标尺" data-timeline-pan="seek" tabIndex={-1}><TimelineIndicators />{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
       <div className={styles.waveRow}>
         <div className={styles.sourceLabel}><Select aria-label="波形／声谱图音源" title="波形／声谱图音源" value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">原曲</option>{vocalId && <option value="vocal">人声</option>}</Select></div>
       <div
@@ -585,7 +586,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           ref={canvas}
           className={styles.wave}
         />
-        <span ref={head} className={styles.head} />
+        <TimelineIndicators playback />
         {snap && span <= 30 && Array.from({ length: beatCount }, (_, index) => <span key={index} className={styles.beatLine} style={{ left: `${((firstBeat + index) * beatMs - startMs) / (endMs - startMs) * 100}%` }} />)}
         {bandA != null && bandB != null && bandB > bandA && bandB >= start && bandA <= end && (
           <span
@@ -603,6 +604,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       </div></div>
   </div>);
   const plots = (
+    <TimelineIndicatorContext.Provider value={{ startMs, endMs, preview: timelinePreview, publish: publishTimelinePreview }}>
       <div id="timeline-plots" ref={plotsRef} className={styles.timelinePlots}
         onPointerDown={event => {
           const plot = (event.target as Element).closest<HTMLElement>('[data-timeline-pan]');
@@ -610,17 +612,19 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         }} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={cancelPan} onLostPointerCapture={cancelPan}>
         <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
           <button data-role="secondary" onClick={tapBpm}>Tap</button><button data-role="secondary" disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label>{bpmStatus && <small role="status">{bpmStatus}</small>}</div>
+      {timelineError && <p role="alert" className={styles.error}>{timelineError}</p>}
       {timelineHost && <div className={styles.header}>{viewportTools}</div>}
 
-      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} positionMs={Math.round(position*1000)} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?' 背景':''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document?.lines.flatMap(l=>[l,...l.words,...l.words.flatMap(w=>w.rubyUnits)]).flatMap(u=>[u.beginMs,u.endMs]).filter((t):t is number=>t!==null&&t>=startMs&&t<=endMs)??[]} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
+      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?' 背景':''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document?.lines.flatMap(l=>[l,...l.words,...l.words.flatMap(w=>w.rubyUnits)]).flatMap(u=>[u.beginMs,u.endMs]).filter((t):t is number=>t!==null&&t>=startMs&&t<=endMs)??[]} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
       {document && onTimelineCommand && onSelectLine && <>
 
         <TimelineTracks document={document} selectedLineId={selectedLineId ?? null} selectedRomanization={selectedRomanization ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
           visible={visible}
-          apply={onTimelineCommand} onSelectLine={id=>{ui?.setSegmentTarget(false);onSelectLine(id);}} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setError} />
+          apply={onTimelineCommand} onSelectLine={id=>{ui?.setSegmentTarget(false);onSelectLine(id);}} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
       </>}
       {visible.spectrum && asset && <SpectrogramCanvas vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
       </div>
+    </TimelineIndicatorContext.Provider>
   );
   return (
     <footer data-transport className={`${styles.footer} ${expanded && !timelineHost ? styles.expanded : styles.collapsed}`} onKeyDown={keyDown}>

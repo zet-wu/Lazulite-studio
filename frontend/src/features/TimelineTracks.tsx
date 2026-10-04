@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { LyricCommand } from '../domain/lyric-commands';
 import type { LyricDocument, LyricWord } from '../domain/lyric-document';
-import { moveTimeline, resizeTimeline, snapTime, type TimelineTarget } from '../domain/timeline-editing';
+import { moveTimeline, resizeTimeline, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
 import { packIntervals } from '../domain/pack-intervals';
 import styles from './media.module.css';
 
 type Props = { document: LyricDocument; selectedLineId: string | null; selectedRomanization: { trackId: string; contentId: string } | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
   visible: { line: boolean; word: boolean; ruby: boolean; gap: boolean };
   apply: (command: LyricCommand) => void; onSelectLine: (lineId: string) => void; onPan: (startMs: number) => void; onError: (message: string) => void };
-type Drag = { target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number };
+type Drag = { target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string } };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end > begin;
 
 export function TimelineTracks({ document, selectedLineId, selectedRomanization, startMs, endMs, positionMs, bpm, snap, visible, apply, onSelectLine, onPan, onError }: Props) {
@@ -20,24 +21,34 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
     const observer = new ResizeObserver(() => setPlotWidth(lane.getBoundingClientRect().width));
     observer.observe(lane); return () => observer.disconnect();
   }, [visible.line, visible.word, visible.ruby]);
-  useEffect(() => {
-    const cancel = (event: KeyboardEvent) => { if (event.key === 'Escape') { dragRef.current = null; setDrag(null); } };
-    window.addEventListener('keydown', cancel); return () => window.removeEventListener('keydown', cancel);
-  }, []);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
   const [selectedLines, setSelectedLines] = useState<string[]>([]);
   const dragRef = useRef<Drag | null>(null);
+  const { publish } = useContext(TimelineIndicatorContext);
+  const capture = useRef<{ element: HTMLElement; id: number } | null>(null);
+  const cancel = useCallback(() => {
+    dragRef.current = null; setDrag(null); publish(null);
+    const held = capture.current; capture.current = null;
+    if (held?.element.hasPointerCapture(held.id)) held.element.releasePointerCapture(held.id);
+  }, [publish]);
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && dragRef.current) { event.preventDefault(); cancel(); } };
+    window.addEventListener('keydown', escape); return () => { window.removeEventListener('keydown', escape); cancel(); };
+  }, [cancel]);
+  useEffect(() => { cancel(); }, [document, selectedLineId, visible.line, visible.word, visible.ruby, cancel]);
+  useEffect(() => { if (dragRef.current?.side !== 'pan') cancel(); }, [startMs, endMs, cancel]);
+  const displayed = drag?.candidate.document ?? document;
   const propsEndMs = endMs;
   const spanMs = Math.max(1, endMs - startMs);
-  const mainLines = document.lines.filter((item) => !item.backgroundOf);
+  const mainLines = displayed.lines.filter((item) => !item.backgroundOf);
   const ordinalById = new Map(mainLines.map((item, index) => [item.id, index + 1]));
-  const line = document.lines.find((item) => item.id === selectedLineId) ?? document.lines.find((item) => !item.backgroundOf);
+  const line = displayed.lines.find((item) => item.id === selectedLineId) ?? displayed.lines.find((item) => !item.backgroundOf);
   const romanTrack = document.romanizationTracks.find((track) => track.id === selectedRomanization?.trackId);
   const romanContent = romanTrack?.contents.find((content) => content.id === selectedRomanization?.contentId && content.lineId === line?.id);
   const intersects = (begin: number | null, end: number | null) => timed(begin, end) && end! > startMs && begin! < endMs;
   const overview = mainLines.filter(item => intersects(item.beginMs, item.endMs));
-  const backgrounds = document.lines.filter(item => item.backgroundOf && intersects(item.beginMs, item.endMs));
+  const backgrounds = displayed.lines.filter(item => item.backgroundOf && intersects(item.beginMs, item.endMs));
   const words = line?.words.filter(word => intersects(word.beginMs, word.endMs)) ?? [];
   const rubies = line?.words.flatMap(word => word.rubyUnits.filter(unit => intersects(unit.beginMs, unit.endMs)).map(unit => ({ word, unit }))) ?? [];
   const currentLayouts = useMemo(() => ({
@@ -63,6 +74,7 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
   }, [bpm, document, endMs, startMs]);
   const pct = (timeMs: number) => `${((timeMs - startMs) / spanMs) * 100}%`;
   const begin = (event: PointerEvent<HTMLElement>, target: TimelineTarget | null, side: Drag['side'], originalMs: number) => {
+    if (event.button !== 0) return;
     event.preventDefault(); event.stopPropagation();
     if (target?.kind === 'line' && (event.shiftKey || event.ctrlKey || event.metaKey)) {
       const ids = document.lines.filter((item) => !item.backgroundOf).map((item) => item.id);
@@ -73,26 +85,42 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
       return;
     }
     const lane = (event.currentTarget.closest('[data-track-lane]') ?? tracksRef.current!.querySelector('[data-track-lane]')) as HTMLElement;
-    const next = { target, side, x: event.clientX, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs };
+    const next: Drag = { target, side, x: event.clientX, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, candidate: { timeMs: originalMs, document, error: '' } };
     event.currentTarget.setPointerCapture(event.pointerId);
+    capture.current = { element: event.currentTarget, id: event.pointerId };
+    if (side !== 'pan') publish({ timeMs: originalMs, valid: true });
     frozenLayouts.current = currentLayouts;
     dragRef.current = next; setDrag(next);
   };
   const move = (event: PointerEvent<HTMLElement>) => {
-    if (!dragRef.current) return;
-    const next = { ...dragRef.current, current: event.clientX };
+    const current = dragRef.current;
+    if (!current) return;
+    const delta = timelineDelta(event.clientX - current.x, current.width, spanMs);
+    const proposed = current.originalMs + delta;
+    const timeMs = current.side === 'select' || current.side === 'pan' ? proposed
+      : snapTimelineTime(proposed, anchors.filter(value => value !== current.originalMs), spanMs, current.width, snap);
+    const candidate = { timeMs, document, error: '' };
+    if (current.target && Math.abs(event.clientX - current.x) >= 3) {
+      const target = current.target;
+      try {
+        candidate.document = current.side === 'move'
+          ? moveTimeline(document, target.kind === 'word' && selectedWords.includes(target.wordId) ? selectedWords.map(wordId => ({ kind: 'word' as const, lineId: target.lineId, wordId })) : target.kind === 'line' && selectedLines.includes(target.lineId) ? selectedLines.map(lineId => ({ kind: 'line' as const, lineId })) : [target], timeMs - current.originalMs)
+          : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs);
+      } catch (cause) { candidate.error = cause instanceof Error ? cause.message : '时间轴编辑失败'; }
+      onError(candidate.error);
+    } else if (current.target) candidate.timeMs = current.originalMs;
+    const next = { ...current, current: event.clientX, candidate };
     dragRef.current = next; setDrag(next);
-    if (next.side === 'pan' && Math.abs(next.current - next.x) >= 4) onPan(next.originalMs - Math.round((next.current - next.x) / next.width * spanMs));
+    if (next.side === 'pan') { if (Math.abs(next.current - next.x) >= 4) onPan(next.originalMs - delta); }
+    else publish({ timeMs: candidate.timeMs, valid: !candidate.error });
   };
   const finish = () => {
     const current = dragRef.current;
-    dragRef.current = null; setDrag(null);
-    if (!current) return;
-    const delta = Math.round((current.current - current.x) / current.width * spanMs);
-    if (current.side === 'pan') return;
+    cancel();
+    if (!current || current.side === 'pan') return;
     if (current.side === 'select') {
-      const first = current.originalMs, last = current.originalMs + delta;
-      setSelectedWords(words.filter((word) => word.beginMs! < Math.max(first, last) && word.endMs! > Math.min(first, last)).map((word) => word.id));
+      const first = current.originalMs, last = current.candidate.timeMs;
+      setSelectedWords(words.filter(word => word.beginMs! < Math.max(first, last) && word.endMs! > Math.min(first, last)).map(word => word.id));
       return;
     }
     if (!current.target || Math.abs(current.current - current.x) < 3) {
@@ -100,15 +128,8 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
       else if (current.target?.kind === 'word') setSelectedWords([current.target.wordId]);
       return;
     }
-    const target = current.target;
-    const proposed = current.originalMs + delta;
-    const timeMs = snap ? snapTime(proposed, anchors.filter((value) => value !== current.originalMs), spanMs * 8 / current.width) : proposed;
-    try {
-      const changed = current.side === 'move'
-        ? moveTimeline(document, target.kind === 'word' && selectedWords.includes(target.wordId) ? selectedWords.map((wordId) => ({ kind: 'word' as const, lineId: target.lineId, wordId })) : target.kind === 'line' && selectedLines.includes(target.lineId) ? selectedLines.map((lineId) => ({ kind: 'line' as const, lineId })) : [target], timeMs - current.originalMs)
-        : resizeTimeline(document, target, current.side, timeMs);
-      apply({ type: 'replace-document', document: changed }); onError('');
-    } catch (cause) { onError(cause instanceof Error ? cause.message : '时间轴编辑失败'); }
+    if (current.candidate.error) { onError(current.candidate.error); return; }
+    apply({ type: 'replace-document', document: current.candidate.document }); onError('');
   };
   const bar = (target: TimelineTarget, label: string, beginMs: number, endMs: number, active = false) => {
     const key = target.kind === 'line' ? target.lineId : target.kind === 'word' ? target.wordId : target.rubyId;
@@ -119,7 +140,7 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
     return <div key={key} data-timeline-key={key}
       className={`${styles.trackBar} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${positionMs >= beginMs && positionMs < endMs ? styles.trackPlaying : ''}`} role="button" tabIndex={0} aria-label={label}
       style={{ left: pct(clippedBegin), width: `${(right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
-      onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { dragRef.current = null; setDrag(null); }}
+      onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
       onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); if (target.kind === 'line') onSelectLine(target.lineId); } }}>
       {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanMs * plotWidth }} /><span className={styles.narrowMarker} title="窄区间，请用时间轴缩放后调整边界" /></>}
       {!narrow && beginMs >= startMs && <span className={styles.trackHandle} aria-label={`${label}开始边界`} onPointerDown={(event) => begin(event, target, 'beginMs', beginMs)} onPointerMove={move} onPointerUp={finish} />}
@@ -129,8 +150,8 @@ export function TimelineTracks({ document, selectedLineId, selectedRomanization,
   };
   const row = (name: string, content: React.ReactNode, selectable = false, laneCount = 1) => <div className={styles.trackRow} key={name}><strong>{name}</strong><div data-track-lane className={styles.trackLane} style={{ height: `calc(${Math.max(1, laneCount)} * var(--timeline-lane-height))` }}
     onPointerDown={(event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); begin(event, null, selectable && event.shiftKey ? 'select' : 'pan', selectable && event.shiftKey ? startMs + Math.round((event.clientX - rect.left) / rect.width * spanMs) : startMs); } }}
-    onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { dragRef.current = null; setDrag(null); }}>
-    {content}{drag && drag.side !== 'pan' && <span className={styles.dragGuide} style={{ left: pct(drag.originalMs + Math.round((drag.current - drag.x) / drag.width * spanMs)) }} />}</div></div>;
+    onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}>
+    {content}<TimelineIndicators /></div></div>;
   const closeGap = (left: LyricWord, right: LyricWord) => {
     if (!line || left.endMs === null || right.beginMs === null) return;
     try {

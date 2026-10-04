@@ -114,3 +114,8 @@ export function snapTime(timeMs: number, anchors: number[], toleranceMs: number)
   }, null);
   return nearest?.value ?? timeMs;
 }
+
+/** Shared pixel-to-time conversion for lyric and segment gestures. */
+export const timelineDelta = (pixels: number, width: number, spanMs: number) => Math.round(pixels / width * spanMs);
+export const snapTimelineTime = (timeMs: number, anchors: number[], spanMs: number, width: number, enabled: boolean) =>
+  Math.round(enabled ? snapTime(timeMs, anchors, spanMs * 8 / width) : timeMs);

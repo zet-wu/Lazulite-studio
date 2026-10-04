@@ -1,3 +1,4 @@
+import { TimelineIndicators } from './TimelineIndicators';
 import { useEffect, useRef, useState } from 'react';
 import { studioApi } from '../adapters/http/client';
 import { SPECTRUM_HEIGHT, SPECTRUM_WIDTH, SPECTRUM_WINDOW_MS, spectrumWindow } from '../domain/spectrogram';
@@ -136,7 +137,7 @@ function AssetSpectrum({ vocal, projectId, startMs, endMs, durationMs }: Props) 
   const ready = wanted.current.filter(first => cache.current.get(first)).length;
   return <div className={styles.spectrogram} data-spectrum-ready={ready} data-spectrum-wanted={wanted.current.length}
     data-spectrum-stats={JSON.stringify({ ...stats.current, cacheSize: cache.current.size, evictions: cache.current.evictions, pending: pending.current.size })}>
-    <canvas ref={canvas} aria-label="声谱图" data-timeline-pan="seek" tabIndex={-1} />
+    <div className={styles.spectrumPlot}><canvas ref={canvas} aria-label="声谱图" data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
     {ready < wanted.current.length && !displayError && <small role="status">声谱图加载中…</small>}
     {displayError && <small role="alert">{displayError} <button data-role="secondary" onClick={() => { failed.current.clear(); setError(''); setRetry(value => value + 1); }}>重试声谱图</button></small>}
   </div>;
