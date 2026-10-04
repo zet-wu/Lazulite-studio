@@ -1,5 +1,5 @@
 import { nonemptyTranslations } from '../../domain/sublyrics';
-import { createWord, LYRIC_SCHEMA_VERSION, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationTrack, type RomanizationUnit, type RubyUnit, type TimeMs } from '../../domain/lyric-document';
+import { createWord, LYRIC_SCHEMA_VERSION, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RomanizationUnit, type RubyUnit, type TimeMs } from '../../domain/lyric-document';
 
 const TTML = 'http://www.w3.org/ns/ttml';
 const TTS = 'http://www.w3.org/ns/ttml#styling';
@@ -166,6 +166,39 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   };
 }
 
+// Parentheses in external background nodes are decorative, not lyric text.
+function stripDecoration(text: string) { return text.startsWith('(') && text.endsWith(')') ? text.slice(1, -1) : text; }
+function stripContentDecoration(content: RomanizationContent) {
+  if (content.kind === 'plain') content.text = stripDecoration(content.text);
+  else if (content.units[0]?.text.startsWith('(') && content.units.at(-1)!.text.endsWith(')')) {
+    content.units[0].text = content.units[0].text.slice(1);
+    content.units.at(-1)!.text = content.units.at(-1)!.text.slice(0, -1);
+  }
+}
+function readRomanization(item: Element, lineId: string, absoluteTimes: boolean, namespace: string): RomanizationContent {
+  const id = attr(item, STUDIO, 'id') ?? crypto.randomUUID();
+  if (!item.children.length && attr(item, STUDIO, 'kind') !== 'timed') return { id, lineId, kind: 'plain', text: textOnly(item, 'Transliteration') };
+  const units: RomanizationUnit[] = [];
+  let pending = '';
+  for (const node of Array.from(item.childNodes)) {
+    if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) {
+      const value = node.nodeValue ?? '';
+      if (value.trim() || !/[\r\n]/.test(value) || item.getAttributeNS(XML, 'space') === 'preserve') {
+        if (units.length) units[units.length - 1].text += value; else pending += value;
+      }
+      continue;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE || !is(node as Element, namespace, 'span')) throw new Error('Unsupported transliteration child');
+    const span = node as Element;
+    checkAttributes(span, ['begin', 'end', 'dur']);
+    if (attr(span, TTM, 'role')) throw new Error('Unsupported transliteration role');
+    const [beginMs, endMs] = boundaries(span, 0, null, absoluteTimes);
+    units.push({ id: attr(span, STUDIO, 'id') ?? crypto.randomUUID(), text: pending + textOnly(span, 'Word transliteration'), beginMs, endMs });
+    pending = '';
+  }
+  return { id, lineId, kind: 'timed', units };
+}
+
 export function parseLyricTtml(xml: string): LyricDocument {
   if (new TextEncoder().encode(xml).byteLength > MAX_BYTES) throw new Error('TTML exceeds 2 MiB limit');
   if (/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml)) throw new Error('DTD and external entities are not accepted');
@@ -180,6 +213,8 @@ export function parseLyricTtml(xml: string): LyricDocument {
   const lines: LyricLine[] = [];
   const appleTranslations = new Map<string, LyricLine['translations']>();
   const romanizationTracks: RomanizationTrack[] = [];
+  const backgroundContents: Array<{ parentId: string; content: RomanizationContent }> = [];
+  const backgroundTranslations: Array<{ parentId: string; value: LyricLine['translations'][number] }> = [];
   const inlineRomanizationTracks = new Map<string, RomanizationTrack>();
   const addMetadata = (key: string, value: string) => { (metadata[key] ??= []).push(value); };
   const readAppleMetadata = (node: Element) => {
@@ -206,38 +241,23 @@ export function parseLyricTtml(xml: string): LyricDocument {
           checkAttributes(item, ['for']);
           const lineId = attr(item, null, 'for');
           if (!lineId) throw new Error('iTunes sublyric needs a line reference');
-          if (translation) {
-            const values = appleTranslations.get(lineId) ?? [];
-            values.push({ language: attr(entry, XML, 'lang'), text: textOnly(item, 'iTunes translation') });
-            appleTranslations.set(lineId, values);
-            continue;
-          }
-          const contentId = attr(item, STUDIO, 'id') ?? crypto.randomUUID();
-          if (item.children.length || attr(item, STUDIO, 'kind') === 'timed') {
-            const units: RomanizationUnit[] = [];
-            let pending = '';
-            for (const node of Array.from(item.childNodes)) {
-              if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) {
-                const value = node.nodeValue ?? '';
-                if (value.trim() || !/[\r\n]/.test(value)) {
-                  if (units.length) units[units.length - 1].text += value;
-                  else pending += value;
-                }
-                continue;
-              }
-              if (node.nodeType !== Node.ELEMENT_NODE) throw new Error('Unsupported iTunes transliteration node');
-              const span = node as Element;
-              if (!is(span, ITUNES, 'span')) throw new Error(`Unsupported iTunes transliteration child <${span.localName}>`);
-              checkAttributes(span, ['begin', 'end', 'dur']);
-              const text = pending + textOnly(span, 'Word transliteration');
-              pending = '';
-              const [beginMs, endMs] = boundaries(span, 0, null, absoluteTimes);
-              units.push({ id: attr(span, STUDIO, 'id') ?? crypto.randomUUID(), text, beginMs, endMs });
+          const background = Array.from(item.children).filter(node => attr(node, TTM, 'role') === 'x-bg');
+          if (background.length > 1) throw new Error('Multiple background sublyrics');
+          const main = item.cloneNode(true) as Element;
+          for (const node of Array.from(main.children)) if (attr(node, TTM, 'role') === 'x-bg') node.remove();
+          const parts = [...((!background.length || main.children.length || Array.from(main.childNodes).some(node => node.nodeValue && (node.nodeValue.trim() || root.getAttributeNS(XML, 'space') === 'preserve' || !/[\r\n]/.test(node.nodeValue))) || attr(main, STUDIO, 'id') || attr(main, STUDIO, 'kind')) ? [{ node: main, background: false }] : []),
+            ...background.map(node => ({ node, background: true }))];
+          for (const part of parts) {
+            checkAttributes(part.node, part.background ? [] : ['for']);
+            if (translation) {
+              const value = { language: attr(entry, XML, 'lang'), text: textOnly(part.node, 'iTunes translation') };
+              if (part.background) { value.text = stripDecoration(value.text); backgroundTranslations.push({ parentId: lineId, value }); }
+              else { const values = appleTranslations.get(lineId) ?? []; values.push(value); appleTranslations.set(lineId, values); }
+            } else {
+              const content = readRomanization(part.node, lineId, absoluteTimes, ITUNES);
+              if (part.background) { stripContentDecoration(content); backgroundContents.push({ parentId: lineId, content }); }
+              track!.contents.push(content);
             }
-            if (pending && units.length) units[units.length - 1].text += pending;
-            track!.contents.push({ id: contentId, lineId, kind: 'timed', units });
-          } else {
-            track!.contents.push({ id: contentId, lineId, kind: 'plain', text: textOnly(item, 'iTunes transliteration') });
           }
         }
         if (track) romanizationTracks.push(track);
@@ -319,27 +339,45 @@ export function parseLyricTtml(xml: string): LyricDocument {
       const ignoreSync = attr(child, STUDIO, 'ignoreSync');
       if (ignoreSync !== null && ignoreSync !== 'true' && ignoreSync !== 'false') throw new Error('Invalid draft ignoreSync flag');
       lines.push({ id, words, beginMs, endMs, endLink: readEndLink(child), agentRefs, backgroundOf: null, songPart: part, translations, ignoreSync: ignoreSync === 'true' });
-      inlineRomanizations.forEach((value, index) => {
+      const addInline = (values: typeof inlineRomanizations, lineId: string) => values.forEach((value, index) => {
         const key = `${value.language ?? ''}\u0000${index}`;
         let track = inlineRomanizationTracks.get(key);
         if (!track) {
           track = { id: crypto.randomUUID(), language: value.language, contents: [] };
           inlineRomanizationTracks.set(key, track);
         }
-        track.contents.push({ id: crypto.randomUUID(), lineId: id, kind: 'plain', text: value.text });
+        track.contents.push({ id: crypto.randomUUID(), lineId, kind: 'plain', text: value.text });
       });
+      addInline(inlineRomanizations, id);
       if (background) {
         checkAttributes(background, ['begin', 'end', 'dur']);
         const [bgBegin, bgEnd] = boundaries(background, wordStart, ownEnd, absoluteTimes);
         const bgId = attr(background, STUDIO, 'id') ?? `${id}:bg`;
         const bgStart = bgBegin ?? wordStart;
-        const bgWords = Array.from(background.childNodes).map((node, index) => makeWord(node, bgId, index, bgStart, bgEnd, absoluteTimes)).filter((word): word is LyricWord => word !== null);
-        if (bgWords.length) {
+        const bgTranslations: LyricLine['translations'] = [];
+        const bgRomanizations: typeof inlineRomanizations = [];
+        const bgWords: LyricWord[] = [];
+        for (const [index, node] of Array.from(background.childNodes).entries()) {
+          const role = node.nodeType === Node.ELEMENT_NODE ? attr(node as Element, TTM, 'role') : null;
+          if (role === 'x-translation' || role === 'x-roman') {
+            checkAttributes(node as Element, []);
+            const value = { language: attr(node as Element, XML, 'lang'), text: textOnly(node as Element, role) };
+            (role === 'x-translation' ? bgTranslations : bgRomanizations).push(value);
+          } else {
+            if (role) throw new Error(`Unsupported background role ${role}`);
+            const word = makeWord(node, bgId, index, bgStart, bgEnd, absoluteTimes);
+            if (word) bgWords.push(word);
+          }
+        }
+        addInline(bgRomanizations, bgId);
+        const bgAgents = (attr(background, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
+        if (bgAgents.some(ref => !agents.some(agent => agent.id === ref))) throw new Error(`Unknown agent on line ${bgId}`);
+        if (bgWords[0]?.text.startsWith('(') && bgWords.at(-1)!.text.endsWith(')')) {
           bgWords[0] = { ...bgWords[0], text: bgWords[0].text.replace(/^\(/, '') };
           const last = bgWords.length - 1;
           bgWords[last] = { ...bgWords[last], text: bgWords[last].text.replace(/\)$/, '') };
         }
-        lines.push({ id: bgId, words: bgWords, beginMs: bgBegin ?? (bgWords.every((word) => word.beginMs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginMs!)) : null), endMs: bgEnd ?? (bgWords.every((word) => word.endMs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endMs!)) : null), endLink: null, agentRefs: [], backgroundOf: id, songPart: null, translations: [], ignoreSync: false });
+        lines.push({ id: bgId, words: bgWords, beginMs: bgBegin ?? (bgWords.every((word) => word.beginMs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginMs!)) : null), endMs: bgEnd ?? (bgWords.every((word) => word.endMs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endMs!)) : null), endLink: null, agentRefs: bgAgents, backgroundOf: id, songPart: null, translations: bgTranslations, ignoreSync: false });
       }
     }
   };
@@ -354,10 +392,20 @@ export function parseLyricTtml(xml: string): LyricDocument {
     if (!line) throw new Error(`iTunes sublyric refers to unknown line ${id}`);
     line.translations.push(...translations);
   }
+  for (const { parentId, content } of backgroundContents) {
+    const background = lines.find(line => line.backgroundOf === parentId);
+    if (!background) throw new Error(`Background transliteration refers to unknown parent ${parentId}`);
+    content.lineId = background.id;
+  }
+  for (const { parentId, value } of backgroundTranslations) {
+    const background = lines.find(line => line.backgroundOf === parentId);
+    if (!background) throw new Error(`Background translation refers to unknown parent ${parentId}`);
+    background.translations.push(value);
+  }
   for (const line of lines) line.translations = nonemptyTranslations(line.translations);
   romanizationTracks.push(...inlineRomanizationTracks.values());
   for (const track of romanizationTracks) for (const content of track.contents) {
-    if (!lines.some((line) => line.id === content.lineId && !line.backgroundOf)) throw new Error(`iTunes transliteration refers to unknown line ${content.lineId}`);
+    if (!lines.some((line) => line.id === content.lineId)) throw new Error(`iTunes transliteration refers to unknown line ${content.lineId}`);
   }
   // Resolve all relative endpoints before quantizing; never round each ancestor.
   const quantize = (item: { beginMs: TimeMs; endMs: TimeMs }) => {
@@ -429,17 +477,25 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
         const entry = xml.createElementNS(ITUNES, 'transliteration');
         if (draft) entry.setAttributeNS(STUDIO, 'studio:id', track.id);
         if (track.language !== null) entry.setAttributeNS(XML, 'xml:lang', track.language);
+        let previousMain: { lineId: string; node: Element } | null = null;
         for (const content of track.contents) {
-          if (!document.lines.some((line) => line.id === content.lineId && !line.backgroundOf)) throw new Error(`Transliteration refers to unknown line ${content.lineId}`);
-          const textNode = xml.createElementNS(ITUNES, 'text');
-          textNode.setAttribute('for', content.lineId);
+          const line = document.lines.find(line => line.id === content.lineId);
+          if (!line) throw new Error(`Transliteration refers to unknown line ${content.lineId}`);
+          const parentId = line.backgroundOf ?? line.id;
+          const parent: Element = line.backgroundOf && previousMain?.lineId === parentId ? previousMain.node : xml.createElementNS(ITUNES, 'text');
+          parent.setAttribute('for', parentId);
+          if (!parent.parentNode) entry.appendChild(parent);
+          previousMain = line.backgroundOf || !draft && content.kind === 'plain' && !content.text ? null : { lineId: line.id, node: parent };
+          const textNode = line.backgroundOf ? xml.createElementNS(ITUNES, 'span') : parent;
+          if (line.backgroundOf) textNode.setAttributeNS(TTM, 'ttm:role', 'x-bg');
           if (draft) {
             textNode.setAttributeNS(STUDIO, 'studio:id', content.id);
-            if (content.kind === 'timed') textNode.setAttributeNS(STUDIO, 'studio:kind', 'timed');
+            textNode.setAttributeNS(STUDIO, 'studio:kind', content.kind);
           }
-          if (content.kind === 'plain') textNode.textContent = content.text;
+          if (content.kind === 'plain') textNode.appendChild(xml.createTextNode(line.backgroundOf ? `(${content.text})` : content.text));
           else {
             if (!draft && !content.units.length) throw new Error(`Timed transliteration ${content.id} has no units`);
+            if (line.backgroundOf && content.units.length) textNode.appendChild(xml.createTextNode('('));
             for (const unit of content.units) {
               if (!draft && /^\s+$/.test(unit.text) && unit.beginMs === null && unit.endMs === null) {
                 textNode.appendChild(xml.createTextNode(unit.text)); continue;
@@ -451,8 +507,9 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
               span.textContent = unit.text;
               textNode.appendChild(span);
             }
+            if (line.backgroundOf && content.units.length) textNode.appendChild(xml.createTextNode(')'));
           }
-          entry.appendChild(textNode);
+          if (line.backgroundOf) parent.appendChild(textNode);
         }
         group.appendChild(entry);
       }
@@ -535,12 +592,20 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     }
     const bg = backgrounds.get(line.id);
     if (bg) {
-      if (bg.ignoreSync || bg.translations.length) throw new Error(`Background vocal ${bg.id} has fields not yet mapped to TTML`);
+      if (bg.ignoreSync) throw new Error(`Background vocal ${bg.id} has fields not yet mapped to TTML`);
       const span = xml.createElementNS(TTML, 'span');
       span.setAttributeNS(TTM, 'ttm:role', 'x-bg');
       if (draft) span.setAttributeNS(STUDIO, 'studio:id', bg.id);
+      if (bg.agentRefs.length) span.setAttributeNS(TTM, 'ttm:agent', bg.agentRefs.join(' '));
       setTime(span, bg.beginMs, bg.endMs, draft);
       bg.words.forEach((word, index) => appendWord(span, word, `${index === 0 ? '(' : ''}${word.text}${index === bg.words.length - 1 ? ')' : ''}`));
+      for (const item of nonemptyTranslations(bg.translations)) {
+        const translation = xml.createElementNS(TTML, 'span');
+        translation.setAttributeNS(TTM, 'ttm:role', 'x-translation');
+        if (item.language) translation.setAttributeNS(XML, 'xml:lang', item.language);
+        translation.textContent = item.text;
+        span.appendChild(translation);
+      }
       p.appendChild(span);
     }
     div.appendChild(p);

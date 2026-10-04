@@ -51,7 +51,6 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
     if (item.romanLyric) plainTrack.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: item.romanLyric });
     return line;
   });
-  for (const line of lines) if (line.backgroundOf) line.agentRefs = [];
   return { ...createLyricDocument(), lines,
     agents: [{ id: 'v1', name: null, type: 'person' }, { id: 'v2', name: null, type: 'person' }],
     romanizationTracks: [timedTrack, plainTrack].filter((track) => track.contents.length) };

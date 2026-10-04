@@ -24,8 +24,8 @@ export function rubySourceRows(document: LyricDocument, trackId: string, content
   const requested = new Set(contentIds);
   if (!requested.size || contentIds.some((id) => !track.contents.some((content) => content.id === id))) throw new Error('请选择当前轨道中的音译内容');
   return track.contents.filter((content) => requested.has(content.id)).flatMap((content: RomanizationContent) => {
-    const line = document.lines.find((item) => item.id === content.lineId && !item.backgroundOf);
-    if (!line) throw new Error('音译主行已不存在');
+    const line = document.lines.find((item) => item.id === content.lineId);
+    if (!line) throw new Error('音译所属行已不存在');
     const units = content.kind === 'plain'
       ? [{ id: null, text: content.text, beginMs: null, endMs: null }]
       : content.units.map((unit) => ({ ...unit }));

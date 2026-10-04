@@ -211,9 +211,9 @@ export function EditorWorkspace(props: Props) {
   const ordinalById = visibleLineOrdinals(document);
   const mainIds = mainLines.map((line) => line.id);
   const occupiedParents = new Set(document.lines.filter(line => line.backgroundOf && line.id !== selectedLine?.id).map(line => line.backgroundOf));
-  const selectedMainLines = selectedLine?.backgroundOf ? [] : selection?.kind === 'lines' && selection.ids.length
-    ? mainLines.filter((line) => selection.ids.includes(line.id))
-    : selectedLine && !selectedLine.backgroundOf ? [selectedLine] : [];
+  const propertyLines = selectedLine?.backgroundOf && !(selection?.kind === 'lines' && selection.ids.includes(selectedLine.id)) ? [selectedLine]
+    : selection?.kind === 'lines' && selection.ids.length ? document.lines.filter(line => selection.ids.includes(line.id)) : selectedLine ? [selectedLine] : [];
+  const selectedMainLines = propertyLines.filter(line => !line.backgroundOf);
   const selectedWordLineIndexes = selection?.kind === 'words'
     ? document.lines.flatMap((line, index) => line.words.some((word) => selection.ids.includes(word.id)) ? [index] : []) : [];
   const selectLine = (line: LyricLine, shift = false, toggle = false) => {
@@ -513,9 +513,9 @@ export function EditorWorkspace(props: Props) {
         { label: '生成日文注音…', run: () => openJapaneseRuby(effective.ids) },
         { label: '前插行', run: () => { const index = mainLines.findIndex((item) => item.id === id); dispatch({ type: 'insert-line', afterLineId: mainLines[index - 1]?.id ?? null }); } },
         { label: '后插行', run: () => dispatch({ type: 'insert-line', afterLineId: id }) },
-        ...(!line.backgroundOf && document.romanizationTracks.some(track => track.contents.some(content => content.lineId === line.id))
-          ? [{ label: '从音译生成 注音…', run: () => setRubyGeneration({ lineIds: effective.ids.filter(id => mainIds.includes(id)) }) }] : []),
-        ...(!line.backgroundOf ? [{ label: '生成日文罗马字音译…', run: () => setRomanizationGeneration(effective.ids.filter(id => mainIds.includes(id))) }] : []),
+        ...(document.romanizationTracks.some(track => track.contents.some(content => content.lineId === line.id))
+          ? [{ label: '从音译生成 注音…', run: () => setRubyGeneration({ lineIds: effective.ids }) }] : []),
+        { label: '生成日文罗马字音译…', run: () => setRomanizationGeneration(effective.ids) },
         { label: '添加词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') }) },
         { label: '行上移', disabled: Boolean(line.backgroundOf) || mainLines[0]?.id === line.id, run: () => moveLine(line, -1) },
         { label: '行下移', disabled: Boolean(line.backgroundOf) || mainLines.at(-1)?.id === line.id, run: () => moveLine(line, 1) },
@@ -702,8 +702,8 @@ export function EditorWorkspace(props: Props) {
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
       canGenerateJapaneseRuby={selection?.kind === 'lines' && selection.ids.length > 0} openJapaneseRuby={() => openJapaneseRuby(selection?.kind === 'lines' ? selection.ids : [])}
-      canGenerateRuby={selectedMainLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
-      canGenerateRomanization={selectedMainLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(selectedMainLines.map(line => line.id))} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: selectedMainLines.map((line) => line.id) })} />}
+      canGenerateRuby={propertyLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
+      canGenerateRomanization={propertyLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(propertyLines.map(line => line.id))} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: propertyLines.map((line) => line.id) })} />}
     {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} onClick={event => {
       const button = (event.target as Element).closest('[data-outline-drag]');
       if (!button) return;
@@ -733,8 +733,8 @@ export function EditorWorkspace(props: Props) {
               props.onSelectLine?.(line.id); props.onSelectUnit?.(line.id, word.id, null); return true;
             }} />
           </div>
-          {!line.backgroundOf && <TranslationEditor items={line.translations} apply={items => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items })} />}
-          {!line.backgroundOf && <div className={styles.romanizationTracks}>
+          {<TranslationEditor items={line.translations} apply={items => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items })} />}
+          {<div className={styles.romanizationTracks}>
             {displayed.romanizationTracks.map((track, trackIndex) => {
               const contents = track.contents.filter((content) => content.lineId === line.id);
               return <div key={track.id}>
@@ -759,8 +759,8 @@ export function EditorWorkspace(props: Props) {
         <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />
         {selectedMainLines.length > 0 && <>
           <BooleanField label="跳过打轴" switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={selectedMainLines.every(line => line.ignoreSync)} mixed={selectedMainLines.some(line => line.ignoreSync) && !selectedMainLines.every(line => line.ignoreSync)} onChange={checked => dispatch({type:'batch', commands:selectedMainLines.map(line=>({type:'set-ignore-sync',lineId:line.id,ignoreSync:checked}))})}/>
-          <SingerSelection agents={document.agents} lines={selectedMainLines} apply={dispatch} />
         </>}
+        <SingerSelection agents={document.agents} lines={propertyLines} apply={dispatch} />
         {selection?.kind !== 'lines' || selection.ids.length <= 1 ? <>
           <BooleanField label="背景歌词" switchControl checked={Boolean(selectedLine.backgroundOf)} onChange={(checked) => {
             if (!checked) { dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: null }); return; }
@@ -775,7 +775,6 @@ export function EditorWorkspace(props: Props) {
           }}>
             <option value="">请选择</option>{mainLines.filter((line) => line.id !== selectedLine.id && !occupiedParents.has(line.id)).map((line) => <option key={line.id} value={line.id}>L{ordinalById.get(line.id)}</option>)}
           </Select></label>
-          {selectedLine.backgroundOf && <p>歌手继承自所属主行：{document.lines.find((line) => line.id === selectedLine.backgroundOf)?.agentRefs.map((id) => document.agents.find((agent) => agent.id === id)?.name ?? id).join('、') || '未指定'}</p>}
         </> : null}
       </>}
       </div></aside>}</div>}

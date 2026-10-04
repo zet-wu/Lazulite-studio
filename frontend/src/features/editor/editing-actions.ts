@@ -56,7 +56,7 @@ export function copySelection(document: LyricDocument, selection: EditorSelectio
   }
   const groups = document.lines.filter((line) => !line.backgroundOf && selection.ids.includes(line.id)).map((line) => ({
     line, background: document.lines.find((item) => item.backgroundOf === line.id) ?? null,
-    romanizations: document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === line.id).map((content) => ({ trackId: track.id, content }))),
+    romanizations: document.romanizationTracks.flatMap((track) => track.contents.filter((content) => (content.lineId === line.id || document.lines.some(bg => bg.id === content.lineId && bg.backgroundOf === line.id))).map((content) => ({ trackId: track.id, content }))),
   }));
   return { kind: 'lines', groups, text: groups.map(({ line }) => lineText(line)).join('\n') };
 }
@@ -128,7 +128,7 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
       selection: { ...selection, ids: copied.map((unit) => unit.id), anchorId: copied[0].id, activeId: copied.at(-1)!.id } };
   }
   if (clipboard.kind === 'romanization-content') {
-    if (!currentLine || currentLine.backgroundOf) throw new Error('请先选择主歌词行');
+    if (!currentLine) throw new Error('请先选择歌词行');
     const contents = clipboard.contents.map((content) => content.kind === 'plain'
       ? { ...content, id: crypto.randomUUID(), lineId: currentLine.id }
       : { ...content, id: crypto.randomUUID(), lineId: currentLine.id, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) });
@@ -166,13 +166,12 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
     commands.push({ type: 'insert-line', afterLineId: after, line });
     if (group.background) {
       const background = cloneLine(group.background, `${id}:bg`, null);
-      background.agentRefs = [];
       commands.push({ type: 'insert-line', afterLineId: id, line: background });
       commands.push({ type: 'set-background-of', lineId: background.id, parentLineId: id });
     }
     for (const { trackId, content } of group.romanizations) commands.push({ type: 'insert-romanization-content', trackId, content: content.kind === 'plain'
-      ? { ...content, id: crypto.randomUUID(), lineId: id }
-      : { ...content, id: crypto.randomUUID(), lineId: id, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) } });
+      ? { ...content, id: crypto.randomUUID(), lineId: content.lineId === group.line.id ? id : `${id}:bg` }
+      : { ...content, id: crypto.randomUUID(), lineId: content.lineId === group.line.id ? id : `${id}:bg`, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) } });
     ids.push(id);
     after = id;
   }

@@ -96,6 +96,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   const track = source.romanizationTracks.find(item => item.id === trackId);
   const lines = useMemo(() => new Map(source.lines.map(line => [line.id, line])), [source]);
   const ordinals = useMemo(() => new Map(source.lines.filter(line => !line.backgroundOf).map((line, index) => [line.id, index + 1])), [source]);
+  const lineLabel = (id: string) => { const line = source.lines.find(line => line.id === id)!; return `L${ordinals.get(line.backgroundOf ?? id)}${line.backgroundOf ? ' · 背景' : ''}`; };
   const targetFor = (lineId: string) => targets[lineId] ?? (track?.contents.some(content => content.lineId === lineId) ? 'skip' : 'append');
   let issue = '';
   try { prepareRomanization(document, source, rows, { trackId: trackId || null, targets }); }
@@ -128,20 +129,20 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
             if (row.kind === 'timed') row.groups.forEach((unit, index) => { const list = byWord.get(unit.wordId) ?? []; list.push({ unit, index }); byWord.set(unit.wordId, list); });
             return <div key={row.lineId} ref={item ? virtualizer.measureElement : undefined} data-index={item?.index} data-roman-proposal={row.lineId}
             style={item ? { position: 'absolute', width: '100%', transform: `translateY(${item.start}px)` } : undefined} className={`${styles.rubyGenerationRow} ${styles.romanGenerationRow}`}>
-            <label className={styles.romanTarget}>L{ordinals.get(row.lineId)} <Select quotes={Object.fromEntries((track?.contents.filter(content => content.lineId === row.lineId) ?? []).map(content => [content.id, { prefix: '替换 · ', text: content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('') }]))} aria-label={`L${ordinals.get(row.lineId)}生成内容`} value={targetFor(row.lineId)} onChange={event => setTargets(current => ({ ...current, [row.lineId]: event.target.value }))}>
+            <label className={styles.romanTarget}>{lineLabel(row.lineId)} <Select quotes={Object.fromEntries((track?.contents.filter(content => content.lineId === row.lineId) ?? []).map(content => [content.id, { prefix: '替换 · ', text: content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('') }]))} aria-label={`${lineLabel(row.lineId)}生成内容`} value={targetFor(row.lineId)} onChange={event => setTargets(current => ({ ...current, [row.lineId]: event.target.value }))}>
               <option value="skip">跳过 · 保留已有</option><option value="append">添加新内容</option>
               {track?.contents.filter(content => content.lineId === row.lineId).map(content => <option key={content.id} value={content.id}>替换 · {content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</option>)}
             </Select></label>
             <div className={styles.romanPreviewWords}>
               {lines.get(row.lineId)!.words.map(word => row.kind === 'timed'
-                ? <TimedWordPreview key={word.id} word={word} units={byWord.get(word.id) ?? []} lineLabel={`L${ordinals.get(row.lineId)}`}
+                ? <TimedWordPreview key={word.id} word={word} units={byWord.get(word.id) ?? []} lineLabel={`${lineLabel(row.lineId)}`}
                   change={(text, key) => changeText(row.lineId, text, key)} focus={active => setFocusedRow(active ? row.lineId : null)} />
                 : <div key={word.id} className={styles.romanPreviewWord} data-source-word={word.id}>
                   <div className={styles.romanPreviewReading}>{word.rubyUnits.map(unit => unit.reading).join(' ')}</div>
                   <div className={styles.romanPreviewBody}>{word.text}</div>
                 </div>)}
             </div>
-            {row.kind === 'plain' && <ProposalText multiline text={row.text} hint={row.hint} label={`L${ordinals.get(row.lineId)}音译`}
+            {row.kind === 'plain' && <ProposalText multiline text={row.text} hint={row.hint} label={`${lineLabel(row.lineId)}音译`}
               change={text => changeText(row.lineId, text)} focus={active => setFocusedRow(active ? row.lineId : null)} />}
           </div>; })}
         </div>

@@ -23,7 +23,7 @@ function previewRomanization(line: LyricLine, content: RomanizationContent | und
 
 /** Pure whitespace uses AMLL’s independent 0–0 text nodes; all timings remain a preview projection. */
 export function toAmllLines(document: LyricDocument, showTranslation: boolean, showRomanization: boolean, trackId?: string | null): PreviewLine[] {
-  const leadAgent = document.agents.find((agent) => document.lines.some((line) => !line.backgroundOf && line.agentRefs.includes(agent.id)))?.id;
+  const leadAgent = document.agents.find((agent) => document.lines.some((line) => line.agentRefs.includes(agent.id)))?.id;
   return document.lines.flatMap((line) => {
     const timedWords = line.words.filter((word) => valid(word.beginMs, word.endMs));
     const begin = line.beginMs ?? timedWords[0]?.beginMs ?? null;
@@ -38,12 +38,11 @@ export function toAmllLines(document: LyricDocument, showTranslation: boolean, s
       romanWord: roman.words.get(word.id) || undefined, obscene: word.obscene,
       ruby: word.rubyUnits.filter((unit) => valid(unit.beginMs, unit.endMs)).map((unit) => ({ word: unit.reading, startTime: milliseconds(unit.beginMs!), endTime: milliseconds(unit.endMs!) })),
     })) : [{ word: lineText(line), startTime: milliseconds(begin), endTime: milliseconds(end!) }];
-    const effective = line.backgroundOf ? document.lines.find((item) => item.id === line.backgroundOf) ?? line : line;
     return [{ id: line.id, lyric: {
       words, startTime: milliseconds(begin), endTime: milliseconds(end!),
       translatedLyric: showTranslation ? line.translations.map((item) => item.text).join(' / ') : '',
       romanLyric: roman.words.size ? '' : roman.text,
-      isBG: Boolean(line.backgroundOf), isDuet: Boolean(leadAgent && effective.agentRefs.length && !effective.agentRefs.includes(leadAgent)),
+      isBG: Boolean(line.backgroundOf), isDuet: Boolean(leadAgent && line.agentRefs.length && !line.agentRefs.includes(leadAgent)),
     } }];
   });
 }

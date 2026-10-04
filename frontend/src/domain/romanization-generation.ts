@@ -93,7 +93,7 @@ export function proposeRomanization(document: LyricDocument, lineIds: readonly s
 export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: RomanizationKind): RomanizationProposal[];
 export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: RomanizationKind = 'plain'): RomanizationProposal[] {
   const selected = new Set(lineIds);
-  return document.lines.filter(line => selected.has(line.id) && !line.backgroundOf).map(line => {
+  return document.lines.filter(line => selected.has(line.id)).map(line => {
     const groups = generateLine(line);
     return kind === 'timed' ? { lineId: line.id, kind, groups } : { lineId: line.id, kind, text: groups.map(unit => unit.text).join('') || ' ', hint: groups.some(unit => unit.hint) ? '自动结果有空转换或特殊分片，可修正或保留' : '' };
   });

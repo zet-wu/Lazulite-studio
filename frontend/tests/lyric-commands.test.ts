@@ -87,12 +87,14 @@ describe('semantic lyric commands', () => {
     expect(detached.present.lines[1]).toMatchObject({ id: 'bg', backgroundOf: null, words: background.words });
   });
 
-  it('does not turn a line with attached transliteration into a background row', () => {
+  it('preserves attached transliteration when establishing a background relation', () => {
     const document = createLyricDocument('主唱');
     const candidate = createLine('保留音译', 'candidate');
     document.lines.push(candidate);
     document.romanizationTracks.push({ id: 'track', language: null, contents: [{ id: 'content', lineId: candidate.id, kind: 'plain', text: 'romaji' }] });
-    expect(() => executeLyricCommand(createLyricEditorState(document), { type: 'set-background-of', lineId: candidate.id, parentLineId: document.lines[0].id })).toThrow(/音译内容/);
+    const result = executeLyricCommand(createLyricEditorState(document), { type: 'set-background-of', lineId: candidate.id, parentLineId: document.lines[0].id });
+    expect(result.present.romanizationTracks).toEqual(document.romanizationTracks);
+    expect(undoLyricCommand(result).present).toBe(document);
   });
 
   it('edits and reorders independent transliteration units in one undoable command each', () => {
@@ -215,14 +217,13 @@ describe('semantic lyric commands', () => {
   });
 });
 
-it.each(['child', 'translation', 'link', 'referenced'])('P3-05 rejects background %s without modifying document or history', reason => {
+it.each(['child', 'link', 'referenced'])('P3-05 rejects background %s without modifying document or history', reason => {
   const document = createLyricDocument('主唱');
   const main = document.lines[0], source = createLine('源歌词', 'source');
   main.beginMs = 1000; main.endMs = 10000;
   source.beginMs = 2000; source.endMs = 3000;
   document.lines.push(source);
   if (reason === 'child') document.lines.push({ ...createLine('子背景', 'child'), backgroundOf: source.id });
-  if (reason === 'translation') source.translations.push({ language: 'zh', text: '译文保留' });
   if (reason === 'link') source.endLink = { targetLineId: main.id};
   if (reason === 'referenced') main.endLink = { targetLineId: source.id};
   const snapshot = structuredClone(document), state = createLyricEditorState(document);

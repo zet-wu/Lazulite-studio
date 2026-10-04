@@ -75,8 +75,9 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : '生成 注音 失败'); }
   };
   const ordinals = new Map(sourceDocument.lines.filter(line => !line.backgroundOf).map((line, index) => [line.id, index + 1]));
+  const lineLabel = (id: string) => { const line = sourceDocument.lines.find(line => line.id === id)!; return `L${ordinals.get(line.backgroundOf ?? id)}${line.backgroundOf ? ' · 背景' : ''}`; };
   const generatedLines = new Set(sourceRows.map(row => row.lineId)).size;
-  return <SettingsDialog title="从音译生成 注音" subtitle={lineIds.length === 1 && generatedLines === 1 ? `L${ordinals.get(lineIds[0])}` : `生成 ${generatedLines} / ${lineIds.length} 行`} close={close} actions={<><button data-role="secondary" onClick={close}>取消</button><button data-role="primary" disabled={!preview} onClick={submit}>生成 注音</button></>}>
+  return <SettingsDialog title="从音译生成 注音" subtitle={lineIds.length === 1 && generatedLines === 1 ? lineLabel(lineIds[0]) : `生成 ${generatedLines} / ${lineIds.length} 行`} close={close} actions={<><button data-role="secondary" onClick={close}>取消</button><button data-role="primary" disabled={!preview} onClick={submit}>生成 注音</button></>}>
     <div className={styles.rubyGeneration}>
       {stale ? <p role="alert">文档已变化，旧提案不能应用。<button data-role="secondary" onClick={refresh}>重新生成提案</button></p> : <>
         <div className={styles.rubyGenerationOptions}><label>音译轨道 <Select value={trackId} onChange={(event) => selectTrack(event.target.value)}>{tracks.map((track, index) => <option key={track.id} value={track.id}>轨道 {index + 1} · {track.language ?? '未指定语言'}</option>)}</Select></label>
@@ -84,14 +85,14 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
         <details className={styles.sourceChoices}><summary>音译内容</summary><fieldset className={styles.rubyGenerationChoices}><legend>选取具体音译内容</legend>{contents.map((content) => {
           const line = sourceDocument.lines.find((item) => item.id === content.lineId)!;
           return <label key={content.id}><input type="checkbox" checked={contentIds.includes(content.id)} onChange={(event) => { setContentIds((ids) => event.target.checked ? [...ids, content.id] : ids.filter((id) => id !== content.id)); resetChoices(); }} />
-            L{ordinals.get(line.id)} · {content.kind === 'plain' ? content.text : content.units.map((unit) => unit.text).join('')}
+            {lineLabel(line.id)} · {content.kind === 'plain' ? content.text : content.units.map((unit) => unit.text).join('')}
           </label>;
         })}</fieldset></details>
         <RubyProposalRows rows={rows} renderRow={row => {
           const line = sourceDocument.lines.find((item) => item.id === row.lineId)!;
           const selected = Object.hasOwn(assignments, row.key) ? assignments[row.key] ?? '' : row.defaultWordId ?? '';
           return <div className={styles.rubyGenerationRow}>
-            <strong>{row.sourceText || '空单元'}</strong><small>{time(row.beginMs)} – {time(row.endMs)} · L{ordinals.get(line.id)}</small>
+            <strong>{row.sourceText || '空单元'}</strong><small>{time(row.beginMs)} – {time(row.endMs)} · {lineLabel(line.id)}</small>
             <label>目标词 <Select value={selected} disabled={skipped.has(row.key)} onChange={(event) => { const nextWordId = event.target.value || null;
                 setSkipOverrides(current => Object.fromEntries(Object.entries(current).filter(([key]) => {
                   const affected = rows.find(item => item.key === key)!;

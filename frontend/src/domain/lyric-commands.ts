@@ -151,11 +151,10 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (source.id === parent.id || parent.backgroundOf) throw new Error('背景歌词只能附属于另一条主行');
       if (document.lines.some((line) => line.backgroundOf === source.id)) throw new Error('此行已有背景歌词，请先处理所属关系');
       if (document.lines.some((line) => line.backgroundOf === parent.id && line.id !== source.id)) throw new Error('目标主行已有背景歌词');
-      if (document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === source.id))) throw new Error('此行有音译内容，请先转移或删除');
-      if (source.translations.length || source.endLink || document.lines.some((line) => line.endLink?.targetLineId === source.id)) throw new Error('此行有翻译或行尾链接，请先处理');
+      if (source.endLink || document.lines.some((line) => line.endLink?.targetLineId === source.id)) throw new Error('此行有行尾链接，请先处理');
       const lines = document.lines.filter((line) => line.id !== source.id);
       const parentIndex = lines.findIndex((line) => line.id === parent.id);
-      lines.splice(parentIndex + 1, 0, { ...source, backgroundOf: parent.id, agentRefs: [], songPart: null });
+      lines.splice(parentIndex + 1, 0, { ...source, backgroundOf: parent.id, songPart: null });
       return { ...document, lines };
     }
     case 'delete-line': {
@@ -379,7 +378,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     case 'set-line-agents': {
       const index = lineIndex(document, command.lineId);
       const line = document.lines[index];
-      if (line.backgroundOf) throw new Error('Set agents on the parent line');
       if (command.agentRefs.some((ref) => !document.agents.some((agent) => agent.id === ref))) throw new Error('Unknown lyric agent');
       const lines = document.lines.slice();
       lines[index] = { ...line, agentRefs: command.agentRefs };
@@ -396,7 +394,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     }
     case 'set-sublyrics': {
       const index = lineIndex(document, command.lineId);
-      if (document.lines[index].backgroundOf) throw new Error('Background vocal sublyrics are not supported');
       const lines = document.lines.slice();
       const items = nonemptyTranslations(command.items);
       if (items.length === lines[index].translations.length && items.every((item, i) => item.text === lines[index].translations[i].text && item.language === lines[index].translations[i].language)) return document;
@@ -437,7 +434,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       let contents: RomanizationContent[];
       if (command.type === 'insert-romanization-content') {
         if (document.romanizationTracks.some((item) => item.contents.some((content) => content.id === command.content.id))) throw new Error('音译内容 ID 重复');
-        if (!document.lines.some((line) => line.id === command.content.lineId && !line.backgroundOf)) throw new Error('音译主行不存在');
+        if (!document.lines.some((line) => line.id === command.content.lineId)) throw new Error('音译所属行不存在');
         if (command.content.kind === 'timed') {
           if (new Set(command.content.units.map((unit) => unit.id)).size !== command.content.units.length) throw new Error('音译单元 ID 重复');
           command.content.units.forEach((unit) => validTime(unit.beginMs, unit.endMs));
@@ -446,7 +443,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       } else {
         if (contentIndex < 0) throw new Error('音译内容不存在');
         if (command.type === 'set-romanization-content') {
-          if (!document.lines.some((line) => line.id === command.content.lineId && !line.backgroundOf)) throw new Error('音译主行不存在');
+          if (!document.lines.some((line) => line.id === command.content.lineId)) throw new Error('音译所属行不存在');
           if (command.content.kind === 'timed') {
             if (new Set(command.content.units.map((unit) => unit.id)).size !== command.content.units.length) throw new Error('音译单元 ID 重复');
             command.content.units.forEach((unit) => validTime(unit.beginMs, unit.endMs));
@@ -461,7 +458,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     case 'move-romanization-content': {
       const index = document.romanizationTracks.findIndex((track) => track.id === command.trackId);
       if (index < 0) throw new Error('音译轨道不存在');
-      if (!document.lines.some((line) => line.id === command.lineId && !line.backgroundOf)) throw new Error('音译主行不存在');
+      if (!document.lines.some((line) => line.id === command.lineId)) throw new Error('音译所属行不存在');
       const track = document.romanizationTracks[index];
       const content = track.contents.find((item) => item.id === command.contentId);
       if (!content) throw new Error('音译内容不存在');
