@@ -13,7 +13,6 @@ const shifted = (value: TimeMs, delta: number): TimeMs => {
 export function shiftLineTimes(document: LyricDocument, lineIds: string[], deltaMs: number): LyricCommand {
   if (!Number.isSafeInteger(deltaMs)) throw new Error('时间偏移必须是整数毫秒');
   const selected = new Set(lineIds);
-  for (const line of document.lines) if (line.backgroundOf && selected.has(line.backgroundOf)) selected.add(line.id);
   const shiftedLines = document.lines.map((line): LyricLine => {
     if (!selected.has(line.id)) return line;
     return { ...line, beginMs: shifted(line.beginMs, deltaMs), endMs: shifted(line.endMs, deltaMs),

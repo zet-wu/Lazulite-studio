@@ -21,14 +21,26 @@ describe('E6 timeline editing', () => {
     return document;
   };
 
-  it('moves a line with its 注音, alignment and background in one undo step', () => {
+  it('moves only the explicitly selected line and its own children in one undo step', () => {
     const document = sample();
     const word = document.lines[0].words[0];
     const moved = moveTimeline(document, [{ kind: 'line', lineId: document.lines[0].id }], 500);
     const state = executeLyricCommand(createLyricEditorState(document), { type: 'replace-document', document: moved });
     expect(state.present.lines[0].words[0].rubyUnits[0].beginMs).toBe(1500);
-    expect(state.present.lines[1].words[0].beginMs).toBe(2000);
+    expect(state.present.lines[1]).toBe(document.lines[1]);
     expect(undoLyricCommand(state).present).toBe(document);
+  });
+
+  it('moves explicit background and main selections once, including their own timed romanization', () => {
+    const document = sample();
+    document.romanizationTracks = [{ id: 'track', language: 'ja-Latn', contents: document.lines.map(line => ({ id: `roman-${line.id}`, lineId: line.id, kind: 'timed', units: [{ id: `unit-${line.id}`, text: ' a ', beginMs: 1600, endMs: 2000 }] })) }];
+    const background = moveTimeline(document, [{ kind: 'line', lineId: 'bg' }], 100);
+    expect(background.lines[0]).toBe(document.lines[0]);
+    expect(background.lines[1].beginMs).toBe(1600);
+    expect(background.romanizationTracks[0].contents[0]).toBe(document.romanizationTracks[0].contents[0]);
+    const both = moveTimeline(document, document.lines.flatMap(line => [{ kind: 'line' as const, lineId: line.id }, { kind: 'line' as const, lineId: line.id }]), 100);
+    expect(both.lines.map(line => line.beginMs)).toEqual([1100, 1600]);
+    expect(both.romanizationTracks[0].contents.map(content => content.kind === 'timed' && content.units[0].beginMs)).toEqual([1700, 1700]);
   });
 
   it('resizes a 注音 edge and updates its parent without changing another word', () => {

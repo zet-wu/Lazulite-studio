@@ -43,7 +43,6 @@ export function moveTimeline(document: LyricDocument, targets: TimelineTarget[],
   if (!targets.length || !deltaMs) return document;
   if (targets.every((target) => target.kind === 'line')) {
     const ids = new Set(targets.map((target) => target.lineId));
-    for (const line of document.lines) if (line.backgroundOf && ids.has(line.backgroundOf)) ids.add(line.id);
     return (shiftLineTimes(document, [...ids], deltaMs) as Extract<ReturnType<typeof shiftLineTimes>, { type: 'replace-document' }>).document;
   }
   let result = document;
