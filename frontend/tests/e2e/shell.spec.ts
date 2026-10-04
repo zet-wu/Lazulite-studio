@@ -108,6 +108,7 @@ test('previews the current lyrics and returns to editing', async ({ page }) => {
 
 test('keeps the sync cursor separate from lyric undo', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
+  await page.locator('[data-outline-drag]').first().click();
   await page.getByRole('button', { name: '打轴', exact: true }).click();
   const panel = page.getByRole('region', { name: '连续打轴' });
   await expect(panel.getByText('L1 · 单元 1 / 1')).toBeVisible();
@@ -120,6 +121,7 @@ test('keeps the sync cursor separate from lyric undo', async ({ page }) => {
 
 test('moves a timed word on the timeline and undoes the move', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
+  await page.locator('[data-outline-drag]').first().click();
   const start = page.getByRole('textbox', { name: '词 夜の風が静かに吹く开始秒数' });
   const end = page.getByRole('textbox', { name: '词 夜の風が静かに吹く结束秒数' });
   await start.fill('0'); await start.blur();

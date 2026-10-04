@@ -5,6 +5,7 @@ import styles from './semantic-editor.module.css';
 type Props = MenuState & {
   selection: EditorSelection | null;
   canPaste: boolean;
+  canCopy: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   copy: () => void;
@@ -34,8 +35,8 @@ export function EditorRibbon(props: Props) {
   return <div className={styles.ribbon} aria-label="编辑操作">
     <span>{selection ? `${selection.kind === 'words' ? '词' : selection.kind === 'lines' ? '行' : selection.kind === 'ruby' ? '注音' : selection.kind === 'romanization-unit' ? '音译单元' : '音译内容'}已选 ${selection.ids.length}` : '当前行'}</span>
     <TopMenu id="clipboard" title="选择与剪贴" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
-      <button data-role="inline" onClick={props.copy} disabled={selection?.ids.length === 0}>复制</button>
-      <button data-role="inline" onClick={props.cut} disabled={selection?.ids.length === 0}>剪切</button>
+      <button data-role="inline" onClick={props.copy} disabled={!selection?.ids.length || !props.canCopy}>复制</button>
+      <button data-role="inline" onClick={props.cut} disabled={!selection?.ids.length || !props.canCopy}>剪切</button>
       <button data-role="inline" onClick={props.remove} disabled={!selection?.ids.length}>删除</button>
       <button data-role="inline" onClick={props.paste} disabled={!props.canPaste}>粘贴</button>
       <button data-role="inline" onClick={props.selectAll}>全选</button>

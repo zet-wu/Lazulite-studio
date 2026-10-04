@@ -1,3 +1,5 @@
+import { useEditorSelection } from './editor/SelectionContext';
+import { selectionEnvelope, documentTargets, targetInterval } from './editor/selection-targets';
 import { TimelineIndicators, TimelineIndicatorContext, type TimelinePreview } from './TimelineIndicators';
 import { Select } from '../shared/Select';
 import { useAudioReview } from './AudioReviewContext';
@@ -53,9 +55,7 @@ type Props = {
   onPosition?: (positionMs: number) => void;
   document?: LyricDocument;
   selectedLineId?: string | null;
-  selectedRomanization?: { trackId: string; contentId: string } | null;
   onTimelineCommand?: (command: LyricCommand) => void;
-  onSelectLine?: (lineId: string) => void;
 };
 
 export type TransportHandle = {
@@ -77,13 +77,18 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   onPosition,
   document,
   selectedLineId,
-  selectedRomanization,
   onTimelineCommand,
-  onSelectLine,
 }: Props, ref) {
   const ui=useAudioReview();
-  const segment=ui?.selected.length===1?acoustics?.segments.find(s=>s.id===ui.selected[0]):undefined;
-  const loopRange=ui?.segmentTarget?(segment?{begin_ms:segment.beginMs,end_ms:segment.endMs}:undefined):lyricLoopRange;
+  const sharedSelection = useEditorSelection();
+  useEffect(() => {
+    if (sharedSelection?.effective?.kind !== 'segments') return;
+    const ids = sharedSelection.selectedSegments.filter(id => acoustics?.segments.some(segment => segment.id === id));
+    if (ids.length !== sharedSelection.selectedSegments.length) sharedSelection.setSelectedSegments(ids);
+  }, [acoustics, sharedSelection?.effective]);
+  const selectedSegments = acoustics?.segments.filter(segment => sharedSelection?.selectedSegments.includes(segment.id)) ?? [];
+  const lyricEnvelope = document && sharedSelection ? selectionEnvelope(document, sharedSelection.selection, asset?.duration_ms ?? 0) : { range: lyricLoopRange, reason: '' };
+  const loopRange = sharedSelection?.effective?.kind === 'segments' ? (selectedSegments.length ? { begin_ms: Math.min(...selectedSegments.map(segment => segment.beginMs)), end_ms: Math.max(...selectedSegments.map(segment => segment.endMs)) } : undefined) : lyricEnvelope.range;
   const plotsRef=useRef<HTMLDivElement>(null);
   const keys = useShortcuts();
   const results = useQuery({ queryKey:['vocals',projectId], queryFn:()=>vocalApi.list(projectId), refetchInterval:3000, enabled:!!asset });
@@ -136,7 +141,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [snap, setSnap] = useState(true);
   const [bottomExpanded, setExpanded] = useState(true);
   const expanded = !!timelineHost || bottomExpanded;
-  const [visible, setVisible] = useState({ line: true, word: true, ruby: true, gap: true, spectrum: false, wave: true, energy:true, segments:true });
+  const [visible, setVisible] = useState({ line: true, word: true, ruby: true, romanization: true, gap: true, spectrum: false, wave: true, energy:true, segments:true });
   const { width, ratio } = useCanvasMetrics(canvas, expanded, timelineHost);
   const [follow, setFollow] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
@@ -561,8 +566,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         <IconButton data-role="secondary" disabled={disabled} icon="minus" label="缩小波形" onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}/>
         <span className={styles.viewportRange}>视窗 {fmt(start)} – {fmt(end)}</span>
         <div className={styles.visibility} aria-label="时间轴图层">
-          {(['line', 'word', 'ruby', 'gap', 'wave', 'spectrum', ...(timelineHost?['energy','segments'] as const:[])] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
-            {({ line: '行', word: '词', ruby: '注音', gap: '空隙', wave: '波形', spectrum: '声谱图', energy:'能量',segments:'片段' })[key]}
+          {(['line', 'word', 'ruby', 'romanization', 'gap', 'wave', 'spectrum', ...(timelineHost?['energy','segments'] as const:[])] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
+            {({ line: '行', word: '词', ruby: '注音', romanization: '音译', gap: '空隙', wave: '波形', spectrum: '声谱图', energy:'能量',segments:'片段' })[key]}
           </button>)}
         </div>
 </>);
@@ -615,12 +620,12 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       {timelineError && <p role="alert" className={styles.error}>{timelineError}</p>}
       {timelineHost && <div className={styles.header}>{viewportTools}</div>}
 
-      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?' 背景':''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document?.lines.flatMap(l=>[l,...l.words,...l.words.flatMap(w=>w.rubyUnits)]).flatMap(u=>[u.beginMs,u.endMs]).filter((t):t is number=>t!==null&&t>=startMs&&t<=endMs)??[]} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
-      {document && onTimelineCommand && onSelectLine && <>
+      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?' 背景':''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document ? documentTargets(document).flatMap(target => { const value = targetInterval(document, target); return value ? [value.beginMs, value.endMs].filter((time): time is number => time !== null) : []; }) : []} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
+      {document && onTimelineCommand && <>
 
-        <TimelineTracks document={document} selectedLineId={selectedLineId ?? null} selectedRomanization={selectedRomanization ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
-          visible={visible}
-          apply={onTimelineCommand} onSelectLine={id=>{ui?.setSegmentTarget(false);onSelectLine(id);}} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
+        <TimelineTracks document={document} selectedLineId={selectedLineId ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
+          visible={visible} externalAnchors={acoustics?.segments.flatMap(segment => [segment.beginMs, segment.endMs]) ?? []}
+          apply={onTimelineCommand} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
       </>}
       {visible.spectrum && asset && <SpectrogramCanvas vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
       </div>
@@ -685,10 +690,10 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           循环当前行
         </button>
         <button data-role="secondary"
-          disabled={disabled || !validUnit}
+          title={loopRange ? undefined : lyricEnvelope.reason} disabled={disabled || !validUnit}
           onClick={() => setLoop(captureLoop(loopRange!.begin_ms, loopRange!.end_ms, durationMs))}
         >
-          循环当前单元
+          循环选区
         </button>
         {error ? (
           <button data-role="secondary" className={styles.error} onClick={retryMedia}>

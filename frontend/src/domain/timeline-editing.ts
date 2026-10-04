@@ -4,7 +4,8 @@ import { shiftLineTimes } from './batch-editing';
 export type TimelineTarget =
   | { kind: 'line'; lineId: string }
   | { kind: 'word'; lineId: string; wordId: string }
-  | { kind: 'ruby'; lineId: string; wordId: string; rubyId: string };
+  | { kind: 'ruby'; lineId: string; wordId: string; rubyId: string }
+  | { kind: 'romanization'; lineId: string; trackId: string; contentId: string; unitId: string };
 
 const changed = (time: TimeMs, delta: number): TimeMs => {
   if (time === null) return null;
@@ -23,7 +24,8 @@ const envelope = (values: TimeMs[], minimum: boolean): TimeMs => {
 const include = (line: LyricLine, word: LyricWord): LyricLine => {
   const beginMs = envelope([line.beginMs, word.beginMs], true);
   const endMs = envelope([line.endMs, word.endMs], false);
-  return { ...line, beginMs, endMs, endLink: endMs === line.endMs ? line.endLink : null };
+  if (line.endLink && endMs !== line.endMs) throw new Error('时间修改与行尾链接冲突');
+  return { ...line, beginMs, endMs };
 };
 const moveWord = (word: LyricWord, deltaMs: number): LyricWord => ({ ...word,
   beginMs: changed(word.beginMs, deltaMs), endMs: changed(word.endMs, deltaMs),
@@ -45,8 +47,22 @@ export function moveTimeline(document: LyricDocument, targets: TimelineTarget[],
     const ids = new Set(targets.map((target) => target.lineId));
     return (shiftLineTimes(document, [...ids], deltaMs) as Extract<ReturnType<typeof shiftLineTimes>, { type: 'replace-document' }>).document;
   }
+  if (new Set(targets.map(target => target.kind)).size > 1) throw new Error('只能同时移动同类对象');
+  if (targets.every(target => target.kind === 'romanization')) {
+    const keys = new Set(targets.map(target => JSON.stringify([target.trackId, target.contentId, target.lineId, target.unitId])));
+    let found = 0;
+    const romanizationTracks = document.romanizationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.kind === 'plain' ? content : { ...content, units: content.units.map(unit => {
+      if (!keys.has(JSON.stringify([track.id, content.id, content.lineId, unit.id]))) return unit;
+      found++;
+      if (unit.beginMs === null || unit.endMs === null) throw new Error('请先为音译设置完整时间');
+      return { ...unit, beginMs: changed(unit.beginMs, deltaMs), endMs: changed(unit.endMs, deltaMs) };
+    }) }) }));
+    if (found !== keys.size) throw new Error('定时音译单元已不存在');
+    return { ...document, romanizationTracks };
+  }
   let result = document;
   for (const target of targets) {
+    if (target.kind === 'romanization') throw new Error('只能同时移动同类对象');
     if (target.kind === 'line') throw new Error('行与子轨道不能同时移动');
     result = editTarget(result, target, (line) => {
       const index = line.words.findIndex((word) => word.id === target.wordId);
@@ -74,13 +90,15 @@ export function moveTimeline(document: LyricDocument, targets: TimelineTarget[],
 
 export function resizeTimeline(document: LyricDocument, target: TimelineTarget, side: 'beginMs' | 'endMs', timeMs: number): LyricDocument {
   valid(timeMs, timeMs);
+  if (target.kind === 'romanization') return editRomanization(document, target, unit => { const next = { ...unit, [side]: timeMs }; valid(next.beginMs, next.endMs); return next; });
   return editTarget(document, target, (line) => {
     if (target.kind === 'line') {
       const beginMs = side === 'beginMs' ? timeMs : line.beginMs;
       const endMs = side === 'endMs' ? timeMs : line.endMs;
       valid(beginMs, endMs);
       if (line.words.some((word) => beginMs !== null && word.beginMs !== null && word.beginMs < beginMs || endMs !== null && word.endMs !== null && word.endMs > endMs)) throw new Error('行边界不能排除词');
-      return { ...line, beginMs, endMs, endLink: side === 'endMs' ? null : line.endLink };
+      if (line.endLink && endMs !== line.endMs) throw new Error('时间修改与行尾链接冲突');
+      return { ...line, beginMs, endMs };
     }
     const index = line.words.findIndex((word) => word.id === target.wordId);
     if (index < 0) throw new Error('时间轴词已不存在');
@@ -118,3 +136,13 @@ export function snapTime(timeMs: number, anchors: number[], toleranceMs: number)
 export const timelineDelta = (pixels: number, width: number, spanMs: number) => Math.round(pixels / width * spanMs);
 export const snapTimelineTime = (timeMs: number, anchors: number[], spanMs: number, width: number, enabled: boolean) =>
   Math.round(enabled ? snapTime(timeMs, anchors, spanMs * 8 / width) : timeMs);
+
+function editRomanization(document: LyricDocument, target: Extract<TimelineTarget, { kind: 'romanization' }>, update: (unit: import('./lyric-document').RomanizationUnit) => import('./lyric-document').RomanizationUnit): LyricDocument {
+  let found = false;
+  const romanizationTracks = document.romanizationTracks.map(track => track.id !== target.trackId ? track : { ...track, contents: track.contents.map(content => {
+    if (content.id !== target.contentId || content.lineId !== target.lineId || content.kind !== 'timed') return content;
+    return { ...content, units: content.units.map(unit => { if (unit.id !== target.unitId) return unit; found = true; return update(unit); }) };
+  }) });
+  if (!found) throw new Error('定时音译单元已不存在');
+  return { ...document, romanizationTracks };
+}

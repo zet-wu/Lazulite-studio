@@ -53,12 +53,12 @@ test('Delete protects input, IME, menu, empty selection and clipboard',async({pa
   await page.keyboard.press('Escape');await page.keyboard.press('Delete');await expect(words).toHaveCount(5);
 });
 
-test('track object focus keeps current sync target and protects repeat and input',async({page})=>{
+test('track object focus selects its shared sync target and protects repeat and input',async({page})=>{
   await page.goto('/projects/sample-project/edit');await importLyrics(page,{name:'focus.ttml',mimeType:'application/xml',buffer:Buffer.from(phase7Ttml)});
   await page.locator('[data-ruby-id]').first().click({position:{x:3,y:3}});await page.getByRole('button',{name:'打轴',exact:true}).click();
   const track=page.getByRole('button',{name:'时间轴注音 こ',exact:true});await track.focus();
   await page.locator('audio').evaluate((a:HTMLAudioElement)=>{a.currentTime=.5;});await page.keyboard.press('s');
-  await expect(page.getByLabel('读音 が开始秒数')).toHaveValue('0.5');
-  await track.dispatchEvent('keydown',{key:'d',code:'KeyD',repeat:true});await expect(page.getByRole('region',{name:'连续打轴'})).toContainText('单元 1 / 4');
-  await page.getByRole('spinbutton',{name:'BPM',exact:true}).focus();await page.keyboard.press('d');await expect(page.getByRole('region',{name:'连续打轴'})).toContainText('单元 1 / 4');
+  await expect(page.getByLabel('读音 こ开始秒数')).toHaveValue('0.5');
+  await track.dispatchEvent('keydown',{key:'d',code:'KeyD',repeat:true});await expect(page.getByRole('region',{name:'连续打轴'})).toContainText('单元 3 / 4');
+  await page.getByRole('spinbutton',{name:'BPM',exact:true}).focus();await page.keyboard.press('d');await expect(page.getByRole('region',{name:'连续打轴'})).toContainText('单元 3 / 4');
 });

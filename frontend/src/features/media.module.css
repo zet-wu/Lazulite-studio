@@ -158,3 +158,9 @@
 .spectrogram, .spectrumHint { background: var(--timeline-surface); box-shadow: inset 0 0 0 1px var(--line); border-radius: 3px; }
 
 .ruler [data-drag-guide] { transform: none; }
+
+.expandedTracks { max-height: 240px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.expandedGroup { display: flex; flex-direction: column; gap: var(--timeline-row-gap); padding-bottom: var(--timeline-row-gap); }
+.expandedGroup .trackRow > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.groupLabel { padding-left: calc(var(--timeline-label-width) + var(--timeline-gap)); font-size: 10px; color: var(--muted); }

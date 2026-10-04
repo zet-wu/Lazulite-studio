@@ -1,3 +1,5 @@
+import { documentTargets, selectionKind, targetId, targetSelection, selectionTargets, targetInterval } from './selection-targets';
+import { SelectionProvider, useEditorSelection } from './SelectionContext';
 import { flushSync } from 'react-dom';
 import { JapaneseRubyDialog } from './JapaneseRubyDialog';
 import { Select } from '../../shared/Select';
@@ -90,12 +92,17 @@ function isTextInput(target: EventTarget) {
 }
 
 export function EditorWorkspace(props: Props) {
+  const shared = useEditorSelection();
+  return shared ? <EditorWorkspaceContent {...props} /> : <SelectionProvider><EditorWorkspaceContent {...props} /></SelectionProvider>;
+}
+
+function EditorWorkspaceContent(props: Props) {
   const audioReview = useAudioReview();
   const { document, apply } = props;
   const searchConditions = useSearchConditions(props.projectId);
   const [acquisitionStore] = useState(() => new AcquisitionStore());
   useEffect(() => { acquisitionStore.activate(); return () => acquisitionStore.dispose(); }, [acquisitionStore]);
-  const [selection, setSelection] = useState<EditorSelection | null>(null);
+  const { selection, setSelection, commands: selectionCommands } = useEditorSelection()!;
   const [syncTargetVersion, setSyncTargetVersion] = useState(0);
   const [clipboard, setClipboard] = useState<EditorClipboard | null>(null);
   const clipboardToken = useRef('');
@@ -158,50 +165,28 @@ export function EditorWorkspace(props: Props) {
   const requestLocate = (id: string, focus?: string) => setLocate({ id, focus, serial: ++locateSerial.current });
   const pendingFocus = useRef<string | null>(null);
   useEffect(() => {
-    setSelection((current) => {
+    setSelection(current => {
       if (!current) return current;
-      if (current.kind === 'lines') {
-        const order = document.lines.map((line) => line.id);
-        const ids = current.ids.filter((id) => order.includes(id));
-        if (ids.length === current.ids.length && (current.activeId === '' || document.lines.some((line) => line.id === current.activeId))) return current;
-        return { ...current, ids, anchorId: order.includes(current.anchorId) ? current.anchorId : ids[0] ?? '', activeId: document.lines.some((line) => line.id === current.activeId) ? current.activeId : ids.at(-1) ?? '' };
+      if (current.kind === 'romanization-content') {
+        const contents = document.romanizationTracks.flatMap(track => track.contents);
+        const ids = current.ids.filter(id => contents.some(content => content.id === id));
+        return ids.length === current.ids.length ? current : null;
       }
-      if (current.kind === 'romanization-content' || current.kind === 'romanization-unit') {
-        const track = document.romanizationTracks.find((item) => item.id === current.trackId);
-        const content = track?.contents.find((item) => item.id === current.contentId);
-        if (!track || !content) return null;
-        if (current.kind === 'romanization-content') {
-          const ids = current.ids.filter((id) => track.contents.some((item) => item.id === id && item.lineId === content.lineId));
-          return ids.length === current.ids.length && current.lineId === content.lineId ? current
-            : { ...current, lineId: content.lineId, ids, anchorId: ids.includes(current.anchorId) ? current.anchorId : ids[0] ?? '', activeId: ids.includes(current.activeId) ? current.activeId : ids.at(-1) ?? '' };
-        }
-        if (content.kind !== 'timed') return null;
-        const ids = current.ids.filter((id) => content.units.some((unit) => unit.id === id));
-        return ids.length ? { ...current, lineId: content.lineId, ids, anchorId: ids.includes(current.anchorId) ? current.anchorId : ids[0], activeId: ids.includes(current.activeId) ? current.activeId : ids.at(-1)! }
-          : { kind: 'romanization-content', lineId: content.lineId, trackId: current.trackId, contentId: content.id, ids: [content.id], anchorId: content.id, activeId: content.id };
-      }
-      if (current.kind === 'ruby') {
-        const line = document.lines.find((item) => item.id === current.lineId);
-        const word = line?.words.find((item) => item.id === current.wordId);
-        if (!word) return null;
-        const ids = current.ids.filter((id) => word.rubyUnits.some((unit) => unit.id === id));
-        return ids.length ? { ...current, ids, anchorId: ids.includes(current.anchorId) ? current.anchorId : ids[0], activeId: ids.includes(current.activeId) ? current.activeId : ids.at(-1)! }
-          : { kind: 'words', lineId: line!.id, ids: [word.id], anchorId: word.id, activeId: word.id };
-      }
-      const order = document.lines.flatMap((line) => line.words.map((word) => word.id));
-      const ids = current.ids.filter((id) => order.includes(id));
-      const activeId = order.includes(current.activeId) ? current.activeId : ids.at(-1) ?? '';
-      const activeLine = document.lines.find((line) => line.words.some((word) => word.id === activeId));
-      if (activeLine && ids.length === current.ids.length && current.lineId === activeLine.id) return current;
-      return activeLine ? { ...current, lineId: activeLine.id, ids, anchorId: order.includes(current.anchorId) ? current.anchorId : ids[0] ?? '', activeId }
-        : { kind: 'lines', ids: [], anchorId: '', activeId: '' };
+      const targets = documentTargets(document).filter(target => selectionKind(target) === current.kind && current.ids.includes(targetId(target)));
+      const ids = targets.map(targetId);
+      if (!ids.length) return null;
+      const active = targets.find(target => targetId(target) === current.activeId) ?? targets.at(-1)!;
+      const next = targetSelection(active, ids, ids.includes(current.anchorId) ? current.anchorId : ids[0]);
+      return JSON.stringify(next) === JSON.stringify(current) ? current : next;
     });
-  }, [document]);
+  }, [document, selection]);
   const activeLineId = selectionLineId(selection) ?? props.selectedLineId;
   const selectedLine = document.lines.find((line) => line.id === activeLineId) ?? document.lines[0];
   // The active canvas selection is the single source of the timing target.
+  const activePropertyTarget = selectionTargets(document, selection).find(target => targetId(target) === selection?.activeId);
+  const activePropertyInterval = activePropertyTarget && targetInterval(document, activePropertyTarget);
   const syncCursor = syncUnits(document).find(unit => {
-    if (!selection) return unit.lineId === selectedLine?.id;
+    if (!selection || selection.ids.length !== 1) return false;
     if (selection.kind === 'lines') return unit.lineId === selection.activeId;
     if (selection.kind === 'words') return unit.wordId === selection.activeId;
     if (selection.kind === 'ruby') return unit.wordId === selection.wordId && unit.rubyUnitId === selection.activeId;
@@ -220,8 +205,8 @@ export function EditorWorkspace(props: Props) {
     setSyncTargetVersion(value => value + 1);
     const id = line.id;
     const previous = selection?.kind === 'lines' ? selection : null;
-    const ids = selectIds(document.lines.map(l => l.id), previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
-    setSelection({ kind: 'lines', ids, anchorId: shift || toggle ? previous?.anchorId ?? id : id, activeId: line.id });
+    const ids = !shift && !toggle && previous?.ids.includes(id) ? previous.ids : selectIds(document.lines.map(l => l.id), previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
+    setSelection({ kind: 'lines', ids, anchorId: shift || toggle || previous?.ids.includes(id) ? previous?.anchorId ?? id : id, activeId: line.id });
     props.onSelectLine?.(line.id);
     props.onSelectUnit?.(line.id, null, null);
   };
@@ -229,17 +214,17 @@ export function EditorWorkspace(props: Props) {
     setSyncTargetVersion(value => value + 1);
     const previous = selection?.kind === 'words' ? selection : null;
     const order = document.lines.flatMap((item) => item.words.map((value) => value.id));
-    const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? word.id, word.id, shift, toggle);
-    setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift || toggle ? previous?.anchorId ?? word.id : word.id, activeId: word.id });
+    const ids = !shift && !toggle && previous?.ids.includes(word.id) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? word.id, word.id, shift, toggle);
+    setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift || toggle || previous?.ids.includes(word.id) ? previous?.anchorId ?? word.id : word.id, activeId: word.id });
     props.onSelectLine?.(line.id);
     props.onSelectUnit?.(line.id, word.id, null);
   };
   const selectRuby = (line: LyricLine, word: LyricWord, rubyId: string, shift = false, toggle = false) => {
     setSyncTargetVersion(value => value + 1);
-    const previous = selection?.kind === 'ruby' && selection.wordId === word.id ? selection : null;
-    const order = word.rubyUnits.map((unit) => unit.id);
-    const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? rubyId, rubyId, shift, toggle);
-    setSelection({ kind: 'ruby', lineId: line.id, wordId: word.id, ids, anchorId: shift || toggle ? previous?.anchorId ?? rubyId : rubyId, activeId: rubyId });
+    const previous = selection?.kind === 'ruby' ? selection : null;
+    const order = document.lines.flatMap(line => line.words.flatMap(word => word.rubyUnits.map(unit => unit.id)));
+    const ids = !shift && !toggle && previous?.ids.includes(rubyId) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? rubyId, rubyId, shift, toggle);
+    setSelection({ kind: 'ruby', lineId: line.id, wordId: word.id, ids, anchorId: shift || toggle || previous?.ids.includes(rubyId) ? previous?.anchorId ?? rubyId : rubyId, activeId: rubyId });
     props.onSelectLine?.(line.id);
     props.onSelectUnit?.(line.id, word.id, rubyId);
   };
@@ -247,18 +232,18 @@ export function EditorWorkspace(props: Props) {
     setSyncTargetVersion(value => value + 1);
     const previous = selection?.kind === 'romanization-content' && selection.trackId === trackId && selection.lineId === lineId ? selection : null;
     const order = document.romanizationTracks.find((track) => track.id === trackId)?.contents.filter((content) => content.lineId === lineId).map((content) => content.id) ?? [];
-    const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? contentId, contentId, shift, toggle);
-    setSelection({ kind: 'romanization-content', lineId, trackId, contentId, ids, anchorId: shift || toggle ? previous?.anchorId ?? contentId : contentId, activeId: contentId });
+    const ids = !shift && !toggle && previous?.ids.includes(contentId) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? contentId, contentId, shift, toggle);
+    setSelection({ kind: 'romanization-content', lineId, trackId, contentId, ids, anchorId: shift || toggle || previous?.ids.includes(contentId) ? previous?.anchorId ?? contentId : contentId, activeId: contentId });
     props.onSelectLine?.(lineId);
     props.onSelectRomanization?.(trackId, contentId);
   };
   const selectRomanizationUnit = (lineId: string, trackId: string, contentId: string, unitId: string, shift = false, toggle = false) => {
     setSyncTargetVersion(value => value + 1);
-    const previous = selection?.kind === 'romanization-unit' && selection.contentId === contentId ? selection : null;
+    const previous = selection?.kind === 'romanization-unit' ? selection : null;
     const content = document.romanizationTracks.find((track) => track.id === trackId)?.contents.find((item) => item.id === contentId);
-    const order = content?.kind === 'timed' ? content.units.map((unit) => unit.id) : [];
-    const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? unitId, unitId, shift, toggle);
-    setSelection({ kind: 'romanization-unit', lineId, trackId, contentId, ids, anchorId: shift || toggle ? previous?.anchorId ?? unitId : unitId, activeId: unitId });
+    const order = document.romanizationTracks.find(track => track.id === trackId)?.contents.flatMap(content => content.kind === 'timed' ? content.units.map(unit => unit.id) : []) ?? [];
+    const ids = !shift && !toggle && previous?.ids.includes(unitId) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? unitId, unitId, shift, toggle);
+    setSelection({ kind: 'romanization-unit', lineId, trackId, contentId, ids, anchorId: shift || toggle || previous?.ids.includes(unitId) ? previous?.anchorId ?? unitId : unitId, activeId: unitId });
     props.onSelectLine?.(lineId);
     props.onSelectRomanization?.(trackId, contentId);
   };
@@ -279,7 +264,7 @@ export function EditorWorkspace(props: Props) {
     } else if(issue.kind==='romanization-content') {
       selectRomanizationContent(line.id,issue.trackId!,issue.contentId!);
       focus=`[data-romanization-content-id="${CSS.escape(issue.contentId!)}"]`;
-    } else selectLine(line);
+    } else if (issue.kind === 'translation-content' || issue.kind === 'translation-unit') { setSelection(null); focus = issue.unitId ? `[data-translation-unit-id="${CSS.escape(issue.unitId)}"] input` : `[data-translation-id="${CSS.escape(issue.contentId!)}"] input`; } else selectLine(line);
     requestLocate(line.id,focus);
   };
   const assignmentIssues: OutputIssue[] = props.assignmentError ? props.assignmentError.objectIds.map(id=>{
@@ -302,10 +287,11 @@ export function EditorWorkspace(props: Props) {
   };
   const drag = useObjectDrag(document, pageRef, dispatch, setSelection);
   const displayed = drag.document;
-  const currentSelection = (): EditorSelection | null => selection ?? (selectedLine ? { kind: 'lines', ids: [selectedLine.backgroundOf ?? selectedLine.id], anchorId: selectedLine.backgroundOf ?? selectedLine.id, activeId: selectedLine.id } : null);
+  const currentSelection = (): EditorSelection | null => selection;
   const copy = (target?: EditorSelection) => {
     const current = target ?? currentSelection();
     if (!current?.ids.length) return null;
+    if (!copyAllowed(current)) { setMessage('跨内容音译复制暂不支持，请选择同一份内容'); return null; }
     const next = copySelection(document, current);
     clipboardToken.current = crypto.randomUUID();
     setClipboard(next);
@@ -315,12 +301,13 @@ export function EditorWorkspace(props: Props) {
   const cut = (target?: EditorSelection) => {
     const current = target ?? currentSelection();
     if (!current?.ids.length) return null;
+    if (!copyAllowed(current)) { setMessage('跨内容音译复制暂不支持，请选择同一份内容'); return null; }
     const next = copySelection(document, current);
     if (dispatch(cutSelection(document, current))) {
       setClipboard(next);
       clipboardToken.current = crypto.randomUUID();
       const available = current.kind !== 'lines' ? current.lineId : mainIds.filter((id) => !current.ids.includes(id)).at(-1);
-      setSelection(available ? { kind: 'lines', ids: [available], anchorId: available, activeId: available } : { kind: 'lines', ids: [], anchorId: '', activeId: '' });
+      setSelection(current.kind === 'lines' && available ? { kind: 'lines', ids: [available], anchorId: available, activeId: available } : null);
       mainRef.current?.focus({ preventScroll: true });
       return next;
     }
@@ -330,7 +317,7 @@ export function EditorWorkspace(props: Props) {
     if (!current?.ids.length) return;
     if (dispatch(deleteSelection(document, current))) {
       const available = current.kind === 'lines' ? mainIds.find(id => !current.ids.includes(id)) : current.lineId;
-      setSelection(available ? { kind: 'lines', ids: [available], anchorId: available, activeId: available } : null);
+      setSelection(current.kind === 'lines' && available ? { kind: 'lines', ids: [available], anchorId: available, activeId: available } : null);
       mainRef.current?.focus({ preventScroll: true });
     }
   };
@@ -341,6 +328,11 @@ export function EditorWorkspace(props: Props) {
       if (dispatch(result.command)) setSelection(result.selection);
     } catch (error) { setMessage(error instanceof Error ? error.message : '粘贴失败'); }
   };
+  const copyAllowed = (current: EditorSelection | null) => current?.kind !== 'romanization-unit' || document.romanizationTracks.flatMap(track => track.contents.filter(content => content.kind === 'timed' && content.units.some(unit => current.ids.includes(unit.id)))).length <= 1;
+  const canCopySelection = copyAllowed(selection);
+  useEffect(() => {
+    selectionCommands.current = { copy: () => { try { return copy(); } catch (cause) { setMessage((cause as Error).message); return null; } }, cut: () => { try { return cut(); } catch (cause) { setMessage((cause as Error).message); return null; } }, remove: () => removeSelection(), paste: text => paste(text ? null : clipboard, text), canCopy: Boolean(selection?.ids.length) && canCopySelection, canPaste: Boolean(clipboard), clipboardToken: () => clipboardToken.current };
+  });
   const selectAll = (invert: boolean) => {
     if (selection?.kind === 'ruby') {
       const order = document.lines.find((line) => line.id === selection.lineId)?.words.find((word) => word.id === selection.wordId)?.rubyUnits.map((unit) => unit.id) ?? [];
@@ -348,7 +340,7 @@ export function EditorWorkspace(props: Props) {
       setSelection({ ...selection, ids, anchorId: ids[0] ?? '', activeId: ids.at(-1) ?? '' });
     } else if (selection?.kind === 'romanization-unit') {
       const content = document.romanizationTracks.find((track) => track.id === selection.trackId)?.contents.find((item) => item.id === selection.contentId);
-      const order = content?.kind === 'timed' ? content.units.map((unit) => unit.id) : [];
+      const order = document.romanizationTracks.find(track => track.id === selection.trackId)?.contents.flatMap(content => content.kind === 'timed' ? content.units.map(unit => unit.id) : []) ?? [];
       const ids = invert ? invertIds(order, selection.ids) : order;
       setSelection({ ...selection, ids, anchorId: ids[0] ?? '', activeId: ids.at(-1) ?? '' });
     } else if (selection?.kind === 'romanization-content') {
@@ -420,7 +412,7 @@ export function EditorWorkspace(props: Props) {
       const index = word.rubyUnits.findIndex((unit) => unit.id === rubyId);
       const unit = word.rubyUnits[index];
       if (!unit) return false;
-      effective = selection?.kind === 'ruby' && selection.wordId === word.id && selection.ids.includes(rubyId) ? { ...selection, activeId: rubyId }
+      effective = selection?.kind === 'ruby' && selection.ids.includes(rubyId) ? { ...selection, lineId: line.id, wordId: word.id, activeId: rubyId }
         : { kind: 'ruby', lineId: line.id, wordId: word.id, ids: [rubyId], anchorId: rubyId, activeId: rubyId };
       title = '注音 操作';
       actions = [
@@ -445,7 +437,7 @@ export function EditorWorkspace(props: Props) {
         const index = content.units.findIndex((unit) => unit.id === romanUnitId);
         const unit = content.units[index];
         if (!unit) return false;
-        effective = selection?.kind === 'romanization-unit' && selection.contentId === content.id && selection.ids.includes(unit.id) ? { ...selection, activeId: unit.id }
+        effective = selection?.kind === 'romanization-unit' && selection.ids.includes(unit.id) ? { ...selection, lineId: line.id, trackId: track.id, contentId: content.id, activeId: unit.id }
           : { kind: 'romanization-unit', lineId: line.id, trackId: track.id, contentId: content.id, ids: [unit.id], anchorId: unit.id, activeId: unit.id };
         title = '音译单元操作';
         actions = [
@@ -529,10 +521,11 @@ export function EditorWorkspace(props: Props) {
       ];
     }
     const shared: ContextAction[] = [
-      { label: '复制', run: () => { copy(effective); } },
-      { label: '剪切', run: () => { cut(effective); } },
+      { label: '复制', disabled: !copyAllowed(effective), run: () => { copy(effective); } },
+      { label: '剪切', disabled: !copyAllowed(effective), run: () => { cut(effective); } },
       { label: '粘贴', disabled: !clipboard, run: () => paste(clipboard, undefined, effective) },
     ];
+    if (effective.ids.length > 1) actions = actions.map(action => action.label.startsWith('删除所选') || effective.kind === 'lines' && ['生成日文注音…', '生成日文罗马字音译…', '从音译生成 注音…', '分词…'].includes(action.label) ? action : { ...action, disabled: true });
     setSelection(effective);
     props.onSelectLine?.(line.id);
     if (effective.kind === 'romanization-content' || effective.kind === 'romanization-unit') props.onSelectRomanization?.(effective.trackId, effective.contentId);
@@ -562,7 +555,7 @@ export function EditorWorkspace(props: Props) {
   const wordView = (line: LyricLine, word: LyricWord) => <LyricWordView key={word.id} id={word.id} placeholder={drag.isPlaceholder('word', word.id)}
     selected={selection?.kind === 'words' && selection.ids.includes(word.id)}
     onSelect={(shift, toggle) => selectWord(line, word, shift, toggle)}>
-    <RubyWordEditor lineId={line.id} word={word} placeholderIds={drag.placeholders?.kind === 'ruby' ? drag.placeholders.ids : undefined} selectedRubyIds={selection?.kind === 'ruby' && selection.wordId === word.id ? selection.ids : []}
+    <RubyWordEditor lineId={line.id} word={word} placeholderIds={drag.placeholders?.kind === 'ruby' ? drag.placeholders.ids : undefined} selectedRubyIds={selection?.kind === 'ruby' ? selection.ids : []}
       onSelectRuby={(rubyId, shift, toggle) => selectRuby(line, word, rubyId, shift, toggle)} apply={dispatch}
       requestAddSerial={rubyShortcut?.wordId === word.id ? rubyShortcut.serial : undefined} requestAfterRubyId={rubyShortcut?.wordId === word.id ? rubyShortcut.afterRubyId : undefined} />
     <div className={styles.wordMain}>
@@ -682,7 +675,7 @@ export function EditorWorkspace(props: Props) {
     {props.projectId && props.project && props.applyProject && props.project.sourceAssetId && <VocalPanel visible={mode==='audio'} projectId={props.projectId} project={props.project} apply={props.applyProject} durationMs={props.audioDurationMs??0}/>}
     {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.project.sourceAssetId ? <div ref={layoutRef} className={vocalStyles.audioLayout} style={{gridTemplateColumns:template(rendered)}}>
       {columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} aria-label="音频处理大纲"><h2>大纲</h2><div className={styles.panelBody}>{document.lines.map(line => <div key={line.id} draggable onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed="copy";const ghost=e.currentTarget.cloneNode(true) as HTMLElement;ghost.style.cssText="position:fixed;left:-10000px;opacity:.6;width:220px";window.document.body.appendChild(ghost);e.dataTransfer.setDragImage(ghost,20,16);setTimeout(()=>ghost.remove(),0);}}>
-        <div onClick={() => selectLine(line)}><OutlineRow line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} selected={selectedLine?.id===line.id}/></div>
+        <div onClick={() => selectLine(line)}><OutlineRow line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} selected={selection?.kind === 'lines' && selection.ids.includes(line.id)}/></div>
         {props.assignmentError?.lineId===line.id && <div role="alert" className={vocalStyles.error}>{props.assignmentError.message}{assignmentIssues.map((issue,i)=><button data-role="secondary" key={i} onClick={()=>locateIssue(issue)}>定位{issue.kind==='ruby'?'注音':issue.kind==='word'?'词':issue.kind==='romanization-unit'?'音译单元':'行'}{i+1}</button>)}</div>}
       </div>)}</div></aside>}
       {columns.outlineVisible && separator('outline')}
@@ -694,7 +687,7 @@ export function EditorWorkspace(props: Props) {
     {mode === 'preview' && <Suspense fallback={<p>正在载入预览…</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={props.onSelectLine} /></Suspense>}
     {mode === 'sync' && <SyncPanel preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} document={document} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
       onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
-    {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canPaste={Boolean(clipboard)}
+    {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canCopy={canCopySelection} canPaste={Boolean(clipboard)}
       canMoveUp={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes[0] > 0}
       canMoveDown={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes.at(-1) !== document.lines.length - 1}
       copy={() => { copy(); }} cut={() => { cut(); }} remove={() => removeSelection()} paste={() => paste(clipboard)}
@@ -711,7 +704,7 @@ export function EditorWorkspace(props: Props) {
       selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); requestLocate(line.id);
     }}><h2>大纲</h2><div className={styles.panelBody}>
       {displayed.lines.map(line => <OutlineRow key={line.id} line={line} placeholder={drag.isPlaceholder('line', line.backgroundOf ?? line.id)} ordinal={ordinalById.get(line.backgroundOf ?? line.id)}
-        selected={selection?.kind === 'lines' ? selection.ids.includes(line.id) : selectedLine?.id === line.id} />)}
+        selected={selection?.kind === 'lines' && selection.ids.includes(line.id)} />)}
     </div></aside>}{columns.outlineVisible && separator('outline')}
       <main ref={mainRef} tabIndex={-1} className={styles.canvas}>
         <LyricList lines={displayed.lines} locate={locate} append={() => {
@@ -721,7 +714,7 @@ export function EditorWorkspace(props: Props) {
             props.onSelectLine?.(line.id); requestLocate(line.id);
           }
         }} renderLine={(line) => <LyricLineView key={line.id} line={line} placeholder={drag.isPlaceholder('line', line.backgroundOf ?? line.id)}
-          selected={selection ? selection.kind === 'lines' ? selection.ids.includes(line.id) : selection.kind === 'words' ? line.words.some((word) => selection.ids.includes(word.id)) : line.id === selection.lineId : selectedLine?.id === line.id}
+          selected={selection?.kind === 'lines' && selection.ids.includes(line.id)}
           playhead={props.playheadLineId === line.id}
           onSelect={(shift, toggle) => selectLine(line, shift, toggle)} onMove={(direction) => moveLine(line, direction)}>
           <div className={styles.lineHeader}><span>L{ordinalById.get(line.backgroundOf ?? line.id)} · {line.backgroundOf ? '背景' : '主唱'}</span></div>
@@ -745,7 +738,7 @@ export function EditorWorkspace(props: Props) {
                 {contents.map((content) => <RomanizationRow key={content.id} track={track} content={content}
                     placeholder={drag.isPlaceholder('romanization-content', content.id)} placeholderUnitIds={drag.placeholders?.kind === 'romanization-unit' ? drag.placeholders.ids : undefined}
                     selectedContent={selection?.kind === 'romanization-content' && selection.ids.includes(content.id)}
-                    selectedUnitIds={selection?.kind === 'romanization-unit' && selection.contentId === content.id ? selection.ids : []}
+                    selectedUnitIds={selection?.kind === 'romanization-unit' ? selection.ids : []}
                     selectContent={(shift, toggle) => selectRomanizationContent(line.id, track.id, content.id, shift, toggle)}
                     selectUnit={(unitId, shift, toggle) => selectRomanizationUnit(line.id, track.id, content.id, unitId, shift, toggle)} apply={dispatch} />)}
               </div>;
@@ -754,9 +747,22 @@ export function EditorWorkspace(props: Props) {
         </LyricLineView>} />
       </main>
       {columns.inspectorVisible && separator('inspector')}{columns.inspectorVisible && <aside ref={inspectorRef} className={styles.inspector}><h2>属性</h2><div className={styles.panelBody}>{selectedLine && <>
-        <p>已选行：{selection?.kind === 'lines' && selection.ids.length > 1 ? `${selection.ids.length} 行` : `L${ordinalById.get(selectedLine.backgroundOf ?? selectedLine.id)}${selectedLine.backgroundOf ? ' · 背景' : ''}`}</p>
+        <p>{selection?.kind === 'lines' ? '已选行' : '所在行'}：{selection?.kind === 'lines' && selection.ids.length > 1 ? `${selection.ids.length} 行` : `L${ordinalById.get(selectedLine.backgroundOf ?? selectedLine.id)}${selectedLine.backgroundOf ? ' · 背景' : ''}`}</p>
         {selection?.kind === 'lines' && selection.ids.length > 1 && <p className={styles.fieldContext}>当前行 L{ordinalById.get(selectedLine.backgroundOf ?? selectedLine.id)}</p>}
+        {activePropertyTarget && activePropertyTarget.kind !== 'line' && activePropertyInterval && <>
+          <p>{selection?.kind === 'words' ? '词' : selection?.kind === 'ruby' ? '注音' : '音译单元'}：已选 {selection?.ids.length}</p>
+          {selection?.ids.length === 1 ? <TimePair begin={activePropertyInterval.beginMs} end={activePropertyInterval.endMs} label="选中对象" onCommit={(beginMs, endMs) => {
+            const target = activePropertyTarget;
+            if (target.kind === 'word') dispatch({ type: 'set-word-time', lineId: target.lineId, wordId: target.wordId, beginMs, endMs });
+            else if (target.kind === 'ruby') dispatch({ type: 'set-ruby-time', lineId: target.lineId, wordId: target.wordId, rubyId: target.rubyId, beginMs, endMs });
+            else if (target.kind === 'romanization') { const content = document.romanizationTracks.find(track => track.id === target.trackId)!.contents.find(content => content.id === target.contentId)!; if (content.kind === 'timed') dispatch({ type: 'set-romanization-content', trackId: target.trackId, content: { ...content, units: content.units.map(unit => unit.id === target.unitId ? { ...unit, beginMs, endMs } : unit) } }); }
+          }} /> : <small>多对象时间可在时间轴整体平移；端点请单独调整。</small>}
+        </>}
+        <fieldset disabled={selection?.kind !== 'lines'} style={{ border: 0, padding: 0, margin: 0 }}>
+        <fieldset disabled={selection?.kind === 'lines' && selection.ids.length > 1} style={{ border: 0, padding: 0, margin: 0 }}>
         <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />
+        </fieldset>
+        {selection?.kind === 'lines' && selection.ids.length > 1 && <small>多行时间请使用整体偏移或时间轴平移。</small>}
         {selectedMainLines.length > 0 && <>
           <BooleanField label="跳过打轴" switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={selectedMainLines.every(line => line.ignoreSync)} mixed={selectedMainLines.some(line => line.ignoreSync) && !selectedMainLines.every(line => line.ignoreSync)} onChange={checked => dispatch({type:'batch', commands:selectedMainLines.map(line=>({type:'set-ignore-sync',lineId:line.id,ignoreSync:checked}))})}/>
         </>}
@@ -776,6 +782,7 @@ export function EditorWorkspace(props: Props) {
             <option value="">请选择</option>{mainLines.filter((line) => line.id !== selectedLine.id && !occupiedParents.has(line.id)).map((line) => <option key={line.id} value={line.id}>L{ordinalById.get(line.id)}</option>)}
           </Select></label>
         </> : null}
+        </fieldset>
       </>}
       </div></aside>}</div>}
     {settingsDialog === 'metadata' && <SettingsDialog title="元数据编辑" close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} /></SettingsDialog>}

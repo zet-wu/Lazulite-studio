@@ -5,6 +5,8 @@ import { createLine, createLyricDocument } from '../../domain/lyric-document';
 import { EditorWorkspace } from './EditorWorkspace';
 
 vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+vi.stubGlobal('matchMedia', () => ({ matches: false }));
+HTMLElement.prototype.scrollTo = vi.fn();
 
 afterEach(() => { cleanup(); localStorage.clear(); });
 
@@ -63,6 +65,7 @@ it('rejects an occupied preceding main row without searching farther back or cha
   render(<MemoryRouter><EditorWorkspace title="背景" document={lyric} selectedLineId={lyric.lines[3].id} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
     onSave={() => {}} /></MemoryRouter>);
+  fireEvent.click(window.document.querySelector(`[data-line-id="${lyric.lines[3].id}"] > [data-outline-drag]`)!);
   expect(screen.getByLabelText('所属主行')).toBeDisabled();
   fireEvent.click(screen.getByLabelText('背景歌词'));
   expect(apply).not.toHaveBeenCalled();

@@ -24,13 +24,14 @@ for (const theme of ['light', 'dark']) test(`timeline geometry and hidden layers
     const source = root.querySelector('select')!;
     const wr = wave.getBoundingClientRect(), sr = source.getBoundingClientRect();
     const rows = Array.from(root.querySelectorAll('[aria-label="波形进度"], [aria-label="人声能量"], [data-vocal-lane], [data-track-lane], canvas[aria-label="声谱图"]'));
-    const rects = rows.map(e => e.getBoundingClientRect()).filter(r => r.height > 0);
-    const labels = Array.from(root.querySelectorAll('[data-vocal-tracks] strong, [aria-label="可编辑时间轴"] strong'));
+    const visibleRows = rows.filter(e => e.getBoundingClientRect().height > 0);
+    const rects = visibleRows.map(e => e.getBoundingClientRect());
+    const labels = Array.from(root.querySelectorAll('[data-vocal-tracks] strong, [aria-label="可编辑时间轴"] div:has(> [data-track-lane]) > strong'));
     const sourceStyle = getComputedStyle(source);
     const textStart = sr.x + parseFloat(sourceStyle.borderLeftWidth) + parseFloat(sourceStyle.paddingLeft);
     return {
       center: Math.abs(wr.y + wr.height / 2 - sr.y - sr.height / 2),
-      gaps: rects.slice(1).map((r, i) => r.y - rects[i].bottom),
+      gaps: rects.slice(1).flatMap((r, i) => visibleRows[i + 1].closest('section[aria-label]') === visibleRows[i].closest('section[aria-label]') ? [r.y - rects[i].bottom] : []),
       aligned: rects.map(r => Math.abs(r.x - wr.x)),
       labels: labels.map(e => Math.abs(e.getBoundingClientRect().x + parseFloat(getComputedStyle(e).paddingLeft) - textStart)),
       bars: Array.from(root.querySelectorAll('[data-segment-id]')).map(e => e.getBoundingClientRect().height),

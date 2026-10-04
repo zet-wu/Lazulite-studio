@@ -16,7 +16,7 @@ test('mixed selection, exact background scope, mora apply and undo',async({page}
  await mock(page);await load(page);const outline=page.locator('[data-outline-drag]');await outline.first().click();await outline.nth(1).click({modifiers:['Control']});const dialog=await open(page);
  await expect(dialog.locator('[data-reading-row]')).toHaveCount(2);await expect(dialog.getByLabel('食完整读音')).toHaveValue('た');await expect(dialog.getByLabel('魂完整读音')).toHaveValue('たましい');
  await dialog.getByRole('button',{name:'应用',exact:true}).click();await expect(page.locator('main [data-ruby-id]')).toHaveCount(5);await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('main [data-ruby-id]')).toHaveCount(0);
- await outline.nth(1).click();const bg=await open(page,1);await expect(bg.locator('[data-reading-row]')).toHaveCount(1);await expect(bg.getByLabel('魂完整读音')).toBeVisible();await bg.getByRole('button',{name:'取消',exact:true}).click();
+ await outline.first().press('Escape');await outline.nth(1).click();const bg=await open(page,1);await expect(bg.locator('[data-reading-row]')).toHaveCount(1);await expect(bg.getByLabel('魂完整读音')).toBeVisible();await bg.getByRole('button',{name:'取消',exact:true}).click();
 });
 test('unblurred reading, Escape, IME and resize preserve current field',async({page})=>{
  await mock(page);await load(page);const d=await open(page,2),input=d.getByLabel('今日完整读音');await input.fill('こんにち');await input.press('Escape');await expect(input).toHaveValue('きょう');await expect(d).toBeVisible();

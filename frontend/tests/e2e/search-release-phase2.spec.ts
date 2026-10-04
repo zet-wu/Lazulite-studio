@@ -73,9 +73,9 @@ test('paused playhead projects into the changed viewport without seeking', async
   await page.getByRole('button', { name: '放大波形' }).click();
   const slider = page.getByRole('slider', { name: '波形进度' });
   await expect(slider).toBeVisible();
-  const before = await slider.locator('[class*="head"]').evaluate((el: HTMLElement) => el.style.left);
+  const before = await slider.locator('[class*="head"]').evaluate((el: HTMLElement) => getComputedStyle(el).left);
   await page.getByRole('button', { name: '后移窗口' }).click();
-  await expect.poll(() => slider.locator('[class*="head"]').evaluate((el: HTMLElement) => el.style.left)).not.toBe(before);
+  await expect.poll(() => slider.locator('[class*="head"]').evaluate((el: HTMLElement) => getComputedStyle(el).left)).not.toBe(before);
   expect(await page.locator('audio').evaluate((a: HTMLAudioElement) => a.currentTime)).toBe(60);
 });
 test('preview fade and emphasis phases follow actual media rates, pause, seek and mode rebuild', async ({ page }, info) => {
@@ -123,6 +123,7 @@ test('invalid timing selections and control/menu focus cannot stamp another obje
   await expect(page.getByLabel('读音 っ开始秒数')).toHaveValue('1');
   await edge(page, '[data-ruby-id]', 1); await page.locator('[data-top-menu="settings"] summary').click(); await page.keyboard.press('KeyS');
   await expect(page.getByLabel('读音 っ开始秒数')).toHaveValue('1'); await page.keyboard.press('Escape');
+  await page.locator('[data-outline-drag]').first().click();
   await page.getByRole('switch', { name: '跳过打轴' }).check(); await edge(page, '[data-ruby-id]', 1);
   await expect(panel).toContainText('当前选择不参与打轴'); await expect(panel.getByRole('button', { name: '起始轴' })).toBeDisabled();
   await page.keyboard.press('KeyD'); await expect(page.getByLabel('词 しん开始秒数')).toHaveValue('4');

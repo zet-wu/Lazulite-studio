@@ -23,7 +23,7 @@ export function selectIds(order: string[], current: string[], anchor: string, id
     if (start < 0 || end < 0) return [id];
     return order.slice(Math.min(start, end), Math.max(start, end) + 1);
   }
-  if (toggle) return current.includes(id) ? current.filter((item) => item !== id) : order.filter((item) => current.includes(item) || item === id);
+  if (toggle) return current.includes(id) ? current.filter((item) => item !== id) : [...current.filter(item => !order.includes(item)), ...order.filter(item => current.includes(item) || item === id)];
   return [id];
 }
 
@@ -33,9 +33,7 @@ export function invertIds(order: string[], selected: string[]): string[] {
 
 export function copySelection(document: LyricDocument, selection: EditorSelection): EditorClipboard {
   if (selection.kind === 'ruby') {
-    const word = document.lines.find((line) => line.id === selection.lineId)?.words.find((item) => item.id === selection.wordId);
-    if (!word) throw new Error('读音所属词不存在');
-    const units = word.rubyUnits.filter((unit) => selection.ids.includes(unit.id));
+    const units = document.lines.flatMap(line => line.words.flatMap(word => word.rubyUnits.filter(unit => selection.ids.includes(unit.id))));
     return { kind: 'ruby', units, text: units.map((unit) => unit.reading).join('') };
   }
   if (selection.kind === 'romanization-content' || selection.kind === 'romanization-unit') {
@@ -47,6 +45,8 @@ export function copySelection(document: LyricDocument, selection: EditorSelectio
       return { kind: 'romanization-content', trackId: selection.trackId, contents, text: contents.map((item) => item.kind === 'plain' ? item.text : item.units.map((unit) => unit.text).join('')).join('\n') };
     }
     if (content.kind !== 'timed') throw new Error('请选择音译单元');
+    const selectedContents = document.romanizationTracks.flatMap(track => track.contents.filter(item => item.kind === 'timed' && item.units.some(unit => selection.ids.includes(unit.id))));
+    if (selectedContents.length !== 1) throw new Error('跨内容音译复制暂不支持，请选择同一份内容');
     const units = content.units.filter((unit) => selection.ids.includes(unit.id));
     return { kind: 'romanization-unit', trackId: selection.trackId, contentId: content.id, units, text: units.map((unit) => unit.text).join('') };
   }
@@ -54,7 +54,7 @@ export function copySelection(document: LyricDocument, selection: EditorSelectio
     const groups = document.lines.map((line) => line.words.filter((word) => selection.ids.includes(word.id))).filter((words) => words.length);
     return { kind: 'words', words: groups.flat(), text: groups.map((words) => words.map((word) => word.text).join('')).join('\n') };
   }
-  const groups = document.lines.filter((line) => !line.backgroundOf && selection.ids.includes(line.id)).map((line) => ({
+  const groups = document.lines.filter((line) => !line.backgroundOf && (selection.ids.includes(line.id) || document.lines.some(child => child.backgroundOf === line.id && selection.ids.includes(child.id)))).map((line) => ({
     line, background: document.lines.find((item) => item.backgroundOf === line.id) ?? null,
     romanizations: document.romanizationTracks.flatMap((track) => track.contents.filter((content) => (content.lineId === line.id || document.lines.some(bg => bg.id === content.lineId && bg.backgroundOf === line.id))).map((content) => ({ trackId: track.id, content }))),
   }));
@@ -62,16 +62,14 @@ export function copySelection(document: LyricDocument, selection: EditorSelectio
 }
 
 export function deleteSelection(document: LyricDocument, selection: EditorSelection): LyricCommand {
-  if (selection.kind === 'ruby') return { type: 'batch', commands: selection.ids.map((rubyId) => ({ type: 'delete-ruby', lineId: selection.lineId, wordId: selection.wordId, rubyId })) };
+  if (selection.kind === 'ruby') return { type: 'batch', commands: document.lines.flatMap(line => line.words.flatMap(word => word.rubyUnits.filter(unit => selection.ids.includes(unit.id)).map(unit => ({ type: 'delete-ruby' as const, lineId: line.id, wordId: word.id, rubyId: unit.id })))) };
   if (selection.kind === 'romanization-content') return { type: 'batch', commands: selection.ids.map((contentId) => ({ type: 'delete-romanization-content', trackId: selection.trackId, contentId })) };
   if (selection.kind === 'romanization-unit') {
-    const content = document.romanizationTracks.find((track) => track.id === selection.trackId)?.contents.find((item) => item.id === selection.contentId);
-    if (!content || content.kind !== 'timed') throw new Error('请选择定时音译内容');
-    return { type: 'set-romanization-content', trackId: selection.trackId, content: { ...content, units: content.units.filter((unit) => !selection.ids.includes(unit.id)) } };
+    return { type: 'batch', commands: document.romanizationTracks.flatMap(track => track.contents.flatMap(content => content.kind === 'timed' && content.units.some(unit => selection.ids.includes(unit.id)) ? [{ type: 'set-romanization-content' as const, trackId: track.id, content: { ...content, units: content.units.filter(unit => !selection.ids.includes(unit.id)) } }] : [])) };
   }
   return { type: 'batch', commands: selection.kind === 'words'
     ? document.lines.flatMap((line) => line.words.filter((word) => selection.ids.includes(word.id)).map((word) => ({ type: 'delete-word' as const, lineId: line.id, wordId: word.id })))
-    : selection.ids.map((lineId) => ({ type: 'delete-line', lineId })) };
+    : selection.ids.filter(id => { const line = document.lines.find(line => line.id === id); return !line?.backgroundOf || !selection.ids.includes(line.backgroundOf); }).map((lineId) => ({ type: 'delete-line', lineId })) };
 }
 
 // Cutting uses the same atomic deletion as direct object deletion.

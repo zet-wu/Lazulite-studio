@@ -358,6 +358,7 @@ test('P4-06 narrow blocks use existing zoom then normal endpoints without adding
   const bar = page.getByRole('button', { name: '时间轴行 L1', exact: true });
   await expect(bar).toBeVisible();
   expect((await bar.locator('[data-time-color]').boundingBox())!.width).toBeLessThan(1);
+  await page.locator('[data-outline-drag]').first().click();
   const height = (await page.locator('footer').boundingBox())!.height;
   await bar.focus();
   await bar.press('Enter');

@@ -65,9 +65,9 @@ test('waveform creation restores layers, segment loop captures once, group movem
  await expect(page.locator('[data-vocal-lane]')).toHaveCount(0);await expect(page.getByLabel('人声能量',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'片段',exact:true}).click();await expect(page.locator('[data-segment-id]')).toHaveCount(2);
  const blocks=page.locator('[data-segment-id]');await blocks.nth(1).click();
- const loop=page.getByRole('button',{name:'循环当前单元',exact:true});await expect(loop).toBeEnabled();await loop.click();
+ const loop=page.getByRole('button',{name:'循环选区',exact:true});await expect(loop).toBeEnabled();await loop.click();
  const a=await page.getByRole('button',{name:/^A /}).textContent();
- await blocks.first().click({modifiers:['Control']});await expect(loop).toBeDisabled();
+ await blocks.first().click({modifiers:['Control']});await expect(loop).toBeEnabled();
  const before=await blocks.evaluateAll(nodes=>nodes.map(n=>n.getAttribute('aria-label')));
  const r=(await blocks.first().boundingBox())!;await page.mouse.move(r.x+r.width/2,r.y+9);await page.mouse.down();await page.mouse.move(r.x+r.width/2+20,r.y+9,{steps:4});await page.mouse.up();
  const moved=await blocks.evaluateAll(nodes=>nodes.map(n=>n.getAttribute('aria-label')));expect(moved[0]).not.toBe(before[0]);expect(moved[1]).not.toBe(before[1]);

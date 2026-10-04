@@ -24,8 +24,8 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
   const current = document.lines.find((line) => line.id === currentLineId);
   const targets = document.lines.filter((line, index) => scope === 'all' || scope === 'range' && index + 1 >= from && index + 1 <= to ||
     scope === 'selected' && selection?.kind === 'words' && line.words.some((word) => selection.ids.includes(word.id)) ||
-    scope === 'selected' && selection?.kind === 'lines' && selection.ids.includes(line.backgroundOf ?? line.id) ||
-    scope === 'current' && (line.id === currentLineId || line.backgroundOf === currentLineId));
+    scope === 'selected' && selection?.kind === 'lines' && selection.ids.includes(operation === 'shift' ? line.id : line.backgroundOf ?? line.id) ||
+    scope === 'current' && (line.id === currentLineId || operation !== 'shift' && line.backgroundOf === currentLineId));
   const wordIds = scope === 'selected' && selection?.kind === 'words' ? selection.ids : targets.flatMap((line) => line.words.map((word) => word.id));
   const run = () => {
     try {

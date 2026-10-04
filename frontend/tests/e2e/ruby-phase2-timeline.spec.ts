@@ -15,7 +15,7 @@ for(const theme of ['light','dark']) for(const audio of [false,true]) test(`geom
   const measure=()=>page.locator('#timeline-plots').evaluate(el=>{
     const rows=Array.from(el.querySelectorAll<HTMLElement>('[data-track-lane]')).map(lane=>{
       const l=lane.getBoundingClientRect(),r=lane.parentElement!.getBoundingClientRect();
-      return {name:lane.parentElement!.textContent,row:r.height,lane:l.height,top:r.top,bottom:r.bottom,bars:Array.from(lane.children).map(b=>{const q=b.getBoundingClientRect();return {top:q.top-l.top,bottom:q.bottom-l.top,height:q.height,bg:getComputedStyle(b).backgroundColor};})};
+      return {group:lane.closest('section[aria-label]')?.getAttribute('aria-label')??null,name:lane.parentElement!.textContent,row:r.height,lane:l.height,top:r.top,bottom:r.bottom,bars:Array.from(lane.children).map(b=>{const q=b.getBoundingClientRect();return {top:q.top-l.top,bottom:q.bottom-l.top,height:q.height,bg:getComputedStyle(b).backgroundColor};})};
     });
     return {height:el.clientHeight,scroll:el.scrollHeight,rows,surfaces:Array.from(el.querySelectorAll('[data-timeline-pan], [data-track-lane]')).filter(e=>e.tagName!=='CANVAS'&&e.getAttribute('aria-label')!=='时间标尺').map(e=>getComputedStyle(e).backgroundColor)};
   });
@@ -24,7 +24,8 @@ for(const theme of ['light','dark']) for(const audio of [false,true]) test(`geom
     const m=await measure();
     for(const r of m.rows) {expect(r.row).toBeGreaterThanOrEqual(r.lane);for(const b of r.bars){expect(b.height).toBe(20);expect(b.top).toBeGreaterThanOrEqual(1);expect(b.bottom).toBeLessThanOrEqual(r.lane-1);}}
     expect(m.rows.filter(r=>r.lane===66)).toHaveLength(2);
-    for(let i=1;i<m.rows.length;i++) expect(m.rows[i].top-m.rows[i-1].bottom).toBe(4);
+    for(let i=1;i<m.rows.length;i++) if(m.rows[i].group===m.rows[i-1].group) expect(m.rows[i].top-m.rows[i-1].bottom).toBe(4);
+    expect(await page.getByRole('region',{name:'L1 子轨',exact:true}).getByText('L1',{exact:true}).count()).toBe(1);
     expect(new Set(m.surfaces).size).toBe(1);
     if(!audio){expect(m.height).toBeLessThanOrEqual(300);expect(m.scroll).toBeGreaterThan(m.height);}
     const gap=m.rows.find(r=>r.name?.startsWith('空隙'))!;expect(new Set(gap.bars.map(b=>b.bg)).size).toBe(2);

@@ -18,6 +18,7 @@ export async function loadTimeline(page:Page, audio=false, segments = [{id:'s1',
   }, segments);
   await page.goto('/projects/sample-project/edit');
   await importLyrics(page,{name:'overlap.ttml',mimeType:'application/xml',buffer:xml});
+  await page.locator('[data-outline-drag]').first().click();
   await page.locator('audio').evaluate(async (audio:HTMLAudioElement) => {
     const rate=8000,count=rate*120,buffer=new ArrayBuffer(44+count*2),v=new DataView(buffer);
     const str=(i:number,s:string)=>[...s].forEach((c,j)=>v.setUint8(i+j,c.charCodeAt(0)));

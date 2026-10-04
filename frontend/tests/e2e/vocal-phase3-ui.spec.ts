@@ -21,7 +21,7 @@ for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) t
   await page.getByRole('button', { name: '打轴', exact: true }).click();
   for (const select of await page.locator('select:visible').all()) expect(await select.evaluate(e => getComputedStyle(e).backgroundImage)).toBe('none');
   await page.getByRole('button', { name: '编辑', exact: true }).click();
-  await rows.first().click(); let dialog = await generate(page);
+  await rows.first().press('Escape'); await rows.first().click(); let dialog = await generate(page);
   await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
   const target = dialog.getByLabel('L1生成内容');
   const label = await target.locator('..').locator('..').boundingBox(), box = await target.boundingBox();

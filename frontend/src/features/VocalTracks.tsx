@@ -1,3 +1,4 @@
+import { useEditorSelection } from './editor/SelectionContext';
 import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
 import { waveformRequestWindow } from '../domain/timeline-viewport';
 import { visibleEnergy } from '../domain/energy-window';
@@ -19,7 +20,8 @@ export function VocalTracks(props: Props) {
   const { acoustics, startMs, endMs, durationMs } = props;
   const { publish } = useContext(TimelineIndicatorContext);
   const capture = useRef<{ element: HTMLElement; id: number } | null>(null);
-  const {selected,setSelected,adding,setAdding,setSegmentTarget,toolsHost}=useAudioReview();
+  const sharedSelection = useEditorSelection()!;
+  const {selected,setSelected,adding,setAdding,toolsHost}=useAudioReview();
   const addButton=useRef<HTMLButtonElement>(null);
   const showEnergy=props.showEnergy||adding, showSegments=props.showSegments||adding;
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -75,13 +77,13 @@ export function VocalTracks(props: Props) {
   };
   const begin = (e:PointerEvent<HTMLElement>,segment?:VocalSegment,side:Drag['side']='new')=>{
     if(e.button!==0 || (!segment && !adding))return;
-    e.preventDefault(); e.stopPropagation(); setSegmentTarget(true);
+    e.preventDefault(); e.stopPropagation();
     if(segment && (e.ctrlKey||e.metaKey||e.shiftKey)) {
       const sorted=[...acoustics.segments].sort((a,b)=>a.beginMs-b.beginMs||a.endMs-b.endMs||a.id.localeCompare(b.id));
-      if(e.shiftKey&&selected.length){const a=sorted.findIndex(s=>s.id===selected.at(-1)),b=sorted.findIndex(s=>s.id===segment.id);setSelected(sorted.slice(Math.min(a,b),Math.max(a,b)+1).map(s=>s.id));}
+      if(e.shiftKey&&selected.length){const a=sorted.findIndex(s=>s.id===(sharedSelection.effective?.anchorId ?? selected[0])),b=sorted.findIndex(s=>s.id===segment.id);setSelected(sorted.slice(Math.min(a,b),Math.max(a,b)+1).map(s=>s.id));}
       else setSelected(selected.includes(segment.id)?selected.filter(id=>id!==segment.id):[...selected,segment.id]);return;
     }
-    setSegmentTarget(true);
+
     if(segment && !selected.includes(segment.id))setSelected([segment.id]);
     const lane=e.currentTarget.closest('[data-vocal-lane]')??e.currentTarget.querySelector('[data-vocal-lane]')??e.currentTarget;
     const box=lane.getBoundingClientRect();
@@ -118,7 +120,7 @@ export function VocalTracks(props: Props) {
       {energy.isError && <button className={styles.energyError} data-role="inline" onClick={()=>void energy.refetch()}>能量加载失败 · 重试</button>}
     </div></div>}
     {showSegments && <div className={styles.segmentRow}><strong>片段</strong><div data-vocal-lane data-timeline-pan="pan" tabIndex={-1} className={styles.lane} style={{height:`calc(${Math.max(1,frozen.current.laneCount)} * var(--timeline-lane-height))`}} onPointerDown={e=>begin(e)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={clearDrag}>
-      {visible.map(s=>{const p=preview&&drag?.side==='move'&&drag.ids.includes(s.id)?{...s,beginMs:s.beginMs+preview.beginMs-drag.segment!.beginMs,endMs:s.endMs+preview.beginMs-drag.segment!.beginMs}:preview&&drag?.segment?.id===s.id?preview:s;return <button data-role="secondary" key={s.id} className={styles.segment} data-segment-id={s.id} title={`${labels.get(s.id)} · ${s.beginMs}–${s.endMs} 毫秒`} aria-label={`人声片段 ${labels.get(s.id)} ${s.beginMs}–${s.endMs} 毫秒`} aria-pressed={selected.includes(s.id)} style={{left:`${Math.max(0,pct(p.beginMs))}%`,width:`${Math.min(100,pct(p.endMs))-Math.max(0,pct(p.beginMs))}%`,top:`calc(${frozen.current.lanes.get(s.id)??0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`,outline:dropId===s.id?'3px solid var(--primary, #3367ab)':undefined}} onPointerDown={e=>{if(!adding)begin(e,s,'move');}} onClick={e=>{if(e.detail===0){setSelected([s.id]);setSegmentTarget(true);}}} onKeyDown={e=>{if(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10'){e.preventDefault();if(!selected.includes(s.id))setSelected([s.id]);setSegmentTarget(true);const r=e.currentTarget.getBoundingClientRect();setMenu({x:r.left,y:r.bottom});}}} onContextMenu={e=>{e.preventDefault();if(adding)return;if(!selected.includes(s.id))setSelected([s.id]);setMenu({x:e.clientX,y:e.clientY});}} onDragOver={e=>{if(!adding&&e.dataTransfer.types.includes(VOCAL_LINE_MIME)){e.preventDefault();setDropId(s.id);}}} onDragLeave={()=>setDropId(null)} onDrop={e=>{e.preventDefault();setDropId(null);if(adding)return;const id=e.dataTransfer.getData(VOCAL_LINE_MIME);if(id){setSelected([s.id]);assign(id,s);}}}>
+      {visible.map(s=>{const p=preview&&drag?.side==='move'&&drag.ids.includes(s.id)?{...s,beginMs:s.beginMs+preview.beginMs-drag.segment!.beginMs,endMs:s.endMs+preview.beginMs-drag.segment!.beginMs}:preview&&drag?.segment?.id===s.id?preview:s;return <button data-role="secondary" key={s.id} className={styles.segment} data-segment-id={s.id} title={`${labels.get(s.id)} · ${s.beginMs}–${s.endMs} 毫秒`} aria-label={`人声片段 ${labels.get(s.id)} ${s.beginMs}–${s.endMs} 毫秒`} aria-pressed={selected.includes(s.id)} style={{left:`${Math.max(0,pct(p.beginMs))}%`,width:`${Math.min(100,pct(p.endMs))-Math.max(0,pct(p.beginMs))}%`,top:`calc(${frozen.current.lanes.get(s.id)??0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`,outline:dropId===s.id?'3px solid var(--primary, #3367ab)':undefined}} onPointerDown={e=>{if(!adding)begin(e,s,'move');}} onClick={e=>{if(e.detail===0 && !selected.includes(s.id)){setSelected([s.id]);}}} onKeyDown={e=>{if(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10'){e.preventDefault();if(!selected.includes(s.id))setSelected([s.id]);const r=e.currentTarget.getBoundingClientRect();setMenu({x:r.left,y:r.bottom});}}} onContextMenu={e=>{e.preventDefault();if(adding)return;if(!selected.includes(s.id))setSelected([s.id]);setMenu({x:e.clientX,y:e.clientY});}} onDragOver={e=>{if(!adding&&e.dataTransfer.types.includes(VOCAL_LINE_MIME)){e.preventDefault();setDropId(s.id);}}} onDragLeave={()=>setDropId(null)} onDrop={e=>{e.preventDefault();setDropId(null);if(adding)return;const id=e.dataTransfer.getData(VOCAL_LINE_MIME);if(id){setSelected([s.id]);assign(id,s);}}}>
         <span>{labels.get(s.id)}</span><span className={`${styles.edge} ${styles.begin}`} onPointerDown={e=>{if(!adding)begin(e,s,'beginMs');}}/><span className={`${styles.edge} ${styles.end}`} onPointerDown={e=>{if(!adding)begin(e,s,'endMs');}}/>
       </button>;})}
       {preview&&drag?.side==='new'&&<span className={styles.newRange} style={{left:`${pct(preview.beginMs)}%`,width:`${pct(preview.endMs)-pct(preview.beginMs)}%`}}/>}
