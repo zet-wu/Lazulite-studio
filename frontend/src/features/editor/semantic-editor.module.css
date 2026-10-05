@@ -253,7 +253,7 @@
 .romanPreviewSlot { display: grid; grid-template-rows: var(--roman-reading-height, 16px) 0 auto; row-gap: 5px; justify-items: center; flex: 0 0 auto; min-width: 0; max-width: 100%; }
 .romanPreviewSlot[data-first-preview-row] { grid-template-rows: var(--roman-reading-height, 16px) var(--roman-body-height, 32px) auto; }
 .romanPreviewSlot > [data-source-unit] { align-self: start; max-width: 100%; }
-.romanPreviewSlot > [data-generated-unit] { grid-row: 3; display: grid; justify-items: center; max-width: 100%; }
+.romanPreviewSlot > [data-generated-unit] { grid-row: 3; display: grid; justify-items: center; width: 100%; max-width: 100%; }
 .page .rubyGeneration input.romanPreviewInput { text-align: center; }
 .page .rubyGeneration :is(input, textarea).romanPreviewInput { box-sizing: border-box; border: 1px solid transparent; background: transparent; color: var(--muted); padding: 4px; min-width: 3ch; max-width: 100%; border-radius: 4px; font: inherit; }
 textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-height: 34px; }

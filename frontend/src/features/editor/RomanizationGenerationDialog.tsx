@@ -18,7 +18,7 @@ function ProposalText({ text, hint, label, multiline, change, focus }: {
     resize(); window.addEventListener('resize', resize); return () => window.removeEventListener('resize', resize);
   }, [text]);
   const common = {
-    'aria-label': label, 'aria-description': hint || undefined, title: hint || undefined,
+    'aria-label': label, 'aria-description': hint || undefined, title: [text, hint].filter(Boolean).join('；'),
     value: text, placeholder: '空格占位', className: `${styles.romanPreviewInput} ${hint ? styles.romanPreviewHint : ''}`,
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => change(event.target.value),
     onFocus: () => { start.current = text; focus(true); },
@@ -30,7 +30,7 @@ function ProposalText({ text, hint, label, multiline, change, focus }: {
       if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.blur(); }
     },
   };
-  return multiline ? <textarea {...common} ref={area} rows={1} /> : <input {...common} style={{ width: `${Math.max(3, Math.min(32, Array.from(text).length + 1))}ch` }} />;
+  return multiline ? <textarea {...common} ref={area} rows={1} /> : <input {...common} style={{ width: '100%' }} />;
 }
 
 function TimedWordPreview({ word, units, lineLabel, change, focus, highlight }: {
@@ -43,6 +43,17 @@ function TimedWordPreview({ word, units, lineLabel, change, focus, highlight }: 
     const slots = Array.from(element.querySelectorAll<HTMLElement>('[data-preview-unit]'));
     // Keep the inputs mounted when wrapping changes, including during IME input.
     const layout = () => {
+      const context = document.createElement('canvas').getContext('2d');
+      if (context) slots.forEach(slot => {
+        const input = slot.querySelector('input')!, reading = slot.querySelector<HTMLElement>('[data-source-unit] > div')!;
+        const inputStyle = getComputedStyle(input), readingStyle = getComputedStyle(reading);
+        context.font = inputStyle.font;
+        const inset = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce((sum, key) => sum + parseFloat(inputStyle[key as keyof CSSStyleDeclaration] as string || '0'), 0);
+        const inputWidth = context.measureText(input.value || input.placeholder).width + inset + 4;
+        context.font = readingStyle.font;
+        const readingWidth = Math.max(...reading.textContent!.split('\n').map(text => context.measureText(text).width));
+        slot.style.width = `${Math.min(384, Math.max(32, inputWidth, readingWidth))}px`;
+      });
       const firstTop = slots[0]?.offsetTop;
       const readingHeight = Math.max(16, ...slots.map(slot => slot.querySelector<HTMLElement>('[data-source-unit]')!.offsetHeight));
       element.style.setProperty('--roman-reading-height', `${readingHeight}px`);
@@ -56,7 +67,7 @@ function TimedWordPreview({ word, units, lineLabel, change, focus, highlight }: 
     });
     [element, text, ...slots].forEach(item => observer.observe(item));
     return () => { observer.disconnect(); cancelAnimationFrame(frame); };
-  }, [word, units.length]);
+  }, [word, units]);
   const readings = new Map(word.rubyUnits.map(unit => [unit.id, unit.reading]));
   return <div ref={root} className={`${styles.romanPreviewWord} ${styles.romanPreviewTimedWord}`} data-source-word={word.id}
     style={{ minWidth: `min(100%, ${Array.from(word.text).length * 22}px)` }}>
@@ -64,9 +75,7 @@ function TimedWordPreview({ word, units, lineLabel, change, focus, highlight }: 
     {units.map(({ unit, index }) => {
       const reading = readings.get(unit.key) ?? word.text;
       const kanaHint = kanaHighlightHint(reading, highlight);
-      const inputWidth = Math.max(3, Math.min(32, Array.from(unit.text).length + 1));
-      const width = `min(32ch, max(${Array.from(reading).length * 12}px, ${inputWidth}ch))`;
-      return <div key={unit.key} className={styles.romanPreviewSlot} style={{ width }} data-preview-unit={unit.key}>
+      return <div key={unit.key} className={styles.romanPreviewSlot} data-preview-unit={unit.key}>
         <div data-source-unit={unit.key}><div tabIndex={kanaHint ? 0 : undefined} title={kanaHint || undefined} aria-description={kanaHint || undefined} className={`${styles.romanPreviewReading} ${kanaHint ? styles.romanPreviewHint : ''}`}>{reading}</div></div>
         <div data-generated-unit={unit.key}><ProposalText text={unit.text} hint={[unit.hint, kanaHint].filter(Boolean).join('；')} label={`${lineLabel}单元 ${index + 1}音译`}
           change={text => change(text, unit.key)} focus={focus} /></div>
