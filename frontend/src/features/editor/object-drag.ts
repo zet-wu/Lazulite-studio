@@ -106,6 +106,11 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     if (current && root.current?.hasPointerCapture(current.id)) root.current.releasePointerCapture(current.id);
   };
   const cancel = () => { cleanup(); setPreview(null); };
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && session.current) { event.preventDefault(); event.stopPropagation(); cancel(); } };
+    window.addEventListener('keydown', escape, true);
+    return () => window.removeEventListener('keydown', escape, true);
+  }, []);
   useEffect(() => { cancel(); }, [document]);
   useEffect(() => () => cleanup(), []);
 
