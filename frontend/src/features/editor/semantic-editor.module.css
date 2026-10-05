@@ -114,12 +114,21 @@
 .rubyGenerationOptions small { flex-basis: 100%; }
 .rubyGenerationOptions label { display: grid; gap: 4px; }
 .rubyGeneration select, .rubyGeneration input:not([type="checkbox"]) { box-sizing: border-box; min-width: 0; max-width: 100%; padding: 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--canvas); color: var(--ink); font: inherit; }
-.rubyGenerationRows { display: grid; gap: 7px; max-height: 40dvh; overflow-y: auto; }
-.rubyGenerationRow { box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) max-content; align-items: center; gap: 5px 8px; padding: 7px; border: 1px solid var(--line); border-radius: 5px; }
-.rubyGenerationRowsVirtual { height: 40dvh; position: relative; display: block; }
-.rubyGenerationRow > strong, .rubyGenerationRow > small { grid-column: 1 / -1; overflow-wrap: anywhere; }
-.rubyGenerationRow label { display: grid; gap: 3px; min-width: 0; }
-.rubyGenerationRow label:has([type="checkbox"]) { display: inline-flex; align-items: center; white-space: nowrap; }
+.rubyGenerationRows { display: grid; }
+.rubyGenerationRow { box-sizing: border-box; display: grid; grid-template-columns: minmax(90px, .8fr) minmax(140px, 1.1fr) minmax(100px, 1fr) max-content; align-items: end; gap: 8px; padding: 7px 3px; border-bottom: 1px solid var(--line); scroll-margin-block: 10px; }
+.rubyGenerationRowsVirtual { height: 40dvh; position: relative; display: block; overflow: auto; overflow-anchor: none; }
+.rubyGenerationRow label, .rubySource { display: grid; gap: 4px; min-width: 0; }
+.rubySource strong { font: inherit; font-weight: 600; overflow-wrap: anywhere; line-height: 28px; }
+.rubySource small { font: inherit; color: var(--muted); }
+.rubyGenerationRow select, .rubyGenerationRow input:not([type="checkbox"]) { width: 100%; height: 30px; }
+.rubyGenerationRow label:has([type="checkbox"]) { display: inline-flex; align-items: center; white-space: nowrap; min-height: 30px; }
+.rubyGeneration [data-attention] { outline: 1px dashed var(--danger); outline-offset: 2px; }
+.rubyPatrol { margin-right: auto; }
+.rubyDescription { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.rubyHint { position: fixed; z-index: 120; max-width: 310px; overflow-wrap: anywhere; padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-high); color: var(--ink); box-shadow: 0 3px 12px #0003; pointer-events: none; }
+.rubyIssueList { display: grid; gap: 4px; }
+.rubyIssueList button { display: flex; flex-wrap: wrap; gap: 4px 8px; text-align: left; }
+.rubyIssueList strong { font-weight: 600; overflow-wrap: anywhere; }
 
 .syncButtons { display: flex; flex-wrap: wrap; gap: 6px; }
 .previewMode { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; background: var(--canvas); }
@@ -183,11 +192,6 @@
 .modeTabs button[data-role]:focus-visible, .modeTabs button[data-role]:active { border-color:var(--blue); color:var(--blue); }
 .modeTabs button[data-role][aria-current="page"] { border-color:var(--blue); color:var(--blue); background:var(--blue-soft); box-shadow:inset 0 -2px var(--blue); }
 .wordMain input { font-size: var(--lyric-size); line-height: 1.45; }
-.rubyGenerationRow > strong { font-size: var(--lyric-size); font-weight: 500; }
-.rubyGenerationRow > small { color: var(--muted); font-variant-numeric: tabular-nums; }
-.rubyGenerationRow { background: var(--surface-container); border: 0; padding: 10px; }
-.rubyGenerationRows { max-height: none; overflow: visible; }
-.rubyGenerationRowsVirtual { height: 40dvh; overflow: auto; }
 .sourceChoices summary { cursor: pointer; padding: 6px 0; color: var(--muted); }
 .sourceChoices fieldset { margin-top: 6px; }
 .dialog:has(.rubyGenerationRowsVirtual) .dialogBody { overflow: auto; }

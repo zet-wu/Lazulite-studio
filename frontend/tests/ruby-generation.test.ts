@@ -217,10 +217,9 @@ describe('structured reverse-ruby issues', () => {
     expect(defaultRubySkips(document, rows, 'hiragana', {}).size).toBe(0);
     line.words[0].text = '漢字'; expect(issues()).toEqual([]);
     line.words[0].text = 'かな'; expect(issues({}, new Set(), 'roman')).toEqual([]);
-    for (const [text, reading] of [['は', 'わ'], ['へ', 'え'], ['が', 'が']]) {
+    for (const [text, reading, difference] of [['はー', 'わ', true], ['へー', 'え', true], ['がー', 'が', false]] as const) {
       line.words[0].text = text;
-      const result = issues({ 'c:a': reading, 'c:b': 'ー' });
-      expect(result).toHaveLength(1);
+      expect(issues({ 'c:a': reading, 'c:b': 'ー' })).toHaveLength(difference ? 1 : 0);
     }
   });
   it('collects target, reading, overwrite and link errors without stale conversion gates', () => {

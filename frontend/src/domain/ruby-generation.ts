@@ -147,7 +147,10 @@ export function rubyGenerationIssues(document: LyricDocument, rows: RubyProposal
   for (const line of document.lines) {
     const active = rows.filter(row => row.lineId === line.id && row.wordId && !skipped.has(row.key));
     if (!active.length) continue;
-    const nextWords = line.words.map(word => wordEnvelope(word, active.filter(row => row.wordId === word.id)));
+    const nextWords = line.words.map(word => {
+      const assigned = active.filter(row => row.wordId === word.id);
+      return assigned.length ? wordEnvelope(word, assigned) : word;
+    });
     const next = envelope(line, nextWords.map(word => word.beginMs), nextWords.map(word => word.endMs));
     if ((next.beginMs !== line.beginMs || next.endMs !== line.endMs)
       && (line.endLink || document.lines.some(item => item.endLink?.targetLineId === line.id))) {

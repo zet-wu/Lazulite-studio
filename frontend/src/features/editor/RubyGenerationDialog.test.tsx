@@ -116,3 +116,22 @@ it('counts only selected contents with nonempty source rows as tracks and conten
   expect(screen.getByText('生成 0 / 3 行')).toBeVisible();
   expect(screen.getByRole('button', { name: '生成 注音' })).toBeDisabled();
 });
+
+it('blocks stale proposals and refreshes explicitly without applying old edits', () => {
+  const document = createLyricDocument('は'), line = document.lines[0];
+  Object.assign(line.words[0], { beginMs: 0, endMs: 1000 });
+  document.romanizationTracks = [{ id: 't', language: null, contents: [{ id: 'c', lineId: line.id, kind: 'timed',
+    units: [{ id: 'u', text: 'ka', beginMs: 0, endMs: 1000 }] }] }];
+  const props = { document, lineIds: [line.id], apply: vi.fn(() => true), close: vi.fn() };
+  const view = render(<RubyGenerationDialog {...props} />);
+  fireEvent.change(screen.getByLabelText('目标 注音'), { target: { value: 'わ' } });
+  view.rerender(<RubyGenerationDialog {...props} document={{ ...document }} />);
+  expect(screen.getByRole('button', { name: '下一处错误／警告' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '生成 注音' })).toBeDisabled();
+  expect(screen.queryByRole('button', { name: /核对 ·/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '重新生成提案' }));
+  expect(screen.getByLabelText('目标 注音')).toHaveValue('か');
+  expect(props.apply).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '取消' }));
+  expect(props.close).toHaveBeenCalledOnce();
+});
