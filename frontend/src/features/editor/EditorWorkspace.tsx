@@ -252,6 +252,11 @@ function EditorWorkspaceContent(props: Props) {
   const [focusAgent,setFocusAgent] = useState<string>();
   const locateIssue = (issue: OutputIssue) => {
     if(issue.kind === 'agent') { setMode('edit'); setFocusAgent(issue.agentId); setSettingsDialog('singers'); return; }
+    if (issue.kind === 'romanization-content' || issue.kind === 'romanization-unit' || issue.kind === 'translation-content' || issue.kind === 'translation-unit') {
+      const tracks = issue.kind.startsWith('translation') ? document.translationTracks : document.romanizationTracks;
+      const content = tracks.flatMap(track => track.contents).find(content => content.id === issue.contentId && content.lineId === issue.lineId);
+      if (!content || issue.unitId && (content.kind !== 'timed' || !content.units.some(unit => unit.id === issue.unitId))) return;
+    }
     const line=document.lines.find(l=>l.id===issue.lineId);
     if(!line)return;
     setMode('edit');
