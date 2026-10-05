@@ -37,3 +37,35 @@ it('resizes only the requested side without filling unknown ancestors and reject
   line.beginMs = 0;
   expect(() => moveTimeline(doc, [{ kind: 'line', lineId: line.id }], 10)).toThrow('完整时间');
 });
+it('computes parents before children while using only real sibling endpoints and all descendant constraints', () => {
+  const doc = createLyricDocument('');
+  doc.lines = [{ ...createLine('prior'), beginMs: 0, endMs: 2000 }, { ...createLine('target'), beginMs: null, endMs: 3000 }];
+  const row = doc.lines[1];
+  row.words = [{ ...createWord('a'), beginMs: 1000, endMs: null, rubyUnits: [{ id: 'r', reading: 'あ', beginMs: 500, endMs: 2500 }] }, { ...createWord('b'), beginMs: 2000, endMs: null }];
+  const shown = projectTimeline(doc, 5000);
+  expect(shown.lines[1].beginMs).toBe(0); // 2000 excludes real descendants.
+  expect(shown.lines[1].words[0].endMs).toBeNull(); // The known start already excludes its Ruby.
+  row.words[0].beginMs = null; row.words[0].endMs = 2500;
+  expect(projectTimeline(doc, 5000).lines[1].words[0].beginMs).toBe(0);
+  expect(doc.lines[1].beginMs).toBeNull();
+});
+it('keeps romanization independent, discards reverse candidates and never projects two unknown endpoints', () => {
+  const doc = createLyricDocument('a'), line = doc.lines[0]; line.beginMs = 100; line.endMs = 200;
+  doc.romanizationTracks = [{ id: 't', language: null, contents: [{ id: 'c', lineId: line.id, kind: 'timed', units: [
+    { id: 'u', text: 'a', beginMs: 300, endMs: null }, { id: 'v', text: 'b', beginMs: 400, endMs: null }, { id: 'unknown', text: 'c', beginMs: null, endMs: null },
+  ] }] }];
+  const units = (d: typeof doc) => { const c = d.romanizationTracks[0].contents[0]; if (c.kind !== 'timed') throw Error(); return c.units; };
+  expect(units(projectTimeline(doc))[0].endMs).toBe(400);
+  expect(units(projectTimeline(doc))[1].endMs).toBeNull();
+  expect(units(projectTimeline(doc, 500))[1].endMs).toBe(500);
+  expect(units(projectTimeline(doc, 500))[2]).toMatchObject({ beginMs: null, endMs: null });
+});
+it('resizing Ruby retains known parent sides when no Ruby supplies that side, and row resize includes real Ruby', () => {
+  const doc = createLyricDocument('a'), row = doc.lines[0], word = row.words[0];
+  row.beginMs = 0; row.endMs = null; word.beginMs = 10; word.endMs = null;
+  word.rubyUnits = [{ id: 'r', reading: 'あ', beginMs: null, endMs: 100 }];
+  const next = resizeTimeline(doc, { kind: 'ruby', lineId: row.id, wordId: word.id, rubyId: 'r' }, 'endMs', 200);
+  expect(next.lines[0]).toMatchObject({ beginMs: 0, endMs: null });
+  expect(next.lines[0].words[0]).toMatchObject({ beginMs: 10, endMs: null });
+  expect(() => resizeTimeline(doc, { kind: 'line', lineId: row.id }, 'endMs', 50)).toThrow('不能排除');
+});

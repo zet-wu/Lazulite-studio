@@ -55,15 +55,11 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && dragRef.current) { event.preventDefault(); cancel(); } };
     window.addEventListener('keydown', escape); return () => { window.removeEventListener('keydown', escape); cancel(); };
   }, [cancel]);
-  useEffect(() => { cancel(); }, [document, visible.line, visible.word, visible.ruby, visible.romanization, cancel]);
+  useEffect(() => { cancel(); }, [document, durationMs, visible.line, visible.word, visible.ruby, visible.romanization, cancel]);
   useEffect(() => { if (dragRef.current?.side !== 'pan') cancel(); }, [startMs, endMs, cancel]);
   const projection = useMemo(() => projectTimeline(document, durationMs), [document, durationMs]);
   const candidateDocument = drag?.candidate.document ?? document;
   const displayed = projectTimeline(candidateDocument, durationMs);
-  if (drag?.target) for (const target of allTargets) {
-    const real = targetInterval(candidateDocument, target), frozen = targetInterval(projection, target), shown = targetInterval(displayed, target);
-    if (real && frozen && shown) for (const side of ['beginMs', 'endMs'] as const) if (real[side] === null) shown[side] = frozen[side];
-  }
   const propsEndMs = endMs;
   const spanMs = Math.max(1, endMs - startMs);
   const mainLines = displayed.lines;
@@ -164,7 +160,7 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
     const narrow = (Math.min(endMs, propsEndMs) - clippedBegin) / spanMs * plotWidth < 16;
     return <div key={key} data-timeline-key={key}
       className={`${styles.trackBar} ${target.kind === 'line' && document.lines.find(line => line.id === target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${real?.beginMs != null && real?.endMs != null && positionMs >= real.beginMs && positionMs < real.endMs ? styles.trackPlaying : ''}`} role="button" tabIndex={0} aria-label={label} title={description} aria-description={description} data-temporary-begin={ghostBegin || undefined} data-temporary-end={ghostEnd || undefined}
-      style={{ left: pct(clippedBegin), width: `${(right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
+      style={{ transform: narrow && beginMs === endMs && beginMs === propsEndMs ? 'translateX(-100%)' : undefined, left: pct(clippedBegin), width: `${(right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
       onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
       onFocus={() => { if (!dragRef.current) choose(target); }}
       onContextMenu={event => { event.preventDefault(); choose(target); setMenu({ x: event.clientX, y: event.clientY, target: event.currentTarget }); }}

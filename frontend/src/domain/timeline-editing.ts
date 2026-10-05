@@ -81,7 +81,7 @@ export function moveTimeline(document: LyricDocument, targets: TimelineTarget[],
         if (unit.beginMs === null || unit.endMs === null) throw new Error('请先为 注音 设置完整时间');
         rubyUnits[rubyIndex] = { ...unit, beginMs: changed(unit.beginMs, deltaMs), endMs: changed(unit.endMs, deltaMs) };
         words[index] = { ...word, rubyUnits,
-          beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true), endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false), };
+          beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true) ?? word.beginMs, endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false) ?? word.endMs, };
       }
       return include({ ...line, words }, words[index]);
     });
@@ -97,7 +97,7 @@ export function resizeTimeline(document: LyricDocument, target: TimelineTarget, 
       const beginMs = side === 'beginMs' ? timeMs : line.beginMs;
       const endMs = side === 'endMs' ? timeMs : line.endMs;
       valid(beginMs, endMs);
-      if (line.words.some((word) => beginMs !== null && word.beginMs !== null && word.beginMs < beginMs || endMs !== null && word.endMs !== null && word.endMs > endMs)) throw new Error('行边界不能排除词');
+      if (line.words.flatMap(word => [word, ...word.rubyUnits]).some((word) => beginMs !== null && word.beginMs !== null && word.beginMs < beginMs || endMs !== null && word.endMs !== null && word.endMs > endMs)) throw new Error('行边界不能排除词');
       if (line.endLink && endMs !== line.endMs) throw new Error('时间修改与行尾链接冲突');
       return { ...line, beginMs, endMs };
     }
@@ -119,7 +119,7 @@ export function resizeTimeline(document: LyricDocument, target: TimelineTarget, 
       valid(unit.beginMs, unit.endMs);
       rubyUnits[rubyIndex] = unit;
       words[index] = { ...word, rubyUnits,
-        beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true), endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false) };
+        beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true) ?? word.beginMs, endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false) ?? word.endMs };
     }
     return include({ ...line, words }, words[index]);
   });
