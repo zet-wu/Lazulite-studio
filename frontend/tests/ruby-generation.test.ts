@@ -84,15 +84,18 @@ describe('P4 注音 candidate tolerance and grouped defaults', () => {
     document.romanizationTracks.push({ id: 'latin', language: 'ja', contents: [{ id: 'c', lineId: line.id, kind: 'timed', units: [{ id: 'u', text: 'na', beginMs, endMs }] }] });
     return document;
   }
-  it('distinguishes touching, 1ms, exact 10ms, 11ms, true crossing and tiny matches without mutating time', () => {
+  it('distinguishes touching, 1ms, 49ms, exact 50ms, 51ms, true crossing and tiny matches without mutating time', () => {
     for (const [begin, end, candidates, defaultId] of [
       [1000, 1500, ['right'], 'right'],
       [999, 1500, ['right'], 'right'],
-      [990, 1500, ['right'], 'right'],
-      [989, 1500, ['right', 'left'], null],
+      [951, 1500, ['right'], 'right'],
+      [949, 1500, ['right', 'left'], null],
       [500, 1500, ['left', 'right'], null],
       [999, 1001, ['left', 'right'], null],
-      [1000, 1010, ['right'], null],
+      [1000, 1049, ['right'], null],
+      [1000, 1050, ['right'], null],
+      [1000, 1051, ['right'], 'right'],
+      [950, 1500, ['right'], 'right'],
       [2000, 3000, [], null],
       [null, null, [], null],
     ] as const) {
@@ -175,5 +178,16 @@ it('filters empty and whitespace 注音 sources without changing source times or
   expect(state.present.romanizationTracks).toEqual(snapshot.romanizationTracks);
   expect(rubySourceRows(document, 'track', ['plain'])).toEqual([]);
   expect(() => rubyGenerationCommand(document, document, [], {}, new Set(), new Set())).toThrow();
+  expect(document).toEqual(snapshot);
+});
+
+it('filters only explicit punctuation before conversion', () => {
+  const document = createLyricDocument('歌'), line = document.lines[0];
+  const removed = ['', '　', ' ,。()「」… ', '“”！？'];
+  const retained = ['ー', '-', "'", '々', '★', '123', 'ka,', 'ka', '（ ka ）'];
+  document.romanizationTracks = [{ id: 't', language: null, contents: [{ id: 'c', lineId: line.id, kind: 'timed', units:
+    [...removed, ...retained].map((text, i) => ({ id: String(i), text, beginMs: null, endMs: null })) }] }];
+  const snapshot = structuredClone(document);
+  expect(rubySourceRows(document, 't', ['c']).map(row => row.sourceText)).toEqual(retained);
   expect(document).toEqual(snapshot);
 });

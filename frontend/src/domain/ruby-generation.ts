@@ -10,9 +10,11 @@ export type RubySourceRow = {
 };
 export type RubyProposalRow = RubySourceRow & { wordId: string | null; reading: string | null; conversionIssue: string | null };
 
-export const RUBY_OVERLAP_TOLERANCE_MS = 10;
+export const RUBY_OVERLAP_TOLERANCE_MS = 50;
 
 const kana = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
+// Explicit non-reading punctuation; preserve apostrophes, hyphens and unknown symbols.
+const punctuationOnly = /^[,，、.。!！?？:：;；()（）\[\]［］{}｛｝「」『』【】〈〉《》“”"…⋯]+$/u;
 const sourceReading = (text: string) => text.replace(/\s+/gu, '');
 const convert = (value: string, output: RubyOutput) => output === 'roman' ? value : output === 'hiragana' ? toHiragana(value) : toKatakana(value);
 const overlap = (begin: number, end: number, word: LyricWord) => word.beginMs === null || word.endMs === null ? 0
@@ -29,7 +31,7 @@ export function rubySourceRows(document: LyricDocument, trackId: string, content
     const units = content.kind === 'plain'
       ? [{ id: null, text: content.text, beginMs: null, endMs: null }]
       : content.units.map((unit) => ({ ...unit }));
-    return units.filter((unit) => sourceReading(unit.text)).map((unit) => {
+    return units.filter((unit) => sourceReading(unit.text) && !punctuationOnly.test(unit.text.trim())).map((unit) => {
       const ranked = unit.beginMs !== null && unit.endMs !== null && unit.beginMs < unit.endMs
         ? line.words.map((word) => ({ id: word.id, amount: overlap(unit.beginMs!, unit.endMs!, word) })).filter((item) => item.amount > 0).sort((left, right) => right.amount - left.amount)
         : [];
