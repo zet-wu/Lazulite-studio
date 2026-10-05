@@ -1,3 +1,4 @@
+import { isUntimedSeparator, projectExportSeparators } from './export-separators';
 import { AGENT_TYPES } from '../domain/lyric-document';
 import type { LyricDocument, LyricLine, TimeMs } from '../domain/lyric-document';
 import type { LyricFormat } from './lyric-formats';
@@ -27,13 +28,19 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
    if ((lrc || target==='txt') && line.backgroundOf) continue;
    const base={kind:'line' as const,lineId:line.id},prefix=label(line);
    if(fullBody || lrc) add(base,prefix,line.beginMs,line.endMs,fullBody,line.beginMs!==null && line.endMs!==null && (fullBody ? line.endMs<=line.beginMs : line.endMs<line.beginMs) ? '结束时间必须晚于开始' : undefined);
+   if (fullBody && target !== 'publish') {
+     const projection = projectExportSeparators(line.words);
+     if (!projection.units.length) issues.push({ ...base, code: 'empty-content', missing: [], message: `${prefix}：该行没有可输出的定时正文` });
+     else for (const word of projection.unhosted) issues.push({ kind: 'word', lineId: line.id, wordId: word.id, code: 'missing-time', missing: [], message: `${prefix}：分隔空白没有相邻的有效定时正文` });
+     for (const word of line.words) if (/[\t\r\n\u2028\u2029]/u.test(word.text)) issues.push({ kind: 'word', lineId: line.id, wordId: word.id, code: 'serialization', missing: [], message: `${prefix}：此格式不能忠实表达正文中的制表符或换行` });
+   }
    let boundary=line.beginMs === null ? null : line.beginMs;
    for(const [i,word] of line.words.entries()) {
-     const blank=/^\s+$/.test(word.text) && word.beginMs===null && word.endMs===null && !word.rubyUnits.length && !word.emptyBeat;
-     if(blank && (target === 'publish' || !fullBody))continue;
+     const blank=isUntimedSeparator(word);
+     if(blank)continue;
      const wordBase={kind:'word' as const,lineId:line.id,wordId:word.id},wordPrefix=`${prefix}第 ${i+1} 词`;
-     const begin=fullBody && target!=='publish' && line.words.length===1 ? word.beginMs ?? line.beginMs : word.beginMs;
-     const end=fullBody && target!=='publish' && line.words.length===1 ? word.endMs ?? line.endMs : word.endMs;
+     const begin=word.beginMs;
+     const end=word.endMs;
      if(fullBody) add(wordBase,wordPrefix,begin,end,true, target !== 'publish' && begin !== null && end !== null && end <= begin ? '结束时间必须晚于开始' : undefined);
      if(target==='elrc') {
        const b=begin === null ? null : begin,e=end===null ? null : end;
@@ -53,7 +60,7 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
      if(content.kind==='timed') {
        if(!content.units.length)issues.push({kind:'romanization-content',lineId:line.id,trackId:track.id,contentId:content.id,code:'empty-content',missing:[],message:`${prefix}：定时内容没有单元`});
        for(const [i,unit] of content.units.entries()) {
-         if(/^\s+$/.test(unit.text) && unit.beginMs===null && unit.endMs===null)continue;
+         if(isUntimedSeparator(unit))continue;
          add({kind:'romanization-unit',lineId:line.id,trackId:track.id,contentId:content.id,unitId:unit.id},`${prefix}第 ${i+1} 单元`,unit.beginMs,unit.endMs,true);
        }
      }
@@ -62,7 +69,7 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
  if (target === 'ttml' || target === 'publish') for (const track of document.translationTracks) for (const content of track.contents) if (content.kind === 'timed') {
    const line = document.lines.find(line => line.id === content.lineId)!;
    if (!content.units.length) issues.push({ kind: 'translation-content', lineId: line.id, contentId: content.id, code: 'empty-content', missing: [], message: `${label(line)}翻译没有单元` });
-   for (const [index, unit] of content.units.entries()) add({ kind: 'translation-unit', lineId: line.id, contentId: content.id, unitId: unit.id }, `${label(line)}翻译第 ${index + 1} 单元`, unit.beginMs, unit.endMs, true, unit.beginMs !== null && unit.endMs !== null && unit.beginMs > unit.endMs ? '时间倒序' : undefined);
+   for (const [index, unit] of content.units.entries()) { if (isUntimedSeparator(unit)) continue; add({ kind: 'translation-unit', lineId: line.id, contentId: content.id, unitId: unit.id }, `${label(line)}翻译第 ${index + 1} 单元`, unit.beginMs, unit.endMs, true, unit.beginMs !== null && unit.endMs !== null && unit.beginMs > unit.endMs ? '时间倒序' : undefined); }
  }
  return issues;
 }

@@ -22,5 +22,6 @@ it('exports ASS and rejects an untimed final file', () => {
   const document = createLyricDocument('歌');
   expect(() => exportLyricFile(document, 'ass')).toThrow(/第 1 行：缺少开始和结束时间/);
   document.lines[0].beginMs = 1000; document.lines[0].endMs = 2000;
+  document.lines[0].words[0].beginMs = 1000; document.lines[0].words[0].endMs = 2000;
   expect(exportLyricFile(document, 'ass')).toContain('[Events]');
 });

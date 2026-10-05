@@ -1,17 +1,18 @@
+import { projectExportSeparators } from './export-separators';
 import { translationsForLine } from '../domain/lyric-document';
 import { plainTranslation } from '../domain/lyric-document';
 import { translationText } from '../domain/lyric-document';
 import { parseWordFormat, parseLrcSource } from './source-codec';
 import { assertOutputDocument } from './output-validation';
 import { renderLrc } from './lrc';
-import { parseEslrc, parseLrc, parseLys, parseQrc, parseYrc, stringifyAss, stringifyEslrc, stringifyLrc, stringifyLys, stringifyQrc, stringifyYrc, type LyricLine as FormatLine } from '@applemusic-like-lyrics/lyric';
+import { parseEslrc, parseLrc, parseLys, parseQrc, parseYrc, stringifyAss, stringifyEslrc, stringifyLrc, type LyricLine as FormatLine } from '@applemusic-like-lyrics/lyric';
 import { createLine, createLyricDocument, createWord, type LyricDocument, type RomanizationTrack, type TranslationTrack } from '../domain/lyric-document';
 import { toAmllLines } from '../domain/preview-adapter';
 import { parseLyricTtml, serializeLyricTtml } from './ttml/lyric-codec';
 
 export type LyricFormat = 'ttml' | 'txt' | 'lrc' | 'elrc' | 'eslrc' | 'qrc' | 'krc' | 'yrc' | 'lys' | 'ass';
 const parseTimed = { elrc: parseLrc, lrc: parseLrc, eslrc: parseEslrc, qrc: parseQrc, yrc: parseYrc, lys: parseLys };
-const stringifyTimed = { lrc: stringifyLrc, eslrc: stringifyEslrc, qrc: stringifyQrc, yrc: stringifyYrc, lys: stringifyLys, ass: stringifyAss };
+const stringifyTimed = { lrc: stringifyLrc, eslrc: stringifyEslrc, ass: stringifyAss };
 const maximumSize = 4_000_000;
 const milliseconds = (ms: number): number => {
   if (!Number.isFinite(ms) || ms < 0) throw new Error('歌词时间无效');
@@ -69,14 +70,20 @@ export function exportLyricFile(document: LyricDocument, format: LyricFormat): s
   const preview = new Map(toAmllLines(document, false, true).map((item) => [item.id, item.lyric]));
   const lines: FormatLine[] = document.lines.map((line) => {
     if (line.beginMs === null || line.endMs === null || line.endMs <= line.beginMs) throw new Error('导出前请补全每行时间');
-    const words = line.words.map((word, index) => {
-      const begin = word.beginMs ?? (line.words.length === 1 ? line.beginMs : null);
-      const end = word.endMs ?? (line.words.length === 1 ? line.endMs : null);
+    const words = projectExportSeparators(line.words).units.map((word, index) => {
+      const begin = word.beginMs;
+      const end = word.endMs;
       if (begin === null || end === null || end <= begin) throw new Error('导出前请补全逐词时间');
       return { word: word.text, startTime: begin, endTime: end, romanWord: preview.get(line.id)?.words[index]?.romanWord };
     });
     return { words, startTime: line.beginMs, endTime: line.endMs,
       translatedLyric: translationsForLine(document, line.id).map(translationText).join(' / '), romanLyric: preview.get(line.id)?.romanLyric ?? '', isBG: Boolean(line.backgroundOf), isDuet: preview.get(line.id)?.isDuet ?? false };
   });
+  // The library drops timed whitespace-only QRC/YRC words, including a background closing bracket.
+  if (format === 'qrc' || format === 'yrc') return lines.map(line => `[${line.startTime},${line.endTime-line.startTime}]` + line.words.map((word,index) => {
+    const text = `${line.isBG && index === 0 ? '（' : ''}${word.word}${line.isBG && index === line.words.length-1 ? '）' : ''}`;
+    return format === 'qrc' ? `${text}(${word.startTime},${word.endTime-word.startTime})` : `(${word.startTime},${word.endTime-word.startTime},0)${text}`;
+  }).join('')).join('\n');
+  if (format === 'lys') return lines.map(line => `[${(line.isBG ? 6 : 0) + (line.isDuet ? 2 : 1)}]` + line.words.map(word => `${word.word}(${word.startTime},${word.endTime-word.startTime})`).join('')).join('\n');
   return stringifyTimed[format](lines);
 }

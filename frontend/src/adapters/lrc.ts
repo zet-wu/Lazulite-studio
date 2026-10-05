@@ -1,3 +1,4 @@
+import { isUntimedSeparator } from './export-separators';
 import { assertOutputDocument, visibleLineOrdinals } from './output-validation';
 import { lineText, type LyricDocument, type LyricLine } from '../domain/lyric-document';
 export type LrcKind = 'lrc' | 'elrc';
@@ -6,7 +7,7 @@ function extended(line: LyricLine, ordinal: number): string {
   let boundary = line.beginMs!, result = '';
   const emit = (time: number) => { if (time !== boundary) result += `<${stamp(time)}>`; boundary = time; };
   line.words.forEach((word, index) => {
-    if (!word.text.trim() && word.beginMs === null) { result += word.text; return; }
+    if (isUntimedSeparator(word)) { result += word.text; return; }
     if (word.beginMs === null) throw new Error(`第 ${ordinal} 行第 ${index + 1} 单元缺少开始时间`);
     const begin = word.beginMs, end = word.endMs === null ? null : word.endMs;
     if (begin < boundary || (end !== null && end < begin)) throw new Error(`第 ${ordinal} 行第 ${index + 1} 单元时间倒序或重叠，无法输出扩展 LRC`);
