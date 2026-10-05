@@ -29,7 +29,7 @@ function generateLine(line: LyricLine): GeneratedUnit[] {
   });
   const put = (owner: number, text: string, hint = '') => {
     sources[owner].text += text;
-    if (hint) sources[owner].hint = hint;
+    if (hint) sources[owner].hint = [...new Set([sources[owner].hint, hint].filter(Boolean))].join('；');
   };
   const syllableAt = (index: number) => {
     let end = index + 1;

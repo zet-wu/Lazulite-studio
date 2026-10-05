@@ -28,7 +28,7 @@ function previewRomanization(line: LyricLine, content: RomanizationContent | und
 export function toAmllLines(document: LyricDocument, showTranslation: boolean, showRomanization: boolean, trackId?: string | null): PreviewLine[] {
   const leadAgent = document.agents.find((agent) => document.lines.some((line) => line.agentRefs.includes(agent.id)))?.id;
   return document.lines.flatMap((line) => {
-    const timedWords = line.words.filter((word) => valid(word.beginMs, word.endMs));
+    const timedWords = line.words.filter((word) => valid(word.beginMs, word.endMs) || isPunctuation(word.text) && word.beginMs !== null && word.endMs === word.beginMs);
     const begin = line.beginMs ?? timedWords[0]?.beginMs ?? null;
     const end = line.endMs ?? timedWords.at(-1)?.endMs ?? null;
     if (!valid(begin, end)) return [];

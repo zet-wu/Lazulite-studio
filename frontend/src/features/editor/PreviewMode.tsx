@@ -48,7 +48,7 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
     </div>
     {lines.length ? <div className={styles.previewPlayer}>
       <LyricPlayer lyricPlayer={StudioLyricPlayer} ref={player} lyricLines={lyricLines} currentTime={transport ? undefined : localTime}
-        playing={transport ? playing : false} hidePassedLines={hidePassed} wordFadeWidth={fadeWidth}
+        isSeeking={!transport} playing={transport ? playing : false} hidePassedLines={hidePassed} wordFadeWidth={fadeWidth}
         onLyricLineClick={(event) => {
           const matched = lines[event.lineIndex];
           if (!matched) return;
