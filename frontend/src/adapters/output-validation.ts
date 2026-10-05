@@ -2,9 +2,10 @@ import { AGENT_TYPES } from '../domain/lyric-document';
 import type { LyricDocument, LyricLine, TimeMs } from '../domain/lyric-document';
 import type { LyricFormat } from './lyric-formats';
 export type OutputIssue = {
+  severity?: 'warning' | 'loss' | 'error'; formats?: string[];
   kind: 'agent' | 'line' | 'word' | 'ruby' | 'romanization-content' | 'romanization-unit' | 'translation-content' | 'translation-unit';
   lineId: string; agentId?: string; wordId?: string; rubyId?: string; trackId?: string; contentId?: string; unitId?: string;
-  code?: 'invalid-agent-type' | 'missing-time' | 'invalid-range' | 'unsupported-order' | 'empty-content';
+  code?: 'invalid-agent-type' | 'missing-time' | 'invalid-range' | 'unsupported-order' | 'empty-content' | 'punctuation-zero' | 'loss-ruby' | 'loss-translation' | 'loss-romanization' | 'loss-background' | 'serialization';
   missing: ('begin' | 'end')[]; message: string;
 };
 export class DocumentOutputError extends Error {
@@ -29,11 +30,11 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
    let boundary=line.beginMs === null ? null : line.beginMs;
    for(const [i,word] of line.words.entries()) {
      const blank=/^\s+$/.test(word.text) && word.beginMs===null && word.endMs===null && !word.rubyUnits.length && !word.emptyBeat;
-     if(blank)continue;
+     if(blank && (target === 'publish' || !fullBody))continue;
      const wordBase={kind:'word' as const,lineId:line.id,wordId:word.id},wordPrefix=`${prefix}第 ${i+1} 词`;
      const begin=fullBody && target!=='publish' && line.words.length===1 ? word.beginMs ?? line.beginMs : word.beginMs;
      const end=fullBody && target!=='publish' && line.words.length===1 ? word.endMs ?? line.endMs : word.endMs;
-     if(fullBody) add(wordBase,wordPrefix,begin,end,true);
+     if(fullBody) add(wordBase,wordPrefix,begin,end,true, target !== 'publish' && begin !== null && end !== null && end <= begin ? '结束时间必须晚于开始' : undefined);
      if(target==='elrc') {
        const b=begin === null ? null : begin,e=end===null ? null : end;
        const wrong=(b!==null && boundary!==null && b<boundary) || (b!==null && e!==null && e<b);

@@ -3,6 +3,7 @@ import type { LyricLine as AmllLine } from '@applemusic-like-lyrics/core';
 import { lineText, type LyricDocument, type LyricLine, type RomanizationContent } from './lyric-document';
 
 export type PreviewLine = { id: string; lyric: AmllLine };
+export const isPunctuation = (text: string) => /^[\p{P}]+$/u.test(text);
 const milliseconds = (value: number) => value;
 const valid = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end > begin;
 
@@ -33,7 +34,14 @@ export function toAmllLines(document: LyricDocument, showTranslation: boolean, s
     const contents = document.romanizationTracks.filter((track) => !trackId || track.id === trackId)
       .flatMap((track) => track.contents.filter((content) => content.lineId === line.id));
     const roman = showRomanization ? previewRomanization(line, contents[0]) : { text: '', words: new Map<string, string>() };
-    const words: AmllLine['words'] = timedWords.length ? line.words.filter((word) => valid(word.beginMs, word.endMs) || /^\s+$/u.test(word.text)).map((word) => ({
+    const projectedWords = line.words.map((word, index) => {
+      if (!isPunctuation(word.text) || word.beginMs !== null || word.endMs !== null) return word;
+      const before = line.words.slice(0, index).reverse().find(item => valid(item.beginMs, item.endMs));
+      const after = line.words.slice(index + 1).find(item => valid(item.beginMs, item.endMs));
+      const neighbor = /^[\p{Ps}\p{Pi}]+$/u.test(word.text) ? after ?? before : before ?? after;
+      return neighbor ? { ...word, beginMs: neighbor.beginMs, endMs: neighbor.endMs } : word;
+    });
+    const words: AmllLine['words'] = timedWords.length ? projectedWords.filter((word) => valid(word.beginMs, word.endMs) || isPunctuation(word.text) && word.beginMs !== null && word.endMs === word.beginMs || /^\s+$/u.test(word.text)).map((word) => ({
       word: word.text,
       startTime: /^\s+$/u.test(word.text) ? 0 : milliseconds(word.beginMs!), endTime: /^\s+$/u.test(word.text) ? 0 : milliseconds(word.endMs!),
       romanWord: roman.words.get(word.id) || undefined, obscene: word.obscene,

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { createLine, createLyricDocument } from '../src/domain/lyric-document';
+import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
 import { toAmllLines } from '../src/domain/preview-adapter';
 import { parseLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { readFileSync } from 'node:fs';
@@ -59,4 +59,21 @@ it('preserves independent spaces in order as 0–0 AMLL words, skips untimed ord
   expect(document).toEqual(before);
   line.words.forEach(word => { word.beginMs = null; word.endMs = null; });
   expect(toAmllLines(document, false, false)[0].lyric.words[0].word).toBe(' I  still love\tyou　untimed');
+});
+
+it('retains untimed and zero-duration punctuation without changing source times or Ruby mapping', () => {
+  const document = createLyricDocument('');
+  document.lines[0].beginMs = 100; document.lines[0].endMs = 1000;
+  document.lines[0].words = [
+    { ...createWord('「'), beginMs: null, endMs: null },
+    { ...createWord('字'), beginMs: 100, endMs: 500, rubyUnits: [{ id: 'r', reading: 'じ', beginMs: 100, endMs: 500 }] },
+    { ...createWord('！'), beginMs: 500, endMs: 500 },
+    { ...createWord('」'), beginMs: null, endMs: null },
+  ];
+  const before = JSON.stringify(document);
+  const words = toAmllLines(document, false, false)[0].lyric.words;
+  expect(words.map(word => word.word).join('')).toBe('「字！」');
+  expect(words[2]).toMatchObject({ startTime: 500, endTime: 500 });
+  expect(words[1].ruby?.[0].word).toBe('じ');
+  expect(JSON.stringify(document)).toBe(before);
 });
