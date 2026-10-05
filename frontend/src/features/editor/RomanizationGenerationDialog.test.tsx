@@ -8,8 +8,8 @@ vi.mock('../../domain/romanization-generation', async importOriginal => {
   const actual = await importOriginal<typeof import('../../domain/romanization-generation')>();
   return { ...actual, proposeRomanization: vi.fn(actual.proposeRomanization) };
 });
-beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); localStorage.setItem('lazulite-romanization-mode:project:first', 'plain'); });
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
+beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); localStorage.setItem('lazulite-romanization-mode:project:first', 'plain'); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
 it('generates only at entry and mode change, blocks a changed source without replacing manual text', () => {
   const doc = createLyricDocument('きゃ'), apply = vi.fn(() => true), close = vi.fn();
   const props = { document: doc, lineIds: [doc.lines[0].id], preferenceScope: 'project:first', apply, close };
