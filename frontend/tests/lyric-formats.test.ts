@@ -25,3 +25,7 @@ it('exports ASS and rejects an untimed final file', () => {
   document.lines[0].words[0].beginMs = 1000; document.lines[0].words[0].endMs = 2000;
   expect(exportLyricFile(document, 'ass')).toContain('[Events]');
 });
+it('preserves LYS duet projection when unused agents precede the first referenced singer',()=>{
+ const d=createLyricDocument('A');d.agents=['unused','lead','other'].map(id=>({id,name:null,type:'person'}));const line=d.lines[0];line.beginMs=100;line.endMs=500;line.words[0].beginMs=100;line.words[0].endMs=500;line.agentRefs=['lead'];
+ d.lines.push({...structuredClone(line),id:'second',agentRefs:['other']});expect(exportLyricFile(d,'lys').split('\n').map(row=>row.slice(0,3))).toEqual(['[1]','[2]']);
+});

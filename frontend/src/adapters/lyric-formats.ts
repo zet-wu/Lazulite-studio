@@ -65,6 +65,7 @@ export function exportLyricFile(document: LyricDocument, format: LyricFormat): s
   if (format === 'ass') return renderAss(prepareAss(document).events);
   if (format === 'txt') return document.lines.filter((line) => !line.backgroundOf).map((line) => line.words.map((word) => word.text).join('')).join('\n') + '\n';
   if (format === 'lrc' || format === 'elrc') return renderLrc(document, format).text;
+  const leadAgent = document.agents.find(agent => document.lines.some(line => line.agentRefs.includes(agent.id)))?.id;
   const lines: FormatLine[] = document.lines.map((line) => {
     if (line.beginMs === null || line.endMs === null || line.endMs <= line.beginMs) throw new Error('导出前请补全每行时间');
     const words = projectExportSeparators(line.words).units.map(word => {
@@ -74,7 +75,7 @@ export function exportLyricFile(document: LyricDocument, format: LyricFormat): s
       return { word: word.text, startTime: begin, endTime: end };
     });
     return { words, startTime: line.beginMs, endTime: line.endMs,
-      translatedLyric: '', romanLyric: '', isBG: Boolean(line.backgroundOf), isDuet: Boolean(document.agents[0] && line.agentRefs.length && !line.agentRefs.includes(document.agents[0].id)) };
+      translatedLyric: '', romanLyric: '', isBG: Boolean(line.backgroundOf), isDuet: Boolean(leadAgent && line.agentRefs.length && !line.agentRefs.includes(leadAgent)) };
   });
   // The library drops timed whitespace-only QRC/YRC words, including a background closing bracket.
   if (format === 'qrc' || format === 'yrc') return lines.map(line => `[${line.startTime},${line.endTime-line.startTime}]` + line.words.map((word,index) => {
