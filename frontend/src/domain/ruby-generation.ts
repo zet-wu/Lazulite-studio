@@ -1,6 +1,6 @@
 import { toHiragana, toKatakana } from 'wanakana';
 import type { LyricCommand } from './lyric-commands';
-import type { LyricDocument, LyricLine, LyricWord, RomanizationContent, RubyUnit, TimeMs } from './lyric-document';
+import type { LyricDocument, LyricWord, RomanizationContent, RubyUnit, TimeMs } from './lyric-document';
 
 export type RubyOutput = 'roman' | 'hiragana' | 'katakana';
 export type RubySourceRow = {
@@ -94,18 +94,88 @@ const envelope = (base: Envelope, begins: TimeMs[], ends: TimeMs[]): Envelope =>
   return { beginMs: starts.length ? Math.min(...starts) : null, endMs: finishes.length ? Math.max(...finishes) : null };
 };
 
+export type RubyIssueKind = 'target' | 'reading' | 'overwrite' | 'link' | 'kana-difference';
+export type RubyIssue = {
+  id: string; kind: RubyIssueKind; severity: 'error' | 'warning';
+  lineId: string; rowKey: string; rowKeys: string[]; wordId: string | null;
+  position: number; order: number; message: string;
+};
+const issueOrder: Record<RubyIssueKind, number> = { target: 0, reading: 1, overwrite: 2, link: 3, 'kana-difference': 4 };
+const effectiveReading = (row: RubyProposalRow, readings: Record<string, string>) => (readings[row.key] ?? row.reading ?? '').trim();
+const wordEnvelope = (word: LyricWord, rows: RubyProposalRow[]) => envelope(word,
+  [...word.rubyUnits.map(unit => unit.beginMs), ...rows.map(row => row.beginMs)],
+  [...word.rubyUnits.map(unit => unit.endMs), ...rows.map(row => row.endMs)]);
+const comparableKana = (text: string) => toHiragana(text.normalize('NFC')).normalize('NFC');
+
+/** Shared by preflight and submission; all determinable errors are collected together. */
+export function rubyGenerationIssues(document: LyricDocument, rows: RubyProposalRow[], readings: Record<string, string>,
+  skipped: Set<string>, overwrite: Set<string>, output: RubyOutput = 'roman'): RubyIssue[] {
+  const issues: RubyIssue[] = [];
+  const positions = new Map(rows.map((row, index) => [row.key, index]));
+  const add = (kind: RubyIssueKind, group: RubyProposalRow[], message: string) => {
+    const active = group.filter(row => !skipped.has(row.key));
+    if (!active.length) return;
+    const row = active[0];
+    issues.push({ id: JSON.stringify([kind, row.lineId, kind === 'target' || kind === 'reading' ? row.key : row.wordId]),
+      kind, severity: kind === 'kana-difference' ? 'warning' : 'error', lineId: row.lineId, rowKey: row.key,
+      rowKeys: active.map(item => item.key), wordId: row.wordId, position: positions.get(row.key)!, order: issueOrder[kind], message });
+  };
+  const groups = new Map<string, RubyProposalRow[]>();
+  for (const row of rows) {
+    if (row.wordId) {
+      const key = JSON.stringify([row.lineId, row.wordId]);
+      const group = groups.get(key);
+      if (group) group.push(row); else groups.set(key, [row]);
+    }
+    if (skipped.has(row.key)) continue;
+    const word = document.lines.find(line => line.id === row.lineId)?.words.find(word => word.id === row.wordId);
+    if (!word) add('target', [row], '尚未指定有效目标词');
+    if (!effectiveReading(row, readings)) add('reading', [row], row.conversionIssue ?? '尚未确认 注音 读音');
+  }
+  for (const group of groups.values()) {
+    const row = group[0];
+    const word = document.lines.find(line => line.id === row.lineId)?.words.find(word => word.id === row.wordId);
+    if (!word) continue;
+    if (word.rubyUnits.length && !overwrite.has(word.id)) add('overwrite', group, '已有 注音，请显式选择覆盖');
+    const text = word.text.normalize('NFC');
+    const values = group.map(row => effectiveReading(row, readings).normalize('NFC'));
+    if (output !== 'roman' && kana.test(text) && values.every(value => kana.test(value))
+      && comparableKana(values.join('')) !== comparableKana(text)) {
+      add('kana-difference', group, '注音与假名正文读音不同，请核对');
+    }
+  }
+  for (const line of document.lines) {
+    const active = rows.filter(row => row.lineId === line.id && row.wordId && !skipped.has(row.key));
+    if (!active.length) continue;
+    const nextWords = line.words.map(word => wordEnvelope(word, active.filter(row => row.wordId === word.id)));
+    const next = envelope(line, nextWords.map(word => word.beginMs), nextWords.map(word => word.endMs));
+    if ((next.beginMs !== line.beginMs || next.endMs !== line.endMs)
+      && (line.endLink || document.lines.some(item => item.endLink?.targetLineId === line.id))) {
+      add('link', active, '行尾链接会受时间扩展影响，请先处理链接');
+    }
+  }
+  return issues.sort((a, b) => a.position - b.position || a.order - b.order);
+}
+
+/** Keep a stable identity plus the former position when a corrected issue disappears. */
+export function nextRubyIssue(issues: RubyIssue[], current: RubyIssue | null): RubyIssue | null {
+  if (!issues.length) return null;
+  if (!current) return issues[0];
+  const index = issues.findIndex(issue => issue.id === current.id);
+  if (index >= 0) return issues[(index + 1) % issues.length];
+  return issues.find(issue => issue.position > current.position || issue.position === current.position && issue.order > current.order) ?? issues[0];
+}
+
 export function rubyGenerationCommand(document: LyricDocument, sourceDocument: LyricDocument, rows: RubyProposalRow[], readings: Record<string, string>, skipped: Set<string>, overwriteWordIds: Set<string>): LyricCommand {
   if (document !== sourceDocument) throw new Error('文档已变化，请重新生成提案');
+  const blocking = rubyGenerationIssues(document, rows, readings, skipped, overwriteWordIds).find(issue => issue.severity === 'error');
+  if (blocking) throw new Error(blocking.message);
   const byWord = new Map<string, RubyProposalRow[]>();
   for (const row of rows) {
     if (skipped.has(row.key)) continue;
-    if (!row.wordId) throw new Error(`音译「${row.sourceText}」尚未指定目标词`);
     const reading = readings[row.key] ?? row.reading;
-    if (!reading?.trim()) throw new Error(`音译「${row.sourceText}」尚未确认 注音 读音`);
-    const line = document.lines.find((item) => item.id === row.lineId);
-    if (!line?.words.some((word) => word.id === row.wordId)) throw new Error('目标词已变化，请重新生成提案');
     const key = `${row.lineId}:${row.wordId}`;
-    byWord.set(key, [...(byWord.get(key) ?? []), { ...row, reading: reading.trim() }]);
+    byWord.set(key, [...(byWord.get(key) ?? []), { ...row, reading: reading!.trim() }]);
   }
   if (!byWord.size) throw new Error('没有可应用的 注音');
   const commands: Extract<LyricCommand, { type: 'set-line-time' | 'set-word-time' | 'set-ruby-units' }>[] = [];
@@ -113,16 +183,14 @@ export function rubyGenerationCommand(document: LyricDocument, sourceDocument: L
     const groups = line.words.map((word) => ({ word, rows: byWord.get(`${line.id}:${word.id}`) ?? [] })).filter((group) => group.rows.length);
     if (!groups.length) continue;
     const proposedWords = groups.map(({ word, rows }) => {
-      if (word.rubyUnits.length && !overwriteWordIds.has(word.id)) throw new Error(`词「${word.text}」已有 注音，请显式选择覆盖`);
       const units: RubyUnit[] = rows.map((row) => ({ id: crypto.randomUUID(), reading: row.reading!, beginMs: row.beginMs, endMs: row.endMs }));
-      const next = envelope(word, [...word.rubyUnits.map((unit) => unit.beginMs), ...units.map((unit) => unit.beginMs)], [...word.rubyUnits.map((unit) => unit.endMs), ...units.map((unit) => unit.endMs)]);
+      const next = wordEnvelope(word, rows);
       return { word, units, next };
     });
     const lineNext = envelope(line,
       [...line.words.map((word) => word.beginMs), ...proposedWords.map((item) => item.next.beginMs)],
       [...line.words.map((word) => word.endMs), ...proposedWords.map((item) => item.next.endMs)]);
     if (lineNext.beginMs !== line.beginMs || lineNext.endMs !== line.endMs) {
-      if (line.endLink || document.lines.some((item) => item.endLink?.targetLineId === line.id)) throw new Error('行尾链接会受时间扩展影响，请先处理链接');
       commands.push({ type: 'set-line-time', lineId: line.id, ...lineNext });
     }
     for (const { word, units, next } of proposedWords) {

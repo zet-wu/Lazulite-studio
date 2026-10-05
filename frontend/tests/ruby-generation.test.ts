@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand, redoLyricCommand } from '../src/domain/lyric-commands';
 import { createLyricDocument, createWord } from '../src/domain/lyric-document';
-import { defaultRubySkips, proposeRuby, rubyGenerationCommand, rubySourceRows } from '../src/domain/ruby-generation';
+import { defaultRubySkips, rubyGenerationIssues, nextRubyIssue, proposeRuby, rubyGenerationCommand, rubySourceRows } from '../src/domain/ruby-generation';
 
 describe('explicit transliteration to 注音', () => {
   it('copies ko/na and yu/ki with independent time and extends the parent envelope once', () => {
@@ -190,4 +190,63 @@ it('filters only explicit punctuation before conversion', () => {
   const snapshot = structuredClone(document);
   expect(rubySourceRows(document, 't', ['c']).map(row => row.sourceText)).toEqual(retained);
   expect(document).toEqual(snapshot);
+});
+
+describe('structured reverse-ruby issues', () => {
+  function fixture(text = 'かな') {
+    const document = createLyricDocument(text), line = document.lines[0];
+    line.beginMs = 0; line.endMs = 1000;
+    Object.assign(line.words[0], { beginMs: 0, endMs: 1000 });
+    document.romanizationTracks = [{ id: 't', language: null, contents: [{ id: 'c', lineId: line.id, kind: 'timed',
+      units: [{ id: 'a', text: 'ka', beginMs: 0, endMs: 500 }, { id: 'b', text: 'ni', beginMs: 500, endMs: 1000 }] }] }];
+    const rows = proposeRuby(rubySourceRows(document, 't', ['c']), 'hiragana');
+    const issues = (readings = {}, skipped = new Set<string>(), output: 'hiragana' | 'roman' = 'hiragana') =>
+      rubyGenerationIssues(document, rows, readings, skipped, new Set(), output);
+    return { document, line, rows, issues };
+  }
+  it('compares entire groups, folds kana scripts only, and keeps differences nonblocking', () => {
+    const { document, line, rows, issues } = fixture();
+    expect(issues()).toMatchObject([{ kind: 'kana-difference', severity: 'warning', rowKeys: ['c:a', 'c:b'] }]);
+    expect(() => rubyGenerationCommand(document, document, rows, {}, new Set(), new Set())).not.toThrow();
+    expect(issues({ 'c:b': 'な' })).toEqual([]);
+    expect(issues({}, new Set(['c:a']))).toMatchObject([{ rowKeys: ['c:b'] }]);
+    expect(issues({ 'c:b': 'な' }, new Set(['c:a']))).toEqual([]);
+    expect(issues({}, new Set(['c:a', 'c:b']))).toEqual([]);
+    line.words[0].text = 'カニ';
+    expect(issues()).toEqual([]);
+    expect(defaultRubySkips(document, rows, 'hiragana', {}).size).toBe(0);
+    line.words[0].text = '漢字'; expect(issues()).toEqual([]);
+    line.words[0].text = 'かな'; expect(issues({}, new Set(), 'roman')).toEqual([]);
+    for (const [text, reading] of [['は', 'わ'], ['へ', 'え'], ['が', 'が']]) {
+      line.words[0].text = text;
+      const result = issues({ 'c:a': reading, 'c:b': 'ー' });
+      expect(result).toHaveLength(1);
+    }
+  });
+  it('collects target, reading, overwrite and link errors without stale conversion gates', () => {
+    const { document, line, rows, issues } = fixture();
+    rows[0].reading = null; rows[0].conversionIssue = '整组转换：请确认';
+    expect(issues().map(issue => issue.kind)).toEqual(['reading']);
+    expect(issues({ 'c:a': 'か', 'c:b': 'な' })).toEqual([]);
+    line.words[0].rubyUnits = [{ id: 'old', reading: 'か', beginMs: 0, endMs: 1000 }];
+    line.endLink = { targetLineId: 'next' }; rows[1].endMs = 1001;
+    const result = issues();
+    expect(result.map(issue => issue.kind)).toEqual(['reading', 'overwrite', 'link']);
+    const skipped = new Set(rows.map(row => row.key));
+    expect(issues({}, skipped)).toEqual([]);
+    rows[0].wordId = null;
+    expect(issues().map(issue => issue.kind)).toContain('target');
+    expect(() => rubyGenerationCommand(document, document, rows, {}, new Set(), new Set())).toThrow('目标词');
+  });
+  it('continues after a removed issue, cycles and shares direct-selection position', () => {
+    const { rows, issues } = fixture();
+    rows.forEach(row => { row.wordId = null; row.reading = null; });
+    const all = issues();
+    expect(nextRubyIssue(all, null)).toBe(all[0]);
+    expect(nextRubyIssue(all, all[0])).toBe(all[1]);
+    expect(nextRubyIssue(all.slice(2), all[1])).toBe(all[2]);
+    expect(nextRubyIssue(all, all.at(-1)!)).toBe(all[0]);
+    expect(nextRubyIssue([all[0]], all[0])).toBe(all[0]);
+    expect(nextRubyIssue([], all[0])).toBeNull();
+  });
 });
