@@ -48,3 +48,11 @@
 
 .downloadRow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .outputIssues li[data-blocking="true"] { outline: 2px solid var(--color-error, #bd4141); outline-offset: -2px; border-radius: 6px; }
+
+.formatComparison { border-collapse: collapse; width: 100%; max-width: 640px; margin-top: 8px; font-size: 13px; }
+.formatComparison th, .formatComparison td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+.formatComparison th { font-weight: 500; }
+.formatDetail { display: inline-block; position: relative; border-radius: 3px; }
+.formatDetail:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.formatDetail [role="tooltip"] { display: none; position: absolute; z-index: 20; top: 100%; right: 0; width: max-content; max-width: min(380px, 60vw); padding: 8px 10px; color: var(--ink); background: var(--surface-high); border: 1px solid var(--line); border-radius: 4px; white-space: normal; font-weight: 400; }
+.formatDetail:hover [role="tooltip"], .formatDetail:focus [role="tooltip"] { display: block; }

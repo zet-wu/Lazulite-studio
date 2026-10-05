@@ -10,7 +10,7 @@ it('checks actual output gates and merges affected formats without blocking TXT 
   const zero = issues.find(issue => issue.code === 'punctuation-zero');
   expect(zero?.severity).toBe('warning');
   const error = issues.find(issue => issue.code === 'invalid-range');
-  expect(error?.formats).toEqual(['ESLRC', 'QRC', 'YRC', 'LYS', 'ASS']);
+  expect(error?.formats).toEqual(['ESLRC', 'QRC', 'YRC', 'LYS']);
   expect(issues.some(issue => issue.formats?.includes('KRC'))).toBe(false);
   expect(() => exportLyricFile(doc, 'ttml')).not.toThrow();
   doc.lines[0].words[1].endMs = null;
@@ -24,10 +24,10 @@ it('keeps rich valid lyrics out of the issue list and describes actual ASS outpu
   doc.translationTracks = [{ id: 't', language: 'en', purpose: 'subtitle', contents: [{ id: 'c', lineId: line.id, kind: 'plain', text: 'translation' }] }];
   doc.romanizationTracks = [{ id: 'r', language: 'ja', contents: [{ id: 'rc', lineId: line.id, kind: 'plain', text: 'romanization' }] }];
   expect(validateLyrics(doc)).toEqual([]);
-  expect(describeLyricFormat(doc, 'txt').filter(note => note.includes('Ruby'))).toHaveLength(1);
+  expect(describeLyricFormat(doc, 'txt').filter(row => row.element === '注音' && row.result === '❌')).toHaveLength(1);
   const ass = exportLyricFile(doc, 'ass'); expect(ass).toContain('translation'); expect(ass).toContain('romanization');
-  expect(describeLyricFormat(doc, 'ass').join(' ')).toContain('普通字幕');
-  expect(describeLyricFormat(doc, 'ass').join(' ')).toContain('整行投影');
+  expect(describeLyricFormat(doc, 'ass').filter(row=>row.result==='分轨字幕')).toHaveLength(2);
+  expect(describeLyricFormat(doc, 'ass')[0].detail).toContain('厘秒');
   line.words[0].beginMs = null;
   expect(validateLyrics(doc).some(issue => issue.code === 'missing-time' && issue.wordId === line.words[0].id && !issue.formats?.includes('TXT'))).toBe(true);
   expect(() => exportLyricFile(doc, 'txt')).not.toThrow();
@@ -40,9 +40,9 @@ it('describes background and timing projections without treating them as source 
   expect(validateLyrics(doc)).toEqual([]);
   for (const format of ['txt', 'lrc', 'elrc'] as const) {
     expect(exportLyricFile(doc, format)).not.toContain('background');
-    expect(describeLyricFormat(doc, format).join(' ')).toContain('不输出背景行');
+    expect(describeLyricFormat(doc, format).find(row=>row.element==='背景')?.result).toBe('❌');
   }
   for (const format of ['ass', 'eslrc', 'qrc', 'yrc', 'lys'] as const) expect(exportLyricFile(doc, format)).toContain('background');
   expect(exportLyricFile(doc, 'lrc')).toContain('[00:01.000]');
-  expect(describeLyricFormat(doc, 'lrc').join(' ')).toContain('段尾');
+  expect(describeLyricFormat(doc, 'lrc')[0].detail).toContain('段尾');
 });

@@ -47,7 +47,7 @@ test('explicit validation invalidates on edits and still permits TXT with missin
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
   await expect(page.getByText('尚未执行歌词校验。')).toBeVisible();
   await page.getByRole('button', { name: '歌词校验', exact: true }).click();
-  await expect(page.getByText(/已检查 TTML、TXT/)).toBeVisible(); expect(downloads).toBe(0);
+  await expect(page.getByText(/已检查 TTML、TXT/)).toHaveCount(0); await expect(page.getByText(/有 \d+ 项需要处理/)).toBeVisible(); expect(downloads).toBe(0);
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   const text = page.locator('main section[data-line-id="a"]').getByLabel('翻译 1', { exact: true }); await text.fill('change'); await text.press('Enter');
   await page.getByRole('button', { name: '文件打包', exact: true }).click();

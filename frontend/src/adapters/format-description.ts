@@ -1,27 +1,46 @@
 import type { LyricDocument } from '../domain/lyric-document';
 import type { LyricFormat } from './lyric-formats';
 
-/** Document-wide information, deliberately separate from actionable output issues. */
-export function describeLyricFormat(document: LyricDocument, format: LyricFormat): string[] {
-  if (format === 'ttml') return ['TTML 导出保留 Ruby、翻译与音译轨道、语言、类型、内容时间及背景关系；最终文件不包含 Studio 编辑标识。'];
-  const notes: string[] = [];
-  const words = document.lines.flatMap(line => line.words);
-  if (words.some(word => word.rubyUnits.length)) notes.push('当前导出不保留 Ruby 结构及读音时间，保留正文。');
-  if (document.translationTracks.length) notes.push(format === 'ass'
-    ? '翻译按行以 / 合并为普通字幕，使用正文字幕时间，不保留轨道、语言、类型及独立单元时间。'
-    : '当前导出不输出翻译内容及轨道信息。');
-  if (document.romanizationTracks.length) notes.push(format === 'ass'
-    ? '音译仅输出预览中的整行投影，使用正文字幕时间；逐词附着音译、多轨、语言及独立时间不保留。'
-    : '当前导出不输出音译内容及轨道信息。');
-  if (document.lines.some(line => line.backgroundOf)) notes.push(['txt', 'lrc', 'elrc'].includes(format)
-    ? '当前导出不输出背景行。'
-    : format === 'ass' ? '背景正文输出为带 -bg 名称的字幕，不保留与主行的关联。'
-    : format === 'lys' ? '背景正文保留背景标志，不保留与主行的关联。'
-    : format === 'eslrc' ? '背景正文作为普通行输出，不保留背景标志及主行关联。'
-    : '背景正文以括号标记，不保留与主行的关联。');
-  if (format === 'txt' && document.lines.some(line => line.beginMs !== null || line.endMs !== null || line.words.some(word => word.beginMs !== null || word.endMs !== null))) notes.push('纯文本不保留行及逐词时间。');
-  if (format === 'lrc') notes.push('普通 LRC 输出主行开始时间，用空时间标签表达可输出的段尾；不保留逐词时间及重叠行各自的结束边界。');
-  if (format === 'elrc') notes.push('扩展 LRC 输出主行及逐词时间，不保留独立的附属内容结构。');
-  if (format === 'ass') notes.push('ASS 当前输出卡拉 OK 正文字幕；字幕边界取正文词范围，时间精度为厘秒。');
-  return notes.length ? notes : ['当前文档未包含需要额外说明的 Ruby、翻译、音译或背景结构。'];
+export type FormatComparison = { element: string; result: string; detail: string };
+const elements = ['时间（行／词）','注音','翻译','音译','背景','重叠主行'];
+const results: Record<Exclude<LyricFormat,'krc'>,string[]> = {
+ ttml:['✔','✔','✔','✔','✔','✔'],
+ txt:['❌','❌','❌','❌','❌','❌'],
+ lrc:['行开始、部分段尾','❌','❌','❌','❌','开始标签；可能无法同显'],
+ elrc:['行／词时间；词倒序或重叠受限','❌','❌','❌','❌','开始标签；可能无法同显'],
+ eslrc:['首词开始、各词结束','❌','❌','❌','普通行；无关联','词包络；显示依播放器'],
+ qrc:['✔','❌','❌','❌','括号；无关联','独立行时间；显示依播放器'],
+ yrc:['✔','❌','❌','❌','括号；无关联','独立行时间；显示依播放器'],
+ lys:['词时间；行界由词推导','❌','❌','❌','背景标志；无关联','词包络；显示依播放器'],
+ ass:['厘秒；词重叠受限','❌','分轨字幕','分轨字幕','独立字幕；无关联','独立事件；需排版'],
+};
+/** Only known, valid main-line intervals contribute; missing times never mean "no overlap". */
+export function overlappingMainLines(document: LyricDocument): number[] {
+ const rows=document.lines.filter(line=>!line.backgroundOf).map((line,index)=>({line,ordinal:index+1})).filter(({line})=>line.beginMs!==null&&line.endMs!==null&&line.endMs>line.beginMs).sort((a,b)=>a.line.beginMs!-b.line.beginMs!);
+ const overlap=new Set<number>();let active: typeof rows=[];
+ for(const row of rows){active=active.filter(other=>other.line.endMs!>row.line.beginMs!);for(const other of active){overlap.add(other.ordinal);overlap.add(row.ordinal);}active.push(row);}
+ return [...overlap].sort((a,b)=>a-b);
+}
+/** TTML is the current Studio exchange baseline, not a claim of full TTML2 support. */
+export function describeLyricFormat(document: LyricDocument, format: Exclude<LyricFormat,'krc'>): FormatComparison[] {
+ const overlap=overlappingMainLines(document);
+ return elements.map((element,index)=>{
+  const result=results[format][index];
+  let detail=result==='✔'?'相对当前 Studio TTML 导出保留此项内容与结构。':result==='❌'?'不输出此项。':result;
+  if(index===0){
+   if(format==='lrc')detail='输出主行开始标签和可表达的段尾空标签；不保留逐词时间或重叠行各自的结束时间。';
+   if(format==='elrc')detail='输出行开始与逐词标签；同一行内倒序或重叠不可输出，重叠主行各自的结束边界不能完整保留。';
+   if(format==='eslrc')detail='只输出首词开始和每词结束，后词独立起点、间隙和重叠可能丢失；行边界由词包络推导。';
+   if(format==='lys')detail='保留逐词端点；独立行边界由词包络替代。';
+   if(format==='ass')detail='正文保留有效行边界；正文和定时翻译／音译的绝对端点统一量化到厘秒，再计算间隙与时长。短单元可能为零，文字保留但高亮精度降低；事件内单元重叠、倒序或正文越出行边界会阻塞。';
+  }
+  if((index===2||index===3)&&format==='ass')detail='每份内容分别形成事件，按样式、名称区分。普通内容使用所属行时间，定时内容使用独立包络；不保留原生轨道身份、关联或 replacement 语义，不代表容器内可选字幕流。';
+  if(index===4&&format!=='ttml'&&result!=='❌')detail+='；保留背景正文，不保留与主行的结构关联。';
+  if(index===5){
+   if(format==='ass')detail='各主行输出独立事件，默认按时间分配纵向位置；复杂多声部、长行及消费者字体差异仍需检查排版。';
+   if(format==='lrc'||format==='elrc')detail='保留各行开始标签，不能完整保留重叠行各自的结束时间；同时显示取决于播放器。';
+   if(overlap.length)detail+=` 当前已知时间有重叠，涉及主行：${overlap.join('、')}。`;
+  }
+  return {element,result,detail};
+ });
 }

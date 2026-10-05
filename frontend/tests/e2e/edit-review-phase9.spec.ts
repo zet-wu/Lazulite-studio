@@ -59,8 +59,8 @@ for (const theme of ['light', 'dark']) test(`compact references, keyboard mixed 
   expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
-  await page.getByLabel('导出格式').selectOption('ass'); await page.getByText('格式说明', { exact: true }).click();
-  await expect(page.getByText(/翻译按行以 \/ 合并为普通字幕/)).toBeVisible();
+  await page.getByLabel('导出格式').selectOption('ass'); await page.getByText('导出对照', { exact: true }).click();
+  await expect(page.getByRole('table', { name: '所选格式导出对照' }).getByText('分轨字幕', { exact: true })).toHaveCount(2);
   await page.getByRole('button', { name: '歌词校验', exact: true }).focus();
   await page.screenshot({ path: test.info().outputPath(`format-${theme}.png`) });
 });
