@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createLyricDocument, plainTranslation } from '../../domain/lyric-document';
 import { TranslationEditor } from './TranslationEditor';
 import { TranslationTrackDialog } from './TranslationTrackDialog';
-import { applyLyricCommand } from '../../domain/lyric-commands';
+import { type LyricCommand, applyLyricCommand } from '../../domain/lyric-commands';
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it('requires an explicit track and submits text without local language overrides', () => {
@@ -46,4 +46,24 @@ it('short references keep five complete visible characters and never modify whit
   for (const text of ['', '短句', '12345', ' e\u0301👨‍👩‍👧‍👦🇨🇳字']) expect(shortReference(text)).toBe(text);
   expect(shortReference(' e\u0301👨‍👩‍👧‍👦🇨🇳字尾')).toBe(' e\u0301👨‍👩‍👧‍👦🇨🇳字…');
   expect(shortReference('123456')).toBe('12345…');
+});
+it('selects all content across tracks with mixed states and reports only actual moves', () => {
+  const document = createLyricDocument('行'); const lineId = document.lines[0].id;
+  document.translationTracks = Array.from({ length: 40 }, (_, i) => ({ id: `t${i}`, language: 'en', purpose: 'subtitle', contents: [plainTranslation(`text${i}`, lineId)] }));
+  document.translationTracks.push({ id: 'empty', language: null, purpose: 'subtitle', contents: [] });
+  const apply = vi.fn((_command: LyricCommand) => true); render(<TranslationTrackDialog document={document} apply={apply} close={vi.fn()} />);
+  const global = screen.getByRole('checkbox', { name: '全选内容' });
+  fireEvent.click(screen.getByLabelText(`选择翻译内容 ${document.translationTracks[0].contents[0].id}`));
+  expect(global).toHaveAttribute('aria-checked', 'mixed'); expect((global as HTMLInputElement).indeterminate).toBe(true);
+  fireEvent.click(global); expect(global).toBeChecked();
+  expect(screen.getAllByRole('checkbox', { name: '全选本轨内容' }).at(-1)).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('翻译归轨目标'), { target: { value: 't0' } });
+  expect(screen.getByText(/实际转入 39 份，将移除 39 条/)).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: '转入目标轨道' }));
+  fireEvent.click(screen.getByRole('button', { name: '应用' }));
+  const command = apply.mock.calls[0][0];
+  if (command.type !== 'set-translation-tracks') throw new Error('wrong command');
+  const tracks = command.tracks;
+  expect(tracks.map((track: { id: string }) => track.id)).toEqual(['t0', 'empty']);
+  expect(tracks[0].contents).toEqual(document.translationTracks.flatMap(track => track.contents));
 });

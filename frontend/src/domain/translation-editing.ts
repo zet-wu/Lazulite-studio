@@ -25,5 +25,10 @@ export function transferTranslations(document: LyricDocument, contentIds: string
   if (all.filter(content => selected.has(content.id)).length !== selected.size) throw new Error('所选翻译内容已失效');
   const moved = document.translationTracks.filter(track => track.id !== targetId).flatMap(track => track.contents.filter(content => selected.has(content.id)));
   if (!moved.length) return document.translationTracks;
-  return document.translationTracks.map(track => ({ ...track, contents: track.id === targetId ? [...track.contents, ...moved] : track.contents.filter(content => !selected.has(content.id)) }));
+  return document.translationTracks.flatMap(track => {
+    if (track.id === targetId) return [{ ...track, contents: [...track.contents, ...moved] }];
+    const contents = track.contents.filter(content => !selected.has(content.id));
+    if (contents.length === track.contents.length) return [track];
+    return contents.length ? [{ ...track, contents }] : [];
+  });
 }

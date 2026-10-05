@@ -27,3 +27,26 @@ it('preserves empty tracks, same-language tracks, same-line contents and raw whi
   for (const tag of ['zh-Hans', 'en-US', 'ja', 'x-song']) expect(() => validateLanguageTag(tag)).not.toThrow();
   for (const tag of ['en_MS', 'a', 'en-', '中文']) expect(() => validateLanguageTag(tag)).toThrow(/语言标签/);
 });
+it('cleans only sources emptied by this transfer, preserves ordering and timed identities through undo and TTML', () => {
+  const document = createLyricDocument('正文'); const lineId = document.lines[0].id;
+  const one = plainTranslation(' ', lineId), two = plainTranslation('  two ', lineId), existing = plainTranslation('target', lineId);
+  const timed = { id: 'timed', lineId, kind: 'timed' as const, units: [{ id: 'unit', text: ' é👨‍👩‍👧‍👦 ', beginMs: 10, endMs: 80 }] };
+  document.translationTracks = [
+    { id: 'empty', language: null, purpose: 'subtitle', contents: [] },
+    { id: 'a', language: 'en', purpose: 'subtitle', contents: [one] },
+    { id: 'b', language: 'ja', purpose: 'replacement', contents: [two, timed] },
+    { id: 'target', language: 'en', purpose: 'replacement', contents: [existing] },
+  ];
+  expect(transferTranslations(document, [existing.id], 'target')).toBe(document.translationTracks);
+  expect(() => transferTranslations(document, [one.id], 'missing')).toThrow('不存在');
+  const tracks = transferTranslations(document, [timed.id, existing.id, one.id], 'target');
+  expect(tracks.map(track => track.id)).toEqual(['empty', 'b', 'target']);
+  expect(tracks[0]).toBe(document.translationTracks[0]); expect(tracks[1].contents).toEqual([two]);
+  expect(tracks[2].contents).toEqual([existing, one, timed]);
+  const state = executeLyricCommand(createLyricEditorState(document), { type: 'set-translation-tracks', source: document.translationTracks, tracks });
+  expect(undoLyricCommand(state).present).toBe(document);
+  expect(redoLyricCommand(undoLyricCommand(state)).present).toBe(state.present);
+  expect(parseLyricTtml(serializeLyricTtml(state.present, { draft: true }))).toEqual(state.present);
+  const final = parseLyricTtml(serializeLyricTtml(state.present));
+  expect(final.translationTracks.map(track => [track.language, track.purpose, track.contents.length])).toEqual([[null, 'subtitle', 0], ['ja', 'replacement', 1], ['en', 'replacement', 3]]);
+});
