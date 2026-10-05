@@ -28,3 +28,22 @@ it('applies active metadata edits once, validates language and blocks stale docu
   view.rerender(<TranslationTrackDialog {...props} document={{ ...document }} />);
   expect(screen.getByRole('button', { name: '应用' })).toBeDisabled();
 });
+it('deletes immediately in the draft, clears target and selection, and allows cancelling without application', () => {
+  const document = createLyricDocument('行'); const content = plainTranslation('text', document.lines[0].id);
+  document.translationTracks = [{ id: 'a', language: 'en', purpose: 'subtitle', contents: [content] }];
+  const apply = vi.fn(() => true), close = vi.fn(); render(<TranslationTrackDialog document={document} apply={apply} close={close} />);
+  fireEvent.click(screen.getByLabelText(`选择翻译内容 ${content.id}`));
+  fireEvent.change(screen.getByLabelText('翻译归轨目标'), { target: { value: 'a' } });
+  fireEvent.click(screen.getByRole('button', { name: '删除轨道及 1 份内容（轨道 1）' }));
+  expect(screen.getByLabelText('翻译归轨目标')).toHaveValue('');
+  expect(screen.getByRole('button', { name: '转入目标轨道' })).toBeDisabled();
+  expect(screen.getByText(/已选择 0 份内容/)).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: '取消' }));
+  expect(close).toHaveBeenCalledOnce(); expect(apply).not.toHaveBeenCalled(); expect(document.translationTracks[0].contents).toEqual([content]);
+});
+it('short references keep five complete visible characters and never modify whitespace', async () => {
+  const { shortReference } = await import('./TranslationTrackDialog');
+  for (const text of ['', '短句', '12345', ' e\u0301👨‍👩‍👧‍👦🇨🇳字']) expect(shortReference(text)).toBe(text);
+  expect(shortReference(' e\u0301👨‍👩‍👧‍👦🇨🇳字尾')).toBe(' e\u0301👨‍👩‍👧‍👦🇨🇳字…');
+  expect(shortReference('123456')).toBe('12345…');
+});

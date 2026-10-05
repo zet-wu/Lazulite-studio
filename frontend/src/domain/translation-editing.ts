@@ -6,7 +6,7 @@ export function validateTranslationTracks(tracks: TranslationTrack[], lineIds: S
   const identity = (id: string) => { if (!id || ids.has(id)) throw new Error('翻译标识为空或重复'); ids.add(id); };
   for (const track of tracks) {
     identity(track.id); validateLanguageTag(track.language);
-    if (!['subtitle', 'replacement'].includes(track.purpose)) throw new Error('翻译用途无效');
+    if (!['subtitle', 'replacement'].includes(track.purpose)) throw new Error('翻译类型无效');
     for (const content of track.contents) {
       identity(content.id);
       if (!lineIds.has(content.lineId)) throw new Error('翻译所属行不存在');

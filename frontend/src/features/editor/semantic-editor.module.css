@@ -334,3 +334,12 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .translationToolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .translationToolbar label { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .translationToolbar select { max-width: 240px; }
+
+.translationReference { display: grid; grid-template-columns: auto 7ch minmax(0, 1fr) minmax(0, 1fr); align-items: baseline; gap: 6px 10px; padding: 5px; border-radius: var(--control-radius); }
+.translationReference:hover, .translationReference:focus-within { background: var(--blue-soft); }
+.translationBody, .translationText { font-size: var(--body-size); white-space: pre-wrap; overflow-wrap: anywhere; }
+.translationBody { font-weight: 600; }
+.translationText { font-weight: 400; }
+.translationFull { display: none; grid-column: 2 / -1; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; }
+.translationFull > span:nth-child(odd) { font-weight: 400; color: var(--muted); }
+.translationReference:hover .translationFull, .translationReference:focus-within .translationFull { display: grid; }
