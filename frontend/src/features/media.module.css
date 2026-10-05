@@ -164,3 +164,7 @@
 .expandedGroup .trackRow > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .groupLabel { padding-left: calc(var(--timeline-label-width) + var(--timeline-gap)); font-size: 10px; color: var(--muted); }
+
+.trackBar[data-temporary-begin] { border-left: 2px dashed currentColor; }
+.trackBar[data-temporary-end] { border-right: 2px dashed currentColor; }
+.trackBar .temporaryHandle { border: 1px dashed currentColor; background: repeating-linear-gradient(135deg, transparent, transparent 2px, currentColor 3px, transparent 4px); min-width: 6px; }

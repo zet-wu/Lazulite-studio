@@ -1,3 +1,4 @@
+import { projectTimeline } from '../domain/timeline-projection';
 import { createPortal } from 'react-dom';
 import { EditorContextMenu } from './editor/EditorContextMenu';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -14,12 +15,12 @@ import styles from './media.module.css';
 
 type Props = { document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
   visible: { line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
-  externalAnchors?: number[];
+  externalAnchors?: number[]; durationMs?: number | null;
   apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string) => void };
-type Drag = { target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string } };
+type Drag = { source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string } };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
 
-export function TimelineTracks({ document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], apply, onPan, onError }: Props) {
+export function TimelineTracks({ document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onPan, onError }: Props) {
   const tracksRef = useRef<HTMLDivElement>(null);
   const [plotWidth, setPlotWidth] = useState(640);
   useEffect(() => {
@@ -56,7 +57,13 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
   }, [cancel]);
   useEffect(() => { cancel(); }, [document, visible.line, visible.word, visible.ruby, visible.romanization, cancel]);
   useEffect(() => { if (dragRef.current?.side !== 'pan') cancel(); }, [startMs, endMs, cancel]);
-  const displayed = drag?.candidate.document ?? document;
+  const projection = useMemo(() => projectTimeline(document, durationMs), [document, durationMs]);
+  const candidateDocument = drag?.candidate.document ?? document;
+  const displayed = projectTimeline(candidateDocument, durationMs);
+  if (drag?.target) for (const target of allTargets) {
+    const real = targetInterval(candidateDocument, target), frozen = targetInterval(projection, target), shown = targetInterval(displayed, target);
+    if (real && frozen && shown) for (const side of ['beginMs', 'endMs'] as const) if (real[side] === null) shown[side] = frozen[side];
+  }
   const propsEndMs = endMs;
   const spanMs = Math.max(1, endMs - startMs);
   const mainLines = displayed.lines;
@@ -64,7 +71,7 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
   const line = displayed.lines.find((item) => item.id === selectedLineId) ?? displayed.lines.find((item) => !item.backgroundOf);
   const intersects = (begin: number | null, end: number | null) => timed(begin, end) && end! >= startMs && begin! <= endMs;
   const overview = mainLines.filter(item => intersects(item.beginMs, item.endMs));
-  const currentLayout = useMemo(() => packIntervals(document.lines.filter(item => intersects(item.beginMs, item.endMs)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [document, startMs, endMs]);
+  const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => intersects(item.beginMs, item.endMs)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs]);
   const frozenLayout = useRef(currentLayout);
   const editing = drag && !['pan', 'select'].includes(drag.side);
   if (!editing) frozenLayout.current = currentLayout;
@@ -83,7 +90,7 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
       if (event.shiftKey || event.ctrlKey || event.metaKey) return;
     }
     const lane = (event.currentTarget.closest('[data-track-lane]') ?? tracksRef.current!.querySelector('[data-track-lane]')) as HTMLElement;
-    const next: Drag = { target, side, x: event.clientX, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, candidate: { timeMs: originalMs, document, error: '' } };
+    const next: Drag = { source: document, target, side, x: event.clientX, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, candidate: { timeMs: originalMs, document, error: '' } };
     event.currentTarget.setPointerCapture(event.pointerId);
     capture.current = { element: event.currentTarget, id: event.pointerId };
     if (side !== 'pan') publish({ timeMs: originalMs, valid: true });
@@ -115,6 +122,7 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
     if (current.target && Math.abs(event.clientX - current.x) >= 3) {
       const target = current.target;
       try {
+        if (durationMs !== null && timeMs > durationMs) throw new Error('时间超出歌曲范围');
         candidate.document = current.side === 'move'
           ? moveTimeline(document, moving, timeMs - current.originalMs)
           : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs);
@@ -129,10 +137,10 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
   const finish = () => {
     const current = dragRef.current;
     cancel();
-    if (!current || current.side === 'pan') return;
+    if (!current || current.source !== document || current.side === 'pan') return;
     if (current.side === 'select') {
       const first = current.originalMs, last = current.candidate.timeMs;
-      const picked = boxTargets.current.filter(target => { const item = targetInterval(document, target); return item && item.beginMs !== null && item.endMs !== null && item.beginMs < Math.max(first, last) && item.endMs > Math.min(first, last); });
+      const picked = boxTargets.current.filter(target => { const item = targetInterval(projection, target); return item && item.beginMs !== null && item.endMs !== null && item.beginMs < Math.max(first, last) && item.endMs > Math.min(first, last); });
       if (picked.length) setSelection(targetSelection(picked.at(-1)!, picked.map(targetId), targetId(picked[0])));
       return;
     }
@@ -147,12 +155,15 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
   const bar = (target: TimelineTarget, label: string, beginMs: number, endMs: number, active = false, laneLayoutOverride?: ReturnType<typeof packIntervals>) => {
     const key = target.kind === 'line' ? target.lineId : target.kind === 'word' ? target.wordId : target.kind === 'ruby' ? target.rubyId : target.unitId;
     const layout = laneLayoutOverride ?? lineLayout;
+    const real = targetInterval(candidateDocument, target);
+    const ghostBegin = real?.beginMs === null, ghostEnd = real?.endMs === null;
+    const description = ghostBegin || ghostEnd ? `${ghostBegin ? '开始' : '结束'}未定，临时端点 ${ghostBegin ? beginMs : endMs} 毫秒，拖动该边界设置真实时间` : undefined;
     active = selection?.kind === selectionKind(target) && selection.ids.includes(key) || false;
     const clippedBegin = Math.max(startMs, beginMs);
     const right = Math.min(endMs, propsEndMs);
     const narrow = (Math.min(endMs, propsEndMs) - clippedBegin) / spanMs * plotWidth < 16;
     return <div key={key} data-timeline-key={key}
-      className={`${styles.trackBar} ${target.kind === 'line' && document.lines.find(line => line.id === target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${positionMs >= beginMs && positionMs < endMs ? styles.trackPlaying : ''}`} role="button" tabIndex={0} aria-label={label}
+      className={`${styles.trackBar} ${target.kind === 'line' && document.lines.find(line => line.id === target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${real?.beginMs != null && real?.endMs != null && positionMs >= real.beginMs && positionMs < real.endMs ? styles.trackPlaying : ''}`} role="button" tabIndex={0} aria-label={label} title={description} aria-description={description} data-temporary-begin={ghostBegin || undefined} data-temporary-end={ghostEnd || undefined}
       style={{ left: pct(clippedBegin), width: `${(right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
       onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
       onFocus={() => { if (!dragRef.current) choose(target); }}
@@ -163,9 +174,9 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
         if (event.key === 'Delete' && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); }
       }}>
       {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanMs * plotWidth }} /><span className={styles.narrowMarker} title="窄区间，请用时间轴缩放后调整边界" /></>}
-      {!narrow && beginMs >= startMs && <span className={styles.trackHandle} aria-label={`${label}开始边界`} onPointerDown={(event) => begin(event, target, 'beginMs', beginMs)} onPointerMove={move} onPointerUp={finish} />}
+      {(!narrow || ghostBegin) && beginMs >= startMs && <span className={`${styles.trackHandle} ${ghostBegin ? styles.temporaryHandle : ''}`} title={ghostBegin ? description : undefined} aria-label={`${label}开始边界`} onPointerDown={(event) => begin(event, target, 'beginMs', beginMs)} onPointerMove={move} onPointerUp={finish} />}
       <span className={styles.trackBarText}>{label.replace(/^时间轴(?:行|词|注音) /, '')}</span>
-      {!narrow && endMs <= propsEndMs && <span className={styles.trackHandle} aria-label={`${label}结束边界`} onPointerDown={(event) => begin(event, target, 'endMs', endMs)} onPointerMove={move} onPointerUp={finish} />}
+      {(!narrow || ghostEnd) && endMs <= propsEndMs && <span className={`${styles.trackHandle} ${ghostEnd ? styles.temporaryHandle : ''}`} title={ghostEnd ? description : undefined} aria-label={`${label}结束边界`} onPointerDown={(event) => begin(event, target, 'endMs', endMs)} onPointerMove={move} onPointerUp={finish} />}
     </div>;
   };
   const row = (name: string, content: React.ReactNode, selectable: TimelineTarget[] = [], laneCount = 1, caption = name) => <div className={styles.trackRow} key={name}><strong title={name}>{caption}</strong><div data-track-lane className={styles.trackLane} style={{ height: `calc(${Math.max(1, laneCount)} * var(--timeline-lane-height))` }}
@@ -197,8 +208,8 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
       const item = displayed.lines.find(line => line.id === expandedLines[virtualRow.index].id)!;
       const label = `L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ' 背景' : ''}`;
       const renderTargets = (name: string, targets: TimelineTarget[]) => {
-        const intervals = targets.filter(target => { const value = targetInterval(document, target); return value && intersects(value.beginMs, value.endMs); });
-        const layout = packIntervals(intervals.map(target => { const value = targetInterval(document, target)!; return { key: targetId(target), beginMs: value.beginMs!, endMs: value.endMs! }; }));
+        const intervals = targets.filter(target => { const value = targetInterval(projection, target); return value && intersects(value.beginMs, value.endMs); });
+        const layout = packIntervals(intervals.map(target => { const value = targetInterval(projection, target)!; return { key: targetId(target), beginMs: value.beginMs!, endMs: value.endMs! }; }));
         return row(`${label} ${name}`, intervals.map(target => { const value = targetInterval(displayed, target)!; const text = 'text' in value ? value.text : 'reading' in value ? value.reading : ''; return bar(target, `时间轴${name} ${text}`, value.beginMs!, value.endMs!, false, layout); }), targets, layout.laneCount, name);
       };
       const targets = allTargets.filter(target => target.lineId === item.id);

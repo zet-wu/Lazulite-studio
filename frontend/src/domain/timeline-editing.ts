@@ -22,8 +22,8 @@ const envelope = (values: TimeMs[], minimum: boolean): TimeMs => {
   return numbers.length ? (minimum ? Math.min(...numbers) : Math.max(...numbers)) : null;
 };
 const include = (line: LyricLine, word: LyricWord): LyricLine => {
-  const beginMs = envelope([line.beginMs, word.beginMs], true);
-  const endMs = envelope([line.endMs, word.endMs], false);
+  const beginMs = line.beginMs === null ? null : envelope([line.beginMs, word.beginMs], true);
+  const endMs = line.endMs === null ? null : envelope([line.endMs, word.endMs], false);
   if (line.endLink && endMs !== line.endMs) throw new Error('时间修改与行尾链接冲突');
   return { ...line, beginMs, endMs };
 };
@@ -45,6 +45,7 @@ export function moveTimeline(document: LyricDocument, targets: TimelineTarget[],
   if (!targets.length || !deltaMs) return document;
   if (targets.every((target) => target.kind === 'line')) {
     const ids = new Set(targets.map((target) => target.lineId));
+    if (document.lines.some(line => ids.has(line.id) && (line.beginMs === null || line.endMs === null))) throw new Error('请先为行设置完整时间');
     return (shiftLineTimes(document, [...ids], deltaMs) as Extract<ReturnType<typeof shiftLineTimes>, { type: 'replace-document' }>).document;
   }
   if (new Set(targets.map(target => target.kind)).size > 1) throw new Error('只能同时移动同类对象');
@@ -80,7 +81,7 @@ export function moveTimeline(document: LyricDocument, targets: TimelineTarget[],
         if (unit.beginMs === null || unit.endMs === null) throw new Error('请先为 注音 设置完整时间');
         rubyUnits[rubyIndex] = { ...unit, beginMs: changed(unit.beginMs, deltaMs), endMs: changed(unit.endMs, deltaMs) };
         words[index] = { ...word, rubyUnits,
-          beginMs: envelope(rubyUnits.map((item) => item.beginMs), true), endMs: envelope(rubyUnits.map((item) => item.endMs), false), };
+          beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true), endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false), };
       }
       return include({ ...line, words }, words[index]);
     });
@@ -118,7 +119,7 @@ export function resizeTimeline(document: LyricDocument, target: TimelineTarget, 
       valid(unit.beginMs, unit.endMs);
       rubyUnits[rubyIndex] = unit;
       words[index] = { ...word, rubyUnits,
-        beginMs: envelope(rubyUnits.map((item) => item.beginMs), true), endMs: envelope(rubyUnits.map((item) => item.endMs), false) };
+        beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true), endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false) };
     }
     return include({ ...line, words }, words[index]);
   });
