@@ -331,3 +331,6 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .trackManager .translationTrackContents input { width: auto; }
 .romanPreviewReading.romanPreviewHint, .romanPreviewReading .romanPreviewHint { border-bottom: 1px dashed var(--danger); border-radius: 2px; }
 .romanPreviewReading .romanPreviewHint { display: inline-block; margin-inline-end: 3px; }
+.translationToolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.translationToolbar label { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.translationToolbar select { max-width: 240px; }

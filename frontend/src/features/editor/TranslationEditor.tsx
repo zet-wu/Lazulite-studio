@@ -45,15 +45,18 @@ export function TranslationEditor({ document, lineId, apply, manage }: { documen
   const shared = useEditorSelection();
   const items = document.translationTracks.flatMap((track, index) => track.contents.filter(content => content.lineId === lineId).map(content => ({ track, index, content })));
   const submit = (tracks: TranslationTrack[]) => apply({ type: 'set-translation-tracks', source: document.translationTracks, tracks });
-  return <div className={styles.sublyrics} onFocus={() => shared?.setSelection(null)}><div><strong>翻译</strong>
+  return <div className={styles.sublyrics} onFocus={() => shared?.setSelection(null)}><div>
+    <div className={styles.translationToolbar}><strong>翻译</strong>
+    <label>添加到 <Select aria-label="新增翻译的轨道" value={trackId} disabled={Boolean(adding)} onChange={event => setTrackId(event.target.value)}><option value="">选择轨道</option>{document.translationTracks.map((track, index) => <option key={track.id} value={track.id}>{translationTrackLabel(track, index)}</option>)}</Select></label>
+    <button data-role="secondary" disabled={Boolean(adding) || !document.translationTracks.some(track => track.id === trackId)} onClick={() => setAdding(plainTranslation('', lineId))}>添加</button>
+    <button data-role="inline" onClick={manage}>管理翻译轨道…</button>
+    </div>
     {items.map(({ track, index: trackIndex, content }, index) => <div key={content.id}>
       <small>{translationTrackLabel(track, trackIndex)}</small>
       <TranslationRow item={content} index={index} commit={next => submit(document.translationTracks.map(value => value.id !== track.id ? value : { ...value, contents: value.contents.map(item => item.id === content.id ? next : item) }))}
         remove={() => submit(document.translationTracks.map(value => value.id !== track.id ? value : { ...value, contents: value.contents.filter(item => item.id !== content.id) }))} />
     </div>)}
-    <label>添加到 <Select aria-label="新增翻译的轨道" value={trackId} disabled={Boolean(adding)} onChange={event => setTrackId(event.target.value)}><option value="">选择轨道</option>{document.translationTracks.map((track, index) => <option key={track.id} value={track.id}>{translationTrackLabel(track, index)}</option>)}</Select></label>
     {adding && <TranslationRow item={adding} index={items.length} fresh remove={() => setAdding(null)} commit={content => { if (apply({ type: 'insert-translation-content', trackId, content })) setAdding(null); }} />}
-    <button data-role="secondary" disabled={Boolean(adding) || !document.translationTracks.some(track => track.id === trackId)} onClick={() => setAdding(plainTranslation('', lineId))}>添加</button>
-    <button data-role="inline" onClick={manage}>管理翻译轨道…</button>
+
   </div></div>;
 }
