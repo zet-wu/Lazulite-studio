@@ -17,3 +17,18 @@ it('checks actual output gates and merges affected formats without blocking TXT 
   expect(() => exportLyricFile(doc, 'txt')).not.toThrow();
   expect(validateLyrics(doc).some(issue => issue.code === 'missing-time')).toBe(true);
 });
+it('keeps rich valid lyrics out of the issue list and describes actual ASS output once', async () => {
+  const { describeLyricFormat } = await import('../src/adapters/format-description');
+  const doc = createLyricDocument('字'); const line = doc.lines[0]; line.beginMs = 0; line.endMs = 1000;
+  line.words = Array.from({ length: 50 }, (_, i) => ({ ...createWord('字'), beginMs: i * 20, endMs: (i + 1) * 20, rubyUnits: [{ id: `r${i}`, reading: 'じ', beginMs: i * 20, endMs: (i + 1) * 20 }] }));
+  doc.translationTracks = [{ id: 't', language: 'en', purpose: 'subtitle', contents: [{ id: 'c', lineId: line.id, kind: 'plain', text: 'translation' }] }];
+  doc.romanizationTracks = [{ id: 'r', language: 'ja', contents: [{ id: 'rc', lineId: line.id, kind: 'plain', text: 'romanization' }] }];
+  expect(validateLyrics(doc)).toEqual([]);
+  expect(describeLyricFormat(doc, 'txt').filter(note => note.includes('Ruby'))).toHaveLength(1);
+  const ass = exportLyricFile(doc, 'ass'); expect(ass).toContain('translation'); expect(ass).toContain('romanization');
+  expect(describeLyricFormat(doc, 'ass').join(' ')).toContain('普通字幕');
+  expect(describeLyricFormat(doc, 'ass').join(' ')).toContain('整行投影');
+  line.words[0].beginMs = null;
+  expect(validateLyrics(doc).some(issue => issue.code === 'missing-time' && issue.wordId === line.words[0].id && !issue.formats?.includes('TXT'))).toBe(true);
+  expect(() => exportLyricFile(doc, 'txt')).not.toThrow();
+});
