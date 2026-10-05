@@ -32,3 +32,17 @@ it('keeps rich valid lyrics out of the issue list and describes actual ASS outpu
   expect(validateLyrics(doc).some(issue => issue.code === 'missing-time' && issue.wordId === line.words[0].id && !issue.formats?.includes('TXT'))).toBe(true);
   expect(() => exportLyricFile(doc, 'txt')).not.toThrow();
 });
+it('describes background and timing projections without treating them as source problems', async () => {
+  const { describeLyricFormat } = await import('../src/adapters/format-description');
+  const { createLine } = await import('../src/domain/lyric-document');
+  const doc = createLyricDocument('main'); doc.lines.push({ ...createLine('background'), backgroundOf: doc.lines[0].id });
+  for (const line of doc.lines) { line.beginMs = 0; line.endMs = 1000; line.words[0].beginMs = 0; line.words[0].endMs = 1000; }
+  expect(validateLyrics(doc)).toEqual([]);
+  for (const format of ['txt', 'lrc', 'elrc'] as const) {
+    expect(exportLyricFile(doc, format)).not.toContain('background');
+    expect(describeLyricFormat(doc, format).join(' ')).toContain('不输出背景行');
+  }
+  for (const format of ['ass', 'eslrc', 'qrc', 'yrc', 'lys'] as const) expect(exportLyricFile(doc, format)).toContain('background');
+  expect(exportLyricFile(doc, 'lrc')).toContain('[00:01.000]');
+  expect(describeLyricFormat(doc, 'lrc').join(' ')).toContain('段尾');
+});

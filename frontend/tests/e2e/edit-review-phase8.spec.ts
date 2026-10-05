@@ -14,16 +14,16 @@ for (const theme of ['light', 'dark']) test(`track metadata, reorder and transfe
   await dialog.getByLabel('翻译轨道 1语言').fill('ja');
   await dialog.getByRole('button', { name: '下移翻译轨道 1', exact: true }).click();
   await dialog.getByRole('checkbox').last().check();
-  await dialog.getByLabel('翻译归轨目标').selectOption({ label: '轨道 1 · en · 替换文字' });
+  await dialog.getByLabel('翻译归轨目标').selectOption({ label: '轨道 1 · en · replacement' });
   await dialog.getByRole('button', { name: '转入目标轨道', exact: true }).click();
   await page.screenshot({ path: test.info().outputPath(`translation-manager-${theme}.png`) });
   await dialog.getByRole('button', { name: '应用', exact: true }).click();
   await expect(row.getByLabel('翻译 1', { exact: true })).toHaveValue('other');
   await expect(row.getByLabel('翻译 2', { exact: true })).toHaveValue(' manual ');
-  await expect(page.locator('main section[data-line-id="b"]')).toContainText('替换文字');
+  await expect(page.locator('main section[data-line-id="b"]')).toContainText('replacement');
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(row.getByLabel('翻译 1', { exact: true })).toHaveValue(' manual ');
-  await expect(page.locator('main section[data-line-id="b"]')).toContainText('字幕');
+  await expect(page.locator('main section[data-line-id="b"]')).toContainText('subtitle');
 });
 test('kana preference is global, keyboard accessible and survives manual generation edits', async ({ page }) => {
   await load(page); await page.locator('[data-top-menu=settings] summary').click();

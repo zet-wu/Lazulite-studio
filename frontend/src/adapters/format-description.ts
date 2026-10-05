@@ -20,7 +20,7 @@ export function describeLyricFormat(document: LyricDocument, format: LyricFormat
     : format === 'eslrc' ? '背景正文作为普通行输出，不保留背景标志及主行关联。'
     : '背景正文以括号标记，不保留与主行的关联。');
   if (format === 'txt' && document.lines.some(line => line.beginMs !== null || line.endMs !== null || line.words.some(word => word.beginMs !== null || word.endMs !== null))) notes.push('纯文本不保留行及逐词时间。');
-  if (format === 'lrc') notes.push('普通 LRC 只输出主行开始时间，不保留行结束及逐词时间。');
+  if (format === 'lrc') notes.push('普通 LRC 输出主行开始时间，用空时间标签表达可输出的段尾；不保留逐词时间及重叠行各自的结束边界。');
   if (format === 'elrc') notes.push('扩展 LRC 输出主行及逐词时间，不保留独立的附属内容结构。');
   if (format === 'ass') notes.push('ASS 当前输出卡拉 OK 正文字幕；字幕边界取正文词范围，时间精度为厘秒。');
   return notes.length ? notes : ['当前文档未包含需要额外说明的 Ruby、翻译、音译或背景结构。'];

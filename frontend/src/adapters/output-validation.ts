@@ -2,10 +2,10 @@ import { AGENT_TYPES } from '../domain/lyric-document';
 import type { LyricDocument, LyricLine, TimeMs } from '../domain/lyric-document';
 import type { LyricFormat } from './lyric-formats';
 export type OutputIssue = {
-  severity?: 'warning' | 'loss' | 'error'; formats?: string[];
+  severity?: 'warning' | 'error'; formats?: string[];
   kind: 'agent' | 'line' | 'word' | 'ruby' | 'romanization-content' | 'romanization-unit' | 'translation-content' | 'translation-unit';
   lineId: string; agentId?: string; wordId?: string; rubyId?: string; trackId?: string; contentId?: string; unitId?: string;
-  code?: 'invalid-agent-type' | 'missing-time' | 'invalid-range' | 'unsupported-order' | 'empty-content' | 'punctuation-zero' | 'loss-ruby' | 'loss-translation' | 'loss-romanization' | 'loss-background' | 'loss-timing' | 'serialization';
+  code?: 'invalid-agent-type' | 'missing-time' | 'invalid-range' | 'unsupported-order' | 'empty-content' | 'punctuation-zero' | 'serialization';
   missing: ('begin' | 'end')[]; message: string;
 };
 export class DocumentOutputError extends Error {

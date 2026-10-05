@@ -30,7 +30,7 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   const saved = await (await page.request.get('/api/v1/projects/phase4-background/document')).json();
   await page.reload();
-  await expect(line).toContainText('轨道 1 · ja · 字幕');
+  await expect(line).toContainText('轨道 1 · ja · subtitle');
   await expect(line.getByRole('button', { name: '删除翻译', exact: true })).toHaveCount(1);
   await expect(line.getByLabel('词 追加开始秒数')).toHaveValue('');
   await expect(line.getByLabel('读音 I', { exact: true })).toHaveValue('ai');
@@ -48,7 +48,7 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
   const xml = await readFile(await (await download).path(), 'utf8');
   await importLyrics(page, { name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
-  await expect(line).toContainText('轨道 1 · ja · 字幕');
+  await expect(line).toContainText('轨道 1 · ja · subtitle');
   await page.locator('[data-outline-drag]').nth(1).click();
   await expect(page.getByLabel('歌手 主唱', { exact: true })).toBeChecked();
   await expect(page.getByLabel('歌手 另一歌手', { exact: true })).toBeChecked();

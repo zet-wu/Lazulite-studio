@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { importLyrics } from '../fixtures/import-lyrics';
 
-test('document translation tracks survive actual save, reopen, reorder, transfer and final consumer parsing', async ({ page }) => {
+for (const scope of ['partial', 'all']) test(`document translation tracks survive actual save, reopen, reorder, ${scope} transfer and final consumer parsing`, async ({ page }) => {
   await page.goto('/projects/phase4-background/edit');
   const xml = await page.evaluate(async () => {
     const path = '/src/domain/lyric-document.ts', codecPath = '/src/adapters/ttml/lyric-codec.ts';
@@ -20,7 +20,8 @@ test('document translation tracks survive actual save, reopen, reorder, transfer
   await page.locator('main section[data-line-id="a"]').getByRole('button', { name: '管理翻译轨道…' }).click();
   const manager = page.getByRole('dialog', { name: '翻译轨道管理' });
   await manager.getByRole('button', { name: '下移翻译轨道 1', exact: true }).click();
-  await manager.getByRole('checkbox').nth(2).check();
+  if (scope === 'all') await manager.getByRole('checkbox', { name: '全选内容', exact: true }).check();
+  else await manager.getByRole('checkbox', { name: /^选择翻译内容 / }).nth(2).check();
   await manager.getByLabel('翻译归轨目标').selectOption('two');
   await manager.getByRole('button', { name: '转入目标轨道', exact: true }).click();
   await manager.getByRole('button', { name: '应用', exact: true }).click();
@@ -38,8 +39,8 @@ test('document translation tracks survive actual save, reopen, reorder, transfer
     const semantics = (doc: typeof d) => doc.translationTracks.map(({ id, contents, ...track }) => ({ ...track, contents: contents.map(({ id, ...content }) => content.kind === 'plain' ? content : { ...content, units: content.units.map(({ id, ...unit }) => unit) }) }));
     return { trackIds: d.translationTracks.map(track => track.id), draft: semantics(d), final: semantics(f), unitId: d.translationTracks[0].contents[0].kind === 'timed' ? d.translationTracks[0].contents[0].units[0].id : null };
   }, { draft: saved.document.lyrics.draftTtml, final });
-  expect(evidence.trackIds).toEqual(['two', 'one', 'empty']); expect(evidence.unitId).toBe('u');
-  expect(evidence.draft[0].contents).toHaveLength(3); expect(evidence.draft[2].contents).toEqual([]);
+  expect(evidence.trackIds).toEqual(scope === 'all' ? ['two', 'empty'] : ['two', 'one', 'empty']); expect(evidence.unitId).toBe('u');
+  expect(evidence.draft[0].contents).toHaveLength(scope === 'all' ? 4 : 3); expect(evidence.draft.at(-1)!.contents).toEqual([]);
   expect(evidence.final).toEqual(evidence.draft); expect(final).not.toContain('studio:');
   await writeFile(test.info().outputPath('translation-tracks-roundtrip.json'), JSON.stringify(evidence, null, 2));
 });
