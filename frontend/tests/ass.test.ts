@@ -7,7 +7,7 @@ function fixture(){const d=createLyricDocument();d.lines[0].beginMs=1000;d.lines
 it('uses line bounds, absolute centisecond endpoints, empty gaps and k without mutating the document',()=>{
  const d=fixture(),before=structuredClone(d),out=exportLyricFile(d,'ass');expect(d).toEqual(before);
  expect(out).toContain('ScriptType: v4.00+');expect(out).toContain('[V4+ Styles]');expect(out).toContain('Format: Layer, Start, End');
- expect(out).toContain('0:00:01.00,0:00:05.00,Main');expect(out).toContain('{\\k23}{\\k28}A {\\k49}{\\k41}B');expect(out).not.toContain('\\kf');
+ expect(out).toContain('0:00:01.00,0:00:05.00,Main');expect(out).toContain('{\\k23}\u2060{\\k28}A {\\k49}\u2060{\\k41}B');expect(out).not.toContain('\\kf');
 });
 it('outputs all plain/timed translation and romanization contents, including matching body units and background',()=>{
  const d=fixture(),l=d.lines[0];const bg={...createLine('BG'),beginMs:1100,endMs:4200,backgroundOf:l.id,words:[unit('BG',1200,4000)]};d.lines.push(bg);

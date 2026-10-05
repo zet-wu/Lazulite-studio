@@ -23,3 +23,8 @@ export function projectExportSeparators<T extends ExportUnit>(units: T[]) {
   }
   return { units: projected, unhosted };
 }
+
+/** TTML's xml:space=preserve can also carry actual tabs and line breaks as body text. */
+export function isUntimedXmlWhitespace(unit: ExportUnit & Partial<Pick<LyricWord, 'rubyUnits' | 'emptyBeat' | 'obscene'>>) {
+  return /^[\p{Zs}\t\r\n\u2028\u2029\uFEFF]+$/u.test(unit.text) && isUntimedSeparator({ ...unit, text: ' ' });
+}

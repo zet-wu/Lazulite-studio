@@ -43,3 +43,15 @@ it('preserves timed translation separators in draft and final TTML, without flat
  expect(parseLyricTtml(serializeLyricTtml(doc,{draft:true}))).toEqual(doc);
  expect(summary(parseLyricTtml(exportLyricFile(doc,'ttml')))).toEqual(summary(doc));
 });
+
+it('retains background edge separator units around decorative parentheses in final TTML', async()=>{
+ const { phase10Document } = await import('./fixtures/phase10'); const doc=phase10Document();
+ const before=doc.translationTracks[1].contents[0],after=parseLyricTtml(exportLyricFile(doc,'ttml')).translationTracks[1].contents[0];
+ if(before.kind!=='timed'||after.kind!=='timed')throw Error('timed fixture');
+ expect(after.units.map(({text,beginMs,endMs})=>({text,beginMs,endMs}))).toEqual(before.units.map(({text,beginMs,endMs})=>({text,beginMs,endMs})));
+ expect(parseLyricTtml(serializeLyricTtml(doc,{draft:true}))).toEqual(doc);
+});
+it('keeps all-separator timed attachments typed without inventing endpoints',()=>{
+ const d=fixture();d.translationTracks=[{id:'t',language:null,purpose:'subtitle',contents:[{id:'c',lineId:d.lines[0].id,kind:'timed',units:[{id:'u',text:' \u3000',beginMs:null,endMs:null}]}]}];
+ const c=parseLyricTtml(exportLyricFile(d,'ttml')).translationTracks[0].contents[0];expect(c.kind).toBe('timed');if(c.kind==='timed')expect(c.units.map(u=>[u.text,u.beginMs,u.endMs])).toEqual([[' \u3000',null,null]]);
+});

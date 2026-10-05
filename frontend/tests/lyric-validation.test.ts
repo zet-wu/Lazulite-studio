@@ -46,3 +46,8 @@ it('describes background and timing projections without treating them as source 
   expect(exportLyricFile(doc, 'lrc')).toContain('[00:01.000]');
   expect(describeLyricFormat(doc, 'lrc')[0].detail).toContain('段尾');
 });
+it('merges the same missing translation endpoint across TTML, ASS and publishing',()=>{
+ const doc=createLyricDocument('a');const line=doc.lines[0];line.beginMs=0;line.endMs=1000;line.words[0].beginMs=0;line.words[0].endMs=1000;
+ doc.translationTracks=[{id:'t',language:'en',purpose:'subtitle',contents:[{id:'c',lineId:line.id,kind:'timed',units:[{id:'u',text:'word',beginMs:100,endMs:null}]}]}];
+ const issues=validateLyrics(doc).filter(issue=>issue.unitId==='u');expect(issues).toHaveLength(1);expect(issues[0].formats).toEqual(['TTML','ASS','发布歌词']);
+});

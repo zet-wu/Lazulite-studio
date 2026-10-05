@@ -1,4 +1,4 @@
-import { isUntimedSeparator } from '../export-separators';
+import { isUntimedSeparator, isUntimedXmlWhitespace } from '../export-separators';
 import { validateTranslationTracks } from '../../domain/translation-editing';
 import { plainTranslation, type TranslationTrack, createWord, LYRIC_SCHEMA_VERSION, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RomanizationUnit, type RubyUnit, type TimeMs } from '../../domain/lyric-document';
 
@@ -170,14 +170,16 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
 
 // Parentheses in external background nodes are decorative, not lyric text.
 function stripDecoration(text: string) { return text.startsWith('(') && text.endsWith(')') ? text.slice(1, -1) : text; }
-function stripContentDecoration(content: RomanizationContent) {
-  if (content.kind === 'plain') content.text = stripDecoration(content.text);
-  else if (content.units[0]?.text.startsWith('(') && content.units.at(-1)!.text.endsWith(')')) {
-    content.units[0].text = content.units[0].text.slice(1);
-    content.units.at(-1)!.text = content.units.at(-1)!.text.slice(0, -1);
+function readRomanization(item: Element, lineId: string, absoluteTimes: boolean, namespace: string, background = false): RomanizationContent {
+  if (background) {
+    // Remove the wrapper before reading bare separators, so edge whitespace keeps unknown endpoints.
+    item = item.cloneNode(true) as Element;
+    const walker = item.ownerDocument.createTreeWalker(item, NodeFilter.SHOW_TEXT);
+    const texts: Text[] = [];
+    while (walker.nextNode()) texts.push(walker.currentNode as Text);
+    const first = texts[0], last = texts.at(-1);
+    if (first?.data.startsWith('(') && last?.data.endsWith(')')) { first.data = first.data.slice(1); last.data = last.data.slice(0, -1); }
   }
-}
-function readRomanization(item: Element, lineId: string, absoluteTimes: boolean, namespace: string): RomanizationContent {
   const id = attr(item, STUDIO, 'id') ?? crypto.randomUUID();
   if (!item.children.length && attr(item, STUDIO, 'kind') !== 'timed') return { id, lineId, kind: 'plain', text: textOnly(item, 'Transliteration') };
   const units: RomanizationUnit[] = [];
@@ -254,8 +256,8 @@ export function parseLyricTtml(xml: string): LyricDocument {
           for (const part of parts) {
             if (part.background && !is(part.node, ITUNES, 'span')) throw new Error('Unsupported background sublyric node');
             checkAttributes(part.node, part.background ? [] : ['for']);
-            const content = readRomanization(part.node, lineId, absoluteTimes, part.node.namespaceURI ?? ITUNES);
-            if (part.background) { stripContentDecoration(content); backgroundContents.push({ parentId: lineId, content }); }
+            const content = readRomanization(part.node, lineId, absoluteTimes, part.node.namespaceURI ?? ITUNES, part.background);
+            if (part.background) { backgroundContents.push({ parentId: lineId, content }); }
             track.contents.push(content);
           }
         }
@@ -362,8 +364,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
             const language = attr(node as Element, XML, 'lang');
             if (role === 'x-translation') translationTracks.push({ id: crypto.randomUUID(), language, purpose: 'subtitle', contents: [{ ...plainTranslation(textOnly(node as Element, role), bgId), id: attr(node as Element, STUDIO, 'id') ?? crypto.randomUUID() }] });
             else {
-              const content = readRomanization(node as Element, bgId, absoluteTimes, TTML);
-              stripContentDecoration(content);
+              const content = readRomanization(node as Element, bgId, absoluteTimes, TTML, true);
               bgRomanizations.push({ language, content });
             }
           } else {
@@ -490,11 +491,12 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
           else {
             if (!draft && !content.units.length) throw new Error(`Timed transliteration ${content.id} has no units`);
             if (line.backgroundOf && content.units.length) textNode.appendChild(xml.createTextNode('('));
+            const hasTimedText = content.units.some(item => !isUntimedSeparator(item));
             for (const unit of content.units) {
-              if (!draft && isUntimedSeparator(unit)) {
+              if (!draft && isUntimedSeparator(unit) && hasTimedText) {
                 textNode.appendChild(xml.createTextNode(unit.text)); continue;
               }
-              if (!draft && (unit.beginMs === null || unit.endMs === null)) throw new Error(`Transliteration unit ${unit.id} needs timing`);
+              if (!draft && !isUntimedSeparator(unit) && (unit.beginMs === null || unit.endMs === null)) throw new Error(`Transliteration unit ${unit.id} needs timing`);
               const span = xml.createElementNS(ITUNES, 'span');
               if (draft) span.setAttributeNS(STUDIO, 'studio:id', unit.id);
               setTime(span, unit.beginMs, unit.endMs, draft);
@@ -529,9 +531,10 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
         else {
           if (!draft && !item.units.length) throw new Error(`Translation ${item.id} has no units`);
           if (line.backgroundOf) content.appendChild(xml.createTextNode('('));
+          const hasTimedText = item.units.some(unit => !isUntimedSeparator(unit));
           for (const unit of item.units) {
-            if (!draft && isUntimedSeparator(unit)) { content.appendChild(xml.createTextNode(unit.text)); continue; }
-            if (!draft && (unit.beginMs === null || unit.endMs === null)) throw new Error(`Translation ${item.id} unit ${unit.id} needs timing`);
+            if (!draft && isUntimedSeparator(unit) && hasTimedText) { content.appendChild(xml.createTextNode(unit.text)); continue; }
+            if (!draft && !isUntimedSeparator(unit) && (unit.beginMs === null || unit.endMs === null)) throw new Error(`Translation ${item.id} unit ${unit.id} needs timing`);
             const node = xml.createElementNS(ITUNES, 'span');
             if (draft) node.setAttributeNS(STUDIO, 'studio:id', unit.id);
             setTime(node, unit.beginMs, unit.endMs, draft); node.textContent = unit.text; content.appendChild(node);
@@ -582,7 +585,8 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     if (line.agentRefs.length) p.setAttributeNS(TTM, 'ttm:agent', line.agentRefs.join(' '));
     const appendWord = (parent: Element, word: LyricWord, text: string) => {
       if (word.obscene) throw new Error(`Word ${word.id} has fields not yet mapped to TTML`);
-      if (!draft && isUntimedSeparator(word)) {
+      // XML with xml:space=preserve also faithfully carries tabs/newlines in body text.
+      if (!draft && isUntimedXmlWhitespace(word)) {
         parent.appendChild(xml.createTextNode(text));
         return;
       }

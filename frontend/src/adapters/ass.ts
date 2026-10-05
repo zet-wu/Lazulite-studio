@@ -13,7 +13,19 @@ export function prepareAss(document: LyricDocument): { events: AssEvent[]; issue
   for (const line of document.lines) {
     const label = `第 ${ordinals.get(line.backgroundOf ?? line.id)} 行${line.backgroundOf ? ' · 背景' : ''}`;
     const lineBase = { kind: 'line' as const, lineId: line.id };
-    const problem = (base: Omit<OutputIssue,'missing'|'message'>, reason: string, missing: OutputIssue['missing'] = []) => issues.push({ ...base, missing, message: `${label}：${reason}` });
+    const problem = (base: Omit<OutputIssue,'missing'|'message'>, reason: string, missing: OutputIssue['missing'] = []) => {
+      let context = '';
+      if (base.wordId) context = `第 ${line.words.findIndex(word=>word.id===base.wordId)+1} 词`;
+      if (base.trackId) {
+        const translation = base.kind.startsWith('translation');
+        const tracks = translation ? document.translationTracks : document.romanizationTracks;
+        const index = tracks.findIndex(track=>track.id===base.trackId), track = tracks[index];
+        const contentIndex = track.contents.findIndex(content=>content.id===base.contentId), content = track.contents[contentIndex];
+        context = ` · ${translation ? '翻译' : '音译'} ${track.language ?? '未指定语言'} 轨道 ${index+1} 内容 ${contentIndex+1}`;
+        if (base.unitId && content.kind === 'timed') context += `第 ${content.units.findIndex(unit=>unit.id===base.unitId)+1} 单元`;
+      }
+      issues.push({ ...base, missing, message: `${label}${context}：${reason}` });
+    };
     const range = (unit: ExportUnit, base: Omit<OutputIssue,'missing'|'message'>) => {
       const missing: OutputIssue['missing'] = [...(unit.beginMs === null ? ['begin' as const] : []), ...(unit.endMs === null ? ['end' as const] : [])];
       if (missing.length) { problem({ ...base, code: 'missing-time' }, `缺少${missing.length === 2 ? '开始和结束' : missing[0] === 'begin' ? '开始' : '结束'}时间`, missing); return false; }
@@ -78,7 +90,8 @@ function eventText(event: AssEvent) {
   let cursor=event.begin,text='';
   for(const unit of event.units) {
     const begin=cs(unit.beginMs!),end=cs(unit.endMs!);
-    if(begin>cursor)text+=`{\\k${begin-cursor}}`;
+    // Keep an invisible glyph in empty timing segments: libass otherwise merges adjacent k tags.
+    if(begin>cursor)text+=`{\\k${begin-cursor}}\u2060`;
     text+=`{\\k${end-begin}}${wrap(unit.text)}`;cursor=end;
   }
   return { text, rows };

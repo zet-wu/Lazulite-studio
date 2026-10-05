@@ -74,7 +74,7 @@ export function exportLyricFile(document: LyricDocument, format: LyricFormat): s
       return { word: word.text, startTime: begin, endTime: end };
     });
     return { words, startTime: line.beginMs, endTime: line.endMs,
-      translatedLyric: '', romanLyric: '', isBG: Boolean(line.backgroundOf), isDuet: document.agents.findIndex(agent => agent.id === line.agentRefs[0]) > 0 };
+      translatedLyric: '', romanLyric: '', isBG: Boolean(line.backgroundOf), isDuet: Boolean(document.agents[0] && line.agentRefs.length && !line.agentRefs.includes(document.agents[0].id)) };
   });
   // The library drops timed whitespace-only QRC/YRC words, including a background closing bracket.
   if (format === 'qrc' || format === 'yrc') return lines.map(line => `[${line.startTime},${line.endTime-line.startTime}]` + line.words.map((word,index) => {

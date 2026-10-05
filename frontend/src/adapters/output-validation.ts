@@ -1,5 +1,5 @@
 import { prepareAss } from './ass';
-import { isUntimedSeparator, projectExportSeparators } from './export-separators';
+import { isUntimedSeparator, isUntimedXmlWhitespace, projectExportSeparators } from './export-separators';
 import { AGENT_TYPES } from '../domain/lyric-document';
 import type { LyricDocument, LyricLine, TimeMs } from '../domain/lyric-document';
 import type { LyricFormat } from './lyric-formats';
@@ -39,7 +39,7 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
    let boundary=line.beginMs === null ? null : line.beginMs;
    for(const [i,word] of line.words.entries()) {
      const blank=isUntimedSeparator(word);
-     if(blank)continue;
+     if(blank || target === 'publish' && isUntimedXmlWhitespace(word))continue;
      const wordBase={kind:'word' as const,lineId:line.id,wordId:word.id},wordPrefix=`${prefix}第 ${i+1} 词`;
      const begin=word.beginMs;
      const end=word.endMs;
@@ -70,8 +70,8 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
  }
  if (target === 'ttml' || target === 'publish') for (const track of document.translationTracks) for (const content of track.contents) if (content.kind === 'timed') {
    const line = document.lines.find(line => line.id === content.lineId)!;
-   if (!content.units.length) issues.push({ kind: 'translation-content', lineId: line.id, contentId: content.id, code: 'empty-content', missing: [], message: `${label(line)}翻译没有单元` });
-   for (const [index, unit] of content.units.entries()) { if (isUntimedSeparator(unit)) continue; add({ kind: 'translation-unit', lineId: line.id, contentId: content.id, unitId: unit.id }, `${label(line)}翻译第 ${index + 1} 单元`, unit.beginMs, unit.endMs, true, unit.beginMs !== null && unit.endMs !== null && unit.beginMs > unit.endMs ? '时间倒序' : undefined); }
+   if (!content.units.length) issues.push({ kind: 'translation-content', lineId: line.id, trackId: track.id, contentId: content.id, code: 'empty-content', missing: [], message: `${label(line)}翻译没有单元` });
+   for (const [index, unit] of content.units.entries()) { if (isUntimedSeparator(unit)) continue; add({ kind: 'translation-unit', lineId: line.id, trackId: track.id, contentId: content.id, unitId: unit.id }, `${label(line)}翻译第 ${index + 1} 单元`, unit.beginMs, unit.endMs, true, unit.beginMs !== null && unit.endMs !== null && unit.beginMs > unit.endMs ? '时间倒序' : undefined); }
  }
  return issues;
 }
