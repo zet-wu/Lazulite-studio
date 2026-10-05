@@ -1,3 +1,4 @@
+import { prepareAss } from './ass';
 import { isUntimedSeparator, projectExportSeparators } from './export-separators';
 import { AGENT_TYPES } from '../domain/lyric-document';
 import type { LyricDocument, LyricLine, TimeMs } from '../domain/lyric-document';
@@ -14,6 +15,7 @@ export class DocumentOutputError extends Error {
 }
 export function visibleLineOrdinals(document: LyricDocument) { return new Map(document.lines.filter(l=>!l.backgroundOf).map((l,i)=>[l.id,i+1])); }
 export function collectOutputIssues(document: LyricDocument, target: LyricFormat | 'publish'): OutputIssue[] {
+ if (target === 'ass') return prepareAss(document).issues;
  const issues: OutputIssue[] = [], ordinals=visibleLineOrdinals(document);
  if (target === 'ttml' || target === 'publish') for (const agent of document.agents) if (!AGENT_TYPES.some(type => type === agent.type)) issues.push({ kind: 'agent', lineId: '', agentId: agent.id, code: 'invalid-agent-type', missing: [], message: `歌手 ${agent.id}：${agent.type ? `非法 type ${agent.type}` : '缺少 type'}` });
  const label=(line: LyricLine)=>`第 ${ordinals.get(line.backgroundOf ?? line.id)} 行${line.backgroundOf ? ' · 背景' : ''}`;
