@@ -16,13 +16,13 @@ describe('background content and independent singers', () => {
     const d = fixture();
     expect(lineText(d.lines[1])).toBe('かな');
     expect(d.lines[1].agentRefs).toEqual(['v2', 'v1']);
-    expect(d.lines[1].translations).toEqual([{ trackId: expect.any(String), trackOrder: 0, contentOrder: 0, id: expect.any(String), purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: ' 背景译文 ' }]);
+    expect(d.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === d.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([{ id: expect.any(String), purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: ' 背景译文 ' }]);
     expect(d.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1:bg', kind: 'plain', text: ' ka na ' });
     for (const draft of [true, false]) {
       const result = parseLyricTtml(serializeLyricTtml(d, { draft }));
       expect(result.lines.map(lineText)).toEqual(['MAIN', 'かな']);
       expect(result.lines[1].agentRefs).toEqual(['v2', 'v1']);
-      expect(result.lines[1].translations).toEqual(d.lines[1].translations.map(item => ({ ...item, id: expect.any(String), trackId: expect.any(String), trackOrder: expect.any(Number), contentOrder: expect.any(Number) })));
+      expect(result.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(d.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === d.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).map(item => ({ ...item, id: expect.any(String) })));
       expect(result.romanizationTracks[0].contents).toHaveLength(1);
       expect(result.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1:bg', text: ' ka na ' });
       if (draft) expect(result).toEqual(d);
@@ -31,7 +31,7 @@ describe('background content and independent singers', () => {
   it('reads header background translations and timed romanization without inventing main content', () => {
     const head = '<iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><translations><translation xml:lang="en"><text for="L1"><span ttm:role="x-bg">( background )</span></text></translation></translations><transliterations><transliteration xml:lang="ja-Latn"><text for="L1">\n <span ttm:role="x-bg">(<span begin="2.000" end="3.000">ka </span><span begin="3.000" end="5.000">na</span>)</span>\n</text></transliteration></transliterations></iTunesMetadata>';
     const d = parseLyricTtml(xml(head, bg.replace(/<span ttm:role="x-roman"[^]*?<\/span>/, '')));
-    expect(d.lines[1].translations.at(-1)).toMatchObject({ kind: 'plain', text: ' background ' });
+    expect(d.translationTracks[0].contents[0]).toMatchObject({ kind: 'plain', text: ' background ' });
     expect(d.romanizationTracks[0].contents).toHaveLength(1);
     expect(d.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1:bg', kind: 'timed', units: [{ text: 'ka ', beginMs: 2000, endMs: 3000 }, { text: 'na', beginMs: 3000, endMs: 5000 }] });
     expect(parseLyricTtml(serializeLyricTtml(d, { draft: true }))).toEqual(d);
@@ -55,7 +55,7 @@ describe('background content and independent singers', () => {
     for (const parentLineId of ['next', null, 'L1']) {
       const before = state;
       state = executeLyricCommand(state, { type: 'set-background-of', lineId: 'L1:bg', parentLineId });
-      expect(state.present.lines.find(l => l.id === 'L1:bg')).toMatchObject({ translations: d.lines[1].translations, agentRefs: ['v2', 'v1'] });
+      expect(state.present.lines.find(l => l.id === 'L1:bg')).toMatchObject({ agentRefs: ['v2', 'v1'] });
       expect(state.present.romanizationTracks).toEqual(d.romanizationTracks);
       expect(undoLyricCommand(state).present).toBe(before.present);
     }
@@ -64,7 +64,7 @@ describe('background content and independent singers', () => {
     const selection = { kind: 'lines' as const, ids: ['L1'], anchorId: 'L1', activeId: 'L1' };
     const copied = executeLyricCommand(state, pasteRich(state.present, copySelection(state.present, selection), selection).command);
     const clone = copied.present.lines.find(l => l.backgroundOf && l.id !== 'L1:bg')!;
-    expect(clone.translations).toEqual(d.lines[1].translations.map(item => ({ ...item, id: expect.any(String), trackId: expect.any(String), trackOrder: expect.any(Number), contentOrder: expect.any(Number) })));
+    expect(copied.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === clone.id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(d.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === d.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).map(item => ({ ...item, id: expect.any(String) })));
     expect(clone.agentRefs).toEqual(['v2', 'v1']);
     expect(copied.present.romanizationTracks[0].contents.find(c => c.lineId === clone.id)).toMatchObject({ text: ' ka na ' });
     expect(undoLyricCommand(copied).present).toBe(state.present);

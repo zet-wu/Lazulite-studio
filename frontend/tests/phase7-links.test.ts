@@ -15,7 +15,7 @@ it('splits linked lines preserving incoming links, current endpoint, target upda
   const doc = fixture(); doc.lines[3].endMs = 0; doc.lines[3].beginMs = 0;
   doc.lines[3].endLink = { targetLineId: 'a'};
   const before = createLyricEditorState(doc);
-  const split = executeLyricCommand(before, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', translationIndicesForNewLine: [], contentIdsForNewLine: [], backgroundTarget: null });
+  const split = executeLyricCommand(before, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', translationIdsForNewLine: [], contentIdsForNewLine: [], backgroundTarget: null });
   expect(split.present.lines[0]).toMatchObject({ id: 'a', endMs: 1000, endLink: null });
   expect(split.present.lines[1].endLink).toEqual(doc.lines[0].endLink);
   expect(split.present.lines.at(-1)!.endLink!.targetLineId).toBe('a');
@@ -36,14 +36,14 @@ it('merges the internal chain and inherits the last external link and current en
 });
 it('reports all real conflicts with source ordinals and safely rebinds identical starts', () => {
   const doc = fixture(); doc.lines[3].endLink = { targetLineId: 'b'}; doc.lines[3].endMs = 2000; doc.lines[3].beginMs = 0;
-  doc.lines[0].translations = [{ trackId: 'translation-track-2964', trackOrder: 0, contentOrder: 0, id: 'translation-2964', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'a' }]; doc.lines[1].translations = [{ trackId: 'translation-track-3025', trackOrder: 0, contentOrder: 0, id: 'translation-3025', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'ja', text: 'b' }];
+  doc.translationTracks = [...doc.translationTracks.filter(track => !track.contents.some(content => content.lineId === doc.lines[0].id)), ...([{ id: 'translation-2964', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'a' }]).map(({ language, purpose, ...content }) => ({ id: crypto.randomUUID(), language, purpose, contents: [{ ...content, lineId: doc.lines[0].id }] }))]; doc.translationTracks = [...doc.translationTracks.filter(track => !track.contents.some(content => content.lineId === doc.lines[1].id)), ...([{ id: 'translation-3025', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'ja', text: 'b' }]).map(({ language, purpose, ...content }) => ({ id: crypto.randomUUID(), language, purpose, contents: [{ ...content, lineId: doc.lines[1].id }] }))];
   doc.lines[1].agentRefs = ['v2']; doc.lines[1].songPart = 'verse';
   const issues = lineStructureIssues(doc, doc.lines[0], doc.lines[1]);
   expect(issues).toHaveLength(5); expect(issues.join('；')).toContain('L4行尾链接 → L2');
   const state = createLyricEditorState(doc);
   expect(() => executeLyricCommand(state, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' })).toThrow(issues.join('；'));
   expect(state.present).toBe(doc); expect(state.past).toHaveLength(0);
-  doc.lines[0].translations = []; doc.lines[1].translations = []; doc.lines[1].agentRefs = []; doc.lines[1].songPart = null;
+  doc.translationTracks = doc.translationTracks.filter(track => !track.contents.some(content => content.lineId === doc.lines[0].id)); doc.translationTracks = doc.translationTracks.filter(track => !track.contents.some(content => content.lineId === doc.lines[1].id)); doc.lines[1].agentRefs = []; doc.lines[1].songPart = null;
   doc.lines[0].beginMs = 2000; doc.lines[0].words = [];
   const safe = executeLyricCommand(state, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' });
   expect(safe.present.lines.at(-1)!.endLink!.targetLineId).toBe('a');
@@ -52,18 +52,18 @@ it('reports all real conflicts with source ordinals and safely rebinds identical
 });
 it('assigns translations independently with romanization and background in one split and roundtrip', () => {
   const doc = fixture();
-  doc.lines[0].translations = [{ trackId: 'translation-track-4196', trackOrder: 0, contentOrder: 0, id: 'translation-4196', purpose: 'subtitle' as const, kind: 'plain' as const,  text: 'one', language: 'en' }, { trackId: 'translation-track-4229', trackOrder: 0, contentOrder: 0, id: 'translation-4229', purpose: 'subtitle' as const, kind: 'plain' as const,  text: '二', language: 'zh-Hans' }, { trackId: 'translation-track-4265', trackOrder: 0, contentOrder: 0, id: 'translation-4265', purpose: 'subtitle' as const, kind: 'plain' as const,  text: '三', language: 'ja' }];
+  doc.translationTracks = [...doc.translationTracks.filter(track => !track.contents.some(content => content.lineId === doc.lines[0].id)), ...([{ id: 'translation-4196', purpose: 'subtitle' as const, kind: 'plain' as const,  text: 'one', language: 'en' }, { id: 'translation-4229', purpose: 'subtitle' as const, kind: 'plain' as const,  text: '二', language: 'zh-Hans' }, { id: 'translation-4265', purpose: 'subtitle' as const, kind: 'plain' as const,  text: '三', language: 'ja' }]).map(({ language, purpose, ...content }) => ({ id: crypto.randomUUID(), language, purpose, contents: [{ ...content, lineId: doc.lines[0].id }] }))];
   doc.lines.splice(1, 0, { ...createLine('声', 'bg'), backgroundOf: 'a' });
   doc.romanizationTracks = [{ id: 't', language: 'ja-Latn', contents: [{ id: 'r', lineId: 'a', kind: 'plain', text: 'a' }] }];
   const state = createLyricEditorState(doc);
-  const result = executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: ['r'], translationIndicesForNewLine: [1, 2], backgroundTarget: 'right' });
-  expect(result.present.lines[0].translations).toEqual([doc.lines[0].translations[0]]);
-  expect(result.present.lines[1].translations).toEqual(doc.lines[0].translations.slice(1));
+  const result = executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: ['r'], translationIdsForNewLine: ['translation-4229', 'translation-4265'], backgroundTarget: 'right' });
+  expect(result.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.present.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === doc.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))[0]]);
+  expect(result.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.present.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === doc.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).slice(1));
   expect(result.present.lines[2].backgroundOf).toBe('new');
   expect(result.present.romanizationTracks[0].contents[0].lineId).toBe('new');
-  for (const draft of [true, false]) expect(parseLyricTtml(serializeLyricTtml(result.present, { draft })).lines[1].translations).toEqual(doc.lines[0].translations.slice(1).map(item => ({ ...item, id: expect.any(String), trackId: expect.any(String), trackOrder: expect.any(Number), contentOrder: expect.any(Number) })));
+  for (const draft of [true, false]) expect(parseLyricTtml(serializeLyricTtml(result.present, { draft })).translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.present.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === doc.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).slice(1).map(item => ({ ...item, id: expect.any(String) })));
   expect(undoLyricCommand(result).present).toBe(doc);
-  expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: [], translationIndicesForNewLine: [3], backgroundTarget: 'left' })).toThrow('翻译分配条目不存在');
+  expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: [], translationIdsForNewLine: ['missing'], backgroundTarget: 'left' })).toThrow('翻译分配条目不存在');
 });
 
 it('eliminates every internal end link when coincident boundaries merge', () => {

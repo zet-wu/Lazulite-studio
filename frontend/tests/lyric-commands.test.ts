@@ -137,10 +137,10 @@ describe('semantic lyric commands', () => {
     ] });
     const original = createLyricEditorState(document);
     const withBackground = executeLyricCommand(original, { type: 'set-background-of', lineId: bg.id, parentLineId: main.id });
-    expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIndicesForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: null })).toThrow(/背景歌词归属/);
-    const leftAssigned = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIndicesForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: 'left' });
+    expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIdsForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: null })).toThrow(/背景歌词归属/);
+    const leftAssigned = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIdsForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: 'left' });
     expect(leftAssigned.present.lines.find(line => line.id === bg.id)).toMatchObject({ backgroundOf: main.id, beginMs: bg.beginMs, endMs: bg.endMs });
-    const split = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIndicesForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: 'right' });
+    const split = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordId: 'back', newLineId: 'right', translationIdsForNewLine: [], contentIdsForNewLine: ['second'], backgroundTarget: 'right' });
     expect(split.present.lines.map((line) => [line.id, line.backgroundOf])).toEqual([[main.id, null], ['right', null], ['bg', 'right']]);
     expect(split.present.romanizationTracks[0].contents.map((content) => [content.id, content.lineId])).toEqual([['first', main.id], ['second', 'right']]);
     expect(undoLyricCommand(split).present).toBe(withBackground.present);
@@ -172,10 +172,10 @@ describe('semantic lyric commands', () => {
     const first = document.lines[0].words[0];
     let state = createLyricEditorState(document);
     state = executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: first.id, word: createWord(' も', 'next') });
-    state = executeLyricCommand(state, { type: 'set-sublyrics', lineId, kind: 'translations', items: [{ trackId: 'translation-track-12331', trackOrder: 0, contentOrder: 0, id: 'translation-12331', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天也' }] });
+    state = executeLyricCommand(state, { type: 'set-translation-tracks', source: document.translationTracks, tracks: ([{ id: 'translation-12331', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天也' }]).map(({ language, purpose, ...content }) => ({ id: crypto.randomUUID(), language, purpose, contents: [{ ...content, lineId }] })) });
     expect(lineText(state.present.lines[0])).toBe('今日 も');
-    expect((state.present.lines[0].translations[0] as { text: string }).text).toBe('今天也');
-    expect(undoLyricCommand(state).present.lines[0].translations).toEqual([]);
+    expect((state.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === state.present.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))[0] as { text: string }).text).toBe('今天也');
+    expect(undoLyricCommand(state).present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === undoLyricCommand(state).present.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([]);
     expect(undoLyricCommand(undoLyricCommand(state)).present).toBe(document);
     expect(() => executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: null, word: createWord('重', first.id) })).toThrow(/already exists/);
   });
@@ -204,7 +204,7 @@ describe('semantic lyric commands', () => {
     const edited = executeLyricCommand(state, { type: 'batch', commands: [
       { type: 'split-word', lineId, wordId, at: 2, newWordId: 'rest' },
       { type: 'edit-word', lineId, wordId: 'rest', text: ' も歌う' },
-      { type: 'set-sublyrics', lineId, kind: 'translations', items: [{ trackId: 'translation-track-14585', trackOrder: 0, contentOrder: 0, id: 'translation-14585', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天也唱歌' }] },
+      { type: 'set-translation-tracks', source: document.translationTracks, tracks: ([{ id: 'translation-14585', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天也唱歌' }]).map(({ language, purpose, ...content }) => ({ id: crypto.randomUUID(), language, purpose, contents: [{ ...content, lineId }] })) },
     ] });
     expect(lineText(edited.present.lines[0])).toBe('今日 も歌う');
     expect(edited.past).toEqual([document]);

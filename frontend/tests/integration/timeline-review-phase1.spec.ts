@@ -16,7 +16,7 @@ test('timed replacement translations survive real save, reload, final download a
  const compare = (xml: string, identities: boolean) => page.evaluate(async ({xml,identities}) => {
   const path='/src/adapters/ttml/lyric-codec.ts'; const {parseLyricTtml}=await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
   const d=parseLyricTtml(xml);
-  return d.lines.map(line=>({id:line.id,backgroundOf:line.backgroundOf,text:line.words.map(word=>word.text).join(''),translations:line.translations.map(item=>identities ? item : {language:item.language,purpose:item.purpose,kind:item.kind,...(item.kind==='plain'?{text:item.text}:{units:item.units.map(({id,...unit})=>unit)})})}));
+  return d.lines.map(line=>({id:line.id,backgroundOf:line.backgroundOf,text:line.words.map(word=>word.text).join(''),translations:d.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === line.id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).map(item=>identities ? item : {language:item.language,purpose:item.purpose,kind:item.kind,...(item.kind==='plain'?{text:item.text}:{units:item.units.map(({id,...unit})=>unit)})})}));
  }, {xml,identities});
  const before = await compare(saved.document.lyrics.draftTtml,true);
  await page.reload(); await expect(input).toHaveValue(' 修改 ');

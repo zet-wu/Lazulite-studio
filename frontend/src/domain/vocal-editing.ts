@@ -8,7 +8,7 @@ export function assignVocalSegment(document: LyricDocument, lineId: string, segm
   validateSegments([segment], durationMs);
   const line = document.lines.find(item => item.id === lineId);
   if (!line) throw new Error('请选择一行歌词');
-  const internal = [...line.translations.flatMap(item => item.kind === 'timed' ? item.units : []), ...line.words.flatMap(w => [w, ...w.rubyUnits]), ...document.romanizationTracks.flatMap(t => t.contents.flatMap(c => c.lineId === lineId && c.kind === 'timed' ? c.units : []))];
+  const internal = [...document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === lineId)).flatMap(item => item.kind === 'timed' ? item.units : []), ...line.words.flatMap(w => [w, ...w.rubyUnits]), ...document.romanizationTracks.flatMap(t => t.contents.flatMap(c => c.lineId === lineId && c.kind === 'timed' ? c.units : []))];
   if (line.beginMs === null && line.endMs === null && internal.some(unit => unit.beginMs !== null || unit.endMs !== null)) throw new AssignmentError('行内已有时间，请先明确行起点或终点', lineId, [lineId]);
   const delta = line.beginMs !== null ? segment.beginMs - line.beginMs : line.endMs !== null ? segment.endMs - line.endMs : 0;
   const invalid = [line, ...internal].filter(unit => [unit.beginMs, unit.endMs].some(t => t !== null && (!Number.isSafeInteger(t + delta) || t + delta < 0 || t + delta > durationMs)));
@@ -19,13 +19,14 @@ export function assignVocalSegment(document: LyricDocument, lineId: string, segm
     if (item.id !== lineId) return item.endLink?.targetLineId === lineId ? { ...item, endLink: null } : item;
     const moved = shift(item);
     if (item.beginMs === null && item.endMs === null) { moved.beginMs = segment.beginMs; moved.endMs = segment.endMs; }
-    return { ...moved, translations: item.translations.map(content => content.kind === 'plain' ? content : { ...content, units: content.units.map(shift) }), endLink: null, words: item.words.map(word => ({ ...shift(word), rubyUnits: word.rubyUnits.map(shift) })) };
+    return { ...moved, endLink: null, words: item.words.map(word => ({ ...shift(word), rubyUnits: word.rubyUnits.map(shift) })) };
   });
   const romanizationTracks = document.romanizationTracks.map(track => {
     const contents = track.contents.map(content => content.lineId === lineId && content.kind === 'timed' ? { ...content, units: content.units.map(shift) } : content);
     return contents.every((c,i) => c === track.contents[i]) ? track : { ...track, contents };
   });
-  return { ...document, lines, romanizationTracks };
+  const translationTracks = document.translationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.lineId === lineId && content.kind === 'timed' ? { ...content, units: content.units.map(shift) } : content) }));
+  return { ...document, lines, romanizationTracks, translationTracks };
 }
 export function editSegments(acoustics: Acoustics, operation: { type: 'put'; segment: VocalSegment } | { type: 'delete' | 'merge'; ids: string[] }, durationMs: number): Acoustics {
   let segments: VocalSegment[];

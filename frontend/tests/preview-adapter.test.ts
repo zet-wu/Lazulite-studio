@@ -10,7 +10,7 @@ it('maps timed 注音, translations, background and duet without mutating a draf
   const main = document.lines[0]; main.beginMs = 1000; main.endMs = 2000; main.agentRefs = ['v2'];
   main.words[0].beginMs = 1000; main.words[0].endMs = 2000;
   main.words[0].rubyUnits = [{ id: 'ruby', reading: 'うた', beginMs: 1000, endMs: 2000 }];
-  main.translations = [{ trackId: 'translation-track-796', trackOrder: 0, contentOrder: 0, id: 'translation-796', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'song' }];
+  document.translationTracks = [...document.translationTracks.filter(track => !track.contents.some(content => content.lineId === main.id)), ...([{ id: 'translation-796', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'song' }]).map(({ language, purpose, ...content }) => ({ id: crypto.randomUUID(), language, purpose, contents: [{ ...content, lineId: main.id }] }))];
   const bg = createLine('ah'); bg.backgroundOf = main.id; bg.beginMs = 1200; bg.endMs = 1800;
   document.lines.push(bg);
   const lead = createLine('lead'); lead.agentRefs = ['v1']; lead.beginMs = 2000; lead.endMs = 3000;

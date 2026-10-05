@@ -2,21 +2,21 @@ import { translationText } from '../../domain/lyric-document';
 import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
 import { useState } from 'react';
-import type { LyricLine, RomanizationContent, RomanizationTrack } from '../../domain/lyric-document';
+import type { LyricLine, TranslationContent, RomanizationContent, RomanizationTrack } from '../../domain/lyric-document';
 import { lineText } from '../../domain/lyric-document';
 import styles from './semantic-editor.module.css';
 
 type Attached = { track: RomanizationTrack; content: RomanizationContent };
 
-export function LineSplitDialog({ line, background, attached, close, submit }: {
-  line: LyricLine;
+export function LineSplitDialog({ line, translations, background, attached, close, submit }: {
+  line: LyricLine; translations: TranslationContent[];
   background: LyricLine | null;
   attached: Attached[];
   close: () => void;
-  submit: (beforeWordId: string, contentIdsForNewLine: string[], backgroundTarget: 'left' | 'right' | null, translationIndicesForNewLine: number[]) => boolean;
+  submit: (beforeWordId: string, contentIdsForNewLine: string[], backgroundTarget: 'left' | 'right' | null, translationIdsForNewLine: string[]) => boolean;
 }) {
   const [beforeWordId, setBeforeWordId] = useState(line.words[1]?.id ?? '');
-  const [rightTranslations, setRightTranslations] = useState<number[]>([]);
+  const [rightTranslations, setRightTranslations] = useState<string[]>([]);
   const [rightIds, setRightIds] = useState<string[]>([]);
   const [backgroundTarget, setBackgroundTarget] = useState<'left' | 'right'>('right');
   const boundary = line.words.findIndex((word) => word.id === beforeWordId);
@@ -31,14 +31,14 @@ export function LineSplitDialog({ line, background, attached, close, submit }: {
         const time = (value: number | null) => value === null ? '未定' : `${(value / 1e3).toFixed(3)}s`;
         return <section key={String(isRight)}><small>{isRight ? '后行' : '前行'} · {time(begin)} – {time(end)}</small>
           <p>{words.map(word => word.text).join('')}</p>
-          {line.translations.filter((_, index) => rightTranslations.includes(index) === isRight).map((item, index) => <small key={index}>{item.language ?? '未指定语言'} · {translationText(item)}</small>)}
+          {translations.filter(item => rightTranslations.includes(item.id) === isRight).map((item, index) => <small key={index}>{translationText(item)}</small>)}
           {attached.filter(({ content }) => rightIds.includes(content.id) === isRight).map(({ content, track }) => <small key={content.id}>{track.language ?? '未指定语言'} · {content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</small>)}
           {background && (backgroundTarget === 'right') === isRight && <small>背景 · {lineText(background)}</small>}
         </section>;
       })}</div>
-      {line.translations.length > 0 && <fieldset><legend>翻译归属</legend>{line.translations.map((item, index) => <label key={index} className={styles.splitAssignment}>
-        <span>{item.language ?? '未指定语言'} · {translationText(item)}</span>
-        <Select aria-label={`翻译 ${index + 1}归属`} value={rightTranslations.includes(index) ? 'right' : 'left'} onChange={event => setRightTranslations(indices => event.target.value === 'right' ? [...indices, index] : indices.filter(i => i !== index))}>
+      {translations.length > 0 && <fieldset><legend>翻译归属</legend>{translations.map((item, index) => <label key={index} className={styles.splitAssignment}>
+        <span>{translationText(item)}</span>
+        <Select aria-label={`翻译 ${index + 1}归属`} value={rightTranslations.includes(item.id) ? 'right' : 'left'} onChange={event => setRightTranslations(indices => event.target.value === 'right' ? [...indices, item.id] : indices.filter(i => i !== item.id))}>
           <option value="left">前行</option><option value="right">后行</option>
         </Select>
       </label>)}</fieldset>}

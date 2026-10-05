@@ -112,7 +112,7 @@ describe('semantic TTML codec', () => {
     ]);
     const state = createLyricEditorState(document);
     expect(() => executeLyricCommand(state, { type: 'set-word-time', lineId: document.lines[0].id, wordId: document.lines[0].words[0].id, beginMs: 600, endMs: 1000 })).toThrow(/注音单元/);
-    expect(document.lines[0].translations).toEqual([{ trackId: expect.any(String), trackOrder: 0, contentOrder: 0, id: expect.any(String), purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天也唱歌' }]);
+    expect(document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === document.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([{ id: expect.any(String), purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天也唱歌' }]);
     expect(document.romanizationTracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ lineId: document.lines[0].id, kind: 'plain', text: 'kyou mo utau' }] });
     expect(document.lines[1]).toMatchObject({ backgroundOf: document.lines[0].id, beginMs: 500, endMs: 1800 });
     expect(lineText(document.lines[1])).toBe('響く');
@@ -149,7 +149,7 @@ describe('semantic TTML codec', () => {
     expect(document.lines.map(lineText)).toEqual(['今日 も歌う', '響く', '宇宙']);
     expect(document.lines[0].songPart).toBe('Verse');
     expect(document.lines[2]).toMatchObject({ agentRefs: ['v2'] });
-    expect(document.lines[0].translations).toEqual([{ trackId: expect.any(String), trackOrder: 0, contentOrder: 0, id: expect.any(String), purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天 也唱歌' }]);
+    expect(document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === document.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([{ id: expect.any(String), purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天 也唱歌' }]);
     expect(document.romanizationTracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ lineId: document.lines[0].id, kind: 'plain', text: 'kyou mo utau' }] });
     expect(document.lines[1]).toMatchObject({ backgroundOf: 'L1', beginMs: 1500, endMs: 2700 });
     const state = createLyricEditorState(document);

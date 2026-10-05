@@ -58,7 +58,7 @@ const isState = (value: unknown): value is ProjectEditorState => {
     try { validateSegments(project.acoustics.segments, Number.MAX_SAFE_INTEGER); } catch { return false; }
     const item = project.lyrics as LyricDocument;
     if (!item || typeof item !== 'object') return false;
-    return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.romanizationTracks) && Array.isArray(item.agents)
+    return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.romanizationTracks) && Array.isArray(item.translationTracks) && Array.isArray(item.agents)
       && !!item.metadata && typeof item.metadata === 'object'
       && item.lines.every((line) => !!line && typeof line.id === 'string' && Array.isArray(line.words)
         && line.words.every((word) => !!word && typeof word.id === 'string' && typeof word.text === 'string' && Array.isArray(word.rubyUnits) ));

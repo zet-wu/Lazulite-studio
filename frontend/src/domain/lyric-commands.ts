@@ -1,6 +1,6 @@
 import { lineStructureIssues } from './line-structure';
-import { nonemptyTranslations } from './sublyrics';
-import { createLine, createWord, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type SubLyric, type TimeMs } from './lyric-document';
+import { validateTranslationTracks } from './translation-editing';
+import { createLine, createWord, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type TranslationTrack, type TranslationContent, type TimeMs } from './lyric-document';
 import { splitAtGrapheme } from './text-boundaries';
 import { distributeRubyTime, splitReadingMora } from './ruby-editing';
 import { stampSync, type SyncAction, type SyncCursor, type SyncMode } from './sync-editing';
@@ -12,7 +12,7 @@ type AtomicLyricCommand =
   | { type: 'set-background-of'; lineId: string; parentLineId: string | null }
   | { type: 'delete-line'; lineId: string }
   | { type: 'move-line'; lineId: string; afterLineId: string | null }
-  | { type: 'split-line'; lineId: string; beforeWordId: string; newLineId: string; contentIdsForNewLine: string[]; translationIndicesForNewLine: number[]; backgroundTarget: 'left' | 'right' | null }
+  | { type: 'split-line'; lineId: string; beforeWordId: string; newLineId: string; contentIdsForNewLine: string[]; translationIdsForNewLine: string[]; backgroundTarget: 'left' | 'right' | null }
   | { type: 'merge-lines'; firstLineId: string; secondLineId: string }
   | { type: 'insert-word'; lineId: string; afterWordId: string | null; word: LyricWord }
   | { type: 'delete-word'; lineId: string; wordId: string }
@@ -25,7 +25,8 @@ type AtomicLyricCommand =
   | { type: 'unlink-line-end'; lineId: string }
   | { type: 'set-line-agents'; lineId: string; agentRefs: string[] }
   | { type: 'set-ignore-sync'; lineId: string; ignoreSync: boolean }
-  | { type: 'set-sublyrics'; lineId: string; kind: 'translations'; items: SubLyric[] }
+  | { type: 'set-translation-tracks'; tracks: TranslationTrack[]; source: TranslationTrack[] }
+  | { type: 'insert-translation-content'; trackId: string; content: TranslationContent }
   | { type: 'add-romanization-track'; track: RomanizationTrack }
   | { type: 'delete-romanization-track'; trackId: string }
   | { type: 'set-romanization-track-language'; trackId: string; language: string | null }
@@ -165,7 +166,8 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
         return { ...line, endLink: null };
       });
       const romanizationTracks = document.romanizationTracks.map((track) => ({ ...track, contents: track.contents.filter((content) => !removed.has(content.lineId)) }));
-      return { ...document, lines, romanizationTracks };
+      const translationTracks = document.translationTracks.map(track => ({ ...track, contents: track.contents.filter(content => !removed.has(content.lineId)) }));
+      return { ...document, lines, romanizationTracks, translationTracks };
     }
     case 'move-line': {
       const index = lineIndex(document, command.lineId);
@@ -188,15 +190,16 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (wordIndex <= 0) throw new Error('请选择非首词作为拆行边界');
       const attached = document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === line.id));
       if (command.contentIdsForNewLine.some((id) => !attached.some((content) => content.id === id))) throw new Error('音译内容分配目标不存在');
-      if (command.translationIndicesForNewLine.some(index => !Number.isInteger(index) || index < 0 || index >= line.translations.length)) throw new Error('翻译分配条目不存在');
-      const translationIndices = new Set(command.translationIndicesForNewLine);
+      const attachedTranslations = document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === line.id));
+      if (command.translationIdsForNewLine.some(id => !attachedTranslations.some(content => content.id === id))) throw new Error('翻译分配条目不存在');
+      const translationIds = new Set(command.translationIdsForNewLine);
       const background = document.lines.find((item) => item.backgroundOf === line.id);
       if (background && !command.backgroundTarget) throw new Error('请指定背景歌词归属');
       const leftWords = line.words.slice(0, wordIndex), rightWords = line.words.slice(wordIndex);
       const leftEnd = leftWords.every(word => word.endMs !== null) ? Math.max(...leftWords.map(word => word.endMs!)) : null;
       const rightBegin = rightWords[0].beginMs;
-      const left = { ...line, words: leftWords, endMs: leftEnd, endLink: null, translations: line.translations.filter((_, index) => !translationIndices.has(index)) };
-      const right: LyricLine = { ...line, id: command.newLineId, words: rightWords, beginMs: rightBegin, translations: line.translations.filter((_, index) => translationIndices.has(index)) };
+      const left = { ...line, words: leftWords, endMs: leftEnd, endLink: null };
+      const right: LyricLine = { ...line, id: command.newLineId, words: rightWords, beginMs: rightBegin };
       validTime(left.beginMs, left.endMs);
       validTime(right.beginMs, right.endMs);
       left.words.forEach((word) => wordFitsLine(word, left));
@@ -210,7 +213,8 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       }
       const selected = new Set(command.contentIdsForNewLine);
       const romanizationTracks = document.romanizationTracks.map((track) => ({ ...track, contents: track.contents.map((content) => selected.has(content.id) ? { ...content, lineId: right.id } : content) }));
-      return { ...document, lines, romanizationTracks };
+      const translationTracks = document.translationTracks.map(track => ({ ...track, contents: track.contents.map(content => translationIds.has(content.id) ? { ...content, lineId: right.id } : content) }));
+      return { ...document, lines, romanizationTracks, translationTracks };
     }
     case 'merge-lines': {
       const firstIndex = lineIndex(document, command.firstLineId);
@@ -392,13 +396,16 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       lines[index] = { ...line, ignoreSync: command.ignoreSync };
       return { ...document, lines };
     }
-    case 'set-sublyrics': {
-      const index = lineIndex(document, command.lineId);
-      const lines = document.lines.slice();
-      const items = nonemptyTranslations(command.items);
-      if (JSON.stringify(items) === JSON.stringify(lines[index].translations)) return document;
-      lines[index] = { ...lines[index], [command.kind]: items };
-      return { ...document, lines };
+    case 'set-translation-tracks': {
+      if (command.source !== document.translationTracks) throw new Error('翻译已变化，请重新执行操作');
+      validateTranslationTracks(command.tracks, new Set(document.lines.map(line => line.id)));
+      return JSON.stringify(command.tracks) === JSON.stringify(document.translationTracks) ? document : { ...document, translationTracks: command.tracks };
+    }
+    case 'insert-translation-content': {
+      if (!document.translationTracks.some(track => track.id === command.trackId)) throw new Error('翻译轨道不存在');
+      const translationTracks = document.translationTracks.map(track => track.id !== command.trackId ? track : { ...track, contents: [...track.contents, command.content] });
+      validateTranslationTracks(translationTracks, new Set(document.lines.map(line => line.id)));
+      return { ...document, translationTracks };
     }
     case 'add-romanization-track':
       if (document.romanizationTracks.some((track) => track.id === command.track.id)) throw new Error('音译轨道 ID 重复');

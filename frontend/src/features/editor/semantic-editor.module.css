@@ -324,3 +324,10 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 }
 .word[data-ruby-drag-size] .rubyAbove:not(:has(> [data-ruby-id]:not([data-drag-placeholder]))) > [data-drag-placeholder] { flex: 1; }
 .word[data-ruby-drag-size] .rubyAbove:not(:has(> [data-ruby-id]:not([data-drag-placeholder]))) > [data-drag-placeholder]::after { width: 100%; }
+
+.translationTrackSection { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding-block: 8px; border-bottom: 1px solid var(--line); }
+.translationTrackSection > strong, .translationTrackContents { flex-basis: 100%; }
+.translationTrackContents { max-height: 240px; overflow-y: auto; }
+.trackManager .translationTrackContents input { width: auto; }
+.romanPreviewReading.romanPreviewHint, .romanPreviewReading .romanPreviewHint { border-bottom: 1px dashed var(--danger); border-radius: 2px; }
+.romanPreviewReading .romanPreviewHint { display: inline-block; margin-inline-end: 3px; }

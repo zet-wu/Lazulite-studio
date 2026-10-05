@@ -37,6 +37,8 @@ import { EditorRibbon } from './EditorRibbon';
 import { SegmentationPanel } from './SegmentationPanel';
 import { BatchToolsPanel } from './BatchToolsPanel';
 import { RubyWordEditor } from './RubyWordEditor';
+import { TranslationTrackDialog } from './TranslationTrackDialog';
+import { translationsForLine } from '../../domain/lyric-document';
 import { TranslationEditor } from './TranslationEditor';
 import { RomanizationRow } from './RomanizationRow';
 import { LineSplitDialog } from './LineSplitDialog';
@@ -141,7 +143,7 @@ function EditorWorkspaceContent(props: Props) {
       }}
       onCommit={width => commitColumns({ ...columns, [`${side}Width`]: width })} />;
   };
-  const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | null>(null);
+  const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | 'translations' | null>(null);
   const [message, setMessage] = useState('');
   const [segmentationOpen, setSegmentationOpen] = useState(false);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
@@ -264,7 +266,7 @@ function EditorWorkspaceContent(props: Props) {
     } else if(issue.kind==='romanization-content') {
       selectRomanizationContent(line.id,issue.trackId!,issue.contentId!);
       focus=`[data-romanization-content-id="${CSS.escape(issue.contentId!)}"]`;
-    } else if (issue.kind === 'translation-content' || issue.kind === 'translation-unit') { setSelection(null); focus = issue.unitId ? `[data-translation-unit-id="${CSS.escape(issue.unitId)}"] input` : `[data-translation-id="${CSS.escape(issue.contentId!)}"] input`; } else selectLine(line);
+    } else if (issue.kind === 'translation-content' || issue.kind === 'translation-unit') { setSelection(null); focus = issue.unitId ? `[data-translation-unit-id="${CSS.escape(issue.unitId)}"] input` : `[data-translation-id="${CSS.escape(issue.contentId!)}"] :is(input, textarea)`; } else selectLine(line);
     requestLocate(line.id,focus);
   };
   const assignmentIssues: OutputIssue[] = props.assignmentError ? props.assignmentError.objectIds.map(id=>{
@@ -696,7 +698,7 @@ function EditorWorkspaceContent(props: Props) {
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
       canGenerateJapaneseRuby={selection?.kind === 'lines' && selection.ids.length > 0} openJapaneseRuby={() => openJapaneseRuby(selection?.kind === 'lines' ? selection.ids : [])}
       canGenerateRuby={propertyLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
-      canGenerateRomanization={propertyLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(propertyLines.map(line => line.id))} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: propertyLines.map((line) => line.id) })} />}
+      canGenerateRomanization={propertyLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(propertyLines.map(line => line.id))} openTranslationTracks={() => setSettingsDialog('translations')} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: propertyLines.map((line) => line.id) })} />}
     {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} onClick={event => {
       const button = (event.target as Element).closest('[data-outline-drag]');
       if (!button) return;
@@ -726,7 +728,7 @@ function EditorWorkspaceContent(props: Props) {
               props.onSelectLine?.(line.id); props.onSelectUnit?.(line.id, word.id, null); return true;
             }} />
           </div>
-          <TranslationEditor items={line.translations} apply={items => dispatch({ type: 'set-sublyrics', lineId: line.id, kind: 'translations', items })} />
+          <TranslationEditor document={document} lineId={line.id} apply={dispatch} manage={() => setSettingsDialog('translations')} />
           <div className={styles.romanizationTracks}>
             {displayed.romanizationTracks.map((track, trackIndex) => {
               const contents = track.contents.filter((content) => content.lineId === line.id);
@@ -785,6 +787,7 @@ function EditorWorkspaceContent(props: Props) {
         </fieldset>
       </>}
       </div></aside>}</div>}
+    {settingsDialog === 'translations' && <TranslationTrackDialog document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'metadata' && <SettingsDialog title="元数据编辑" close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} /></SettingsDialog>}
     {settingsDialog === 'singers' && <SingerDialog focusAgent={focusAgent} document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'tracks' && <SettingsDialog title="音译轨道管理" close={() => setSettingsDialog(null)}><div className={styles.trackManager}>
@@ -819,11 +822,11 @@ function EditorWorkspaceContent(props: Props) {
     {japaneseRuby && <JapaneseRubyDialog document={document} lineIds={japaneseRuby} apply={dispatch} close={() => setJapaneseRuby(null)} />}
     {rubyGeneration && <RubyGenerationDialog document={document} lineIds={rubyGeneration.lineIds} initialTrackId={rubyGeneration.trackId} initialContentId={rubyGeneration.contentId}
       apply={dispatch} close={() => setRubyGeneration(null)} />}
-    {splitLineId && document.lines.find((line) => line.id === splitLineId) && <LineSplitDialog key={splitLineId} line={document.lines.find((line) => line.id === splitLineId)!}
+    {splitLineId && document.lines.find((line) => line.id === splitLineId) && <LineSplitDialog translations={translationsForLine(document, splitLineId)} key={splitLineId} line={document.lines.find((line) => line.id === splitLineId)!}
       background={document.lines.find((line) => line.backgroundOf === splitLineId) ?? null}
       attached={document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === splitLineId).map((content) => ({ track, content })))}
       close={() => setSplitLineId(null)}
-      submit={(beforeWordId, contentIdsForNewLine, backgroundTarget, translationIndicesForNewLine) => dispatch({ type: 'split-line', lineId: splitLineId, beforeWordId, newLineId: crypto.randomUUID(), contentIdsForNewLine, backgroundTarget, translationIndicesForNewLine })} />}
+      submit={(beforeWordId, contentIdsForNewLine, backgroundTarget, translationIdsForNewLine) => dispatch({ type: 'split-line', lineId: splitLineId, beforeWordId, newLineId: crypto.randomUUID(), contentIdsForNewLine, backgroundTarget, translationIdsForNewLine })} />}
     {contextMenu && <EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.title} actions={contextMenu.actions} close={closeContext} />}
   </div>;
 }

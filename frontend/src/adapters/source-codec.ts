@@ -42,11 +42,11 @@ export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc', onSid
           part.lyricContent.forEach((values: unknown, i: number) => {
             const line = d.lines[i];
             if (!line || !Array.isArray(values) || values.some(v => typeof v !== 'string')) { onSidecarIssue(); return; }
-            if (part.type === 1) { if (values.join('')) line.translations.push(plainTranslation(values.join(''))); }
+            if (part.type === 1) { if (values.join('')) track.contents.push(plainTranslation(values.join(''), line.id)); }
             else if (values.length === line.words.length) track.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'timed', units: values.map((v, j) => ({ id: crypto.randomUUID(), text: v, beginMs: line.words[j].beginMs, endMs: line.words[j].endMs })) });
             else if (values.join('')) track.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: values.join('') });
           });
-          if (track.contents.length) d.romanizationTracks.push(track);
+          if (track.contents.length) { if (part.type === 1) d.translationTracks.push({ ...track, purpose: 'subtitle' }); else d.romanizationTracks.push(track); }
         }
       } catch (error) { if (!(error instanceof Error)) throw error; onSidecarIssue(); }
     }
@@ -104,9 +104,9 @@ export function attachSidecar(d: LyricDocument, text: string, kind: 'translation
     const main = mains[cursor];
     if (!main || Math.abs(main.beginMs! - start) > 750 || counts.get(main.beginMs!)! > 1) { issues.push('附属行无唯一对应'); continue; }
     ++cursor;
-    if (kind === 'translation') main.translations.push(plainTranslation(lineText(line)));
+    if (kind === 'translation') track.contents.push(plainTranslation(lineText(line), main.id));
     else track.contents.push(timed ? { id: crypto.randomUUID(), lineId: main.id, kind: 'timed', units: line.words.map(w => ({ id: crypto.randomUUID(), text: w.text, beginMs: w.beginMs, endMs: w.endMs })) } : { id: crypto.randomUUID(), lineId: main.id, kind: 'plain', text: lineText(line) });
   }
-  if (track.contents.length) d.romanizationTracks.push(track);
+  if (track.contents.length) { if (kind === 'translation') d.translationTracks.push({ ...track, purpose: 'subtitle' }); else d.romanizationTracks.push(track); }
   return issues;
 }

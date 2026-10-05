@@ -25,6 +25,7 @@ type Props = MenuState & {
   openRubyGeneration: () => void;
   canGenerateRomanization: boolean;
   openRomanizationGeneration: () => void;
+  openTranslationTracks: () => void;
   openTracks: () => void;
   openMetadata: () => void;
   openSingers: () => void;
@@ -55,6 +56,7 @@ export function EditorRibbon(props: Props) {
     <TopMenu id="lyrics-settings" title="歌词设置" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
       <button data-role="inline" onClick={props.openMetadata}>元数据编辑</button>
       <button data-role="inline" onClick={props.openSingers}>歌手管理</button>
+      <button data-role="inline" onClick={props.openTranslationTracks}>管理翻译轨道…</button>
       <button data-role="inline" onClick={props.openTracks}>管理音译轨道…</button>
     </TopMenu>
   </div>;

@@ -94,7 +94,7 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
     for (const track of document.romanizationTracks) for (const content of track.contents.filter(c => c.lineId === background.id)) {
       state = commands.executeLyricCommand(state, { type: 'delete-romanization-content', trackId: track.id, contentId: content.id });
     }
-    state = commands.executeLyricCommand(state, { type: 'set-sublyrics', lineId: background.id, kind: 'translations', items: [] });
+    state = commands.executeLyricCommand(state, { type: 'set-translation-tracks', source: state.present.translationTracks, tracks: state.present.translationTracks.map(track => ({ ...track, contents: track.contents.filter(content => content.lineId !== background.id) })) });
     state = commands.executeLyricCommand(state, { type: 'set-background-of', lineId: background.id, parentLineId: parent.id });
     return { xml: codec.serializeLyricTtml(state.present, { draft: true }), parentId: parent.id, backgroundId: background.id,
       parentTime: [parent.beginMs, parent.endMs], backgroundTime: [background.beginMs, background.endMs],

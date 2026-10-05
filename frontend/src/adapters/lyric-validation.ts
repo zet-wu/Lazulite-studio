@@ -29,7 +29,7 @@ export function validateLyrics(document: LyricDocument): OutputIssue[] {
       if (word.rubyUnits.length) for (const format of checkedFormats.filter(format => format !== 'ttml')) add({ kind: 'word', lineId: line.id, wordId: word.id, code: 'loss-ruby', missing: [], message: '此格式不保留 Ruby 结构及读音时间' }, format.toUpperCase(), 'loss');
     }
     if (line.backgroundOf) for (const format of ['TXT', 'LRC', 'ELRC']) add({ kind: 'line', lineId: line.id, code: 'loss-background', missing: [], message: '此格式不输出背景行' }, format, 'loss');
-    if (line.translations.length) for (const format of checkedFormats.filter(format => format !== 'ttml')) add({ kind: 'line', lineId: line.id, code: 'loss-translation', missing: [], message: format === 'ass' ? '翻译合为普通字幕，不保留轨道、语言、用途及单元时间' : '此格式不输出翻译内容及轨道信息' }, format.toUpperCase(), 'loss');
+    if (document.translationTracks.some(track => track.contents.some(content => content.lineId === line.id))) for (const format of checkedFormats.filter(format => format !== 'ttml')) add({ kind: 'line', lineId: line.id, code: 'loss-translation', missing: [], message: format === 'ass' ? '翻译合为普通字幕，不保留轨道、语言、用途及单元时间' : '此格式不输出翻译内容及轨道信息' }, format.toUpperCase(), 'loss');
     if (document.romanizationTracks.some(track => track.contents.some(content => content.lineId === line.id))) for (const format of checkedFormats.filter(format => format !== 'ttml')) add({ kind: 'line', lineId: line.id, code: 'loss-romanization', missing: [], message: format === 'ass' ? '仅可输出首份普通音译；独立定时、多轨及语言信息不保留' : '此格式不输出音译内容及轨道信息' }, format.toUpperCase(), 'loss');
   }
   return [...result.values()];

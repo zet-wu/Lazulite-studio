@@ -18,7 +18,7 @@ test('background sublyrics and independent singers survive service save/reopen a
   const semantics = (xml: string) => page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const { parseLyricTtml } = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
     const d = parseLyricTtml(xml);
-    return { lines: d.lines.map(l => ({ id: l.id, parent: l.backgroundOf, agents: l.agentRefs, translations: l.translations.map(({id, trackId, trackOrder, contentOrder, ...item}) => item), text: l.words.map(w => w.text).join(''), beginMs: l.beginMs, endMs: l.endMs })),
+    return { lines: d.lines.map(l => ({ id: l.id, parent: l.backgroundOf, agents: l.agentRefs, translations: d.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === l.id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).map(({id, ...item}) => item), text: l.words.map(w => w.text).join(''), beginMs: l.beginMs, endMs: l.endMs })),
       tracks: d.romanizationTracks.map(t => ({ language: t.language, contents: t.contents.map(c => c.kind === 'plain' ? { lineId: c.lineId, kind: c.kind, text: c.text } : { lineId: c.lineId, kind: c.kind, units: c.units.map(({ text, beginMs, endMs }) => ({ text, beginMs, endMs })) }) })) };
   }, xml);
   const before = await semantics(saved.document.lyrics.draftTtml);

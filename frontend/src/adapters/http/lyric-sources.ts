@@ -23,7 +23,7 @@ export function parsePayload(payload: Payload) {
  }
  const words = document.lines.flatMap(l => l.words);
  const badges = [words.some(w => w.beginMs !== null) ? (document.lines.some(l => l.words.filter(w => w.beginMs !== null).length > 1) ? '逐词' : '逐行') : '无时间', payload.format.toUpperCase()];
- if (document.lines.some(l => l.translations.length)) badges.push('翻译');
+ if (document.translationTracks.some(track => track.contents.length)) badges.push('翻译');
  if (document.romanizationTracks.length) badges.push('音译');
  if (words.some(w => w.rubyUnits.length)) badges.push('注音');
  return { document, badges, partial };

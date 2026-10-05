@@ -1,3 +1,4 @@
+import { translationsForLine } from './lyric-document';
 import { translationText } from './lyric-document';
 import type { LyricLine as AmllLine } from '@applemusic-like-lyrics/core';
 import { lineText, type LyricDocument, type LyricLine, type RomanizationContent } from './lyric-document';
@@ -49,7 +50,7 @@ export function toAmllLines(document: LyricDocument, showTranslation: boolean, s
     })) : [{ word: lineText(line), startTime: milliseconds(begin), endTime: milliseconds(end!) }];
     return [{ id: line.id, lyric: {
       words, startTime: milliseconds(begin), endTime: milliseconds(end!),
-      translatedLyric: showTranslation ? line.translations.map(translationText).join(' / ') : '',
+      translatedLyric: showTranslation ? translationsForLine(document, line.id).map(translationText).join(' / ') : '',
       romanLyric: roman.words.size ? '' : roman.text,
       isBG: Boolean(line.backgroundOf), isDuet: Boolean(leadAgent && line.agentRefs.length && !line.agentRefs.includes(leadAgent)),
     } }];

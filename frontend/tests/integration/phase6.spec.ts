@@ -8,7 +8,8 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   await importLyrics(page, { name: 'phase6.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase6Ttml()) });
   const line = page.locator('main section[data-line-id="english"]');
   await expect(line.getByLabel('翻译 1', { exact: true })).toHaveValue('song');
-  await line.getByLabel('翻译 1语言', { exact: true }).fill('ja'); await line.getByLabel('翻译 1语言', { exact: true }).press('Enter');
+  await line.getByRole('button', { name: '管理翻译轨道…' }).click();
+  const manager = page.getByRole('dialog', { name: '翻译轨道管理' }); await manager.getByLabel('翻译轨道 1语言').fill('ja'); await manager.getByRole('button', { name: '应用', exact: true }).click();
   await line.getByRole('button', { name: '删除翻译', exact: true }).nth(1).click();
   await page.locator('[data-outline-drag]').nth(1).click();
   await page.getByLabel('歌手 主唱', { exact: true }).check();
@@ -29,7 +30,7 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   const saved = await (await page.request.get('/api/v1/projects/phase4-background/document')).json();
   await page.reload();
-  await expect(line.getByLabel('翻译 1语言', { exact: true })).toHaveValue('ja');
+  await expect(line).toContainText('轨道 1 · ja · 字幕');
   await expect(line.getByRole('button', { name: '删除翻译', exact: true })).toHaveCount(1);
   await expect(line.getByLabel('词 追加开始秒数')).toHaveValue('');
   await expect(line.getByLabel('读音 I', { exact: true })).toHaveValue('ai');
@@ -37,7 +38,7 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   const semantic = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
     const document = codec.parseLyricTtml(xml);
-    return { agents: document.lines.map(line => line.agentRefs), translations: document.lines[0].translations, appended: document.lines[0].words.slice(-2).map(word => ({ text: word.text, beginMs: word.beginMs, endMs: word.endMs })), units: document.romanizationTracks[0].contents[0] };
+    return { agents: document.lines.map(line => line.agentRefs), translations: document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === document.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))), appended: document.lines[0].words.slice(-2).map(word => ({ text: word.text, beginMs: word.beginMs, endMs: word.endMs })), units: document.romanizationTracks[0].contents[0] };
   }, saved.document.lyrics.draftTtml);
   expect(semantic.agents.slice(0, 2)).toEqual([['v1', 'v2'], ['v2', 'v1']]);
   expect(semantic.translations).toMatchObject([{ purpose: 'subtitle' as const, kind: 'plain' as const,  text: 'song', language: 'ja' }]);
@@ -47,7 +48,7 @@ test('P6 real FastAPI preserves translations, multiple singer order, source blan
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
   const xml = await readFile(await (await download).path(), 'utf8');
   await importLyrics(page, { name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
-  await expect(line.getByLabel('翻译 1语言', { exact: true })).toHaveValue('ja');
+  await expect(line).toContainText('轨道 1 · ja · 字幕');
   await page.locator('[data-outline-drag]').nth(1).click();
   await expect(page.getByLabel('歌手 主唱', { exact: true })).toBeChecked();
   await expect(page.getByLabel('歌手 另一歌手', { exact: true })).toBeChecked();

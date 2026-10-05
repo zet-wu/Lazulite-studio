@@ -18,7 +18,7 @@ export function lineStructureIssues(document: LyricDocument, first: LyricLine, s
   if (first.backgroundOf || second.backgroundOf || main.indexOf(second) !== main.indexOf(first) + 1) issues.push('只能合并相邻主行');
   for (const line of [first, second]) {
     if (document.lines.some(item => item.backgroundOf === line.id)) issues.push(`${label(line)}有背景歌词`);
-    if (line.translations.length) issues.push(`${label(line)}有翻译`);
+    if (document.translationTracks.some(track => track.contents.some(content => content.lineId === line.id))) issues.push(`${label(line)}有翻译`);
   }
   if (first.songPart !== second.songPart) issues.push(`${label(first)}与${label(second)}歌曲段落不同`);
   if (first.agentRefs.join(' ') !== second.agentRefs.join(' ')) issues.push(`${label(first)}与${label(second)}歌手不同`);

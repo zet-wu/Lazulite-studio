@@ -49,7 +49,7 @@ describe('editor selection and clipboard', () => {
   it('copies and cuts a parent with its background as one undoable operation', () => {
     const document = createLyricDocument('主唱');
     const parent = document.lines[0];
-    parent.translations = [{ trackId: 'translation-track-3098', trackOrder: 0, contentOrder: 0, id: 'translation-3098', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '翻译' }];
+    document.translationTracks = [...document.translationTracks.filter(track => !track.contents.some(content => content.lineId === parent.id)), ...([{ id: 'translation-3098', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '翻译' }]).map(({ language, purpose, ...content }) => ({ id: crypto.randomUUID(), language, purpose, contents: [{ ...content, lineId: parent.id }] }))];
     const background = { ...createLine('和声', 'bg'), backgroundOf: parent.id };
     document.lines.push(background, createLine('下一行', 'next'));
     const selection = { kind: 'lines' as const, ids: [parent.id], anchorId: parent.id, activeId: parent.id };
@@ -57,7 +57,7 @@ describe('editor selection and clipboard', () => {
     const pasted = pasteRich(document, clipboard, selection);
     const duplicated = executeLyricCommand(createLyricEditorState(document), pasted.command);
     expect(duplicated.present.lines.map((line) => line.id)).toEqual([parent.id, 'bg', pasted.selection.ids[0], `${pasted.selection.ids[0]}:bg`, 'next']);
-    expect(duplicated.present.lines[2].translations).toEqual(parent.translations.map(item => ({ ...item, id: expect.any(String), trackId: expect.any(String), trackOrder: expect.any(Number), contentOrder: expect.any(Number) })));
+    expect(duplicated.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === duplicated.present.lines[2].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === parent.id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).map(item => ({ ...item, id: expect.any(String) })));
     expect(duplicated.present.lines[3].backgroundOf).toBe(duplicated.present.lines[2].id);
     const cut = executeLyricCommand(duplicated, cutSelection(duplicated.present, selection));
     expect(cut.present.lines.map(lineText)).toEqual(['主唱', '和声', '下一行']);

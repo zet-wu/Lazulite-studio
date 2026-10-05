@@ -1,10 +1,11 @@
+import { translationsForLine } from '../domain/lyric-document';
 import { plainTranslation } from '../domain/lyric-document';
 import { translationText } from '../domain/lyric-document';
 import { parseWordFormat, parseLrcSource } from './source-codec';
 import { assertOutputDocument } from './output-validation';
 import { renderLrc } from './lrc';
 import { parseEslrc, parseLrc, parseLys, parseQrc, parseYrc, stringifyAss, stringifyEslrc, stringifyLrc, stringifyLys, stringifyQrc, stringifyYrc, type LyricLine as FormatLine } from '@applemusic-like-lyrics/lyric';
-import { createLine, createLyricDocument, createWord, type LyricDocument, type RomanizationTrack } from '../domain/lyric-document';
+import { createLine, createLyricDocument, createWord, type LyricDocument, type RomanizationTrack, type TranslationTrack } from '../domain/lyric-document';
 import { toAmllLines } from '../domain/preview-adapter';
 import { parseLyricTtml, serializeLyricTtml } from './ttml/lyric-codec';
 
@@ -39,6 +40,7 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
   let mainId: string | null = null;
   const timedTrack: RomanizationTrack = { id: crypto.randomUUID(), language: null, contents: [] };
   const plainTrack: RomanizationTrack = { id: crypto.randomUUID(), language: null, contents: [] };
+  const translationTrack: TranslationTrack = { id: crypto.randomUUID(), language: null, purpose: 'subtitle', contents: [] };
   const lines = parsed.map((item) => {
     const line = createLine('');
     if (item.isBG && mainId) line.backgroundOf = mainId;
@@ -49,11 +51,11 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
     line.words = item.words.map((word) => ({ ...createWord(word.word), beginMs: milliseconds(word.startTime), endMs: milliseconds(word.endTime) }));
     const romanUnits = item.words.filter((word) => word.romanWord !== undefined).map((word) => ({ id: crypto.randomUUID(), text: word.romanWord ?? '', beginMs: milliseconds(word.startTime), endMs: milliseconds(word.endTime) }));
     if (romanUnits.length) timedTrack.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'timed', units: romanUnits });
-    line.translations = item.translatedLyric ? [plainTranslation(item.translatedLyric)] : [];
+    if (item.translatedLyric) translationTrack.contents.push(plainTranslation(item.translatedLyric, line.id));
     if (item.romanLyric) plainTrack.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: item.romanLyric });
     return line;
   });
-  return { ...createLyricDocument(), lines,
+  return { ...createLyricDocument(), lines, translationTracks: translationTrack.contents.length ? [translationTrack] : [],
     agents: [{ id: 'v1', name: null, type: 'person' }, { id: 'v2', name: null, type: 'person' }],
     romanizationTracks: [timedTrack, plainTrack].filter((track) => track.contents.length) };
 }
@@ -74,7 +76,7 @@ export function exportLyricFile(document: LyricDocument, format: LyricFormat): s
       return { word: word.text, startTime: begin, endTime: end, romanWord: preview.get(line.id)?.words[index]?.romanWord };
     });
     return { words, startTime: line.beginMs, endTime: line.endMs,
-      translatedLyric: line.translations.map(translationText).join(' / '), romanLyric: preview.get(line.id)?.romanLyric ?? '', isBG: Boolean(line.backgroundOf), isDuet: preview.get(line.id)?.isDuet ?? false };
+      translatedLyric: translationsForLine(document, line.id).map(translationText).join(' / '), romanLyric: preview.get(line.id)?.romanLyric ?? '', isBG: Boolean(line.backgroundOf), isDuet: preview.get(line.id)?.isDuet ?? false };
   });
   return stringifyTimed[format](lines);
 }
