@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import type { LyricFormat } from '../../adapters/lyric-formats';
+import { KanaHighlightDialog } from './KanaHighlightDialog';
 import { ShortcutDialog } from './ShortcutDialog';
 import { TopMenu, type MenuState } from './TopMenu';
 import styles from './semantic-editor.module.css';
@@ -23,6 +24,7 @@ type Props = MenuState & {
 };
 
 export function EditorMenu(props: Props) {
+  const [kanaOpen, setKanaOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [dark, setDark] = useState(() => localStorage.getItem('lazulite-editor-theme') === 'dark');
   useEffect(() => {
@@ -44,8 +46,10 @@ export function EditorMenu(props: Props) {
       </TopMenu>
       <TopMenu id="settings" title="设置" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
         <button data-role="inline" onClick={() => setShortcutsOpen(true)}>快捷键设置</button>
+        <button data-role="inline" onClick={() => setKanaOpen(true)}>音译生成假名高亮</button>
       </TopMenu>
     </div>
+    {kanaOpen && <KanaHighlightDialog close={() => setKanaOpen(false)} />}
     {shortcutsOpen && <ShortcutDialog close={() => setShortcutsOpen(false)} />}
   </header>;
 }

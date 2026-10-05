@@ -102,3 +102,19 @@ it('uses timed output for missing or invalid preferences without inventing sourc
     view.unmount();
   }
 });
+
+it('keeps kana source hints after manual edits and snapshots preferences until reopening', () => {
+  const doc = createLyricDocument('ハヘを');
+  const props = { document: doc, lineIds: [doc.lines[0].id], preferenceScope: 'new', apply: vi.fn(() => true), close: vi.fn() };
+  const view = render(<RomanizationGenerationDialog {...props} />);
+  const input = screen.getByLabelText('L1单元 1音译');
+  expect(input.getAttribute('aria-description')).toContain('は、へ、を');
+  fireEvent.change(input, { target: { value: 'wa e o' } });
+  localStorage.setItem('lazulite-kana-highlight', '');
+  view.rerender(<RomanizationGenerationDialog {...props} />);
+  expect(input).toHaveValue('wa e o');
+  expect(input.getAttribute('aria-description')).toContain('は、へ、を');
+  expect(proposeRomanization).toHaveBeenCalledTimes(1);
+  view.unmount(); render(<RomanizationGenerationDialog {...props} />);
+  expect(screen.getByLabelText('L1单元 1音译')).not.toHaveAttribute('aria-description');
+});

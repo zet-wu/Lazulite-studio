@@ -1,3 +1,4 @@
+import { kanaHighlightHint, readKanaHighlight } from './kana-highlight';
 import { Select } from '../../shared/Select';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
@@ -32,8 +33,8 @@ function ProposalText({ text, hint, label, multiline, change, focus }: {
   return multiline ? <textarea {...common} ref={area} rows={1} /> : <input {...common} style={{ width: `${Math.max(3, Math.min(32, Array.from(text).length + 1))}ch` }} />;
 }
 
-function TimedWordPreview({ word, units, lineLabel, change, focus }: {
-  word: LyricWord; units: Array<{ unit: GeneratedUnit; index: number }>; lineLabel: string;
+function TimedWordPreview({ word, units, lineLabel, change, focus, highlight }: {
+  highlight: string; word: LyricWord; units: Array<{ unit: GeneratedUnit; index: number }>; lineLabel: string;
   change: (text: string, key: string) => void; focus: (active: boolean) => void;
 }) {
   const root = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null);
@@ -61,12 +62,13 @@ function TimedWordPreview({ word, units, lineLabel, change, focus }: {
     style={{ minWidth: `min(100%, ${Array.from(word.text).length * 22}px)` }}>
     <div ref={body} className={styles.romanPreviewBody}>{word.text}</div>
     {units.map(({ unit, index }) => {
-      const reading = readings.get(unit.key) ?? '';
+      const reading = readings.get(unit.key) ?? word.text;
+      const kanaHint = kanaHighlightHint(reading, highlight);
       const inputWidth = Math.max(3, Math.min(32, Array.from(unit.text).length + 1));
       const width = `min(32ch, max(${Array.from(reading).length * 12}px, ${inputWidth}ch))`;
       return <div key={unit.key} className={styles.romanPreviewSlot} style={{ width }} data-preview-unit={unit.key}>
-        <div data-source-unit={unit.key}><div className={styles.romanPreviewReading}>{reading}</div></div>
-        <div data-generated-unit={unit.key}><ProposalText text={unit.text} hint={unit.hint} label={`${lineLabel}单元 ${index + 1}音译`}
+        <div data-source-unit={unit.key}><div tabIndex={kanaHint ? 0 : undefined} title={kanaHint || undefined} aria-description={kanaHint || undefined} className={`${styles.romanPreviewReading} ${kanaHint ? styles.romanPreviewHint : ''}`}>{reading}</div></div>
+        <div data-generated-unit={unit.key}><ProposalText text={unit.text} hint={[unit.hint, kanaHint].filter(Boolean).join('；')} label={`${lineLabel}单元 ${index + 1}音译`}
           change={text => change(text, unit.key)} focus={focus} /></div>
       </div>;
     })}
@@ -76,6 +78,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   document: LyricDocument; lineIds: string[]; preferenceScope: string; apply: (command: LyricCommand) => boolean; close: () => void;
 }) {
   const [source] = useState(document);
+  const [highlight] = useState(readKanaHighlight);
   const [sourceIds] = useState(lineIds);
   const modeStorage = `lazulite-romanization-mode:${preferenceScope}`;
   const [kind, setKind] = useState<RomanizationKind>(() => localStorage.getItem(modeStorage) === 'plain' ? 'plain' : 'timed');
@@ -102,8 +105,8 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   try { prepareRomanization(document, source, rows, { trackId: trackId || null, targets }); }
   catch (cause) { issue = (cause as Error).message; }
   const changeText = (lineId: string, text: string, key?: string) => setRows(current => current.map(row => row.lineId !== lineId ? row : row.kind === 'timed'
-    ? { ...row, groups: row.groups.map(unit => unit.key === key ? { ...unit, text, hint: text.trim() ? '' : '音译空格占位，可直接应用' } : unit) }
-    : { ...row, text, hint: text.trim() ? '' : '音译空格占位，可直接应用' }));
+    ? { ...row, groups: row.groups.map(unit => unit.key === key ? { ...unit, text, hint: unit.hint.includes('分片') ? unit.hint : text.trim() ? '' : '音译空格占位，可直接应用' } : unit) }
+    : { ...row, text, hint: row.hint.includes('分片') ? row.hint : text.trim() ? '' : '音译空格占位，可直接应用' }));
   const submit = () => {
     try { if (apply(romanizationGenerationCommand(document, source, rows, { trackId: trackId || null, targets }))) close(); }
     catch (cause) { setMessage((cause as Error).message); }
@@ -135,10 +138,10 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
             </Select></label>
             <div className={styles.romanPreviewWords}>
               {lines.get(row.lineId)!.words.map(word => row.kind === 'timed'
-                ? <TimedWordPreview key={word.id} word={word} units={byWord.get(word.id) ?? []} lineLabel={`${lineLabel(row.lineId)}`}
+                ? <TimedWordPreview highlight={highlight} key={word.id} word={word} units={byWord.get(word.id) ?? []} lineLabel={`${lineLabel(row.lineId)}`}
                   change={(text, key) => changeText(row.lineId, text, key)} focus={active => setFocusedRow(active ? row.lineId : null)} />
                 : <div key={word.id} className={styles.romanPreviewWord} data-source-word={word.id}>
-                  <div className={styles.romanPreviewReading}>{word.rubyUnits.map(unit => unit.reading).join(' ')}</div>
+                  <div className={styles.romanPreviewReading}>{(word.rubyUnits.length ? word.rubyUnits.map(unit => unit.reading) : [word.text]).map((reading, index) => { const hint = kanaHighlightHint(reading, highlight); return <span key={index} tabIndex={hint ? 0 : undefined} title={hint || undefined} aria-description={hint || undefined} className={hint ? styles.romanPreviewHint : undefined}>{reading}</span>; })}</div>
                   <div className={styles.romanPreviewBody}>{word.text}</div>
                 </div>)}
             </div>
