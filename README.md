@@ -12,12 +12,14 @@
 - [前端结构](frontend/README.md)、[服务端结构](server/README.md)、[契约边界](contracts/README.md)。
 - [开发约定](AGENTS.md)。
 
-歌词编辑器已包含词块/Ruby、分词、打轴、时间轴和预览。当前 v6 文档以整数毫秒保存时间，保留有序音译轨道，移除重复 duet，接入背景父关系、附属行、显式生成 Ruby、桌面菜单和单一 A/B。Phase 3 已实现共享时间坐标、独立重叠子轨、侧栏调宽显隐、长短列表定位和统一菜单。Phase 4 已修正收起高度与播放高亮，按10ms边缘匹配生成Ruby提案、默认跳过相同假名并保留人工选择；窄块使用既有缩放编辑，背景保留独立时间与实际AMLL展示。大提案仅挂载可见行。架构说明按实际源码描述，不把计划写成当前能力。
+歌词编辑器已包含词块/Ruby、分词、打轴、时间轴和预览。当前 v8 文档以整数毫秒保存时间，保留有序音译轨道，移除重复 duet，接入背景父关系、附属行、显式生成 Ruby、桌面菜单和单一 A/B。Phase 3 已实现共享时间坐标、独立重叠子轨、侧栏调宽显隐、长短列表定位和统一菜单。Phase 4 已修正收起高度与播放高亮，按10ms边缘匹配生成Ruby提案、默认跳过相同假名并保留人工选择；窄块使用既有缩放编辑，背景保留独立时间与实际AMLL展示。大提案仅挂载可见行。架构说明按实际源码描述，不把计划写成当前能力。
 
 ## 外部开发文档
 
-开发方案、审阅、过程记录、验收及证据统一保存在并列的 [lyric-workflow](../lyric-workflow/docs/studio/README.md)：[当前状态](../lyric-workflow/docs/studio/current-state.md)、[当前审阅整改方案](../lyric-workflow/docs/studio-ruby-review/Review-phase1/plan.md)、[前端运行](../lyric-workflow/docs/studio/development/frontend-development.md)、[服务端运行](../lyric-workflow/docs/studio/development/server-development.md)、[依赖许可](../lyric-workflow/docs/studio/reference/dependency-licenses.md)。本仓库不再保存开发过程文档；可执行测试夹具仍随源码维护。
+开发方案、审阅、过程记录、验收及证据统一保存在并列的 [lyric-workflow](../lyric-workflow/docs/studio/README.md)：[当前状态](../lyric-workflow/docs/studio/current-state.md)、[当前审阅整改方案](../lyric-workflow/docs/studio-edit-review/Review-phase10/plan.md)、[前端运行](../lyric-workflow/docs/studio/development/frontend-development.md)、[服务端运行](../lyric-workflow/docs/studio/development/server-development.md)、[依赖许可](../lyric-workflow/docs/studio/reference/dependency-licenses.md)。本仓库不再保存开发过程文档；可执行测试夹具仍随源码维护。
 
 日文自动注音由当前画布快照调用 `/api/v1/reading/analyze`，主行和背景行独立选择，提供整行上下文、完整读音编辑和单次原子应用。允许词内拆分、不自动合词；未知或歧义位置留空。新注音按音拍分配整数毫秒时间，已有注音未改时保持原单元与时间。关联对齐字段及专用编辑逻辑已移除。
 
 日文自动注音以 Sudachi C 决定整行读音，使用一致 A 细分、随服务部署的 JmdictFurigana 精确词形/读音分段和唯一假名锚点投影原词。连续汉字不因词典更细而强制拆词。Ruby 支持同行跨词拖动及同源选中组，含空目标；保留 ID、读音和时间，选择与焦点随新归属。
+
+歌词下载使用所选格式的六项导出对照。独立 ASS 直接从歌词文档生成正文、背景和全部翻译／音译事件，保留独立时间并量化至厘秒，输出共享样式及按时间分配的默认纵向布局；不提供 ASS Ruby 或媒体内嵌。
