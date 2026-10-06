@@ -92,3 +92,33 @@ it('rejects invalid split segments and assignments; unknown segment ends remain 
   expect(() => executeLyricCommand(createLyricEditorState(document), command)).toThrow(/第 2 行/);
   expect(() => executeLyricCommand(createLyricEditorState(document), { ...command, beforeWordIds: [] })).toThrow(/切点/);
 });
+
+it('keeps plain and timed translation/romanization content intact across split assignments', () => {
+  const { document, line } = fixture();
+  const units = [{ id: 'u', text: ' independent ', beginMs: 200, endMs: 9000 }];
+  document.translationTracks = [{ id: 't', language: 'en', purpose: 'subtitle', contents: [
+    { id: 'plain', lineId: line.id, kind: 'plain', text: ' untouched ' }, { id: 'timed', lineId: line.id, kind: 'timed', units },
+  ] }];
+  document.romanizationTracks = [{ id: 'r', language: 'ja-Latn', contents: [
+    { id: 'rp', lineId: line.id, kind: 'plain', text: ' unchanged ' }, { id: 'rt', lineId: line.id, kind: 'timed', units: [{ ...units[0], id: 'ru' }] },
+  ] }];
+  const command = { type: 'split-line' as const, lineId: line.id, beforeWordIds: ['w1', 'w3'], newLineIds: ['b', 'c'], translationTargets: { plain: 0, timed: 2 }, contentTargets: { rp: 1, rt: 2 }, backgroundTarget: null };
+  const state = createLyricEditorState(document);
+  const next = executeLyricCommand(state, command).present;
+  expect(next.translationTracks[0].contents).toEqual([document.translationTracks[0].contents[0], { ...document.translationTracks[0].contents[1], lineId: 'c' }]);
+  expect(next.romanizationTracks[0].contents).toEqual(document.romanizationTracks[0].contents.map((content, i) => ({ ...content, lineId: i ? 'c' : 'b' })));
+  expect(() => executeLyricCommand(state, { ...command, translationTargets: { plain: 0, timed: 3 } })).toThrow(/归属已失效/);
+  expect(() => executeLyricCommand(state, { ...command, contentTargets: { rp: 1 } })).toThrow(/归属已失效/);
+});
+
+it('merges inside a background line and preserves attached content, while excluding out-of-parent Ruby', () => {
+  const { document, line } = fixture();
+  const bg = { ...createLine('', 'bg'), backgroundOf: line.id, words: ['a', 'b', 'c'].map((text, i) => createWord(text, `bg${i}`)) };
+  document.lines.push(bg);
+  const merged = executeLyricCommand(createLyricEditorState(document), { type: 'merge-words', wordIds: ['bg2', 'bg0', 'bg1'] });
+  expect(merged.present.lines[1].words[0]).toMatchObject({ text: 'abc', id: 'bg0', beginMs: null, endMs: null });
+  expect(merged.present.lines[0]).toBe(line);
+  line.words[0].beginMs = 1000;
+  line.words[0].rubyUnits = [{ id: 'a', reading: 'a', beginMs: 500, endMs: null }, { id: 'b', reading: 'b', beginMs: null, endMs: 1500 }];
+  expect(() => executeLyricCommand(createLyricEditorState(document), { type: 'merge-ruby', rubyIds: ['a', 'b'] })).toThrow(/排除注音/);
+});

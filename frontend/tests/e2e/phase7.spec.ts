@@ -43,13 +43,15 @@ test('P7 split previews and assigns translations with cancellation and one undo'
   const outline = page.locator('[data-outline-drag]'); await outline.first().click({ button: 'right' });
   await page.getByRole('menuitem', { name: '拆分行…' }).click();
   const dialog = page.getByRole('dialog', { name: '拆分歌词行', exact: true });
+  await dialog.getByRole('button', { name: '在第 2 词前切分' }).click();
   await expect(dialog.getByLabel('拆分结果').locator('section')).toHaveCount(2);
-  await dialog.getByLabel('翻译 2归属').selectOption('right');
+  await dialog.getByLabel('翻译 2归属').selectOption({ label: '第 2 行' });
   await expect(dialog.getByLabel('拆分结果').locator('section').last()).toContainText('译文');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行…' }).click();
-  await dialog.getByLabel('翻译 2归属').selectOption('right'); await dialog.getByRole('button', { name: '应用', exact: true }).click();
+  await dialog.getByRole('button', { name: '在第 2 词前切分' }).click();
+  await dialog.getByLabel('翻译 2归属').selectOption({ label: '第 2 行' }); await dialog.getByRole('button', { name: '应用', exact: true }).click();
   await expect(outline).toHaveCount(4);
   const rows = page.locator('main section[data-line-id]');
   await expect(rows.nth(0).getByLabel('翻译 1', { exact: true })).toHaveValue('song');

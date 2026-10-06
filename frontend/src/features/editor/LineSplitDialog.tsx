@@ -37,7 +37,7 @@ export function LineSplitDialog({ line, translations, background, attached, clos
     <div className={styles.manualGraphemes} aria-label="拆行切点">{line.words.map((word, index) => <span key={word.id}>
       {index > 0 && <button data-role="inline" aria-label={`在第 ${index + 1} 词前切分`} aria-pressed={cuts.includes(word.id)} onClick={() => {
         const next = cuts.includes(word.id) ? cuts.filter(id => id !== word.id) : [...cuts, word.id];
-        if (backgroundKey === null && next.length) setBackgroundKey(line.words.filter(item => next.includes(item.id)).at(-1)!.id);
+        if (backgroundKey === null && cuts.includes(word.id) && bgKey === word.id) setBackgroundKey(bgKey);
         setCuts(next);
       }}>|</button>}
       <strong className={styles.splitWord}>{word.text}</strong>
