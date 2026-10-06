@@ -18,7 +18,7 @@ import { RomanizationGenerationDialog } from './RomanizationGenerationDialog';
 import { lineStructureIssues } from '../../domain/line-structure';
 import { useObjectDrag, type DragSource } from './object-drag';
 import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
-import type { LyricCommand } from '../../domain/lyric-commands';
+import { planWordMerge, planRubyMerge, type LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord } from '../../domain/lyric-document';
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, segmentText } from '../../domain/segmentation';
@@ -403,6 +403,29 @@ function EditorWorkspaceContent(props: Props) {
     if (index + direction < 0 || index + direction >= line.words.length) return;
     dispatch({ type: 'move-word', lineId: line.id, wordId: word.id, toLineId: line.id, afterWordId: direction < 0 ? line.words[index - 2]?.id ?? null : line.words[index + 1].id });
   };
+  const mergeAction = (kind: 'words' | 'ruby', ids: string[], multiple: boolean): ContextAction => {
+    const label = multiple ? '合并' : kind === 'words' ? '合并前一词' : '合并前一读音';
+    try {
+      if (kind === 'words') planWordMerge(document, ids); else planRubyMerge(document, ids);
+    } catch (cause) { return { label, disabled: true, reason: (cause as Error).message, run: () => {} }; }
+    return { label, run: () => {
+      if (kind === 'words') {
+        const { line, merged } = planWordMerge(document, ids);
+        if (dispatch({ type: 'merge-words', wordIds: ids })) {
+          setSelection({ kind, lineId: line.id, ids: [merged.id], anchorId: merged.id, activeId: merged.id });
+          props.onSelectUnit?.(line.id, merged.id, null);
+          requestLocate(line.id, `[data-word-id="${merged.id}"] input[aria-label^="词 "]`);
+        }
+      } else {
+        const { line, word, merged } = planRubyMerge(document, ids);
+        if (dispatch({ type: 'merge-ruby', rubyIds: ids })) {
+          setSelection({ kind, lineId: line.id, wordId: word.id, ids: [merged.id], anchorId: merged.id, activeId: merged.id });
+          props.onSelectUnit?.(line.id, word.id, merged.id);
+          requestLocate(line.id, `[data-ruby-id="${merged.id}"] input`);
+        }
+      }
+    } };
+  };
   const openContext = (target: HTMLElement, x: number, y: number) => {
     const rubyId = target.closest<HTMLElement>('[data-ruby-id]')?.dataset.rubyId;
     const romanUnitId = target.closest<HTMLElement>('[data-romanization-unit-id]')?.dataset.romanizationUnitId;
@@ -425,7 +448,7 @@ function EditorWorkspaceContent(props: Props) {
       actions = [
         { label: '添加读音', run: () => { setRubyShortcut({ wordId: word.id, afterRubyId: rubyId, serial: ++rubyShortcutSerial.current }); } },
         { label: '拆分读音', disabled: Array.from(unit.reading).length < 2, run: () => dispatch({ type: 'split-ruby', lineId: line.id, wordId: word.id, rubyId, at: Math.floor(Array.from(unit.reading).length / 2) }) },
-        { label: '合并前一读音', disabled: index === 0, run: () => dispatch({ type: 'merge-ruby', lineId: line.id, wordId: word.id, firstRubyId: word.rubyUnits[index - 1].id, secondRubyId: rubyId }) },
+        mergeAction('ruby', effective.ids.length > 1 ? effective.ids : word.rubyUnits.slice(Math.max(0, index - 1), index + 1).map(unit => unit.id), effective.ids.length > 1),
         { label: '向前移动', disabled: index === 0, run: () => dispatch({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId, afterRubyId: word.rubyUnits[index - 2]?.id ?? null }) },
         { label: '向后移动', disabled: index === word.rubyUnits.length - 1, run: () => dispatch({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId, afterRubyId: word.rubyUnits[index + 1].id }) },
         { label: '按音拍拆分', disabled: splitReadingMora(unit.reading).length < 2, run: () => {
@@ -488,7 +511,7 @@ function EditorWorkspaceContent(props: Props) {
             dispatch({ type: 'segment-words', changes: [{ lineId: line.id, wordId: word.id, words: distributeSegmentTime(word, parts, DEFAULT_SEGMENT_OPTIONS.punctuationWeight) }] });
           } catch (cause) { setMessage((cause as Error).message); }
         } },
-        { label: '合并前一词', disabled: index === 0, run: () => dispatch({ type: 'merge-words', lineId: line.id, firstWordId: line.words[index - 1].id, secondWordId: word.id }) },
+        mergeAction('words', effective.ids.length > 1 ? effective.ids : line.words.slice(Math.max(0, index - 1), index + 1).map(item => item.id), effective.ids.length > 1),
         { label: '词前移', disabled: index === 0, run: () => moveWord(line, word, -1) },
         { label: '词后移', disabled: index === line.words.length - 1, run: () => moveWord(line, word, 1) },
         { label: '移到上一行', disabled: document.lines[document.lines.indexOf(line) - 1] === undefined, run: () => {
@@ -532,7 +555,7 @@ function EditorWorkspaceContent(props: Props) {
       { label: '剪切', disabled: !copyAllowed(effective), run: () => { cut(effective); } },
       { label: '粘贴', disabled: !clipboard, run: () => paste(clipboard, undefined, effective) },
     ];
-    if (effective.ids.length > 1) actions = actions.map(action => action.label.startsWith('删除所选') || effective.kind === 'lines' && ['生成日文注音…', '生成日文罗马字音译…', '从音译生成 注音…', '分词…'].includes(action.label) ? action : { ...action, disabled: true });
+    if (effective.ids.length > 1) actions = actions.map(action => action.label === '合并' || action.label.startsWith('删除所选') || effective.kind === 'lines' && ['生成日文注音…', '生成日文罗马字音译…', '从音译生成 注音…', '分词…'].includes(action.label) ? action : { ...action, disabled: true });
     setSelection(effective);
     props.onSelectLine?.(line.id);
     if (effective.kind === 'romanization-content' || effective.kind === 'romanization-unit') props.onSelectRomanization?.(effective.trackId, effective.contentId);

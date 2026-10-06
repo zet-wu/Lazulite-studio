@@ -27,7 +27,7 @@ describe('E4 注音 editing', () => {
       ['きょ', 1000, 1500], ['う', 1500, 2000],
     ]);
     const beforeMerge = state.present;
-    state = executeLyricCommand(state, { type: 'merge-ruby', lineId: line.id, wordId: word.id, firstRubyId: 'r1', secondRubyId: 'r2' });
+    state = executeLyricCommand(state, { type: 'merge-ruby', rubyIds: ['r1', 'r2' ] });
     expect(state.present.lines[0].words[0].rubyUnits).toEqual([{ id: 'r1', reading: 'きょう', beginMs: 1000, endMs: 2000 }]);
     expect(undoLyricCommand(state).present).toBe(beforeMerge);
     const inserted = executeLyricCommand(state, { type: 'insert-ruby', lineId: line.id, wordId: word.id, afterRubyId: null, reading: '新', rubyId: 'head' });
@@ -39,7 +39,7 @@ describe('E4 注音 editing', () => {
     const line = document.lines[0];
     line.words.push(createWord('日', 'day'), createWord('も', 'also'));
     const state = executeLyricCommand(createLyricEditorState(document), { type: 'batch', commands: [
-      { type: 'merge-words', lineId: line.id, firstWordId: line.words[0].id, secondWordId: 'day' },
+      { type: 'merge-words', wordIds: [line.words[0].id, 'day' ] },
       { type: 'add-ruby', lineId: line.id, wordId: line.words[0].id, reading: 'きょう', rubyId: 'reading' },
     ] });
     expect(state.present.lines[0].words.map((word) => word.text)).toEqual(['今日', 'も']);

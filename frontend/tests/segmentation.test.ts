@@ -57,7 +57,7 @@ describe('E3 segmentation', () => {
     word.rubyUnits = [];
     const parts = distributeSegmentTime(word, ['今日', 'も'], 0.2);
     const split = executeLyricCommand(createLyricEditorState(document), { type: 'segment-word', lineId: line.id, wordId: word.id, words: parts });
-    const merged = executeLyricCommand(split, { type: 'merge-words', lineId: line.id, firstWordId: parts[0].id, secondWordId: parts[1].id });
+    const merged = executeLyricCommand(split, { type: 'merge-words', wordIds: [parts[0].id, parts[1].id ] });
     expect(merged.present.lines[0].words).toHaveLength(1);
     expect(merged.present.lines[0].words[0].text).toBe('今日も');
   });

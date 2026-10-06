@@ -18,7 +18,7 @@ type AtomicLyricCommand =
   | { type: 'delete-word'; lineId: string; wordId: string }
   | { type: 'segment-word'; lineId: string; wordId: string; words: LyricWord[] }
   | { type: 'segment-words'; changes: Array<{ lineId: string; wordId: string; words: LyricWord[] }> }
-  | { type: 'merge-words'; lineId: string; firstWordId: string; secondWordId: string }
+  | { type: 'merge-words'; wordIds: string[] }
   | { type: 'move-word'; lineId: string; wordId: string; toLineId: string; afterWordId: string | null }
   | { type: 'set-line-time'; lineId: string; beginMs: TimeMs; endMs: TimeMs }
   | { type: 'link-line-end'; lineId: string; targetLineId: string }
@@ -51,7 +51,7 @@ type AtomicLyricCommand =
   | { type: 'set-word-time'; lineId: string; wordId: string; beginMs: TimeMs; endMs: TimeMs }
   | { type: 'add-ruby'; lineId: string; wordId: string; reading: string; rubyId?: string }
   | { type: 'insert-ruby'; lineId: string; wordId: string; afterRubyId: string | null; reading: string; rubyId?: string }
-  | { type: 'merge-ruby'; lineId: string; wordId: string; firstRubyId: string; secondRubyId: string }
+  | { type: 'merge-ruby'; rubyIds: string[] }
   | { type: 'move-ruby'; lineId: string; wordId: string; rubyId: string; rubyIds?: string[]; toWordId?: string; afterRubyId: string | null }
   | { type: 'set-ruby-units'; lineId: string; wordId: string; units: RubyUnit[]; overwrite?: boolean }
   | { type: 'redistribute-ruby-time'; lineId: string; wordId: string }
@@ -62,7 +62,7 @@ type AtomicLyricCommand =
   | { type: 'set-ruby-time'; lineId: string; wordId: string; rubyId: string; beginMs: TimeMs; endMs: TimeMs };
 
 export type LyricCommand = AtomicLyricCommand | { type: 'batch'; commands: AtomicLyricCommand[] };
-type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'merge-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
+type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
 
 export type LyricEditorState = { present: LyricDocument; past: LyricDocument[]; future: LyricDocument[] };
 
@@ -125,6 +125,50 @@ function afterLineGroup(lines: LyricLine[], id: string): number {
 function wordFitsLine(word: LyricWord, line: LyricLine) {
   validTime(word.beginMs, word.endMs);
   if (line.beginMs !== null && word.beginMs !== null && word.beginMs < line.beginMs || line.endMs !== null && word.endMs !== null && word.endMs > line.endMs) throw new Error('Word time exceeds line');
+}
+
+/** Resolve every ID from the current document, then check document-order continuity. */
+function consecutive<T extends { id: string }>(siblings: T[], ids: string[]): T[] {
+  const selected = siblings.filter(item => ids.includes(item.id));
+  if (ids.length < 2 || new Set(ids).size !== ids.length || selected.length !== ids.length) throw new Error('请选择至少两个有效且同属一处的单元');
+  const start = siblings.indexOf(selected[0]);
+  if (selected.some((item, index) => siblings[start + index] !== item)) throw new Error('只能合并连续选区，不能跳过空白或标点');
+  return selected;
+}
+
+function timeEnvelope(units: { beginMs: TimeMs; endMs: TimeMs }[]) {
+  const starts = units.flatMap(unit => unit.beginMs === null ? [] : [unit.beginMs]);
+  const ends = units.flatMap(unit => unit.endMs === null ? [] : [unit.endMs]);
+  const beginMs = starts.length ? Math.min(...starts) : null;
+  const endMs = ends.length ? Math.max(...ends) : null;
+  validTime(beginMs, endMs);
+  return { beginMs, endMs };
+}
+
+function rubyFitsWord(unit: RubyUnit, word: LyricWord) {
+  validTime(unit.beginMs, unit.endMs);
+  if (word.beginMs !== null && unit.beginMs !== null && unit.beginMs < word.beginMs || word.endMs !== null && unit.endMs !== null && unit.endMs > word.endMs) throw new Error('正文词时间不能排除注音单元，请先调整时间');
+}
+
+export function planWordMerge(document: LyricDocument, ids: string[]) {
+  const owners = document.lines.filter(line => line.words.some(word => ids.includes(word.id)));
+  if (owners.length !== 1) throw new Error('只能合并同一行的词，主行与背景分别处理');
+  const line = owners[0], words = consecutive(line.words, ids);
+  const merged = { ...words[0], text: words.map(word => word.text).join(''), ...timeEnvelope(words),
+    rubyUnits: words.flatMap(word => word.rubyUnits), obscene: words.some(word => word.obscene) };
+  wordFitsLine(merged, line);
+  merged.rubyUnits.forEach(unit => rubyFitsWord(unit, merged));
+  return { line, words, merged };
+}
+
+export function planRubyMerge(document: LyricDocument, ids: string[]) {
+  const owners = document.lines.flatMap(line => line.words.filter(word => word.rubyUnits.some(unit => ids.includes(unit.id))).map(word => ({ line, word })));
+  if (owners.length !== 1) throw new Error('只能合并同一正文词内的读音');
+  const { line, word } = owners[0], units = consecutive(word.rubyUnits, ids);
+  const merged = { ...units[0], reading: units.map(unit => unit.reading).join(''), ...timeEnvelope(units) };
+  rubyFitsWord(merged, word);
+  wordFitsLine({ ...word, ...timeEnvelope([word, merged]) }, line);
+  return { line, word, units, merged };
 }
 
 function applyStructure(document: LyricDocument, command: AtomicLyricCommand): LyricDocument | null {
@@ -303,19 +347,15 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       return { ...document, lines };
     }
     case 'merge-words': {
-      const index = lineIndex(document, command.lineId);
-      const line = document.lines[index];
-      const first = line.words.findIndex((word) => word.id === command.firstWordId);
-      if (first < 0 || line.words[first + 1]?.id !== command.secondWordId) throw new Error('只能合并相邻词');
-      const left = line.words[first], right = line.words[first + 1];
-      if ([left, right].some((word) => word.rubyUnits.length || word.obscene || word.emptyBeat)) throw new Error('带附属属性的词不能直接合并');
-      const words = line.words.slice();
-      const starts = [left.beginMs, right.beginMs].filter((value): value is number => value !== null);
-      const ends = [left.endMs, right.endMs].filter((value): value is number => value !== null);
-      words.splice(first, 2, { ...left, text: left.text + right.text, beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null });
-      const lines = document.lines.slice();
-      lines[index] = { ...line, words };
-      return { ...document, lines };
+      const { line, words: selected, merged } = planWordMerge(document, command.wordIds);
+      const ids = new Set(command.wordIds);
+      const words = line.words.flatMap(word => word.id === selected[0].id ? [merged] : ids.has(word.id) ? [] : [word]);
+      return { ...document, lines: document.lines.map(item => item === line ? { ...line, words } : item) };
+    }
+    case 'merge-ruby': {
+      const { line, word, units, merged } = planRubyMerge(document, command.rubyIds);
+      const ids = new Set(command.rubyIds);
+      return editWord(document, line.id, word.id, () => [{ ...word, rubyUnits: word.rubyUnits.flatMap(unit => unit.id === units[0].id ? [merged] : ids.has(unit.id) ? [] : [unit]) }]);
     }
     case 'move-word': {
       const fromIndex = lineIndex(document, command.lineId);
@@ -611,16 +651,6 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
         if (wordCommand.afterRubyId !== null && after < 0) throw new Error('注音插入位置已不存在');
         const rubyUnits = word.rubyUnits.slice();
         rubyUnits.splice(after + 1, 0, { id, reading: wordCommand.reading, beginMs: null, endMs: null });
-        return [{ ...word, rubyUnits }];
-      }
-      case 'merge-ruby': {
-        const first = word.rubyUnits.findIndex((unit) => unit.id === wordCommand.firstRubyId);
-        if (first < 0 || word.rubyUnits[first + 1]?.id !== wordCommand.secondRubyId) throw new Error('只能合并相邻读音单元');
-        const left = word.rubyUnits[first], right = word.rubyUnits[first + 1];
-        const starts = [left.beginMs, right.beginMs].filter((value): value is number => value !== null);
-        const ends = [left.endMs, right.endMs].filter((value): value is number => value !== null);
-        const rubyUnits = word.rubyUnits.slice();
-        rubyUnits.splice(first, 2, { ...left, reading: left.reading + right.reading, beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null });
         return [{ ...word, rubyUnits }];
       }
       case 'set-ruby-units': {

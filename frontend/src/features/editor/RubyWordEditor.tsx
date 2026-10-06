@@ -52,7 +52,7 @@ export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, 
   const merge = (unit: RubyUnit, previous: RubyUnit, draft: string) => {
     const commands: Extract<LyricCommand, { type: 'edit-ruby' | 'merge-ruby' }>[] = [];
     if (draft !== unit.reading) commands.push({ type: 'edit-ruby', lineId, wordId: word.id, rubyId: unit.id, reading: draft });
-    commands.push({ type: 'merge-ruby', lineId, wordId: word.id, firstRubyId: previous.id, secondRubyId: unit.id });
+    commands.push({ type: 'merge-ruby', rubyIds: [previous.id, unit.id ] });
     if (apply({ type: 'batch', commands })) pendingFocus.current = previous.id;
   };
   const slot = newAfter !== undefined && <div className={styles.rubyTile} key="new-reading"><input ref={newInput} aria-label={`新增读音 ${word.text}`} value={newReading}

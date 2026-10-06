@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import styles from './semantic-editor.module.css';
 
-export type ContextAction = { label: string; run: () => void; disabled?: boolean };
+export type ContextAction = { label: string; run: () => void; disabled?: boolean; reason?: string };
 
 export function EditorContextMenu({ x, y, title, actions, close }: { x: number; y: number; title: string; actions: ContextAction[]; close: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -23,6 +23,6 @@ export function EditorContextMenu({ x, y, title, actions, close }: { x: number; 
       }
     }}>
     {actions.map((item, index) => <button data-role="inline" key={`${index}:${item.label}`} role="menuitem" disabled={item.disabled}
-      onClick={() => { item.run(); close(); }}>{item.label}</button>)}
+      onClick={() => { item.run(); close(); }}>{item.label}{item.reason && <small> · {item.reason}</small>}</button>)}
   </div>;
 }
