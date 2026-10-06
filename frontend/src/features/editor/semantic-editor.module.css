@@ -349,3 +349,5 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .translationReference:hover .translationFull, .translationReference:focus-within .translationFull { display: grid; }
 
 .splitWord { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1.1rem; }
+
+.outlineRow[data-active-context] .outlineNumber { color: var(--primary); font-weight: 600; }

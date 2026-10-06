@@ -19,14 +19,14 @@ import { PackagingPanel } from '../PackagingPanel';
 import { RomanizationGenerationDialog } from './RomanizationGenerationDialog';
 import { lineStructureIssues } from '../../domain/line-structure';
 import { useObjectDrag, type DragSource } from './object-drag';
-import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
 import { planWordMerge, planRubyMerge, type LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord } from '../../domain/lyric-document';
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, segmentText } from '../../domain/segmentation';
 import { distributeRubyTime, splitReadingMora } from '../../domain/ruby-editing';
 import { copySelection, cutSelection, deleteSelection, invertIds, moveWordsAcrossLine, pastePlain, pasteRich, selectIds, selectionLineId, type EditorClipboard, type EditorSelection } from './editing-actions';
-import { LyricList } from './LyricList';
+import { LyricList, type ListMemory } from './LyricList';
 import { LyricLine as LyricLineView } from './LyricLine';
 import { LyricWord as LyricWordView } from './LyricWord';
 import { InlineDraft } from './InlineAdd';
@@ -166,8 +166,9 @@ function EditorWorkspaceContent(props: Props) {
   };
   const [rubyGeneration, setRubyGeneration] = useState<{ lineIds: string[]; trackId?: string; contentId?: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; title: string; actions: ContextAction[]; target: HTMLElement } | null>(null);
-  const [locate, setLocate] = useState<{ id: string; serial: number; focus?: string } | null>(null);
+  const [locate, setLocate] = useState<{ id: string; serial: number; focus?: string; selector?: string } | null>(null);
   const locateSerial = useRef(0);
+  const listMemory = useRef<Record<'edit' | 'sync', ListMemory>>({ edit: { offset: 0, handled: null }, sync: { offset: 0, handled: null } });
   const requestLocate = (id: string, focus?: string) => setLocate({ id, focus, serial: ++locateSerial.current });
   const pendingFocus = useRef<string | null>(null);
   useEffect(() => {
@@ -198,8 +199,32 @@ function EditorWorkspaceContent(props: Props) {
     if (selection.kind === 'ruby') return unit.wordId === selection.wordId && unit.rubyUnitId === selection.activeId;
     return false;
   }) ?? null;
-  const mainLines = document.lines.filter((line) => !line.backgroundOf);
-  const ordinalById = visibleLineOrdinals(document);
+  const mainLines = useMemo(() => document.lines.filter((line) => !line.backgroundOf), [document.lines]);
+  const ordinalById = useMemo(() => visibleLineOrdinals(document), [document]);
+  const previousMode = useRef(mode);
+  const externalSelection = useRef(props.selectedLineId);
+  useEffect(() => {
+    const returned = previousMode.current !== mode && (mode === 'edit' || mode === 'sync');
+    const external = externalSelection.current !== props.selectedLineId;
+    previousMode.current = mode; externalSelection.current = props.selectedLineId;
+    if (!returned && !external) return;
+    const target = activePropertyTarget;
+    const lineId = target?.lineId ?? (selection?.kind === 'romanization-content' ? selection.lineId : selection ? null : props.selectedLineId);
+    if (!lineId || !document.lines.some(line => line.id === lineId)) { setLocate(null); return; }
+    const selector = target?.kind === 'word' ? `[data-word-id="${CSS.escape(target.wordId)}"]`
+      : target?.kind === 'ruby' ? `[data-ruby-id="${CSS.escape(target.rubyId)}"]`
+      : target?.kind === 'romanization' ? `[data-romanization-unit-id="${CSS.escape(target.unitId)}"]` : undefined;
+    setLocate({ id: lineId, selector, serial: ++locateSerial.current });
+  }, [mode, props.selectedLineId, activePropertyTarget, selection, document]);
+  useEffect(() => {
+    const pane = outlineRef.current?.querySelector<HTMLElement>(`.${styles.panelBody}`);
+    const lineId = activePropertyTarget?.lineId ?? activeLineId;
+    const row = lineId && pane?.querySelector<HTMLElement>(`[data-line-id="${CSS.escape(lineId)}"]`);
+    if (!pane || !row) return;
+    const view = pane.getBoundingClientRect(), box = row.getBoundingClientRect();
+    if (box.top < view.top) pane.scrollTop += box.top - view.top;
+    else if (box.bottom > view.bottom) pane.scrollTop += box.bottom - view.bottom;
+  }, [activePropertyTarget?.lineId, activeLineId, mode, columns.outlineVisible]);
   const mainIds = mainLines.map((line) => line.id);
   const occupiedParents = new Set(document.lines.filter(line => line.backgroundOf && line.id !== selectedLine?.id).map(line => line.backgroundOf));
   const propertyLines = selectedLine?.backgroundOf && !(selection?.kind === 'lines' && selection.ids.includes(selectedLine.id)) ? [selectedLine]
@@ -751,10 +776,10 @@ function EditorWorkspaceContent(props: Props) {
       selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey); requestLocate(line.id);
     }}><h2>大纲</h2><div className={styles.panelBody}>
       {displayed.lines.map(line => <OutlineRow key={line.id} line={line} placeholder={drag.isPlaceholder('line', line.backgroundOf ?? line.id)} ordinal={ordinalById.get(line.backgroundOf ?? line.id)}
-        selected={selection?.kind === 'lines' && selection.ids.includes(line.id)} />)}
+        selected={selection?.kind === 'lines' && selection.ids.includes(line.id)} context={selection?.kind !== 'lines' && activePropertyTarget?.lineId === line.id} />)}
     </div></aside>}{columns.outlineVisible && separator('outline')}
       <main ref={mainRef} tabIndex={-1} className={styles.canvas}>
-        <LyricList lines={displayed.lines} locate={locate} append={() => {
+        <LyricList key={mode} memory={listMemory.current[mode]} lines={displayed.lines} locate={locate} append={() => {
           const line = createLine('');
           if (dispatch({ type: 'insert-line', afterLineId: mainLines.at(-1)?.id ?? null, line })) {
             setSelection({ kind: 'lines', ids: [line.id], anchorId: line.id, activeId: line.id });
