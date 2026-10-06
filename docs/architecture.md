@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-2026-10-05 更新至编辑 Phase 9。执行依据见[本轮方案](../../lyric-workflow/docs/studio-edit-review/Review-phase9/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
+2026-10-07 更新至时间轴 Phase 2。执行依据见[本轮方案](../../lyric-workflow/docs/studio-timeline-review/Review-phase2/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
 
 ## 1. 应用与目录
 
@@ -34,7 +34,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 ## 3. 权威文档与事务
 
-`ProjectDocument`（`studio-project-v1`）是唯一项目编辑状态，包含源资产 ID、结构化 lyrics 与 acoustics（采用结果 ID、片段副本）。其中 `LyricDocument`（`studio-lyric-v8`）为歌词部分，含 lines、romanizationTracks、translationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs 与时间链接；词含 text、时间、Ruby 单元、对齐单元、空拍等。音译轨道按主行或背景行的稳定 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
+`ProjectDocument`（`studio-project-v2`）是唯一项目编辑状态，包含源资产 ID、结构化 lyrics 与 acoustics（采用结果 ID、片段副本）。其中 `LyricDocument`（`studio-lyric-v9`）为歌词部分，含 lines、romanizationTracks、translationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs 与实际时间；词含 text、时间、Ruby 单元、对齐单元等。项目 editing 独立保存词／Ruby 空拍、忽略行与行尾链接；关系和歌词实际端点在同一项目事务内维护。音译轨道按主行或背景行的稳定 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
 
 时间使用绝对整数毫秒/null；拆分坐标使用 code point 并检查 grapheme 边界。`lyric-commands.ts` 提供纯函数歌词事务；运行时只有 `project-document.ts` 提交 256 次项目历史，歌词与声学操作按实际顺序统一撤销。背景勾选时原子附属最近的前一主行，前行已占用即拒绝，不向更早或后方寻找；下拉仅建立关系后启用，显示动态Lx，value保留稳定ID。内容、链接及各单元自身时间由单一命令校验；背景建立/改绑及主行拆分归属允许父背景各自独立绝对时间，不截短背景或扩展父行。selection、focus、播放时钟不作为歌词权威内容；批量操作一次入历史，最终改动经 codec 保存。
 
@@ -54,7 +54,7 @@ RomanizationGenerationDialog自有静态正文/Ruby对照布局，无播放遮�
 
 `lyric-formats.ts` 支持文本、LRC/扩展 LRC/ESLRC/QRC/YRC/LYS 双向、KRC 导入与 ASS 导出。`source-codec.ts` 解析原始 QRC/YRC/KRC 和附属内容；本地二进制 KRC 在浏览器解压。`lrc.ts` 统一普通/尖括号扩展 LRC 下载和内嵌文本：只取主行正文，未知结束不猜测，重叠主行保留且仅在已知区间并集外清屏。低表达力格式不能携带全部 Ruby/元数据或多条音译轨道。预览动态正文使用有效完整时间，独立纯空白词按原顺序以0–0 AMLL word投影；其他未定时正文不进入动态预览，整行无定时词沿用正文回退，不修改文档。isDuet 从歌手引用派生；引用包含主唱时显示主唱侧，否则显示另一侧，无法可视化多歌手合唱。StudioLyricPlayer使用AMLL的单一DOM播放器，关闭自动时间改写，仅把父/背景显示组活跃区设为两行时间并集，保持各行及词/Ruby输入时间。
 
-项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存完整当前项目与基础修订，重开不恢复撤销栈。FastAPI 接受 `studio-document-v3` envelope，document 为 JSON 项目快照，lyrics 保存 draftTtml；修订以不可变 JSON 文件和 project_path 指针提交，不双写旧 TTML 修订。歌词导入仅替换 lyrics，声学数据保留；发布捕获完整快照并从确切修订提取歌词。复核只比较歌词语义。候选由用户明确采用；人声处理由用户启动后在成功时按捕获的声学基线自动接入，真实冲突才提供明确替换入口。
+项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存完整当前项目与基础修订，重开不恢复撤销栈。FastAPI 接受 `studio-document-v4` envelope，document 为 JSON 项目快照，lyrics 保存 draftTtml；修订以不可变 JSON 文件和 project_path 指针提交，不双写旧 TTML 修订。歌词导入仅替换 lyrics，声学数据保留；发布捕获完整快照并从确切修订提取歌词。复核只比较歌词语义。候选由用户明确采用；人声处理由用户启动后在成功时按捕获的声学基线自动接入，真实冲突才提供明确替换入口。
 
 ## 5. 媒体与服务
 
@@ -102,7 +102,7 @@ EditorWorkspace 持有 `AcquisitionStore` 与独立 `useSearchConditions`，切�
 
 ## 毫秒时间与输出生命周期
 
-项目文档为 `studio-project-v1`，歌词部分仍为 `studio-lyric-v8`：`TimeMs`、`beginMs/endMs`、打轴和 A/B 均为整数毫秒或 `null`。行尾链接仅存 targetLineId，普通解除、分配解除和删除目标均冻结当前有效结束时间，不保留旧端点。文档接口为 `studio-document-v3`，媒体与任务契约使用 `_ms`。恢复检查点使用独立 project-v1 数据库，旧检查点不再读取；没有旧结构转换或双写。媒体元素仍用秒，PCM 仍按样本帧，编码 timescale 不改。
+项目文档为 `studio-project-v2`，歌词部分仍为 `studio-lyric-v9`：`TimeMs`、`beginMs/endMs`、打轴和 A/B 均为整数毫秒或 `null`。行尾链接存 editing.endLinks 来源 ID → 目标 ID，普通解除、分配解除和删除目标均冻结当前有效结束时间，不保留旧端点。文档接口为 `studio-document-v4`，媒体与任务契约使用 `_ms`。恢复检查点使用独立 project-v2 数据库，旧检查点不再读取；没有旧结构转换或双写。媒体元素仍用秒，PCM 仍按样本帧，编码 timescale 不改。
 
 TTML 解析先处理相对祖先得到实际端点，再按半毫秒向上舍入；时钟写法（包括带小时）为绝对时间。保存、下载与 STPP 使用三位毫秒时钟，零时长舍入不自动延长。`server/time_units.py` 在修订写入边界规范化，并保留正文及 Apple 头部元素的默认命名空间，避免外部消费者漏读带自动前缀的正文；Studio 草稿属性只在最终产物剥离。自动对齐/转写结果只向 Studio 暴露毫秒端点，引擎原生秒数在适配边界转换。
 
