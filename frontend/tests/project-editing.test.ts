@@ -105,3 +105,10 @@ it('retains configured whitespace export gates without leaking configuration int
   expect(xml).not.toMatch(/emptyBeat|ignoreSync|endLink/);
   expect(parseLyricTtml(xml).lines[0].words.at(-1)?.text).toBe(' ');
 });
+
+it('rejects generated Ruby replacement that would silently erase configured identity', () => {
+ let state=apply(fixture(),{type:'add-ruby',lineId:'a',wordId:'a1',reading:'あ',rubyId:'r'});
+ state=apply(state,{type:'set-empty-beat',id:'r',kind:'ruby',count:2});
+ expect(()=>apply(state,{type:'set-ruby-units',lineId:'a',wordId:'a1',overwrite:true,units:[{id:'new-r',reading:'い',beginMs:null,endMs:null}]})).toThrow(/空拍/);
+ expect(state.present.editing.emptyBeats.r.count).toBe(2);
+});

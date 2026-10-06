@@ -9,6 +9,7 @@ async function load(page: import('@playwright/test').Page) {
 const word = (page: import('@playwright/test').Page, id: string) => page.locator(`main [data-word-id="${id}"]`);
 const clock = (page: import('@playwright/test').Page, ms: number) => page.locator('audio').evaluate((audio: HTMLAudioElement, ms) => { audio.currentTime = ms / 1000; }, ms);
 test('compact body/ruby bands keep whitespace, align dots, group background and share post-beat progress', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await load(page);
   await expect(page.locator('main input')).toHaveCount(0);
   await expect(word(page, 'space').locator('[data-sync-marker]')).toHaveCount(0);
@@ -34,7 +35,9 @@ test('compact body/ruby bands keep whitespace, align dots, group background and 
   const rows = await page.locator('main [data-line-id]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-line-id')));
   expect(rows).toEqual(['a', 'bg', 'b']);
   await page.screenshot({ path: test.info().outputPath('compact-light.png') });
-  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.locator('[data-top-menu="view"] summary').click();
+  await page.getByRole('button', { name: '夜间模式', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.screenshot({ path: test.info().outputPath('compact-dark.png') });
 });
 test('inline editing commits once, retains invalid input on mode switch, and cancels without history', async ({ page }) => {
@@ -94,4 +97,28 @@ for (const count of [80, 81]) test(`return locates exact active object and resto
   await expect(page.locator(`[data-active-context][data-line-id="p${count - 3}"]`)).toHaveCount(1);
   await page.getByRole('button', { name: '打轴', exact: true }).click(); await expect(page.locator(`main [data-word-id="${id}"]`)).toBeInViewport();
   if (count > 80) expect(await page.locator('main [data-line-id]').count()).toBeLessThan(30);
+  await page.getByRole('button', { name: '编辑', exact: true }).click();
+  await page.locator('main').focus(); await page.keyboard.press('Escape');
+  const scroller = page.getByLabel('歌词列表', { exact: true });
+  await scroller.evaluate(el => { el.scrollTop = 400; });
+  await page.waitForTimeout(100);
+  const offset = await scroller.evaluate(el => el.scrollTop);
+  await page.getByRole('button', { name: '音频处理', exact: true }).click();
+  await page.getByRole('button', { name: '编辑', exact: true }).click();
+  await expect.poll(() => scroller.evaluate(el => el.scrollTop)).toBe(offset);
+
+});
+
+test('32 beats remain operable through narrow wrapping and the upper bound is disabled', async ({ page }) => {
+ await load(page); await page.setViewportSize({ width: 1280, height: 900 });
+ const ruby = page.locator('main [data-ruby-id="r1"]');
+ for (let i=0;i<32;i++) { await ruby.click({button:'right'}); await page.getByRole('menuitem',{name:'添加空拍',exact:true}).click(); }
+ await expect(page.locator('[data-beat-owner="r1"]')).toHaveCount(32);
+ await ruby.click({button:'right'}); await expect(page.getByRole('menuitem',{name:'添加空拍',exact:true})).toBeDisabled(); await page.keyboard.press('Escape');
+ const second = page.locator('main [data-ruby-id="r2"]');
+ for (let i=0;i<32;i++) { await second.click({button:'right'}); await page.getByRole('menuitem',{name:'添加空拍',exact:true}).click(); }
+ const scroller=page.getByLabel('歌词列表',{exact:true});
+ expect(await scroller.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+ await page.locator('[data-beat-owner="r1"]').last().click({button:'right'}); await page.getByRole('menuitem',{name:'减少空拍',exact:true}).click();
+ await expect(page.locator('[data-beat-owner="r1"]')).toHaveCount(31);
 });

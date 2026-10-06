@@ -187,3 +187,24 @@ def test_timed_translation_real_save_preserves_purpose_units_and_unknown_draft_t
     assert first.get('{urn:lazulite:studio:draft}id') == 'translation-unit'
     assert first.get('{urn:lazulite:studio:draft}null') == 'begin'
     assert first.get('end') == '00:01.250'
+
+
+def test_invalid_project_editing_is_rejected_without_revision_change(tmp_path):
+    from copy import deepcopy
+    setup_project(tmp_path)
+    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
+    before = client.get('/api/v1/projects/p/document')
+    snapshot = initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="0" end="1"><span studio:id="w" begin="0" end="1">A</span></p></body></tt>', None)
+    invalid = [
+        {'emptyBeats': {'w': {'kind': 'word', 'count': 33}}},
+        {'emptyBeats': {'w': {'kind': 'ruby', 'count': 1}}},
+        {'emptyBeats': {'missing': {'kind': 'word', 'count': 1}}},
+        {'ignoredSyncLineIds': ['a', 'a']},
+        {'endLinks': {'a': 'missing'}},
+    ]
+    for patch in invalid:
+        document = deepcopy(snapshot)
+        document['editing'].update(patch)
+        response = client.put('/api/v1/projects/p/document', json={'schema_version': 'studio-document-v4', 'project_id': 'p', 'revision': before.json()['revision'], 'document': document}, headers={'origin': 'http://studio', 'if-match': before.headers['etag']})
+        assert response.status_code == 422, response.text
+        assert client.get('/api/v1/projects/p/document').json()['revision'] == before.json()['revision']

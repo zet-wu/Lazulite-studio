@@ -37,11 +37,10 @@ test('canvas drives timing, line completion blocks repeat and same target can be
   await page.getByRole('combobox', { name: '打轴模式' }).selectOption('line');
   await edge(page, '[data-ruby-id]', 3); await expect(panel).toContainText('L1 · 单元 4 / 4');
   await page.locator('audio').evaluate((a: HTMLAudioElement) => { a.currentTime = 3.5; });
-  await panel.getByRole('button', { name: '连续轴', exact: true }).click(); await expect(panel).toContainText('本行已完成');
-  await expect(page.getByRole('textbox', { name: '词 しん开始秒数' })).toHaveValue('4');
+  await panel.getByRole('button', { name: '连续轴', exact: true }).click(); await expect(page.locator('[data-sync-marker][data-current]')).toHaveCount(0);
   await expect(panel.getByRole('button', { name: '连续轴', exact: true })).toBeDisabled();
   await edge(page, '[data-ruby-id]', 3); await expect(panel.getByRole('button', { name: '连续轴', exact: true })).toBeEnabled();
-  await page.getByRole('textbox', { name: '词 よう', exact: true }).click(); await expect(panel).toContainText('L2 · 单元 2 / 2');
+  await page.locator('main [data-word-id]').filter({ hasText: 'よう' }).dblclick(); await expect(panel).toContainText('L2 · 单元 2 / 2');
   await page.keyboard.press('End'); await page.keyboard.type('sdf'); await expect(page.getByRole('textbox', { name: '词 よう', exact: true })).toHaveValue('ようsdf');
 });
 test('exactly twelve global bindings, conflict rejection, modifier routing and reload persistence', async ({ page }) => {
@@ -120,13 +119,13 @@ test('invalid timing selections and control/menu focus cannot stamp another obje
   await expect(panel).toContainText('单元 2 / 4');
   expect(await page.locator('audio').evaluate((a: HTMLAudioElement) => a.currentTime)).toBe(1);
   await page.getByRole('separator', { name: '大纲宽度' }).focus(); await page.keyboard.press('KeyS');
-  await expect(page.getByLabel('读音 っ开始秒数')).toHaveValue('1');
+  await expect(page.getByLabel('选中对象开始秒数')).toHaveValue('1');
   await edge(page, '[data-ruby-id]', 1); await page.locator('[data-top-menu="settings"] summary').click(); await page.keyboard.press('KeyS');
-  await expect(page.getByLabel('读音 っ开始秒数')).toHaveValue('1'); await page.keyboard.press('Escape');
+  await expect(page.getByLabel('选中对象开始秒数')).toHaveValue('1'); await page.keyboard.press('Escape');
   await page.locator('[data-outline-drag]').first().click();
   await page.getByRole('switch', { name: '跳过打轴' }).check(); await edge(page, '[data-ruby-id]', 1);
   await expect(panel).toContainText('当前选择不参与打轴'); await expect(panel.getByRole('button', { name: '起始轴' })).toBeDisabled();
-  await page.keyboard.press('KeyD'); await expect(page.getByLabel('词 しん开始秒数')).toHaveValue('4');
+  await page.keyboard.press('KeyD'); await page.getByRole('button', { name: '编辑', exact: true }).click(); await expect(page.getByLabel('词 しん开始秒数')).toHaveValue('4');
 });
 test('singer form validates locally and reading draft protects composition and empty cancellation', async ({ page }) => {
   await load(page);

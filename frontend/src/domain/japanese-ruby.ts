@@ -1,3 +1,4 @@
+import { createProjectEditing, emptyBeatCount } from './project-editing';
 import { toHiragana } from 'wanakana';
 export type ReadingRange = { line_id: string; base_start: number; base_end: number; base: string; reading: string };
 import { lineText, rubyReading, type LyricDocument, type LyricWord } from './lyric-document';
@@ -104,7 +105,7 @@ export function hasJapaneseRubyChanges(rows: ReadingRow[], source: LyricDocument
   return rows.some(row => row.blocks.some(b => b.editable && b.reading.trim() && (!b.existing || b.reading !== rubyReading(words.get(b.wordId)!))));
 }
 
-export function japaneseRubyCommand(current: LyricDocument, source: LyricDocument, rows: ReadingRow[]): LyricCommand {
+export function japaneseRubyCommand(current: LyricDocument, source: LyricDocument, rows: ReadingRow[], editing = createProjectEditing()): LyricCommand {
   if (current !== source) throw new Error('源文档已变化，请重新打开生成');
   if (!hasJapaneseRubyChanges(rows, source)) throw new Error('没有可应用的注音修改');
   const rowMap = new Map(rows.map(row => [row.lineId, row]));
@@ -131,6 +132,7 @@ export function japaneseRubyCommand(current: LyricDocument, source: LyricDocumen
       const accepted = blocks.filter(b => b.editable && b.reading.trim());
       if (!accepted.length) return [word];
       const cuts = [...new Set([0, length(word.text), ...accepted.flatMap(b => [b.start, b.end])])].sort((a,b) => a-b);
+      if (cuts.length > 2 && emptyBeatCount(editing, word.id)) throw new Error('带空拍的词不能自动拆分，请先调整空拍');
       const boundary = (at: number) => at === 0 ? word.beginMs : at === length(word.text) ? word.endMs : word.beginMs === null || word.endMs === null ? null : word.beginMs + Math.round((word.endMs-word.beginMs)*at/length(word.text));
       return cuts.slice(0,-1).map((a,index): LyricWord => {
         const b = cuts[index+1], reading = accepted.find(item => item.start === a && item.end === b)?.reading;

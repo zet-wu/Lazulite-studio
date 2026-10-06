@@ -34,7 +34,7 @@ for (const conflict of [false,true]) test(`bottom timeline stamp and seek owners
   await wave.click({position:{x:10,y:10}});
   await page.locator('audio').evaluate((a:HTMLAudioElement)=>{a.currentTime=1.5;});
   await page.keyboard.press('s');
-  await expect(page.getByLabel('读音 が开始秒数')).toHaveValue(conflict?'0':'1.5');
+  await expect(page.getByLabel('选中对象开始秒数')).toHaveValue(conflict?'0':'1.5');
   if(conflict) await expect.poll(()=>page.locator('audio').evaluate((a:HTMLAudioElement)=>a.currentTime)).toBeCloseTo(.5,1);
   await page.keyboard.press('Delete'); await expect(page.locator('[data-ruby-id]')).toHaveCount(4);
 });
@@ -58,7 +58,7 @@ test('track object focus selects its shared sync target and protects repeat and 
   await page.locator('[data-ruby-id]').first().click({position:{x:3,y:3}});await page.getByRole('button',{name:'打轴',exact:true}).click();
   const track=page.getByRole('button',{name:'时间轴注音 こ',exact:true});await track.focus();
   await page.locator('audio').evaluate((a:HTMLAudioElement)=>{a.currentTime=.5;});await page.keyboard.press('s');
-  await expect(page.getByLabel('读音 こ开始秒数')).toHaveValue('0.5');
+  await expect(page.getByLabel('选中对象开始秒数')).toHaveValue('0.5');
   await track.dispatchEvent('keydown',{key:'d',code:'KeyD',repeat:true});await expect(page.getByRole('region',{name:'连续打轴'})).toContainText('单元 3 / 4');
   await page.getByRole('spinbutton',{name:'BPM',exact:true}).focus();await page.keyboard.press('d');await expect(page.getByRole('region',{name:'连续打轴'})).toContainText('单元 3 / 4');
 });

@@ -6,24 +6,29 @@ import { phase7Ttml } from '../fixtures/phase7';
 test('P7 linked split, translation ownership and generated timed track persist through actual service and final export', async ({ page }) => {
   await page.goto('/projects/phase4-background/edit');
   const xml = await page.evaluate(async xml => {
-    const codecPath = '/src/adapters/ttml/lyric-codec.ts', commandPath = '/src/domain/lyric-commands.ts';
+    const codecPath = '/src/adapters/ttml/lyric-codec.ts', commandPath = '/src/domain/project-document.ts';
     const codec = await import(codecPath) as typeof import('../../src/adapters/ttml/lyric-codec');
-    const commands = await import(commandPath) as typeof import('../../src/domain/lyric-commands');
+    const commands = await import(commandPath) as typeof import('../../src/domain/project-document');
     const doc = codec.parseLyricTtml(xml);
     doc.translationTracks = [...doc.translationTracks.filter(track => !track.contents.some(content => content.lineId === doc.lines[1].id)), ...([{ id: 'translation-841', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'first' }, { id: 'translation-876', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh-Hans', text: '后行' }]).map(({ language, purpose, ...content }) => ({ id: crypto.randomUUID(), language, purpose, contents: [{ ...content, lineId: doc.lines[1].id }] }))];
-    let state = commands.createLyricEditorState(doc);
-    state = commands.executeLyricCommand(state, { type: 'link-line-end', lineId: 'kana', targetLineId: 'context' });
-    state = commands.executeLyricCommand(state, { type: 'link-line-end', lineId: 'context', targetLineId: 'missing' });
-    return codec.serializeLyricTtml(state.present, { draft: true });
+    let state = commands.createProjectEditorState(commands.createProjectDocument(doc));
+    state = commands.executeProjectCommand(state, { type: 'lyrics', command: { type: 'link-line-end', lineId: 'kana', targetLineId: 'context' } });
+    state = commands.executeProjectCommand(state, { type: 'lyrics', command: { type: 'link-line-end', lineId: 'context', targetLineId: 'missing' } });
+    return { text: codec.serializeLyricTtml(state.present.lyrics, { draft: true }), editing: state.present.editing };
   }, phase7Ttml);
-  await importLyrics(page, { name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml.text) });
+  await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByText('已保存', { exact: true })).toBeVisible();
+  const url = '/api/v1/projects/phase4-background/document', response = await page.request.get(url), envelope = await response.json();
+  const seeded = await page.request.put(url, { data: { schema_version: envelope.schema_version, project_id: envelope.project_id, revision: envelope.revision, document: { ...envelope.document, editing: xml.editing } }, headers: { origin: 'http://127.0.0.1:5175', 'if-match': response.headers().etag } });
+  expect(seeded.status(), await seeded.text()).toBe(200); await page.reload();
   const outline = page.locator('[data-outline-drag]'); await expect(outline).toHaveCount(3);
   await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   const generation = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
   await generation.getByLabel('输出', { exact: true }).selectOption('timed'); await generation.getByRole('button', { name: '生成音译', exact: true }).click();
   await outline.nth(1).click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行…' }).click();
   const split = page.getByRole('dialog', { name: '拆分歌词行', exact: true });
-  await split.getByLabel('翻译 2归属').selectOption('right'); await split.getByRole('button', { name: '应用', exact: true }).click();
+  await split.getByRole('button', { name: '在第 2 词前切分' }).click();
+  await split.getByLabel('翻译 2归属').selectOption({ label: '第 2 行' }); await split.getByRole('button', { name: '应用', exact: true }).click();
   await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   const saved = await (await page.request.get('/api/v1/projects/phase4-background/document')).json();
   const semantics = async (xml: string) => page.evaluate(async xml => {

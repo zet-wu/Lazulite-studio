@@ -42,7 +42,9 @@ export function reconcileEditing(before: LyricDocument, after: LyricDocument, ed
   const rubies = new Set([...words.values()].flatMap(word => word.rubyUnits.map(unit => unit.id)));
   for (const old of before.lines.flatMap(line => line.words)) {
     const word = words.get(old.id);
-    if (!word || old.rubyUnits.length === word.rubyUnits.length) continue;
+    if (!word) continue;
+    if (old.rubyUnits.length && word.rubyUnits.length && old.rubyUnits.every(unit => !rubies.has(unit.id)) && old.rubyUnits.some(unit => emptyBeatCount(editing, unit.id))) throw new Error('替换注音会丢失空拍归属，请先清除原注音空拍');
+    if (old.rubyUnits.length === word.rubyUnits.length) continue;
     if (!old.rubyUnits.length && word.rubyUnits.length && emptyBeatCount(editing, word.id)) {
       const first = word.rubyUnits[0].id;
       if (emptyBeatCount(editing, first)) throw new Error('词与首个注音都有空拍，请先清除其中一处配置');

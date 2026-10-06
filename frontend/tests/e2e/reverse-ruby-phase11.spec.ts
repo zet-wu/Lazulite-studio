@@ -16,12 +16,21 @@ async function open(page: Page, count = 3, source = 'ka', body = 'は', setup: '
     if (setup === 'link') {
       const next = domain.createLyricDocument('次').lines[0]; next.id = 'next'; next.beginMs = count * 1000;
       next.endMs = (count + 1) * 1000; Object.assign(next.words[0], { beginMs: next.beginMs, endMs: next.endMs });
-      line.endLink = { targetLineId: 'next' }; doc.lines.push(next);
+      doc.lines.push(next);
       doc.romanizationTracks[0].contents[0].units.at(-1).endMs += 1;
     }
     return codec.serializeLyricTtml(doc, { draft: true });
   }, { count, source, body, setup });
   await importLyrics(page, { name: 'reverse.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  if (setup === 'link') {
+    await page.locator('[data-outline-drag]').first().click();
+    await page.locator('[data-top-menu="tools"] summary').click();
+    await page.getByRole('button', { name: '批处理…', exact: true }).click();
+    const batch = page.getByRole('dialog', { name: '批处理', exact: true });
+    await batch.getByRole('button', { name: '结束时间链接', exact: true }).click();
+    await batch.getByRole('button', { name: '应用（一次撤销）', exact: true }).click();
+    await batch.getByRole('button', { name: '关闭', exact: true }).click();
+  }
   await page.locator('[data-top-menu="tools"] summary').click();
   await page.getByRole('button', { name: '从音译生成 注音…', exact: true }).click();
   return page.getByRole('dialog', { name: '从音译生成 注音', exact: true });

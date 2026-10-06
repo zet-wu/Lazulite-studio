@@ -58,7 +58,7 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
         if (!current || current.backgroundOf) throw new Error('请先选择主唱行');
         if (editing.endLinks[current.id]) {
           command = { type: 'unlink-line-end', lineId: current.id };
-          summary = '已取消链接并恢复原结束时间';
+          summary = '已取消链接并保留当前结束时间';
         } else {
           const main = document.lines.filter((line) => !line.backgroundOf);
           const target = main[main.findIndex((line) => line.id === current.id) + 1];
@@ -79,7 +79,7 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
       {operation === 'shift' && <label>偏移毫秒（负数为提前）<input type="number" step="1" value={amountMs} onChange={(event) => setAmountMs(event.target.value)} /></label>}
       {operation === 'smooth' && <label>相邻词间隙或重叠阈值（毫秒）<input type="number" min="0" step="1" value={thresholdMs} onChange={(event) => setThresholdMs(event.target.value)} /></label>}
     </div>}
-    <p className={styles.toolHint}>{operation === 'replace' ? `目标：${wordIds.length} 词；只替换词内文本，带 注音/附属属性的词需单独处理。` : operation === 'shift' ? `目标：${targets.length} 行；行、词、注音 和对齐一起平移，负值越界时整次取消。` : operation === 'smooth' ? `目标：${targets.length} 行；仅填平阈值内的 CJK 相邻词边界，注音/对齐边界保持原样。` : operation === 'sync' ? `目标：${targets.length} 行；行首尾取已定时间词的包络，未定词不变；改变已链接行的结束时间会取消链接。` : (current && editing.endLinks[current.id]) ? `当前行链接到 ${editing.endLinks[current.id]}；取消后恢复原结束时间。` : '将当前主唱行结束时间链接到下一主唱行的开始时间；词和 注音 时间不变。'}</p>
+    <p className={styles.toolHint}>{operation === 'replace' ? `目标：${wordIds.length} 词；只替换词内文本，带 注音/附属属性的词需单独处理。` : operation === 'shift' ? `目标：${targets.length} 行；行、词、注音 和对齐一起平移，负值越界时整次取消。` : operation === 'smooth' ? `目标：${targets.length} 行；仅填平阈值内的 CJK 相邻词边界，注音/对齐边界保持原样。` : operation === 'sync' ? `目标：${targets.length} 行；行首尾取已定时间词的包络，未定词不变；改变已链接行的结束时间会取消链接。` : (current && editing.endLinks[current.id]) ? `当前行链接到 ${editing.endLinks[current.id]}；取消后保留当前结束时间。` : '将当前主唱行结束时间链接到下一主唱行的开始时间；词和 注音 时间不变。'}</p>
 
     {message && <p role="alert">{message}</p>}
   </SettingsDialog>;

@@ -17,7 +17,8 @@ test('inline annotation and bounded timing survive real save, reopen, undo and r
   await page.locator('[data-ruby-id]').last().click({ position: { x: 3, y: 3 } }); await page.getByRole('button', { name: '打轴', exact: true }).click();
   await page.getByLabel('打轴模式').selectOption('line');
   await page.locator('audio').evaluate((a: HTMLAudioElement) => { a.pause(); a.currentTime = 3.5; });
-  await page.getByRole('button', { name: '连续轴', exact: true }).click(); await expect(page.getByText('本行已完成')).toBeVisible();
+  await page.getByRole('button', { name: '连续轴', exact: true }).click(); await expect(page.locator('[data-sync-marker][data-current]')).toHaveCount(0);
+  await page.getByRole('button', { name: '编辑', exact: true }).click();
   await expect(page.getByLabel('词 しん开始秒数')).toHaveValue('4');
   await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   await page.reload(); await expect(page.getByLabel('读音 う结束秒数')).toHaveValue('3.5');

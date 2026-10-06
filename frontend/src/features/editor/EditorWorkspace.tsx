@@ -106,6 +106,12 @@ export function EditorWorkspace(props: Props) {
   return shared ? <EditorWorkspaceContent {...props} /> : <SelectionProvider><EditorWorkspaceContent {...props} /></SelectionProvider>;
 }
 
+// Cached rows keep event functions stable while every invocation reads current state.
+function useLiveCallback<Args extends unknown[], Result>(callback: (...args: Args) => Result) {
+  const latest = useRef(callback); latest.current = callback;
+  return useRef((...args: Args) => latest.current(...args)).current;
+}
+
 function EditorWorkspaceContent(props: Props) {
   const editing = useProjectEditing();
   const audioReview = useAudioReview();
@@ -114,6 +120,7 @@ function EditorWorkspaceContent(props: Props) {
   const [acquisitionStore] = useState(() => new AcquisitionStore());
   useEffect(() => { acquisitionStore.activate(); return () => acquisitionStore.dispose(); }, [acquisitionStore]);
   const { selection, setSelection, commands: selectionCommands } = useEditorSelection()!;
+  const selectionRef = useRef(selection); selectionRef.current = selection;
   const [syncTargetVersion, setSyncTargetVersion] = useState(0);
   const [clipboard, setClipboard] = useState<EditorClipboard | null>(null);
   const clipboardToken = useRef('');
@@ -214,6 +221,17 @@ function EditorWorkspaceContent(props: Props) {
   const [syncProgress, setSyncProgress] = useSyncProgress(document, editing, syncCursor, syncTargetVersion, props.historyVersion ?? 0);
   const mainLines = useMemo(() => document.lines.filter((line) => !line.backgroundOf), [document.lines]);
   const ordinalById = useMemo(() => visibleLineOrdinals(document), [document]);
+  const attachmentVersions = useMemo(() => {
+    const result = new Map<string, unknown[]>();
+    for (const [kind, tracks] of [['romanization', document.romanizationTracks], ['translation', document.translationTracks]] as const) {
+      tracks.forEach((track, index) => track.contents.forEach(content => {
+        const entries = result.get(content.lineId) ?? [];
+        entries.push([kind, index, track.id, track.language, 'purpose' in track ? track.purpose : null, content]);
+        result.set(content.lineId, entries);
+      }));
+    }
+    return result;
+  }, [document.romanizationTracks, document.translationTracks]);
   const previousMode = useRef(mode);
   const externalSelection = useRef(props.selectedLineId);
   useEffect(() => {
@@ -221,6 +239,8 @@ function EditorWorkspaceContent(props: Props) {
     const external = externalSelection.current !== props.selectedLineId;
     previousMode.current = mode; externalSelection.current = props.selectedLineId;
     if (!returned && !external) return;
+    // Validation links explicitly request keyboard focus; returning must not supersede them.
+    if (returned && locate?.focus) return;
     if (syncDraftCommit.current && !syncDraftCommit.current()) return;
     const target = activePropertyTarget;
     const lineId = target?.lineId ?? (selection?.kind === 'romanization-content' ? selection.lineId : selection ? null : props.selectedLineId);
@@ -246,57 +266,62 @@ function EditorWorkspaceContent(props: Props) {
   const selectedMainLines = propertyLines.filter(line => !line.backgroundOf);
   const selectedWordLineIndexes = selection?.kind === 'words'
     ? document.lines.flatMap((line, index) => line.words.some((word) => selection.ids.includes(word.id)) ? [index] : []) : [];
-  const selectLine = (line: LyricLine, shift = false, toggle = false) => {
-    if (syncEditingId && !finishSyncDraft()) return;
+  const selectLine = useLiveCallback((line: LyricLine, shift: boolean = false, toggle: boolean = false) => {
+    if (syncDraftCommit.current && !finishSyncDraft()) return;
     setSyncTargetVersion(value => value + 1);
     const id = line.id;
-    const previous = selection?.kind === 'lines' ? selection : null;
+    const currentSelection = selectionRef.current;
+    const previous = currentSelection?.kind === 'lines' ? currentSelection : null;
     const ids = !shift && !toggle && previous?.ids.includes(id) ? previous.ids : selectIds(document.lines.map(l => l.id), previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
     setSelection({ kind: 'lines', ids, anchorId: shift || toggle || previous?.ids.includes(id) ? previous?.anchorId ?? id : id, activeId: line.id });
     props.onSelectLine?.(line.id);
     props.onSelectUnit?.(line.id, null, null);
-  };
-  const selectWord = (line: LyricLine, word: LyricWord, shift = false, toggle = false) => {
-    if (syncEditingId && !finishSyncDraft()) return;
+  });
+  const selectWord = useLiveCallback((line: LyricLine, word: LyricWord, shift: boolean = false, toggle: boolean = false) => {
+    if (syncDraftCommit.current && !finishSyncDraft()) return;
     setSyncTargetVersion(value => value + 1);
-    const previous = selection?.kind === 'words' ? selection : null;
+    const currentSelection = selectionRef.current;
+    const previous = currentSelection?.kind === 'words' ? currentSelection : null;
     const order = document.lines.flatMap((item) => item.words.map((value) => value.id));
     const ids = !shift && !toggle && previous?.ids.includes(word.id) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? word.id, word.id, shift, toggle);
     setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift || toggle || previous?.ids.includes(word.id) ? previous?.anchorId ?? word.id : word.id, activeId: word.id });
     props.onSelectLine?.(line.id);
     props.onSelectUnit?.(line.id, word.id, null);
-  };
-  const selectRuby = (line: LyricLine, word: LyricWord, rubyId: string, shift = false, toggle = false) => {
-    if (syncEditingId && !finishSyncDraft()) return;
+  });
+  const selectRuby = useLiveCallback((line: LyricLine, word: LyricWord, rubyId: string, shift: boolean = false, toggle: boolean = false) => {
+    if (syncDraftCommit.current && !finishSyncDraft()) return;
     setSyncTargetVersion(value => value + 1);
-    const previous = selection?.kind === 'ruby' ? selection : null;
+    const currentSelection = selectionRef.current;
+    const previous = currentSelection?.kind === 'ruby' ? currentSelection : null;
     const order = document.lines.flatMap(line => line.words.flatMap(word => word.rubyUnits.map(unit => unit.id)));
     const ids = !shift && !toggle && previous?.ids.includes(rubyId) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? rubyId, rubyId, shift, toggle);
     setSelection({ kind: 'ruby', lineId: line.id, wordId: word.id, ids, anchorId: shift || toggle || previous?.ids.includes(rubyId) ? previous?.anchorId ?? rubyId : rubyId, activeId: rubyId });
     props.onSelectLine?.(line.id);
     props.onSelectUnit?.(line.id, word.id, rubyId);
-  };
-  const selectRomanizationContent = (lineId: string, trackId: string, contentId: string, shift = false, toggle = false) => {
-    if (syncEditingId && !finishSyncDraft()) return;
+  });
+  const selectRomanizationContent = useLiveCallback((lineId: string, trackId: string, contentId: string, shift: boolean = false, toggle: boolean = false) => {
+    if (syncDraftCommit.current && !finishSyncDraft()) return;
     setSyncTargetVersion(value => value + 1);
-    const previous = selection?.kind === 'romanization-content' && selection.trackId === trackId && selection.lineId === lineId ? selection : null;
+    const currentSelection = selectionRef.current;
+    const previous = currentSelection?.kind === 'romanization-content' && currentSelection.trackId === trackId && currentSelection.lineId === lineId ? currentSelection : null;
     const order = document.romanizationTracks.find((track) => track.id === trackId)?.contents.filter((content) => content.lineId === lineId).map((content) => content.id) ?? [];
     const ids = !shift && !toggle && previous?.ids.includes(contentId) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? contentId, contentId, shift, toggle);
     setSelection({ kind: 'romanization-content', lineId, trackId, contentId, ids, anchorId: shift || toggle || previous?.ids.includes(contentId) ? previous?.anchorId ?? contentId : contentId, activeId: contentId });
     props.onSelectLine?.(lineId);
     props.onSelectRomanization?.(trackId, contentId);
-  };
-  const selectRomanizationUnit = (lineId: string, trackId: string, contentId: string, unitId: string, shift = false, toggle = false) => {
-    if (syncEditingId && !finishSyncDraft()) return;
+  });
+  const selectRomanizationUnit = useLiveCallback((lineId: string, trackId: string, contentId: string, unitId: string, shift: boolean = false, toggle: boolean = false) => {
+    if (syncDraftCommit.current && !finishSyncDraft()) return;
     setSyncTargetVersion(value => value + 1);
-    const previous = selection?.kind === 'romanization-unit' ? selection : null;
+    const currentSelection = selectionRef.current;
+    const previous = currentSelection?.kind === 'romanization-unit' ? currentSelection : null;
     const content = document.romanizationTracks.find((track) => track.id === trackId)?.contents.find((item) => item.id === contentId);
     const order = document.romanizationTracks.find(track => track.id === trackId)?.contents.flatMap(content => content.kind === 'timed' ? content.units.map(unit => unit.id) : []) ?? [];
     const ids = !shift && !toggle && previous?.ids.includes(unitId) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? unitId, unitId, shift, toggle);
     setSelection({ kind: 'romanization-unit', lineId, trackId, contentId, ids, anchorId: shift || toggle || previous?.ids.includes(unitId) ? previous?.anchorId ?? unitId : unitId, activeId: unitId });
     props.onSelectLine?.(lineId);
     props.onSelectRomanization?.(trackId, contentId);
-  };
+  });
   const [focusAgent,setFocusAgent] = useState<string>();
   const locateIssue = (issue: OutputIssue) => {
     if(issue.kind === 'agent') { setMode('edit'); setFocusAgent(issue.agentId); setSettingsDialog('singers'); return; }
@@ -336,10 +361,10 @@ function EditorWorkspaceContent(props: Props) {
     paint();const observer=new MutationObserver(paint);observer.observe(pageRef.current!,{childList:true,subtree:true});
     return()=>{observer.disconnect();globalThis.document.querySelectorAll('[data-assignment-error]').forEach(el=>el.removeAttribute('data-assignment-error'));};
   },[props.assignmentError,mode]);
-  const dispatch = (command: LyricCommand) => {
+  const dispatch = useLiveCallback((command: LyricCommand) => {
     try { apply(command); editRejected.current = false; setMessage(''); return true; }
     catch (error) { editRejected.current = true; setMessage(error instanceof Error ? error.message : '编辑失败'); return false; }
-  };
+  });
   const drag = useObjectDrag(document, pageRef, dispatch, setSelection);
   const displayed = drag.document;
   const currentSelection = (): EditorSelection | null => selection;
@@ -451,10 +476,10 @@ function EditorWorkspaceContent(props: Props) {
     if (index + direction < 0 || index + direction >= line.words.length) return;
     dispatch({ type: 'move-word', lineId: line.id, wordId: word.id, toLineId: line.id, afterWordId: direction < 0 ? line.words[index - 2]?.id ?? null : line.words[index + 1].id });
   };
-  const startWordDraft = (lineId: string, afterWordId: string | null) => {
+  const startWordDraft = useLiveCallback((lineId: string, afterWordId: string | null) => {
     setWordDraft({ lineId, afterWordId, serial: ++wordDraftSerial.current });
     requestLocate(lineId, '[data-word-draft] input');
-  };
+  });
   const renderWordDraft = (line: LyricLine, afterWordId: string | null) => wordDraft?.lineId === line.id && wordDraft.afterWordId === afterWordId &&
     <span data-word-draft key={`draft-${wordDraft.serial}`}><InlineDraft label="添加词" close={() => setWordDraft(null)} commit={text => {
       const word = createWord(text);
@@ -705,8 +730,8 @@ function EditorWorkspaceContent(props: Props) {
         selectWord(line, line.words.find(word => word.id === source.wordId)!, false, toggle);
       }
       else if (source.kind === 'ruby') {
-        if (!toggle && selection?.kind === 'ruby' && selection.lineId === source.lineId && selection.wordId === source.wordId && selection.ids.includes(source.rubyId)) source.rubyIds = selection.ids;
-        else selectRuby(line, line.words.find(word => word.id === source.wordId)!, source.rubyId, false, toggle);
+        if (!toggle && selection?.kind === 'ruby' && selection.ids.includes(source.rubyId)) source.rubyIds = selection.ids;
+        selectRuby(line, line.words.find(word => word.id === source.wordId)!, source.rubyId, false, toggle);
       }
       else if (source.kind === 'romanization-content') selectRomanizationContent(line.id, source.trackId, source.contentId, false, toggle);
       else selectRomanizationUnit(line.id, source.trackId, source.contentId, source.unitId, false, toggle);
@@ -824,8 +849,7 @@ function EditorWorkspaceContent(props: Props) {
           mode, ordinalById.get(line.backgroundOf ?? line.id), props.playheadLineId === line.id,
           selection?.kind, selectedTargets.filter(target => target.lineId === line.id).map(targetId),
           selection?.kind === 'romanization-content' && selection.lineId === line.id ? selection.ids : null,
-          document.romanizationTracks.map(track => [track.id, track.language, track.contents.filter(content => content.lineId === line.id)]),
-          document.translationTracks.map(track => [track.id, track.language, track.contents.filter(content => content.lineId === line.id)]),
+          attachmentVersions.get(line.id),
           wordDraft?.lineId === line.id ? wordDraft : null,
           line.words.some(word => word.id === rubyShortcut?.wordId) ? rubyShortcut : null,
           line.words.some(word => word.id === syncEditingId || word.rubyUnits.some(unit => unit.id === syncEditingId)) ? syncEditingId : null,

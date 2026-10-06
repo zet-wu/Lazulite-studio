@@ -1,3 +1,4 @@
+import { useProjectEditing } from './ProjectEditingContext';
 import { useEffect, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { analyzeReadings } from '../../adapters/http/reading';
@@ -19,6 +20,7 @@ function ReadingInput({ block, change, focus, composition }: { block: ReadingBlo
 }
 
 export function JapaneseRubyDialog({ document, lineIds, apply, close }: { document: LyricDocument; lineIds: string[]; apply: (command: LyricCommand) => boolean; close: () => void }) {
+ const editing = useProjectEditing();
  const [source] = useState(document), [ids] = useState(lineIds);
  const [rows,setRows] = useState(()=>proposeJapaneseRuby(source,ids,[]));
  const [attempt,setAttempt] = useState(0), [pending,setPending] = useState(true), [error,setError] = useState('');
@@ -47,7 +49,7 @@ export function JapaneseRubyDialog({ document, lineIds, apply, close }: { docume
   rangeExtractor:range=>{const items=defaultRangeExtractor(range),index=rows.findIndex(r=>r.lineId===active);return index<0||items.includes(index)?items:[...items,index].sort((a,b)=>a-b);}});
  const shown=virtual?virtualizer.getVirtualItems().map(item=>({row:rows[item.index],item})):rows.map(row=>({row,item:null}));
  const stale=document!==source, changed=hasJapaneseRubyChanges(rows,source);
- const submit=()=>{if(composing||pending||stale)return;try{if(apply(japaneseRubyCommand(document,source,rows)))close();}catch(cause){setError((cause as Error).message);}};
+ const submit=()=>{if(composing||pending||stale)return;try{if(apply(japaneseRubyCommand(document,source,rows,editing)))close();}catch(cause){setError((cause as Error).message);}};
  return <SettingsDialog title="生成日文注音" subtitle={`${rows.length} 行`} close={()=>{if(!composing)close();}}
   actions={<><button data-role="secondary" onClick={close} disabled={composing}>取消</button><button data-role="primary" onClick={submit} disabled={composing||pending||stale||!changed}>应用</button></>}>
   <div className={styles.rubyGeneration}>

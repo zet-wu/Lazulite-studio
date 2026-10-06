@@ -63,7 +63,7 @@ function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate,
     scroller.addEventListener('pointerdown', cancel);
     scroller.addEventListener('keydown', key);
     return () => {
-      cancel();
+      cancelAnimationFrame(frame); mountTarget?.(null);
       scroller.removeEventListener('wheel', cancel);
       scroller.removeEventListener('pointerdown', cancel);
       scroller.removeEventListener('keydown', key);

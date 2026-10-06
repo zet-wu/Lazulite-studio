@@ -360,8 +360,8 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .syncWords { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px 4px; min-height: 64px; }
 .syncWord { display: grid; grid-template-rows: minmax(24px, auto) minmax(34px, auto) minmax(24px, auto); position: relative; min-width: 24px; max-width: 100%; border-radius: 5px; outline-offset: -2px; }
 .syncBody { grid-row: 2; grid-column: 1 / -1; text-align: center; padding: 0; font-size: 24px; font-weight: 650; line-height: 1.4; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.syncRubyColumn { display: grid; grid-template-rows: subgrid; grid-row: 1 / 4; min-width: 24px; }
-.syncRuby { grid-row: 1; padding: 0 calc(4px + var(--beat-space)) 0 4px; text-align: center; font-size: 14px; font-weight: 600; min-width: 24px; border-radius: 4px; }
+.syncRubyColumn { display: grid; grid-template-rows: subgrid; grid-row: 1 / 4; min-width: 0; }
+.syncRuby { grid-row: 1; padding: 0 min(calc(4px + var(--beat-space)), max(4px, calc(100% - 28px))) 0 4px; text-align: center; font-size: 14px; font-weight: 600; min-width: 24px; border-radius: 4px; }
 .syncRubyDraft { grid-row: 1; min-width: 60px; }
 .syncText { display: inline-block; white-space: pre-wrap; min-width: 12px; max-width: 100%; vertical-align: baseline; }
 .syncText > span { display: inline-block; transition: transform 100ms ease, color 100ms ease; }
