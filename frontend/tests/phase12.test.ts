@@ -62,3 +62,33 @@ describe('Phase 12 merges', () => {
     for (const rubyIds of [['r0', 'r2'], ['r0', 'missing'], ['r0', 'other']]) expect(() => executeLyricCommand(state, { type: 'merge-ruby', rubyIds })).toThrow();
   });
 });
+
+it('splits into three segments retaining original units, links, independent attached times and atomic history', () => {
+  const { document, line } = fixture();
+  line.beginMs = 500; line.endMs = 5000;
+  line.words.forEach((word, i) => { word.beginMs = 1000 + i * 900; word.endMs = 2400 + i * 700; });
+  line.endLink = { targetLineId: 'next' };
+  document.lines.push({ ...createLine('', 'bg'), backgroundOf: line.id, beginMs: 200, endMs: 9000 }, { ...createLine('', 'next'), beginMs: 5000 });
+  document.romanizationTracks = [{ id: 'r', language: 'ja-Latn', contents: [{ id: 'rc', lineId: line.id, kind: 'timed', units: [{ id: 'ru', text: ' ima ', beginMs: 300, endMs: 8000 }] }] }];
+  document.translationTracks = [{ id: 't', language: 'en', purpose: 'subtitle', contents: [{ id: 'tc', lineId: line.id, kind: 'plain', text: ' now ' }] }];
+  const state = executeLyricCommand(createLyricEditorState(document), { type: 'split-line', lineId: line.id, beforeWordIds: ['w3', 'w1'], newLineIds: ['part2', 'part3'], translationTargets: { tc: 1 }, contentTargets: { rc: 2 }, backgroundTarget: 2 });
+  expect(state.present.lines.slice(0, 3).map(item => [item.beginMs, item.endMs])).toEqual([[500, 2400], [1900, 3800], [3700, 5000]]);
+  expect(state.present.lines.slice(0, 3).flatMap(item => item.words)).toEqual(line.words);
+  expect(state.present.lines[0].endLink).toBeNull(); expect(state.present.lines[1].endLink).toBeNull();
+  expect(state.present.lines[2].endLink).toEqual(line.endLink);
+  expect(state.present.lines[3]).toEqual({ ...document.lines[1], backgroundOf: 'part3' });
+  expect(state.present.romanizationTracks[0].contents[0]).toEqual({ ...document.romanizationTracks[0].contents[0], lineId: 'part3' });
+  expect(state.present.translationTracks[0].contents[0]).toEqual({ ...document.translationTracks[0].contents[0], lineId: 'part2' });
+  expect(undoLyricCommand(state).present).toBe(document);
+  expect(redoLyricCommand(undoLyricCommand(state)).present).toBe(state.present);
+});
+
+it('rejects invalid split segments and assignments; unknown segment ends remain unknown', () => {
+  const { document, line } = fixture();
+  const command = { type: 'split-line' as const, lineId: line.id, beforeWordIds: ['w2'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTarget: null };
+  line.words[0].endMs = 2000;
+  expect(executeLyricCommand(createLyricEditorState(document), command).present.lines[0].endMs).toBeNull();
+  line.words[2].beginMs = 1500; line.words[3].beginMs = 1000;
+  expect(() => executeLyricCommand(createLyricEditorState(document), command)).toThrow(/第 2 行/);
+  expect(() => executeLyricCommand(createLyricEditorState(document), { ...command, beforeWordIds: [] })).toThrow(/切点/);
+});

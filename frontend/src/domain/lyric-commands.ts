@@ -12,7 +12,7 @@ type AtomicLyricCommand =
   | { type: 'set-background-of'; lineId: string; parentLineId: string | null }
   | { type: 'delete-line'; lineId: string }
   | { type: 'move-line'; lineId: string; afterLineId: string | null }
-  | { type: 'split-line'; lineId: string; beforeWordId: string; newLineId: string; contentIdsForNewLine: string[]; translationIdsForNewLine: string[]; backgroundTarget: 'left' | 'right' | null }
+  | ({ type: 'split-line' } & LineSplitPlan)
   | { type: 'merge-lines'; firstLineId: string; secondLineId: string }
   | { type: 'insert-word'; lineId: string; afterWordId: string | null; word: LyricWord }
   | { type: 'delete-word'; lineId: string; wordId: string }
@@ -171,6 +171,32 @@ export function planRubyMerge(document: LyricDocument, ids: string[]) {
   return { line, word, units, merged };
 }
 
+export type LineSplitPlan = {
+  lineId: string;
+  beforeWordIds: string[];
+  newLineIds: string[];
+  contentTargets: Record<string, number>;
+  translationTargets: Record<string, number>;
+  backgroundTarget: number | null;
+};
+
+/** The dialog and command share exact segment boundaries and validation. */
+export function previewLineSplit(line: LyricLine, beforeWordIds: string[]) {
+  const cuts = line.words.flatMap((word, index) => beforeWordIds.includes(word.id) ? [index] : []);
+  if (!cuts.length || cuts[0] === 0 || cuts.length !== beforeWordIds.length) throw new Error('请选择有效的词间切点');
+  const bounds = [0, ...cuts, line.words.length];
+  return bounds.slice(0, -1).map((start, index) => {
+    const words = line.words.slice(start, bounds[index + 1]);
+    const segment = { ...line, words, beginMs: index ? words[0].beginMs : line.beginMs,
+      endMs: index === cuts.length ? line.endMs : words.every(word => word.endMs !== null) ? Math.max(...words.map(word => word.endMs!)) : null,
+      endLink: index === cuts.length ? line.endLink : null };
+    let issue: string | null = null;
+    try { validTime(segment.beginMs, segment.endMs); words.forEach(word => wordFitsLine(word, segment)); }
+    catch { issue = `第 ${index + 1} 行时间不合法或排除了段内词，请先调整原词时间`; }
+    return { segment, issue };
+  });
+}
+
 function applyStructure(document: LyricDocument, command: AtomicLyricCommand): LyricDocument | null {
   switch (command.type) {
     case 'sync-stamp': return stampSync(document, command.cursor, command.action, command.timeMs, command.mode);
@@ -225,39 +251,27 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       return rest.every((item, i) => item === document.lines[i]) ? document : { ...document, lines: rest };
     }
     case 'split-line': {
-      const index = lineIndex(document, command.lineId);
-      const line = document.lines[index];
+      const index = lineIndex(document, command.lineId), line = document.lines[index];
       const issues = lineStructureIssues(document, line);
       if (issues.length) throw new Error(issues.join('；'));
-      if (document.lines.some((item) => item.id === command.newLineId)) throw new Error('新行 ID 已存在');
-      const wordIndex = line.words.findIndex((word) => word.id === command.beforeWordId);
-      if (wordIndex <= 0) throw new Error('请选择非首词作为拆行边界');
-      const attached = document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === line.id));
-      if (command.contentIdsForNewLine.some((id) => !attached.some((content) => content.id === id))) throw new Error('音译内容分配目标不存在');
-      const attachedTranslations = document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === line.id));
-      if (command.translationIdsForNewLine.some(id => !attachedTranslations.some(content => content.id === id))) throw new Error('翻译分配条目不存在');
-      const translationIds = new Set(command.translationIdsForNewLine);
-      const background = document.lines.find((item) => item.backgroundOf === line.id);
-      if (background && !command.backgroundTarget) throw new Error('请指定背景歌词归属');
-      const leftWords = line.words.slice(0, wordIndex), rightWords = line.words.slice(wordIndex);
-      const leftEnd = leftWords.every(word => word.endMs !== null) ? Math.max(...leftWords.map(word => word.endMs!)) : null;
-      const rightBegin = rightWords[0].beginMs;
-      const left = { ...line, words: leftWords, endMs: leftEnd, endLink: null };
-      const right: LyricLine = { ...line, id: command.newLineId, words: rightWords, beginMs: rightBegin };
-      validTime(left.beginMs, left.endMs);
-      validTime(right.beginMs, right.endMs);
-      left.words.forEach((word) => wordFitsLine(word, left));
-      right.words.forEach((word) => wordFitsLine(word, right));
-      const lines = document.lines.filter((item) => item.id !== background?.id);
-      lines[index] = left;
-      lines.splice(index + 1, 0, right);
-      if (background) {
-        const owner = command.backgroundTarget === 'right' ? right : left;
-        lines.splice(index + (owner === left ? 1 : 2), 0, { ...background, backgroundOf: owner.id });
-      }
-      const selected = new Set(command.contentIdsForNewLine);
-      const romanizationTracks = document.romanizationTracks.map((track) => ({ ...track, contents: track.contents.map((content) => selected.has(content.id) ? { ...content, lineId: right.id } : content) }));
-      const translationTracks = document.translationTracks.map(track => ({ ...track, contents: track.contents.map(content => translationIds.has(content.id) ? { ...content, lineId: right.id } : content) }));
+      const preview = previewLineSplit(line, command.beforeWordIds);
+      const invalid = preview.flatMap(item => item.issue ? [item.issue] : []);
+      if (invalid.length) throw new Error(invalid.join('；'));
+      if (command.newLineIds.length !== preview.length - 1 || new Set(command.newLineIds).size !== command.newLineIds.length || command.newLineIds.some(id => document.lines.some(item => item.id === id))) throw new Error('新行 ID 无效');
+      const segments = preview.map(({ segment }, i) => ({ ...segment, id: i ? command.newLineIds[i - 1] : line.id }));
+      const assigned = (targets: Record<string, number>, contents: { id: string; lineId: string }[], label: string) => {
+        const attached = contents.filter(content => content.lineId === line.id);
+        if (Object.keys(targets).some(id => !attached.some(content => content.id === id))) throw new Error(`${label}分配条目不存在`);
+        if (attached.some(content => !Number.isInteger(targets[content.id]) || !segments[targets[content.id]])) throw new Error(`${label}归属已失效，请重新选择`);
+      };
+      assigned(command.contentTargets, document.romanizationTracks.flatMap(track => track.contents), '音译');
+      assigned(command.translationTargets, document.translationTracks.flatMap(track => track.contents), '翻译');
+      const background = document.lines.find(item => item.backgroundOf === line.id);
+      if (background && (command.backgroundTarget === null || !Number.isInteger(command.backgroundTarget) || !segments[command.backgroundTarget])) throw new Error('请重新指定背景歌词归属');
+      const lines = document.lines.filter(item => item !== background);
+      lines.splice(index, 1, ...segments.flatMap((segment, i) => background && i === command.backgroundTarget ? [segment, { ...background, backgroundOf: segment.id }] : [segment]));
+      const romanizationTracks = document.romanizationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.lineId === line.id ? { ...content, lineId: segments[command.contentTargets[content.id]].id } : content) }));
+      const translationTracks = document.translationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.lineId === line.id ? { ...content, lineId: segments[command.translationTargets[content.id]].id } : content) }));
       return { ...document, lines, romanizationTracks, translationTracks };
     }
     case 'merge-lines': {

@@ -854,7 +854,7 @@ function EditorWorkspaceContent(props: Props) {
       background={document.lines.find((line) => line.backgroundOf === splitLineId) ?? null}
       attached={document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === splitLineId).map((content) => ({ track, content })))}
       close={() => setSplitLineId(null)}
-      submit={(beforeWordId, contentIdsForNewLine, backgroundTarget, translationIdsForNewLine) => dispatch({ type: 'split-line', lineId: splitLineId, beforeWordId, newLineId: crypto.randomUUID(), contentIdsForNewLine, backgroundTarget, translationIdsForNewLine })} />}
+      submit={plan => dispatch({ type: 'split-line', ...plan })} />}
     {contextMenu && <EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.title} actions={contextMenu.actions} close={closeContext} />}
   </div>;
 }

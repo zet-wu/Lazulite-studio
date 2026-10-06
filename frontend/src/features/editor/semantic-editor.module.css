@@ -347,3 +347,5 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .translationFull { display: none; grid-column: 2 / -1; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; }
 .translationFull > span:nth-child(odd) { font-weight: 400; color: var(--muted); }
 .translationReference:hover .translationFull, .translationReference:focus-within .translationFull { display: grid; }
+
+.splitWord { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1.1rem; }

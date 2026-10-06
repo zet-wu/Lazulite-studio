@@ -15,7 +15,7 @@ it('splits linked lines preserving incoming links, current endpoint, target upda
   const doc = fixture(); doc.lines[3].endMs = 0; doc.lines[3].beginMs = 0;
   doc.lines[3].endLink = { targetLineId: 'a'};
   const before = createLyricEditorState(doc);
-  const split = executeLyricCommand(before, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', translationIdsForNewLine: [], contentIdsForNewLine: [], backgroundTarget: null });
+  const split = executeLyricCommand(before, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTarget: null });
   expect(split.present.lines[0]).toMatchObject({ id: 'a', endMs: 1000, endLink: null });
   expect(split.present.lines[1].endLink).toEqual(doc.lines[0].endLink);
   expect(split.present.lines.at(-1)!.endLink!.targetLineId).toBe('a');
@@ -56,14 +56,14 @@ it('assigns translations independently with romanization and background in one s
   doc.lines.splice(1, 0, { ...createLine('声', 'bg'), backgroundOf: 'a' });
   doc.romanizationTracks = [{ id: 't', language: 'ja-Latn', contents: [{ id: 'r', lineId: 'a', kind: 'plain', text: 'a' }] }];
   const state = createLyricEditorState(doc);
-  const result = executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: ['r'], translationIdsForNewLine: ['translation-4229', 'translation-4265'], backgroundTarget: 'right' });
+  const result = executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], contentTargets: { r: 1 }, translationTargets: { 'translation-4196': 0, 'translation-4229': 1, 'translation-4265': 1 }, backgroundTarget: 1 });
   expect(result.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.present.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === doc.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))[0]]);
   expect(result.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.present.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === doc.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).slice(1));
   expect(result.present.lines[2].backgroundOf).toBe('new');
   expect(result.present.romanizationTracks[0].contents[0].lineId).toBe('new');
   for (const draft of [true, false]) expect(parseLyricTtml(serializeLyricTtml(result.present, { draft })).translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.present.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === doc.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).slice(1).map(item => ({ ...item, id: expect.any(String) })));
   expect(undoLyricCommand(result).present).toBe(doc);
-  expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordId: 'w1', newLineId: 'new', contentIdsForNewLine: [], translationIdsForNewLine: ['missing'], backgroundTarget: 'left' })).toThrow('翻译分配条目不存在');
+  expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], contentTargets: { r: 0 }, translationTargets: { missing: 1 }, backgroundTarget: 0 })).toThrow('翻译分配条目不存在');
 });
 
 it('eliminates every internal end link when coincident boundaries merge', () => {
