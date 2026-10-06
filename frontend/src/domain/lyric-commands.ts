@@ -141,7 +141,6 @@ function timeEnvelope(units: { beginMs: TimeMs; endMs: TimeMs }[]) {
   const ends = units.flatMap(unit => unit.endMs === null ? [] : [unit.endMs]);
   const beginMs = starts.length ? Math.min(...starts) : null;
   const endMs = ends.length ? Math.max(...ends) : null;
-  validTime(beginMs, endMs);
   return { beginMs, endMs };
 }
 
@@ -187,9 +186,9 @@ export function previewLineSplit(line: LyricLine, beforeWordIds: string[]) {
   const bounds = [0, ...cuts, line.words.length];
   return bounds.slice(0, -1).map((start, index) => {
     const words = line.words.slice(start, bounds[index + 1]);
-    const segment = { ...line, words, beginMs: index ? words[0].beginMs : line.beginMs,
-      endMs: index === cuts.length ? line.endMs : words.every(word => word.endMs !== null) ? Math.max(...words.map(word => word.endMs!)) : null,
-      endLink: index === cuts.length ? line.endLink : null };
+    const envelope = timeEnvelope(words);
+    const segment = { ...line, words, ...envelope,
+      endLink: index === cuts.length && envelope.endMs === line.endMs ? line.endLink : null };
     let issue: string | null = null;
     try { validTime(segment.beginMs, segment.endMs); words.forEach(word => wordFitsLine(word, segment)); }
     catch { issue = `第 ${index + 1} 行时间不合法或排除了段内词，请先调整原词时间`; }
@@ -268,7 +267,9 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       assigned(command.translationTargets, document.translationTracks.flatMap(track => track.contents), '翻译');
       const background = document.lines.find(item => item.backgroundOf === line.id);
       if (background && (command.backgroundTarget === null || !Number.isInteger(command.backgroundTarget) || !segments[command.backgroundTarget])) throw new Error('请重新指定背景歌词归属');
-      const lines = document.lines.filter(item => item !== background);
+      // Changing the first start detaches incoming links, freezing their existing ends.
+      const lines = document.lines.filter(item => item !== background).map(item =>
+        item.endLink?.targetLineId === line.id && segments[0].beginMs !== line.beginMs ? { ...item, endLink: null } : item);
       lines.splice(index, 1, ...segments.flatMap((segment, i) => background && i === command.backgroundTarget ? [segment, { ...background, backgroundOf: segment.id }] : [segment]));
       const romanizationTracks = document.romanizationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.lineId === line.id ? { ...content, lineId: segments[command.contentTargets[content.id]].id } : content) }));
       const translationTracks = document.translationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.lineId === line.id ? { ...content, lineId: segments[command.translationTargets[content.id]].id } : content) }));
