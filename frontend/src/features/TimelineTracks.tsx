@@ -1,3 +1,4 @@
+import { useProjectEditing } from './editor/ProjectEditingContext';
 import { projectTimeline } from '../domain/timeline-projection';
 import { createPortal } from 'react-dom';
 import { EditorContextMenu } from './editor/EditorContextMenu';
@@ -21,6 +22,7 @@ type Drag = { source: LyricDocument; target: TimelineTarget | null; side: 'move'
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
 
 export function TimelineTracks({ document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onPan, onError }: Props) {
+  const editing = useProjectEditing();
   const tracksRef = useRef<HTMLDivElement>(null);
   const [plotWidth, setPlotWidth] = useState(640);
   useEffect(() => {
@@ -69,9 +71,9 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
   const overview = mainLines.filter(item => intersects(item.beginMs, item.endMs));
   const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => intersects(item.beginMs, item.endMs)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs]);
   const frozenLayout = useRef(currentLayout);
-  const editing = drag && !['pan', 'select'].includes(drag.side);
-  if (!editing) frozenLayout.current = currentLayout;
-  const lineLayout = editing ? frozenLayout.current : currentLayout;
+  const draggingTime = drag && !['pan', 'select'].includes(drag.side);
+  if (!draggingTime) frozenLayout.current = currentLayout;
+  const lineLayout = draggingTime ? frozenLayout.current : currentLayout;
   const gaps = line?.words.flatMap((word, index) => {
     const right = line.words[index + 1];
     return right && word.endMs !== null && right.beginMs !== null && word.endMs !== right.beginMs ? [{ left: word, right, beginMs: Math.min(word.endMs, right.beginMs), endMs: Math.max(word.endMs, right.beginMs), overlap: word.endMs > right.beginMs }] : [];
@@ -104,8 +106,8 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
     // identities against the unsnapped edit, preserving unrelated equal times.
     let unsnapped = document;
     if (current.target) try {
-      unsnapped = current.side === 'move' ? moveTimeline(document, moving, delta)
-        : resizeTimeline(document, current.target, current.side as 'beginMs' | 'endMs', proposed);
+      unsnapped = current.side === 'move' ? moveTimeline(document, moving, delta, editing)
+        : resizeTimeline(document, current.target, current.side as 'beginMs' | 'endMs', proposed, editing);
     } catch { /* Invalid candidates still receive the normal validation below. */ }
     const candidateAnchors = [...externalAnchors, ...allTargets.filter(item => !excluded(item)).flatMap(item => {
       const before = targetInterval(document, item), after = targetInterval(unsnapped, item);
@@ -120,8 +122,8 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
       try {
         if (durationMs !== null && timeMs > durationMs) throw new Error('时间超出歌曲范围');
         candidate.document = current.side === 'move'
-          ? moveTimeline(document, moving, timeMs - current.originalMs)
-          : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs);
+          ? moveTimeline(document, moving, timeMs - current.originalMs, editing)
+          : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs, editing);
       } catch (cause) { candidate.error = cause instanceof Error ? cause.message : '时间轴编辑失败'; }
       onError(candidate.error);
     } else if (current.target) candidate.timeMs = current.originalMs;
@@ -183,8 +185,8 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
     if (!line || left.endMs === null || right.beginMs === null) return;
     try {
       const middle = Math.round((left.endMs + right.beginMs) / 2);
-      let changed = resizeTimeline(document, { kind: 'word', lineId: line.id, wordId: left.id }, 'endMs', middle);
-      changed = resizeTimeline(changed, { kind: 'word', lineId: line.id, wordId: right.id }, 'beginMs', middle);
+      let changed = resizeTimeline(document, { kind: 'word', lineId: line.id, wordId: left.id }, 'endMs', middle, editing);
+      changed = resizeTimeline(changed, { kind: 'word', lineId: line.id, wordId: right.id }, 'beginMs', middle, editing);
       apply({ type: 'replace-document', document: changed }); onError('');
     } catch (cause) { onError(cause instanceof Error ? cause.message : '无法闭合空隙'); }
   };

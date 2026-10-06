@@ -1,14 +1,15 @@
+import { createProjectEditing, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit } from './lyric-document';
 
 export type SyncCursor = { lineId: string; wordId: string; rubyUnitId: string | null };
 export type SyncMode = 'continuous' | 'line';
 export type SyncAction = 'start' | 'next' | 'end';
 
-export function syncUnits(document: LyricDocument): SyncCursor[] {
-  return document.lines.filter((line) => !line.backgroundOf && !line.ignoreSync).flatMap((line) =>
+export function syncUnits(document: LyricDocument, editing = createProjectEditing(), backgroundLineId?: string): SyncCursor[] {
+  return document.lines.filter(line => (backgroundLineId ? line.id === backgroundLineId : !line.backgroundOf) && !editing.ignoredSyncLineIds.includes(line.id)).flatMap(line =>
     line.words.flatMap((word): SyncCursor[] => word.rubyUnits.length
-      ? word.rubyUnits.map((unit) => ({ lineId: line.id, wordId: word.id, rubyUnitId: unit.id }))
-      : [{ lineId: line.id, wordId: word.id, rubyUnitId: null }]));
+      ? word.rubyUnits.filter(unit => unit.reading.trim().length > 0).map(unit => ({ lineId: line.id, wordId: word.id, rubyUnitId: unit.id }))
+      : word.text.trim().length > 0 ? [{ lineId: line.id, wordId: word.id, rubyUnitId: null }] : []));
 }
 
 export function syncIndex(units: SyncCursor[], cursor: SyncCursor | null): number {
@@ -31,7 +32,7 @@ function assign(word: LyricWord, rubyUnitId: string | null, side: 'beginMs' | 'e
   return { ...word, rubyUnits, beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null };
 }
 
-function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endMs', timeMs: number): LyricLine {
+function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endMs', timeMs: number, editing: ProjectEditing): LyricLine {
   const index = line.words.findIndex((word) => word.id === cursor.wordId);
   if (index < 0) throw new Error('打轴词已不存在');
   const words = line.words.slice();
@@ -40,12 +41,14 @@ function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endM
   const ends = words.map((word) => word.endMs).filter((value): value is number => value !== null);
   const beginMs = starts.length ? Math.min(...starts, ...(line.beginMs === null ? [] : [line.beginMs])) : line.beginMs;
   const endMs = ends.length ? Math.max(...ends, ...(line.endMs === null ? [] : [line.endMs])) : line.endMs;
-  return { ...line, words, beginMs, endMs, endLink: endMs === line.endMs ? line.endLink : null };
+  if (endMs !== line.endMs) delete editing.endLinks[line.id];
+  return { ...line, words, beginMs, endMs };
 }
 
-export function stampSync(document: LyricDocument, cursor: SyncCursor, action: SyncAction, timeMs: number, mode: SyncMode = 'continuous'): LyricDocument {
+export function stampSync(document: LyricDocument, cursor: SyncCursor, action: SyncAction, timeMs: number, mode: SyncMode = 'continuous', editing = createProjectEditing()): LyricDocument {
   if (!Number.isSafeInteger(timeMs) || timeMs < 0) throw new Error('打轴时间必须是非负整数毫秒');
-  const units = syncUnits(document);
+  const background = document.lines.find(line => line.id === cursor.lineId)?.backgroundOf;
+  const units = syncUnits(document, editing, background ? cursor.lineId : undefined);
   const index = syncIndex(units, cursor);
   if (index < 0) throw new Error('打轴游标已失效');
   const current = units[index];
@@ -53,21 +56,21 @@ export function stampSync(document: LyricDocument, cursor: SyncCursor, action: S
   const next = action === 'next' && (mode === 'continuous' || successor?.lineId === current.lineId) ? successor : null;
   const changes = new Map<string, LyricLine>();
   const read = (id: string) => changes.get(id) ?? document.lines.find((line) => line.id === id)!;
-  if (action === 'start') changes.set(current.lineId, updateUnit(read(current.lineId), current, 'beginMs', timeMs));
+  if (action === 'start') changes.set(current.lineId, updateUnit(read(current.lineId), current, 'beginMs', timeMs, editing));
   else {
     const original = read(current.lineId).words.find((word) => word.id === current.wordId)!;
     const begin = current.rubyUnitId ? original.rubyUnits.find((unit) => unit.id === current.rubyUnitId)!.beginMs : original.beginMs;
     if (begin === null) throw new Error('请先为当前单元打起始轴');
     if (timeMs < begin) throw new Error('结束轴不能早于起始轴');
-    changes.set(current.lineId, updateUnit(read(current.lineId), current, 'endMs', timeMs));
-    if (next) changes.set(next.lineId, updateUnit(read(next.lineId), next, 'beginMs', timeMs));
+    changes.set(current.lineId, updateUnit(read(current.lineId), current, 'endMs', timeMs, editing));
+    if (next) changes.set(next.lineId, updateUnit(read(next.lineId), next, 'beginMs', timeMs, editing));
   }
   const lines = document.lines.map((line) => changes.get(line.id) ?? line);
   // A linked end follows the target start, but never excludes the source words.
   // Validate the whole result before exposing the single timing transaction.
   return { ...document, lines: lines.map(line => {
-    if (!line.endLink || !changes.has(line.endLink.targetLineId)) return line;
-    const target = changes.get(line.endLink.targetLineId)!;
+    if (!editing.endLinks[line.id] || !changes.has(editing.endLinks[line.id])) return line;
+    const target = changes.get(editing.endLinks[line.id])!;
     const original = document.lines.find(item => item.id === target.id)!;
     if (target.beginMs === original.beginMs) return line;
     const endMs = target.beginMs;

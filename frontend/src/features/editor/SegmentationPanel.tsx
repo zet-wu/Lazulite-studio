@@ -1,3 +1,5 @@
+import { useProjectEditing } from './ProjectEditingContext';
+import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
 import { useEffect, useState } from 'react';
@@ -28,6 +30,7 @@ function parseRules(input: string): SegmentOptions['rules'] {
 }
 
 export function SegmentationPanel({ document, selection, currentLineId, apply, close }: Props) {
+  const editing = useProjectEditing();
   const [mode, setMode] = useState<'manual' | 'auto' | 'advanced'>('manual');
   const [scope, setScope] = useState('current');
   const [from, setFrom] = useState(1);
@@ -70,14 +73,14 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
       if (mode === 'manual') {
         if (!activeWord || !manualLine) throw new Error('请先选择一个词');
         const parts = manualParts(activeWord);
-        setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.obscene || activeWord.emptyBeat) }]);
+        setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.obscene || emptyBeatCount(editing, activeWord.id)) }]);
         return;
       }
       const ids = targetWordIds(document, selection, currentLineId, scope, from, to);
       if (!ids.length) throw new Error('所选范围没有歌词词块');
       const config = { ...options, ignore: ignoreText.split('\n').map((item) => item.trim()).filter(Boolean), rules: parseRules(ruleText) };
       const divide = config.western === 'syllable' ? await loadSyllableDivider(config.language) : undefined;
-      setPreview(segmentationPreview(document, ids, config, divide));
+      setPreview(segmentationPreview(document, ids, config, divide, editing));
     } catch (cause) { setPreview([]); setError(cause instanceof Error ? cause.message : '分词预览失败'); }
   };
   const commit = () => {
@@ -85,7 +88,7 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
       const changed = preview.filter((item) => item.parts.length > 1 && !item.blocked);
       if (!changed.length) return;
       const changes = changed.map((item) => ({ lineId: item.lineId, wordId: item.word.id,
-        words: distributeSegmentTime(item.word, item.parts, options.punctuationWeight) }));
+        words: distributeSegmentTime(item.word, item.parts, options.punctuationWeight, editing) }));
       if (apply({ type: 'segment-words', changes })) close();
     } catch (cause) { setError(cause instanceof Error ? cause.message : '应用分词失败'); }
   };
@@ -96,7 +99,7 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
         <div className={styles.manualGraphemes} aria-label="字符切分边界">{chars.map((char, index) => <span key={index}><span>{char}</span>{index < chars.length - 1 && <button data-role="secondary" aria-label={`切分边界 ${index + 1}`} aria-pressed={manualBoundaries.includes(index + 1)} onClick={() => {
           const next = manualBoundaries.includes(index + 1) ? manualBoundaries.filter((value) => value !== index + 1) : [...manualBoundaries, index + 1];
           setManualBoundaries(next);
-          if (activeWord && manualLine) { const parts = manualParts(activeWord, next); setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.obscene || activeWord.emptyBeat) }]); }
+          if (activeWord && manualLine) { const parts = manualParts(activeWord, next); setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.obscene || emptyBeatCount(editing, activeWord.id)) }]); }
         }}>{manualBoundaries.includes(index + 1) ? '│' : '·'}</button>}</span>)}</div>
       </div> : <div className={styles.dialogControls}>
         <label>应用范围<Select value={scope} onChange={(event) => { setScope(event.target.value); setPreview([]); }}><option value="current">当前行</option><option value="selected">选中词或行</option><option value="range">指定行范围</option><option value="all">全文</option></Select></label>

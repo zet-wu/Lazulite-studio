@@ -875,7 +875,7 @@ export interface components {
         };
         DocumentEnvelope: {
             /** @constant */
-            schema_version: "studio-document-v3";
+            schema_version: "studio-document-v4";
             project_id: string;
             revision: string | null;
             etag?: string;
@@ -883,7 +883,7 @@ export interface components {
             client_seq?: number | null;
             document: {
                 /** @constant */
-                schemaVersion: "studio-project-v1";
+                schemaVersion: "studio-project-v2";
                 sourceAssetId: string | null;
                 lyrics: {
                     draftTtml: string;
@@ -895,6 +895,19 @@ export interface components {
                         beginMs: number;
                         endMs: number;
                     }[];
+                };
+                editing: {
+                    emptyBeats: {
+                        [key: string]: {
+                            /** @enum {unknown} */
+                            kind: "word" | "ruby";
+                            count: number;
+                        };
+                    };
+                    ignoredSyncLineIds: string[];
+                    endLinks: {
+                        [key: string]: string;
+                    };
                 };
             };
         };

@@ -1,3 +1,4 @@
+import { createProjectEditing, emptyBeatCount, setEmptyBeat, reconcileEditing, validateProjectEditing, type ProjectEditing } from './project-editing';
 import { lineStructureIssues } from './line-structure';
 import { validateTranslationTracks } from './translation-editing';
 import { createLine, createWord, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type TranslationTrack, type TranslationContent, type TimeMs } from './lyric-document';
@@ -45,7 +46,9 @@ type AtomicLyricCommand =
   | { type: 'delete-agent'; id: string }
   | { type: 'rename-metadata'; key: string; nextKey: string }
   | { type: 'sync-stamp'; cursor: SyncCursor; action: SyncAction; timeMs: number; mode?: SyncMode }
-  | { type: 'replace-document'; document: LyricDocument }
+  | { type: 'replace-document'; document: LyricDocument; editing?: ProjectEditing }
+  | { type: 'restore-editing'; editing: ProjectEditing }
+  | { type: 'set-empty-beat'; kind: 'word' | 'ruby'; id: string; count: number }
   | { type: 'split-word'; lineId: string; wordId: string; at: number; newWordId?: string }
   | { type: 'edit-word'; lineId: string; wordId: string; text: string }
   | { type: 'set-word-time'; lineId: string; wordId: string; beginMs: TimeMs; endMs: TimeMs }
@@ -187,8 +190,7 @@ export function previewLineSplit(line: LyricLine, beforeWordIds: string[]) {
   return bounds.slice(0, -1).map((start, index) => {
     const words = line.words.slice(start, bounds[index + 1]);
     const envelope = timeEnvelope(words);
-    const segment = { ...line, words, ...envelope,
-      endLink: index === cuts.length && envelope.endMs === line.endMs ? line.endLink : null };
+    const segment = { ...line, words, ...envelope };
     let issue: string | null = null;
     try { validTime(segment.beginMs, segment.endMs); words.forEach(word => wordFitsLine(word, segment)); }
     catch { issue = `第 ${index + 1} 行时间不合法或排除了段内词，请先调整原词时间`; }
@@ -196,9 +198,9 @@ export function previewLineSplit(line: LyricLine, beforeWordIds: string[]) {
   });
 }
 
-function applyStructure(document: LyricDocument, command: AtomicLyricCommand): LyricDocument | null {
+function applyStructure(document: LyricDocument, command: AtomicLyricCommand, editing: ProjectEditing): LyricDocument | null {
   switch (command.type) {
-    case 'sync-stamp': return stampSync(document, command.cursor, command.action, command.timeMs, command.mode);
+    case 'sync-stamp': return stampSync(document, command.cursor, command.action, command.timeMs, command.mode, editing);
     case 'insert-line': {
       const line = command.line ?? createLine('');
       if (document.lines.some((item) => item.id === line.id)) throw new Error(`Line id already exists: ${line.id}`);
@@ -221,7 +223,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (source.id === parent.id || parent.backgroundOf) throw new Error('背景歌词只能附属于另一条主行');
       if (document.lines.some((line) => line.backgroundOf === source.id)) throw new Error('此行已有背景歌词，请先处理所属关系');
       if (document.lines.some((line) => line.backgroundOf === parent.id && line.id !== source.id)) throw new Error('目标主行已有背景歌词');
-      if (source.endLink || document.lines.some((line) => line.endLink?.targetLineId === source.id)) throw new Error('此行有行尾链接，请先处理');
+      if (editing.endLinks[source.id] || Object.values(editing.endLinks).includes(source.id)) throw new Error('此行有行尾链接，请先处理');
       const lines = document.lines.filter((line) => line.id !== source.id);
       const parentIndex = lines.findIndex((line) => line.id === parent.id);
       lines.splice(parentIndex + 1, 0, { ...source, backgroundOf: parent.id, songPart: null });
@@ -230,10 +232,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     case 'delete-line': {
       lineIndex(document, command.lineId);
       const removed = new Set(document.lines.filter((line) => line.id === command.lineId || line.backgroundOf === command.lineId).map((line) => line.id));
-      const lines = document.lines.filter((line) => !removed.has(line.id)).map((line) => {
-        if (!line.endLink || !removed.has(line.endLink.targetLineId)) return line;
-        return { ...line, endLink: null };
-      });
+      const lines = document.lines.filter(line => !removed.has(line.id));
       const romanizationTracks = document.romanizationTracks.map((track) => ({ ...track, contents: track.contents.filter((content) => !removed.has(content.lineId)) }));
       const translationTracks = document.translationTracks.map(track => ({ ...track, contents: track.contents.filter(content => !removed.has(content.lineId)) }));
       return { ...document, lines, romanizationTracks, translationTracks };
@@ -267,9 +266,12 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       assigned(command.translationTargets, document.translationTracks.flatMap(track => track.contents), '翻译');
       const background = document.lines.find(item => item.backgroundOf === line.id);
       if (background && (command.backgroundTarget === null || !Number.isInteger(command.backgroundTarget) || !segments[command.backgroundTarget])) throw new Error('请重新指定背景歌词归属');
-      // Changing the first start detaches incoming links, freezing their existing ends.
-      const lines = document.lines.filter(item => item !== background).map(item =>
-        item.endLink?.targetLineId === line.id && segments[0].beginMs !== line.beginMs ? { ...item, endLink: null } : item);
+      for (const [id, target] of Object.entries(editing.endLinks)) if (target === line.id && segments[0].beginMs !== line.beginMs) delete editing.endLinks[id];
+      const outgoing = editing.endLinks[line.id];
+      delete editing.endLinks[line.id];
+      if (outgoing && segments.at(-1)!.endMs === line.endMs) editing.endLinks[segments.at(-1)!.id] = outgoing;
+      if (editing.ignoredSyncLineIds.includes(line.id)) editing.ignoredSyncLineIds.push(...command.newLineIds);
+      const lines = document.lines.filter(item => item !== background);
       lines.splice(index, 1, ...segments.flatMap((segment, i) => background && i === command.backgroundTarget ? [segment, { ...background, backgroundOf: segment.id }] : [segment]));
       const romanizationTracks = document.romanizationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.lineId === line.id ? { ...content, lineId: segments[command.contentTargets[content.id]].id } : content) }));
       const translationTracks = document.translationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.lineId === line.id ? { ...content, lineId: segments[command.translationTargets[content.id]].id } : content) }));
@@ -279,12 +281,16 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const firstIndex = lineIndex(document, command.firstLineId);
       const secondIndex = lineIndex(document, command.secondLineId);
       const first = document.lines[firstIndex], second = document.lines[secondIndex];
-      const issues = lineStructureIssues(document, first, second);
+      const issues = lineStructureIssues(document, first, second, editing);
       if (issues.length) throw new Error(issues.join('；'));
-      const merged: LyricLine = { ...first, words: [...first.words, ...second.words], beginMs: first.beginMs ?? second.beginMs, endMs: second.endMs ?? first.endMs, endLink: second.endLink && ![first.id, second.id].includes(second.endLink.targetLineId) ? second.endLink : null };
+      const merged: LyricLine = { ...first, words: [...first.words, ...second.words], beginMs: first.beginMs ?? second.beginMs, endMs: second.endMs ?? first.endMs };
       validTime(merged.beginMs, merged.endMs);
       merged.words.forEach((word) => wordFitsLine(word, merged));
-      const lines = document.lines.filter((line) => line.id !== second.id).map((line) => line.id === first.id ? merged : line.endLink?.targetLineId === second.id ? { ...line, endLink: { ...line.endLink, targetLineId: first.id } } : line);
+      const outgoing = editing.endLinks[second.id];
+      delete editing.endLinks[first.id]; delete editing.endLinks[second.id];
+      if (outgoing && ![first.id, second.id].includes(outgoing)) editing.endLinks[first.id] = outgoing;
+      for (const [id, target] of Object.entries(editing.endLinks)) if (target === second.id) editing.endLinks[id] = first.id;
+      const lines = document.lines.filter(line => line.id !== second.id).map(line => line.id === first.id ? merged : line);
       const romanizationTracks = document.romanizationTracks.map((track) => {
         const secondContents = track.contents.filter((content) => content.lineId === second.id).map((content) => ({ ...content, lineId: first.id }));
         const contents = track.contents.filter((content) => content.lineId !== second.id);
@@ -322,11 +328,11 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
     case 'segment-word':
       return editWord(document, command.lineId, command.wordId, (word, line) => {
         if (command.words.length < 2 || command.words.map((part) => part.text).join('') !== word.text || command.words[0].id !== word.id) throw new Error('分词必须保留原文和首词 ID');
-        if (word.rubyUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
+        if (word.rubyUnits.length || word.obscene || emptyBeatCount(editing, word.id)) throw new Error('带附属属性的词不能自动分词');
         const ids = command.words.map((part) => part.id);
         if (new Set(ids).size !== ids.length || ids.slice(1).some((id) => document.lines.some((item) => item.words.some((part) => part.id === id)))) throw new Error('分词 ID 重复');
         for (const part of command.words) {
-          if (!part.text || part.rubyUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
+          if (!part.text || part.rubyUnits.length || part.obscene || emptyBeatCount(editing, part.id)) throw new Error('分词不能引入附属属性');
           wordFitsLine(part, line);
         }
         if (command.words[0].beginMs !== word.beginMs || command.words.at(-1)?.endMs !== word.endMs) throw new Error('分词必须保留父词时间区间');
@@ -345,10 +351,10 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
           const change = changes.get(word.id);
           if (!change) return [word];
           if (change.lineId !== line.id || change.words.length < 2 || change.words[0].id !== word.id || change.words.map((part) => part.text).join('') !== word.text) throw new Error('分词目标或原文不匹配');
-          if (word.rubyUnits.length || word.obscene || word.emptyBeat) throw new Error('带附属属性的词不能自动分词');
+          if (word.rubyUnits.length || word.obscene || emptyBeatCount(editing, word.id)) throw new Error('带附属属性的词不能自动分词');
           if (change.words[0].beginMs !== word.beginMs || change.words.at(-1)?.endMs !== word.endMs) throw new Error('分词必须保留父词时间区间');
           for (const [index, part] of change.words.entries()) {
-            if (!part.text || part.rubyUnits.length || part.obscene || part.emptyBeat) throw new Error('分词不能引入附属属性');
+            if (!part.text || part.rubyUnits.length || part.obscene || emptyBeatCount(editing, part.id)) throw new Error('分词不能引入附属属性');
             if (generatedIds.has(part.id) || index > 0 && originalIds.has(part.id)) throw new Error('分词 ID 重复');
             generatedIds.add(part.id);
             wordFitsLine(part, line);
@@ -402,10 +408,11 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       if (line.words.some((word) => command.beginMs !== null && word.beginMs !== null && word.beginMs < command.beginMs || command.endMs !== null && word.endMs !== null && word.endMs > command.endMs)) throw new Error('Line time cannot exclude a word');
       if (line.beginMs === command.beginMs && line.endMs === command.endMs) return document;
       const lines = document.lines.slice();
-      lines[index] = { ...line, beginMs: command.beginMs, endMs: command.endMs, endLink: line.endMs === command.endMs ? line.endLink : null };
+      lines[index] = { ...line, beginMs: command.beginMs, endMs: command.endMs };
+      if (line.endMs !== command.endMs) delete editing.endLinks[line.id];
       for (let linkedIndex = 0; linkedIndex < lines.length; linkedIndex++) {
         const linked = lines[linkedIndex];
-        if (linked.endLink?.targetLineId !== line.id) continue;
+        if (editing.endLinks[linked.id] !== line.id) continue;
         const linkedEnd = command.beginMs;
         if (linkedEnd === null || linked.words.some((word) => word.endMs !== null && word.endMs > linkedEnd)) throw new Error('Linked line end cannot precede its words');
         validTime(linked.beginMs, linkedEnd);
@@ -421,18 +428,16 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       const targetBegin = target.beginMs;
       if (line.words.some((word) => word.endMs !== null && word.endMs > targetBegin)) throw new Error('目标行开始时间早于当前词结束时间');
       validTime(line.beginMs, targetBegin);
-      if (line.endLink?.targetLineId === target.id) return document;
+      if (editing.endLinks[line.id] === target.id) return document;
       const lines = document.lines.slice();
-      lines[index] = { ...line, endMs: targetBegin, endLink: { targetLineId: target.id } };
+      lines[index] = { ...line, endMs: targetBegin };
+      editing.endLinks[line.id] = target.id;
       return { ...document, lines };
     }
     case 'unlink-line-end': {
-      const index = lineIndex(document, command.lineId);
-      const line = document.lines[index];
-      if (!line.endLink) return document;
-      const lines = document.lines.slice();
-      lines[index] = { ...line, endLink: null };
-      return { ...document, lines };
+      lineIndex(document, command.lineId);
+      delete editing.endLinks[command.lineId];
+      return document;
     }
     case 'set-line-agents': {
       const index = lineIndex(document, command.lineId);
@@ -443,14 +448,22 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       return { ...document, lines };
     }
     case 'set-ignore-sync': {
-      const index = lineIndex(document, command.lineId);
-      const line = document.lines[index];
-      if (line.backgroundOf) throw new Error('背景行不参与打轴');
-      if (line.ignoreSync === command.ignoreSync) return document;
-      const lines = document.lines.slice();
-      lines[index] = { ...line, ignoreSync: command.ignoreSync };
-      return { ...document, lines };
+      lineIndex(document, command.lineId);
+      editing.ignoredSyncLineIds = editing.ignoredSyncLineIds.filter(id => id !== command.lineId);
+      if (command.ignoreSync) editing.ignoredSyncLineIds.push(command.lineId);
+      return document;
     }
+    case 'set-empty-beat': {
+      const exists = document.lines.some(line => line.words.some(word => command.kind === 'word' ? word.id === command.id : word.rubyUnits.some(unit => unit.id === command.id)));
+      if (!exists) throw new Error('空拍对象不存在');
+      setEmptyBeat(editing, command.id, command.kind, command.count);
+      return document;
+    }
+    case 'restore-editing':
+      Object.assign(editing.emptyBeats, command.editing.emptyBeats);
+      editing.ignoredSyncLineIds = [...new Set([...editing.ignoredSyncLineIds, ...command.editing.ignoredSyncLineIds])];
+      Object.assign(editing.endLinks, command.editing.endLinks);
+      return document;
     case 'set-translation-tracks': {
       if (command.source !== document.translationTracks) throw new Error('翻译已变化，请重新执行操作');
       validateTranslationTracks(command.tracks, new Set(document.lines.map(line => line.id)));
@@ -620,20 +633,21 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand): L
       return { ...document, lines: document.lines.map(item => item === line ? { ...line, words } : item) };
     }
     case 'replace-document':
+      if (command.editing) Object.assign(editing, structuredClone(command.editing));
       return command.document;
     default:
       return null;
   }
 }
 
-function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): LyricDocument {
-  const structured = applyStructure(document, command);
+function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editing: ProjectEditing): LyricDocument {
+  const structured = applyStructure(document, command, editing);
   const wordCommand = command as WordCommand;
   return structured ?? editWord(document, wordCommand.lineId, wordCommand.wordId, (word, line) => {
     switch (wordCommand.type) {
       case 'split-word': {
         if (word.rubyUnits.length) throw new Error('拆分带注音的正文前，请先明确拆分读音');
-        if (word.obscene || word.emptyBeat) throw new Error('Splitting a word with attached properties requires explicit redistribution');
+        if (word.obscene || emptyBeatCount(editing, word.id)) throw new Error('Splitting a word with attached properties requires explicit redistribution');
         const [left, right] = splitAtGrapheme(word.text, wordCommand.at);
         const newId = wordCommand.newWordId ?? crypto.randomUUID();
         if (line.words.some((item) => item.id === newId)) throw new Error('Word id already exists');
@@ -681,8 +695,8 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand): Lyri
       case 'redistribute-ruby-time':
         return [{ ...word, rubyUnits: distributeRubyTime(word, word.rubyUnits) }];
       case 'set-word-empty-beat':
-        if (!Number.isSafeInteger(wordCommand.emptyBeat) || wordCommand.emptyBeat < 0 || wordCommand.emptyBeat > 32) throw new Error('空拍数必须是 0–32 的整数');
-        return [word.emptyBeat === wordCommand.emptyBeat ? word : { ...word, emptyBeat: wordCommand.emptyBeat }];
+        setEmptyBeat(editing, word.id, 'word', wordCommand.emptyBeat);
+        return [word];
       case 'split-ruby':
         return [updateRuby(word, wordCommand.rubyId, (unit) => {
             const [left, right] = splitAtGrapheme(unit.reading, wordCommand.at);
@@ -727,6 +741,18 @@ export function redoLyricCommand(state: LyricEditorState): LyricEditorState {
   return { present: state.future[0], past: [...state.past, state.present], future: state.future.slice(1) };
 }
 
-export function applyLyricCommand(document: LyricDocument, command: LyricCommand): LyricDocument {
-  return command.type === 'batch' ? command.commands.reduce(applyAtomic, document) : applyAtomic(document, command);
+export function applyLyricTransaction(document: LyricDocument, command: LyricCommand, original: ProjectEditing) {
+  const editing = structuredClone(original);
+  const atomic = (before: LyricDocument, command: AtomicLyricCommand) => {
+    const after = applyAtomic(before, command, editing);
+    return after;
+  };
+  const lyrics = command.type === 'batch' ? command.commands.reduce(atomic, document) : atomic(document, command);
+  reconcileEditing(document, lyrics, editing);
+  validateProjectEditing(lyrics, editing);
+  return { lyrics, editing: JSON.stringify(editing) === JSON.stringify(original) ? original : editing };
+}
+
+export function applyLyricCommand(document: LyricDocument, command: LyricCommand, editing = createProjectEditing()): LyricDocument {
+  return applyLyricTransaction(document, command, editing).lyrics;
 }

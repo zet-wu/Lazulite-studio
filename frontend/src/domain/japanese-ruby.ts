@@ -134,7 +134,7 @@ export function japaneseRubyCommand(current: LyricDocument, source: LyricDocumen
       const boundary = (at: number) => at === 0 ? word.beginMs : at === length(word.text) ? word.endMs : word.beginMs === null || word.endMs === null ? null : word.beginMs + Math.round((word.endMs-word.beginMs)*at/length(word.text));
       return cuts.slice(0,-1).map((a,index): LyricWord => {
         const b = cuts[index+1], reading = accepted.find(item => item.start === a && item.end === b)?.reading;
-        const part = { ...word, id: index ? crypto.randomUUID() : word.id, text: slice(word.text,a,b), beginMs: boundary(a), endMs: boundary(b), emptyBeat: index ? 0 : word.emptyBeat };
+        const part = { ...word, id: index ? crypto.randomUUID() : word.id, text: slice(word.text,a,b), beginMs: boundary(a), endMs: boundary(b) };
         return reading ? { ...part, rubyUnits: makeRubyUnits(part, splitReadingMora(reading)) } : part;
       });
     });

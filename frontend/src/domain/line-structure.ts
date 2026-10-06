@@ -1,3 +1,4 @@
+import { createProjectEditing, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine } from './lyric-document';
 
 export function lineLabel(document: LyricDocument, line: LyricLine): string {
@@ -6,7 +7,7 @@ export function lineLabel(document: LyricDocument, line: LyricLine): string {
 }
 
 /** Shared by entry points and the atomic command; only actual conflicts are reported. */
-export function lineStructureIssues(document: LyricDocument, first: LyricLine, second?: LyricLine): string[] {
+export function lineStructureIssues(document: LyricDocument, first: LyricLine, second?: LyricLine, editing: ProjectEditing = createProjectEditing()): string[] {
   const label = (line: LyricLine) => lineLabel(document, line);
   const issues: string[] = [];
   if (!second) {
@@ -22,13 +23,13 @@ export function lineStructureIssues(document: LyricDocument, first: LyricLine, s
   }
   if (first.songPart !== second.songPart) issues.push(`${label(first)}与${label(second)}歌曲段落不同`);
   if (first.agentRefs.join(' ') !== second.agentRefs.join(' ')) issues.push(`${label(first)}与${label(second)}歌手不同`);
-  if (first.endLink && ![first.id, second.id].includes(first.endLink.targetLineId)) {
-    const target = document.lines.find(item => item.id === first.endLink!.targetLineId)!;
+  if (editing.endLinks[first.id] && ![first.id, second.id].includes(editing.endLinks[first.id])) {
+    const target = document.lines.find(item => item.id === editing.endLinks[first.id])!;
     issues.push(`${label(first)}行尾链接 → ${label(target)}在合并范围外`);
   }
   const mergedBegin = first.beginMs ?? second.beginMs;
   for (const source of document.lines) {
-    if (source.id === first.id || source.id === second.id || source.endLink?.targetLineId !== second.id) continue;
+    if (source.id === first.id || source.id === second.id || editing.endLinks[source.id] !== second.id) continue;
     if (mergedBegin !== second.beginMs) issues.push(`${label(source)}行尾链接 → ${label(second)}的开始边界将在合并后消失`);
   }
   return issues;

@@ -1,3 +1,4 @@
+import { createProjectEditing, remapEditing, type ProjectEditing } from '../../domain/project-editing';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationUnit, type RubyUnit } from '../../domain/lyric-document';
 
@@ -8,12 +9,12 @@ export type EditorSelection =
   | { kind: 'romanization-content'; lineId: string; trackId: string; contentId: string; ids: string[]; anchorId: string; activeId: string }
   | { kind: 'romanization-unit'; lineId: string; trackId: string; contentId: string; ids: string[]; anchorId: string; activeId: string };
 
-export type EditorClipboard =
+export type EditorClipboard = (
   | { kind: 'lines'; groups: Array<{ line: LyricLine; background: LyricLine | null; translations: Array<{ trackId: string; content: RomanizationContent }>; romanizations: Array<{ trackId: string; content: RomanizationContent }> }>; text: string }
   | { kind: 'words'; words: LyricWord[]; text: string }
   | { kind: 'ruby'; units: RubyUnit[]; text: string }
   | { kind: 'romanization-content'; trackId: string; contents: RomanizationContent[]; text: string }
-  | { kind: 'romanization-unit'; trackId: string; contentId: string; units: RomanizationUnit[]; text: string };
+  | { kind: 'romanization-unit'; trackId: string; contentId: string; units: RomanizationUnit[]; text: string }) & { editing?: ProjectEditing };
 
 export const selectionLineId = (selection: EditorSelection | null): string | null => selection?.kind === 'lines' ? selection.activeId || null : selection?.lineId ?? null;
 
@@ -31,7 +32,14 @@ export function invertIds(order: string[], selected: string[]): string[] {
   return order.filter((id) => !selected.includes(id));
 }
 
-export function copySelection(document: LyricDocument, selection: EditorSelection): EditorClipboard {
+export function copySelection(document: LyricDocument, selection: EditorSelection, editing = createProjectEditing()): EditorClipboard {
+  const result = copyObjects(document, selection);
+  const ids = new Map<string, string>();
+  const collect = (value: unknown) => { if (!value || typeof value !== 'object') return; if ('id' in value && typeof value.id === 'string') ids.set(value.id, value.id); Object.values(value).forEach(collect); };
+  collect(result);
+  return { ...result, editing: remapEditing(editing, ids) };
+}
+function copyObjects(document: LyricDocument, selection: EditorSelection): EditorClipboard {
   if (selection.kind === 'ruby') {
     const units = document.lines.flatMap(line => line.words.flatMap(word => word.rubyUnits.filter(unit => selection.ids.includes(unit.id))));
     return { kind: 'ruby', units, text: units.map((unit) => unit.reading).join('') };
@@ -99,23 +107,32 @@ export function moveWordsAcrossLine(document: LyricDocument, selection: Extract<
   return { type: 'batch', commands };
 }
 
-function cloneWord(word: LyricWord): LyricWord {
-  const rubyIds = new Map(word.rubyUnits.map((unit) => [unit.id, crypto.randomUUID()]));
-  return { ...word, id: crypto.randomUUID(), rubyUnits: word.rubyUnits.map((unit) => ({ ...unit, id: rubyIds.get(unit.id)! })) };
+function cloneWord(word: LyricWord, ids: Map<string, string>): LyricWord {
+  const rubyIds = new Map(word.rubyUnits.map(unit => [unit.id, copyId(unit.id, ids)]));
+  return { ...word, id: copyId(word.id, ids), rubyUnits: word.rubyUnits.map((unit) => ({ ...unit, id: rubyIds.get(unit.id)! })) };
 }
 
-function cloneLine(line: LyricLine, id: string, backgroundOf: string | null): LyricLine {
-  return { ...line, id, backgroundOf, words: line.words.map(cloneWord) };
+function cloneLine(line: LyricLine, id: string, backgroundOf: string | null, ids: Map<string, string>): LyricLine {
+  ids.set(line.id, id);
+  return { ...line, id, backgroundOf, words: line.words.map(word => cloneWord(word, ids)) };
 }
 
+function copyId(id: string, ids: Map<string, string>) { const next = crypto.randomUUID(); ids.set(id, next); return next; }
 export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null): { command: LyricCommand; selection: EditorSelection } {
+  const ids = new Map<string, string>();
+  const result = pasteObjects(document, clipboard, selection, ids);
+  if (!clipboard.editing) return result;
+  const command: LyricCommand = { type: 'batch', commands: [...(result.command.type === 'batch' ? result.command.commands : [result.command]), { type: 'restore-editing', editing: remapEditing(clipboard.editing, ids) }] };
+  return { ...result, command };
+}
+function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null, idMap: Map<string, string>): { command: LyricCommand; selection: EditorSelection } {
   const selectedLineId = selectionLineId(selection);
   const currentLine = document.lines.find((line) => line.id === selectedLineId);
   if (clipboard.kind === 'ruby') {
     if (selection?.kind !== 'ruby') throw new Error('请先选择目标读音单元');
     const word = currentLine?.words.find((item) => item.id === selection.wordId);
     if (!word) throw new Error('读音所属词不存在');
-    const copied = clipboard.units.map((unit) => ({ ...unit, id: crypto.randomUUID() }));
+    const copied = clipboard.units.map((unit) => ({ ...unit, id: copyId(unit.id, idMap) }));
     const commands: Array<Extract<LyricCommand, { type: 'insert-ruby' | 'set-ruby-time' }>> = [];
     let afterRubyId = selection.activeId;
     for (const unit of copied) {
@@ -140,7 +157,7 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
     if (!content || content.kind !== 'timed') throw new Error('请先选择定时音译内容');
     const units = content.units.slice();
     const after = selection.kind === 'romanization-unit' ? units.findIndex((unit) => unit.id === selection.activeId) : units.length - 1;
-    const copied = clipboard.units.map((unit) => ({ ...unit, id: crypto.randomUUID() }));
+    const copied = clipboard.units.map((unit) => ({ ...unit, id: copyId(unit.id, idMap) }));
     units.splice(after + 1, 0, ...copied);
     return { command: { type: 'set-romanization-content', trackId: selection.trackId, content: { ...content, units } },
       selection: { kind: 'romanization-unit', lineId: selection.lineId, trackId: selection.trackId, contentId: content.id, ids: copied.map((unit) => unit.id), anchorId: copied[0].id, activeId: copied.at(-1)!.id } };
@@ -148,7 +165,7 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
   if (clipboard.kind === 'words') {
     if (!currentLine) throw new Error('请先选择粘贴目标行');
     const afterWordId = selection?.kind === 'words' && currentLine.words.some((word) => word.id === selection.activeId) ? selection.activeId : currentLine.words.at(-1)?.id ?? null;
-    const words = clipboard.words.map(cloneWord);
+    const words = clipboard.words.map(word => cloneWord(word, idMap));
     const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'insert-word' }>> = [];
     const { beginMs, endMs } = expandedLineTime(currentLine, words);
     if (beginMs !== currentLine.beginMs || endMs !== currentLine.endMs) commands.push({ type: 'set-line-time', lineId: currentLine.id, beginMs, endMs });
@@ -161,10 +178,10 @@ export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, s
   let after = currentLine?.backgroundOf ?? currentLine?.id ?? document.lines.filter((line) => !line.backgroundOf).at(-1)?.id ?? null;
   for (const group of clipboard.groups) {
     const id = `line-${crypto.randomUUID()}`;
-    const line = cloneLine(group.line, id, null);
+    const line = cloneLine(group.line, id, null, idMap);
     commands.push({ type: 'insert-line', afterLineId: after, line });
     if (group.background) {
-      const background = cloneLine(group.background, `${id}:bg`, null);
+      const background = cloneLine(group.background, `${id}:bg`, null, idMap);
       commands.push({ type: 'insert-line', afterLineId: id, line: background });
       commands.push({ type: 'set-background-of', lineId: background.id, parentLineId: id });
     }

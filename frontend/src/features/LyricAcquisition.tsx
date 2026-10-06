@@ -1,3 +1,4 @@
+import { createProjectEditing } from '../domain/project-editing';
 import { translationsForLine } from '../domain/lyric-document';
 import { translationText } from '../domain/lyric-document';
 import { Select } from '../shared/Select';
@@ -61,7 +62,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   const confirm = () => {
     if (!incoming) return;
     if (base !== document) { setBase(document); setChoices(defaultChoices(document, incoming)); setMessage('当前歌词已变化，已重新对照元数据，请检查后再次导入。'); return; }
-    try { apply({ type: 'replace-document', document: { ...incoming, metadata: selectedMetadata(base, incoming, choices) } }); setIncoming(null); store.cancelAll(); if (filename) onImportName?.(filename); onImported(); }
+    try { apply({ type: 'replace-document', editing: createProjectEditing(), document: { ...incoming, metadata: selectedMetadata(base, incoming, choices) } }); setIncoming(null); store.cancelAll(); if (filename) onImportName?.(filename); onImported(); }
     catch (e) { setMessage(e instanceof Error ? e.message : '导入失败'); }
   };
   return <div className={styles.page}>

@@ -1,3 +1,4 @@
+import { createProjectEditing, followChangedEndLinks, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
 import { shiftLineTimes } from './batch-editing';
 
@@ -21,10 +22,10 @@ const envelope = (values: TimeMs[], minimum: boolean): TimeMs => {
   const numbers = values.filter((value): value is number => value !== null);
   return numbers.length ? (minimum ? Math.min(...numbers) : Math.max(...numbers)) : null;
 };
-const include = (line: LyricLine, word: LyricWord): LyricLine => {
+const include = (line: LyricLine, word: LyricWord, editing: ProjectEditing): LyricLine => {
   const beginMs = line.beginMs === null ? null : envelope([line.beginMs, word.beginMs], true);
   const endMs = line.endMs === null ? null : envelope([line.endMs, word.endMs], false);
-  if (line.endLink && endMs !== line.endMs) throw new Error('时间修改与行尾链接冲突');
+  if (editing.endLinks[line.id] && endMs !== line.endMs) throw new Error('时间修改与行尾链接冲突');
   return { ...line, beginMs, endMs };
 };
 const moveWord = (word: LyricWord, deltaMs: number): LyricWord => ({ ...word,
@@ -40,13 +41,13 @@ function editTarget(document: LyricDocument, target: TimelineTarget, update: (li
   return { ...document, lines };
 }
 
-export function moveTimeline(document: LyricDocument, targets: TimelineTarget[], deltaMs: number): LyricDocument {
+function moveTargets(document: LyricDocument, targets: TimelineTarget[], deltaMs: number, editing = createProjectEditing()): LyricDocument {
   if (!Number.isSafeInteger(deltaMs)) throw new Error('移动量必须是整数毫秒');
   if (!targets.length || !deltaMs) return document;
   if (targets.every((target) => target.kind === 'line')) {
     const ids = new Set(targets.map((target) => target.lineId));
     if (document.lines.some(line => ids.has(line.id) && (line.beginMs === null || line.endMs === null))) throw new Error('请先为行设置完整时间');
-    return (shiftLineTimes(document, [...ids], deltaMs) as Extract<ReturnType<typeof shiftLineTimes>, { type: 'replace-document' }>).document;
+    return (shiftLineTimes(document, [...ids], deltaMs, editing) as Extract<ReturnType<typeof shiftLineTimes>, { type: 'replace-document' }>).document;
   }
   if (new Set(targets.map(target => target.kind)).size > 1) throw new Error('只能同时移动同类对象');
   if (targets.every(target => target.kind === 'romanization')) {
@@ -83,13 +84,13 @@ export function moveTimeline(document: LyricDocument, targets: TimelineTarget[],
         words[index] = { ...word, rubyUnits,
           beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true) ?? word.beginMs, endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false) ?? word.endMs, };
       }
-      return include({ ...line, words }, words[index]);
+      return include({ ...line, words }, words[index], editing);
     });
   }
   return result;
 }
 
-export function resizeTimeline(document: LyricDocument, target: TimelineTarget, side: 'beginMs' | 'endMs', timeMs: number): LyricDocument {
+function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'beginMs' | 'endMs', timeMs: number, editing = createProjectEditing()): LyricDocument {
   valid(timeMs, timeMs);
   if (target.kind === 'romanization') return editRomanization(document, target, unit => { const next = { ...unit, [side]: timeMs }; valid(next.beginMs, next.endMs); return next; });
   return editTarget(document, target, (line) => {
@@ -98,7 +99,7 @@ export function resizeTimeline(document: LyricDocument, target: TimelineTarget, 
       const endMs = side === 'endMs' ? timeMs : line.endMs;
       valid(beginMs, endMs);
       if (line.words.flatMap(word => [word, ...word.rubyUnits]).some((word) => beginMs !== null && word.beginMs !== null && word.beginMs < beginMs || endMs !== null && word.endMs !== null && word.endMs > endMs)) throw new Error('行边界不能排除词');
-      if (line.endLink && endMs !== line.endMs) throw new Error('时间修改与行尾链接冲突');
+      if (editing.endLinks[line.id] && endMs !== line.endMs) throw new Error('时间修改与行尾链接冲突');
       return { ...line, beginMs, endMs };
     }
     const index = line.words.findIndex((word) => word.id === target.wordId);
@@ -121,7 +122,7 @@ export function resizeTimeline(document: LyricDocument, target: TimelineTarget, 
       words[index] = { ...word, rubyUnits,
         beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true) ?? word.beginMs, endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false) ?? word.endMs };
     }
-    return include({ ...line, words }, words[index]);
+    return include({ ...line, words }, words[index], editing);
   });
 }
 
@@ -146,4 +147,11 @@ function editRomanization(document: LyricDocument, target: Extract<TimelineTarge
   }) });
   if (!found) throw new Error('定时音译单元已不存在');
   return { ...document, romanizationTracks };
+}
+
+export function moveTimeline(document: LyricDocument, targets: TimelineTarget[], deltaMs: number, editing = createProjectEditing()) {
+  return followChangedEndLinks(document, moveTargets(document, targets, deltaMs, editing), editing);
+}
+export function resizeTimeline(document: LyricDocument, target: TimelineTarget, side: 'beginMs' | 'endMs', timeMs: number, editing = createProjectEditing()) {
+  return followChangedEndLinks(document, resizeTarget(document, target, side, timeMs, editing), editing);
 }

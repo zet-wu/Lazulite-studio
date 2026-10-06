@@ -1,3 +1,4 @@
+import { createProjectEditing, emptyBeatCount, type ProjectEditing } from './project-editing';
 import type { LyricCommand } from './lyric-commands';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
 
@@ -10,7 +11,7 @@ const shifted = (value: TimeMs, delta: number): TimeMs => {
   return result;
 };
 
-export function shiftLineTimes(document: LyricDocument, lineIds: string[], deltaMs: number): LyricCommand {
+export function shiftLineTimes(document: LyricDocument, lineIds: string[], deltaMs: number, editing = createProjectEditing()): LyricCommand {
   if (!Number.isSafeInteger(deltaMs)) throw new Error('时间偏移必须是整数毫秒');
   const selected = new Set(lineIds);
   const shiftedLines = document.lines.map((line): LyricLine => {
@@ -21,8 +22,8 @@ export function shiftLineTimes(document: LyricDocument, lineIds: string[], delta
       })) };
   });
   const lines = shiftedLines.map((line) => {
-    if (!line.endLink) return line;
-    const target = shiftedLines.find((item) => item.id === line.endLink!.targetLineId)!;
+    if (!editing.endLinks[line.id]) return line;
+    const target = shiftedLines.find((item) => item.id === editing.endLinks[line.id])!;
     const endMs = target.beginMs;
     if (endMs === null || line.beginMs !== null && endMs < line.beginMs || line.words.some((word) => word.endMs !== null && word.endMs > endMs)) throw new Error('偏移后链接的行结束时间不能覆盖词块');
     return endMs === line.endMs ? line : { ...line, endMs };
@@ -69,7 +70,7 @@ export function syncLineTimes(document: LyricDocument, lineIds: string[]): Lyric
   return { type: 'batch', commands };
 }
 
-export function replaceWords(document: LyricDocument, wordIds: string[], search: string, replacement: string, ignoreCase = false): { command: LyricCommand; count: number } {
+export function replaceWords(document: LyricDocument, wordIds: string[], search: string, replacement: string, ignoreCase = false, editing = createProjectEditing()): { command: LyricCommand; count: number } {
   if (!search) throw new Error('查找内容不能为空');
   const selected = new Set(wordIds);
   const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -80,7 +81,7 @@ export function replaceWords(document: LyricDocument, wordIds: string[], search:
     if (!selected.has(word.id)) continue;
     const matches = word.text.match(pattern);
     if (!matches?.length) continue;
-    if (word.rubyUnits.length || word.obscene || word.emptyBeat) throw new Error(`词“${word.text}”含注音或附属属性，不能批量替换`);
+    if (word.rubyUnits.length || word.obscene || emptyBeatCount(editing, word.id)) throw new Error(`词“${word.text}”含注音或附属属性，不能批量替换`);
     const next = word.text.replace(pattern, () => replacement);
     count += matches.length;
     commands.push(next ? { type: 'edit-word', lineId: line.id, wordId: word.id, text: next } : { type: 'delete-word', lineId: line.id, wordId: word.id });

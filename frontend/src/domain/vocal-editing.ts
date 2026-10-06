@@ -16,10 +16,10 @@ export function assignVocalSegment(document: LyricDocument, lineId: string, segm
   const shift = <T extends { beginMs: TimeMs; endMs: TimeMs }>(unit: T): T => ({ ...unit, beginMs: unit.beginMs === null ? null : unit.beginMs + delta, endMs: unit.endMs === null ? null : unit.endMs + delta });
   // Freeze all incoming ends before moving the selected row. No recursive following.
   const lines = document.lines.map(item => {
-    if (item.id !== lineId) return item.endLink?.targetLineId === lineId ? { ...item, endLink: null } : item;
+    if (item.id !== lineId) return item;
     const moved = shift(item);
     if (item.beginMs === null && item.endMs === null) { moved.beginMs = segment.beginMs; moved.endMs = segment.endMs; }
-    return { ...moved, endLink: null, words: item.words.map(word => ({ ...shift(word), rubyUnits: word.rubyUnits.map(shift) })) };
+    return { ...moved, words: item.words.map(word => ({ ...shift(word), rubyUnits: word.rubyUnits.map(shift) })) };
   });
   const romanizationTracks = document.romanizationTracks.map(track => {
     const contents = track.contents.map(content => content.lineId === lineId && content.kind === 'timed' ? { ...content, units: content.units.map(shift) } : content);
@@ -45,4 +45,11 @@ export function editSegments(acoustics: Acoustics, operation: { type: 'put'; seg
   }
   validateSegments(segments, durationMs);
   return { ...acoustics, segments };
+}
+
+export function assignVocalSegmentCommand(project: import('./project-document').ProjectDocument, lineId: string, segment: VocalSegment, durationMs: number): import('./lyric-commands').LyricCommand {
+  const document = assignVocalSegment(project.lyrics, lineId, segment, durationMs);
+  const editing = structuredClone(project.editing);
+  for (const [source, target] of Object.entries(editing.endLinks)) if (source === lineId || target === lineId) delete editing.endLinks[source];
+  return { type: 'replace-document', document, editing };
 }

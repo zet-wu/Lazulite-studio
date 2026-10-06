@@ -1,5 +1,5 @@
 /** The semantic editor document. Transport, XML trees and playback stay outside it. */
-export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v8' as const;
+export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v9' as const;
 
 export type TimeMs = number | null;
 
@@ -17,7 +17,6 @@ export type LyricWord = {
   endMs: TimeMs;
   rubyUnits: RubyUnit[];
   obscene: boolean;
-  emptyBeat: number;
 };
 
 export type RomanizationUnit = { id: string; text: string; beginMs: TimeMs; endMs: TimeMs };
@@ -38,11 +37,9 @@ export type LyricLine = {
   words: LyricWord[];
   beginMs: TimeMs;
   endMs: TimeMs;
-  endLink: { targetLineId: string } | null;
   agentRefs: string[];
   backgroundOf: string | null;
   songPart: string | null;
-  ignoreSync: boolean;
 };
 
 export const AGENT_TYPES = ['person', 'character', 'group', 'organization', 'other'] as const;
@@ -68,14 +65,13 @@ export const lineText = (line: LyricLine) => line.words.map((word) => word.text)
 export const rubyReading = (word: LyricWord) => word.rubyUnits.map((unit) => unit.reading).join('');
 
 export function createWord(text: string, id: string = crypto.randomUUID()): LyricWord {
-  return { id, text, beginMs: null, endMs: null, rubyUnits: [], obscene: false, emptyBeat: 0 };
+  return { id, text, beginMs: null, endMs: null, rubyUnits: [], obscene: false };
 }
 
 export function createLine(text: string, id: string = `line-${crypto.randomUUID()}`): LyricLine {
   return {
     id, words: text ? [createWord(text, `${id}:word:0`)] : [],
-    beginMs: null, endMs: null, endLink: null, agentRefs: [], backgroundOf: null, songPart: null,
-    ignoreSync: false,
+    beginMs: null, endMs: null, agentRefs: [], backgroundOf: null, songPart: null,
   };
 }
 

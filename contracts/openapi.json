@@ -3068,7 +3068,7 @@
         ],
         "properties": {
           "schema_version": {
-            "const": "studio-document-v3"
+            "const": "studio-document-v4"
           },
           "project_id": {
             "type": "string"
@@ -3098,11 +3098,12 @@
               "schemaVersion",
               "sourceAssetId",
               "lyrics",
-              "acoustics"
+              "acoustics",
+              "editing"
             ],
             "properties": {
               "schemaVersion": {
-                "const": "studio-project-v1"
+                "const": "studio-project-v2"
               },
               "sourceAssetId": {
                 "type": [
@@ -3163,6 +3164,54 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "editing": {
+                "type": "object",
+                "required": [
+                  "emptyBeats",
+                  "ignoredSyncLineIds",
+                  "endLinks"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "emptyBeats": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "count"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "word",
+                            "ruby"
+                          ]
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 32
+                        }
+                      }
+                    }
+                  },
+                  "ignoredSyncLineIds": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "endLinks": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                }
               }
             },
             "additionalProperties": false

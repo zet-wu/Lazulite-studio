@@ -128,11 +128,11 @@ test('P8 line and content ranges delete fully and restore with one undo', async 
   await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '删除所选行（2）' }).click(); await expect(outline).toHaveCount(1);
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(outline).toHaveCount(3);
 });
-test('linked-target deletion freezes current ends and restores all rows on undo', async ({ page }) => {
+test('multi-row deletion preserves unrelated endpoints and restores rows on undo', async ({ page }) => {
   await page.goto('/editor');
   const xml = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
-    const doc = codec.parseLyricTtml(xml); doc.lines[0].endLink = { targetLineId: 'missing'}; doc.lines[0].endMs = 6e3;
+    const doc = codec.parseLyricTtml(xml); doc.lines[0].endMs = 6e3;
     return codec.serializeLyricTtml(doc, { draft: true });
   }, phase7Ttml);
   await importLyrics(page, { name: 'links.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });

@@ -1,14 +1,15 @@
+import { createProjectEditing, emptyBeatCount, setEmptyBeat } from '../src/domain/project-editing';
 import { expect, it } from 'vitest';
 import { createLyricDocument, createWord, createLine } from '../src/domain/lyric-document';
 import { proposeJapaneseRuby, japaneseRubyCommand, hasJapaneseRubyChanges } from '../src/domain/japanese-ruby';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand, redoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand, redoLyricCommand } from './helpers/project-history';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 const range = (base: string, reading: string, line_id: string, base_start = 0) => ({ base, reading, line_id, base_start, base_end: base_start + Array.from(base).length });
 it('splits okurigana, preserves properties and outer times in one undoable transaction', () => {
- const d=createLyricDocument('食べる 魂');const l=d.lines[0],w=l.words[0];w.beginMs=10;w.endMs=1011;w.emptyBeat=3;w.obscene=true;
+ const d=createLyricDocument('食べる 魂');const l=d.lines[0],w=l.words[0];w.beginMs=10;w.endMs=1011;const editing=createProjectEditing();setEmptyBeat(editing,w.id,'word',3);w.obscene=true;
  const rows=proposeJapaneseRuby(d,[l.id],[range('食べる','たべる',l.id),range('魂','たましい',l.id,4)]);
- const state=executeLyricCommand(createLyricEditorState(d),japaneseRubyCommand(d,d,rows));const words=state.present.lines[0].words;
- expect(words.map(w=>w.text)).toEqual(['食','べる ','魂']);expect(words.map(w=>w.emptyBeat)).toEqual([3,0,0]);expect(words.every(w=>w.obscene)).toBe(true);
+ const state=executeLyricCommand(createLyricEditorState(d,editing),japaneseRubyCommand(d,d,rows));const words=state.present.lines[0].words;
+ expect(words.map(w=>w.text)).toEqual(['食','べる ','魂']);expect(emptyBeatCount(state.editing,words[0].rubyUnits[0].id)).toBe(3);expect(words.every(w=>w.obscene)).toBe(true);
  expect(words[0]).toMatchObject({beginMs:10,endMs:210});expect(words[2].rubyUnits.map(u=>u.reading)).toEqual(['た','ま','し','い']);expect(words[2].rubyUnits.at(-1)?.endMs).toBe(1011);
  expect(undoLyricCommand(state).present).toBe(d);expect(redoLyricCommand(undoLyricCommand(state)).present).toEqual(state.present);
 });

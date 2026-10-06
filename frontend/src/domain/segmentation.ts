@@ -1,3 +1,4 @@
+import { createProjectEditing, emptyBeatCount, type ProjectEditing } from './project-editing';
 import { createWord, type LyricDocument, type LyricWord } from './lyric-document';
 import { isGraphemeBoundary } from './text-boundaries';
 
@@ -108,10 +109,10 @@ export function segmentText(text: string, options: SegmentOptions, divide?: (tex
   return result;
 }
 
-export function distributeSegmentTime(word: LyricWord, parts: string[], punctuationWeight: number): LyricWord[] {
+export function distributeSegmentTime(word: LyricWord, parts: string[], punctuationWeight: number, editing = createProjectEditing()): LyricWord[] {
   if (!parts.length || parts.join('') !== word.text || parts.some((part) => !part)) throw new Error('分词结果未保留原文');
   if (parts.length === 1) return [word];
-  if (word.rubyUnits.length || word.obscene || word.emptyBeat) throw new Error(`词“${word.text}”包含注音或附属属性，请先手动处理`);
+  if (word.rubyUnits.length || word.obscene || emptyBeatCount(editing, word.id)) throw new Error(`词“${word.text}”包含注音或附属属性，请先手动处理`);
   const weights = parts.map((part) => graphemes(part).reduce((total, item) => total + (isSpace(item) ? 0 : isPunctuation(item) ? punctuationWeight : 1), 0));
   const sum = weights.reduce((a, b) => a + b, 0);
   const begin = word.beginMs, end = word.endMs;
@@ -124,11 +125,11 @@ export function distributeSegmentTime(word: LyricWord, parts: string[], punctuat
   });
 }
 
-export function segmentationPreview(document: LyricDocument, wordIds: string[], options: SegmentOptions, divide?: (text: string) => string[]) {
+export function segmentationPreview(document: LyricDocument, wordIds: string[], options: SegmentOptions, divide?: (text: string) => string[], editing = createProjectEditing()) {
   const chosen = new Set(wordIds);
   return document.lines.flatMap((line) => line.words.filter((word) => chosen.has(word.id)).map((word) => {
     const parts = segmentText(word.text, options, divide);
-    const blocked = parts.length > 1 && Boolean(word.rubyUnits.length || word.obscene || word.emptyBeat);
+    const blocked = parts.length > 1 && Boolean(word.rubyUnits.length || word.obscene || emptyBeatCount(editing, word.id));
     return { lineId: line.id, word, parts, blocked };
   }));
 }

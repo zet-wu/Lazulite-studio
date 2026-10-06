@@ -1,6 +1,7 @@
+import { createProjectEditing, emptyBeatCount, setEmptyBeat } from '../src/domain/project-editing';
 import { describe, expect, it } from 'vitest';
 import { createLine, createLyricDocument, createWord, lineText } from '../src/domain/lyric-document';
-import { createLyricEditorState, executeLyricCommand, redoLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, redoLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { codePointToUtf16, splitAtGrapheme, utf16ToCodePoint } from '../src/domain/text-boundaries';
 
 describe('semantic lyric commands', () => {
@@ -224,9 +225,10 @@ it.each(['child', 'link', 'referenced'])('P3-05 rejects background %s without mo
   source.beginMs = 2000; source.endMs = 3000;
   document.lines.push(source);
   if (reason === 'child') document.lines.push({ ...createLine('子背景', 'child'), backgroundOf: source.id });
-  if (reason === 'link') source.endLink = { targetLineId: main.id};
-  if (reason === 'referenced') main.endLink = { targetLineId: source.id};
-  const snapshot = structuredClone(document), state = createLyricEditorState(document);
+  const editing = createProjectEditing();
+  if (reason === 'link') editing.endLinks[source.id] = main.id;
+  if (reason === 'referenced') editing.endLinks[main.id] = source.id;
+  const snapshot = structuredClone(document), state = createLyricEditorState(document, editing);
   expect(() => executeLyricCommand(state, { type: 'set-background-of', lineId: source.id, parentLineId: main.id })).toThrow();
   expect(state.present).toEqual(snapshot);
   expect(state.past).toHaveLength(0);

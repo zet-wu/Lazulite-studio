@@ -1,6 +1,8 @@
+import { createProjectEditing } from '../src/domain/project-editing';
+import { parseProject, serializeProject } from '../src/adapters/project-codec';
 import { describe, expect, it } from 'vitest';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { stampSync, syncUnits } from '../src/domain/sync-editing';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 
@@ -13,10 +15,10 @@ describe('E5 sync editing', () => {
     ];
     document.lines[0].words.push(createWord('も', 'also'));
     const background = createLine('響く', 'background'); background.backgroundOf = document.lines[0].id;
-    const ignored = createLine('間奏', 'ignored'); ignored.ignoreSync = true;
+    const ignored = createLine('間奏', 'ignored'); const editing = createProjectEditing(); editing.ignoredSyncLineIds = [ignored.id];
     const final = createLine('宇宙', 'final');
     document.lines.push(background, ignored, final);
-    expect(syncUnits(document).map((unit) => [unit.lineId, unit.wordId, unit.rubyUnitId])).toEqual([
+    expect(syncUnits(document, editing).map((unit) => [unit.lineId, unit.wordId, unit.rubyUnitId])).toEqual([
       [document.lines[0].id, document.lines[0].words[0].id, 'r1'],
       [document.lines[0].id, document.lines[0].words[0].id, 'r2'],
       [document.lines[0].id, 'also', null],
@@ -54,7 +56,7 @@ describe('E5 sync editing', () => {
     expect(document.lines[0].words[0].beginMs).toBeNull();
   });
 
-  it('keeps skip and empty-beat settings in drafts and omits them from final TTML', () => {
+  it('keeps editing settings in project snapshots and omits them from all TTML', () => {
     const document = createLyricDocument('間奏');
     const line = document.lines[0], word = line.words[0];
     let state = createLyricEditorState(document);
@@ -62,10 +64,10 @@ describe('E5 sync editing', () => {
       { type: 'set-ignore-sync', lineId: line.id, ignoreSync: true },
       { type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: 2 },
     ] });
-    expect(syncUnits(state.present)).toEqual([]);
-    const draft = parseLyricTtml(serializeLyricTtml(state.present, { draft: true }));
-    expect(draft.lines[0].ignoreSync).toBe(true);
-    expect(draft.lines[0].words[0].emptyBeat).toBe(2);
+    expect(syncUnits(state.present, state.editing)).toEqual([]);
+    const draft = parseProject(serializeProject(state.project.present));
+    expect(draft.editing.ignoredSyncLineIds).toEqual([line.id]);
+    expect(draft.editing.emptyBeats[word.id]).toEqual({ kind: 'word', count: 2 });
     expect(serializeLyricTtml(state.present)).not.toContain('studio:');
     expect(undoLyricCommand(state).present).toBe(document);
   });
@@ -97,18 +99,18 @@ it('preserves line margins and its unchanged link, and limits line-mode successo
   line.words[0].beginMs = 2000; line.words[0].endMs = 8000;
   const next = createLine('two'); next.beginMs = 10000;
   document.lines.push(next);
-  line.endLink = { targetLineId: next.id};
+  const editing = createProjectEditing(); editing.endLinks[line.id] = next.id;
   const cursor = syncUnits(document)[0];
-  let state = createLyricEditorState(document);
+  let state = createLyricEditorState(document, editing);
   state = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 3000 });
-  expect(state.present.lines[0]).toMatchObject({ beginMs: 0, endMs: 10000, endLink: line.endLink });
+  expect(state.present.lines[0]).toMatchObject({ beginMs: 0, endMs: 10000 });
   const before = state.present;
   state = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'next', timeMs: 7000, mode: 'line' });
   expect(state.present.lines[1]).toEqual(next);
-  expect(state.present.lines[0]).toMatchObject({ beginMs: 0, endMs: 10000, endLink: line.endLink });
+  expect(state.present.lines[0]).toMatchObject({ beginMs: 0, endMs: 10000 });
   expect(undoLyricCommand(state).present).toBe(before);
-  const outside = stampSync(state.present, cursor, 'end', 12000, 'line');
-  expect(outside.lines[0]).toMatchObject({ beginMs: 0, endMs: 12000, endLink: null });
+  const outside = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'end', timeMs: 12000, mode: 'line' }).present;
+  expect(outside.lines[0]).toMatchObject({ beginMs: 0, endMs: 12000 });
 });
 
 it('updates incoming line links and rejects an excluded word without changing document or history', () => {
@@ -118,11 +120,11 @@ it('updates incoming line links and rejects an excluded word without changing do
   source.words[0].beginMs = 0; source.words[0].endMs = 8000;
   const target = createLine('target'); target.beginMs = 10000; target.endMs = 20000;
   target.words[0].beginMs = 12000; target.words[0].endMs = 18000;
-  source.endLink = { targetLineId: target.id};
+  const editing = createProjectEditing(); editing.endLinks[source.id] = target.id;
   document.lines.push(target);
-  const state = createLyricEditorState(document), cursor = syncUnits(document)[1];
+  const state = createLyricEditorState(document, editing), cursor = syncUnits(document)[1];
   const accepted = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 9000 });
-  expect(accepted.present.lines[0]).toMatchObject({ endMs: 9000, endLink: source.endLink });
+  expect(accepted.present.lines[0]).toMatchObject({ endMs: 9000 });
   expect(accepted.present.lines[1].beginMs).toBe(9000);
   expect(undoLyricCommand(accepted).present).toBe(document);
   expect(() => executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 7000 })).toThrow(/关联行/);

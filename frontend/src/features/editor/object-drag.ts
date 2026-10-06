@@ -1,5 +1,7 @@
+import { createProjectEditing } from '../../domain/project-editing';
+import { useProjectEditing } from './ProjectEditingContext';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { createLyricEditorState, executeLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
+import { applyLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
 import type { LyricDocument } from '../../domain/lyric-document';
 import { copySelection, moveWordsAcrossLine, pasteRich, type EditorSelection } from './editing-actions';
 import styles from './semantic-editor.module.css';
@@ -19,13 +21,13 @@ export function dragSelection(source: DragSource): EditorSelection {
 }
 
 /** One explicit predecessor is used both for the transient layout and the committed command. */
-export function dragCommand(document: LyricDocument, source: DragSource, slot: DragSlot, copy: boolean): { command: LyricCommand; selection: EditorSelection } {
+export function dragCommand(document: LyricDocument, source: DragSource, slot: DragSlot, copy: boolean, editing = createProjectEditing()): { command: LyricCommand; selection: EditorSelection } {
   const selection = dragSelection(source);
   if (copy && (source.kind === 'line' || source.kind === 'word')) {
     const target: EditorSelection = source.kind === 'line'
       ? { kind: 'lines', ids: [], anchorId: '', activeId: slot.afterId ?? '' }
       : { kind: 'words', lineId: slot.lineId, ids: [], anchorId: '', activeId: slot.afterId ?? '' };
-    const result = pasteRich(document, copySelection(document, selection), target);
+    const result = pasteRich(document, copySelection(document, selection, editing), target);
     if (result.command.type === 'batch') {
       const first = result.command.commands.find(command => command.type === (source.kind === 'line' ? 'insert-line' : 'insert-word'));
       if (first?.type === 'insert-line') first.afterLineId = slot.afterId;
@@ -60,6 +62,7 @@ function visibleOutlineRows(panel: HTMLElement): HTMLElement[] {
 }
 
 export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivElement | null>, apply: (command: LyricCommand) => boolean, select: (selection: EditorSelection) => void) {
+  const editing = useProjectEditing();
   const [preview, setPreview] = useState<Preview | null>(null);
   const session = useRef<Session | null>(null);
   const animations = useRef<Animation[]>([]);
@@ -209,8 +212,8 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
         let next: Preview | null = null;
         if (slot) {
           try {
-            const result = dragCommand(latest.current.document, current.source, slot, current.copy);
-            const projected = executeLyricCommand(createLyricEditorState(latest.current.document), result.command).present;
+            const result = dragCommand(latest.current.document, current.source, slot, current.copy, editing);
+            const projected = applyLyricCommand(latest.current.document, result.command, editing);
             if (projected !== latest.current.document) next = { ...result, kind: current.source.kind, document: projected, placeholders: new Set(result.selection.ids) };
           } catch (cause) {
             current.ghost!.dataset.dropError = cause instanceof Error ? cause.message : '此处无法放置';

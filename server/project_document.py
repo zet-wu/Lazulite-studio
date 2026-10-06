@@ -19,19 +19,33 @@ class Lyrics(BaseModel):
     model_config = ConfigDict(extra='forbid')
     draftTtml: str = Field(min_length=1, max_length=2 * 1024 * 1024)
 
+class EmptyBeat(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    kind: Literal['word', 'ruby']
+    count: StrictInt = Field(ge=1, le=32)
+
+class Editing(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    emptyBeats: dict[str, EmptyBeat]
+    ignoredSyncLineIds: list[str]
+    endLinks: dict[str, str]
+
 class ProjectSnapshot(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    schemaVersion: Literal['studio-project-v1']
+    schemaVersion: Literal['studio-project-v2']
     sourceAssetId: str | None
     lyrics: Lyrics
     acoustics: Acoustics
+    editing: Editing
 
 def initial_project(ttml: str, asset_id: str | None) -> dict:
-    return {'schemaVersion': 'studio-project-v1', 'sourceAssetId': asset_id,
-            'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
+    return {'schemaVersion': 'studio-project-v2', 'sourceAssetId': asset_id,
+            'editing': {'emptyBeats': {}, 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
 
 def read_project(path: str | Path) -> dict:
-    return ProjectSnapshot.model_validate_json(Path(path).read_text(encoding='utf-8')).model_dump()
+    snapshot = ProjectSnapshot.model_validate_json(Path(path).read_text(encoding='utf-8')).model_dump()
+    validate_editing(snapshot)
+    return snapshot
 
 def read_lyrics(path: str | Path) -> str:
     return read_project(path)['lyrics']['draftTtml']
@@ -44,6 +58,7 @@ def validate_project(value: dict, conn, project_id: str) -> dict:
     if row is None: raise KeyError(project_id)
     if snapshot['sourceAssetId'] != row[0]: raise ValueError('项目源音频不匹配')
     snapshot['lyrics']['draftTtml'] = normalize_ttml(validate_ttml(snapshot['lyrics']['draftTtml']))
+    validate_editing(snapshot)
     acoustic = snapshot['acoustics']
     if acoustic['analysisId'] is not None:
         result = conn.execute('SELECT source_asset_id FROM vocal_results WHERE id=? AND project_id=? AND status=?', (acoustic['analysisId'], project_id, 'ready')).fetchone()
@@ -54,3 +69,58 @@ def validate_project(value: dict, conn, project_id: str) -> dict:
             raise ValueError('人声片段标识重复或时间超出歌曲范围')
         ids.add(segment['id'])
     return snapshot
+
+
+def validate_editing(snapshot):
+    import xml.etree.ElementTree as ET
+    from decimal import Decimal
+    from .time_units import normalize_ttml
+    root = ET.fromstring(normalize_ttml(snapshot['lyrics']['draftTtml']))
+    studio = '{urn:lazulite:studio:draft}'
+    tt = '{http://www.w3.org/ns/ttml}'
+    tts = '{http://www.w3.org/ns/ttml#styling}'
+    ttm = '{http://www.w3.org/ns/ttml#metadata}'
+    xml = '{http://www.w3.org/XML/1998/namespace}'
+    objects, lines, backgrounds = {}, {}, set()
+    def identity(node, kind):
+        key = node.get(studio+'id') or node.get(xml+'id')
+        if key:
+            if key in objects: raise ValueError('duplicate editing object ID')
+            objects[key] = kind
+        return key
+    def words(node):
+        for child in node:
+            if child.tag != tt+'span' or child.get(ttm+'role'): continue
+            identity(child, 'word')
+            for unit in child.iter():
+                if unit.get(tts+'ruby') == 'text': identity(unit, 'ruby')
+    for node in root.iter():
+        if any(studio+field in node.attrib for field in ['emptyBeat','ignoreSync','endLink','order','members']): raise ValueError('obsolete lyric editing attributes')
+        if node.tag == tt+'p':
+            key = identity(node, 'line')
+            if key: lines[key] = node
+            words(node)
+            for child in node:
+                if child.get(ttm+'role') == 'x-bg':
+                    key = identity(child, 'line')
+                    if key: lines[key] = child; backgrounds.add(key)
+                    words(child)
+    editing = snapshot['editing']
+    for key, beat in editing['emptyBeats'].items():
+        if objects.get(key) != beat['kind']: raise ValueError('empty beat object or category is invalid')
+    ignored = editing['ignoredSyncLineIds']
+    if len(set(ignored)) != len(ignored) or any(key not in lines for key in ignored): raise ValueError('ignored sync line is invalid')
+    def time(node, side):
+        if side in node.get(studio+'null', '').split(): return None
+        raw = node.get(side)
+        if raw is None: return None
+        value = Decimal(0)
+        for part in raw.split(':'): value = value * 60 + Decimal(part)
+        return int(value * 1000)
+    for source, target in editing['endLinks'].items():
+        if source not in lines or target not in lines or source == target or source in backgrounds or target in backgrounds: raise ValueError('invalid end link relationship')
+        line, destination = lines[source], lines[target]
+        end, begin = time(line, 'end'), time(destination, 'begin')
+        if begin is None or end != begin or time(line, 'begin') is not None and time(line, 'begin') > end: raise ValueError('invalid evaluated end link')
+        for child in line:
+            if child.tag == tt+'span' and not child.get(ttm+'role') and time(child, 'end') is not None and time(child, 'end') > end: raise ValueError('linked end excludes word')

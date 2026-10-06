@@ -1,5 +1,6 @@
+import { createProjectEditing, emptyBeatCount, setEmptyBeat } from '../src/domain/project-editing';
 import { describe, expect, it } from 'vitest';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { createLine, createLyricDocument, lineText } from '../src/domain/lyric-document';
 import { copySelection, cutSelection, deleteSelection, moveWordsAcrossLine, pastePlain, pasteRich, selectIds } from '../src/features/editor/editing-actions';
 
@@ -125,12 +126,12 @@ it('batch deletion freezes incoming ends and undo restores both removed lines', 
   const doc = createLyricDocument('前');
   const linked = doc.lines[0]; linked.beginMs = 0; linked.endMs = 3000;
   linked.words[0].beginMs = 0; linked.words[0].endMs = 2000;
-  linked.endLink = { targetLineId: 'target'};
+  const editing = createProjectEditing(); editing.endLinks[linked.id] = 'target';
   doc.lines.push(createLine('先删', 'first'), createLine('目标', 'target'));
-  const state = createLyricEditorState(doc), before = structuredClone(doc);
+  const state = createLyricEditorState(doc, editing), before = structuredClone(doc);
   const deleted = executeLyricCommand(state, deleteSelection(doc, { kind: 'lines', ids: ['first', 'target'], anchorId: 'first', activeId: 'target' }));
   expect(deleted.present.lines).toHaveLength(1);
-  expect(deleted.present.lines[0]).toMatchObject({ endMs: 3000, endLink: null });
+  expect(deleted.present.lines[0]).toMatchObject({ endMs: 3000 });
   expect(undoLyricCommand(deleted).present).toBe(doc);
   expect(state.present).toEqual(before); expect(state.past).toHaveLength(0);
 });

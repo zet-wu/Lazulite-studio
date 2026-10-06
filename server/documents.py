@@ -95,23 +95,6 @@ def validate_ttml(ttml: str) -> str:
     for element in root.iter("{http://www.w3.org/ns/ttml#metadata}actor"):
         if element.attrib.get("agent") not in agents:
             raise ValueError("unknown actor agent reference")
-    studio_members = "{urn:lazulite:studio:draft}members"
-    groups = {e.attrib.get("{http://www.w3.org/XML/1998/namespace}id"): e
-              for e in root.iter() if e.tag == "{http://www.w3.org/ns/ttml#metadata}agent" and e.attrib.get(studio_members) is not None}
-    for group_id, element in groups.items():
-        members = element.attrib.get(studio_members, "").split()
-        if any(member not in agents and member not in groups for member in members):
-            raise ValueError("unknown studio group member reference")
-    def visit_group(group_id: str, trail: set[str]) -> None:
-        if group_id in trail:
-            raise ValueError("studio group membership cycle")
-        trail.add(group_id)
-        for member in groups[group_id].attrib.get(studio_members, "").split():
-            if member in groups:
-                visit_group(member, trail)
-        trail.remove(group_id)
-    for group_id in groups:
-        visit_group(group_id, set())
     return ttml
 
 
@@ -124,7 +107,7 @@ class DocumentService:
         import json
         digest = hashlib.sha256(json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
         return {
-            "schema_version": "studio-document-v3",
+            "schema_version": "studio-document-v4",
             "project_id": project_id,
             "revision": rev,
             "etag": f'"{rev}"',
@@ -138,7 +121,7 @@ class DocumentService:
 
     def save(self, body: DocumentEnvelope, *, if_match: str | None,
              operation_id: str | None, subject: str = "local") -> dict:
-        if body.schema_version != "studio-document-v3":
+        if body.schema_version != "studio-document-v4":
             raise HTTPException(422, {"code": "document_schema_unsupported", "message": "unsupported document schema version", "retryable": False})
         if not body.project_id:
             raise ValueError("project_id is required")

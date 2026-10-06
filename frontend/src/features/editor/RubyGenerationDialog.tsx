@@ -1,3 +1,5 @@
+import { useProjectEditing } from './ProjectEditingContext';
+import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
@@ -74,6 +76,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
   document: LyricDocument; lineIds: string[]; initialTrackId?: string; initialContentId?: string;
   apply: (command: LyricCommand) => boolean; close: () => void;
 }) {
+  const editing = useProjectEditing();
   const [sourceDocument, setSourceDocument] = useState(document);
   const tracks = sourceDocument.romanizationTracks.filter((track) => track.contents.some((content) => lineIds.includes(content.lineId)));
   const [trackId, setTrackId] = useState(initialTrackId ?? tracks[0]?.id ?? '');
@@ -111,7 +114,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
   const allSkipped = rows.length > 0 && skipped.size === rows.length;
   const chosenWords = new Set(rows.filter((row) => !skipped.has(row.key)).map((row) => row.wordId).filter((id): id is string => Boolean(id)));
   const existingWords = sourceDocument.lines.flatMap((line) => line.words.filter((word) => chosenWords.has(word.id) && word.rubyUnits.length).map((word) => ({ line, word })));
-  const issues = rubyGenerationIssues(sourceDocument, rows, readings, skipped, overwrite, output);
+  const issues = rubyGenerationIssues(sourceDocument, rows, readings, skipped, overwrite, output, editing);
   const describeRow = (row: RubyProposalRow) => {
     const rowIssues = issues.filter(issue => issue.rowKeys.includes(row.key));
     const ordered = [...rowIssues].sort((a, b) => Number(a.severity === 'warning') - Number(b.severity === 'warning'));
@@ -138,7 +141,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
   };
   const submit = () => {
     try {
-      const result = rubyGenerationCommand(document, sourceDocument, rows, readings, skipped, overwrite);
+      const result = rubyGenerationCommand(document, sourceDocument, rows, readings, skipped, overwrite, editing);
       if (apply(result)) close();
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : '生成 注音 失败'); }
   };

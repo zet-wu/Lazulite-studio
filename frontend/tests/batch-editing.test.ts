@@ -1,7 +1,8 @@
+import { parseProject, serializeProject } from '../src/adapters/project-codec';
 import { describe, expect, it } from 'vitest';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { replaceWords, shiftLineTimes, smoothWordTimes, syncLineTimes } from '../src/domain/batch-editing';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
 
 describe('E3 batch editing', () => {
@@ -44,7 +45,7 @@ describe('E3 batch editing', () => {
     expect(() => replaceWords(document, [word.id], 'hello', 'hi')).toThrow(/注音/);
   });
 
-  it('persists line end links in draft TTML, tracks target changes and retains the current end', () => {
+  it('persists line end links in project snapshots, tracks target changes and retains the current end', () => {
     const document = createLyricDocument('一');
     const first = document.lines[0], second = createLine('二', 'second');
     first.beginMs = 100; first.endMs = 500;
@@ -54,12 +55,12 @@ describe('E3 batch editing', () => {
     document.lines.push(second);
     const linked = executeLyricCommand(createLyricEditorState(document), { type: 'link-line-end', lineId: first.id, targetLineId: second.id });
     expect(linked.present.lines[0].endMs).toBe(800);
-    const reloaded = parseLyricTtml(serializeLyricTtml(linked.present, { draft: true }));
-    expect(reloaded.lines[0].endLink).toEqual({ targetLineId: second.id});
-    const moved = executeLyricCommand(createLyricEditorState(reloaded), { type: 'set-line-time', lineId: second.id, beginMs: 900, endMs: 1100 });
+    const reloaded = parseProject(serializeProject(linked.project.present));
+    expect(reloaded.editing.endLinks[first.id]).toEqual(second.id);
+    const moved = executeLyricCommand(createLyricEditorState(reloaded.lyrics, reloaded.editing), { type: 'set-line-time', lineId: second.id, beginMs: 900, endMs: 1100 });
     expect(moved.present.lines[0].endMs).toBe(900);
     const unlinked = executeLyricCommand(moved, { type: 'unlink-line-end', lineId: first.id });
-    expect(unlinked.present.lines[0]).toMatchObject({ endMs: 900, endLink: null });
+    expect(unlinked.present.lines[0]).toMatchObject({ endMs: 900 });
     expect(() => executeLyricCommand(linked, { type: 'set-line-time', lineId: second.id, beginMs: 300, endMs: 1100 })).toThrow();
   });
 });

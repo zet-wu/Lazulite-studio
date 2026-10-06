@@ -1,3 +1,5 @@
+import { useProjectEditing } from './ProjectEditingContext';
+import { emptyBeatCount } from '../../domain/project-editing';
 import { Icon } from '../../shared/Icon';
 import { Fragment } from 'react';
 import { documentTargets, selectionKind, targetId, targetSelection, selectionTargets, targetInterval } from './selection-targets';
@@ -101,6 +103,7 @@ export function EditorWorkspace(props: Props) {
 }
 
 function EditorWorkspaceContent(props: Props) {
+  const editing = useProjectEditing();
   const audioReview = useAudioReview();
   const { document, apply } = props;
   const searchConditions = useSearchConditions(props.projectId);
@@ -192,7 +195,7 @@ function EditorWorkspaceContent(props: Props) {
   // The active canvas selection is the single source of the timing target.
   const activePropertyTarget = selectionTargets(document, selection).find(target => targetId(target) === selection?.activeId);
   const activePropertyInterval = activePropertyTarget && targetInterval(document, activePropertyTarget);
-  const syncCursor = syncUnits(document).find(unit => {
+  const syncCursor = syncUnits(document, editing).find(unit => {
     if (!selection || selection.ids.length !== 1) return false;
     if (selection.kind === 'lines') return unit.lineId === selection.activeId;
     if (selection.kind === 'words') return unit.wordId === selection.activeId;
@@ -328,7 +331,7 @@ function EditorWorkspaceContent(props: Props) {
     const current = target ?? currentSelection();
     if (!current?.ids.length) return null;
     if (!copyAllowed(current)) { setMessage('跨内容音译复制暂不支持，请选择同一份内容'); return null; }
-    const next = copySelection(document, current);
+    const next = copySelection(document, current, editing);
     clipboardToken.current = crypto.randomUUID();
     setClipboard(next);
     setMessage('已复制到编辑器剪贴板');
@@ -338,7 +341,7 @@ function EditorWorkspaceContent(props: Props) {
     const current = target ?? currentSelection();
     if (!current?.ids.length) return null;
     if (!copyAllowed(current)) { setMessage('跨内容音译复制暂不支持，请选择同一份内容'); return null; }
-    const next = copySelection(document, current);
+    const next = copySelection(document, current, editing);
     if (dispatch(cutSelection(document, current))) {
       setClipboard(next);
       clipboardToken.current = crypto.randomUUID();
@@ -550,7 +553,7 @@ function EditorWorkspaceContent(props: Props) {
           try {
             const parts = segmentText(word.text, DEFAULT_SEGMENT_OPTIONS);
             if (parts.length < 2) { setSegmentationOpen(true); return; }
-            dispatch({ type: 'segment-words', changes: [{ lineId: line.id, wordId: word.id, words: distributeSegmentTime(word, parts, DEFAULT_SEGMENT_OPTIONS.punctuationWeight) }] });
+            dispatch({ type: 'segment-words', changes: [{ lineId: line.id, wordId: word.id, words: distributeSegmentTime(word, parts, DEFAULT_SEGMENT_OPTIONS.punctuationWeight, editing) }] });
           } catch (cause) { setMessage((cause as Error).message); }
         } },
         mergeAction('words', effective.ids.length > 1 ? effective.ids : line.words.slice(Math.max(0, index - 1), index + 1).map(item => item.id), effective.ids.length > 1),
@@ -646,7 +649,7 @@ function EditorWorkspaceContent(props: Props) {
         inputRef={(node) => { if (node) { wordInputs.current.set(word.id, node); if (pendingFocus.current === word.id) { pendingFocus.current = null; node.focus(); } } else wordInputs.current.delete(word.id); }} />
     </div>
     <TimePair begin={word.beginMs} end={word.endMs} label={`词 ${word.text}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginMs, endMs })} />
-    <label className={styles.emptyBeat}>空拍 <input type="number" min="0" max="32" aria-label={`词 ${word.text}空拍数`} value={word.emptyBeat} onChange={(event) => dispatch({ type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: Number(event.target.value) })} /></label>
+    <label className={styles.emptyBeat}>空拍 <input type="number" min="0" max="32" aria-label={`词 ${word.text}空拍数`} value={emptyBeatCount(editing, word.id)} onChange={(event) => dispatch({ type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: Number(event.target.value) })} /></label>
   </LyricWordView>;
   return <div ref={pageRef} className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`}
     onInputCapture={() => { editRejected.current = false; }}
@@ -830,8 +833,8 @@ function EditorWorkspaceContent(props: Props) {
         <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />
         </fieldset>
         {selection?.kind === 'lines' && selection.ids.length > 1 && <small>多行时间请使用整体偏移或时间轴平移。</small>}
-        {selectedMainLines.length > 0 && <>
-          <BooleanField label="跳过打轴" switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={selectedMainLines.every(line => line.ignoreSync)} mixed={selectedMainLines.some(line => line.ignoreSync) && !selectedMainLines.every(line => line.ignoreSync)} onChange={checked => dispatch({type:'batch', commands:selectedMainLines.map(line=>({type:'set-ignore-sync',lineId:line.id,ignoreSync:checked}))})}/>
+        {propertyLines.length > 0 && <>
+          <BooleanField label="跳过打轴" switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} mixed={propertyLines.some(line => editing.ignoredSyncLineIds.includes(line.id)) && !propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} onChange={checked => dispatch({type:'batch', commands:propertyLines.map(line=>({type:'set-ignore-sync',lineId:line.id,ignoreSync:checked}))})}/>
         </>}
         <SingerSelection agents={document.agents} lines={propertyLines} apply={dispatch} />
         {selection?.kind !== 'lines' || selection.ids.length <= 1 ? <>

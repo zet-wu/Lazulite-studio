@@ -2,9 +2,9 @@ import type { TimeMs, LyricWord } from '../domain/lyric-document';
 
 export type ExportUnit = { id: string; text: string; beginMs: TimeMs; endMs: TimeMs };
 /** Unicode horizontal spaces; tabs and line separators have different format semantics. */
-export function isUntimedSeparator(unit: ExportUnit & Partial<Pick<LyricWord, 'rubyUnits' | 'emptyBeat' | 'obscene'>>) {
+export function isUntimedSeparator(unit: ExportUnit & Partial<Pick<LyricWord, 'rubyUnits' | 'obscene'>>) {
   return /^[\u0020\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]+$/u.test(unit.text)
-    && unit.beginMs === null && unit.endMs === null && !unit.rubyUnits?.length && !unit.emptyBeat && !unit.obscene;
+    && unit.beginMs === null && unit.endMs === null && !unit.rubyUnits?.length && !unit.obscene;
 }
 /** Copy only: a missing body unit is a barrier, never a bridge to a distant host. */
 export function projectExportSeparators<T extends ExportUnit>(units: T[]) {
@@ -25,6 +25,6 @@ export function projectExportSeparators<T extends ExportUnit>(units: T[]) {
 }
 
 /** TTML's xml:space=preserve can also carry actual tabs and line breaks as body text. */
-export function isUntimedXmlWhitespace(unit: ExportUnit & Partial<Pick<LyricWord, 'rubyUnits' | 'emptyBeat' | 'obscene'>>) {
+export function isUntimedXmlWhitespace(unit: ExportUnit & Partial<Pick<LyricWord, 'rubyUnits' | 'obscene'>>) {
   return /^[\p{Zs}\t\r\n\u2028\u2029\uFEFF]+$/u.test(unit.text) && isUntimedSeparator({ ...unit, text: ' ' });
 }

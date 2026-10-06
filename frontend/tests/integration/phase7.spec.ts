@@ -28,18 +28,18 @@ test('P7 linked split, translation ownership and generated timed track persist t
   const saved = await (await page.request.get('/api/v1/projects/phase4-background/document')).json();
   const semantics = async (xml: string) => page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const { parseLyricTtml } = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
-    const doc = parseLyricTtml(xml); return { lines: doc.lines.map(line => ({ id: line.id, beginMs: line.beginMs, endMs: line.endMs, endLink: line.endLink, translations: doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === line.id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).map(({id, ...item}) => item), text: line.words.map(w => w.text).join(''), reading: line.words.flatMap(w => w.rubyUnits.map(r => r.reading)) })), tracks: doc.romanizationTracks };
+    const doc = parseLyricTtml(xml); return { lines: doc.lines.map(line => ({ id: line.id, beginMs: line.beginMs, endMs: line.endMs,  translations: doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === line.id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).map(({id, ...item}) => item), text: line.words.map(w => w.text).join(''), reading: line.words.flatMap(w => w.rubyUnits.map(r => r.reading)) })), tracks: doc.romanizationTracks };
   }, xml);
   const draft = await semantics(saved.document.lyrics.draftTtml);
-  expect(draft.lines[0].endLink).toEqual({ targetLineId: 'context'});
-  expect(draft.lines[1]).toMatchObject({ endLink: null, endMs: 5e3, translations: [{ purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'first' }] });
-  expect(draft.lines[2]).toMatchObject({ endLink: { targetLineId: 'missing'}, translations: [{ purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh-Hans', text: '后行' }] });
+  expect(saved.document.editing.endLinks[draft.lines[0].id]).toBe('context');
+  expect(draft.lines[1]).toMatchObject({ endMs: 5e3, translations: [{ purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'first' }] });
+  expect(draft.lines[2]).toMatchObject({ translations: [{ purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh-Hans', text: '后行' }] });
   expect(draft.tracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ kind: 'timed', units: [{ text: 'ga ', beginMs: 0, endMs: 1e3 }, { text: 'k ', beginMs: 1e3, endMs: 2e3 }, { text: 'ko ', beginMs: 2e3, endMs: 3e3 }, { text: 'u', beginMs: 3e3, endMs: 4e3 }] }] });
   await page.reload(); await expect(outline).toHaveCount(4);
   await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
   const finalXml = await readFile(await (await download).path(), 'utf8'); const final = await semantics(finalXml);
-  expect(final.lines.map(({ endLink: _link, ...line }) => line)).toEqual(draft.lines.map(({ endLink: _link, ...line }) => line));
-  expect(final.lines.every(line => line.endLink === null)).toBe(true);
+  expect(final.lines).toEqual(draft.lines);
+  expect(finalXml).not.toContain('endLink');
   await importLyrics(page, { name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
   await expect(page.getByLabel('音译单元 1', { exact: true })).toHaveValue('ga ');
   await writeFile(test.info().outputPath('roundtrip.json'), JSON.stringify({ draft, final }, null, 2));

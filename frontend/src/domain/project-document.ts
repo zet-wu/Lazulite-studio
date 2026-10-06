@@ -1,19 +1,21 @@
-import { applyLyricCommand, type LyricCommand } from './lyric-commands';
+import { createProjectEditing, type ProjectEditing } from './project-editing';
+import { applyLyricTransaction, type LyricCommand } from './lyric-commands';
 import { createLyricDocument, type LyricDocument } from './lyric-document';
 
 export type VocalSegment = { id: string; beginMs: number; endMs: number };
 export type Acoustics = { analysisId: string | null; segments: VocalSegment[] };
 export type ProjectDocument = {
-  schemaVersion: 'studio-project-v1';
+  schemaVersion: 'studio-project-v2';
   sourceAssetId: string | null;
   lyrics: LyricDocument;
   acoustics: Acoustics;
+  editing: ProjectEditing;
 };
 export type ProjectSnapshot = Omit<ProjectDocument, 'lyrics'> & { lyrics: { draftTtml: string } };
 export type ProjectEditorState = { present: ProjectDocument; past: ProjectDocument[]; future: ProjectDocument[] };
 export type ProjectCommand = { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics; durationMs: number };
 export function createProjectDocument(lyrics = createLyricDocument(), sourceAssetId: string | null = null): ProjectDocument {
-  return { schemaVersion: 'studio-project-v1', sourceAssetId, lyrics, acoustics: { analysisId: null, segments: [] } };
+  return { schemaVersion: 'studio-project-v2', sourceAssetId, lyrics, editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
 }
 export function validateSegments(segments: VocalSegment[], durationMs: number) {
   const ids = new Set<string>();
@@ -26,9 +28,9 @@ export function createProjectEditorState(present: ProjectDocument): ProjectEdito
 export function executeProjectCommand(state: ProjectEditorState, command: ProjectCommand): ProjectEditorState {
   let present: ProjectDocument;
   if (command.type === 'lyrics') {
-    const lyrics = applyLyricCommand(state.present.lyrics, command.command);
-    if (lyrics === state.present.lyrics) return state;
-    present = { ...state.present, lyrics };
+    const result = applyLyricTransaction(state.present.lyrics, command.command, state.present.editing);
+    if (result.lyrics === state.present.lyrics && result.editing === state.present.editing) return state;
+    present = { ...state.present, ...result };
   } else {
     validateSegments(command.acoustics.segments, command.durationMs);
     if (command.acoustics === state.present.acoustics) return state;

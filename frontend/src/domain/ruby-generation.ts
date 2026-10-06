@@ -1,3 +1,4 @@
+import { createProjectEditing, type ProjectEditing } from './project-editing';
 import { toHiragana, toKatakana } from 'wanakana';
 import type { LyricCommand } from './lyric-commands';
 import type { LyricDocument, LyricWord, RomanizationContent, RubyUnit, TimeMs } from './lyric-document';
@@ -109,7 +110,7 @@ const comparableKana = (text: string) => toHiragana(text.normalize('NFC')).norma
 
 /** Shared by preflight and submission; all determinable errors are collected together. */
 export function rubyGenerationIssues(document: LyricDocument, rows: RubyProposalRow[], readings: Record<string, string>,
-  skipped: Set<string>, overwrite: Set<string>, output: RubyOutput = 'roman'): RubyIssue[] {
+  skipped: Set<string>, overwrite: Set<string>, output: RubyOutput = 'roman', editing = createProjectEditing()): RubyIssue[] {
   const issues: RubyIssue[] = [];
   const positions = new Map(rows.map((row, index) => [row.key, index]));
   const add = (kind: RubyIssueKind, group: RubyProposalRow[], message: string) => {
@@ -153,7 +154,7 @@ export function rubyGenerationIssues(document: LyricDocument, rows: RubyProposal
     });
     const next = envelope(line, nextWords.map(word => word.beginMs), nextWords.map(word => word.endMs));
     if ((next.beginMs !== line.beginMs || next.endMs !== line.endMs)
-      && (line.endLink || document.lines.some(item => item.endLink?.targetLineId === line.id))) {
+      && (editing.endLinks[line.id] || Object.values(editing.endLinks).includes(line.id))) {
       add('link', active, '行尾链接会受时间扩展影响，请先处理链接');
     }
   }
@@ -169,9 +170,9 @@ export function nextRubyIssue(issues: RubyIssue[], current: RubyIssue | null): R
   return issues.find(issue => issue.position > current.position || issue.position === current.position && issue.order > current.order) ?? issues[0];
 }
 
-export function rubyGenerationCommand(document: LyricDocument, sourceDocument: LyricDocument, rows: RubyProposalRow[], readings: Record<string, string>, skipped: Set<string>, overwriteWordIds: Set<string>): LyricCommand {
+export function rubyGenerationCommand(document: LyricDocument, sourceDocument: LyricDocument, rows: RubyProposalRow[], readings: Record<string, string>, skipped: Set<string>, overwriteWordIds: Set<string>, editing = createProjectEditing()): LyricCommand {
   if (document !== sourceDocument) throw new Error('文档已变化，请重新生成提案');
-  const blocking = rubyGenerationIssues(document, rows, readings, skipped, overwriteWordIds).find(issue => issue.severity === 'error');
+  const blocking = rubyGenerationIssues(document, rows, readings, skipped, overwriteWordIds, 'roman', editing).find(issue => issue.severity === 'error');
   if (blocking) throw new Error(blocking.message);
   const byWord = new Map<string, RubyProposalRow[]>();
   for (const row of rows) {

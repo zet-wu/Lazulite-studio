@@ -1,3 +1,4 @@
+import { ProjectEditingContext } from './ProjectEditingContext';
 import { useEffect, useRef, useState } from 'react';
 import { createRecoveryAdapter } from '../../adapters/recovery';
 import { exportLyricFile, type LyricFormat } from '../../adapters/lyric-formats';
@@ -66,8 +67,8 @@ export function LocalEditor() {
       touched.current = true; commitState(createProjectEditorState(next)); setClean(next); setName('未命名.ttml'); setMessage(null);
     } catch (error) { setMessage(error instanceof Error ? error.message : '新建失败'); }
   };
-  return <EditorWorkspace title={name} document={state.present.lyrics} apply={apply} undo={() => commitState(undoProjectCommand(stateRef.current))} redo={() => commitState(redoProjectCommand(stateRef.current))}
+  return <ProjectEditingContext value={state.present.editing}><EditorWorkspace project={state.present} title={name} document={state.present.lyrics} apply={apply} undo={() => commitState(undoProjectCommand(stateRef.current))} redo={() => commitState(redoProjectCommand(stateRef.current))}
     canUndo={state.past.length > 0} canRedo={state.future.length > 0} dirty={dirty} saving={saving} error={message}
     onSave={() => void save()} onImportName={setName} onNew={() => void createNew()}
-    onExportFormat={exportFormat} />;
+    onExportFormat={exportFormat} /></ProjectEditingContext>;
 }
