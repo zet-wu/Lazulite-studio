@@ -1,3 +1,5 @@
+import { exportLyricFile } from '../src/adapters/lyric-formats';
+import { collectOutputIssues } from '../src/adapters/output-validation';
 import { expect, it } from 'vitest';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
 import { createProjectDocument, createProjectEditorState, executeProjectCommand, undoProjectCommand, redoProjectCommand } from '../src/domain/project-document';
@@ -90,4 +92,16 @@ it('timeline target start follows incoming links and rejects invalid endpoints a
   expect(() => resizeTimeline(state.present.lyrics, { kind: 'line', lineId: 'a' }, 'endMs', 900, state.present.editing)).toThrow(/链接/);
   const next = apply(state, { type: 'replace-document', document: moved });
   expect(undoProjectCommand(next).present).toBe(state.present);
+});
+
+it('retains configured whitespace export gates without leaking configuration into TTML', () => {
+  const state = fixture(), line = state.present.lyrics.lines[0];
+  line.beginMs = 0; line.endMs = 2000;
+  line.words = [{ ...createWord('text', 'text'), beginMs: 0, endMs: 2000 }, createWord(' ', 'space')];
+  const configured = apply(state, { type: 'set-empty-beat', kind: 'word', id: 'space', count: 2 }).present;
+  expect(collectOutputIssues(configured.lyrics, 'elrc', configured.editing).some(issue => issue.wordId === 'space')).toBe(true);
+  expect(() => exportLyricFile(configured.lyrics, 'qrc', configured.editing)).toThrow();
+  const xml = exportLyricFile(configured.lyrics, 'ttml', configured.editing);
+  expect(xml).not.toMatch(/emptyBeat|ignoreSync|endLink/);
+  expect(parseLyricTtml(xml).lines[0].words.at(-1)?.text).toBe(' ');
 });

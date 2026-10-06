@@ -1,3 +1,4 @@
+import type { ProjectEditing } from '../../domain/project-editing';
 import { isUntimedSeparator, isUntimedXmlWhitespace } from '../export-separators';
 import { validateTranslationTracks } from '../../domain/translation-editing';
 import { plainTranslation, type TranslationTrack, createWord, LYRIC_SCHEMA_VERSION, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RomanizationUnit, type RubyUnit, type TimeMs } from '../../domain/lyric-document';
@@ -406,7 +407,7 @@ function setTime(node: Element, begin: TimeMs, end: TimeMs, draft: boolean) {
   }
 }
 
-export function serializeLyricTtml(document: LyricDocument, options: { draft?: boolean } = {}): string {
+export function serializeLyricTtml(document: LyricDocument, options: { draft?: boolean; editing?: ProjectEditing } = {}): string {
   if (document.schemaVersion !== LYRIC_SCHEMA_VERSION) throw new Error('Unsupported lyric document schema');
   validateTranslationTracks(document.translationTracks, new Set(document.lines.map(line => line.id)));
   const draft = options.draft === true;
@@ -566,7 +567,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     const appendWord = (parent: Element, word: LyricWord, text: string) => {
       if (word.obscene) throw new Error(`Word ${word.id} has fields not yet mapped to TTML`);
       // XML with xml:space=preserve also faithfully carries tabs/newlines in body text.
-      if (!draft && isUntimedXmlWhitespace(word)) {
+      if (!draft && isUntimedXmlWhitespace(word,options.editing)) {
         parent.appendChild(xml.createTextNode(text));
         return;
       }

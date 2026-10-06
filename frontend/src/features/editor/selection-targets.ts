@@ -3,11 +3,14 @@ import type { TimelineTarget } from '../../domain/timeline-editing';
 import type { EditorSelection } from './editing-actions';
 
 export const targetId = (target: TimelineTarget) => target.kind === 'line' ? target.lineId : target.kind === 'word' ? target.wordId : target.kind === 'ruby' ? target.rubyId : target.unitId;
+const targetCache = new WeakMap<LyricDocument, TimelineTarget[]>();
 export function documentTargets(document: LyricDocument): TimelineTarget[] {
-  return [...document.lines.flatMap<TimelineTarget>(line => [
+  const cached = targetCache.get(document); if (cached) return cached;
+  const targets = [...document.lines.flatMap<TimelineTarget>(line => [
     { kind: 'line' as const, lineId: line.id },
     ...line.words.flatMap(word => [{ kind: 'word' as const, lineId: line.id, wordId: word.id }, ...word.rubyUnits.map(unit => ({ kind: 'ruby' as const, lineId: line.id, wordId: word.id, rubyId: unit.id }))]),
   ]), ...document.romanizationTracks.flatMap(track => track.contents.flatMap(content => content.kind === 'timed' ? content.units.map(unit => ({ kind: 'romanization' as const, lineId: content.lineId, trackId: track.id, contentId: content.id, unitId: unit.id })) : []))];
+  targetCache.set(document, targets); return targets;
 }
 export const selectionKind = (target: TimelineTarget): EditorSelection['kind'] => target.kind === 'line' ? 'lines' : target.kind === 'word' ? 'words' : target.kind === 'ruby' ? 'ruby' : 'romanization-unit';
 export function selectionTargets(document: LyricDocument, selection: EditorSelection | null) {

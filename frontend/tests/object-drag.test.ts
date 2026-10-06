@@ -46,3 +46,14 @@ it('reorders same-track contents and timed units without modifying their times o
   expect(state.present.romanizationTracks[0].contents[0]).toMatchObject({ units: [units[1], units[0]] });
   expect(undoLyricCommand(state).present).toBe(document);
 });
+
+it('moves a full word selection in document order in one history entry', () => {
+ const document = createLyricDocument('A'), line = document.lines[0];
+ line.words.push(createWord('B'), createWord('C'));
+ const ids = line.words.slice(0,2).map(word => word.id);
+ const result = dragCommand(document, { kind: 'word', lineId: line.id, wordId: ids[1], wordIds: [...ids].reverse() }, { lineId: line.id, afterId: line.words[2].id }, false);
+ const state = executeLyricCommand(createLyricEditorState(document), result.command);
+ expect(state.present.lines[0].words.map(word => word.text)).toEqual(['C','A','B']);
+ expect(result.selection.ids).toEqual([...ids].reverse());
+ expect(undoLyricCommand(state).present).toBe(document);
+});

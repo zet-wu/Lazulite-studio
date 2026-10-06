@@ -1,15 +1,17 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { defaultRangeExtractor, useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
 import type { LyricLine } from '../../domain/lyric-document';
 import { Icon } from '../../shared/Icon';
 import styles from './semantic-editor.module.css';
 
-export type ListMemory = { offset: number; handled: number | null };
+export type ListMemory = { offset: number; handled: number | null; measured?: { items: VirtualItem[]; lines: LyricLine[]; width: number; viewport: number; font: string; key: string } };
 
 type Props = {
   memory?: ListMemory;
+  pinnedLineIds?: string[];
   lines: LyricLine[];
   append?: () => void;
+  lineVersion?: (line: LyricLine) => string;
   renderLine: (line: LyricLine, index: number) => ReactNode;
   locate: { id: string; serial: number; focus?: string; selector?: string } | null;
 };
@@ -79,7 +81,11 @@ function VirtualLyricList(props: ListProps) {
   useLayoutEffect(() => { const node = scrollRef.current!; node.scrollTop = props.memory?.offset ?? 0; return () => { if (props.memory) props.memory.offset = node.scrollTop; }; }, []);
   const [focusedLineId, setFocusedLineId] = useState<string | null>(null);
   const focusedIndex = lines.findIndex(line => line.id === focusedLineId);
+  const layoutKey = lines.map(line => props.lineVersion?.(line) ?? '').join('\n');
+  const cached = props.memory?.measured;
+  const font = getComputedStyle(window.document.documentElement).font;
   const virtualizer = useVirtualizer({
+    initialMeasurementsCache: cached?.lines === lines && cached.key === layoutKey && cached.viewport === innerWidth && cached.font === font ? cached.items : undefined,
     count: lines.length,
     initialOffset: props.memory?.offset ?? 0,
     getScrollElement: () => scrollRef.current,
@@ -88,10 +94,25 @@ function VirtualLyricList(props: ListProps) {
     overscan: 4,
     rangeExtractor: range => {
       const visible = defaultRangeExtractor(range);
-      return focusedIndex < 0 || visible.includes(focusedIndex) ? visible : [...visible, focusedIndex].sort((a, b) => a - b);
+      const pinned = lines.flatMap((line, index) => props.pinnedLineIds?.includes(line.id) || index === focusedIndex ? [index] : []);
+      return [...new Set([...visible, ...pinned])].sort((a, b) => a - b);
     },
     useFlushSync: false,
   });
+  const latestLayout = useRef({ lines, key: layoutKey }); latestLayout.current = { lines, key: layoutKey };
+  useLayoutEffect(() => {
+    const node = scrollRef.current!;
+    let width = node.clientWidth;
+    if (cached && cached.width !== width) virtualizer.measure();
+    const resize = new ResizeObserver(() => { if (node.clientWidth !== width) { width = node.clientWidth; virtualizer.measure(); } });
+    resize.observe(node);
+    const fonts = () => virtualizer.measure();
+    window.document.fonts.addEventListener('loadingdone', fonts);
+    return () => {
+      resize.disconnect(); window.document.fonts.removeEventListener('loadingdone', fonts);
+      if (props.memory) props.memory.measured = { ...latestLayout.current, width, viewport: innerWidth, font: getComputedStyle(window.document.documentElement).font, items: virtualizer.takeSnapshot() };
+    };
+  }, []);
   // The stable virtualizer instance owns the coarse mount; smooth scrolling uses measured DOM.
   const mountTarget = useRef((index: number | null) => {
     if (index !== null) virtualizer.scrollToIndex(index, { align: 'center', behavior: 'auto' });
@@ -118,8 +139,14 @@ function NormalLyricList(props: ListProps) {
   return <div ref={scrollRef} className={styles.lyricScroller} aria-label="歌词列表">{props.lines.map(props.renderLine)}<AppendLine append={props.append} /></div>;
 }
 
+const CachedLine = memo(function CachedLine({ line, index, render }: { line: LyricLine; index: number; version: string; render: RefObject<Props['renderLine']> }) {
+  return render.current(line, index);
+});
+
 export function LyricList(props: Props) {
+  const render = useRef(props.renderLine); render.current = props.renderLine;
+  const renderLine = (line: LyricLine, index: number) => <CachedLine key={line.id} line={line} index={index} version={props.lineVersion?.(line) ?? ''} render={render}/>;
   const handled = useRef<number | null>(props.memory?.handled ?? null);
   useEffect(() => () => { if (props.memory) props.memory.handled = handled.current; }, [props.memory]);
-  return props.lines.length > 80 ? <VirtualLyricList {...props} handled={handled} /> : <NormalLyricList {...props} handled={handled} />;
+  return props.lines.length > 80 ? <VirtualLyricList {...props} renderLine={props.lineVersion ? renderLine : props.renderLine} handled={handled} /> : <NormalLyricList {...props} renderLine={props.lineVersion ? renderLine : props.renderLine} handled={handled} />;
 }

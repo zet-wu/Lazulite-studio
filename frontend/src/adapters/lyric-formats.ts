@@ -1,3 +1,4 @@
+import type { ProjectEditing } from '../domain/project-editing';
 import { prepareAss, renderAss } from './ass';
 import { projectExportSeparators } from './export-separators';
 import { plainTranslation } from '../domain/lyric-document';
@@ -58,17 +59,17 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
     romanizationTracks: [timedTrack, plainTrack].filter((track) => track.contents.length) };
 }
 
-export function exportLyricFile(document: LyricDocument, format: LyricFormat): string {
+export function exportLyricFile(document: LyricDocument, format: LyricFormat, editing?: ProjectEditing): string {
   if (format === 'krc') throw new Error('KRC 目前仅支持导入');
-  assertOutputDocument(document,format);
-  if (format === 'ttml') return serializeLyricTtml(document);
-  if (format === 'ass') return renderAss(prepareAss(document).events);
+  assertOutputDocument(document,format,editing);
+  if (format === 'ttml') return serializeLyricTtml(document,{editing});
+  if (format === 'ass') return renderAss(prepareAss(document,editing).events);
   if (format === 'txt') return document.lines.filter((line) => !line.backgroundOf).map((line) => line.words.map((word) => word.text).join('')).join('\n') + '\n';
-  if (format === 'lrc' || format === 'elrc') return renderLrc(document, format).text;
+  if (format === 'lrc' || format === 'elrc') return renderLrc(document, format,editing).text;
   const leadAgent = document.agents.find(agent => document.lines.some(line => line.agentRefs.includes(agent.id)))?.id;
   const lines: FormatLine[] = document.lines.map((line) => {
     if (line.beginMs === null || line.endMs === null || line.endMs <= line.beginMs) throw new Error('导出前请补全每行时间');
-    const words = projectExportSeparators(line.words).units.map(word => {
+    const words = projectExportSeparators(line.words,editing).units.map(word => {
       const begin = word.beginMs;
       const end = word.endMs;
       if (begin === null || end === null || end <= begin) throw new Error('导出前请补全逐词时间');

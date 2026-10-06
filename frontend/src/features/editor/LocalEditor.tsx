@@ -24,6 +24,7 @@ export function LocalEditor() {
   const [name, setName] = useState('未命名.ttml');
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [historyVersion, setHistoryVersion] = useState(0);
   const touched = useRef(false);
   const dirty = state.present !== clean;
   useEffect(() => {
@@ -57,7 +58,7 @@ export function LocalEditor() {
     finally { setSaving(false); }
   };
   const exportFormat = (format: LyricFormat) => {
-    download(exportLyricFile(state.present.lyrics, format), name.replace(/\.[^.]*$/, '') + '.' + (format === 'elrc' ? 'extended.lrc' : format));
+    download(exportLyricFile(state.present.lyrics, format, state.present.editing), name.replace(/\.[^.]*$/, '') + '.' + (format === 'elrc' ? 'extended.lrc' : format));
   };
   const createNew = async () => {
     if (dirty && !window.confirm('当前修改尚未保存，确定新建吗？')) return;
@@ -67,7 +68,7 @@ export function LocalEditor() {
       touched.current = true; commitState(createProjectEditorState(next)); setClean(next); setName('未命名.ttml'); setMessage(null);
     } catch (error) { setMessage(error instanceof Error ? error.message : '新建失败'); }
   };
-  return <ProjectEditingContext value={state.present.editing}><EditorWorkspace project={state.present} title={name} document={state.present.lyrics} apply={apply} undo={() => commitState(undoProjectCommand(stateRef.current))} redo={() => commitState(redoProjectCommand(stateRef.current))}
+  return <ProjectEditingContext value={state.present.editing}><EditorWorkspace historyVersion={historyVersion} project={state.present} title={name} document={state.present.lyrics} apply={apply} undo={() => { commitState(undoProjectCommand(stateRef.current)); setHistoryVersion(v => v + 1); }} redo={() => { commitState(redoProjectCommand(stateRef.current)); setHistoryVersion(v => v + 1); }}
     canUndo={state.past.length > 0} canRedo={state.future.length > 0} dirty={dirty} saving={saving} error={message}
     onSave={() => void save()} onImportName={setName} onNew={() => void createNew()}
     onExportFormat={exportFormat} /></ProjectEditingContext>;

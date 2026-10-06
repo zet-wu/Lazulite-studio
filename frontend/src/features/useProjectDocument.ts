@@ -88,7 +88,7 @@ export function useProjectDocument(
     }
     if (forPackaging && pending.current) throw new Error('上次保存尚未确认，请先重试保存再打包');
     const captured = stateRef.current.present;
-    if (!dirty) return { revision, document: captured.lyrics };
+    if (!dirty) return { revision, document: captured.lyrics, editing: captured.editing };
     inFlight.current = true;
     setSaving(true);
     try {
@@ -124,7 +124,7 @@ export function useProjectDocument(
           result.revision,
         ));
       }
-      return { revision: result.revision, document: captured.lyrics };
+      return { revision: result.revision, document: captured.lyrics, editing: captured.editing };
     } catch (caught) {
       if ((caught as { status?: number }).status === 404) { deletedRef.current = true; setDeleted(true); }
       if ((caught as { status?: number }).status === 412) setConflict(true);
@@ -142,6 +142,7 @@ export function useProjectDocument(
     const timer = window.setTimeout(() => void save(), 700);
     return () => window.clearTimeout(timer);
   }, [conflict, deleted, dirty, error, save]);
+  const [historyVersion, setHistoryVersion] = useState(0);
   const history = useCallback(
     (change: (s: ProjectEditorState) => ProjectEditorState) => {
       if (conflict || deletedRef.current) return;
@@ -213,7 +214,7 @@ export function useProjectDocument(
     if (deleted) void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError("项目已删除，本地数据清理失败"));
   }, [deleted, enqueueRecovery, projectId]);
   return {
-    deleted,
+    deleted, historyVersion,
     document: state.present.lyrics,
     project: state.present,
     applyProject: (command: ProjectCommand) => history(s => executeProjectCommand(s, command)),
@@ -231,8 +232,8 @@ export function useProjectDocument(
     restore,
     discardRecovery,
     reloadRecovery: recover,
-    undo: () => history(undoProjectCommand),
-    redo: () => history(redoProjectCommand),
+    undo: () => { history(undoProjectCommand); setHistoryVersion(v => v + 1); },
+    redo: () => { history(redoProjectCommand); setHistoryVersion(v => v + 1); },
     canUndo: state.past.length > 0,
     canRedo: state.future.length > 0,
     clearConflict: () => setConflict(false),

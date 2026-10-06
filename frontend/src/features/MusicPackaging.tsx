@@ -1,3 +1,5 @@
+import { useProjectEditing } from './editor/ProjectEditingContext';
+import type { ProjectEditing } from '../domain/project-editing';
 import { Select } from '../shared/Select';
 import { usePreference } from './editor/use-preference';
 import { collectOutputIssues, uniqueOutputIssues, DocumentOutputError, type OutputIssue } from '../adapters/output-validation';
@@ -12,12 +14,13 @@ import { validatePublishDocument } from '../adapters/publish-validation';
 import styles from './acquisition.module.css';
 type Info = { filename: string; format_label: string; asset_id: string; supported: boolean; container: string | null; tracks: { track_id: number; language: string; name: string }[]; error: string | null };
 const active = new Set(['queued','running','processing','cancel_requested']);
-export function MusicPackaging({ projectId, document, saveForPackaging, onIssues, dirty }: { dirty?: boolean; onIssues: (issues: OutputIssue[])=>void; projectId: string; document: LyricDocument; saveForPackaging: () => Promise<{ revision: string; document: LyricDocument } | undefined> }) {
+export function MusicPackaging({ projectId, document, saveForPackaging, onIssues, dirty }: { dirty?: boolean; onIssues: (issues: OutputIssue[])=>void; projectId: string; document: LyricDocument; saveForPackaging: () => Promise<{ revision: string; document: LyricDocument; editing?: ProjectEditing } | undefined> }) {
+ const editing = useProjectEditing();
  const client = useQueryClient();
  const info = useQuery({ queryKey:['packaging',projectId], queryFn:async (): Promise<Info> => { const r=await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/packaging`,{headers:requestHeaders(),credentials:'include'}); if (!r.ok) throw new Error('无法读取源文件打包信息'); return r.json(); } });
  const exports = useQuery({ queryKey:['exports',projectId], queryFn:()=>publishingApi.list(projectId), refetchInterval:q=>q.state.data?.items.some(i=>active.has(i.status)) ? 1500 : false });
  const [kind,setKind] = usePreference<LrcKind>(`studio:packaging:project:${projectId}`, 'lrc', (v): v is LrcKind => v === 'lrc' || v === 'elrc'), [track,setTrack] = useState<number | null>(null), [busy,setBusy] = useState(false), [message,setMessage] = useState('');
- useEffect(()=>{onIssues([]);},[kind,track,document,onIssues]);
+ useEffect(()=>{onIssues([]);},[kind,track,document,editing,onIssues]);
  const [captured,setCaptured] = useState<LyricDocument | null>(null);
  const recent=exports.data?.items.find(item=>item.status==='succeeded' && item.download_url);
  const current=exports.data?.items[0];
@@ -27,13 +30,13 @@ export function MusicPackaging({ projectId, document, saveForPackaging, onIssues
    setBusy(true); setMessage(''); onIssues([]);
    try {
      const snapshot = document, target = track, asset = info.data.asset_id;
-     const problems=[...collectOutputIssues(snapshot,kind),...(info.data.container === 'mp4' ? collectOutputIssues(snapshot,'publish') : [])];
+     const problems=[...collectOutputIssues(snapshot,kind,editing),...(info.data.container === 'mp4' ? collectOutputIssues(snapshot,'publish',editing) : [])];
      const unique=uniqueOutputIssues(problems);
      if(unique.length)throw new DocumentOutputError(unique);
-     const lrc=renderLrc(snapshot,kind).text;
-     if (info.data.container === 'mp4') validatePublishDocument(snapshot);
+     const lrc=renderLrc(snapshot,kind,editing).text;
+     if (info.data.container === 'mp4') validatePublishDocument(snapshot,editing);
      const saved = await saveForPackaging();
-     if (!saved || saved.document !== snapshot) throw new Error('保存快照已变化，请重新发起打包');
+     if (!saved || saved.document !== snapshot || saved.editing && saved.editing !== editing) throw new Error('保存快照已变化，请重新发起打包');
      setCaptured(snapshot);
      await publishingApi.publish(projectId,saved.revision,asset,{lrc_kind:kind,lrc_text:lrc,target_track_id:target});
      setMessage(`已提交打包，修订 ${saved.revision}`); await client.invalidateQueries({queryKey:['exports',projectId]});

@@ -1,13 +1,14 @@
+import type { ProjectEditing } from '../domain/project-editing';
 import { isUntimedSeparator } from './export-separators';
 import { assertOutputDocument, visibleLineOrdinals } from './output-validation';
 import { lineText, type LyricDocument, type LyricLine } from '../domain/lyric-document';
 export type LrcKind = 'lrc' | 'elrc';
 const stamp = (v: number) => `${String(Math.floor(v / 60000)).padStart(2, '0')}:${String(Math.floor(v / 1000) % 60).padStart(2, '0')}.${String(v % 1000).padStart(3, '0')}`;
-function extended(line: LyricLine, ordinal: number): string {
+function extended(line: LyricLine, ordinal: number, editing?: ProjectEditing): string {
   let boundary = line.beginMs!, result = '';
   const emit = (time: number) => { if (time !== boundary) result += `<${stamp(time)}>`; boundary = time; };
   line.words.forEach((word, index) => {
-    if (isUntimedSeparator(word)) { result += word.text; return; }
+    if (isUntimedSeparator(word,editing)) { result += word.text; return; }
     if (word.beginMs === null) throw new Error(`第 ${ordinal} 行第 ${index + 1} 单元缺少开始时间`);
     const begin = word.beginMs, end = word.endMs === null ? null : word.endMs;
     if (begin < boundary || (end !== null && end < begin)) throw new Error(`第 ${ordinal} 行第 ${index + 1} 单元时间倒序或重叠，无法输出扩展 LRC`);
@@ -16,8 +17,8 @@ function extended(line: LyricLine, ordinal: number): string {
   return result;
 }
 /** Pure export projection: inferred ends never become source times. */
-export function renderLrc(document: LyricDocument, kind: LrcKind = 'lrc'): { text: string; overlapLines: number[] } {
-  assertOutputDocument(document,kind);
+export function renderLrc(document: LyricDocument, kind: LrcKind = 'lrc', editing?: ProjectEditing): { text: string; overlapLines: number[] } {
+  assertOutputDocument(document,kind,editing);
   const ordinals=visibleLineOrdinals(document);
   const rows = document.lines.map((line) => ({ line, ordinal: ordinals.get(line.id)! })).filter(({ line }) => !line.backgroundOf);
   for (const { line, ordinal } of rows) {
@@ -35,7 +36,7 @@ export function renderLrc(document: LyricDocument, kind: LrcKind = 'lrc'): { tex
       output.push(`[${stamp(groupEnd)}]`); groupRows = []; groupEnd = undefined;
     }
     for (const other of groupRows) if (other.line.beginMs! === begin || (other.line.endMs !== null && other.line.endMs > begin)) { overlap.add(other.ordinal); overlap.add(ordinal); }
-    output.push(`[${stamp(begin)}]${kind === 'elrc' ? extended(line, ordinal) : lineText(line)}`);
+    output.push(`[${stamp(begin)}]${kind === 'elrc' ? extended(line, ordinal,editing) : lineText(line)}`);
     groupEnd = groupEnd === null || end === null ? null : Math.max(groupEnd ?? end, end);
     groupRows.push(row);
   }

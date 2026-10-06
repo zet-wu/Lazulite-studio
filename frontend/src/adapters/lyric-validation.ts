@@ -1,3 +1,4 @@
+import type { ProjectEditing } from '../domain/project-editing';
 import type { LyricDocument } from '../domain/lyric-document';
 import { isPunctuation } from '../domain/preview-adapter';
 import { exportLyricFile, type LyricFormat } from './lyric-formats';
@@ -5,20 +6,20 @@ import { collectOutputIssues, DocumentOutputError, outputIssueKey, type OutputIs
 
 export const checkedFormats: Exclude<LyricFormat, 'krc'>[] = ['ttml', 'txt', 'lrc', 'elrc', 'eslrc', 'qrc', 'yrc', 'lys', 'ass'];
 /** Runs the actual serializers in memory; no download, persistence or history effects. */
-export function validateLyrics(document: LyricDocument): OutputIssue[] {
+export function validateLyrics(document: LyricDocument, editing?: ProjectEditing): OutputIssue[] {
   const result = new Map<string, OutputIssue>();
   const add = (issue: OutputIssue, format: string, severity: NonNullable<OutputIssue['severity']>) => {
     const key = `${outputIssueKey(issue)}:${severity}`, previous = result.get(key);
     result.set(key, { ...issue, severity, formats: [...new Set([...(previous?.formats ?? []), format])] });
   };
   for (const format of checkedFormats) {
-    try { exportLyricFile(document, format); }
+    try { exportLyricFile(document, format,editing); }
     catch (cause) {
       const issues = cause instanceof DocumentOutputError ? cause.issues : [{ kind: 'line' as const, lineId: '', missing: [], code: 'serialization' as const, message: cause instanceof Error ? cause.message : '序列化失败' }];
       issues.forEach(issue => add(issue, format.toUpperCase(), 'error'));
     }
   }
-  collectOutputIssues(document, 'publish').forEach(issue => add(issue, '发布歌词', 'error'));
+  collectOutputIssues(document, 'publish',editing).forEach(issue => add(issue, '发布歌词', 'error'));
   for (const line of document.lines) {
     for (const word of line.words) {
       if (isPunctuation(word.text)) {

@@ -58,13 +58,13 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
   }, [editor.dirty, editor.saving, editor.conflict]);
   if (editor.deleted) return <main><p role="alert">项目已删除，不能继续保存或恢复。</p><a href="/projects">返回项目列表</a></main>;
   const exportFormat = (format: LyricFormat) => {
-    download(exportLyricFile(editor.document, format), `${title}.${format === 'elrc' ? 'extended.lrc' : format}`);
+    download(exportLyricFile(editor.document, format, editor.project.editing), `${title}.${format === 'elrc' ? 'extended.lrc' : format}`);
   };
   return <ProjectEditingContext value={editor.project.editing}><div className={styles.editorShell} onKeyDown={event=>{
     if(event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || !(event.ctrlKey||event.metaKey) || (event.target as Element).closest('input,textarea,select,[role="dialog"]'))return;
     if(event.key.toLowerCase()==='z'){event.preventDefault();if(event.shiftKey)editor.redo();else editor.undo();}
     if(event.key.toLowerCase()==='s'){event.preventDefault();void editor.save();}
-  }}><EditorWorkspace project={editor.project} applyProject={command=>{if(editor.conflict)throw new Error('保存冲突，请先处理');editor.applyProject(command);}} audioDurationMs={asset?.duration_ms ?? 0} onTimelineHost={setTimelineHost} assignmentError={assignmentError} embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
+  }}><EditorWorkspace historyVersion={editor.historyVersion} project={editor.project} applyProject={command=>{if(editor.conflict)throw new Error('保存冲突，请先处理');editor.applyProject(command);}} audioDurationMs={asset?.duration_ms ?? 0} onTimelineHost={setTimelineHost} assignmentError={assignmentError} embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo} canRedo={editor.canRedo} dirty={editor.dirty} saving={editor.saving} outputIssues={outputIssues} error={message || editor.error}
     onSave={() => void editor.save()} onExportFormat={exportFormat}
     saveForPackaging={editor.saveForPackaging}

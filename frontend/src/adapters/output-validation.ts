@@ -1,3 +1,4 @@
+import type { ProjectEditing } from '../domain/project-editing';
 import { prepareAss } from './ass';
 import { isUntimedSeparator, isUntimedXmlWhitespace, projectExportSeparators } from './export-separators';
 import { AGENT_TYPES } from '../domain/lyric-document';
@@ -14,8 +15,8 @@ export class DocumentOutputError extends Error {
   constructor(readonly issues: OutputIssue[]) { super(issues[0].message); }
 }
 export function visibleLineOrdinals(document: LyricDocument) { return new Map(document.lines.filter(l=>!l.backgroundOf).map((l,i)=>[l.id,i+1])); }
-export function collectOutputIssues(document: LyricDocument, target: LyricFormat | 'publish'): OutputIssue[] {
- if (target === 'ass') return prepareAss(document).issues;
+export function collectOutputIssues(document: LyricDocument, target: LyricFormat | 'publish', editing?: ProjectEditing): OutputIssue[] {
+ if (target === 'ass') return prepareAss(document,editing).issues;
  const issues: OutputIssue[] = [], ordinals=visibleLineOrdinals(document);
  if (target === 'ttml' || target === 'publish') for (const agent of document.agents) if (!AGENT_TYPES.some(type => type === agent.type)) issues.push({ kind: 'agent', lineId: '', agentId: agent.id, code: 'invalid-agent-type', missing: [], message: `歌手 ${agent.id}：${agent.type ? `非法 type ${agent.type}` : '缺少 type'}` });
  const label=(line: LyricLine)=>`第 ${ordinals.get(line.backgroundOf ?? line.id)} 行${line.backgroundOf ? ' · 背景' : ''}`;
@@ -31,15 +32,15 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
    const base={kind:'line' as const,lineId:line.id},prefix=label(line);
    if(fullBody || lrc) add(base,prefix,line.beginMs,line.endMs,fullBody,line.beginMs!==null && line.endMs!==null && (fullBody ? line.endMs<=line.beginMs : line.endMs<line.beginMs) ? '结束时间必须晚于开始' : undefined);
    if (fullBody && target !== 'publish') {
-     const projection = projectExportSeparators(line.words);
+     const projection = projectExportSeparators(line.words,editing);
      if (!projection.units.length) issues.push({ ...base, code: 'empty-content', missing: [], message: `${prefix}：该行没有可输出的定时正文` });
      else for (const word of projection.unhosted) issues.push({ kind: 'word', lineId: line.id, wordId: word.id, code: 'missing-time', missing: [], message: `${prefix}：分隔空白没有相邻的有效定时正文` });
      for (const word of line.words) if (/[\t\r\n\u2028\u2029]/u.test(word.text)) issues.push({ kind: 'word', lineId: line.id, wordId: word.id, code: 'serialization', missing: [], message: `${prefix}：此格式不能忠实表达正文中的制表符或换行` });
    }
    let boundary=line.beginMs === null ? null : line.beginMs;
    for(const [i,word] of line.words.entries()) {
-     const blank=isUntimedSeparator(word);
-     if(blank || target === 'publish' && isUntimedXmlWhitespace(word))continue;
+     const blank=isUntimedSeparator(word,editing);
+     if(blank || target === 'publish' && isUntimedXmlWhitespace(word,editing))continue;
      const wordBase={kind:'word' as const,lineId:line.id,wordId:word.id},wordPrefix=`${prefix}第 ${i+1} 词`;
      const begin=word.beginMs;
      const end=word.endMs;
@@ -75,7 +76,7 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
  }
  return issues;
 }
-export function assertOutputDocument(document: LyricDocument,target: LyricFormat | 'publish') { const issues=collectOutputIssues(document,target);if(issues.length)throw new DocumentOutputError(issues); }
+export function assertOutputDocument(document: LyricDocument,target: LyricFormat | 'publish', editing?: ProjectEditing) { const issues=collectOutputIssues(document,target,editing);if(issues.length)throw new DocumentOutputError(issues); }
 
 export function outputIssueKey(issue: OutputIssue) {
  return JSON.stringify([issue.kind,issue.agentId,issue.lineId,issue.wordId,issue.rubyId,issue.trackId,issue.contentId,issue.unitId,issue.code ?? 'missing-time',issue.missing]);

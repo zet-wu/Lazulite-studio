@@ -1,3 +1,4 @@
+import type { SyncProgress } from './sync-progress';
 import { useProjectEditing } from './ProjectEditingContext';
 import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
@@ -11,16 +12,16 @@ import { visibleLineOrdinals } from '../../adapters/output-validation';
 import type { TransportHandle } from '../MediaTransport';
 import styles from './semantic-editor.module.css';
 
-type Props = { preferenceScope?: string; document: LyricDocument; cursor: SyncCursor | null; targetVersion?: number; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
+type Props = { progress: SyncProgress; onProgress: (progress: SyncProgress) => void; preferenceScope?: string; document: LyricDocument; cursor: SyncCursor | null; targetVersion?: number; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
 
-export function SyncPanel({ document, cursor, targetVersion, apply, transport, onCursor, preferenceScope = 'local:untitled' }: Props) {
+export function SyncPanel({ progress, onProgress, document, cursor, targetVersion, apply, transport, onCursor, preferenceScope = 'local:untitled' }: Props) {
   const editing = useProjectEditing();
-  const units = useMemo(() => syncUnits(document, editing), [document]);
+  const background = document.lines.find(line => line.id === cursor?.lineId)?.backgroundOf;
+  const units = useMemo(() => syncUnits(document, editing, background ? cursor?.lineId : undefined), [document, editing, background, cursor?.lineId]);
   const [mode, setMode] = usePreference<SyncMode>('studio:sync-mode', 'continuous', (v): v is SyncMode => v === 'continuous' || v === 'line');
-  const [completed, setCompleted] = useState(false);
+  const { completed, consumed: emptyBeats } = progress;
   const keys = useShortcuts();
   const [offsetMs, setOffsetMs] = usePreference<number>(`studio:sync-offset:${preferenceScope}`, 0, (v): v is number => Number.isSafeInteger(v));
-  const [emptyBeats, setEmptyBeats] = useState(0);
   const [error, setError] = useState('');
   const index = syncIndex(units, cursor);
   const active = index >= 0 ? units[index] : null;
@@ -29,30 +30,32 @@ export function SyncPanel({ document, cursor, targetVersion, apply, transport, o
   const ruby = word?.rubyUnits.find((item) => item.id === active?.rubyUnitId);
   const beginMs = ruby ? ruby.beginMs : word?.beginMs ?? null;
   const endMs = ruby ? ruby.endMs : word?.endMs ?? null;
-  useEffect(() => { setEmptyBeats(0); setCompleted(false); setError(''); }, [cursor?.lineId, cursor?.wordId, cursor?.rubyUnitId, targetVersion]);
+  useEffect(() => { setError(''); }, [cursor?.lineId, cursor?.wordId, cursor?.rubyUnitId, targetVersion]);
+  const beatCount = active ? emptyBeatCount(editing, active.rubyUnitId ?? active.wordId) : 0;
+  const effectiveMode = background ? 'line' : mode;
   const lineUnits = units.filter(unit => unit.lineId === active?.lineId);
   const lineIndex = syncIndex(lineUnits, active);
   const lineNumber = line ? visibleLineOrdinals(document).get(line.id) : null;
   const moveTo = (at: number) => {
     const next = units[at];
     if (!next) return;
-    setCompleted(false); setEmptyBeats(0); setError(''); onCursor(next);
+    onProgress({ completed: false, consumed: 0 }); setError(''); onCursor(next);
   };
   const previousLine = () => { const before = units.slice(0, index).reverse().find((unit) => unit.lineId !== active?.lineId); if (before) moveTo(units.findIndex((unit) => unit.lineId === before.lineId)); };
   const followingLine = () => { const at = units.findIndex((unit, position) => position > index && unit.lineId !== active?.lineId); if (at >= 0) moveTo(at); };
   const stamp = (action: SyncAction) => {
-    if (!active || completed) return;
+    if (!active || completed && action !== 'start') return;
     const clock = transport?.current;
     if (!clock) { setError('请先连接项目音频'); return; }
     const timeMs = Math.max(0, clock.getPositionMs() + Math.round(offsetMs));
-    if (action === 'next' && !active.rubyUnitId && word && emptyBeats < emptyBeatCount(editing, word.id)) { setEmptyBeats((value) => value + 1); return; }
-    if (apply({ type: 'sync-stamp', cursor: active, action, timeMs, mode })) {
-      setError('');
-      if (action !== 'start') {
-        if (mode === 'line' && lineIndex === lineUnits.length - 1) setCompleted(true);
-        else moveTo(Math.min(units.length - 1, index + 1));
-      }
-    }
+    if (action !== 'start' && (beginMs === null || !Number.isSafeInteger(beginMs) || beginMs < 0)) { setError('请先为当前单元打起始轴'); return; }
+    if (action === 'next' && emptyBeats < beatCount) { onProgress({ completed: false, consumed: emptyBeats + 1 }); setError(''); return; }
+    if (!apply({ type: 'sync-stamp', cursor: active, action, timeMs, mode: effectiveMode })) return;
+    setError('');
+    if (action === 'start') { onProgress({ completed: false, consumed: 0 }); return; }
+    const next = units[index + 1];
+    if (!next || effectiveMode === 'line' && next.lineId !== active.lineId) onProgress({ completed: true, consumed: 0 });
+    else moveTo(index + 1);
   };
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -82,14 +85,14 @@ export function SyncPanel({ document, cursor, targetVersion, apply, transport, o
     <strong>{active ? `L${lineNumber} · 单元 ${lineIndex + 1} / ${lineUnits.length}` : '当前选择不参与打轴'}</strong>
     <span className={styles.syncQuote}><span>{word?.text}</span>{ruby && <b> → {ruby.reading}</b>}</span>
     <small className={styles.syncTime}>{beginMs === null ? '—' : (beginMs / 1e3).toFixed(3)}–{endMs === null ? '—' : (endMs / 1e3).toFixed(3)} s</small>
-    <Select aria-label="打轴模式" value={mode} onChange={event => { setMode(event.target.value as SyncMode); setCompleted(false); }}><option value="continuous">连续</option><option value="line">本行</option></Select>
+    <Select aria-label="打轴模式" disabled={Boolean(background)} value={effectiveMode} onChange={event => { setMode(event.target.value as SyncMode); onProgress({ completed: false, consumed: 0 }); }}><option value="continuous">连续</option><option value="line">本行</option></Select>
+    {background && <span>背景 · 本行</span>}
     {offsetMs !== 0 && <small>输入偏移 {offsetMs} ms <button data-role="secondary" onClick={() => setOffsetMs(0)}>归零</button></small>}
-    {emptyBeats > 0 && <small>空拍 {emptyBeats}/{(word ? emptyBeatCount(editing, word.id) : 0)}</small>}
-    {completed && <small role="status">本行已完成</small>}
+    {emptyBeats > 0 && <small>空拍 {emptyBeats}/{beatCount}</small>}
     <div className={styles.syncButtons}>
       <button data-role="secondary" disabled={index <= 0} onClick={() => moveTo(index - 1)}>上一单元</button>
       <button data-role="secondary" disabled={!units.slice(0, index).some((unit) => unit.lineId !== active?.lineId)} onClick={previousLine}>上一行</button>
-      <button data-role="secondary" disabled={!active || completed} onClick={() => stamp('start')}>起始轴</button>
+      <button data-role="secondary" disabled={!active} onClick={() => stamp('start')}>起始轴</button>
       <button data-role="secondary" disabled={!active || completed} onClick={() => stamp('next')}>连续轴</button>
       <button data-role="secondary" disabled={!active || completed} onClick={() => stamp('end')}>结束轴</button>
       <button data-role="secondary" disabled={index < 0 || index >= units.length - 1} onClick={() => moveTo(index + 1)}>下一单元</button>
@@ -99,7 +102,7 @@ export function SyncPanel({ document, cursor, targetVersion, apply, transport, o
       <button data-role="secondary" disabled={beginMs === null} onClick={() => { if (beginMs !== null) transport?.current?.seekMs(beginMs); }}>回听定位</button>
       <button data-role="secondary" disabled={beginMs === null} onClick={() => audition(true)}>听前段</button>
       <button data-role="secondary" disabled={endMs === null} onClick={() => audition(false)}>听后段</button>
-    {word && emptyBeatCount(editing, word.id) > 0 && !active?.rubyUnitId && <small>空拍 {emptyBeats}/{emptyBeatCount(editing, word.id)}：连续轴先计数，再落点</small>}
+    {beatCount > 0 && <small>空拍 {emptyBeats}/{beatCount}：连续轴先计数，再落点</small>}
     <label>输入偏移（毫秒） <input type="number" value={offsetMs} onChange={(event) => setOffsetMs(Math.round(Number(event.target.value)))} /></label>
     <button data-role="secondary" disabled={beginMs === null || !transport?.current} onClick={() => { if (beginMs !== null && transport?.current) setOffsetMs(Math.round((beginMs - transport.current.getPositionMs()) )); }}>按当前起点校准</button>
     </div></details>

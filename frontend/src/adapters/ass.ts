@@ -1,3 +1,4 @@
+import type { ProjectEditing } from '../domain/project-editing';
 import type { LyricDocument, RomanizationContent } from '../domain/lyric-document';
 import type { OutputIssue } from './output-validation';
 import { isUntimedSeparator, projectExportSeparators, type ExportUnit } from './export-separators';
@@ -7,7 +8,7 @@ const cs = (ms: number) => Math.round(ms / 10);
 const stamp = (value: number) => `${Math.floor(value / 360000)}:${String(Math.floor(value / 6000) % 60).padStart(2,'0')}:${String(Math.floor(value / 100) % 60).padStart(2,'0')}.${String(value % 100).padStart(2,'0')}`;
 
 /** Both validation and serialization consume this exact projection, never the playback selection. */
-export function prepareAss(document: LyricDocument): { events: AssEvent[]; issues: OutputIssue[] } {
+export function prepareAss(document: LyricDocument, editing?: ProjectEditing): { events: AssEvent[]; issues: OutputIssue[] } {
   const events: AssEvent[] = [], issues: OutputIssue[] = [];
   const ordinals = new Map(document.lines.filter(line=>!line.backgroundOf).map((line,index)=>[line.id,index+1]));
   for (const line of document.lines) {
@@ -38,13 +39,13 @@ export function prepareAss(document: LyricDocument): { events: AssEvent[]; issue
     const lineValid = range({ ...line, text: '' }, lineBase);
     if (lineValid && cs(line.endMs!) <= cs(line.beginMs!)) problem({ ...lineBase, code: 'invalid-range' }, 'ASS 行边界量化到厘秒后必须有正时长');
     const timed = (source: ExportUnit[], base: Omit<OutputIssue,'missing'|'message'>, unitBase: (unit: ExportUnit)=>Omit<OutputIssue,'missing'|'message'>, body: boolean) => {
-      const projection = projectExportSeparators(source);
+      const projection = projectExportSeparators(source,body ? editing : undefined);
       if (!projection.units.length) problem({ ...base, code: 'empty-content' }, body ? '该行没有可输出的定时正文' : '该定时内容没有可输出的定时单元');
       for (const unit of projection.unhosted) problem({ ...unitBase(unit), code: 'missing-time' }, '分隔空白没有相邻的有效定时单元');
       let previousEnd: number | null = null;
       for (const unit of source) {
         textCheck(unit.text, unitBase(unit));
-        if (isUntimedSeparator(unit)) continue;
+        if (isUntimedSeparator(unit,body ? editing : undefined)) continue;
         if (!range(unit, unitBase(unit))) continue;
         if (previousEnd !== null && unit.beginMs! < previousEnd) problem({ ...unitBase(unit), code: 'unsupported-order' }, 'ASS 无法表达同一事件内的单元重叠或倒序');
         if (body && lineValid && (unit.beginMs! < line.beginMs! || unit.endMs! > line.endMs!)) problem({ ...unitBase(unit), code: 'invalid-range' }, 'ASS 正文单元超出所属行边界');
