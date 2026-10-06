@@ -23,6 +23,6 @@ export function EditorContextMenu({ x, y, title, actions, close }: { x: number; 
       }
     }}>
     {actions.map((item, index) => <button data-role="inline" key={`${index}:${item.label}`} role="menuitem" disabled={item.disabled}
-      onClick={() => { item.run(); close(); }}>{item.label}{item.reason && <small> · {item.reason}</small>}</button>)}
+      onClick={() => { close(); item.run(); }}>{item.label}{item.reason && <small> · {item.reason}</small>}</button>)}
   </div>;
 }

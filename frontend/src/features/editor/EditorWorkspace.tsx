@@ -1,3 +1,5 @@
+import { Icon } from '../../shared/Icon';
+import { Fragment } from 'react';
 import { documentTargets, selectionKind, targetId, targetSelection, selectionTargets, targetInterval } from './selection-targets';
 import { SelectionProvider, useEditorSelection } from './SelectionContext';
 import { flushSync } from 'react-dom';
@@ -27,7 +29,7 @@ import { copySelection, cutSelection, deleteSelection, invertIds, moveWordsAcros
 import { LyricList } from './LyricList';
 import { LyricLine as LyricLineView } from './LyricLine';
 import { LyricWord as LyricWordView } from './LyricWord';
-import { InlineAdd } from './InlineAdd';
+import { InlineDraft } from './InlineAdd';
 import { DraftInput, TimePair } from './EditorFields';
 import { ColumnSeparator } from './ColumnSeparator';
 import { OutlineRow } from './OutlineRow';
@@ -149,6 +151,8 @@ function EditorWorkspaceContent(props: Props) {
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number; afterRubyId?: string | null } | null>(null);
   const rubyShortcutSerial = useRef(0);
+  const [wordDraft, setWordDraft] = useState<{ lineId: string; afterWordId: string | null; serial: number } | null>(null);
+  const wordDraftSerial = useRef(0);
   const [splitLineId, setSplitLineId] = useState<string | null>(null);
   const [contentTransfer, setContentTransfer] = useState<{ trackId: string; contentId: string; targetLineId: string } | null>(null);
   const [romanizationGeneration, setRomanizationGeneration] = useState<string[] | null>(null);
@@ -403,6 +407,19 @@ function EditorWorkspaceContent(props: Props) {
     if (index + direction < 0 || index + direction >= line.words.length) return;
     dispatch({ type: 'move-word', lineId: line.id, wordId: word.id, toLineId: line.id, afterWordId: direction < 0 ? line.words[index - 2]?.id ?? null : line.words[index + 1].id });
   };
+  const startWordDraft = (lineId: string, afterWordId: string | null) => {
+    setWordDraft({ lineId, afterWordId, serial: ++wordDraftSerial.current });
+    requestLocate(lineId, '[data-word-draft] input');
+  };
+  const renderWordDraft = (line: LyricLine, afterWordId: string | null) => wordDraft?.lineId === line.id && wordDraft.afterWordId === afterWordId &&
+    <span data-word-draft key={`draft-${wordDraft.serial}`}><InlineDraft label="添加词" close={() => setWordDraft(null)} commit={text => {
+      const word = createWord(text);
+      if (!dispatch({ type: 'insert-word', lineId: line.id, afterWordId, word })) return false;
+      setSelection({ kind: 'words', lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id });
+      props.onSelectLine?.(line.id); props.onSelectUnit?.(line.id, word.id, null);
+      requestLocate(line.id, `[data-word-id="${word.id}"] input[aria-label^="词 "]`);
+      return true;
+    }} /></span>;
   const mergeAction = (kind: 'words' | 'ruby', ids: string[], multiple: boolean): ContextAction => {
     const label = multiple ? '合并' : kind === 'words' ? '合并前一词' : '合并前一读音';
     try {
@@ -502,8 +519,8 @@ function EditorWorkspaceContent(props: Props) {
         : { kind: 'words', lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id };
       title = '词操作';
       actions = [
-        { label: '前插词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words[index - 1]?.id ?? null, word: createWord('新词') }) },
-        { label: '后插词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: word.id, word: createWord('新词') }) },
+        { label: '前插词', run: () => startWordDraft(line.id, line.words[index - 1]?.id ?? null) },
+        { label: '后插词', run: () => startWordDraft(line.id, word.id) },
         { label: '拆分词', disabled: Array.from(word.text).length < 2, run: () => {
           try {
             const parts = segmentText(word.text, DEFAULT_SEGMENT_OPTIONS);
@@ -538,7 +555,7 @@ function EditorWorkspaceContent(props: Props) {
         ...(document.romanizationTracks.some(track => track.contents.some(content => content.lineId === line.id))
           ? [{ label: '从音译生成 注音…', run: () => setRubyGeneration({ lineIds: effective.ids }) }] : []),
         { label: '生成日文罗马字音译…', run: () => setRomanizationGeneration(effective.ids) },
-        { label: '添加词', run: () => dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word: createWord('新词') }) },
+        { label: '添加词', run: () => startWordDraft(line.id, line.words.at(-1)?.id ?? null) },
         { label: '行上移', disabled: Boolean(line.backgroundOf) || mainLines[0]?.id === line.id, run: () => moveLine(line, -1) },
         { label: '行下移', disabled: Boolean(line.backgroundOf) || mainLines.at(-1)?.id === line.id, run: () => moveLine(line, 1) },
         { label: '拆分行…', disabled: Boolean(line.backgroundOf) || line.words.length < 2, run: () => { const issues = lineStructureIssues(document, line); if (issues.length) setMessage(issues.join('；')); else setSplitLineId(line.id); } },
@@ -555,7 +572,7 @@ function EditorWorkspaceContent(props: Props) {
       { label: '剪切', disabled: !copyAllowed(effective), run: () => { cut(effective); } },
       { label: '粘贴', disabled: !clipboard, run: () => paste(clipboard, undefined, effective) },
     ];
-    if (effective.ids.length > 1) actions = actions.map(action => action.label === '合并' || action.label.startsWith('删除所选') || effective.kind === 'lines' && ['生成日文注音…', '生成日文罗马字音译…', '从音译生成 注音…', '分词…'].includes(action.label) ? action : { ...action, disabled: true });
+    if (effective.ids.length > 1) actions = actions.map(action => ['合并', '前插词', '后插词'].includes(action.label) || action.label.startsWith('删除所选') || effective.kind === 'lines' && ['生成日文注音…', '生成日文罗马字音译…', '从音译生成 注音…', '分词…'].includes(action.label) ? action : { ...action, disabled: true });
     setSelection(effective);
     props.onSelectLine?.(line.id);
     if (effective.kind === 'romanization-content' || effective.kind === 'romanization-unit') props.onSelectRomanization?.(effective.trackId, effective.contentId);
@@ -748,13 +765,8 @@ function EditorWorkspaceContent(props: Props) {
           playhead={props.playheadLineId === line.id}
           onSelect={(shift, toggle) => selectLine(line, shift, toggle)} onMove={(direction) => moveLine(line, direction)}>
           <div className={styles.lineHeader}><span>L{ordinalById.get(line.backgroundOf ?? line.id)} · {line.backgroundOf ? '背景' : '主唱'}</span></div>
-          <div className={styles.words}>{line.words.map((word) => wordView(line, word))}
-            <InlineAdd label="添加词" commit={text => {
-              const word = createWord(text);
-              if (!dispatch({ type: 'insert-word', lineId: line.id, afterWordId: line.words.at(-1)?.id ?? null, word })) return false;
-              setSelection({ kind: 'words', lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id });
-              props.onSelectLine?.(line.id); props.onSelectUnit?.(line.id, word.id, null); return true;
-            }} />
+          <div className={styles.words}>{renderWordDraft(line, null)}{line.words.map(word => <Fragment key={word.id}>{wordView(line, word)}{renderWordDraft(line, word.id)}</Fragment>)}
+            <button data-role="inline" className="icon-button" title="添加词" data-tooltip="添加词" aria-label="添加词" onClick={event => { event.stopPropagation(); startWordDraft(line.id, line.words.at(-1)?.id ?? null); }}><Icon name="add"/></button>
           </div>
           <TranslationEditor document={document} lineId={line.id} apply={dispatch} manage={() => setSettingsDialog('translations')} />
           <div className={styles.romanizationTracks}>
