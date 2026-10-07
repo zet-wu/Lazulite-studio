@@ -44,7 +44,7 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
       {document.romanizationTracks.length > 1 && <label>预览音译轨道 <Select value={romanizationTrackId ?? ''} onChange={(event) => setRomanizationTrackId(event.target.value || null)}><option value="">每行首条</option>{document.romanizationTracks.map((track, index) => <option key={track.id} value={track.id}>{index + 1} · {track.language ?? '未指定语言'}</option>)}</Select></label>}
       <label><input type="checkbox" checked={hidePassed} onChange={(event) => setHidePassed(event.target.checked)} /> 隐藏已播行</label>
       <label>词渐变宽度 <input type="range" min="0.05" max="1.5" step="0.05" value={fadeWidth} onChange={(event) => setFadeWidth(Number(event.target.value))} /></label>
-      {!transport && <label>试听位置 <input type="range" min="0" max={duration} value={localTime} onChange={(event) => setLocalTime(Number(event.target.value))} /></label>}
+      {!transport && <label>预览位置 <input type="range" min="0" max={duration} value={localTime} onChange={(event) => setLocalTime(Number(event.target.value))} /></label>}
     </div>
     {lines.length ? <div className={styles.previewPlayer}>
       <LyricPlayer lyricPlayer={StudioLyricPlayer} ref={player} lyricLines={lyricLines} currentTime={transport ? undefined : localTime}

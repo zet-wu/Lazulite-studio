@@ -64,7 +64,7 @@ export function ProjectList() {
     return (
       <main className={styles.centerState}>
         <strong>还没有项目</strong>
-        <p className={styles.muted}>上传一首歌曲，开始制作歌词。</p>
+        <p className={styles.muted}>创建项目开始制作歌词，音乐可稍后上传。</p>
         <CreateProject
           onCreated={(id) => window.location.assign(`/projects/${id}/edit`)}
         />
@@ -79,9 +79,7 @@ export function ProjectList() {
           <p className={styles.muted}>管理歌曲、歌词草稿与复核任务</p>
         </div>
         <div className={styles.pageHeadingActions}>
-          <Link className={styles.primary} to="/editor">
-            打开 TTML
-          </Link>
+
           <CreateProject
             onCreated={(id) => window.location.assign(`/projects/${id}/edit`)}
           />

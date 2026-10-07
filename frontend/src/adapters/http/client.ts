@@ -106,14 +106,14 @@ async function mutate<T>(
   return value;
 }
 
-export function uploadAsset(
+export function uploadMusic(
   file: File,
   onProgress: (value: number) => void,
   signal?: AbortSignal,
 ): Promise<Asset> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_ROOT}/assets`);
+    xhr.open("POST", `${API_ROOT}/uploads`);
     xhr.withCredentials = true;
     xhr.setRequestHeader("X-Request-ID", crypto.randomUUID());
     if (csrf())
@@ -198,9 +198,11 @@ export const studioApi = {
       },
       isSession,
     ),
+  discardUpload: (id: string) => s4<{cancelled:string}>(`/uploads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  attachMusic: (projectId: string, uploadId: string) => s4<Asset>(`/projects/${encodeURIComponent(projectId)}/music`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ upload_id: uploadId }) }),
   createProject: (
     name: string,
-    sourceAssetId: string,
+    uploadId: string | null,
     idempotencyKey: string,
     signal?: AbortSignal,
     sourceFilename?: string,
@@ -214,7 +216,7 @@ export const studioApi = {
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ name, source_asset_id: sourceAssetId, source_filename: sourceFilename }),
+        body: JSON.stringify({ name, upload_id: uploadId, source_filename: sourceFilename }),
       },
       isProjectSummary,
     ),
@@ -279,7 +281,7 @@ export const studioS4 = {
     if (!isDocumentEnvelope(body) || !body.revision) throw new ApiError(502, { code: "invalid_response", message: "文档响应无有效 revision", request_id: "", retryable: false });
     return { ...body, revision: body.revision, etag: response.headers.get("ETag") ?? undefined };
   },
-  saveRichDocument: async (projectId: string, document: ProjectSnapshot, baseRevision: string, operationId: string, seq: number, etag?: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/document`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag ?? `"${baseRevision}"`, "Idempotency-Key": operationId }, body: JSON.stringify({ schema_version: "studio-document-v4", project_id: projectId, revision: baseRevision, client_seq: seq, document }) }); if (!isDocumentEnvelope(result) || !result.revision) throw new ApiError(502, { code: "invalid_response", message: "保存响应无有效 revision", request_id: "", retryable: false }); return { revision: result.revision, etag: `"${result.revision}"` }; },
+  saveRichDocument: async (projectId: string, document: ProjectSnapshot, baseRevision: string, operationId: string, seq: number, etag?: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/document`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag ?? `"${baseRevision}"`, "Idempotency-Key": operationId }, body: JSON.stringify({ schema_version: "studio-document-v5", project_id: projectId, revision: baseRevision, client_seq: seq, document }) }); if (!isDocumentEnvelope(result) || !result.revision) throw new ApiError(502, { code: "invalid_response", message: "保存响应无有效 revision", request_id: "", retryable: false }); return { revision: result.revision, etag: `"${result.revision}"` }; },
   importLyrics: async (projectId: string, revision: string, filename: string, content: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/imports?revision=${encodeURIComponent(revision)}`, { method: 'POST', headers: { 'Content-Type': filename.endsWith("ttml") || filename.endsWith("xml") ? "application/ttml+xml" : filename.endsWith(".lrc") ? "text/lrc" : "text/plain", 'Idempotency-Key': crypto.randomUUID() }, body: content }); if (!isImportCandidate(result)) throw new ApiError(502, { code: "invalid_response", message: "导入响应格式无效", request_id: "", retryable: false }); return result; },
 };
 

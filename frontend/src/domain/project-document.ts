@@ -5,8 +5,7 @@ import { createLyricDocument, type LyricDocument } from './lyric-document';
 export type VocalSegment = { id: string; beginMs: number; endMs: number };
 export type Acoustics = { analysisId: string | null; segments: VocalSegment[] };
 export type ProjectDocument = {
-  schemaVersion: 'studio-project-v2';
-  sourceAssetId: string | null;
+  schemaVersion: 'studio-project-v3';
   lyrics: LyricDocument;
   acoustics: Acoustics;
   editing: ProjectEditing;
@@ -14,8 +13,8 @@ export type ProjectDocument = {
 export type ProjectSnapshot = Omit<ProjectDocument, 'lyrics'> & { lyrics: { draftTtml: string } };
 export type ProjectEditorState = { present: ProjectDocument; past: ProjectDocument[]; future: ProjectDocument[] };
 export type ProjectCommand = { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics; durationMs: number };
-export function createProjectDocument(lyrics = createLyricDocument(), sourceAssetId: string | null = null): ProjectDocument {
-  return { schemaVersion: 'studio-project-v2', sourceAssetId, lyrics, editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
+export function createProjectDocument(lyrics = createLyricDocument()): ProjectDocument {
+  return { schemaVersion: 'studio-project-v3', lyrics, editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
 }
 export function validateSegments(segments: VocalSegment[], durationMs: number) {
   const ids = new Set<string>();

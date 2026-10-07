@@ -9,7 +9,7 @@ import { TopMenu } from './editor/TopMenu';
 import { IconButton } from '../shared/Controls';
 import editorStyles from './editor/semantic-editor.module.css';
 import styles from './vocal.module.css';
-export function VocalPanel({ projectId, project, apply, durationMs, visible }: { projectId: string; project: ProjectDocument; apply: (command: ProjectCommand) => void; durationMs: number; visible: boolean }) {
+export function VocalPanel({ projectId, project, sourceAssetId, apply, durationMs, visible }: { projectId: string; project: ProjectDocument; sourceAssetId: string; apply: (command: ProjectCommand) => void; durationMs: number; visible: boolean }) {
   const ui = useAudioReview();
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
@@ -30,7 +30,7 @@ export function VocalPanel({ projectId, project, apply, durationMs, visible }: {
   const latest = pending ? tasks.find(j=>j.id===pending.id) : tasks[0];
   const completed = useQuery({queryKey:['vocal-result',latest?.id], queryFn:()=>vocalApi.jobResult(latest!.id), enabled:latest?.status==='succeeded'});
   const result = results.data?.items.find(r=>r.id===(completed.data?.analysis_id ?? latest?.id));
-  const sourceResults = results.data?.items.filter(r=>r.source_asset_id===project.sourceAssetId) ?? [];
+  const sourceResults = results.data?.items.filter(r=>r.source_asset_id===sourceAssetId) ?? [];
   const currentAudio = sourceResults.find(r=>r.audio_state==='current') ?? sourceResults[0];
   const repair = currentAudio?.audio_state==='missing';
   const update = currentAudio?.audio_state==='outdated';
@@ -50,10 +50,10 @@ export function VocalPanel({ projectId, project, apply, durationMs, visible }: {
     if(pending && latest?.status==='succeeded' && result?.status==='ready' && !conflict && !handled.current.has(pending.id) && !error) adopt();
   },[pending,latest?.status,result,conflict,error]);
   const run = async (reuse?: string) => {
-    if (!project.sourceAssetId || busy || active) return;
+    if (!sourceAssetId || busy || active) return;
     const baseline=JSON.stringify(project.acoustics);
     setBusy(true); setError(''); setDismissed(null);
-    try { const job=await jobsApi.createVocal(projectId, project.sourceAssetId, reuse); setPending({id:job.id,baseline}); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); }
+    try { const job=await jobsApi.createVocal(projectId, sourceAssetId, reuse); setPending({id:job.id,baseline}); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); }
     catch(e) { setError(e instanceof Error ? e.message : '无法创建人声任务'); }
     finally { setBusy(false); }
   };

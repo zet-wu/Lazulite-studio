@@ -486,45 +486,6 @@
         }
       }
     },
-    "/assets": {
-      "post": {
-        "operationId": "uploadAsset",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "file"
-                ],
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Uploaded asset",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Asset"
-                }
-              }
-            }
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      }
-    },
     "/projects/{projectId}": {
       "delete": {
         "operationId": "deleteProject",
@@ -1497,6 +1458,119 @@
           }
         }
       }
+    },
+    "/uploads": {
+      "post": {
+        "operationId": "uploadMusic",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Uploaded asset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/uploads/{token}": {
+      "delete": {
+        "operationId": "discardUpload",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "临时上传已取消"
+          },
+          "404": {
+            "description": "上传已失效或已接入"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/music": {
+      "post": {
+        "operationId": "attachMusic",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "upload_id"
+                ],
+                "properties": {
+                  "upload_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "已校验的项目音乐资源",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "音乐已由其他请求接入；未采用本次上传"
+          },
+          "404": {
+            "description": "项目或临时上传不存在"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1780,16 +1854,12 @@
       "CreateProjectRequest": {
         "type": "object",
         "required": [
-          "name",
-          "source_asset_id"
+          "name"
         ],
         "properties": {
           "name": {
             "type": "string",
             "minLength": 1
-          },
-          "source_asset_id": {
-            "type": "string"
           },
           "source_filename": {
             "type": [
@@ -1797,6 +1867,12 @@
               "null"
             ],
             "maxLength": 1000
+          },
+          "upload_id": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -3068,7 +3144,7 @@
         ],
         "properties": {
           "schema_version": {
-            "const": "studio-document-v4"
+            "const": "studio-document-v5"
           },
           "project_id": {
             "type": "string"
@@ -3096,20 +3172,13 @@
             "type": "object",
             "required": [
               "schemaVersion",
-              "sourceAssetId",
               "lyrics",
               "acoustics",
               "editing"
             ],
             "properties": {
               "schemaVersion": {
-                "const": "studio-project-v2"
-              },
-              "sourceAssetId": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "const": "studio-project-v3"
               },
               "lyrics": {
                 "type": "object",

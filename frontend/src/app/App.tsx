@@ -13,7 +13,6 @@ import {
 } from "react-router-dom";
 import { ProjectList } from "../features/ProjectList";
 import { Workspace } from "../features/Workspace";
-import { LocalEditor } from "../features/editor/LocalEditor";
 import { ApiError, studioApi } from "../adapters/http/client";
 import styles from "./app.module.css";
 
@@ -49,7 +48,6 @@ function DemoBanner() {
   const [params] = useSearchParams();
   const scenario = params.get("scenario");
   const [open, setOpen] = useState(false);
-  if (window.location.pathname === "/editor") return null;
   if (!import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCKS !== "true")
     return null;
   const pick = (value: string) => {
@@ -133,7 +131,6 @@ function Login() {
             返回模拟工作台
           </button>
         ) : null}
-        <Link to="/editor">打开本地 TTML</Link>
       </div>
     </main>
   );
@@ -174,7 +171,7 @@ function AppRoutes() {
       <DemoBanner />
       <div className={styles.appContent}>
         <Routes>
-          <Route path="/editor" element={<LocalEditor />} />
+          <Route path="/editor" element={<Navigate to="/projects" replace />} />
           <Route path="*" element={<ProtectedRoutes />} />
         </Routes>
       </div>
@@ -210,7 +207,6 @@ function SessionGate({ children }: { children: ReactNode }) {
         <strong>服务暂时不可用</strong>
         <p>会话服务没有响应。</p>
         <button data-role="secondary" onClick={() => query.refetch()}>重试</button>
-        <Link to="/editor">打开本地 TTML</Link>
       </main>
     );
   if (query.data && !query.data.authenticated) return <Login />;

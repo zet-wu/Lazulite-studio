@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
   studioApi,
-  uploadAsset,
+  uploadMusic,
   type Asset,
 } from "../adapters/http/client";
 import styles from "./create-project.module.css";
@@ -52,6 +52,7 @@ export function CreateProject({
     setError("已取消上传");
   };
   const close = () => {
+    if (asset && status !== 'creating') void studioApi.discardUpload(asset.id).catch(error => setError(error.message));
     if (status === "uploading") {
       cancelUpload();
       dialog.current?.close();
@@ -59,8 +60,8 @@ export function CreateProject({
   };
   const submit = async () => {
     if (status !== "idle") return;
-    if (!name.trim() || (!file && !asset)) {
-      setError("请填写项目名称并选择音频文件");
+    if (!name.trim()) {
+      setError("请填写项目名称");
       return;
     }
     const current = ++token.current;
@@ -72,7 +73,7 @@ export function CreateProject({
         const active = new AbortController();
         controller.current = active;
         setStatus("uploading");
-        uploaded = await uploadAsset(
+        uploaded = await uploadMusic(
           file,
           (value) => {
             if (token.current === current) setProgress(value);
@@ -82,13 +83,13 @@ export function CreateProject({
         if (token.current !== current) return;
         setAsset(uploaded);
       }
-      if (!uploaded || token.current !== current) return;
+      if (token.current !== current) return;
       const active = new AbortController();
       controller.current = active;
       setStatus("creating");
       const project = await studioApi.createProject(
         name.trim(),
-        uploaded.id,
+        uploaded?.id ?? null,
         key,
         active.signal,
         file?.name,
@@ -125,7 +126,7 @@ export function CreateProject({
         className={styles.modal}
         onCancel={(event) => {
           if (status === "creating") event.preventDefault();
-          else if (status === "uploading") cancelUpload();
+          else { if (status === "uploading") cancelUpload(); if (asset) void studioApi.discardUpload(asset.id).catch(error => setError(error.message)); }
         }}
       >
         <form
@@ -148,7 +149,7 @@ export function CreateProject({
             />
           </label>
           <label>
-            音频文件
+            音频文件（可选）
             <input
               ref={fileInput}
               type="file"
@@ -221,7 +222,7 @@ export function CreateProject({
                 className={styles.primary}
                 disabled={status === "creating"}
               >
-                {asset ? "重试创建" : "上传并创建"}
+                {asset ? "重试创建" : file ? "上传并创建" : "创建项目"}
               </button>
             )}
           </div>

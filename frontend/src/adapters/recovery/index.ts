@@ -2,9 +2,9 @@ import { validateProjectEditing } from '../../domain/project-editing';
 import { createProjectEditorState, validateSegments, type ProjectEditorState, type ProjectDocument } from '../../domain/project-document';
 import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
-const DATABASE = 'lazulite-studio-recovery-project-v2';
+const DATABASE = 'lazulite-studio-recovery-project-v3';
 const STORE = 'projects';
-const RECORD_VERSION = 2;
+const RECORD_VERSION = 3;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {
@@ -53,8 +53,7 @@ const isState = (value: unknown): value is ProjectEditorState => {
   const validDocument = (document: unknown) => {
     if (!document || typeof document !== 'object') return false;
     const project = document as ProjectDocument;
-    if (project.schemaVersion !== 'studio-project-v2' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
-    if (project.sourceAssetId !== null && typeof project.sourceAssetId !== 'string') return false;
+    if (project.schemaVersion !== 'studio-project-v3' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
     if (project.acoustics.analysisId !== null && typeof project.acoustics.analysisId !== 'string') return false;
     try { validateSegments(project.acoustics.segments, Number.MAX_SAFE_INTEGER); validateProjectEditing(project.lyrics, project.editing); } catch { return false; }
     const item = project.lyrics as LyricDocument;
