@@ -15,7 +15,7 @@ def create_browser_app():
     temporary = TemporaryDirectory(prefix="studio-browser-")
     root = Path(temporary.name)
     db = Database(root / "studio.sqlite3")
-    store = RevisionStore(db, root / "revisions")
+    store = RevisionStore(db, root / "projects")
     with db.transaction() as connection:
         connection.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)", ("phase2", "浏览器集成项目", None, None, "now", "now"))
     fixture = Path(__file__).resolve().parents[2] / "tests/fixtures/ttml/phase2-multitrack.ttml"

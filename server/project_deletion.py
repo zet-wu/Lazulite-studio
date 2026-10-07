@@ -1,65 +1,48 @@
-"""Delete one project while excluding workers under the database write lock."""
-import json
+"""Project directory quarantine and database commit share the SQLite write lock."""
 import logging
 import shutil
-import uuid
 from pathlib import Path
-
 from fastapi import HTTPException
 
 
+def recover_deletions(db, root: Path):
+    trash = root / '.deleting'
+    with db.transaction() as c:
+        for directory in trash.glob('*'):
+            destination = root / 'projects' / directory.name
+            if c.execute('SELECT 1 FROM projects WHERE id=?', (directory.name,)).fetchone():
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                directory.rename(destination)
+            else:
+                shutil.rmtree(directory)
+
+
 def delete_project(db, root: Path, pid: str):
-    staged = []
-    trash = root / '.deleting' / uuid.uuid4().hex
+    directory = root / 'projects' / pid
+    trash = root / '.deleting' / pid
+    moved = False
     try:
         with db.transaction() as c:
-            if not c.execute('SELECT 1 FROM projects WHERE id=?', (pid,)).fetchone():
-                raise HTTPException(404, {'code': 'project_not_found', 'message': '项目不存在', 'retryable': False})
+            project = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (pid,)).fetchone()
+            if not project:
+                raise HTTPException(404, {'code':'project_not_found','message':'项目不存在','retryable':False})
             if c.execute("SELECT 1 FROM jobs WHERE project_id=? AND status IN ('queued','running','cancel_requested')", (pid,)).fetchone():
-                raise HTTPException(409, {'code': 'project_busy', 'message': '项目仍有任务运行，请先取消并等待任务结束', 'retryable': True})
-            revisions = c.execute('SELECT id,project_path FROM revisions WHERE project_id=?', (pid,)).fetchall()
-            jobs = c.execute('SELECT id,result_json FROM jobs WHERE project_id=?', (pid,)).fetchall()
-            files = [Path(r[1]) for r in revisions] + [root / 'revisions' / f'{pid}.draft.json']
-            for job in jobs:
-                result = json.loads(job[1]) if job[1] else {}
-                if result.get('output_path'):
-                    path = Path(result['output_path']).resolve()
-                    if (root / 'exports').resolve() not in path.parents:
-                        raise ValueError('产物路径不属于项目存储')
-                    files.append(path)
-            vocal_rows = c.execute('SELECT id,directory FROM vocal_results WHERE project_id=?', (pid,)).fetchall()
-            for vocal in vocal_rows:
-                directory = Path(vocal['directory'])
-                if (root / 'vocals').resolve() not in directory.resolve().parents: raise ValueError('人声产物路径无效')
-                files.extend(p for p in directory.rglob('*') if p.is_file())
-                files.extend(p for p in (root / 'proxies').glob(f"vocal-{vocal['id']}*") if p.is_file())
-                files.extend(p for p in (root / 'proxies' / f"vocal-{vocal['id']}.peaks-v1").glob('*') if p.is_file())
-            c.execute('DELETE FROM vocal_results WHERE project_id=?', (pid,))
-            # Assets and their shared proxies stay in the content addressed store.
-            # No asset is removed while uploads, other projects or readers may use it.
-            trash.mkdir(parents=True)
-            for path in files:
-                if path.is_file():
-                    destination = trash / str(len(staged))
-                    path.rename(destination)
-                    staged.append((path, destination))
-            for job in jobs:
-                c.execute('DELETE FROM job_events WHERE job_id=?', (job[0],))
-            for table in ('search_conditions', 'job_idempotency', 'jobs', 'reading_dictionary', 'review_confirmations', 'review_versions'):
+                raise HTTPException(409, {'code':'project_busy','message':'项目仍有任务运行，请先取消并等待任务结束','retryable':True})
+            trash.parent.mkdir(parents=True, exist_ok=True)
+            if directory.exists():
+                directory.rename(trash)
+                moved = True
+            c.execute('DELETE FROM job_events WHERE job_id IN (SELECT id FROM jobs WHERE project_id=?)', (pid,))
+            c.execute("DELETE FROM idempotency WHERE json_extract(response,'$.id')=? OR json_extract(response,'$.id') IN (SELECT id FROM revisions WHERE project_id=?)", (pid,pid))
+            for table in ('vocal_results','search_conditions','job_idempotency','jobs','reading_dictionary','review_confirmations','review_versions','revisions'):
                 c.execute(f'DELETE FROM {table} WHERE project_id=?', (pid,))
-            for identity in [pid, *(r[0] for r in revisions)]:
-                c.execute("DELETE FROM idempotency WHERE json_extract(response,'$.id')=? OR json_extract(response,'$.project_id')=?", (identity, pid))
-            c.execute('DELETE FROM revisions WHERE project_id=?', (pid,))
             c.execute('DELETE FROM projects WHERE id=?', (pid,))
+            c.execute('DELETE FROM assets WHERE id=?', (project[0],))
     except Exception:
-        for original, temporary in reversed(staged):
-            temporary.rename(original)
-        if trash.exists():
-            shutil.rmtree(trash)
+        if moved: trash.rename(directory)
         raise
-    # Once committed, quarantined bytes are no longer project data or downloadable.
-    try:
-        shutil.rmtree(trash)
-    except OSError:
-        logging.getLogger(__name__).warning('deleted project bytes await cleanup: %s', trash, exc_info=True)
-    return {'deleted': pid}
+    if moved:
+        try: shutil.rmtree(trash)
+        except OSError:
+            logging.getLogger(__name__).warning('项目已删除，暂存文件将在重启时重试释放：%s', trash, exc_info=True)
+    return {'deleted':pid}

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS search_conditions (
  FOREIGN KEY(project_id) REFERENCES projects(id)
 );
 CREATE TABLE IF NOT EXISTS assets (
- id TEXT PRIMARY KEY, sha256 TEXT NOT NULL UNIQUE, size INTEGER NOT NULL,
+ id TEXT PRIMARY KEY, sha256 TEXT NOT NULL, size INTEGER NOT NULL,
  mime TEXT NOT NULL, filename TEXT, playable INTEGER NOT NULL DEFAULT 0,
  duration_ms INTEGER, start_ms INTEGER, sample_rate INTEGER, channels INTEGER,
  metadata TEXT, created_at TEXT NOT NULL
@@ -70,7 +70,11 @@ class Database:
         self.path = str(path)
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
+            version = conn.execute('PRAGMA user_version').fetchone()[0]
+            if version != 4 and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
+                raise RuntimeError('旧项目存储不兼容；请保留原目录并指定新的 STUDIO_DATA_DIR')
             conn.executescript(SCHEMA)
+            conn.execute('PRAGMA user_version=4')
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

@@ -19,7 +19,7 @@ def isolated_worker(monkeypatch):
 def test_api_remains_responsive_while_model_holds_child_gil(tmp_path, isolated_worker):
     client, db = setup(tmp_path, factory=None)
     with client:
-        asset = client.get('/api/v1/projects/p/document').json()['document']['sourceAssetId']
+        asset = client.get('/api/v1/projects/p').json()['asset']['id']
         job = client.post('/api/v1/projects/p/jobs/vocal', json={'params': {'asset_id': asset}}, headers={'origin':'http://studio'}).json()['id']
         for _ in range(100):
             value = client.get('/api/v1/jobs/'+job).json()
@@ -36,7 +36,7 @@ def test_api_remains_responsive_while_model_holds_child_gil(tmp_path, isolated_w
 def test_child_crash_is_job_failure_and_api_survives(tmp_path, isolated_worker, monkeypatch):
     client, db = setup(tmp_path, factory=None)
     with client:
-        asset = client.get('/api/v1/projects/p/document').json()['document']['sourceAssetId']
+        asset = client.get('/api/v1/projects/p').json()['asset']['id']
         def submit():
             return client.post('/api/v1/projects/p/jobs/vocal', json={'params': {'asset_id': asset}}, headers={'origin': 'http://studio'}).json()['id']
         monkeypatch.setenv('STUDIO_TEST_VOCAL_CRASH', '1')
@@ -48,7 +48,7 @@ def test_child_crash_is_job_failure_and_api_survives(tmp_path, isolated_worker, 
 def test_cancel_at_boundary_and_shutdown_reap_child(tmp_path, isolated_worker):
     from server.db import Database
     db=Database(tmp_path/'studio.sqlite3')
-    request={'database':db.path,'root':str(tmp_path/'vocals'),'project_id':'p','asset_path':str(tmp_path/'source.wav'),'params':{},'job_id':'cancel'}
+    request={'database':db.path,'root':str(tmp_path/'projects'),'project_id':'p','asset_path':str(tmp_path/'source.wav'),'params':{},'job_id':'cancel'}
     runner=VocalProcess()
     with pytest.raises(VocalCancelled): runner.run(request,lambda *args:None,lambda:True)
     started=threading.Event();errors=[]

@@ -81,7 +81,7 @@ class RevisionStore:
             if row[0] != base:
                 raise RevisionConflict(row[0])
             revision = uuid.uuid4().hex
-            path = self.root / f"{revision}.json"
+            path = self.root / project_id / "revisions" / f"{revision}.json"
             self._write_atomic(path, encoded)
             try:
                 conn.execute(
@@ -165,6 +165,7 @@ class RevisionStore:
             raise ValueError("revision cannot be read") from exc
 
     def _write_atomic(self, destination: Path, content: bytes) -> None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
         fd, name = tempfile.mkstemp(
             prefix=f".{destination.name}-", dir=destination.parent
         )
@@ -180,8 +181,9 @@ class RevisionStore:
             temporary.unlink(missing_ok=True)
 
     def _materialize(self, project_id: str, source: Path) -> None:
-        destination = self.root / f"{project_id}.draft.json"
-        fd, name = tempfile.mkstemp(prefix=f".{project_id}.draft-", dir=self.root)
+        destination = self.root / project_id / "revisions" / "current.draft.json"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        fd, name = tempfile.mkstemp(prefix=f".{project_id}.draft-", dir=destination.parent)
         temporary = Path(name)
         try:
             with os.fdopen(fd, "wb") as handle, source.open("rb") as input_file:
@@ -189,7 +191,7 @@ class RevisionStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, destination)
-            self._fsync_dir(self.root)
+            self._fsync_dir(destination.parent)
         finally:
             temporary.unlink(missing_ok=True)
 
@@ -221,8 +223,10 @@ class RevisionStore:
             rows = conn.execute(
                 "SELECT id,current_revision FROM projects WHERE current_revision IS NOT NULL"
             ).fetchall()
-            for path in self.root.glob("*.json"):
+            for path in self.root.glob("*/revisions/*.json"):
                 if not path.name.endswith(".draft.json") and path.stem not in revisions:
                     path.unlink(missing_ok=True)
+        for temporary in self.root.glob('*/revisions/.*'):
+            if temporary.is_file(): temporary.unlink(missing_ok=True)
         for row in rows:
             self.materialize_current(row[0])

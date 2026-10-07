@@ -33,6 +33,8 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
 
     def validate(pid, body):
         row = project(pid)
+        if not row[2]:
+            raise HTTPException(422, {'code':'audio_required','message':'上传音乐后才可打包音乐文件','retryable':False})
         if body.asset_id != row[2]:
             raise HTTPException(422, {"code": "publish_input_invalid", "message": "asset does not belong to project", "retryable": False})
         with service.db.connect() as c:
@@ -48,6 +50,8 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
         from mutagen.flac import FLAC
         from .publishing import stpp_tracks
         row = project(pid)
+        if not row[2]:
+            raise HTTPException(422, {'code':'audio_required','message':'上传音乐后才可打包音乐文件','retryable':False})
         with service.db.connect() as c:
             asset = c.execute('SELECT filename FROM assets WHERE id=?', (row[2],)).fetchone()
         path = Path(asset_path(pid))
@@ -103,7 +107,7 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
         job = service.get(job_id)
         if not job or job["project_id"] != pid or job["kind"] != "publish":
             raise HTTPException(404, {"code": "export_not_found", "message": "export not found", "retryable": False})
-        with service._lock:
+        with service._lock, service.db.transaction():
             result = service.result(job_id) or {}; report = result.get("report") or {}
             if result.get('superseded'):
                 raise HTTPException(410, {"code":"export_replaced","message":"此产物已被较新的成功产物替换","retryable":False})

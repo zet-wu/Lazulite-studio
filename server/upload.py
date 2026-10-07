@@ -13,7 +13,7 @@ class UploadLimitMiddleware:
         self.limit = limit
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not scope["path"].endswith("/assets"):
+        if scope["type"] != "http" or not scope["path"].endswith("/uploads"):
             await self.app(scope, receive, send)
             return
         content_length = next(

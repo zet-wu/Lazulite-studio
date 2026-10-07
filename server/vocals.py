@@ -26,7 +26,7 @@ class VocalRunner:
         # Startup has no live model worker. Discard only unregistered partial products.
         with db.connect() as c:
             known = {Path(row[0]).resolve() for row in c.execute('SELECT directory FROM vocal_results')}
-        for directory in self.root.glob('*/*'):
+        for directory in self.root.glob('*/vocals/*'):
             if directory.is_dir() and directory.resolve() not in known: shutil.rmtree(directory)
 
     def close(self):
@@ -52,7 +52,7 @@ class VocalRunner:
             if cancelled(): raise VocalCancelled()
         boundary()
         result_id = job_id
-        directory = self.root / project_id / result_id
+        directory = self.root / project_id / 'vocals' / result_id
         directory.mkdir(parents=True, exist_ok=True)
         vocal_path = directory / 'vocals.flac'
         signature = self.separation_signature(params['asset_id'], params['model_name'], params['device'])
@@ -195,5 +195,5 @@ class VocalRunner:
     def clean_unregistered(self, project_id, result_id):
         with self.db.connect() as c:
             found = c.execute('SELECT 1 FROM vocal_results WHERE id=?', (result_id,)).fetchone()
-        directory = self.root / project_id / result_id
+        directory = self.root / project_id / 'vocals' / result_id
         if not found and directory.is_dir(): shutil.rmtree(directory)

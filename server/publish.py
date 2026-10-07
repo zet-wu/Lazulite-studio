@@ -179,7 +179,9 @@ class PublishRunner:
         from .media_format import describe_media, download_filename
         format_info = describe_media(asset, media, bound[2])
         if format_info['extension'] is None: raise PublishInvalid('源文件格式不支持打包')
-        output = self.output_root / f"{uuid.uuid4().hex}{format_info['extension']}"
+        directory = self.output_root / project_id / "exports"
+        directory.mkdir(parents=True, exist_ok=True)
+        output = directory / f"{uuid.uuid4().hex}{format_info['extension']}"
         try:
             result = dict(self.publisher.publish(ttml, asset, output, request['lrc_text'], request.get('target_track_id')) or {})
             if not isinstance(result.get("report"), dict) or "passed" not in result["report"]:

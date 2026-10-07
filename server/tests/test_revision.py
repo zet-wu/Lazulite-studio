@@ -8,7 +8,7 @@ from server.revisions import IdempotencyConflict, RevisionConflict, RevisionStor
 
 def test_revision_cas_and_recovery(tmp_path: Path):
     db = Database(tmp_path / "db.sqlite")
-    store = RevisionStore(db, tmp_path / "revisions")
+    store = RevisionStore(db, tmp_path / "projects")
     with db.transaction() as conn:
         conn.execute(
             "INSERT INTO projects VALUES(?,?,?,?,?,?)",
@@ -21,10 +21,10 @@ def test_revision_cas_and_recovery(tmp_path: Path):
         assert exc.current == first["id"]
     else:
         raise AssertionError("CAS must reject stale base")
-    (tmp_path / "revisions" / "orphan.json").write_text("partial")
+    (tmp_path / "projects" / "p" / "revisions" / "orphan.json").write_text("partial")
     store.recover()
-    assert not (tmp_path / "revisions" / "orphan.json").exists()
-    draft = tmp_path / "revisions" / "p.draft.json"
+    assert not (tmp_path / "projects" / "p" / "revisions" / "orphan.json").exists()
+    draft = tmp_path / "projects" / "p" / "revisions" / "current.draft.json"
     before = draft.read_text()
     with db.transaction() as conn:
         conn.execute(
@@ -48,7 +48,7 @@ def test_initial_revision_is_idempotent_and_recovery_replaces_stale_draft(
     tmp_path: Path,
 ):
     db = Database(tmp_path / "db.sqlite")
-    store = RevisionStore(db, tmp_path / "revisions")
+    store = RevisionStore(db, tmp_path / "projects")
     with db.transaction() as conn:
         conn.execute(
             "INSERT INTO projects VALUES(?,?,?,?,?,?)",
@@ -70,7 +70,7 @@ def test_initial_revision_is_idempotent_and_recovery_replaces_stale_draft(
         raise AssertionError("same operation must reject different content")
     with db.connect() as conn:
         assert conn.execute("SELECT count(*) FROM revisions").fetchone()[0] == 1
-    draft = tmp_path / "revisions" / "p.draft.json"
+    draft = tmp_path / "projects" / "p" / "revisions" / "current.draft.json"
     draft.write_text("stale")
     store.recover()
     assert (

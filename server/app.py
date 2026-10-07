@@ -1,6 +1,7 @@
 from io import StringIO
+from .project_resources import stream_file
 from .project_document import read_lyrics, initial_project
-import hashlib, json, os, secrets, tempfile, uuid
+import hashlib, json, os, secrets, tempfile, uuid, shutil, time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -20,7 +21,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from .auth import Settings
 from .db import Database
@@ -55,14 +56,32 @@ def create_app(
             "set STUDIO_ORIGIN and STUDIO_PASSWORD, or enable STUDIO_TRUSTED_GATEWAY"
         )
     root = Path(
-        data_dir or os.getenv("STUDIO_DATA_DIR", Path(__file__).parent / "data")
+        data_dir or os.getenv("STUDIO_DATA_DIR", Path(__file__).parent / "data-projects-v4")
     )
-    db, media = Database(root / "studio.sqlite3"), MediaService(root)
-    revisions = RevisionStore(db, root / "revisions")
+    db = Database(root / "studio.sqlite3")
+    from .project_deletion import recover_deletions
+    recover_deletions(db, root)
+    uploads = root / 'uploads'
+    shutil.rmtree(uploads, ignore_errors=True)
+    uploads.mkdir(parents=True)
+    with db.connect() as c:
+        known = {r[0] for r in c.execute('SELECT id FROM projects')}
+    for directory in (root / 'projects').glob('*'):
+        if directory.name not in known: shutil.rmtree(directory)
+        else:
+            with db.connect() as c:
+                has_music = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (directory.name,)).fetchone()[0]
+            if not has_music:
+                for name in ('source','cache'): shutil.rmtree(directory / name, ignore_errors=True)
+    media_services = {}
+    def media_for(pid):
+        if pid not in media_services: media_services[pid] = MediaService(root / 'projects' / pid)
+        return media_services[pid]
+    revisions = RevisionStore(db, root / "projects")
     revisions.recover()
     from .vocals import VocalRunner
     from .vocal_routes import build_vocal_router, vocal_asset
-    vocal_runner = VocalRunner(db, root / 'vocals', separator_factory)
+    vocal_runner = VocalRunner(db, root / 'projects', separator_factory)
     configured_engine_instance = engine or configured_engine()
     if forced_aligner is not None:
         from .forced import ForcedAlignmentRunner
@@ -111,8 +130,9 @@ def create_app(
         password: str | None = None
 
     class ProjectCreate(BaseModel):
+        model_config = ConfigDict(extra='forbid')
         name: str = Field(min_length=1, max_length=200)
-        source_asset_id: str
+        upload_id: str | None = None
         source_filename: str | None = Field(default=None, max_length=1000)
 
     def asset_dto(row):
@@ -222,62 +242,97 @@ def create_app(
             ],
         }
 
-    @api.post("/assets")
-    async def upload(file: Annotated[UploadFile, File()], _: object = Depends(write)):
-        fd, temp_name = tempfile.mkstemp(prefix="studio-upload-", dir=root)
-        os.close(fd)
-        temp = Path(temp_name)
-        size = 0
+    def staged_upload(token):
+        if not token or len(token) != 32 or any(ch not in '0123456789abcdef' for ch in token):
+            fail('upload_not_found', '上传已失效，请重新上传', 404)
+        directory = uploads / token
+        try: metadata = json.loads((directory / 'asset.json').read_text())
+        except FileNotFoundError: fail('upload_not_found', '上传已失效，请重新上传', 404)
+        return directory, metadata
+
+    def adopt_upload(c, token, pid):
+        directory, record = staged_upload(token)
+        destination = root / 'projects' / pid
+        destination.mkdir(parents=True, exist_ok=True)
+        for name in ('source', 'cache'):
+            (directory / name).rename(destination / name)
+        c.execute('INSERT INTO assets VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', record)
+        return c.execute('SELECT * FROM assets WHERE id=?', (token,)).fetchone()
+
+    @api.post('/uploads')
+    async def upload(request: Request, file: Annotated[UploadFile, File()], _: object = Depends(write)):
+        # Each token owns independent files; no content-addressed shared asset library.
+        with db.transaction():
+            for metadata in uploads.glob('*/asset.json'):
+                if metadata.stat().st_mtime < time.time() - 3600:
+                    shutil.rmtree(metadata.parent)
+        token = uuid.uuid4().hex
+        directory = uploads / token
+        directory.mkdir()
+        temporary = directory / 'upload'
+        successful = False
         try:
-            with temp.open("wb") as out:
+            size = 0
+            with temporary.open('wb') as out:
                 while chunk := await file.read(1024 * 1024):
                     size += len(chunk)
-                    if size > MAX_UPLOAD:
-                        fail("upload_too_large", "upload exceeds limit", 413)
+                    if size > MAX_UPLOAD: fail('upload_too_large', 'upload exceeds limit', 413)
                     out.write(chunk)
-            asset = await run_in_threadpool(media.import_asset, temp, file.filename)
+            media = MediaService(directory)
+            asset = await run_in_threadpool(media.import_asset, temporary, file.filename)
             proxy = await run_in_threadpool(media.playback_proxy, asset)
-            with db.transaction() as c:
-                existing = c.execute(
-                    "SELECT id FROM assets WHERE sha256=?", (asset.content_hash,)
-                ).fetchone()
-                asset_id = existing[0] if existing else asset.content_hash
-                metadata = json.dumps(
-                    {
-                        "codec": asset.probe.codec,
-                        "container": asset.probe.container,
-                        "proxy_offset_ms": proxy.offset_ms,
-                        "proxy_duration_ms": proxy.duration_ms,
-                    }
-                )
-                if not existing:
-                    c.execute(
-                        "INSERT INTO assets VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                        (
-                            asset_id,
-                            asset.content_hash,
-                            asset.size,
-                            asset.probe.mime_type,
-                            asset.original_name,
-                            1,
-                            asset.probe.duration_ms,
-                            asset.probe.start_ms,
-                            asset.probe.sample_rate,
-                            asset.probe.channels,
-                            metadata,
-                            stamp(),
-                        ),
-                    )
-            with db.connect() as c:
-                stored = c.execute(
-                    "SELECT * FROM assets WHERE id=?", (asset_id,)
-                ).fetchone()
-            return asset_dto(stored)
-        except MediaError as exc:
-            fail("media_invalid", str(exc), 415)
+            if await request.is_disconnected(): fail('upload_cancelled', '上传已取消', 409)
+            record = [token, asset.content_hash, asset.size, asset.probe.mime_type, asset.original_name, 1,
+                      asset.probe.duration_ms, asset.probe.start_ms, asset.probe.sample_rate, asset.probe.channels,
+                      json.dumps({'codec': asset.probe.codec, 'container': asset.probe.container,
+                                  'proxy_offset_ms': proxy.offset_ms, 'proxy_duration_ms': proxy.duration_ms}), stamp()]
+            (directory / 'asset.json').write_text(json.dumps(record))
+            successful = True
+            return asset_dto(record)
+        except MediaError as exc: fail('media_invalid', str(exc), 415)
         finally:
-            temp.unlink(missing_ok=True)
+            temporary.unlink(missing_ok=True)
             await file.close()
+            if not successful: shutil.rmtree(directory, ignore_errors=True)
+
+    @api.delete('/uploads/{token}')
+    def cancel_upload(token: str, _: object = Depends(write)):
+        with db.transaction():
+            directory, _ = staged_upload(token)
+            shutil.rmtree(directory)
+        return {'cancelled': token}
+
+    class MusicUpload(BaseModel):
+        upload_id: str
+
+    @api.post('/projects/{pid}/music')
+    def attach_music(pid: str, body: MusicUpload, _: object = Depends(write)):
+        try:
+            with db.transaction() as c:
+                row = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (pid,)).fetchone()
+                if not row: fail('project_not_found', '项目已删除', 404)
+                if row[0] == body.upload_id:
+                    return asset_dto(c.execute('SELECT * FROM assets WHERE id=?', (row[0],)).fetchone())
+                if row[0]: fail('project_changed', '项目音乐已改变，请刷新；未采用本次上传', 409)
+                directory, _ = staged_upload(body.upload_id)
+                try:
+                    asset = adopt_upload(c, body.upload_id, pid)
+                    c.execute('UPDATE projects SET source_asset_id=?,updated_at=? WHERE id=?', (asset[0], stamp(), pid))
+                except Exception:
+                    for name in ('source','cache'):
+                        shutil.rmtree(root / 'projects' / pid / name, ignore_errors=True)
+                    raise
+            return asset_dto(asset)
+        except Exception:
+            with db.transaction() as c:
+                current = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (pid,)).fetchone()
+                if current and not current[0]:
+                    for name in ('source','cache'): shutil.rmtree(root / 'projects' / pid / name, ignore_errors=True)
+            raise
+        finally:
+            # Committed and rejected uploads both cease to be pending assets.
+            if len(body.upload_id) == 32 and all(ch in '0123456789abcdef' for ch in body.upload_id):
+                shutil.rmtree(uploads / body.upload_id, ignore_errors=True)
 
     @api.post("/projects")
     def create_project(
@@ -297,47 +352,54 @@ def create_app(
             ).encode()
         ).hexdigest()
         key = idem or uuid.uuid4().hex
-        with db.transaction() as c:
-            old = c.execute(
-                "SELECT response,request_hash FROM idempotency WHERE key=?", (key,)
-            ).fetchone()
-            if old:
-                if old[1] != digest:
-                    fail(
-                        "idempotency_mismatch", "key was used for another request", 409
-                    )
-                return json.loads(old[0])
-            asset = c.execute(
-                "SELECT * FROM assets WHERE id=?", (body.source_asset_id,)
-            ).fetchone()
-            if not asset:
-                fail("asset_not_found", "source asset not found", 404)
-            pid, t = uuid.uuid4().hex, stamp()
-            rev = uuid.uuid4().hex
-            path = root / "revisions" / f"{rev}.json"
-            revisions._write_atomic(path, json.dumps(initial_project(INITIAL_TTML, body.source_asset_id), ensure_ascii=False).encode())
-            c.execute(
-                "INSERT INTO projects VALUES(?,?,?,?,?,?)",
-                (pid, name, body.source_asset_id, rev, t, t),
-            )
-            conditions = initial_conditions(root / "assets" / asset[1][:2] / asset[1], body.source_filename or asset[4])
-            c.execute("INSERT INTO search_conditions VALUES(?,?,?,?)", (pid, conditions['title'], conditions['artist'], conditions['album']))
-            c.execute(
-                "INSERT INTO revisions VALUES(?,?,?,?,?)",
-                (rev, pid, None, str(path), t),
-            )
-            result = {
-                "schema_version": "studio-project-v1",
-                "id": pid,
-                "name": name,
-                "updated_at": t,
-                "document_status": "draft",
-                "asset": asset_dto(asset),
-            }
-            c.execute(
-                "INSERT INTO idempotency VALUES(?,?,?,?,?)",
-                (key, subject, digest, json.dumps(result), t),
-            )
+        pid = None
+        try:
+            with db.transaction() as c:
+                old = c.execute(
+                    "SELECT response,request_hash FROM idempotency WHERE key=?", (key,)
+                ).fetchone()
+                if old:
+                    if old[1] != digest:
+                        fail(
+                            "idempotency_mismatch", "key was used for another request", 409
+                        )
+                    return json.loads(old[0])
+                pid, t = uuid.uuid4().hex, stamp()
+                rev = uuid.uuid4().hex
+                asset = adopt_upload(c, body.upload_id, pid) if body.upload_id else None
+                asset_id = asset[0] if asset else None
+                path = root / 'projects' / pid / 'revisions' / f'{rev}.json'
+                revisions._write_atomic(path, json.dumps(initial_project(INITIAL_TTML, None), ensure_ascii=False).encode())
+                c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)', (pid, name, asset_id, rev, t, t))
+                conditions = initial_conditions(root / 'projects' / pid / 'source' / 'original', body.source_filename or asset[4]) if asset else {'title':'','artist':'','album':''}
+                c.execute('INSERT INTO search_conditions VALUES(?,?,?,?)', (pid, conditions['title'], conditions['artist'], conditions['album']))
+                c.execute(
+                    "INSERT INTO revisions VALUES(?,?,?,?,?)",
+                    (rev, pid, None, str(path), t),
+                )
+                result = {
+                    "schema_version": "studio-project-v1",
+                    "id": pid,
+                    "name": name,
+                    "updated_at": t,
+                    "document_status": "draft",
+                    "asset": asset_dto(asset) if asset else None,
+                }
+                c.execute(
+                    "INSERT INTO idempotency VALUES(?,?,?,?,?)",
+                    (key, subject, digest, json.dumps(result), t),
+                )
+        except Exception:
+            if pid:
+                # Move staged source back so an idempotent create can retry after a file/DB failure.
+                if body.upload_id:
+                    temporary = uploads / body.upload_id
+                    for name in ('source','cache'):
+                        source = root / 'projects' / pid / name
+                        if source.exists(): source.rename(temporary / name)
+                shutil.rmtree(root / 'projects' / pid, ignore_errors=True)
+            raise
+        if body.upload_id: shutil.rmtree(uploads / body.upload_id, ignore_errors=True)
         try:
             revisions.materialize_current(pid)
         except OSError:
@@ -444,24 +506,25 @@ def create_app(
         with db.connect() as c:
             return r, c.execute("SELECT * FROM assets WHERE id=?", (r[2],)).fetchone()
 
-    def asset_model(row):
+    def asset_model(row, pid):
         return Asset(
             row[0],
             row[1],
-            root / "assets" / row[1][:2] / row[1],
+            root / 'projects' / pid / 'source' / 'original',
             row[4],
             row[2],
             MediaProbe(row[6], row[7] or 0, row[8], row[9], None, None, row[3]),
         )
 
     @api.get("/projects/{pid}/audio")
-    def audio(pid: str, vocal: str | None = None, _: object = Depends(auth)):
-        r, a = asset_for(pid)
-        if not a:
-            fail("audio_not_found", "audio not found", 404)
-        asset = vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(a)
-        proxy = media.playback_proxy(asset)
-        return FileResponse(proxy.path, media_type=proxy.mime_type)
+    def audio(pid: str, request: Request, vocal: str | None = None, _: object = Depends(auth)):
+        with db.transaction():
+            r, a = asset_for(pid)
+            if not a:
+                fail("audio_not_found", "audio not found", 404)
+            asset = vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(a, pid)
+            proxy = media_for(pid).playback_proxy(asset)
+            return stream_file(proxy.path, proxy.mime_type, request.headers.get('range'), request.headers.get('if-range'))
 
     @api.get("/projects/{pid}/waveform")
     def waveform(
@@ -472,36 +535,39 @@ def create_app(
         end_ms: int = 1_000,
         _: object = Depends(auth),
     ):
-        _, a = asset_for(pid)
-        try:
-            asset = vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(a)
-            peaks = media.peaks(asset, level=level, start_ms=start_ms, end_ms=end_ms)
-        except MediaError as exc:
-            fail("waveform_invalid", str(exc), 422)
-        return {
-            "schema_version": "studio-waveform-v1",
-            "asset_id": a[0],
-            "asset_hash": peaks.asset_hash,
-            "version": peaks.version,
-            "level": level,
-            "start_ms": peaks.start_ms,
-            "end_ms": peaks.end_ms,
-            "bucket_ms": peaks.bucket_ms,
-            "minimum": peaks.minimum,
-            "maximum": peaks.maximum,
-        }
+        with db.transaction():
+            _, a = asset_for(pid)
+            if not a: fail('audio_not_found', '上传音乐后可用', 404)
+            try:
+                asset = vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(a, pid)
+                peaks = media_for(pid).peaks(asset, level=level, start_ms=start_ms, end_ms=end_ms)
+            except MediaError as exc:
+                fail("waveform_invalid", str(exc), 422)
+            return {
+                "schema_version": "studio-waveform-v1",
+                "asset_id": a[0],
+                "asset_hash": peaks.asset_hash,
+                "version": peaks.version,
+                "level": level,
+                "start_ms": peaks.start_ms,
+                "end_ms": peaks.end_ms,
+                "bucket_ms": peaks.bucket_ms,
+                "minimum": peaks.minimum,
+                "maximum": peaks.maximum,
+            }
 
     @api.get("/projects/{pid}/pcm")
     def pcm_window(pid: str, start_ms: int, end_ms: int, vocal: str | None = None, _: object = Depends(auth)):
         """Read a PCM proxy window of at most 4,020,000 milliseconds (FFT context included)."""
-        _, row = asset_for(pid)
-        if not row:
-            fail("audio_not_found", "audio not found", 404)
-        try:
-            data, rate, channels = media.pcm_window(vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(row), start_ms=start_ms, end_ms=end_ms)
-        except MediaError as exc:
-            fail("pcm_invalid", str(exc), 422)
-        return Response(data, media_type="application/octet-stream", headers={"X-Sample-Rate": str(rate), "X-Channels": str(channels), "Cache-Control": "private, max-age=60"})
+        with db.transaction():
+            _, row = asset_for(pid)
+            if not row:
+                fail("audio_not_found", "audio not found", 404)
+            try:
+                data, rate, channels = media_for(pid).pcm_window(vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(row, pid), start_ms=start_ms, end_ms=end_ms)
+            except MediaError as exc:
+                fail("pcm_invalid", str(exc), 422)
+            return Response(data, media_type="application/octet-stream", headers={"X-Sample-Rate": str(rate), "X-Channels": str(channels), "Cache-Control": "private, max-age=60"})
 
     def job_project_exists(pid):
         try:
@@ -514,7 +580,7 @@ def create_app(
         _, row = asset_for(pid)
         if not row:
             raise ValueError("project source asset not found")
-        return root / "assets" / row[1][:2] / row[1]
+        return root / 'projects' / pid / 'source' / 'original'
 
     def validate_job_request(pid, kind, params):
         if kind == 'vocal':
@@ -574,7 +640,7 @@ def create_app(
         with db.connect() as c:
             return c.execute("SELECT 1 FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone() is not None
 
-    publish_runner = PublishRunner(revisions, asset_path_for_project, root / "exports", publisher=publisher)
+    publish_runner = PublishRunner(revisions, asset_path_for_project, root / "projects", publisher=publisher)
     job_service = JobService(db, engine=configured_engine_instance, asset_path=asset_path_for_project, reading_runner=reading_runner, publish_runner=publish_runner, vocal_runner=vocal_runner)
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
     api.include_router(build_vocal_router(vocal_runner, auth=auth, project_exists=project))

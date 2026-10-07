@@ -12,7 +12,8 @@ from server.reading import ReadingDictionary, ReadingJobRunner, ReadingProposal,
 
 
 def seed_revision(db, tmp_path, revision, text):
-    path = tmp_path / f"{revision}.json"
+    path = tmp_path / "projects" / "project" / "revisions" / f"{revision}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(initial_project(f'<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="line">{text}</p></body></tt>', "asset")),
         encoding="utf-8",
@@ -51,14 +52,14 @@ def test_dictionary_has_priority_without_modifying_ttml(tmp_path):
     seed_revision(db, tmp_path, "r1", "宇宙")
     dictionary = ReadingDictionary(db)
     dictionary.create("project", "宇宙", "そら")
-    source_hash = hashlib.sha256((tmp_path / "r1.json").read_bytes()).hexdigest()
+    source_hash = hashlib.sha256((tmp_path / "projects" / "project" / "revisions" / "r1.json").read_bytes()).hexdigest()
     proposals = ReadingJobRunner(db, SudachiReadingProposer()).run(
         "project", {"revision": "r1", "asset_id": "asset"}
     )["proposals"]
     assert [(item["base"], item["reading"], item["source"]) for item in proposals] == [
         ("宇宙", "そら", "dictionary")
     ]
-    assert hashlib.sha256((tmp_path / "r1.json").read_bytes()).hexdigest() == source_hash
+    assert hashlib.sha256((tmp_path / "projects" / "project" / "revisions" / "r1.json").read_bytes()).hexdigest() == source_hash
 
 
 def test_reading_runner_projects_requested_old_revision(tmp_path):

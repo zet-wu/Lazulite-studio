@@ -22,15 +22,15 @@ def _m4a(path):
 def _project(client, headers, tmp_path):
     media = tmp_path / "tone.m4a"
     _m4a(media)
-    uploaded = client.post("/api/v1/assets", files={"file": ("tone.m4a", media.read_bytes(), "audio/mp4")}, headers=headers)
+    uploaded = client.post("/api/v1/uploads", files={"file": ("tone.m4a", media.read_bytes(), "audio/mp4")}, headers=headers)
     assert uploaded.status_code == 200
-    made = client.post("/api/v1/projects", json={"name": "Tone", "source_asset_id": uploaded.json()["id"]}, headers={**headers, "idempotency-key": "project"})
+    made = client.post("/api/v1/projects", json={"name": "Tone", "upload_id": uploaded.json()["id"]}, headers={**headers, "idempotency-key": "project"})
     assert made.status_code == 200
     return made.json()["id"], uploaded.json()["id"]
 
 
 def _save(client, headers, pid, revision, text):
-    body = {"schema_version": "studio-document-v4", "project_id": pid, "revision": revision,
+    body = {"schema_version": "studio-document-v5", "project_id": pid, "revision": revision,
             "document": initial_project(text, client.get(f"/api/v1/projects/{pid}").json()["asset"]["id"])}
     out = client.put(f"/api/v1/projects/{pid}/document", json=body, headers={**headers, "if-match": f'"{revision}"', "idempotency-key": revision + "-save"})
     assert out.status_code == 200
@@ -69,7 +69,7 @@ def test_publish_real_http_old_revision_idempotency_and_missing_file(tmp_path):
     assert restarted.get(f"/api/v1/projects/{pid}/exports").json()["items"][0]["id"] == done["id"]
     download = client.get(f"/api/v1/projects/{pid}/exports/{done['id']}/download")
     assert download.status_code == 200 and (b"ftyp" in download.content[:32])
-    path = next((tmp_path / "exports").glob("*"))
+    path = next((tmp_path / "projects" / pid / "exports").glob("*"))
     path.unlink()
     assert client.get(f"/api/v1/projects/{pid}/exports").json()["items"][0]["status"] == "unavailable"
     assert client.get(f"/api/v1/projects/{pid}/exports/{done['id']}/download").status_code == 410
@@ -175,7 +175,7 @@ def test_running_publish_cancel_removes_output_blocks_delete_until_worker_finish
         publisher.release.set()
         assert _wait(client, job)['status'] == 'cancelled'
         exports = client.get(f'/api/v1/projects/{pid}/exports').json()['items']
-        assert exports[0]['download_url'] is None and not list((tmp_path / 'exports').iterdir())
+        assert exports[0]['download_url'] is None and not list((tmp_path / 'projects' / pid / 'exports').iterdir())
         assert client.get(f'/api/v1/projects/{pid}/exports/{job}/download').status_code == 409
         assert client.delete(f'/api/v1/projects/{pid}', headers=headers).status_code == 200
 
@@ -188,8 +188,8 @@ def test_actual_format_controls_output_suffix_and_bound_history(tmp_path, kind, 
     subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','sine=frequency=440:duration=1','-c:a',codec,str(audio)],check=True)
     with TestClient(create_app(tmp_path / 'data', settings), base_url='https://studio') as client:
         headers = _headers(client, settings)
-        asset = client.post('/api/v1/assets', files={'file': ('misleading.flac' if kind != 'flac' else 'misleading.mp3',audio.read_bytes(),'audio/mpeg')}, headers=headers).json()
-        pid = client.post('/api/v1/projects', json={'name':'different project name','source_asset_id':asset['id']}, headers=headers).json()['id']
+        asset = client.post('/api/v1/uploads', files={'file': ('misleading.flac' if kind != 'flac' else 'misleading.mp3',audio.read_bytes(),'audio/mpeg')}, headers=headers).json()
+        pid = client.post('/api/v1/projects', json={'name':'different project name','upload_id':asset['id']}, headers=headers).json()['id']
         info = client.get(f'/api/v1/projects/{pid}/packaging').json()
         assert info['container'] == ('mp4' if kind == 'm4a' else kind)
         assert info['extension'] == f'.{kind}'
@@ -219,8 +219,8 @@ def test_cover_audio_preserves_suffix_and_project_download_history(tmp_path, suf
     app = create_app(tmp_path / 'data', settings)
     with TestClient(app, base_url='https://studio') as client:
         headers = _headers(client, settings)
-        asset = client.post('/api/v1/assets', files={'file': (f'原音频.{suffix}', source.read_bytes(), 'audio/mp4')}, headers=headers).json()
-        pid = client.post('/api/v1/projects', json={'name': '中文 日本語:/曲?', 'source_asset_id': asset['id']}, headers=headers).json()['id']
+        asset = client.post('/api/v1/uploads', files={'file': (f'原音频.{suffix}', source.read_bytes(), 'audio/mp4')}, headers=headers).json()
+        pid = client.post('/api/v1/projects', json={'name': '中文 日本語:/曲?', 'upload_id': asset['id']}, headers=headers).json()['id']
         info = client.get(f'/api/v1/projects/{pid}/packaging').json()
         assert info['extension'] == f'.{suffix}'
         assert info['format_label'] == 'M4A（MP4 容器）'
@@ -232,7 +232,7 @@ def test_cover_audio_preserves_suffix_and_project_download_history(tmp_path, suf
             assert _wait(client, job)['status'] == 'succeeded'
         items = client.get(f'/api/v1/projects/{pid}/exports').json()['items']
         assert len(items) == 2
-        assert len(list((tmp_path / 'data' / 'exports').iterdir())) == 1
+        assert len(list((tmp_path / 'data' / 'projects' / pid / 'exports').iterdir())) == 1
         assert items[1]['download_url'] is None
         for item in items[:1]:
             assert item['filename'] == f'中文 日本語__曲_.{suffix}'

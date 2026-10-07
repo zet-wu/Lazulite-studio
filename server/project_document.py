@@ -32,14 +32,13 @@ class Editing(BaseModel):
 
 class ProjectSnapshot(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    schemaVersion: Literal['studio-project-v2']
-    sourceAssetId: str | None
+    schemaVersion: Literal['studio-project-v3']
     lyrics: Lyrics
     acoustics: Acoustics
     editing: Editing
 
 def initial_project(ttml: str, asset_id: str | None) -> dict:
-    return {'schemaVersion': 'studio-project-v2', 'sourceAssetId': asset_id,
+    return {'schemaVersion': 'studio-project-v3',
             'editing': {'emptyBeats': {}, 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
 
 def read_project(path: str | Path) -> dict:
@@ -56,7 +55,6 @@ def validate_project(value: dict, conn, project_id: str) -> dict:
     snapshot = ProjectSnapshot.model_validate(value).model_dump()
     row = conn.execute('SELECT p.source_asset_id,a.duration_ms FROM projects p LEFT JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?', (project_id,)).fetchone()
     if row is None: raise KeyError(project_id)
-    if snapshot['sourceAssetId'] != row[0]: raise ValueError('项目源音频不匹配')
     snapshot['lyrics']['draftTtml'] = normalize_ttml(validate_ttml(snapshot['lyrics']['draftTtml']))
     validate_editing(snapshot)
     acoustic = snapshot['acoustics']

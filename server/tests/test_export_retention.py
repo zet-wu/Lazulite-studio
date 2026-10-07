@@ -41,7 +41,7 @@ def test_recent_success_failure_cancel_and_single_active(tmp_path):
             stream=route.endpoint(pid,old) if old else None
             job=submit(); assert _wait(client,job)['status']=='succeeded'
             assert len(downloads())==1
-            assert len(list((tmp_path/'exports').iterdir()))==1
+            assert len(list((tmp_path/'projects'/pid/'exports').iterdir()))==1
             if old:
                 assert client.get(f'/api/v1/projects/{pid}/exports/{old}/download').json()['code']=='export_replaced'
                 import asyncio
@@ -60,7 +60,7 @@ def test_recent_success_failure_cancel_and_single_active(tmp_path):
         publisher.release.set()
         assert _wait(client,job)['status']=='cancelled'
         assert downloads()[0]['id']==old
-        assert len(list((tmp_path/'exports').iterdir()))==1
+        assert len(list((tmp_path/'projects'/pid/'exports').iterdir()))==1
 
 
 def test_startup_converges_history_and_orphans_and_retries_windows_lock(tmp_path,monkeypatch):

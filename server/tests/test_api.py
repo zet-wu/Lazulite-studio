@@ -38,7 +38,7 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
     headers = {"origin": settings.origin, "x-csrf-token": csrf}
     assert (
         client.post(
-            "/api/v1/assets",
+            "/api/v1/uploads",
             files={"file": ("x.wav", b"bad", "audio/wav")},
             headers={"origin": settings.origin},
         ).status_code
@@ -46,20 +46,20 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
     )
     assert (
         client.post(
-            "/api/v1/assets",
+            "/api/v1/uploads",
             files={"file": ("x.bin", b"bad", "application/octet-stream")},
             headers=headers,
         ).status_code
         == 415
     )
     oversized = client.post(
-        "/api/v1/assets",
+        "/api/v1/uploads",
         files={"file": ("large.wav", b"x" * (1024 * 1024 + 100), "audio/wav")},
         headers=headers,
     )
     assert oversized.status_code == 413
     chunked = client.post(
-        "/api/v1/assets",
+        "/api/v1/uploads",
         content=multipart_chunks(2 * 1024 * 1024),
         headers={
             **headers,
@@ -73,7 +73,7 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
         and chunked.json()["request_id"] == "chunked-upload"
     )
     uploaded = client.post(
-        "/api/v1/assets",
+        "/api/v1/uploads",
         files={"file": ("tone.wav", wav_bytes(), "audio/wav")},
         headers=headers,
     )
@@ -96,7 +96,7 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
     assert asset["schema_version"] == "studio-asset-v1" and asset["status"] == "ready"
     created = client.post(
         "/api/v1/projects",
-        json={"name": "Tone", "source_asset_id": asset["id"]},
+        json={"name": "Tone", "upload_id": asset["id"]},
         headers={**headers, "idempotency-key": "create-tone"},
     )
     assert created.status_code == 200
@@ -104,14 +104,14 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
     pid = project["id"]
     retry = client.post(
         "/api/v1/projects",
-        json={"name": "Tone", "source_asset_id": asset["id"]},
+        json={"name": "Tone", "upload_id": asset["id"]},
         headers={**headers, "idempotency-key": "create-tone"},
     )
     assert retry.status_code == 200 and retry.json()["id"] == pid
     assert (
         client.post(
             "/api/v1/projects",
-            json={"name": "Other", "source_asset_id": asset["id"]},
+            json={"name": "Other", "upload_id": asset["id"]},
             headers={**headers, "idempotency-key": "create-tone"},
         ).status_code
         == 409
@@ -120,7 +120,7 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
         assert (
             client.post(
                 "/api/v1/projects",
-                json={"name": name, "source_asset_id": asset["id"]},
+                json={"name": name},
                 headers={**headers, "idempotency-key": key},
             ).status_code
             == 200

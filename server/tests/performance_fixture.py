@@ -15,7 +15,7 @@ def create_performance_app():
     temporary = TemporaryDirectory(prefix="studio-performance-")
     root = Path(temporary.name)
     db = Database(root / "studio.sqlite3")
-    store = RevisionStore(db, root / "revisions")
+    store = RevisionStore(db, root / "projects")
     synthetic = root / "synthetic.wav"
     subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=640.123", "-ac", "2", str(synthetic)], check=True)
     sources = {"synthetic": synthetic}

@@ -111,7 +111,7 @@ def content_hash(path: Path, *, chunk_size: int = 1024 * 1024) -> str:
 
 
 def _asset_path(root: Path, digest: str) -> Path:
-    return root / "assets" / digest[:2] / digest
+    return root / "source" / "original"
 
 
 class MediaService:
@@ -121,8 +121,8 @@ class MediaService:
         self._peaks_lock = threading.Lock()
         self.ffmpeg = ffmpeg
         self.ffprobe = ffprobe
-        (self.root / "assets").mkdir(parents=True, exist_ok=True)
-        (self.root / "proxies").mkdir(parents=True, exist_ok=True)
+        (self.root / "source").mkdir(parents=True, exist_ok=True)
+        (self.root / "cache").mkdir(parents=True, exist_ok=True)
 
     def import_asset(self, temporary_path: Path, original_name: str | None = None) -> Asset:
         source = Path(temporary_path)
@@ -151,9 +151,9 @@ class MediaService:
 
     def _playback_proxy(self, asset: Asset) -> Proxy:
         """Create a normalized PCM WAV; Studio time starts at decoded sample zero."""
-        target = self.root / "proxies" / f"{asset.content_hash}.wav"
+        target = self.root / "cache" / f"{asset.content_hash}.wav"
         if not target.exists():
-            fd, temporary_name = tempfile.mkstemp(prefix="proxy-", suffix=".wav", dir=self.root / "proxies")
+            fd, temporary_name = tempfile.mkstemp(prefix="proxy-", suffix=".wav", dir=self.root / "cache")
             os.close(fd)
             temporary = Path(temporary_name)
             try:
@@ -196,7 +196,7 @@ class MediaService:
         if end_ms <= start_ms:
             return PeakWindow(asset.content_hash, "peaks-v1", start_ms, end_ms, bucket_ms, (), ())
         self._ensure_peak_files(asset)
-        path = self.root / "proxies" / f"{asset.content_hash}.peaks-v1" / f"l{level}.peaks"
+        path = self.root / "cache" / f"{asset.content_hash}.peaks-v1" / f"l{level}.peaks"
         aligned_start = (start_ms // bucket_ms) * bucket_ms
         aligned_end = math.ceil(end_ms / bucket_ms) * bucket_ms
         count = (aligned_end - aligned_start) // bucket_ms
@@ -218,12 +218,12 @@ class MediaService:
             self._build_peak_files(asset)
 
     def _build_peak_files(self, asset: Asset) -> None:
-        target = self.root / "proxies" / f"{asset.content_hash}.peaks-v1"
+        target = self.root / "cache" / f"{asset.content_hash}.peaks-v1"
         if target.is_dir():
             return
         proxy = self.playback_proxy(asset)
         handles: list[BinaryIO] = []
-        temporary_root = Path(tempfile.mkdtemp(prefix=f".{asset.content_hash}.peaks-", dir=self.root / "proxies"))
+        temporary_root = Path(tempfile.mkdtemp(prefix=f".{asset.content_hash}.peaks-", dir=self.root / "cache"))
         pending: list[tuple[float, float] | None] = [None] * 16
         try:
             with wave.open(str(proxy.path), "rb") as audio:

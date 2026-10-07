@@ -1,8 +1,8 @@
 from pathlib import Path
 import math
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from .project_resources import stream_file
 from .studio.media import Asset, MediaProbe
 
 def build_vocal_router(runner, *, auth, project_exists):
@@ -43,13 +43,14 @@ def build_vocal_router(runner, *, auth, project_exists):
         return {'start_ms': first*hop, 'step_ms': stride*hop, 'values': samples}
 
     @router.get('/projects/{pid}/vocals/{rid}/file')
-    def file(pid: str, rid: str, _=Depends(auth)):
-        project_exists(pid)
-        try: row, metadata = runner.get(pid, rid)
-        except KeyError: raise HTTPException(404, '人声结果不存在')
-        path = runner.audio_path(pid, metadata)
-        if not path.is_file(): raise HTTPException(404, '人声文件不存在，请重新生成')
-        return FileResponse(path, media_type='audio/flac')
+    def file(pid: str, rid: str, request: Request, _=Depends(auth)):
+        with runner.db.transaction():
+            project_exists(pid)
+            try: row, metadata = runner.get(pid, rid)
+            except KeyError: raise HTTPException(404, '人声结果不存在')
+            path = runner.audio_path(pid, metadata)
+            if not path.is_file(): raise HTTPException(404, '人声文件不存在，请重新生成')
+            return stream_file(path, 'audio/flac', request.headers.get('range'), request.headers.get('if-range'))
     return router
 
 def vocal_asset(runner, pid, rid):
