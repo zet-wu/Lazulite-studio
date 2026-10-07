@@ -50,6 +50,7 @@ type AtomicLyricCommand =
   | { type: 'restore-editing'; editing: ProjectEditing }
   | { type: 'set-empty-beat'; kind: 'word' | 'ruby'; id: string; count: number }
   | { type: 'split-word'; lineId: string; wordId: string; at: number; newWordId?: string }
+  | { type: 'set-word-obscene'; lineId: string; wordId: string; obscene: boolean }
   | { type: 'edit-word'; lineId: string; wordId: string; text: string }
   | { type: 'set-word-time'; lineId: string; wordId: string; beginMs: TimeMs; endMs: TimeMs }
   | { type: 'add-ruby'; lineId: string; wordId: string; reading: string; rubyId?: string }
@@ -65,7 +66,7 @@ type AtomicLyricCommand =
   | { type: 'set-ruby-time'; lineId: string; wordId: string; rubyId: string; beginMs: TimeMs; endMs: TimeMs };
 
 export type LyricCommand = AtomicLyricCommand | { type: 'batch'; commands: AtomicLyricCommand[] };
-type WordCommand = Extract<AtomicLyricCommand, { type: 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
+type WordCommand = Extract<AtomicLyricCommand, { type: 'set-word-obscene' | 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
 
 export type LyricEditorState = { present: LyricDocument; past: LyricDocument[]; future: LyricDocument[] };
 
@@ -657,6 +658,8 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
           { ...createWord(right, newId), beginMs: middle, endMs: word.endMs },
         ];
       }
+      case 'set-word-obscene':
+        return [word.obscene === wordCommand.obscene ? word : { ...word, obscene: wordCommand.obscene }];
       case 'edit-word':
         if (!wordCommand.text) throw new Error('Word text must be non-empty');
         return [wordCommand.text === word.text ? word : { ...word, text: wordCommand.text }];

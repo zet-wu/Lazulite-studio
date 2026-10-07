@@ -87,11 +87,15 @@ function textOnly(node: Element, label: string): string {
   return node.textContent ?? '';
 }
 
-function checkAttributes(node: Element, allowed: string[]) {
+function checkAttributes(node: Element, allowed: string[], word = false) {
   for (const attribute of Array.from(node.attributes)) {
     if (attribute.namespaceURI === 'http://www.w3.org/2000/xmlns/') continue;
     if (attribute.namespaceURI === null && allowed.includes(attribute.localName)) continue;
     if (attribute.namespaceURI === XML && ['id', 'lang', 'space'].includes(attribute.localName)) continue;
+    if (word && attribute.namespaceURI === AMLL && attribute.localName === 'obscene') {
+      if (!['true', 'false'].includes(attribute.value)) throw new Error('amll:obscene must be true or false');
+      continue;
+    }
     if (attribute.namespaceURI === TTS && attribute.localName === 'ruby') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'role') continue;
@@ -111,13 +115,14 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   if (node.nodeType !== Node.ELEMENT_NODE) throw new Error('Unsupported TTML line child');
   const element = node as Element;
   if (!is(element, TTML, 'span')) throw new Error(`Unsupported TTML line child <${element.localName}>`);
-  checkAttributes(element, ['begin', 'end', 'dur']);
+  checkAttributes(element, ['begin', 'end', 'dur'], true);
+  const obscene = attr(element, AMLL, 'obscene') === 'true';
   const wordId = attr(element, STUDIO, 'id') ?? id;
   const [beginMs, endMs] = boundaries(element, lineStart, lineEnd, absoluteTimes);
   const rubyKind = attr(element, TTS, 'ruby');
   if (!rubyKind) {
     const text = textOnly(element, 'Word');
-    return text ? { ...createWord(text, wordId), beginMs, endMs } : null;
+    return text ? { ...createWord(text, wordId), beginMs, endMs, obscene } : null;
   }
   if (rubyKind !== 'container') throw new Error(`不支持的注音类型： ${rubyKind}`);
   const parts = Array.from(element.children);
@@ -150,7 +155,7 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   }
   if (!rubyUnits.length) throw new Error('注音读音不能为空');
   return {
-    ...createWord(text, wordId),
+    ...createWord(text, wordId), obscene,
     beginMs: beginMs ?? (rubyUnits.every((unit) => unit.beginMs !== null) ? Math.min(...rubyUnits.map((unit) => unit.beginMs!)) : null),
     endMs: endMs ?? (rubyUnits.every((unit) => unit.endMs !== null) ? Math.max(...rubyUnits.map((unit) => unit.endMs!)) : null),
     rubyUnits,
@@ -565,7 +570,6 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     setTime(p, line.beginMs, line.endMs, draft);
     if (line.agentRefs.length) p.setAttributeNS(TTM, 'ttm:agent', line.agentRefs.join(' '));
     const appendWord = (parent: Element, word: LyricWord, text: string) => {
-      if (word.obscene) throw new Error(`Word ${word.id} has fields not yet mapped to TTML`);
       // XML with xml:space=preserve also faithfully carries tabs/newlines in body text.
       if (!draft && isUntimedXmlWhitespace(word,options.editing)) {
         parent.appendChild(xml.createTextNode(text));
@@ -573,6 +577,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       }
       const span = xml.createElementNS(TTML, 'span');
       if (draft) span.setAttributeNS(STUDIO, 'studio:id', word.id);
+      if (word.obscene) span.setAttributeNS(AMLL, 'amll:obscene', 'true');
       setTime(span, word.beginMs, word.endMs, draft);
       if (!word.rubyUnits.length) span.textContent = text;
       else {

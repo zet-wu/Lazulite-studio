@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
-const xml = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:studio="urn:lazulite:studio:draft"><body><div><p xml:id="a" begin="0" end="9"><span studio:id="A" begin="1" end="2">Alpha</span><span studio:id="B" begin="2" end="3">B</span><span studio:id="W" tts:ruby="container" begin="3" end="4"><span tts:ruby="base">今日</span><span tts:ruby="textContainer"><span studio:id="r1" tts:ruby="text" begin="3" end="3.5">きょ</span><span studio:id="r2" tts:ruby="text" begin="3.5" end="4">う</span></span></span><span studio:id="bg" ttm:role="x-bg" begin="2" end="8"><span studio:id="BG" begin="2" end="8">背景</span></span></p><p xml:id="empty"/></div></body></tt>`;
+import { xml } from '../fixtures/timeline-phase3';
 async function load(page: Page, sync = true, data = xml) {
   await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/editor');
   await importLyrics(page, { name: 'phase3.ttml', mimeType: 'application/xml', buffer: Buffer.from(data) });
@@ -73,4 +73,18 @@ test('inspector only mounts fields for the effective object type', async ({ page
   await page.locator('main [data-ruby-id="r1"]').click(); await expect(page.getByLabel('选中对象开始秒数')).toHaveValue('3'); await expect(page.getByLabel('背景歌词', { exact: true })).toHaveCount(0);
   await word(page, 'A').click(); await word(page, 'B').click({ modifiers: ['Control'] }); await expect(page.getByLabel('选中对象开始秒数')).toHaveCount(0); await expect(page.getByText('多对象时间可在时间轴整体平移；端点请单独调整。')).toBeVisible();
   await page.locator('main [data-line-id="a"] [class*="syncOrdinal"]').click(); await expect(page.getByLabel('跳过打轴', { exact: true })).toBeVisible(); await expect(page.getByLabel('行 a开始秒数')).toBeVisible();
+});
+
+test('word-only obscene toggles, undo and local recovery preserve plain/ruby/background words', async ({ page }) => {
+  await load(page);
+  for (const id of ['A', 'W', 'BG']) {
+    await word(page, id).click(); const toggle = page.getByLabel('不雅用语', { exact: true }); await toggle.check();
+    await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(toggle).not.toBeChecked();
+    await page.getByRole('button', { name: '重做', exact: true }).click(); await expect(toggle).toBeChecked();
+  }
+  await page.locator('main [data-ruby-id="r1"]').click(); await expect(page.getByLabel('不雅用语', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByText('检查点已保存', { exact: true })).toBeVisible();
+  page.on('dialog', d => d.accept()); await page.reload(); await page.getByRole('button', { name: '打轴', exact: true }).click();
+  for (const id of ['A', 'W', 'BG']) { await word(page, id).click(); await expect(page.getByLabel('不雅用语', { exact: true })).toBeChecked(); }
+  await expect(word(page, 'A')).toContainText('Alpha');
 });

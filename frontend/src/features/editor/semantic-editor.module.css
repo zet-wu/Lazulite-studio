@@ -372,3 +372,5 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 
 .segmentParts { display: inline; white-space: pre-wrap; font-weight: 550; }
 .segmentParts svg { vertical-align: middle; color: var(--muted); margin-inline: 3px; }
+
+.inspector .propertyQuote { font-weight: 650; font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }

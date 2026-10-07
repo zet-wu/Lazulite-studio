@@ -83,6 +83,21 @@ def validate_ttml(ttml: str) -> str:
             b, e = seconds(begin), seconds(end)
             if b is not None and e is not None and e < b:
                 raise ValueError("end timing precedes begin")
+    # The AMLL content flag belongs only to a body word (including a Ruby
+    # container or background word), never an individual reading or line.
+    parents = {child: parent for parent in root.iter() for child in parent}
+    amll_obscene = "{http://www.example.com/ns/amll}obscene"
+    ruby = "{http://www.w3.org/ns/ttml#styling}ruby"
+    role = "{http://www.w3.org/ns/ttml#metadata}role"
+    for element in root.iter():
+        if amll_obscene not in element.attrib:
+            continue
+        parent = parents.get(element)
+        background = parent is not None and parent.tag == f"{{{TTML_NS}}}span" and parent.get(role) == 'x-bg' and parents.get(parent) is not None and parents[parent].tag == f"{{{TTML_NS}}}p"
+        if (element.get(amll_obscene) not in ('true', 'false') or element.tag != f"{{{TTML_NS}}}span"
+                or element.get(ruby) not in (None, 'container') or element.get(role)
+                or parent is None or not (parent.tag == f"{{{TTML_NS}}}p" or background)):
+            raise ValueError('amll:obscene requires a word and a true/false value')
     agents = {
         e.attrib.get("{http://www.w3.org/XML/1998/namespace}id")
         for e in root.iter()

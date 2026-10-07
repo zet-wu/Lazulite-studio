@@ -209,6 +209,9 @@ function EditorWorkspaceContent(props: Props) {
   // The active canvas selection is the single source of the timing target.
   const selectedTargets = useMemo(() => selectionTargets(document, selection), [document, selection]);
   const activePropertyTarget = selectedTargets.find(target => targetId(target) === selection?.activeId);
+  const propertyWord = activePropertyTarget && (activePropertyTarget.kind === 'word' || activePropertyTarget.kind === 'ruby')
+    ? document.lines.find(line => line.id === activePropertyTarget.lineId)?.words.find(word => word.id === activePropertyTarget.wordId) : undefined;
+  const propertyText = activePropertyTarget?.kind === 'ruby' ? propertyWord?.rubyUnits.find(unit => unit.id === activePropertyTarget.rubyId)?.reading : propertyWord?.text;
   const activePropertyInterval = activePropertyTarget && targetInterval(document, activePropertyTarget);
   const syncLine = document.lines.find(line => line.id === activePropertyTarget?.lineId);
   const syncCursor = syncUnits(document, editing, syncLine?.backgroundOf ? syncLine.id : undefined).find(unit => {
@@ -899,6 +902,7 @@ function EditorWorkspaceContent(props: Props) {
         {selection?.kind === 'lines' && selection.ids.length > 1 && <p className={styles.fieldContext}>当前行 L{ordinalById.get(selectedLine.backgroundOf ?? selectedLine.id)}</p>}
         {activePropertyTarget && activePropertyTarget.kind !== 'line' && activePropertyInterval && <>
           <p>{selection?.kind === 'words' ? '词' : selection?.kind === 'ruby' ? '注音' : '音译单元'}：已选 {selection?.ids.length}</p>
+          {selection?.ids.length === 1 && propertyText !== undefined && <p className={styles.propertyQuote}>{propertyText}</p>}
           {selection?.ids.length === 1 ? <TimePair begin={activePropertyInterval.beginMs} end={activePropertyInterval.endMs} label="选中对象" onCommit={(beginMs, endMs) => {
             const target = activePropertyTarget;
             if (target.kind === 'word') dispatch({ type: 'set-word-time', lineId: target.lineId, wordId: target.wordId, beginMs, endMs });
@@ -906,6 +910,7 @@ function EditorWorkspaceContent(props: Props) {
             else if (target.kind === 'romanization') { const content = document.romanizationTracks.find(track => track.id === target.trackId)!.contents.find(content => content.id === target.contentId)!; if (content.kind === 'timed') dispatch({ type: 'set-romanization-content', trackId: target.trackId, content: { ...content, units: content.units.map(unit => unit.id === target.unitId ? { ...unit, beginMs, endMs } : unit) } }); }
           }} /> : <small>多对象时间可在时间轴整体平移；端点请单独调整。</small>}
         </>}
+        {selection?.kind === 'words' && selection.ids.length === 1 && propertyWord && activePropertyTarget?.kind === 'word' && <BooleanField label="不雅用语" switchControl checked={propertyWord.obscene} onChange={obscene => dispatch({ type: 'set-word-obscene', lineId: activePropertyTarget.lineId, wordId: propertyWord.id, obscene })}/>}
         {selection?.kind === 'lines' && <>
         {selection.ids.length === 1 && <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />}
         {selection?.kind === 'lines' && selection.ids.length > 1 && <small>多行时间请使用整体偏移或时间轴平移。</small>}
