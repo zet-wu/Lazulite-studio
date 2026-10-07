@@ -24,7 +24,7 @@ it('keeps rich valid lyrics out of the issue list and describes actual ASS outpu
   doc.translationTracks = [{ id: 't', language: 'en', purpose: 'subtitle', contents: [{ id: 'c', lineId: line.id, kind: 'plain', text: 'translation' }] }];
   doc.romanizationTracks = [{ id: 'r', language: 'ja', contents: [{ id: 'rc', lineId: line.id, kind: 'plain', text: 'romanization' }] }];
   expect(validateLyrics(doc)).toEqual([]);
-  expect(describeLyricFormat(doc, 'txt').filter(row => row.element === '注音' && row.result === '❌')).toHaveLength(1);
+  expect(describeLyricFormat(doc, 'txt').filter(row => row.element === '注音' && row.status === 'omitted')).toHaveLength(1);
   const ass = exportLyricFile(doc, 'ass'); expect(ass).toContain('translation'); expect(ass).toContain('romanization');
   expect(describeLyricFormat(doc, 'ass').filter(row=>row.result==='分轨字幕')).toHaveLength(2);
   expect(describeLyricFormat(doc, 'ass')[0].detail).toContain('厘秒');
@@ -40,7 +40,7 @@ it('describes background and timing projections without treating them as source 
   expect(validateLyrics(doc)).toEqual([]);
   for (const format of ['txt', 'lrc', 'elrc'] as const) {
     expect(exportLyricFile(doc, format)).not.toContain('background');
-    expect(describeLyricFormat(doc, format).find(row=>row.element==='背景')?.result).toBe('❌');
+    expect(describeLyricFormat(doc, format).find(row=>row.element==='背景')?.status).toBe('omitted');
   }
   for (const format of ['ass', 'eslrc', 'qrc', 'yrc', 'lys'] as const) expect(exportLyricFile(doc, format)).toContain('background');
   expect(exportLyricFile(doc, 'lrc')).toContain('[00:01.000]');

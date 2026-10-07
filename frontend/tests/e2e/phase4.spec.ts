@@ -96,6 +96,7 @@ test('P4-04/05 grouped skips, manual generation, history and checkpoint with bou
 test('P4-06 wheel zoom keeps clipped edges uneditable and pointercancel leaves no transaction', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   await importLyrics(page, { name: 'phase4.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase4Ttml()) });
+  await page.locator('[data-outline-drag]').first().click();
   const bar = page.getByRole('button', { name: '时间轴行 L1', exact: true });
   await expect(bar).toBeVisible();
   await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 2; e.dispatchEvent(new Event('seeked')); });

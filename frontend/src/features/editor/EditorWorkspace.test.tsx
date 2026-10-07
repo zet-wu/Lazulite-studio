@@ -82,6 +82,7 @@ it('dispatches exactly one attachment to the nearest main row, skipping backgrou
   render(<MemoryRouter><EditorWorkspace title="背景" document={lyric} selectedLineId={lyric.lines[3].id} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
     onSave={() => {}} /></MemoryRouter>);
+  fireEvent.click(window.document.querySelector(`[data-line-id="${lyric.lines[3].id}"] > [data-outline-drag]`)!);
   fireEvent.click(screen.getByLabelText('背景歌词'));
   expect(apply).toHaveBeenCalledExactlyOnceWith({ type: 'set-background-of', lineId: lyric.lines[3].id, parentLineId: lyric.lines[2].id });
 });

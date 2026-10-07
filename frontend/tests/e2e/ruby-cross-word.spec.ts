@@ -13,7 +13,7 @@ test('empty target receives selected group, preserves IDs/times, focus, undo and
  await load(page);const source=page.getByLabel('词 元',{exact:true}).locator('xpath=ancestor::*[@data-word-id]'),target=page.getByLabel('词 先',{exact:true}).locator('xpath=ancestor::*[@data-word-id]');
  const units=source.locator('[data-ruby-id]');const ids=await units.evaluateAll(es=>es.map(e=>e.getAttribute('data-ruby-id')));
  await units.first().click({position:{x:2,y:2}});await units.nth(1).click({modifiers:['Shift'],position:{x:2,y:2}});await expect(page.getByText('注音已选 2')).toBeVisible();
- await move(page,units.first(),target,false);await expect(target.locator('[data-drag-placeholder]')).toHaveCount(2);await page.screenshot({path:'/tmp/ruby-cross-word-receiver.png'});await page.mouse.up();
+ await move(page,units.first(),target,false);await expect(source.locator('[data-drag-placeholder]')).toHaveCount(2);await expect(target.locator('[data-ruby-id]')).toHaveCount(0);await expect(page.locator('[class*="dragInsertion"]')).toBeVisible();await page.screenshot({path:'/tmp/ruby-cross-word-receiver.png'});await page.mouse.up();
  await expect(page.locator('[data-ruby-drag-size]')).toHaveCount(0);
  await expect(target.locator('[data-ruby-id]')).toHaveCount(2);expect(await target.locator('[data-ruby-id]').evaluateAll(es=>es.map(e=>e.getAttribute('data-ruby-id')))).toEqual(ids.slice(0,2));
  await expect(target.locator('[data-ruby-id]').first()).toBeFocused();await expect(page.getByText('注音已选 2')).toBeVisible();await expect(source.locator('[data-ruby-id]')).toHaveCount(1);

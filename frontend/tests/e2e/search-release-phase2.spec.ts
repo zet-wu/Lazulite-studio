@@ -40,7 +40,8 @@ test('canvas drives timing, line completion blocks repeat and same target can be
   await panel.getByRole('button', { name: '连续轴', exact: true }).click(); await expect(page.locator('[data-sync-marker][data-current]')).toHaveCount(0);
   await expect(panel.getByRole('button', { name: '连续轴', exact: true })).toBeDisabled();
   await edge(page, '[data-ruby-id]', 3); await expect(panel.getByRole('button', { name: '连续轴', exact: true })).toBeEnabled();
-  await page.locator('main [data-word-id]').filter({ hasText: 'よう' }).dblclick(); await expect(panel).toContainText('L2 · 单元 2 / 2');
+  await page.locator('main [data-word-id]').filter({ hasText: 'よう' }).locator('[class*="syncBody"]').dblclick({ position: { x: 3, y: 3 } });
+  await expect(page.getByRole('textbox', { name: '词 よう', exact: true })).toBeFocused(); await expect(panel).toContainText('L2 · 单元 2 / 2');
   await page.keyboard.press('End'); await page.keyboard.type('sdf'); await expect(page.getByRole('textbox', { name: '词 よう', exact: true })).toHaveValue('ようsdf');
 });
 test('exactly twelve global bindings, conflict rejection, modifier routing and reload persistence', async ({ page }) => {

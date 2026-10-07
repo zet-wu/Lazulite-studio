@@ -88,3 +88,17 @@ test('word-only obscene toggles, undo and local recovery preserve plain/ruby/bac
   for (const id of ['A', 'W', 'BG']) { await word(page, id).click(); await expect(page.getByLabel('不雅用语', { exact: true })).toBeChecked(); }
   await expect(word(page, 'A')).toContainText('Alpha');
 });
+
+test('project canvas press on another visible row does not treat its own selection echo as a locate', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.goto('/projects/sample-project/edit');
+  const rows = Array.from({ length: 12 }, (_, i) => `<p xml:id="l${i}" begin="${i}" end="${i + 1}"><span studio:id="w${i}" begin="${i}" end="${i + 1}">Row${i}</span></p>`).join('');
+  await importLyrics(page, { name: 'press.ttml', mimeType: 'application/xml', buffer: Buffer.from(`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><div>${rows}</div></body></tt>`) });
+  await page.getByRole('button', { name: '打轴', exact: true }).click();
+  const scroll = page.getByLabel('歌词列表', { exact: true }); await scroll.evaluate(n => n.scrollTop = 90);
+  const target = page.locator('main [data-word-id="w1"] [class*="syncBody"]');
+  const box = (await target.boundingBox())!, before = await scroll.evaluate(n => n.scrollTop);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+  await page.waitForTimeout(800); expect(await scroll.evaluate(n => n.scrollTop)).toBe(before); await expect(page.locator('[data-object-drag]')).toHaveCount(0); await page.mouse.up();
+  await page.locator('main [data-word-id="w2"] [class*="syncBody"]').dblclick();
+  await expect(page.getByRole('textbox', { name: '词 Row2', exact: true })).toBeFocused();
+});

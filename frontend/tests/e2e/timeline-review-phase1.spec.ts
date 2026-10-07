@@ -32,6 +32,8 @@ test('timed romanization drag preserves body and translation; translation fields
  const before = (await roman.boundingBox())!;
  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2); await page.mouse.down();
  await page.mouse.move(before.x + before.width / 2 + 25, before.y + before.height / 2, {steps:4}); await page.mouse.up();
+ await expect(page.getByRole('textbox', {name:'行 a开始秒数',exact:true})).toHaveCount(0);
+ await page.locator('[data-line-id="a"] > [data-outline-drag]').click();
  await expect(page.getByRole('textbox', {name:'行 a开始秒数',exact:true})).toHaveValue('1');
  await expect(page.getByRole('spinbutton', {name:'翻译 1 单元 1 开始毫秒',exact:true})).toHaveValue('1000');
  await page.getByRole('button',{name:'撤销',exact:true}).click();

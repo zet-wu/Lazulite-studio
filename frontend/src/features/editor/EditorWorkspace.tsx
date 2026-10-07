@@ -239,7 +239,9 @@ function EditorWorkspaceContent(props: Props) {
   const externalSelection = useRef(props.selectedLineId);
   useEffect(() => {
     const returned = previousMode.current !== mode && (mode === 'edit' || mode === 'sync');
-    const external = externalSelection.current !== props.selectedLineId;
+    // ProjectEditor derives selectedLineId from this same selection context.
+    // Its acknowledgement must not recenter a row under a stationary pointer.
+    const external = externalSelection.current !== props.selectedLineId && props.selectedLineId !== selectionLineId(selection);
     previousMode.current = mode; externalSelection.current = props.selectedLineId;
     if (!returned && !external) return;
     // Validation links explicitly request keyboard focus; returning must not supersede them.
