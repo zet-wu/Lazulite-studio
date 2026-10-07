@@ -728,7 +728,7 @@ function EditorWorkspaceContent(props: Props) {
       if (source.kind === 'line') {
         const clicked = document.lines.find(item => item.id === node.dataset.lineId)!;
         if (!toggle && selection?.kind === 'lines' && selection.ids.includes(source.lineId)) source.lineIds = selection.ids;
-        selectLine(clicked, false, toggle); if (element.closest('[data-outline-drag]')) requestLocate(clicked.id);
+        selectLine(clicked, false, toggle);
       }
       else if (source.kind === 'word') {
         if (!toggle && selection?.kind === 'words' && selection.ids.includes(source.wordId)) source.wordIds = selection.ids;
@@ -740,7 +740,7 @@ function EditorWorkspaceContent(props: Props) {
       }
       else if (source.kind === 'romanization-content') selectRomanizationContent(line.id, source.trackId, source.contentId, false, toggle);
       else selectRomanizationUnit(line.id, source.trackId, source.contentId, source.unitId, false, toggle);
-      drag.start(source, node, event.pointerId, event.clientX, event.clientY, event.altKey || event.ctrlKey && !event.metaKey);
+      drag.start(source, node, event.pointerId, event.clientX, event.clientY, event.altKey || event.ctrlKey && !event.metaKey, element.closest('[data-outline-drag]') ? () => requestLocate(node.dataset.lineId!) : undefined);
     }}
     onPointerMove={(event) => {
       if (!drag.active()) return;

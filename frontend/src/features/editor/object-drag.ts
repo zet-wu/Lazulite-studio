@@ -63,7 +63,7 @@ export function dragCommand(document: LyricDocument, source: DragSource, slot: D
 
 type Preview = { command: LyricCommand; selection: EditorSelection };
 type Marker = { x: number; y: number; width: number; height: number };
-type Session = { source: DragSource; id: number; originX: number; originY: number; x: number; y: number; copy: boolean; started: boolean;
+type Session = { source: DragSource; id: number; originX: number; originY: number; x: number; y: number; copy: boolean; started: boolean; onClick?: () => void;
   ghost: HTMLElement | null; marker: HTMLElement | null; node: HTMLElement; offsetX: number; offsetY: number; key: string; preview: Preview | null; frame: number; slot: DragSlot | null;
   boundary: { node: HTMLElement; before: boolean } | null; edge: { node: HTMLElement; direction: number; since: number } | null; lastTime: number };
 
@@ -91,7 +91,8 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
   useEffect(() => {
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && session.current) { event.preventDefault(); event.stopPropagation(); cancel(); } };
     window.addEventListener('keydown', escape, true);
-    return () => window.removeEventListener('keydown', escape, true);
+    window.addEventListener('blur', cancel);
+    return () => { window.removeEventListener('keydown', escape, true); window.removeEventListener('blur', cancel); };
   }, []);
   useEffect(() => { cancel(); }, [document]);
   useEffect(() => () => cleanup(), []);
@@ -179,17 +180,22 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     const current = session.current; if (!current?.started) return;
     current.ghost!.style.transform = `translate(${current.x - current.offsetX}px, ${current.y - current.offsetY}px)`;
     const elapsed = Math.min(50, now - current.lastTime); current.lastTime = now;
-    const element = window.document.elementFromPoint(current.x, current.y);
-    const scroller = element?.closest<HTMLElement>(`[aria-label="歌词列表"], .${styles.outline} .${styles.panelBody}`);
-    const scrollAllowed = current.source.kind === 'line' || current.source.kind === 'word' || !scroller?.closest(`.${styles.outline}`);
+    // Captured pointers may be above/below the pane (including outside the viewport).
+    // Match the pane's horizontal column, not elementFromPoint, so headers and the
+    // bottom transport do not leave a tiny strip as the only scroll target.
+    const scroller = [...(root.current?.querySelectorAll<HTMLElement>(`[aria-label="歌词列表"], .${styles.outline} .${styles.panelBody}`) ?? [])].find(node => {
+      if (current.source.kind !== 'line' && current.source.kind !== 'word' && node.closest(`.${styles.outline}`)) return false;
+      const rect = node.getBoundingClientRect();
+      return rect.height > 0 && current.x >= rect.left && current.x <= rect.right;
+    });
     let direction = 0, strength = 0;
-    if (scroller && root.current?.contains(scroller) && scrollAllowed) {
+    if (scroller) {
       const rect = scroller.getBoundingClientRect();
       const top = Math.max(0, rect.top), bottom = Math.min(window.innerHeight, rect.bottom);
-      const band = Math.min(22, (bottom - top) / 6);
-      if (current.x >= rect.left && current.x <= rect.right && current.y >= top && current.y <= bottom) {
-        if (current.y < top + band) { direction = -1; strength = (top + band - current.y) / band; }
-        else if (current.y > bottom - band) { direction = 1; strength = (current.y - bottom + band) / band; }
+      const band = Math.min(48, (bottom - top) / 4);
+      if (band > 0) {
+        if (current.y < top + band) { direction = -1; strength = Math.min(1, (top + band - current.y) / band); }
+        else if (current.y > bottom - band) { direction = 1; strength = Math.min(1, (current.y - bottom + band) / band); }
       }
     }
     if (!direction || !scroller) current.edge = null;
@@ -221,10 +227,10 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     }
     current.frame = requestAnimationFrame(tick);
   };
-  const start = (source: DragSource, node: HTMLElement, pointerId: number, x: number, y: number, copy: boolean) => {
+  const start = (source: DragSource, node: HTMLElement, pointerId: number, x: number, y: number, copy: boolean, onClick?: () => void) => {
     cleanup();
     const rect = node.getBoundingClientRect();
-    session.current = { source, node, id: pointerId, originX: x, originY: y, x, y, copy, started: false, ghost: null, marker: null, offsetX: x - rect.left, offsetY: y - rect.top, key: 'pending', preview: null, frame: 0, slot: null, boundary: null, edge: null, lastTime: performance.now() };
+    session.current = { source, node, onClick, id: pointerId, originX: x, originY: y, x, y, copy, started: false, ghost: null, marker: null, offsetX: x - rect.left, offsetY: y - rect.top, key: 'pending', preview: null, frame: 0, slot: null, boundary: null, edge: null, lastTime: performance.now() };
     suppressClick.current = true;
     root.current!.setPointerCapture(pointerId);
   };
@@ -252,6 +258,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     if (current?.started) { cancelAnimationFrame(current.frame); tick(); }
     const result = current?.preview;
     cleanup(); setDragging(null);
+    if (current && !current.started) current.onClick?.();
     if (result && latest.current.apply(result.command)) {
       latest.current.select(result.selection);
       if (result.selection.kind === 'ruby') {
