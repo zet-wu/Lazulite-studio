@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-2026-10-07 更新至时间轴 Phase 3。执行依据见[本轮方案](../../lyric-workflow/docs/studio-timeline-review/Review-phase3/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
+2026-10-07 更新至时间轴 Phase 4。执行依据见[本轮方案](../../lyric-workflow/docs/studio-timeline-review/Review-phase4/plan.md)，实际验证和开放项见[当前状态](../../lyric-workflow/docs/studio/current-state.md)。
 
 ## 1. 应用与目录
 
@@ -20,7 +20,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 ## 2. 路由与组合
 
-`/editor` 由 LocalEditor 管本地文件与检查点，`/projects/:projectId/edit` 由 Workspace 管项目；两者使用同一个 EditorWorkspace、领域命令和 codec。项目路由有音频服务与保存冲突处理；本地路由没有同等媒体资产能力。
+`/projects/:projectId/edit` 是唯一编辑工作流，由 Workspace 组合 EditorWorkspace、领域历史、服务保存及按项目恢复。`/editor` 仅跳转项目列表；本地文件从歌词获取页导入。音乐可选，无音乐时不传 transport，预览位置只用于无声浏览。首次上传由 MusicUpload 更新资源缓存，不重挂编辑器。
 
 其他路由为 `/projects`、`/login`、`/settings`。编辑器提供歌词获取/音频处理/编辑/打轴/预览/文件打包及末尾“项目辅助”占位；大纲、歌词列表、属性各自滚动；大纲点击在栏上委托，未变化行用memo复用，元数据、歌手与音译轨道通过编辑模式的“歌词设置”进入既有弹窗。音频页复用同一大纲分隔条与宽度偏好，按两栏约束计算且不扣除属性栏；隐藏侧栏时焦点可回主栏。两侧独立显隐，默认190px/250px，范围160–360px/200–420px；6px分隔条支持指针捕获、取消、键盘8/32px、双击默认。拖动直接预览grid几何，仅分隔条更新自身ARIA，松手才提交工作区偏好；单一localStorage偏好不进入文档/history，resize仅限制渲染宽度；普通/虚拟列表共用显式ID/serial定位：远端先挂载，再按真实卡片矩形平滑居中，超高卡片靠顶；有界校准，新请求及用户滚动取消，尊重reduced-motion，普通定位不抢焦点；输出错误项的显式定位请求选中稳定对象并转移键盘焦点。EditorMenu与EditorRibbon共用单一activeMenuId；受控details保留输入挂载，跨菜单互斥，命令/外点/Escape关闭（Escape回触发器），离开200ms关闭并保护菜单内键盘焦点；文件菜单已移除，导入在歌词获取、导出在文件打包。
 
@@ -34,17 +34,17 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 ## 3. 权威文档与事务
 
-`ProjectDocument`（`studio-project-v2`）是唯一项目编辑状态，包含源资产 ID、结构化 lyrics 与 acoustics（采用结果 ID、片段副本）。其中 `LyricDocument`（`studio-lyric-v9`）为歌词部分，含 lines、romanizationTracks、translationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs 与实际时间；词含 text、时间、Ruby 单元、对齐单元等。项目 editing 独立保存词／Ruby 空拍、忽略行与行尾链接；关系和歌词实际端点在同一项目事务内维护。音译轨道按主行或背景行的稳定 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
+`ProjectDocument`（`studio-project-v3`）是唯一项目编辑状态，包含结构化 lyrics 与 acoustics（采用结果 ID、片段副本）。其中 `LyricDocument`（`studio-lyric-v9`）为歌词部分，含 lines、romanizationTracks、translationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs 与实际时间；词含 text、时间、Ruby 单元、对齐单元等。项目 editing 独立保存词／Ruby 空拍、忽略行与行尾链接；关系和歌词实际端点在同一项目事务内维护。音译轨道按主行或背景行的稳定 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
 
 时间使用绝对整数毫秒/null；拆分坐标使用 code point 并检查 grapheme 边界。`lyric-commands.ts` 提供纯函数歌词事务；运行时只有 `project-document.ts` 提交 256 次项目历史，歌词与声学操作按实际顺序统一撤销。背景勾选时原子附属最近的前一主行，前行已占用即拒绝，不向更早或后方寻找；下拉仅建立关系后启用，显示动态Lx，value保留稳定ID。内容、链接及各单元自身时间由单一命令校验；背景建立/改绑及主行拆分归属允许父背景各自独立绝对时间，不截短背景或扩展父行。selection、focus、播放时钟不作为歌词权威内容；批量操作一次入历史，最终改动经 codec 保存。
 
 `line-structure.ts` 为拆合行提供共享实际阻塞原因和当前 Lx 对象标识。拆行前行保留ID、起点并清除结束链接，后行继承原结束/链接，外部入链仍指前行；翻译按稳定内容 ID 逐条前/后分配，与音译/背景一次提交。合并消除内部边界链接并继承末行外链；外部指向第二行的入链仅在开始时间相同才改绑，否则明确阻塞。LineSplitDialog上下结果直接显示正文、时间和附属归属。
 
-`romanization-generation.ts` 按已有Ruby单元或无Ruby假名正文词生成ja-Latn，以行内带源归属的假名序列处理上下文。普通拼写复用wanakana，跨单元促音保留所属单元，拆开的拗音使用ky/ya类特殊分片；长音取行内前元音，未知读音隔断上下文，行末促音不借下一行。源单元数量/顺序及毫秒端点原样保留，不合时间包络、不猜新时间。相邻非空白片段的真实分隔空格附着前单元，源空白原样保存；空转换及手工清空使用空格占位，提示不进入文档。
+`romanization-generation.ts` 按已有Ruby单元或无Ruby假名正文词生成ja-Latn，以行内带源归属的假名序列处理上下文。普通拼写复用wanakana，跨单元促音保留所属单元，拆开的拗音使用ky/ya类特殊分片；长音取行内前元音，未知读音隔断上下文，行末促音不借下一行。有效源单元顺序及毫秒端点原样保留，不合时间包络、不猜新时间。相邻非空白片段的真实分隔空格附着前单元，纯空白分片分隔附着相邻有效单元；最终空转换及手工清空不生成定时单元，源位置和提示只保留在生成窗口。
 
 RomanizationGenerationDialog自有静态正文/Ruby对照布局，无播放遮罩或对唱位置。普通模式只有行级text/hint结果，定时模式只有源归属/时间/text/hint单元；输入不改变结构。打开或输出切换生成一次，目标切换、输入及应用不再转换；切模式丢弃本窗手工文字，源变化阻塞。input/自动高度textarea持续挂载，悬停/焦点显示边框；非阻塞虚线提示与整体阻塞实线分开，Enter提交字段、Esc恢复并阻止整窗关闭，IME期间不处理提交/恢复。超过80行TanStack有界挂载，活动输入行保留，手工结果滚出重挂不丢失。应用当前结果一次batch，源正文/Ruby不变；新轨道追加，已有内容默认跳过，只替换明确指定的局部内容。未定时间允许生成草稿，纯输出中实际音译文字及单端点缺失继续要求补全；双端点未定的非空纯空白原位置输出文本节点。
 
-`editing-actions.ts` 的deleteSelection与cutSelection共用原子删除，覆盖行、跨行词、Ruby、音译内容/单元；右键已选对象保留ID集合和范围锚点，删除消费有效选区，空选区禁用。直接删除不写剪贴板，成功后选择仍存在的行并聚焦画布。浏览器剪贴事件仅在编辑/打轴的歌词对象区域且有选区时接管；文本输入、弹窗与页面文字选区保留原生行为，菜单显式剪贴仍针对对象。快捷键撤销/重做若移除了焦点对象，下一帧将焦点回落画布，不添加全局监听。LocalEditor同步执行纯命令后才更新stateRef与React状态，异常可由画布dispatch准确展示且不破坏页面；项目容器同样先执行后提交。音译相邻合并继续原样拼接文字及已有时间包络。
+`editing-actions.ts` 的deleteSelection与cutSelection共用原子删除，覆盖行、跨行词、Ruby、音译内容/单元；右键已选对象保留ID集合和范围锚点，删除消费有效选区，空选区禁用。直接删除不写剪贴板，成功后选择仍存在的行并聚焦画布。浏览器剪贴事件仅在编辑/打轴的歌词对象区域且有选区时接管；文本输入、弹窗与页面文字选区保留原生行为，菜单显式剪贴仍针对对象。快捷键撤销/重做若移除了焦点对象，下一帧将焦点回落画布，不添加全局监听。项目容器同步执行纯命令后才更新stateRef与React状态，异常由画布dispatch展示且不破坏页面。音译相邻合并继续原样拼接文字及已有时间包络。
 
 词级与行级旧音译字段已移除，预览临时派生逐词音译与二侧歌手状态。音译轨道在主行和背景行下作为独立附属内容编辑；“从音译生成 Ruby”只在显式提交时把提案写入 Ruby，源轨道继续保留。候选判断采用50ms边缘容差：最大重叠>50ms才滤除其他≤50ms候选，全短/多候选仍人工。假名转换整词连接后与正文NFC相同，派生默认跳过；手动boolean覆盖保留用户取消，目标/输出/源变化按事件重算。对话框使用“跳过生成”，全跳过禁用应用，不新增空历史；>80行使用已有TanStack Virtual，仅挂载可见提案，全部状态以稳定row key保留，源选择按需展开，覆盖列表有界滚动。空、纯空白及明确的纯非读音标点音译源在建提案时过滤，源数据不变；歌词行右键复用批量入口，比例按当前轨道、内容勾选及非空源行实时计算。生成不再要求时间扩展同意，也不保留扩展展示明细；必要的词/行包络计算仍与 Ruby 写入组成同一 batch，保留源时间、覆盖选择、过期及行尾链接检查。旧格式数据直接丢弃，不设迁移或双写。
 
@@ -54,7 +54,7 @@ RomanizationGenerationDialog自有静态正文/Ruby对照布局，无播放遮�
 
 `lyric-formats.ts` 支持文本、LRC/扩展 LRC/ESLRC/QRC/YRC/LYS 双向、KRC 导入与 ASS 导出。`source-codec.ts` 解析原始 QRC/YRC/KRC 和附属内容；本地二进制 KRC 在浏览器解压。`lrc.ts` 统一普通/尖括号扩展 LRC 下载和内嵌文本：只取主行正文，未知结束不猜测，重叠主行保留且仅在已知区间并集外清屏。低表达力格式不能携带全部 Ruby/元数据或多条音译轨道。预览动态正文使用有效完整时间，独立纯空白词按原顺序以0–0 AMLL word投影；其他未定时正文不进入动态预览，整行无定时词沿用正文回退，不修改文档。isDuet 从歌手引用派生；引用包含主唱时显示主唱侧，否则显示另一侧，无法可视化多歌手合唱。StudioLyricPlayer使用AMLL的单一DOM播放器，关闭自动时间改写，仅把父/背景显示组活跃区设为两行时间并集，保持各行及词/Ruby输入时间。
 
-项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存完整当前项目与基础修订，重开不恢复撤销栈。FastAPI 接受 `studio-document-v4` envelope，document 为 JSON 项目快照，lyrics 保存 draftTtml；修订以不可变 JSON 文件和 project_path 指针提交，不双写旧 TTML 修订。歌词导入仅替换 lyrics，声学数据保留；发布捕获完整快照并从确切修订提取歌词。复核只比较歌词语义。候选由用户明确采用；人声处理由用户启动后在成功时按捕获的声学基线自动接入，真实冲突才提供明确替换入口。
+项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存完整当前项目与基础修订，重开不恢复撤销栈。FastAPI 接受 `studio-document-v5` envelope，document 为 JSON 项目快照，lyrics 保存 draftTtml；修订以不可变 JSON 文件和 project_path 指针提交，不双写旧 TTML 修订。歌词导入仅替换 lyrics，声学数据保留；发布捕获完整快照并从确切修订提取歌词。复核只比较歌词语义。候选由用户明确采用；人声处理由用户启动后在成功时按捕获的声学基线自动接入，真实冲突才提供明确替换入口。
 
 ## 5. 媒体与服务
 
@@ -102,7 +102,7 @@ EditorWorkspace 持有 `AcquisitionStore` 与独立 `useSearchConditions`，切�
 
 ## 毫秒时间与输出生命周期
 
-项目文档为 `studio-project-v2`，歌词部分仍为 `studio-lyric-v9`：`TimeMs`、`beginMs/endMs`、打轴和 A/B 均为整数毫秒或 `null`。行尾链接存 editing.endLinks 来源 ID → 目标 ID，普通解除、分配解除和删除目标均冻结当前有效结束时间，不保留旧端点。文档接口为 `studio-document-v4`，媒体与任务契约使用 `_ms`。恢复检查点使用独立 project-v2 数据库，旧检查点不再读取；没有旧结构转换或双写。媒体元素仍用秒，PCM 仍按样本帧，编码 timescale 不改。
+项目文档为 `studio-project-v3`，歌词部分仍为 `studio-lyric-v9`：`TimeMs`、`beginMs/endMs`、打轴和 A/B 均为整数毫秒或 `null`。行尾链接存 editing.endLinks 来源 ID → 目标 ID，普通解除、分配解除和删除目标均冻结当前有效结束时间，不保留旧端点。文档接口为 `studio-document-v5`，媒体与任务契约使用 `_ms`。恢复检查点使用独立 project-v2 数据库，旧检查点不再读取；没有旧结构转换或双写。媒体元素仍用秒，PCM 仍按样本帧，编码 timescale 不改。
 
 TTML 解析先处理相对祖先得到实际端点，再按半毫秒向上舍入；时钟写法（包括带小时）为绝对时间。保存、下载与 STPP 使用三位毫秒时钟，零时长舍入不自动延长。`server/time_units.py` 在修订写入边界规范化，并保留正文及 Apple 头部元素的默认命名空间，避免外部消费者漏读带自动前缀的正文；Studio 草稿属性只在最终产物剥离。自动对齐/转写结果只向 Studio 暴露毫秒端点，引擎原生秒数在适配边界转换。
 
@@ -208,3 +208,9 @@ MediaTransport 通过唯一时钟写宿主 CSS 变量，同帧投影波形、能
 SyncLine 用左侧统一行号栏和正文／读音／SVG 标记三层布局；普通展示禁选，输入恢复原生文字选择。行末 primary 加号位于正文层。属性栏按有效对象挂载对应控件，词／Ruby 不再挂载父行表单。父组件回传与共享选区一致的行 ID 不触发自动定位，显式大纲／校验定位和模式返回仍保留。
 
 词级 `obscene` 由单次领域命令修改，只在单词属性栏提供开关，Ruby 没有独立标记。草稿与正式 TTML 使用词 span／Ruby container 上的 `amll:obscene`，服务保存保留并校验 true／false 和词级位置。结构剪贴、合词逻辑或和原有分词门控保持。既有歌词／项目／接口／恢复版本及数据不变。
+
+## 时间轴 Phase 4 的项目资源边界
+
+源音乐权威为项目资源接口，退出 ProjectDocument／撤销／恢复。创建仅需名称，空项目默认歌词获取；文件解析及导入复用既有实现。无音乐不挂媒体底栏、音频任务或音乐打包；歌词保存、纯歌词下载及手工端点可用。属性空拍、翻译首次建轨和元数据分区仍走同一项目命令历史。
+
+资源目录为 projects/<id>/{source,cache,revisions,vocals,exports}，SQLite 必要索引保留。上传先进入 uploads/<token>，媒体和代理成功后在事务中首次关联；独立 token 不按哈希共享。删除整项目目录先隔离、数据库提交后释放，重启恢复未提交删除。修订按引用保护、其余最近 100 份及 7 天规则在保存后和启动回收，人声历史随项目删除。新默认目录与旧检查点处置见工作区 Phase 4 实施记录；不提供旧存储兼容分支。

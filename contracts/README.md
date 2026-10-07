@@ -1,6 +1,6 @@
 # Contracts：前后端协议
 
-[openapi.json](openapi.json) 已覆盖会话、能力、项目、上传、文档 GET/PUT、导入、歌词下载、媒体播放、波形和 PCM 片段、任务/SSE、读音词典、发布及成品下载。文档接口承载带 revision 的 studio-document-v4 envelope，document 是 studio-project-v2 JSON 快照，lyrics.draftTtml 为歌词交换边界，不再是 S1 的只读行摘要。
+[openapi.json](openapi.json) 已覆盖会话、能力、项目、上传、文档 GET/PUT、导入、歌词下载、媒体播放、波形和 PCM 片段、任务/SSE、读音词典、发布及成品下载。文档接口承载带 revision 的 studio-document-v5 envelope，document 是 studio-project-v3 JSON 快照，lyrics.draftTtml 为歌词交换边界，不再是 S1 的只读行摘要。
 
 生成结果为 `frontend/src/adapters/http/generated.ts`；MSW 数据与 handlers 位于 `frontend/src/mocks`。修改接口时同步路由、契约、调用方与必要的行为验证。
 
@@ -17,3 +17,5 @@
 ReadingAnalysis.ranges 可返回比 Sudachi C token 更细的可靠片段，仍是原始 code point 范围。范围不等于用户正文词，也不要求前端照其边界拆词；前端先做假名锚点再投影。字段结构不变。
 
 项目 `editing` 保存词／Ruby 非零空拍计数、忽略行 ID、行尾链接映射；三类配置不写入 draftTtml。服务端在读取与保存边界验证引用、类别、范围、重复 ID 与链接的已求值端点。旧快照不转换。
+
+创建项目只要求 name，可选 upload_id；POST /uploads 返回独立临时资源 ID，DELETE /uploads/{token} 取消已完成临时上传，POST /projects/{id}/music 首次接入。歌词快照不含 sourceAssetId，项目接口的 asset 为资源权威，无音乐返回 null。无音乐拒绝音频接口及媒体发布，纯歌词保存和下载可用。

@@ -1,6 +1,6 @@
 # Server 架构
 
-FastAPI 同源 API，SQLite 管理项目、资产索引、修订指针、任务和复核。文件存储管理源媒体、代理/peaks、不可变项目 JSON 与发布成品。
+FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针、任务和复核。文件存储管理源媒体、代理/peaks、不可变项目 JSON 与发布成品。
 
 `app.py` 组合认证与路由；`documents.py/revisions.py/project_document.py` 管项目快照与 CAS 保存；`jobs.py/job_routes.py` 管任务/SSE；`reading.py/review.py` 管读音词典和复核；`studio/media.py` 与 `media.py` 管音频窗口；`publish*.py/publishing.py` 管发布和回读。`projection.py` 为引擎构造正文投影，不把 Ruby 或 sidecar 当作正文。
 
@@ -8,13 +8,13 @@ FastAPI 同源 API，SQLite 管理项目、资产索引、修订指针、任务�
 
 `lyric_sources.py` 负责四来源检索和载荷解密，歌词语义解析仍在前端。`packaging.py` 写入并回读 MP4/M4A、MP3、FLAC 歌词；`publish.py` 从不可变修订执行任务，`publishing.py` 按显式 track ID 写 STPP。Mutagen 管兼容标签，FFprobe 校验音频 packet hash，源文件保留。vendored QRC 解密器来源及许可见 [vendor](vendor/README.md)。
 
-`project_deletion.py` 负责活动任务阻断、项目记录与修订/产物清理，失败恢复暂存文件，共享资产保留。`search_conditions.py` 负责创建时音频标签/上传文件名初始化与三个最终字符串持久化，旧项目不回填。`media_format.py` 按实际内容识别能力及产物后缀；取消在最终结果写锁检查并清理产物，报告记录实际 STPP ID。发布副本将双端点未定的纯空白音译转换为原位置文本，原修订保持不变。
+`project_deletion.py` 负责活动任务阻断、项目目录隔离与关联索引清理，失败回移，重启按数据库状态恢复或清理；源音乐及缓存同样随项目释放。`search_conditions.py` 负责创建时音频标签/上传文件名初始化与三个最终字符串持久化，旧项目不回填。`media_format.py` 按实际内容识别能力及产物后缀；取消在最终结果写锁检查并清理产物，报告记录实际 STPP ID。发布副本将双端点未定的纯空白音译转换为原位置文本，原修订保持不变。
 
 
 `media_format.describe_media` 排除 attached_pic 封面视频流，结合实际容器保留合法原后缀。`publish` 用打包时项目名生成可下载名称，UUID 内部文件名保持独立；结果记录名称，`publish_routes` 用同一名称生成下载响应，旧结果缺名称时沿用磁盘名。命名不触发转码，不放宽成功回读下载门控。
 
 
-`time_units.py` 是秒数/高精度 TTML 到整数毫秒的服务边界；修订写入规范化时间，STPP 使用相同毫秒时钟及无前缀正文元素。当前资产数据库列和接口使用 `_ms`，旧开发库需要明确重建，不包含迁移器。`jobs.reconcile_exports` 保留各项目最近成功且报告通过的记录作为当前产物，退休标记与成功结果同事务提交；物理文件延迟删除可重试，任务记录不删除。`publish_routes` 先打开下载句柄再释放切换锁，以支持下载期间替换。
+`time_units.py` 是秒数/高精度 TTML 到整数毫秒的服务边界；修订写入规范化时间，STPP 使用相同毫秒时钟及无前缀正文元素。当前资源数据库列和接口使用 `_ms`。数据库版本 4 拒绝旧结构，默认使用 data-projects-v4，原 data 保留，不包含迁移器。`jobs.reconcile_exports` 保留各项目最近成功且报告通过的记录作为当前产物，退休标记与成功结果同事务提交；物理文件延迟删除可重试，任务记录不删除。`publish_routes` 先打开下载句柄再释放切换锁，以支持下载期间替换。
 
 `vocal_process.py` 为每个人声任务启动并监管独立 Python 子进程，`vocal_worker.py` 调用同一 `vocals.py` 实现，模型初始化／推理与分析不占用 API 的解释器。父进程保留单任务队列、任务状态和阶段事件，子进程直接保存同一数据库的持久结果；通过管道确认阶段边界取消，异常退出只使本次任务失败，服务关闭时终止并回收子进程。仅 API 启动清理未注册目录，工作子进程不执行启动清理。注入轻量 separator 的单元测试在进程内运行。
 
@@ -35,3 +35,7 @@ FastAPI 同源 API，SQLite 管理项目、资产索引、修订指针、任务�
 `furigana.py` 加载随服务部署的固定 JmdictFurigana 资源，校验原始 SHA-256 并缓存精确词形＋读音的唯一有效分段。`reading.py` 以 C 读音为准，先查精确分段，再取可完整回拼的 split(A) 并查子词；tokenize、token 读取与细分共用锁。资源缺损明确使读音服务不可用，不在生成时下载。数据来源、署名、许可及维护方式见 [分段资源](vendor/jmdict-furigana/README.md)。
 
 `documents.validate_ttml` 保留词级 `amll:obscene` 扩展，普通词／Ruby container／背景词允许明确 true／false；行、背景容器、Ruby 读音及非法值拒绝。规范化时间与不可变修订仍使用相同链路和项目／HTTP 版本。
+
+项目目录 projects/<id> 包含 source/original、cache、revisions、vocals 和 exports；assets 表仅为已关联项目的资源索引，哈希不唯一，不承担跨项目共享。临时上传在 uploads/<token> 校验和建代理后，由创建或首次接入事务转移归属；失败回收，竞争首次接入只允许一份音乐。SQLite 写锁排序上传提交、删除和缓存构建，下载锁内打开句柄、锁外分段读取并支持 Range。重启清理临时上传、无源引用目录及孤立项目目录；已完成放弃上传在后续上传时按一小时回收。
+
+项目快照 v3 与 HTTP 文档 v5 不含源资源 ID，上传不写歌词修订。RevisionStore 保存后和启动保护当前、任务及复核引用，再保留其余最新 100 份和 7 天内修订；回收先移除索引，文件失败由启动清理重试。人声注册历史仍仅随项目删除回收，保留同项目 audio_result_id 复用。
