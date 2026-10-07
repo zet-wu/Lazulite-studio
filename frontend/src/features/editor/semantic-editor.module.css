@@ -212,7 +212,7 @@
 .romanizationHeader strong { font-size: var(--label-size); font-weight: 500; }
 .romanizationTrackHeader { color: var(--muted); font-size: var(--label-size); }
 .inspector p { font-size: var(--body-size); }
-.dragGhost[data-drop-error]::after { content: attr(data-drop-error); display: block; color: var(--danger); background: var(--panel); padding: 8px; }
+.dragGhost[data-drop-error] { outline: 2px dashed var(--danger); outline-offset: 2px; }
 .actions > button { border: 0; background: transparent; }
 .actions > .primaryButton { background-color: var(--blue); color: var(--on-primary); padding-inline: 12px; }
 .settingsMenu button[aria-pressed] > svg { flex-shrink: 0; color: var(--blue); }

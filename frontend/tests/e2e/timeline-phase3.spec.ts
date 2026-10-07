@@ -17,15 +17,26 @@ for (const sync of [false, true]) test(`stable geometry and hysteresis, invalid 
   const box = before!;
   await page.mouse.move(box.x + box.width / 2 - 5, box.y + 3, { steps: 4 });
   const mark = page.locator('[class*="dragInsertion"]'); await expect(mark).toBeVisible();
+  const ghost = page.locator('body > [class*="dragGhost"]');
+  const checkInvalid = async () => {
+    const valid = (await ghost.boundingBox())!;
+    await page.mouse.move(1430, 180); await expect(mark).toBeHidden(); await expect(ghost).toHaveAttribute('data-drop-error');
+    await expect(ghost).toHaveCSS('outline-style', 'dashed'); await expect(ghost).toHaveCSS('outline-width', '2px');
+    expect(await ghost.evaluate(n => getComputedStyle(n, '::after').content)).toBe('none');
+    const invalid = (await ghost.boundingBox())!; expect(invalid.width).toBe(valid.width); expect(invalid.height).toBe(valid.height);
+  };
   const left = await mark.boundingBox();
   for (const dx of [1, -1, 2, -2, 1]) { await page.mouse.move(box.x + box.width / 2 + dx, box.y + 3); await page.waitForTimeout(40); expect(await mark.boundingBox()).toEqual(left); }
   expect(await b.boundingBox()).toEqual(before);
   await page.mouse.move(box.x + box.width / 2 + 5, box.y + 3); await expect.poll(async () => (await mark.boundingBox())?.x).not.toBe(left?.x);
   await page.waitForTimeout(250); expect(await b.boundingBox()).toEqual(before);
-  await page.mouse.move(1430, 180); await expect(mark).toBeHidden(); await expect(page.locator('[data-drop-error]')).toHaveCount(1);
+  await checkInvalid();
   await page.mouse.up(); expect(await page.locator('main [data-word-id]').evaluateAll(ns => ns.map(n => n.getAttribute('data-word-id')))).toEqual(['A', 'B', 'W', 'BG']);
   const r = (await ruby.boundingBox())!; await page.mouse.move(r.x + 2, r.y + 2); await page.mouse.down();
   await page.mouse.move(box.x + 5, box.y + 3, { steps: 4 }); await expect(mark).toBeVisible(); expect(await b.boundingBox()).toEqual(before);
+  await checkInvalid();
+  await page.mouse.move(box.x + 5, box.y + 3); await expect(mark).toBeVisible(); await expect(ghost).not.toHaveAttribute('data-drop-error');
+  await expect(ghost).not.toHaveCSS('outline-style', 'dashed');
   await page.keyboard.press('Escape'); await page.mouse.up(); await expect(mark).toHaveCount(0);
 });
 test('SVG colors, body add button, gutter, selection and native input selection', async ({ page }) => {
