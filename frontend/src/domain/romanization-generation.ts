@@ -98,6 +98,24 @@ export function proposeRomanization(document: LyricDocument, lineIds: readonly s
     return kind === 'timed' ? { lineId: line.id, kind, groups } : { lineId: line.id, kind, text: groups.map(unit => unit.text).join('') || ' ', hint: groups.some(unit => unit.hint) ? '自动结果有空转换或特殊分片，可修正或保留' : '' };
   });
 }
+/** Keep separators as text, never as independently timed objects. */
+export function generatedTimedUnits(groups: GeneratedUnit[]): GeneratedUnit[] {
+  const result: GeneratedUnit[] = [];
+  let leading = '';
+  for (const unit of groups) {
+    if (!unit.text.trim()) {
+      if (result.length) result[result.length - 1].text += unit.text;
+      else leading += unit.text;
+    } else {
+      result.push({ ...unit, text: leading + unit.text });
+      leading = '';
+    }
+  }
+  return result;
+}
+export function hasGeneratedContent(row: RomanizationProposal): boolean {
+  return row.kind === 'plain' ? Boolean(row.text.trim()) : row.groups.some(unit => Boolean(unit.text.trim()));
+}
 export type RomanizationChoices = { trackId: string | null; targets: Record<string, string> };
 export function prepareRomanization(document: LyricDocument, source: LyricDocument, rows: RomanizationProposal[], choices: RomanizationChoices) {
   if (document !== source) throw new Error('文档已变化，请重新打开生成窗口');
@@ -108,18 +126,18 @@ export function prepareRomanization(document: LyricDocument, source: LyricDocume
   const prepared = rows.flatMap(row => {
     const existing = byLine.get(row.lineId) ?? [];
     const target = choices.targets[row.lineId] ?? (existing.length ? 'skip' : 'append');
-    if (target === 'skip') return [];
+    if (target === 'skip' || !hasGeneratedContent(row)) return [];
     if (target !== 'append' && !existing.some(content => content.id === target)) throw new Error('替换的音译内容不存在');
     return [{ row, target }];
   });
-  if (!prepared.length) throw new Error('没有选择生成内容');
+  if (!prepared.length) throw new Error('没有可生成内容（未选择内容或结果为空，未替换）');
   return { track, prepared };
 }
 export function romanizationGenerationCommand(document: LyricDocument, source: LyricDocument, rows: RomanizationProposal[], choices: RomanizationChoices): LyricCommand {
   const { track, prepared } = prepareRomanization(document, source, rows, choices);
   const contents: RomanizationContent[] = prepared.map(({ row, target }) => row.kind === 'plain'
-    ? { id: target === 'append' ? crypto.randomUUID() : target, lineId: row.lineId, kind: 'plain', text: row.text || ' ' }
-    : { id: target === 'append' ? crypto.randomUUID() : target, lineId: row.lineId, kind: 'timed', units: row.groups.map(({ text, beginMs, endMs }) => ({ text: text || ' ', beginMs, endMs, id: crypto.randomUUID() })) });
+    ? { id: target === 'append' ? crypto.randomUUID() : target, lineId: row.lineId, kind: 'plain', text: row.text }
+    : { id: target === 'append' ? crypto.randomUUID() : target, lineId: row.lineId, kind: 'timed', units: generatedTimedUnits(row.groups).map(({ text, beginMs, endMs }) => ({ text, beginMs, endMs, id: crypto.randomUUID() })) });
   if (!track) {
     const trackId = crypto.randomUUID();
     return { type: 'batch', commands: [{ type: 'add-romanization-track', track: { id: trackId, language: 'ja-Latn', contents: [] } }, ...contents.map(content => ({ type: 'insert-romanization-content' as const, trackId, content }))] };

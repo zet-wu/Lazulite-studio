@@ -4,7 +4,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import type { LyricDocument, LyricWord } from '../../domain/lyric-document';
 import type { LyricCommand } from '../../domain/lyric-commands';
-import { prepareRomanization, proposeRomanization, romanizationGenerationCommand, type RomanizationKind, type GeneratedUnit, type RomanizationProposal } from '../../domain/romanization-generation';
+import { hasGeneratedContent, prepareRomanization, proposeRomanization, romanizationGenerationCommand, type RomanizationKind, type GeneratedUnit, type RomanizationProposal } from '../../domain/romanization-generation';
 import { SettingsDialog } from './SettingsDialog';
 import styles from './semantic-editor.module.css';
 
@@ -19,10 +19,10 @@ function ProposalText({ text, hint, label, multiline, change, focus }: {
   }, [text]);
   const common = {
     'aria-label': label, 'aria-description': hint || undefined, title: [text, hint].filter(Boolean).join('；'),
-    value: text, placeholder: '空格占位', className: `${styles.romanPreviewInput} ${hint ? styles.romanPreviewHint : ''}`,
+    value: text, placeholder: '留空则不生成', className: `${styles.romanPreviewInput} ${hint ? styles.romanPreviewHint : ''}`,
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => change(event.target.value),
     onFocus: () => { start.current = text; focus(true); },
-    onBlur: () => { if (!text) change(' '); focus(false); },
+    onBlur: () => { focus(false); },
     onCompositionStart: () => { composing.current = true; }, onCompositionEnd: () => { composing.current = false; },
     onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       if (composing.current || event.nativeEvent.isComposing) { event.stopPropagation(); return; }
@@ -114,13 +114,13 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   try { prepareRomanization(document, source, rows, { trackId: trackId || null, targets }); }
   catch (cause) { issue = (cause as Error).message; }
   const changeText = (lineId: string, text: string, key?: string) => setRows(current => current.map(row => row.lineId !== lineId ? row : row.kind === 'timed'
-    ? { ...row, groups: row.groups.map(unit => unit.key === key ? { ...unit, text, hint: unit.hint.includes('分片') ? unit.hint : text.trim() ? '' : '音译空格占位，可直接应用' } : unit) }
-    : { ...row, text, hint: row.hint.includes('分片') ? row.hint : text.trim() ? '' : '音译空格占位，可直接应用' }));
+    ? { ...row, groups: row.groups.map(unit => unit.key === key ? { ...unit, text, hint: unit.hint.includes('分片') ? unit.hint : text.trim() ? '' : '留空则不生成' } : unit) }
+    : { ...row, text, hint: row.hint.includes('分片') ? row.hint : text.trim() ? '' : '留空则不生成' }));
   const submit = () => {
     try { if (apply(romanizationGenerationCommand(document, source, rows, { trackId: trackId || null, targets }))) close(); }
     catch (cause) { setMessage((cause as Error).message); }
   };
-  return <SettingsDialog title="生成日文罗马字音译" subtitle={`生成 ${rows.filter(row => targetFor(row.lineId) !== 'skip').length} / ${sourceIds.length} 行`} close={close}
+  return <SettingsDialog title="生成日文罗马字音译" subtitle={`生成 ${rows.filter(row => targetFor(row.lineId) !== 'skip' && hasGeneratedContent(row)).length} / ${sourceIds.length} 行`} close={close}
     actions={<><button data-role="secondary" onClick={close}>取消</button><button data-role="primary" disabled={Boolean(issue)} onClick={submit}>生成音译</button></>}>
     <div className={styles.rubyGeneration}>
       <div className={`${styles.rubyGenerationOptions} ${styles.romanGenerationOptions}`}>
@@ -145,6 +145,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
               <option value="skip">跳过 · 保留已有</option><option value="append">添加新内容</option>
               {track?.contents.filter(content => content.lineId === row.lineId).map(content => <option key={content.id} value={content.id}>替换 · {content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</option>)}
             </Select></label>
+            {!hasGeneratedContent(row) && <small>结果为空，未替换；留空则不生成</small>}
             <div className={styles.romanPreviewWords}>
               {lines.get(row.lineId)!.words.map(word => row.kind === 'timed'
                 ? <TimedWordPreview highlight={highlight} key={word.id} word={word} units={byWord.get(word.id) ?? []} lineLabel={`${lineLabel(row.lineId)}`}
@@ -159,7 +160,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
           </div>; })}
         </div>
       </div>
-      {kind === 'timed' && rows.some(row => row.kind === 'timed' && targetFor(row.lineId) !== 'skip' && row.groups.some(unit => unit.beginMs === null || unit.endMs === null)) && <small>源时间未定，生成后请在画布补全；最终定时导出要求完整时间。</small>}
+      {kind === 'timed' && rows.some(row => row.kind === 'timed' && targetFor(row.lineId) !== 'skip' && row.groups.some(unit => unit.text.trim() && (unit.beginMs === null || unit.endMs === null))) && <small>源时间未定，生成后请在画布补全；最终定时导出要求完整时间。</small>}
       {(message || issue) && <p role="alert" className={styles.romanGenerationError}>{message || issue}</p>}
     </div>
   </SettingsDialog>;

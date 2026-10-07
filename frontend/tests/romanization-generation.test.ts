@@ -31,7 +31,7 @@ for (const [parts, output] of [
     expect(proposeRomanization(doc, [doc.lines[0].id])[0].text).toBe(output.join(''));
   }
 });
-it('copies timed units exactly, accepts placeholders, roundtrips final/draft and undoes once', () => {
+it('filters empty timed units, preserves valid times, roundtrips final/draft and undoes once', () => {
   const doc = source(['が', 'っ', 'こ', 'う', '漢字'], true), before = structuredClone(doc);
   const rows = proposeRomanization(doc, [doc.lines[0].id], 'timed');
   rows[0].groups[0].text = 'manual  '; rows[0].groups[4].text = '';
@@ -40,7 +40,7 @@ it('copies timed units exactly, accepts placeholders, roundtrips final/draft and
   for (const draft of [true, false]) {
     const content = parseLyricTtml(serializeLyricTtml(result.present, { draft })).romanizationTracks[0].contents[0];
     expect(content.kind).toBe('timed');
-    if (content.kind === 'timed') expect(content.units.map(({ text, beginMs, endMs }) => ({ text, beginMs, endMs }))).toEqual(rows[0].groups.map(({ text, beginMs, endMs }) => ({ text: text || ' ', beginMs, endMs })));
+    if (content.kind === 'timed') expect(content.units.map(({ text, beginMs, endMs }) => ({ text, beginMs, endMs }))).toEqual(rows[0].groups.filter(unit => unit.text.trim()).map(({ text, beginMs, endMs }) => ({ text, beginMs, endMs })));
   }
   expect(result.past).toHaveLength(1); expect(undoLyricCommand(result).present).toBe(doc);
 });
@@ -50,17 +50,34 @@ it('keeps missing times and isolates line-final sokuon from the next line', () =
   expect(rows[0].groups[0]).toMatchObject({ text: ' ', beginMs: null, endMs: null });
   const result = executeLyricCommand(createLyricEditorState(doc), romanizationGenerationCommand(doc, doc, rows, choices));
   expect(() => serializeLyricTtml(result.present)).toThrow('needs timing');
-  expect(parseLyricTtml(serializeLyricTtml(result.present, { draft: true })).romanizationTracks[0].contents).toHaveLength(2);
+  expect(parseLyricTtml(serializeLyricTtml(result.present, { draft: true })).romanizationTracks[0].contents).toHaveLength(1);
 });
 it('applies current ordinary text without converting again and preserves non-target contents', () => {
   const doc = source(['漢字', 'かな']); const lineId = doc.lines[0].id;
   doc.romanizationTracks = [{ id: 'track', language: 'ja-Latn', contents: [{ id: 'keep', lineId, kind: 'plain', text: 'keep' }, { id: 'replace', lineId, kind: 'plain', text: 'old' }] }];
   const rows = proposeRomanization(doc, [lineId]); rows[0].text = '  edited  ';
-  expect(() => romanizationGenerationCommand(doc, doc, rows, { trackId: 'track', targets: {} })).toThrow('没有选择生成内容');
+  expect(() => romanizationGenerationCommand(doc, doc, rows, { trackId: 'track', targets: {} })).toThrow('没有可生成内容');
   const opts = { trackId: 'track', targets: { [lineId]: 'replace' } };
   const state = executeLyricCommand(createLyricEditorState(doc), romanizationGenerationCommand(doc, doc, rows, opts));
   expect(state.present.romanizationTracks[0].contents).toEqual([doc.romanizationTracks[0].contents[0], { id: 'replace', lineId, kind: 'plain', text: '  edited  ' }]);
   expect(() => romanizationGenerationCommand({ ...doc }, doc, rows, opts)).toThrow('文档已变化');
   expect(() => romanizationGenerationCommand(doc, doc, rows, { trackId: 'missing', targets: {} })).toThrow('ja-Latn');
   expect(() => romanizationGenerationCommand(doc, doc, rows, { trackId: 'track', targets: { [lineId]: 'missing' } })).toThrow('不存在');
+});
+
+it('attaches all whitespace without extending times, preserves empty replacements and manual additions', () => {
+  const doc = source([' ', 'か', '  ', 'な', '\t', 'English']);
+  const rows = proposeRomanization(doc, [doc.lines[0].id], 'timed');
+  rows[0].groups[2].beginMs = null;
+  rows[0].groups[5].text = 'manual';
+  const state = executeLyricCommand(createLyricEditorState(doc), romanizationGenerationCommand(doc, doc, rows, choices));
+  const content = state.present.romanizationTracks[0].contents[0];
+  expect(content.kind === 'timed' && content.units.map(unit => [unit.text, unit.beginMs, unit.endMs])).toEqual([
+    [' ka  ', 204, 303], ['na\t', 410, 509], ['manual', 616, 715],
+  ]);
+  const track = state.present.romanizationTracks[0];
+  const empty = rows.map(row => ({ ...row, groups: row.groups.map(unit => ({ ...unit, text: ' \t　' })) }));
+  expect(() => romanizationGenerationCommand(doc, doc, empty, choices)).toThrow('没有可生成内容');
+  expect(() => romanizationGenerationCommand(state.present, state.present, empty, { trackId: track.id, targets: { [doc.lines[0].id]: content.id } })).toThrow('结果为空，未替换');
+  expect(track.contents[0]).toBe(content);
 });
