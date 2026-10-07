@@ -7,3 +7,5 @@
 tokens.css 为紧凑桌面定义表面层次、强调色上的文本、hover/pressed 状态层、文字角色与间距/圆角；明暗主题使用相同语义角色。Editor 的按钮、无框菜单、固定面板标题与对话框复用这些变量，不依赖额外组件库。
 
 按钮以 data-role 显式声明 primary/secondary/inline/danger/danger-primary，选中另用 aria-pressed 或 aria-current。IconButton 使用统一 SVG、可访问名称、悬停和键盘提示；BooleanField 复用真实 checkbox，单行用 switch，批量支持 indeterminate。
+
+Icon 同时提供填充 circle／窄 rect 打轴图形及勾选、警告、音符等内联 SVG；图形仅装饰，名称与状态由控件表达，调用方决定语义颜色。

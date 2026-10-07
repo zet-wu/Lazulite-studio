@@ -33,3 +33,5 @@ FastAPI 同源 API，SQLite 管理项目、资产索引、修订指针、任务�
 `POST /api/v1/reading/analyze` 接受 `lines: [{id,text}]` 当前文本快照，沿用会话及写请求来源校验，不创建项目、修订或任务。返回原始 code point 范围、正文及平假名读音；未覆盖范围显式为空，服务不可用返回 503。Sudachi 共用 tokenizer 通过互斥锁序列化分词调用，后续映射不持锁。旧读音任务保留独立接口，但新生成路径不依赖其修订或项目词典。
 
 `furigana.py` 加载随服务部署的固定 JmdictFurigana 资源，校验原始 SHA-256 并缓存精确词形＋读音的唯一有效分段。`reading.py` 以 C 读音为准，先查精确分段，再取可完整回拼的 split(A) 并查子词；tokenize、token 读取与细分共用锁。资源缺损明确使读音服务不可用，不在生成时下载。数据来源、署名、许可及维护方式见 [分段资源](vendor/jmdict-furigana/README.md)。
+
+`documents.validate_ttml` 保留词级 `amll:obscene` 扩展，普通词／Ruby container／背景词允许明确 true／false；行、背景容器、Ruby 读音及非法值拒绝。规范化时间与不可变修订仍使用相同链路和项目／HTTP 版本。
