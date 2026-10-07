@@ -61,7 +61,10 @@ test('generated whitespace is omitted and actual word preview remains aligned',a
   },snapshot);
   expect(projection.content.units).toHaveLength(2);expect(projection.content.units.map((u:{beginMs:number;endMs:number})=>[u.beginMs,u.endMs])).toEqual([[1000,2000],[2000,3000]]);
   expect(projection.lyric.words.filter((w:{romanWord?:string})=>w.romanWord).map((w:{romanWord:string})=>w.romanWord.trim())).toEqual(['ka','na']);
-  await page.getByRole('button',{name:'预览',exact:true}).click();await page.getByLabel('预览位置').fill('1500');await expect(page.getByRole('region',{name:'动态歌词预览'})).toContainText('ka');await page.screenshot({path:test.info().outputPath('word-preview.png')});
+  await page.getByRole('button',{name:'预览',exact:true}).click();await page.getByLabel('预览位置').fill('1500');await expect(page.getByRole('region',{name:'动态歌词预览'})).toContainText('ka');
+  const roman=page.getByText(/^ka\s*$/).last();
+  await expect.poll(async()=>{const a=await roman.boundingBox();const b=await page.locator('[class*="previewPlayer"]').boundingBox();return Boolean(a&&b&&a.y>=b.y&&a.y+a.height<=b.y+b.height);}).toBe(true);
+  await page.screenshot({path:test.info().outputPath('word-preview.png')});
 });
 test('first upload keeps dirty text and undo history and switches preview clock',async({page})=>{
   const id=await create(page);await importLyrics(page,file);const word=page.getByRole('textbox',{name:'词 Alpha',exact:true});await word.fill('Before');await word.press('Enter');
