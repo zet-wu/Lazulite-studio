@@ -15,18 +15,31 @@ from .time_units import milliseconds
 class VocalCancelled(Exception): pass
 
 class VocalRunner:
-    def __init__(self, db, root: Path, separator_factory=None):
+    def __init__(self, db, root: Path, separator_factory=None, *, cleanup=True):
         self.db, self.root = db, root
         self.root.mkdir(parents=True, exist_ok=True)
         self.separator_factory = separator_factory
         self._audio_checks = {}
+        from .vocal_process import VocalProcess
+        self._worker = VocalProcess()
+        if not cleanup: return
         # Startup has no live model worker. Discard only unregistered partial products.
         with db.connect() as c:
             known = {Path(row[0]).resolve() for row in c.execute('SELECT directory FROM vocal_results')}
         for directory in self.root.glob('*/*'):
             if directory.is_dir() and directory.resolve() not in known: shutil.rmtree(directory)
 
+    def close(self):
+        self._worker.close()
+
     def run(self, project_id, asset_path, params, job_id, emit, cancelled):
+        # Injected lightweight separators remain in-process for deterministic domain tests.
+        if self.separator_factory:
+            return self.run_in_process(project_id, asset_path, params, job_id, emit, cancelled)
+        return self._worker.run({'database': str(Path(self.db.path).resolve()), 'root': str(self.root.resolve()),
+            'project_id': project_id, 'asset_path': str(Path(asset_path).resolve()), 'params': params, 'job_id': job_id}, emit, cancelled)
+
+    def run_in_process(self, project_id, asset_path, params, job_id, emit, cancelled):
         try:
             import soundfile as sf
         except ImportError as exc:

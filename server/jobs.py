@@ -192,4 +192,5 @@ class JobService:
         return json.loads(row[0]) if row and row[0] else None
 
     def close(self):
+        if self.vocal_runner is not None: self.vocal_runner.close()
         self._pool.shutdown(wait=False, cancel_futures=False)

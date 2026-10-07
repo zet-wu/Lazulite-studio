@@ -18,12 +18,12 @@ def main():
     args = parser.parse_args()
     if not args.source.is_file(): parser.error('source must be an existing audio file')
     if args.root.exists() and any(args.root.iterdir()): parser.error('root must be empty to preserve earlier results')
-    import torch
+    os.environ['OMP_NUM_THREADS'] = str(args.threads)
+    os.environ['MKL_NUM_THREADS'] = str(args.threads)
     from server.db import Database
     from server.revisions import RevisionStore
     from server.tests.media_fixture import add_media_project
     from server.vocals import VocalRunner
-    torch.set_num_threads(args.threads)
     args.root.mkdir(parents=True, exist_ok=True)
     db = Database(args.root / 'studio.sqlite3')
     add_media_project(args.root, db, RevisionStore(db, args.root / 'revisions'), 'real', args.source,
