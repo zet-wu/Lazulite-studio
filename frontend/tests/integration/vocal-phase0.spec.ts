@@ -1,3 +1,4 @@
+import { uploadFixtureMusic } from '../fixtures/upload-music';
 import { test, expect } from '@playwright/test';
 test('vocal processing adopts automatically, shares history, assigns and reopens a complete project', async ({page})=>{
  await page.goto('/projects/phase0-packaging/edit');
@@ -32,8 +33,8 @@ test('vocal processing adopts automatically, shares history, assigns and reopens
 });
 
 async function newProject(page: import('@playwright/test').Page, xml: string) {
- const asset=(await (await page.request.get('/api/v1/projects/phase0-packaging')).json()).asset.id;
- const made=await page.request.post('/api/v1/projects',{headers:{origin:'http://127.0.0.1:5175'},data:{name:'人声验收',source_asset_id:asset}});
+ const asset = await uploadFixtureMusic(page);
+ const made=await page.request.post('/api/v1/projects',{headers:{origin:'http://127.0.0.1:5175'},data:{name:'人声验收',upload_id:asset}});
  const pid=(await made.json()).id;
  const before=await (await page.request.get(`/api/v1/projects/${pid}/document`)).json();
  const saved=await page.request.put(`/api/v1/projects/${pid}/document`,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:pid,revision:before.revision,document:{...before.document,lyrics:{draftTtml:xml}}}});expect(saved.ok()).toBeTruthy();

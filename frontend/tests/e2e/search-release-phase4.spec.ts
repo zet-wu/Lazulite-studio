@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { importLyrics } from '../fixtures/import-lyrics';
 const xml = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><head><metadata><ttm:agent xml:id="role" type="character"><ttm:name>长名称角色</ttm:name><ttm:actor agent="actor"/></ttm:agent><ttm:agent xml:id="actor" type="person"/><ttm:title>标题</ttm:title><ttm:artist>甲</ttm:artist><ttm:artist>乙</ttm:artist></metadata></head><body><div><p xml:id="L1" begin="00:01.000" end="00:02.000" ttm:agent="role actor">歌</p><p xml:id="L2" begin="00:02.000" end="00:03.000" ttm:agent="actor">曲</p></div></body></tt>`;
-async function load(page:Page,source=xml){await page.goto('/editor');await importLyrics(page,{name:'phase4.ttml',mimeType:'application/xml',buffer:Buffer.from(source)});}
+async function load(page:Page,source=xml){await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,{name:'phase4.ttml',mimeType:'application/xml',buffer:Buffer.from(source)});}
 async function settings(page:Page,name:string){await page.getByRole('button',{name:'编辑',exact:true}).click();await page.locator('summary').filter({hasText:'歌词设置'}).click();await page.getByRole('button',{name,exact:true}).click();}
 async function download(page:Page){await page.getByRole('button',{name:'文件打包',exact:true}).click();const promise=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词'}).click();return readFile((await (await promise).path())!,'utf8');}
 test('metadata edits preserve focus, reject duplicates, cancel locally and delete individual values',async({page})=>{

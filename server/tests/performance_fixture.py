@@ -16,6 +16,9 @@ def create_performance_app():
     root = Path(temporary.name)
     db = Database(root / "studio.sqlite3")
     store = RevisionStore(db, root / "projects")
+    with db.transaction() as c:
+        c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)', ('no-music','无音乐性能夹具',None,None,'now','now'))
+    store.create_initial('no-music', operation_id='performance-empty')
     synthetic = root / "synthetic.wav"
     subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=640.123", "-ac", "2", str(synthetic)], check=True)
     sources = {"synthetic": synthetic}

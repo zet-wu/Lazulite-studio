@@ -4,7 +4,7 @@ import { phase7Ttml } from '../fixtures/phase7';
 import { phase6Ttml } from '../fixtures/phase6';
 
 for (const kind of ['lines', 'words', 'ruby', 'content', 'unit']) for (const count of [1, 2]) test(`Delete ${kind} ${count}: atomic history and focus`, async ({ page }) => {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'delete.ttml', mimeType: 'application/xml', buffer: Buffer.from(['content','unit'].includes(kind) ? phase6Ttml() : phase7Ttml) });
   const selector = { lines: '[data-outline-drag]', words: 'main [data-word-id]', ruby: 'main [data-ruby-id]', content: 'main [data-line-id="english"] [data-romanization-content-id]', unit: 'main [data-line-id="english"] [data-romanization-unit-id]' }[kind]!;
   const items = page.locator(selector), before = await items.count();
@@ -40,7 +40,7 @@ for (const conflict of [false,true]) test(`bottom timeline stamp and seek owners
 });
 
 test('Delete protects input, IME, menu, empty selection and clipboard',async({page})=>{
-  await page.goto('/editor');await importLyrics(page,{name:'protect.ttml',mimeType:'application/xml',buffer:Buffer.from(phase7Ttml)});
+  await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,{name:'protect.ttml',mimeType:'application/xml',buffer:Buffer.from(phase7Ttml)});
   const words=page.locator('main [data-word-id]');
   await words.nth(1).click({position:{x:3,y:3}});await words.nth(1).focus();await page.locator('[data-top-menu="clipboard"] summary').click();await page.getByRole('button',{name:'复制',exact:true}).click();
   const input=page.getByLabel('词 しん',{exact:true});await input.focus();await page.keyboard.press('Home');await page.keyboard.press('Delete');

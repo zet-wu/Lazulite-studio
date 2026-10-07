@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
 
 async function load(page: Page) {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   const xml = await page.evaluate(async () => {
     const path = '/src/domain/lyric-document.ts', codec = '/src/adapters/ttml/lyric-codec.ts';
     const { createLyricDocument, createLine } = await import(path) as typeof import('../../src/domain/lyric-document');

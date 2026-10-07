@@ -4,7 +4,7 @@ import {phase7Ttml} from '../fixtures/phase7';
 
 test('shared popup in a dialog uses actual height, clips at both edges and returns focus',async({page})=>{
   await page.setViewportSize({width:1280,height:620});
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page,{name:'select.ttml',mimeType:'application/xml',buffer:Buffer.from(phase7Ttml)});
   const row=page.locator('[data-outline-drag]').first();await row.click({button:'right'});
   await page.getByRole('menuitem',{name:'生成日文罗马字音译…'}).click();

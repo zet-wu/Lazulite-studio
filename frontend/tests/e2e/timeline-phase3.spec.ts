@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
 import { xml } from '../fixtures/timeline-phase3';
 async function load(page: Page, sync = true, data = xml) {
-  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/editor');
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'phase3.ttml', mimeType: 'application/xml', buffer: Buffer.from(data) });
   if (sync) await page.getByRole('button', { name: '打轴', exact: true }).click();
 }
@@ -72,8 +72,16 @@ test('edge dwell, middle and outside stop; stationary press never scrolls', asyn
   const first = (await page.locator('main [data-line-id]').first().boundingBox())!;
   await page.mouse.move(first.x + 3, first.y + 3); await page.mouse.down();
   const initial = await scroll.evaluate(n => n.scrollTop); await page.waitForTimeout(500); expect(await scroll.evaluate(n => n.scrollTop)).toBe(initial);
-  await page.mouse.move(box.x + 15, box.y + box.height - 5); await page.waitForTimeout(70); expect(await scroll.evaluate(n => n.scrollTop)).toBe(initial);
+  // Time dwell in the browser: the mouse command round trip can itself exceed 180ms.
+  await scroll.evaluate(node => {
+    window.addEventListener('pointermove', () => {
+      const entered = performance.now();
+      node.addEventListener('scroll', () => { node.dataset.firstEdgeScroll = String(performance.now() - entered); }, { once: true });
+    }, { once: true });
+  });
+  await page.mouse.move(box.x + 15, box.y + box.height - 5);
   await expect.poll(() => scroll.evaluate(n => n.scrollTop)).toBeGreaterThan(initial + 100);
+  expect(Number(await scroll.getAttribute('data-first-edge-scroll'))).toBeGreaterThanOrEqual(170);
   await page.mouse.move(box.x + 15, box.y + box.height / 2); const middle = await scroll.evaluate(n => n.scrollTop); await page.waitForTimeout(300); expect(await scroll.evaluate(n => n.scrollTop)).toBe(middle);
   await page.mouse.move(1430, box.y + box.height - 5); await page.waitForTimeout(250); expect(await scroll.evaluate(n => n.scrollTop)).toBe(middle);
   await page.keyboard.press('Escape'); await page.mouse.up(); await page.waitForTimeout(200); expect(await scroll.evaluate(n => n.scrollTop)).toBe(middle);
@@ -86,7 +94,7 @@ test('inspector only mounts fields for the effective object type', async ({ page
   await page.locator('main [data-line-id="a"] [class*="syncOrdinal"]').click(); await expect(page.getByLabel('跳过打轴', { exact: true })).toBeVisible(); await expect(page.getByLabel('行 a开始秒数')).toBeVisible();
 });
 
-test('word-only obscene toggles, undo and local recovery preserve plain/ruby/background words', async ({ page }) => {
+test('word-only obscene toggles, undo and project save preserve plain/ruby/background words', async ({ page }) => {
   await load(page);
   for (const id of ['A', 'W', 'BG']) {
     await word(page, id).click(); const toggle = page.getByLabel('不雅用语', { exact: true }); await toggle.check();
@@ -94,7 +102,7 @@ test('word-only obscene toggles, undo and local recovery preserve plain/ruby/bac
     await page.getByRole('button', { name: '重做', exact: true }).click(); await expect(toggle).toBeChecked();
   }
   await page.locator('main [data-ruby-id="r1"]').click(); await expect(page.getByLabel('不雅用语', { exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByText('检查点已保存', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   page.on('dialog', d => d.accept()); await page.reload(); await page.getByRole('button', { name: '打轴', exact: true }).click();
   for (const id of ['A', 'W', 'BG']) { await word(page, id).click(); await expect(page.getByLabel('不雅用语', { exact: true })).toBeChecked(); }
   await expect(word(page, 'A')).toContainText('Alpha');

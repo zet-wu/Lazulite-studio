@@ -4,7 +4,7 @@ import { importLyrics } from '../fixtures/import-lyrics';
 
 for(const theme of ['light','dark'])for(const zoom of [1,1.25,1.5])test(`short romanization text fits, identity and composition survive resize ${theme} ${zoom}`,async({page})=>{
  await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
- await page.setViewportSize({width:1440,height:1000});await page.goto('/editor');
+ await page.setViewportSize({width:1440,height:1000});await page.goto('/projects/sample-project/edit?scenario=no-music');
  const xml='<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1" end="5"><span begin="1" end="2">が</span><span begin="2" end="3">も</span><span begin="3" end="3.5">わ</span><span begin="3.5" end="4">つ</span><span begin="4" end="5">ち</span></p></div></body></tt>';
  await importLyrics(page,{name:'short.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
  await page.locator('[data-outline-drag]').first().click({button:'right'});await page.getByRole('menuitem',{name:'生成日文罗马字音译…'}).click();
@@ -23,7 +23,7 @@ for(const theme of ['light','dark'])for(const zoom of [1,1.25,1.5])test(`short r
 });
 
 test('real downloads use the same gates, six-row table switches and overlap details work with missing line times',async({page})=>{
- await page.goto('/editor');
+ await page.goto('/projects/sample-project/edit?scenario=no-music');
  const xml=await page.evaluate(async()=>{const fixturePath='/tests/fixtures/phase10.ts',codecPath='/src/adapters/ttml/lyric-codec.ts';const {phase10Document}=await import(fixturePath);const {serializeLyricTtml}=await import(codecPath);return serializeLyricTtml(phase10Document(),{draft:true});});
  await importLyrics(page,{name:'phase10.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.getByRole('button',{name:'文件打包',exact:true}).click();
  await page.getByRole('button',{name:'歌词校验',exact:true}).click();await expect(page.getByText('当前检查未发现问题',{exact:true})).toBeVisible();
@@ -37,7 +37,7 @@ test('real downloads use the same gates, six-row table switches and overlap deta
  const overlap=await page.evaluate(async()=>{const fixturePath='/tests/fixtures/phase10.ts',description='/src/adapters/format-description.ts';const {phase10Document}=await import(fixturePath);const {describeLyricFormat}=await import(description);const d=phase10Document();d.lines.push({...d.lines[2],id:'missing',beginMs:null});return describeLyricFormat(d,'lrc')[5].detail;});expect(overlap).toContain('1、2');
 });
 for(const theme of ['light','dark'])test(`ASS-only issue locates its attachment with shared inline styling and latest gates in ${theme}`,async({page})=>{
- await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);await page.goto('/editor');
+ await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);await page.goto('/projects/sample-project/edit?scenario=no-music');
  const xml=await page.evaluate(async()=>{const fixture='/tests/fixtures/phase10.ts',codec='/src/adapters/ttml/lyric-codec.ts';const {phase10Document}=await import(fixture);const {serializeLyricTtml}=await import(codec);const d=phase10Document();d.romanizationTracks[0].contents[0].units[2].beginMs=1400;return serializeLyricTtml(d,{draft:true});});
  await importLyrics(page,{name:'blocked.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByRole('button',{name:'歌词校验',exact:true}).click();
  const issue=page.getByRole('button',{name:/音译.*重叠或倒序/});await expect(issue).toHaveCount(1);await expect(issue).toHaveAttribute('data-role','inline');

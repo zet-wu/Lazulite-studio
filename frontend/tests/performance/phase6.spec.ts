@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { performanceTtml } from '../fixtures/phase3';
 
 test('P6 production inline commits keep 2000 rich rows bounded and report actual latency', async ({ page }) => {
-  await page.goto('/editor');
+  await page.goto('/projects/no-music/edit');
   await page.locator('input[type=file]').setInputFiles({ name: 'large.ttml', mimeType: 'application/xml', buffer: Buffer.from(performanceTtml()) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(2000);
   await page.evaluate(() => {

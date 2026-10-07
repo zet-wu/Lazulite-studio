@@ -3,7 +3,7 @@ import { importLyrics } from '../fixtures/import-lyrics';
 import { xml } from '../fixtures/timeline-phase3';
 
 test('uniform three-digit gutters, scaled filled markers and body add controls', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/editor');
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/projects/sample-project/edit?scenario=no-music');
   const data = xml.replace('<p xml:id="empty"/>', Array.from({ length: 100 }, (_, i) => `<p xml:id="tail${i}"><span>尾${i}</span></p>`).join(''));
   await importLyrics(page, { name: 'gutter.ttml', mimeType: 'application/xml', buffer: Buffer.from(data) });
   await page.getByRole('button', { name: '打轴', exact: true }).click();
@@ -23,7 +23,7 @@ test('uniform three-digit gutters, scaled filled markers and body add controls',
 });
 
 test('menus and split boundaries use SVG while preserving state and original text', async ({ page }) => {
-  await page.goto('/editor'); await importLyrics(page, { name: 'icons.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await page.goto('/projects/sample-project/edit?scenario=no-music'); await importLyrics(page, { name: 'icons.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await page.locator('[data-top-menu="view"] summary').click();
   const outline = page.getByRole('button', { name: '显示大纲', exact: true }); await expect(outline).toHaveAttribute('aria-pressed', 'true'); await expect(outline.locator('svg')).toHaveCount(1);
   await page.keyboard.press('Escape');
@@ -34,7 +34,7 @@ test('menus and split boundaries use SVG while preserving state and original tex
 });
 
 for (const copy of [false, true]) test(`sync drags whole selected word set with configuration, copy=${copy}`, async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/editor');
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'group.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await page.getByRole('button', { name: '打轴', exact: true }).click();
   const line = page.locator('main [data-line-id="a"]'), a = line.locator('[data-word-id="A"]'), b = line.locator('[data-word-id="B"]');
@@ -58,7 +58,7 @@ for (const copy of [false, true]) test(`sync drags whole selected word set with 
 });
 
 test('drag remeasures after virtual mounting and commits to the visible row', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/editor');
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/projects/sample-project/edit?scenario=no-music');
   const rows = Array.from({ length: 120 }, (_, i) => `<p xml:id="l${i}"><span>Row${i}</span></p>`).join('');
   await importLyrics(page, { name: 'virtual.ttml', mimeType: 'application/xml', buffer: Buffer.from(`<tt xmlns="http://www.w3.org/ns/ttml"><body><div>${rows}</div></body></tt>`) });
   await page.getByRole('button', { name: '打轴', exact: true }).click();

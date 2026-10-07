@@ -5,7 +5,7 @@ const root = '/api/v1';
 const scenario = () => new URL(location.href).searchParams.get('scenario') ?? 'normal';
 const response = <T>(body: T) => scenario() === 'loading' ? new Promise<never>(() => undefined) : HttpResponse.json(body as Record<string, unknown>);
 const error = (status: number, code: string, message: string, retryable = false) => HttpResponse.json({ code, message, request_id: `mock-${status}`, retryable }, { status });
-let currentDocument = document;
+let currentDocument: typeof document = JSON.parse(sessionStorage.getItem('studio-mock-document') ?? 'null') ?? document;
 let searchConditions={title:'',artist:'',album:''};
 
 export const handlers = [
@@ -15,7 +15,7 @@ export const handlers = [
   http.get(`${root}/session`, () => scenario() === 'expired' ? error(401, 'session_expired', '登录已过期') : response(session)),
   http.get(`${root}/capabilities`, () => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : response(capabilities)),
   http.get(`${root}/projects`, () => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : scenario() === 'empty' ? response({ schema_version: 'studio-project-list-v1', items: [], next_cursor: null }) : response(projects)),
-  http.get(`${root}/projects/:projectId`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'long' ? { ...sampleProject, asset: { ...sampleProject.asset, duration_ms: 1_800_000 } } : sampleProject) : error(404, 'project_not_found', '项目不存在')),
+  http.get(`${root}/projects/:projectId`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'no-music' ? { ...sampleProject, asset: null } : scenario() === 'long' ? { ...sampleProject, asset: { ...sampleProject.asset, duration_ms: 1_800_000 } } : sampleProject) : error(404, 'project_not_found', '项目不存在')),
   http.get(`${root}/projects/:projectId/jobs`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(jobs) : error(404, 'project_not_found', '项目不存在')),
   http.get(`${root}/projects/:projectId/exports`, ({ params }) => params.projectId === 'sample-project' ? response(exports) : error(404, 'project_not_found', '项目不存在')),
   http.post(`${root}/projects/:projectId/publish`, async ({ params, request }) => {
@@ -73,6 +73,7 @@ export const handlers = [
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
     const body = await request.json() as { revision?: string; document?: typeof currentDocument.document };
     currentDocument = { ...currentDocument, revision: 'sample-r2', document: body.document ?? currentDocument.document };
+    sessionStorage.setItem('studio-mock-document', JSON.stringify(currentDocument));
     const next = currentDocument;
     return HttpResponse.json(next, { headers: { ETag: '"sample-r2"' } });
   }),

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
 const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><p xml:id="main" begin="0" end="4"><span begin="0" end="4">食べる</span><span ttm:role="x-bg" begin="0" end="4"><span begin="0" end="4">魂</span></span></p><p xml:id="second" begin="4" end="8"><span begin="4" end="8">今日</span></p></body></tt>';
-async function load(page: Page, text=xml){await page.goto('/editor');await importLyrics(page,{name:'ruby.ttml',mimeType:'application/xml',buffer:Buffer.from(text)});}
+async function load(page: Page, text=xml){await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,{name:'ruby.ttml',mimeType:'application/xml',buffer:Buffer.from(text)});}
 async function mock(page: Page, fail=false){await page.addInitScript(fail=>{
  const original=window.fetch; (window as any).readingFailure=fail;
  window.fetch=async(input,init)=>{

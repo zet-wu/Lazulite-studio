@@ -6,7 +6,7 @@ const largeKana = () => `<tt xmlns="http://www.w3.org/ns/ttml"><body><div>${Arra
 }).join('')}</div></body></tt>`.replace('<tt xmlns=', '<tt xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns=');
 
 test('P7 production 2000-row translation draft and kana proposal keep bounded mounts and preserve one history', async ({ page }) => {
-  await page.goto('/editor'); await page.locator('input[type=file]').setInputFiles({ name: 'large-kana.ttml', mimeType: 'application/xml', buffer: Buffer.from(largeKana()) });
+  await page.goto('/projects/no-music/edit'); await page.locator('input[type=file]').setInputFiles({ name: 'large-kana.ttml', mimeType: 'application/xml', buffer: Buffer.from(largeKana()) });
   const outline = page.locator('[data-outline-drag]'); await expect(outline).toHaveCount(2000);
   const text = page.locator('main section[data-line-id="k0"]').getByLabel('翻译 1', { exact: true });
   await text.fill('很长翻译 '.repeat(100));

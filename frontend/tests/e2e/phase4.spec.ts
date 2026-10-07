@@ -61,7 +61,7 @@ test('P4-02 playing color is visible on ordinary and true narrow widths', async 
 
 test('P4-04/05 grouped skips, manual generation, history and checkpoint with bounded layout', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(rubyTtml()) });
   const line = page.locator('main section[data-line-id="kana"]');
   await expect(line.locator('[data-romanization-content-id]')).toBeVisible();
@@ -86,7 +86,7 @@ test('P4-04/05 grouped skips, manual generation, history and checkpoint with bou
   await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '重做', exact: true }).click();
   await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(page.getByText('检查点已保存')).toBeVisible();
+  await expect(page.getByText('已保存')).toBeVisible();
   page.once('dialog', dialog => dialog.accept());
   await page.reload();
   await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(2);
@@ -121,7 +121,7 @@ test('P4-06 wheel zoom keeps clipped edges uneditable and pointercancel leaves n
 test('P4-08 large proposal scroll preserves manual choices while mounting only visible rows', async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   const xml = performanceTtml(2000).replace(/<text for="p(\d+)"><span begin="[^"]*" end="[^"]*">rom<\/span><\/text>/g, (_, i) =>
     `<text for="p${i}"><span begin="${(Number(i) * .3).toFixed(3)}" end="${(Number(i) * .3 + .024).toFixed(3)}">ko</span></text>`);
   await importLyrics(page, { name: 'large-ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });

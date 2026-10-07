@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
 async function importTtml(page: Page, name = 'reference-apple-metadata') {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   const source = await readFile(`../tests/fixtures/ttml/${name}.ttml`);
   await importLyrics(page, { name: `${name}.ttml`, mimeType: 'application/xml', buffer: source });
 }
@@ -62,8 +62,8 @@ test('generates 注音 explicitly from one track and preserves source content on
 test('opens lyric metadata and singers in edit mode and keeps the auxiliary page', async ({ page }) => {
   await importTtml(page);
   await openMenu(page, '歌词设置');
-  await page.getByRole('button', { name: '元数据编辑' }).click();
-  await expect(page.getByRole('dialog', { name: '元数据编辑' })).toBeVisible();
+  await page.getByRole('button', { name: '歌词元数据' }).click();
+  await expect(page.getByRole('dialog', { name: '歌词元数据' })).toBeVisible();
   await page.getByRole('button', { name: '关闭元数据编辑' }).click();
   await openMenu(page, '歌词设置');
   await page.getByRole('button', { name: '歌手管理' }).click();
@@ -76,7 +76,7 @@ test('opens lyric metadata and singers in edit mode and keeps the auxiliary page
 });
 
 test('shows one lyric scroller at 80 and 81 lines without horizontal page overflow', async ({ page }) => {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   for (const count of [80, 81]) {
     const text = Array.from({ length: count }, (_, index) => `${index + 1} ${'长词'.repeat(24)}`).join('\n');
     await importLyrics(page, { name: `rows-${count}.txt`, mimeType: 'text/plain', buffer: Buffer.from(text) });
@@ -100,7 +100,7 @@ test('restores a local project checkpoint without persisting the undo stack', as
   await word.fill('检查点文字');
   await word.blur();
   await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(page.getByText('检查点已保存')).toBeVisible();
+  await expect(page.getByText('已保存')).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
   await page.reload();
   await expect(page.getByRole('textbox', { name: '词 检查点文字', exact: true })).toBeVisible();
@@ -126,7 +126,7 @@ test('moves a word through its context menu and by direct mouse drag', async ({ 
 
 test('virtualizes 2000 lines and locates the last line from the outline', async ({ page }) => {
   test.setTimeout(60_000);
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   const text = Array.from({ length: 2000 }, (_, index) => `词${index} ${'長'.repeat(index % 6)}`).join('\n');
   await importLyrics(page, { name: 'long.txt', mimeType: 'text/plain', buffer: Buffer.from(text) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(2000);

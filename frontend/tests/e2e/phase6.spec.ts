@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { phase6Ttml } from '../fixtures/phase6';
 
 async function load(page: Page, xml = phase6Ttml()) {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'phase6.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await expect(page.locator('main [data-line-id="english"]')).toBeVisible();
 }

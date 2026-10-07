@@ -3,7 +3,7 @@ import { createProjectDocument, createProjectEditorState, executeProjectCommand,
 import { createLyricDocument } from '../src/domain/lyric-document';
 import { serializeProject, parseProject } from '../src/adapters/project-codec';
 it('uses one history for acoustic and lyric edits; lyric import retains acoustics', () => {
-  const initial = createProjectEditorState(createProjectDocument(createLyricDocument('old'), 'source'));
+  const initial = createProjectEditorState(createProjectDocument(createLyricDocument('old')));
   const acoustics = { analysisId: 'analysis', segments: [{ id: 's', beginMs: 100, endMs: 400 }] };
   const acoustic = executeProjectCommand(initial, { type: 'acoustics', acoustics, durationMs: 500 });
   expect(acoustic.present.lyrics).toBe(initial.present.lyrics);

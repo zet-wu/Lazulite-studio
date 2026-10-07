@@ -100,3 +100,35 @@ def test_revision_collection_protects_references_recent_and_current(tmp_path):
     assert len(kept) == 104 # 100 unreferenced + three references + current (recent is among 100)
     store.recover()
     assert store.read('p')[0] == ids[-1]
+
+def test_create_failure_restores_upload_for_retry_and_attach_failure_cleans(tmp_path):
+    import pytest
+    with client_for(tmp_path) as client:
+        token=upload(client);db=Database(tmp_path/'studio.sqlite3')
+        with db.transaction() as c:
+            c.execute("CREATE TRIGGER reject_create BEFORE INSERT ON projects BEGIN SELECT RAISE(ABORT,'fail'); END")
+        with pytest.raises(Exception, match='fail'):
+            client.post('/api/v1/projects',json={'name':'retry','upload_id':token},headers=HEADERS)
+        assert (tmp_path/'uploads'/token/'source'/'original').is_file()
+        assert not list((tmp_path/'projects').iterdir())
+        with db.transaction() as c:c.execute('DROP TRIGGER reject_create')
+        made=client.post('/api/v1/projects',json={'name':'retry','upload_id':token},headers=HEADERS)
+        assert made.status_code==200
+        empty=client.post('/api/v1/projects',json={'name':'empty'},headers=HEADERS).json()['id'];token=upload(client)
+        with db.transaction() as c:c.execute("CREATE TRIGGER reject_music BEFORE UPDATE OF source_asset_id ON projects BEGIN SELECT RAISE(ABORT,'music fail'); END")
+        with pytest.raises(Exception,match='music fail'):
+            client.post(f'/api/v1/projects/{empty}/music',json={'upload_id':token},headers=HEADERS)
+        assert not (tmp_path/'projects'/empty/'source').exists()
+        assert not (tmp_path/'uploads'/token).exists()
+        assert client.get(f'/api/v1/projects/{empty}').json()['asset'] is None
+
+def test_restart_restores_uncommitted_delete_and_collects_committed_quarantine(tmp_path):
+    with client_for(tmp_path) as client:
+        pid=client.post('/api/v1/projects',json={'name':'recover'},headers=HEADERS).json()['id']
+    directory=tmp_path/'projects'/pid;trash=tmp_path/'.deleting'/pid;trash.parent.mkdir();directory.rename(trash)
+    with client_for(tmp_path) as client:
+        assert directory.is_dir() and not trash.exists()
+        assert client.get(f'/api/v1/projects/{pid}/document').status_code==200
+    # Simulate bytes left after a committed deletion; no live project can claim these.
+    orphan=trash.parent/'already-deleted';orphan.mkdir();(orphan/'file').write_bytes(b'old')
+    with client_for(tmp_path):assert not orphan.exists()

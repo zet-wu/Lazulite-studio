@@ -81,3 +81,27 @@ it('attaches all whitespace without extending times, preserves empty replacement
   expect(() => romanizationGenerationCommand(state.present, state.present, empty, { trackId: track.id, targets: { [doc.lines[0].id]: content.id } })).toThrow('结果为空，未替换');
   expect(track.contents[0]).toBe(content);
 });
+it('omits empty results with every timing shape and retains English text with valid Ruby', () => {
+  for (const times of [[null, null], [100, null], [null, 200], [100, 200]] as const) {
+    const doc = source(['漢字', 'か']);
+    doc.lines[0].words[0].beginMs = times[0]; doc.lines[0].words[0].endMs = times[1];
+    const rows = proposeRomanization(doc, [doc.lines[0].id], 'timed');
+    rows[0].groups[0].text = '\t　';
+    const result = executeLyricCommand(createLyricEditorState(doc), romanizationGenerationCommand(doc, doc, rows, choices));
+    const content = result.present.romanizationTracks[0].contents[0];
+    expect(content.kind === 'timed' && content.units).toEqual([expect.objectContaining({ text: '\t　ka', beginMs: 204, endMs: 303 })]);
+  }
+  const doc = source(['かな'], true); doc.lines[0].words[0].text = 'English';
+  const rows = proposeRomanization(doc, [doc.lines[0].id], 'timed');
+  const result = executeLyricCommand(createLyricEditorState(doc), romanizationGenerationCommand(doc, doc, rows, choices));
+  expect(result.present.romanizationTracks[0].contents[0]).toMatchObject({kind:'timed', units:[{text:'kana'}]});
+});
+it('preserves empty replacement lines while generating another line and keeps plain spacing', () => {
+  const doc = source(['か']); doc.lines.push(createLine('な'));
+  const lineId = doc.lines[0].id;
+  doc.romanizationTracks = [{id:'existing',language:'ja-Latn',contents:[{id:'keep',lineId,kind:'plain',text:'old'}]}];
+  const rows = proposeRomanization(doc, doc.lines.map(line=>line.id), 'plain'); rows[0].text = ' \t　'; rows[1].text = '  manual  spacing  ';
+  const state = executeLyricCommand(createLyricEditorState(doc), romanizationGenerationCommand(doc,doc,rows,{trackId:'existing',targets:{[lineId]:'keep'}}));
+  expect(state.present.romanizationTracks[0].contents).toEqual([doc.romanizationTracks[0].contents[0], expect.objectContaining({text:'  manual  spacing  '})]);
+  expect(state.past).toHaveLength(1);
+});

@@ -50,8 +50,8 @@ it('routes desktop history shortcuts only outside inputs, dialogs and IME compos
   expect(undo).toHaveBeenCalledOnce();
   expect(redo).toHaveBeenCalledOnce();
   fireEvent.click(screen.getByText('歌词设置'));
-  fireEvent.click(screen.getByRole('button', { name: '元数据编辑' }));
-  fireEvent.keyDown(screen.getByRole('dialog', { name: '元数据编辑' }), { key: 'z', ctrlKey: true });
+  fireEvent.click(screen.getByRole('button', { name: '歌词元数据' }));
+  fireEvent.keyDown(screen.getByRole('dialog', { name: '歌词元数据' }), { key: 'z', ctrlKey: true });
   expect(undo).toHaveBeenCalledOnce();
   fireEvent.keyDown(line, { key: 's', metaKey: true });
   expect(onSave).toHaveBeenCalledOnce();

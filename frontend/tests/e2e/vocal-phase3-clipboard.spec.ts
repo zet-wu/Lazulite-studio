@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
 import { phase7Ttml } from '../fixtures/phase7';
 async function load(page: Page) {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'clipboard.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
 }
 test('page text copy and cut preserve lyrics; hidden object selection cannot paste', async ({ page, context }) => {

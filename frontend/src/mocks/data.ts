@@ -69,12 +69,12 @@ export const jobs: JobList = {
   ],
 };
 export const document: DocumentEnvelope = {
-  schema_version: "studio-document-v4",
+  schema_version: "studio-document-v5",
   project_id: "sample-project",
   revision: "sample-r1",
   sha256: "demo",
   document: {
-    schemaVersion: "studio-project-v2", editing: { emptyBeats: {}, ignoredSyncLineIds: [], endLinks: {} }, sourceAssetId: "sample-asset", acoustics: { analysisId: null, segments: [] },
+    schemaVersion: "studio-project-v3", editing: { emptyBeats: {}, ignoredSyncLineIds: [], endLinks: {} }, acoustics: { analysisId: null, segments: [] },
     lyrics: { draftTtml: '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="line-1" begin="0s" end="5s">夜の風が静かに吹く</p><p xml:id="line-2" begin="5s" end="10s">遠い星を見上げて</p><p xml:id="line-3" begin="10s" end="15s">白い月が道を照らす</p><p xml:id="line-4" begin="15s" end="20s">小さな願いを抱いて</p><p xml:id="line-5" begin="20s" end="25s">朝の光へ歩き出す</p><p xml:id="line-6" begin="25s" end="30s">星の手紙を胸に</p></div></body></tt>' },
   },
 };

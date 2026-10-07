@@ -3,7 +3,7 @@ import { expect, test, type Page, type Locator } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 
 async function load(page: Page, count = 3) {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'rows.txt', mimeType: 'text/plain', buffer: Buffer.from(Array.from({ length: count }, (_, i) => `行${i + 1}`).join('\n')) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(count);
 }
@@ -90,7 +90,7 @@ test('UI virtual append remains at the true end and long-document drag stays vir
 });
 
 for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) test(`UI surfaces ${theme} ${width}`, async ({ page }) => {
-  await page.setViewportSize({ width, height: 900 }); await page.goto('/editor');
+  await page.setViewportSize({ width, height: 900 }); await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: await readFile('../tests/fixtures/ttml/phase2-multitrack.ttml') });
   await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
   await page.screenshot({ path: test.info().outputPath('editor.png') });
@@ -123,7 +123,7 @@ test('UI empty document and background tail append both remain usable after undo
 
 test('UI word to empty line, 注音 and romanization drags use the same insertion slots', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: await readFile('../tests/fixtures/ttml/phase2-multitrack.ttml') });
   const line = page.locator('main section[data-line-id="line-a"]'), units = line.locator('[data-romanization-content-id]').first().locator('[data-romanization-unit-id]');
   const ids = await units.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-romanization-unit-id')));
@@ -181,7 +181,7 @@ test('UI pointercancel and lost capture restore layout, modifiers preserve objec
 });
 
 test('UI wrapped words preview their actual first slot and virtual edge scrolling cleans up', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 }); await page.goto('/editor');
+  await page.setViewportSize({ width: 1280, height: 900 }); await page.goto('/projects/sample-project/edit?scenario=no-music');
   const xml = `<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="wrap">${Array.from({ length: 9 }, (_, i) => `<span>词${i}</span>`).join('')}</p></div></body></tt>`;
   await importLyrics(page, { name: 'wrap.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   const words = page.locator('main [data-word-id]'); await expect(words).toHaveCount(9);

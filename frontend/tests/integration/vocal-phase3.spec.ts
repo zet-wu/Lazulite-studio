@@ -1,7 +1,8 @@
+import { uploadFixtureMusic } from '../fixtures/upload-music';
 import { expect, test } from '@playwright/test';
 test('audio outline shares resize preference and graphics stay aligned with independent sources', async ({ page }) => {
-  const asset=(await(await page.request.get('/api/v1/projects/phase0-packaging')).json()).asset.id;
-  const response=await page.request.post('/api/v1/projects',{headers:{origin:'http://127.0.0.1:5175'},data:{name:'Phase 3 UI',source_asset_id:asset}});
+ const asset = await uploadFixtureMusic(page);
+  const response=await page.request.post('/api/v1/projects',{headers:{origin:'http://127.0.0.1:5175'},data:{name:'Phase 3 UI',upload_id:asset}});
   const pid=(await response.json()).id;
   await page.goto(`/projects/${pid}/edit`);
   await page.getByRole('button',{name:'音频处理',exact:true}).click();

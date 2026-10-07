@@ -7,7 +7,7 @@ const incoming = xml('新词',meta('artists','C')+meta('musicName','新歌'));
 const file = (buffer: string) => ({ name:'synthetic.ttml',mimeType:'application/xml',buffer:Buffer.from(buffer) });
 
 test('preview is read-only; metadata selection and body replacement undo together',async ({page})=>{
- await page.goto('/editor'); await importLyrics(page,file(source));
+ await page.goto('/projects/sample-project/edit?scenario=no-music'); await importLyrics(page,file(source));
  await page.getByRole('button',{name:'歌词获取',exact:true}).click();
  await page.locator('input[type=file]').setInputFiles(file(incoming));
  await expect(page.getByRole('button',{name:'artist 原值',exact:true})).toHaveAttribute('aria-pressed','true');
@@ -23,7 +23,7 @@ test('preview is read-only; metadata selection and body replacement undo togethe
 });
 
 test('stale candidate response never replaces a newer selection and ID association is independent',async ({page})=>{
- await page.goto('/editor');
+ await page.goto('/projects/sample-project/edit?scenario=no-music');
  await page.getByRole('button',{name:'歌词获取',exact:true}).waitFor();
  await page.evaluate(() => {
    const original = window.fetch;
@@ -48,7 +48,7 @@ test('stale candidate response never replaces a newer selection and ID associati
 
 for(const width of [1280,1440,1920])for(const theme of ['light','dark'])test(`acquisition layout ${width} ${theme}`,async ({page})=>{
  await page.setViewportSize({width,height:900});await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
- await page.goto('/editor');await importLyrics(page,file(source));await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.locator('input[type=file]').setInputFiles(file(incoming));
+ await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,file(source));await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.locator('input[type=file]').setInputFiles(file(incoming));
  await expect(page.getByRole('button',{name:'确认导入并替换歌词'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(1);
  await page.screenshot({path:test.info().outputPath(`acquisition-${width}-${theme}.png`)});
@@ -59,7 +59,7 @@ test('binary KRC file is decoded locally and previews before one import transact
  const key=[64,71,97,119,94,50,116,71,81,54,49,45,206,210,110,105];
  const compressed=deflateSync(Buffer.from('[1000,2000]<0,1000,0>本地<1000,1000,0>歌词'));
  const bytes=Buffer.concat([Buffer.from('krc1'),compressed.map((v,i)=>v^key[i%16])]);
- await page.goto('/editor');
+ await page.goto('/projects/sample-project/edit?scenario=no-music');
  await page.getByRole('button',{name:'歌词获取',exact:true}).click();
  await page.locator('input[type=file]').setInputFiles({name:'synthetic.krc',mimeType:'application/octet-stream',buffer:bytes});
  await expect(page.getByText('本地歌词',{exact:true})).toBeVisible();

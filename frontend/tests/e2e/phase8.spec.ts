@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { phase7Ttml } from '../fixtures/phase7';
 import { phase6Ttml } from '../fixtures/phase6';
 export async function load(page: Page, xml = phase7Ttml) {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'phase8.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
 }
 async function edge(page: Page, selector: string, index: number, options: { button?: 'right'; modifiers?: ('Shift' | 'Control' | 'Meta')[] } = {}) {
@@ -105,8 +105,8 @@ test('P8 lyric settings are unique in edit mode, menus dismiss and keyboard reac
   await expect(page.locator('[data-top-menu="settings"]')).toHaveCount(1);
   const settings = page.locator('[data-top-menu="lyrics-settings"] summary');
   await settings.focus(); await settings.press('Enter'); await expect(settings).toHaveAttribute('aria-expanded', 'true');
-  await page.getByRole('button', { name: '元数据编辑', exact: true }).focus(); await page.keyboard.press('Enter');
-  await expect(page.getByRole('dialog', { name: '元数据编辑', exact: true })).toBeVisible(); await page.keyboard.press('Escape'); await expect(settings).toHaveAttribute('aria-expanded', 'false');
+  await page.getByRole('button', { name: '歌词元数据', exact: true }).focus(); await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: '歌词元数据', exact: true })).toBeVisible(); await page.keyboard.press('Escape'); await expect(settings).toHaveAttribute('aria-expanded', 'false');
   for (const [entry, title] of [['歌手管理', '歌手管理'], ['管理音译轨道…', '音译轨道管理']]) {
     await settings.click(); await page.getByRole('button', { name: entry, exact: true }).click(); await expect(page.getByRole('dialog', { name: title, exact: true })).toBeVisible(); await page.keyboard.press('Escape');
   }
@@ -129,7 +129,7 @@ test('P8 line and content ranges delete fully and restore with one undo', async 
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(outline).toHaveCount(3);
 });
 test('multi-row deletion preserves unrelated endpoints and restores rows on undo', async ({ page }) => {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   const xml = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');
     const doc = codec.parseLyricTtml(xml); doc.lines[0].endMs = 6e3;

@@ -83,7 +83,7 @@ test('word/Ruby drafts, keyboard beat menus and ignored background persist throu
 });
 for (const count of [80, 81]) test(`return locates exact active object and restores no-target scroll at ${count} rows`, async ({ page }) => {
   const { performanceTtml } = await import('../fixtures/phase3');
-  await page.goto('/editor'); await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/projects/sample-project/edit?scenario=no-music'); await page.emulateMedia({ reducedMotion: 'reduce' });
   await importLyrics(page, { name: 'large.ttml', mimeType: 'application/xml', buffer: Buffer.from(performanceTtml(count)) });
   await page.locator('[data-outline-drag]').nth(count - 3).click();
   const row = page.locator(`main [data-line-id="p${count - 3}"]`); await expect(row).toBeVisible();

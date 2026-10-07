@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { importPhase12 } from '../fixtures/phase12';
 const row = (page: Page) => page.locator('main section[data-line-id="p12-0"]');
 const edge = async (page: Page, i: number, options = {}) => row(page).locator('[data-word-id]').nth(i).click({ position: { x: 3, y: 3 }, ...options });
-test.beforeEach(async ({ page }) => { await page.goto('/editor'); await importPhase12(page); });
+test.beforeEach(async ({ page }) => { await page.goto('/projects/sample-project/edit?scenario=no-music'); await importPhase12(page); });
 
 test('P12 reverse selection, mouse/keyboard menus, word and Ruby merge retain selection and focus', async ({ page }) => {
   await edge(page, 2); await edge(page, 0, { modifiers: ['Shift'] });

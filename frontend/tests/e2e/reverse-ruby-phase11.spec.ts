@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
 
 async function open(page: Page, count = 3, source = 'ka', body = 'は', setup: 'normal' | 'untimed' | 'overwrite' | 'link' = 'normal') {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   const xml = await page.evaluate(async ({ count, source, body, setup }) => {
     const domainPath = '/src/domain/lyric-document.ts'; const domain = await import(domainPath);
     const codecPath = '/src/adapters/ttml/lyric-codec.ts'; const codec = await import(codecPath);

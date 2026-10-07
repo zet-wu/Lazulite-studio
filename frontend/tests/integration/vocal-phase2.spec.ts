@@ -1,8 +1,9 @@
+import { uploadFixtureMusic } from '../fixtures/upload-music';
 import { test, expect, type Page } from '@playwright/test';
 
 async function setup(page: Page) {
-  const asset = (await (await page.request.get('/api/v1/projects/phase0-packaging')).json()).asset.id;
-  const response = await page.request.post('/api/v1/projects', {headers:{origin:'http://127.0.0.1:5175'},data:{name:'Phase 2',source_asset_id:asset}});
+ const asset = await uploadFixtureMusic(page);
+  const response = await page.request.post('/api/v1/projects', {headers:{origin:'http://127.0.0.1:5175'},data:{name:'Phase 2',upload_id:asset}});
   const pid = (await response.json()).id;
   await page.goto(`/projects/${pid}/edit`);
   await page.getByRole('button',{name:'音频处理',exact:true}).click();

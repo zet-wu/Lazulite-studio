@@ -23,8 +23,9 @@ function TranslationRow({ item, index, commit, remove, fresh = false }: {
   }, [draft]);
   const submit = () => {
     if (cancelled.current) { cancelled.current = false; return; }
+    if (composing.current) return;
     if (fresh && draft.kind === 'plain' && !draft.text.trim()) { remove(); return; }
-    if (composing.current || JSON.stringify(draft) === JSON.stringify(item)) return;
+    if (JSON.stringify(draft) === JSON.stringify(item)) return;
     try { commit(draft); setError(''); } catch (cause) { setError((cause as Error).message); }
   };
   return <div data-translation-id={item.id} className={styles.translationRow} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={event => {

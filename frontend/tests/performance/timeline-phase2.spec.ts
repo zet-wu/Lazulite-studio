@@ -10,7 +10,7 @@ for (const count of [20, 80, 81, 2000]) test(`timeline phase2 return measurement
     new PerformanceObserver(list => tasks.push(...list.getEntries().map(e => ({ start: e.startTime, duration: e.duration })))).observe({ type: 'longtask' });
   });
   test.setTimeout(60000);
-  await page.goto('/editor');
+  await page.goto('/projects/no-music/edit');
   await page.getByRole('button', { name: '歌词获取', exact: true }).click();
   const rows: unknown[] = [];
   const start = await page.evaluate(() => performance.now());

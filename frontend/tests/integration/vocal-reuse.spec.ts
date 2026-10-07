@@ -1,8 +1,9 @@
+import { uploadFixtureMusic } from '../fixtures/upload-music';
 import { test, expect } from '@playwright/test';
 
 test('one vocal source across reanalysis, undo, reload and cached separation adoption',async({page})=>{
- const asset=(await(await page.request.get('/api/v1/projects/phase0-packaging')).json()).asset.id;
- const created=await page.request.post('/api/v1/projects',{headers:{origin:'http://127.0.0.1:5175'},data:{name:'共享人声',source_asset_id:asset}});
+ const asset = await uploadFixtureMusic(page);
+ const created=await page.request.post('/api/v1/projects',{headers:{origin:'http://127.0.0.1:5175'},data:{name:'共享人声',upload_id:asset}});
  const pid=(await created.json()).id;
  const current=async()=>(await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.acoustics;
  await page.goto(`/projects/${pid}/edit`);

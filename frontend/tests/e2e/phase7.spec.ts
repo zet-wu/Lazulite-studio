@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { phase6Ttml } from '../fixtures/phase6';
 import { phase7Ttml as xml } from '../fixtures/phase7';
 async function load(page: Page, text = xml) {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'phase7.ttml', mimeType: 'application/xml', buffer: Buffer.from(text) });
 }
 test('P7 generated source timing remains batch scoped with local replacement and one undo', async ({ page }) => {

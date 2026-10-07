@@ -2,7 +2,7 @@ import { expect, test, type Page, type Locator } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
 const ruby=(text:string,readings:string[])=>`<span begin="0" end="1" xmlns:tts="http://www.w3.org/ns/ttml#styling" tts:ruby="container"><span tts:ruby="base">${text}</span><span tts:ruby="textContainer">${readings.map((r,i)=>`<span tts:ruby="text" begin="${i/10}" end="${(i+1)/10}">${r}</span>`).join('')}</span></span>`;
 export const dragXml=`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><p xml:id="main" begin="0" end="4">${ruby('元',['あ','い','う'])}<span begin="2" end="3">先</span>${ruby('隣',['え','お'])}<span ttm:role="x-bg" begin="0" end="4">${ruby('背',['か'])}<span begin="2" end="3">景</span></span></p><p xml:id="other" begin="4" end="8"><span begin="4" end="8">別</span></p></body></tt>`;
-async function load(page:Page,xml=dragXml){await page.goto('/editor');await importLyrics(page,{name:'cross.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});}
+async function load(page:Page,xml=dragXml){await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,{name:'cross.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});}
 async function move(page:Page,source:Locator,target:Locator,finish=true,side='body'){
  const a=(await source.boundingBox())!,b=(await target.boundingBox())!;
  await page.mouse.move(a.x+2,a.y+2);await page.mouse.down();

@@ -7,7 +7,7 @@ const issueXml=`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.o
 <transliteration xml:lang="ja-Latn"><text for="line2"><span studio:id="r2" studio:null="end" begin="2">b</span></text></transliteration></transliterations></iTunesMetadata></metadata></head>
 <body><p xml:id="line1" begin="0" end="2"><span studio:id="word1" studio:null="begin end">word</span><span ttm:role="x-bg" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" studio:id="bg" studio:null="end" begin="0"><span studio:id="bgword" studio:null="begin end">background</span></span></p><p xml:id="line2" begin="2" end="4"><span begin="2" end="4">正文</span></p></body></tt>`;
 test('pure TTML shows every relevant issue; error links select and focus exact track units',async({page})=>{
- await page.goto('/editor');await importLyrics(page,file(issueXml));
+ await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,file(issueXml));
  await page.getByRole('button',{name:'文件打包',exact:true}).click();
  await expect(page.getByRole('button',{name:'下载草稿'})).toHaveCount(0);await expect(page.getByRole('button',{name:'最终 TTML'})).toHaveCount(0);
  await page.getByRole('button',{name:'下载歌词',exact:true}).click();
@@ -22,7 +22,7 @@ test('pure TTML shows every relevant issue; error links select and focus exact t
 });
 
 test('four-source round survives tabs and modes; edits retain results; explicit search starts fresh',async({page})=>{
- await page.goto('/editor');await page.getByRole('button',{name:'歌词获取',exact:true}).waitFor();
+ await page.goto('/projects/sample-project/edit?scenario=no-music');await page.getByRole('button',{name:'歌词获取',exact:true}).waitFor();
  await page.evaluate(()=>{
   const original=window.fetch;const state={searches:[] as string[],checks:[] as string[]};(window as any).probe=state;
   window.fetch=async(input,init)=>{
@@ -52,7 +52,7 @@ test('four-source round survives tabs and modes; edits retain results; explicit 
 
 for(const width of [1280,1440,1920])for(const theme of ['light','dark'])test(`network long fields badges and errors ${width} ${theme}`,async({page})=>{
  await page.setViewportSize({width,height:900});await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
- await page.goto('/editor');await page.getByRole('button',{name:'歌词获取',exact:true}).waitFor();
+ await page.goto('/projects/sample-project/edit?scenario=no-music');await page.getByRole('button',{name:'歌词获取',exact:true}).waitFor();
  await page.evaluate(()=>{const original=window.fetch;window.fetch=async(input,init)=>{const url=String(input),body=JSON.parse(String(init?.body??'{}'));if(url.endsWith('/lyric-sources/search'))return Response.json({items:[{source:body.source,id:'1',songmid:'mid',title:'长标题'.repeat(20),artists:['长艺术家'.repeat(12)],album:'长专辑'.repeat(15),duration_ms:120000}]});if(url.endsWith('/lyric-sources/fetch'))return Response.json({empty:false,format:'qrc',content:'[1000,500]正文(1000,500)',metadata:{},translation:'broken'});return original(input,init);};});
  await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.getByRole('tab',{name:'网易云音乐'}).click();await page.getByRole('textbox',{name:'搜索标题'}).fill('长标题'.repeat(80));await page.getByRole('button',{name:'搜索',exact:true}).click();
  await page.getByRole('button',{name:/长标题长标题/}).click();await expect(page.getByRole('button',{name:'确认导入并替换歌词'})).toBeVisible();
@@ -83,7 +83,7 @@ test('packaging error links focus body, background and 注音 with visible main 
 });
 
 test('output issue mounts a distant virtual row and transfers keyboard focus',async({page})=>{
- await page.goto('/editor');
+ await page.goto('/projects/sample-project/edit?scenario=no-music');
  const lines=Array.from({length:82},(_,i)=>`<p xml:id="virtual${i}" begin="${i*2}" ${i===81 ? 'studio:null="end"' : `end="${i*2+1}"`}><span begin="${i*2}" end="${i*2+1}">word${i}</span></p>`).join('');
  await importLyrics(page,file(`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body>${lines}</body></tt>`));
  await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('qrc');await page.getByRole('button',{name:'下载歌词',exact:true}).click();

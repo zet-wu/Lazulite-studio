@@ -32,7 +32,7 @@ for (const project of [false, true]) for (const count of [40, 120]) for (const k
 });
 
 test('outline drag does not issue the outline click locate', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/editor');
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/projects/sample-project/edit?scenario=no-music');
   const rows = Array.from({ length: 120 }, (_, i) => `<p xml:id="l${i}"><span>Row${i}</span></p>`).join('');
   await importLyrics(page, { name: 'outline.ttml', mimeType: 'application/xml', buffer: Buffer.from(`<tt xmlns="http://www.w3.org/ns/ttml"><body><div>${rows}</div></body></tt>`) });
   await page.getByRole('button', { name: '打轴', exact: true }).click();

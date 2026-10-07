@@ -8,8 +8,8 @@ async function generate(page: Page) {
   return page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
 }
 
-test('Local file mode survives reopening and reload, without sharing across filenames', async ({ page }) => {
-  await page.goto('/editor');
+test('Project generation mode survives reopening and file imports', async ({ page }) => {
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   const load = (name: string) => importLyrics(page, { name, mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
   await load('first.ttml'); let dialog = await generate(page);
   await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
@@ -33,7 +33,7 @@ test('Local file mode survives reopening and reload, without sharing across file
 });
 
 test('First ja-Latn track is reused, populated lines stay skipped and new remains explicit', async ({ page }) => {
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   const xml = await page.evaluate(async xml => {
     const path = '/src/adapters/ttml/lyric-codec.ts';
     const codec = await import(path) as typeof import('../../src/adapters/ttml/lyric-codec');

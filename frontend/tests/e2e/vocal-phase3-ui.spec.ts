@@ -9,7 +9,7 @@ async function generate(page: Page) {
 for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) test(`outline selection and quoted romanization ${width} ${theme}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 });
   await page.addInitScript(theme => localStorage.setItem('lazulite-editor-theme', theme), theme);
-  await page.goto('/editor');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'phase3.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
   const rows = page.locator('[data-outline-drag]');
   await rows.first().click(); await rows.nth(1).click({ modifiers: ['Control'] });
@@ -40,7 +40,7 @@ for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) t
   await page.keyboard.press('Escape'); await dialog.getByRole('button', { name: '取消', exact: true }).click();
 });
 test('four sources keep many long candidates inside scrolling rows and actions stationary', async ({ page }) => {
-  await page.setViewportSize({ width:1280, height:650 }); await page.goto('/editor');
+  await page.setViewportSize({ width:1280, height:650 }); await page.goto('/projects/sample-project/edit?scenario=no-music');
   await page.getByRole('button', { name: '歌词获取', exact: true }).waitFor();
   await page.evaluate(() => {
     const original = window.fetch;

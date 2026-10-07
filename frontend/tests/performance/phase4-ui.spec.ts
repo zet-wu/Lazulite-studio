@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { performanceTtml } from '../fixtures/phase3';
 
 test('UI production pointer preview with 2000 rich rows remains bounded', async ({ page }) => {
-  await page.goto('/editor');
+  await page.goto('/projects/no-music/edit');
   await page.locator('input[type=file]').setInputFiles({ name: 'large.ttml', mimeType: 'application/xml', buffer: Buffer.from(performanceTtml()) });
   const outline = page.locator('[data-outline-drag]');
   await expect(outline).toHaveCount(2000);
