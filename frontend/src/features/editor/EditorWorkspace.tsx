@@ -127,7 +127,12 @@ function EditorWorkspaceContent(props: Props) {
   const clipboardToken = useRef('');
   const pageRef = useRef<HTMLDivElement>(null);
   const wordInputs = useRef(new Map<string, HTMLInputElement>());
-  const [mode, setMode] = useState<'audio' | 'acquire' | 'edit' | 'sync' | 'preview' | 'package' | 'auxiliary'>(() => props.projectId && !document.lines.some(line => line.words.some(word => word.text.trim())) ? 'acquire' : 'edit');
+  const [mode, setMode] = useState<'audio' | 'acquire' | 'edit' | 'sync' | 'preview' | 'package' | 'auxiliary'>(() => {
+    const remembered = props.projectId ? localStorage.getItem(`studio:workspace-mode:project:${props.projectId}`) : null;
+    if (remembered === 'audio' || remembered === 'acquire' || remembered === 'edit' || remembered === 'sync' || remembered === 'preview' || remembered === 'package' || remembered === 'auxiliary') return remembered;
+    return props.projectId && !document.lines.some(line => line.words.some(word => word.text.trim())) ? 'acquire' : 'edit';
+  });
+  useEffect(() => { if (props.projectId) localStorage.setItem(`studio:workspace-mode:project:${props.projectId}`, mode); }, [props.projectId, mode]);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [columns, setColumns] = useState(readColumnPreferences);
   const layoutRef = useRef<HTMLDivElement>(null);

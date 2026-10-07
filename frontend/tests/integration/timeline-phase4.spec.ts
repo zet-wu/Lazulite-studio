@@ -89,3 +89,9 @@ test('upload failure and cancellation keep project empty and allow retry',async(
   await page.unroute('**/api/v1/uploads');await page.getByRole('button',{name:'重试上传',exact:true}).click();await expect(input).toHaveCount(0);
   await expect(page.getByRole('textbox',{name:'词 Alpha',exact:true})).toHaveValue('Alpha');
 });
+
+test('empty project opens acquisition once and remembers the chosen workspace mode', async ({page}) => {
+  await create(page); await expect(page.getByRole('button',{name:'歌词获取',exact:true})).toHaveAttribute('aria-current','page');
+  await page.getByRole('button',{name:'编辑',exact:true}).click(); await page.reload();
+  await expect(page.getByRole('button',{name:'编辑',exact:true})).toHaveAttribute('aria-current','page');
+});

@@ -17,6 +17,7 @@ export async function clearProjectLocalData(projectId: string) {
   localStorage.removeItem(`lazulite-romanization-mode:project:${projectId}`);
   localStorage.removeItem(`studio:sync-offset:project:${projectId}`);
   localStorage.removeItem(`studio:download:project:${projectId}`);
+  localStorage.removeItem(`studio:workspace-mode:project:${projectId}`);
   sessionStorage.removeItem(`studio-vocal-intent-v1:${projectId}`);
   await createRecoveryAdapter().clear(projectId);
 }
