@@ -44,3 +44,27 @@ test('outline drag does not issue the outline click locate', async ({ page }) =>
   await page.keyboard.press('Escape'); await page.mouse.up();
   await source.click(); await expect.poll(()=>scroll.evaluate(n=>n.scrollTop)).toBeGreaterThan(1000);
 });
+
+for (const count of [40, 120]) test(`word ghost stays outside layout through drop and undo, ${count} rows`, async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/projects/sample-project/edit');
+  const rows = Array.from({ length: count }, (_, i) => `<p xml:id="l${i}"><span studio:id="a${i}">Alpha</span><span studio:id="b${i}">Beta</span></p>`).join('');
+  await importLyrics(page, { name: 'ghost.ttml', mimeType: 'application/xml', buffer: Buffer.from(`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><div>${rows}</div></body></tt>`) });
+  await page.getByRole('button', { name: '打轴', exact: true }).click();
+  const scroll = page.getByLabel('歌词列表', { exact: true }); await scroll.evaluate(n => n.scrollTop = 1800); await page.waitForTimeout(350);
+  const bounds = (await scroll.boundingBox())!;
+  const id = await page.locator('main [data-line-id]').evaluateAll((ns, b) => ns.find(n => { const r = n.getBoundingClientRect(); return r.top > b.y + 100 && r.bottom < b.y + b.height - 100; })!.getAttribute('data-line-id')!, bounds);
+  const row = page.locator(`main [data-line-id="${id}"]`), a = row.locator('[data-word-id]').first(), b = row.locator('[data-word-id]').nth(1);
+  const box = (await a.boundingBox())!, target = (await b.boundingBox())!;
+  const measure = () => scroll.evaluate(n => ({ top: n.scrollTop, height: n.scrollHeight, width: n.clientWidth, pageHeight: document.documentElement.scrollHeight, pageWidth: document.documentElement.clientWidth }));
+  const before = await measure(), rowBefore = await row.boundingBox();
+  await page.mouse.move(box.x + 3, box.y + 30); await page.mouse.down(); await page.mouse.move(box.x + 11, box.y + 30);
+  const ghost = page.locator('body > [class*="dragGhost"]'); await expect(ghost).toHaveCount(1);
+  // The clone retains syncWord's class; its structural position must not override the overlay.
+  await expect(ghost).toHaveCSS('position', 'fixed');
+  const ghostBox = (await ghost.boundingBox())!; expect(ghostBox.x).toBeCloseTo(box.x + 8, 0); expect(ghostBox.y).toBeCloseTo(box.y, 0);
+  await page.waitForTimeout(250); expect(await measure()).toEqual(before); expect(await row.boundingBox()).toEqual(rowBefore);
+  await page.mouse.move(target.x + target.width - 3, target.y + 30); await page.mouse.up();
+  await expect(ghost).toHaveCount(0); await expect(row.locator('[data-word-id]').first()).toHaveText(/Beta/);
+  await page.waitForTimeout(250); expect((await measure()).top).toBe(before.top); expect(await row.boundingBox()).toEqual(rowBefore);
+  await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(row.locator('[data-word-id]').first()).toHaveText(/Alpha/);
+});

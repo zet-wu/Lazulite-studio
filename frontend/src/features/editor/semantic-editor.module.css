@@ -201,7 +201,8 @@
 .page[data-object-drag], .page[data-object-drag] * { cursor: grabbing !important; }
 .page [data-drag-placeholder] { opacity: .45; }
 .dragInsertion { position: fixed; pointer-events: none; z-index: 101; background: var(--blue); border-radius: 2px; }
-.dragGhost { position: fixed; top: 0; left: 0; z-index: 100; pointer-events: none; opacity: .85; margin: 0; box-shadow: 0 10px 28px #0004; max-height: 65vh; overflow: hidden; cursor: grabbing; }
+/* Clones retain source classes (e.g. syncWord); overlay geometry must outrank them. */
+.dragGhost.dragGhost { position: fixed; top: 0; left: 0; z-index: 100; pointer-events: none; opacity: .85; margin: 0; box-shadow: 0 10px 28px #0004; max-height: 65vh; overflow: hidden; cursor: grabbing; }
 @media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto; } }
 
 .page { font-size: var(--body-size); }
