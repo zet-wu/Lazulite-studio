@@ -1,7 +1,16 @@
-import type { LyricDocument, TimeMs } from './lyric-document';
+import type { LyricDocument, LyricWord, TimeMs } from './lyric-document';
 
 type Interval = { beginMs: TimeMs; endMs: TimeMs };
 const endpoints = (items: Interval[]) => items.flatMap(item => [item.beginMs, item.endMs]).filter((time): time is number => time !== null);
+
+function adjacentWord(words: LyricWord[], index: number, direction: -1 | 1): LyricWord | undefined {
+  for (let i = index + direction; i >= 0 && i < words.length; i += direction) {
+    const word = words[i];
+    // Untimed whitespace separates lyrics but supplies no timeline boundary.
+    if (word.beginMs === null && word.endMs === null && /^\s+$/u.test(word.text)) continue;
+    return word;
+  }
+}
 
 /** Display-only copies. Never pass this projection to commands, playback or persistence. */
 export function projectTimeline(document: LyricDocument, durationMs: number | null = null): LyricDocument {
@@ -23,7 +32,9 @@ export function projectTimeline(document: LyricDocument, durationMs: number | nu
   const lines = document.lines.map((line, index) => {
     const shown = project(line, document.lines[index - 1], document.lines[index + 1], undefined, line.words.flatMap(word => [word, ...word.rubyUnits]));
     return { ...shown, words: line.words.map((word, i) => {
-      const shownWord = project(word, line.words[i - 1], line.words[i + 1], shown, word.rubyUnits);
+      const previous = word.beginMs === null && word.endMs !== null ? adjacentWord(line.words, i, -1) : undefined;
+      const next = word.endMs === null && word.beginMs !== null ? adjacentWord(line.words, i, 1) : undefined;
+      const shownWord = project(word, previous, next, shown, word.rubyUnits);
       return { ...shownWord, rubyUnits: word.rubyUnits.map((unit, j) => project(unit, word.rubyUnits[j - 1], word.rubyUnits[j + 1], shownWord)) };
     }) };
   });

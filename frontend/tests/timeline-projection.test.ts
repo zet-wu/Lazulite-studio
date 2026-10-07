@@ -69,3 +69,54 @@ it('resizing Ruby retains known parent sides when no Ruby supplies that side, an
   expect(next.lines[0].words[0]).toMatchObject({ beginMs: 10, endMs: null });
   expect(() => resizeTimeline(doc, { kind: 'line', lineId: row.id }, 'endMs', 50)).toThrow('不能排除');
 });
+
+it.each(['beginMs', 'endMs'] as const)('skips consecutive untimed whitespace for a background word missing %s without changing source data', side => {
+  const doc = createLyricDocument('main');
+  const background = { ...createLine(''), backgroundOf: doc.lines[0].id, beginMs: 147255, endMs: 151092 };
+  background.words = [
+    { ...createWord('scell'), beginMs: 147919, endMs: 148176 }, createWord(' '), createWord('\t\u3000'),
+    { ...createWord('gungnir'), beginMs: 148176, endMs: 148528, [side]: null },
+    createWord('\u3000'), createWord(' '), { ...createWord('tron)'), beginMs: 148528, endMs: 151092 },
+  ];
+  doc.lines.push(background);
+  const before = structuredClone(doc);
+  for (const duration of [null, 180000]) {
+    const shown = projectTimeline(doc, duration).lines[1];
+    expect(shown.words[3]).toMatchObject({ beginMs: 148176, endMs: 148528 });
+    expect(shown.words.map(word => word.text)).toEqual(background.words.map(word => word.text));
+    for (const index of [1, 2, 4, 5]) expect(shown.words[index]).toEqual(background.words[index]);
+  }
+  expect(doc).toEqual(before);
+});
+
+it.each([
+  { text: ' ', beginMs: 12000, endMs: 13000, expectedBegin: 13000, expectedEnd: 12000 },
+  { text: ' ', beginMs: 12000, endMs: null, expectedBegin: 1000, expectedEnd: 12000 },
+  { text: ' ', beginMs: null, endMs: 13000, expectedBegin: 13000, expectedEnd: 20000 },
+  { text: 'unknown', beginMs: null, endMs: null, expectedBegin: 1000, expectedEnd: 20000 },
+  { text: '、', beginMs: null, endMs: null, expectedBegin: 1000, expectedEnd: 20000 },
+])('retains the neighbor barrier for $text [$beginMs, $endMs]', ({ text, beginMs, endMs, expectedBegin, expectedEnd }) => {
+  const doc = createLyricDocument(''); const line = doc.lines[0]; line.beginMs = 1000; line.endMs = 20000;
+  line.words = [
+    { ...createWord('left'), beginMs: 1000, endMs: 9000 }, createWord(' '),
+    { ...createWord(text), beginMs, endMs }, createWord('\u3000'),
+    { ...createWord('target'), beginMs: null, endMs: 15000 },
+  ];
+  expect(projectTimeline(doc).lines[0].words[4].beginMs).toBe(expectedBegin);
+  line.words.reverse(); line.words[0].beginMs = 10000; line.words[0].endMs = null;
+  expect(projectTimeline(doc).lines[0].words[0].endMs).toBe(expectedEnd);
+});
+
+it('filters skipped-whitespace candidates by direction and real Ruby bounds, and stays within the row', () => {
+  const doc = createLyricDocument(''); const line = doc.lines[0]; line.beginMs = 1000; line.endMs = 20000;
+  line.words = [{ ...createWord('target'), beginMs: 10000, endMs: null }, createWord(' '), { ...createWord('next'), beginMs: 9000, endMs: 16000 }];
+  expect(projectTimeline(doc).lines[0].words[0].endMs).toBe(20000);
+  line.words[2].beginMs = 12000;
+  line.words[0].rubyUnits = [{ id: 'r', reading: 'あ', beginMs: 10000, endMs: 13000 }];
+  expect(projectTimeline(doc).lines[0].words[0].endMs).toBe(20000);
+  line.words[0].rubyUnits = [];
+  expect(projectTimeline(doc).lines[0].words[0].endMs).toBe(12000);
+  line.words.pop();
+  doc.lines.push({ ...createLine('other row'), beginMs: 11000, endMs: 15000 });
+  expect(projectTimeline(doc).lines[0].words[0].endMs).toBe(20000);
+});

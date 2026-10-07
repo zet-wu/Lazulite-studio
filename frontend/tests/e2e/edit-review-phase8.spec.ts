@@ -108,3 +108,20 @@ for (const theme of ['light', 'dark']) test(`actual AMLL renders untimed quotes 
   for (const char of ['「', '！', '」']) expect(geometry[char]?.some(width => width > 0)).toBe(true);
   await page.screenshot({ path: test.info().outputPath(`punctuation-${theme}.png`) });
 });
+
+for (const side of ['开始', '结束']) test(`background word temporary ${side} skips untimed separator words after clearing and undo`, async ({ page }) => {
+  await loadTimeline(page);
+  const source = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:studio="urn:lazulite:studio:draft" xml:space="preserve"><body><p xml:id="main" begin="1" end="8"><span begin="1" end="8">正文</span><span ttm:role="x-bg" studio:id="bg" begin="1" end="8"><span begin="2" end="3">scell</span><span studio:id="space-before" studio:null="begin end"> </span><span studio:id="gungnir" begin="3" end="4">gungnir</span><span studio:id="space-wide" studio:null="begin end">　</span><span studio:id="space-after" studio:null="begin end"> </span><span begin="4" end="8">tron)</span></span></p></body></tt>`;
+  await importLyrics(page, { name: 'background-separators.ttml', mimeType: 'application/xml', buffer: Buffer.from(source) });
+  await page.getByRole('button', { name: '时间轴行 L1 背景', exact: true }).click();
+  const field = page.getByRole('textbox', { name: `词 gungnir${side}秒数`, exact: true });
+  await field.fill(''); await field.press('Tab');
+  const word = page.getByRole('button', { name: '时间轴词 gungnir', exact: true });
+  await expect(word).toHaveAttribute('aria-description', `${side}未定，临时端点 ${side === '开始' ? 3000 : 4000} 毫秒，拖动该边界设置真实时间`);
+  await expect(field).toHaveValue('');
+  await word.click();
+  await expect(page.getByRole('button', { name: '循环选区', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(field).toHaveValue(side === '开始' ? '3' : '4');
+  await expect(word).not.toHaveAttribute(side === '开始' ? 'data-temporary-begin' : 'data-temporary-end');
+});
