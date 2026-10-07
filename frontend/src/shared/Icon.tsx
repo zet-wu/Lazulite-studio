@@ -1,7 +1,13 @@
-type IconName = "skip" | "chevron" | "search" | "play" | "pause" | "dots" | "back" | "trash" | "add" | "up" | "down" | "close" | "minus";
+type PathIconName = "check" | "warning" | "music" | "skip" | "chevron" | "search" | "play" | "pause" | "dots" | "back" | "trash" | "add" | "up" | "down" | "close" | "minus";
 
-export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
-  const paths: Record<IconName, string> = {
+export function Icon({ name, size = 16 }: { name: PathIconName | "sync-dot" | "sync-beat"; size?: number }) {
+  if (name === 'sync-dot' || name === 'sync-beat') return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 16 16">
+    {name === 'sync-dot' ? <circle cx="8" cy="8" r="2.5" fill="currentColor"/> : <rect x="6.5" y="2" width="3" height="12" rx="1" fill="currentColor"/>}
+  </svg>;
+  const paths: Record<PathIconName, string> = {
+    check: "m3 8 3 3 7-7",
+    warning: "M8 2 1 14h14ZM8 6v4M8 12h.01",
+    music: "M6 11V3l7-1v8M6 5l7-1M6 11c0 3-4 3-4 1s4-3 4-1M13 10c0 3-4 3-4 1s4-3 4-1",
     skip: "m3 3 7 5-7 5ZM12 3v10",
     close: "M4 4l8 8M12 4l-8 8",
     minus: "M3 8h10",

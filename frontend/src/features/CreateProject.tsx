@@ -1,3 +1,4 @@
+import { Icon } from '../shared/Icon';
 import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
@@ -117,7 +118,7 @@ export function CreateProject({
   return (
     <>
       <button data-role="secondary" className={styles.primary} onClick={open}>
-        ＋ 新建项目
+        <Icon name="add"/> 新建项目
       </button>
       <dialog
         ref={dialog}

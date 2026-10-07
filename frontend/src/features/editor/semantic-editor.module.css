@@ -214,8 +214,8 @@
 .dragGhost[data-drop-error]::after { content: attr(data-drop-error); display: block; color: var(--danger); background: var(--panel); padding: 8px; }
 .actions > button { border: 0; background: transparent; }
 .actions > .primaryButton { background-color: var(--blue); color: var(--on-primary); padding-inline: 12px; }
-.settingsMenu button[aria-pressed]::before { content: ' '; display: inline-block; width: 1.4em; }
-.settingsMenu button[aria-pressed="true"]::before { content: '✓'; color: var(--blue); }
+.settingsMenu button[aria-pressed] > svg { flex-shrink: 0; color: var(--blue); }
+.settingsMenu button[aria-pressed="false"] > svg { visibility: hidden; }
 .settingsMenu button[aria-pressed="true"] { background: var(--blue-soft); }
 
 .translationRow { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
@@ -335,11 +335,15 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .outlineRow[data-active-context] .outlineNumber { color: var(--primary); font-weight: 600; }
 
 /* Compact timing canvas: reading, body and markers occupy fixed grid rows. */
-.syncLine { padding: 12px 10px 16px; border-radius: 8px; outline-offset: -2px; }
-.syncLine[data-background] { margin-left: 26px; font-size: .9em; }
-.syncLineNumber { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; min-height: 22px; }
+.syncLine { display: grid; grid-template-columns: max(36px, calc((var(--gutter-digits) + 1) * 1ch + 8px)) minmax(0, 1fr); column-gap: 8px; user-select: none; cursor: default; padding: 12px 10px 16px; border-radius: 8px; outline-offset: -2px; }
+.syncLine[data-background] { font-size: .9em; }
+.syncLineNumber { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding-top: 24px; color: var(--muted); font-size: 12px; min-height: 22px; }
 .syncLineNumber > span { display: inline-flex; }
-.syncWords { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px 4px; min-height: 64px; }
+.syncOrdinal { min-height: 34px; align-items: center; }
+.syncLine input, .syncLine textarea { user-select: text; cursor: text; }
+.syncAddWord { display: grid; grid-template-rows: 24px 34px 24px; align-self: flex-start; }
+.syncAddWord > button { grid-row: 2; align-self: center; }
+.syncWords { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px 4px; min-height: 64px; }
 .syncWord { display: grid; grid-template-rows: minmax(24px, auto) minmax(34px, auto) minmax(24px, auto); position: relative; min-width: 24px; max-width: 100%; border-radius: 5px; outline-offset: -2px; }
 .syncBody { grid-row: 2; grid-column: 1 / -1; text-align: center; padding: 0; font-size: 24px; font-weight: 650; line-height: 1.4; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .syncRubyColumn { display: grid; grid-template-rows: subgrid; grid-row: 1 / 4; min-width: 0; }
@@ -351,14 +355,12 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .syncText small { display: block; font-size: 11px; color: var(--error); }
 .syncText[data-sync-active] > span { color: var(--blue); transform: translateY(-2px); }
 .syncMarkers { grid-row: 3; display: flex; flex-wrap: wrap; align-items: center; min-width: 24px; }
-.syncMarkers button[data-role] { display: grid; place-items: center; height: 24px; min-height: 24px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--muted); }
+.syncMarkers button[data-role][data-role] { display: grid; place-items: center; height: 24px; min-height: 24px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--muted); }
 .syncMarkers .syncDot { flex: 1 0 24px; min-width: 24px; }
 .syncMarkers .syncBeat { flex: 0 0 16px; width: 16px; }
-.syncDot i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-.syncBeat i { width: 2px; height: 12px; border-radius: 1px; background: currentColor; }
-.syncMarkers button[data-current] { color: var(--blue); }
-.syncMarkers button[data-current] i { box-shadow: 0 0 7px 2px color-mix(in srgb, var(--blue) 65%, transparent); }
-.syncMarkers button[data-passed] { color: var(--blue); opacity: .55; }
+.syncMarkers button[data-role][data-current] { color: var(--blue); }
+.syncMarkers button[data-current] svg { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--blue) 80%, transparent)); }
+.syncMarkers button[data-role][data-passed] { color: var(--muted); opacity: .55; }
 .syncLine[data-ignored-sync] .syncText, .syncLine[data-ignored-sync] .syncMarkers { opacity: .65; }
 .syncLine:hover:not(:has(.syncWord:hover, button:hover)), .syncLine:focus-visible { background: var(--surface-container); }
 .syncWord:hover:not(:has(.syncRuby:hover, button:hover)), .syncWord:focus-visible { background: var(--surface-container-high); }
@@ -367,3 +369,6 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .syncWord:focus-visible, .syncRuby:focus-visible, .syncLine:focus-visible { outline: 2px solid var(--blue); }
 .outlineRow[data-active-context] .outlineNumber { color: var(--blue); }
 @media (prefers-reduced-motion: reduce) { .syncText[data-sync-active] > span { transform: none; transition: none; } }
+
+.segmentParts { display: inline; white-space: pre-wrap; font-weight: 550; }
+.segmentParts svg { vertical-align: middle; color: var(--muted); margin-inline: 3px; }

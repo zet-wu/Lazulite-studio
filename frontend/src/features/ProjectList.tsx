@@ -89,7 +89,7 @@ export function ProjectList() {
       </div>
       <div className={styles.projectToolbar}>
         <label className={styles.search}>
-          <span>⌕</span>
+          <Icon name="search"/>
           <input
             placeholder="搜索项目"
             value={search}
@@ -111,7 +111,7 @@ export function ProjectList() {
           {visible.map((project) => (
             <div className={styles.projectRow} key={project.id}>
             <Link to={withScenario(`/projects/${project.id}/edit`)} className={styles.projectMainLink}>
-              <div className={styles.projectGlyph}>♪</div>
+              <div className={styles.projectGlyph}><Icon name="music" size={24}/></div>
               <div className={styles.projectMain}>
                 <strong>{project.name}</strong>
                 <span>

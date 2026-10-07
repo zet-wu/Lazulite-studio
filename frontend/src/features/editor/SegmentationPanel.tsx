@@ -1,13 +1,18 @@
+import { Icon } from '../../shared/Icon';
 import { useProjectEditing } from './ProjectEditingContext';
 import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { lineText, type LyricDocument, type LyricWord } from '../../domain/lyric-document';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, loadSyllableDivider, segmentText, segmentationPreview, SYLLABLE_LANGUAGES, type SegmentOptions } from '../../domain/segmentation';
 import type { EditorSelection } from './editing-actions';
 import styles from './semantic-editor.module.css';
+
+function Parts({ parts }: { parts: string[] }) {
+  return <span className={styles.segmentParts}>{parts.map((part, index) => <Fragment key={index}>{index > 0 && <Icon name="sync-beat"/>}<span>{part}</span></Fragment>)}</span>;
+}
 
 type PreviewItem = ReturnType<typeof segmentationPreview>[number];
 type Props = { document: LyricDocument; selection: EditorSelection | null; currentLineId: string | null; apply: (command: LyricCommand) => boolean; close: () => void };
@@ -39,7 +44,7 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
   const [ignoreText, setIgnoreText] = useState('');
   const [ruleText, setRuleText] = useState('');
   const [testInput, setTestInput] = useState('');
-  const [testOutput, setTestOutput] = useState('');
+  const [testOutput, setTestOutput] = useState<string[]>([]);
   const [preview, setPreview] = useState<PreviewItem[]>([]);
   const [error, setError] = useState('');
   const [manualBoundaries, setManualBoundaries] = useState<number[]>([]);
@@ -63,9 +68,9 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
     try {
       const config = { ...options, ignore: ignoreText.split('\n').map((item) => item.trim()).filter(Boolean), rules: parseRules(ruleText) };
       const divide = config.western === 'syllable' ? await loadSyllableDivider(config.language) : undefined;
-      setTestOutput(segmentText(testInput, config, divide).join(' │ '));
+      setTestOutput(segmentText(testInput, config, divide));
       setError('');
-    } catch (cause) { setTestOutput(''); setError(cause instanceof Error ? cause.message : '测试失败'); }
+    } catch (cause) { setTestOutput([]); setError(cause instanceof Error ? cause.message : '测试失败'); }
   };
   const buildPreview = async () => {
     try {
@@ -100,7 +105,7 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
           const next = manualBoundaries.includes(index + 1) ? manualBoundaries.filter((value) => value !== index + 1) : [...manualBoundaries, index + 1];
           setManualBoundaries(next);
           if (activeWord && manualLine) { const parts = manualParts(activeWord, next); setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.obscene || emptyBeatCount(editing, activeWord.id)) }]); }
-        }}>{manualBoundaries.includes(index + 1) ? '│' : '·'}</button>}</span>)}</div>
+        }}><Icon name={manualBoundaries.includes(index + 1) ? "sync-beat" : "sync-dot"}/></button>}</span>)}</div>
       </div> : <div className={styles.dialogControls}>
         <label>应用范围<Select value={scope} onChange={(event) => { setScope(event.target.value); setPreview([]); }}><option value="current">当前行</option><option value="selected">选中词或行</option><option value="range">指定行范围</option><option value="all">全文</option></Select></label>
         {scope === 'range' && <div className={styles.inlineFields}><label>从第 <input type="number" min="1" max={document.lines.length} value={from} onChange={(event) => { setFrom(Number(event.target.value)); setPreview([]); }} /> 行</label><label>到第 <input type="number" min="1" max={document.lines.length} value={to} onChange={(event) => { setTo(Number(event.target.value)); setPreview([]); }} /> 行</label></div>}
@@ -113,13 +118,13 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
           <label>标点时间权重<input type="number" min="0" step="0.1" value={options.punctuationWeight} onChange={(event) => updateOption('punctuationWeight', Number(event.target.value))} /></label>
           <label>忽略列表（每行一个）<textarea value={ignoreText} onChange={(event) => { setIgnoreText(event.target.value); setPreview([]); }} /></label>
           <label>自定义规则（每行 原文=部分|部分）<textarea value={ruleText} onChange={(event) => { setRuleText(event.target.value); setPreview([]); }} /></label>
-          <label>测试输入<input aria-label="分词测试输入" value={testInput} placeholder="输入任意短句" onChange={(event) => { setTestInput(event.target.value); setTestOutput(''); }} /></label>
+          <label>测试输入<input aria-label="分词测试输入" value={testInput} placeholder="输入任意短句" onChange={(event) => { setTestInput(event.target.value); setTestOutput([]); }} /></label>
           <button data-role="secondary" onClick={() => void testRule()}>测试规则</button>
-          {testOutput && <p>测试结果：{testOutput}</p>}
+          {testOutput.length > 0 && <p>测试结果：<Parts parts={testOutput}/></p>}
         </>}
       </div>}
 
       {error && <p role="alert">{error}</p>}
-      {preview.length > 0 && <div className={styles.segmentPreview}><strong>预览：{preview.filter((item) => item.parts.length > 1 && !item.blocked).length} 词将切分</strong>{preview.map((item) => <div key={item.word.id}><small>{lineText(document.lines.find((line) => line.id === item.lineId)!)}</small><span>{item.word.text} → {item.parts.join(' │ ')}</span>{item.blocked && <em>含 注音 或附属属性，保留原词</em>}</div>)}</div>}
+      {preview.length > 0 && <div className={styles.segmentPreview}><strong>预览：{preview.filter((item) => item.parts.length > 1 && !item.blocked).length} 词将切分</strong>{preview.map((item) => <div key={item.word.id}><small>{lineText(document.lines.find((line) => line.id === item.lineId)!)}</small><span>{item.word.text} → <Parts parts={item.parts}/></span>{item.blocked && <em>含 注音 或附属属性，保留原词</em>}</div>)}</div>}
     </SettingsDialog>;
 }

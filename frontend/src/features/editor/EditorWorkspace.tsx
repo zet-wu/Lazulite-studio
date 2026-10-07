@@ -862,7 +862,7 @@ function EditorWorkspaceContent(props: Props) {
             setSelection({ kind: 'lines', ids: [line.id], anchorId: line.id, activeId: line.id });
             props.onSelectLine?.(line.id); requestLocate(line.id);
           }
-        }} renderLine={(line) => mode === 'sync' ? <SyncLine key={line.id} line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} editing={editing} selection={selection} cursor={syncCursor} progress={syncProgress}
+        }} renderLine={(line) => mode === 'sync' ? <SyncLine key={line.id} line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} gutterDigits={String(mainLines.length).length} editing={editing} selection={selection} cursor={syncCursor} progress={syncProgress}
           draft={{ id: syncEditingId, commit: syncDraftCommit, open: id => { if (finishSyncDraft()) setSyncEditingId(id); }, close: () => setSyncEditingId(null) }} apply={dispatch}
           selectLine={(shift, toggle) => selectLine(line, shift, toggle)} selectWord={(word, shift, toggle) => selectWord(line, word, shift, toggle)} selectRuby={(word, id, shift, toggle) => selectRuby(line, word, id, shift, toggle)}
           renderWordDraft={after => renderWordDraft(line, after)} addWord={() => startWordDraft(line.id, line.words.at(-1)?.id ?? null)} rubyDraft={rubyShortcut} closeRubyDraft={() => setRubyShortcut(null)} placeholder={drag.isPlaceholder}/>
@@ -906,10 +906,8 @@ function EditorWorkspaceContent(props: Props) {
             else if (target.kind === 'romanization') { const content = document.romanizationTracks.find(track => track.id === target.trackId)!.contents.find(content => content.id === target.contentId)!; if (content.kind === 'timed') dispatch({ type: 'set-romanization-content', trackId: target.trackId, content: { ...content, units: content.units.map(unit => unit.id === target.unitId ? { ...unit, beginMs, endMs } : unit) } }); }
           }} /> : <small>多对象时间可在时间轴整体平移；端点请单独调整。</small>}
         </>}
-        <fieldset disabled={selection?.kind !== 'lines'} style={{ border: 0, padding: 0, margin: 0 }}>
-        <fieldset disabled={selection?.kind === 'lines' && selection.ids.length > 1} style={{ border: 0, padding: 0, margin: 0 }}>
-        <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />
-        </fieldset>
+        {selection?.kind === 'lines' && <>
+        {selection.ids.length === 1 && <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />}
         {selection?.kind === 'lines' && selection.ids.length > 1 && <small>多行时间请使用整体偏移或时间轴平移。</small>}
         {propertyLines.length > 0 && <>
           <BooleanField label="跳过打轴" switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} mixed={propertyLines.some(line => editing.ignoredSyncLineIds.includes(line.id)) && !propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} onChange={checked => dispatch({type:'batch', commands:propertyLines.map(line=>({type:'set-ignore-sync',lineId:line.id,ignoreSync:checked}))})}/>
@@ -930,7 +928,7 @@ function EditorWorkspaceContent(props: Props) {
             <option value="">请选择</option>{mainLines.filter((line) => line.id !== selectedLine.id && !occupiedParents.has(line.id)).map((line) => <option key={line.id} value={line.id}>L{ordinalById.get(line.id)}</option>)}
           </Select></label>
         </> : null}
-        </fieldset>
+        </>}
       </>}
       </div></aside>}</div>}
     {settingsDialog === 'translations' && <TranslationTrackDialog document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}

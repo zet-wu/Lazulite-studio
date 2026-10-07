@@ -39,8 +39,8 @@ function SyncText({ id, text, label, active, draft, commit }: { id: string; text
   </span>;
 }
 
-export function SyncLine({ line, ordinal, editing, selection, cursor, progress, draft, apply, selectLine, selectWord, selectRuby, renderWordDraft, addWord, rubyDraft, closeRubyDraft, placeholder }: {
-  line: LyricLine; ordinal?: number; editing: ProjectEditing; selection: EditorSelection | null; cursor: SyncCursor | null; progress: SyncProgress; draft: DraftController;
+export function SyncLine({ line, ordinal, gutterDigits, editing, selection, cursor, progress, draft, apply, selectLine, selectWord, selectRuby, renderWordDraft, addWord, rubyDraft, closeRubyDraft, placeholder }: {
+  line: LyricLine; ordinal?: number; gutterDigits: number; editing: ProjectEditing; selection: EditorSelection | null; cursor: SyncCursor | null; progress: SyncProgress; draft: DraftController;
   apply: (command: LyricCommand) => boolean; selectLine: (shift: boolean, toggle: boolean) => void;
   selectWord: (word: LyricWord, shift?: boolean, toggle?: boolean) => void; selectRuby: (word: LyricWord, id: string, shift?: boolean, toggle?: boolean) => void;
   renderWordDraft: (afterId: string | null) => ReactNode; addWord: () => void;
@@ -57,16 +57,16 @@ export function SyncLine({ line, ordinal, editing, selection, cursor, progress, 
   };
   const markers = (id: string, kind: 'word' | 'ruby', participates: boolean, choose: () => void) => participates && <div className={styles.syncMarkers}>
     <button data-role="inline" className={styles.syncDot} tabIndex={-1} aria-label="打轴单元" data-sync-marker="dot" data-current={activeId === id && progress.consumed === 0 || undefined}
-      onClick={event => { event.stopPropagation(); choose(); }}><i /></button>
+      onClick={event => { event.stopPropagation(); choose(); }}><Icon name="sync-dot" size={16}/></button>
     {Array.from({ length: emptyBeatCount(editing, id) }, (_, index) => <button key={index} data-role="inline" className={styles.syncBeat} data-beat-owner={id} data-beat-kind={kind} data-sync-marker="beat"
       data-current={activeId === id && progress.consumed === index + 1 || undefined} data-passed={activeId === id && progress.consumed > index + 1 || undefined}
-      aria-label={`后置空拍 ${index + 1}`} title="右键或 Shift+F10 调整空拍" onClick={event => event.stopPropagation()}><i /></button>)}
+      aria-label={`后置空拍 ${index + 1}`} title="右键或 Shift+F10 调整空拍" onClick={event => event.stopPropagation()}><Icon name="sync-beat" size={16}/></button>)}
   </div>;
-  return <section className={styles.syncLine} data-line-id={line.id} data-background={Boolean(line.backgroundOf) || undefined} data-ignored-sync={ignored || undefined}
+  return <section className={styles.syncLine} style={{ '--gutter-digits': gutterDigits } as CSSProperties} data-line-id={line.id} data-background={Boolean(line.backgroundOf) || undefined} data-ignored-sync={ignored || undefined}
     data-selected={selected('lines', line.id) || undefined} data-drag-placeholder={placeholder('line', line.backgroundOf ?? line.id) ? '' : undefined} tabIndex={0} aria-label={`歌词行 ${line.words.map(word => word.text).join('') || '空行'}`}
     onKeyDown={event => chooseKey(event, () => selectLine(event.shiftKey, event.ctrlKey || event.metaKey))}
     onClick={event => { if (!(event.target as Element).closest('[data-word-id],button,input')) selectLine(event.shiftKey, event.ctrlKey || event.metaKey); }}>
-    <div className={styles.syncLineNumber}>L{ordinal}{line.backgroundOf && ' · 背景'}{ignored && <span tabIndex={0} data-tooltip="此行跳过打轴" aria-label="此行跳过打轴"><Icon name="skip"/></span>}</div>
+    <div className={styles.syncLineNumber}><span className={styles.syncOrdinal}>L{ordinal}</span>{line.backgroundOf && <span>背景</span>}{ignored && <span tabIndex={0} data-tooltip="此行跳过打轴" aria-label="此行跳过打轴"><Icon name="skip"/></span>}</div>
     <div className={styles.syncWords}>{renderWordDraft(null)}{line.words.map(word => {
       const hasRuby = word.rubyUnits.length > 0;
       const count = !hasRuby && word.text.trim() ? emptyBeatCount(editing, word.id) : 0;
@@ -100,6 +100,6 @@ export function SyncLine({ line, ordinal, editing, selection, cursor, progress, 
         </div>
         {!hasRuby && markers(word.id, 'word', Boolean(word.text.trim()), () => selectWord(word))}
       </div>{renderWordDraft(word.id)}</Fragment>;
-    })}<button data-role="inline" className="icon-button" title="添加词" aria-label="添加词" onClick={event => { event.stopPropagation(); addWord(); }}><Icon name="add"/></button></div>
+    })}<div className={styles.syncAddWord}><button data-role="primary" className="icon-button" title="添加词" aria-label="添加词" onClick={event => { event.stopPropagation(); addWord(); }}><Icon name="add"/></button></div></div>
   </section>;
 }

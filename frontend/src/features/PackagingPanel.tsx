@@ -1,3 +1,4 @@
+import { Icon } from '../shared/Icon';
 import { useProjectEditing } from './editor/ProjectEditingContext';
 import type { ProjectEditing } from '../domain/project-editing';
 import { describeLyricFormat } from '../adapters/format-description';
@@ -28,6 +29,6 @@ export function PackagingPanel(props: { title?: string; document: LyricDocument;
  setBlocking([]); setMessage('');
  try { const problems=collectOutputIssues(props.document,format,editing); if(problems.length)throw new DocumentOutputError(problems); props.onExportFormat?.(format); }
  catch(e) { if(e instanceof DocumentOutputError)setBlocking(uniqueOutputIssues(e.issues)); else setMessage(e instanceof Error ? e.message : '导出失败'); }
- }}>下载歌词</button></div><details><summary>导出对照</summary><table className={styles.formatComparison} aria-label="所选格式导出对照"><thead><tr><th scope="col">要素</th><th scope="col">导出结果</th></tr></thead><tbody>{describeLyricFormat(props.document, format as Exclude<LyricFormat,'krc'>).map((row,index) => <tr key={row.element}><th scope="row">{row.element}</th><td><span className={styles.formatDetail} tabIndex={0} aria-describedby={`format-detail-${index}`}><span role={row.result === '✔' || row.result === '❌' ? 'img' : undefined} aria-label={row.result === '✔' ? '保留' : row.result === '❌' ? '不输出' : undefined}>{row.result}</span><span role="tooltip" id={`format-detail-${index}`}>{row.detail}</span></span></td></tr>)}</tbody></table></details>{message && <p role="alert">{message}</p>}
+ }}>下载歌词</button></div><details><summary>导出对照</summary><table className={styles.formatComparison} aria-label="所选格式导出对照"><thead><tr><th scope="col">要素</th><th scope="col">导出结果</th></tr></thead><tbody>{describeLyricFormat(props.document, format as Exclude<LyricFormat,'krc'>).map((row,index) => <tr key={row.element}><th scope="row">{row.element}</th><td><span className={styles.formatDetail} tabIndex={0} aria-describedby={`format-detail-${index}`}>{row.status === 'partial' ? <span>{row.result}</span> : <span role="img" aria-label={row.result}><Icon name={row.status === 'preserved' ? 'check' : 'close'}/></span>}<span role="tooltip" id={`format-detail-${index}`}>{row.detail}</span></span></td></tr>)}</tbody></table></details>{message && <p role="alert">{message}</p>}
  <h2>音乐文件</h2>{props.projectId && props.saveForPackaging ? <MusicPackaging dirty={props.dirty} key={props.projectId} onIssues={setBlocking} projectId={props.projectId} document={props.document} saveForPackaging={props.saveForPackaging} /> : <p>音乐打包需要关联项目音频，请从项目列表打开带音频的项目。</p>}</section></div>;
 }

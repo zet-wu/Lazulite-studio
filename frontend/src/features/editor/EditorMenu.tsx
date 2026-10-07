@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/Icon';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import type { LyricFormat } from '../../adapters/lyric-formats';
@@ -40,8 +41,8 @@ export function EditorMenu(props: Props) {
       <button data-role="inline" onClick={props.undo} disabled={!props.canUndo}>撤销</button>
       <button data-role="inline" onClick={props.redo} disabled={!props.canRedo}>重做</button>
       <TopMenu id="view" title="视图" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
-        <button data-role="inline" aria-label="显示大纲" aria-pressed={props.outlineVisible} onClick={props.onToggleOutline}>显示大纲</button>
-        <button data-role="inline" aria-label="显示属性栏" aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}>显示属性栏</button>
+        <button data-role="inline" aria-label="显示大纲" aria-pressed={props.outlineVisible} onClick={props.onToggleOutline}><Icon name="check"/>显示大纲</button>
+        <button data-role="inline" aria-label="显示属性栏" aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}><Icon name="check"/>显示属性栏</button>
         <button data-role="inline" onClick={() => setDark((value) => !value)}>{dark ? '日间模式' : '夜间模式'}</button>
       </TopMenu>
       <TopMenu id="settings" title="设置" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
