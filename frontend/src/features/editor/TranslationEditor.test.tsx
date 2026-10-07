@@ -6,13 +6,13 @@ import { TranslationTrackDialog } from './TranslationTrackDialog';
 import { type LyricCommand, applyLyricCommand } from '../../domain/lyric-commands';
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
-it('requires an explicit track and submits text without local language overrides', () => {
-  const document = createLyricDocument('行'), apply = vi.fn(() => true);
+it('defaults to the first track and submits text without local language overrides', () => {
+  const document = createLyricDocument('行'), apply = vi.fn((_command: LyricCommand) => true);
   document.translationTracks = [{ id: 'a', language: 'en', purpose: 'subtitle', contents: [] }];
-  render(<TranslationEditor document={document} lineId={document.lines[0].id} apply={apply} manage={vi.fn()} />);
-  expect(screen.getByRole('button', { name: '添加' })).toBeDisabled();
+  render(<TranslationEditor document={document} lineId={document.lines[0].id} apply={apply} />);
+  expect(screen.getByLabelText('新增翻译的轨道')).toHaveValue('a');
   fireEvent.change(screen.getByLabelText('新增翻译的轨道'), { target: { value: 'a' } });
-  fireEvent.click(screen.getByRole('button', { name: '添加' }));
+  fireEvent.click(screen.getByRole('button', { name: '新增翻译' }));
   const text = screen.getByLabelText('翻译 1'); fireEvent.change(text, { target: { value: ' song ' } }); fireEvent.blur(text);
   expect(apply).toHaveBeenCalledWith(expect.objectContaining({ type: 'insert-translation-content', trackId: 'a', content: expect.objectContaining({ text: ' song ', lineId: document.lines[0].id }) }));
 });
@@ -66,4 +66,31 @@ it('selects all content across tracks with mixed states and reports only actual 
   const tracks = command.tracks;
   expect(tracks.map((track: { id: string }) => track.id)).toEqual(['t0', 'empty']);
   expect(tracks[0].contents).toEqual(document.translationTracks.flatMap(track => track.contents));
+});
+
+it('creates the first track atomically and cancels empty drafts without writing', () => {
+  const document = createLyricDocument('行'), apply = vi.fn((_command: LyricCommand) => true);
+  render(<TranslationEditor document={document} lineId={document.lines[0].id} apply={apply}/>);
+  fireEvent.click(screen.getByRole('button', { name: '新增翻译' }));
+  fireEvent.blur(screen.getByLabelText('翻译 1')); expect(apply).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '新增翻译' }));
+  fireEvent.change(screen.getByLabelText('翻译 1'), { target: { value: '译文' } });
+  fireEvent.blur(screen.getByLabelText('翻译 1'));
+  const next = applyLyricCommand(document, apply.mock.calls[0][0]);
+  expect(next.translationTracks).toHaveLength(1);
+  expect(next.translationTracks[0]).toMatchObject({ language: null, purpose: 'subtitle', contents: [{ text: '译文' }] });
+});
+it('keeps a draft when its stable target disappears and requires a new selection', () => {
+  const document = createLyricDocument('行'), apply = vi.fn((_command: LyricCommand) => true);
+  document.translationTracks = ['a', 'b'].map(id => ({ id, language: null, purpose: 'subtitle', contents: [] }));
+  const props = { document, lineId: document.lines[0].id, apply };
+  const view = render(<TranslationEditor {...props}/>);
+  fireEvent.change(screen.getByLabelText('新增翻译的轨道'), { target: { value: 'b' } });
+  fireEvent.click(screen.getByRole('button', { name: '新增翻译' }));
+  fireEvent.change(screen.getByLabelText('翻译 1'), { target: { value: '草稿' } });
+  view.rerender(<TranslationEditor {...props} document={{ ...document, translationTracks: [document.translationTracks[0]] }}/>);
+  fireEvent.blur(screen.getByLabelText('翻译 1')); expect(apply).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('翻译 1')).toHaveValue('草稿');
+  fireEvent.change(screen.getByLabelText('新增翻译的轨道'), { target: { value: 'a' } });
+  fireEvent.blur(screen.getByLabelText('翻译 1')); expect(apply).toHaveBeenCalledOnce();
 });

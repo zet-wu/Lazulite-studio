@@ -54,7 +54,7 @@ export function EditorRibbon(props: Props) {
       <button data-role="inline" disabled={!props.canGenerateRuby} onClick={props.openRubyGeneration}>从音译生成 注音…</button>
     </TopMenu>
     <TopMenu id="lyrics-settings" title="歌词设置" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
-      <button data-role="inline" onClick={props.openMetadata}>元数据编辑</button>
+      <button data-role="inline" onClick={props.openMetadata}>歌词元数据</button>
       <button data-role="inline" onClick={props.openSingers}>歌手管理</button>
       <button data-role="inline" onClick={props.openTranslationTracks}>管理翻译轨道…</button>
       <button data-role="inline" onClick={props.openTracks}>管理音译轨道…</button>

@@ -35,7 +35,7 @@ import { LyricList, type ListMemory } from './LyricList';
 import { LyricLine as LyricLineView } from './LyricLine';
 import { LyricWord as LyricWordView } from './LyricWord';
 import { InlineDraft } from './InlineAdd';
-import { DraftInput, TimePair } from './EditorFields';
+import { EmptyBeatField, DraftInput, TimePair } from './EditorFields';
 import { ColumnSeparator } from './ColumnSeparator';
 import { OutlineRow } from './OutlineRow';
 import { COLUMN_LIMITS, COLUMN_STORAGE, readColumnPreferences, renderedColumns, type ColumnPreferences, type ColumnSide } from './column-preferences';
@@ -707,7 +707,6 @@ function EditorWorkspaceContent(props: Props) {
         inputRef={(node) => { if (node) { wordInputs.current.set(word.id, node); if (pendingFocus.current === word.id) { pendingFocus.current = null; node.focus(); } } else wordInputs.current.delete(word.id); }} />
     </div>
     <TimePair begin={word.beginMs} end={word.endMs} label={`词 ${word.text}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginMs, endMs })} />
-    <label className={styles.emptyBeat}>空拍 <input type="number" min="0" max="32" aria-label={`词 ${word.text}空拍数`} value={emptyBeatCount(editing, word.id)} onChange={(event) => dispatch({ type: 'set-word-empty-beat', lineId: line.id, wordId: word.id, emptyBeat: Number(event.target.value) })} /></label>
   </LyricWordView>;
   return <div ref={pageRef} className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`}
     onInputCapture={() => { editRejected.current = false; }}
@@ -879,7 +878,7 @@ function EditorWorkspaceContent(props: Props) {
           <div className={styles.words}>{renderWordDraft(line, null)}{line.words.map(word => <Fragment key={word.id}>{wordView(line, word)}{renderWordDraft(line, word.id)}</Fragment>)}
             <button data-role="inline" className="icon-button" title="添加词" data-tooltip="添加词" aria-label="添加词" onClick={event => { event.stopPropagation(); startWordDraft(line.id, line.words.at(-1)?.id ?? null); }}><Icon name="add"/></button>
           </div>
-          <TranslationEditor document={document} lineId={line.id} apply={dispatch} manage={() => setSettingsDialog('translations')} />
+          <TranslationEditor document={document} lineId={line.id} apply={dispatch} />
           <div className={styles.romanizationTracks}>
             {displayed.romanizationTracks.map((track, trackIndex) => {
               const contents = track.contents.filter((content) => content.lineId === line.id);
@@ -912,6 +911,9 @@ function EditorWorkspaceContent(props: Props) {
             else if (target.kind === 'romanization') { const content = document.romanizationTracks.find(track => track.id === target.trackId)!.contents.find(content => content.id === target.contentId)!; if (content.kind === 'timed') dispatch({ type: 'set-romanization-content', trackId: target.trackId, content: { ...content, units: content.units.map(unit => unit.id === target.unitId ? { ...unit, beginMs, endMs } : unit) } }); }
           }} /> : <small>多对象时间可在时间轴整体平移；端点请单独调整。</small>}
         </>}
+        {selection?.ids.length === 1 && activePropertyTarget && propertyWord && (activePropertyTarget.kind === 'ruby' || activePropertyTarget.kind === 'word' && propertyWord.rubyUnits.length === 0) && <EmptyBeatField
+          key={targetId(activePropertyTarget)} count={emptyBeatCount(editing, targetId(activePropertyTarget))} whitespace={!propertyText?.trim()}
+          commit={count => dispatch({ type: 'set-empty-beat', kind: activePropertyTarget.kind as 'ruby' | 'word', id: targetId(activePropertyTarget), count })}/>}
         {selection?.kind === 'words' && selection.ids.length === 1 && propertyWord && activePropertyTarget?.kind === 'word' && <BooleanField label="不雅用语" switchControl checked={propertyWord.obscene} onChange={obscene => dispatch({ type: 'set-word-obscene', lineId: activePropertyTarget.lineId, wordId: propertyWord.id, obscene })}/>}
         {selection?.kind === 'lines' && <>
         {selection.ids.length === 1 && <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />}
@@ -939,7 +941,7 @@ function EditorWorkspaceContent(props: Props) {
       </>}
       </div></aside>}</div>}
     {settingsDialog === 'translations' && <TranslationTrackDialog document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
-    {settingsDialog === 'metadata' && <SettingsDialog title="元数据编辑" close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} /></SettingsDialog>}
+    {settingsDialog === 'metadata' && <SettingsDialog title="歌词元数据" close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} /></SettingsDialog>}
     {settingsDialog === 'singers' && <SingerDialog focusAgent={focusAgent} document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'tracks' && <SettingsDialog title="音译轨道管理" close={() => setSettingsDialog(null)}><div className={styles.trackManager}>
       {document.romanizationTracks.map((track, index) => <div key={track.id}><strong>轨道 {index + 1}</strong>

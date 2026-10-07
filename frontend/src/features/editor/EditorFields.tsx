@@ -46,3 +46,21 @@ export function TimePair({ begin, end, label, onCommit }: { begin: TimeMs; end: 
   };
   return <span className={styles.times}><input aria-label={`${label}开始秒数`} inputMode="decimal" aria-invalid={Boolean(error)} value={start} onChange={(event) => setStart(event.target.value)} onBlur={commit} /><span>–</span><input aria-label={`${label}结束秒数`} inputMode="decimal" aria-invalid={Boolean(error)} value={finish} onChange={(event) => setFinish(event.target.value)} onBlur={commit} />{error && <small role="alert">{error}</small>}</span>;
 }
+
+export function EmptyBeatField({ count, commit, whitespace }: { count: number; commit: (count: number) => boolean; whitespace: boolean }) {
+  const [draft, setDraft] = useState(String(count));
+  const [error, setError] = useState('');
+  const cancelled = useRef(false);
+  useEffect(() => { setDraft(String(count)); setError(''); }, [count]);
+  const submit = () => {
+    if (cancelled.current) { cancelled.current = false; return; }
+    if (!/^\d+$/.test(draft) || Number(draft) > 32) { setError('请输入 0–32 的整数'); return; }
+    if (Number(draft) !== count && !commit(Number(draft))) return;
+    setError(''); setDraft(String(Number(draft)));
+  };
+  return <div><label>后置空拍 <input aria-label="后置空拍" inputMode="numeric" value={draft} aria-invalid={Boolean(error)} onChange={event => setDraft(event.target.value)} onBlur={submit} onKeyDown={event => {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === 'Enter') event.currentTarget.blur();
+    if (event.key === 'Escape') { event.stopPropagation(); cancelled.current = true; setDraft(String(count)); setError(''); event.currentTarget.blur(); }
+  }}/></label>{error && <small role="alert">{error}</small>}{whitespace && <small>纯空白不参与打轴，也不显示或消费空拍；0 可清除配置。</small>}</div>;
+}
