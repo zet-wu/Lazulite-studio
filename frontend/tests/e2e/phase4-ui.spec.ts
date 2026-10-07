@@ -30,7 +30,7 @@ test('UI append is empty, after the document, selected, reversible and keyboard 
   await expect(page.getByRole('dialog', { name: '音译轨道管理' })).toBeVisible();
 });
 
-test('UI drag displays an insertion placeholder, commits once and cancels without history or selection residue', async ({ page }) => {
+test('UI drag keeps source layout with an insertion line, commits once and cancels without history or selection residue', async ({ page }) => {
   await load(page);
   const rows = page.locator('main section[data-line-id]');
   const ids = await rows.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-line-id')));
@@ -45,8 +45,8 @@ test('UI drag displays an insertion placeholder, commits once and cancels withou
   await expect(page.locator('main [data-drag-placeholder]')).toHaveCount(1);
   const preview = await rows.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-line-id')));
   await page.mouse.up();
-  expect(await rows.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-line-id')))).toEqual(preview);
-  expect(preview).toEqual([ids[1], ids[0], ids[2]]);
+  expect(preview).toEqual(ids);
+  expect(await rows.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-line-id')))).toEqual([ids[1], ids[0], ids[2]]);
   await expect(page.locator('[data-drag-placeholder]')).toHaveCount(0);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   expect(await rows.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-line-id')))).toEqual(ids);
@@ -60,8 +60,8 @@ test('UI copy keeps source, outline drag has the same placement and reduced moti
   await page.emulateMedia({ reducedMotion: 'reduce' }); await load(page);
   const rows = page.locator('main section[data-line-id]');
   await page.keyboard.down('Alt'); await begin(page, rows.last(), rows.first(), false);
-  await expect(rows).toHaveCount(4);
-  await expect(rows.first()).toHaveAttribute('data-drag-placeholder', '');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.last()).toHaveAttribute('data-drag-placeholder', '');
   await page.mouse.up(); await page.keyboard.up('Alt');
   await expect(rows.first()).toHaveAttribute('aria-label', '歌词行 行3');
   await expect(rows.last()).toHaveAttribute('aria-label', '歌词行 行3');
@@ -156,7 +156,7 @@ test('UI word to empty line, 注音 and romanization drags use the same insertio
   const empty = page.locator(`main section[data-line-id="${emptyId}"]`);
   await empty.scrollIntoViewIfNeeded(); await source.scrollIntoViewIfNeeded();
   await begin(page, source, empty, false);
-  await expect(empty.locator('[data-drag-placeholder]')).toHaveCount(1); await page.mouse.up();
+  await expect(source).toHaveAttribute('data-drag-placeholder', ''); await page.mouse.up();
   await expect(empty.locator('[data-word-id]')).toHaveCount(1);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(empty.locator('[data-word-id]')).toHaveCount(0);
@@ -188,7 +188,7 @@ test('UI wrapped words preview their actual first slot and virtual edge scrollin
   const a = (await words.last().boundingBox())!, b = (await words.first().boundingBox())!;
   expect(a.y).toBeGreaterThan(b.y);
   await page.mouse.move(a.x + 2, a.y + 2); await page.mouse.down(); await page.mouse.move(b.x + 2, b.y + 2, { steps: 6 });
-  await expect(words.first()).toHaveAttribute('data-drag-placeholder', '');
+  await expect(words.last()).toHaveAttribute('data-drag-placeholder', '');
   await page.mouse.up(); await expect(words.first().getByRole('textbox', { name: '词 词8', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(words.first().getByRole('textbox', { name: '词 词0', exact: true })).toBeVisible();
