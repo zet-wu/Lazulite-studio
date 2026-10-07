@@ -8,7 +8,7 @@ import shutil
 import tempfile
 import uuid
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from .db import Database
@@ -142,7 +142,36 @@ class RevisionStore:
                 "revision committed but draft materialization failed",
                 extra={"project_id": project_id, "revision": result["id"]},
             )
+        try: self.collect(project_id)
+        except OSError: logger.warning('修订回收待重试：%s', project_id, exc_info=True)
         return result
+
+    def collect(self, project_id: str) -> None:
+        """Retain current/referenced snapshots, the newest 100, and the last 7 days.
+
+        Index removal precedes byte collection; startup recovers orphaned files.
+        Parent IDs are lineage, not live inputs. Idempotency responses remain valid.
+        """
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        paths = []
+        with self.db.transaction() as conn:
+            rows = conn.execute('SELECT id,project_path,created_at FROM revisions WHERE project_id=? ORDER BY created_at DESC,id DESC', (project_id,)).fetchall()
+            current = conn.execute('SELECT current_revision FROM projects WHERE id=?', (project_id,)).fetchone()
+            if not current: return
+            protected = {current[0]}
+            protected.update(row[0] for row in conn.execute('SELECT revision FROM review_confirmations WHERE project_id=?', (project_id,)))
+            for job in conn.execute('SELECT request_json,result_json FROM jobs WHERE project_id=?', (project_id,)):
+                request, result = json.loads(job[0]), json.loads(job[1] or '{}')
+                protected.add(request.get('revision'))
+                protected.add((result.get('binding') or {}).get('revision'))
+            unreferenced = [row for row in rows if row[0] not in protected]
+            protected.update(row[0] for row in unreferenced[:100])
+            for row in rows:
+                if row[0] not in protected and row[2] < cutoff:
+                    conn.execute('UPDATE revisions SET parent_id=NULL WHERE parent_id=?', (row[0],))
+                    conn.execute('DELETE FROM revisions WHERE id=?', (row[0],))
+                    paths.append(Path(row[1]))
+        for path in paths: path.unlink(missing_ok=True)
 
     def read(self, project_id: str, revision: str | None = None) -> tuple[str, dict]:
         """Read an immutable revision and return (revision id, project snapshot)."""
@@ -230,3 +259,4 @@ class RevisionStore:
             if temporary.is_file(): temporary.unlink(missing_ok=True)
         for row in rows:
             self.materialize_current(row[0])
+            self.collect(row[0])
