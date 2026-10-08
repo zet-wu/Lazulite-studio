@@ -1,0 +1,2 @@
+.entry { display: inline-flex; align-items: center; gap: 8px; }
+.status { display: flex; align-items: center; gap: 8px; padding: 6px 16px; font-size: 12px; }

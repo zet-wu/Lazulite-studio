@@ -14,14 +14,14 @@ import { moveTimeline, resizeTimeline, snapTimelineTime, timelineDelta, type Tim
 import { packIntervals } from '../domain/pack-intervals';
 import styles from './media.module.css';
 
-type Props = { document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
+type Props = { locked?: boolean; document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
   visible: { line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
   externalAnchors?: number[]; durationMs?: number | null;
   apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string) => void };
 type Drag = { source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string } };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
 
-export function TimelineTracks({ document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onPan, onError }: Props) {
+export function TimelineTracks({ locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onPan, onError }: Props) {
   const editing = useProjectEditing();
   const tracksRef = useRef<HTMLDivElement>(null);
   const [plotWidth, setPlotWidth] = useState(640);
@@ -80,7 +80,7 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
   }) ?? [];
   const pct = (timeMs: number) => `${((timeMs - startMs) / spanMs) * 100}%`;
   const begin = (event: PointerEvent<HTMLElement>, target: TimelineTarget | null, side: Drag['side'], originalMs: number) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || locked && target !== null) return;
     event.preventDefault(); event.stopPropagation();
     if (target) {
       (event.currentTarget.closest('[data-timeline-key]') as HTMLElement)?.focus({ preventScroll: true });
@@ -161,14 +161,14 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
     const right = Math.min(endMs, propsEndMs);
     const narrow = (Math.min(endMs, propsEndMs) - clippedBegin) / spanMs * plotWidth < 16;
     return <div key={key} data-timeline-key={key}
-      className={`${styles.trackBar} ${target.kind === 'line' && document.lines.find(line => line.id === target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${real?.beginMs != null && real?.endMs != null && positionMs >= real.beginMs && positionMs < real.endMs ? styles.trackPlaying : ''}`} role="button" tabIndex={0} aria-label={label} title={description} aria-description={description} data-temporary-begin={ghostBegin || undefined} data-temporary-end={ghostEnd || undefined}
+      className={`${styles.trackBar} ${target.kind === 'line' && document.lines.find(line => line.id === target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${real?.beginMs != null && real?.endMs != null && positionMs >= real.beginMs && positionMs < real.endMs ? styles.trackPlaying : ''}`} role="button" aria-disabled={locked} tabIndex={0} aria-label={label} title={description} aria-description={description} data-temporary-begin={ghostBegin || undefined} data-temporary-end={ghostEnd || undefined}
       style={{ transform: narrow && beginMs === endMs && beginMs === propsEndMs ? 'translateX(-100%)' : undefined, left: pct(clippedBegin), width: `${(right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
       onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
       onFocus={() => { if (!dragRef.current) choose(target); }}
-      onContextMenu={event => { event.preventDefault(); choose(target); setMenu({ x: event.clientX, y: event.clientY, target: event.currentTarget }); }}
+      onContextMenu={event => { event.preventDefault(); if(locked)return; choose(target); setMenu({ x: event.clientX, y: event.clientY, target: event.currentTarget }); }}
       onKeyDown={event => {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(target, event.shiftKey, event.ctrlKey || event.metaKey); }
-        if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') { event.preventDefault(); choose(target); const box = event.currentTarget.getBoundingClientRect(); setMenu({ x: box.left, y: box.bottom, target: event.currentTarget }); }
+        if (!locked && (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10')) { event.preventDefault(); choose(target); const box = event.currentTarget.getBoundingClientRect(); setMenu({ x: box.left, y: box.bottom, target: event.currentTarget }); }
         if (event.key === 'Delete' && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); }
       }}>
       {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanMs * plotWidth }} /><span className={styles.narrowMarker} title="窄区间，请用时间轴缩放后调整边界" /></>}
@@ -222,6 +222,6 @@ export function TimelineTracks({ document, selectedLineId, startMs, endMs, posit
       </section>;
     })}
     </div></div>
-    {visible.gap && line && row('空隙', gaps.map(({ left, right, beginMs, endMs, overlap }) => <button data-role="secondary" key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? '消除重叠' : '闭合空隙'} onClick={() => closeGap(left, right)}>{overlap ? '重叠' : '空隙'}</button>))}
+    {visible.gap && line && row('空隙', gaps.map(({ left, right, beginMs, endMs, overlap }) => <button data-role="secondary" disabled={locked} key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? '消除重叠' : '闭合空隙'} onClick={() => closeGap(left, right)}>{overlap ? '重叠' : '空隙'}</button>))}
   </div>;
 }

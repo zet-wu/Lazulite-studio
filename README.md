@@ -2,9 +2,9 @@
 
 单一项目工作流，音乐可选；源音乐、缓存、人声、修订及成品按项目独立保存。默认数据目录为 `server/data-projects-v4`，旧目录保留且不自动转换，切换说明见当前工作区实施记录。
 
-面向本地音乐的歌词制作工作台。浏览器负责歌词编辑和试听；FastAPI 管理项目、媒体、不可变项目 JSON 修订、自动化候选及 MP4/M4A、MP3、FLAC 歌词打包。AMLL 只读取当前草稿作预览，不回写权威文档。
+面向本地音乐的歌词制作工作台。浏览器负责歌词编辑和试听；FastAPI 管理项目、媒体、不可变项目 JSON 修订、自动对齐及 MP4/M4A、MP3、FLAC 歌词打包。AMLL 只读取当前草稿作预览，不回写权威文档。
 
-工作区依次提供歌词获取、音频处理、编辑、打轴、预览、文件打包与项目辅助。四源载荷保留原始歌词粒度，预览和元数据整组选择后一次导入；打包绑定已保存快照，并验证歌词、非目标内容和音频载荷。统一开发入口为根目录 `dev.py`，具体环境准备见运行手册。
+工作区依次提供歌词获取、音频处理、编辑、打轴、AMLL 预览与文件打包。四源载荷保留原始歌词粒度，预览和元数据整组选择后一次导入；打包绑定已保存快照，并验证歌词、非目标内容和音频载荷。统一开发入口为根目录 `dev.py`，具体环境准备见运行手册。
 
 项目快照统一歌词、声学片段和编辑配置的保存、恢复与 256 次历史。音频处理接入持久 Demucs 人声/能量、成功自动原子接入（重处理替换片段）、人工片段与行时间分配；原曲/人声的播放和图形独立选源，共用一个播放时钟。
 
@@ -14,14 +14,16 @@
 - [前端结构](frontend/README.md)、[服务端结构](server/README.md)、[契约边界](contracts/README.md)。
 - [开发约定](AGENTS.md)。
 
-歌词编辑器已包含词块/Ruby、分词、打轴、时间轴和预览。当前 v9 文档以整数毫秒保存时间，保留有序音译轨道，移除重复 duet，接入背景父关系、附属行、显式生成 Ruby、桌面菜单和单一 A/B。Phase 3 已实现共享时间坐标、独立重叠子轨、侧栏调宽显隐、长短列表定位和统一菜单。Phase 4 已修正收起高度与播放高亮，按10ms边缘匹配生成Ruby提案、默认跳过相同假名并保留人工选择；窄块使用既有缩放编辑，背景保留独立时间与实际AMLL展示。大提案仅挂载可见行。架构说明按实际源码描述，不把计划写成当前能力。
+歌词编辑器已包含词块/Ruby、分词、打轴、时间轴和预览。当前 v10 文档以整数毫秒保存时间，保留有序音译轨道，移除重复 duet，接入背景父关系、附属行、显式生成 Ruby、桌面菜单和单一 A/B。Phase 3 已实现共享时间坐标、独立重叠子轨、侧栏调宽显隐、长短列表定位和统一菜单。Phase 4 已修正收起高度与播放高亮，按10ms边缘匹配生成Ruby提案、默认跳过相同假名并保留人工选择；窄块使用既有缩放编辑，背景保留独立时间与实际AMLL展示。大提案仅挂载可见行。架构说明按实际源码描述，不把计划写成当前能力。
 
 ## 外部开发文档
 
-开发方案、审阅、过程记录、验收及证据统一保存在并列的 [lyric-workflow](../lyric-workflow/docs/studio/README.md)：[当前状态](../lyric-workflow/docs/studio/current-state.md)、[当前审阅整改方案](../lyric-workflow/docs/studio-timeline-review/Review-phase4/plan.md)、[前端运行](../lyric-workflow/docs/studio/development/frontend-development.md)、[服务端运行](../lyric-workflow/docs/studio/development/server-development.md)、[依赖许可](../lyric-workflow/docs/studio/reference/dependency-licenses.md)。本仓库不再保存开发过程文档；可执行测试夹具仍随源码维护。
+开发方案、审阅、过程记录、验收及证据统一保存在并列的 [lyric-workflow](../lyric-workflow/docs/studio/README.md)：[当前状态](../lyric-workflow/docs/studio/current-state.md)、[当前审阅整改方案](../lyric-workflow/docs/studio-align-review/Review-phase0/studio-integration-plan.md)、[前端运行](../lyric-workflow/docs/studio/development/frontend-development.md)、[服务端运行](../lyric-workflow/docs/studio/development/server-development.md)、[依赖许可](../lyric-workflow/docs/studio/reference/dependency-licenses.md)。本仓库不再保存开发过程文档；可执行测试夹具仍随源码维护。
 
 日文自动注音由当前画布快照调用 `/api/v1/reading/analyze`，主行和背景行独立选择，提供整行上下文、完整读音编辑和单次原子应用。允许词内拆分、不自动合词；未知或歧义位置留空。新注音按音拍分配整数毫秒时间，已有注音未改时保持原单元与时间。关联对齐字段及专用编辑逻辑已移除。
 
 日文自动注音以 Sudachi C 决定整行读音，使用一致 A 细分、随服务部署的 JmdictFurigana 精确词形/读音分段和唯一假名锚点投影原词。连续汉字不因词典更细而强制拆词。Ruby 支持同行跨词拖动及同源选中组，含空目标；保留 ID、读音和时间，选择与焦点随新归属。
 
 歌词下载使用所选格式的六项导出对照。独立 ASS 直接从歌词文档生成正文、背景和全部翻译／音译事件，保留独立时间并量化至厘秒，输出共享样式及按时间分配的默认纵向布局；不提供 ASS Ruby 或媒体内嵌。
+
+音频处理提供全局“自动对齐”：使用正文／假名 Ruby，按显示排布包含主行和背景行，可按行跳过。确认时可选行首辅助，运行中锁定项目编辑并可取消，成功后一次应用、撤销及自动保存；人声首次准备与时间更新同属一个项目事务。

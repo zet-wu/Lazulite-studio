@@ -260,38 +260,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/projects/{projectId}/reading-dictionary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listReadingDictionary"];
-        put?: never;
-        post: operations["createReadingDictionaryEntry"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects/{projectId}/reading-dictionary/{entryId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["updateReadingDictionaryEntry"];
-        post?: never;
-        delete: operations["deleteReadingDictionaryEntry"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/projects/{projectId}/lyrics": {
         parameters: {
             query?: never;
@@ -551,6 +519,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/alignment-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview the saved global alignment input without running a model */
+        get: {
+            parameters: {
+                query: {
+                    revision: string;
+                };
+                header?: never;
+                path: {
+                    projectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Participating lines and usable readings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AlignmentSummary"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -752,7 +760,7 @@ export interface components {
         };
         JobCreate: {
             /** @enum {string} */
-            kind: "search" | "fetch" | "transcribe" | "align" | "line_align" | "reading" | "forced_align" | "vocal";
+            kind: "vocal" | "alignment";
             /** @description 歌词任务必须带 revision；vocal 只绑定源资产，可用 retry_analysis_id 复用已有 separated/ready 人声重新分析；每次生成以任务 ID 标识的新结果，不覆盖旧结果。模型和设备取服务配置。 */
             params: {
                 revision?: string;
@@ -799,100 +807,17 @@ export interface components {
                 revision: string;
                 revision_sha256?: string | null;
             };
-            items?: (components["schemas"]["SearchCandidate"] | components["schemas"]["FetchedLyric"] | components["schemas"]["AlignedLine"] | components["schemas"]["TranscriptionSegment"] | components["schemas"]["ReadingProposal"] | components["schemas"]["ForcedAlignmentUnit"])[];
-            proposals?: components["schemas"]["ReadingProposal"][];
-            units?: components["schemas"]["ForcedAlignmentUnit"][];
-            evidence?: {
-                [key: string]: unknown;
-            };
-        } & {
-            [key: string]: unknown;
-        };
-        DictionaryEntryInput: {
-            surface: string;
-            reading: string;
-        };
-        DictionaryEntry: components["schemas"]["DictionaryEntryInput"] & {
-            /** @constant */
-            schema_version: "studio-reading-dictionary-entry-v1";
-            project_id: string;
-            id: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        ReadingDictionary: {
-            /** @constant */
-            schema_version: "studio-reading-dictionary-v1";
-            project_id: string;
-            items: components["schemas"]["DictionaryEntry"][];
-        };
-        ReadingProposal: {
-            line_id: string;
-            proposal_id: string;
-            base_start: number;
-            base_end: number;
-            base: string;
-            reading: string;
-            /** @enum {string} */
-            source: "dictionary" | "sudachi";
-            needs_review: boolean;
-        };
-        SearchCandidate: {
-            source: string;
-            candidate_id: string;
-            title: string;
-            artist?: string | null;
-            album?: string | null;
-            duration?: number | null;
-            match_score: number;
-            raw?: Record<string, never>;
-        };
-        FetchedLyric: {
-            candidate: components["schemas"]["SearchCandidate"];
-            provider_rank: number;
-            line_count: number;
-            lines: {
-                id: string;
-                text: string;
-                start?: number | null;
-                end?: number | null;
+            /** @enum {unknown} */
+            kind?: "alignment" | "vocal" | "publish";
+            alignment?: components["schemas"]["AlignmentResult"];
+            mapping?: {
+                unit_id: string;
+                object_id: string;
+                word_id: string;
+                line_id: string;
+                /** @enum {unknown} */
+                kind: "word" | "ruby";
             }[];
-        };
-        AlignedLine: {
-            line_id: string;
-            start?: number | null;
-            end?: number | null;
-            begin_ms?: number | null;
-            end_ms?: number | null;
-            similarity?: number | null;
-            score?: number | null;
-            timing_source: string;
-            source_segment_ids?: string[];
-            issues?: string[];
-        };
-        ForcedAlignmentUnit: {
-            line_id: string;
-            input_range: number[];
-            source_range?: number[];
-            text: string;
-            start: number | null;
-            end: number | null;
-            start_ms: number | null;
-            end_ms: number | null;
-            /** @enum {string} */
-            granularity: "subword" | "word" | "character" | "mora" | "phoneme";
-            confidence: number | null;
-        };
-        TranscriptionSegment: {
-            source_segment_id: string;
-            text: string;
-            language?: string | null;
-            start?: number | null;
-            end?: number | null;
-            begin_ms?: number | null;
-            end_ms?: number | null;
-            confidence?: number | null;
-            timed_text?: Record<string, never>[];
         } & {
             [key: string]: unknown;
         };
@@ -1095,6 +1020,48 @@ export interface components {
         ReadingAnalysis: {
             /** Ranges */
             ranges: components["schemas"]["ReadingRange"][];
+        };
+        AlignmentSummary: {
+            line_count: number;
+            skipped_count: number;
+            unknown_count: number;
+            hint_count: number;
+            emitting_count: number;
+        };
+        AlignmentStart: {
+            revision: string;
+            /** @default false */
+            use_hints: boolean;
+        };
+        AlignmentResult: {
+            /** @constant */
+            schema: "lazulite-japanese-result-v1";
+            units: ({
+                unit_id: string;
+                line_id: string;
+                proposed_timing: {
+                    start: {
+                        time: number;
+                        source: string;
+                        basis_ids?: string[];
+                    } | null;
+                    end: {
+                        time: number;
+                        source: string;
+                        basis_ids?: string[];
+                    } | null;
+                };
+                raw_timing?: Record<string, never>;
+                fragments?: Record<string, never>[];
+                issues?: Record<string, never>[];
+            } & {
+                [key: string]: unknown;
+            })[];
+            execution?: Record<string, never>;
+            coverage?: Record<string, never>;
+            calibration?: Record<string, never>;
+        } & {
+            [key: string]: unknown;
         };
     };
     responses: {
@@ -1645,7 +1612,7 @@ export interface operations {
             };
             path: {
                 projectId: components["parameters"]["ProjectId"];
-                kind: string;
+                kind: "vocal" | "alignment";
             };
             cookie?: never;
         };
@@ -1815,106 +1782,6 @@ export interface operations {
             409: components["responses"]["Error"];
             412: components["responses"]["Error"];
             428: components["responses"]["Error"];
-            default: components["responses"]["Error"];
-        };
-    };
-    listReadingDictionary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Project reading dictionary */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReadingDictionary"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    createReadingDictionaryEntry: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DictionaryEntryInput"];
-            };
-        };
-        responses: {
-            /** @description Created dictionary entry */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DictionaryEntry"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    updateReadingDictionaryEntry: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-                entryId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DictionaryEntryInput"];
-            };
-        };
-        responses: {
-            /** @description Updated dictionary entry */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DictionaryEntry"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    deleteReadingDictionaryEntry: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-                entryId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted dictionary entry */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
             default: components["responses"]["Error"];
         };
     };

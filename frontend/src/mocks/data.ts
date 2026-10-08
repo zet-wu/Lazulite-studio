@@ -5,7 +5,6 @@ import type {
   ProjectList,
   Session,
 } from "../adapters/http/client";
-import type { ReadingDictionary } from "../adapters/http/reading";
 
 export const session: Session = {
   schema_version: "studio-session-v1",
@@ -18,6 +17,7 @@ export const capabilities: Capabilities = {
     { id: "project.read", enabled: true, reason: null },
     { id: "document.edit", enabled: true, reason: null },
     { id: "job.run", enabled: true, reason: null },
+    { id: "job.alignment", enabled: false, reason: "演示环境未加载对齐模型" },
     { id: "publish.stpp", enabled: true, reason: null },
   ],
 };
@@ -77,12 +77,6 @@ export const document: DocumentEnvelope = {
     lyrics: { draftTtml: '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="line-1" begin="0s" end="5s">夜の風が静かに吹く</p><p xml:id="line-2" begin="5s" end="10s">遠い星を見上げて</p><p xml:id="line-3" begin="10s" end="15s">白い月が道を照らす</p><p xml:id="line-4" begin="15s" end="20s">小さな願いを抱いて</p><p xml:id="line-5" begin="20s" end="25s">朝の光へ歩き出す</p><p xml:id="line-6" begin="25s" end="30s">星の手紙を胸に</p></div></body></tt>' },
   },
 };
-export const readingDictionary: ReadingDictionary = {
-  schema_version: "studio-reading-dictionary-v1",
-  project_id: "sample-project",
-  items: [],
-};
-
 export const emptyDocument: DocumentEnvelope = {
   ...document,
   revision: "sample-empty-r1",

@@ -1,8 +1,8 @@
 # Server 架构
 
-FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针、任务和复核。文件存储管理源媒体、代理/peaks、不可变项目 JSON 与发布成品。
+FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针和任务。文件存储管理源媒体、代理/peaks、不可变项目 JSON 与发布成品。
 
-`app.py` 组合认证与路由；`documents.py/revisions.py/project_document.py` 管项目快照与 CAS 保存；`jobs.py/job_routes.py` 管任务/SSE；`reading.py/review.py` 管读音词典和复核；`studio/media.py` 与 `media.py` 管音频窗口；`publish*.py/publishing.py` 管发布和回读。`projection.py` 为引擎构造正文投影，不把 Ruby 或 sidecar 当作正文。
+`app.py` 组合认证与路由；`documents.py/revisions.py/project_document.py` 管项目快照与 CAS 保存；`jobs.py/job_routes.py` 管任务/SSE；`reading.py` 管无状态主动注音，`alignment*.py` 管全局对齐；`studio/media.py` 与 `media.py` 管音频窗口；`publish*.py/publishing.py` 管发布和回读。`projection.py` 为打包提取正文，不把 Ruby 或 sidecar 当作正文。
 
 服务是登录者共享项目库的单工作台；模型按配置开放。启动配置与验证命令见[服务端开发说明](../../lyric-workflow/docs/studio/development/server-development.md)，接口摘要见[契约说明](../../lyric-workflow/docs/studio/reference/service-contract.md)。
 
@@ -30,7 +30,7 @@ FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针、�
 
 音频所有者在自己的结果目录保存一份 FLAC，每条分析记录都必须提供 audio_result_id：首次分离引用自身，重分析直接引用原音频所有者。separation_signature 与 audio_sha256 同样必填，不为缺失字段提供旧数据回退。播放、下载及波形缓存统一解析所有者，能量仍按 analysis_id 读取。结果列表附 audio_id 与 audio_state，界面仅暴露当前源的一个人声。启动只清理未注册临时目录，不迁移、合并或改写注册结果；保留所有注册分析和不同内容的音频，避免破坏已保存修订、未保存撤销历史及任务接入。项目删除统一释放它们，不执行无法获知浏览器历史的运行期分析回收。
 
-`POST /api/v1/reading/analyze` 接受 `lines: [{id,text}]` 当前文本快照，沿用会话及写请求来源校验，不创建项目、修订或任务。返回原始 code point 范围、正文及平假名读音；未覆盖范围显式为空，服务不可用返回 503。Sudachi 共用 tokenizer 通过互斥锁序列化分词调用，后续映射不持锁。旧读音任务保留独立接口，但新生成路径不依赖其修订或项目词典。
+`POST /api/v1/reading/analyze` 接受 `lines: [{id,text}]` 当前文本快照，沿用会话及写请求来源校验，不创建项目、修订或任务。返回原始 code point 范围、正文及平假名读音；未覆盖范围显式为空，服务不可用返回 503。Sudachi 共用 tokenizer 通过互斥锁序列化分词调用，后续映射不持锁。旧读音任务与项目词典接口已移除。
 
 `furigana.py` 加载随服务部署的固定 JmdictFurigana 资源，校验原始 SHA-256 并缓存精确词形＋读音的唯一有效分段。`reading.py` 以 C 读音为准，先查精确分段，再取可完整回拼的 split(A) 并查子词；tokenize、token 读取与细分共用锁。资源缺损明确使读音服务不可用，不在生成时下载。数据来源、署名、许可及维护方式见 [分段资源](vendor/jmdict-furigana/README.md)。
 
@@ -38,7 +38,7 @@ FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针、�
 
 项目目录 projects/<id> 包含 source/original、cache、revisions、vocals 和 exports；assets 表仅为已关联项目的资源索引，哈希不唯一，不承担跨项目共享。临时上传在 uploads/<token> 校验和建代理后，由创建或首次接入事务转移归属；失败回收，竞争首次接入只允许一份音乐。SQLite 写锁排序上传提交、删除和缓存构建，下载锁内打开句柄、锁外分段读取并支持 Range。重启清理临时上传、无源引用目录及孤立项目目录；已完成放弃上传在后续上传时按一小时回收。
 
-项目快照 v4 与 HTTP 文档 v6 不含源资源 ID，上传不写歌词修订。RevisionStore 保存后和启动保护当前、任务及复核引用，再保留其余最新 100 份和 7 天内修订；回收先移除索引，文件失败由启动清理重试。人声注册历史仍仅随项目删除回收，保留同项目 audio_result_id 复用。
+项目快照 v5 与 HTTP 文档 v7 不含源资源 ID，上传不写歌词修订。RevisionStore 保存后和启动保护当前及任务引用，再保留其余最新 100 份和 7 天内修订；回收先移除索引，文件失败由启动清理重试。人声注册历史仍仅随项目删除回收，保留同项目 audio_result_id 复用。
 
 `GET /projects/{pid}/embedded-lyrics` 从项目原始上传文件读取候选，MP3 的 USLT、FLAC 的 LYRICS/UNSYNCEDLYRICS、MP4 的 ©lyr 与各 STPP 轨道分别返回。无音乐、损坏和不支持结构明确报告，不改变项目。STPP 当前仅读取单 sample、单 chunk、无编辑列表或 composition offset 的轨道，支持 stco/co64 与固定或逐项 sample size；多 sample 与分片拒绝。
 
@@ -46,6 +46,6 @@ AMLL 兼容设置和显示顺序在项目快照中保存；`amll_compatibility.p
 
 自动对齐依赖固定为 `vendor/lazulite/lazulite-0.2.0-py3-none-any.whl`（散列见同目录 `SHA256SUMS`），不再 editable 引用并列旧仓库。从仓库根目录安装 `server/requirements.txt`。模型运行依赖和 NextFire 路径由服务配置管理，歌词获取与媒体基础能力不加载模型。
 
-自动对齐由 `alignment_projection.py` 从已保存项目构造全局请求，`alignment.py` 校验当前 revision／源音频身份并准备资源，`alignment_worker.py` 在受监管子进程执行固定 NextFire 路线。配置 `STUDIO_NEXTFIRE_PATH` 指向交付模型目录，`STUDIO_ALIGNMENT_DEVICE` 为 `cpu` 或 `cuda`；分离保持 `htdemucs`，设备由 `STUDIO_VOCAL_DEVICE` 配置。安装 `server/requirements-alignment.txt` 不更新已有 Torch 构建。模型散列由 Lazulite 固定校验。
+自动对齐由 `alignment_projection.py` 从已保存项目构造全局请求，`alignment.py` 校验当前 revision／源音频身份并准备资源，`alignment_worker.py` 在受监管子进程执行固定 NextFire 路线。配置 `STUDIO_NEXTFIRE_PATH` 指向交付模型目录，`STUDIO_ALIGNMENT_DEVICE` 为 `cpu` 或 `cuda`；分离保持 `htdemucs`，设备由 `STUDIO_VOCAL_DEVICE` 配置。`server/requirements-alignment.txt` 引用本轮 Linux CUDA 实测依赖约束；其他平台应选择相容的 Torch 设备构建并单独验证。模型散列由 Lazulite 固定校验。
 
 HTTP 提供只读 `alignment-preview?revision=…` 和内部 `jobs/alignment`，只接受 revision 与 use_hints；路径、模型与输出位置均由服务构造。任务与人声互斥、支持幂等启动和取消，结果保留原始／建议时间及映射，服务不自动改稿。当前页面持有一次应用意图。旧转写／行级／forced／读音任务、项目词典与审核路由已删除；`/reading/analyze` 保留主动注音能力。

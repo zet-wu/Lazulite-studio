@@ -629,7 +629,11 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "vocal",
+                "alignment"
+              ]
             }
           },
           {
@@ -840,131 +844,6 @@
           },
           "428": {
             "$ref": "#/components/responses/Error"
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      }
-    },
-    "/projects/{projectId}/reading-dictionary": {
-      "get": {
-        "operationId": "listReadingDictionary",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ProjectId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Project reading dictionary",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReadingDictionary"
-                }
-              }
-            }
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      },
-      "post": {
-        "operationId": "createReadingDictionaryEntry",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ProjectId"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DictionaryEntryInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created dictionary entry",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DictionaryEntry"
-                }
-              }
-            }
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      }
-    },
-    "/projects/{projectId}/reading-dictionary/{entryId}": {
-      "put": {
-        "operationId": "updateReadingDictionaryEntry",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ProjectId"
-          },
-          {
-            "name": "entryId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DictionaryEntryInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated dictionary entry",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DictionaryEntry"
-                }
-              }
-            }
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "deleteReadingDictionaryEntry",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ProjectId"
-          },
-          {
-            "name": "entryId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Deleted dictionary entry"
           },
           "default": {
             "$ref": "#/components/responses/Error"
@@ -1641,6 +1520,41 @@
                       ]
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/alignment-preview": {
+      "get": {
+        "summary": "Preview the saved global alignment input without running a model",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Participating lines and usable readings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlignmentSummary"
                 }
               }
             }
@@ -2471,14 +2385,8 @@
           "kind": {
             "type": "string",
             "enum": [
-              "search",
-              "fetch",
-              "transcribe",
-              "align",
-              "line_align",
-              "reading",
-              "forced_align",
-              "vocal"
+              "vocal",
+              "alignment"
             ]
           },
           "params": {
@@ -2665,452 +2573,47 @@
               }
             }
           },
-          "items": {
-            "type": "array",
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/SearchCandidate"
-                },
-                {
-                  "$ref": "#/components/schemas/FetchedLyric"
-                },
-                {
-                  "$ref": "#/components/schemas/AlignedLine"
-                },
-                {
-                  "$ref": "#/components/schemas/TranscriptionSegment"
-                },
-                {
-                  "$ref": "#/components/schemas/ReadingProposal"
-                },
-                {
-                  "$ref": "#/components/schemas/ForcedAlignmentUnit"
-                }
-              ]
-            }
-          },
-          "proposals": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReadingProposal"
-            }
-          },
-          "units": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ForcedAlignmentUnit"
-            }
-          },
-          "evidence": {
-            "type": "object",
-            "additionalProperties": true
-          }
-        },
-        "additionalProperties": true
-      },
-      "DictionaryEntryInput": {
-        "type": "object",
-        "required": [
-          "surface",
-          "reading"
-        ],
-        "properties": {
-          "surface": {
-            "type": "string",
-            "minLength": 1
-          },
-          "reading": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      },
-      "DictionaryEntry": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/DictionaryEntryInput"
-          },
-          {
-            "type": "object",
-            "required": [
-              "schema_version",
-              "project_id",
-              "id",
-              "updated_at"
-            ],
-            "properties": {
-              "schema_version": {
-                "const": "studio-reading-dictionary-entry-v1"
-              },
-              "project_id": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "updated_at": {
-                "type": "string",
-                "format": "date-time"
-              }
-            }
-          }
-        ]
-      },
-      "ReadingDictionary": {
-        "type": "object",
-        "required": [
-          "schema_version",
-          "project_id",
-          "items"
-        ],
-        "properties": {
-          "schema_version": {
-            "const": "studio-reading-dictionary-v1"
-          },
-          "project_id": {
-            "type": "string"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DictionaryEntry"
-            }
-          }
-        }
-      },
-      "ReadingProposal": {
-        "type": "object",
-        "required": [
-          "line_id",
-          "proposal_id",
-          "base_start",
-          "base_end",
-          "base",
-          "reading",
-          "source",
-          "needs_review"
-        ],
-        "properties": {
-          "line_id": {
-            "type": "string"
-          },
-          "proposal_id": {
-            "type": "string"
-          },
-          "base_start": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "base_end": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "base": {
-            "type": "string"
-          },
-          "reading": {
-            "type": "string",
-            "minLength": 1
-          },
-          "source": {
-            "type": "string",
+          "kind": {
             "enum": [
-              "dictionary",
-              "sudachi"
+              "alignment",
+              "vocal",
+              "publish"
             ]
           },
-          "needs_review": {
-            "type": "boolean"
-          }
-        }
-      },
-      "SearchCandidate": {
-        "type": "object",
-        "required": [
-          "source",
-          "candidate_id",
-          "title",
-          "match_score"
-        ],
-        "properties": {
-          "source": {
-            "type": "string"
+          "alignment": {
+            "$ref": "#/components/schemas/AlignmentResult"
           },
-          "candidate_id": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "artist": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "album": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "duration": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "match_score": {
-            "type": "number"
-          },
-          "raw": {
-            "type": "object"
-          }
-        }
-      },
-      "FetchedLyric": {
-        "type": "object",
-        "required": [
-          "candidate",
-          "provider_rank",
-          "line_count",
-          "lines"
-        ],
-        "properties": {
-          "candidate": {
-            "$ref": "#/components/schemas/SearchCandidate"
-          },
-          "provider_rank": {
-            "type": "integer"
-          },
-          "line_count": {
-            "type": "integer"
-          },
-          "lines": {
+          "mapping": {
             "type": "array",
             "items": {
               "type": "object",
               "required": [
-                "id",
-                "text"
+                "unit_id",
+                "object_id",
+                "word_id",
+                "line_id",
+                "kind"
               ],
               "properties": {
-                "id": {
+                "unit_id": {
                   "type": "string"
                 },
-                "text": {
+                "object_id": {
                   "type": "string"
                 },
-                "start": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
+                "word_id": {
+                  "type": "string"
                 },
-                "end": {
-                  "type": [
-                    "number",
-                    "null"
+                "line_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "word",
+                    "ruby"
                   ]
                 }
               }
-            }
-          }
-        }
-      },
-      "AlignedLine": {
-        "type": "object",
-        "required": [
-          "line_id",
-          "timing_source"
-        ],
-        "properties": {
-          "line_id": {
-            "type": "string"
-          },
-          "start": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "end": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "begin_ms": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "end_ms": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "similarity": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "score": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "timing_source": {
-            "type": "string"
-          },
-          "source_segment_ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "issues": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "ForcedAlignmentUnit": {
-        "type": "object",
-        "required": [
-          "line_id",
-          "input_range",
-          "text",
-          "start",
-          "end",
-          "start_ms",
-          "end_ms",
-          "granularity",
-          "confidence"
-        ],
-        "properties": {
-          "line_id": {
-            "type": "string"
-          },
-          "input_range": {
-            "type": "array",
-            "minItems": 2,
-            "maxItems": 2,
-            "items": {
-              "type": "integer"
-            }
-          },
-          "source_range": {
-            "type": "array",
-            "items": {
-              "type": "integer"
-            }
-          },
-          "text": {
-            "type": "string"
-          },
-          "start": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "end": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "start_ms": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "end_ms": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "granularity": {
-            "type": "string",
-            "enum": [
-              "subword",
-              "word",
-              "character",
-              "mora",
-              "phoneme"
-            ]
-          },
-          "confidence": {
-            "type": [
-              "number",
-              "null"
-            ]
-          }
-        }
-      },
-      "TranscriptionSegment": {
-        "type": "object",
-        "required": [
-          "source_segment_id",
-          "text"
-        ],
-        "properties": {
-          "source_segment_id": {
-            "type": "string"
-          },
-          "text": {
-            "type": "string"
-          },
-          "language": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "start": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "end": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "begin_ms": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "end_ms": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "confidence": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "timed_text": {
-            "type": "array",
-            "items": {
-              "type": "object"
             }
           }
         },
@@ -3881,6 +3384,171 @@
         ],
         "title": "ReadingAnalysis",
         "type": "object"
+      },
+      "AlignmentSummary": {
+        "type": "object",
+        "required": [
+          "line_count",
+          "skipped_count",
+          "unknown_count",
+          "hint_count",
+          "emitting_count"
+        ],
+        "properties": {
+          "line_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unknown_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hint_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "emitting_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "AlignmentStart": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "use_hints"
+        ],
+        "properties": {
+          "revision": {
+            "type": "string"
+          },
+          "use_hints": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "AlignmentResult": {
+        "type": "object",
+        "required": [
+          "schema",
+          "units"
+        ],
+        "properties": {
+          "schema": {
+            "const": "lazulite-japanese-result-v1"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "unit_id",
+                "line_id",
+                "proposed_timing"
+              ],
+              "properties": {
+                "unit_id": {
+                  "type": "string"
+                },
+                "line_id": {
+                  "type": "string"
+                },
+                "proposed_timing": {
+                  "type": "object",
+                  "required": [
+                    "start",
+                    "end"
+                  ],
+                  "properties": {
+                    "start": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "required": [
+                        "time",
+                        "source"
+                      ],
+                      "properties": {
+                        "time": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "basis_ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "end": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "required": [
+                        "time",
+                        "source"
+                      ],
+                      "properties": {
+                        "time": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "basis_ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "raw_timing": {
+                  "type": "object"
+                },
+                "fragments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "issues": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "execution": {
+            "type": "object"
+          },
+          "coverage": {
+            "type": "object"
+          },
+          "calibration": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": true
       }
     }
   }

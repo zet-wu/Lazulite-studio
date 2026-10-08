@@ -46,6 +46,7 @@ const offset = (asset: Asset | null) => (asset?.proxy_offset_ms ?? 0) / 1e3;
 type Props = {
   timelineHost?: HTMLDivElement | null;
   acoustics?: Acoustics;
+  editingLocked?: boolean;
   onAcoustics?: (acoustics: Acoustics) => void;
   onAssign?: (lineId: string, segment: VocalSegment) => void;
   projectId: string;
@@ -69,7 +70,7 @@ export type TransportHandle = {
 };
 
 export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaTransport({
-  timelineHost, acoustics, onAcoustics, onAssign,
+  editingLocked, timelineHost, acoustics, onAcoustics, onAssign,
   projectId,
   selectedLine,
   asset,
@@ -620,10 +621,10 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       {timelineError && <p role="alert" className={styles.error}>{timelineError}</p>}
       {timelineHost && <div className={styles.header}>{viewportTools}</div>}
 
-      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?' 背景':''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document ? documentTargets(document).flatMap(target => { const value = targetInterval(document, target); return value ? [value.beginMs, value.endMs].filter((time): time is number => time !== null) : []; }) : []} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
+      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks locked={editingLocked} projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?' 背景':''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document ? documentTargets(document).flatMap(target => { const value = targetInterval(document, target); return value ? [value.beginMs, value.endMs].filter((time): time is number => time !== null) : []; }) : []} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
       {document && onTimelineCommand && <>
 
-        <TimelineTracks durationMs={durationMs > 0 ? durationMs : null} document={document} selectedLineId={selectedLineId ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
+        <TimelineTracks locked={editingLocked} durationMs={durationMs > 0 ? durationMs : null} document={document} selectedLineId={selectedLineId ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
           visible={visible} externalAnchors={acoustics?.segments.flatMap(segment => [segment.beginMs, segment.endMs]) ?? []}
           apply={onTimelineCommand} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
       </>}

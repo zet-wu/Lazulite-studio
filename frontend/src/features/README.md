@@ -2,7 +2,7 @@
 
 `editor/EditorWorkspace.tsx` 提供唯一项目语义编辑界面，可修改行、词、Ruby、时间、翻译、音译、背景、歌手及元数据。`Workspace.tsx` 负责项目加载、revision 保存和资源连接；`MusicUpload` 负责无音乐时的首次上传、进度、取消及重试，成功只更新资源缓存，不重挂编辑器。
 
-`useProjectDocument.ts` 管理撤销重做、串行保存、冲突和本地恢复。`CandidatePanel` 与 `JobCandidatePanel` 将候选转为一次领域事务，不直接改服务器文档。`MediaTransport` 保留播放和波形控制，`PackagingPanel` 下载当前歌词，`MusicPackaging` 保存确切快照后创建媒体打包任务。
+`useProjectDocument.ts` 管理撤销重做、串行保存、冲突和本地恢复。`CandidatePanel` 将导入候选转为一次领域事务，不直接改服务器文档。`MediaTransport` 保留播放和波形控制，`PackagingPanel` 下载当前歌词，`MusicPackaging` 保存确切快照后创建媒体打包任务。
 
 `editor/editing-actions.ts` 负责有序选择、带 Ruby/时间/对齐的内部剪贴板、共用原子选区删除、纯文本插入和跨行词事务；`SegmentationPanel` 与 `BatchToolsPanel` 调用相同命令历史。`SyncPanel` 使用播放器时钟连续打轴，`TimelineTracks` 提交拖动事务，`PreviewMode` 延迟加载 AMLL 并读取当前草稿。音译附属行和显式 Ruby 提案已接入。普通与超过80行的虚拟列表共用显式定位、真实高度校准和取消语义；时间轴三类区间独立分轨、共享绘图区，窄区间使用既有缩放后普通端点编辑，不设专属工具行。实际状态与剩余差距见[当前状态](../../../../lyric-workflow/docs/studio/current-state.md)。
 
@@ -39,7 +39,7 @@ Phase 7：LineSplitDialog上下预览与逐条翻译归属，TranslationEditor�
 
 AudioReviewContext 共享音频页片段选择、最近循环目标、临时新增和工具栏/状态容器。VocalTracks 将共用标尺、波形、能量和片段组成完整新增区；VocalFocus 用动态 SVG 渐变遮罩作用于真实 backdrop blur，并消费外围点击。片段按起点全局编号、22px 分轨、成组平移和统一吸附；能量上限按窗口向上取百分位且最低 0.01。MediaTransport 仅在波形/能量使用非被动原生 wheel 监听。共享 Select 保留原生表单与标签语义，使用统一列表弹层和键盘选择。
 
-`JapaneseRubyDialog` 与音译转 Ruby、罗马字生成分别提供入口。主行/背景行按独立 ID 多选；打开前提交有效字段，组合输入或无效字段阻止打开。窗口只持有源快照及完整读音提案，异步请求可取消；重试保留已编辑正文词的完整提案结构，避免分词变化覆盖手改。大于 80 行时虚拟挂载并固定活动输入行，重排不替换输入节点；Enter 提交字段、Esc 恢复聚焦前文字，应用一次进入原有项目历史。旧 JobCandidatePanel 不再应用旧读音或精细对齐结果，旧任务面板仍不接入主界面。
+`JapaneseRubyDialog` 与音译转 Ruby、罗马字生成分别提供入口。主行/背景行按独立 ID 多选；打开前提交有效字段，组合输入或无效字段阻止打开。窗口只持有源快照及完整读音提案，异步请求可取消；重试保留已编辑正文词的完整提案结构，避免分词变化覆盖手改。大于 80 行时虚拟挂载并固定活动输入行，重排不替换输入节点；Enter 提交字段、Esc 恢复聚焦前文字，应用一次进入原有项目历史。旧任务候选与任务面板已经删除。
 
 Ruby 拖动沿用 `object-drag.ts`：落点及预览身份包含目标词 ID，同一源词选中组按原顺序移动；空目标命中词本体，以不占布局的插入线提示，无常驻空框。候选校验和提交共用 move-ruby；主行与背景行间拒绝，同行自动换行可跨显示行。提交选择和焦点跟随新归属。
 
@@ -74,3 +74,5 @@ RomanizationGenerationDialog 保留源位置供补写，空文字不再失焦补
 歌词获取的内嵌页读取当前项目原始音乐候选，每次选定候选复用 LyricAcquisition 的解析、元数据取舍和一次 replace-document 历史。不会因上传或读取自动替换歌词；离开页面取消请求，音乐变化清除旧预览。
 
 AMLL Phase 0：`AmllPanel` 提供五规则按需结果树、范围选择及原子批量动作，简化转换使用唯一的映射面板；右上设置使用项目持续开关。属性栏支持词级歌手、背景前置，简化模式以主行对唱开关代替身份管理；编辑与打轴使用同一稳定显示排布，音频大纲共享选区。普通歌词校验及兼容校验分别绑定项目快照，变更后旧结果不能执行处理。
+
+`AlignmentPanel` 在音频工具栏提供全项目自动对齐。确认前提交有效草稿并保存，开始时捕获项目并在 `useProjectDocument` 的命令／历史入口加锁；各模式控件与时间轴编辑同步禁用，播放、滚动和缩放保持。页面拥有一次应用意图，取消／离开使迟到结果失效，短暂断线重查原任务；不自动恢复旧结果。`domain/alignment.ts` 按稳定映射聚合建议端点、保留旧值并处理链接，`alignment` 项目命令一次应用时间及首次声学快照。保存错误保留本地历史，重试保存不再次应用。

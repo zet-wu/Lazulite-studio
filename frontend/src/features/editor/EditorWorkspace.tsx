@@ -15,6 +15,7 @@ import { flushSync } from 'react-dom';
 import { JapaneseRubyDialog } from './JapaneseRubyDialog';
 import { Select } from '../../shared/Select';
 import { useAudioReview } from '../AudioReviewContext';
+import { AlignmentPanel, type AlignmentControl } from '../AlignmentPanel';
 import { VocalPanel } from '../VocalPanel';
 import { VOCAL_LINE_MIME } from '../VocalTracks';
 import vocalStyles from '../vocal.module.css';
@@ -69,6 +70,7 @@ const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
 const PreviewMode = lazy(() => import('./PreviewMode').then((module) => ({ default: module.PreviewMode })));
 
 type Props = {
+  alignment?: AlignmentControl;
   historyVersion?: number;
   project?: ProjectDocument;
   applyProject?: (command: ProjectCommand) => void;
@@ -131,9 +133,9 @@ function EditorWorkspaceContent(props: Props) {
   const clipboardToken = useRef('');
   const pageRef = useRef<HTMLDivElement>(null);
   const wordInputs = useRef(new Map<string, HTMLInputElement>());
-  const [mode, setMode] = useState<'audio' | 'acquire' | 'edit' | 'sync' | 'preview' | 'package' | 'auxiliary'>(() => {
+  const [mode, setMode] = useState<'audio' | 'acquire' | 'edit' | 'sync' | 'preview' | 'package'>(() => {
     const remembered = props.projectId ? localStorage.getItem(`studio:workspace-mode:project:${props.projectId}`) : null;
-    if (remembered === 'audio' || remembered === 'acquire' || remembered === 'edit' || remembered === 'sync' || remembered === 'preview' || remembered === 'package' || remembered === 'auxiliary') return remembered;
+    if (remembered === 'audio' || remembered === 'acquire' || remembered === 'edit' || remembered === 'sync' || remembered === 'preview' || remembered === 'package') return remembered;
     return props.projectId && !document.lines.some(line => line.words.some(word => word.text.trim())) ? 'acquire' : 'edit';
   });
   useEffect(() => { if (props.projectId) localStorage.setItem(`studio:workspace-mode:project:${props.projectId}`, mode); }, [props.projectId, mode]);
@@ -829,10 +831,15 @@ function EditorWorkspaceContent(props: Props) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
-    <EditorMenu {...props} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} />
+    <fieldset disabled={props.alignment?.locked} style={{display:"contents"}}><EditorMenu {...props} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} /></fieldset>
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
-    <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['audio','音频处理'],['edit','编辑'],['sync','打轴'],['preview','AMLL 预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { if (canvasComposing.current || !finishSyncDraft()) return; flushSync(() => { const input = window.document.activeElement; if (input instanceof HTMLInputElement) input.blur(); }); if (pageRef.current?.querySelector('[aria-invalid="true"]')) return; setLocate(null); setRubyShortcut(null); setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
-    {props.projectId && props.project && props.applyProject && props.sourceAssetId && <VocalPanel visible={mode==='audio'} projectId={props.projectId} project={props.project} sourceAssetId={props.sourceAssetId} apply={props.applyProject} durationMs={props.audioDurationMs??0}/>}
+    <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['audio','音频处理'],['edit','编辑'],['sync','打轴'],['preview','AMLL 预览'],['package','文件打包']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { if (canvasComposing.current || !finishSyncDraft()) return; flushSync(() => { const input = window.document.activeElement; if (input instanceof HTMLInputElement) input.blur(); }); if (pageRef.current?.querySelector('[aria-invalid="true"]')) return; setLocate(null); setRubyShortcut(null); setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
+    {props.projectId && props.project && props.alignment && <AlignmentPanel pid={props.projectId} project={props.project} control={props.alignment} assetId={props.sourceAssetId} durationMs={props.audioDurationMs??0} visible={mode==='audio'} finishDraft={()=>{
+      if(canvasComposing.current || !finishSyncDraft())return false;
+      flushSync(()=>{const active=window.document.activeElement;if(active instanceof HTMLElement)active.blur();});
+      return !editRejected.current && !pageRef.current?.querySelector('[aria-invalid="true"]');
+    }}/>}
+    {props.projectId && props.project && props.applyProject && props.sourceAssetId && <VocalPanel locked={props.alignment?.locked} visible={mode==='audio'} projectId={props.projectId} project={props.project} sourceAssetId={props.sourceAssetId} apply={props.applyProject} durationMs={props.audioDurationMs??0}/>}
     {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.sourceAssetId ? <div ref={layoutRef} className={vocalStyles.audioLayout} style={{gridTemplateColumns:template(rendered)}}>
       {columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} aria-label="音频处理大纲"><h2>大纲</h2><div className={styles.panelBody}>{displayOrder.map(line => <div key={line.id} draggable onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed="copy";const ghost=e.currentTarget.cloneNode(true) as HTMLElement;ghost.style.cssText="position:fixed;left:-10000px;opacity:.6;width:220px";window.document.body.appendChild(ghost);e.dataTransfer.setDragImage(ghost,20,16);setTimeout(()=>ghost.remove(),0);}}>
         <div onClick={event => selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey)}><OutlineRow line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} selected={selection?.kind === 'lines' && selection.ids.includes(line.id)}/></div>
@@ -841,9 +848,9 @@ function EditorWorkspaceContent(props: Props) {
       {columns.outlineVisible && separator('outline')}
       <main ref={mainRef} tabIndex={-1} className={vocalStyles.main}><div ref={audioReview.setStatusHost}/><div hidden={!audioReview.timelineReady} className={vocalStyles.host} ref={props.onTimelineHost}/></main>
     </div> : <section className={styles.auxiliaryPlaceholder}><h1>人声分离与声学分析</h1><p>请从底部上传音乐文件，再进行人声处理。歌词可继续编辑、保存和下载。</p></section>)}
+    <fieldset disabled={props.alignment?.locked} style={{display:"contents"}}>
     {mode === 'acquire' && <LyricAcquisition projectId={props.projectId} sourceAssetId={props.sourceAssetId} store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
     {mode === 'package' && <PackagingPanel {...props} validationTab={validationTab} onValidationTab={setValidationTab} focusRule={focusRule} onRuleLocated={()=>setFocusRule(undefined)} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
-    {mode === 'auxiliary' && <section className={styles.auxiliaryPlaceholder}><h1>项目辅助</h1><p>候选、任务、词典与审核流程将在后续阶段整理到此处。歌词文档与播放器保持当前状态。</p></section>}
     {mode === 'preview' && <Suspense fallback={<p>正在载入预览…</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={id => { const line = document.lines.find(line => line.id === id); if (line) selectLine(line); }} /></Suspense>}
     {mode === 'sync' && <SyncPanel progress={syncProgress} onProgress={setSyncProgress} preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} document={document} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
       onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
@@ -1008,5 +1015,6 @@ function EditorWorkspaceContent(props: Props) {
       close={() => setSplitLineId(null)}
       submit={plan => dispatch({ type: 'split-line', ...plan })} />}
     {contextMenu && <EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.title} actions={contextMenu.actions} close={closeContext} />}
+    </fieldset>
   </div>;
 }
