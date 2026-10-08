@@ -42,6 +42,19 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
         if not found:
             raise HTTPException(422, {"code": "publish_input_invalid", "message": "revision does not belong to project", "retryable": False})
 
+    @router.get("/projects/{pid}/embedded-lyrics")
+    def embedded_lyrics(pid: str, _: object = Depends(auth)):
+        import struct
+        from .embedded_lyrics import read_embedded
+        from mutagen import MutagenError
+        row = project(pid)
+        if not row[2]:
+            raise HTTPException(422, {'code': 'audio_required', 'message': '请先上传音乐文件', 'retryable': False})
+        try:
+            return {'asset_id': row[2], 'candidates': read_embedded(Path(asset_path(pid)))}
+        except (ValueError, MutagenError, OSError, struct.error) as exc:
+            raise HTTPException(422, {'code': 'embedded_invalid', 'message': f'内嵌歌词读取失败：{exc}', 'retryable': False}) from exc
+
     @router.get("/projects/{pid}/packaging")
     def packaging(pid: str, _: object = Depends(auth)):
         from mutagen import File

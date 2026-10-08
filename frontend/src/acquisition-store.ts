@@ -6,7 +6,7 @@ export const SOURCES: Source[] = ['netease','qqmusic','kugou','amll'];
 export type CheckStatus = 'pending' | 'fetching' | 'parsing' | 'ready' | 'partial' | 'fetch-failed' | 'decode-failed' | 'parse-failed' | 'empty';
 export type CandidateRecord = { candidate: Candidate; score: number; badges: string[]; status: CheckStatus; error?: string };
 export type SourceState = { rows: string[]; records: Record<string,CandidateRecord>; selected: string | null; pending: number; succeeded: number; failed: string[]; cancelled: boolean };
-export type AcquisitionState = { round: number; query: SearchConditions | null; tab: Source | 'file' | 'text'; sources: Record<Source,SourceState>; version: number };
+export type AcquisitionState = { round: number; query: SearchConditions | null; tab: Source | 'file' | 'text' | 'embedded'; sources: Record<Source,SourceState>; version: number };
 type Task = { source: Source; kind: 'search' | 'check'; id?: string; round: number; controller: AbortController; run: () => Promise<void> };
 const freshSource = (): SourceState => ({ rows: [], records: {}, selected: null, pending: 0, succeeded: 0, failed: [], cancelled: false });
 const freshSources = () => Object.fromEntries(SOURCES.map(source=>[source,freshSource()])) as Record<Source,SourceState>;

@@ -1571,6 +1571,82 @@
           }
         }
       }
+    },
+    "/projects/{projectId}/embedded-lyrics": {
+      "get": {
+        "operationId": "getEmbeddedLyrics",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Separate lyric tag and STPP candidates from the project original media",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asset_id": {
+                      "type": "string"
+                    },
+                    "supported": {
+                      "type": "boolean"
+                    },
+                    "container": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "tracks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "track_id": {
+                            "type": "integer"
+                          },
+                          "language": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "error": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "filename": {
+                      "type": "string"
+                    },
+                    "format_label": {
+                      "type": "string"
+                    },
+                    "extension": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

@@ -1,3 +1,4 @@
+import { EmbeddedLyrics } from './EmbeddedLyrics';
 import { createProjectEditing } from '../domain/project-editing';
 import { translationsForLine } from '../domain/lyric-document';
 import { translationText } from '../domain/lyric-document';
@@ -24,10 +25,10 @@ export function selectedMetadata(current: LyricDocument, incoming: LyricDocument
     return values?.length ? [[key, [...values]]] : [];
   }));
 }
-export function LyricAcquisition({ store, searchConditions, document, apply, onImported, onNew, onImportName }: { store: AcquisitionStore; searchConditions: ReturnType<typeof useSearchConditions>; document: LyricDocument; apply: (command: LyricCommand) => void; onImported: () => void; onNew?: () => void; onImportName?: (name: string) => void }) {
+export function LyricAcquisition({ store, searchConditions, document, apply, onImported, onNew, onImportName, projectId, sourceAssetId }: { projectId?: string; sourceAssetId?: string | null; store: AcquisitionStore; searchConditions: ReturnType<typeof useSearchConditions>; document: LyricDocument; apply: (command: LyricCommand) => void; onImported: () => void; onNew?: () => void; onImportName?: (name: string) => void }) {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const tab = snapshot.tab;
-  const network = tab !== 'file' && tab !== 'text';
+  const network = tab !== 'file' && tab !== 'text' && tab !== 'embedded';
   const selected = network && snapshot.sources[tab].selected ? snapshot.sources[tab].records[snapshot.sources[tab].selected!] : null;
   const networkPreview = network ? store.preview(tab) : null;
   const [dismissed, setDismissed] = useState(false);
@@ -45,6 +46,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   useEffect(() => {
     if (networkPreview) stage(networkPreview); else if (network) setIncoming(null);
   }, [networkPreview, tab]);
+  useEffect(() => { if (tab === 'embedded') setIncoming(null); }, [sourceAssetId]);
   useEffect(() => setDismissed(false), [tab, selected?.candidate.id, selected?.error]);
   const parse = (content: string, kind: Exclude<LyricFormat, 'ass'>) => {
     try { stage(importLyricFile(content, kind)); } catch (e) { setIncoming(null); setMessage(`解析失败：${e instanceof Error ? e.message : e}`); }
@@ -67,9 +69,10 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   };
   return <div className={styles.page}>
     <section className={styles.pane}><h2>歌词获取</h2><div className={styles.tabs} role="tablist" aria-label="歌词来源">
-      {[['netease','网易云音乐'],['qqmusic','QQ 音乐'],['kugou','酷狗'],['amll','AMLL DB'],['file', '文件'], ['text', '文本']].map(([id, label]) => <button data-role="secondary" key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; store.setTab(id as typeof tab); setFilename(null); setIncoming(null); setMessage(''); }}>{label}</button>)}
+      {[['netease','网易云音乐'],['qqmusic','QQ 音乐'],['kugou','酷狗'],['amll','AMLL DB'],['embedded', '内嵌'], ['file', '文件'], ['text', '文本']].map(([id, label]) => <button data-role="secondary" key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; store.setTab(id as typeof tab); setFilename(null); setIncoming(null); setMessage(''); }}>{label}</button>)}
     </div>
-      {!['file','text'].includes(tab) && <NetworkLyrics store={store} searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} />}
+      {network && <NetworkLyrics store={store} searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} />}
+      {tab === 'embedded' && <EmbeddedLyrics projectId={projectId} sourceAssetId={sourceAssetId} onPreview={parse} />}
       {tab === 'file' && <><button data-role="secondary" onClick={() => fileInput.current?.click()}>选择歌词文件</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
       {tab === 'text' && <><label>文本格式 <Select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</Select></label><textarea aria-label="待导入歌词文本" value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button data-role="secondary" onClick={() => parse(text, format)}>预览文本</button></>}
       {onNew && <button data-role="secondary" onClick={onNew}>新建空白歌词</button>}

@@ -535,6 +535,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/embedded-lyrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getEmbeddedLyrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2347,6 +2363,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getEmbeddedLyrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Separate lyric tag and STPP candidates from the project original media */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        asset_id?: string;
+                        supported?: boolean;
+                        container?: string | null;
+                        tracks?: {
+                            track_id?: number;
+                            language?: string;
+                            name?: string;
+                        }[];
+                        error?: string | null;
+                        filename?: string;
+                        format_label?: string;
+                        extension?: string | null;
+                    };
+                };
             };
         };
     };

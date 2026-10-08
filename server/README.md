@@ -39,3 +39,5 @@ FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针、�
 项目目录 projects/<id> 包含 source/original、cache、revisions、vocals 和 exports；assets 表仅为已关联项目的资源索引，哈希不唯一，不承担跨项目共享。临时上传在 uploads/<token> 校验和建代理后，由创建或首次接入事务转移归属；失败回收，竞争首次接入只允许一份音乐。SQLite 写锁排序上传提交、删除和缓存构建，下载锁内打开句柄、锁外分段读取并支持 Range。重启清理临时上传、无源引用目录及孤立项目目录；已完成放弃上传在后续上传时按一小时回收。
 
 项目快照 v3 与 HTTP 文档 v5 不含源资源 ID，上传不写歌词修订。RevisionStore 保存后和启动保护当前、任务及复核引用，再保留其余最新 100 份和 7 天内修订；回收先移除索引，文件失败由启动清理重试。人声注册历史仍仅随项目删除回收，保留同项目 audio_result_id 复用。
+
+`GET /projects/{pid}/embedded-lyrics` 从项目原始上传文件读取候选，MP3 的 USLT、FLAC 的 LYRICS/UNSYNCEDLYRICS、MP4 的 ©lyr 与各 STPP 轨道分别返回。无音乐、损坏和不支持结构明确报告，不改变项目。STPP 当前仅读取单 sample、单 chunk、无编辑列表或 composition offset 的轨道，支持 stco/co64 与固定或逐项 sample size；多 sample 与分片拒绝。

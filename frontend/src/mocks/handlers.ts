@@ -9,6 +9,10 @@ let currentDocument: typeof document = JSON.parse(sessionStorage.getItem('studio
 let searchConditions={title:'',artist:'',album:''};
 
 export const handlers = [
+  http.get(`${root}/projects/:projectId/embedded-lyrics`, () => response({ asset_id: 'sample-asset', candidates: [
+    { id: 'one', label: 'USLT · eng', format: 'elrc', content: '[00:01.000]<00:01.000>Hello<00:02.000> world<00:03.000>' },
+    { id: 'two', label: 'USLT · jpn', format: 'lrc', content: '[00:02.000]別の歌詞' },
+  ] })),
   http.get(`${root}/projects/:projectId/vocals`, () => HttpResponse.json({items:[]})),
   http.get(`${root}/projects/:projectId/search-conditions`, () => response(searchConditions)),
   http.put(`${root}/projects/:projectId/search-conditions`, async ({request}) => { searchConditions=await request.json() as typeof searchConditions; return response(searchConditions); }),

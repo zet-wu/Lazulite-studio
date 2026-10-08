@@ -320,11 +320,28 @@ def extract_stpp(path: Path, track_id: int | None = None) -> bytes:
         entries = list(_boxes(stsd[8:]))
         if not any(entry_type == b"stpp" for entry_type, _, _, _ in entries):
             continue
-        stsz, stco = _find(stbl, b"stsz"), _find(stbl, b"stco")
-        if not stsz or not stco or struct.unpack_from(">I", stsz, 8)[0] != 1:
-            continue
-        size = struct.unpack_from(">I", stsz, 12)[0]
-        offset = struct.unpack_from(">I", stco, 8)[0]
+        if _find(moov, b"mvex") is not None or _find(trak, b"edts") is not None:
+            raise PublishingError("不支持分片 STPP 或编辑列表时间映射")
+        stsz, stco, co64 = _find(stbl, b"stsz"), _find(stbl, b"stco"), _find(stbl, b"co64")
+        if not stsz or len(stsz) < 12:
+            raise PublishingError("损坏的 STPP sample 表")
+        if struct.unpack_from(">I", stsz, 8)[0] != 1:
+            raise PublishingError("不支持多 sample STPP；不会只读取第一段")
+        size = struct.unpack_from(">I", stsz, 4)[0]
+        if not size:
+            if len(stsz) != 16: raise PublishingError("损坏的 STPP sample 大小")
+            size = struct.unpack_from(">I", stsz, 12)[0]
+        table, width = (co64, 8) if co64 is not None else (stco, 4)
+        if table is None or len(table) != 8 + width or struct.unpack_from(">I", table, 4)[0] != 1:
+            raise PublishingError("不支持的 STPP chunk 表")
+        offset = struct.unpack_from(">Q" if width == 8 else ">I", table, 8)[0]
+        stsc, stts = _find(stbl, b"stsc"), _find(stbl, b"stts")
+        if stsc is None or len(stsc) != 20 or struct.unpack_from(">IIII", stsc, 4) != (1, 1, 1, 1):
+            raise PublishingError("不支持的 STPP sample/chunk 映射")
+        if stts is None or len(stts) != 16 or struct.unpack_from(">II", stts, 4) != (1, 1) or _find(stbl, b"ctts") is not None:
+            raise PublishingError("不支持的 STPP sample 时间映射")
+        if not 0 < size <= 4_000_000 or not any(kind == b"mdat" and pos + header <= offset and offset + size <= pos + length for kind, pos, length, header in top):
+            raise PublishingError("STPP sample 超限或不在媒体数据范围内")
         with path.open("rb") as source:
             source.seek(offset)
             sample = source.read(size)

@@ -19,3 +19,5 @@ ReadingAnalysis.ranges 可返回比 Sudachi C token 更细的可靠片段，仍�
 项目 `editing` 保存词／Ruby 非零空拍计数、忽略行 ID、行尾链接映射；三类配置不写入 draftTtml。服务端在读取与保存边界验证引用、类别、范围、重复 ID 与链接的已求值端点。旧快照不转换。
 
 创建项目只要求 name，可选 upload_id；POST /uploads 返回独立临时资源 ID，DELETE /uploads/{token} 取消已完成临时上传，POST /projects/{id}/music 首次接入。歌词快照不含 sourceAssetId，项目接口的 asset 为资源权威，无音乐返回 null。无音乐拒绝音频接口及媒体发布，纯歌词保存和下载可用。
+
+`GET /projects/{projectId}/embedded-lyrics` 为只读原始音频歌词候选接口，返回 asset_id 与 candidates。每项含 id、label，以及 content/format 或 error；服务确认项目资源归属，不接收客户端路径。
