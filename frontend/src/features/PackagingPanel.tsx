@@ -14,16 +14,16 @@ import type { LyricDocument } from '../domain/lyric-document';
 import styles from './acquisition.module.css';
 export function PackagingPanel(props: { title?: string; document: LyricDocument; dirty?: boolean; onExportFormat?: (format: LyricFormat) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument; editing?: ProjectEditing } | undefined>; projectId?: string; sourceAssetId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
  const editing = useProjectEditing();
- const [validation, setValidation] = useState<{ document: LyricDocument; projectId?: string; issues: OutputIssue[] } | null>(null);
+ const [validation, setValidation] = useState<{ document: LyricDocument; projectId?: string; editing: ProjectEditing; issues: OutputIssue[] } | null>(null);
  const [blocking,setBlocking] = useState<OutputIssue[]>([]), [message,setMessage] = useState('');
  const [format, setFormat] = usePreference<LyricFormat>(`studio:download:${props.projectId ? `project:${props.projectId}` : `local:${props.title}`}`, 'ttml', (v): v is LyricFormat => typeof v === 'string' && ['ttml','txt','lrc','elrc','eslrc','qrc','yrc','lys','ass'].includes(v));
  useEffect(()=>{setBlocking([]);setMessage('');},[editing,props.document,props.projectId,format]);
- useEffect(() => { setValidation(null); }, [editing,props.document, props.projectId]);
- const current = validation?.document === props.document && validation.projectId === props.projectId;
+
+ const current = validation?.document === props.document && validation.projectId === props.projectId && validation.editing === editing;
  const issues = current ? validation.issues : [];
- return <div className={styles.page}><section className={styles.pane}><button data-role="primary" onClick={() => setValidation({ document: props.document, projectId: props.projectId, issues: validateLyrics(props.document,editing) })}>歌词校验</button>
- <OutputIssues issues={issues} locate={props.locateIssue} />{!current ? <p>{validation ? '文档已变化，请重新执行歌词校验。' : '尚未执行歌词校验。'}</p> : !issues.length && <p>当前检查未发现问题</p>}
- <OutputIssues issues={blocking} highlighted={blocking} locate={props.locateIssue} />
+ return <div className={styles.page}><section className={styles.pane}><button data-role="primary" onClick={() => setValidation({ document: props.document, projectId: props.projectId, editing, issues: validateLyrics(props.document,editing) })}>歌词校验</button>
+ <OutputIssues document={props.document} issues={issues} locate={props.locateIssue} />{!current ? <p>{validation ? '文档已变化，请重新执行歌词校验。' : '尚未执行歌词校验。'}</p> : !issues.length && <p>当前检查未发现问题</p>}
+ <OutputIssues document={props.document} issues={blocking} highlighted={blocking} locate={props.locateIssue} />
  </section><section className={styles.pane}><h2>歌词下载</h2><div className={styles.downloadRow}>
  <label>导出格式 <Select aria-label="导出格式" value={format} onChange={e => setFormat(e.target.value as LyricFormat)}>{[['ttml','TTML'],['txt','纯文本'],['lrc','普通 LRC'],['elrc','扩展 LRC（尖括号）'],['eslrc','ESLRC（正文后方括号）'],['qrc','QRC'],['yrc','YRC'],['lys','LYS'],['ass','ASS']].map(([id,label]) => <option key={id} value={id}>{label}</option>)}</Select></label><button data-role="secondary" onClick={() => {
  setBlocking([]); setMessage('');
