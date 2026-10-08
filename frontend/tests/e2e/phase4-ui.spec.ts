@@ -146,6 +146,10 @@ test('UI word to empty line, 注音 and romanization drags use the same insertio
   await expect(rubies.first().getByRole('textbox').first()).toHaveValue('り');
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(rubies.first().getByRole('textbox').first()).toHaveValue('ふ');
+  // Preserve the source singer when moving to a line without an inherited singer.
+  await page.locator('[data-top-menu=settings] > summary').click();
+  await page.getByRole('switch', { name: '禁用词级歌手', exact: true }).uncheck();
+  await page.keyboard.press('Escape');
   // Add a real empty container and move its predecessor's word into it.
   const add = page.getByRole('button', { name: '新增歌词行', exact: true }); await add.click();
   const rows = page.locator('main section[data-line-id]');
@@ -193,8 +197,10 @@ test('UI wrapped words preview their actual first slot and virtual edge scrollin
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(words.first().getByRole('textbox', { name: '词 词0', exact: true })).toBeVisible();
   await load(page, 2000);
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   const rows = page.locator('main section[data-line-id]'), scroll = page.getByLabel('歌词列表', { exact: true });
-  const source = (await rows.first().boundingBox())!, box = (await scroll.boundingBox())!;
+  const source = (await page.locator('[data-outline-drag]').first().boundingBox())!, box = (await scroll.boundingBox())!;
   await page.mouse.move(source.x + 3, source.y + 3); await page.mouse.down();
   await page.mouse.move(box.x + 12, box.y + box.height - 8, { steps: 8 });
   await expect.poll(() => scroll.evaluate(node => node.scrollTop)).toBeGreaterThan(200);

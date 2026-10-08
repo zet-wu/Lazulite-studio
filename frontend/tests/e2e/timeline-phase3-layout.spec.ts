@@ -10,8 +10,10 @@ test('uniform three-digit gutters, scaled filled markers and body add controls',
   const a = page.locator('main [data-word-id="A"]'); await a.click({ button: 'right' }); await page.getByRole('menuitem', { name: '添加空拍', exact: true }).click();
   for (const zoom of [1, 1.25, 1.5]) for (const theme of ['light', 'dark']) {
     await page.evaluate(({ zoom, theme }) => { document.body.style.zoom = String(zoom); document.documentElement.dataset.theme = theme; }, { zoom, theme });
-    const starts = await page.locator('main [class*="syncWords"]').evaluateAll(ns => ns.map(n => n.getBoundingClientRect().x));
-    expect(Math.max(...starts) - Math.min(...starts)).toBeLessThan(1);
+    await expect.poll(async () => {
+      const starts = await page.locator('main [class*="syncWords"]').evaluateAll(ns => ns.map(n => n.getBoundingClientRect().x));
+      return Math.max(...starts) - Math.min(...starts);
+    }).toBeLessThan(1);
     const beat = a.locator('[data-sync-marker="beat"]'), rect = await beat.locator('rect').boundingBox(), hit = await beat.boundingBox();
     expect(rect!.width).toBeCloseTo(3 * zoom, 1); expect(hit!.width).toBeGreaterThan(rect!.width * 3);
     const line = page.locator('main [data-line-id="a"]'), add = line.getByRole('button', { name: '添加词', exact: true });

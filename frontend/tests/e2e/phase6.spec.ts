@@ -75,7 +75,8 @@ test('P6 inline addition, native text selection, IME, cancellation and one histo
 test('P6 translation languages, trash, clear, background and singer mixed editing preserve history', async ({ page }) => {
   await load(page);
   const line = row(page);
-  await line.getByRole('button', { name: '管理翻译轨道…' }).click();
+  await page.locator('[data-top-menu=lyrics-settings] summary').click();
+  await page.getByRole('button', { name: '管理翻译轨道…' }).click();
   const manager = page.getByRole('dialog', { name: '翻译轨道管理' });
   await manager.getByLabel('翻译轨道 1语言').fill('en_MS'); await manager.getByRole('button', { name: '应用', exact: true }).click();
   await expect(page.getByRole('alert').filter({ hasText: '语言标签格式无效' })).toBeVisible();

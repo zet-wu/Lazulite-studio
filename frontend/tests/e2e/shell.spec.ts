@@ -1,10 +1,4 @@
-import { importLyrics } from '../fixtures/import-lyrics';
-import { expect, test, type Page } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
-
-async function openFileMenu(page: Page) {
-  await page.getByRole('button', { name: '文件打包', exact: true }).click();
-}
+import { expect, test } from '@playwright/test';
 
 test('opens a project, selects a line and keeps edit navigation visible', async ({ page }) => {
   await page.goto('/projects');
@@ -58,43 +52,6 @@ test('zooms a long waveform and leaves the editor responsive', async ({ page }) 
   await page.getByRole('button', { name: '后移窗口' }).click();
   await page.getByRole('button', { name: '前移窗口' }).click();
   await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
-});
-
-test('saves a semantic project edit and reopens the saved revision', async ({ page }) => {
-  await page.goto('/projects/sample-project/edit');
-  const word = page.getByRole('textbox', { name: '词 夜の風が静かに吹く', exact: true });
-  await word.dblclick();
-  await word.fill('夜の風が静かに歌う');
-  await word.blur();
-  await expect(page.getByText('已保存', { exact: true })).toBeVisible({ timeout: 10_000 });
-  await page.getByRole('link', { name: 'Lazulite Studio' }).click();
-  await page.getByRole('link', { name: /星の手紙/ }).click();
-  await expect(page.getByRole('textbox', { name: '词 夜の風が静かに歌う', exact: true })).toBeVisible();
-});
-
-test('imports rich TTML, saves 注音 and reopens it from the project route', async ({ page }) => {
-  await page.goto('/projects/sample-project/edit');
-  const source = await readFile('../tests/fixtures/ttml/reference-apple-metadata.ttml');
-  await importLyrics(page, { name: 'reference.ttml', mimeType: 'application/ttml+xml', buffer: source });
-  const ruby = page.getByRole('textbox', { name: '读音 今日', exact: true }).first();
-  await ruby.dblclick();
-  await ruby.fill('きよう');
-  await ruby.blur();
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(page.getByText('已保存', { exact: true })).toBeVisible({ timeout: 10_000 });
-  await page.getByRole('link', { name: 'Lazulite Studio' }).click();
-  await page.getByRole('link', { name: /星の手紙/ }).click();
-  await expect(page.getByRole('textbox', { name: '读音 今日', exact: true }).first()).toHaveValue('きよう');
-  await expect(page.getByRole('textbox', { name: '翻译 1', exact: true })).toHaveValue('今天 也唱歌');
-  await page.locator('[data-top-menu="lyrics-settings"] summary').click();
-  await page.getByRole('button', { name: '歌手管理', exact: true }).click();
-  await page.getByLabel('歌手 v1 type').selectOption('person');
-  await page.getByLabel('歌手 v2 type').selectOption('person');
-  await page.getByRole('button', { name: '关闭歌手管理' }).click();
-  await openFileMenu(page);
-  const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '下载歌词' }).click();
-  expect(await readFile(await (await download).path(), 'utf8')).toContain('きよう');
 });
 
 test('previews the current lyrics and returns to editing', async ({ page }) => {

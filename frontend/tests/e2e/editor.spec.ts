@@ -64,7 +64,7 @@ test('opens lyric metadata and singers in edit mode and keeps the auxiliary page
   await openMenu(page, '歌词设置');
   await page.getByRole('button', { name: '歌词元数据' }).click();
   await expect(page.getByRole('dialog', { name: '歌词元数据' })).toBeVisible();
-  await page.getByRole('button', { name: '关闭元数据编辑' }).click();
+  await page.getByRole('button', { name: '关闭歌词元数据' }).click();
   await openMenu(page, '歌词设置');
   await page.getByRole('button', { name: '歌手管理' }).click();
   await expect(page.getByRole('dialog', { name: '歌手管理' })).toBeVisible();
@@ -87,6 +87,7 @@ test('shows one lyric scroller at 80 and 81 lines without horizontal page overfl
     }
     const scroller = page.getByLabel('歌词列表');
     await expect(scroller).toHaveCount(1);
+    await scroller.evaluate(element => { element.scrollTop = 0; });
     const before = await scroller.evaluate((element) => element.scrollTop);
     await scroller.evaluate((element) => { element.scrollTop = element.scrollHeight; });
     expect(await scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(before);

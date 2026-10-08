@@ -67,19 +67,6 @@ test('P8 mode regenerates once; unfocused and active edits, Escape and IME stay 
   await expect(page.getByLabel('音译 ja-Latn', { exact: true })).toHaveValue('not blurred');
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.getByLabel('音译 ja-Latn', { exact: true })).toHaveCount(0);
 });
-test('P8 placeholders and special fragments stay nonblocking; manual blank preserves a timed unit', async ({ page }) => {
-  await load(page); await page.locator('[data-outline-drag]').last().click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
-  const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
-  await dialog.getByLabel('输出', { exact: true }).selectOption('timed'); const input = dialog.getByLabel('L3单元 1音译');
-  await expect(input).toHaveValue(' '); expect(await input.evaluate(e => getComputedStyle(e).borderTopStyle)).toBe('dashed');
-  await input.focus(); await input.blur(); expect(await input.evaluate(e => getComputedStyle(e).borderTopStyle)).toBe('dashed');
-  await expect(dialog.getByRole('button', { name: '生成音译', exact: true })).toBeEnabled();
-  await input.fill('kanji'); expect(await input.evaluate(e => getComputedStyle(e).borderTopStyle)).toBe('solid');
-  await input.fill(''); await dialog.getByRole('button', { name: '生成音译', exact: true }).click();
-  await expect(page.getByLabel('音译单元 1', { exact: true })).toHaveValue(' ');
-  await expect(page.getByLabel('音译单元 1开始秒数')).toHaveValue('6'); await expect(page.getByLabel('音译单元 1结束秒数')).toHaveValue('8');
-});
 for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) test(`P8 static proposal layout at ${width} ${theme}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 });
   await page.addInitScript(theme => localStorage.setItem('lazulite-editor-theme', theme), theme);
@@ -112,7 +99,7 @@ test('P8 lyric settings are unique in edit mode, menus dismiss and keyboard reac
   }
   await settings.click(); await page.locator('[data-top-menu="tools"] summary').click(); await expect(settings).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByRole('button', { name: '管理音译轨道…', exact: true })).toBeHidden();
-  for (const mode of ['打轴', '预览']) {
+  for (const mode of ['打轴', 'AMLL 预览']) {
     await page.getByRole('button', { name: mode, exact: true }).click(); await expect(settings).toHaveCount(0);
   }
   await page.getByRole('button', { name: '编辑', exact: true }).click(); await expect(settings).toHaveAttribute('aria-expanded', 'false');

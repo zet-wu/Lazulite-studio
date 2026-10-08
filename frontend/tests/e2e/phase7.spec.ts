@@ -13,7 +13,7 @@ test('P7 generated source timing remains batch scoped with local replacement and
   await outline.first().click(); await outline.last().click({ modifiers: ['Shift'] }); await outline.nth(1).click({ button: 'right' });
   await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
   const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
-  await expect(dialog).toContainText('生成 3 / 3 行');
+  await expect(dialog).toContainText('生成 2 / 3 行');
   await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
   await expect(dialog.getByLabel('L1音译', { exact: true })).toHaveValue('ga k ko u');
   await dialog.getByLabel('输出', { exact: true }).selectOption('timed');

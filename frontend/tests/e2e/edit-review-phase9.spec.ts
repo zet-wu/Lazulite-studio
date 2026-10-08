@@ -26,6 +26,7 @@ for (const theme of ['light', 'dark']) test(`compact references, keyboard mixed 
   await load(page); let dialog = await manage(page);
   const first = dialog.getByRole('checkbox', { name: '选择翻译内容 c0', exact: true });
   const row = first.locator('..'), full = row.locator('[id="translation-reference-c0"]');
+  await dialog.focus(); await page.mouse.move(0, 0);
   await expect(full).toBeHidden();
   await expect(row.locator(':scope > span').nth(0)).toHaveText(' é👨‍👩‍👧‍👦🇨🇳字…');
   await expect(row.locator(':scope > span').nth(1)).toHaveText(' é👨‍👩‍👧‍👦🇨🇳字…');

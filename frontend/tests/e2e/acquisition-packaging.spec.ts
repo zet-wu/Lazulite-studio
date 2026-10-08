@@ -9,7 +9,7 @@ const file = (buffer: string) => ({ name:'synthetic.ttml',mimeType:'application/
 test('preview is read-only; metadata selection and body replacement undo together',async ({page})=>{
  await page.goto('/projects/sample-project/edit?scenario=no-music'); await importLyrics(page,file(source));
  await page.getByRole('button',{name:'歌词获取',exact:true}).click();
- await page.locator('input[type=file]').setInputFiles(file(incoming));
+ await page.locator('input[type=file][accept^=".ttml"]').setInputFiles(file(incoming));
  await expect(page.getByRole('button',{name:'artist 原值',exact:true})).toHaveAttribute('aria-pressed','true');
  await page.getByRole('button',{name:'artist 待导入值',exact:true}).click();
  await page.getByRole('button',{name:'album 待导入值',exact:true}).focus(); await page.keyboard.press('Space');
@@ -17,7 +17,7 @@ test('preview is read-only; metadata selection and body replacement undo togethe
  await expect(page.getByRole('textbox',{name:'词 新词',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'撤销',exact:true}).click();
  await expect(page.getByRole('textbox',{name:'词 原文',exact:true})).toBeVisible();
- for(const mode of ['歌词获取','文件打包','预览','打轴','编辑']) await page.getByRole('button',{name:mode,exact:true}).click();
+ for(const mode of ['歌词获取','文件打包','AMLL 预览','打轴','编辑']) await page.getByRole('button',{name:mode,exact:true}).click();
  await expect(page.getByRole('textbox',{name:'词 原文',exact:true})).toBeVisible();
  await expect(page.locator('[data-top-menu="file"]')).toHaveCount(0);
 });
@@ -48,7 +48,7 @@ test('stale candidate response never replaces a newer selection and ID associati
 
 for(const width of [1280,1440,1920])for(const theme of ['light','dark'])test(`acquisition layout ${width} ${theme}`,async ({page})=>{
  await page.setViewportSize({width,height:900});await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
- await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,file(source));await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.locator('input[type=file]').setInputFiles(file(incoming));
+ await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,file(source));await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.locator('input[type=file][accept^=".ttml"]').setInputFiles(file(incoming));
  await expect(page.getByRole('button',{name:'确认导入并替换歌词'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(1);
  await page.screenshot({path:test.info().outputPath(`acquisition-${width}-${theme}.png`)});
@@ -61,7 +61,7 @@ test('binary KRC file is decoded locally and previews before one import transact
  const bytes=Buffer.concat([Buffer.from('krc1'),compressed.map((v,i)=>v^key[i%16])]);
  await page.goto('/projects/sample-project/edit?scenario=no-music');
  await page.getByRole('button',{name:'歌词获取',exact:true}).click();
- await page.locator('input[type=file]').setInputFiles({name:'synthetic.krc',mimeType:'application/octet-stream',buffer:bytes});
+ await page.locator('input[type=file][accept^=".ttml"]').setInputFiles({name:'synthetic.krc',mimeType:'application/octet-stream',buffer:bytes});
  await expect(page.getByText('本地歌词',{exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'撤销',exact:true})).toBeDisabled();
  await page.getByRole('button',{name:'确认导入并替换歌词'}).click();

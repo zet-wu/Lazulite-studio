@@ -260,7 +260,7 @@ test('P3-08 top menus are mutually exclusive and dismiss with pointer, outside, 
   await menu('lyrics-settings').locator('summary').click();
   await page.getByRole('button', { name: '歌词元数据' }).click();
   await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
-  await page.getByRole('button', { name: '关闭元数据编辑' }).click();
+  await page.getByRole('button', { name: '关闭歌词元数据' }).click();
   await menu('view').locator('summary').click();
   await page.getByLabel('歌词列表', { exact: true }).click();
   await expect(page.locator('[data-top-menu][open]')).toHaveCount(0);
@@ -269,7 +269,7 @@ test('P3-08 top menus are mutually exclusive and dismiss with pointer, outside, 
 test('P3-08 file input survives cancellation, same-file reselection and format export', async ({ page }) => {
   await page.goto('/projects/sample-project/edit?scenario=no-music');
   await page.getByRole('button', { name: '歌词获取', exact: true }).click();
-  await page.locator('input[type=file]').dispatchEvent('cancel');
+  await page.locator('input[type=file][accept^=".ttml"]').dispatchEvent('cancel');
   for (let i = 0; i < 2; i++) {
     await importLyrics(page, { name: 'same.txt', mimeType: 'text/plain', buffer: Buffer.from('合成歌词') });
     await expect(page.getByRole('textbox', { name: '词 合成歌词', exact: true })).toBeVisible();
@@ -431,7 +431,7 @@ test('P3-10 rapid panning terminates obsolete worker jobs instead of queuing the
 for (const count of [80, 83]) test(`P3-07 variable 注音/transliteration height and background locate ${count} rows`, async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, recordVideo: { dir: test.info().outputPath('locate-video') } });
   const page = await context.newPage();
-  await page.goto('http://127.0.0.1:5174/editor');
+  await page.goto('http://127.0.0.1:5174/projects/sample-project/edit?scenario=no-music');
   const bg = count - 1, parent = count - 2;
   let xml = performanceTtml(count).replace(new RegExp(`<text for="p${bg}">[\\s\\S]*?</text>`), '');
   xml = xml.replace(`<p xml:id="p${parent}" begin="${(parent * .3).toFixed(3)}" end="${(parent * .3 + .29).toFixed(3)}">`, `<p xml:id="p${parent}" begin="${(parent * .3).toFixed(3)}" end="${(bg * .3 + .29).toFixed(3)}">`);
