@@ -63,7 +63,7 @@ export async function decodeKrcFile(file: File): Promise<string> {
   try { while (true) { const { value, done } = await reader.read(); if (done) break; total += value.length; if (total > 4_000_000) throw new Error('KRC 解压超过 4 MB'); result += decoder.decode(value, { stream: true }); } return result + decoder.decode(); }
   finally { await reader.cancel(); }
 }
-export function parseLrcSource(text: string): LyricDocument {
+export function parseLrcSource(text: string, lineTimedWords?: Set<string>): LyricDocument {
   const d = createLyricDocument(); d.lines = [];
   const offset = Number(text.match(/^\[offset:([+-]?\d+)\]/m)?.[1] ?? 0);
   const clock = (a: string, b: string) => time(Number(a) * 60000 + Number(b) * 1000 + offset);
@@ -83,6 +83,7 @@ export function parseLrcSource(text: string): LyricDocument {
       // Empty events are format boundaries, not editable lyric lines.
       if (!body) { const prev = d.lines.at(-1); if (prev && prev.endMs === null) prev.endMs = line.beginMs; continue; }
       if (pos === body.length) line.endMs = begin;
+      if (pos === 0) line.words.forEach(word => lineTimedWords?.add(word.id));
       d.lines.push(line);
     }
   }

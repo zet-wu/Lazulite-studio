@@ -1,3 +1,4 @@
+import { lyricCapabilities } from '../lyric-capabilities';
 import { requestHeaders } from './client';
 import { importLyricFile, type LyricFormat } from '../lyric-formats';
 import { attachSidecar } from '../source-codec';
@@ -13,7 +14,8 @@ export type Payload = { empty: boolean; format: Exclude<LyricFormat, 'ass'>; con
 export function parsePayload(payload: Payload) {
  if (payload.empty) throw new Error('此候选没有可用歌词');
  let partial = payload.partial === true;
- const document = importLyricFile(payload.content, payload.format, () => { partial = true; });
+ const lineTimedWords = new Set<string>();
+ const document = importLyricFile(payload.content, payload.format, () => { partial = true; }, lineTimedWords);
  if (!document.lines.some(line=>line.words.some(word=>word.text.trim()))) throw new Error('此候选没有可用正文');
  document.metadata = { ...payload.metadata, ...document.metadata };
  for (const [text,kind] of [[payload.translation,'translation'],[payload.romanization,'romanization']] as const) {
@@ -21,10 +23,6 @@ export function parsePayload(payload: Payload) {
    try { if (attachSidecar(document,text,kind).length) partial = true; }
    catch (error) { if (!(error instanceof Error)) throw error; partial = true; }
  }
- const words = document.lines.flatMap(l => l.words);
- const badges = [words.some(w => w.beginMs !== null) ? (document.lines.some(l => l.words.filter(w => w.beginMs !== null).length > 1) ? '逐词' : '逐行') : '无时间', payload.format.toUpperCase()];
- if (document.translationTracks.some(track => track.contents.length)) badges.push('翻译');
- if (document.romanizationTracks.length) badges.push('音译');
- if (words.some(w => w.rubyUnits.length)) badges.push('注音');
+ const badges = [payload.format.toUpperCase(), ...lyricCapabilities(document, lineTimedWords)];
  return { document, badges, partial };
 }
