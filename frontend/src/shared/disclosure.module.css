@@ -1,0 +1,9 @@
+.disclosure { min-width: 0; border-bottom: 1px solid var(--line); }
+button.trigger[data-role] { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; text-align: left; padding: 6px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.trigger > span { min-width: 0; overflow-wrap: anywhere; }
+.trigger > svg { flex-shrink: 0; transition: transform 120ms; }
+.trigger[aria-expanded=true] > svg { transform: rotate(90deg); }
+button.trigger[data-role]:hover { background: var(--blue-soft); }
+button.trigger[data-role]:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.content { min-width: 0; padding: 4px 0 6px 12px; }
+@media (prefers-reduced-motion: reduce) { .trigger > svg { transition: none; } }

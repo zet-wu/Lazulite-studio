@@ -1,5 +1,6 @@
+import { Disclosure as Branch } from '../shared/Disclosure';
 import { Icon } from '../shared/Icon';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { outputIssueKey, type OutputIssue } from '../adapters/output-validation';
 import { lineText, type LyricDocument } from '../domain/lyric-document';
 import styles from './acquisition.module.css';
@@ -7,10 +8,7 @@ const reasons: Record<NonNullable<OutputIssue['code']>, string> = {
   'invalid-agent-type': '歌手类型', 'missing-time': '缺少时间', 'invalid-range': '时间范围',
   'unsupported-order': '时间顺序', 'empty-content': '空内容', 'punctuation-zero': '标点零时长', 'serialization': '序列化',
 };
-export function Branch({ title, initiallyOpen = false, children }: { title: ReactNode; initiallyOpen?: boolean; children: () => ReactNode }) {
-  const [open, setOpen] = useState(initiallyOpen);
-  return <details open={open} onToggle={event => setOpen(event.currentTarget.open)}><summary>{title}</summary>{open && children()}</details>;
-}
+export { Disclosure as Branch } from '../shared/Disclosure';
 type IssueSelection = { ids: string[]; toggle: (id: string) => void };
 function IssueItems({ issues, keys, locate, selection }: { issues: OutputIssue[]; keys: Set<string>; locate: (issue: OutputIssue) => void; selection?: IssueSelection }) {
   const [limit, setLimit] = useState(50);

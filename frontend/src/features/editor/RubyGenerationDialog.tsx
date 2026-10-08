@@ -1,3 +1,4 @@
+import { Disclosure } from '../../shared/Disclosure';
 import { useProjectEditing } from './ProjectEditingContext';
 import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
@@ -155,12 +156,12 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
       {stale ? <p role="alert">文档已变化，旧提案不能应用。<button data-role="secondary" onClick={refresh}>重新生成提案</button></p> : <>
         <div className={styles.rubyGenerationOptions}><label>音译轨道 <Select value={trackId} onChange={(event) => selectTrack(event.target.value)}>{tracks.map((track, index) => <option key={track.id} value={track.id}>轨道 {index + 1} · {track.language ?? '未指定语言'}</option>)}</Select></label>
           <label>字符输出 <Select value={output} onChange={(event) => { setOutput(event.target.value as RubyOutput); resetPatrol(); setReadings({}); setSkipOverrides({}); setMessage(''); }}><option value="roman">保持罗马字</option><option value="hiragana">转换为平假名</option><option value="katakana">转换为片假名</option></Select></label></div>
-        <details className={styles.sourceChoices}><summary>音译内容</summary><fieldset className={styles.rubyGenerationChoices}><legend>选取具体音译内容</legend>{contents.map((content) => {
+        <Disclosure className={styles.sourceChoices} title="音译内容">{() => <fieldset className={styles.rubyGenerationChoices}><legend>选取具体音译内容</legend>{contents.map((content) => {
           const line = sourceDocument.lines.find((item) => item.id === content.lineId)!;
           return <label key={content.id}><input type="checkbox" checked={contentIds.includes(content.id)} onChange={(event) => { setContentIds((ids) => event.target.checked ? [...ids, content.id] : ids.filter((id) => id !== content.id)); resetChoices(); }} />
             {lineLabel(line.id)} · {content.kind === 'plain' ? content.text : content.units.map((unit) => unit.text).join('')}
           </label>;
-        })}</fieldset></details>
+        })}</fieldset>}</Disclosure>
         <RubyProposalRows rows={rows} navigation={navigation} renderRow={row => {
           const line = sourceDocument.lines.find((item) => item.id === row.lineId)!;
           const selected = Object.hasOwn(assignments, row.key) ? assignments[row.key] ?? '' : row.defaultWordId ?? '';

@@ -1,3 +1,4 @@
+import { Disclosure } from '../shared/Disclosure';
 import { useProjectEditing } from './editor/ProjectEditingContext';
 import type { ProjectEditing } from '../domain/project-editing';
 import { Select } from '../shared/Select';
@@ -59,7 +60,7 @@ export function MusicPackaging({ projectId, document, saveForPackaging, onIssues
    const label=item.lrc_kind==='elrc' ? '扩展 LRC' : '普通 LRC';
    const result=active.has(item.status) ? '正在打包' : passed && item.report?.subtitle_codec==='stpp' ? `已写入 STPP · ${label}` : passed && item.report?.lyrics_preserved ? `已写入 ${label}` : item.status==='failed' ? '打包失败' : item.status==='cancelled' ? '已取消' : item.status==='unavailable' ? '产物不可用' : item.status==='interrupted' ? '打包中断' : item.status;
    return <article key={item.id}><h3>{item.id===recent?.id ? '最近产物' : '当前任务'}</h3>{item.id===recent?.id && dirty && <p>当前歌词有未保存修改，此产物不包含这些修改。</p>}<p>{item.asset_filename ?? '未记录源文件名'} · {item.format_label ?? '格式待确认'} · {result}{item.track_id ? ` · STPP 轨道 ${item.track_id}` : ''}</p><p className={styles.hint}>修订 {item.revision}{item.stale ? ' · 旧修订' : ''}{item.filename ? ` · ${item.filename}` : ''}</p>
-   {active.has(item.status) && <button data-role="secondary" onClick={()=>void jobsApi.cancel(item.id).then(()=>client.invalidateQueries({queryKey:['exports',projectId]})).catch(e=>setMessage(e.message))}>取消任务</button>}<details><summary>回读报告</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{JSON.stringify(item.error ?? item.report,null,2)}</pre></details></article>;
+   {active.has(item.status) && <button data-role="secondary" onClick={()=>void jobsApi.cancel(item.id).then(()=>client.invalidateQueries({queryKey:['exports',projectId]})).catch(e=>setMessage(e.message))}>取消任务</button>}<Disclosure title="回读报告">{() => <pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{JSON.stringify(item.error ?? item.report,null,2)}</pre>}</Disclosure></article>;
  })}
  {!exports.data?.items.length && <p className={styles.hint}>还没有打包产物。</p>}
  </>;

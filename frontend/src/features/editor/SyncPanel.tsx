@@ -1,9 +1,10 @@
+import { DisclosureTrigger } from '../../shared/Disclosure';
 import type { SyncProgress } from './sync-progress';
 import { useProjectEditing } from './ProjectEditingContext';
 import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
 import { usePreference } from './use-preference';
-import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useState, useId, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import type { LyricDocument } from '../../domain/lyric-document';
 import { syncIndex, syncUnits, type SyncAction, type SyncMode, type SyncCursor } from '../../domain/sync-editing';
@@ -16,6 +17,8 @@ type Props = { progress: SyncProgress; onProgress: (progress: SyncProgress) => v
 
 export function SyncPanel({ progress, onProgress, document, cursor, targetVersion, apply, transport, onCursor, preferenceScope = 'local:untitled' }: Props) {
   const editing = useProjectEditing();
+  const [extrasOpen, setExtrasOpen] = useState(false);
+  const extrasId = useId();
   const background = document.lines.find(line => line.id === cursor?.lineId)?.backgroundOf;
   const units = useMemo(() => syncUnits(document, editing, background ? cursor?.lineId : undefined), [document, editing, background, cursor?.lineId]);
   const [mode, setMode] = usePreference<SyncMode>('studio:sync-mode', 'continuous', (v): v is SyncMode => v === 'continuous' || v === 'line');
@@ -82,6 +85,7 @@ export function SyncPanel({ progress, onProgress, document, cursor, targetVersio
     transport?.current?.audition(start, before ? beginMs : endMs + 600);
   };
   return <section className={styles.syncPanel} aria-label="连续打轴">
+    <div className={styles.syncMain}>
     {!transport && <small>上传音乐后可播放、回听和按播放位置打轴；仍可手工编辑时间。</small>}
     <strong>{active ? `L${lineNumber} · 单元 ${lineIndex + 1} / ${lineUnits.length}` : '当前选择不参与打轴'}</strong>
     <span className={styles.syncQuote}><span>{word?.text}</span>{ruby && <b> → {ruby.reading}</b>}</span>
@@ -99,14 +103,16 @@ export function SyncPanel({ progress, onProgress, document, cursor, targetVersio
       <button data-role="secondary" disabled={index < 0 || index >= units.length - 1} onClick={() => moveTo(index + 1)}>下一单元</button>
       <button data-role="secondary" disabled={!units.some((unit, position) => position > index && unit.lineId !== active?.lineId)} onClick={followingLine}>下一行</button>
     </div>
-    <details className={styles.syncExtras}><summary>回听与校准</summary><div>
+    <DisclosureTrigger open={extrasOpen} controls={extrasId} toggle={() => setExtrasOpen(open => !open)}>回听与校准</DisclosureTrigger>
+    </div>
+    {extrasOpen && <div className={styles.syncExtras} id={extrasId}>
       <button data-role="secondary" disabled={!transport || beginMs === null} onClick={() => { if (beginMs !== null) transport?.current?.seekMs(beginMs); }}>回听定位</button>
       <button data-role="secondary" disabled={!transport || beginMs === null} onClick={() => audition(true)}>听前段</button>
       <button data-role="secondary" disabled={!transport || endMs === null} onClick={() => audition(false)}>听后段</button>
     {beatCount > 0 && <small>空拍 {emptyBeats}/{beatCount}：连续轴先计数，再落点</small>}
     <label>输入偏移（毫秒） <input type="number" value={offsetMs} onChange={(event) => setOffsetMs(Math.round(Number(event.target.value)))} /></label>
     <button data-role="secondary" disabled={beginMs === null || !transport?.current} onClick={() => { if (beginMs !== null && transport?.current) setOffsetMs(Math.round((beginMs - transport.current.getPositionMs()) )); }}>按当前起点校准</button>
-    </div></details>
+    </div>}
     {error && <p role="alert">{error}</p>}
   </section>;
 }
