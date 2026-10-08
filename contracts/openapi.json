@@ -2175,8 +2175,7 @@
           "schema_version",
           "id",
           "name",
-          "updated_at",
-          "document_status"
+          "updated_at"
         ],
         "properties": {
           "schema_version": {
@@ -2191,14 +2190,6 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
-          },
-          "document_status": {
-            "type": "string",
-            "enum": [
-              "empty",
-              "draft",
-              "ready"
-            ]
           },
           "asset": {
             "anyOf": [

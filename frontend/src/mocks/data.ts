@@ -26,7 +26,6 @@ export const sampleProject = {
   id: "sample-project",
   name: "星の手紙 · 合成示例",
   updated_at: "2026-09-06T00:00:00Z",
-  document_status: "draft" as const,
   asset: {
     schema_version: "studio-asset-v1" as const,
     id: "sample-asset",

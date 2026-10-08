@@ -72,7 +72,6 @@ export function isProjectSummary(
     string(value.id) &&
     string(value.name) &&
     string(value.updated_at) &&
-    ["empty", "draft", "ready"].includes(String(value.document_status)) &&
     (value.asset === undefined || value.asset === null || isAsset(value.asset))
   );
 }

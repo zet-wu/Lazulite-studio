@@ -682,8 +682,6 @@ export interface components {
             name: string;
             /** Format: date-time */
             updated_at: string;
-            /** @enum {string} */
-            document_status: "empty" | "draft" | "ready";
             asset?: components["schemas"]["Asset"] | null;
         };
         ProjectList: {

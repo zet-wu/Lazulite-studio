@@ -76,7 +76,7 @@ export function ProjectList() {
         <div>
           <div className={styles.eyebrow}>工作台</div>
           <h1>项目</h1>
-          <p className={styles.muted}>管理歌曲、歌词草稿与复核任务</p>
+          <p className={styles.muted}>管理歌曲与歌词项目</p>
         </div>
         <div className={styles.pageHeadingActions}>
 
@@ -112,18 +112,8 @@ export function ProjectList() {
               <div className={styles.projectGlyph}><Icon name="music" size={24}/></div>
               <div className={styles.projectMain}>
                 <strong>{project.name}</strong>
-                <span>
-                  {project.document_status === "ready"
-                    ? "已就绪"
-                    : project.document_status === "draft"
-                      ? "草稿"
-                      : "空项目"}{" "}
-                  · {new Date(project.updated_at).toLocaleDateString("zh-CN")}
-                </span>
+                <span>{new Date(project.updated_at).toLocaleDateString("zh-CN")}</span>
               </div>
-              <span className={styles.status}>
-                {project.document_status === "ready" ? "已保存" : "草稿"}
-              </span>
               <span className={styles.rowArrow}>›</span>
             </Link>
             <button data-role="danger" className={`icon-button ${styles.projectDelete}`} aria-label={`删除项目 ${project.name}`} title={`删除项目 ${project.name}`} disabled={deleting === project.id} onClick={async () => {

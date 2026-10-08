@@ -382,7 +382,6 @@ def create_app(
                     "id": pid,
                     "name": name,
                     "updated_at": t,
-                    "document_status": "draft",
                     "asset": asset_dto(asset) if asset else None,
                 }
                 c.execute(
@@ -444,7 +443,6 @@ def create_app(
                 "id": r[0],
                 "name": r[1],
                 "updated_at": r[5],
-                "document_status": "draft",
             }
             for r in rows[:limit]
         ]
@@ -464,7 +462,6 @@ def create_app(
             "id": r[0],
             "name": r[1],
             "updated_at": r[5],
-            "document_status": "draft",
             "asset": asset_dto(a) if a else None,
         }
 
