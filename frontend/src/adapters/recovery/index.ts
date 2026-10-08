@@ -3,9 +3,9 @@ import { validateProjectEditing } from '../../domain/project-editing';
 import { createProjectEditorState, validateSegments, type ProjectEditorState, type ProjectDocument } from '../../domain/project-document';
 import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
-const DATABASE = 'lazulite-studio-recovery-project-v3';
+const DATABASE = 'lazulite-studio-recovery-project-v4';
 const STORE = 'projects';
-const RECORD_VERSION = 3;
+const RECORD_VERSION = 4;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {
@@ -25,8 +25,16 @@ export type RecoveryAdapter = {
   discard(slotKey: string): Promise<void>;
 };
 
-function openDatabase(): Promise<IDBDatabase> {
+let cleanup: Promise<void> | undefined;
+async function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') return Promise.reject(new Error('Local recovery is unavailable in this browser'));
+  cleanup ??= indexedDB.databases().then(databases => Promise.all(databases.filter(db => db.name?.startsWith('lazulite-studio-recovery') && db.name !== DATABASE).map(db => new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(db.name!);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(new Error('清理旧版恢复数据失败'));
+    request.onblocked = () => reject(new Error('请关闭旧版 Studio 标签页后重试清理恢复数据'));
+  })))).then(() => undefined).catch(error => { cleanup = undefined; throw error; });
+  await cleanup;
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE, 1);
     request.onupgradeneeded = () => request.result.createObjectStore(STORE);

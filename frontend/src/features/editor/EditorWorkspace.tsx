@@ -298,7 +298,7 @@ function EditorWorkspaceContent(props: Props) {
     setSyncTargetVersion(value => value + 1);
     const currentSelection = selectionRef.current;
     const previous = currentSelection?.kind === 'words' ? currentSelection : null;
-    const order = document.lines.flatMap((item) => item.words.map((value) => value.id));
+    const order = displayLines(document, props.project?.lineOrder ?? []).flatMap(item => item.words.map(word => word.id));
     const ids = !shift && !toggle && previous?.ids.includes(word.id) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? word.id, word.id, shift, toggle);
     setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift || toggle || previous?.ids.includes(word.id) ? previous?.anchorId ?? word.id : word.id, activeId: word.id });
     props.onSelectLine?.(line.id);
@@ -309,7 +309,7 @@ function EditorWorkspaceContent(props: Props) {
     setSyncTargetVersion(value => value + 1);
     const currentSelection = selectionRef.current;
     const previous = currentSelection?.kind === 'ruby' ? currentSelection : null;
-    const order = document.lines.flatMap(line => line.words.flatMap(word => word.rubyUnits.map(unit => unit.id)));
+    const order = displayLines(document, props.project?.lineOrder ?? []).flatMap(line => line.words.flatMap(word => word.rubyUnits.map(unit => unit.id)));
     const ids = !shift && !toggle && previous?.ids.includes(rubyId) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? rubyId, rubyId, shift, toggle);
     setSelection({ kind: 'ruby', lineId: line.id, wordId: word.id, ids, anchorId: shift || toggle || previous?.ids.includes(rubyId) ? previous?.anchorId ?? rubyId : rubyId, activeId: rubyId });
     props.onSelectLine?.(line.id);
@@ -382,8 +382,8 @@ function EditorWorkspaceContent(props: Props) {
     catch (error) { editRejected.current = true; setMessage(error instanceof Error ? error.message : '编辑失败'); return false; }
   });
   const drag = useObjectDrag(document, pageRef, dispatch, setSelection);
-  const displayed = { ...drag.document, lines: displayLines(drag.document,props.project?.lineOrder??[]) };
-  const displayOrder = displayLines(document,props.project?.lineOrder??[]);
+  const displayed = useMemo(() => ({ ...drag.document, lines: displayLines(drag.document, props.project?.lineOrder ?? []) }), [drag.document, props.project?.lineOrder]);
+  const displayOrder = useMemo(() => displayLines(document, props.project?.lineOrder ?? []), [document, props.project?.lineOrder]);
   const currentSelection = (): EditorSelection | null => selection;
   const copy = (target?: EditorSelection) => {
     const current = target ?? currentSelection();
