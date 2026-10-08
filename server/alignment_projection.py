@@ -17,7 +17,7 @@ def normalized(text):
 def category(text):
     value = normalized(text)
     if is_kana_text(value) or is_hold(value): return 'ja'
-    if value and all(c.isascii() and (c.isalpha() or c in "'’") for c in value): return 'en'
+    if any(c.isascii() and c.isalpha() for c in value) and all(c.isascii() and (c.isalpha() or c in "'’") for c in value): return 'en'
     if all(c.isspace() or ud.category(c).startswith('P') for c in text): return 'separator'
     return 'unknown'
 
@@ -52,6 +52,7 @@ def project_alignment(snapshot, use_hints=False):
     rows = [by_id[key] for key in order] + [row for row in rows if identity(row) not in order]
     skipped = set(snapshot['editing']['skippedAlignmentLineIds'])
     mapping, lines, unknown, hinted, emitted = [], [], set(), 0, 0
+    unit_counts = {}
     for row in rows:
         line_id = identity(row)
         if line_id in skipped: continue
@@ -72,7 +73,8 @@ def project_alignment(snapshot, use_hints=False):
                 pieces = [m.text for m in split_morae(normalized(reading))] if language == 'ja' else [normalized(reading)]
                 reading_offset = 0
                 for piece in pieces:
-                    uid = json.dumps([object_id, len([x for x in mapping if x['object_id'] == object_id])], ensure_ascii=False, separators=(',', ':'))
+                    uid = json.dumps([object_id, unit_counts.get(object_id, 0)], ensure_ascii=False, separators=(',', ':'))
+                    unit_counts[object_id] = unit_counts.get(object_id, 0) + 1
                     units.append(JapaneseUnit(uid, (a, b), piece, language, source, (reading_offset, reading_offset+len(piece)) if piece else None))
                     mapping.append({'unit_id': uid, 'object_id': object_id, 'word_id': identity(word), 'line_id': line_id, 'kind': 'ruby' if rubies else 'word'})
                     reading_offset += len(piece)

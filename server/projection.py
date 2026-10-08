@@ -1,59 +1,14 @@
-"""Pure正文投影 for automation jobs; reading/ruby markup never enters engines."""
+"""Plain TTML text extraction used by publication."""
 from __future__ import annotations
 import xml.etree.ElementTree as ET
-import re
-from pathlib import Path
 
 TTML = "http://www.w3.org/ns/ttml"
 TTS = "http://www.w3.org/ns/ttml#styling"
 TTM = "http://www.w3.org/ns/ttml#metadata"
-ITUNES = "http://music.apple.com/lyric-ttml-internal"
 RUBY = {"ruby", "rt", "rtc"}
 
 def _content(value: str) -> str:
     return "" if not value.strip() and ("\n" in value or "\r" in value) else value
-
-def _seconds(value: str | None) -> float | None:
-    if not value:
-        return None
-    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(ms|s)", value.strip())
-    if match:
-        return float(match.group(1)) / (1000 if match.group(2) == "ms" else 1)
-    if re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", value.strip()):
-        return float(value)
-    match = re.fullmatch(r"([0-9]+):([0-9]{2}):([0-9]{2}(?:\.[0-9]+)?)", value.strip())
-    if match and int(match.group(2)) < 60 and float(match.group(3)) < 60:
-        return float(match.group(1)) * 3600 + int(match.group(2)) * 60 + float(match.group(3))
-    match = re.fullmatch(r"([0-9]+):([0-9]{2}(?:\.[0-9]+)?)", value.strip())
-    if match and float(match.group(2)) < 60:
-        return int(match.group(1)) * 60 + float(match.group(2))
-    return None
-
-def _timing(node: ET.Element, parent_begin: float, parent_end: float | None) -> tuple[float, float | None]:
-    attrs = {(key.rsplit("}", 1)[-1] if key.startswith("{" + TTML + "}") else key): value for key, value in node.attrib.items()}
-    null_value = node.attrib.get("{urn:lazulite:studio:draft}null", "")
-    time_base = node.attrib.get("{http://www.w3.org/ns/ttml#parameter}timeBase", node.attrib.get("timeBase"))
-    if time_base not in (None, "media") or attrs.get("timeContainer") == "seq" or null_value:
-        raise ValueError("forced projection does not support seq/frame/tick/null timing")
-    begin_raw, end_raw, dur_raw = attrs.get("begin"), attrs.get("end"), attrs.get("dur")
-    begin = _seconds(begin_raw) if begin_raw is not None else 0.0
-    end = _seconds(end_raw) if end_raw is not None else None
-    dur = _seconds(dur_raw) if dur_raw is not None else None
-    if (begin_raw is not None and begin is None) or (end_raw is not None and end is None) or (dur_raw is not None and dur is None):
-        raise ValueError("forced projection has unsupported timing expression")
-    # Reference-tool numeric clocks are absolute media seconds; unit-bearing
-    # TTML expressions remain offsets from the parent.
-    def position(raw: str | None, parsed: float | None) -> float | None:
-        if parsed is None:
-            return None
-        return parsed if raw is not None and re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", raw.strip()) or raw is not None and ":" in raw else parent_begin + parsed
-    absolute_begin = position(begin_raw, begin) if begin_raw is not None else parent_begin
-    assert absolute_begin is not None
-    candidates = [x for x in (parent_end, position(end_raw, end), absolute_begin + dur if dur is not None else None) if x is not None]
-    absolute_end = min(candidates) if candidates else None
-    if absolute_end is not None and absolute_end < absolute_begin:
-        raise ValueError("forced projection timing is inverted")
-    return absolute_begin, absolute_end
 
 def _plain(node: ET.Element) -> str:
     local = node.tag.rsplit("}", 1)[-1]
@@ -66,28 +21,4 @@ def _plain(node: ET.Element) -> str:
         return ""
     value = "\n" if local == "br" else _content(node.text or "")
     return value + "".join(_plain(child) + _content(child.tail or "") for child in node)
-
-def project_ttml(path: str | Path) -> list[dict[str, str]]:
-    root = ET.parse(path).getroot()
-    lines = []
-    body = next((item for item in root if item.tag == "{" + TTML + "}body"), None)
-    if body is None:
-        return lines
-    index = 0
-    def visit(parent: ET.Element, path: list[int]):
-        nonlocal index
-        for child_index, element in enumerate(parent):
-            if element.tag not in {"{" + TTML + "}div", "{" + TTML + "}p"}:
-                continue
-            local = element.tag.rsplit("}", 1)[-1]
-            current_path = path + [child_index]
-            if local == "p":
-                xml_id = element.attrib.get("{http://www.w3.org/XML/1998/namespace}id") or element.attrib.get("{" + ITUNES + "}key")
-                fallback = "line-" + "-".join(str(item) for item in current_path)
-                lines.append({"id": xml_id or fallback, "text": _plain(element).strip()})
-                index += 1
-            else:
-                visit(element, current_path)
-    visit(body, [list(root).index(body)])
-    return lines
 

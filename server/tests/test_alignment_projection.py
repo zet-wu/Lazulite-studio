@@ -31,3 +31,19 @@ def test_skipping_filters_after_order_without_propagating_or_hints():
     assert result['summary']['hint_count'] == 0
     snapshot['editing']['skippedAlignmentLineIds']=['bg','main']
     assert project_alignment(snapshot)['summary']['emitting_count'] == 0
+
+
+def test_multiple_background_order_and_english_ruby_are_independent():
+    snapshot = fixture()
+    snapshot['lyrics']['draftTtml'] = snapshot['lyrics']['draftTtml'].replace('</p>', '<span ttm:role="x-bg" studio:id="bg2" begin="1"><span studio:id="bgword2">(R)</span></span></p>')
+    snapshot['lineOrder'] = ['bg2', 'main', 'bg']
+    result = project_alignment(snapshot, True)
+    assert [line['line_id'] for line in result['request']['lines']] == ['bg2', 'main', 'bg']
+    assert result['request']['lines'][0]['units'][0]['reading_language'] == 'en'
+    assert result['request']['lines'][0]['units'][0]['reading'] == 'R'
+    rubies = [unit for line in result['request']['lines'] for unit in line['units'] if unit['reading_source'] == 'ruby']
+    assert [unit['reading'] for unit in rubies] == ['ら', 'bad', 'ぶ']
+    snapshot['editing']['skippedAlignmentLineIds'] = ['bg2']
+    result = project_alignment(snapshot, True)
+    assert [line['line_id'] for line in result['request']['lines']] == ['main', 'bg']
+    assert result['summary']['hint_count'] == 1

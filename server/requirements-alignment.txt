@@ -1,5 +1,6 @@
 # Install from repository root after server/requirements.txt.
+-c constraints-alignment.txt
 -r requirements-vocal.txt
 transformers==4.57.6
-# Retain the installed Torch/CUDA build. Validated delivery used Torch 2.14.0;
-# Studio's local runtime is recorded with each model run.
+# constraints-alignment.txt records the tested Linux CUDA stack.
+# Other platforms require a compatible device build and separate validation.

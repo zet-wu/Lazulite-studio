@@ -1,24 +1,15 @@
 """Active, stateless Japanese reading analysis for the Ruby editor."""
 from __future__ import annotations
-from io import StringIO
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 import hashlib
-from pathlib import Path
-import sqlite3
 from typing import Any, Mapping, Protocol, Sequence
-import uuid
 from threading import Lock
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from .furigana import load_index, token_segments
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _proposal_id(line_id: str, start: int, end: int, base: str, reading: str) -> str:
@@ -51,7 +42,7 @@ class ReadingProposal:
 
 
 class ReadingProposer(Protocol):
-    def propose(self, lines: Sequence[Mapping[str, str]], dictionary: Mapping[str, str]) -> Sequence[ReadingProposal | Mapping[str, Any]]:
+    def propose(self, lines: Sequence[Mapping[str, str]]) -> Sequence[ReadingProposal | Mapping[str, Any]]:
         """Return whole-word proposals using code-point offsets in each line."""
 
 
@@ -88,7 +79,7 @@ class SudachiReadingProposer:
     def available(self) -> bool:
         return self._tokenizer is not None
 
-    def propose(self, lines: Sequence[Mapping[str, str]], dictionary: Mapping[str, str]) -> Sequence[ReadingProposal]:
+    def propose(self, lines: Sequence[Mapping[str, str]]) -> Sequence[ReadingProposal]:
         if self._tokenizer is None:
             raise ReadingUnavailable(self.unavailable_reason or "SudachiPy 不可用")
         output: list[ReadingProposal] = []
@@ -97,15 +88,14 @@ class SudachiReadingProposer:
             with self._tokenizer_lock:
                 # Keep token reads and split(A) inside the tokenizer lock too.
                 for token in self._tokenizer.tokenize(text, self._mode):
-                    override = dictionary.get(token.surface())
-                    segments = [(token.begin(), token.end(), token.surface(), _hiragana(override))] if override else token_segments(token, self._furigana, self._mode_a, _hiragana)
+                    segments = token_segments(token, self._furigana, self._mode_a, _hiragana)
                     for start, end, base, reading in segments:
                         if not _contains_japanese(base) or not reading or reading == '*' or _hiragana(base) == reading:
                             continue
                         output.append(ReadingProposal(
                             line_id=line_id, proposal_id=_proposal_id(line_id, start, end, base, reading),
                             base_start=start, base_end=end, base=base, reading=reading,
-                            source='dictionary' if override else 'sudachi', needs_review=not bool(override),
+                            source='sudachi', needs_review=True,
                         ))
         return output
 
@@ -137,9 +127,9 @@ def _coerce_proposal(value: ReadingProposal | Mapping[str, Any], lines: Mapping[
     )
 
 
-def propose_readings(lines: Sequence[Mapping[str, str]], proposer: ReadingProposer, dictionary: Mapping[str, str]) -> list[ReadingProposal]:
+def propose_readings(lines: Sequence[Mapping[str, str]], proposer: ReadingProposer) -> list[ReadingProposal]:
     texts = {str(line["id"]): str(line.get("text", "")) for line in lines}
-    return [_coerce_proposal(item, texts) for item in proposer.propose(lines, dictionary)]
+    return [_coerce_proposal(item, texts) for item in proposer.propose(lines)]
 
 
 class ReadingLine(BaseModel):
@@ -170,7 +160,7 @@ def analyze_snapshot(body: ReadingSnapshot, proposer: ReadingProposer) -> Readin
         raise ValueError('行标识重复')
     if sum(len(line.text) for line in body.lines) > 1000000:
         raise ValueError('本次正文过长，请减少所选行')
-    proposals = propose_readings(lines, proposer, {})
+    proposals = propose_readings(lines, proposer)
     ranges = []
     for line in body.lines:
         offset = 0

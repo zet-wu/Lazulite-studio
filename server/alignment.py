@@ -55,7 +55,7 @@ def run_alignment(request, emit, cancelled):
     from lazulite.models.audio import AudioBuffer, VocalSegment, VocalAnalysis
     from lazulite.audio.preparation import prepare_existing_vocals
     from lazulite.models.japanese import JapaneseAlignmentRequest
-    from lazulite.alignment.japanese import align_japanese
+    from lazulite.alignment.japanese.run import align_japanese
     from lazulite.alignment.japanese.run import JapaneseConfig
     from lazulite.alignment.japanese.backend import NextFireBackend, NextFireConfig
     from lazulite.cache import FileCache

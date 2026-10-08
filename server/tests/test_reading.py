@@ -1,45 +1,14 @@
-import json
-from server.project_document import initial_project
-import hashlib
-import time
-
 from fastapi.testclient import TestClient
 
 from server.app import create_app
 from server.auth import Settings
 from server.db import Database
-from server.reading import ReadingProposal, SudachiReadingProposer
-
-
-def seed_revision(db, tmp_path, revision, text):
-    path = tmp_path / "projects" / "project" / "revisions" / f"{revision}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(initial_project(f'<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="line">{text}</p></body></tt>', "asset")),
-        encoding="utf-8",
-    )
-    with db.transaction() as conn:
-        conn.execute(
-            "INSERT INTO revisions VALUES(?,?,?,?,?)",
-            (revision, "project", None, str(path), "t"),
-        )
-
-
-def seed_project(db):
-    with db.transaction() as conn:
-        conn.execute(
-            "INSERT INTO assets VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-            ("asset", "a" * 64, 1, "audio/wav", "x", 1, 1, 0, 1, 1, "{}", "t"),
-        )
-        conn.execute(
-            "INSERT INTO projects VALUES(?,?,?,?,?,?)",
-            ("project", "demo", "asset", "r1", "t", "t"),
-        )
+from server.reading import SudachiReadingProposer
 
 
 def test_sudachi_uses_whole_word_and_code_point_offsets():
     proposals = SudachiReadingProposer().propose(
-        [{"id": "line", "text": "𝄞今日かな"}], {}
+        [{"id": "line", "text": "𝄞今日かな"}]
     )
     assert [(item.base, item.base_start, item.base_end) for item in proposals] == [
         ("今日", 1, 3)
@@ -62,7 +31,7 @@ def test_snapshot_rejects_duplicate_ids_and_surfaces_failure():
     with pytest.raises(ValueError, match='行标识重复'):
         analyze_snapshot(ReadingSnapshot(lines=[{'id': 'a', 'text': '今日'}] * 2), SudachiReadingProposer())
     class Unavailable:
-        def propose(self, lines, dictionary):
+        def propose(self, lines):
             raise ReadingUnavailable('offline')
     with pytest.raises(ReadingUnavailable):
         analyze_snapshot(ReadingSnapshot(lines=[{'id': 'a', 'text': '今日'}]), Unavailable())
@@ -138,5 +107,5 @@ def test_missing_furigana_resource_is_explicit_failure(monkeypatch, tmp_path):
     proposer = SudachiReadingProposer()
     assert not proposer.available
     with pytest.raises(ReadingUnavailable, match='读音资源不可用'):
-        proposer.propose([{'id': 'l', 'text': '夜空'}], {})
+        proposer.propose([{'id': 'l', 'text': '夜空'}])
     resource.load_index.cache_clear()
