@@ -6,3 +6,5 @@ httpx[socks]==0.28.1
 SudachiPy==0.6.10
 sudachidict_core==20250129
 mutagen==1.48.1
+# Run installation from the repository root; fixed reviewed delivery.
+./server/vendor/lazulite/lazulite-0.2.0-py3-none-any.whl

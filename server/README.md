@@ -43,3 +43,5 @@ FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针、�
 `GET /projects/{pid}/embedded-lyrics` 从项目原始上传文件读取候选，MP3 的 USLT、FLAC 的 LYRICS/UNSYNCEDLYRICS、MP4 的 ©lyr 与各 STPP 轨道分别返回。无音乐、损坏和不支持结构明确报告，不改变项目。STPP 当前仅读取单 sample、单 chunk、无编辑列表或 composition offset 的轨道，支持 stco/co64 与固定或逐项 sample size；多 sample 与分片拒绝。
 
 AMLL 兼容设置和显示顺序在项目快照中保存；`amll_compatibility.py` 在持久化边界检查五项限制、简化联动和排布引用。TTML 的词级歌手和多个独立背景由文档验证器接受；Ruby 内部独立歌手仍明确拒绝。新项目使用限制默认值，不迁移旧快照。
+
+自动对齐依赖固定为 `vendor/lazulite/lazulite-0.2.0-py3-none-any.whl`（散列见同目录 `SHA256SUMS`），不再 editable 引用并列旧仓库。从仓库根目录安装 `server/requirements.txt`。模型运行依赖和 NextFire 路径由服务配置管理，歌词获取与媒体基础能力不加载模型。
