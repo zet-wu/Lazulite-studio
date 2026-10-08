@@ -1,3 +1,4 @@
+import { parseLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { expect, it } from 'vitest';
 import { createProjectDocument, createProjectEditorState, executeProjectCommand, undoProjectCommand, redoProjectCommand } from '../src/domain/project-document';
 import { createLyricDocument } from '../src/domain/lyric-document';
@@ -21,4 +22,15 @@ it('bounds the single history to 256 entries', () => {
  let state = createProjectEditorState(createProjectDocument());
  for (let i = 0; i < 300; i++) state = executeProjectCommand(state, { type: 'lyrics', command: { type: 'set-metadata', key: 'title', values: [String(i)] } });
  expect(state.past).toHaveLength(256);
+});
+
+it('reopens incomplete draft Ruby outside the line without changing times or relaxing external import', () => {
+ const document = createProjectDocument(createLyricDocument('傍'));
+ const line = document.lyrics.lines[0], word = line.words[0];
+ line.beginMs=141129;line.endMs=144539;
+ word.beginMs=141129;word.endMs=141499;
+ word.rubyUnits=[{id:'ruby',reading:'そ',beginMs:330583,endMs:null}];
+ const snapshot=serializeProject(document);
+ expect(parseProject(snapshot)).toEqual(document);
+ expect(()=>parseLyricTtml(snapshot.lyrics.draftTtml)).toThrow('TTML child time exceeds parent');
 });

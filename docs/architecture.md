@@ -246,3 +246,5 @@ AMLL 五项设置位于共享 SettingsDialog，入口在设置菜单；立即走
 `LyricCandidate` 共用在线／内嵌满宽框体、选中态、能力与错误徽章。`lyricCapabilities` 从正文行、词和 Ruby 时间及附属轨道判断能力；LRC 解析器提供瞬态行级词 ID 集合，区分继承行起点与独立词时间，不修改解析文档。STPP 保留在来源标签，歌词格式单独显示 TTML。项目列表仅使用名称与更新时间；ProjectSummary 已移除 document_status，服务端保存副本和编辑器真实保存状态独立保留。
 
 项目快照为 `studio-project-v5`，文档 envelope 为 `studio-document-v7`，浏览器恢复库 project-v5／记录 v5。歌词仍为 v10，资源数据库保持版本 4。`editing.skippedAlignmentLineIds` 独立于打轴忽略，按稳定行 ID 保存；复制映射、拆行继承、合行取全部来源交集，在结构事务内维护。普通歌词交换不包含此偏好。旧项目／恢复数据不转换、不自动删除。
+
+项目快照的 draft TTML 读取显式使用草稿模式：允许词／Ruby 的待修正时间超出父级结束，保留所有已知／未定端点供继续编辑。外部 TTML 导入仍执行父级时间边界检查；草稿可重开不表示通过发布时间校验。

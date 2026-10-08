@@ -65,7 +65,7 @@ function timeText(ms: number) {
   return seconds >= 3600 ? `${String(Math.floor(seconds / 3600)).padStart(2, '0')}:${tail}` : tail;
 }
 
-function boundaries(node: Element, parentStart: number, parentEnd: TimeMs, absoluteTimes: boolean): [TimeMs, TimeMs] {
+function boundaries(node: Element, parentStart: number, parentEnd: TimeMs, absoluteTimes: boolean, draft = false): [TimeMs, TimeMs] {
   if (attr(node, null, 'timeContainer') === 'seq') throw new Error('Sequential TTML timing is not supported');
   const beginRaw = attr(node, null, 'begin');
   const endRaw = attr(node, null, 'end');
@@ -79,7 +79,8 @@ function boundaries(node: Element, parentStart: number, parentEnd: TimeMs, absol
   const endFromDur = durRaw === null ? null : (begin ?? parentStart) + parseTime(durRaw);
   const end = nulls.includes('end') ? null : [endFromEnd, endFromDur].filter((value): value is number => value !== null).reduce<number | null>((left, value) => left === null ? value : Math.min(left, value), null);
   if (begin !== null && end !== null && begin > end) throw new Error('TTML end precedes begin');
-  if (parentEnd !== null && ((begin !== null && begin > parentEnd) || (end !== null && end > parentEnd))) throw new Error('TTML child time exceeds parent');
+  // Saved editor drafts may contain timing issues; reopen them without changing endpoints.
+  if (!draft && parentEnd !== null && ((begin !== null && begin > parentEnd) || (end !== null && end > parentEnd))) throw new Error('TTML child time exceeds parent');
   return [begin, end];
 }
 
@@ -112,7 +113,7 @@ function checkAttributes(node: Element, allowed: string[], word = false) {
   }
 }
 
-function makeWord(node: Node, lineId: string, index: number, lineStart: number, lineEnd: TimeMs, absoluteTimes: boolean): LyricWord | null {
+function makeWord(node: Node, lineId: string, index: number, lineStart: number, lineEnd: TimeMs, absoluteTimes: boolean, draft: boolean): LyricWord | null {
   const id = `${lineId}:word:${index}`;
   if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) {
     const text = node.nodeValue ?? '';
@@ -130,7 +131,7 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   const agentRefs = (attr(element, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
   const identity = agentRefs.length ? { agentRefs } : {};
   const wordId = attr(element, STUDIO, 'id') ?? id;
-  const [beginMs, endMs] = boundaries(element, lineStart, lineEnd, absoluteTimes);
+  const [beginMs, endMs] = boundaries(element, lineStart, lineEnd, absoluteTimes, draft);
   const rubyKind = attr(element, TTS, 'ruby');
   if (!rubyKind) {
     const text = textOnly(element, 'Word');
@@ -161,7 +162,7 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
     if (attr(reading, TTS, 'ruby') === 'textContainer' && attr(part, TTS, 'ruby') !== 'text') throw new Error('注音读音容器须包含读音单元');
     const value = textOnly(part, '注音 reading unit');
     if (!value) throw new Error('注音读音单元不能为空');
-    const [unitBegin, unitEnd] = boundaries(part, lineStart, lineEnd, absoluteTimes);
+    const [unitBegin, unitEnd] = boundaries(part, lineStart, lineEnd, absoluteTimes, draft);
     rubyUnits.push({ id: attr(part, STUDIO, 'id') ?? `${wordId}:ruby:${unitIndex}`, reading: value, beginMs: unitBegin, endMs: unitEnd });
     unitIndex++;
   }
@@ -210,7 +211,7 @@ function readRomanization(item: Element, lineId: string, absoluteTimes: boolean,
   return { id, lineId, kind: 'timed', units };
 }
 
-export function parseLyricTtml(xml: string): LyricDocument {
+export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean } = {}): LyricDocument {
   if (new TextEncoder().encode(xml).byteLength > MAX_BYTES) throw new Error('TTML exceeds 2 MiB limit');
   if (/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml)) throw new Error('DTD and external entities are not accepted');
   const parsed = new DOMParser().parseFromString(xml, 'application/xml');
@@ -305,7 +306,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
   const visit = (parent: Element, parentStart: number, parentEnd: TimeMs, depth: number, songPart: string | null) => {
     if (depth > 128) throw new Error('TTML nesting exceeds depth 128');
     checkAttributes(parent, ['begin', 'end', 'dur', 'timeContainer']);
-    const [ownBegin, ownEnd] = boundaries(parent, parentStart, parentEnd, absoluteTimes);
+    const [ownBegin, ownEnd] = boundaries(parent, parentStart, parentEnd, absoluteTimes, draft);
     const start = ownBegin ?? parentStart;
     const part = attr(parent, ITUNES, 'songPart') ?? songPart;
     for (const child of Array.from(parent.children)) {
@@ -315,7 +316,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
       }
       if (!is(child, TTML, 'p')) throw new Error(`Unsupported TTML body child <${child.localName}>`);
       checkAttributes(child, ['begin', 'end', 'dur']);
-      const [beginMs, endMs] = boundaries(child, start, ownEnd, absoluteTimes);
+      const [beginMs, endMs] = boundaries(child, start, ownEnd, absoluteTimes, draft);
       const id = attr(child, XML, 'id') ?? attr(child, ITUNES, 'key') ?? `line-${lines.length + 1}`;
       const wordStart = beginMs ?? start;
       const inlineRomanizations: Array<{ language: string | null; content: RomanizationContent }> = [];
@@ -337,7 +338,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
           }
           if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new Error(`Unsupported TTML role ${role}`);
         }
-        const word = makeWord(node, id, index, wordStart, endMs, absoluteTimes);
+        const word = makeWord(node, id, index, wordStart, endMs, absoluteTimes, draft);
         if (word) words.push(word);
       }
       const agentRefs = (attr(child, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
@@ -355,7 +356,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
       addInline(inlineRomanizations, id);
       for (const [bgIndex, background] of backgrounds.entries()) {
         checkAttributes(background, ['begin', 'end', 'dur']);
-        const [bgBegin, bgEnd] = boundaries(background, wordStart, ownEnd, absoluteTimes);
+        const [bgBegin, bgEnd] = boundaries(background, wordStart, ownEnd, absoluteTimes, draft);
         const bgId = attr(background, STUDIO, 'id') ?? attr(background, XML, 'id') ?? `${id}-bg${bgIndex || ''}`;
         const bgStart = bgBegin ?? wordStart;
         const bgRomanizations: typeof inlineRomanizations = [];
@@ -372,7 +373,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
             }
           } else {
             if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new Error(`Unsupported background role ${role}`);
-            const word = makeWord(node, bgId, index, bgStart, bgEnd, absoluteTimes);
+            const word = makeWord(node, bgId, index, bgStart, bgEnd, absoluteTimes, draft);
             if (word) bgWords.push(word);
           }
         }

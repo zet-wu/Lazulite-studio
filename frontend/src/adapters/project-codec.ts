@@ -4,7 +4,7 @@ import type { ProjectDocument, ProjectSnapshot } from '../domain/project-documen
 import { parseLyricTtml, serializeLyricTtml } from './ttml/lyric-codec';
 export function parseProject(snapshot: ProjectSnapshot): ProjectDocument {
   if (snapshot.schemaVersion !== 'studio-project-v5') throw new Error('项目版本不兼容');
-  const result = { ...snapshot, lyrics: parseLyricTtml(snapshot.lyrics.draftTtml) };
+  const result = { ...snapshot, lyrics: parseLyricTtml(snapshot.lyrics.draftTtml, { draft: true }) };
   validateProjectEditing(result.lyrics, result.editing);
   assertAmll(result.lyrics, result.amll);
   if(!Array.isArray(result.lineOrder) || new Set(result.lineOrder).size!==result.lineOrder.length || result.lineOrder.some(id=>!result.lyrics.lines.some(line=>line.id===id))) throw new Error('背景前置引用无效');
