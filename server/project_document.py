@@ -88,7 +88,7 @@ def validate_editing(snapshot):
         return key
     def words(node):
         for child in node:
-            if child.tag != tt+'span' or child.get(ttm+'role'): continue
+            if child.tag != tt+'span' or any(role != 'expletive' for role in child.get(ttm+'role', '').split()): continue
             identity(child, 'word')
             for unit in child.iter():
                 if unit.get(tts+'ruby') == 'text': identity(unit, 'ruby')
@@ -121,4 +121,4 @@ def validate_editing(snapshot):
         end, begin = time(line, 'end'), time(destination, 'begin')
         if begin is None or end != begin or time(line, 'begin') is not None and time(line, 'begin') > end: raise ValueError('invalid evaluated end link')
         for child in line:
-            if child.tag == tt+'span' and not child.get(ttm+'role') and time(child, 'end') is not None and time(child, 'end') > end: raise ValueError('linked end excludes word')
+            if child.tag == tt+'span' and all(role == 'expletive' for role in child.get(ttm+'role', '').split()) and time(child, 'end') is not None and time(child, 'end') > end: raise ValueError('linked end excludes word')

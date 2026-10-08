@@ -34,7 +34,7 @@ FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针、�
 
 `furigana.py` 加载随服务部署的固定 JmdictFurigana 资源，校验原始 SHA-256 并缓存精确词形＋读音的唯一有效分段。`reading.py` 以 C 读音为准，先查精确分段，再取可完整回拼的 split(A) 并查子词；tokenize、token 读取与细分共用锁。资源缺损明确使读音服务不可用，不在生成时下载。数据来源、署名、许可及维护方式见 [分段资源](vendor/jmdict-furigana/README.md)。
 
-`documents.validate_ttml` 保留词级 `amll:obscene` 扩展，普通词／Ruby container／背景词允许明确 true／false；行、背景容器、Ruby 读音及非法值拒绝。规范化时间与不可变修订仍使用相同链路和项目／HTTP 版本。
+`documents.validate_ttml` 保留词级 `amll:obscene` 扩展与标准 `ttm:role="expletive"`；任一标记可读，角色按列表识别，expletive 与明确 false 冲突拒绝，普通词／Ruby container／背景词允许明确 true／false；行、背景容器、Ruby 读音及非法值拒绝。规范化时间与不可变修订仍使用相同链路和项目／HTTP 版本。
 
 项目目录 projects/<id> 包含 source/original、cache、revisions、vocals 和 exports；assets 表仅为已关联项目的资源索引，哈希不唯一，不承担跨项目共享。临时上传在 uploads/<token> 校验和建代理后，由创建或首次接入事务转移归属；失败回收，竞争首次接入只允许一份音乐。SQLite 写锁排序上传提交、删除和缓存构建，下载锁内打开句柄、锁外分段读取并支持 Range。重启清理临时上传、无源引用目录及孤立项目目录；已完成放弃上传在后续上传时按一小时回收。
 

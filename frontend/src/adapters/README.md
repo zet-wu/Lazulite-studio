@@ -28,6 +28,6 @@ ASS 画布宽 1920、高至少 1080，按并行字幕行数增加高度；按事
 
 `project-codec` 读写项目 v3 的 editing，并验证其稳定 ID 关联；草稿 TTML 仅保留身份、类型和未定时间。导出／打包传入同一快照的 editing，带空拍空白词仍遵守原有时间门控，正式 TTML 不携带项目配置。
 
-`LyricWord.obscene` 的草稿及正式 TTML 映射为词 span／Ruby container 的 `amll:obscene="true"`，背景词同样处理；false 不写，读取允许明确 true／false，非法值及非词位置不静默忽略。恢复继续检查既有 obscene 字段为 boolean。不写 Ruby 独立标记，不双写标准角色，不改变原文。外部消费者兼容范围见工作区实施记录。
+`LyricWord.obscene` 的草稿及正式 TTML 映射为词 span／Ruby container 的 `amll:obscene="true"` 与 `ttm:role="expletive"`，背景词同样处理；false 不写，读取允许明确 true／false，非法值及非词位置不静默忽略。恢复继续检查既有 obscene 字段为 boolean。不写 Ruby 独立标记，同时写标准 `ttm:role="expletive"`，读取任一标记并按角色列表识别；与明确 false 冲突时拒绝，不改变原文。外部消费者兼容范围见工作区实施记录。
 
 项目 v3 快照只含歌词、editing 和 acoustics，音源只来自项目接口。上传使用 /uploads 临时区及 /projects/{id}/music 首次接入；源资源不受歌词撤销、保存或恢复覆盖。

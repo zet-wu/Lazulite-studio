@@ -90,12 +90,16 @@ def validate_ttml(ttml: str) -> str:
     ruby = "{http://www.w3.org/ns/ttml#styling}ruby"
     role = "{http://www.w3.org/ns/ttml#metadata}role"
     for element in root.iter():
-        if amll_obscene not in element.attrib:
+        roles = element.get(role, '').split()
+        expletive = 'expletive' in roles
+        if amll_obscene not in element.attrib and not expletive:
             continue
+        if expletive and element.get(amll_obscene) == 'false':
+            raise ValueError('expletive conflicts with amll:obscene=false')
         parent = parents.get(element)
         background = parent is not None and parent.tag == f"{{{TTML_NS}}}span" and parent.get(role) == 'x-bg' and parents.get(parent) is not None and parents[parent].tag == f"{{{TTML_NS}}}p"
-        if (element.get(amll_obscene) not in ('true', 'false') or element.tag != f"{{{TTML_NS}}}span"
-                or element.get(ruby) not in (None, 'container') or element.get(role)
+        if (element.get(amll_obscene) not in (None, 'true', 'false') or element.tag != f"{{{TTML_NS}}}span"
+                or element.get(ruby) not in (None, 'container') or any(value != 'expletive' for value in roles)
                 or parent is None or not (parent.tag == f"{{{TTML_NS}}}p" or background)):
             raise ValueError('amll:obscene requires a word and a true/false value')
     agents = {

@@ -98,7 +98,10 @@ function checkAttributes(node: Element, allowed: string[], word = false) {
     }
     if (attribute.namespaceURI === TTS && attribute.localName === 'ruby') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
-    if (attribute.namespaceURI === TTM && attribute.localName === 'role') continue;
+    if (attribute.namespaceURI === TTM && attribute.localName === 'role') {
+      if (!word && attribute.value.split(/\s+/).includes('expletive')) throw new Error('expletive requires a word');
+      continue;
+    }
     if ([ITUNES, ITUNES_EXT].includes(attribute.namespaceURI ?? '') && ['key', 'timing', 'songPart'].includes(attribute.localName)) continue;
     if (attribute.namespaceURI === STUDIO && ['id', 'kind', 'null'].includes(attribute.localName)) continue;
     throw new Error(`Unsupported TTML attribute ${attribute.name} on <${node.localName}>`);
@@ -116,7 +119,10 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   const element = node as Element;
   if (!is(element, TTML, 'span')) throw new Error(`Unsupported TTML line child <${element.localName}>`);
   checkAttributes(element, ['begin', 'end', 'dur'], true);
-  const obscene = attr(element, AMLL, 'obscene') === 'true';
+  const roles = (attr(element, TTM, 'role') ?? '').split(/\s+/).filter(Boolean);
+  if (roles.some(role => role !== 'expletive')) throw new Error(`Unsupported word role ${roles.join(' ')}`);
+  if (roles.includes('expletive') && attr(element, AMLL, 'obscene') === 'false') throw new Error('expletive conflicts with amll:obscene=false');
+  const obscene = roles.includes('expletive') || attr(element, AMLL, 'obscene') === 'true';
   const wordId = attr(element, STUDIO, 'id') ?? id;
   const [beginMs, endMs] = boundaries(element, lineStart, lineEnd, absoluteTimes);
   const rubyKind = attr(element, TTS, 'ruby');
@@ -324,7 +330,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
             background = node as Element;
             continue;
           }
-          if (role) throw new Error(`Unsupported TTML role ${role}`);
+          if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new Error(`Unsupported TTML role ${role}`);
         }
         const word = makeWord(node, id, index, wordStart, endMs, absoluteTimes);
         if (word) words.push(word);
@@ -360,7 +366,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
               bgRomanizations.push({ language, content });
             }
           } else {
-            if (role) throw new Error(`Unsupported background role ${role}`);
+            if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new Error(`Unsupported background role ${role}`);
             const word = makeWord(node, bgId, index, bgStart, bgEnd, absoluteTimes);
             if (word) bgWords.push(word);
           }
@@ -577,7 +583,10 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
       }
       const span = xml.createElementNS(TTML, 'span');
       if (draft) span.setAttributeNS(STUDIO, 'studio:id', word.id);
-      if (word.obscene) span.setAttributeNS(AMLL, 'amll:obscene', 'true');
+      if (word.obscene) {
+        span.setAttributeNS(AMLL, 'amll:obscene', 'true');
+        span.setAttributeNS(TTM, 'ttm:role', 'expletive');
+      }
       setTime(span, word.beginMs, word.endMs, draft);
       if (!word.rubyUnits.length) span.textContent = text;
       else {

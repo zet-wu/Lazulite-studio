@@ -25,6 +25,7 @@ it('word flags have one project history each; plain, ruby and background roundtr
   for (const draft of [true, false]) {
     const xml = serializeLyricTtml(flagged, { draft });
     expect(xml.match(/amll:obscene="true"/g)).toHaveLength(3);
+    expect(xml.match(/ttm:role="expletive"/g)).toHaveLength(3);
     const parsed = parseLyricTtml(xml);
     expect(parsed.lines.flatMap(l => l.words.map(w => [w.text, w.obscene]))).toEqual([['Alpha', true], ['今日', true], ['背景', true]]);
     expect(parsed.lines[0].words[1].rubyUnits[0]).not.toHaveProperty('obscene');
@@ -48,10 +49,23 @@ it('rich copy remaps IDs, merge uses logical OR, and attached-property split gat
 it('rejects invalid flag values and flags on individual Ruby/line nodes instead of discarding them', () => {
   const doc = fixture(); doc.lines[0].words[1].obscene = true;
   const xml = serializeLyricTtml(doc, { draft: true });
-  expect(parseLyricTtml(xml.replace('amll:obscene="true"', 'amll:obscene="false"')).lines[0].words[1].obscene).toBe(false);
+  expect(parseLyricTtml(xml.replace(' ttm:role="expletive"', '').replace('amll:obscene="true"', 'amll:obscene="false"')).lines[0].words[1].obscene).toBe(false);
   expect(() => parseLyricTtml(xml.replace('amll:obscene="true"', 'amll:obscene="yes"'))).toThrow(/true or false/);
   for (const target of ['tts:ruby="text"', 'xml:id=']) {
     const invalid = target === 'xml:id=' ? xml.replace('<p ', '<p amll:obscene="true" ') : xml.replace(target, `${target} amll:obscene="true"`);
     expect(() => parseLyricTtml(invalid)).toThrow(/Unsupported TTML attribute/);
   }
+});
+
+it('imports either obscene expression, tokenizes roles and rejects contradictions and unknown roles', () => {
+  const doc = fixture(); doc.lines.forEach(line => line.words.forEach(word => { word.obscene = true; }));
+  const xml = serializeLyricTtml(doc, { draft: true });
+  for (const input of [xml, xml.replaceAll(' amll:obscene="true"', ''), xml.replaceAll(' ttm:role="expletive"', ''), xml.replaceAll('ttm:role="expletive"', 'ttm:role=" expletive  expletive "')]) {
+    expect(parseLyricTtml(input)).toEqual(doc);
+  }
+  expect(() => parseLyricTtml(xml.replace('obscene="true"', 'obscene="false"'))).toThrow(/conflicts/);
+  expect(() => parseLyricTtml(xml.replace('role="expletive"', 'role="expletive unknown"'))).toThrow(/role/);
+  doc.lines.forEach(line => line.words.forEach(word => { word.obscene = false; }));
+  const cleared = serializeLyricTtml(doc, { draft: false });
+  expect(cleared).not.toContain('expletive'); expect(cleared).not.toContain('obscene');
 });
