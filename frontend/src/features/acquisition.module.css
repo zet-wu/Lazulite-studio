@@ -59,3 +59,5 @@
 .formatDetail:hover [role="tooltip"], .formatDetail:focus [role="tooltip"] { display: block; }
 
 .validationTabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.validationBranch > div { padding-left: 24px; }

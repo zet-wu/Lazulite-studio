@@ -47,23 +47,22 @@ export function AmllPanel({project,results,current,apply,locate,focusRule,onRule
  }
  const execute=(command:ProjectCommand)=>{if(!current) return false; try{apply(command);setError('');return true;}catch(e){setError(e instanceof Error?e.message:'处理失败');return false;}};
  return <section aria-label="AMLL 兼容校验">
- <p>仅检查本轮五项约束，不代表外部工具无损或投稿通过。</p>
  {error&&<p role="alert">{error}</p>}
  {(Object.keys(amllLabels) as AmllRule[]).map(rule=>{
   const issues:OutputIssue[]=results[rule].map(item=>({kind:item.wordId?'word':item.agentId?'agent':'line',lineId:item.lineId??'',wordId:item.wordId,agentId:item.agentId,missing:[],message:item.message}));
   const ids=selected[rule]??[];const count=ruleCount(results,rule), lost=selected[rule]!==undefined&&!ids.length;
   const run=(all=false)=>{if(rule==='simplified')setMapping(project);else execute({type:'amll-batch',rule,ids:all?[]:ids});};
-  return <div key={rule} id={`amll-${rule}`}><Branch open={expanded[rule]??false} onOpenChange={open=>setExpanded(prev=>({...prev,[rule]:open}))} title={`${amllLabels[rule]}：${count?'不满足':'满足'} · 设置${project.amll[rule]?'开启':'关闭'}`}>
-   {()=> <><p>{rule==='noMultipleBackgrounds'?`${issues.length} 个主行组`:rule==='noWordAgents'?`${issues.length} 个词，涉及 ${new Set(issues.map(i=>i.lineId)).size} 行`:rule==='noIndependentBackground'?`${issues.length} 条背景行`:`${issues.length} 个对象`}</p>
+  return <div key={rule} id={`amll-${rule}`}><Branch open={expanded[rule]??false} onOpenChange={open=>setExpanded(prev=>({...prev,[rule]:open}))} title={`${amllLabels[rule]}：${count?'不满足':'满足'}`}>
+   {()=> <><p>{rule==='simplified'?`当前有 ${issues.length} 位自定义歌手。`:rule==='noMultipleBackgrounds'?`${issues.length} 个主行组`:rule==='noWordAgents'?`${issues.length} 个词，涉及 ${new Set(issues.map(i=>i.lineId)).size} 行`:rule==='noIndependentBackground'?`${issues.length} 条背景行`:`${issues.length} 个对象`}</p>
     {rule==='simplified'&&amllDependencies.map(key=>results[key].length>0&&<p key={key}>依赖 {amllLabels[key]}：{results[key].length} 个对象 <a href={`#amll-${key}`}>查看规则组</a></p>)}
     {(count>0||lost)&&<><p>范围：{rule==='simplified'?'全项目':lost?'原选中问题已消失':ids.length?`选中 ${ids.length} 项`:'该规则全部问题对象'}</p>
       <button data-role="secondary" disabled={!current||lost||!count} onClick={()=>run()}>{actions[rule]}{rule!=='simplified'&&(selected[rule]!==undefined?`（处理选中 ${ids.length} 项）`:`（处理全部 ${count} 项）`)}</button>
       {selected[rule]!==undefined&&count>0&&<button data-role="secondary" disabled={!current} onClick={()=>run(true)}>处理全部 {count} 项</button>}
     </>}
-    <LineGroups issues={issues} keys={new Set()} locate={locate} document={project.lyrics} selection={rule==='simplified'?undefined:{ids,toggle:id=>setSelected(prev=>{
+    {rule!=='simplified'&&<LineGroups issues={issues} keys={new Set()} locate={locate} document={project.lyrics} selection={{ids,toggle:id=>setSelected(prev=>{
       const next=ids.includes(id)?ids.filter(item=>item!==id):[...ids,id];
       const updated={...prev,[rule]:next}; if(!next.length)delete updated[rule]; return updated;
-    })}}/>
+    })}}/>}
    </>}
   </Branch></div>;
  })}

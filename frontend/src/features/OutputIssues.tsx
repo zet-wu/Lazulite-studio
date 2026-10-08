@@ -1,6 +1,6 @@
-import { Disclosure as Branch } from '../shared/Disclosure';
+import { Disclosure } from '../shared/Disclosure';
 import { Icon } from '../shared/Icon';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { outputIssueKey, type OutputIssue } from '../adapters/output-validation';
 import { lineText, type LyricDocument } from '../domain/lyric-document';
 import styles from './acquisition.module.css';
@@ -8,7 +8,9 @@ const reasons: Record<NonNullable<OutputIssue['code']>, string> = {
   'invalid-agent-type': '歌手类型', 'missing-time': '缺少时间', 'invalid-range': '时间范围',
   'unsupported-order': '时间顺序', 'empty-content': '空内容', 'punctuation-zero': '标点零时长', 'serialization': '序列化',
 };
-export { Disclosure as Branch } from '../shared/Disclosure';
+export function Branch(props: ComponentProps<typeof Disclosure>) {
+  return <Disclosure {...props} className={styles.validationBranch} />;
+}
 type IssueSelection = { ids: string[]; toggle: (id: string) => void };
 function IssueItems({ issues, keys, locate, selection }: { issues: OutputIssue[]; keys: Set<string>; locate: (issue: OutputIssue) => void; selection?: IssueSelection }) {
   const [limit, setLimit] = useState(50);

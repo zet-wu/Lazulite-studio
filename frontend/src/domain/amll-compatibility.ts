@@ -13,7 +13,7 @@ export type AmllIssue = { id: string; lineId?: string; wordId?: string; agentId?
 export type AmllResults = Record<AmllRule, AmllIssue[]>;
 export function checkAmll(doc: LyricDocument): AmllResults {
   const result: AmllResults = { simplified: [], noMultipleBackgrounds: [], noChorus: [], noWordAgents: [], noIndependentBackground: [] };
-  for (const agent of doc.agents) if (!['v1','v2'].includes(agent.id) || agent.type !== 'person' || agent.name !== null || agent.actorRef) result.simplified.push({id:agent.id,agentId:agent.id,message:'简化模型仅支持匿名 person v1／v2，不能包含名称或 actor 关系'});
+  for (const agent of doc.agents) if (!['v1','v2'].includes(agent.id) || agent.type !== 'person' || agent.name !== null || agent.actorRef) result.simplified.push({id:agent.id,agentId:agent.id,message:'自定义歌手不符合简化歌手模型'});
   const backgrounds = new Map<string, LyricLine[]>();
   for (const line of doc.lines) {
     const base = { id:line.id, lineId:line.id, message:lineText(line) };
