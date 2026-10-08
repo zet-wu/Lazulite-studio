@@ -12,7 +12,6 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from .db import Database
-from .review_fingerprint import fingerprints
 from .project_document import initial_project, validate_project, read_project, read_lyrics
 
 INITIAL_TTML = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>'
@@ -96,29 +95,6 @@ class RevisionStore:
                     != 1
                 ):
                     raise RevisionConflict(row[0])
-                # Confirmations belong to a precise lyric revision. A saved
-                # document makes prior confirmations stale atomically.
-                old_hashes = {}
-                if base:
-                    old_row = conn.execute("SELECT project_path FROM revisions WHERE id=?", (base,)).fetchone()
-                    if old_row:
-                        old_root = ET.fromstring(read_lyrics(old_row[0]))
-                        confirmed_ids = [row[0] for row in conn.execute("SELECT line_id FROM review_confirmations WHERE project_id=? AND status='confirmed'", (project_id,)).fetchall()]
-                        old_fingerprints = fingerprints(old_root)
-                        old_hashes = {line_id: old_fingerprints.get(line_id) for line_id in confirmed_ids}
-                new_root = ET.fromstring(ttml.encode())
-                new_fingerprints = fingerprints(new_root)
-                confirmed = conn.execute("SELECT line_id,content_hash FROM review_confirmations WHERE project_id=? AND status='confirmed'", (project_id,)).fetchall()
-                review_changed = False
-                for item in confirmed:
-                    if old_hashes.get(item[0]) == new_fingerprints.get(item[0]) == item[1]:
-                        conn.execute("UPDATE review_confirmations SET revision=? WHERE project_id=? AND line_id=?", (revision, project_id, item[0]))
-                        review_changed = True
-                    else:
-                        conn.execute("UPDATE review_confirmations SET status='stale' WHERE project_id=? AND line_id=?", (project_id, item[0]))
-                        review_changed = True
-                if review_changed:
-                    conn.execute("INSERT INTO review_versions(project_id,version) VALUES(?,1) ON CONFLICT(project_id) DO UPDATE SET version=version+1", (project_id,))
                 result = {
                     "id": revision,
                     "etag": f'"{revision}"',
@@ -159,7 +135,6 @@ class RevisionStore:
             current = conn.execute('SELECT current_revision FROM projects WHERE id=?', (project_id,)).fetchone()
             if not current: return
             protected = {current[0]}
-            protected.update(row[0] for row in conn.execute('SELECT revision FROM review_confirmations WHERE project_id=?', (project_id,)))
             for job in conn.execute('SELECT request_json,result_json FROM jobs WHERE project_id=?', (project_id,)):
                 request, result = json.loads(job[0]), json.loads(job[1] or '{}')
                 protected.add(request.get('revision'))

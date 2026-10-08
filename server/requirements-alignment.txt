@@ -1,0 +1,5 @@
+# Install from repository root after server/requirements.txt.
+-r requirements-vocal.txt
+transformers==4.57.6
+# Retain the installed Torch/CUDA build. Validated delivery used Torch 2.14.0;
+# Studio's local runtime is recorded with each model run.

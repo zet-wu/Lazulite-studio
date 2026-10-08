@@ -45,3 +45,7 @@ FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针、�
 AMLL 兼容设置和显示顺序在项目快照中保存；`amll_compatibility.py` 在持久化边界检查五项限制、简化联动和排布引用。TTML 的词级歌手和多个独立背景由文档验证器接受；Ruby 内部独立歌手仍明确拒绝。新项目使用限制默认值，不迁移旧快照。
 
 自动对齐依赖固定为 `vendor/lazulite/lazulite-0.2.0-py3-none-any.whl`（散列见同目录 `SHA256SUMS`），不再 editable 引用并列旧仓库。从仓库根目录安装 `server/requirements.txt`。模型运行依赖和 NextFire 路径由服务配置管理，歌词获取与媒体基础能力不加载模型。
+
+自动对齐由 `alignment_projection.py` 从已保存项目构造全局请求，`alignment.py` 校验当前 revision／源音频身份并准备资源，`alignment_worker.py` 在受监管子进程执行固定 NextFire 路线。配置 `STUDIO_NEXTFIRE_PATH` 指向交付模型目录，`STUDIO_ALIGNMENT_DEVICE` 为 `cpu` 或 `cuda`；分离保持 `htdemucs`，设备由 `STUDIO_VOCAL_DEVICE` 配置。安装 `server/requirements-alignment.txt` 不更新已有 Torch 构建。模型散列由 Lazulite 固定校验。
+
+HTTP 提供只读 `alignment-preview?revision=…` 和内部 `jobs/alignment`，只接受 revision 与 use_hints；路径、模型与输出位置均由服务构造。任务与人声互斥、支持幂等启动和取消，结果保留原始／建议时间及映射，服务不自动改稿。当前页面持有一次应用意图。旧转写／行级／forced／读音任务、项目词典与审核路由已删除；`/reading/analyze` 保留主动注音能力。

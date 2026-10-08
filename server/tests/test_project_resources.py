@@ -91,13 +91,12 @@ def test_revision_collection_protects_references_recent_and_current(tmp_path):
         # Make recency deterministic and preserve one old snapshot by age.
         for i,rid in enumerate(ids):c.execute('UPDATE revisions SET created_at=? WHERE id=?',(f'2000-01-01T00:{i//60:02}:{i%60:02}+00:00',rid))
         c.execute('UPDATE revisions SET created_at=? WHERE id=?',(datetime.now(timezone.utc).isoformat(),ids[0]))
-        c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,result_json,created_at,updated_at) VALUES('j','p','reading','succeeded',?,?,'now','now')",(json.dumps({'revision':ids[1]}),json.dumps({'binding':{'revision':ids[2]}})))
-        c.execute("INSERT INTO review_confirmations VALUES('p','line',?,'stale',NULL,'now',NULL)",(ids[3],))
+        c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,result_json,created_at,updated_at) VALUES('j','p','alignment','succeeded',?,?,'now','now')",(json.dumps({'revision':ids[1]}),json.dumps({'binding':{'revision':ids[2]}})))
     store.collect('p')
     with db.connect() as c: kept={row[0] for row in c.execute('SELECT id FROM revisions')}
-    assert set(ids[:4]+[ids[-1]]) <= kept
+    assert set(ids[:3]+[ids[-1]]) <= kept
     assert ids[4] not in kept and ids[5] not in kept
-    assert len(kept) == 104 # 100 unreferenced + three references + current (recent is among 100)
+    assert len(kept) == 103 # 100 unreferenced + two references + current (recent is among 100)
     store.recover()
     assert store.read('p')[0] == ids[-1]
 

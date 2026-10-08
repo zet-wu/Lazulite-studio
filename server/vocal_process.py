@@ -13,7 +13,8 @@ PREFIX = 'STUDIO_VOCAL '
 logger = logging.getLogger(__name__)
 
 class VocalProcess:
-    def __init__(self):
+    def __init__(self, module="server.vocal_worker"):
+        self.module = module
         self._lock = threading.Lock()
         self._process = None
         self._closed = False
@@ -23,7 +24,7 @@ class VocalProcess:
         with self._lock:
             if self._closed:
                 raise RuntimeError('人声工作进程已关闭')
-            process = subprocess.Popen([sys.executable, '-u', '-m', 'server.vocal_worker'],
+            process = subprocess.Popen([sys.executable, '-u', '-m', self.module],
                 cwd=Path(__file__).resolve().parent.parent, stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace')
             self._process = process

@@ -31,11 +31,8 @@ from .job_routes import create_job_router
 from .jobs import JobService
 from .publish import PublishRunner, MediaPublisher
 from .publish_routes import build_publish_router
-from .engine import configured_engine
-from .forced import configured_forced_runner, prepare_forced_request
-from .projection import project_ttml, project_ttml_for_forced
-from .reading import ReadingJobRunner, ReadingDictionary, SudachiReadingProposer, build_dictionary_router, build_analysis_router
-from .review import build_router as build_review_router
+from .engine import EngineUnavailable
+from .reading import SudachiReadingProposer, build_analysis_router
 from .revisions import INITIAL_TTML, RevisionStore
 from .studio.media import Asset, MediaError, MediaProbe, MediaService
 from .upload import UploadLimitMiddleware
@@ -47,8 +44,8 @@ def stamp():
     return datetime.now(timezone.utc).isoformat()
 
 def create_app(
-    data_dir: str | Path | None = None, settings: Settings | None = None, engine=None,
-    reading_proposer=None, forced_aligner=None, publisher=None, separator_factory=None,
+    data_dir: str | Path | None = None, settings: Settings | None = None,
+    reading_proposer=None, publisher=None, separator_factory=None,
 ) -> FastAPI:
     cfg = settings or Settings.from_env()
     if not cfg.origin or (not cfg.trusted_gateway and not cfg.password):
@@ -82,16 +79,9 @@ def create_app(
     from .vocals import VocalRunner
     from .vocal_routes import build_vocal_router, vocal_asset
     vocal_runner = VocalRunner(db, root / 'projects', separator_factory)
-    configured_engine_instance = engine or configured_engine()
-    if forced_aligner is not None:
-        from .forced import ForcedAlignmentRunner
-        configured_engine_instance.forced_runner = ForcedAlignmentRunner(forced_aligner)
-    elif getattr(configured_engine_instance, "forced_runner", None) is None:
-        configured_engine_instance.forced_runner = configured_forced_runner()
     configured_reading_proposer = reading_proposer or SudachiReadingProposer()
     if publisher is None:
         publisher = MediaPublisher()
-    reading_runner = ReadingJobRunner(db, configured_reading_proposer)
     api = APIRouter(prefix="/api/v1")
 
     def fail(code, message, status=400, retryable=False, **extra):
@@ -219,24 +209,13 @@ def create_app(
 
     @api.get("/capabilities")
     def capabilities():
-        reading_enabled = reading_runner.available()
         return {
             "schema_version": "studio-capabilities-v1",
             "items": [
                 {"id": "assets", "enabled": True, "reason": None},
                 {"id": "document.edit", "enabled": True, "reason": None},
                 {"id": "job.run", "enabled": True, "reason": None},
-                {"id": "job.search", "enabled": True, "reason": None},
-                {"id": "job.fetch", "enabled": True, "reason": None},
-                {"id": "job.transcribe", "enabled": bool(getattr(configured_engine_instance, "transcriber", None)),
-                 "reason": None if getattr(configured_engine_instance, "transcriber", None) else "未配置转写模型后端"},
-                {"id": "job.align", "enabled": bool(getattr(configured_engine_instance, "transcriber", None)),
-                 "reason": None if getattr(configured_engine_instance, "transcriber", None) else "未配置转写模型后端"},
-                {"id": "job.forced_align", "enabled": bool(getattr(getattr(configured_engine_instance, "forced_runner", None), "available", False)),
-                 "experimental": True,
-                 "reason": None if getattr(getattr(configured_engine_instance, "forced_runner", None), "available", False) else "未显式配置实验 forced aligner"},
-                {"id": "job.reading", "enabled": reading_enabled,
-                 "reason": None if reading_enabled else (reading_runner.reason() or "未配置日语读音后端")},
+                {"id": "job.alignment", "enabled": alignment_unavailable() is None, "reason": alignment_unavailable()},
                 {"id": "publish.stpp", "enabled": publish_runner.available(),
                  "reason": None if publish_runner.available() else "未配置 STPP 发布器"},
             ],
@@ -579,7 +558,23 @@ def create_app(
             raise ValueError("project source asset not found")
         return root / 'projects' / pid / 'source' / 'original'
 
+    from .alignment import AlignmentRunner, alignment_unavailable
+    from .alignment_projection import project_alignment
+    alignment_runner = AlignmentRunner(db, root / 'projects')
+
+    @api.get('/projects/{pid}/alignment-preview')
+    def alignment_preview(pid: str, revision: str, _=Depends(auth)):
+        project(pid)
+        try:
+            snapshot, _ = alignment_runner.snapshot(pid, revision)
+            return project_alignment(snapshot)['summary']
+        except ValueError as exc: fail('alignment_input_invalid', str(exc), 409)
+
     def validate_job_request(pid, kind, params):
+        if kind == 'alignment':
+            try: alignment_runner.validate(pid, params)
+            except ValueError as exc: fail('alignment_input_invalid', str(exc), 422)
+            return
         if kind == 'vocal':
             row = project(pid)
             if not row[2] or params.get('asset_id') != row[2]: fail('job_input_invalid', '人声任务需要当前项目源音频', 422)
@@ -594,60 +589,17 @@ def create_app(
             return
         if kind == "publish":
             fail("publish_endpoint_required", "publish jobs must use /projects/{pid}/publish", 422)
-        # Automated proposals must identify the immutable inputs they bind to.
-        revision = params.get("revision")
-        asset_id = params.get("asset_id")
-        row = project(pid)
-        if not revision or not asset_id or (revision != row[3] and not _revision_belongs(pid, revision)):
-            fail("job_input_invalid", "job must reference a revision and asset belonging to project", 422)
-        if asset_id != row[2]:
-            fail("job_input_invalid", "asset does not belong to project", 422)
-        with db.connect() as c:
-            revision_row = c.execute("SELECT project_path FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone()
-        if revision_row:
-            try:
-                selected_forced = params.get("line_id") if kind in {"forced", "forced_align", "forced-alignment"} else None
-                projected = (project_ttml_for_forced(StringIO(read_lyrics(revision_row[0])), selected_forced) if kind in {"forced", "forced_align", "forced-alignment"}
-                             else project_ttml(StringIO(read_lyrics(revision_row[0]))))
-                selected = params.get("line_ids")
-                if selected is not None and any(item not in {line["id"] for line in projected} for item in selected):
-                    fail("job_input_invalid", "selected line does not belong to revision", 422)
-                if kind in {"line_align", "align"}:
-                    params["lines"] = [line for line in projected if selected is None or line["id"] in selected]
-                if kind in {"forced", "forced_align", "forced-alignment"}:
-                    line_id = params.get("line_id")
-                    if not line_id or line_id not in {line["id"] for line in projected}:
-                        fail("job_input_invalid", "forced alignment requires one line_id", 422)
-                    line = next(line for line in projected if line["id"] == line_id)
-                    with db.connect() as review_db:
-                        confirmation = review_db.execute(
-                            "SELECT status,revision FROM review_confirmations WHERE project_id=? AND line_id=?",
-                            (pid, line_id),
-                        ).fetchone()
-                    if not confirmation or confirmation[0] != "confirmed" or confirmation[1] != revision:
-                        fail("job_input_invalid", "forced alignment requires a confirmed lyric line at this revision", 422)
-                    try:
-                        prepare_forced_request(line, params, confirmed=bool(confirmation and confirmation[0] == "confirmed"), confirmed_revision=confirmation[1] if confirmation else None, revision=revision)
-                    except ValueError as exc:
-                        fail("job_input_invalid", str(exc), 422)
-            except (ET.ParseError, OSError, ValueError) as exc:
-                fail("job_input_invalid", "revision cannot be projected", 422)
-
-    def _revision_belongs(pid, revision):
-        with db.connect() as c:
-            return c.execute("SELECT 1 FROM revisions WHERE id=? AND project_id=?", (revision, pid)).fetchone() is not None
+        fail('job_kind_removed', '不支持此任务类别', 422)
 
     publish_runner = PublishRunner(revisions, asset_path_for_project, root / "projects", publisher=publisher)
-    job_service = JobService(db, engine=configured_engine_instance, asset_path=asset_path_for_project, reading_runner=reading_runner, publish_runner=publish_runner, vocal_runner=vocal_runner)
+    job_service = JobService(db, asset_path=asset_path_for_project, publish_runner=publish_runner, vocal_runner=vocal_runner, alignment_runner=alignment_runner)
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
     api.include_router(build_vocal_router(vocal_runner, auth=auth, project_exists=project))
     api.include_router(build_analysis_router(configured_reading_proposer, write=write))
-    api.include_router(build_dictionary_router(ReadingDictionary(db), auth=auth, write=write, project_exists=project))
     api.include_router(build_router(DocumentService(revisions), auth=auth, write=write, project_exists=project))
     from .lyric_sources import build_sources_router
     api.include_router(build_sources_router(write=write))
     api.include_router(build_publish_router(job_service, auth=auth, write=write, project_row=project, asset_path=asset_path_for_project))
-    api.include_router(build_review_router(db, auth=auth, write=write, project_exists=project, stamp=stamp))
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
     app.include_router(api)
     app.add_middleware(UploadLimitMiddleware, limit=MAX_UPLOAD + 1024 * 1024)

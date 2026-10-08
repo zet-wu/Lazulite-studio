@@ -6,9 +6,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .db import Database
-from .engine import EngineUnavailable, LazuliteEngine
+from .engine import EngineUnavailable
 from .reading import ReadingUnavailable
-from .forced import ForcedUnavailable
 from .publish import PublishInvalid
 from .publishing import PublishingError
 from .vocals import VocalCancelled
@@ -19,9 +18,10 @@ def now(): return datetime.now(timezone.utc).isoformat()
 
 class JobService:
     """Durable single-slot executor. Every lifecycle transition is committed before notification."""
-    def __init__(self, db: Database, *, engine=None, asset_path=None, reading_runner=None, publish_runner=None, vocal_runner=None):
-        self.db, self.engine, self.asset_path, self.reading_runner, self.publish_runner = db, engine or LazuliteEngine(), asset_path, reading_runner, publish_runner
+    def __init__(self, db: Database, *, asset_path=None, publish_runner=None, vocal_runner=None, alignment_runner=None):
+        self.db, self.asset_path, self.publish_runner = db, asset_path, publish_runner
         self.vocal_runner = vocal_runner
+        self.alignment_runner = alignment_runner
         self._lock = threading.RLock(); self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="studio-job")
         with db.transaction() as c:
             rows = c.execute("SELECT id FROM jobs WHERE status IN ('queued','running','cancel_requested')").fetchall()
@@ -77,6 +77,9 @@ class JobService:
                 if old:
                     if old[0]!=digest: raise ValueError("idempotency key was used for another request")
                     return self.get(old[1])
+            if kind in {'vocal', 'alignment'}:
+                active = c.execute("SELECT id,kind FROM jobs WHERE project_id=? AND kind IN ('vocal','alignment') AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone()
+                if active and (kind != 'vocal' or active['kind'] != 'vocal'): raise ValueError('已有音频处理运行，请等待完成或取消')
             if kind == 'vocal':
                 active = c.execute("SELECT id FROM jobs WHERE project_id=? AND kind='vocal' AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone()
                 if active: return self.get(active[0])
@@ -103,21 +106,21 @@ class JobService:
             if kind == "vocal":
                 result = self.vocal_runner.run(record[1], self.asset_path(record[1]), request, jid,
                     lambda *x: self.emit(jid, *x), lambda: self.get(jid)['status'] == 'cancel_requested')
-            elif kind == "reading":
-                if self.reading_runner is None:
-                    raise ReadingUnavailable("未配置读音后端")
-                result = self.reading_runner.run(record[1], request)
+            elif kind == "alignment":
+                result = self.alignment_runner.run(record[1], self.asset_path(record[1]), request, jid,
+                    lambda *x: self.emit(jid, *x), lambda: self.get(jid)["status"] == "cancel_requested")
             elif kind == "publish":
                 if self.publish_runner is None:
                     raise RuntimeError("STPP publisher is not configured")
                 result = self.publish_runner.run(record[1], request)
             else:
-                result=self.engine.run(kind, asset_path=self.asset_path(record[1]) if self.asset_path else None, params=request, emit=lambda *x:self.emit(jid,*x))
+                raise ValueError("不支持此任务类别")
             if kind != "vocal":
                 with self.db.connect() as c:
                     project = c.execute("SELECT source_asset_id,current_revision FROM projects WHERE id=?", (record[1],)).fetchone()
                     bound_revision = request.get("revision")
                     bound_asset = request.get("asset_id")
+                    if kind == "alignment" and (project is None or project["current_revision"] != bound_revision or project["source_asset_id"] != bound_asset): raise ValueError("项目版本或源音频已改变，请重新运行")
                     rev = c.execute("SELECT project_path FROM revisions WHERE id=? AND project_id=?", (bound_revision, record[1])).fetchone()
                     if not rev:
                         raise RuntimeError("bound revision disappeared")
@@ -128,7 +131,7 @@ class JobService:
                                      "revision_sha256": revision_hash}
             with self._lock, self.db.transaction() as c:
                 cancelled = c.execute('SELECT cancel_requested FROM jobs WHERE id=?', (jid,)).fetchone()
-                if kind in {'publish', 'vocal'} and cancelled[0]:
+                if kind in {'publish', 'vocal', 'alignment'} and cancelled[0]:
                     t = now()
                     c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=?", (t,t,jid))
                     self._event(c,jid,'state','cancelled',None,None,'打包已取消')
@@ -147,13 +150,13 @@ class JobService:
                 c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=?", (t,t,jid))
                 self._event(c,jid,'state','cancelled',None,None,'人声任务已在阶段边界停止')
         except (PublishInvalid, PublishingError) as exc: self._finish_error(jid, "publish_failed", str(exc))
-        except (EngineUnavailable, ReadingUnavailable, ForcedUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
+        except (EngineUnavailable, ReadingUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
         except Exception as exc:
             logger.exception("job %s failed", jid)
-            self._finish_error(jid, "engine_error", "Lazulite engine failed; inspect server logs")
+            self._finish_error(jid, "engine_error", str(exc) if kind == "alignment" else "Lazulite engine failed; inspect server logs")
 
         finally:
-            if record and record[2] == 'vocal': self.vocal_runner.clean_unregistered(record[1], jid)
+            if record and record[2] in {'vocal','alignment'}: self.vocal_runner.clean_unregistered(record[1], jid)
             if not published and isinstance(result, dict) and result.get('output_path') and record[2] == 'publish':
                 try:
                     Path(result['output_path']).unlink(missing_ok=True)
@@ -193,4 +196,5 @@ class JobService:
 
     def close(self):
         if self.vocal_runner is not None: self.vocal_runner.close()
+        if self.alignment_runner is not None: self.alignment_runner.close()
         self._pool.shutdown(wait=False, cancel_futures=False)

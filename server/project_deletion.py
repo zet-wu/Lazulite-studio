@@ -34,7 +34,7 @@ def delete_project(db, root: Path, pid: str):
                 moved = True
             c.execute('DELETE FROM job_events WHERE job_id IN (SELECT id FROM jobs WHERE project_id=?)', (pid,))
             c.execute("DELETE FROM idempotency WHERE json_extract(response,'$.id')=? OR json_extract(response,'$.id') IN (SELECT id FROM revisions WHERE project_id=?)", (pid,pid))
-            for table in ('vocal_results','search_conditions','job_idempotency','jobs','reading_dictionary','review_confirmations','review_versions','revisions'):
+            for table in ('vocal_results','search_conditions','job_idempotency','jobs','revisions'):
                 c.execute(f'DELETE FROM {table} WHERE project_id=?', (pid,))
             c.execute('DELETE FROM projects WHERE id=?', (pid,))
             c.execute('DELETE FROM assets WHERE id=?', (project[0],))

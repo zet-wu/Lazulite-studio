@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from server.projection import project_ttml, project_ttml_for_forced
+from server.projection import project_ttml
 from server.documents import validate_ttml
 
 
@@ -16,25 +16,4 @@ def test_reference_tool_roles_and_absolute_numeric_times_are_projected_as_main_l
         source = evidence / filename
         validate_ttml(source.read_text(encoding="utf-8"))
         assert project_ttml(source) == [{"id": line_id, "text": "今日も歌う"}]
-        forced = project_ttml_for_forced(source)
-        assert len(forced) == 1
-        assert forced[0]["text"] == "今日も歌う"
-        assert forced[0]["begin"] == 0.0
-        assert forced[0]["end"] == 2.0
-        assert forced[0]["reading_spans"] == [{
-            "ruby_id": f"{line_id}:ruby-0", "base_start": 0, "base_end": 2,
-            "base": "今日", "reading": "きょう",
-        }]
 
-
-def test_apple_reference_projection_uses_itunes_line_keys_and_skips_metadata():
-    source = Path(__file__).resolve().parents[2] / "tests/fixtures/ttml/reference-apple-metadata.ttml"
-    validate_ttml(source.read_text(encoding="utf-8"))
-    assert project_ttml(source) == [{"id": "L1", "text": "今日 も歌う"}, {"id": "L2", "text": "宇宙"}]
-    forced = project_ttml_for_forced(source, selected_line_id="L1")
-    assert len(forced) == 1
-    assert forced[0]["id"] == "L1"
-    assert forced[0]["text"] == "今日 も歌う"
-    assert forced[0]["begin"] == 1.0
-    assert forced[0]["end"] == 3.0
-    assert forced[0]["reading_spans"][0]["base"] == "今日"

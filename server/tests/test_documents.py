@@ -101,41 +101,8 @@ def test_import_lrc_multiple_tags_metadata_offset_and_plain_text(tmp_path):
     assert missing.status_code == 404
 
 
-def test_review_tracks_only_changed_line_and_save_is_atomic(tmp_path):
-    setup_project(tmp_path)
-    db = Database(tmp_path / "studio.sqlite3")
-    store = RevisionStore(db, tmp_path / "projects")
-    with db.transaction() as c:
-        old = c.execute("SELECT current_revision FROM projects WHERE id='p'").fetchone()[0]
-    xml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="a" begin="0s" end="1s">A</p><p xml:id="b" begin="1s" end="2s">B</p></div></body></tt>'
-    rev = store.create("p", initial_project(xml, None), old)["id"]
-    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
-    doc = client.get("/api/v1/projects/p/document").json()
-    review = client.get("/api/v1/projects/p/review").json()
-    patch_headers = {"origin": "http://studio", "if-match": f'"{review["version"]}"'}
-    confirmed = client.patch("/api/v1/projects/p/review", json={"line_id": "a", "document_revision": doc["revision"], "confirmed": True}, headers=patch_headers)
-    assert confirmed.status_code == 200
-    body = {"schema_version": "studio-document-v7", "project_id": "p", "revision": doc["revision"], "document": initial_project(xml.replace('>B</p>', '>B2</p>'), None)}
-    changed = client.put("/api/v1/projects/p/document", json=body, headers={"origin": "http://studio", "if-match": f'"{doc["revision"]}"', "idempotency-key": "change-b"})
-    assert changed.status_code == 200
-    items = {x["line_id"]: x for x in client.get("/api/v1/projects/p/review").json()["items"]}
-    assert items["a"]["status"] == "confirmed" and items["a"]["revision"] == changed.json()["revision"]
-    old_patch = client.patch("/api/v1/projects/p/review", json={"line_id": "a", "document_revision": doc["revision"], "confirmed": True}, headers={"origin": "http://studio", "if-match": '"1"'})
-    assert old_patch.status_code == 412
-    newer = {**body, "revision": changed.json()["revision"], "document": initial_project(xml.replace('>A</p>', '>A2</p>').replace('>B</p>', '>B2</p>'), None)}
-    saved = client.put("/api/v1/projects/p/document", json=newer, headers={"origin": "http://studio", "if-match": f'"{changed.json()["revision"]}"', "idempotency-key": "change-a"})
-    assert saved.status_code == 200
-    items = {x["line_id"]: x for x in client.get("/api/v1/projects/p/review").json()["items"]}
-    assert items["a"]["status"] == "stale"
-    with db.transaction() as c:
-        c.execute("CREATE TRIGGER reject_review_update BEFORE UPDATE OF status ON review_confirmations BEGIN SELECT RAISE(ABORT, 'blocked'); END")
-    before = client.get("/api/v1/projects/p/document").json()["revision"]
-    failed = client.put("/api/v1/projects/p/document", json=newer, headers={"origin": "http://studio", "if-match": f'"{before}"', "idempotency-key": "change-c"})
-    assert failed.status_code >= 400
-    assert client.get("/api/v1/projects/p/document").json()["revision"] == before
 
-
-def test_acoustic_edit_is_saved_atomically_and_preserves_lyric_review(tmp_path):
+def test_acoustic_edit_is_saved_atomically(tmp_path):
     from server.tests.media_fixture import add_media_project
     import subprocess
     db = Database(tmp_path / 'studio.sqlite3')
@@ -146,16 +113,12 @@ def test_acoustic_edit_is_saved_atomically_and_preserves_lyric_review(tmp_path):
     client = TestClient(create_app(tmp_path, Settings(None, True, 'http://studio')))
     before = client.get('/api/v1/projects/p/document')
     envelope = before.json()
-    confirmation = client.patch('/api/v1/projects/p/review', json={'line_id': 'a', 'document_revision': envelope['revision'], 'confirmed': True}, headers={'origin': 'http://studio', 'if-match': '0'})
-    assert confirmation.status_code == 200
     envelope['document']['acoustics']['segments'] = [{'id': 's', 'beginMs': 100, 'endMs': 1500}]
     body = {k: envelope[k] for k in ('schema_version', 'project_id', 'revision', 'document')}
     response = client.put('/api/v1/projects/p/document', json=body, headers={'origin': 'http://studio', 'if-match': before.headers['etag']})
     assert response.status_code == 200
     reopened = client.get('/api/v1/projects/p/document').json()
     assert reopened['document'] == envelope['document']
-    review = client.get('/api/v1/projects/p/review').json()['items'][0]
-    assert review['status'] == 'confirmed' and review['revision'] == reopened['revision']
     assert client.put('/api/v1/projects/p/document', json=body, headers={'origin': 'http://studio', 'if-match': before.headers['etag']}).status_code == 412
     body['revision'] = reopened['revision']
     body['document']['sourceAssetId'] = 'wrong'

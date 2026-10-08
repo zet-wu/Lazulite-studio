@@ -1,7 +1,6 @@
-"""Japanese reading proposals and the small project dictionary store."""
+"""Active, stateless Japanese reading analysis for the Ruby editor."""
 from __future__ import annotations
 from io import StringIO
-from .project_document import read_lyrics
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -16,8 +15,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from .furigana import load_index, token_segments
-from .db import Database
-from .projection import project_ttml
 
 
 def _now() -> str:
@@ -144,140 +141,6 @@ def propose_readings(lines: Sequence[Mapping[str, str]], proposer: ReadingPropos
     texts = {str(line["id"]): str(line.get("text", "")) for line in lines}
     return [_coerce_proposal(item, texts) for item in proposer.propose(lines, dictionary)]
 
-
-class ReadingDictionary:
-    def __init__(self, db: Database):
-        self.db = db
-
-    def list(self, project_id: str) -> list[dict[str, str]]:
-        with self.db.connect() as conn:
-            rows = conn.execute(
-                "SELECT id,surface,reading,updated_at FROM reading_dictionary WHERE project_id=? ORDER BY surface,id",
-                (project_id,),
-            ).fetchall()
-        return [dict(row) for row in rows]
-
-    def create(self, project_id: str, surface: str, reading: str) -> dict[str, str]:
-        surface, reading = self._values(surface, reading)
-        entry = {"id": uuid.uuid4().hex, "surface": surface, "reading": reading, "updated_at": _now()}
-        try:
-            with self.db.transaction() as conn:
-                conn.execute(
-                    "INSERT INTO reading_dictionary(id,project_id,surface,reading,updated_at) VALUES(?,?,?,?,?)",
-                    (entry["id"], project_id, surface, reading, entry["updated_at"]),
-                )
-        except sqlite3.IntegrityError as exc:
-            raise DictionaryConflict(surface) from exc
-        return entry
-
-    def update(self, project_id: str, entry_id: str, surface: str, reading: str) -> dict[str, str] | None:
-        surface, reading = self._values(surface, reading)
-        updated_at = _now()
-        try:
-            with self.db.transaction() as conn:
-                cursor = conn.execute(
-                    "UPDATE reading_dictionary SET surface=?,reading=?,updated_at=? WHERE id=? AND project_id=?",
-                    (surface, reading, updated_at, entry_id, project_id),
-                )
-                if cursor.rowcount == 0:
-                    return None
-        except sqlite3.IntegrityError as exc:
-            raise DictionaryConflict(surface) from exc
-        return {"id": entry_id, "surface": surface, "reading": reading, "updated_at": updated_at}
-
-    def delete(self, project_id: str, entry_id: str) -> bool:
-        with self.db.transaction() as conn:
-            return conn.execute("DELETE FROM reading_dictionary WHERE id=? AND project_id=?", (entry_id, project_id)).rowcount == 1
-
-    @staticmethod
-    def _values(surface: str, reading: str) -> tuple[str, str]:
-        surface, reading = surface.strip(), reading.strip()
-        if not surface or not reading:
-            raise ValueError("surface and reading must be non-empty")
-        return surface, reading
-
-
-class DictionaryConflict(ValueError):
-    pass
-
-
-class DictionaryBody(BaseModel):
-    surface: str = Field(min_length=1)
-    reading: str = Field(min_length=1)
-
-
-def build_dictionary_router(store: ReadingDictionary, *, auth, write, project_exists) -> APIRouter:
-    router = APIRouter()
-
-    def register(prefix: str) -> None:
-        @router.get(prefix)
-        def list_entries(pid: str, _: object = Depends(auth)):
-            project_exists(pid)
-            return {"schema_version": "studio-reading-dictionary-v1", "project_id": pid, "items": store.list(pid)}
-
-        @router.post(prefix, status_code=201)
-        def create_entry(pid: str, body: DictionaryBody, _: object = Depends(write)):
-            project_exists(pid)
-            try:
-                entry = store.create(pid, body.surface, body.reading)
-            except ValueError as exc:
-                raise HTTPException(409 if isinstance(exc, DictionaryConflict) else 422, {"code": "dictionary_conflict" if isinstance(exc, DictionaryConflict) else "dictionary_invalid", "message": str(exc), "retryable": False}) from exc
-            return {"schema_version": "studio-reading-dictionary-entry-v1", "project_id": pid, **entry}
-
-        @router.put(prefix + "/{entry_id}")
-        def update_entry(pid: str, entry_id: str, body: DictionaryBody, _: object = Depends(write)):
-            project_exists(pid)
-            try:
-                entry = store.update(pid, entry_id, body.surface, body.reading)
-            except ValueError as exc:
-                raise HTTPException(409 if isinstance(exc, DictionaryConflict) else 422, {"code": "dictionary_conflict" if isinstance(exc, DictionaryConflict) else "dictionary_invalid", "message": str(exc), "retryable": False}) from exc
-            if entry is None:
-                raise HTTPException(404, {"code": "dictionary_entry_not_found", "message": "dictionary entry not found", "retryable": False})
-            return {"schema_version": "studio-reading-dictionary-entry-v1", "project_id": pid, **entry}
-
-        @router.delete(prefix + "/{entry_id}", status_code=204)
-        def delete_entry(pid: str, entry_id: str, _: object = Depends(write)):
-            project_exists(pid)
-            if not store.delete(pid, entry_id):
-                raise HTTPException(404, {"code": "dictionary_entry_not_found", "message": "dictionary entry not found", "retryable": False})
-            return None
-
-    register("/projects/{pid}/reading-dictionary")
-    return router
-
-
-class ReadingJobRunner:
-    """Job adapter that snapshots text from the requested immutable revision."""
-
-    def __init__(self, db: Database, proposer: ReadingProposer):
-        self.db, self.proposer, self.dictionary = db, proposer, ReadingDictionary(db)
-
-    def available(self) -> bool:
-        return bool(getattr(self.proposer, "available", True))
-
-    def reason(self) -> str | None:
-        return getattr(self.proposer, "unavailable_reason", None)
-
-    def run(self, project_id: str, params: Mapping[str, Any]) -> dict[str, Any]:
-        if not self.available():
-            raise ReadingUnavailable(self.reason() or "未配置日语读音后端")
-        revision = params.get("revision")
-        with self.db.connect() as conn:
-            row = conn.execute(
-                "SELECT project_path FROM revisions WHERE id=? AND project_id=?", (revision, project_id)
-            ).fetchone()
-        if not row:
-            raise ValueError("reading revision not found")
-        projected = project_ttml(StringIO(read_lyrics(row[0])))
-        selected = params.get("line_ids")
-        if selected is not None:
-            selected_set = set(selected)
-            projected = [line for line in projected if line["id"] in selected_set]
-        dictionary = {item["surface"]: item["reading"] for item in self.dictionary.list(project_id)}
-        proposals = propose_readings(projected, self.proposer, dictionary)
-        identity = getattr(self.proposer, "identity", None)
-        engine = identity() if callable(identity) else {"name": "reading", "build": "injected"}
-        return {"kind": "reading", "engine": engine, "proposals": [item.as_dict() for item in proposals]}
 
 class ReadingLine(BaseModel):
     id: str = Field(min_length=1, max_length=200)

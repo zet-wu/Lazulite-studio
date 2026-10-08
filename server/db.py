@@ -33,13 +33,6 @@ CREATE TABLE IF NOT EXISTS idempotency (
  key TEXT PRIMARY KEY, subject TEXT NOT NULL, request_hash TEXT NOT NULL, response TEXT NOT NULL, created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, expires_at TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS review_versions (project_id TEXT PRIMARY KEY, version INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS review_confirmations (
- project_id TEXT NOT NULL, line_id TEXT NOT NULL, revision TEXT NOT NULL,
- status TEXT NOT NULL, note TEXT, updated_at TEXT NOT NULL,
- content_hash TEXT,
- PRIMARY KEY(project_id,line_id)
-);
 CREATE TABLE IF NOT EXISTS jobs (
  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
  request_json TEXT NOT NULL, result_json TEXT, error_json TEXT, engine_json TEXT,
@@ -57,11 +50,6 @@ CREATE TABLE IF NOT EXISTS job_idempotency (
  project_id TEXT NOT NULL, idem_key TEXT NOT NULL, request_hash TEXT NOT NULL, job_id TEXT NOT NULL,
  PRIMARY KEY(project_id, idem_key), FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
-CREATE TABLE IF NOT EXISTS reading_dictionary (
- id TEXT PRIMARY KEY, project_id TEXT NOT NULL, surface TEXT NOT NULL, reading TEXT NOT NULL,
- updated_at TEXT NOT NULL, UNIQUE(project_id, surface), FOREIGN KEY(project_id) REFERENCES projects(id)
-);
-CREATE INDEX IF NOT EXISTS reading_dictionary_project ON reading_dictionary(project_id, surface);
 """
 
 

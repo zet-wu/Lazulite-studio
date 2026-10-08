@@ -27,8 +27,6 @@ def test_delete_project_releases_owned_resources_and_preserves_other_project(tmp
         c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,result_json,created_at,updated_at) VALUES(?,?,'publish','succeeded','{}',?,'now','now')", ('j', pid, json.dumps({'output_path': str(output)})))
         c.execute("INSERT INTO job_events VALUES('j',1,'state',NULL,NULL,NULL,NULL,0,'now')")
         c.execute("INSERT INTO job_idempotency VALUES(?,'key','hash','j')", (pid,))
-        c.execute("INSERT INTO reading_dictionary VALUES('dict',?,'a','b','now')", (pid,))
-        c.execute('INSERT INTO review_versions VALUES(?,1)', (pid,))
         vocal = tmp_path / 'projects' / pid / 'vocals' / 'voice'; vocal.mkdir(parents=True)
         (vocal / 'vocals.flac').write_bytes(b'flac')
         (vocal / 'energy.npy').write_bytes(b'energy')
