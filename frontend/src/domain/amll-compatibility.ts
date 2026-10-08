@@ -42,6 +42,7 @@ export function assertAmll(doc: LyricDocument, settings: AmllSettings) {
 }
 export function validateAgents(doc: LyricDocument) {
   const ids=new Set(doc.agents.map(agent=>agent.id));
+  if(ids.size!==doc.agents.length)throw new Error('歌手标识重复');
   for(const line of doc.lines) for(const refs of [line.agentRefs,...line.words.map(word=>word.agentRefs)]) if(refs!==undefined && (!Array.isArray(refs)||new Set(refs).size!==refs.length||refs.some(id=>!ids.has(id)))) throw new Error('歌手引用无效或重复');
   for(const line of doc.lines) for(const word of line.words) if(word.agentRefs && !word.agentRefs.length) throw new Error('词级歌手清除时必须移除字段');
 }
@@ -54,7 +55,8 @@ export function preserveWordAgents(doc: LyricDocument, from: LyricLine, to: Lyri
 }
 export function displayLines(doc: LyricDocument, order: string[]) {
   const byId=new Map(doc.lines.map(line=>[line.id,line]));
-  return [...order.flatMap(id=>byId.has(id)?[byId.get(id)!]:[]),...doc.lines.filter(line=>!order.includes(line.id))];
+  const included=new Set(order);
+  return [...order.flatMap(id=>byId.has(id)?[byId.get(id)!]:[]),...doc.lines.filter(line=>!included.has(line.id))];
 }
 export function groupDisplayLines(doc: LyricDocument, before: string[]) {
   return doc.lines.filter(line=>!line.backgroundOf).flatMap(line=>{

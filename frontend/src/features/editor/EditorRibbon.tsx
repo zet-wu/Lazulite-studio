@@ -28,6 +28,7 @@ type Props = MenuState & {
   openTranslationTracks: () => void;
   openTracks: () => void;
   openMetadata: () => void;
+  singersDisabled?: boolean;
   openSingers: () => void;
 };
 
@@ -55,7 +56,7 @@ export function EditorRibbon(props: Props) {
     </TopMenu>
     <TopMenu id="lyrics-settings" title="歌词设置" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
       <button data-role="inline" onClick={props.openMetadata}>歌词元数据</button>
-      <button data-role="inline" onClick={props.openSingers}>歌手管理</button>
+      <button data-role="inline" disabled={props.singersDisabled} onClick={props.openSingers}>歌手管理</button>
       <button data-role="inline" onClick={props.openTranslationTracks}>管理翻译轨道…</button>
       <button data-role="inline" onClick={props.openTracks}>管理音译轨道…</button>
     </TopMenu>

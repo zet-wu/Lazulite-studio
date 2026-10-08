@@ -5,8 +5,8 @@ import { LineSplitDialog } from './LineSplitDialog';
 afterEach(cleanup);
 it('previews multiple cuts and requires reassignment when a background segment disappears', () => {
   const line = createLine(''); line.words = [0, 1, 2, 3].map(i => createWord(`${i}`, `w${i}`));
-  const submit = vi.fn(() => true);
-  render(<LineSplitDialog line={line} translations={[]} attached={[]} background={createLine('背景')} close={() => {}} submit={submit} />);
+  const submit = vi.fn((_plan: import('../../domain/lyric-commands').LineSplitPlan) => true);
+  render(<LineSplitDialog line={line} translations={[]} attached={[]} backgrounds={[createLine('背景')]} close={() => {}} submit={submit} />);
   expect(screen.getByRole('button', { name: '应用' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: '在第 4 词前切分' }));
   fireEvent.click(screen.getByRole('button', { name: '在第 2 词前切分' }));
@@ -19,11 +19,11 @@ it('previews multiple cuts and requires reassignment when a background segment d
 
 it('defaults background to the last of three results while adding boundaries', () => {
   const line = createLine(''); line.words = [0, 1, 2, 3].map(i => createWord(`${i}`, `w${i}`));
-  const submit = vi.fn(() => true);
-  render(<LineSplitDialog line={line} translations={[]} attached={[]} background={createLine('背景')} close={() => {}} submit={submit} />);
+  const submit = vi.fn((_plan: import('../../domain/lyric-commands').LineSplitPlan) => true);
+  render(<LineSplitDialog line={line} translations={[]} attached={[]} backgrounds={[createLine('背景')]} close={() => {}} submit={submit} />);
   fireEvent.click(screen.getByRole('button', { name: '在第 2 词前切分' }));
   fireEvent.click(screen.getByRole('button', { name: '在第 4 词前切分' }));
   expect(screen.getByLabelText('拆分结果').querySelectorAll('section')[2]).toHaveTextContent('背景');
   fireEvent.click(screen.getByRole('button', { name: '应用' }));
-  expect(submit).toHaveBeenCalledWith(expect.objectContaining({ backgroundTarget: 2 }));
+  expect(Object.values(submit.mock.calls[0][0].backgroundTargets!)).toEqual([2]);
 });

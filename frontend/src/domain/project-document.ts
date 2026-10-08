@@ -40,6 +40,7 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     if (!state.present.lyrics.lines.find(line=>line.id===command.lineId)?.backgroundOf) throw new Error('只能前置背景行');
     const line = state.present.lyrics.lines.find(line=>line.id===command.lineId)!;
     const shown=displayLines(state.present.lyrics,state.present.lineOrder);
+    if((shown.indexOf(line)<shown.findIndex(item=>item.id===line.backgroundOf))===command.before)return state;
     const ids=shown.map(item=>item.id).filter(id=>id!==line.id);
     const parent=ids.indexOf(line.backgroundOf!);
     const end=ids.reduce((last,id,i)=>state.present.lyrics.lines.find(item=>item.id===id)?.backgroundOf===line.backgroundOf ? Math.max(last,i):last,parent);
@@ -67,12 +68,13 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
         lyrics.agents=[{id:'v1',name:null,type:'person'},{id:'v2',name:null,type:'person'}];
       } else if(command.rule==='noMultipleBackgrounds') {
         const displayed=displayLines(lyrics,state.present.lineOrder);
+        let converted=false;
         for(const parent of lyrics.lines.filter(line=>!line.backgroundOf&&included(line.id))) {
           for(const bg of lyrics.lines.filter(line=>line.backgroundOf===parent.id).slice(1)) {
-            bg.agentRefs=[...lineAgents(lyrics,bg)]; bg.backgroundOf=null;
+            bg.agentRefs=[...lineAgents(lyrics,bg)]; bg.backgroundOf=null; converted=true;
           }
         }
-        lyrics.lines=displayed;
+        if(converted) lyrics.lines=displayed;
       } else for(const line of lyrics.lines) {
         if(command.rule==='noChorus') {
           if(included(line.id)) line.agentRefs=line.agentRefs.slice(0,1);
@@ -97,7 +99,8 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     if (command.acoustics === state.present.acoustics) return state;
     present = { ...state.present, acoustics: command.acoustics };
   }
-  present = { ...present, lineOrder: present.lineOrder.filter(id=>present.lyrics.lines.some(line=>line.id===id)) };
+  const lineIds=new Set(present.lyrics.lines.map(line=>line.id));
+  present = { ...present, lineOrder: present.lineOrder.filter(id=>lineIds.has(id)) };
   assertAmll(present.lyrics, present.amll);
   return { present, past: [...state.past.slice(-255), state.present], future: [] };
 }

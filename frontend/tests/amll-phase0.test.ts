@@ -69,3 +69,35 @@ it('rejects cross-line inheritance loss and unequal merge, preserves effective s
  doc=applyLyricCommand(doc,{type:'move-word',lineId:from.id,wordId:'w',toLineId:to.id,afterWordId:null});expect(doc.lines[1].words[0].agentRefs).toEqual(['a']);
  doc.lines[1].words.push(createWord('two','w2'));expect(()=>applyLyricCommand(doc,{type:'merge-words',wordIds:['w','w2']})).toThrow(/统一/);
 });
+
+it('copies every background and attachment and remaps editing references',()=>{
+ const doc=rich(),main=doc.lines[0];
+ const editing=createProjectEditing();editing.ignoredSyncLineIds=['bg2'];editing.emptyBeats[doc.lines[1].words[0].id]={kind:'word',count:2};
+ const selection={kind:'lines' as const,ids:[main.id],anchorId:main.id,activeId:main.id};
+ const pasted=pasteRich(doc,copySelection(doc,selection,editing),selection);
+ const result=applyLyricTransaction(doc,pasted.command,editing);
+ const copied=result.lyrics.lines.filter(l=>!doc.lines.some(old=>old.id===l.id));
+ expect(copied).toHaveLength(3);expect(copied.slice(1).map(l=>l.backgroundOf)).toEqual([copied[0].id,copied[0].id]);
+ expect(copied.map(l=>l.words[0].agentRefs)).toEqual(doc.lines.map(l=>l.words[0].agentRefs));
+ for(const track of [result.lyrics.translationTracks[0],result.lyrics.romanizationTracks[0]])expect(track.contents.slice(3).map(c=>c.lineId)).toEqual(copied.map(l=>l.id));
+ expect(result.editing.ignoredSyncLineIds).toContain(copied[2].id);expect(result.editing.emptyBeats[copied[1].words[0].id].count).toBe(2);
+});
+it('splits with each background assigned separately, preserving attachments and singers',()=>{
+ const doc=rich(),main=doc.lines[0];main.words=[{...createWord('first','w1'),beginMs:0,endMs:500,agentRefs:['b']},{...createWord('second','w2'),beginMs:1000,endMs:1500}];main.endMs=1500;
+ const split=applyLyricCommand(doc,{type:'split-line',lineId:main.id,beforeWordIds:['w2'],newLineIds:['second'],contentTargets:{[`r-${main.id}`]:0},translationTargets:{[`t-${main.id}`]:1},backgroundTargets:{bg1:0,bg2:1}});
+ expect(split.lines.map(l=>[l.id,l.backgroundOf])).toEqual([[main.id,null],['bg1',main.id],['second',null],['bg2','second']]);
+ expect(split.lines[0].words[0].agentRefs).toEqual(['b']);expect(split.lines[3]).toEqual({...doc.lines[2],backgroundOf:'second'});
+ expect(split.translationTracks[0].contents.find(c=>c.lineId==='bg2')).toEqual(doc.translationTracks[0].contents[2]);
+});
+it('moves the explicit preposed line set without expanding to intervening backgrounds',()=>{
+ const doc=rich(),main=doc.lines[0];const shown=displayLines(doc,['bg2',main.id,'bg1']);
+ const moved=moveTimeline(doc,[{kind:'line',lineId:shown[0].id},{kind:'line',lineId:shown[1].id}],500);
+ expect(moved.lines.map(l=>l.beginMs)).toEqual([500,1000,2500]);
+ expect(moved.translationTracks[0].contents).toEqual(doc.translationTracks[0].contents);
+ expect(moved.romanizationTracks[0].contents.map(c=>c.kind==='timed'?c.units[0].beginMs:null)).toEqual([500,1000,2500]);
+});
+import {copySelection,pasteRich} from '../src/features/editor/editing-actions';
+import {createProjectEditing} from '../src/domain/project-editing';
+import {applyLyricTransaction} from '../src/domain/lyric-commands';
+import {displayLines} from '../src/domain/amll-compatibility';
+import {moveTimeline} from '../src/domain/timeline-editing';

@@ -1,3 +1,5 @@
+import { AmllPanel } from './AmllPanel';
+import type { ProjectDocument, ProjectCommand } from '../domain/project-document';
 import { Icon } from '../shared/Icon';
 import { useProjectEditing } from './editor/ProjectEditingContext';
 import type { ProjectEditing } from '../domain/project-editing';
@@ -12,16 +14,17 @@ import { useEffect, useState } from 'react';
 import type { LyricFormat } from '../adapters/lyric-formats';
 import type { LyricDocument } from '../domain/lyric-document';
 import styles from './acquisition.module.css';
-export function PackagingPanel(props: { title?: string; document: LyricDocument; dirty?: boolean; onExportFormat?: (format: LyricFormat) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument; editing?: ProjectEditing } | undefined>; projectId?: string; sourceAssetId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
+export function PackagingPanel(props: { project?: ProjectDocument; applyProject?: (command:ProjectCommand)=>void; title?: string; document: LyricDocument; dirty?: boolean; onExportFormat?: (format: LyricFormat) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument; editing?: ProjectEditing } | undefined>; projectId?: string; sourceAssetId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
  const editing = useProjectEditing();
- const [validation, setValidation] = useState<{ document: LyricDocument; projectId?: string; editing: ProjectEditing; issues: OutputIssue[] } | null>(null);
+ const [validation, setValidation] = useState<{ document: LyricDocument; projectId?: string; project?: ProjectDocument; editing: ProjectEditing; issues: OutputIssue[] } | null>(null);
  const [blocking,setBlocking] = useState<OutputIssue[]>([]), [message,setMessage] = useState('');
  const [format, setFormat] = usePreference<LyricFormat>(`studio:download:${props.projectId ? `project:${props.projectId}` : `local:${props.title}`}`, 'ttml', (v): v is LyricFormat => typeof v === 'string' && ['ttml','txt','lrc','elrc','eslrc','qrc','yrc','lys','ass'].includes(v));
  useEffect(()=>{setBlocking([]);setMessage('');},[editing,props.document,props.projectId,format]);
 
- const current = validation?.document === props.document && validation.projectId === props.projectId && validation.editing === editing;
+ const current = validation?.document === props.document && validation.projectId === props.projectId && validation.editing === editing && validation.project === props.project;
  const issues = current ? validation.issues : [];
- return <div className={styles.page}><section className={styles.pane}><button data-role="primary" onClick={() => setValidation({ document: props.document, projectId: props.projectId, editing, issues: validateLyrics(props.document,editing) })}>歌词校验</button>
+ return <div className={styles.page}><section className={styles.pane}><button data-role="primary" onClick={() => setValidation({ document: props.document, projectId: props.projectId, project: props.project, editing, issues: validateLyrics(props.document,editing) })}>歌词校验</button>
+ {props.project&&props.applyProject&&<AmllPanel project={props.project} apply={props.applyProject} locate={props.locateIssue}/>}
  <OutputIssues document={props.document} issues={issues} locate={props.locateIssue} />{!current ? <p>{validation ? '文档已变化，请重新执行歌词校验。' : '尚未执行歌词校验。'}</p> : !issues.length && <p>当前检查未发现问题</p>}
  <OutputIssues document={props.document} issues={blocking} highlighted={blocking} locate={props.locateIssue} />
  </section><section className={styles.pane}><h2>歌词下载</h2><div className={styles.downloadRow}>

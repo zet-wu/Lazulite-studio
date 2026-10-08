@@ -47,6 +47,7 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
       {!transport && <label>预览位置 <input type="range" min="0" max={duration} value={localTime} onChange={(event) => setLocalTime(Number(event.target.value))} /></label>}
     </div>
     {document.lines.some(line => !line.backgroundOf && document.lines.filter(bg => bg.backgroundOf === line.id).length > 1) && <p className={styles.toolHint}>当前 AMLL 预览不能忠实呈现多条背景歌词；完整内容保留在编辑与打轴中。</p>}
+    {document.lines.some(line => line.agentRefs.length > 1 || line.words.some(word => word.agentRefs?.length)) && <p className={styles.toolHint}>当前 AMLL 预览只呈现行级默认／对唱两侧，不能忠实呈现合唱和词级歌手；完整身份保留在编辑中。</p>}
     {lines.length ? <div className={styles.previewPlayer}>
       <LyricPlayer lyricPlayer={StudioLyricPlayer} ref={player} lyricLines={lyricLines} currentTime={transport ? undefined : localTime}
         isSeeking={!transport} playing={transport ? playing : false} hidePassedLines={hidePassed} wordFadeWidth={fadeWidth}

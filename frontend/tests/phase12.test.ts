@@ -72,7 +72,7 @@ it('splits into three segments retaining original units, links, independent atta
   document.lines.push({ ...createLine('', 'bg'), backgroundOf: line.id, beginMs: 200, endMs: 9000 }, { ...createLine('', 'next'), beginMs: 5000 });
   document.romanizationTracks = [{ id: 'r', language: 'ja-Latn', contents: [{ id: 'rc', lineId: line.id, kind: 'timed', units: [{ id: 'ru', text: ' ima ', beginMs: 300, endMs: 8000 }] }] }];
   document.translationTracks = [{ id: 't', language: 'en', purpose: 'subtitle', contents: [{ id: 'tc', lineId: line.id, kind: 'plain', text: ' now ' }] }];
-  const state = executeLyricCommand(createLyricEditorState(document, editing), { type: 'split-line', lineId: line.id, beforeWordIds: ['w3', 'w1'], newLineIds: ['part2', 'part3'], translationTargets: { tc: 1 }, contentTargets: { rc: 2 }, backgroundTarget: 2 });
+  const state = executeLyricCommand(createLyricEditorState(document, editing), { type: 'split-line', lineId: line.id, beforeWordIds: ['w3', 'w1'], newLineIds: ['part2', 'part3'], translationTargets: { tc: 1 }, contentTargets: { rc: 2 }, backgroundTargets: { bg: 2 } });
   expect(state.present.lines.slice(0, 3).map(item => [item.beginMs, item.endMs])).toEqual([[1000, 2400], [1900, 3800], [3700, 4500]]);
   expect(state.present.lines.slice(0, 3).flatMap(item => item.words)).toEqual(line.words);
   expect(state.editing.endLinks[state.present.lines[0].id]).toBeUndefined(); expect(state.editing.endLinks[state.present.lines[1].id]).toBeUndefined();
@@ -86,7 +86,7 @@ it('splits into three segments retaining original units, links, independent atta
 
 it('uses known endpoints despite unknown siblings, and rejects invalid intervals', () => {
   const { document, line } = fixture();
-  const command = { type: 'split-line' as const, lineId: line.id, beforeWordIds: ['w2'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTarget: null };
+  const command = { type: 'split-line' as const, lineId: line.id, beforeWordIds: ['w2'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTargets: {} };
   line.words[0].endMs = 2000;
   expect(executeLyricCommand(createLyricEditorState(document), command).present.lines[0].endMs).toBe(2000);
   line.words[2].beginMs = 1500; line.words[3].beginMs = 1000;
@@ -105,7 +105,7 @@ it('keeps plain and timed translation/romanization content intact across split a
   document.romanizationTracks = [{ id: 'r', language: 'ja-Latn', contents: [
     { id: 'rp', lineId: line.id, kind: 'plain', text: ' unchanged ' }, { id: 'rt', lineId: line.id, kind: 'timed', units: [{ ...units[0], id: 'ru' }] },
   ] }];
-  const command = { type: 'split-line' as const, lineId: line.id, beforeWordIds: ['w1', 'w3'], newLineIds: ['b', 'c'], translationTargets: { plain: 0, timed: 2 }, contentTargets: { rp: 1, rt: 2 }, backgroundTarget: null };
+  const command = { type: 'split-line' as const, lineId: line.id, beforeWordIds: ['w1', 'w3'], newLineIds: ['b', 'c'], translationTargets: { plain: 0, timed: 2 }, contentTargets: { rp: 1, rt: 2 }, backgroundTargets: {} };
   const state = createLyricEditorState(document);
   const next = executeLyricCommand(state, command).present;
   expect(next.translationTracks[0].contents).toEqual([document.translationTracks[0].contents[0], { ...document.translationTracks[0].contents[1], lineId: 'c' }]);
@@ -134,7 +134,7 @@ it('splits a 1ms reversed punctuation boundary by word envelope without changing
     { ...createWord('(', 'cut'), beginMs: 75224, endMs: 75224 },
     { ...createWord('伝え)', 'right'), beginMs: 75223, endMs: 75865, rubyUnits: [{ id: 'reading', reading: 'つたえ', beginMs: 75223, endMs: 75865 }] },
   ];
-  const result = executeLyricCommand(createLyricEditorState(document), { type: 'split-line', lineId: line.id, beforeWordIds: ['cut'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTarget: null });
+  const result = executeLyricCommand(createLyricEditorState(document), { type: 'split-line', lineId: line.id, beforeWordIds: ['cut'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTargets: {} });
   expect(result.present.lines.map(item => [item.beginMs, item.endMs])).toEqual([[74560, 75224], [75223, 75865]]);
   expect(result.present.lines.flatMap(item => item.words)).toEqual(line.words);
   expect(undoLyricCommand(result).present).toBe(document);
@@ -145,7 +145,7 @@ it('freezes incoming links when the first start changes and leaves fully unknown
   line.beginMs = 1000; line.endMs = 5000;
   document.lines.unshift({ ...createLine('', 'incoming'), beginMs: 0, endMs: 1000 });
   const editing = createProjectEditing(); editing.endLinks.incoming = line.id;
-  const result = executeLyricCommand(createLyricEditorState(document, editing), { type: 'split-line', lineId: line.id, beforeWordIds: ['w2'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTarget: null });
+  const result = executeLyricCommand(createLyricEditorState(document, editing), { type: 'split-line', lineId: line.id, beforeWordIds: ['w2'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTargets: {} });
   expect(result.present.lines[0]).toMatchObject({ endMs: 1000 });
   expect(result.present.lines.slice(1).map(item => [item.beginMs, item.endMs])).toEqual([[null, null], [null, null]]);
   expect(undoLyricCommand(result).present).toBe(document);

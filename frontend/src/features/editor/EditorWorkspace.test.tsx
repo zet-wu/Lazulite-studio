@@ -1,3 +1,4 @@
+import {createProjectDocument} from '../../domain/project-document';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -18,7 +19,7 @@ it('selects 注音 independently and opens its card menu while leaving input con
     { id: 'r2', reading: 'た', beginMs: null, endMs: null },
   ];
   const apply = vi.fn();
-  const { container } = render(<MemoryRouter><EditorWorkspace title="测试" document={lyric} apply={apply}
+  const { container } = render(<MemoryRouter><EditorWorkspace title="测试" document={lyric} project={createProjectDocument(lyric)} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
     onSave={() => {}} /></MemoryRouter>);
   const tile = container.querySelector<HTMLElement>('[data-ruby-id="r1"]')!;
@@ -35,7 +36,7 @@ it('selects 注音 independently and opens its card menu while leaving input con
 it('routes desktop history shortcuts only outside inputs, dialogs and IME composition', () => {
   const lyric = createLyricDocument('歌');
   const undo = vi.fn(), redo = vi.fn(), onSave = vi.fn();
-  const { container } = render(<MemoryRouter><EditorWorkspace title="测试" document={lyric} apply={() => {}}
+  const { container } = render(<MemoryRouter><EditorWorkspace title="测试" document={lyric} project={createProjectDocument(lyric)} apply={() => {}}
     undo={undo} redo={redo} canUndo canRedo dirty onSave={onSave}
     /></MemoryRouter>);
   const line = container.querySelector<HTMLElement>('[data-line-id]')!;
@@ -62,7 +63,7 @@ it('rejects an occupied preceding main row without searching farther back or cha
   lyric.lines = ['未占用', '前主行', '背景', '源行'].map(text => createLine(text));
   lyric.lines[2].backgroundOf = lyric.lines[1].id;
   const apply = vi.fn();
-  render(<MemoryRouter><EditorWorkspace title="背景" document={lyric} selectedLineId={lyric.lines[3].id} apply={apply}
+  render(<MemoryRouter><EditorWorkspace title="背景" document={lyric} project={createProjectDocument(lyric)} selectedLineId={lyric.lines[3].id} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
     onSave={() => {}} /></MemoryRouter>);
   fireEvent.click(window.document.querySelector(`[data-line-id="${lyric.lines[3].id}"] > [data-outline-drag]`)!);
@@ -79,7 +80,7 @@ it('dispatches exactly one attachment to the nearest main row, skipping backgrou
   lyric.lines = ['前行', '背景', '最近主行', '源行'].map(text => createLine(text));
   lyric.lines[1].backgroundOf = lyric.lines[0].id;
   const apply = vi.fn();
-  render(<MemoryRouter><EditorWorkspace title="背景" document={lyric} selectedLineId={lyric.lines[3].id} apply={apply}
+  render(<MemoryRouter><EditorWorkspace title="背景" document={lyric} project={createProjectDocument(lyric)} selectedLineId={lyric.lines[3].id} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
     onSave={() => {}} /></MemoryRouter>);
   fireEvent.click(window.document.querySelector(`[data-line-id="${lyric.lines[3].id}"] > [data-outline-drag]`)!);
@@ -91,7 +92,7 @@ it('splits from the word menu with default graphemes and preserved spaces, openi
   const lyric = createLyricDocument('中文 I  still e\u0301'), word = lyric.lines[0].words[0];
   word.beginMs = 0; word.endMs = 1000;
   const apply = vi.fn();
-  const { container, rerender } = render(<MemoryRouter><EditorWorkspace title="分词" document={lyric} apply={apply}
+  const { container, rerender } = render(<MemoryRouter><EditorWorkspace title="分词" document={lyric} project={createProjectDocument(lyric)} apply={apply}
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false}
     onSave={() => {}} /></MemoryRouter>);
   fireEvent.contextMenu(container.querySelector('[data-word-id]')!);

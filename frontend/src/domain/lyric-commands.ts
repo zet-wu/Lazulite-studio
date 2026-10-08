@@ -185,8 +185,7 @@ export type LineSplitPlan = {
   newLineIds: string[];
   contentTargets: Record<string, number>;
   translationTargets: Record<string, number>;
-  backgroundTarget: number | null;
-  backgroundTargets?: Record<string, number>;
+  backgroundTargets: Record<string, number>;
 };
 
 /** The dialog and command share exact segment boundaries and validation. */
@@ -272,7 +271,8 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       assigned(command.contentTargets, document.romanizationTracks.flatMap(track => track.contents), '音译');
       assigned(command.translationTargets, document.translationTracks.flatMap(track => track.contents), '翻译');
       const backgrounds = document.lines.filter(item => item.backgroundOf === line.id);
-      const target = (id: string) => command.backgroundTargets?.[id] ?? command.backgroundTarget;
+      const target = (id: string) => command.backgroundTargets[id];
+      if (Object.keys(command.backgroundTargets).some(id => !backgrounds.some(bg => bg.id === id))) throw new Error('背景歌词分配条目不存在');
       if (backgrounds.some(bg => target(bg.id) === null || !Number.isInteger(target(bg.id)) || !segments[target(bg.id)!])) throw new Error('请重新指定背景歌词归属');
       for (const [id, target] of Object.entries(editing.endLinks)) if (target === line.id && segments[0].beginMs !== line.beginMs) delete editing.endLinks[id];
       const outgoing = editing.endLinks[line.id];

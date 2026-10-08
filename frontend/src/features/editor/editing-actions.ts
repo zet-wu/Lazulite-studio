@@ -1,3 +1,4 @@
+import { wordAgents, lineAgents, sameAgents } from '../../domain/amll-compatibility';
 import { createProjectEditing, remapEditing, type ProjectEditing } from '../../domain/project-editing';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationUnit, type RubyUnit } from '../../domain/lyric-document';
@@ -10,8 +11,8 @@ export type EditorSelection =
   | { kind: 'romanization-unit'; lineId: string; trackId: string; contentId: string; ids: string[]; anchorId: string; activeId: string };
 
 export type EditorClipboard = (
-  | { kind: 'lines'; groups: Array<{ line: LyricLine; background: LyricLine | null; translations: Array<{ trackId: string; content: RomanizationContent }>; romanizations: Array<{ trackId: string; content: RomanizationContent }> }>; text: string }
-  | { kind: 'words'; words: LyricWord[]; text: string }
+  | { kind: 'lines'; groups: Array<{ line: LyricLine; backgrounds: LyricLine[]; translations: Array<{ trackId: string; content: RomanizationContent }>; romanizations: Array<{ trackId: string; content: RomanizationContent }> }>; text: string }
+  | { kind: 'words'; words: LyricWord[]; sources?: Record<string,string[]>; text: string }
   | { kind: 'ruby'; units: RubyUnit[]; text: string }
   | { kind: 'romanization-content'; trackId: string; contents: RomanizationContent[]; text: string }
   | { kind: 'romanization-unit'; trackId: string; contentId: string; units: RomanizationUnit[]; text: string }) & { editing?: ProjectEditing };
@@ -60,10 +61,10 @@ function copyObjects(document: LyricDocument, selection: EditorSelection): Edito
   }
   if (selection.kind === 'words') {
     const groups = document.lines.map((line) => line.words.filter((word) => selection.ids.includes(word.id))).filter((words) => words.length);
-    return { kind: 'words', words: groups.flat(), text: groups.map((words) => words.map((word) => word.text).join('')).join('\n') };
+    return { kind: 'words', sources:Object.fromEntries(document.lines.flatMap(line=>line.words.map(word=>[word.id,wordAgents(document,line,word)]))), words: groups.flat(), text: groups.map((words) => words.map((word) => word.text).join('')).join('\n') };
   }
   const groups = document.lines.filter((line) => !line.backgroundOf && (selection.ids.includes(line.id) || document.lines.some(child => child.backgroundOf === line.id && selection.ids.includes(child.id)))).map((line) => ({
-    line, background: document.lines.find((item) => item.backgroundOf === line.id) ?? null,
+    line, backgrounds: document.lines.filter((item) => item.backgroundOf === line.id),
     translations: document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === line.id || document.lines.some(bg => bg.id === content.lineId && bg.backgroundOf === line.id)).map(content => ({ trackId: track.id, content }))),
     romanizations: document.romanizationTracks.flatMap((track) => track.contents.filter((content) => (content.lineId === line.id || document.lines.some(bg => bg.id === content.lineId && bg.backgroundOf === line.id))).map((content) => ({ trackId: track.id, content }))),
   }));
@@ -165,7 +166,7 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
   if (clipboard.kind === 'words') {
     if (!currentLine) throw new Error('请先选择粘贴目标行');
     const afterWordId = selection?.kind === 'words' && currentLine.words.some((word) => word.id === selection.activeId) ? selection.activeId : currentLine.words.at(-1)?.id ?? null;
-    const words = clipboard.words.map(word => cloneWord(word, idMap));
+    const words = clipboard.words.map(word => {const effective=clipboard.sources?.[word.id]; if(!word.agentRefs&&effective&&!sameAgents(effective,lineAgents(document,currentLine))) {if(!effective.length)throw new Error('无歌手词无法在有歌手目标行中保真');return cloneWord({...word,agentRefs:effective},idMap);}return cloneWord(word,idMap);});
     const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'insert-word' }>> = [];
     const { beginMs, endMs } = expandedLineTime(currentLine, words);
     if (beginMs !== currentLine.beginMs || endMs !== currentLine.endMs) commands.push({ type: 'set-line-time', lineId: currentLine.id, beginMs, endMs });
@@ -180,17 +181,17 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
     const id = `line-${crypto.randomUUID()}`;
     const line = cloneLine(group.line, id, null, idMap);
     commands.push({ type: 'insert-line', afterLineId: after, line });
-    if (group.background) {
-      const background = cloneLine(group.background, `${id}:bg`, null, idMap);
+    for (const original of group.backgrounds) {
+      const background = cloneLine(original, `bg-${crypto.randomUUID()}`, null, idMap);
       commands.push({ type: 'insert-line', afterLineId: id, line: background });
       commands.push({ type: 'set-background-of', lineId: background.id, parentLineId: id });
     }
     for (const { trackId, content } of group.romanizations) commands.push({ type: 'insert-romanization-content', trackId, content: content.kind === 'plain'
-      ? { ...content, id: crypto.randomUUID(), lineId: content.lineId === group.line.id ? id : `${id}:bg` }
-      : { ...content, id: crypto.randomUUID(), lineId: content.lineId === group.line.id ? id : `${id}:bg`, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) } });
+      ? { ...content, id: crypto.randomUUID(), lineId: idMap.get(content.lineId)! }
+      : { ...content, id: crypto.randomUUID(), lineId: idMap.get(content.lineId)!, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) } });
     for (const { trackId, content } of group.translations) commands.push({ type: 'insert-translation-content', trackId, content: content.kind === 'plain'
-      ? { ...content, id: crypto.randomUUID(), lineId: content.lineId === group.line.id ? id : `${id}:bg` }
-      : { ...content, id: crypto.randomUUID(), lineId: content.lineId === group.line.id ? id : `${id}:bg`, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) } });
+      ? { ...content, id: crypto.randomUUID(), lineId: idMap.get(content.lineId)! }
+      : { ...content, id: crypto.randomUUID(), lineId: idMap.get(content.lineId)!, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) } });
     ids.push(id);
     after = id;
   }

@@ -19,7 +19,7 @@ it('splits linked lines preserving incoming links, current endpoint, target upda
   const { doc, editing } = fixture(); doc.lines[3].endMs = 0; doc.lines[3].beginMs = 0;
   editing.endLinks[doc.lines[3].id] = 'a';
   const before = createLyricEditorState(doc, editing);
-  const split = executeLyricCommand(before, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTarget: null });
+  const split = executeLyricCommand(before, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTargets: {} });
   expect(split.present.lines[0]).toMatchObject({ id: 'a', endMs: 1000 });
   expect(split.editing.endLinks[split.present.lines[1].id]).toEqual(editing.endLinks[doc.lines[0].id]);
   expect(split.editing.endLinks[split.present.lines.at(-1)!.id]).toBe('a');
@@ -60,14 +60,14 @@ it('assigns translations independently with romanization and background in one s
   doc.lines.splice(1, 0, { ...createLine('声', 'bg'), backgroundOf: 'a' });
   doc.romanizationTracks = [{ id: 't', language: 'ja-Latn', contents: [{ id: 'r', lineId: 'a', kind: 'plain', text: 'a' }] }];
   const state = createLyricEditorState(doc, editing);
-  const result = executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], contentTargets: { r: 1 }, translationTargets: { 'translation-4196': 0, 'translation-4229': 1, 'translation-4265': 1 }, backgroundTarget: 1 });
+  const result = executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], contentTargets: { r: 1 }, translationTargets: { 'translation-4196': 0, 'translation-4229': 1, 'translation-4265': 1 }, backgroundTargets: { bg: 1 } });
   expect(result.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.present.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === doc.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))[0]]);
   expect(result.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.present.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === doc.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).slice(1));
   expect(result.present.lines[2].backgroundOf).toBe('new');
   expect(result.present.romanizationTracks[0].contents[0].lineId).toBe('new');
   for (const draft of [true, false]) expect(parseLyricTtml(serializeLyricTtml(result.present, { draft })).translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.present.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === doc.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).slice(1).map(item => ({ ...item, id: expect.any(String) })));
   expect(undoLyricCommand(result).present).toBe(doc);
-  expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], contentTargets: { r: 0 }, translationTargets: { missing: 1 }, backgroundTarget: 0 })).toThrow('翻译分配条目不存在');
+  expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], contentTargets: { r: 0 }, translationTargets: { missing: 1 }, backgroundTargets: { bg: 0 } })).toThrow('翻译分配条目不存在');
 });
 
 it('eliminates every internal end link when coincident boundaries merge', () => {

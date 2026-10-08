@@ -1,3 +1,5 @@
+import { AmllSettings } from '../AmllPanel';
+import { displayLines } from '../../domain/amll-compatibility';
 import type { ProjectEditing } from '../../domain/project-editing';
 import { SyncLine } from './SyncLine';
 import { useSyncProgress } from './sync-progress';
@@ -286,7 +288,7 @@ function EditorWorkspaceContent(props: Props) {
     const id = line.id;
     const currentSelection = selectionRef.current;
     const previous = currentSelection?.kind === 'lines' ? currentSelection : null;
-    const ids = !shift && !toggle && previous?.ids.includes(id) ? previous.ids : selectIds(document.lines.map(l => l.id), previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
+    const ids = !shift && !toggle && previous?.ids.includes(id) ? previous.ids : selectIds(displayLines(document,props.project?.lineOrder??[]).map(l => l.id), previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
     setSelection({ kind: 'lines', ids, anchorId: shift || toggle || previous?.ids.includes(id) ? previous?.anchorId ?? id : id, activeId: line.id });
     props.onSelectLine?.(line.id);
     props.onSelectUnit?.(line.id, null, null);
@@ -380,7 +382,8 @@ function EditorWorkspaceContent(props: Props) {
     catch (error) { editRejected.current = true; setMessage(error instanceof Error ? error.message : '编辑失败'); return false; }
   });
   const drag = useObjectDrag(document, pageRef, dispatch, setSelection);
-  const displayed = drag.document;
+  const displayed = { ...drag.document, lines: displayLines(drag.document,props.project?.lineOrder??[]) };
+  const displayOrder = displayLines(document,props.project?.lineOrder??[]);
   const currentSelection = (): EditorSelection | null => selection;
   const copy = (target?: EditorSelection) => {
     const current = target ?? currentSelection();
@@ -820,12 +823,12 @@ function EditorWorkspaceContent(props: Props) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
-    <EditorMenu {...props} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} />
+    <EditorMenu {...props} amllSettings={props.project&&props.applyProject?<AmllSettings project={props.project} apply={command=>{try{props.applyProject!(command);}catch(e){setMessage(e instanceof Error?e.message:String(e));}}} locate={()=>setMode('package')}/>:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} />
     {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
     <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['audio','音频处理'],['edit','编辑'],['sync','打轴'],['preview','AMLL 预览'],['package','文件打包'],['auxiliary','项目辅助']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { if (canvasComposing.current || !finishSyncDraft()) return; flushSync(() => { const input = window.document.activeElement; if (input instanceof HTMLInputElement) input.blur(); }); if (pageRef.current?.querySelector('[aria-invalid="true"]')) return; setLocate(null); setRubyShortcut(null); setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
     {props.projectId && props.project && props.applyProject && props.sourceAssetId && <VocalPanel visible={mode==='audio'} projectId={props.projectId} project={props.project} sourceAssetId={props.sourceAssetId} apply={props.applyProject} durationMs={props.audioDurationMs??0}/>}
     {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.sourceAssetId ? <div ref={layoutRef} className={vocalStyles.audioLayout} style={{gridTemplateColumns:template(rendered)}}>
-      {columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} aria-label="音频处理大纲"><h2>大纲</h2><div className={styles.panelBody}>{document.lines.map(line => <div key={line.id} draggable onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed="copy";const ghost=e.currentTarget.cloneNode(true) as HTMLElement;ghost.style.cssText="position:fixed;left:-10000px;opacity:.6;width:220px";window.document.body.appendChild(ghost);e.dataTransfer.setDragImage(ghost,20,16);setTimeout(()=>ghost.remove(),0);}}>
+      {columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} aria-label="音频处理大纲"><h2>大纲</h2><div className={styles.panelBody}>{displayOrder.map(line => <div key={line.id} draggable onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed="copy";const ghost=e.currentTarget.cloneNode(true) as HTMLElement;ghost.style.cssText="position:fixed;left:-10000px;opacity:.6;width:220px";window.document.body.appendChild(ghost);e.dataTransfer.setDragImage(ghost,20,16);setTimeout(()=>ghost.remove(),0);}}>
         <div onClick={event => selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey)}><OutlineRow line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} selected={selection?.kind === 'lines' && selection.ids.includes(line.id)}/></div>
         {props.assignmentError?.lineId===line.id && <div role="alert" className={vocalStyles.error}>{props.assignmentError.message}{assignmentIssues.map((issue,i)=><button data-role="secondary" key={i} onClick={()=>locateIssue(issue)}>定位{issue.kind==='ruby'?'注音':issue.kind==='word'?'词':issue.kind==='romanization-unit'?'音译单元':'行'}{i+1}</button>)}</div>}
       </div>)}</div></aside>}
@@ -847,7 +850,7 @@ function EditorWorkspaceContent(props: Props) {
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
       canGenerateJapaneseRuby={selection?.kind === 'lines' && selection.ids.length > 0} openJapaneseRuby={() => openJapaneseRuby(selection?.kind === 'lines' ? selection.ids : [])}
       canGenerateRuby={propertyLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
-      canGenerateRomanization={propertyLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(propertyLines.map(line => line.id))} openTranslationTracks={() => setSettingsDialog('translations')} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: propertyLines.map((line) => line.id) })} />}
+      canGenerateRomanization={propertyLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(propertyLines.map(line => line.id))} openTranslationTracks={() => setSettingsDialog('translations')} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} singersDisabled={props.project?.amll.simplified} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: propertyLines.map((line) => line.id) })} />}
     {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} onClick={event => {
       const button = (event.target as Element).closest('[data-outline-drag]');
       if (!button) return;
@@ -924,20 +927,22 @@ function EditorWorkspaceContent(props: Props) {
           key={targetId(activePropertyTarget)} count={emptyBeatCount(editing, targetId(activePropertyTarget))} whitespace={!propertyText?.trim()}
           commit={count => dispatch({ type: 'set-empty-beat', kind: activePropertyTarget.kind as 'ruby' | 'word', id: targetId(activePropertyTarget), count })}/>}
         {selection?.kind === 'words' && selection.ids.length === 1 && propertyWord && activePropertyTarget?.kind === 'word' && <BooleanField label="不雅用语" switchControl checked={propertyWord.obscene} onChange={obscene => dispatch({ type: 'set-word-obscene', lineId: activePropertyTarget.lineId, wordId: propertyWord.id, obscene })}/>}
+        {selection?.kind==='words'&&selection.ids.length===1&&propertyWord&&activePropertyTarget?.kind==='word'&&<fieldset disabled={props.project?.amll.noWordAgents}><legend>词级歌手</legend>{document.agents.map(agent=><label key={agent.id}><input type="checkbox" aria-label={`词级歌手 ${agent.name??agent.id}`} checked={propertyWord.agentRefs?.includes(agent.id)??false} onChange={event=>dispatch({type:'set-word-agents',lineId:activePropertyTarget.lineId,wordId:propertyWord.id,agentRefs:event.target.checked?[...(propertyWord.agentRefs??[]),agent.id]:(propertyWord.agentRefs??[]).filter(id=>id!==agent.id)})}/>{agent.name??agent.id}</label>)}</fieldset>}
         {selection?.kind === 'lines' && <>
         {selection.ids.length === 1 && <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />}
         {selection?.kind === 'lines' && selection.ids.length > 1 && <small>多行时间请使用整体偏移或时间轴平移。</small>}
         {propertyLines.length > 0 && <>
           <BooleanField label="跳过打轴" switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} mixed={propertyLines.some(line => editing.ignoredSyncLineIds.includes(line.id)) && !propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} onChange={checked => dispatch({type:'batch', commands:propertyLines.map(line=>({type:'set-ignore-sync',lineId:line.id,ignoreSync:checked}))})}/>
         </>}
-        <SingerSelection agents={document.agents} lines={propertyLines} apply={dispatch} />
+        {props.project?.amll.simplified ? selectedMainLines.map(line=><BooleanField key={line.id} label="对唱歌词" switchControl checked={line.agentRefs.includes('v2')} onChange={duet=>props.applyProject?.({type:'duet',lineId:line.id,duet})}/>) : <SingerSelection agents={document.agents} lines={propertyLines} apply={dispatch} />}
+        {selectedLine.backgroundOf&&props.project&&<BooleanField label="背景置于主行之前" switchControl checked={displayOrder.indexOf(selectedLine)<displayOrder.findIndex(line=>line.id===selectedLine.backgroundOf)} onChange={before=>props.applyProject?.({type:'background-position',lineId:selectedLine.id,before})}/>}
         {selection?.kind !== 'lines' || selection.ids.length <= 1 ? <>
           <BooleanField label="背景歌词" switchControl checked={Boolean(selectedLine.backgroundOf)} onChange={(checked) => {
             if (!checked) { dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: null }); return; }
             const index = document.lines.findIndex(line => line.id === selectedLine.id);
             const preceding = document.lines.slice(0, index).filter(line => !line.backgroundOf).at(-1);
             if (!preceding) { setMessage('此行之前没有主行，不能设为背景歌词'); return; }
-            if (document.lines.some(line => line.backgroundOf === preceding.id)) { setMessage('前一主行已有背景歌词，请先处理所属关系'); return; }
+            if (props.project?.amll.noMultipleBackgrounds && document.lines.some(line => line.backgroundOf === preceding.id)) { setMessage('前一主行已有背景歌词，请先处理所属关系'); return; }
             dispatch({ type: 'set-background-of', lineId: selectedLine.id, parentLineId: preceding.id });
           }} />
           <label>所属主行 <Select disabled={!selectedLine.backgroundOf} value={selectedLine.backgroundOf ?? ''} onChange={(event) => {
@@ -951,7 +956,7 @@ function EditorWorkspaceContent(props: Props) {
       </div></aside>}</div>}
     {settingsDialog === 'translations' && <TranslationTrackDialog document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'metadata' && <SettingsDialog title="歌词元数据" close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} /></SettingsDialog>}
-    {settingsDialog === 'singers' && <SingerDialog focusAgent={focusAgent} document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
+    {settingsDialog === 'singers' && !props.project?.amll.simplified && <SingerDialog focusAgent={focusAgent} document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'tracks' && <SettingsDialog title="音译轨道管理" close={() => setSettingsDialog(null)}><div className={styles.trackManager}>
       {document.romanizationTracks.map((track, index) => <div key={track.id}><strong>轨道 {index + 1}</strong>
         <DraftInput value={track.language ?? ''} label={`音译轨道 ${index + 1} 语言`} placeholder="语言" onCommit={(language) => dispatch({ type: 'set-romanization-track-language', trackId: track.id, language: language || null })} />
@@ -985,7 +990,7 @@ function EditorWorkspaceContent(props: Props) {
     {rubyGeneration && <RubyGenerationDialog document={document} lineIds={rubyGeneration.lineIds} initialTrackId={rubyGeneration.trackId} initialContentId={rubyGeneration.contentId}
       apply={dispatch} close={() => setRubyGeneration(null)} />}
     {splitLineId && document.lines.find((line) => line.id === splitLineId) && <LineSplitDialog translations={translationsForLine(document, splitLineId)} key={splitLineId} line={document.lines.find((line) => line.id === splitLineId)!}
-      background={document.lines.find((line) => line.backgroundOf === splitLineId) ?? null}
+      backgrounds={document.lines.filter((line) => line.backgroundOf === splitLineId)}
       attached={document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === splitLineId).map((content) => ({ track, content })))}
       close={() => setSplitLineId(null)}
       submit={plan => dispatch({ type: 'split-line', ...plan })} />}
