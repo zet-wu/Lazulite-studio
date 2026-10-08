@@ -1,6 +1,7 @@
+import { createProjectEditing } from '../src/domain/project-editing';
 import { expect, it } from 'vitest';
 import { createLyricDocument, createWord } from '../src/domain/lyric-document';
-import { validateLyrics } from '../src/adapters/lyric-validation';
+import { validateLyrics, validateLyricsIncrementally } from '../src/adapters/lyric-validation';
 import { exportLyricFile } from '../src/adapters/lyric-formats';
 it('checks actual output gates and merges affected formats without blocking TXT or TTML for zero punctuation', () => {
   const doc = createLyricDocument('a'); doc.lines[0].beginMs = 0; doc.lines[0].endMs = 200;
@@ -50,4 +51,11 @@ it('merges the same missing translation endpoint across TTML, ASS and publishing
  const doc=createLyricDocument('a');const line=doc.lines[0];line.beginMs=0;line.endMs=1000;line.words[0].beginMs=0;line.words[0].endMs=1000;
  doc.translationTracks=[{id:'t',language:'en',purpose:'subtitle',contents:[{id:'c',lineId:line.id,kind:'timed',units:[{id:'u',text:'word',beginMs:100,endMs:null}]}]}];
  const issues=validateLyrics(doc).filter(issue=>issue.unitId==='u');expect(issues).toHaveLength(1);expect(issues[0].formats).toEqual(['TTML','ASS','发布歌词']);
+});
+
+it('incremental execution yields with identical full results and aborts stale work',async()=>{
+ const document=createLyricDocument('unfinished'),editing=createProjectEditing();
+ expect(await validateLyricsIncrementally(document,editing,new AbortController().signal)).toEqual(validateLyrics(document,editing));
+ const controller=new AbortController();const pending=validateLyricsIncrementally(document,editing,controller.signal);controller.abort();
+ await expect(pending).rejects.toMatchObject({name:'AbortError'});
 });

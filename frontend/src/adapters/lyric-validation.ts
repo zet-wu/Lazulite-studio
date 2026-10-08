@@ -6,7 +6,7 @@ import { collectOutputIssues, DocumentOutputError, outputIssueKey, type OutputIs
 
 export const checkedFormats: Exclude<LyricFormat, 'krc'>[] = ['ttml', 'txt', 'lrc', 'elrc', 'eslrc', 'qrc', 'yrc', 'lys', 'ass'];
 /** Runs the actual serializers in memory; no download, persistence or history effects. */
-export function validateLyrics(document: LyricDocument, editing?: ProjectEditing): OutputIssue[] {
+function* validationSteps(document: LyricDocument, editing?: ProjectEditing): Generator<void, OutputIssue[]> {
   const result = new Map<string, OutputIssue>();
   const add = (issue: OutputIssue, format: string, severity: NonNullable<OutputIssue['severity']>) => {
     const key = `${outputIssueKey(issue)}:${severity}`, previous = result.get(key);
@@ -18,8 +18,10 @@ export function validateLyrics(document: LyricDocument, editing?: ProjectEditing
       const issues = cause instanceof DocumentOutputError ? cause.issues : [{ kind: 'line' as const, lineId: '', missing: [], code: 'serialization' as const, message: cause instanceof Error ? cause.message : '序列化失败' }];
       issues.forEach(issue => add(issue, format.toUpperCase(), 'error'));
     }
+    yield;
   }
   collectOutputIssues(document, 'publish',editing).forEach(issue => add(issue, '发布歌词', 'error'));
+  yield;
   for (const line of document.lines) {
     for (const word of line.words) {
       if (isPunctuation(word.text)) {
@@ -30,4 +32,22 @@ export function validateLyrics(document: LyricDocument, editing?: ProjectEditing
     }
   }
   return [...result.values()];
+}
+
+/** Synchronous callers retain the identical full check. */
+export function validateLyrics(document: LyricDocument, editing?: ProjectEditing): OutputIssue[] {
+  const steps=validationSteps(document,editing);
+  let step=steps.next();
+  while(!step.done) step=steps.next();
+  return step.value;
+}
+/** Give input and paint a turn between actual serializers; abort superseded snapshots. */
+export async function validateLyricsIncrementally(document: LyricDocument, editing: ProjectEditing, signal: AbortSignal): Promise<OutputIssue[]> {
+  const steps=validationSteps(document,editing);
+  while(true) {
+    signal.throwIfAborted();
+    const step=steps.next();
+    if(step.done)return step.value;
+    await new Promise<void>(resolve=>setTimeout(resolve,0));
+  }
 }

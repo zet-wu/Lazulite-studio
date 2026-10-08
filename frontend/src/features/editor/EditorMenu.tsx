@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { Icon } from '../../shared/Icon';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -10,7 +9,7 @@ import styles from './semantic-editor.module.css';
 
 type Props = MenuState & {
   title: string;
-  amllSettings?: ReactNode;
+  onAmllSettings?: () => void;
   dirty: boolean;
   saving?: boolean;
   canUndo: boolean;
@@ -48,7 +47,7 @@ export function EditorMenu(props: Props) {
         <button data-role="inline" onClick={() => setDark((value) => !value)}>{dark ? '日间模式' : '夜间模式'}</button>
       </TopMenu>
       <TopMenu id="settings" title="设置" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
-        {props.amllSettings}
+        {props.onAmllSettings && <button data-role="inline" onClick={props.onAmllSettings}>AMLL 兼容设置</button>}
         <button data-role="inline" onClick={() => setShortcutsOpen(true)}>快捷键设置</button>
         <button data-role="inline" onClick={() => setKanaOpen(true)}>音译生成假名高亮</button>
       </TopMenu>

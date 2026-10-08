@@ -1,0 +1,27 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { expect, it, vi } from 'vitest';
+import { AmllPanel } from './AmllPanel';
+import { checkAmll } from '../domain/amll-compatibility';
+import { createProjectDocument } from '../domain/project-document';
+import { createLine, createWord } from '../domain/lyric-document';
+it('keeps disclosure and never widens a vanished selected range; invalidates mappings',async()=>{
+ const project=createProjectDocument();project.amll.noWordAgents=false;
+ const line=createLine('');line.words=['one','two'].map(text=>({...createWord(text),agentRefs:['a']}));project.lyrics.lines=[line];
+ project.lyrics.agents=[{id:'a',name:'Alice',type:'person'}];
+ const apply=vi.fn(),locate=vi.fn();
+ const renderPanel=(p=project,current=true)=><AmllPanel project={p} results={checkAmll(p.lyrics)} current={current} apply={apply} locate={locate}/>;
+ const {rerender}=render(renderPanel());
+ fireEvent.click(screen.getByRole('button',{name:/^禁用词级歌手：/}));fireEvent.click(screen.getByRole('button',{name:/^第 1 行/}));
+ fireEvent.click(screen.getByRole('checkbox',{name:'选择 one'}));
+ const updated={...project,lyrics:{...project.lyrics,lines:[{...line,words:[{...line.words[0],agentRefs:undefined},line.words[1]]}]}};
+ rerender(renderPanel(updated));
+ expect(screen.getByText('范围：原选中问题已消失')).toBeVisible();
+ expect(screen.getByRole('button',{name:/清除词级歌手（处理选中 0 项）/})).toBeDisabled();
+ expect(screen.getByRole('checkbox',{name:'选择 two'})).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'处理全部 1 项'}));expect(apply).toHaveBeenLastCalledWith({type:'amll-batch',rule:'noWordAgents',ids:[]});
+ rerender(renderPanel(updated,false));expect(screen.getByRole('button',{name:'处理全部 1 项'})).toBeDisabled();
+ rerender(renderPanel(updated));fireEvent.click(screen.getByRole('button',{name:/^使用 AMLL 简化歌手模型：/}));
+ fireEvent.click(screen.getByRole('button',{name:'转换为简化歌手模型'}));expect(screen.getByRole('dialog')).toBeVisible();
+ rerender(renderPanel(project,false));await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
+ rerender(renderPanel(updated));expect(screen.queryByRole('dialog')).toBeNull();
+});

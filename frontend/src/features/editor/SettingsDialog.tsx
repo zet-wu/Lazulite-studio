@@ -2,14 +2,14 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { IconButton } from '../../shared/Controls';
 import styles from './semantic-editor.module.css';
 
-export function SettingsDialog({ title, subtitle, close, children, actions }: { title: string; subtitle?: string; actions?: ReactNode; close: () => void; children: ReactNode }) {
+export function SettingsDialog({ title, subtitle, close, children, actions, returnFocus }: { title: string; returnFocus?: () => HTMLElement | null; subtitle?: string; actions?: ReactNode; close: () => void; children: ReactNode }) {
   const ref = useRef<HTMLElement>(null);
   const previous = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
   useEffect(() => {
     const initial = ref.current?.querySelector<HTMLElement>('[data-initial-focus]');
     if (initial) initial.focus();
     else if (!ref.current?.contains(document.activeElement)) ref.current?.focus();
-    return () => previous.current?.focus();
+    return () => { const target = returnFocus ? returnFocus() : previous.current; target?.focus(); };
   }, []);
   return <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
     <section ref={ref} tabIndex={-1} className={styles.dialog} role="dialog" aria-modal="true" aria-label={title} onKeyDown={(event) => {

@@ -57,3 +57,5 @@
 .formatDetail:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 .formatDetail [role="tooltip"] { display: none; position: absolute; z-index: 20; top: 100%; right: 0; width: max-content; max-width: min(340px, 30vw); padding: 8px 10px; color: var(--ink); background: var(--surface-high); border: 1px solid var(--line); border-radius: 4px; white-space: normal; font-weight: 400; }
 .formatDetail:hover [role="tooltip"], .formatDetail:focus [role="tooltip"] { display: block; }
+
+.validationTabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
