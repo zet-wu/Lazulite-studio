@@ -4,12 +4,12 @@ import { backgroundPhase3 } from '../fixtures/background-phase3';
 async function load(page: Page) {
   await page.goto('/projects/sample-project/edit');
   await importLyrics(page, { name: 'background.ttml', mimeType: 'application/xml', buffer: Buffer.from(backgroundPhase3) });
-  await expect(page.locator('main section[data-line-id="L1:bg"]')).toBeVisible();
+  await expect(page.locator('main section[data-line-id="L1-bg"]')).toBeVisible();
 }
 test('background editing, mixed singer selection, relation and generation use explicit rows', async ({ page }) => {
   await load(page);
-  const bg = page.locator('main section[data-line-id="L1:bg"]'), main = page.locator('main section[data-line-id="L1"]');
-  const bgOutline = page.locator('[data-line-id="L1:bg"] > [data-outline-drag]'), mainOutline = page.locator('[data-line-id="L1"] > [data-outline-drag]');
+  const bg = page.locator('main section[data-line-id="L1-bg"]'), main = page.locator('main section[data-line-id="L1"]');
+  const bgOutline = page.locator('[data-line-id="L1-bg"] > [data-outline-drag]'), mainOutline = page.locator('[data-line-id="L1"] > [data-outline-drag]');
   await bgOutline.click();
   await expect(page.getByRole('checkbox', { name: '歌手 Backing', exact: true })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: '歌手 Main', exact: true })).not.toBeChecked();
@@ -45,7 +45,7 @@ test('background editing, mixed singer selection, relation and generation use ex
 });
 test('background content transfer and clipboard deletion preserve its parent', async ({ page }) => {
   await load(page);
-  const bg = page.locator('main section[data-line-id="L1:bg"]');
+  const bg = page.locator('main section[data-line-id="L1-bg"]');
   await bg.locator('[data-romanization-content-id]').getByText('音译 · ja-Latn', { exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: '转移到其他歌词行…', exact: true }).click();
   const transfer = page.getByRole('dialog', { name: '转移音译内容' });

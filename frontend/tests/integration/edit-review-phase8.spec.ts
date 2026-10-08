@@ -8,10 +8,10 @@ for (const scope of ['partial', 'all']) test(`document translation tracks surviv
     const path = '/src/domain/lyric-document.ts', codecPath = '/src/adapters/ttml/lyric-codec.ts';
     const { createLyricDocument, createLine, plainTranslation } = await import(path) as typeof import('../../src/domain/lyric-document');
     const { serializeLyricTtml } = await import(codecPath) as typeof import('../../src/adapters/ttml/lyric-codec');
-    const d = createLyricDocument(); d.lines = ['a', 'a:bg', 'b'].map((id, i) => ({ ...createLine(`正文${i}`, id), beginMs: 1000 + i * 2000, endMs: 3000 + i * 2000, backgroundOf: i === 1 ? 'a' : null }));
+    const d = createLyricDocument(); d.lines = ['a', 'a-bg', 'b'].map((id, i) => ({ ...createLine(`正文${i}`, id), beginMs: 1000 + i * 2000, endMs: 3000 + i * 2000, backgroundOf: i === 1 ? 'a' : null }));
     d.translationTracks = [
       { id: 'one', language: 'en', purpose: 'subtitle', contents: [plainTranslation(' one ', 'a'), plainTranslation('two', 'b')] },
-      { id: 'two', language: 'en', purpose: 'replacement', contents: [{ id: 'timed', lineId: 'a', kind: 'timed', units: [{ id: 'u', text: ' timed ', beginMs: 1000, endMs: 2000 }] }, plainTranslation(' bg ', 'a:bg')] },
+      { id: 'two', language: 'en', purpose: 'replacement', contents: [{ id: 'timed', lineId: 'a', kind: 'timed', units: [{ id: 'u', text: ' timed ', beginMs: 1000, endMs: 2000 }] }, plainTranslation(' bg ', 'a-bg')] },
       { id: 'empty', language: null, purpose: 'subtitle', contents: [] },
     ];
     return serializeLyricTtml(d, { draft: true });

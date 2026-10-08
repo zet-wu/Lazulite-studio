@@ -109,6 +109,7 @@ def validate_ttml(ttml: str) -> str:
     }
     for element in root.iter():
         ref = element.attrib.get("{http://www.w3.org/ns/ttml#metadata}agent", "")
+        if ref and element.get(ruby) in ('base','text','textContainer'): raise ValueError('Ruby 不支持独立歌手')
         if any(item not in agents for item in ref.split()):
             raise ValueError("unknown ttm:agent reference")
     for element in root.iter("{http://www.w3.org/ns/ttml#metadata}actor"):

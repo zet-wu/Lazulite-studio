@@ -17,14 +17,14 @@ describe('background content and independent singers', () => {
     expect(lineText(d.lines[1])).toBe('かな');
     expect(d.lines[1].agentRefs).toEqual(['v2', 'v1']);
     expect(d.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === d.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([{ id: expect.any(String), purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: ' 背景译文 ' }]);
-    expect(d.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1:bg', kind: 'plain', text: ' ka na ' });
+    expect(d.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1-bg', kind: 'plain', text: ' ka na ' });
     for (const draft of [true, false]) {
       const result = parseLyricTtml(serializeLyricTtml(d, { draft }));
       expect(result.lines.map(lineText)).toEqual(['MAIN', 'かな']);
       expect(result.lines[1].agentRefs).toEqual(['v2', 'v1']);
       expect(result.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(d.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === d.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).map(item => ({ ...item, id: expect.any(String) })));
       expect(result.romanizationTracks[0].contents).toHaveLength(1);
-      expect(result.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1:bg', text: ' ka na ' });
+      expect(result.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1-bg', text: ' ka na ' });
       if (draft) expect(result).toEqual(d);
     }
   });
@@ -33,14 +33,14 @@ describe('background content and independent singers', () => {
     const d = parseLyricTtml(xml(head, bg.replace(/<span ttm:role="x-roman"[^]*?<\/span>/, '')));
     expect(d.translationTracks[0].contents[0]).toMatchObject({ kind: 'plain', text: ' background ' });
     expect(d.romanizationTracks[0].contents).toHaveLength(1);
-    expect(d.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1:bg', kind: 'timed', units: [{ text: 'ka ', beginMs: 2000, endMs: 3000 }, { text: 'na', beginMs: 3000, endMs: 5000 }] });
+    expect(d.romanizationTracks[0].contents[0]).toMatchObject({ lineId: 'L1-bg', kind: 'timed', units: [{ text: 'ka ', beginMs: 2000, endMs: 3000 }, { text: 'na', beginMs: 3000, endMs: 5000 }] });
     expect(parseLyricTtml(serializeLyricTtml(d, { draft: true }))).toEqual(d);
   });
   it('keeps multiple contents, languages, empty drafts, and main/background texts distinct', () => {
     const d = fixture(), track = d.romanizationTracks[0];
     track.contents.unshift({ id: 'main', lineId: 'L1', kind: 'plain', text: ' main ' });
-    track.contents.push({ id: 'bg2', lineId: 'L1:bg', kind: 'timed', units: [{ id: 'u', text: '  ', beginMs: null, endMs: 5000 }] });
-    d.romanizationTracks.push({ id: 'second', language: 'en', contents: [{ id: 'empty', lineId: 'L1', kind: 'plain', text: '' }, { id: 'empty-bg', lineId: 'L1:bg', kind: 'timed', units: [] }] });
+    track.contents.push({ id: 'bg2', lineId: 'L1-bg', kind: 'timed', units: [{ id: 'u', text: '  ', beginMs: null, endMs: 5000 }] });
+    d.romanizationTracks.push({ id: 'second', language: 'en', contents: [{ id: 'empty', lineId: 'L1', kind: 'plain', text: '' }, { id: 'empty-bg', lineId: 'L1-bg', kind: 'timed', units: [] }] });
     expect(parseLyricTtml(serializeLyricTtml(d, { draft: true }))).toEqual(d);
     expect(() => serializeLyricTtml(d)).toThrow(/timing|no units/);
   });
@@ -54,16 +54,16 @@ describe('background content and independent singers', () => {
     let state = createLyricEditorState(d);
     for (const parentLineId of ['next', null, 'L1']) {
       const before = state;
-      state = executeLyricCommand(state, { type: 'set-background-of', lineId: 'L1:bg', parentLineId });
-      expect(state.present.lines.find(l => l.id === 'L1:bg')).toMatchObject({ agentRefs: ['v2', 'v1'] });
+      state = executeLyricCommand(state, { type: 'set-background-of', lineId: 'L1-bg', parentLineId });
+      expect(state.present.lines.find(l => l.id === 'L1-bg')).toMatchObject({ agentRefs: ['v2', 'v1'] });
       expect(state.present.romanizationTracks).toEqual(d.romanizationTracks);
       expect(undoLyricCommand(state).present).toBe(before.present);
     }
     state = executeLyricCommand(state, { type: 'set-line-agents', lineId: 'L1', agentRefs: [] });
-    expect(state.present.lines.find(l => l.id === 'L1:bg')!.agentRefs).toEqual(['v2', 'v1']);
+    expect(state.present.lines.find(l => l.id === 'L1-bg')!.agentRefs).toEqual(['v2', 'v1']);
     const selection = { kind: 'lines' as const, ids: ['L1'], anchorId: 'L1', activeId: 'L1' };
     const copied = executeLyricCommand(state, pasteRich(state.present, copySelection(state.present, selection), selection).command);
-    const clone = copied.present.lines.find(l => l.backgroundOf && l.id !== 'L1:bg')!;
+    const clone = copied.present.lines.find(l => l.backgroundOf && l.id !== 'L1-bg')!;
     expect(copied.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === clone.id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(d.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === d.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).map(item => ({ ...item, id: expect.any(String) })));
     expect(clone.agentRefs).toEqual(['v2', 'v1']);
     expect(copied.present.romanizationTracks[0].contents.find(c => c.lineId === clone.id)).toMatchObject({ text: ' ka na ' });
@@ -72,15 +72,15 @@ describe('background content and independent singers', () => {
     expect(deleted.present.romanizationTracks[0].contents).toEqual([]);
     expect(undoLyricCommand(deleted).present).toBe(state.present);
     const renamed = executeLyricCommand(state, { type: 'rename-agent', id: 'v2', nextId: 'backing' });
-    expect(renamed.present.lines.find(l => l.id === 'L1:bg')!.agentRefs).toEqual(['backing', 'v1']);
-    expect(executeLyricCommand(renamed, { type: 'delete-agent', id: 'backing' }).present.lines.find(l => l.id === 'L1:bg')!.agentRefs).toEqual(['v1']);
+    expect(renamed.present.lines.find(l => l.id === 'L1-bg')!.agentRefs).toEqual(['backing', 'v1']);
+    expect(executeLyricCommand(renamed, { type: 'delete-agent', id: 'backing' }).present.lines.find(l => l.id === 'L1-bg')!.agentRefs).toEqual(['v1']);
   });
   it('generates and converts using background source timings and previews its own singer', () => {
     const d = fixture(); d.romanizationTracks = []; d.lines[1].agentRefs = ['v2'];
-    const rows = proposeRomanization(d, ['L1:bg'], 'timed');
+    const rows = proposeRomanization(d, ['L1-bg'], 'timed');
     let state = executeLyricCommand(createLyricEditorState(d), romanizationGenerationCommand(d, d, rows, { trackId: null, targets: {} }));
     const track = state.present.romanizationTracks[0];
-    expect(track.contents[0]).toMatchObject({ lineId: 'L1:bg', kind: 'timed', units: [{ text: 'kana', beginMs: 2000, endMs: 5000 }] });
+    expect(track.contents[0]).toMatchObject({ lineId: 'L1-bg', kind: 'timed', units: [{ text: 'kana', beginMs: 2000, endMs: 5000 }] });
     const proposed = proposeRuby(rubySourceRows(state.present, track.id, [track.contents[0].id]), 'hiragana');
     state = executeLyricCommand(state, rubyGenerationCommand(state.present, state.present, proposed, {}, new Set(), new Set()));
     expect(state.present.lines[1].words[0].rubyUnits[0]).toMatchObject({ reading: 'かな', beginMs: 2000, endMs: 5000 });

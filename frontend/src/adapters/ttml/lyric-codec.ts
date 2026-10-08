@@ -98,7 +98,10 @@ function checkAttributes(node: Element, allowed: string[], word = false) {
       continue;
     }
     if (attribute.namespaceURI === TTS && attribute.localName === 'ruby') continue;
-    if (attribute.namespaceURI === TTM && attribute.localName === 'agent') continue;
+    if (attribute.namespaceURI === TTM && attribute.localName === 'agent') {
+      if (['base','textContainer','text'].includes(attr(node,TTS,'ruby')??'')) throw new Error('Ruby 不支持独立歌手');
+      continue;
+    }
     if (attribute.namespaceURI === TTM && attribute.localName === 'role') {
       if (!word && attribute.value.split(/\s+/).includes('expletive')) throw new Error('expletive requires a word');
       continue;
@@ -353,7 +356,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
       for (const [bgIndex, background] of backgrounds.entries()) {
         checkAttributes(background, ['begin', 'end', 'dur']);
         const [bgBegin, bgEnd] = boundaries(background, wordStart, ownEnd, absoluteTimes);
-        const bgId = attr(background, STUDIO, 'id') ?? attr(background, XML, 'id') ?? `${id}:bg${bgIndex || ''}`;
+        const bgId = attr(background, STUDIO, 'id') ?? attr(background, XML, 'id') ?? `${id}-bg${bgIndex || ''}`;
         const bgStart = bgBegin ?? wordStart;
         const bgRomanizations: typeof inlineRomanizations = [];
         const bgWords: LyricWord[] = [];
