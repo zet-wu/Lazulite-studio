@@ -5,6 +5,7 @@ import type {OutputIssue} from '../adapters/output-validation';
 import {BooleanField} from '../shared/Controls';
 import {SettingsDialog} from './editor/SettingsDialog';
 import {Branch,LineGroups} from './OutputIssues';
+import styles from './editor/semantic-editor.module.css';
 export function AmllSettings({project,apply,locate}:{project:ProjectDocument;apply:(command:ProjectCommand)=>void;locate:(rule:AmllRule)=>void}) {
  const results=useMemo(()=>checkAmll(project.lyrics),[project.lyrics]);
  return <section aria-label="AMLL 项目设置">{(Object.keys(amllLabels) as AmllRule[]).map(rule=>{
@@ -19,7 +20,9 @@ function Simplify({project,apply,close,error}:{project:ProjectDocument;error:str
  return <SettingsDialog title="转换为简化歌手模型" close={close} actions={<><button data-role="secondary" onClick={close}>取消</button><button data-role="primary" onClick={()=>{if(apply({type:'amll-batch',rule:'simplified',duetAgents:selected}))close();}}>转换</button></>}>
  {error&&<p role="alert">{error}</p>}
  <p>选中歌手归对唱侧，其余归默认侧。全项目清除自定义身份、词级及背景独立歌手；主行按引用首项映射。</p>
+ <fieldset className={styles.singerSelection}><legend>对唱侧歌手</legend>
  {project.lyrics.agents.map(agent=><label key={agent.id}><input type="checkbox" checked={selected.includes(agent.id)} onChange={()=>setSelected(ids=>ids.includes(agent.id)?ids.filter(id=>id!==agent.id):[...ids,agent.id])}/>{agent.name??agent.id}</label>)}
+ </fieldset>
  </SettingsDialog>;
 }
 const actions:Record<AmllRule,string>={simplified:'转换为简化歌手模型',noMultipleBackgrounds:'保留首条背景，其余转主行',noChorus:'保留引用首位歌手',noWordAgents:'清除词级歌手',noIndependentBackground:'清除背景行及其词的歌手'};
