@@ -18,11 +18,16 @@ async function setup(page:Page){
 }
 test('short disconnect reconnects the original run and a failed save retains local undo',async({page})=>{
  const state=await setup(page);state.disconnects=2;
- await expect(page.getByRole('status').filter({hasText:'连接中断'})).toBeVisible();
+ await expect(page.getByRole('alert').filter({hasText:'连接中断'})).toBeVisible();
+ await page.getByRole('alert').filter({hasText:'连接中断'}).locator('..').getByRole('button',{name:'关闭提示'}).click();
+ await expect(page.getByRole('button',{name:'取消',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeDisabled();
  let fail=true;
  await page.route(`**${url}`,async route=>{if(route.request().method()==='PUT'&&fail)return route.fulfill({status:500,json:{message:'保存测试失败'}});return route.continue();});
  state.status='succeeded';await expect(page.getByRole('status').filter({hasText:'已更新歌词时间'})).toBeVisible();
- await expect(page.getByRole('alert').filter({hasText:'请求失败，请重试'})).toBeVisible();
+ const saveError=page.getByRole('alert').filter({hasText:'请求失败，请重试'});await expect(saveError).toBeVisible();
+ await saveError.locator('..').getByRole('button',{name:'关闭提示'}).click();await expect(saveError).toHaveCount(0);await expect(page.getByText('未保存',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'保存',exact:true}).click();await expect(saveError).toBeVisible();
  await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('button',{name:'撤销',exact:true})).toBeEnabled();
  fail=false;await page.getByRole('button',{name:'保存',exact:true}).click();await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('begin="00:01.000"');
  expect(state.starts).toBe(1);expect(state.results).toBe(1);
@@ -30,7 +35,7 @@ test('short disconnect reconnects the original run and a failed save retains loc
 test('another window changing revision prevents adoption and releases editing',async({page})=>{
  const state=await setup(page);const current=await(await page.request.get(url)).json();
  const response=await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':current.revision},data:{schema_version:current.schema_version,project_id:pid,revision:current.revision,document:current.document}});expect(response.ok()).toBeTruthy();
- state.status='succeeded';await expect(page.getByRole('status').filter({hasText:'项目版本或音频已改变'})).toBeVisible();
+ state.status='succeeded';await expect(page.getByRole('alert').filter({hasText:'项目版本或音频已改变'})).toBeVisible();
  await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeEnabled();
  expect((await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('studio:null="begin end"');
 });
@@ -38,4 +43,19 @@ test('leaving revokes adoption and reopening does not inherit the lock',async({p
  const state=await setup(page);await page.goto('/projects');await expect.poll(()=>state.cancels).toBeGreaterThan(0);state.status='succeeded';
  await page.goto(`/projects/${pid}/edit`);await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeEnabled();
  expect(state.results).toBe(0);expect((await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('studio:null="begin end"');
+});
+
+for(const theme of ['light','dark'])test(`feedback timeout, keyboard dismiss and repeated operation in ${theme}`,async({page})=>{
+ await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
+ const state=await setup(page);state.status='succeeded';
+ const success=page.getByRole('status').filter({hasText:'已更新歌词时间'});await expect(success).toBeVisible();
+ const close=success.locator('..').getByRole('button',{name:'关闭提示'});await expect(close.locator('svg')).toHaveCount(1);await expect(close).toHaveText('');
+ await close.focus();await page.screenshot({path:test.info().outputPath(`message-${theme}.png`)});await close.press('Enter');await expect(success).toHaveCount(0);
+ expect(await page.evaluate(()=>document.activeElement?.tagName)).toBe('BUTTON');
+ await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('button',{name:'开始对齐',exact:true}).click();
+ const unchanged=page.getByRole('status').filter({hasText:'未更新歌词时间'});await expect(unchanged).toBeVisible();await expect(unchanged).toHaveCount(0,{timeout:6000});
+ await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('button',{name:'开始对齐',exact:true}).click();await expect(unchanged).toBeVisible();
+ // New project context does not inherit the old result or its timer.
+ await page.goto('/projects');await page.goto(`/projects/${pid}/edit`);await expect(unchanged).toHaveCount(0);
+ expect(state.starts).toBe(3);
 });
