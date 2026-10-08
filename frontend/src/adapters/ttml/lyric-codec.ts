@@ -1,3 +1,4 @@
+import { validateAgents } from '../../domain/amll-compatibility';
 import type { ProjectEditing } from '../../domain/project-editing';
 import { isUntimedSeparator, isUntimedXmlWhitespace } from '../export-separators';
 import { validateTranslationTracks } from '../../domain/translation-editing';
@@ -123,12 +124,14 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   if (roles.some(role => role !== 'expletive')) throw new Error(`Unsupported word role ${roles.join(' ')}`);
   if (roles.includes('expletive') && attr(element, AMLL, 'obscene') === 'false') throw new Error('expletive conflicts with amll:obscene=false');
   const obscene = roles.includes('expletive') || attr(element, AMLL, 'obscene') === 'true';
+  const agentRefs = (attr(element, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
+  const identity = agentRefs.length ? { agentRefs } : {};
   const wordId = attr(element, STUDIO, 'id') ?? id;
   const [beginMs, endMs] = boundaries(element, lineStart, lineEnd, absoluteTimes);
   const rubyKind = attr(element, TTS, 'ruby');
   if (!rubyKind) {
     const text = textOnly(element, 'Word');
-    return text ? { ...createWord(text, wordId), beginMs, endMs, obscene } : null;
+    return text ? { ...createWord(text, wordId), beginMs, endMs, obscene, ...identity } : null;
   }
   if (rubyKind !== 'container') throw new Error(`不支持的注音类型： ${rubyKind}`);
   const parts = Array.from(element.children);
@@ -161,7 +164,7 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   }
   if (!rubyUnits.length) throw new Error('注音读音不能为空');
   return {
-    ...createWord(text, wordId), obscene,
+    ...createWord(text, wordId), obscene, ...identity,
     beginMs: beginMs ?? (rubyUnits.every((unit) => unit.beginMs !== null) ? Math.min(...rubyUnits.map((unit) => unit.beginMs!)) : null),
     endMs: endMs ?? (rubyUnits.every((unit) => unit.endMs !== null) ? Math.max(...rubyUnits.map((unit) => unit.endMs!)) : null),
     rubyUnits,
@@ -218,7 +221,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
   const lines: LyricLine[] = [];
   const translationTracks: TranslationTrack[] = [];
   const romanizationTracks: RomanizationTrack[] = [];
-  const backgroundContents: Array<{ parentId: string; content: RomanizationContent }> = [];
+  const backgroundContents: Array<{ parentId: string; backgroundId: string | null; content: RomanizationContent }> = [];
   const inlineRomanizationTracks = new Map<string, RomanizationTrack>();
   const addMetadata = (key: string, value: string) => { (metadata[key] ??= []).push(value); };
   const readAppleMetadata = (node: Element) => {
@@ -248,16 +251,16 @@ export function parseLyricTtml(xml: string): LyricDocument {
           const lineId = attr(item, null, 'for');
           if (!lineId) throw new Error('iTunes sublyric needs a line reference');
           const background = Array.from(item.children).filter(node => attr(node, TTM, 'role') === 'x-bg');
-          if (background.length > 1) throw new Error('Multiple background sublyrics');
+
           const main = item.cloneNode(true) as Element;
           for (const node of Array.from(main.children)) if (attr(node, TTM, 'role') === 'x-bg') node.remove();
           const parts = [...((!background.length || main.children.length || Array.from(main.childNodes).some(node => node.nodeValue && (node.nodeValue.trim() || root.getAttributeNS(XML, 'space') === 'preserve' || !/[\r\n]/.test(node.nodeValue))) || attr(main, STUDIO, 'id') || attr(main, STUDIO, 'kind')) ? [{ node: main, background: false }] : []),
             ...background.map(node => ({ node, background: true }))];
           for (const part of parts) {
             if (part.background && !is(part.node, ITUNES, 'span')) throw new Error('Unsupported background sublyric node');
-            checkAttributes(part.node, part.background ? [] : ['for']);
+            checkAttributes(part.node, ['for']);
             const content = readRomanization(part.node, lineId, absoluteTimes, part.node.namespaceURI ?? ITUNES, part.background);
-            if (part.background) { backgroundContents.push({ parentId: lineId, content }); }
+            if (part.background) { backgroundContents.push({ parentId: lineId, backgroundId: attr(part.node, null, 'for'), content }); }
             track.contents.push(content);
           }
         }
@@ -313,7 +316,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
       const id = attr(child, XML, 'id') ?? attr(child, ITUNES, 'key') ?? `line-${lines.length + 1}`;
       const wordStart = beginMs ?? start;
       const inlineRomanizations: Array<{ language: string | null; content: RomanizationContent }> = [];
-      let background: Element | null = null;
+      const backgrounds: Element[] = [];
       const words: LyricWord[] = [];
       for (const [index, node] of Array.from(child.childNodes).entries()) {
         if (node.nodeType === Node.ELEMENT_NODE) {
@@ -326,8 +329,7 @@ export function parseLyricTtml(xml: string): LyricDocument {
             continue;
           }
           if (role === 'x-bg') {
-            if (background) throw new Error(`Line ${id} has multiple background vocals`);
-            background = node as Element;
+            backgrounds.push(node as Element);
             continue;
           }
           if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new Error(`Unsupported TTML role ${role}`);
@@ -348,10 +350,10 @@ export function parseLyricTtml(xml: string): LyricDocument {
         track.contents.push({ ...value.content, lineId });
       });
       addInline(inlineRomanizations, id);
-      if (background) {
+      for (const [bgIndex, background] of backgrounds.entries()) {
         checkAttributes(background, ['begin', 'end', 'dur']);
         const [bgBegin, bgEnd] = boundaries(background, wordStart, ownEnd, absoluteTimes);
-        const bgId = attr(background, STUDIO, 'id') ?? `${id}:bg`;
+        const bgId = attr(background, STUDIO, 'id') ?? attr(background, XML, 'id') ?? `${id}:bg${bgIndex || ''}`;
         const bgStart = bgBegin ?? wordStart;
         const bgRomanizations: typeof inlineRomanizations = [];
         const bgWords: LyricWord[] = [];
@@ -385,8 +387,10 @@ export function parseLyricTtml(xml: string): LyricDocument {
   };
   visit(body, rootStart, null, 1, null);
   if (new Set(lines.map((line) => line.id)).size !== lines.length) throw new Error('Duplicate line id');
-  for (const { parentId, content } of backgroundContents) {
-    const background = lines.find(line => line.backgroundOf === parentId);
+  for (const { parentId, backgroundId, content } of backgroundContents) {
+    const candidates = lines.filter(line => line.backgroundOf === parentId);
+    if (!backgroundId && candidates.length > 1) throw new Error('多背景附属内容需要明确 for 引用');
+    const background = candidates.find(line => !backgroundId || line.id === backgroundId);
     if (!background) throw new Error(`Background transliteration refers to unknown parent ${parentId}`);
     content.lineId = background.id;
   }
@@ -406,7 +410,9 @@ export function parseLyricTtml(xml: string): LyricDocument {
   for (const track of [...romanizationTracks, ...translationTracks]) for (const content of track.contents) if (content.kind === 'timed') content.units.forEach(quantize);
   for (const agent of agents) if (agent.actorRef && !agents.some(a => a.id === agent.actorRef)) throw new Error(`歌手 ${agent.id} 的 actor 引用不存在：${agent.actorRef}`);
   validateTranslationTracks(translationTracks, new Set(lines.map(line => line.id)));
-  return { schemaVersion: LYRIC_SCHEMA_VERSION, lines, romanizationTracks, translationTracks, agents, metadata, language: attr(root, XML, 'lang') };
+  const document = { schemaVersion: LYRIC_SCHEMA_VERSION, lines, romanizationTracks, translationTracks, agents, metadata, language: attr(root, XML, 'lang') };
+  validateAgents(document);
+  return document;
 }
 
 function setTime(node: Element, begin: TimeMs, end: TimeMs, draft: boolean) {
@@ -476,7 +482,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
           if (!parent.parentNode) entry.appendChild(parent);
           previousMain = line.backgroundOf || !draft && content.kind === 'plain' && !content.text ? null : { lineId: line.id, node: parent };
           const textNode = line.backgroundOf ? xml.createElementNS(ITUNES, 'span') : parent;
-          if (line.backgroundOf) textNode.setAttributeNS(TTM, 'ttm:role', 'x-bg');
+          if (line.backgroundOf) { textNode.setAttributeNS(TTM, 'ttm:role', 'x-bg'); textNode.setAttribute('for', line.id); }
           if (draft) {
             textNode.setAttributeNS(STUDIO, 'studio:id', content.id);
             textNode.setAttributeNS(STUDIO, 'studio:kind', content.kind);
@@ -519,7 +525,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
         const parent = xml.createElementNS(ITUNES, 'text');
         parent.setAttribute('for', line.backgroundOf ?? line.id);
         const content = line.backgroundOf ? xml.createElementNS(ITUNES, 'span') : parent;
-        if (line.backgroundOf) content.setAttributeNS(TTM, 'ttm:role', 'x-bg');
+        if (line.backgroundOf) { content.setAttributeNS(TTM, 'ttm:role', 'x-bg'); content.setAttribute('for', line.id); }
         if (draft) { content.setAttributeNS(STUDIO, 'studio:id', item.id); content.setAttributeNS(STUDIO, 'studio:kind', item.kind); }
         if (item.kind === 'plain') content.textContent = line.backgroundOf ? `(${item.text})` : item.text;
         else {
@@ -552,10 +558,9 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   }
   let div: Element | null = null;
   let currentPart: string | null | undefined;
-  const backgrounds = new Map<string, LyricLine>();
+  const backgrounds = new Map<string, LyricLine[]>();
   for (const line of document.lines) if (line.backgroundOf) {
-    if (backgrounds.has(line.backgroundOf)) throw new Error(`Multiple background vocals for ${line.backgroundOf}`);
-    backgrounds.set(line.backgroundOf, line);
+    backgrounds.set(line.backgroundOf, [...(backgrounds.get(line.backgroundOf) ?? []), line]);
   }
   for (const parentId of backgrounds.keys()) if (!document.lines.some((line) => line.id === parentId && !line.backgroundOf)) throw new Error(`Background vocal has no parent: ${parentId}`);
   for (const line of document.lines) {
@@ -577,12 +582,13 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     if (line.agentRefs.length) p.setAttributeNS(TTM, 'ttm:agent', line.agentRefs.join(' '));
     const appendWord = (parent: Element, word: LyricWord, text: string) => {
       // XML with xml:space=preserve also faithfully carries tabs/newlines in body text.
-      if (!draft && isUntimedXmlWhitespace(word,options.editing)) {
+      if (!draft && !word.agentRefs && isUntimedXmlWhitespace(word,options.editing)) {
         parent.appendChild(xml.createTextNode(text));
         return;
       }
       const span = xml.createElementNS(TTML, 'span');
       if (draft) span.setAttributeNS(STUDIO, 'studio:id', word.id);
+      if (word.agentRefs?.length) span.setAttributeNS(TTM, 'ttm:agent', word.agentRefs.join(' '));
       if (word.obscene) {
         span.setAttributeNS(AMLL, 'amll:obscene', 'true');
         span.setAttributeNS(TTM, 'ttm:role', 'expletive');
@@ -611,10 +617,10 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     };
     for (const word of line.words) appendWord(p, word, word.text);
 
-    const bg = backgrounds.get(line.id);
-    if (bg) {
+    for (const bg of backgrounds.get(line.id) ?? []) {
       const span = xml.createElementNS(TTML, 'span');
       span.setAttributeNS(TTM, 'ttm:role', 'x-bg');
+      span.setAttributeNS(XML, 'xml:id', bg.id);
       if (draft) span.setAttributeNS(STUDIO, 'studio:id', bg.id);
       if (bg.agentRefs.length) span.setAttributeNS(TTM, 'ttm:agent', bg.agentRefs.join(' '));
       setTime(span, bg.beginMs, bg.endMs, draft);

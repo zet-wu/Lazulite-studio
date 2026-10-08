@@ -73,7 +73,7 @@ def test_forced_http_requires_confirmation_and_returns_bound_result(tmp_path):
     pid = project["id"]
     document = client.get(f"/api/v1/projects/{pid}/document").json(); etag = client.get(f"/api/v1/projects/{pid}/document").headers["etag"]
     ttml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div begin="1s"><p xml:id="L" begin="0s" end="1s">歌</p></div></body></tt>'
-    saved = client.put(f"/api/v1/projects/{pid}/document", json={"schema_version":"studio-document-v5","project_id":pid,"revision":document["revision"],"document":initial_project(ttml, asset["id"])}, headers={**headers,"if-match":etag})
+    saved = client.put(f"/api/v1/projects/{pid}/document", json={"schema_version":"studio-document-v6","project_id":pid,"revision":document["revision"],"document":initial_project(ttml, asset["id"])}, headers={**headers,"if-match":etag})
     revision = saved.json()["revision"]
     body = {"revision": revision, "asset_id": asset["id"], "line_id": "L"}
     assert client.post(f"/api/v1/projects/{pid}/jobs/forced_align", json={"params":body}, headers=headers).status_code == 422
@@ -92,6 +92,6 @@ def test_forced_http_requires_confirmation_and_returns_bound_result(tmp_path):
     assert result["units"][0]["start_ms"] == 1100
     changed = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><div begin="1s"><p xml:id="L" begin="0s" end="1s"><span tts:ruby="container"><span tts:ruby="base">歌</span><span tts:ruby="text">うた</span></span></p></div></body></tt>'
     current = client.get(f"/api/v1/projects/{pid}/document")
-    updated = client.put(f"/api/v1/projects/{pid}/document", json={"schema_version":"studio-document-v5","project_id":pid,"revision":current.json()["revision"],"document":initial_project(changed, asset["id"])}, headers={**headers,"if-match":current.headers["etag"]})
+    updated = client.put(f"/api/v1/projects/{pid}/document", json={"schema_version":"studio-document-v6","project_id":pid,"revision":current.json()["revision"],"document":initial_project(changed, asset["id"])}, headers={**headers,"if-match":current.headers["etag"]})
     new_body = {"revision": updated.json()["revision"], "asset_id": asset["id"], "line_id": "L", "coordinate_space": "ruby", "ruby_id": "ui-ruby", "base_range": [0, 1]}
     assert client.post(f"/api/v1/projects/{pid}/jobs/forced_align", json={"params":new_body}, headers=headers).status_code == 422

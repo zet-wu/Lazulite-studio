@@ -1,0 +1,71 @@
+import {expect,it} from 'vitest';
+import {createLyricDocument,createLine,createWord} from '../src/domain/lyric-document';
+import {parseLyricTtml,serializeLyricTtml} from '../src/adapters/ttml/lyric-codec';
+import {createProjectDocument,createProjectEditorState,executeProjectCommand,undoProjectCommand} from '../src/domain/project-document';
+import {parseProject,serializeProject} from '../src/adapters/project-codec';
+import {applyLyricCommand} from '../src/domain/lyric-commands';
+function rich() {
+ const doc=createLyricDocument('main');doc.agents=[{id:'a',name:'A',type:'person'},{id:'b',name:null,type:'group'}];
+ const main=doc.lines[0];main.agentRefs=['a'];
+ for(const id of ['bg1','bg2']) {const bg=createLine(id,id);bg.backgroundOf=main.id;bg.agentRefs=id==='bg2'?['b']:[];doc.lines.push(bg);}
+ doc.lines.forEach((line,i)=>{line.beginMs=i*1000;line.endMs=i*1000+500;line.words[0].beginMs=line.beginMs;line.words[0].endMs=line.endMs;});
+ doc.lines[1].words[0].agentRefs=['b'];
+ doc.translationTracks=[{id:'t',language:'en',purpose:'subtitle',contents:doc.lines.map(line=>({id:`t-${line.id}`,lineId:line.id,kind:'plain',text:`translation ${line.id}`}))}];
+ doc.romanizationTracks=[{id:'r',language:'ja-Latn',contents:doc.lines.map(line=>({id:`r-${line.id}`,lineId:line.id,kind:'timed',units:[{id:`u-${line.id}`,text:`roman ${line.id}`,beginMs:line.beginMs,endMs:line.endMs}]}))}];return doc;
+}
+it('separately exchanges backgrounds, attachments and word singers',()=>{
+ const doc=rich();expect(parseLyricTtml(serializeLyricTtml(doc,{draft:true}))).toEqual(doc);
+ const formal=parseLyricTtml(serializeLyricTtml(doc,{draft:false}));
+ expect(formal.lines.map(l=>[l.id,l.backgroundOf,l.agentRefs,l.words[0].agentRefs])).toEqual(doc.lines.map(l=>[l.id,l.backgroundOf,l.agentRefs,l.words[0].agentRefs]));
+ expect(formal.translationTracks[0].contents.map(c=>[c.lineId,c.kind==='plain'?c.text:''])).toEqual(doc.translationTracks[0].contents.map(c=>[c.lineId,c.kind==='plain'?c.text:'']));
+ expect(formal.romanizationTracks[0].contents.map(c=>[c.lineId,c.kind==='timed'?c.units[0].text:''])).toEqual(doc.romanizationTracks[0].contents.map(c=>[c.lineId,c.kind==='timed'?c.units[0].text:'']));
+});
+it('gates import, saves position and converts extra backgrounds in one undo',()=>{
+ let state=createProjectEditorState(createProjectDocument());
+ expect(()=>executeProjectCommand(state,{type:'lyrics',command:{type:'replace-document',document:rich()}})).toThrow();
+ for(const rule of ['noWordAgents','noMultipleBackgrounds'] as const)state=executeProjectCommand(state,{type:'amll-setting',rule,enabled:false});
+ state=executeProjectCommand(state,{type:'lyrics',command:{type:'replace-document',document:rich()}});
+ state=executeProjectCommand(state,{type:'background-position',lineId:'bg2',before:true});expect(parseProject(serializeProject(state.present))).toEqual(state.present);
+ const before=state;state=executeProjectCommand(state,{type:'amll-batch',rule:'noMultipleBackgrounds'});
+ expect(state.present.lyrics.lines[0].id).toBe('bg2');expect(state.present.lyrics.lines[0].backgroundOf).toBeNull();expect(undoProjectCommand(state).present).toBe(before.present);
+});
+it('merges explicit and inherited same singers explicitly, then preserves split and rename',()=>{
+ let doc=createLyricDocument('');doc.agents=[{id:'a',name:null,type:'person'}];const line=doc.lines[0];line.agentRefs=['a'];line.words=[createWord('one','w1'),{...createWord('two','w2'),agentRefs:['a']}];
+ doc=applyLyricCommand(doc,{type:'merge-words',wordIds:['w1','w2']});expect(doc.lines[0].words[0].agentRefs).toEqual(['a']);
+ doc=applyLyricCommand(doc,{type:'split-word',lineId:line.id,wordId:'w1',at:3,newWordId:'w3'});expect(doc.lines[0].words.map(w=>w.agentRefs)).toEqual([['a'],['a']]);
+ doc=applyLyricCommand(doc,{type:'rename-agent',id:'a',nextId:'new'});expect(doc.lines[0].words[1].agentRefs).toEqual(['new']);
+ doc=applyLyricCommand(doc,{type:'delete-agent',id:'new'});expect(doc.lines[0].words[1]).not.toHaveProperty('agentRefs');
+});
+it('keeps all preposed relative positions through conversion and save reopening',()=>{
+ let state=createProjectEditorState({...createProjectDocument(rich()),amll:{simplified:false,noMultipleBackgrounds:false,noChorus:false,noWordAgents:false,noIndependentBackground:false}});
+ for(const lineId of ['bg1','bg2'])state=executeProjectCommand(state,{type:'background-position',lineId,before:true});
+ const order=state.present.lineOrder;
+ state=executeProjectCommand(state,{type:'amll-batch',rule:'noMultipleBackgrounds'});
+ expect(state.present.lineOrder).toEqual(order);
+ expect(parseProject(serializeProject(state.present)).lineOrder).toEqual(order);
+});
+it('maps singers by reference order, preserves stable sides and locks dependencies',()=>{
+ const doc=rich();doc.lines[0].agentRefs=['b','a'];
+ let state=createProjectEditorState({...createProjectDocument(doc),amll:{simplified:false,noMultipleBackgrounds:false,noChorus:false,noWordAgents:false,noIndependentBackground:false}});
+ state=executeProjectCommand(state,{type:'amll-batch',rule:'simplified',duetAgents:['b']});
+ expect(state.present.lyrics.lines[0].agentRefs).toEqual(['v2']);
+ expect(state.present.lyrics.lines.slice(1).every(l=>!l.agentRefs.length&&l.words.every(w=>!w.agentRefs))).toBe(true);
+ const before=state;state=executeProjectCommand(state,{type:'amll-setting',rule:'simplified',enabled:true});
+ expect(state.present.amll).toMatchObject({simplified:true,noChorus:true,noWordAgents:true,noIndependentBackground:true,noMultipleBackgrounds:false});
+ expect(()=>executeProjectCommand(state,{type:'amll-setting',rule:'noWordAgents',enabled:false})).toThrow(/锁定/);
+ expect(undoProjectCommand(state).present).toBe(before.present);
+ state=executeProjectCommand(state,{type:'amll-setting',rule:'simplified',enabled:false});expect(state.present.amll.noWordAgents).toBe(true);
+});
+it('scope and no-op batches are atomic, singers are inherited on detached backgrounds',()=>{
+ const doc=rich();doc.lines[1].agentRefs=['a','b'];doc.lines[2].agentRefs=['b','a'];
+ let state=createProjectEditorState({...createProjectDocument(doc),amll:{simplified:false,noMultipleBackgrounds:false,noChorus:false,noWordAgents:false,noIndependentBackground:false}});
+ state=executeProjectCommand(state,{type:'amll-batch',rule:'noChorus',ids:['bg1']});expect(state.present.lyrics.lines[1].agentRefs).toEqual(['a']);expect(state.present.lyrics.lines[2].agentRefs).toEqual(['b','a']);
+ state=executeProjectCommand(state,{type:'amll-batch',rule:'noIndependentBackground',ids:['bg1']});expect(state.present.lyrics.lines[1].words[0]).not.toHaveProperty('agentRefs');
+ expect(executeProjectCommand(state,{type:'amll-batch',rule:'noWordAgents'})).toBe(state);
+ const detached=executeProjectCommand(state,{type:'lyrics',command:{type:'set-background-of',lineId:'bg1',parentLineId:null}});expect(detached.present.lyrics.lines.find(l=>l.id==='bg1')!.agentRefs).toEqual(['a']);
+});
+it('rejects cross-line inheritance loss and unequal merge, preserves effective singer on movement',()=>{
+ let doc=createLyricDocument('');doc.agents=[{id:'a',name:null,type:'person'},{id:'b',name:null,type:'person'}];const from=doc.lines[0],to=createLine('');from.agentRefs=['a'];to.agentRefs=['b'];from.words=[createWord('one','w')];doc.lines.push(to);
+ doc=applyLyricCommand(doc,{type:'move-word',lineId:from.id,wordId:'w',toLineId:to.id,afterWordId:null});expect(doc.lines[1].words[0].agentRefs).toEqual(['a']);
+ doc.lines[1].words.push(createWord('two','w2'));expect(()=>applyLyricCommand(doc,{type:'merge-words',wordIds:['w','w2']})).toThrow(/统一/);
+});

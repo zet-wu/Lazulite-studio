@@ -1,3 +1,4 @@
+import { lineAgents } from './amll-compatibility';
 import { translationsForLine } from './lyric-document';
 import { translationText } from './lyric-document';
 import type { LyricLine as AmllLine } from '@applemusic-like-lyrics/core';
@@ -26,7 +27,7 @@ function previewRomanization(line: LyricLine, content: RomanizationContent | und
 
 /** Pure whitespace uses AMLL’s independent 0–0 text nodes; all timings remain a preview projection. */
 export function toAmllLines(document: LyricDocument, showTranslation: boolean, showRomanization: boolean, trackId?: string | null): PreviewLine[] {
-  const leadAgent = document.agents.find((agent) => document.lines.some((line) => line.agentRefs.includes(agent.id)))?.id;
+  const leadAgent = document.agents.every(agent=>['v1','v2'].includes(agent.id)&&agent.name===null&&agent.type==='person'&&!agent.actorRef) ? 'v1' : document.agents.find((agent) => document.lines.some((line) => line.agentRefs.includes(agent.id)))?.id;
   const backgrounds = new Map<string, LyricLine[]>();
   for (const line of document.lines) if (line.backgroundOf) {
     const group = backgrounds.get(line.backgroundOf) ?? [];
@@ -58,7 +59,7 @@ export function toAmllLines(document: LyricDocument, showTranslation: boolean, s
       words, startTime: milliseconds(begin), endTime: milliseconds(end!),
       translatedLyric: showTranslation ? translationsForLine(document, line.id).map(translationText).join(' / ') : '',
       romanLyric: roman.words.size ? '' : roman.text,
-      isBG: Boolean(line.backgroundOf), isDuet: Boolean(leadAgent && line.agentRefs.length && !line.agentRefs.includes(leadAgent)),
+      isBG: Boolean(line.backgroundOf), isDuet: Boolean(leadAgent && lineAgents(document,line).length && !lineAgents(document,line).includes(leadAgent)),
     } }];
   });
 }

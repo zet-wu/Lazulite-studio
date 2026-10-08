@@ -923,7 +923,7 @@ export interface components {
         };
         DocumentEnvelope: {
             /** @constant */
-            schema_version: "studio-document-v5";
+            schema_version: "studio-document-v6";
             project_id: string;
             revision: string | null;
             etag?: string;
@@ -931,7 +931,7 @@ export interface components {
             client_seq?: number | null;
             document: {
                 /** @constant */
-                schemaVersion: "studio-project-v3";
+                schemaVersion: "studio-project-v4";
                 lyrics: {
                     draftTtml: string;
                 };
@@ -956,6 +956,14 @@ export interface components {
                         [key: string]: string;
                     };
                 };
+                amll: {
+                    simplified: boolean;
+                    noMultipleBackgrounds: boolean;
+                    noChorus: boolean;
+                    noWordAgents: boolean;
+                    noIndependentBackground: boolean;
+                };
+                lineOrder: string[];
             };
         };
         DocumentSaveResponse: components["schemas"]["DocumentEnvelope"] & {

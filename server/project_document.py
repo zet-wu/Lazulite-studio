@@ -1,7 +1,7 @@
 """The only persisted editable project format. Audio products live separately."""
 import json
 from pathlib import Path
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictBool
 from typing import Literal
 
 class Segment(BaseModel):
@@ -30,20 +30,33 @@ class Editing(BaseModel):
     ignoredSyncLineIds: list[str]
     endLinks: dict[str, str]
 
+class AmllSettings(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    simplified: StrictBool
+    noMultipleBackgrounds: StrictBool
+    noChorus: StrictBool
+    noWordAgents: StrictBool
+    noIndependentBackground: StrictBool
+
 class ProjectSnapshot(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    schemaVersion: Literal['studio-project-v3']
+    schemaVersion: Literal['studio-project-v4']
+    amll: AmllSettings
+    lineOrder: list[str]
     lyrics: Lyrics
     acoustics: Acoustics
     editing: Editing
 
 def initial_project(ttml: str, asset_id: str | None) -> dict:
-    return {'schemaVersion': 'studio-project-v3',
+    from .amll_compatibility import DEFAULTS
+    return {'schemaVersion': 'studio-project-v4', 'amll': dict(DEFAULTS), 'lineOrder': [],
             'editing': {'emptyBeats': {}, 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
 
 def read_project(path: str | Path) -> dict:
     snapshot = ProjectSnapshot.model_validate_json(Path(path).read_text(encoding='utf-8')).model_dump()
     validate_editing(snapshot)
+    from .amll_compatibility import validate_amll
+    validate_amll(snapshot)
     return snapshot
 
 def read_lyrics(path: str | Path) -> str:
@@ -57,6 +70,8 @@ def validate_project(value: dict, conn, project_id: str) -> dict:
     if row is None: raise KeyError(project_id)
     snapshot['lyrics']['draftTtml'] = normalize_ttml(validate_ttml(snapshot['lyrics']['draftTtml']))
     validate_editing(snapshot)
+    from .amll_compatibility import validate_amll
+    validate_amll(snapshot)
     acoustic = snapshot['acoustics']
     if acoustic['analysisId'] is not None:
         result = conn.execute('SELECT source_asset_id FROM vocal_results WHERE id=? AND project_id=? AND status=?', (acoustic['analysisId'], project_id, 'ready')).fetchone()

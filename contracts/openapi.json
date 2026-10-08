@@ -3220,7 +3220,7 @@
         ],
         "properties": {
           "schema_version": {
-            "const": "studio-document-v5"
+            "const": "studio-document-v6"
           },
           "project_id": {
             "type": "string"
@@ -3250,11 +3250,13 @@
               "schemaVersion",
               "lyrics",
               "acoustics",
-              "editing"
+              "editing",
+              "amll",
+              "lineOrder"
             ],
             "properties": {
               "schemaVersion": {
-                "const": "studio-project-v3"
+                "const": "studio-project-v4"
               },
               "lyrics": {
                 "type": "object",
@@ -3356,6 +3358,40 @@
                       "type": "string"
                     }
                   }
+                }
+              },
+              "amll": {
+                "type": "object",
+                "required": [
+                  "simplified",
+                  "noMultipleBackgrounds",
+                  "noChorus",
+                  "noWordAgents",
+                  "noIndependentBackground"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "simplified": {
+                    "type": "boolean"
+                  },
+                  "noMultipleBackgrounds": {
+                    "type": "boolean"
+                  },
+                  "noChorus": {
+                    "type": "boolean"
+                  },
+                  "noWordAgents": {
+                    "type": "boolean"
+                  },
+                  "noIndependentBackground": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "lineOrder": {
+                "type": "array",
+                "items": {
+                  "type": "string"
                 }
               }
             },

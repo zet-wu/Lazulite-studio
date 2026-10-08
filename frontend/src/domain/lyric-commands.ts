@@ -1,3 +1,4 @@
+import { preserveWordAgents, wordAgents, sameAgents, validateAgents, lineAgents } from './amll-compatibility';
 import { createProjectEditing, emptyBeatCount, setEmptyBeat, reconcileEditing, validateProjectEditing, type ProjectEditing } from './project-editing';
 import { lineStructureIssues } from './line-structure';
 import { validateTranslationTracks } from './translation-editing';
@@ -24,6 +25,7 @@ type AtomicLyricCommand =
   | { type: 'set-line-time'; lineId: string; beginMs: TimeMs; endMs: TimeMs }
   | { type: 'link-line-end'; lineId: string; targetLineId: string }
   | { type: 'unlink-line-end'; lineId: string }
+  | { type: 'set-word-agents'; lineId: string; wordId: string; agentRefs: string[] }
   | { type: 'set-line-agents'; lineId: string; agentRefs: string[] }
   | { type: 'set-ignore-sync'; lineId: string; ignoreSync: boolean }
   | { type: 'set-translation-tracks'; tracks: TranslationTrack[]; source: TranslationTrack[] }
@@ -66,7 +68,7 @@ type AtomicLyricCommand =
   | { type: 'set-ruby-time'; lineId: string; wordId: string; rubyId: string; beginMs: TimeMs; endMs: TimeMs };
 
 export type LyricCommand = AtomicLyricCommand | { type: 'batch'; commands: AtomicLyricCommand[] };
-type WordCommand = Extract<AtomicLyricCommand, { type: 'set-word-obscene' | 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
+type WordCommand = Extract<AtomicLyricCommand, { type: 'set-word-agents' | 'set-word-obscene' | 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
 
 export type LyricEditorState = { present: LyricDocument; past: LyricDocument[]; future: LyricDocument[] };
 
@@ -122,8 +124,8 @@ function afterLineGroup(lines: LyricLine[], id: string): number {
   if (index < 0) throw new Error(`Line not found: ${id}`);
   const line = lines[index];
   if (line.backgroundOf) throw new Error('Use the parent line as the insertion anchor');
-  const background = lines.findIndex((item) => item.backgroundOf === id);
-  return background >= 0 ? background : index;
+  const background = lines.reduce((last,item,i)=>item.backgroundOf===id?i:last,-1);
+  return Math.max(background,index);
 }
 
 function wordFitsLine(word: LyricWord, line: LyricLine) {
@@ -157,7 +159,10 @@ export function planWordMerge(document: LyricDocument, ids: string[]) {
   const owners = document.lines.filter(line => line.words.some(word => ids.includes(word.id)));
   if (owners.length !== 1) throw new Error('只能合并同一行的词，主行与背景分别处理');
   const line = owners[0], words = consecutive(line.words, ids);
-  const merged = { ...words[0], text: words.map(word => word.text).join(''), ...timeEnvelope(words),
+  const effective = wordAgents(document,line,words[0]);
+  if(words.some(word=>!sameAgents(wordAgents(document,line,word),effective))) throw new Error('合词前请先统一有效歌手');
+  const explicit=words.some(word=>word.agentRefs);
+  const merged = { ...words[0], ...(explicit ? {agentRefs:[...effective]} : {}), text: words.map(word => word.text).join(''), ...timeEnvelope(words),
     rubyUnits: words.flatMap(word => word.rubyUnits), obscene: words.some(word => word.obscene) };
   wordFitsLine(merged, line);
   merged.rubyUnits.forEach(unit => rubyFitsWord(unit, merged));
@@ -181,6 +186,7 @@ export type LineSplitPlan = {
   contentTargets: Record<string, number>;
   translationTargets: Record<string, number>;
   backgroundTarget: number | null;
+  backgroundTargets?: Record<string, number>;
 };
 
 /** The dialog and command share exact segment boundaries and validation. */
@@ -217,16 +223,16 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       if (source.backgroundOf === command.parentLineId) return document;
       if (command.parentLineId === null) {
         const lines = document.lines.slice();
-        lines[sourceIndex] = { ...source, backgroundOf: null };
+        lines[sourceIndex] = { ...source, agentRefs: [...lineAgents(document,source)], backgroundOf: null };
         return { ...document, lines };
       }
       const parent = document.lines[lineIndex(document, command.parentLineId)];
       if (source.id === parent.id || parent.backgroundOf) throw new Error('背景歌词只能附属于另一条主行');
       if (document.lines.some((line) => line.backgroundOf === source.id)) throw new Error('此行已有背景歌词，请先处理所属关系');
-      if (document.lines.some((line) => line.backgroundOf === parent.id && line.id !== source.id)) throw new Error('目标主行已有背景歌词');
+
       if (editing.endLinks[source.id] || Object.values(editing.endLinks).includes(source.id)) throw new Error('此行有行尾链接，请先处理');
       const lines = document.lines.filter((line) => line.id !== source.id);
-      const parentIndex = lines.findIndex((line) => line.id === parent.id);
+      const parentIndex = afterLineGroup(lines, parent.id);
       lines.splice(parentIndex + 1, 0, { ...source, backgroundOf: parent.id, songPart: null });
       return { ...document, lines };
     }
@@ -265,15 +271,16 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       };
       assigned(command.contentTargets, document.romanizationTracks.flatMap(track => track.contents), '音译');
       assigned(command.translationTargets, document.translationTracks.flatMap(track => track.contents), '翻译');
-      const background = document.lines.find(item => item.backgroundOf === line.id);
-      if (background && (command.backgroundTarget === null || !Number.isInteger(command.backgroundTarget) || !segments[command.backgroundTarget])) throw new Error('请重新指定背景歌词归属');
+      const backgrounds = document.lines.filter(item => item.backgroundOf === line.id);
+      const target = (id: string) => command.backgroundTargets?.[id] ?? command.backgroundTarget;
+      if (backgrounds.some(bg => target(bg.id) === null || !Number.isInteger(target(bg.id)) || !segments[target(bg.id)!])) throw new Error('请重新指定背景歌词归属');
       for (const [id, target] of Object.entries(editing.endLinks)) if (target === line.id && segments[0].beginMs !== line.beginMs) delete editing.endLinks[id];
       const outgoing = editing.endLinks[line.id];
       delete editing.endLinks[line.id];
       if (outgoing && segments.at(-1)!.endMs === line.endMs) editing.endLinks[segments.at(-1)!.id] = outgoing;
       if (editing.ignoredSyncLineIds.includes(line.id)) editing.ignoredSyncLineIds.push(...command.newLineIds);
-      const lines = document.lines.filter(item => item !== background);
-      lines.splice(index, 1, ...segments.flatMap((segment, i) => background && i === command.backgroundTarget ? [segment, { ...background, backgroundOf: segment.id }] : [segment]));
+      const lines = document.lines.filter(item => !backgrounds.includes(item));
+      lines.splice(index, 1, ...segments.flatMap((segment, i) => [segment, ...backgrounds.filter(bg=>target(bg.id)===i).map(bg=>({...bg,backgroundOf:segment.id}))]));
       const romanizationTracks = document.romanizationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.lineId === line.id ? { ...content, lineId: segments[command.contentTargets[content.id]].id } : content) }));
       const translationTracks = document.translationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.lineId === line.id ? { ...content, lineId: segments[command.translationTargets[content.id]].id } : content) }));
       return { ...document, lines, romanizationTracks, translationTracks };
@@ -337,7 +344,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
           wordFitsLine(part, line);
         }
         if (command.words[0].beginMs !== word.beginMs || command.words.at(-1)?.endMs !== word.endMs) throw new Error('分词必须保留父词时间区间');
-        return command.words;
+        return command.words.map(part=>({...part,...(word.agentRefs?{agentRefs:[...word.agentRefs]}:{})}));
       });
     case 'segment-words': {
       if (!command.changes.length) return document;
@@ -361,7 +368,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
             wordFitsLine(part, line);
           }
           applied++;
-          return change.words;
+          return change.words.map(part=>({...part,...(word.agentRefs?{agentRefs:[...word.agentRefs]}:{})}));
         });
         return { ...line, words };
       });
@@ -391,7 +398,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       const destination = to.words.filter((item) => item.id !== word.id);
       const after = command.afterWordId === null ? -1 : destination.findIndex((item) => item.id === command.afterWordId);
       if (command.afterWordId !== null && after < 0) throw new Error(`Word not found: ${command.afterWordId}`);
-      destination.splice(after + 1, 0, word);
+      destination.splice(after + 1, 0, preserveWordAgents(document,from,to,word));
       const lines = document.lines.slice();
       if (fromIndex === toIndex) {
         if (destination.every((item, index) => item === from.words[index])) return document;
@@ -604,16 +611,16 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       if (!document.agents.some(a => a.id === command.id)) throw new Error('歌手不存在');
       if (command.id === command.nextId) return document;
       if (!/^[A-Za-z_][\w.-]*$/.test(command.nextId) || document.agents.some(a => a.id === command.nextId)) throw new Error('歌手 ID 非法或已存在');
-      return { ...document, agents: document.agents.map(a => ({ ...a, id: a.id === command.id ? command.nextId : a.id, ...(a.actorRef === command.id ? { actorRef: command.nextId } : {}) })), lines: document.lines.map(l => ({ ...l, agentRefs: l.agentRefs.map(id => id === command.id ? command.nextId : id) })) };
+      return { ...document, agents: document.agents.map(a => ({ ...a, id: a.id === command.id ? command.nextId : a.id, ...(a.actorRef === command.id ? { actorRef: command.nextId } : {}) })), lines: document.lines.map(l => ({ ...l, agentRefs: l.agentRefs.map(id => id === command.id ? command.nextId : id), words:l.words.map(w=>w.agentRefs?{...w,agentRefs:w.agentRefs.map(id=>id===command.id?command.nextId:id)}:w) })) };
     }
     case 'delete-agent': {
       if (!document.agents.some(a => a.id === command.id)) throw new Error('歌手不存在');
-      return { ...document, agents: document.agents.filter(a => a.id !== command.id).map(a => { if (a.actorRef !== command.id) return a; const { actorRef: _, ...rest } = a; return rest; }), lines: document.lines.map(l => ({ ...l, agentRefs: l.agentRefs.filter(id => id !== command.id) })) };
+      return { ...document, agents: document.agents.filter(a => a.id !== command.id).map(a => { if (a.actorRef !== command.id) return a; const { actorRef: _, ...rest } = a; return rest; }), lines: document.lines.map(l => ({ ...l, agentRefs: l.agentRefs.filter(id => id !== command.id), words:l.words.map(w=>{if(!w.agentRefs)return w;const next: LyricWord={...w,agentRefs:w.agentRefs.filter(id=>id!==command.id)};if(!next.agentRefs!.length)delete next.agentRefs;return next;}) })) };
     }
     case 'set-agents':
       if (command.agents.some(a => a.actorRef !== undefined && !command.agents.some(target => target.id === a.actorRef))) throw new Error('未知 actor 引用');
       if (command.agents.some((agent) => !/^[A-Za-z_][\w.-]*$/.test(agent.id)) || new Set(command.agents.map((agent) => agent.id)).size !== command.agents.length) throw new Error('Invalid or duplicate agent ID');
-      if (document.lines.some((line) => line.agentRefs.some((ref) => !command.agents.some((agent) => agent.id === ref)))) throw new Error('An assigned agent cannot be removed');
+      if (document.lines.some((line) => [...line.agentRefs,...line.words.flatMap(word=>word.agentRefs??[])].some((ref) => !command.agents.some((agent) => agent.id === ref)))) throw new Error('An assigned agent cannot be removed');
       return { ...document, agents: command.agents };
     case 'move-ruby': {
       const line = document.lines.find(line => line.id === command.lineId);
@@ -655,8 +662,13 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
         const middle = splitTime(word.beginMs, word.endMs, Array.from(left).length, Array.from(word.text).length);
         return [
           { ...word, text: left, endMs: middle },
-          { ...createWord(right, newId), beginMs: middle, endMs: word.endMs },
+          { ...word, id:newId, text:right, beginMs: middle, endMs: word.endMs },
         ];
+      }
+      case 'set-word-agents': {
+        const next = {...word};
+        if(wordCommand.agentRefs.length) next.agentRefs=[...wordCommand.agentRefs]; else delete next.agentRefs;
+        return JSON.stringify(next)===JSON.stringify(word)?[word]:[next];
       }
       case 'set-word-obscene':
         return [word.obscene === wordCommand.obscene ? word : { ...word, obscene: wordCommand.obscene }];
@@ -753,6 +765,7 @@ export function applyLyricTransaction(document: LyricDocument, command: LyricCom
   const lyrics = command.type === 'batch' ? command.commands.reduce(atomic, document) : atomic(document, command);
   reconcileEditing(document, lyrics, editing);
   validateProjectEditing(lyrics, editing);
+  validateAgents(lyrics);
   return { lyrics, editing: JSON.stringify(editing) === JSON.stringify(original) ? original : editing };
 }
 

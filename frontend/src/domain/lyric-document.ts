@@ -1,5 +1,5 @@
 /** The semantic editor document. Transport, XML trees and playback stay outside it. */
-export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v9' as const;
+export const LYRIC_SCHEMA_VERSION = 'studio-lyric-v10' as const;
 
 export type TimeMs = number | null;
 
@@ -17,6 +17,7 @@ export type LyricWord = {
   endMs: TimeMs;
   rubyUnits: RubyUnit[];
   obscene: boolean;
+  agentRefs?: string[];
 };
 
 export type RomanizationUnit = { id: string; text: string; beginMs: TimeMs; endMs: TimeMs };

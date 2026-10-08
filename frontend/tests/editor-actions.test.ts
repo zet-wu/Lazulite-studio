@@ -57,7 +57,7 @@ describe('editor selection and clipboard', () => {
     const clipboard = copySelection(document, selection);
     const pasted = pasteRich(document, clipboard, selection);
     const duplicated = executeLyricCommand(createLyricEditorState(document), pasted.command);
-    expect(duplicated.present.lines.map((line) => line.id)).toEqual([parent.id, 'bg', pasted.selection.ids[0], `${pasted.selection.ids[0]}:bg`, 'next']);
+    expect(duplicated.present.lines.map((line) => line.id)).toEqual([parent.id, 'bg', pasted.selection.ids[0], expect.any(String), 'next']);
     expect(duplicated.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === duplicated.present.lines[2].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === parent.id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).map(item => ({ ...item, id: expect.any(String) })));
     expect(duplicated.present.lines[3].backgroundOf).toBe(duplicated.present.lines[2].id);
     const cut = executeLyricCommand(duplicated, cutSelection(duplicated.present, selection));

@@ -1,3 +1,4 @@
+import { assertAmll, checkAmll, createAmllSettings, amllDependencies, displayLines, groupDisplayLines, lineAgents, type AmllRule, type AmllSettings } from './amll-compatibility';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
 import { applyLyricTransaction, type LyricCommand } from './lyric-commands';
 import { createLyricDocument, type LyricDocument } from './lyric-document';
@@ -5,16 +6,18 @@ import { createLyricDocument, type LyricDocument } from './lyric-document';
 export type VocalSegment = { id: string; beginMs: number; endMs: number };
 export type Acoustics = { analysisId: string | null; segments: VocalSegment[] };
 export type ProjectDocument = {
-  schemaVersion: 'studio-project-v3';
+  schemaVersion: 'studio-project-v4';
   lyrics: LyricDocument;
+  amll: AmllSettings;
+  lineOrder: string[];
   acoustics: Acoustics;
   editing: ProjectEditing;
 };
 export type ProjectSnapshot = Omit<ProjectDocument, 'lyrics'> & { lyrics: { draftTtml: string } };
 export type ProjectEditorState = { present: ProjectDocument; past: ProjectDocument[]; future: ProjectDocument[] };
-export type ProjectCommand = { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics; durationMs: number };
+export type ProjectCommand = { type: 'amll-setting'; rule: AmllRule; enabled: boolean } | { type: 'background-position'; lineId: string; before: boolean } | { type: 'amll-batch'; rule: AmllRule; ids?: string[]; duetAgents?: string[] } | { type: 'duet'; lineId: string; duet: boolean } | { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics; durationMs: number };
 export function createProjectDocument(lyrics = createLyricDocument()): ProjectDocument {
-  return { schemaVersion: 'studio-project-v3', lyrics, editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
+  return { schemaVersion: 'studio-project-v4', lyrics, amll: createAmllSettings(), lineOrder: [], editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
 }
 export function validateSegments(segments: VocalSegment[], durationMs: number) {
   const ids = new Set<string>();
@@ -26,15 +29,76 @@ export function validateSegments(segments: VocalSegment[], durationMs: number) {
 export function createProjectEditorState(present: ProjectDocument): ProjectEditorState { return { present, past: [], future: [] }; }
 export function executeProjectCommand(state: ProjectEditorState, command: ProjectCommand): ProjectEditorState {
   let present: ProjectDocument;
-  if (command.type === 'lyrics') {
+  if (command.type === 'amll-setting') {
+    const amll = {...state.present.amll};
+    if (amll.simplified && amllDependencies.includes(command.rule)) throw new Error('简化模型已锁定此限制');
+    amll[command.rule] = command.enabled;
+    if (amll.simplified) for (const key of amllDependencies) amll[key] = true;
+    if (JSON.stringify(amll) === JSON.stringify(state.present.amll)) return state;
+    present = {...state.present, amll};
+  } else if (command.type === 'background-position') {
+    if (!state.present.lyrics.lines.find(line=>line.id===command.lineId)?.backgroundOf) throw new Error('只能前置背景行');
+    const line = state.present.lyrics.lines.find(line=>line.id===command.lineId)!;
+    const shown=displayLines(state.present.lyrics,state.present.lineOrder);
+    const ids=shown.map(item=>item.id).filter(id=>id!==line.id);
+    const parent=ids.indexOf(line.backgroundOf!);
+    const end=ids.reduce((last,id,i)=>state.present.lyrics.lines.find(item=>item.id===id)?.backgroundOf===line.backgroundOf ? Math.max(last,i):last,parent);
+    ids.splice((command.before?parent:end+1),0,line.id);
+    if(ids.join(' ')==shown.map(item=>item.id).join(' '))return state;
+    present = {...state.present,lineOrder:ids};
+  } else if (command.type === 'amll-batch' || command.type === 'duet') {
+    const lyrics = structuredClone(state.present.lyrics);
+    if(command.type==='duet') {
+      if(!state.present.amll.simplified) throw new Error('请先启用简化歌手模型');
+      const line=lyrics.lines.find(line=>line.id===command.lineId);
+      if(!line || line.backgroundOf) throw new Error('请选择主行');
+      const id=command.duet?'v2':'v1';
+      if(!lyrics.agents.some(agent=>agent.id===id)) lyrics.agents.push({id,name:null,type:'person'});
+      line.agentRefs=[id];
+      for(const bg of lyrics.lines.filter(bg=>bg.backgroundOf===line.id)) bg.agentRefs=[];
+    } else {
+      const ids=command.ids?.length?command.ids:checkAmll(lyrics)[command.rule].map(issue=>issue.id);
+      const included=(id:string)=>ids.includes(id);
+      if(command.rule==='simplified') {
+        for(const line of lyrics.lines) {
+          line.agentRefs=line.backgroundOf?[]:[command.duetAgents?.includes(line.agentRefs[0])?'v2':'v1'];
+          for(const word of line.words) delete word.agentRefs;
+        }
+        lyrics.agents=[{id:'v1',name:null,type:'person'},{id:'v2',name:null,type:'person'}];
+      } else if(command.rule==='noMultipleBackgrounds') {
+        const displayed=displayLines(lyrics,state.present.lineOrder);
+        for(const parent of lyrics.lines.filter(line=>!line.backgroundOf&&included(line.id))) {
+          for(const bg of lyrics.lines.filter(line=>line.backgroundOf===parent.id).slice(1)) {
+            bg.agentRefs=[...lineAgents(lyrics,bg)]; bg.backgroundOf=null;
+          }
+        }
+        lyrics.lines=displayed;
+      } else for(const line of lyrics.lines) {
+        if(command.rule==='noChorus') {
+          if(included(line.id)) line.agentRefs=line.agentRefs.slice(0,1);
+          for(const word of line.words) if(included(word.id)&&word.agentRefs) word.agentRefs=word.agentRefs.slice(0,1);
+        }
+        if(command.rule==='noWordAgents') for(const word of line.words) if(included(word.id)) delete word.agentRefs;
+        if(command.rule==='noIndependentBackground'&&line.backgroundOf&&included(line.id)) {line.agentRefs=[];for(const word of line.words) delete word.agentRefs;}
+      }
+    }
+    if(JSON.stringify(lyrics)===JSON.stringify(state.present.lyrics)) return state;
+    const result=applyLyricTransaction(state.present.lyrics,{type:'replace-document',document:lyrics},state.present.editing);
+    present={...state.present,...result, lineOrder:command.type==='amll-batch'&&command.rule==='noMultipleBackgrounds'?lyrics.lines.map(line=>line.id):state.present.lineOrder};
+  } else if (command.type === 'lyrics') {
     const result = applyLyricTransaction(state.present.lyrics, command.command, state.present.editing);
     if (result.lyrics === state.present.lyrics && result.editing === state.present.editing) return state;
-    present = { ...state.present, ...result };
+    const previous=displayLines(state.present.lyrics,state.present.lineOrder);
+    const before=previous.filter((line,i)=>line.backgroundOf&&i<previous.findIndex(item=>item.id===line.backgroundOf)).map(line=>line.id);
+    const changedOrder=result.lyrics.lines.map(line=>line.id).join(' ')!==state.present.lyrics.lines.map(line=>line.id).join(' ');
+    present = { ...state.present, ...result, lineOrder:changedOrder?groupDisplayLines(result.lyrics,before).map(line=>line.id):state.present.lineOrder };
   } else {
     validateSegments(command.acoustics.segments, command.durationMs);
     if (command.acoustics === state.present.acoustics) return state;
     present = { ...state.present, acoustics: command.acoustics };
   }
+  present = { ...present, lineOrder: present.lineOrder.filter(id=>present.lyrics.lines.some(line=>line.id===id)) };
+  assertAmll(present.lyrics, present.amll);
   return { present, past: [...state.past.slice(-255), state.present], future: [] };
 }
 export function undoProjectCommand(state: ProjectEditorState): ProjectEditorState {

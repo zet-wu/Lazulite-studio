@@ -83,7 +83,7 @@ describe('semantic lyric commands', () => {
     const attached = executeLyricCommand(original, { type: 'set-background-of', lineId: background.id, parentLineId: main.id });
     expect(attached.present.lines.map((line) => [line.id, line.backgroundOf])).toEqual([[main.id, null], ['bg', main.id], ['another', null]]);
     expect(undoLyricCommand(attached).present).toBe(document);
-    expect(() => executeLyricCommand(attached, { type: 'set-background-of', lineId: another.id, parentLineId: main.id })).toThrow(/已有背景/);
+    expect(() => executeLyricCommand(attached, { type: 'set-background-of', lineId: another.id, parentLineId: main.id })).toThrow(/禁用多行背景/);
     const detached = executeLyricCommand(attached, { type: 'set-background-of', lineId: background.id, parentLineId: null });
     expect(detached.present.lines[1]).toMatchObject({ id: 'bg', backgroundOf: null, words: background.words });
   });

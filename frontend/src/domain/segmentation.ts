@@ -121,7 +121,7 @@ export function distributeSegmentTime(word: LyricWord, parts: string[], punctuat
     const start = begin === null || end === null ? index === 0 ? begin : null : begin + Math.round((end - begin) * cumulative / (sum || parts.length));
     cumulative += sum ? weights[index] : 1;
     const finish = begin === null || end === null ? index === parts.length - 1 ? end : null : index === parts.length - 1 ? end : begin + Math.round((end - begin) * cumulative / (sum || parts.length));
-    return { ...createWord(part, index === 0 ? word.id : crypto.randomUUID()), beginMs: start, endMs: finish };
+    return { ...createWord(part, index === 0 ? word.id : crypto.randomUUID()), beginMs: start, endMs: finish, ...(word.agentRefs ? {agentRefs:[...word.agentRefs]} : {}) };
   });
 }
 
