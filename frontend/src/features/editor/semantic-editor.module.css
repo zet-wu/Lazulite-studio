@@ -304,7 +304,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .ribbonMenu a[data-role="secondary"] { justify-content:flex-start; border-color:transparent; background-color:transparent; font-size:12px; }
 
 .japaneseRubyBlocks { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 4px; padding: 10px 0; }
-.japaneseRubyBlock { display: flex; flex-direction: column; align-items: center; max-width: 100%; min-width: 0; }
+.japaneseRubyBlock { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; max-width: 100%; min-width: 0; }
 .japaneseRubyText { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 20px; font-weight: 550; }
 .japaneseRubyLabel { font-size: 12px; opacity: .75; }
 .japaneseRubyBlock small { font-size: 11px; }

@@ -43,3 +43,32 @@ test('current canvas unblurred edit enters snapshot and invalid/IME edits block 
  const last=page.getByLabel('词 魂',{exact:true}).last();await last.fill('');await page.locator('[data-outline-drag]').last().click({button:'right'});await page.getByRole('menuitem',{name:'生成日文注音…',exact:true}).click();await expect(page.getByRole('dialog',{name:'生成日文注音',exact:true})).toHaveCount(0);
  await last.fill('魂');await last.dispatchEvent('compositionstart');await page.locator('[data-outline-drag]').last().click({button:'right'});await page.getByRole('menuitem',{name:'生成日文注音…',exact:true}).click();await expect(page.getByRole('dialog',{name:'生成日文注音',exact:true})).toHaveCount(0);await last.dispatchEvent('compositionend');
 });
+
+for(const theme of ['light','dark'])test(`measured kana blocks preserve input and selection in ${theme}`,async({page})=>{
+ await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
+ await mock(page);await load(page);const dialog=await open(page);const input=dialog.getByRole('textbox').first();
+ for(const text of ['たべる','きょうはとてもあたたかいひですね','Wiあいう漢字かな','']){
+  await input.fill(text);
+  await expect.poll(()=>input.evaluate((el:HTMLInputElement)=>{const s=getComputedStyle(el),c=document.createElement('canvas').getContext('2d')!;c.font=s.font;return el.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)-c.measureText(el.value).width;})).toBeGreaterThanOrEqual(3);
+ }
+ await input.fill('あいうえお'.repeat(100));await expect(input).toHaveAttribute('title','あいうえお'.repeat(100));
+ await input.evaluate((el:HTMLInputElement)=>{el.dataset.original='yes';el.setSelectionRange(7,12);el.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));});
+ await page.setViewportSize({width:1000,height:800});await page.evaluate(()=>{document.documentElement.style.zoom='1.25';});
+ await input.press('Escape');await expect(input).toBeFocused();await expect(input).toHaveAttribute('data-original','yes');
+ expect(await input.evaluate((el:HTMLInputElement)=>[el.selectionStart,el.selectionEnd])).toEqual([7,12]);
+ expect(await input.evaluate((el:HTMLInputElement)=>el.scrollWidth>el.clientWidth)).toBe(true);
+ await input.dispatchEvent('compositionend');await input.fill('たべる');
+ await expect.poll(()=>input.evaluate((el:HTMLInputElement)=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+ await page.screenshot({path:test.info().outputPath(`kana-${theme}.png`)});
+});
+
+test('virtual kana rows remeasure after whole blocks wrap',async({page})=>{
+ await mock(page);await load(page,`<tt xmlns="http://www.w3.org/ns/ttml"><body>${Array.from({length:90},(_,i)=>`<p begin="${i}" end="${i+1}"><span>今日</span><span>魂</span><span>食べる</span></p>`).join('')}</body></tt>`);
+ await page.locator('[data-outline-drag]').first().click();await page.keyboard.press('Control+a');
+ const dialog=await open(page);await expect(dialog.locator('[data-japanese-rows]')).toHaveAttribute('data-japanese-rows','90');
+ const row=dialog.locator('[data-reading-row]').first();const input=row.getByRole('textbox').first();await input.fill('あ'.repeat(200));
+ await page.setViewportSize({width:1000,height:800});
+ await expect.poll(()=>dialog.locator('[data-reading-row]').evaluateAll(rows=>rows.slice(1).every((r,i)=>r.getBoundingClientRect().top>=rows[i].getBoundingClientRect().bottom-1))).toBe(true);
+ await expect(input).toHaveValue('あ'.repeat(200));
+ await page.screenshot({path:test.info().outputPath('kana-virtual.png')});
+});

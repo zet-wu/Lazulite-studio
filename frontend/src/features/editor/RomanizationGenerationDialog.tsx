@@ -1,3 +1,4 @@
+import { measureTextWidth } from '../../shared/measure-text';
 import { kanaHighlightHint, readKanaHighlight } from './kana-highlight';
 import { Select } from '../../shared/Select';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -43,15 +44,10 @@ function TimedWordPreview({ word, units, lineLabel, change, focus, highlight }: 
     const slots = Array.from(element.querySelectorAll<HTMLElement>('[data-preview-unit]'));
     // Keep the inputs mounted when wrapping changes, including during IME input.
     const layout = () => {
-      const context = document.createElement('canvas').getContext('2d');
-      if (context) slots.forEach(slot => {
+      slots.forEach(slot => {
         const input = slot.querySelector('input')!, reading = slot.querySelector<HTMLElement>('[data-source-unit] > div')!;
-        const inputStyle = getComputedStyle(input), readingStyle = getComputedStyle(reading);
-        context.font = inputStyle.font;
-        const inset = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce((sum, key) => sum + parseFloat(inputStyle[key as keyof CSSStyleDeclaration] as string || '0'), 0);
-        const inputWidth = context.measureText(input.value || input.placeholder).width + inset + 4;
-        context.font = readingStyle.font;
-        const readingWidth = Math.max(...reading.textContent!.split('\n').map(text => context.measureText(text).width));
+        const inputWidth = measureTextWidth(input, input.value || input.placeholder, true);
+        const readingWidth = measureTextWidth(reading, reading.textContent!);
         slot.style.width = `${Math.min(384, Math.max(32, inputWidth, readingWidth))}px`;
       });
       const firstTop = slots[0]?.offsetTop;

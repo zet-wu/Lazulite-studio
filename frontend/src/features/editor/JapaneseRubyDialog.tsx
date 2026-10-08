@@ -1,5 +1,6 @@
+import { measureTextWidth } from '../../shared/measure-text';
 import { useProjectEditing } from './ProjectEditingContext';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { analyzeReadings } from '../../adapters/http/reading';
 import { lineText, type LyricDocument } from '../../domain/lyric-document';
@@ -10,10 +11,23 @@ import styles from './semantic-editor.module.css';
 
 function ReadingInput({ block, change, focus, composition }: { block: ReadingBlock; change: (value: string) => void; focus: (active: boolean) => void; composition: (active: boolean) => void }) {
  const start = useRef(block.reading), composing = useRef(false);
+ const input = useRef<HTMLInputElement>(null);
+ useLayoutEffect(()=>{
+  const element=input.current!, container=element.parentElement!, row=container.parentElement!;
+  const resize=()=>{
+   const body=container.querySelector<HTMLElement>('[data-reading-body]')!;
+   // A whole block wraps; only truly oversized text scrolls within the single input.
+   container.style.width=`${Math.min(row.clientWidth, 640, Math.max(40, measureTextWidth(element,block.reading,true),measureTextWidth(body,block.text)))}px`;
+  };
+  resize();
+  const observer=new ResizeObserver(resize);observer.observe(row);
+  let alive=true;void document.fonts?.ready.then(()=>{if(alive)resize();});
+  return()=>{alive=false;observer.disconnect();};
+ },[block.reading,block.text]);
  const missing = !block.reading.trim();
- return <input aria-label={`${block.text}完整读音`} aria-description={missing ? block.existing ? '清空将保留原注音' : '缺少读音，留空将跳过' : undefined}
+ return <input ref={input} title={block.reading || undefined} aria-label={`${block.text}完整读音`} aria-description={missing ? block.existing ? '清空将保留原注音' : '缺少读音，留空将跳过' : undefined}
   className={`${styles.romanPreviewInput} ${missing ? styles.japaneseRubyMissing : ''}`} value={block.reading}
-  style={{ width: `${Math.max(4,Math.min(32,Array.from(block.reading).length+1))}ch` }}
+  style={{ width: '100%' }}
   onChange={e=>change(e.target.value)} onFocus={()=>{start.current=block.reading;focus(true);}} onBlur={()=>focus(false)}
   onCompositionStart={()=>{composing.current=true;composition(true);}} onCompositionEnd={()=>{composing.current=false;composition(false);}}
   onKeyDown={e=>{if(composing.current||e.nativeEvent.isComposing){e.stopPropagation();return;}if(e.key==='Escape'){e.preventDefault();e.stopPropagation();change(start.current);}if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}/>;
@@ -65,7 +79,7 @@ export function JapaneseRubyDialog({ document, lineIds, apply, close }: { docume
       {block.editable&&<ReadingInput block={block} composition={setComposing} focus={value=>setActive(value?row.lineId:null)} change={reading=>{
        edited.current.set(block.key,reading);setRows(previous=>previous.map(r=>r.lineId===row.lineId?{...r,blocks:r.blocks.map(b=>b.key===block.key?{...b,reading}:b)}:r));
       }}/>}
-      <div className={styles.japaneseRubyText}>{block.text}</div>
+      <div data-reading-body className={styles.japaneseRubyText}>{block.text}</div>
       {block.existing&&<small>已有注音</small>}
      </div>)}</div>
     </section>)}

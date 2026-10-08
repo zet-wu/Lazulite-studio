@@ -1,9 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createLyricDocument } from '../../domain/lyric-document';
 import { JapaneseRubyDialog } from './JapaneseRubyDialog';
 import { analyzeReadings } from '../../adapters/http/reading';
 vi.mock('../../adapters/http/reading',()=>({analyzeReadings:vi.fn()}));
+beforeEach(()=>{vi.stubGlobal('ResizeObserver',class {observe(){} unobserve(){} disconnect(){}});vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(null);});
+afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
 afterEach(()=>{cleanup();vi.resetAllMocks();});
 it('rejects stale source and aborts late response on close',async()=>{
  let resolve!:(value:{ranges:[]})=>void;vi.mocked(analyzeReadings).mockImplementation(()=>new Promise(r=>{resolve=r;}));const source=createLyricDocument('今日'),apply=vi.fn(()=>true);
