@@ -77,3 +77,13 @@ it('retains untimed and zero-duration punctuation without changing source times 
   expect(words[1].ruby?.[0].word).toBe('じ');
   expect(JSON.stringify(document)).toBe(before);
 });
+
+it('organizes background playback by parent even when displayed before the parent', () => {
+  const document = createLyricDocument();
+  const lead = createLine('first'), main = createLine('second'), bg = createLine('background'), bg2 = createLine('background two');
+  bg.backgroundOf = main.id; bg2.backgroundOf = main.id;
+  document.lines = [lead, bg, main, bg2];
+  for (const line of document.lines) { line.beginMs = 0; line.endMs = 1000; }
+  expect(toAmllLines(document, true, true).map(line => line.id)).toEqual([lead.id, main.id, bg.id, bg2.id]);
+  expect(document.lines.map(line => line.id)).toEqual([lead.id, bg.id, main.id, bg2.id]);
+});

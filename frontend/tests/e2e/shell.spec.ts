@@ -99,8 +99,8 @@ test('imports rich TTML, saves 注音 and reopens it from the project route', as
 
 test('previews the current lyrics and returns to editing', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
-  await page.getByRole('button', { name: '预览', exact: true }).click();
-  await expect(page.getByRole('region', { name: '动态歌词预览' })).toBeVisible();
+  await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'AMLL 预览' })).toBeVisible();
   await expect(page.getByText('夜の風が静かに吹く').first()).toBeVisible();
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();

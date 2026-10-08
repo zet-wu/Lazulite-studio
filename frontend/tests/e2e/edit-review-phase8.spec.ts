@@ -90,7 +90,7 @@ for (const theme of ['light', 'dark']) test(`actual AMLL renders untimed quotes 
     return serializeLyricTtml(d, { draft: true });
   });
   await importLyrics(page, { name: 'punctuation.ttml', mimeType: 'application/xml', buffer: Buffer.from(source) });
-  await page.getByRole('button', { name: '预览', exact: true }).click();
+  await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   const player = page.locator('.amll-lyric-player'); await expect(player).toContainText('！'); await expect(player).toContainText('「'); await expect(player).toContainText('」'); await expect(player).toContainText('じ');
   for (const position of [1500, 2500, 2700]) {
     await page.getByRole('slider', { name: '试听位置', exact: true }).evaluate((element: HTMLInputElement, value) => {

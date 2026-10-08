@@ -5,8 +5,8 @@ import { phase7Ttml } from '../fixtures/phase7';
 test('multi-character ruby base stays horizontal below readings', async ({ page }) => {
   await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
-  await page.getByRole('button', { name: '预览', exact: true }).click();
-  const body = page.getByRole('region', { name: '动态歌词预览' }).locator('[class*="_wordBody"]').filter({ hasText: '学校' }).first();
+  await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
+  const body = page.getByRole('region', { name: 'AMLL 预览' }).locator('[class*="_wordBody"]').filter({ hasText: '学校' }).first();
   await expect(body).toBeVisible();
   await expect(body.locator(':scope > span')).toHaveCount(2);
   const boxes = await body.locator(':scope > span').evaluateAll(elements => elements.map(el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y }; }));

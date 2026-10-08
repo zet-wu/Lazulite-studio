@@ -70,7 +70,7 @@ test('P6 original review I still love you keeps independent visible spaces after
   // The fixture media is only 132s; scrub the actual saved document with the local preview clock.
   await page.goto('/editor');
   await importLyrics(page, { name: 'saved-original.ttml', mimeType: 'application/xml', buffer: Buffer.from(saved.document.lyrics.draftTtml) });
-  await page.getByRole('button', { name: '预览', exact: true }).click();
+  await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   await page.getByRole('slider', { name: '试听位置', exact: true }).evaluate((element: HTMLInputElement) => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(element, '223000');
     element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true }));

@@ -80,7 +80,7 @@ test('paused playhead projects into the changed viewport without seeking', async
 });
 test('preview fade and emphasis phases follow actual media rates, pause, seek and mode rebuild', async ({ page }, info) => {
   const xml = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><p begin="0" end="30"><span begin="0" end="20">Longword </span><span begin="20" end="30">ending</span><span ttm:role="x-bg" begin="0" end="30"><span begin="0" end="20">Background </span><span begin="20" end="30">ending</span></span></p></body></tt>`;
-  await load(page, true, xml); await page.getByRole('button', { name: '预览', exact: true }).click();
+  await load(page, true, xml); await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   await page.evaluate(async () => {
     const count = 48000 * 40, buffer = new ArrayBuffer(44 + count * 2), v = new DataView(buffer);
     const text = (at: number, value: string) => [...value].forEach((char, i) => v.setUint8(at + i, char.charCodeAt(0)));
@@ -100,7 +100,7 @@ test('preview fade and emphasis phases follow actual media rates, pause, seek an
   }
   await page.locator('audio').evaluate((a: HTMLAudioElement) => { a.pause(); a.currentTime = 4; }); await page.waitForTimeout(100);
   for (const a of await page.evaluate(() => document.getAnimations().filter(a => a.id.startsWith('fade-word-')).map(a => ({ time: Number(a.currentTime), state: a.playState })))) { expect(a.time).toBeCloseTo(4000, -1); expect(a.state).toBe('paused'); }
-  await page.getByRole('button', { name: '编辑', exact: true }).click(); await page.getByRole('button', { name: '预览', exact: true }).click();
+  await page.getByRole('button', { name: '编辑', exact: true }).click(); await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   await page.locator('audio').evaluate((a: HTMLAudioElement) => { a.currentTime = 2; }); await page.getByRole('button', { name: /^A / }).click();
   await page.locator('audio').evaluate((a: HTMLAudioElement) => { a.currentTime = 3; }); await page.getByRole('button', { name: /^B / }).click();
   await page.getByRole('button', { name: '循环 A/B', exact: true }).click();

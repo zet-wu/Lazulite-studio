@@ -56,7 +56,7 @@ test('P4-07 independent background saves, exchanges and is visible after its par
   await page.locator('[data-outline-drag]').nth(1).click();
   await expect(page.getByLabel('所属主行')).toHaveValue('parent');
   await expect(page.getByRole('textbox', { name: '行 background结束秒数', exact: true })).toHaveValue('5');
-  await page.getByRole('button', { name: '预览', exact: true }).click();
+  await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 3; });
   await page.getByRole('button', { name: '播放', exact: true }).click();
   const background = page.locator('.amll-lyric-player [class*="bgWrapper"]').filter({ hasText: '背景测试' });
@@ -111,7 +111,7 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
   await expect(page.getByLabel('所属主行')).toHaveValue(prepared.parentId);
   await expect(page.getByRole('textbox', { name: `行 ${prepared.backgroundId}结束秒数`, exact: true })).toHaveValue('129.984');
   const saved = await (await page.request.get('/api/v1/projects/phase4-background/document')).json();
-  await page.getByRole('button', { name: '预览', exact: true }).click();
+  await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   const bg = page.locator('.amll-lyric-player [class*="bgWrapper"]');
   for (const time of [8.5, 10, 11, 65, 129]) {
     await page.locator('audio').evaluate((e: HTMLAudioElement, time) => { e.currentTime = time; e.playbackRate = .5; }, time);
@@ -141,7 +141,7 @@ test('P4-07 readonly original L2/L3 survives real save, final reopen and AMLL lo
     if (xml === saved.document.lyrics.draftTtml) expect(result.bgId).toBe(prepared.backgroundId);
   }
   await importLyrics(page, { name: 'review-final-reopen.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
-  await page.getByRole('button', { name: '预览', exact: true }).click();
+  await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 65; });
   await page.getByRole('button', { name: '播放', exact: true }).click();
   await expect(bg).toHaveClass(/bgWrapperActive/);

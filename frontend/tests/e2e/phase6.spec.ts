@@ -104,7 +104,7 @@ test('P6 translation languages, trash, clear, background and singer mixed editin
 
 test('P6 AMLL receives real whitespace text nodes with visible word gaps', async ({ page }) => {
   await load(page);
-  await page.getByRole('button', { name: '预览', exact: true }).click();
+  await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   const player = page.locator('.amll-lyric-player');
   await expect(player).toContainText('I still love you');
   const spaces = await player.evaluate(e => {

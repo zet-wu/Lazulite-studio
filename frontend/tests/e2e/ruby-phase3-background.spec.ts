@@ -63,7 +63,7 @@ test('AMLL renders background sublyrics while its singer layout remains a consum
   await page.setViewportSize({ width: 1280, height: 900 });
   await load(page);
   await page.getByRole('button', { name: '收起时间轴', exact: true }).click();
-  await page.getByRole('button', { name: '预览', exact: true }).click();
+  await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   const player = page.locator('.amll-lyric-player');
   await expect(player.getByText('背景译文', { exact: true })).toBeInViewport(); await expect(player).toContainText('主行译文');
   await expect(player).toContainText('ka'); await expect(player).toContainText('na');

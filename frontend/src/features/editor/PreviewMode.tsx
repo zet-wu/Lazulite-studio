@@ -36,9 +36,9 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
     frame = requestAnimationFrame(update);
     return () => cancelAnimationFrame(frame);
   }, [transport]);
-  return <section className={styles.previewMode} aria-label="动态歌词预览">
+  return <section className={styles.previewMode} aria-label="AMLL 预览">
     <div className={styles.previewSettings}>
-      <strong>动态预览</strong>
+      <strong>AMLL 预览</strong>
       <label><input type="checkbox" checked={showTranslation} onChange={(event) => setShowTranslation(event.target.checked)} /> 翻译</label>
       <label><input type="checkbox" checked={showRomanization} onChange={(event) => setShowRomanization(event.target.checked)} /> 音译</label>
       {document.romanizationTracks.length > 1 && <label>预览音译轨道 <Select value={romanizationTrackId ?? ''} onChange={(event) => setRomanizationTrackId(event.target.value || null)}><option value="">每行首条</option>{document.romanizationTracks.map((track, index) => <option key={track.id} value={track.id}>{index + 1} · {track.language ?? '未指定语言'}</option>)}</Select></label>}
@@ -46,6 +46,7 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
       <label>词渐变宽度 <input type="range" min="0.05" max="1.5" step="0.05" value={fadeWidth} onChange={(event) => setFadeWidth(Number(event.target.value))} /></label>
       {!transport && <label>预览位置 <input type="range" min="0" max={duration} value={localTime} onChange={(event) => setLocalTime(Number(event.target.value))} /></label>}
     </div>
+    {document.lines.some(line => !line.backgroundOf && document.lines.filter(bg => bg.backgroundOf === line.id).length > 1) && <p className={styles.toolHint}>当前 AMLL 预览不能忠实呈现多条背景歌词；完整内容保留在编辑与打轴中。</p>}
     {lines.length ? <div className={styles.previewPlayer}>
       <LyricPlayer lyricPlayer={StudioLyricPlayer} ref={player} lyricLines={lyricLines} currentTime={transport ? undefined : localTime}
         isSeeking={!transport} playing={transport ? playing : false} hidePassedLines={hidePassed} wordFadeWidth={fadeWidth}

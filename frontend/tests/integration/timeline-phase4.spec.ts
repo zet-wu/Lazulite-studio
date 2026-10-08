@@ -41,7 +41,7 @@ test('no music: import, shared beat properties, translation, metadata, undo and 
   await dialog.getByRole('button',{name:'关闭歌词元数据'}).click();await save(page);
   expect((await envelope(page,id)).document.editing.emptyBeats).toEqual({A:{kind:'word',count:2},r1:{kind:'ruby',count:1}});
   await page.reload();await expect(line.getByLabel('翻译 1',{exact:true})).toHaveValue('译文');
-  await page.getByRole('button',{name:'预览',exact:true}).click();await page.getByLabel('预览位置').fill('3500');
+  await page.getByRole('button',{name:'AMLL 预览',exact:true}).click();await page.getByLabel('预览位置').fill('3500');
   await page.getByRole('button',{name:'文件打包',exact:true}).click();const downloading=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
   const output=await readFile((await(await downloading).path())!,'utf8');expect(output).toContain('作者乙');expect(output).not.toContain('emptyBeat');
 });
@@ -61,7 +61,7 @@ test('generated whitespace is omitted and actual word preview remains aligned',a
   },snapshot);
   expect(projection.content.units).toHaveLength(2);expect(projection.content.units.map((u:{beginMs:number;endMs:number})=>[u.beginMs,u.endMs])).toEqual([[1000,2000],[2000,3000]]);
   expect(projection.lyric.words.filter((w:{romanWord?:string})=>w.romanWord).map((w:{romanWord:string})=>w.romanWord.trim())).toEqual(['ka','na']);
-  await page.getByRole('button',{name:'预览',exact:true}).click();await page.getByLabel('预览位置').fill('1500');await expect(page.getByRole('region',{name:'动态歌词预览'})).toContainText('ka');
+  await page.getByRole('button',{name:'AMLL 预览',exact:true}).click();await page.getByLabel('预览位置').fill('1500');await expect(page.getByRole('region',{name:'AMLL 预览'})).toContainText('ka');
   const roman=page.getByText(/^ka\s*$/).last();
   await expect.poll(async()=>{const a=await roman.boundingBox();const b=await page.locator('[class*="previewPlayer"]').boundingBox();return Boolean(a&&b&&a.y>=b.y&&a.y+a.height<=b.y+b.height);}).toBe(true);
   await page.screenshot({path:test.info().outputPath('word-preview.png')});
@@ -74,7 +74,7 @@ test('first upload keeps dirty text and undo history and switches preview clock'
   const edited=page.getByRole('textbox',{name:'词 Before',exact:true});await edited.fill('During');await edited.press('Enter');release();
   await expect(page.getByLabel('上传音乐文件',{exact:true})).toHaveCount(0);await expect(page.getByRole('textbox',{name:'词 During',exact:true})).toHaveValue('During');
   await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 Before',exact:true})).toHaveValue('Before');await save(page);
-  expect((await(await page.request.get(`/api/v1/projects/${id}`)).json()).asset).not.toBeNull();await page.getByRole('button',{name:'预览',exact:true}).click();await expect(page.getByLabel('预览位置')).toHaveCount(0);
+  expect((await(await page.request.get(`/api/v1/projects/${id}`)).json()).asset).not.toBeNull();await page.getByRole('button',{name:'AMLL 预览',exact:true}).click();await expect(page.getByLabel('预览位置')).toHaveCount(0);
   await page.reload();expect((await envelope(page,id)).document.lyrics.draftTtml).toContain('Before');
 });
 test('upload failure and cancellation keep project empty and allow retry',async({page})=>{

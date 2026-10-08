@@ -27,7 +27,13 @@ function previewRomanization(line: LyricLine, content: RomanizationContent | und
 /** Pure whitespace uses AMLL’s independent 0–0 text nodes; all timings remain a preview projection. */
 export function toAmllLines(document: LyricDocument, showTranslation: boolean, showRomanization: boolean, trackId?: string | null): PreviewLine[] {
   const leadAgent = document.agents.find((agent) => document.lines.some((line) => line.agentRefs.includes(agent.id)))?.id;
-  return document.lines.flatMap((line) => {
+  const backgrounds = new Map<string, LyricLine[]>();
+  for (const line of document.lines) if (line.backgroundOf) {
+    const group = backgrounds.get(line.backgroundOf) ?? [];
+    group.push(line); backgrounds.set(line.backgroundOf, group);
+  }
+  const ordered = document.lines.filter(line => !line.backgroundOf).flatMap(line => [line, ...(backgrounds.get(line.id) ?? [])]);
+  return ordered.flatMap((line) => {
     const timedWords = line.words.filter((word) => valid(word.beginMs, word.endMs) || isPunctuation(word.text) && word.beginMs !== null && word.endMs === word.beginMs);
     const begin = line.beginMs ?? timedWords[0]?.beginMs ?? null;
     const end = line.endMs ?? timedWords.at(-1)?.endMs ?? null;
