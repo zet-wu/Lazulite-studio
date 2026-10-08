@@ -1,0 +1,3 @@
+.message-bar { display:flex; align-items:center; gap:12px; padding:4px 16px; color:var(--ink); background:var(--surface-high); border-bottom:1px solid var(--line); font-size:12px; }
+.message-bar > span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.message-bar > [role="alert"] { color:var(--danger); }

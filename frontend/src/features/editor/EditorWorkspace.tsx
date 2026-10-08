@@ -1,3 +1,4 @@
+import { MessageBar, useNotice, type Notice } from '../../shared/MessageBar';
 import { AmllSettings } from '../AmllPanel';
 import type { ValidationTab } from '../useAutomaticValidation';
 import type { AmllRule } from '../../domain/amll-compatibility';
@@ -88,7 +89,7 @@ type Props = {
   canRedo: boolean;
   dirty: boolean;
   saving?: boolean;
-  error?: string | null;
+  notices?: (Notice | null)[];
   outputIssues?: OutputIssue[];
   onSave: () => void;
   onNew?: () => void;
@@ -110,7 +111,7 @@ function isTextInput(target: EventTarget) {
 
 export function EditorWorkspace(props: Props) {
   const shared = useEditorSelection();
-  return shared ? <EditorWorkspaceContent {...props} /> : <SelectionProvider><EditorWorkspaceContent {...props} /></SelectionProvider>;
+  return shared ? <EditorWorkspaceContent key={props.projectId} {...props} /> : <SelectionProvider><EditorWorkspaceContent key={props.projectId} {...props} /></SelectionProvider>;
 }
 
 // Cached rows keep event functions stable while every invocation reads current state.
@@ -176,7 +177,7 @@ function EditorWorkspaceContent(props: Props) {
       onCommit={width => commitColumns({ ...columns, [`${side}Width`]: width })} />;
   };
   const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | 'translations' | null>(null);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useNotice();
   const [segmentationOpen, setSegmentationOpen] = useState(false);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number; afterRubyId?: string | null } | null>(null);
@@ -400,7 +401,7 @@ function EditorWorkspaceContent(props: Props) {
     const next = copySelection(document, current, editing);
     clipboardToken.current = crypto.randomUUID();
     setClipboard(next);
-    setMessage('已复制到编辑器剪贴板');
+    setMessage('已复制到编辑器剪贴板', 'status');
     return next;
   };
   const cut = (target?: EditorSelection) => {
@@ -728,7 +729,7 @@ function EditorWorkspaceContent(props: Props) {
     </div>
     <TimePair begin={word.beginMs} end={word.endMs} label={`词 ${word.text}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginMs, endMs })} />
   </LyricWordView>;
-  return <div ref={pageRef} className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`}
+  return <div ref={pageRef} data-workspace className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`}
     onInputCapture={() => { editRejected.current = false; }}
     onCompositionStartCapture={() => { canvasComposing.current = true; }} onCompositionEndCapture={() => { canvasComposing.current = false; }}
     onPointerDownCapture={() => { pageRef.current!.dataset.pointerFocus = ''; }}
@@ -832,7 +833,8 @@ function EditorWorkspaceContent(props: Props) {
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
     <fieldset disabled={props.alignment?.locked} style={{display:"contents"}}><EditorMenu {...props} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} /></fieldset>
-    {(message || props.error) && <p role="alert" className={styles.error}>{message || props.error}</p>}
+    <MessageBar notice={message} />
+    {props.notices?.map((notice, index) => <MessageBar key={index} notice={notice} />)}
     <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['audio','音频处理'],['edit','编辑'],['sync','打轴'],['preview','AMLL 预览'],['package','文件打包']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { if (canvasComposing.current || !finishSyncDraft()) return; flushSync(() => { const input = window.document.activeElement; if (input instanceof HTMLInputElement) input.blur(); }); if (pageRef.current?.querySelector('[aria-invalid="true"]')) return; setLocate(null); setRubyShortcut(null); setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
     {props.projectId && props.project && props.alignment && <AlignmentPanel pid={props.projectId} project={props.project} control={props.alignment} assetId={props.sourceAssetId} durationMs={props.audioDurationMs??0} visible={mode==='audio'} finishDraft={()=>{
       if(canvasComposing.current || !finishSyncDraft())return false;

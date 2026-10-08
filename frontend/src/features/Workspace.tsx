@@ -1,3 +1,4 @@
+import { useNotice } from '../shared/MessageBar';
 import { ProjectEditingContext } from './editor/ProjectEditingContext';
 import { selectionLineId } from './editor/editing-actions';
 import { SelectionProvider, useEditorSelection } from './editor/SelectionContext';
@@ -45,7 +46,7 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
     });
   const { selection, expanded } = useEditorSelection()!;
   const selectedLineId = selectionLineId(selection) ?? expanded.at(-1) ?? params.get('line');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useNotice();
   const [outputIssues,setOutputIssues] = useState<OutputIssue[]>([]);
   const [playheadLineId, setPlayheadLineId] = useState<string | null>(null);
   const line = editor.document.lines.find(item => item.id === selectedLineId) ?? editor.document.lines[0];
@@ -65,7 +66,7 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
     if(event.key.toLowerCase()==='z'&&!editor.editingLocked){event.preventDefault();if(event.shiftKey)editor.redo();else editor.undo();}
     if(event.key.toLowerCase()==='s'){event.preventDefault();void editor.save();}
   }}><EditorWorkspace alignment={{locked:editor.editingLocked,lock:editor.lockEditing,save:editor.saveForPackaging}} historyVersion={editor.historyVersion} project={editor.project} applyProject={command=>{if(editor.conflict)throw new Error('保存冲突，请先处理');editor.applyProject(command);}} sourceAssetId={asset?.id} audioDurationMs={asset?.duration_ms ?? undefined} onTimelineHost={setTimelineHost} assignmentError={assignmentError} embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error('保存冲突，请先处理'); }} undo={editor.undo} redo={editor.redo}
-    canUndo={editor.canUndo&&!editor.editingLocked} canRedo={editor.canRedo&&!editor.editingLocked} dirty={editor.dirty} saving={editor.saving} outputIssues={outputIssues} error={message || editor.error}
+    canUndo={editor.canUndo&&!editor.editingLocked} canRedo={editor.canRedo&&!editor.editingLocked} dirty={editor.dirty} saving={editor.saving} outputIssues={outputIssues} notices={[message, editor.errorNotice]}
     onSave={() => void editor.save()} onExportFormat={exportFormat}
     saveForPackaging={editor.saveForPackaging}
     selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={asset ? transport : undefined} />

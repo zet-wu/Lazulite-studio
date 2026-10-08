@@ -1,3 +1,4 @@
+import { useNotice } from '../shared/MessageBar';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listenProjectDeletion, clearProjectLocalData } from "../adapters/project-lifecycle";
 import { createRecoveryAdapter } from "../adapters/recovery";
@@ -36,7 +37,8 @@ export function useProjectDocument(
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorNotice, setError] = useNotice();
+  const error = errorNotice?.text ?? null;
   const [recovery, setRecovery] = useState<{
     available: boolean;
     baseRevision?: string;
@@ -245,6 +247,7 @@ export function useProjectDocument(
     saving,
     conflict,
     error,
+    errorNotice,
     recovery,
     apply,
     save,
