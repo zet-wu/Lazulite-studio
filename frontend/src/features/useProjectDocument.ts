@@ -3,6 +3,7 @@ import { listenProjectDeletion, clearProjectLocalData } from "../adapters/projec
 import { createRecoveryAdapter } from "../adapters/recovery";
 import { parseProject, serializeProject } from '../adapters/project-codec';
 import { createProjectEditorState, executeProjectCommand, redoProjectCommand, undoProjectCommand, type ProjectEditorState, type ProjectSnapshot, type ProjectCommand } from '../domain/project-document';
+import type { ProjectDocument } from '../domain/project-document';
 import type { LyricCommand } from '../domain/lyric-commands';
 
 type Save = (
@@ -20,6 +21,9 @@ export function useProjectDocument(
   saveDocument: Save,
 ) {
   const identity = projectId;
+  const editingLock = useRef<symbol | null>(null);
+  const [editingLocked, setEditingLocked] = useState(false);
+  const savedSequence = useRef(0);
   const deletedRef = useRef(false);
   const [deleted, setDeleted] = useState(false);
   const [state, setState] = useState<ProjectEditorState>(() =>
@@ -71,6 +75,7 @@ export function useProjectDocument(
   );
   const dispatch = useCallback(
     (command: LyricCommand) => {
+      if (editingLock.current) throw new Error('自动对齐期间无法编辑');
       const next = executeProjectCommand(stateRef.current, { type: 'lyrics', command });
       if (next !== stateRef.current) {
         stateRef.current = next;
@@ -88,7 +93,7 @@ export function useProjectDocument(
     }
     if (forPackaging && pending.current) throw new Error('上次保存尚未确认，请先重试保存再打包');
     const captured = stateRef.current.present;
-    if (!dirty) return { revision, document: captured.lyrics, editing: captured.editing };
+    if (sequence.current === savedSequence.current) return { revision, document: captured.lyrics, editing: captured.editing };
     inFlight.current = true;
     setSaving(true);
     try {
@@ -111,6 +116,7 @@ export function useProjectDocument(
       setRevision(result.revision);
       setEtag(result.etag);
       setError(null);
+      savedSequence.current = request.seq;
       pending.current = null;
       if (sequence.current === request.seq) {
         setDirty(false);
@@ -145,6 +151,7 @@ export function useProjectDocument(
   const [historyVersion, setHistoryVersion] = useState(0);
   const history = useCallback(
     (change: (s: ProjectEditorState) => ProjectEditorState) => {
+      if (editingLock.current) throw new Error('自动对齐期间无法编辑');
       if (conflict || deletedRef.current) return;
       const next = change(stateRef.current);
       if (next !== stateRef.current) {
@@ -164,6 +171,7 @@ export function useProjectDocument(
     [conflict, dispatch],
   );
   const recover = useCallback(async () => {
+    if (editingLock.current) throw new Error('自动对齐期间无法恢复');
     if (deletedRef.current) return false;
     const adapter = createRecoveryAdapter();
     const record = await adapter.readCheckpoint(projectId);
@@ -214,7 +222,20 @@ export function useProjectDocument(
     if (deleted) void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError("项目已删除，本地数据清理失败"));
   }, [deleted, enqueueRecovery, projectId]);
   return {
-    deleted, historyVersion,
+    deleted, historyVersion, editingLocked,
+    lockEditing: () => {
+      if (editingLock.current || conflict || deletedRef.current) throw new Error('项目当前不能开始对齐');
+      const token = Symbol('alignment'); editingLock.current = token; setEditingLocked(true);
+      const source = stateRef.current.present;
+      return { source,
+        release: () => { if (editingLock.current === token) { editingLock.current = null; setEditingLocked(false); } },
+        apply: (project: ProjectDocument) => {
+          if (editingLock.current !== token || deletedRef.current) throw new Error('本次对齐已失效');
+          const next = executeProjectCommand(stateRef.current, {type:'alignment', source, project});
+          if (next !== stateRef.current) {stateRef.current=next;setState(next);commit(next);}
+        },
+      };
+    },
     document: state.present.lyrics,
     project: state.present,
     applyProject: (command: ProjectCommand) => history(s => executeProjectCommand(s, command)),

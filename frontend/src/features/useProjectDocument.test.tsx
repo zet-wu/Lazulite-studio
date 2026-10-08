@@ -162,3 +162,21 @@ it('packaging returns the captured revision while later edits remain dirty', asy
  expect(saved?.revision).toBe('packaged'); expect(saved?.document.lines[0].words[0].text).toBe('captured');
  expect(result.current.document.lines[0].words[0].text).toBe('newer'); expect(result.current.dirty).toBe(true);
 });
+
+it('locks every project command and late callbacks until one atomic result is applied', async () => {
+  saveMock.mockResolvedValue({revision:'r2'});
+  const {result}=renderHook(hook);
+  let lock!:ReturnType<typeof result.current.lockEditing>;
+  act(()=>{lock=result.current.lockEditing();});
+  expect(result.current.editingLocked).toBe(true);
+  expect(()=>result.current.apply({type:'set-metadata',key:'title',values:['late']})).toThrow(/无法编辑/);
+  expect(()=>result.current.applyProject({type:'amll-setting',rule:'noChorus',enabled:true})).toThrow(/无法编辑/);
+  expect(()=>result.current.undo()).toThrow(/无法编辑/);
+  expect(()=>result.current.redo()).toThrow(/无法编辑/);
+  await expect(result.current.restore()).rejects.toThrow(/无法恢复/);
+  const updated=structuredClone(lock.source);updated.lyrics.metadata.title=['aligned'];
+  act(()=>{lock.apply(updated);lock.release();});
+  expect(result.current.state.past).toHaveLength(1);expect(result.current.editingLocked).toBe(false);
+  expect(()=>lock.apply(updated)).toThrow(/失效/);
+  act(()=>result.current.undo());expect(result.current.project).toBe(lock.source);
+});

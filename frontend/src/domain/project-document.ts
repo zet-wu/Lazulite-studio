@@ -15,7 +15,7 @@ export type ProjectDocument = {
 };
 export type ProjectSnapshot = Omit<ProjectDocument, 'lyrics'> & { lyrics: { draftTtml: string } };
 export type ProjectEditorState = { present: ProjectDocument; past: ProjectDocument[]; future: ProjectDocument[] };
-export type ProjectCommand = { type: 'amll-setting'; rule: AmllRule; enabled: boolean } | { type: 'background-position'; lineId: string; before: boolean } | { type: 'amll-batch'; rule: AmllRule; ids?: string[]; duetAgents?: string[] } | { type: 'duet'; lineId: string; duet: boolean } | { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics; durationMs: number };
+export type ProjectCommand = { type: 'alignment'; source: ProjectDocument; project: ProjectDocument } | { type: 'amll-setting'; rule: AmllRule; enabled: boolean } | { type: 'background-position'; lineId: string; before: boolean } | { type: 'amll-batch'; rule: AmllRule; ids?: string[]; duetAgents?: string[] } | { type: 'duet'; lineId: string; duet: boolean } | { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics; durationMs: number };
 export function createProjectDocument(lyrics = createLyricDocument()): ProjectDocument {
   return { schemaVersion: 'studio-project-v5', lyrics, amll: createAmllSettings(), lineOrder: [], editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
 }
@@ -29,7 +29,11 @@ export function validateSegments(segments: VocalSegment[], durationMs: number) {
 export function createProjectEditorState(present: ProjectDocument): ProjectEditorState { return { present, past: [], future: [] }; }
 export function executeProjectCommand(state: ProjectEditorState, command: ProjectCommand): ProjectEditorState {
   let present: ProjectDocument;
-  if (command.type === 'amll-setting') {
+  if (command.type === 'alignment') {
+    if (command.source !== state.present) throw new Error('项目已改变，请重新运行自动对齐');
+    if (command.project === state.present) return state;
+    present = command.project;
+  } else if (command.type === 'amll-setting') {
     const amll = {...state.present.amll};
     if (amll.simplified && amllDependencies.includes(command.rule)) throw new Error('简化模型已锁定此限制');
     amll[command.rule] = command.enabled;
