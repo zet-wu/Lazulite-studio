@@ -14,7 +14,7 @@ FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针、�
 `media_format.describe_media` 排除 attached_pic 封面视频流，结合实际容器保留合法原后缀。`publish` 用打包时项目名生成可下载名称，UUID 内部文件名保持独立；结果记录名称，`publish_routes` 用同一名称生成下载响应，旧结果缺名称时沿用磁盘名。命名不触发转码，不放宽成功回读下载门控。
 
 
-`time_units.py` 是秒数/高精度 TTML 到整数毫秒的服务边界；修订写入规范化时间，STPP 使用相同毫秒时钟及无前缀正文元素。当前资源数据库列和接口使用 `_ms`。数据库版本 4 拒绝旧结构，默认使用 data-projects-v4，原 data 保留，不包含迁移器。`jobs.reconcile_exports` 保留各项目最近成功且报告通过的记录作为当前产物，退休标记与成功结果同事务提交；物理文件延迟删除可重试，任务记录不删除。`publish_routes` 先打开下载句柄再释放切换锁，以支持下载期间替换。
+`time_units.py` 是秒数/高精度 TTML 到整数毫秒的服务边界；修订写入规范化时间，STPP 使用相同毫秒时钟及无前缀正文元素。当前资源数据库列和接口使用 `_ms`。数据库版本 4 拒绝旧结构，默认使用 data-projects-v4，不包含迁移器。`jobs.reconcile_exports` 保留各项目最近成功且报告通过的记录作为当前产物，退休标记与成功结果同事务提交；物理文件延迟删除可重试，任务记录不删除。`publish_routes` 先打开下载句柄再释放切换锁，以支持下载期间替换。
 
 `vocal_process.py` 为每个人声任务启动并监管独立 Python 子进程，`vocal_worker.py` 调用同一 `vocals.py` 实现，模型初始化／推理与分析不占用 API 的解释器。父进程保留单任务队列、任务状态和阶段事件，子进程直接保存同一数据库的持久结果；通过管道确认阶段边界取消，异常退出只使本次任务失败，服务关闭时终止并回收子进程。仅 API 启动清理未注册目录，工作子进程不执行启动清理。注入轻量 separator 的单元测试在进程内运行。
 
@@ -38,6 +38,8 @@ FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针、�
 
 项目目录 projects/<id> 包含 source/original、cache、revisions、vocals 和 exports；assets 表仅为已关联项目的资源索引，哈希不唯一，不承担跨项目共享。临时上传在 uploads/<token> 校验和建代理后，由创建或首次接入事务转移归属；失败回收，竞争首次接入只允许一份音乐。SQLite 写锁排序上传提交、删除和缓存构建，下载锁内打开句柄、锁外分段读取并支持 Range。重启清理临时上传、无源引用目录及孤立项目目录；已完成放弃上传在后续上传时按一小时回收。
 
-项目快照 v3 与 HTTP 文档 v5 不含源资源 ID，上传不写歌词修订。RevisionStore 保存后和启动保护当前、任务及复核引用，再保留其余最新 100 份和 7 天内修订；回收先移除索引，文件失败由启动清理重试。人声注册历史仍仅随项目删除回收，保留同项目 audio_result_id 复用。
+项目快照 v4 与 HTTP 文档 v6 不含源资源 ID，上传不写歌词修订。RevisionStore 保存后和启动保护当前、任务及复核引用，再保留其余最新 100 份和 7 天内修订；回收先移除索引，文件失败由启动清理重试。人声注册历史仍仅随项目删除回收，保留同项目 audio_result_id 复用。
 
 `GET /projects/{pid}/embedded-lyrics` 从项目原始上传文件读取候选，MP3 的 USLT、FLAC 的 LYRICS/UNSYNCEDLYRICS、MP4 的 ©lyr 与各 STPP 轨道分别返回。无音乐、损坏和不支持结构明确报告，不改变项目。STPP 当前仅读取单 sample、单 chunk、无编辑列表或 composition offset 的轨道，支持 stco/co64 与固定或逐项 sample size；多 sample 与分片拒绝。
+
+AMLL 兼容设置和显示顺序在项目快照中保存；`amll_compatibility.py` 在持久化边界检查五项限制、简化联动和排布引用。TTML 的词级歌手和多个独立背景由文档验证器接受；Ruby 内部独立歌手仍明确拒绝。新项目使用限制默认值，不迁移旧快照。
