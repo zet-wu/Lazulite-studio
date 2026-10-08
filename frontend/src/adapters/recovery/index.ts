@@ -3,9 +3,9 @@ import { validateProjectEditing } from '../../domain/project-editing';
 import { createProjectEditorState, validateSegments, type ProjectEditorState, type ProjectDocument } from '../../domain/project-document';
 import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
-const DATABASE = 'lazulite-studio-recovery-project-v4';
+const DATABASE = 'lazulite-studio-recovery-project-v5';
 const STORE = 'projects';
-const RECORD_VERSION = 4;
+const RECORD_VERSION = 5;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {
@@ -25,16 +25,8 @@ export type RecoveryAdapter = {
   discard(slotKey: string): Promise<void>;
 };
 
-let cleanup: Promise<void> | undefined;
 async function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') return Promise.reject(new Error('Local recovery is unavailable in this browser'));
-  cleanup ??= indexedDB.databases().then(databases => Promise.all(databases.filter(db => db.name?.startsWith('lazulite-studio-recovery') && db.name !== DATABASE).map(db => new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(db.name!);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(new Error('清理旧版恢复数据失败'));
-    request.onblocked = () => reject(new Error('请关闭旧版 Studio 标签页后重试清理恢复数据'));
-  })))).then(() => undefined).catch(error => { cleanup = undefined; throw error; });
-  await cleanup;
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE, 1);
     request.onupgradeneeded = () => request.result.createObjectStore(STORE);
@@ -62,7 +54,7 @@ const isState = (value: unknown): value is ProjectEditorState => {
   const validDocument = (document: unknown) => {
     if (!document || typeof document !== 'object') return false;
     const project = document as ProjectDocument;
-    if (project.schemaVersion !== 'studio-project-v4' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
+    if (project.schemaVersion !== 'studio-project-v5' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
     if (project.acoustics.analysisId !== null && typeof project.acoustics.analysisId !== 'string') return false;
     try { assertAmll(project.lyrics,project.amll); validateAgents(project.lyrics); if(!Array.isArray(project.lineOrder)||project.lineOrder.some(id=>!project.lyrics.lines.some(line=>line.id===id)))return false; validateSegments(project.acoustics.segments, Number.MAX_SAFE_INTEGER); validateProjectEditing(project.lyrics, project.editing); } catch { return false; }
     const item = project.lyrics as LyricDocument;

@@ -23,8 +23,8 @@ export const SCHEMA_VERSION = {
 } as const;
 
 export function isDocumentEnvelope(value: unknown): value is DocumentEnvelope {
-  return object(value) && value.schema_version === "studio-document-v6" && string(value.project_id) &&
-    string(value.revision) && object(value.document) && value.document.schemaVersion === "studio-project-v4" &&
+  return object(value) && value.schema_version === "studio-document-v7" && string(value.project_id) &&
+    string(value.revision) && object(value.document) && value.document.schemaVersion === "studio-project-v5" &&
     object(value.document.lyrics) && string(value.document.lyrics.draftTtml) && object(value.document.editing) && object(value.document.acoustics) && (value.document.acoustics.analysisId === null || string(value.document.acoustics.analysisId)) && Array.isArray(value.document.acoustics.segments) && string(value.sha256);
 }
 export function isImportCandidate(value: unknown): value is ImportProposal {

@@ -112,3 +112,24 @@ it('rejects generated Ruby replacement that would silently erase configured iden
  expect(()=>apply(state,{type:'set-ruby-units',lineId:'a',wordId:'a1',overwrite:true,units:[{id:'new-r',reading:'い',beginMs:null,endMs:null}]})).toThrow(/空拍/);
  expect(state.present.editing.emptyBeats.r.count).toBe(2);
 });
+
+it('keeps alignment skipping independent, copies/splits it and merges only unanimous sources', () => {
+  const base = fixture();
+  let state = apply(base, { type: 'set-skip-alignment', lineId: 'a', skip: true });
+  expect(state.present.editing.ignoredSyncLineIds).toEqual([]);
+  expect(apply(state, { type: 'set-skip-alignment', lineId: 'a', skip: true })).toBe(state);
+  const clip = copySelection(state.present.lyrics, { kind: 'lines', ids: ['a'], activeId: 'a', anchorId: 'a' }, state.present.editing);
+  const copied = apply(state, pasteRich(state.present.lyrics, clip, null).command);
+  expect(copied.present.editing.skippedAlignmentLineIds).toContain(copied.present.lyrics.lines.at(-1)!.id);
+  state = apply(state, { type: 'split-line', lineId: 'a', beforeWordIds: ['a2'], newLineIds: ['split'], contentTargets: {}, translationTargets: {}, backgroundTargets: {} });
+  expect(state.present.editing.skippedAlignmentLineIds).toEqual(['a', 'split']);
+  const merged = apply(state, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'split' });
+  expect(merged.present.editing.skippedAlignmentLineIds).toEqual(['a']);
+  const mixed = apply(merged, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' });
+  expect(mixed.present.editing.skippedAlignmentLineIds).toEqual([]);
+  expect(undoProjectCommand(mixed).present).toBe(merged.present);
+  expect(redoProjectCommand(undoProjectCommand(mixed)).present).toBe(mixed.present);
+  expect(parseProject(serializeProject(merged.present))).toEqual(merged.present);
+  expect(serializeProject(merged.present).lyrics.draftTtml).not.toContain('skippedAlignment');
+  expect(apply(merged, { type: 'delete-line', lineId: 'a' }).present.editing.skippedAlignmentLineIds).toEqual([]);
+});

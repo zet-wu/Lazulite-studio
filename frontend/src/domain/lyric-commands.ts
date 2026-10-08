@@ -27,6 +27,7 @@ type AtomicLyricCommand =
   | { type: 'unlink-line-end'; lineId: string }
   | { type: 'set-word-agents'; lineId: string; wordId: string; agentRefs: string[] }
   | { type: 'set-line-agents'; lineId: string; agentRefs: string[] }
+  | { type: 'set-skip-alignment'; lineId: string; skip: boolean }
   | { type: 'set-ignore-sync'; lineId: string; ignoreSync: boolean }
   | { type: 'set-translation-tracks'; tracks: TranslationTrack[]; source: TranslationTrack[] }
   | { type: 'insert-translation-content'; trackId: string; content: TranslationContent }
@@ -278,6 +279,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       const outgoing = editing.endLinks[line.id];
       delete editing.endLinks[line.id];
       if (outgoing && segments.at(-1)!.endMs === line.endMs) editing.endLinks[segments.at(-1)!.id] = outgoing;
+      if (editing.skippedAlignmentLineIds.includes(line.id)) editing.skippedAlignmentLineIds.push(...command.newLineIds);
       if (editing.ignoredSyncLineIds.includes(line.id)) editing.ignoredSyncLineIds.push(...command.newLineIds);
       const lines = document.lines.filter(item => !backgrounds.includes(item));
       lines.splice(index, 1, ...segments.flatMap((segment, i) => [segment, ...backgrounds.filter(bg=>target(bg.id)===i).map(bg=>({...bg,backgroundOf:segment.id}))]));
@@ -291,6 +293,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       const first = document.lines[firstIndex], second = document.lines[secondIndex];
       const issues = lineStructureIssues(document, first, second, editing);
       if (issues.length) throw new Error(issues.join('；'));
+      if (!editing.skippedAlignmentLineIds.includes(second.id)) editing.skippedAlignmentLineIds = editing.skippedAlignmentLineIds.filter(id => id !== first.id);
       const merged: LyricLine = { ...first, words: [...first.words, ...second.words], beginMs: first.beginMs ?? second.beginMs, endMs: second.endMs ?? first.endMs };
       validTime(merged.beginMs, merged.endMs);
       merged.words.forEach((word) => wordFitsLine(word, merged));
@@ -455,6 +458,12 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       lines[index] = { ...line, agentRefs: command.agentRefs };
       return { ...document, lines };
     }
+    case 'set-skip-alignment': {
+      lineIndex(document, command.lineId);
+      editing.skippedAlignmentLineIds = editing.skippedAlignmentLineIds.filter(id => id !== command.lineId);
+      if (command.skip) editing.skippedAlignmentLineIds.push(command.lineId);
+      return document;
+    }
     case 'set-ignore-sync': {
       lineIndex(document, command.lineId);
       editing.ignoredSyncLineIds = editing.ignoredSyncLineIds.filter(id => id !== command.lineId);
@@ -469,6 +478,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
     }
     case 'restore-editing':
       Object.assign(editing.emptyBeats, command.editing.emptyBeats);
+      editing.skippedAlignmentLineIds = [...new Set([...editing.skippedAlignmentLineIds, ...command.editing.skippedAlignmentLineIds])];
       editing.ignoredSyncLineIds = [...new Set([...editing.ignoredSyncLineIds, ...command.editing.ignoredSyncLineIds])];
       Object.assign(editing.endLinks, command.editing.endLinks);
       return document;

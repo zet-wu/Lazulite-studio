@@ -27,6 +27,7 @@ class EmptyBeat(BaseModel):
 class Editing(BaseModel):
     model_config = ConfigDict(extra='forbid')
     emptyBeats: dict[str, EmptyBeat]
+    skippedAlignmentLineIds: list[str]
     ignoredSyncLineIds: list[str]
     endLinks: dict[str, str]
 
@@ -40,7 +41,7 @@ class AmllSettings(BaseModel):
 
 class ProjectSnapshot(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    schemaVersion: Literal['studio-project-v4']
+    schemaVersion: Literal['studio-project-v5']
     amll: AmllSettings
     lineOrder: list[str]
     lyrics: Lyrics
@@ -49,8 +50,8 @@ class ProjectSnapshot(BaseModel):
 
 def initial_project(ttml: str, asset_id: str | None) -> dict:
     from .amll_compatibility import DEFAULTS
-    return {'schemaVersion': 'studio-project-v4', 'amll': dict(DEFAULTS), 'lineOrder': [],
-            'editing': {'emptyBeats': {}, 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
+    return {'schemaVersion': 'studio-project-v5', 'amll': dict(DEFAULTS), 'lineOrder': [],
+            'editing': {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
 
 def read_project(path: str | Path) -> dict:
     snapshot = ProjectSnapshot.model_validate_json(Path(path).read_text(encoding='utf-8')).model_dump()
@@ -121,6 +122,8 @@ def validate_editing(snapshot):
     editing = snapshot['editing']
     for key, beat in editing['emptyBeats'].items():
         if objects.get(key) != beat['kind']: raise ValueError('empty beat object or category is invalid')
+    skipped = editing['skippedAlignmentLineIds']
+    if len(set(skipped)) != len(skipped) or any(key not in lines for key in skipped): raise ValueError('skipped alignment line is invalid')
     ignored = editing['ignoredSyncLineIds']
     if len(set(ignored)) != len(ignored) or any(key not in lines for key in ignored): raise ValueError('ignored sync line is invalid')
     def time(node, side):

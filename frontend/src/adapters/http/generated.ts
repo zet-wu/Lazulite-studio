@@ -921,7 +921,7 @@ export interface components {
         };
         DocumentEnvelope: {
             /** @constant */
-            schema_version: "studio-document-v6";
+            schema_version: "studio-document-v7";
             project_id: string;
             revision: string | null;
             etag?: string;
@@ -929,7 +929,7 @@ export interface components {
             client_seq?: number | null;
             document: {
                 /** @constant */
-                schemaVersion: "studio-project-v4";
+                schemaVersion: "studio-project-v5";
                 lyrics: {
                     draftTtml: string;
                 };
@@ -953,6 +953,7 @@ export interface components {
                     endLinks: {
                         [key: string]: string;
                     };
+                    skippedAlignmentLineIds: string[];
                 };
                 amll: {
                     simplified: boolean;

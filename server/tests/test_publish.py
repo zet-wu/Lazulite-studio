@@ -30,7 +30,7 @@ def _project(client, headers, tmp_path):
 
 
 def _save(client, headers, pid, revision, text):
-    body = {"schema_version": "studio-document-v6", "project_id": pid, "revision": revision,
+    body = {"schema_version": "studio-document-v7", "project_id": pid, "revision": revision,
             "document": initial_project(text, client.get(f"/api/v1/projects/{pid}").json()["asset"]["id"])}
     out = client.put(f"/api/v1/projects/{pid}/document", json=body, headers={**headers, "if-match": f'"{revision}"', "idempotency-key": revision + "-save"})
     assert out.status_code == 200

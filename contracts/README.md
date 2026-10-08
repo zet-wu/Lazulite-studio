@@ -1,6 +1,6 @@
 # Contracts：前后端协议
 
-[openapi.json](openapi.json) 已覆盖会话、能力、项目、上传、文档 GET/PUT、导入、歌词下载、媒体播放、波形和 PCM 片段、任务/SSE、读音词典、发布及成品下载。文档接口承载带 revision 的 studio-document-v6 envelope，document 是 studio-project-v4 JSON 快照，lyrics.draftTtml 为歌词交换边界，不再是 S1 的只读行摘要。
+[openapi.json](openapi.json) 已覆盖会话、能力、项目、上传、文档 GET/PUT、导入、歌词下载、媒体播放、波形和 PCM 片段、任务/SSE、读音词典、发布及成品下载。文档接口承载带 revision 的 studio-document-v7 envelope，document 是 studio-project-v5 JSON 快照，lyrics.draftTtml 为歌词交换边界，不再是 S1 的只读行摘要。
 
 生成结果为 `frontend/src/adapters/http/generated.ts`；MSW 数据与 handlers 位于 `frontend/src/mocks`。修改接口时同步路由、契约、调用方与必要的行为验证。
 

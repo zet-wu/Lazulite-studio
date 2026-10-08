@@ -3,10 +3,11 @@ import type { LyricDocument } from './lyric-document';
 /** Project-only editing data. Never encoded in a lyric or a TTML node. */
 export type ProjectEditing = {
   emptyBeats: Record<string, { kind: 'word' | 'ruby'; count: number }>;
+  skippedAlignmentLineIds: string[];
   ignoredSyncLineIds: string[];
   endLinks: Record<string, string>;
 };
-export const createProjectEditing = (): ProjectEditing => ({ emptyBeats: {}, ignoredSyncLineIds: [], endLinks: {} });
+export const createProjectEditing = (): ProjectEditing => ({ emptyBeats: {}, skippedAlignmentLineIds: [], ignoredSyncLineIds: [], endLinks: {} });
 export const emptyBeatCount = (editing: ProjectEditing, id: string) => editing.emptyBeats[id]?.count ?? 0;
 export function setEmptyBeat(editing: ProjectEditing, id: string, kind: 'word' | 'ruby', count: number) {
   if (!Number.isSafeInteger(count) || count < 0 || count > 32) throw new Error('空拍数必须是 0–32 的整数');
@@ -15,8 +16,8 @@ export function setEmptyBeat(editing: ProjectEditing, id: string, kind: 'word' |
 }
 
 export function validateProjectEditing(document: LyricDocument, editing: ProjectEditing) {
-  if (!editing || typeof editing !== 'object' || !editing.emptyBeats || Array.isArray(editing.emptyBeats) || !Array.isArray(editing.ignoredSyncLineIds) || !editing.endLinks || Array.isArray(editing.endLinks)
-    || Object.keys(editing).some(key => !['emptyBeats', 'ignoredSyncLineIds', 'endLinks'].includes(key))) throw new Error('项目编辑配置无效');
+  if (!editing || typeof editing !== 'object' || !editing.emptyBeats || Array.isArray(editing.emptyBeats) || !Array.isArray(editing.skippedAlignmentLineIds) || !Array.isArray(editing.ignoredSyncLineIds) || !editing.endLinks || Array.isArray(editing.endLinks)
+    || Object.keys(editing).some(key => !['emptyBeats', 'ignoredSyncLineIds', 'skippedAlignmentLineIds', 'endLinks'].includes(key))) throw new Error('项目编辑配置无效');
   const objects = new Map<string, 'line' | 'word' | 'ruby'>();
   const add = (id: string, kind: 'line' | 'word' | 'ruby') => { if (!id || objects.has(id)) throw new Error('歌词对象标识重复或为空'); objects.set(id, kind); };
   for (const line of document.lines) {
@@ -28,6 +29,7 @@ export function validateProjectEditing(document: LyricDocument, editing: Project
     if (!value || !['word', 'ruby'].includes(value.kind) || objects.get(id) !== value.kind || !Number.isSafeInteger(value.count) || value.count < 1 || value.count > 32 || Object.keys(value).some(key => !['kind', 'count'].includes(key))) throw new Error('空拍对象、类别或数量无效');
   }
   if (new Set(editing.ignoredSyncLineIds).size !== editing.ignoredSyncLineIds.length || editing.ignoredSyncLineIds.some(id => objects.get(id) !== 'line')) throw new Error('忽略打轴的行无效');
+  if (new Set(editing.skippedAlignmentLineIds).size !== editing.skippedAlignmentLineIds.length || editing.skippedAlignmentLineIds.some(id => objects.get(id) !== 'line')) throw new Error('跳过对齐的行无效');
   for (const [id, targetId] of Object.entries(editing.endLinks)) {
     const line = document.lines.find(line => line.id === id), target = document.lines.find(line => line.id === targetId);
     if (!line || !target || line === target || line.backgroundOf || target.backgroundOf || target.beginMs === null || line.endMs !== target.beginMs
@@ -58,6 +60,7 @@ export function reconcileEditing(before: LyricDocument, after: LyricDocument, ed
     }
   }
   for (const [id, value] of Object.entries(editing.emptyBeats)) if (!(value.kind === 'word' ? words.has(id) : rubies.has(id))) delete editing.emptyBeats[id];
+  editing.skippedAlignmentLineIds = editing.skippedAlignmentLineIds.filter(id => lines.has(id));
   editing.ignoredSyncLineIds = editing.ignoredSyncLineIds.filter(id => lines.has(id));
   for (const [id, target] of Object.entries(editing.endLinks)) if (!lines.has(id) || !lines.has(target)) delete editing.endLinks[id];
 }
@@ -65,6 +68,7 @@ export function reconcileEditing(before: LyricDocument, after: LyricDocument, ed
 export function remapEditing(source: ProjectEditing, ids: Map<string, string>): ProjectEditing {
   return {
     emptyBeats: Object.fromEntries(Object.entries(source.emptyBeats).filter(([id]) => ids.has(id)).map(([id, value]) => [ids.get(id)!, value])),
+    skippedAlignmentLineIds: source.skippedAlignmentLineIds.filter(id => ids.has(id)).map(id => ids.get(id)!),
     ignoredSyncLineIds: source.ignoredSyncLineIds.filter(id => ids.has(id)).map(id => ids.get(id)!),
     endLinks: Object.fromEntries(Object.entries(source.endLinks).filter(([id, target]) => ids.has(id) && ids.has(target)).map(([id, target]) => [ids.get(id)!, ids.get(target)!])),
   };

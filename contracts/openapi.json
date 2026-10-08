@@ -3211,7 +3211,7 @@
         ],
         "properties": {
           "schema_version": {
-            "const": "studio-document-v6"
+            "const": "studio-document-v7"
           },
           "project_id": {
             "type": "string"
@@ -3247,7 +3247,7 @@
             ],
             "properties": {
               "schemaVersion": {
-                "const": "studio-project-v4"
+                "const": "studio-project-v5"
               },
               "lyrics": {
                 "type": "object",
@@ -3308,7 +3308,8 @@
                 "required": [
                   "emptyBeats",
                   "ignoredSyncLineIds",
-                  "endLinks"
+                  "endLinks",
+                  "skippedAlignmentLineIds"
                 ],
                 "additionalProperties": false,
                 "properties": {
@@ -3348,6 +3349,13 @@
                     "additionalProperties": {
                       "type": "string"
                     }
+                  },
+                  "skippedAlignmentLineIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "uniqueItems": true
                   }
                 }
               },

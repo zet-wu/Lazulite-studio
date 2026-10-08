@@ -13,7 +13,7 @@ def test_flags_survive_service_save_and_reopen(tmp_path):
     setup_project(tmp_path)
     client = TestClient(create_app(tmp_path, Settings(None, True, 'http://studio')), base_url='https://studio')
     before = client.get('/api/v1/projects/p/document')
-    saved = client.put('/api/v1/projects/p/document', json={'schema_version': 'studio-document-v6', 'project_id': 'p', 'revision': before.json()['revision'], 'document': initial_project(SOURCE, None)}, headers={'origin': 'http://studio', 'if-match': before.headers['etag']})
+    saved = client.put('/api/v1/projects/p/document', json={'schema_version': 'studio-document-v7', 'project_id': 'p', 'revision': before.json()['revision'], 'document': initial_project(SOURCE, None)}, headers={'origin': 'http://studio', 'if-match': before.headers['etag']})
     assert saved.status_code == 200, saved.text
     reopened = client.get('/api/v1/projects/p/document').json()
     root = ET.fromstring(reopened['document']['lyrics']['draftTtml'])
@@ -21,7 +21,7 @@ def test_flags_survive_service_save_and_reopen(tmp_path):
     assert len(flagged) == 3
     assert [e.get('{urn:lazulite:studio:draft}id') for e in flagged] == ['w', 'rw', 'bw']
     assert list(flagged[0].itertext()) == ['Alpha']
-    assert reopened['document']['editing'] == {'emptyBeats': {}, 'ignoredSyncLineIds': [], 'endLinks': {}}
+    assert reopened['document']['editing'] == {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': [], 'endLinks': {}}
 
 @pytest.mark.parametrize('source', [SOURCE.replace('obscene="true"', 'obscene="yes"', 1), SOURCE.replace('<p ', '<p amll:obscene="true" '), SOURCE.replace('tts:ruby="text"', 'tts:ruby="text" amll:obscene="true"'), SOURCE.replace('tts:ruby="base"', 'tts:ruby="base" amll:obscene="true"'), SOURCE.replace('ttm:role="x-bg"', 'ttm:role="x-bg" amll:obscene="true"')])
 def test_invalid_flags_rejected(source):
