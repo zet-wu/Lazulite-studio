@@ -23,12 +23,11 @@ test('large validation mounts bounded details and supports keyboard location', a
   await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page, {name:'large.ttml',mimeType:'application/xml',buffer:Buffer.from(`<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="line">${words}</p></body></tt>`)});
   await page.getByRole('button',{name:'文件打包',exact:true}).click();
-  await page.getByRole('button',{name:'歌词校验',exact:true}).click();
-  const rule = page.locator('details').filter({has:page.locator('summary').filter({hasText:/^缺少时间/})}).first();
+  const rule = page.getByRole('button',{name:/^缺少时间/}).locator('..');
   await expect(rule.locator('li')).toHaveCount(0);
-  await rule.locator(':scope > summary').click();
+  await rule.locator(':scope > button[aria-expanded]').click();
   await expect(rule.locator('li')).toHaveCount(0);
-  await rule.locator('details > summary').first().click();
+  await rule.getByRole('button',{name:/^第 1 行/}).first().click();
   await expect(rule.locator('li')).toHaveCount(50);
   await rule.getByRole('button',{name:/再显示 50 项/}).click();
   await expect(rule.locator('li')).toHaveCount(100);

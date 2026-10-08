@@ -26,7 +26,7 @@ test('real downloads use the same gates, six-row table switches and overlap deta
  await page.goto('/projects/sample-project/edit?scenario=no-music');
  const xml=await page.evaluate(async()=>{const fixturePath='/tests/fixtures/phase10.ts',codecPath='/src/adapters/ttml/lyric-codec.ts';const {phase10Document}=await import(fixturePath);const {serializeLyricTtml}=await import(codecPath);return serializeLyricTtml(phase10Document(),{draft:true});});
  await importLyrics(page,{name:'phase10.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.getByRole('button',{name:'文件打包',exact:true}).click();
- await page.getByRole('button',{name:'歌词校验',exact:true}).click();await expect(page.getByText('当前检查未发现问题',{exact:true})).toBeVisible();
+ await page.getByRole('tab',{name:'歌词校验',exact:true}).click();await expect(page.getByText('当前检查未发现问题',{exact:true})).toBeVisible();
  await page.getByText('导出对照',{exact:true}).click();const table=page.getByRole('table',{name:'所选格式导出对照'});await expect(table.getByRole('row')).toHaveCount(7);await expect(table.getByRole('columnheader')).toHaveCount(2);
  for(const format of ['ttml','eslrc','qrc','yrc','lys','ass']){
   await page.getByLabel('导出格式').selectOption(format);
@@ -39,8 +39,8 @@ test('real downloads use the same gates, six-row table switches and overlap deta
 for(const theme of ['light','dark'])test(`ASS-only issue locates its attachment with shared inline styling and latest gates in ${theme}`,async({page})=>{
  await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);await page.goto('/projects/sample-project/edit?scenario=no-music');
  const xml=await page.evaluate(async()=>{const fixture='/tests/fixtures/phase10.ts',codec='/src/adapters/ttml/lyric-codec.ts';const {phase10Document}=await import(fixture);const {serializeLyricTtml}=await import(codec);const d=phase10Document();d.romanizationTracks[0].contents[0].units[2].beginMs=1400;return serializeLyricTtml(d,{draft:true});});
- await importLyrics(page,{name:'blocked.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByRole('button',{name:'歌词校验',exact:true}).click();
- const rule=page.locator('details').filter({has:page.locator('summary').filter({hasText:/^时间顺序/})}).first();await rule.locator(':scope > summary').click();await rule.locator('details > summary').click();
+ await importLyrics(page,{name:'blocked.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByRole('tab',{name:'歌词校验',exact:true}).click();
+ const rule=page.getByRole('button',{name:/^时间顺序/}).locator('..');await rule.locator(':scope > button[aria-expanded]').click();await rule.getByRole('button',{name:/^第 1 行/}).click();
  const issue=page.getByRole('button',{name:/音译.*重叠或倒序/});await expect(issue).toHaveCount(1);await expect(issue).toHaveAttribute('data-role','inline');
  expect(await issue.evaluate(e=>getComputedStyle(e).borderTopColor)).toBe('rgba(0, 0, 0, 0)');await expect(issue.locator('..')).toContainText('阻塞 · ASS');await issue.focus();await issue.press('Enter');await expect(page.getByRole('button',{name:'编辑',exact:true})).toHaveAttribute('aria-current','page');
  await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('ass');await page.getByRole('button',{name:'下载歌词',exact:true}).click();await expect(page.getByText(/本次操作有 1 项/)).toBeVisible();

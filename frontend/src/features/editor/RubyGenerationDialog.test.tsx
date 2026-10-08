@@ -107,7 +107,7 @@ it('counts only selected contents with nonempty source rows as tracks and conten
   ] }, { id: 'b', language: 'ja', contents: [{ id: 'c3', lineId: 'third', kind: 'plain', text: 'ame' }] }];
   render(<RubyGenerationDialog document={lyric} lineIds={lyric.lines.map(line => line.id)} apply={vi.fn()} close={vi.fn()} />);
   expect(screen.getByText('生成 2 / 3 行')).toBeVisible();
-  fireEvent.click(screen.getByText('音译内容', { selector: 'summary' }));
+  fireEvent.click(screen.getByRole('button', { name: '音译内容' }));
   fireEvent.click(screen.getByLabelText(/L2 · yuki/));
   expect(screen.getByText('生成 1 / 3 行')).toBeVisible();
   fireEvent.change(screen.getByLabelText('音译轨道'), { target: { value: 'b' } });

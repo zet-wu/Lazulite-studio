@@ -62,7 +62,7 @@ for (const theme of ['light', 'dark']) test(`compact references, keyboard mixed 
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
   await page.getByLabel('导出格式').selectOption('ass'); await page.getByText('导出对照', { exact: true }).click();
   await expect(page.getByRole('table', { name: '所选格式导出对照' }).getByText('分轨字幕', { exact: true })).toHaveCount(2);
-  await page.getByRole('button', { name: '歌词校验', exact: true }).focus();
+  await page.getByRole('tab', { name: '歌词校验', exact: true }).focus();
   await page.screenshot({ path: test.info().outputPath(`format-${theme}.png`) });
 });
 

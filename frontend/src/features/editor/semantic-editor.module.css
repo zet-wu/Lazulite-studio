@@ -270,7 +270,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .ribbon, .syncPanel { min-height: 41px; box-sizing: border-box; padding: 7px 16px; gap: 6px; font-size: 12px; line-height: 16px; }
 .syncPanel { display: block; }
 .syncMain { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.syncMain > button[aria-expanded] { width: auto; flex-shrink: 0; }
+.syncMain > button[aria-expanded][data-role] { width: auto; flex-shrink: 0; }
 .syncPanel button, .syncPanel select { font: inherit; padding: 4px 6px; white-space: nowrap; }
 .syncButtons { flex-wrap: nowrap; }
 .syncQuote { flex: 1; min-width: 40px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; background: var(--state-hover); border-radius: 4px; padding: 2px 6px; }

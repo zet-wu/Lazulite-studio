@@ -7,9 +7,9 @@ it('lazily expands rule and line groups, pages details and locates the selected 
   const locate = vi.fn();
   const {container} = render(<OutputIssues issues={issues} locate={locate}/>);
   expect(container.querySelectorAll('li')).toHaveLength(0);
-  const rule = container.querySelector('details')!; rule.open=true; fireEvent(rule, new Event('toggle'));
+  fireEvent.click(screen.getByRole('button',{name:/^缺少时间/}));
   expect(container.querySelectorAll('li')).toHaveLength(0);
-  const line = rule.querySelector('details')!; line.open=true; fireEvent(line,new Event('toggle'));
+  fireEvent.click(screen.getByRole('button',{name:/^第 1 行/}));
   expect(container.querySelectorAll('li')).toHaveLength(50);
   fireEvent.click(screen.getByRole('button',{name:/再显示 50 项/}));
   expect(container.querySelectorAll('li')).toHaveLength(100);
