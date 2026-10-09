@@ -13,9 +13,11 @@ class UploadLimitMiddleware:
         self.limit = limit
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not scope["path"].endswith("/uploads"):
+        if scope["type"] != "http" or not scope["path"].endswith(("/uploads", "/project-archives")):
             await self.app(scope, receive, send)
             return
+        from .project_archive import MAX_ARCHIVE
+        limit = MAX_ARCHIVE + 1024**2 if scope['path'].endswith('/project-archives') else self.limit
         content_length = next(
             (
                 value
@@ -26,7 +28,7 @@ class UploadLimitMiddleware:
         )
         if content_length:
             try:
-                too_large = int(content_length) > self.limit
+                too_large = int(content_length) > limit
             except ValueError:
                 await self._bad_length(scope, send)
                 return
@@ -40,7 +42,7 @@ class UploadLimitMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 total += len(message.get("body", b""))
-                if total > self.limit:
+                if total > limit:
                     raise HTTPException(
                         status_code=413,
                         detail={

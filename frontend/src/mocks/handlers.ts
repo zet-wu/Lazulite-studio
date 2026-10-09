@@ -1,3 +1,4 @@
+import { zipFiles } from '../adapters/nicokara';
 import { http, HttpResponse } from 'msw';
 import { capabilities, document, emptyDocument, exports, jobs, projects, sampleProject, session } from './data';
 
@@ -9,6 +10,11 @@ let currentDocument: typeof document = JSON.parse(sessionStorage.getItem('studio
 let searchConditions={title:'',artist:'',album:''};
 
 export const handlers = [
+  http.get(`${root}/projects/:projectId/archive`, () => new HttpResponse(zipFiles([
+    {name:'manifest.json',text:JSON.stringify({format:'lazulite-studio-project',version:1,name:sampleProject.name,project:'project.json'})},
+    {name:'project.json',text:JSON.stringify({...currentDocument.document,acoustics:{...currentDocument.document.acoustics,analysisId:null}})},
+  ]),{headers:{'Content-Type':'application/zip'}})),
+  http.post(`${root}/project-archives`, () => error(422,'mock_archive_import','演示服务不持久化工程导入，请使用实际服务',false)),
   http.get(`${root}/projects/:projectId/embedded-lyrics`, () => response({ asset_id: 'sample-asset', candidates: [
     { id: 'one', label: 'USLT · eng', format: 'elrc', content: '[00:01.000]<00:01.000>Hello<00:02.000> world<00:03.000>' },
     { id: 'two', label: 'USLT · jpn', format: 'lrc', content: '[00:02.000]別の歌詞' },

@@ -187,6 +187,15 @@ export class ApiError extends Error {
 
 export type ApiErrorBody = components["schemas"]["Error"];
 export const studioApi = {
+  importProject: (file: File) => {
+    const body = new FormData(); body.append('file', file);
+    return mutate('/project-archives', { method: 'POST', body }, isProjectSummary);
+  },
+  exportProject: async (id: string) => {
+    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(id)}/archive`, { credentials:'include', headers:requestHeaders() });
+    if (!response.ok) { const error = await response.json(); throw new Error(error.message || '导出项目失败'); }
+    return response.blob();
+  },
   getSession: () => request("/session", isSession),
   login: (password: string, username?: string) =>
     mutate(

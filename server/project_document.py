@@ -81,7 +81,7 @@ def validate_project(value: dict, conn, project_id: str) -> dict:
         if result is None or result[0] != row[0]: raise ValueError('声学分析不属于当前项目源音频')
     ids = set()
     for segment in acoustic['segments']:
-        if segment['id'] in ids or not 0 <= segment['beginMs'] < segment['endMs'] <= (row[1] or 0):
+        if segment['id'] in ids or not 0 <= segment['beginMs'] < segment['endMs'] <= (row[1] if row[0] is not None and row[1] is not None else 9007199254740991):
             raise ValueError('人声片段标识重复或时间超出歌曲范围')
         ids.add(segment['id'])
     return snapshot

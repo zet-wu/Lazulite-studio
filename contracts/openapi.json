@@ -1561,6 +1561,74 @@
           }
         }
       }
+    },
+    "/projects/{projectId}/archive": {
+      "get": {
+        "operationId": "exportProjectArchive",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "固定已保存修订的 .lazp ZIP；最多一份源音频",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "项目不存在"
+          }
+        }
+      }
+    },
+    "/project-archives": {
+      "post": {
+        "operationId": "importProjectArchive",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "新建独立项目",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "非法、不完整或不支持的工程包"
+          },
+          "413": {
+            "description": "超出工程大小限制"
+          }
+        }
+      }
     }
   },
   "components": {

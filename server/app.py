@@ -393,6 +393,9 @@ def create_app(
             fail("project_not_found", "project not found", 404)
         return row
 
+    from .project_archive import build_archive_router
+    api.include_router(build_archive_router(db, root, revisions, auth=auth, write=write, project_exists=project))
+
     @api.get("/projects")
     def projects(_: object = Depends(auth), limit: int = 50, cursor: str | None = None):
         limit = max(1, min(limit, 100))

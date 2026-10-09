@@ -1,7 +1,7 @@
 import { Select } from '../shared/Select';
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { studioApi } from "../adapters/http/client";
 import { clearProjectLocalData, announceProjectDeleted } from "../adapters/project-lifecycle";
 import { Icon } from "../shared/Icon";
@@ -13,6 +13,27 @@ export function ProjectList() {
     queryKey: ["projects"],
     queryFn: () => studioApi.listProjects(),
   });
+  const archiveInput = useRef<HTMLInputElement>(null);
+  const [archiveBusy, setArchiveBusy] = useState<string | null>(null);
+  const [archiveError, setArchiveError] = useState('');
+  const importControl = <>
+    <button data-role="secondary" disabled={!!archiveBusy} onClick={()=>archiveInput.current?.click()}>{archiveBusy==='import'?'正在导入…':'导入项目'}</button>
+    <input ref={archiveInput} hidden type="file" accept=".lazp" aria-label="Lazulite Studio 工程（*.lazp）" onChange={async event=>{
+      const file=event.target.files?.[0];event.target.value='';if(!file)return;
+      setArchiveBusy('import');setArchiveError('');
+      try { await studioApi.importProject(file);setExtra([]);setNextCursor(undefined);await query.refetch(); }
+      catch(error){setArchiveError(error instanceof Error?error.message:'导入失败');}
+      finally{setArchiveBusy(null);}
+    }}/>
+  </>;
+  const exportProject = async (id:string,name:string) => {
+    setArchiveBusy(id);setArchiveError('');
+    try {
+      const blob=await studioApi.exportProject(id), url=URL.createObjectURL(blob), link=document.createElement('a');
+      link.href=url;link.download=`${name.replace(/[<>:"/\\|?*]/g,'_') || 'project'}.lazp`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    } catch(error){setArchiveError(error instanceof Error?error.message:'导出失败');}
+    finally{setArchiveBusy(null);}
+  };
   const location = useLocation();
   const scenario = new URLSearchParams(location.search).get("scenario");
   const withScenario = (path: string) =>
@@ -64,6 +85,8 @@ export function ProjectList() {
     return (
       <main className={styles.centerState}>
         <strong>还没有项目</strong>
+        {importControl}
+        {archiveError && <p role="alert">{archiveError}</p>}
         <p className={styles.muted}>创建项目开始制作歌词，音乐可稍后上传。</p>
         <CreateProject
           onCreated={(id) => window.location.assign(`/projects/${id}/edit`)}
@@ -79,6 +102,7 @@ export function ProjectList() {
           <p className={styles.muted}>管理歌曲与歌词项目</p>
         </div>
         <div className={styles.pageHeadingActions}>
+          {importControl}
 
           <CreateProject
             onCreated={(id) => window.location.assign(`/projects/${id}/edit`)}
@@ -103,6 +127,7 @@ export function ProjectList() {
           <option value="name">名称</option>
         </Select>
       </div>
+      {archiveError && <p role="alert">{archiveError}</p>}
       {deleteError && <p role="alert">{deleteError}</p>}
       {visible.length ? (
         <section className={styles.projectList} aria-label="项目列表">
@@ -116,6 +141,7 @@ export function ProjectList() {
               </div>
               <span className={styles.rowArrow}>›</span>
             </Link>
+            <button data-role="secondary" disabled={!!archiveBusy} onClick={()=>void exportProject(project.id,project.name)} aria-label={`导出项目 ${project.name}`}>{archiveBusy===project.id?'正在导出…':'导出项目'}</button>
             <button data-role="danger" className={`icon-button ${styles.projectDelete}`} aria-label={`删除项目 ${project.name}`} title={`删除项目 ${project.name}`} disabled={deleting === project.id} onClick={async () => {
                 if (!window.confirm(`删除项目“${project.name}”？将删除歌词修订、任务和产物。原始上传文件和共享音频保留。`)) return;
                 setDeleting(project.id); setDeleteError("");

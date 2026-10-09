@@ -22,3 +22,5 @@ ReadingAnalysis.ranges 可返回比 Sudachi C token 更细的可靠片段，仍�
 `GET /projects/{projectId}/embedded-lyrics` 为只读原始音频歌词候选接口，返回 asset_id 与 candidates。每项含 id、label，以及 content/format 或 error；服务确认项目资源归属，不接收客户端路径。
 
 人声输入直接解码为 44.1 kHz 双声道 float32；持久音频策略 v2 为单份 PCM_16 WAV，分析从此文件重读，播放／PCM／波形绕过原曲 48 kHz 代理，下载返回同一文件。旧策略结果不可复用，不迁移或删除旧文件；用户需明确重新分离，原歌词和片段保留。
+
+`GET /projects/{projectId}/archive` 返回已保存快照的 `.lazp`；`POST /project-archives` 接受 multipart file 并创建独立项目。ZIP 内固定 `manifest.json`、`project.json` 和可选 `media/source.<扩展名>`；manifest 版本 1，项目模型继续使用 v7。导入不采用来源分析身份，不生成分析任务。
