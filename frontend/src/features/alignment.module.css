@@ -4,4 +4,4 @@
 .options { border: 0; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
 .options legend { font-weight: 600; margin-bottom: 8px; }
 .options label { display: flex; align-items: flex-start; gap: 8px; }
-.options small { display: block; color: var(--text-secondary); margin-top: 2px; }
+.options small { display: block; color: var(--muted); margin-top: 2px; }

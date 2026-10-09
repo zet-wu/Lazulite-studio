@@ -62,7 +62,7 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
     // Missing leading/trailing units cannot be replaced by a lucky middle prediction.
     return merge(id, old, { beginMs: endpoint(units.get(ids[0])!.proposed_timing.start), endMs: endpoint(units.get(ids.at(-1)!)!.proposed_timing.end) });
   }
-  function envelope(id: string, old: Pair, children: Pair[]): Pair {
+  function envelope(old: Pair, children: Pair[]): Pair {
     if (!children.length) return clearUnmatched ? {beginMs:null,endMs:null} : old;
     const proposed = {beginMs: children[0].beginMs, endMs: children.at(-1)!.endMs};
     // Parents do not count as retained/cleared leaf objects.
@@ -79,11 +79,11 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
       const before = JSON.stringify(word);
       if (word.rubyUnits.length) {
         for (const ruby of word.rubyUnits) Object.assign(ruby, adopt(ruby.id, ruby));
-        if (clearUnmatched || JSON.stringify(word) !== before) Object.assign(word, envelope(word.id, word, word.rubyUnits.filter(r => !clearUnmatched || scope.get(r.id)!.target_ids.length)));
+        if (clearUnmatched || JSON.stringify(word) !== before) Object.assign(word, envelope(word, word.rubyUnits.filter(r => !clearUnmatched || scope.get(r.id)!.target_ids.length)));
       } else Object.assign(word, adopt(word.id, word));
       lineChanged ||= JSON.stringify(word) !== before;
     }
-    if (clearUnmatched || lineChanged) Object.assign(line, envelope(line.id, line, line.words.filter(word => clearUnmatched ? (word.rubyUnits.length ? word.rubyUnits.some(r => scope.get(r.id)!.target_ids.length) : scope.get(word.id)!.target_ids.length) : word.text.trim() || word.rubyUnits.length)));
+    if (clearUnmatched || lineChanged) Object.assign(line, envelope(line, line.words.filter(word => clearUnmatched ? (word.rubyUnits.length ? word.rubyUnits.some(r => scope.get(r.id)!.target_ids.length) : scope.get(word.id)!.target_ids.length) : word.text.trim() || word.rubyUnits.length)));
   }
   // Keep evaluated links only when already consistent. Never propagate into skipped rows.
   for (const [id, target] of Object.entries(next.editing.endLinks)) {

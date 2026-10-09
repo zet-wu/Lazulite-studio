@@ -92,13 +92,35 @@ it('rejects missing expected targets, duplicate scope and a missing leaf even wh
 
 it('rebuilds Ruby and row envelopes with partial singing boundaries and excludes omitted Ruby',()=>{
  const p=fixture(),w=p.lyrics.lines[0].words[0];
- w.rubyUnits=[{id:'r1',text:'あ',beginMs:100,endMs:500},{id:'r2',text:'い',beginMs:500,endMs:900},{id:'r3',text:'！',beginMs:900,endMs:1000}];
+ w.rubyUnits=[{id:'r1',reading:'あ',beginMs:100,endMs:500},{id:'r2',reading:'い',beginMs:500,endMs:900},{id:'r3',reading:'！',beginMs:900,endMs:1000}];
  Object.assign(w,{beginMs:100,endMs:1000});
  const r=result(p,[[null,2],[3,4]]);r.mapping[0]={unit_id:'u0',object_id:'r1',word_id:w.id,line_id:'a',kind:'ruby'};
  r.mapping.push({unit_id:'last',object_id:'r2',word_id:w.id,line_id:'a',kind:'ruby'});r.alignment.units.push({unit_id:'last',line_id:'a',proposed_timing:{start:{time:2,source:'profile_hold'},end:{time:3,source:'profile_hold'}}});r.scope=scopeFor(p,r);
  const merged=mergeAlignment(p,r,5000,true);
  expect(merged.project.lyrics.lines[0]).toMatchObject({beginMs:null,endMs:3000});
  expect(merged.project.lyrics.lines[0].words[0]).toMatchObject({beginMs:null,endMs:3000});
- expect(merged.project.lyrics.lines[0].words[0].rubyUnits[2]).toMatchObject({text:'！',beginMs:null,endMs:null});
+ expect(merged.project.lyrics.lines[0].words[0].rubyUnits[2]).toMatchObject({reading:'！',beginMs:null,endMs:null});
+ expect(parseProject(serializeProject(merged.project))).toEqual(merged.project);
  expect(merged.cleared).toHaveLength(2);
+});
+
+it('clearing freezes skipped rows and independent tracks, and clears stale Ruby parents',()=>{
+ const p=fixture();p.editing.skippedAlignmentLineIds=['b'];Object.assign(p.lyrics.lines[1],{beginMs:1000,endMs:2000});Object.assign(p.lyrics.lines[1].words[0],{beginMs:1000,endMs:2000});
+ p.lyrics.romanizationTracks=[{id:'rom',language:'ja-Latn',contents:[{id:'rom-content',lineId:'a',kind:'timed',units:[{id:'rom-u',text:'a',beginMs:100,endMs:900}]}]}];
+ p.lyrics.translationTracks=[{id:'trans',language:'en',purpose:'subtitle',contents:[{id:'trans-content',lineId:'a',kind:'timed',units:[{id:'trans-u',text:'hi',beginMs:100,endMs:900}]}]}];
+ const w=p.lyrics.lines[0].words[0];Object.assign(w,{beginMs:100,endMs:900});Object.assign(p.lyrics.lines[0],{beginMs:100,endMs:900});w.rubyUnits=[{id:'empty-ruby',reading:'',beginMs:null,endMs:null}];
+ p.lyrics.lines.push(createLine('う','c'));
+ const r=result(p,[[1,2]]),voice=p.lyrics.lines[2].words[0];r.mapping[0]={unit_id:'u0',object_id:voice.id,word_id:voice.id,line_id:'c',kind:'word'};r.alignment.units[0].line_id='c';r.scope=scopeFor(p,r);
+ const merged=mergeAlignment(p,r,5000,true);
+ expect(merged.project.lyrics.lines[0]).toMatchObject({beginMs:null,endMs:null});expect(merged.project.lyrics.lines[0].words[0]).toMatchObject({beginMs:null,endMs:null});
+ expect(merged.project.lyrics.lines[1]).toEqual(p.lyrics.lines[1]);
+ expect(merged.project.lyrics.romanizationTracks).toEqual(p.lyrics.romanizationTracks);expect(merged.project.lyrics.translationTracks).toEqual(p.lyrics.translationTracks);
+ expect(merged.cleared).toEqual([]);expect(merged.retained).toEqual([]);
+});
+
+it('does not clear a multi-target object when only its middle suggestion is missing',()=>{
+ const p=fixture(),r=result(p,[[1,null],[3,4]]);
+ r.mapping.splice(1,0,{...r.mapping[0],unit_id:'middle'},{...r.mapping[0],unit_id:'last'});
+ r.alignment.units.push({unit_id:'middle',line_id:'a',proposed_timing:{start:null,end:null}},{unit_id:'last',line_id:'a',proposed_timing:{start:null,end:{time:2,source:'interpolated'}}});r.scope=scopeFor(p,r);
+ expect(mergeAlignment(p,r,5000,true).project.lyrics.lines[0].words[0]).toMatchObject({beginMs:1000,endMs:2000});
 });
