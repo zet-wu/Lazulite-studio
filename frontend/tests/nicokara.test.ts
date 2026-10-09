@@ -77,3 +77,14 @@ it('suppresses ForceWipeDecor with NoDecor and supports mutually exclusive Fix',
  Object.assign(p.karaoke.singerMarkers[0],{sizeMode:'Fix',forceWipeDecor:true,marginRight:0,marginLeft:-4});
  const text=prepareNicokara(p,'s').files[0].text;expect(text).toContain(',,Fix,NoDecor,MarginLeft=-4');expect(text).not.toContain('Zoom=');expect(text).not.toContain('ForceWipeDecor');
 });
+it('detects trigger collisions spanning cue and source text without decoding literal references twice',()=>{
+ const p=fixture();p.lyrics.agents=[{id:'a',name:'A',type:'person'}];p.lyrics.lines[0].agentRefs=['a'];p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);p.karaoke=autoInsertCues(p.lyrics,p.karaoke);
+ p.karaoke.singerMarkers[0].trigger='●愛';expect(prepareNicokara(p,'s').issues.some(i=>i.message.includes('实际歌词'))).toBe(true);
+ p.karaoke.singerMarkers[0].trigger='A';p.lyrics.lines[0].words[0].text='&#65;';expect(prepareNicokara(p,'s').issues).toEqual([]);
+});
+it('checks conflicting triggers across selected body files but not unselected groups',()=>{
+ const p=fixture();p.lyrics.agents=[{id:'a',name:'A',type:'person'},{id:'b',name:'A',type:'person'}];p.lyrics.lines[0].agentRefs=['a'];
+ const bg=createLine('background');bg.agentRefs=['b'];Object.assign(bg.words[0],{beginMs:0,endMs:1000});p.lyrics.lines.push(bg);p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);p.karaoke.lineGroups[bg.id]='background';
+ expect(prepareNicokara(p,'s').issues.filter(i=>i.message.includes('相同'))).toHaveLength(2);
+ p.karaoke.outputs=[outputId('main')];expect(prepareNicokara(p,'s').issues).toEqual([]);
+});

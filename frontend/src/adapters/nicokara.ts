@@ -46,6 +46,7 @@ function sequence(segments: Segment[], offset = 0, singer?: { key: string; emit:
 }
 export function prepareNicokara(project: ProjectDocument, title: string, selected = project.karaoke.outputs) {
   const issues: OutputIssue[] = [], files: { name: string; text: string; output: KaraokeOutput }[] = [], omitted: string[] = [];
+  const emittedMarkers: (SegmentSinger & { outputId: string })[] = [];
   const outputs = karaokeOutputs(project), lyrics = project.lyrics, karaoke = project.karaoke;
   const add = (target: Partial<OutputIssue>, message: string, output: string, code: OutputIssue['code'] = 'serialization') => issues.push({ kind: 'line', lineId: '', missing: [], ...target, code, message, severity: 'error', formats: ['Nicokara'], outputIds: [output] });
   const valid = (begin: TimeMs, end: TimeMs, target: Partial<OutputIssue>, output: string) => {
@@ -76,6 +77,8 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
     const output = outputs.find(output => output.id === id);
     if (!output) { add({ karaokeSettings: true }, '所选输出已失效，请重新选择文件', id); continue; }
     const lines = lyrics.lines.filter(line => karaoke.lineGroups[line.id] === output.groupId);
+    const literalRuns: string[] = [];
+    const sourceText = (segments: Segment[]) => segments.map(segment=>segment.text).join('').replace(/&#(\d+);/g, (_, code: string)=>String.fromCodePoint(Number(code)));
     const rows: string[] = [], rules: string[] = [], bases: { word: LyricWord; lineId: string; signature: string; begin: number; end: number }[] = [];
     const declarations = new Map<string, SegmentSinger>();
     const singer = { key: '[]', emit: (value: SegmentSinger) => declarations.set(value.key, value) };
@@ -135,6 +138,7 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
           for (const cue of karaoke.cues.filter(cue => cue.anchor.kind === 'ruby' && cue.anchor.wordId === word.id && cue.anchor.leftId === unit.id)) { const s = cueSegment(cue); if (s) reading.push(s); }
         }
         if (word.rubyUnits.length) {
+          literalRuns.push(sourceText(reading));
           let encoded = sequence(reading, quantize(word.beginMs!));
           if (encoded.startsWith('[00:00:00]')) encoded = encoded.slice(10);
           // The explicit base range closes trailing silence; keep the last reading end tag.
@@ -145,7 +149,7 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
         for (const cue of karaoke.cues.filter(cue => cue.anchor.kind === 'word' && cue.anchor.lineId === line.id && cue.anchor.leftId === word.id)) { const s = cueSegment(cue); if (s) segments.push(s); }
       }
       if (leadingSpace) add({lineId:line.id}, '空白没有可承载的有效正文时间', id, 'missing-time');
-      if (segments.length) rows.push(sequence(segments, 0, singer));
+      if (segments.length) { literalRuns.push(sourceText(segments)); rows.push(sequence(segments, 0, singer)); }
     }
     if (output.kind === 'body') {
       for (const cue of karaoke.cues.filter(cue => karaoke.lineGroups[cue.anchor.lineId] === output.groupId)) {
@@ -154,8 +158,8 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
       for (const {marker,target,key} of declarations.values()) {
         const problem=markerProblem(marker); if(problem)add(target,problem,id);
         for(const field of [marker.trigger,marker.beforeImage,marker.afterImage])textOk(field,target,id);
-        for(const other of declarations.values())if(other.key!==key && (marker.trigger.includes(other.marker.trigger)||other.marker.trigger.includes(marker.trigger)))add(target,'不同歌手集合的触发标记相同或相互包含，请在歌手标记管理中消歧',id);
-        if(marker.trigger && lines.some(line=>line.words.map(word=>word.text).join('').includes(marker.trigger) || line.words.some(word=>word.rubyUnits.map(unit=>unit.reading).join('').includes(marker.trigger))) || marker.trigger && karaoke.cues.some(cue=>karaoke.lineGroups[cue.anchor.lineId]===output.groupId&&cue.text.includes(marker.trigger)))add(target,'触发标记与实际歌词或导唱冲突，请在歌手标记管理中修改',id);
+        emittedMarkers.push({marker,target,key,outputId:id});
+        if(marker.trigger && literalRuns.some(text=>text.includes(marker.trigger)))add(target,'触发标记与实际歌词或导唱冲突，请在歌手标记管理中修改',id);
         if(emojiDeclaration(marker, declarations.size).length>1024)add(target,'歌手声明超过规范单行 1024 字符限制',id);
       }
       for (const base of bases) for (const line of lines) {
@@ -176,6 +180,9 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
     if (!rows.length) { omitted.push(output.label); continue; }
     const name = names.get(output.id)!;
     files.push({ name, text: '\uFEFF' + [...metadata, ...rows, ...rules, ...[...declarations.values()].map((value,index)=>emojiDeclaration(value.marker,index+1))].join('\r\n') + '\r\n', output });
+  }
+  for (const current of emittedMarkers) for (const other of emittedMarkers) {
+    if (current.key!==other.key && (current.marker.trigger.includes(other.marker.trigger)||other.marker.trigger.includes(current.marker.trigger))) add(current.target,'不同歌手集合的触发标记相同或相互包含，请在歌手标记管理中消歧',current.outputId);
   }
   // Invalid assignments cannot silently drop lyrics from an otherwise selected output.
   for (const line of lyrics.lines) if (!karaoke.groups.some(group => group.id === karaoke.lineGroups[line.id]) && selected.length) add({ lineId: line.id, karaokeSettings: true }, '歌词行缺少有效输出分组', selected[0]);
