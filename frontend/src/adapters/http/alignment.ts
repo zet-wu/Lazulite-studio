@@ -1,8 +1,8 @@
 import { requestHeaders } from './client';
 import type { AlignmentResult } from '../../domain/alignment';
 import type { Job } from './jobs';
-export type AlignmentOptions = {use_hints:boolean; line_blank:boolean; rest_blank:boolean; rest_token:boolean; clear_unmatched:boolean};
-export const defaultAlignmentOptions = (): AlignmentOptions => ({use_hints:false, line_blank:false, rest_blank:false, rest_token:false, clear_unmatched:false});
+export type AlignmentOptions = {use_hints:boolean; line_blank:boolean; rest_blank:boolean; rest_token:boolean; clear_unmatched:boolean; merge_short_gaps:boolean; gap_threshold_ms:number};
+export const defaultAlignmentOptions = (): AlignmentOptions => ({use_hints:false, line_blank:false, rest_blank:false, rest_token:false, clear_unmatched:false, merge_short_gaps:false, gap_threshold_ms:500});
 export type AlignmentSummary = {line_count:number; skipped_count:number; unknown_count:number; hint_count:number; emitting_count:number};
 export async function alignmentCall<T>(path: string, body?: unknown, key?: string, keepalive = false): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {method:body === undefined ? 'GET':'POST', credentials:'include', keepalive,

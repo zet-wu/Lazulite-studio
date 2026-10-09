@@ -1,5 +1,5 @@
 import { MessageBar, useNotice } from '../shared/MessageBar';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import { alignmentApi, defaultAlignmentOptions, type AlignmentSummary } from '../adapters/http/alignment';
@@ -23,6 +23,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const caps=useQuery({queryKey:['capabilities'],queryFn:()=>jobsApi.capabilities()});
   const jobs=useQuery({queryKey:['vocal-jobs',pid],queryFn:()=>jobsApi.list(pid),refetchInterval:1000});
   const [dialog,setDialog]=useState(false),[options,setOptions]=useState(defaultAlignmentOptions),[summary,setSummary]=useState<AlignmentSummary|null>(null);
+  const [gapDraft,setGapDraft]=useState('500'),[gapError,setGapError]=useState('');
+  const gapId=useId(),gapErrorId=useId();
   const [message,setMessage]=useNotice();
   const [progress,setProgress]=useState('');
   const [running,setRunning]=useState(false),[cancelling,setCancelling]=useState(false);
@@ -40,12 +42,14 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const reason=!assetId?'请先上传源音频':!project.lyrics.lines.some(l=>!project.editing.skippedAlignmentLineIds.includes(l.id))?'没有未跳过的歌词行':!capability?.enabled?(capability?.reason??'正在检查模型能力'):active?'已有音频处理运行':null;
   const open=async()=>{
     if(!finishDraft())return;
-    setOpening(true);setMessage('');setOptions(defaultAlignmentOptions());
+    setOpening(true);setMessage('');setOptions(defaultAlignmentOptions());setGapDraft('500');setGapError('');
     try {const saved=await control.save();if(!saved)throw new Error('请先完成保存');const data=await alignmentApi.preview(pid,saved.revision);if(mounted.current){setSummary(data);setDialog(true);}}
     catch(e){setMessage((e as Error).message);}finally{if(mounted.current)setOpening(false);}
   };
   const start=async()=>{
-    const selected = {...options};
+    const threshold=options.merge_short_gaps?Number(gapDraft):500;
+    if(options.merge_short_gaps && (!gapDraft.trim() || !Number.isSafeInteger(threshold) || threshold<=0)){setGapError('行内空隙阈值必须为正的安全整数毫秒');return;}
+    const selected = {...options,gap_threshold_ms:threshold};
     setDialog(false);setRunning(true);setCancelling(false);setMessage('');setProgress('正在准备');
     let lock:ReturnType<AlignmentControl['lock']>;
     try{lock=control.lock();}catch(e){setMessage((e as Error).message);setRunning(false);return;}
@@ -68,8 +72,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
           const current=await studioS4.getDocumentEnvelope(pid);
           if(!op.alive||op.cancel){if(op.alive)setMessage('已取消应用','status',4000);break;}
           if(current.revision!==saved.revision || result.binding.revision!==saved.revision || result.binding.project_id!==pid || result.binding.asset_id!==assetId)throw new Error('项目版本或音频已改变，请重新运行');
-          const merged=mergeAlignment(op.lock.source,result,durationMs,selected.clear_unmatched);op.lock.apply(merged.project);
-          setMessage([merged.project===op.lock.source?'未更新歌词时间':'已更新歌词时间', merged.cleared.length?`清空 ${merged.cleared.length} 个词／注音的缺失端点`:'', merged.retained.length?`${merged.retained.length} 个词／注音部分时间保留原值`:''].filter(Boolean).join('；'), 'status', merged.retained.length||merged.cleared.length?8000:4000);break;
+          const merged=mergeAlignment(op.lock.source,result,durationMs,selected.clear_unmatched,selected.merge_short_gaps?selected.gap_threshold_ms:null);op.lock.apply(merged.project);
+          setMessage([merged.project===op.lock.source?'未更新歌词时间':'已更新歌词时间', merged.mergedGaps?`合并 ${merged.mergedGaps} 处行内空隙`:'', merged.cleared.length?`清空 ${merged.cleared.length} 个词／注音的缺失端点`:'', merged.retained.length?`${merged.retained.length} 个词／注音部分时间保留原值`:''].filter(Boolean).join('；'), 'status', merged.retained.length||merged.cleared.length?8000:4000);break;
         }
         if(['failed','cancelled','interrupted'].includes(job.status)){setMessage(job.error?.message??(job.status==='cancelled'?'已取消对齐':'服务中断，请重新运行'), job.status==='cancelled'?'status':'alert', job.status==='cancelled'?4000:undefined);break;}
         if(!disconnectedAt)setProgress(op.cancel?'正在取消':({separating:'正在分离人声',analyzing:'正在分析声区',acoustic:'正在计算声学概率',decode:'正在全局对齐'}[job.stage??'']??'正在对齐'));
@@ -91,15 +95,22 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       <p>将对齐 {summary?.line_count} 行，跳过 {summary?.skipped_count} 行</p>
       {!!summary?.unknown_count&&<p>有 {summary.unknown_count} 处缺少可用读音，相关时间可能保留原值</p>}
       <label><input type="checkbox" checked={options.use_hints} disabled={!summary?.hint_count} onChange={e=>setOptions({...options,use_hints:e.target.checked})}/>使用已有行起始时间辅助对齐</label>
-      <p>{summary?.hint_count?'适合已有大致准确行首的歌词':'参与行没有已有行首'}</p>
+      <p className={styles.description}>{summary?.hint_count?'适合已有大致准确行首的歌词':'参与行没有已有行首'}</p>
       <label><input type="checkbox" checked={options.clear_unmatched} onChange={e=>setOptions({...options,clear_unmatched:e.target.checked})}/>清空未匹配单元时间</label>
-      <p>清空本次对齐范围内没有新时间建议的词／注音端点，包括未送入对齐的符号、标点和空白；可一次撤销。</p>
+      <p className={styles.description}>清空本次对齐范围内没有新时间建议的词／注音端点，包括未送入对齐的符号、标点和空白；可一次撤销。</p>
+      <div className={styles.gapOption}>
+        <input id={gapId} type="checkbox" checked={options.merge_short_gaps} onChange={e=>{setOptions({...options,merge_short_gaps:e.target.checked});setGapError('');}}/>
+        <label htmlFor={gapId}>将短于</label>
+        <span className={styles.threshold}><input type="number" min="1" step="1" aria-label="行内空隙阈值（毫秒）" aria-invalid={!!gapError} aria-describedby={gapError?gapErrorId:undefined} disabled={!options.merge_short_gaps} value={gapDraft} onChange={e=>{setGapDraft(e.target.value);setGapError('');}}/><label htmlFor={gapId}>ms</label></span>
+        <label htmlFor={gapId}>的行内空隙并入前词</label>
+      </div>
+      {gapError&&<p id={gapErrorId} role="alert">{gapError}</p>}
       <fieldset className={styles.options}><legend>实验性对齐选项</legend>
         {([
           ['line_blank','行内 blank 代价','抑制同一行内部过长的 blank 停留'],
           ['rest_blank','人声休止 blank 代价','在低人声活动处增加行内 blank 代价'],
           ['rest_token','人声休止 token 代价','抑制发音目标落入低人声活动区'],
-        ] as const).map(([key,label,description])=><label key={key}><input type="checkbox" checked={options[key]} onChange={e=>setOptions({...options,[key]:e.target.checked})}/><span>{label}<small>{description}</small></span></label>)}
+        ] as const).map(([key,label,description])=><label key={key}><input type="checkbox" checked={options[key]} onChange={e=>setOptions({...options,[key]:e.target.checked})}/><span>{label}<small className={styles.description}>{description}</small></span></label>)}
       </fieldset>
       {!summary?.emitting_count&&<p>没有可用读音，无法计算</p>}
     </SettingsDialog>}

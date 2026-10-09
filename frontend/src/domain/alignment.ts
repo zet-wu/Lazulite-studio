@@ -90,7 +90,7 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
   for (const [lineIndex, line] of next.lyrics.lines.entries()) {
     if (skipped.has(line.id)) continue;
     const before = JSON.stringify(line.words);
-    const lineLeaves = line.words.flatMap(word => word.rubyUnits.length ? word.rubyUnits : [word]);
+    const lineLeaves = line.words.flatMap<Pair & {id:string}>(word => word.rubyUnits.length ? word.rubyUnits : [word]);
     for (const leaf of lineLeaves) Object.assign(leaf, adopt(leaf.id, leaf));
     if (gapThresholdMs !== null) {
       let previous: (Pair & {id:string}) | undefined;

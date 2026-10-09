@@ -1051,6 +1051,16 @@ export interface components {
              * @default false
              */
             clear_unmatched: boolean;
+            /**
+             * @description Studio result policy; excluded from acoustic and decoding configuration
+             * @default false
+             */
+            merge_short_gaps: boolean;
+            /**
+             * @description Strict gap threshold in original-axis milliseconds; normalized to 500 when disabled
+             * @default 500
+             */
+            gap_threshold_ms: number;
         };
         AlignmentResult: {
             /** @constant */

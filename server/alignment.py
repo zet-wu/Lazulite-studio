@@ -35,8 +35,12 @@ class AlignmentRunner:
         return read_project(row[0]), current['source_asset_id']
 
     def validate(self, pid, params):
-        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched')):
-            raise ValueError('自动对齐只接受项目版本及布尔对齐选项')
+        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'merge_short_gaps', 'gap_threshold_ms'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'merge_short_gaps')):
+            raise ValueError('自动对齐只接受项目版本、布尔选项及行内空隙阈值')
+        if type(params['gap_threshold_ms']) is not int or not 0 < params['gap_threshold_ms'] <= 9007199254740991:
+            raise ValueError('行内空隙阈值必须为正的安全整数毫秒')
+        if not params['merge_short_gaps']:
+            params['gap_threshold_ms'] = 500
         snapshot, asset = self.snapshot(pid, params['revision'])
         projection = project_alignment(snapshot, params['use_hints'])
         if not projection['summary']['line_count']: raise ValueError('没有未跳过的歌词行')

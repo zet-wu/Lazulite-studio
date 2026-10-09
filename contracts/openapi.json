@@ -3462,7 +3462,9 @@
           "line_blank",
           "rest_blank",
           "rest_token",
-          "clear_unmatched"
+          "clear_unmatched",
+          "merge_short_gaps",
+          "gap_threshold_ms"
         ],
         "properties": {
           "revision": {
@@ -3488,6 +3490,18 @@
             "type": "boolean",
             "default": false,
             "description": "Studio merge policy; never an acoustic parameter"
+          },
+          "merge_short_gaps": {
+            "type": "boolean",
+            "default": false,
+            "description": "Studio result policy; excluded from acoustic and decoding configuration"
+          },
+          "gap_threshold_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "default": 500,
+            "description": "Strict gap threshold in original-axis milliseconds; normalized to 500 when disabled"
           }
         }
       },
