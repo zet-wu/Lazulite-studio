@@ -78,3 +78,13 @@ button:disabled {
   cursor: default;
   opacity: 0.55;
 }
+
+.createButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.createButton svg {
+  flex-shrink: 0;
+}

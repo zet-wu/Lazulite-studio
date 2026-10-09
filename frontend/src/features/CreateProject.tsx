@@ -118,8 +118,8 @@ export function CreateProject({
 
   return (
     <>
-      <button data-role="secondary" className={styles.primary} onClick={open}>
-        <Icon name="add"/> 新建项目
+      <button data-role="primary" className={`${styles.primary} ${styles.createButton}`} onClick={open}>
+        <Icon name="add"/><span>新建项目</span>
       </button>
       <dialog
         ref={dialog}
