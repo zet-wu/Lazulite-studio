@@ -29,8 +29,8 @@ test('audio outline shares resize preference and graphics stay aligned with inde
   await page.getByRole('button',{name:'波形',exact:true}).click(); await expect(graphics).toBeVisible();
   await page.getByRole('button',{name:'声谱图',exact:true}).click(); await expect(graphics).toBeVisible();
   await page.locator('[data-top-menu="audio-analysis"] summary').click();
-  const download=page.getByRole('link',{name:'下载人声 FLAC',exact:true}); await expect(download).toBeVisible();
+  const download=page.getByRole('link',{name:'下载人声 WAV',exact:true}); await expect(download).toBeVisible();
   expect(await download.evaluate(e=>getComputedStyle(e).textDecorationLine)).toBe('none');
-  const file=page.waitForEvent('download');await download.click();expect((await file).suggestedFilename()).toMatch(/\.flac$/i);
+  const file=page.waitForEvent('download');await download.click();expect((await file).suggestedFilename()).toMatch(/\.wav$/i);
   await page.screenshot({path:test.info().outputPath('audio.png')});
 });

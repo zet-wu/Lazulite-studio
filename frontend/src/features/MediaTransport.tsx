@@ -628,7 +628,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           visible={visible} externalAnchors={acoustics?.segments.flatMap(segment => [segment.beginMs, segment.endMs]) ?? []}
           apply={onTimelineCommand} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
       </>}
-      {visible.spectrum && asset && <SpectrogramCanvas vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
+      {visible.spectrum && asset && <SpectrogramCanvas pcmRate={graphicVocal ? sourceResults.find(result=>result.audio_id===graphicVocal)!.sample_rate : 48000} vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
       </div>
     </TimelineIndicatorContext.Provider>
   );

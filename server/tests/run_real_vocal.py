@@ -26,12 +26,12 @@ def main():
     from server.vocals import VocalRunner
     args.root.mkdir(parents=True, exist_ok=True)
     db = Database(args.root / 'studio.sqlite3')
-    add_media_project(args.root, db, RevisionStore(db, args.root / 'revisions'), 'real', args.source,
+    add_media_project(args.root, db, RevisionStore(db, args.root / 'projects'), 'real', args.source,
                       '<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>')
     with db.connect() as c:
         asset = c.execute("SELECT source_asset_id FROM projects WHERE id='real'").fetchone()[0]
     start = time.monotonic()
-    result = VocalRunner(db, args.root / 'vocals').run('real', args.source, {
+    result = VocalRunner(db, args.root / 'projects').run('real', args.source, {
         'asset_id': asset, 'model_name': os.getenv('STUDIO_VOCAL_MODEL', 'htdemucs'),
         'device': os.getenv('STUDIO_VOCAL_DEVICE', 'cpu'),
     }, 'actual-demucs', lambda *values: print(values, flush=True), lambda: False)

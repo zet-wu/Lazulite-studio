@@ -15,8 +15,8 @@ it('places a 440 Hz tone above silence in the correct spectral band', () => {
 
 import { PROXY_SAMPLE_RATE, sampleTimestamp, spectrumWindow } from '../src/domain/spectrogram';
 
-it('matches full PCM analysis to padded tiles across tone/noise/transient boundaries and a short tail', () => {
-  const rate = PROXY_SAMPLE_RATE, durationMs = 8123, frames = Math.round(durationMs * rate / 1e3);
+it.each([44100,48000])('matches full PCM to padded tiles at %i Hz across transient boundaries and a short tail', (rate) => {
+  const durationMs = 8123, frames = Math.round(durationMs * rate / 1e3);
   let random = 12345;
   const pcm = Int16Array.from({ length: frames * 2 }, (_, index) => {
     const frame = Math.floor(index / 2);
@@ -24,7 +24,7 @@ it('matches full PCM analysis to padded tiles across tone/noise/transient bounda
     return Math.round(9000 * Math.sin(frame * 2 * Math.PI * 440 / rate) + (random / 2 ** 32 - 0.5) * 4000 + (Math.abs(frame - 4 * rate) < 100 ? 10000 : 0));
   });
   for (const start of [0, 4000, 8000]) {
-    const end = Math.min(start + 4000, durationMs), window = spectrumWindow(start, end, durationMs);
+    const end = Math.min(start + 4000, durationMs), window = spectrumWindow(start, end, durationMs, rate);
     const first = Math.round(window.requestStartMs * rate / 1e3), last = Math.round(window.requestEndMs * rate / 1e3);
     const tiled = computeSpectrogram(pcm.slice(first * 2, last * 2), rate, 2, window);
     const whole = computeSpectrogram(pcm, rate, 2, { ...window, requestStartMs: 0, requestEndMs: durationMs });

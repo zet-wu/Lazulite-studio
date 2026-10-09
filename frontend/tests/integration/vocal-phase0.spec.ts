@@ -1,5 +1,6 @@
 import { uploadFixtureMusic } from '../fixtures/upload-music';
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+async function chooseSource(page:Page,label:string,name:string){await page.getByLabel(label,{exact:true}).click();await page.getByRole('listbox').getByRole('option',{name,exact:true}).click();}
 test('vocal processing adopts automatically, shares history, assigns and reopens a complete project', async ({page})=>{
  await page.goto('/projects/phase0-packaging/edit');
  await page.getByRole('button',{name:'音频处理',exact:true}).click();
@@ -21,11 +22,11 @@ test('vocal processing adopts automatically, shares history, assigns and reopens
  await page.keyboard.press('Control+z');await expect(page.locator('[data-segment-id]')).toHaveCount(1);
  await page.keyboard.press('Control+Shift+z');await expect(page.locator('[data-segment-id]')).toHaveCount(2);
  await page.getByRole('button',{name:'新建人声片段',exact:true}).click();await page.keyboard.press('Tab');await expect(page.locator('[data-vocal-focus]')).toBeFocused();await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'新建人声片段',exact:true})).toBeFocused();await expect(page.getByText('拖动框选新增片段，Esc 取消')).toHaveCount(0);
- await page.getByLabel('播放音源',{exact:true}).selectOption({index:1});await expect(page.getByText('正在加载音源…')).toHaveCount(0);
- await page.getByLabel('波形／声谱图音源',{exact:true}).selectOption('');
+ await chooseSource(page,'播放音源','人声');await expect(page.getByText('正在加载音源…')).toHaveCount(0);
+ await chooseSource(page,'波形／声谱图音源','原曲');
  await expect(page.locator('audio')).toHaveCount(1);
  await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.locator('audio')).toHaveCount(1);
- await expect(page.getByLabel('播放音源',{exact:true})).not.toHaveValue('');
+ await expect(page.getByLabel('播放音源',{exact:true})).toContainText('人声');
  await page.getByRole('button',{name:'音频处理',exact:true}).click();
  await expect.poll(async()=>{const e=await (await page.request.get('/api/v1/projects/phase0-packaging/document')).json();return e.document.acoustics.segments.length;}).toBe(2);
  await page.reload();await page.getByRole('button',{name:'音频处理',exact:true}).click();await expect(page.locator('[data-segment-id]')).toHaveCount(2);
@@ -93,16 +94,16 @@ test('real Demucs audio preserves position rate loop and pause across independen
  await page.getByRole('slider',{name:'播放速度',exact:true}).fill('0.75');
  await page.getByRole('button',{name:/^A /}).click();
  await page.locator('audio').evaluate((el:HTMLAudioElement)=>{el.currentTime=24;});await page.getByRole('button',{name:/^B /}).click();
- await page.getByLabel('播放音源',{exact:true}).selectOption('actual-demucs');
+ await chooseSource(page,'播放音源','人声');
  await expect.poll(()=>page.locator('audio').evaluate((el:HTMLAudioElement)=>el.readyState)).toBeGreaterThan(0);
  await expect.poll(()=>page.locator('audio').evaluate((el:HTMLAudioElement)=>el.currentTime)).toBeCloseTo(24,1);
  expect(await page.locator('audio').evaluate((el:HTMLAudioElement)=>el.paused)).toBeTruthy();
  expect(await page.locator('audio').evaluate((el:HTMLAudioElement)=>el.playbackRate)).toBe(.75);
  await expect(page.getByRole('button',{name:/^A 00:20/})).toBeVisible();await expect(page.getByRole('button',{name:/^B 00:24/})).toBeVisible();
  await page.getByRole('button',{name:'播放',exact:true}).click();await expect.poll(()=>page.locator('audio').evaluate((el:HTMLAudioElement)=>el.paused)).toBeFalsy();
- await page.getByLabel('播放音源',{exact:true}).selectOption('');await expect.poll(()=>page.locator('audio').evaluate((el:HTMLAudioElement)=>el.paused)).toBeFalsy();
+ await chooseSource(page,'播放音源','原曲');await expect.poll(()=>page.locator('audio').evaluate((el:HTMLAudioElement)=>el.paused)).toBeFalsy();
  await page.getByRole('button',{name:'暂停',exact:true}).click();
- await page.getByLabel('波形／声谱图音源',{exact:true}).selectOption('actual-demucs');
+ await chooseSource(page,'波形／声谱图音源','人声');
  for(let i=0;i<5;i++)await page.getByRole('button',{name:'放大波形',exact:true}).click();
  await page.getByRole('button',{name:'声谱图',exact:true}).click();
  await expect(page.getByText('能量加载失败 · 重试')).toHaveCount(0);
@@ -110,8 +111,8 @@ test('real Demucs audio preserves position rate loop and pause across independen
  await expect.poll(async()=>page.locator('[data-spectrum-ready]').evaluate(el=>Number(el.getAttribute('data-spectrum-ready'))>0&&el.getAttribute('data-spectrum-ready')===el.getAttribute('data-spectrum-wanted'))).toBe(true);
  await page.locator('[aria-label="声谱图"]').scrollIntoViewIfNeeded();await page.screenshot({path:test.info().outputPath('real-vocal-spectrum.png')});
  await page.route('**/audio?vocal=actual-demucs',route=>route.abort());
- await page.getByLabel('播放音源',{exact:true}).selectOption('actual-demucs');await expect(page.getByText('所选音源无法播放，请重试 · 重试')).toBeVisible();
- await expect(page.getByLabel('播放音源',{exact:true})).toHaveValue('actual-demucs');
+ await chooseSource(page,'播放音源','人声');await expect(page.getByText('所选音源无法播放，请重试 · 重试')).toBeVisible();
+ await expect(page.getByLabel('播放音源',{exact:true})).toContainText('人声');
 });
 
 test('out of range assignment preserves lyrics and points to hidden offending units',async({page})=>{

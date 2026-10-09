@@ -50,7 +50,9 @@ def build_vocal_router(runner, *, auth, project_exists):
             except KeyError: raise HTTPException(404, '人声结果不存在')
             path = runner.audio_path(pid, metadata)
             if not runner.audio_available(pid, metadata): raise HTTPException(404, '人声文件不存在，请重新生成')
-            return stream_file(path, 'audio/wav', request.headers.get('range'), request.headers.get('if-range'))
+            response = stream_file(path, 'audio/wav', request.headers.get('range'), request.headers.get('if-range'))
+            response.headers['Content-Disposition'] = 'attachment; filename="vocals.wav"'
+            return response
     return router
 
 def vocal_asset(runner, pid, rid):

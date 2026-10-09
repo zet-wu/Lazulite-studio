@@ -1,21 +1,21 @@
 import { TimelineIndicators } from './TimelineIndicators';
 import { useEffect, useRef, useState } from 'react';
 import { studioApi } from '../adapters/http/client';
-import { SPECTRUM_HEIGHT, SPECTRUM_WIDTH, SPECTRUM_WINDOW_MS, spectrumWindow } from '../domain/spectrogram';
+import { SPECTRUM_HEIGHT, SPECTRUM_WIDTH, SPECTRUM_WINDOW_MS, PROXY_SAMPLE_RATE, spectrumWindow } from '../domain/spectrogram';
 import { useCanvasMetrics } from './useCanvasMetrics';
 import { SpectrumCache } from './spectrum-cache';
 import styles from './media.module.css';
 import { spectrumPalette } from './spectrum-palette';
 
-type Props = { vocal?: string | null; projectId: string; assetIdentity: string; startMs: number; endMs: number; durationMs: number };
+type Props = { pcmRate?: number; vocal?: string | null; projectId: string; assetIdentity: string; startMs: number; endMs: number; durationMs: number };
 type Request = { token: number; controller: AbortController; began: number; posted: boolean };
 type Result = { id: number; token: number; pixels: Uint8Array; computeMs: number; error?: string };
 
 export function SpectrogramCanvas(props: Props) {
-  return <AssetSpectrum key={`${props.projectId}:${props.assetIdentity}:${props.durationMs}:fft512-${SPECTRUM_WIDTH}x${SPECTRUM_HEIGHT}`} {...props} />;
+  return <AssetSpectrum key={`${props.projectId}:${props.assetIdentity}:${props.durationMs}:${props.pcmRate ?? PROXY_SAMPLE_RATE}:fft512-${SPECTRUM_WIDTH}x${SPECTRUM_HEIGHT}`} {...props} />;
 }
 
-function AssetSpectrum({ vocal, projectId, startMs, endMs, durationMs }: Props) {
+function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs, endMs, durationMs }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const worker = useRef<Worker | null>(null);
   const cache = useRef(new SpectrumCache());
@@ -41,7 +41,7 @@ function AssetSpectrum({ vocal, projectId, startMs, endMs, durationMs }: Props) 
       if (cache.current.get(first) || pending.current.has(first) || failed.current.has(first)) continue;
       if (pending.current.size >= 2) break;
       const request: Request = { token: ++nextToken.current, controller: new AbortController(), began: performance.now(), posted: false };
-      const window = spectrumWindow(first, Math.min(first + SPECTRUM_WINDOW_MS, durationMs), durationMs);
+      const window = spectrumWindow(first, Math.min(first + SPECTRUM_WINDOW_MS, durationMs), durationMs, pcmRate);
       pending.current.set(first, request);
       void studioApi.getPcmWindow(projectId, window.requestStartMs, window.requestEndMs, request.controller.signal, vocal).then(({ pcm, rate, channels }) => {
         if (pending.current.get(first) !== request || !wanted.current.includes(first)) return;

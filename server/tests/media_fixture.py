@@ -22,10 +22,15 @@ def add_real_vocal_fixture(root, db, store):
     import os, shutil
     if not os.getenv('STUDIO_VOCAL_REAL_ROOT'): return
     source_root = Path(os.environ['STUDIO_VOCAL_REAL_ROOT'])
-    metadata = json.loads((source_root/'vocals/real/actual-demucs/analysis.json').read_text())
-    source = source_root/'assets'/metadata['source_asset_id'][:2]/metadata['source_asset_id']
+    source_db = Database(source_root/'studio.sqlite3')
+    with source_db.connect() as c:
+        result = c.execute("SELECT * FROM vocal_results WHERE id='actual-demucs'").fetchone()
+    metadata = json.loads(result['metadata_json'])
+    source = source_root/'projects'/'real'/'source'/'original'
     add_media_project(root, db, store, 'real-vocal', source, '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="u">真实人声人工分配</p></div></body></tt>')
-    directory = root/'vocals/real-vocal/actual-demucs'
-    shutil.copytree(source_root/'vocals/real/actual-demucs', directory)
+    directory = root/'projects'/'real-vocal'/'vocals'/'actual-demucs'
+    shutil.copytree(Path(result['directory']), directory)
+    metadata['source_asset_id'] = 'real-vocal'
+    (directory/'analysis.json').write_text(json.dumps(metadata))
     with db.transaction() as c:
-        c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', ('actual-demucs','real-vocal',metadata['source_asset_id'],'ready',str(directory),json.dumps(metadata)))
+        c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', ('actual-demucs','real-vocal','real-vocal','ready',str(directory),json.dumps(metadata)))
