@@ -88,3 +88,10 @@ it('checks conflicting triggers across selected body files but not unselected gr
  expect(prepareNicokara(p,'s').issues.filter(i=>i.message.includes('相同'))).toHaveLength(2);
  p.karaoke.outputs=[outputId('main')];expect(prepareNicokara(p,'s').issues).toEqual([]);
 });
+
+it.each([21000, 21009])('omits only the quantized flush Ruby tail (%i), retaining body end and source times', endMs => {
+ const p=fixture();const word=p.lyrics.lines[0].words[0];word.endMs=21009;word.rubyUnits.at(-1)!.endMs=endMs;p.lyrics.lines[0].endMs=21009;
+ const before=structuredClone(p);const out=prepareNicokara(p,'test');
+ expect(out.files[0].text).toContain('@Ruby1=愛,[00:00:20]あ[00:00:30][00:00:60]い,[00:20:00],[00:21:00]');
+ expect(out.files[0].text).toContain('愛[00:21:00]');expect(p).toEqual(before);
+});

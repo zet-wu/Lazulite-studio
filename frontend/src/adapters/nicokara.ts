@@ -141,7 +141,8 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
           literalRuns.push(sourceText(reading));
           let encoded = sequence(reading, quantize(word.beginMs!));
           if (encoded.startsWith('[00:00:00]')) encoded = encoded.slice(10);
-          // The explicit base range closes trailing silence; keep the last reading end tag.
+          // Only a real trailing silence needs a reading end tag; body sequences keep theirs.
+          if (reading.length && quantize(reading.at(-1)!.endMs) === quantize(word.endMs!)) encoded = encoded.slice(0, -10);
           const rule = `@Ruby${rules.length + 1}=${encodeKraText(word.text, true)},${encoded},${nicokaraTime(word.beginMs!)},${nicokaraTime(word.endMs!)}`;
           if (rule.length > 1024) add(target, 'Ruby 字段超过规范单行 1024 字符限制', id);
           rules.push(rule); bases.push({ word, lineId: line.id, signature: encoded, begin: quantize(word.beginMs!), end: quantize(word.endMs!) });
