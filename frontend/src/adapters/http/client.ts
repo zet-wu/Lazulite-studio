@@ -187,6 +187,10 @@ export class ApiError extends Error {
 
 export type ApiErrorBody = components["schemas"]["Error"];
 export const studioApi = {
+  projectStorage: (id:string) => request(`/projects/${encodeURIComponent(id)}/storage`, (value:unknown): value is components['schemas']['ProjectStorage'] => {
+    const v=value as components['schemas']['ProjectStorage'];
+    return !!v && Number.isSafeInteger(v.total_bytes) && v.total_bytes>=0 && typeof v.measured_at==='string' && !!v.categories && ['source','vocals','cache','snapshots','other'].every(key=>Number.isSafeInteger(v.categories[key as keyof typeof v.categories]) && v.categories[key as keyof typeof v.categories]>=0) && Object.values(v.categories).reduce((a,b)=>a+b,0)===v.total_bytes;
+  }),
   importProject: (file: File) => {
     const body = new FormData(); body.append('file', file);
     return mutate('/project-archives', { method: 'POST', body }, isProjectSummary);

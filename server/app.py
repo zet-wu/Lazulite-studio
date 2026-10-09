@@ -393,6 +393,8 @@ def create_app(
             fail("project_not_found", "project not found", 404)
         return row
 
+    from .project_storage import build_storage_router
+    api.include_router(build_storage_router(db, root, auth=auth, project_exists=project))
     from .project_archive import build_archive_router
     api.include_router(build_archive_router(db, root, revisions, auth=auth, write=write, project_exists=project))
 

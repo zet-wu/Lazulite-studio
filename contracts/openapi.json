@@ -1629,6 +1629,31 @@
           }
         }
       }
+    },
+    "/projects/{projectId}/storage": {
+      "get": {
+        "operationId": "getProjectStorage",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前项目文件逻辑大小，包含历史结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectStorage"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "无法统计，不能当作零"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4030,6 +4055,55 @@
         ],
         "title": "SingerMarker",
         "type": "object"
+      },
+      "ProjectStorage": {
+        "type": "object",
+        "required": [
+          "total_bytes",
+          "categories",
+          "measured_at"
+        ],
+        "properties": {
+          "total_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "measured_at": {
+            "type": "string"
+          },
+          "categories": {
+            "type": "object",
+            "required": [
+              "source",
+              "vocals",
+              "cache",
+              "snapshots",
+              "other"
+            ],
+            "properties": {
+              "source": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "vocals": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cache": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "snapshots": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "other": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
       }
     }
   }

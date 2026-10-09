@@ -591,6 +591,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProjectStorage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1241,6 +1257,17 @@ export interface components {
             marginRight: number;
             /** Marginbottom */
             marginBottom: number;
+        };
+        ProjectStorage: {
+            total_bytes: number;
+            measured_at: string;
+            categories: {
+                source: number;
+                vocals: number;
+                cache: number;
+                snapshots: number;
+                other: number;
+            };
         };
     };
     responses: {
@@ -2517,6 +2544,35 @@ export interface operations {
             };
             /** @description 非法、不完整或不支持的工程包 */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getProjectStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前项目文件逻辑大小，包含历史结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectStorage"];
+                };
+            };
+            /** @description 无法统计，不能当作零 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

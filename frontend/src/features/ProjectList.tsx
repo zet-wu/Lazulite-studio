@@ -141,6 +141,7 @@ export function ProjectList() {
               </div>
               <span className={styles.rowArrow}>›</span>
             </Link>
+            <ProjectStorage id={project.id}/>
             <button data-role="secondary" disabled={!!archiveBusy} onClick={()=>void exportProject(project.id,project.name)} aria-label={`导出项目 ${project.name}`}>{archiveBusy===project.id?'正在导出…':'导出项目'}</button>
             <button data-role="danger" className={`icon-button ${styles.projectDelete}`} aria-label={`删除项目 ${project.name}`} title={`删除项目 ${project.name}`} disabled={deleting === project.id} onClick={async () => {
                 if (!window.confirm(`删除项目“${project.name}”？将删除歌词修订、任务和产物。原始上传文件和共享音频保留。`)) return;
@@ -192,4 +193,16 @@ export function ProjectList() {
       )}
     </main>
   );
+}
+
+function ProjectStorage({id}:{id:string}) {
+  const query=useQuery({queryKey:['project-storage',id],queryFn:()=>studioApi.projectStorage(id),staleTime:0,refetchOnMount:'always',refetchInterval:15000});
+  const size=(bytes:number)=>bytes>=1024**3?`${(bytes/1024**3).toFixed(2)} GiB`:`${(bytes/1024**2).toFixed(2)} MiB`;
+  return <div className={styles.projectStorage}>
+    <details><summary>{query.isError?'统计失败':query.data?size(query.data.total_bytes):'正在统计…'}</summary>
+      <p>项目目录文件逻辑大小，包含保留的历史修订与结果；不含共享数据库和浏览器恢复副本。</p>
+      {query.data&&!query.isError&&<dl>{([['source','源音频'],['vocals','人声结果'],['cache','可重建缓存'],['snapshots','项目快照'],['other','其他文件']] as const).map(([key,label])=><div key={key}><dt>{label}</dt><dd>{size(query.data.categories[key])}</dd></div>)}</dl>}
+      <button data-role="inline" disabled={query.isFetching} onClick={()=>void query.refetch()}>刷新空间统计</button>
+    </details>
+  </div>;
 }

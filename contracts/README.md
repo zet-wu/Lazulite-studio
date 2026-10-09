@@ -24,3 +24,5 @@ ReadingAnalysis.ranges 可返回比 Sudachi C token 更细的可靠片段，仍�
 人声输入直接解码为 44.1 kHz 双声道 float32；持久音频策略 v2 为单份 PCM_16 WAV，分析从此文件重读，播放／PCM／波形绕过原曲 48 kHz 代理，下载返回同一文件。旧策略结果不可复用，不迁移或删除旧文件；用户需明确重新分离，原歌词和片段保留。
 
 `GET /projects/{projectId}/archive` 返回已保存快照的 `.lazp`；`POST /project-archives` 接受 multipart file 并创建独立项目。ZIP 内固定 `manifest.json`、`project.json` 和可选 `media/source.<扩展名>`；manifest 版本 1，项目模型继续使用 v7。导入不采用来源分析身份，不生成分析任务。
+
+`GET /projects/{projectId}/storage` 返回 `ProjectStorage`：`total_bytes`、五类 `categories` 及 `measured_at`。数值为项目目录实际逻辑字节，分类之和等于总量；统计失败返回 503，不返回伪造零值。

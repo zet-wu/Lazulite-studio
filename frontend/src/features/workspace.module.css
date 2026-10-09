@@ -899,3 +899,10 @@
 .musicUpload { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 13px; }
 .musicUpload > span:first-child { color: var(--muted); }
 .musicUpload progress { width: 140px; accent-color: var(--blue); }
+
+.projectStorage { position:relative; font-size:12px; color:var(--muted); min-width:90px; }
+.projectStorage details[open] { position:absolute; right:0; top:-12px; width:270px; z-index:3; padding:12px; background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:8px; box-shadow:0 4px 18px #0002; }
+.projectStorage summary { cursor:pointer; }
+.projectStorage p { line-height:1.5; }
+.projectStorage dl > div { display:flex; justify-content:space-between; margin:5px 0; }
+.projectStorage dd { margin:0; }

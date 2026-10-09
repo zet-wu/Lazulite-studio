@@ -10,6 +10,7 @@ let currentDocument: typeof document = JSON.parse(sessionStorage.getItem('studio
 let searchConditions={title:'',artist:'',album:''};
 
 export const handlers = [
+  http.get(`${root}/projects/:projectId/storage`,()=>response({total_bytes:11534336,categories:{source:8388608,vocals:1048576,cache:1048576,snapshots:1048576,other:0},measured_at:new Date().toISOString()})),
   http.get(`${root}/projects/:projectId/archive`, () => new HttpResponse(zipFiles([
     {name:'manifest.json',text:JSON.stringify({format:'lazulite-studio-project',version:1,name:sampleProject.name,project:'project.json'})},
     {name:'project.json',text:JSON.stringify({...currentDocument.document,acoustics:{...currentDocument.document.acoustics,analysisId:null}})},
