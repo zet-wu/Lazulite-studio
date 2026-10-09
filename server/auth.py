@@ -39,6 +39,8 @@ def normalize_origin(value: str) -> str:
         raise ValueError('浏览器来源必须是单一 HTTP(S) 地址，不含用户信息或路径')
     if port is not None and not 1 <= port <= 65535:
         raise ValueError('浏览器来源端口必须位于 1–65535')
+    if '%' in host:
+        raise ValueError('浏览器来源不接受编码主机或 IPv6 区域标识')
     if ':' in host:
         host = '[' + ipaddress.IPv6Address(host).compressed + ']'
     else:

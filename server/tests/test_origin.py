@@ -11,7 +11,7 @@ def test_normalize_browser_origin(value,expected):
  assert Settings(origin=value).origin==expected
 
 
-@pytest.mark.parametrize('value', ['', 'null', 'file://a', 'http://u:p@host', 'http://host/', 'http://host/path', 'http://host?', 'http://host#', 'http://host:0', 'http://host:65536', 'http://host:', 'http://a b', 'http://a\\b', 'http://a,http://b', 'http://127.1', 'http://host\n'])
+@pytest.mark.parametrize('value', ['', 'null', 'file://a', 'http://u:p@host', 'http://host/', 'http://host/path', 'http://host?', 'http://host#', 'http://host:0', 'http://host:65536', 'http://host:', 'http://a b', 'http://a\\b', 'http://a,http://b', 'http://127.1', 'http://[fe80::1%25eth0]', 'http://host\n'])
 def test_invalid_origin(value):
  with pytest.raises(ValueError): normalize_origin(value)
 
