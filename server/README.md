@@ -53,3 +53,5 @@ HTTP 提供只读 `alignment-preview?revision=…` 和内部 `jobs/alignment`，
 `scope` 枚举未跳过行中的全部正文／Ruby 叶对象及其确定的 target_ids，区分正常省略与丢失模型结果。服务校验完整目标后返回；前端按启动快照再次核对范围，清空开启时重算父包络。清空仅修改 Studio 时间，不传入声学配置或改变声学缓存。
 
 浏览器来源由 `server.auth.normalize_origin` 校验并规范化，登录与写接口保持精确匹配。根目录 `dev.py` 按 `--origin`、`STUDIO_ORIGIN`、`--web-port` 默认值的优先级选择来源；监听仍限回环，来源端口可以与监听不同。来源错误独立于密码／CSRF 错误，不信任任意转发头。
+
+`karaoke.py` 定义项目 v6 的独立卡拉 OK 配置及边界形状检查。导唱不写入 TTML，也不进入自动对齐投影；可编辑的时间范围问题不会阻止草稿保存。文档 envelope 为 v8，旧快照不转换、不自动清理。

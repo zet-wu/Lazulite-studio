@@ -34,7 +34,7 @@ React 19 / TypeScript / Vite SPA，React Router 负责路由，TanStack Query �
 
 ## 3. 权威文档与事务
 
-`ProjectDocument`（`studio-project-v5`）是唯一项目编辑状态，包含结构化 lyrics 与 acoustics（采用结果 ID、片段副本）。其中 `LyricDocument`（`studio-lyric-v10`）为歌词部分，含 lines、romanizationTracks、translationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs 与实际时间；词含 text、时间、Ruby 单元等。项目 editing 独立保存词／Ruby 空拍、忽略行、跳过对齐行与行尾链接；关系和歌词实际端点在同一项目事务内维护。音译轨道按主行或背景行的稳定 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
+`ProjectDocument`（`studio-project-v6`）是唯一项目编辑状态，包含结构化 lyrics 与 acoustics（采用结果 ID、片段副本）。其中 `LyricDocument`（`studio-lyric-v10`）为歌词部分，含 lines、romanizationTracks、translationTracks、agents、metadata、language。行包含 words、背景父 ID、agentRefs 与实际时间；词含 text、时间、Ruby 单元等。项目 editing 独立保存词／Ruby 空拍、忽略行、跳过对齐行与行尾链接；关系和歌词实际端点在同一项目事务内维护。音译轨道按主行或背景行的稳定 ID 引用，保存语言、顺序、plain/timed 内容及定时单元。正文由词拼接，读音由 Ruby 拼接。
 
 时间使用绝对整数毫秒/null；拆分坐标使用 code point 并检查 grapheme 边界。`lyric-commands.ts` 提供纯函数歌词事务；运行时只有 `project-document.ts` 提交 256 次项目历史，歌词与声学操作按实际顺序统一撤销。背景勾选时原子附属最近的前一主行，前行已占用即拒绝，不向更早或后方寻找；下拉仅建立关系后启用，显示动态Lx，value保留稳定ID。内容、链接及各单元自身时间由单一命令校验；背景建立/改绑及主行拆分归属允许父背景各自独立绝对时间，不截短背景或扩展父行。selection、focus、播放时钟不作为歌词权威内容；批量操作一次入历史，最终改动经 codec 保存。
 
@@ -54,7 +54,7 @@ RomanizationGenerationDialog自有静态正文/Ruby对照布局，无播放遮�
 
 `lyric-formats.ts` 支持文本、LRC/扩展 LRC/ESLRC/QRC/YRC/LYS 双向、KRC 导入与 ASS 导出。`source-codec.ts` 解析原始 QRC/YRC/KRC 和附属内容；本地二进制 KRC 在浏览器解压。`lrc.ts` 统一普通/尖括号扩展 LRC 下载和内嵌文本：只取主行正文，未知结束不猜测，重叠主行保留且仅在已知区间并集外清屏。低表达力格式不能携带全部 Ruby/元数据或多条音译轨道。预览动态正文使用有效完整时间，独立纯空白词按原顺序以0–0 AMLL word投影；其他未定时正文不进入动态预览，整行无定时词沿用正文回退，不修改文档。isDuet 从歌手引用派生；引用包含主唱时显示主唱侧，否则显示另一侧，无法可视化多歌手合唱。StudioLyricPlayer使用AMLL的单一DOM播放器，关闭自动时间改写，仅把父/背景显示组活跃区设为两行时间并集，保持各行及词/Ruby输入时间。
 
-项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存完整当前项目与基础修订，重开不恢复撤销栈。FastAPI 接受 `studio-document-v7` envelope，document 为 JSON 项目快照，lyrics 保存 draftTtml；修订以不可变 JSON 文件和 project_path 指针提交，不双写旧 TTML 修订。歌词导入仅替换 lyrics，声学数据保留；发布捕获完整快照并从确切修订提取歌词。在线／内嵌歌词候选由用户明确采用；人声处理由用户启动后在成功时按捕获的声学基线自动接入，真实冲突才提供明确替换入口。
+项目由 `useProjectDocument` 持有本地副本、dirty、revision/ETag、保存序号和冲突。IndexedDB 保存完整当前项目与基础修订，重开不恢复撤销栈。FastAPI 接受 `studio-document-v8` envelope，document 为 JSON 项目快照，lyrics 保存 draftTtml；修订以不可变 JSON 文件和 project_path 指针提交，不双写旧 TTML 修订。歌词导入仅替换 lyrics，声学数据保留；发布捕获完整快照并从确切修订提取歌词。在线／内嵌歌词候选由用户明确采用；人声处理由用户启动后在成功时按捕获的声学基线自动接入，真实冲突才提供明确替换入口。
 
 ## 5. 媒体与服务
 
@@ -102,7 +102,7 @@ EditorWorkspace 持有 `AcquisitionStore` 与独立 `useSearchConditions`，切�
 
 ## 毫秒时间与输出生命周期
 
-项目文档为 `studio-project-v5`，歌词部分仍为 `studio-lyric-v10`：`TimeMs`、`beginMs/endMs`、打轴和 A/B 均为整数毫秒或 `null`。行尾链接存 editing.endLinks 来源 ID → 目标 ID，普通解除、分配解除和删除目标均冻结当前有效结束时间，不保留旧端点。文档接口为 `studio-document-v7`，媒体与任务契约使用 `_ms`。恢复检查点使用独立 project-v5 数据库，旧检查点不再读取；没有旧结构转换或双写。媒体元素仍用秒，PCM 仍按样本帧，编码 timescale 不改。
+项目文档为 `studio-project-v6`，歌词部分仍为 `studio-lyric-v10`：`TimeMs`、`beginMs/endMs`、打轴和 A/B 均为整数毫秒或 `null`。行尾链接存 editing.endLinks 来源 ID → 目标 ID，普通解除、分配解除和删除目标均冻结当前有效结束时间，不保留旧端点。文档接口为 `studio-document-v8`，媒体与任务契约使用 `_ms`。恢复检查点使用独立 project-v6 数据库，旧检查点不再读取；没有旧结构转换或双写。媒体元素仍用秒，PCM 仍按样本帧，编码 timescale 不改。
 
 TTML 解析先处理相对祖先得到实际端点，再按半毫秒向上舍入；时钟写法（包括带小时）为绝对时间。保存、下载与 STPP 使用三位毫秒时钟，零时长舍入不自动延长。`server/time_units.py` 在修订写入边界规范化，并保留正文及 Apple 头部元素的默认命名空间，避免外部消费者漏读带自动前缀的正文；Studio 草稿属性只在最终产物剥离。自动对齐保留 Lazulite 原生秒数的原始／建议证据，项目回投时一次量化到毫秒，仅采用 proposed_timing。
 
@@ -222,7 +222,7 @@ AMLL 预览按 backgroundOf 关系组织播放器输入，项目显示位置不�
 
 ## AMLL 项目约束与交换
 
-项目 v5 的 `amll` 保存五个兼容限制；`lineOrder` 保存编辑／打轴排布，歌词 v10 的词可有非空 `agentRefs`。缺少词级字段按所在行解释，背景行未指定时按主行解释。所有歌词编辑、导入、批量动作与开关变更经过原子项目命令的最终约束检查；服务保存与恢复再次验证。开简化模式联动锁定三个歌手限制，关闭后保留这三个限制为开启；匿名 `person` 定义 v1/v2 的侧别固定。简化转换和开启模式是两个独立命令。
+项目 v6 的 `amll` 保存五个兼容限制；`lineOrder` 保存编辑／打轴排布，歌词 v10 的词可有非空 `agentRefs`。缺少词级字段按所在行解释，背景行未指定时按主行解释。所有歌词编辑、导入、批量动作与开关变更经过原子项目命令的最终约束检查；服务保存与恢复再次验证。开简化模式联动锁定三个歌手限制，关闭后保留这三个限制为开启；匿名 `person` 定义 v1/v2 的侧别固定。简化转换和开启模式是两个独立命令。
 
 正文允许一个主行关联多条背景，草稿／正式 TTML 为每条背景写 `xml:id`，iTunes 翻译和音译的背景 span 以 `for` 引用对应背景；多个背景的附属内容缺少可唯一定位的引用时明确拒绝。TTML 使用歌词序列及主背景关系，不写项目 `lineOrder`。前置开关只修改项目排布，保留首条背景的批量动作始终按歌词序列选首条，其余背景转主行并保留当前相对排布、身份与附属内容。
 
@@ -230,7 +230,7 @@ AMLL 预览按 backgroundOf 关系组织播放器输入，项目显示位置不�
 
 AMLL 预览仍使用 core/react 0.5.2，输入按主背景关系投影，与项目前置排布分开；多背景、合唱和词级歌手提示呈现限制。解析／重生成库 lyric 1.0.2 与播放器属于不同路径，不把 Studio 完整往返当作外部无损保证。实际探针和实施证据见工作区 AMLL Phase 0 记录。
 
-恢复检查点使用 project-v5／record 5；旧恢复库原位保留且不读取，不自动删除。服务数据库结构仍为 4，默认目录仍为 data-projects-v4；歌词快照升级独立于资源数据库结构，不提供旧项目转换。
+恢复检查点使用 project-v6／record 6；旧恢复库原位保留且不读取，不自动删除。服务数据库结构仍为 4，默认目录仍为 data-projects-v4；歌词快照升级独立于资源数据库结构，不提供旧项目转换。
 
 
 ## 校验与共享内容展开
@@ -245,7 +245,7 @@ AMLL 五项设置位于共享 SettingsDialog，入口在设置菜单；立即走
 
 `LyricCandidate` 共用在线／内嵌满宽框体、选中态、能力与错误徽章。`lyricCapabilities` 从正文行、词和 Ruby 时间及附属轨道判断能力；LRC 解析器提供瞬态行级词 ID 集合，区分继承行起点与独立词时间，不修改解析文档。STPP 保留在来源标签，歌词格式单独显示 TTML。项目列表仅使用名称与更新时间；ProjectSummary 已移除 document_status，服务端保存副本和编辑器真实保存状态独立保留。
 
-项目快照为 `studio-project-v5`，文档 envelope 为 `studio-document-v7`，浏览器恢复库 project-v5／记录 v5。歌词仍为 v10，资源数据库保持版本 4。`editing.skippedAlignmentLineIds` 独立于打轴忽略，按稳定行 ID 保存；复制映射、拆行继承、合行取全部来源交集，在结构事务内维护。普通歌词交换不包含此偏好。旧项目／恢复数据不转换、不自动删除。
+项目快照为 `studio-project-v6`，文档 envelope 为 `studio-document-v8`，浏览器恢复库 project-v6／记录 v6。歌词仍为 v10，资源数据库保持版本 4。`editing.skippedAlignmentLineIds` 独立于打轴忽略，按稳定行 ID 保存；复制映射、拆行继承、合行取全部来源交集，在结构事务内维护。普通歌词交换不包含此偏好。旧项目／恢复数据不转换、不自动删除。
 
 项目快照的 draft TTML 读取显式使用草稿模式：允许词／Ruby 的待修正时间超出父级结束，保留所有已知／未定端点供继续编辑。外部 TTML 导入仍执行父级时间边界检查；草稿可重开不表示通过发布时间校验。
 
@@ -264,3 +264,13 @@ AMLL 五项设置位于共享 SettingsDialog，入口在设置菜单；立即走
 行内短空隙合并是 Studio 结果策略，默认关闭、阈值 500 ms。`merge_short_gaps`／`gap_threshold_ms` 在开始时固定，重试沿用原参数；服务严格检查布尔与正安全整数，关闭时阈值规范化为 500。它们不传入 JapaneseConfig，也不参与声学／解码缓存身份。窗口内阈值草稿与选项分离，禁用不丢稿，重开恢复默认；数值框与复选框独立关联名称，说明复用 `--muted`。
 
 领域合并先核对完整范围并采用／清空，再按同一行既有正文顺序展开词／Ruby 叶节点。仅两侧本次采用完整合法新双端、整数毫秒差严格大于 0 且小于阈值，并且原轴间隔由实际片段连续覆盖时延长前叶终点。新分析使用返回的片段，已有分析使用启动片段；相接／重叠覆盖允许，删段阻断。无目标且最终双端空的分隔节点透明，其他不合格叶阻断；不跨行或跳过行，不改原始库建议。所有叶处理结束后重算父词／行、解除冲突链接及整体校验，以既有单条命令应用。摘要追加实际叶间隙计数“合并 N 处行内空隙”。
+
+## 卡拉 OK 项目与输出
+
+`karaoke.ts` 保存输出组、行归属、默认导唱参数、文件选择及稳定 ID 锚定的三类导唱。`project-document.ts` 在单一事务中维护邻接归属／关联删除；源时间改变保留手调端点，导出时报告越界。项目快照 v6 与恢复记录 6 携带这些数据，歌词 v10 与 TTML 保持原始正文及 Ruby。重开下载的项目 JSON 仅允许在原项目内，以保持声学资源引用；一次撤销恢复此前完整项目。
+
+卡拉 OK 模式复用 `SyncLine`、虚拟歌词列表和右栏，附加正文／Ruby 空隙插槽。`SelectionContext` 的 cue 身份与歌词／声学选区互斥；`KaraokeTrack` 在共享时间视窗按重叠分道，拖动双端或整体移动在合法原空隙内吸附。`KaraokeTools` 负责分组、默认参数和文件选择窗口。
+
+`adapters/nicokara.ts` 从当前项目及所选输出生成 `.kra` 与 UTF-8 ZIP，独立维护每个文件的歌手状态和 Ruby 编号。正文／附属文件按组×轨道投影，绝对端点先向下量化后计算 Ruby 相对时间，合法空隙保留连续标签。量化坍缩、范围、歌手标记碰撞与 Ruby 同文／跨词子串匹配阻塞受影响文件。文件名基于整个输出目录确定，避免选择顺序改变冲突后缀。文件打包的歌词校验共享问题树与定位，Nicokara 筛选使用最新项目及选择；下载再次实时校验。
+
+实际平台／消费端验证边界见工作区卡拉 OK Phase 0 实施记录，不把编码表达视为 NKM3 成片验收。
