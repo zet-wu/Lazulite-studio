@@ -82,7 +82,7 @@ def test_no_audio_manual_segments_save_and_export(tmp_path):
         assert client.put(f'/api/v1/projects/{pid}/document',json=body,headers={**HEADERS,'if-match':envelope['revision']}).status_code==200
         assert set(entries(client.get(f'/api/v1/projects/{pid}/archive').content))=={'manifest.json','project.json'}
 
-@pytest.mark.parametrize('fault',['version','format','path','missing','hash','oversize','snapshot','duplicate','badzip','reference'])
+@pytest.mark.parametrize('fault',['version','format','path','missing','hash','oversize','snapshot','duplicate','badzip','reference','group','cue'])
 def test_invalid_archives_leave_no_project_or_temp_files(tmp_path,fault):
     with TestClient(create_app(tmp_path,Settings(None,True,'http://studio'))) as client:
         _,data=no_audio(client); files=entries(data); manifest=json.loads(files['manifest.json'])
@@ -95,6 +95,11 @@ def test_invalid_archives_leave_no_project_or_temp_files(tmp_path,fault):
         if fault=='snapshot': files['project.json']='{}'
         if fault=='reference':
             snapshot=json.loads(files['project.json']);snapshot['lineOrder']=['foreign'];files['project.json']=json.dumps(snapshot)
+        if fault in ('group','cue'):
+            snapshot=json.loads(files['project.json'])
+            if fault=='group': snapshot['karaoke']['lineGroups']={'foreign':'main'}
+            else: snapshot['karaoke']['cues']=[{'id':'cue','text':'●','beginMs':0,'endMs':10,'anchor':{'kind':'before','lineId':'foreign'}}]
+            files['project.json']=json.dumps(snapshot)
         files['manifest.json']=json.dumps(manifest)
         data=pack(files)
         if fault=='badzip': data=b'not a zip'

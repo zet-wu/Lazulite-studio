@@ -31,13 +31,14 @@ test('generates 注音, saves through FastAPI and reopens the complete current d
 });
 
 test('reopens a saved incomplete Ruby outside its line and retains the original endpoints', async ({ page }) => {
-  const url='/api/v1/projects/phase0-packaging/document';
+  const created=await page.request.post('/api/v1/projects',{headers:{origin:'http://127.0.0.1:5175'},data:{name:'incomplete Ruby'}});const pid=(await created.json()).id;
+  const url=`/api/v1/projects/${pid}/document`;
   const before=await(await page.request.get(url)).json();
   const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="line-a" begin="1" end="2"><span studio:id="word" begin="1" end="2" tts:ruby="container"><span tts:ruby="base">傍</span><span tts:ruby="textContainer"><span tts:ruby="text" studio:id="ruby" begin="5" studio:null="end">そ</span></span></span></p></body></tt>';
-  const document={...before.document,lyrics:{draftTtml:xml},lineOrder:[],editing:{emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:[],endLinks:{}}};
-  const saved=await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:'phase0-packaging',revision:before.revision,document}});
+  const document={...before.document,karaoke:{...before.document.karaoke,lineGroups:{'line-a':'main'},cues:[]},lyrics:{draftTtml:xml},lineOrder:[],editing:{emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:[],endLinks:{}}};
+  const saved=await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:pid,revision:before.revision,document}});
   expect(saved.ok()).toBeTruthy();
-  await page.goto('/projects/phase0-packaging/edit');
+  await page.goto(`/projects/${pid}/edit`);
   await page.getByRole('button',{name:'编辑',exact:true}).click();
   await expect(page.getByRole('textbox',{name:'词 傍',exact:true})).toBeVisible();
   await page.reload();

@@ -197,7 +197,7 @@ export function ProjectList() {
 
 function ProjectStorage({id}:{id:string}) {
   const query=useQuery({queryKey:['project-storage',id],queryFn:()=>studioApi.projectStorage(id),staleTime:0,refetchOnMount:'always',refetchInterval:15000});
-  const size=(bytes:number)=>bytes>=1024**3?`${(bytes/1024**3).toFixed(2)} GiB`:`${(bytes/1024**2).toFixed(2)} MiB`;
+  const size=(bytes:number)=>bytes>0&&bytes<.01*1024**2?'< 0.01 MiB':bytes>=1024**3?`${(bytes/1024**3).toFixed(2)} GiB`:`${(bytes/1024**2).toFixed(2)} MiB`;
   return <div className={styles.projectStorage}>
     <details><summary>{query.isError?'统计失败':query.data?size(query.data.total_bytes):'正在统计…'}</summary>
       <p>项目目录文件逻辑大小，包含保留的历史修订与结果；不含共享数据库和浏览器恢复副本。</p>

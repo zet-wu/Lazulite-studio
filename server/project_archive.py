@@ -77,6 +77,32 @@ def read_package(path, stage):
             if digest(source_path) != manifest.source.sha256: raise ValueError('源音频 SHA-256 不匹配')
         return manifest, snapshot, source_path
 
+def validate_archive_references(snapshot):
+    import xml.etree.ElementTree as ET
+    studio, xml, tt, ttm, tts = ('{urn:lazulite:studio:draft}', '{http://www.w3.org/XML/1998/namespace}', '{http://www.w3.org/ns/ttml}', '{http://www.w3.org/ns/ttml#metadata}', '{http://www.w3.org/ns/ttml#styling}')
+    root = ET.fromstring(snapshot['lyrics']['draftTtml'])
+    identity = lambda node: node.get(studio+'id') or node.get(xml+'id')
+    lines = {identity(node):node for node in root.iter() if node.tag == tt+'p' or node.get(ttm+'role') == 'x-bg'}
+    karaoke = snapshot['karaoke']
+    groups = {group['id'] for group in karaoke['groups']}
+    if any(key not in lines or group and group not in groups for key, group in karaoke['lineGroups'].items()):
+        raise ValueError('工程歌词分组引用无效')
+    for cue in karaoke['cues']:
+        anchor = cue['anchor']
+        line = lines.get(anchor['lineId'])
+        if line is None: raise ValueError('工程导唱所属行不存在')
+        if anchor['kind'] == 'before': continue
+        words = [child for child in line if child.tag == tt+'span' and all(role == 'expletive' for role in child.get(ttm+'role','').split())]
+        nodes = words
+        if anchor['kind'] == 'ruby':
+            word = next((word for word in words if identity(word) == anchor['wordId']), None)
+            if word is None: raise ValueError('工程 Ruby 导唱所属词不存在')
+            nodes = [node for node in word.iter() if node.get(tts+'ruby') == 'text']
+        ids = [identity(node) for node in nodes]
+        if not any(left == anchor['leftId'] and right == anchor['rightId'] for left,right in zip(ids,ids[1:])):
+            raise ValueError('工程导唱锚点引用或相邻关系无效')
+
+
 def build_archive_router(db, root, revisions, *, auth, write, project_exists):
     router = APIRouter()
 
@@ -129,6 +155,7 @@ def build_archive_router(db, root, revisions, *, auth, write, project_exists):
                 if record: c.execute('INSERT INTO assets VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', record)
                 c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)', (pid, manifest.name.strip(), aid, rid, now, now))
                 snapshot = validate_project(snapshot, c, pid)
+                validate_archive_references(snapshot)
                 relative = Path('revisions') / f'{rid}.json'
                 revisions._write_atomic(staged_project / relative, json.dumps(snapshot, ensure_ascii=False).encode())
                 c.execute('INSERT INTO revisions VALUES(?,?,?,?,?)', (rid, pid, None, str(destination / relative), now))
