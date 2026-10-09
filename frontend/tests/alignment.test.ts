@@ -1,9 +1,10 @@
+import { createKaraoke } from '../src/domain/karaoke';
 import { it, expect } from 'vitest';
 import { createLine, createLyricDocument } from '../src/domain/lyric-document';
 import { createProjectDocument, createProjectEditorState, executeProjectCommand, undoProjectCommand, redoProjectCommand } from '../src/domain/project-document';
 import { mergeAlignment, type AlignmentResult } from '../src/domain/alignment';
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
-function fixture(){const p=createProjectDocument(createLyricDocument());p.lyrics.lines=[createLine('あ','a'),createLine('い','b')];return p;}
+function fixture(){const p=createProjectDocument(createLyricDocument());p.lyrics.lines=[createLine('あ','a'),createLine('い','b')];p.karaoke=createKaraoke(p.lyrics);return p;}
 function result(p:ReturnType<typeof fixture>, times:([number|null,number|null])[]):AlignmentResult{
   const words=p.lyrics.lines.flatMap(l=>l.words.map(w=>({line:l,word:w})));
   const value:AlignmentResult = {scope:[],kind:'alignment',binding:{project_id:'p',revision:'r',asset_id:'a'},acoustics:null,

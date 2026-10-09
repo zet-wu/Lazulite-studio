@@ -5,6 +5,7 @@ import { AGENT_TYPES } from '../domain/lyric-document';
 import type { LyricDocument, LyricLine, TimeMs } from '../domain/lyric-document';
 import type { LyricFormat } from './lyric-formats';
 export type OutputIssue = {
+  cueId?: string; karaokeSettings?: boolean; outputIds?: string[];
   severity?: 'warning' | 'error'; formats?: string[];
   kind: 'agent' | 'line' | 'word' | 'ruby' | 'romanization-content' | 'romanization-unit' | 'translation-content' | 'translation-unit';
   lineId: string; agentId?: string; wordId?: string; rubyId?: string; trackId?: string; contentId?: string; unitId?: string;
@@ -79,7 +80,7 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
 export function assertOutputDocument(document: LyricDocument,target: LyricFormat | 'publish', editing?: ProjectEditing) { const issues=collectOutputIssues(document,target,editing);if(issues.length)throw new DocumentOutputError(issues); }
 
 export function outputIssueKey(issue: OutputIssue) {
- return JSON.stringify([issue.kind,issue.agentId,issue.lineId,issue.wordId,issue.rubyId,issue.trackId,issue.contentId,issue.unitId,issue.code ?? 'missing-time',issue.missing]);
+ return JSON.stringify([issue.kind,issue.cueId,issue.karaokeSettings,issue.agentId,issue.lineId,issue.wordId,issue.rubyId,issue.trackId,issue.contentId,issue.unitId,issue.code ?? 'missing-time',issue.missing]);
 }
 export function uniqueOutputIssues(issues: OutputIssue[]) {
  return [...new Map(issues.map(issue=>[outputIssueKey(issue),issue])).values()];

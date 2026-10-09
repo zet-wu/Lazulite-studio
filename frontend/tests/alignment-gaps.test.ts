@@ -1,3 +1,4 @@
+import { createKaraoke } from '../src/domain/karaoke';
 import { expect, it } from 'vitest';
 import { createLine, createLyricDocument } from '../src/domain/lyric-document';
 import { createProjectDocument, createProjectEditorState, executeProjectCommand, undoProjectCommand, redoProjectCommand } from '../src/domain/project-document';
@@ -6,7 +7,7 @@ import { parseProject, serializeProject } from '../src/adapters/project-codec';
 function fixture() {
  const p=createProjectDocument(createLyricDocument());
  p.lyrics.lines=[createLine('あ','a')];p.lyrics.lines[0].words=['あ','い','う'].map((text,i)=>createLine(text,`temp${i}`).words[0]);
- p.acoustics={analysisId:'stem',segments:[{id:'s',beginMs:0,endMs:10000}]};return p;
+ p.acoustics={analysisId:'stem',segments:[{id:'s',beginMs:0,endMs:10000}]};p.karaoke=createKaraoke(p.lyrics);return p;
 }
 function result(p:ReturnType<typeof fixture>, times:([number|null,number|null]|null)[]):AlignmentResult {
  const r:AlignmentResult={kind:'alignment',binding:{project_id:'p',revision:'r',asset_id:'a'},scope:[],mapping:[],alignment:{schema:'lazulite-japanese-result-v1',units:[]},acoustics:null};let i=0;

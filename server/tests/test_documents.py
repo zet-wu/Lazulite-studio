@@ -171,3 +171,30 @@ def test_invalid_project_editing_is_rejected_without_revision_change(tmp_path):
         response = client.put('/api/v1/projects/p/document', json={'schema_version': 'studio-document-v8', 'project_id': 'p', 'revision': before.json()['revision'], 'document': document}, headers={'origin': 'http://studio', 'if-match': before.headers['etag']})
         assert response.status_code == 422, response.text
         assert client.get('/api/v1/projects/p/document').json()['revision'] == before.json()['revision']
+
+
+def test_karaoke_project_save_reopen_keeps_cues_outside_ttml(tmp_path):
+    from copy import deepcopy
+    setup_project(tmp_path)
+    client = TestClient(create_app(tmp_path, Settings(None, True, 'http://studio')), base_url='https://studio')
+    before = client.get('/api/v1/projects/p/document')
+    snapshot = initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="4" end="5"><span studio:id="w" begin="4" end="5">A</span></p></body></tt>', None)
+    cue = {'id': 'cue-1', 'text': '●●', 'anchor': {'kind': 'before', 'lineId': 'a'}, 'beginMs': 3000, 'endMs': 3900}
+    snapshot['karaoke']['cues'] = [cue]
+    snapshot['karaoke']['groups'][0]['name'] = 'Custom'
+    headers = {'origin': 'http://studio', 'if-match': before.headers['etag']}
+    body = {'schema_version': 'studio-document-v8', 'project_id': 'p', 'revision': before.json()['revision'], 'document': snapshot}
+    invalid = deepcopy(body)
+    invalid['document']['karaoke']['cues'].append(cue)
+    assert client.put('/api/v1/projects/p/document', json=invalid, headers=headers).status_code == 422
+    saved = client.put('/api/v1/projects/p/document', json=body, headers=headers)
+    assert saved.status_code == 200, saved.text
+    reopened = client.get('/api/v1/projects/p/document').json()['document']
+    assert reopened['karaoke'] == snapshot['karaoke']
+    assert '●' not in reopened['lyrics']['draftTtml']
+    # Retiming may leave a cue outside its anchor. Draft persistence must retain it for repair.
+    snapshot['karaoke']['cues'][0]['endMs'] = 4500
+    current = client.get('/api/v1/projects/p/document')
+    body.update(revision=current.json()['revision'], document=snapshot)
+    headers['if-match'] = current.headers['etag']
+    assert client.put('/api/v1/projects/p/document', json=body, headers=headers).status_code == 200
