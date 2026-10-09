@@ -1,0 +1,3 @@
+Lazulite dev 7b77769
+Version: 0.2.1
+Build: python -m pip wheel ../Lazulite --no-deps

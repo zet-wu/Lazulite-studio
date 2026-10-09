@@ -35,8 +35,8 @@ class AlignmentRunner:
         return read_project(row[0]), current['source_asset_id']
 
     def validate(self, pid, params):
-        if set(params) != {'revision', 'use_hints'} or not isinstance(params['revision'], str) or type(params['use_hints']) is not bool:
-            raise ValueError('自动对齐只接受项目版本和行首选项')
+        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token')):
+            raise ValueError('自动对齐只接受项目版本及布尔对齐选项')
         snapshot, asset = self.snapshot(pid, params['revision'])
         projection = project_alignment(snapshot, params['use_hints'])
         if not projection['summary']['line_count']: raise ValueError('没有未跳过的歌词行')
@@ -93,7 +93,7 @@ def run_alignment(request, emit, cancelled):
     if not prepared.segments: raise ValueError('没有可用人声片段')
     backend = NextFireBackend(NextFireConfig(Path(os.environ['STUDIO_NEXTFIRE_PATH']), device=os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu')))
     result = align_japanese(prepared, JapaneseAlignmentRequest.from_dict(projection['request']), backend=backend,
-        config=JapaneseConfig(hint_mode='auto' if params['use_hints'] else 'off'), cache=FileCache(root/pid/'cache'/'alignment'),
+        config=JapaneseConfig(hint_mode='auto' if params['use_hints'] else 'off', **{k:params[k] for k in ('line_blank', 'rest_blank', 'rest_token')}), cache=FileCache(root/pid/'cache'/'alignment'),
         cancel=cancelled, event_sink=lambda event: emit('stage', event.stage, event.completed,event.total,event.message))
     if cancelled(): raise VocalCancelled()
     runner.snapshot(pid, params['revision'])

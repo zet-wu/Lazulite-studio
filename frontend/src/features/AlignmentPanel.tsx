@@ -2,7 +2,7 @@ import { MessageBar, useNotice } from '../shared/MessageBar';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
-import { alignmentApi, type AlignmentSummary } from '../adapters/http/alignment';
+import { alignmentApi, defaultAlignmentOptions, type AlignmentSummary } from '../adapters/http/alignment';
 import { jobsApi } from '../adapters/http/jobs';
 import { studioS4 } from '../adapters/http/client';
 import { mergeAlignment } from '../domain/alignment';
@@ -22,7 +22,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const ui=useAudioReview();
   const caps=useQuery({queryKey:['capabilities'],queryFn:()=>jobsApi.capabilities()});
   const jobs=useQuery({queryKey:['vocal-jobs',pid],queryFn:()=>jobsApi.list(pid),refetchInterval:1000});
-  const [dialog,setDialog]=useState(false),[hints,setHints]=useState(false),[summary,setSummary]=useState<AlignmentSummary|null>(null);
+  const [dialog,setDialog]=useState(false),[options,setOptions]=useState(defaultAlignmentOptions),[summary,setSummary]=useState<AlignmentSummary|null>(null);
   const [message,setMessage]=useNotice();
   const [progress,setProgress]=useState('');
   const [running,setRunning]=useState(false),[cancelling,setCancelling]=useState(false);
@@ -40,11 +40,12 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const reason=!assetId?'请先上传源音频':!project.lyrics.lines.some(l=>!project.editing.skippedAlignmentLineIds.includes(l.id))?'没有未跳过的歌词行':!capability?.enabled?(capability?.reason??'正在检查模型能力'):active?'已有音频处理运行':null;
   const open=async()=>{
     if(!finishDraft())return;
-    setOpening(true);setMessage('');setHints(false);
+    setOpening(true);setMessage('');setOptions(defaultAlignmentOptions());
     try {const saved=await control.save();if(!saved)throw new Error('请先完成保存');const data=await alignmentApi.preview(pid,saved.revision);if(mounted.current){setSummary(data);setDialog(true);}}
     catch(e){setMessage((e as Error).message);}finally{if(mounted.current)setOpening(false);}
   };
   const start=async()=>{
+    const selected = {...options};
     setDialog(false);setRunning(true);setCancelling(false);setMessage('');setProgress('正在准备');
     let lock:ReturnType<AlignmentControl['lock']>;
     try{lock=control.lock();}catch(e){setMessage((e as Error).message);setRunning(false);return;}
@@ -55,8 +56,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       const key=crypto.randomUUID();
       // A lost launch response is retried with the same key, never a second model execution.
       let job;
-      try {job=await alignmentApi.start(pid,saved.revision,hints,key);}
-      catch(e){if(e instanceof TypeError)job=await alignmentApi.start(pid,saved.revision,hints,key);else throw e;}
+      try {job=await alignmentApi.start(pid,saved.revision,selected,key);}
+      catch(e){if(e instanceof TypeError)job=await alignmentApi.start(pid,saved.revision,selected,key);else throw e;}
       op.id=job.id;
       if(!op.alive||op.cancel){await alignmentApi.cancel(job.id);if(op.alive)setMessage('已取消对齐','status',4000);return;}
       let disconnectedAt = 0;
@@ -89,8 +90,15 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       <p>请确认假名注音完整且与实际唱法一致。自动对齐使用正文和假名注音，处理期间无法编辑，完成后一次应用未跳过行的时间，可一次撤销。</p>
       <p>将对齐 {summary?.line_count} 行，跳过 {summary?.skipped_count} 行</p>
       {!!summary?.unknown_count&&<p>有 {summary.unknown_count} 处缺少可用读音，相关时间可能保留原值</p>}
-      <label><input type="checkbox" checked={hints} disabled={!summary?.hint_count} onChange={e=>setHints(e.target.checked)}/>使用已有行起始时间辅助对齐</label>
+      <label><input type="checkbox" checked={options.use_hints} disabled={!summary?.hint_count} onChange={e=>setOptions({...options,use_hints:e.target.checked})}/>使用已有行起始时间辅助对齐</label>
       <p>{summary?.hint_count?'适合已有大致准确行首的歌词':'参与行没有已有行首'}</p>
+      <fieldset className={styles.options}><legend>实验性对齐选项</legend>
+        {([
+          ['line_blank','行内 blank 代价','抑制同一行内部过长的 blank 停留'],
+          ['rest_blank','人声休止 blank 代价','在低人声活动处增加行内 blank 代价'],
+          ['rest_token','人声休止 token 代价','抑制发音目标落入低人声活动区'],
+        ] as const).map(([key,label,description])=><label key={key}><input type="checkbox" checked={options[key]} onChange={e=>setOptions({...options,[key]:e.target.checked})}/><span>{label}<small>{description}</small></span></label>)}
+      </fieldset>
       {!summary?.emitting_count&&<p>没有可用读音，无法计算</p>}
     </SettingsDialog>}
   </>;

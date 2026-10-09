@@ -3422,13 +3422,28 @@
         "additionalProperties": false,
         "required": [
           "revision",
-          "use_hints"
+          "use_hints",
+          "line_blank",
+          "rest_blank",
+          "rest_token"
         ],
         "properties": {
           "revision": {
             "type": "string"
           },
           "use_hints": {
+            "type": "boolean",
+            "default": false
+          },
+          "line_blank": {
+            "type": "boolean",
+            "default": false
+          },
+          "rest_blank": {
+            "type": "boolean",
+            "default": false
+          },
+          "rest_token": {
             "type": "boolean",
             "default": false
           }

@@ -1032,6 +1032,12 @@ export interface components {
             revision: string;
             /** @default false */
             use_hints: boolean;
+            /** @default false */
+            line_blank: boolean;
+            /** @default false */
+            rest_blank: boolean;
+            /** @default false */
+            rest_token: boolean;
         };
         AlignmentResult: {
             /** @constant */
