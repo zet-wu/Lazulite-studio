@@ -95,3 +95,9 @@ it.each([21000, 21009])('omits only the quantized flush Ruby tail (%i), retainin
  expect(out.files[0].text).toContain('@Ruby1=愛,[00:00:20]あ[00:00:30][00:00:60]い,[00:20:00],[00:21:00]');
  expect(out.files[0].text).toContain('愛[00:21:00]');expect(p).toEqual(before);
 });
+it('encodes the reviewed chest example and preserves a genuine 20 ms trailing silence',()=>{
+ const p=fixture(),line=p.lyrics.lines[0],word=line.words[0];line.beginMs=word.beginMs=32590;line.endMs=word.endMs=32920;word.text='胸';word.rubyUnits=[{id:'r1',reading:'む',beginMs:32590,endMs:32760},{id:'r2',reading:'ね',beginMs:32760,endMs:32920}];
+ expect(prepareNicokara(p,'review').files[0].text).toContain('@Ruby1=胸,む[00:00:17]ね,[00:32:59],[00:32:92]');
+ word.rubyUnits[1].endMs=32900;
+ expect(prepareNicokara(p,'review').files[0].text).toContain('@Ruby1=胸,む[00:00:17]ね[00:00:31],[00:32:59],[00:32:92]');
+});
