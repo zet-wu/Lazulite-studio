@@ -12,6 +12,8 @@ import time
 import urllib.request
 import urllib.error
 
+from server.auth import normalize_origin
+
 ROOT = Path(__file__).resolve().parent
 
 
@@ -47,11 +49,20 @@ def health_expired(started, healthy, failed_since, now):
     return (not healthy and now - started > 20) or any(now - since >= 30 for since in failed_since.values())
 
 
+def browser_origin(cli_origin, web_port):
+    return normalize_origin(cli_origin if cli_origin is not None else os.environ.get('STUDIO_ORIGIN', f'http://127.0.0.1:{web_port}'))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--api-port', type=int, default=8000)
     parser.add_argument('--web-port', type=int, default=5173)
+    parser.add_argument('--origin', help='浏览器访问来源，例如 http://127.0.0.1:15173；优先于 STUDIO_ORIGIN')
     args = parser.parse_args()
+    try:
+        origin = browser_origin(args.origin, args.web_port)
+    except ValueError as error:
+        parser.error(str(error))
     if not all(1 <= p <= 65535 for p in (args.api_port, args.web_port)) or args.api_port == args.web_port:
         parser.error('两个端口必须不同且位于 1–65535')
     python = ROOT / 'server' / '.venv' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
@@ -68,7 +79,7 @@ def main():
                 sock.bind(('127.0.0.1', port))
             except OSError:
                 sys.exit(f'端口 {port} 已被占用，请先关闭占用进程。')
-    env = {**os.environ, 'STUDIO_ORIGIN': f'http://127.0.0.1:{args.web_port}', 'STUDIO_API_TARGET': f'http://127.0.0.1:{args.api_port}'}
+    env = {**os.environ, 'STUDIO_ORIGIN': origin, 'STUDIO_API_TARGET': f'http://127.0.0.1:{args.api_port}'}
     commands = [('api', [str(python), '-m', 'uvicorn', '--factory', 'server.app:create_app', '--host', '127.0.0.1', '--port', str(args.api_port), '--reload', '--reload-dir', str(ROOT / 'server')], ROOT),
                 ('vite', [pnpm, 'dev', '--host', '127.0.0.1', '--port', str(args.web_port), '--strictPort'], ROOT / 'frontend')]
     processes = []
@@ -93,7 +104,7 @@ def main():
             processes.append(p)
             if job: job.assign(p)
             threading.Thread(target=log, args=(name, p), daemon=True).start()
-        print(f'打开 http://127.0.0.1:{args.web_port}；Ctrl+C 关闭两个服务。', flush=True)
+        print(f'网页监听 http://127.0.0.1:{args.web_port}；浏览器访问 {origin}；Ctrl+C 关闭两个服务。', flush=True)
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         started = time.monotonic()
         healthy = False

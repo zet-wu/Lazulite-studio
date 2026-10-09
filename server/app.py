@@ -106,7 +106,7 @@ def create_app(
             not request.headers.get("origin")
             or request.headers.get("origin") != cfg.origin
         ):
-            fail("origin_forbidden", "origin is not allowed", 403)
+            fail("origin_forbidden", "访问地址与服务允许的来源不一致，请检查浏览器地址及 --origin／STUDIO_ORIGIN 配置", 403)
         csrf = request.cookies.get("studio_csrf")
         if not cfg.trusted_gateway and (
             not csrf or csrf != request.headers.get("x-csrf-token")
@@ -156,7 +156,7 @@ def create_app(
             not request.headers.get("origin")
             or request.headers.get("origin") != cfg.origin
         ):
-            fail("origin_forbidden", "origin is not allowed", 403)
+            fail("origin_forbidden", "访问地址与服务允许的来源不一致，请检查浏览器地址及 --origin／STUDIO_ORIGIN 配置", 403)
         if cfg.password and not secrets.compare_digest(
             body.password or "", cfg.password
         ):
