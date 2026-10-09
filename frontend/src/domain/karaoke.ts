@@ -13,7 +13,7 @@ export const outputId = (groupId: string, kind = 'body', trackId = '') => JSON.s
 export function createKaraoke(lyrics: LyricDocument): Karaoke {
   return { groups: [{ id: 'main', name: '主歌词' }, { id: 'background', name: '背景歌词' }], lineGroups: Object.fromEntries(lyrics.lines.map(line => [line.id, line.backgroundOf ? 'background' : 'main'])), defaults: { main: 'main', background: 'background', text: '●', beforeMs: 3000, wordMs: 500, rubyMs: 500 }, cues: [], outputs: [outputId('main'), outputId('background')] };
 }
-export const anchorKey = (anchor: CueAnchor) => anchor.kind === 'before' ? `before:${anchor.lineId}` : `${anchor.kind}:${anchor.leftId}:${anchor.rightId}`;
+export const anchorKey = (anchor: CueAnchor) => JSON.stringify(anchor.kind === 'before' ? [anchor.kind,anchor.lineId] : [anchor.kind,anchor.leftId,anchor.rightId]);
 const timed = (item: { beginMs: number | null; endMs: number | null }) => item.beginMs !== null && item.endMs !== null && item.beginMs >= 0 && item.endMs > item.beginMs;
 export const firstLyric = (line: LyricLine) => line.words.find(word => word.text.trim());
 export function anchorRange(lyrics: LyricDocument, anchor: CueAnchor): { beginMs: number; endMs: number } | null {
@@ -59,7 +59,8 @@ export function autoInsertCues(lyrics: LyricDocument, karaoke: Karaoke): Karaoke
     if (group && first && timed(first)) {
       const peers = lyrics.lines.filter(other => other.id !== line.id && karaoke.lineGroups[other.id] === group && firstLyric(other)?.beginMs !== null && firstLyric(other)?.beginMs! < first.beginMs!);
       const ends = peers.flatMap(other => other.words.filter(word => word.text.trim()).map(word => timed(word) ? word.endMs! : null));
-      const preceding = ends.includes(null) ? null : Math.max(0, ...ends as number[]);
+      const unknownBefore=lyrics.lines.slice(0,lyrics.lines.indexOf(line)).some(other=>karaoke.lineGroups[other.id]===group&&other.words.some(word=>word.text.trim()&&!timed(word)));
+      const preceding = unknownBefore || ends.includes(null) ? null : Math.max(0, ...ends as number[]);
       const anchor: CueAnchor = { kind: 'before', lineId: line.id };
       if (preceding !== null && first.beginMs! - preceding > karaoke.defaults.beforeMs && !next.cues.some(cue => anchorKey(cue.anchor) === anchorKey(anchor))) next = insertCue(lyrics, next, anchor);
     }

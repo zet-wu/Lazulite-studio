@@ -39,7 +39,8 @@ function SyncText({ id, text, label, active, draft, commit }: { id: string; text
   </span>;
 }
 
-export function SyncLine({ line, ordinal, gutterDigits, editing, selection, cursor, progress, draft, apply, selectLine, selectWord, selectRuby, renderWordDraft, addWord, rubyDraft, closeRubyDraft, placeholder }: {
+export function SyncLine({ line, ordinal, gutterDigits, editing, selection, cursor, progress, draft, apply, selectLine, selectWord, selectRuby, renderWordDraft, addWord, rubyDraft, closeRubyDraft, placeholder, karaoke }: {
+  karaoke?: { add: ReactNode; before: ReactNode; gap: (leftId: string, rightId: string, wordId?: string) => ReactNode };
   line: LyricLine; ordinal?: number; gutterDigits: number; editing: ProjectEditing; selection: EditorSelection | null; cursor: SyncCursor | null; progress: SyncProgress; draft: DraftController;
   apply: (command: LyricCommand) => boolean; selectLine: (shift: boolean, toggle: boolean) => void;
   selectWord: (word: LyricWord, shift?: boolean, toggle?: boolean) => void; selectRuby: (word: LyricWord, id: string, shift?: boolean, toggle?: boolean) => void;
@@ -66,8 +67,8 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
     data-selected={selected('lines', line.id) || undefined} data-drag-placeholder={placeholder('line', line.backgroundOf ?? line.id) ? '' : undefined} tabIndex={0} aria-label={`歌词行 ${line.words.map(word => word.text).join('') || '空行'}`}
     onKeyDown={event => chooseKey(event, () => selectLine(event.shiftKey, event.ctrlKey || event.metaKey))}
     onClick={event => { if (!(event.target as Element).closest('[data-word-id],button,input')) selectLine(event.shiftKey, event.ctrlKey || event.metaKey); }}>
-    <div className={styles.syncLineNumber}><span className={styles.syncOrdinal}>L{ordinal}</span>{line.backgroundOf && <span>背景</span>}{ignored && <span tabIndex={0} data-tooltip="此行跳过打轴" aria-label="此行跳过打轴"><Icon name="skip"/></span>}</div>
-    <div className={styles.syncWords}>{renderWordDraft(null)}{line.words.map(word => {
+    <div className={styles.syncLineNumber}>{karaoke?.add}<span className={styles.syncOrdinal}>L{ordinal}</span>{line.backgroundOf && <span>背景</span>}{ignored && <span tabIndex={0} data-tooltip="此行跳过打轴" aria-label="此行跳过打轴"><Icon name="skip"/></span>}</div>
+    <div className={styles.syncWords}>{karaoke && <div className={styles.karaokeBodySlot}>{karaoke.before}</div>}{renderWordDraft(null)}{line.words.map((word, wordIndex) => {
       const hasRuby = word.rubyUnits.length > 0;
       const count = !hasRuby && word.text.trim() ? emptyBeatCount(editing, word.id) : 0;
       const hasDraft = rubyDraft?.wordId === word.id;
@@ -79,13 +80,13 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
         return true;
       }} /></div>;
       return <Fragment key={word.id}><div data-word-id={word.id} tabIndex={0} className={styles.syncWord} data-selected={selected('words', word.id) || undefined}
-        data-drag-placeholder={placeholder('word', word.id) ? '' : undefined} style={{ '--beat-space': `${count * 16}px`, gridTemplateColumns: `repeat(${Math.max(1, word.rubyUnits.length + Number(hasDraft))}, minmax(0, max-content))` } as CSSProperties}
+        data-drag-placeholder={placeholder('word', word.id) ? '' : undefined} style={{ '--beat-space': `${count * 16}px`, gridTemplateColumns: `repeat(${Math.max(1, (karaoke ? word.rubyUnits.length*2-1 : word.rubyUnits.length) + Number(hasDraft))}, minmax(0, max-content))` } as CSSProperties}
         onClick={event => { if (!(event.target as Element).closest('[data-ruby-id],button,input')) { event.stopPropagation(); selectWord(word, event.shiftKey, event.ctrlKey || event.metaKey); } }}
         onFocus={event => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus]')) selectWord(word); }}
         onDoubleClick={event => { if (!(event.target as Element).closest('[data-ruby-id],button,input')) { event.stopPropagation(); draft.open(word.id); } }}
         onKeyDown={event => chooseKey(event, () => selectWord(word, event.shiftKey, event.ctrlKey || event.metaKey), word.id)}>
         {hasDraft && rubyDraft.afterRubyId == null && rubySlot}
-        {hasRuby && word.rubyUnits.map((unit, index) => <Fragment key={unit.id}><div className={styles.syncRubyColumn} style={{ gridColumn: index + 1 + Number(hasDraft && (rubyDraft.afterRubyId == null || word.rubyUnits.findIndex(r => r.id === rubyDraft.afterRubyId) < index)), '--beat-space': `${unit.reading.trim() ? emptyBeatCount(editing, unit.id) * 16 : 0}px` } as CSSProperties}>
+        {hasRuby && word.rubyUnits.map((unit, index) => <Fragment key={unit.id}><div className={styles.syncRubyColumn} style={{ gridColumn: index * (karaoke ? 2 : 1) + 1 + Number(hasDraft && (rubyDraft.afterRubyId == null || word.rubyUnits.findIndex(r => r.id === rubyDraft.afterRubyId) < index)), '--beat-space': `${unit.reading.trim() ? emptyBeatCount(editing, unit.id) * 16 : 0}px` } as CSSProperties}>
           <div data-ruby-id={unit.id} tabIndex={0} className={styles.syncRuby} data-selected={selected('ruby', unit.id) || undefined} data-drag-placeholder={placeholder('ruby', unit.id) ? '' : undefined}
             onClick={event => { event.stopPropagation(); selectRuby(word, unit.id, event.shiftKey, event.ctrlKey || event.metaKey); }}
             onFocus={event => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus]')) selectRuby(word, unit.id); }}
@@ -94,12 +95,12 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
             <SyncText id={unit.id} text={unit.reading} label={`读音 ${word.text}`} active={activeId === unit.id} draft={draft} commit={reading => apply({ type: 'edit-ruby', lineId: line.id, wordId: word.id, rubyId: unit.id, reading })}/>
           </div>
           {markers(unit.id, 'ruby', Boolean(unit.reading.trim()), () => selectRuby(word, unit.id))}
-        </div>{hasDraft && rubyDraft.afterRubyId === unit.id && rubySlot}</Fragment>)}
+        </div>{karaoke && word.rubyUnits[index+1] && <div style={{gridRow:1,gridColumn:index*2+2}}>{karaoke.gap(unit.id, word.rubyUnits[index+1].id, word.id)}</div>}{hasDraft && rubyDraft.afterRubyId === unit.id && rubySlot}</Fragment>)}
         <div className={styles.syncBody} style={!hasRuby ? { paddingRight: 'var(--beat-space)' } : undefined}>
           <SyncText id={word.id} text={word.text} label={`词 ${word.text}`} active={!hasRuby && activeId === word.id} draft={draft} commit={text => apply({ type: 'edit-word', lineId: line.id, wordId: word.id, text })}/>
         </div>
         {!hasRuby && markers(word.id, 'word', Boolean(word.text.trim()), () => selectWord(word))}
-      </div>{renderWordDraft(word.id)}</Fragment>;
+      </div>{karaoke && line.words[wordIndex+1] && <div className={styles.karaokeBodySlot}>{karaoke.gap(word.id, line.words[wordIndex+1].id)}</div>}{renderWordDraft(word.id)}</Fragment>;
     })}<div className={styles.syncAddWord}><button data-role="primary" className="icon-button" title="添加词" aria-label="添加词" onClick={event => { event.stopPropagation(); addWord(); }}><Icon name="add"/></button></div></div>
   </section>;
 }

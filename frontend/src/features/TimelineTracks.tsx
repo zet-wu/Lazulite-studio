@@ -1,3 +1,4 @@
+import { KaraokeTrack } from './KaraokeTrack';
 import { useProjectEditing } from './editor/ProjectEditingContext';
 import { projectTimeline } from '../domain/timeline-projection';
 import { createPortal } from 'react-dom';
@@ -200,6 +201,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       { label: '粘贴', disabled: !commands.current?.canPaste, run: () => commands.current?.paste() },
       { label: '删除所选对象', disabled: !selection?.ids.length, run: () => commands.current?.remove() },
     ]} />, window.document.body)}
+    <KaraokeTrack startMs={startMs} endMs={endMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const interval=targetInterval(document,target);return interval?[interval.beginMs,interval.endMs].filter((n):n is number=>n!==null):[];})]} onError={onError}/>
     {visible.line && row('行', overview.filter(item => !editing || lineLayout.lanes.has(item.id)).map(item => bar({ kind: 'line', lineId: item.id }, `时间轴行 L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ' 背景' : ''}`, item.beginMs!, item.endMs!)), [], lineLayout.laneCount)}
     <div ref={scrollRef} className={styles.expandedTracks} style={!expandedLines.length ? { display: 'none' } : undefined}><div style={expandedLines.length > 20 ? { height: virtual.getTotalSize(), position: 'relative' } : undefined}>
     {(expandedLines.length > 20 ? virtual.getVirtualItems() : expandedLines.map((line, index) => ({ index, key: line.id, start: 0 }))).map(virtualRow => {

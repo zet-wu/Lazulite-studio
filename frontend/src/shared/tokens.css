@@ -93,3 +93,6 @@ button[data-role][aria-current="page"], button[data-role][aria-pressed="true"] {
 a[data-role="secondary"] { display:inline-flex; align-items:center; justify-content:center; min-height:30px; padding:5px 10px; border:1px solid var(--line); border-radius:var(--control-radius); background:var(--panel); color:var(--ink); text-decoration:none; font:inherit; }
 a[data-role="secondary"]:hover { background-image:linear-gradient(var(--state-hover),var(--state-hover)); }
 a[data-role="secondary"]:active { background-image:linear-gradient(var(--state-pressed),var(--state-pressed)); }
+
+:root { --karaoke-surface: #fff0a8; --karaoke-text: #493900; }
+[data-theme="dark"] { --karaoke-surface: #574711; --karaoke-text: #ffeba0; }

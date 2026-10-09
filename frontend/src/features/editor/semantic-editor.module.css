@@ -372,3 +372,6 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .segmentParts svg { vertical-align: middle; color: var(--muted); margin-inline: 3px; }
 
 .inspector .propertyQuote { font-weight: 650; font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.karaokeBodySlot { margin-top:24px; font-size:24px; font-weight:650; line-height:1.4; display:flex; gap:4px; }
+.karaokeBodySlot:empty { display:none; }

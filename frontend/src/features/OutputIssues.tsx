@@ -18,7 +18,7 @@ function IssueItems({ issues, keys, locate, selection }: { issues: OutputIssue[]
     const blocking = keys.has(outputIssueKey(issue));
     return <li key={`${outputIssueKey(issue)}:${issue.severity ?? ''}`} data-blocking={blocking}>
       {selection && <input type="checkbox" aria-label={`选择 ${issue.message}`} checked={selection.ids.includes(issue.wordId ?? issue.agentId ?? issue.lineId)} onChange={()=>selection.toggle(issue.wordId ?? issue.agentId ?? issue.lineId)}/>}
-      {!issue.lineId && !issue.agentId ? <span>{issue.message}</span> : <button data-role="inline" aria-label={issue.message} aria-description={blocking ? '本次操作受阻，需要处理' : undefined} onClick={() => locate(issue)}>{blocking && <Icon name="warning" />}{selection && issue.wordId ? <strong className="studio-lyric-quote" title={issue.message}>{issue.message}</strong> : issue.message}</button>}
+      {!issue.lineId && !issue.agentId && !issue.karaokeSettings ? <span>{issue.message}</span> : <button data-role="inline" aria-label={issue.message} aria-description={blocking ? '本次操作受阻，需要处理' : undefined} onClick={() => locate(issue)}>{blocking && <Icon name="warning" />}{selection && issue.wordId ? <strong className="studio-lyric-quote" title={issue.message}>{issue.message}</strong> : issue.message}</button>}
       {issue.severity && <small> {issue.severity === 'error' ? '阻塞' : '核对提示'} · {issue.formats?.join('、')}</small>}
     </li>;
   })}</ul>{issues.length > limit && <button data-role="secondary" onClick={() => setLimit(value => value + 50)}>再显示 50 项（剩余 {issues.length - limit} 项）</button>}</>;

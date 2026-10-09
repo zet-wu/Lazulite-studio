@@ -1,3 +1,5 @@
+import { CueSlot, CueProperties, KaraokeTools } from '../KaraokeTools';
+import type { KaraokeCommand } from '../../domain/karaoke';
 import { MessageBar, useNotice, type Notice } from '../../shared/MessageBar';
 import { AmllSettings } from '../AmllPanel';
 import type { ValidationTab } from '../useAutomaticValidation';
@@ -134,12 +136,16 @@ function EditorWorkspaceContent(props: Props) {
   const clipboardToken = useRef('');
   const pageRef = useRef<HTMLDivElement>(null);
   const wordInputs = useRef(new Map<string, HTMLInputElement>());
-  const [mode, setMode] = useState<'audio' | 'acquire' | 'edit' | 'sync' | 'preview' | 'package'>(() => {
+  const [mode, setMode] = useState<'audio' | 'acquire' | 'edit' | 'sync' | 'karaoke' | 'preview' | 'package'>(() => {
     const remembered = props.projectId ? localStorage.getItem(`studio:workspace-mode:project:${props.projectId}`) : null;
-    if (remembered === 'audio' || remembered === 'acquire' || remembered === 'edit' || remembered === 'sync' || remembered === 'preview' || remembered === 'package') return remembered;
+    if (remembered === 'audio' || remembered === 'acquire' || remembered === 'edit' || remembered === 'karaoke' || remembered === 'sync' || remembered === 'preview' || remembered === 'package') return remembered;
     return props.projectId && !document.lines.some(line => line.words.some(word => word.text.trim())) ? 'acquire' : 'edit';
   });
   useEffect(() => { if (props.projectId) localStorage.setItem(`studio:workspace-mode:project:${props.projectId}`, mode); }, [props.projectId, mode]);
+  const [karaokeExportOpen,setKaraokeExportOpen]=useState(false);
+  const [karaokeValidation,setKaraokeValidation]=useState(false);
+  const {selectedCue,selectCue}=useEditorSelection()!;
+  const cue=props.project?.karaoke.cues.find(c=>c.id===selectedCue);
   const [validationTab,setValidationTab]=useState<ValidationTab>('lyrics');
   const [focusRule,setFocusRule]=useState<AmllRule>();
   const [amllOpen,setAmllOpen]=useState(false);
@@ -202,8 +208,9 @@ function EditorWorkspaceContent(props: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; title: string; actions: ContextAction[]; target: HTMLElement } | null>(null);
   const [locate, setLocate] = useState<{ id: string; serial: number; focus?: string; selector?: string } | null>(null);
   const locateSerial = useRef(0);
-  const listMemory = useRef<Record<'edit' | 'sync', ListMemory>>({ edit: { offset: 0, handled: null }, sync: { offset: 0, handled: null } });
+  const listMemory = useRef<Record<'edit' | 'sync' | 'karaoke', ListMemory>>({ karaoke: {offset:0,handled:null}, edit: { offset: 0, handled: null }, sync: { offset: 0, handled: null } });
   const requestLocate = (id: string, focus?: string) => setLocate({ id, focus, serial: ++locateSerial.current });
+  useEffect(()=>{if(cue){setMode('karaoke');requestLocate(cue.anchor.lineId,`[data-cue-id="${CSS.escape(cue.id)}"]`);}},[selectedCue]);
   const pendingFocus = useRef<string | null>(null);
   useEffect(() => {
     setSelection(current => {
@@ -258,7 +265,7 @@ function EditorWorkspaceContent(props: Props) {
   const previousMode = useRef(mode);
   const externalSelection = useRef(props.selectedLineId);
   useEffect(() => {
-    const returned = previousMode.current !== mode && (mode === 'edit' || mode === 'sync');
+    const returned = previousMode.current !== mode && (mode === 'edit' || mode === 'sync' || mode === 'karaoke');
     // ProjectEditor derives selectedLineId from this same selection context.
     // Its acknowledgement must not recenter a row under a stationary pointer.
     const external = externalSelection.current !== props.selectedLineId && props.selectedLineId !== selectionLineId(selection);
@@ -349,6 +356,8 @@ function EditorWorkspaceContent(props: Props) {
   });
   const [focusAgent,setFocusAgent] = useState<string>();
   const locateIssue = (issue: OutputIssue) => {
+    if(issue.cueId && props.project) { const cue=props.project.karaoke.cues.find(c=>c.id===issue.cueId);if(cue){setMode('karaoke');selectCue(cue.id,cue.anchor.lineId);requestLocate(cue.anchor.lineId,`[data-cue-id="${CSS.escape(cue.id)}"]`);}return;}
+    if(issue.karaokeSettings){setMode('karaoke');if(issue.lineId){const line=document.lines.find(l=>l.id===issue.lineId);if(line)selectLine(line);}else setKaraokeExportOpen(true);return;}
     if(issue.kind === 'agent') { setMode('edit'); setFocusAgent(issue.agentId); setSettingsDialog('singers'); return; }
     if (issue.kind === 'romanization-content' || issue.kind === 'romanization-unit' || issue.kind === 'translation-content' || issue.kind === 'translation-unit') {
       const tracks = issue.kind.startsWith('translation') ? document.translationTracks : document.romanizationTracks;
@@ -386,6 +395,17 @@ function EditorWorkspaceContent(props: Props) {
     paint();const observer=new MutationObserver(paint);observer.observe(pageRef.current!,{childList:true,subtree:true});
     return()=>{observer.disconnect();globalThis.document.querySelectorAll('[data-assignment-error]').forEach(el=>el.removeAttribute('data-assignment-error'));};
   },[props.assignmentError,mode]);
+  const pendingCue=useRef(false);
+  const applyKaraokeCommand = (command:KaraokeCommand) => {
+    if(command.kind==='insert')pendingCue.current=true;
+    try { props.applyProject?.({type:'karaoke',command}); } catch(error) { setMessage((error as Error).message); throw error; }
+  };
+  const insertKaraoke = (command:KaraokeCommand) => {
+    if(command.kind==='insert')pendingCue.current=true;
+    try { applyKaraokeCommand(command); } catch { return; }
+  };
+  const previousCues=useRef(props.project?.karaoke.cues??[]);
+  useEffect(()=>{const old=previousCues.current,next=props.project?.karaoke.cues??[];const removed=old.filter(c=>!next.some(n=>n.id===c.id));if(pendingCue.current){const inserted=next.find(c=>!old.some(o=>o.id===c.id));if(inserted)selectCue(inserted.id,inserted.anchor.lineId);pendingCue.current=false;}if(removed.length)setMessage(`已移除 ${removed.length} 个导唱；可与本次操作一起撤销`,'status',4000);previousCues.current=next;},[props.project]);
   const dispatch = useLiveCallback((command: LyricCommand) => {
     try { apply(command); editRejected.current = false; setMessage(''); return true; }
     catch (error) { editRejected.current = true; setMessage(error instanceof Error ? error.message : '编辑失败'); return false; }
@@ -687,7 +707,7 @@ function EditorWorkspaceContent(props: Props) {
     return true;
   };
   const ownsSelection = (target: EventTarget) => {
-    if ((mode !== 'edit' && mode !== 'sync') || !selection?.ids.length || isTextInput(target)) return false;
+    if ((mode !== 'edit' && mode !== 'sync' && mode !== 'karaoke') || !selection?.ids.length || isTextInput(target)) return false;
     if (!(target instanceof Element) || target.closest('[role="dialog"], [role="menu"]')) return false;
     return Boolean(outlineRef.current?.contains(target) || mainRef.current?.contains(target));
   };
@@ -735,9 +755,9 @@ function EditorWorkspaceContent(props: Props) {
     onPointerDownCapture={() => { pageRef.current!.dataset.pointerFocus = ''; }}
     onKeyDownCapture={() => { delete pageRef.current!.dataset.pointerFocus; }}
     onPointerDown={(event) => {
-      if ((mode !== 'edit' && mode !== 'sync') || event.pointerType !== 'mouse' || event.button !== 0 || event.shiftKey) return;
+      if ((mode !== 'edit' && mode !== 'sync' && mode !== 'karaoke') || event.pointerType !== 'mouse' || event.button !== 0 || event.shiftKey) return;
       const element = event.target as Element;
-      if (element.closest('input,select,textarea,a,[contenteditable="true"],[role="menu"]') || element.closest('button') && !element.closest('[data-outline-drag]')) return;
+      if (element.closest('[data-cue-id],input,select,textarea,a,[contenteditable="true"],[role="menu"]') || element.closest('button') && !element.closest('[data-outline-drag]')) return;
       const source = pointerSource(element);
       if (!source) return;
       event.preventDefault();
@@ -835,7 +855,7 @@ function EditorWorkspaceContent(props: Props) {
     <fieldset disabled={props.alignment?.locked} style={{display:"contents"}}><EditorMenu {...props} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} /></fieldset>
     <MessageBar notice={message} />
     {props.notices?.map((notice, index) => <MessageBar key={index} notice={notice} />)}
-    <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['audio','音频处理'],['edit','编辑'],['sync','打轴'],['preview','AMLL 预览'],['package','文件打包']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { if (canvasComposing.current || !finishSyncDraft()) return; flushSync(() => { const input = window.document.activeElement; if (input instanceof HTMLInputElement) input.blur(); }); if (pageRef.current?.querySelector('[aria-invalid="true"]')) return; setLocate(null); setRubyShortcut(null); setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
+    <nav className={styles.modeTabs} aria-label="工作模式">{([['acquire','歌词获取'],['audio','音频处理'],['edit','编辑'],['sync','打轴'],['karaoke','卡拉 OK'],['preview','AMLL 预览'],['package','文件打包']] as const).map(([id,label]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { if (canvasComposing.current || !finishSyncDraft()) return; flushSync(() => { const input = window.document.activeElement; if (input instanceof HTMLInputElement) input.blur(); }); if (pageRef.current?.querySelector('[aria-invalid="true"]')) return; setLocate(null); setRubyShortcut(null); setMode(id); setActiveMenuId(null); }}>{label}</button>)}</nav>
     {props.projectId && props.project && props.alignment && <AlignmentPanel pid={props.projectId} project={props.project} control={props.alignment} assetId={props.sourceAssetId} durationMs={props.audioDurationMs??0} visible={mode==='audio'} finishDraft={()=>{
       if(canvasComposing.current || !finishSyncDraft())return false;
       flushSync(()=>{const active=window.document.activeElement;if(active instanceof HTMLElement)active.blur();});
@@ -852,8 +872,9 @@ function EditorWorkspaceContent(props: Props) {
     </div> : <section className={styles.auxiliaryPlaceholder}><h1>人声分离与声学分析</h1><p>请从底部上传音乐文件，再进行人声处理。歌词可继续编辑、保存和下载。</p></section>)}
     <fieldset disabled={props.alignment?.locked} style={{display:"contents"}}>
     {mode === 'acquire' && <LyricAcquisition projectId={props.projectId} sourceAssetId={props.sourceAssetId} store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
-    {mode === 'package' && <PackagingPanel {...props} validationTab={validationTab} onValidationTab={setValidationTab} focusRule={focusRule} onRuleLocated={()=>setFocusRule(undefined)} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
+    {mode === 'package' && <PackagingPanel {...props} karaokeOnly={karaokeValidation} onKaraokeOnly={setKaraokeValidation} resumeKaraoke={()=>{setMode("karaoke");setKaraokeExportOpen(true);}} validationTab={validationTab} onValidationTab={setValidationTab} focusRule={focusRule} onRuleLocated={()=>setFocusRule(undefined)} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
     {mode === 'preview' && <Suspense fallback={<p>正在载入预览…</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={id => { const line = document.lines.find(line => line.id === id); if (line) selectLine(line); }} /></Suspense>}
+    {mode === 'karaoke' && props.project && props.applyProject && <KaraokeTools projectId={props.projectId} project={props.project} apply={props.applyProject} title={props.title} exportOpen={karaokeExportOpen} setExportOpen={setKaraokeExportOpen} viewIssues={()=>{setMode('package');setValidationTab('lyrics');setKaraokeValidation(true);}}/>}
     {mode === 'sync' && <SyncPanel progress={syncProgress} onProgress={setSyncProgress} preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} document={document} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
       onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
     {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canCopy={canCopySelection} canPaste={Boolean(clipboard)}
@@ -866,7 +887,7 @@ function EditorWorkspaceContent(props: Props) {
       canGenerateJapaneseRuby={selection?.kind === 'lines' && selection.ids.length > 0} openJapaneseRuby={() => openJapaneseRuby(selection?.kind === 'lines' ? selection.ids : [])}
       canGenerateRuby={propertyLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
       canGenerateRomanization={propertyLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(propertyLines.map(line => line.id))} openTranslationTracks={() => setSettingsDialog('translations')} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} singersDisabled={props.project?.amll.simplified} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: propertyLines.map((line) => line.id) })} />}
-    {(mode === 'edit' || mode === 'sync') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} onClick={event => {
+    {(mode === 'edit' || mode === 'sync' || mode === 'karaoke') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside ref={outlineRef} className={styles.outline} onClick={event => {
       const button = (event.target as Element).closest('[data-outline-drag]');
       if (!button) return;
       const line = document.lines.find(item => item.id === button.parentElement!.getAttribute('data-line-id'))!;
@@ -877,7 +898,7 @@ function EditorWorkspaceContent(props: Props) {
     </div></aside>}{columns.outlineVisible && separator('outline')}
       <main ref={mainRef} tabIndex={-1} className={styles.canvas}>
         <LyricList lineVersion={line => JSON.stringify([
-          mode, ordinalById.get(line.backgroundOf ?? line.id), props.playheadLineId === line.id,
+          mode, mode==='karaoke' ? [props.project?.karaoke,selectedCue] : null, ordinalById.get(line.backgroundOf ?? line.id), props.playheadLineId === line.id,
           selection?.kind, selectedTargets.filter(target => target.lineId === line.id).map(targetId),
           selection?.kind === 'romanization-content' && selection.lineId === line.id ? selection.ids : null,
           translationVersion.current.serial, attachmentVersions.get(line.id),
@@ -893,7 +914,11 @@ function EditorWorkspaceContent(props: Props) {
             setSelection({ kind: 'lines', ids: [line.id], anchorId: line.id, activeId: line.id });
             props.onSelectLine?.(line.id); requestLocate(line.id);
           }
-        }} renderLine={(line) => mode === 'sync' ? <SyncLine key={line.id} line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} gutterDigits={String(mainLines.length).length} editing={editing} selection={selection} cursor={syncCursor} progress={syncProgress}
+        }} renderLine={(line) => mode === 'sync' || mode === 'karaoke' ? <SyncLine karaoke={mode==='karaoke'&&props.project ? {
+          add:<button data-role="inline" aria-label="添加行前导唱" onClick={()=>insertKaraoke({kind:'insert',anchor:{kind:'before',lineId:line.id}})}>＋</button>,
+          before:<CueSlot project={props.project} anchor={{kind:'before',lineId:line.id}} apply={applyKaraokeCommand}/>,
+          gap:(leftId,rightId,wordId)=><CueSlot project={props.project!} anchor={wordId?{kind:'ruby',lineId:line.id,wordId,leftId,rightId}:{kind:'word',lineId:line.id,leftId,rightId}} apply={applyKaraokeCommand}/>
+        }:undefined} key={line.id} line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} gutterDigits={String(mainLines.length).length} editing={editing} selection={selection} cursor={syncCursor} progress={syncProgress}
           draft={{ id: syncEditingId, commit: syncDraftCommit, open: id => { if (finishSyncDraft()) setSyncEditingId(id); }, close: () => setSyncEditingId(null) }} apply={dispatch}
           selectLine={(shift, toggle) => selectLine(line, shift, toggle)} selectWord={(word, shift, toggle) => selectWord(line, word, shift, toggle)} selectRuby={(word, id, shift, toggle) => selectRuby(line, word, id, shift, toggle)}
           renderWordDraft={after => renderWordDraft(line, after)} addWord={() => startWordDraft(line.id, line.words.at(-1)?.id ?? null)} rubyDraft={rubyShortcut} closeRubyDraft={() => setRubyShortcut(null)} placeholder={drag.isPlaceholder}/>
@@ -925,7 +950,7 @@ function EditorWorkspaceContent(props: Props) {
           </div>
         </LyricLineView>} />
       </main>
-      {columns.inspectorVisible && separator('inspector')}{columns.inspectorVisible && <aside ref={inspectorRef} className={styles.inspector}><h2>属性</h2><div className={styles.panelBody}>{selectedLine && <>
+      {columns.inspectorVisible && separator('inspector')}{columns.inspectorVisible && <aside ref={inspectorRef} className={styles.inspector}><h2>属性</h2><div className={styles.panelBody}>{mode==='karaoke'&&cue&&props.project&&<CueProperties key={cue.id} project={props.project} cue={cue} apply={applyKaraokeCommand}/>} {selectedLine && !(mode==='karaoke'&&cue) && <>
         <p>{selection?.kind === 'lines' ? '已选行' : '所在行'}：{selection?.kind === 'lines' && selection.ids.length > 1 ? `${selection.ids.length} 行` : `L${ordinalById.get(selectedLine.backgroundOf ?? selectedLine.id)}${selectedLine.backgroundOf ? ' · 背景' : ''}`}</p>
         {selection?.kind === 'lines' && selection.ids.length > 1 && <p className={styles.fieldContext}>当前行 L{ordinalById.get(selectedLine.backgroundOf ?? selectedLine.id)}</p>}
         {activePropertyTarget && activePropertyTarget.kind !== 'line' && activePropertyInterval && <>
@@ -944,6 +969,7 @@ function EditorWorkspaceContent(props: Props) {
         {selection?.kind === 'words' && selection.ids.length === 1 && propertyWord && activePropertyTarget?.kind === 'word' && <BooleanField label="不雅用语" switchControl checked={propertyWord.obscene} onChange={obscene => dispatch({ type: 'set-word-obscene', lineId: activePropertyTarget.lineId, wordId: propertyWord.id, obscene })}/>}
         {selection?.kind==='words'&&selection.ids.length===1&&propertyWord&&activePropertyTarget?.kind==='word'&&<fieldset className={styles.singerSelection} disabled={props.project?.amll.noWordAgents}><legend>词级歌手</legend>{document.agents.map(agent=><label key={agent.id}><input type="checkbox" aria-label={`词级歌手 ${agent.name??agent.id}`} checked={propertyWord.agentRefs?.includes(agent.id)??false} onChange={event=>dispatch({type:'set-word-agents',lineId:activePropertyTarget.lineId,wordId:propertyWord.id,agentRefs:event.target.checked?[...(propertyWord.agentRefs??[]),agent.id]:(propertyWord.agentRefs??[]).filter(id=>id!==agent.id)})}/>{agent.name??agent.id}</label>)}</fieldset>}
         {selection?.kind === 'lines' && <>
+        {mode==='karaoke'&&props.project&&<label>输出分组<Select aria-label="输出分组" value={new Set(propertyLines.map(l=>props.project!.karaoke.lineGroups[l.id])).size===1?props.project.karaoke.lineGroups[propertyLines[0]?.id]??'':''} onChange={e=>insertKaraoke({kind:'assign',lineIds:propertyLines.map(l=>l.id),groupId:e.target.value})}><option value="">{propertyLines.length>1?'多个值':'请选择分组'}</option>{props.project.karaoke.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</Select></label>}
         {selection.ids.length === 1 && <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />}
         {selection?.kind === 'lines' && selection.ids.length > 1 && <small>多行时间请使用整体偏移或时间轴平移。</small>}
         {propertyLines.length > 0 && <>

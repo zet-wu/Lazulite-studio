@@ -1,3 +1,4 @@
+import { KaraokeContext } from './KaraokeContext';
 import { useNotice } from '../shared/MessageBar';
 import { ProjectEditingContext } from './editor/ProjectEditingContext';
 import { selectionLineId } from './editor/editing-actions';
@@ -61,7 +62,7 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
   const exportFormat = (format: LyricFormat) => {
     download(exportLyricFile(editor.document, format, editor.project.editing), `${title}.${format === 'elrc' ? 'extended.lrc' : format}`);
   };
-  return <ProjectEditingContext value={editor.project.editing}><div className={styles.editorShell} onKeyDown={event=>{
+  return <KaraokeContext value={{project:editor.project,locked:editor.editingLocked,apply:command=>{if(editor.conflict)throw new Error('保存冲突，请先处理');editor.applyProject(command);}}}><ProjectEditingContext value={editor.project.editing}><div className={styles.editorShell} onKeyDown={event=>{
     if(event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || !(event.ctrlKey||event.metaKey) || (event.target as Element).closest('input,textarea,select,[role="dialog"]'))return;
     if(event.key.toLowerCase()==='z'&&!editor.editingLocked){event.preventDefault();if(event.shiftKey)editor.redo();else editor.undo();}
     if(event.key.toLowerCase()==='s'){event.preventDefault();void editor.save();}
@@ -80,5 +81,5 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
       onPosition={(positionMs) => {
         const active = editor.document.lines.find((item) => !item.backgroundOf && item.beginMs !== null && item.endMs !== null && item.beginMs <= positionMs && positionMs < item.endMs)?.id ?? null;
         setPlayheadLineId((current) => current === active ? current : active);
-      }} /> : <MusicUpload projectId={projectId}/>}</div></ProjectEditingContext>;
+      }} /> : <MusicUpload projectId={projectId}/>}</div></ProjectEditingContext></KaraokeContext>;
 }
