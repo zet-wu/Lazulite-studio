@@ -1287,7 +1287,7 @@
           "200": {
             "description": "Successful Response",
             "content": {
-              "audio/flac": {
+              "audio/wav": {
                 "schema": {
                   "type": "string",
                   "format": "binary"

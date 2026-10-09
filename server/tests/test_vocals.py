@@ -33,7 +33,7 @@ def wait(client, job):
         time.sleep(.02)
     raise AssertionError('task did not finish')
 
-def test_vocal_flac_gain_explicit_adoption_and_source_validation(tmp_path):
+def test_vocal_wav_gain_explicit_adoption_and_source_validation(tmp_path):
     client, db = setup(tmp_path)
     with client:
         before = client.get('/api/v1/projects/p/document').json()
@@ -44,10 +44,10 @@ def test_vocal_flac_gain_explicit_adoption_and_source_validation(tmp_path):
         assert client.get('/api/v1/projects/p/document').json()['revision'] == before['revision']
         result = client.get('/api/v1/projects/p/vocals').json()['items'][0]
         assert result['status'] == 'ready' and result['gain'] < 1
-        flac = tmp_path/'projects'/'p'/'vocals'/result['id']/'vocals.flac'
-        info = sf.info(flac)
-        assert info.subtype == 'PCM_24' and info.frames == 88200 and info.channels == 2
-        samples, _ = sf.read(flac)
+        wav = tmp_path/'projects'/'p'/'vocals'/result['id']/'vocals.wav'
+        info = sf.info(wav)
+        assert info.subtype == 'PCM_16' and info.frames == 88200 and info.channels == 2
+        samples, _ = sf.read(wav)
         assert np.max(np.abs(samples)) < 1 and np.max(np.abs(samples[:22050])) == 0
         body = {k: before[k] for k in ('schema_version','project_id','revision','document')}
         body['document']['acoustics'] = {'analysisId':result['id'], 'segments':result['segments']}
@@ -56,6 +56,11 @@ def test_vocal_flac_gain_explicit_adoption_and_source_validation(tmp_path):
         energy = client.get(f"/api/v1/projects/p/vocals/{result['id']}/energy?start_ms=0&end_ms=2000&buckets=10")
         assert energy.status_code == 200 and len(energy.json()['values']) <= 10
         assert client.get(f"/api/v1/projects/p/audio?vocal={result['id']}", headers={'range':'bytes=0-99'}).status_code == 206
+        assert client.get(f"/api/v1/projects/p/audio?vocal={result['id']}").content == wav.read_bytes()
+        assert client.get(f"/api/v1/projects/p/vocals/{result['id']}/file").content == wav.read_bytes()
+        pcm = client.get(f"/api/v1/projects/p/pcm?vocal={result['id']}&start_ms=0&end_ms=1000")
+        assert pcm.status_code == 200
+        assert not list((tmp_path/'projects'/'p'/'cache').glob('vocal-*.wav'))
         body['revision'] = saved.json()['revision']; body['document']['acoustics']['analysisId'] = 'foreign'
         assert client.put('/api/v1/projects/p/document',json=body,headers={'origin':'http://studio','if-match':body['revision']}).status_code == 422
 
@@ -102,7 +107,7 @@ def test_analysis_failure_is_retryable_and_restart_retains_ready_products(tmp_pa
     runner=VocalRunner(db,tmp_path/'projects')
     assert not orphan.exists()
     assert runner.get('p',retry['id'])[0]['status']=='ready'
-    assert (tmp_path/'projects'/'p'/'vocals'/result['id']/'vocals.flac').is_file()
+    assert (tmp_path/'projects'/'p'/'vocals'/result['id']/'vocals.wav').is_file()
 
 
 def test_ready_reanalysis_preserves_old_result(tmp_path):
@@ -121,8 +126,8 @@ def test_ready_reanalysis_preserves_old_result(tmp_path):
         new = run(old)
         assert new != old
         assert before == {p.name: p.read_bytes() for p in directory.iterdir()}
-        assert not (tmp_path/'projects'/'p'/'vocals'/new/'vocals.flac').exists()
-        assert client.get(f'/api/v1/projects/p/vocals/{new}/file').content == before['vocals.flac']
+        assert not (tmp_path/'projects'/'p'/'vocals'/new/'vocals.wav').exists()
+        assert client.get(f'/api/v1/projects/p/vocals/{new}/file').content == before['vocals.wav']
         items = client.get('/api/v1/projects/p/vocals').json()['items']
         assert {r['audio_id'] for r in items} == {old}
         assert {r['audio_state'] for r in items} == {'current'}
@@ -172,7 +177,7 @@ def test_current_lazulite_profile_is_unsmoothed_main_rms_with_centered_clock(tmp
         directory = tmp_path/'projects'/'p'/'vocals'/result['id']
         from lazulite.audio.activity import VocalConfig, build_activity_profile
         from lazulite.models.audio import AudioBuffer
-        samples, rate = sf.read(directory/'vocals.flac', dtype='float32', always_2d=True)
+        samples, rate = sf.read(directory/'vocals.wav', dtype='float32', always_2d=True)
         config = VocalConfig()
         expected = build_activity_profile(AudioBuffer(samples.T, rate, asset), config=config)
         values = np.load(directory/'energy.npy')
@@ -209,15 +214,15 @@ def test_cached_separation_reanalysis_repair_and_version_update(tmp_path, monkey
         assert run() == first and Counted.calls == 1
         second = run(first)
         assert second != first and Counted.calls == 1
-        assert len(list((tmp_path/'projects').rglob('vocals.flac'))) == 1
+        assert len(list((tmp_path/'projects').rglob('vocals.wav'))) == 1
         assert run() == second
-        # Valid FLAC header but changed bytes must also invalidate the cached file.
-        path = tmp_path/'projects'/'p'/'vocals'/first/'vocals.flac'
+        # Valid WAV header but changed bytes must also invalidate the cached file.
+        path = tmp_path/'projects'/'p'/'vocals'/first/'vocals.wav'
         with path.open('ab') as f: f.write(b'corruption')
         assert {r['audio_state'] for r in client.get('/api/v1/projects/p/vocals').json()['items']} == {'missing'}
         repaired = run(second)
         assert Counted.calls == 2 and repaired not in (first, second)
-        path = tmp_path/'projects'/'p'/'vocals'/repaired/'vocals.flac'
+        path = tmp_path/'projects'/'p'/'vocals'/repaired/'vocals.wav'
         path.unlink()
         restored = run()
         assert Counted.calls == 3
@@ -225,7 +230,7 @@ def test_cached_separation_reanalysis_repair_and_version_update(tmp_path, monkey
         assert client.get('/api/v1/projects/p/vocals').json()['items'][0]['audio_state'] == 'outdated'
         updated = run()
         assert updated != restored and Counted.calls == 4
-        assert (tmp_path/'projects'/'p'/'vocals'/restored/'vocals.flac').exists()
+        assert (tmp_path/'projects'/'p'/'vocals'/restored/'vocals.wav').exists()
         assert client.get('/api/v1/projects/p/vocals').json()['items'][0]['audio_state'] == 'current'
 
 
@@ -247,10 +252,41 @@ def test_restart_keeps_shared_audio_and_project_deletion_releases_it(tmp_path):
         _, metadata = runner.get('p',result_id)
         assert metadata['audio_result_id'] == first
         assert metadata['separation_signature'] and metadata['audio_sha256']
-        assert runner.audio_path('p',metadata) == tmp_path/'projects'/'p'/'vocals'/first/'vocals.flac'
+        assert runner.audio_path('p',metadata) == tmp_path/'projects'/'p'/'vocals'/first/'vocals.wav'
         assert runner.audio_available('p', metadata)
     assert before == {str(p): p.read_bytes() for p in (tmp_path/'projects').rglob('*') if p.is_file()}
     with TestClient(create_app(tmp_path, Settings(None, True, 'http://studio'), separator_factory=Separator)) as client:
         assert client.get(f'/api/v1/projects/p/vocals/{second}/file').status_code == 200
         assert client.delete('/api/v1/projects/p',headers={'origin':'http://studio'}).status_code == 200
-    assert not list((tmp_path/'projects').rglob('vocals.flac'))
+    assert not list((tmp_path/'projects').rglob('vocals.wav'))
+
+
+def test_model_receives_direct_stereo_44100_with_sample_zero(tmp_path):
+    from lazulite.audio.io import decode_audio
+    captured = []
+    class Capture(Separator):
+        def separate(self, audio):
+            captured.append(audio)
+            return super().separate(audio)
+    for rate in (22050, 48000):
+        root = tmp_path / str(rate)
+        root.mkdir()
+        client, db = setup(root, Capture)
+        source = root/'projects'/'p'/'source'/'original'
+        samples = np.zeros((rate*2, 2), dtype=np.float32)
+        t = np.arange(rate)/rate
+        samples[rate:,0] = .2*np.sin(t*2*np.pi*11000 if rate==48000 else t*2*np.pi*3000)
+        samples[rate:,1] = .1*np.sin(t*2*np.pi*1000)
+        sf.write(source, samples, rate, format='WAV', subtype='FLOAT')
+        with client:
+            job=client.post('/api/v1/projects/p/jobs/vocal',json={'params':{'asset_id':'p'}},headers={'origin':'http://studio'}).json()
+            assert wait(client,job['id'])['status']=='succeeded'
+        audio=captured[-1]
+        assert audio.sample_rate==44100 and audio.samples.shape==(2,88200)
+        assert audio.samples.dtype==np.float32
+        assert np.max(np.abs(audio.samples[:,:40000]))==0
+        np.testing.assert_array_equal(audio.samples, decode_audio(source,sample_rate=44100,channels=2).samples)
+        assert not np.allclose(audio.samples[0],audio.samples[1])
+        if rate==48000:
+            spectrum=np.abs(np.fft.rfft(audio.samples[0,44100:]))
+            assert np.argmax(spectrum)==11000

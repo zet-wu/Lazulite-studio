@@ -54,13 +54,13 @@ class VocalRunner:
         result_id = job_id
         directory = self.root / project_id / 'vocals' / result_id
         directory.mkdir(parents=True, exist_ok=True)
-        vocal_path = directory / 'vocals.flac'
+        vocal_path = directory / 'vocals.wav'
         signature = self.separation_signature(params['asset_id'], params['model_name'], params['device'])
         reuse = None
         if params.get('retry_analysis_id'):
             row, candidate = self.get(project_id, params['retry_analysis_id'])
             if row['source_asset_id'] != params['asset_id']: raise ValueError('人声来源不匹配')
-            if self.audio_available(project_id, candidate): reuse = (row, candidate)
+            if candidate['separation_signature'] == signature and self.audio_available(project_id, candidate): reuse = (row, candidate)
         else:
             with self.db.connect() as c:
                 rows = c.execute('SELECT * FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id, params['asset_id'])).fetchall()
@@ -86,7 +86,7 @@ class VocalRunner:
             try:
                 from lazulite.audio.separation import DemucsSeparator, DemucsConfig
                 separator = self.separator_factory() if self.separator_factory else DemucsSeparator(DemucsConfig(model_name=params['model_name'], device=params['device']))
-                audio = decode_audio(asset_path)
+                audio = decode_audio(asset_path, sample_rate=44100, channels=2)
                 vocals = separator.separate(audio)
                 # The actual loaded weights, not an unverified caller-supplied label.
                 if hasattr(separator, '_model'):
@@ -101,14 +101,14 @@ class VocalRunner:
                 if 'separator' in locals(): separator.close()
             if not np.isfinite(vocals.samples).all(): raise ValueError('分离人声包含非有限样本')
             peak = float(np.max(np.abs(vocals.samples), initial=0))
-            gain = min(1.0, (1 - 2 ** -23) / peak) if peak else 1.0
+            gain = min(1.0, (1 - 2 ** -15) / peak) if peak else 1.0
             # Multiply in float64 so rounding cannot push the positive peak to 1.
-            sf.write(str(vocal_path), vocals.samples.T.astype(np.float64) * gain, vocals.sample_rate, format='FLAC', subtype='PCM_24')
+            sf.write(str(vocal_path), vocals.samples.T.astype(np.float64) * gain, vocals.sample_rate, format='WAV', subtype='PCM_16')
             metadata = {'id': result_id, 'source_asset_id': params['asset_id'], 'model': identity,
                         'gain': gain, 'peak_before_gain': peak, 'sample_rate': vocals.sample_rate,
                         'channels': vocals.samples.shape[0], 'frames': vocals.samples.shape[1],
-                        'duration_ms': milliseconds(vocals.duration), 'format': 'FLAC PCM_24',
-                        'quantization': 'float to signed 24-bit PCM', 'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'analysis_source_sha256': hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
+                        'duration_ms': milliseconds(vocals.duration), 'format': 'WAV PCM_16',
+                        'quantization': 'float to signed 16-bit PCM', 'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'analysis_source_sha256': hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
             metadata.update(audio_result_id=result_id, separation_signature=signature, audio_sha256=self.file_hash(vocal_path))
             with self.db.transaction() as c:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', str(directory), json.dumps(metadata)))
@@ -151,7 +151,7 @@ class VocalRunner:
             source_hash = c.execute('SELECT sha256 FROM assets WHERE id=?', (asset_id,)).fetchone()[0]
         # The fixed model catalogue is versioned with Demucs. Record loaded weight
         # hashes separately for provenance; analysis source changes do not invalidate audio.
-        identity = {'source': source_hash, 'config': config, 'pcm_pipeline': 1,
+        identity = {'source': source_hash, 'config': config, 'pcm_pipeline': 'demucs-44100-stereo-f32-wav-pcm16-v2',
                     'implementation': [self.file_hash(inspect.getfile(module)) for module in (io, separation)]}
         if self.separator_factory:
             separator = self.separator_factory()
@@ -166,10 +166,11 @@ class VocalRunner:
 
     def audio_path(self, project_id, metadata):
         owner, _ = self.get(project_id, metadata['audio_result_id'])
-        return Path(owner['directory']) / 'vocals.flac'
+        return Path(owner['directory']) / 'vocals.wav'
 
     def audio_available(self, project_id, metadata):
         import soundfile as sf
+        if metadata['format'] != 'WAV PCM_16': return False
         path = self.audio_path(project_id, metadata)
         try:
             stat = path.stat()
@@ -177,7 +178,7 @@ class VocalRunner:
             cached = self._audio_checks.get(path)
             if cached and cached[0] == stamp: return cached[1]
             info = sf.info(path)
-            valid = (info.frames == metadata['frames'] and info.samplerate == metadata['sample_rate'] and info.channels == metadata['channels'])
+            valid = (info.format == 'WAV' and info.subtype == 'PCM_16' and info.frames == metadata['frames'] and info.samplerate == metadata['sample_rate'] and info.channels == metadata['channels'])
             if valid:
                 valid = self.file_hash(path) == metadata['audio_sha256']
         except (OSError, sf.LibsndfileError):

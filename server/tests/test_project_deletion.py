@@ -28,7 +28,7 @@ def test_delete_project_releases_owned_resources_and_preserves_other_project(tmp
         c.execute("INSERT INTO job_events VALUES('j',1,'state',NULL,NULL,NULL,NULL,0,'now')")
         c.execute("INSERT INTO job_idempotency VALUES(?,'key','hash','j')", (pid,))
         vocal = tmp_path / 'projects' / pid / 'vocals' / 'voice'; vocal.mkdir(parents=True)
-        (vocal / 'vocals.flac').write_bytes(b'flac')
+        (vocal / 'vocals.wav').write_bytes(b'wav')
         (vocal / 'energy.npy').write_bytes(b'energy')
         proxy = tmp_path / 'projects' / pid / 'cache' / 'vocal-voice.wav'; proxy.parent.mkdir(exist_ok=True); proxy.write_bytes(b'proxy')
         peaks = tmp_path / 'projects' / pid / 'cache' / 'vocal-voice.peaks-v1'; peaks.mkdir(); (peaks / 'l0.peaks').write_bytes(b'peaks')

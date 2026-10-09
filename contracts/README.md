@@ -9,7 +9,7 @@
 
 歌词获取接口为 POST `/lyric-sources/search`、`fetch`、`resolve`，打包选项来自 GET `/projects/{pid}/packaging`。PublishRequest 要求 revision、asset_id、lrc_kind、lrc_text，可选 target_track_id；静态契约与生成类型已同步。来源/包装响应在静态契约中仍使用宽对象，由手写 HTTP 适配器消费，不能视为完整响应校验。
 
-人声结果列表、能量窗口与 FLAC 下载已列入静态契约；VocalResult、VocalEnergyWindow 由生成类型消费。vocal 任务参数只需资产，可选 retry_analysis_id 复用 separated/ready 人声，每次以任务 ID 创建独立结果并保留旧文件，模型/设备由服务配置；歌词任务仍需 revision。媒体 audio/waveform/pcm 的 vocal 参数选用已注册人声，省略时使用原曲。静态契约不等于所有响应均有运行时校验。
+人声结果列表、能量窗口与 WAV 下载已列入静态契约；VocalResult、VocalEnergyWindow 由生成类型消费。vocal 任务参数只需资产，可选 retry_analysis_id 复用 separated/ready 人声，每次以任务 ID 创建独立结果并保留旧文件，模型/设备由服务配置；歌词任务仍需 revision。媒体 audio/waveform/pcm 的 vocal 参数选用已注册人声，省略时使用原曲。静态契约不等于所有响应均有运行时校验。
 
 日文注音快照接口 `/api/v1/reading/analyze` 使用 ReadingSnapshot/ReadingAnalysis，稳定行 ID 与 code point 范围不依赖项目修订；空读音表示待处理或无需注音区间，由前端按原文识别汉字缺失项。
 
@@ -20,3 +20,5 @@ ReadingAnalysis.ranges 可返回比 Sudachi C token 更细的可靠片段，仍�
 创建项目只要求 name，可选 upload_id；POST /uploads 返回独立临时资源 ID，DELETE /uploads/{token} 取消已完成临时上传，POST /projects/{id}/music 首次接入。歌词快照不含 sourceAssetId，项目接口的 asset 为资源权威，无音乐返回 null。无音乐拒绝音频接口及媒体发布，纯歌词保存和下载可用。
 
 `GET /projects/{projectId}/embedded-lyrics` 为只读原始音频歌词候选接口，返回 asset_id 与 candidates。每项含 id、label，以及 content/format 或 error；服务确认项目资源归属，不接收客户端路径。
+
+人声输入直接解码为 44.1 kHz 双声道 float32；持久音频策略 v2 为单份 PCM_16 WAV，分析从此文件重读，播放／PCM／波形绕过原曲 48 kHz 代理，下载返回同一文件。旧策略结果不可复用，不迁移或删除旧文件；用户需明确重新分离，原歌词和片段保留。

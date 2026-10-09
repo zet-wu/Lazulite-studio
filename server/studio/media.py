@@ -46,6 +46,7 @@ class Asset:
     original_name: str
     size: int
     probe: MediaProbe
+    direct_pcm: bool = False
 
 
 @dataclass(frozen=True)
@@ -151,6 +152,8 @@ class MediaService:
 
     def _playback_proxy(self, asset: Asset) -> Proxy:
         """Create a normalized PCM WAV; Studio time starts at decoded sample zero."""
+        if asset.direct_pcm:
+            return Proxy(asset.path, 'audio/wav', 0, 0, asset.probe.duration_ms)
         target = self.root / "cache" / f"{asset.content_hash}.wav"
         if not target.exists():
             fd, temporary_name = tempfile.mkstemp(prefix="proxy-", suffix=".wav", dir=self.root / "cache")

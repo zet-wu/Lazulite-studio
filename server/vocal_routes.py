@@ -49,16 +49,16 @@ def build_vocal_router(runner, *, auth, project_exists):
             try: row, metadata = runner.get(pid, rid)
             except KeyError: raise HTTPException(404, '人声结果不存在')
             path = runner.audio_path(pid, metadata)
-            if not path.is_file(): raise HTTPException(404, '人声文件不存在，请重新生成')
-            return stream_file(path, 'audio/flac', request.headers.get('range'), request.headers.get('if-range'))
+            if not runner.audio_available(pid, metadata): raise HTTPException(404, '人声文件不存在，请重新生成')
+            return stream_file(path, 'audio/wav', request.headers.get('range'), request.headers.get('if-range'))
     return router
 
 def vocal_asset(runner, pid, rid):
     try: row, metadata = runner.get(pid, rid)
     except KeyError: raise HTTPException(404, '人声结果不存在')
     path = runner.audio_path(pid, metadata)
-    if not path.is_file(): raise HTTPException(404, '人声文件不存在')
-    # The producer already persisted these properties for this immutable PCM FLAC.
-    probe = MediaProbe(metadata['duration_ms'], 0, metadata['sample_rate'], metadata['channels'], 'flac', 'flac', 'audio/flac')
+    if not runner.audio_available(pid, metadata): raise HTTPException(404, '人声文件不存在')
+    # The producer already persisted these properties for this immutable PCM WAV.
+    probe = MediaProbe(metadata['duration_ms'], 0, metadata['sample_rate'], metadata['channels'], 'pcm_s16le', 'wav', 'audio/wav')
     audio_id = metadata['audio_result_id']
-    return Asset(audio_id, f'vocal-{audio_id}', path, 'vocals.flac', path.stat().st_size, probe)
+    return Asset(audio_id, f'vocal-{audio_id}', path, 'vocals.wav', path.stat().st_size, probe, direct_pcm=True)

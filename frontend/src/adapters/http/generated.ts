@@ -2245,7 +2245,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "audio/flac": string;
+                    "audio/wav": string;
                 };
             };
             /** @description Validation Error */
