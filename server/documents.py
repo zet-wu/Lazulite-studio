@@ -127,7 +127,7 @@ class DocumentService:
         import json
         digest = hashlib.sha256(json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
         return {
-            "schema_version": "studio-document-v7",
+            "schema_version": "studio-document-v8",
             "project_id": project_id,
             "revision": rev,
             "etag": f'"{rev}"',
@@ -141,7 +141,7 @@ class DocumentService:
 
     def save(self, body: DocumentEnvelope, *, if_match: str | None,
              operation_id: str | None, subject: str = "local") -> dict:
-        if body.schema_version != "studio-document-v7":
+        if body.schema_version != "studio-document-v8":
             raise HTTPException(422, {"code": "document_schema_unsupported", "message": "unsupported document schema version", "retryable": False})
         if not body.project_id:
             raise ValueError("project_id is required")

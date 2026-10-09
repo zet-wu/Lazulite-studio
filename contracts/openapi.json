@@ -2750,7 +2750,7 @@
         ],
         "properties": {
           "schema_version": {
-            "const": "studio-document-v7"
+            "const": "studio-document-v8"
           },
           "project_id": {
             "type": "string"
@@ -2782,11 +2782,12 @@
               "acoustics",
               "editing",
               "amll",
-              "lineOrder"
+              "lineOrder",
+              "karaoke"
             ],
             "properties": {
               "schemaVersion": {
-                "const": "studio-project-v5"
+                "const": "studio-project-v6"
               },
               "lyrics": {
                 "type": "object",
@@ -2931,6 +2932,52 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "karaoke": {
+                "additionalProperties": false,
+                "properties": {
+                  "groups": {
+                    "items": {
+                      "$ref": "#/components/schemas/KaraokeGroup"
+                    },
+                    "minItems": 1,
+                    "title": "Groups",
+                    "type": "array"
+                  },
+                  "lineGroups": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "title": "Linegroups",
+                    "type": "object"
+                  },
+                  "defaults": {
+                    "$ref": "#/components/schemas/KaraokeDefaults"
+                  },
+                  "cues": {
+                    "items": {
+                      "$ref": "#/components/schemas/KaraokeCue"
+                    },
+                    "title": "Cues",
+                    "type": "array"
+                  },
+                  "outputs": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "Outputs",
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "groups",
+                  "lineGroups",
+                  "defaults",
+                  "cues",
+                  "outputs"
+                ],
+                "title": "Karaoke",
+                "type": "object"
               }
             },
             "additionalProperties": false
@@ -3620,6 +3667,222 @@
           }
         },
         "additionalProperties": true
+      },
+      "KaraokeBefore": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "before",
+            "title": "Kind",
+            "type": "string"
+          },
+          "lineId": {
+            "title": "Lineid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "lineId"
+        ],
+        "title": "Before",
+        "type": "object"
+      },
+      "KaraokeCue": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "anchor": {
+            "discriminator": {
+              "mapping": {
+                "before": "#/components/schemas/KaraokeBefore",
+                "ruby": "#/components/schemas/KaraokeRubyAnchor",
+                "word": "#/components/schemas/KaraokeWordAnchor"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/KaraokeBefore"
+              },
+              {
+                "$ref": "#/components/schemas/KaraokeWordAnchor"
+              },
+              {
+                "$ref": "#/components/schemas/KaraokeRubyAnchor"
+              }
+            ],
+            "title": "Anchor"
+          },
+          "beginMs": {
+            "title": "Beginms",
+            "type": "integer"
+          },
+          "endMs": {
+            "title": "Endms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "anchor",
+          "beginMs",
+          "endMs"
+        ],
+        "title": "Cue",
+        "type": "object"
+      },
+      "KaraokeDefaults": {
+        "additionalProperties": false,
+        "properties": {
+          "main": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main"
+          },
+          "background": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Background"
+          },
+          "text": {
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "beforeMs": {
+            "minimum": 0,
+            "title": "Beforems",
+            "type": "integer"
+          },
+          "wordMs": {
+            "minimum": 0,
+            "title": "Wordms",
+            "type": "integer"
+          },
+          "rubyMs": {
+            "minimum": 0,
+            "title": "Rubyms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "main",
+          "background",
+          "text",
+          "beforeMs",
+          "wordMs",
+          "rubyMs"
+        ],
+        "title": "Defaults",
+        "type": "object"
+      },
+      "KaraokeGroup": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "Group",
+        "type": "object"
+      },
+      "KaraokeRubyAnchor": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "ruby",
+            "title": "Kind",
+            "type": "string"
+          },
+          "lineId": {
+            "title": "Lineid",
+            "type": "string"
+          },
+          "wordId": {
+            "title": "Wordid",
+            "type": "string"
+          },
+          "leftId": {
+            "title": "Leftid",
+            "type": "string"
+          },
+          "rightId": {
+            "title": "Rightid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "lineId",
+          "wordId",
+          "leftId",
+          "rightId"
+        ],
+        "title": "RubyAnchor",
+        "type": "object"
+      },
+      "KaraokeWordAnchor": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "word",
+            "title": "Kind",
+            "type": "string"
+          },
+          "lineId": {
+            "title": "Lineid",
+            "type": "string"
+          },
+          "leftId": {
+            "title": "Leftid",
+            "type": "string"
+          },
+          "rightId": {
+            "title": "Rightid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "lineId",
+          "leftId",
+          "rightId"
+        ],
+        "title": "WordAnchor",
+        "type": "object"
       }
     }
   }

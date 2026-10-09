@@ -854,7 +854,7 @@ export interface components {
         };
         DocumentEnvelope: {
             /** @constant */
-            schema_version: "studio-document-v7";
+            schema_version: "studio-document-v8";
             project_id: string;
             revision: string | null;
             etag?: string;
@@ -862,7 +862,7 @@ export interface components {
             client_seq?: number | null;
             document: {
                 /** @constant */
-                schemaVersion: "studio-project-v5";
+                schemaVersion: "studio-project-v6";
                 lyrics: {
                     draftTtml: string;
                 };
@@ -896,6 +896,20 @@ export interface components {
                     noIndependentBackground: boolean;
                 };
                 lineOrder: string[];
+                /** Karaoke */
+                karaoke: {
+                    /** Groups */
+                    groups: components["schemas"]["KaraokeGroup"][];
+                    /** Linegroups */
+                    lineGroups: {
+                        [key: string]: string;
+                    };
+                    defaults: components["schemas"]["KaraokeDefaults"];
+                    /** Cues */
+                    cues: components["schemas"]["KaraokeCue"][];
+                    /** Outputs */
+                    outputs: string[];
+                };
             };
         };
         DocumentSaveResponse: components["schemas"]["DocumentEnvelope"] & {
@@ -1091,6 +1105,81 @@ export interface components {
             calibration?: Record<string, never>;
         } & {
             [key: string]: unknown;
+        };
+        /** Before */
+        KaraokeBefore: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "before";
+            /** Lineid */
+            lineId: string;
+        };
+        /** Cue */
+        KaraokeCue: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+            /** Anchor */
+            anchor: components["schemas"]["KaraokeBefore"] | components["schemas"]["KaraokeWordAnchor"] | components["schemas"]["KaraokeRubyAnchor"];
+            /** Beginms */
+            beginMs: number;
+            /** Endms */
+            endMs: number;
+        };
+        /** Defaults */
+        KaraokeDefaults: {
+            /** Main */
+            main: string | null;
+            /** Background */
+            background: string | null;
+            /** Text */
+            text: string;
+            /** Beforems */
+            beforeMs: number;
+            /** Wordms */
+            wordMs: number;
+            /** Rubyms */
+            rubyMs: number;
+        };
+        /** Group */
+        KaraokeGroup: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** RubyAnchor */
+        KaraokeRubyAnchor: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "ruby";
+            /** Lineid */
+            lineId: string;
+            /** Wordid */
+            wordId: string;
+            /** Leftid */
+            leftId: string;
+            /** Rightid */
+            rightId: string;
+        };
+        /** WordAnchor */
+        KaraokeWordAnchor: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "word";
+            /** Lineid */
+            lineId: string;
+            /** Leftid */
+            leftId: string;
+            /** Rightid */
+            rightId: string;
         };
     };
     responses: {

@@ -13,7 +13,7 @@ def test_flags_survive_service_save_and_reopen(tmp_path):
     setup_project(tmp_path)
     client = TestClient(create_app(tmp_path, Settings(None, True, 'http://studio')), base_url='https://studio')
     before = client.get('/api/v1/projects/p/document')
-    saved = client.put('/api/v1/projects/p/document', json={'schema_version': 'studio-document-v7', 'project_id': 'p', 'revision': before.json()['revision'], 'document': initial_project(SOURCE, None)}, headers={'origin': 'http://studio', 'if-match': before.headers['etag']})
+    saved = client.put('/api/v1/projects/p/document', json={'schema_version': 'studio-document-v8', 'project_id': 'p', 'revision': before.json()['revision'], 'document': initial_project(SOURCE, None)}, headers={'origin': 'http://studio', 'if-match': before.headers['etag']})
     assert saved.status_code == 200, saved.text
     reopened = client.get('/api/v1/projects/p/document').json()
     root = ET.fromstring(reopened['document']['lyrics']['draftTtml'])

@@ -1,3 +1,4 @@
+import { createKaraoke, reconcileKaraoke, applyKaraoke, type Karaoke, type KaraokeCommand } from './karaoke';
 import { assertAmll, checkAmll, createAmllSettings, amllDependencies, displayLines, groupDisplayLines, lineAgents, type AmllRule, type AmllSettings } from './amll-compatibility';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
 import { applyLyricTransaction, type LyricCommand } from './lyric-commands';
@@ -6,8 +7,9 @@ import { createLyricDocument, type LyricDocument } from './lyric-document';
 export type VocalSegment = { id: string; beginMs: number; endMs: number };
 export type Acoustics = { analysisId: string | null; segments: VocalSegment[] };
 export type ProjectDocument = {
-  schemaVersion: 'studio-project-v5';
+  schemaVersion: 'studio-project-v6';
   lyrics: LyricDocument;
+  karaoke: Karaoke;
   amll: AmllSettings;
   lineOrder: string[];
   acoustics: Acoustics;
@@ -15,9 +17,9 @@ export type ProjectDocument = {
 };
 export type ProjectSnapshot = Omit<ProjectDocument, 'lyrics'> & { lyrics: { draftTtml: string } };
 export type ProjectEditorState = { present: ProjectDocument; past: ProjectDocument[]; future: ProjectDocument[] };
-export type ProjectCommand = { type: 'alignment'; source: ProjectDocument; project: ProjectDocument } | { type: 'amll-setting'; rule: AmllRule; enabled: boolean } | { type: 'background-position'; lineId: string; before: boolean } | { type: 'amll-batch'; rule: AmllRule; ids?: string[]; duetAgents?: string[] } | { type: 'duet'; lineId: string; duet: boolean } | { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics; durationMs: number };
+export type ProjectCommand = { type: 'karaoke'; command: KaraokeCommand } | { type: 'alignment'; source: ProjectDocument; project: ProjectDocument } | { type: 'amll-setting'; rule: AmllRule; enabled: boolean } | { type: 'background-position'; lineId: string; before: boolean } | { type: 'amll-batch'; rule: AmllRule; ids?: string[]; duetAgents?: string[] } | { type: 'duet'; lineId: string; duet: boolean } | { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics; durationMs: number };
 export function createProjectDocument(lyrics = createLyricDocument()): ProjectDocument {
-  return { schemaVersion: 'studio-project-v5', lyrics, amll: createAmllSettings(), lineOrder: [], editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
+  return { schemaVersion: 'studio-project-v6', lyrics, karaoke: createKaraoke(lyrics), amll: createAmllSettings(), lineOrder: [], editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
 }
 export function validateSegments(segments: VocalSegment[], durationMs: number) {
   const ids = new Set<string>();
@@ -29,7 +31,11 @@ export function validateSegments(segments: VocalSegment[], durationMs: number) {
 export function createProjectEditorState(present: ProjectDocument): ProjectEditorState { return { present, past: [], future: [] }; }
 export function executeProjectCommand(state: ProjectEditorState, command: ProjectCommand): ProjectEditorState {
   let present: ProjectDocument;
-  if (command.type === 'alignment') {
+  if (command.type === 'karaoke') {
+    const karaoke = applyKaraoke(state.present.lyrics, state.present.karaoke, command.command);
+    if (karaoke === state.present.karaoke) return state;
+    present = { ...state.present, karaoke };
+  } else if (command.type === 'alignment') {
     if (command.source !== state.present) throw new Error('项目已改变，请重新运行自动对齐');
     if (command.project === state.present) return state;
     present = command.project;
@@ -103,6 +109,7 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     if (command.acoustics === state.present.acoustics) return state;
     present = { ...state.present, acoustics: command.acoustics };
   }
+  if (present.lyrics !== state.present.lyrics) present = { ...present, karaoke: reconcileKaraoke(present.lyrics, present.karaoke) };
   const lineIds=new Set(present.lyrics.lines.map(line=>line.id));
   present = { ...present, lineOrder: present.lineOrder.filter(id=>lineIds.has(id)) };
   assertAmll(present.lyrics, present.amll);

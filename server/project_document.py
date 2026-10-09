@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictBool
 from typing import Literal
+from .karaoke import Karaoke, initial_karaoke
 
 class Segment(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -41,7 +42,8 @@ class AmllSettings(BaseModel):
 
 class ProjectSnapshot(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    schemaVersion: Literal['studio-project-v5']
+    schemaVersion: Literal['studio-project-v6']
+    karaoke: Karaoke
     amll: AmllSettings
     lineOrder: list[str]
     lyrics: Lyrics
@@ -50,7 +52,7 @@ class ProjectSnapshot(BaseModel):
 
 def initial_project(ttml: str, asset_id: str | None) -> dict:
     from .amll_compatibility import DEFAULTS
-    return {'schemaVersion': 'studio-project-v5', 'amll': dict(DEFAULTS), 'lineOrder': [],
+    return {'schemaVersion': 'studio-project-v6', 'karaoke': initial_karaoke(ttml), 'amll': dict(DEFAULTS), 'lineOrder': [],
             'editing': {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
 
 def read_project(path: str | Path) -> dict:

@@ -1,11 +1,12 @@
+import { validateKaraoke } from '../../domain/karaoke';
 import { assertAmll, validateAgents } from '../../domain/amll-compatibility';
 import { validateProjectEditing } from '../../domain/project-editing';
 import { createProjectEditorState, validateSegments, type ProjectEditorState, type ProjectDocument } from '../../domain/project-document';
 import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
-const DATABASE = 'lazulite-studio-recovery-project-v5';
+const DATABASE = 'lazulite-studio-recovery-project-v6';
 const STORE = 'projects';
-const RECORD_VERSION = 5;
+const RECORD_VERSION = 6;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {
@@ -54,9 +55,9 @@ const isState = (value: unknown): value is ProjectEditorState => {
   const validDocument = (document: unknown) => {
     if (!document || typeof document !== 'object') return false;
     const project = document as ProjectDocument;
-    if (project.schemaVersion !== 'studio-project-v5' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
+    if (project.schemaVersion !== 'studio-project-v6' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
     if (project.acoustics.analysisId !== null && typeof project.acoustics.analysisId !== 'string') return false;
-    try { assertAmll(project.lyrics,project.amll); validateAgents(project.lyrics); if(!Array.isArray(project.lineOrder)||project.lineOrder.some(id=>!project.lyrics.lines.some(line=>line.id===id)))return false; validateSegments(project.acoustics.segments, Number.MAX_SAFE_INTEGER); validateProjectEditing(project.lyrics, project.editing); } catch { return false; }
+    try { validateKaraoke(project.lyrics, project.karaoke); assertAmll(project.lyrics,project.amll); validateAgents(project.lyrics); if(!Array.isArray(project.lineOrder)||project.lineOrder.some(id=>!project.lyrics.lines.some(line=>line.id===id)))return false; validateSegments(project.acoustics.segments, Number.MAX_SAFE_INTEGER); validateProjectEditing(project.lyrics, project.editing); } catch { return false; }
     const item = project.lyrics as LyricDocument;
     if (!item || typeof item !== 'object') return false;
     return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.romanizationTracks) && Array.isArray(item.translationTracks) && Array.isArray(item.agents)
