@@ -2615,6 +2615,42 @@
                 }
               }
             }
+          },
+          "scope": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "object_id",
+                "word_id",
+                "line_id",
+                "kind",
+                "target_ids"
+              ],
+              "properties": {
+                "object_id": {
+                  "type": "string"
+                },
+                "word_id": {
+                  "type": "string"
+                },
+                "line_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "word",
+                    "ruby"
+                  ]
+                },
+                "target_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
           }
         },
         "additionalProperties": true
@@ -3425,7 +3461,8 @@
           "use_hints",
           "line_blank",
           "rest_blank",
-          "rest_token"
+          "rest_token",
+          "clear_unmatched"
         ],
         "properties": {
           "revision": {
@@ -3446,6 +3483,11 @@
           "rest_token": {
             "type": "boolean",
             "default": false
+          },
+          "clear_unmatched": {
+            "type": "boolean",
+            "default": false,
+            "description": "Studio merge policy; never an acoustic parameter"
           }
         }
       },

@@ -24,7 +24,7 @@ def test_preview_launch_isolation_idempotency_and_audio_mutex(tmp_path,monkeypat
  with client:
   preview=client.get('/api/v1/projects/p/alignment-preview',params={'revision':revision}).json()
   assert preview['unknown_count']==1 and preview['hint_count']==0 and preview['emitting_count']==2
-  headers={'origin':'http://studio','idempotency-key':'launch'};body={'params':{'revision':revision,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False}}
+  headers={'origin':'http://studio','idempotency-key':'launch'};body={'params':{'revision':revision,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False}}
   first=client.post('/api/v1/projects/p/jobs/alignment',json=body,headers=headers)
   assert first.status_code==202,first.text
   jid=first.json()['id']
@@ -36,14 +36,14 @@ def test_preview_launch_isolation_idempotency_and_audio_mutex(tmp_path,monkeypat
   result=client.get(f'/api/v1/jobs/{jid}/result').json()
   assert result['binding']['revision']==revision and result['engine']['worker_pid']!=os.getpid()
   assert client.get('/api/v1/projects/p/document').json()['revision']==revision
-  assert client.post('/api/v1/projects/p/jobs/alignment',json={'params':{'revision':revision,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'model_path':'/tmp/evil'}},headers={'origin':'http://studio'}).status_code==422
+  assert client.post('/api/v1/projects/p/jobs/alignment',json={'params':{'revision':revision,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'model_path':'/tmp/evil'}},headers={'origin':'http://studio'}).status_code==422
 
 
 def test_cancellation_does_not_publish_and_removed_routes_fail(tmp_path,monkeypatch):
  client,db,revision=prepare(tmp_path,monkeypatch)
  with client:
   headers={'origin':'http://studio'}
-  jid=client.post('/api/v1/projects/p/jobs/alignment',json={'params':{'revision':revision,'use_hints':True,'line_blank':False,'rest_blank':False,'rest_token':False}},headers=headers).json()['id']
+  jid=client.post('/api/v1/projects/p/jobs/alignment',json={'params':{'revision':revision,'use_hints':True,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False}},headers=headers).json()['id']
   client.post(f'/api/v1/jobs/{jid}/cancel',headers=headers)
   assert wait(client,jid)['status']=='cancelled'
   assert client.get(f'/api/v1/jobs/{jid}/result').status_code==409
@@ -60,7 +60,7 @@ def test_all_cost_combinations_are_snapshotted_and_strict(tmp_path,monkeypatch):
  client,db,revision=prepare(tmp_path,monkeypatch)
  with client:
   for flags in itertools.product([False,True],repeat=3):
-   params={'revision':revision,'use_hints':False,**dict(zip(('line_blank','rest_blank','rest_token'),flags))}
+   params={'revision':revision,'use_hints':False,'clear_unmatched':False,**dict(zip(('line_blank','rest_blank','rest_token'),flags))}
    reply=client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers={'origin':'http://studio'})
    assert reply.status_code==202,reply.text
    jid=reply.json()['id'];assert wait(client,jid)['status']=='succeeded'

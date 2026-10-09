@@ -47,3 +47,14 @@ def test_multiple_background_order_and_english_ruby_are_independent():
     result = project_alignment(snapshot, True)
     assert [line['line_id'] for line in result['request']['lines']] == ['main', 'bg']
     assert result['summary']['hint_count'] == 1
+
+
+def test_complete_scope_includes_omitted_symbols_empty_body_and_ruby():
+ snapshot=initial_project('''<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="l"><span studio:id="sym">♪！</span><span studio:id="empty"></span><span studio:id="mixed">あ！</span><span studio:id="ruby" tts:ruby="container"><span tts:ruby="base">愛</span><span tts:ruby="textContainer"><span studio:id="r1" tts:ruby="text">あ</span><span studio:id="r2" tts:ruby="text">！</span></span></span></p></body></tt>''',None)
+ result=project_alignment(snapshot)
+ scope={s['object_id']:s for s in result['scope']}
+ assert set(scope)=={'sym','empty','mixed','r1','r2'}
+ assert all(scope[k]['target_ids']==[] for k in ('sym','empty','r2'))
+ assert all(len(scope[k]['target_ids'])==1 for k in ('mixed','r1'))
+ assert result['summary']['emitting_count']==2
+ assert [m['unit_id'] for m in result['mapping']]==[u['unit_id'] for l in result['request']['lines'] for u in l['units']]

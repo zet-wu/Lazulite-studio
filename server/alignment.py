@@ -35,7 +35,7 @@ class AlignmentRunner:
         return read_project(row[0]), current['source_asset_id']
 
     def validate(self, pid, params):
-        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token')):
+        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched')):
             raise ValueError('自动对齐只接受项目版本及布尔对齐选项')
         snapshot, asset = self.snapshot(pid, params['revision'])
         projection = project_alignment(snapshot, params['use_hints'])
@@ -98,4 +98,7 @@ def run_alignment(request, emit, cancelled):
     if cancelled(): raise VocalCancelled()
     runner.snapshot(pid, params['revision'])
     if result.status == 'unresolved': raise ValueError('无法计算对齐：' + ', '.join(issue.code for issue in result.issues))
-    return {'kind':'alignment', 'alignment':asdict(result), 'mapping':projection['mapping'], 'acoustics':new_acoustics, 'summary':projection['summary']}
+    expected = [(m['unit_id'],m['line_id']) for m in projection['mapping']]
+    if [(u.unit_id,u.line_id) for u in result.units] != expected:
+        raise ValueError('对齐结果与完整投影目标不匹配')
+    return {'kind':'alignment', 'alignment':asdict(result), 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'summary':projection['summary']}

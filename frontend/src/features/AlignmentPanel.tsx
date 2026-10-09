@@ -68,8 +68,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
           const current=await studioS4.getDocumentEnvelope(pid);
           if(!op.alive||op.cancel){if(op.alive)setMessage('已取消应用','status',4000);break;}
           if(current.revision!==saved.revision || result.binding.revision!==saved.revision || result.binding.project_id!==pid || result.binding.asset_id!==assetId)throw new Error('项目版本或音频已改变，请重新运行');
-          const merged=mergeAlignment(op.lock.source,result,durationMs);op.lock.apply(merged.project);
-          setMessage(merged.project===op.lock.source?'未更新歌词时间':`已更新歌词时间${merged.retained.length?'；部分时间保留原值':''}`, 'status', merged.retained.length?8000:4000);break;
+          const merged=mergeAlignment(op.lock.source,result,durationMs,selected.clear_unmatched);op.lock.apply(merged.project);
+          setMessage([merged.project===op.lock.source?'未更新歌词时间':'已更新歌词时间', merged.cleared.length?`清空 ${merged.cleared.length} 个词／注音的缺失端点`:'', merged.retained.length?`${merged.retained.length} 个词／注音部分时间保留原值`:''].filter(Boolean).join('；'), 'status', merged.retained.length||merged.cleared.length?8000:4000);break;
         }
         if(['failed','cancelled','interrupted'].includes(job.status)){setMessage(job.error?.message??(job.status==='cancelled'?'已取消对齐':'服务中断，请重新运行'), job.status==='cancelled'?'status':'alert', job.status==='cancelled'?4000:undefined);break;}
         if(!disconnectedAt)setProgress(op.cancel?'正在取消':({separating:'正在分离人声',analyzing:'正在分析声区',acoustic:'正在计算声学概率',decode:'正在全局对齐'}[job.stage??'']??'正在对齐'));
@@ -92,6 +92,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       {!!summary?.unknown_count&&<p>有 {summary.unknown_count} 处缺少可用读音，相关时间可能保留原值</p>}
       <label><input type="checkbox" checked={options.use_hints} disabled={!summary?.hint_count} onChange={e=>setOptions({...options,use_hints:e.target.checked})}/>使用已有行起始时间辅助对齐</label>
       <p>{summary?.hint_count?'适合已有大致准确行首的歌词':'参与行没有已有行首'}</p>
+      <label><input type="checkbox" checked={options.clear_unmatched} onChange={e=>setOptions({...options,clear_unmatched:e.target.checked})}/>清空未匹配单元时间</label>
+      <p>清空本次对齐范围内没有新时间建议的词／注音端点，包括未送入对齐的符号、标点和空白；可一次撤销。</p>
       <fieldset className={styles.options}><legend>实验性对齐选项</legend>
         {([
           ['line_blank','行内 blank 代价','抑制同一行内部过长的 blank 停留'],

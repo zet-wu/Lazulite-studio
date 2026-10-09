@@ -818,6 +818,14 @@ export interface components {
                 /** @enum {unknown} */
                 kind: "word" | "ruby";
             }[];
+            scope?: {
+                object_id: string;
+                word_id: string;
+                line_id: string;
+                /** @enum {unknown} */
+                kind: "word" | "ruby";
+                target_ids: string[];
+            }[];
         } & {
             [key: string]: unknown;
         };
@@ -1038,6 +1046,11 @@ export interface components {
             rest_blank: boolean;
             /** @default false */
             rest_token: boolean;
+            /**
+             * @description Studio merge policy; never an acoustic parameter
+             * @default false
+             */
+            clear_unmatched: boolean;
         };
         AlignmentResult: {
             /** @constant */
