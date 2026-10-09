@@ -1,7 +1,8 @@
+import { SingerMarkersDialog } from './SingerMarkersDialog';
 import { useMemo, useState, type ReactNode } from 'react';
 import { anchorKey, anchorRange, cueProblem, type CueAnchor, type KaraokeCommand, type KaraokeCue } from '../domain/karaoke';
 import type { ProjectDocument, ProjectCommand } from '../domain/project-document';
-import { karaokeOutputs, nicokaraZip, prepareNicokara, safeFilename, singerSet } from '../adapters/nicokara';
+import { karaokeOutputs, nicokaraZip, prepareNicokara, safeFilename } from '../adapters/nicokara';
 import { SettingsDialog } from './editor/SettingsDialog';
 import { DraftInput, TimePair } from './editor/EditorFields';
 import { useEditorSelection } from './editor/SelectionContext';
@@ -31,11 +32,11 @@ export function CueProperties({project,cue,apply}: {project:ProjectDocument;cue:
     {problem&&<p role="alert">{problem}</p>}<button data-role="danger" onClick={()=>apply({kind:'remove',id:cue.id})}>删除导唱</button></>;
 }
 export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewIssues}: {project:ProjectDocument;apply:(command:ProjectCommand)=>void;title:string;exportOpen:boolean;setExportOpen:(open:boolean)=>void;viewIssues:(issues:OutputIssue[])=>void}) {
- const [dialog,setDialog]=useState<'groups'|'defaults'|'auto'|null>(null), [error,setError]=useState('');
+ const [dialog,setDialog]=useState<'groups'|'defaults'|'auto'|'singers'|null>(null), [error,setError]=useState('');
  const command=(c:KaraokeCommand)=>{try{apply({type:'karaoke',command:c});setError('');return true;}catch(e){setError((e as Error).message);return false;}};
- const sets=useMemo(()=>new Map(project.lyrics.lines.flatMap(line=>line.words.map(word=>{const set=singerSet(project,line,word);return [set.key,set.label||'未指定歌手'] as const;}))),[project.lyrics]);
- return <><div className={styles.tools}><button data-role="secondary" onClick={()=>setDialog('groups')}>分组管理</button><button data-role="secondary" onClick={()=>setDialog('auto')}>自动插入导唱符</button><button data-role="secondary" onClick={()=>setDialog('defaults')}>默认导唱符</button><button data-role="primary" onClick={()=>setExportOpen(true)}>导出 Nicokara</button><div className={styles.singers} aria-label="实际歌手组合">{[...sets].map(([id,label])=><span key={id}>{label}</span>)}</div></div>
+ return <><div className={styles.tools}><button data-role="secondary" onClick={()=>setDialog('groups')}>分组管理</button><button data-role="secondary" onClick={()=>setDialog('auto')}>自动插入导唱符</button><button data-role="secondary" onClick={()=>setDialog('defaults')}>默认导唱符</button><button data-role="primary" onClick={()=>setExportOpen(true)}>导出 Nicokara</button><button data-role="secondary" onClick={()=>setDialog('singers')}>歌手标记管理</button></div>
  {error&&!dialog&&<p role="alert">{error}</p>}
+ {dialog==='singers'&&<SingerMarkersDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='auto'&&<AutoInsertDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='defaults'&&<DefaultsDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='groups'&&<GroupsDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}

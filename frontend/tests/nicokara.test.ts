@@ -31,11 +31,11 @@ it('quantizes absolute times before relative offsets, blocks collapse and ambigu
  expect(prepareNicokara(p,'s').issues.filter(i=>i.message.includes('另一对象'))).toHaveLength(2);
  p.karaoke.lineGroups[second.id]='background';p.karaoke.outputs=[outputId('main')];expect(prepareNicokara(p,'s').issues).toEqual([]);
 });
-it('canonicalizes chorus, carries singer state and explicitly resets unnamed passages',()=>{
+it('canonicalizes chorus and leaves unspecified passages in the last emitted voice',()=>{
  const p=fixture(),l=p.lyrics.lines[0];l.words[0].rubyUnits=[];p.lyrics.agents=[{id:'b',name:'B',type:'person'},{id:'a',name:'A',type:'person'}];l.agentRefs=['a','b'];
  l.words.push({...createWord('次'),beginMs:22000,endMs:23000,agentRefs:['b','a']});const other=createLine('無');Object.assign(other.words[0],{beginMs:24000,endMs:25000});Object.assign(other,{beginMs:24000,endMs:25000});p.lyrics.lines.push(other);p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);
- const out=prepareNicokara(p,'s');expect(out.issues).toEqual([]);expect(out.files[0].text.match(/【B\+A】/g)).toHaveLength(1);expect(out.files[0].text).toContain('【】無');
- p.lyrics.agents.push({id:'c',name:'B+A',type:'person'});other.agentRefs=['c'];expect(prepareNicokara(p,'s').issues.some(i=>i.message.includes('相同标记'))).toBe(true);
+ const out=prepareNicokara(p,'s');expect(out.issues).toEqual([]);expect(out.files[0].text.match(/【B\+A】/g)).toHaveLength(2);expect(out.files[0].text).not.toContain('【】');expect(out.files[0].text).toContain('@Emoji1=【B+A】,transparent-1x1.png,,Zoom=1,NoDecor,MarginRight=-170');
+ p.lyrics.agents.push({id:'c',name:'B+A',type:'person'});other.agentRefs=['c'];expect(prepareNicokara(p,'s').issues.some(i=>i.message.includes('相同或'))).toBe(true);
 });
 it('encodes field commas and references without stripping punctuation or variation selectors',()=>{
  expect(encodeKraText('a,b&[00:01:00]❤️',true)).toBe('a&#44;b&#38;&#91;00:01:00&#93;❤️');
@@ -44,11 +44,36 @@ it('encodes field commas and references without stripping punctuation or variati
 it('creates an independently readable ZIP with UTF-8 BOM and unique safe names',()=>{
  const p=fixture();p.karaoke.groups.push({id:'MAIN',name:'collision'});const other=createLine('B');Object.assign(other.words[0],{beginMs:20000,endMs:21000});p.lyrics.lines.push(other);p.karaoke.lineGroups[other.id]='MAIN';p.karaoke.outputs.push(outputId('MAIN'));
  const zip=nicokaraZip(p,'../曲:*'),dir=mkdtempSync(join(tmpdir(),'kra-')),file=join(dir,'a.zip');
- try{writeFileSync(file,zip);const names=JSON.parse(execFileSync('python',['-c','import zipfile,json,sys; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; assert all(z.read(n).startswith(bytes([239,187,191])) for n in z.namelist()); print(json.dumps(z.namelist()))',file],{encoding:'utf8'}));expect(names).toHaveLength(3);expect(new Set(names.map((n:string)=>n.toLowerCase())).size).toBe(3);expect(names.every((n:string)=>!n.includes('/'))).toBe(true);}finally{rmSync(dir,{recursive:true,force:true});}
+ try{writeFileSync(file,zip);const names=JSON.parse(execFileSync('python',['-c','import zipfile,json,sys; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; assert all(z.read(n).startswith(bytes([239,187,191])) for n in z.namelist() if not n.endswith(".png")); assert z.read("transparent-1x1.png").startswith(bytes([137,80,78,71])); print(json.dumps(z.namelist()))',file],{encoding:'utf8'}));expect(names).toHaveLength(4);expect(new Set(names.map((n:string)=>n.toLowerCase())).size).toBe(4);expect(names.every((n:string)=>!n.includes('/'))).toBe(true);}finally{rmSync(dir,{recursive:true,force:true});}
  expect(safeFilename('CON')).toBe('_CON');
 });
 it('detects a Ruby base crossing a neighboring word boundary',()=>{
  const p=fixture(),l=p.lyrics.lines[0];l.words[0].text='二人';
  const other=createLine('二');Object.assign(other.words[0],{beginMs:20000,endMs:20500});other.words.push({...createWord('人'),beginMs:20500,endMs:21000});p.lyrics.lines.push(other);p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);
  expect(prepareNicokara(p,'s').issues.some(i=>i.message.includes('子串'))).toBe(true);
+});
+it('emits A → unspecified → A only once, A → unspecified → B twice, independently per file',()=>{
+ const p=fixture(),line=p.lyrics.lines[0];p.lyrics.agents=[{id:'a',name:'A',type:'person'},{id:'b',name:'',type:'person'}];
+ line.words=['a',null,'a',null,'b'].map((agent,index)=>({...createWord(String(index)),beginMs:20000+index*1000,endMs:21000+index*1000,agentRefs:agent?[agent]:[]}));
+ p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);
+ const other=createLine('other');other.words=[{...createWord('other'),beginMs:0,endMs:1000,agentRefs:['a']}];p.lyrics.lines.push(other);p.karaoke.lineGroups[other.id]='background';
+ const result=prepareNicokara(p,'s');expect(result.issues).toEqual([]);
+ expect(result.files[0].text.match(/【A】/g)).toHaveLength(2);expect(result.files[0].text).toContain('@Emoji2=【b】');
+ expect(result.files[1].text).toContain('[00:00:00]【A】other');expect(result.files[1].text).toContain('@Emoji1=【A】');expect(result.files[1].text).not.toContain('@Emoji2');
+});
+it('uses custom markers to resolve name collisions, encodes fields and rejects actual lyric conflicts locally',()=>{
+ const p=fixture(),line=p.lyrics.lines[0];p.lyrics.agents=[{id:'a',name:'A',type:'person'},{id:'b',name:'A',type:'person'}];line.agentRefs=['a'];line.words[0].rubyUnits=[];line.words.push({...createWord('next'),beginMs:22000,endMs:23000,agentRefs:['b']});
+ p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);expect(prepareNicokara(p,'s').issues.some(i=>i.message.includes('相同'))).toBe(true);
+ const marker=p.karaoke.singerMarkers[1];marker.trigger='B,&[x]';marker.beforeImage='C:\\images\\x,y&z.png';marker.afterImage='after.png';marker.zoom='25%';marker.noDecor=false;marker.forceWipeDecor=true;
+ let result=prepareNicokara(p,'s');expect(result.issues).toEqual([]);expect(result.files[0].text).toContain('@Emoji2=B&#44;&#38;&#91;x&#93;,C:\\images\\x&#44;y&#38;z.png,after.png,Zoom=25%,ForceWipeDecor,MarginRight=-170');
+ marker.trigger='next';expect(prepareNicokara(p,'s').issues.some(i=>i.message.includes('实际歌词'))).toBe(true);
+ marker.trigger='B';marker.beforeImage='bad\nimage';expect(prepareNicokara(p,'s').issues.some(i=>i.message.includes('控制字符'))).toBe(true);
+ p.lyrics.translationTracks=[{id:'t',language:'zh',purpose:'subtitle',contents:[{id:'t1',lineId:line.id,kind:'plain',text:'translation'}]}];
+ p.karaoke.outputs=[outputId('main','translation','t')];result=prepareNicokara(p,'s');expect(result.issues).toEqual([]);expect(result.files[0].text).not.toContain('@Emoji');
+ const bytes=nicokaraZip(p,'s');expect(new TextDecoder().decode(bytes)).toContain('transparent-1x1.png');
+});
+it('suppresses ForceWipeDecor with NoDecor and supports mutually exclusive Fix',()=>{
+ const p=fixture();p.lyrics.agents=[{id:'a',name:'A',type:'person'}];p.lyrics.lines[0].agentRefs=['a'];p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);
+ Object.assign(p.karaoke.singerMarkers[0],{sizeMode:'Fix',forceWipeDecor:true,marginRight:0,marginLeft:-4});
+ const text=prepareNicokara(p,'s').files[0].text;expect(text).toContain(',,Fix,NoDecor,MarginLeft=-4');expect(text).not.toContain('Zoom=');expect(text).not.toContain('ForceWipeDecor');
 });

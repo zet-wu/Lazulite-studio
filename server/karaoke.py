@@ -41,7 +41,21 @@ class Cue(Model):
     beginMs: StrictInt
     endMs: StrictInt
 
+class SingerMarker(Model):
+    agentIds: list[str] = Field(min_length=1)
+    trigger: str
+    beforeImage: str
+    afterImage: str
+    sizeMode: Literal['Zoom', 'Fix']
+    zoom: str
+    noDecor: bool
+    forceWipeDecor: bool
+    marginLeft: StrictInt
+    marginRight: StrictInt
+    marginBottom: StrictInt
+
 class Karaoke(Model):
+    singerMarkers: list[SingerMarker]
     groups: list[Group] = Field(min_length=1)
     lineGroups: dict[str, str]
     defaults: Defaults
@@ -51,6 +65,9 @@ class Karaoke(Model):
     @model_validator(mode='after')
     def identities(self):
         import json
+        keys = [tuple(sorted(marker.agentIds)) for marker in self.singerMarkers]
+        if len(set(keys)) != len(keys) or any(not all(marker.agentIds) or len(set(marker.agentIds)) != len(marker.agentIds) for marker in self.singerMarkers):
+            raise ValueError('invalid singer marker identities')
         groups = {g.id for g in self.groups}
         if len(groups) != len(self.groups) or len({c.id for c in self.cues}) != len(self.cues):
             raise ValueError('duplicate karaoke identity')
@@ -72,6 +89,6 @@ def initial_karaoke(ttml):
         if node.tag == '{http://www.w3.org/ns/ttml}p' or node.get(ttm+'role') == 'x-bg':
             key = node.get(studio+'id') or node.get(xml+'id')
             if key: groups[key] = 'background' if node.get(ttm+'role') == 'x-bg' else 'main'
-    return {'groups': [{'id': 'main', 'name': '主歌词'}, {'id': 'background', 'name': '背景歌词'}],
+    return {'singerMarkers': [], 'groups': [{'id': 'main', 'name': '主歌词'}, {'id': 'background', 'name': '背景歌词'}],
             'lineGroups': groups, 'defaults': {'main': 'main', 'background': 'background', 'text': '●', 'beforeMs': 3000, 'wordMs': 500, 'rubyMs': 500},
             'cues': [], 'outputs': ['["main","body",""]', '["background","body",""]']}

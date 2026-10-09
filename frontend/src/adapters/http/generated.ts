@@ -854,7 +854,7 @@ export interface components {
         };
         DocumentEnvelope: {
             /** @constant */
-            schema_version: "studio-document-v8";
+            schema_version: "studio-document-v9";
             project_id: string;
             revision: string | null;
             etag?: string;
@@ -862,7 +862,7 @@ export interface components {
             client_seq?: number | null;
             document: {
                 /** @constant */
-                schemaVersion: "studio-project-v6";
+                schemaVersion: "studio-project-v7";
                 lyrics: {
                     draftTtml: string;
                 };
@@ -909,6 +909,7 @@ export interface components {
                     cues: components["schemas"]["KaraokeCue"][];
                     /** Outputs */
                     outputs: string[];
+                    singerMarkers: components["schemas"]["KaraokeSingerMarker"][];
                 };
             };
         };
@@ -1180,6 +1181,34 @@ export interface components {
             leftId: string;
             /** Rightid */
             rightId: string;
+        };
+        /** SingerMarker */
+        KaraokeSingerMarker: {
+            /** Agentids */
+            agentIds: string[];
+            /** Trigger */
+            trigger: string;
+            /** Beforeimage */
+            beforeImage: string;
+            /** Afterimage */
+            afterImage: string;
+            /**
+             * Sizemode
+             * @enum {string}
+             */
+            sizeMode: "Zoom" | "Fix";
+            /** Zoom */
+            zoom: string;
+            /** Nodecor */
+            noDecor: boolean;
+            /** Forcewipedecor */
+            forceWipeDecor: boolean;
+            /** Marginleft */
+            marginLeft: number;
+            /** Marginright */
+            marginRight: number;
+            /** Marginbottom */
+            marginBottom: number;
         };
     };
     responses: {

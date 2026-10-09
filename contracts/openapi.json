@@ -2750,7 +2750,7 @@
         ],
         "properties": {
           "schema_version": {
-            "const": "studio-document-v8"
+            "const": "studio-document-v9"
           },
           "project_id": {
             "type": "string"
@@ -2787,7 +2787,7 @@
             ],
             "properties": {
               "schemaVersion": {
-                "const": "studio-project-v6"
+                "const": "studio-project-v7"
               },
               "lyrics": {
                 "type": "object",
@@ -2967,6 +2967,12 @@
                     },
                     "title": "Outputs",
                     "type": "array"
+                  },
+                  "singerMarkers": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/KaraokeSingerMarker"
+                    }
                   }
                 },
                 "required": [
@@ -2974,7 +2980,8 @@
                   "lineGroups",
                   "defaults",
                   "cues",
-                  "outputs"
+                  "outputs",
+                  "singerMarkers"
                 ],
                 "title": "Karaoke",
                 "type": "object"
@@ -3882,6 +3889,78 @@
           "rightId"
         ],
         "title": "WordAnchor",
+        "type": "object"
+      },
+      "KaraokeSingerMarker": {
+        "additionalProperties": false,
+        "properties": {
+          "agentIds": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Agentids",
+            "type": "array"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          },
+          "beforeImage": {
+            "title": "Beforeimage",
+            "type": "string"
+          },
+          "afterImage": {
+            "title": "Afterimage",
+            "type": "string"
+          },
+          "sizeMode": {
+            "enum": [
+              "Zoom",
+              "Fix"
+            ],
+            "title": "Sizemode",
+            "type": "string"
+          },
+          "zoom": {
+            "title": "Zoom",
+            "type": "string"
+          },
+          "noDecor": {
+            "title": "Nodecor",
+            "type": "boolean"
+          },
+          "forceWipeDecor": {
+            "title": "Forcewipedecor",
+            "type": "boolean"
+          },
+          "marginLeft": {
+            "title": "Marginleft",
+            "type": "integer"
+          },
+          "marginRight": {
+            "title": "Marginright",
+            "type": "integer"
+          },
+          "marginBottom": {
+            "title": "Marginbottom",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agentIds",
+          "trigger",
+          "beforeImage",
+          "afterImage",
+          "sizeMode",
+          "zoom",
+          "noDecor",
+          "forceWipeDecor",
+          "marginLeft",
+          "marginRight",
+          "marginBottom"
+        ],
+        "title": "SingerMarker",
         "type": "object"
       }
     }

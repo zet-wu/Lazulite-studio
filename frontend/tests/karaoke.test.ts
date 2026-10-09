@@ -64,3 +64,12 @@ it('uses the latest prior occupied endpoint across overlapping and reordered lin
  expect(autoInsertCues(p.lyrics,p.karaoke).cues).toHaveLength(0);
  p.lyrics.lines.reverse();expect(autoInsertCues(p.lyrics,p.karaoke).cues).toHaveLength(0);
 });
+it('preserves configured markers through names, order, project round trip and atomic undo',()=>{
+ const p=fixture();p.lyrics.agents=[{id:'a',name:'A',type:'person'},{id:'b',name:'B',type:'person'}];p.lyrics.lines[0].agentRefs=['b','a'];p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);
+ const marker={...p.karaoke.singerMarkers[0],trigger:'duet',beforeImage:'external.png'};
+ const state=createProjectEditorState(p), next=executeProjectCommand(state,{type:'karaoke',command:{kind:'singer-markers',markers:[marker]}});
+ expect(undoProjectCommand(next).present).toBe(p);
+ const changed=structuredClone(next.present.lyrics);changed.agents.reverse();changed.agents[0].name='Renamed';
+ const renamed=executeProjectCommand(next,{type:'lyrics',command:{type:'replace-document',document:changed}});
+ expect(renamed.present.karaoke.singerMarkers).toEqual([marker]);expect(parseProject(serializeProject(renamed.present))).toEqual(renamed.present);
+});

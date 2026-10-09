@@ -1,8 +1,10 @@
+import { initializeSingerMarkers, validateSingerMarkers, markerProblem, type SingerMarker } from './singer-markers';
 import type { LyricDocument, LyricLine, LyricWord } from './lyric-document';
 
 export type CueAnchor = { kind: 'before'; lineId: string } | { kind: 'word'; lineId: string; leftId: string; rightId: string } | { kind: 'ruby'; lineId: string; wordId: string; leftId: string; rightId: string };
 export type KaraokeCue = { id: string; text: string; anchor: CueAnchor; beginMs: number; endMs: number };
 export type Karaoke = {
+  singerMarkers: SingerMarker[];
   groups: { id: string; name: string }[];
   lineGroups: Record<string, string>;
   defaults: { main: string | null; background: string | null; text: string; beforeMs: number; wordMs: number; rubyMs: number };
@@ -11,7 +13,7 @@ export type Karaoke = {
 };
 export const outputId = (groupId: string, kind = 'body', trackId = '') => JSON.stringify([groupId, kind, trackId]);
 export function createKaraoke(lyrics: LyricDocument): Karaoke {
-  return { groups: [{ id: 'main', name: '主歌词' }, { id: 'background', name: '背景歌词' }], lineGroups: Object.fromEntries(lyrics.lines.map(line => [line.id, line.backgroundOf ? 'background' : 'main'])), defaults: { main: 'main', background: 'background', text: '●', beforeMs: 3000, wordMs: 500, rubyMs: 500 }, cues: [], outputs: [outputId('main'), outputId('background')] };
+  return { singerMarkers: initializeSingerMarkers(lyrics, []), groups: [{ id: 'main', name: '主歌词' }, { id: 'background', name: '背景歌词' }], lineGroups: Object.fromEntries(lyrics.lines.map(line => [line.id, line.backgroundOf ? 'background' : 'main'])), defaults: { main: 'main', background: 'background', text: '●', beforeMs: 3000, wordMs: 500, rubyMs: 500 }, cues: [], outputs: [outputId('main'), outputId('background')] };
 }
 export const anchorKey = (anchor: CueAnchor) => JSON.stringify(anchor.kind === 'before' ? [anchor.kind,anchor.lineId] : [anchor.kind,anchor.leftId,anchor.rightId]);
 const timed = (item: { beginMs: number | null; endMs: number | null }) => item.beginMs !== null && item.endMs !== null && item.beginMs >= 0 && item.endMs > item.beginMs;
@@ -90,12 +92,17 @@ export function reconcileKaraoke(lyrics: LyricDocument, karaoke: Karaoke): Karao
     }
     return [];
   });
-  return { ...karaoke, lineGroups, cues };
+  return { ...karaoke, lineGroups, cues, singerMarkers: initializeSingerMarkers(lyrics, karaoke.singerMarkers) };
 }
-export type KaraokeCommand = { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; moves: Record<string, string>; main: string | null; background: string | null } | { kind: 'outputs'; outputs: string[] };
+export type KaraokeCommand = { kind: 'singer-markers'; markers: SingerMarker[] } | { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; moves: Record<string, string>; main: string | null; background: string | null } | { kind: 'outputs'; outputs: string[] };
 export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: KaraokeCommand): Karaoke {
   let next = karaoke;
   switch (command.kind) {
+    case 'singer-markers': {
+      validateSingerMarkers(command.markers);
+      for (const marker of command.markers) { const problem=markerProblem(marker); if(problem)throw new Error(problem); }
+      next = { ...karaoke, singerMarkers: command.markers }; break;
+    }
     case 'insert': next = insertCue(lyrics, karaoke, command.anchor); break;
     case 'auto': {
       const configured = { ...karaoke, defaults: { ...karaoke.defaults, ...command.thresholds } };
@@ -128,6 +135,7 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
 /** Shape validation at persistence boundaries; editable timing issues belong to output validation. */
 export function validateKaraoke(lyrics: LyricDocument, value: Karaoke) {
   if (!value || !Array.isArray(value.groups) || !Array.isArray(value.cues) || !value.lineGroups || !value.defaults || !Array.isArray(value.outputs)) throw new Error('卡拉 OK 项目数据无效');
+  validateSingerMarkers(value.singerMarkers);
   const ids = new Set<string>();
   for (const group of value.groups) { if (typeof group.id !== 'string' || !group.id || ids.has(group.id) || typeof group.name !== 'string' || !group.name.trim()) throw new Error('分组名称或标识无效'); ids.add(group.id); }
   if (!ids.size || ['main', 'background'].some(key => { const id = value.defaults[key as 'main' | 'background']; return id !== null && !ids.has(id); })) throw new Error('默认分组无效');

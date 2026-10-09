@@ -1,5 +1,6 @@
 import { isUntimedSeparator } from './export-separators';
-import { wordAgents } from '../domain/amll-compatibility';
+import { defaultSingerMarker, singerKey, singerSet, markerProblem, type SingerMarker } from '../domain/singer-markers';
+import transparentPng from '../assets/transparent-1x1.png?inline';
 import { cueProblem, cueWord, outputId, type KaraokeCue } from '../domain/karaoke';
 import type { LyricLine, LyricWord, TimeMs } from '../domain/lyric-document';
 import type { ProjectDocument } from '../domain/project-document';
@@ -23,19 +24,20 @@ export const safeFilename = (name: string) => {
   const clean = name.normalize('NFC').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\.{2,}/g, '_').replace(/[. ]+$/g, '').slice(0, 100) || 'project';
   return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(clean) ? `_${clean}` : clean;
 };
-export function singerSet(project: ProjectDocument, line: LyricLine, word: LyricWord) {
-  const refs = wordAgents(project.lyrics, line, word);
-  const ids = project.lyrics.agents.filter(agent => refs.includes(agent.id)).map(agent => agent.id);
-  return { key: JSON.stringify(ids), label: ids.map(id => { const a = project.lyrics.agents.find(a => a.id === id)!; return a.name || a.id; }).join('+'), missing: refs.some(id => !ids.includes(id)) };
+const encodeEmojiField = (text: string) => text.replace(/[&,\[\]]/g, char => `&#${char.codePointAt(0)};`);
+function emojiDeclaration(marker: SingerMarker, index: number) {
+  return `@Emoji${index}=` + [encodeEmojiField(marker.trigger), encodeEmojiField(marker.beforeImage), encodeEmojiField(marker.afterImage), marker.sizeMode==='Zoom'?`Zoom=${marker.zoom}`:'Fix', ...(marker.noDecor?['NoDecor']:marker.forceWipeDecor?['ForceWipeDecor']:[]), ...([['marginLeft','MarginLeft'],['marginRight','MarginRight'],['marginBottom','MarginBottom']] as const).flatMap(([key,name])=>marker[key]?[`${name}=${marker[key]}`]:[])].join(',');
 }
-type Segment = { text: string; beginMs: number; endMs: number; singer?: { key: string; label: string } };
-function sequence(segments: Segment[], offset = 0, singer?: { key: string }) {
+type SegmentSinger = { key: string; marker: SingerMarker; target: Partial<OutputIssue> };
+type Segment = { text: string; beginMs: number; endMs: number; singer?: SegmentSinger };
+function sequence(segments: Segment[], offset = 0, singer?: { key: string; emit: (value: SegmentSinger) => void }) {
   let result = '', last: number | null = null;
   for (const segment of segments) {
     const begin = quantize(segment.beginMs) - offset, end = quantize(segment.endMs) - offset;
     if (last !== begin) result += nicokaraTime(begin);
     if (singer && segment.singer && segment.singer.key !== singer.key) {
-      result += `【${encodeKraText(segment.singer.label)}】`;
+      result += encodeEmojiField(segment.singer.marker.trigger);
+      singer.emit(segment.singer);
       singer.key = segment.singer.key;
     }
     result += segment.text + nicokaraTime(end); last = end;
@@ -75,14 +77,14 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
     if (!output) { add({ karaokeSettings: true }, '所选输出已失效，请重新选择文件', id); continue; }
     const lines = lyrics.lines.filter(line => karaoke.lineGroups[line.id] === output.groupId);
     const rows: string[] = [], rules: string[] = [], bases: { word: LyricWord; lineId: string; signature: string; begin: number; end: number }[] = [];
-    const singer = { key: '[]' }, labels = new Map<string, { key: string; target: Partial<OutputIssue> }>();
-    const singerFor = (line: LyricLine, word: LyricWord) => {
-      const value = singerSet(project, line, word), target = { kind: 'word' as const, lineId: line.id, wordId: word.id };
+    const declarations = new Map<string, SegmentSinger>();
+    const singer = { key: '[]', emit: (value: SegmentSinger) => declarations.set(value.key, value) };
+    const singerFor = (line: LyricLine, word: LyricWord): SegmentSinger | undefined => {
+      const value = singerSet(lyrics, line, word), target = { kind: 'word' as const, lineId: line.id, wordId: word.id };
       if (value.missing) add(target, '歌手引用已失效', id);
-      if (/[【】\r\n]/u.test(value.label)) add(target, '歌手名称包含标记分隔符，无法无歧义表达', id);
-      const old = labels.get(value.label);
-      if (old && old.key !== value.key) { add(target, '不同歌手集合生成相同标记，请修改名称消歧', id); add(old.target, '不同歌手集合生成相同标记，请修改名称消歧', id); }
-      labels.set(value.label, { key: value.key, target }); return value;
+      if (!value.ids.length) return undefined;
+      const marker = karaoke.singerMarkers.find(marker=>singerKey(marker.agentIds)===value.key) ?? defaultSingerMarker(value);
+      return { key: value.key, marker, target };
     };
     const cueSegment = (cue: KaraokeCue): Segment | null => {
       const target = { lineId: cue.anchor.lineId, cueId: cue.id }, problem = cueProblem(lyrics, karaoke, cue);
@@ -149,6 +151,13 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
       for (const cue of karaoke.cues.filter(cue => karaoke.lineGroups[cue.anchor.lineId] === output.groupId)) {
         const problem = cueProblem(lyrics, karaoke, cue); if (problem) add({ lineId: cue.anchor.lineId, cueId: cue.id }, problem, id, 'invalid-range');
       }
+      for (const {marker,target,key} of declarations.values()) {
+        const problem=markerProblem(marker); if(problem)add(target,problem,id);
+        for(const field of [marker.trigger,marker.beforeImage,marker.afterImage])textOk(field,target,id);
+        for(const other of declarations.values())if(other.key!==key && (marker.trigger.includes(other.marker.trigger)||other.marker.trigger.includes(marker.trigger)))add(target,'不同歌手集合的触发标记相同或相互包含，请在歌手标记管理中消歧',id);
+        if(marker.trigger && lines.some(line=>line.words.map(word=>word.text).join('').includes(marker.trigger) || line.words.some(word=>word.rubyUnits.map(unit=>unit.reading).join('').includes(marker.trigger))) || marker.trigger && karaoke.cues.some(cue=>karaoke.lineGroups[cue.anchor.lineId]===output.groupId&&cue.text.includes(marker.trigger)))add(target,'触发标记与实际歌词或导唱冲突，请在歌手标记管理中修改',id);
+        if(emojiDeclaration(marker, declarations.size).length>1024)add(target,'歌手声明超过规范单行 1024 字符限制',id);
+      }
       for (const base of bases) for (const line of lines) {
         const joined=line.words.map(word=>word.text).join('');
         for(let at=joined.indexOf(base.word.text);at>=0;at=joined.indexOf(base.word.text,at+1)){
@@ -166,20 +175,20 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
     for (const tag of metadata) if (tag.length > 1024) add({ karaokeSettings: true }, '元数据超过规范单行 1024 字符限制', id);
     if (!rows.length) { omitted.push(output.label); continue; }
     const name = names.get(output.id)!;
-    files.push({ name, text: '\uFEFF' + [...metadata, ...rows, ...rules].join('\r\n') + '\r\n', output });
+    files.push({ name, text: '\uFEFF' + [...metadata, ...rows, ...rules, ...[...declarations.values()].map((value,index)=>emojiDeclaration(value.marker,index+1))].join('\r\n') + '\r\n', output });
   }
   // Invalid assignments cannot silently drop lyrics from an otherwise selected output.
   for (const line of lyrics.lines) if (!karaoke.groups.some(group => group.id === karaoke.lineGroups[line.id]) && selected.length) add({ lineId: line.id, karaokeSettings: true }, '歌词行缺少有效输出分组', selected[0]);
   if (!selected.length || !files.length && !issues.length) add({ karaokeSettings: true }, '请选择至少一个有实际内容的输出文件', selected[0] ?? '');
   const merged = new Map<string, OutputIssue>();
   for (const issue of issues) { const key = outputIssueKey(issue) + issue.message; const previous = merged.get(key); merged.set(key, previous ? { ...previous, outputIds: [...new Set([...previous.outputIds!, ...issue.outputIds!])] } : issue); }
-  return { files, issues: [...merged.values()], omitted, summary: [...files.map(file => `${file.name} — ${file.output.label}`), ...omitted.map(label => `空输出已省略：${label}`), '时间向下量化为厘秒；源项目毫秒时间不变。', '翻译／音译按整句输出；请在 NKM3 中将扫色前后颜色设为相同以显示静态字幕。', '歌手标记写入输出副本；空标记【】表示返回无歌手。'].join('\r\n') + '\r\n' };
+  return { files, issues: [...merged.values()], omitted, summary: [...files.map(file => `${file.name} — ${file.output.label}`), ...omitted.map(label => `空输出已省略：${label}`), '时间向下量化为厘秒；源项目毫秒时间不变。', '翻译／音译按整句输出；请在 NKM3 中将扫色前后颜色设为相同以显示静态字幕。', '歌手标记写入输出副本；未指定歌手时沿用已输出声部。'].join('\r\n') + '\r\n' };
 }
-/** Small uncompressed ZIP writer. UTF-8 names and CRC32; no media or paths. */
-export function zipTextFiles(files: { name: string; text: string }[]): Uint8Array<ArrayBuffer> {
+/** Uncompressed ZIP writer with UTF-8 names and CRC32. */
+export function zipFiles(files: ({ name: string; text: string } | { name: string; data: Uint8Array<ArrayBuffer> })[]): Uint8Array<ArrayBuffer> {
   const enc = new TextEncoder(), local: Uint8Array<ArrayBuffer>[] = [], central: Uint8Array<ArrayBuffer>[] = []; let offset = 0;
   for (const file of files) {
-    const name = enc.encode(file.name), data = enc.encode(file.text); let crc = 0xffffffff;
+    const name = enc.encode(file.name), data = 'data' in file ? file.data : enc.encode(file.text); let crc = 0xffffffff;
     for (const byte of data) { crc ^= byte; for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0); } crc = (crc ^ 0xffffffff) >>> 0;
     const header = new Uint8Array(30 + name.length), view = new DataView(header.buffer);
     view.setUint32(0, 0x04034b50, true); view.setUint16(4, 20, true); view.setUint16(6, 0x800, true); view.setUint16(12, 33, true);
@@ -197,5 +206,6 @@ export function zipTextFiles(files: { name: string; text: string }[]): Uint8Arra
 export function nicokaraZip(project: ProjectDocument, title: string) {
   const result = prepareNicokara(project, title);
   if (result.issues.length) throw new DocumentOutputError(result.issues);
-  return zipTextFiles([...result.files, { name: 'summary.txt', text: '\uFEFF' + result.summary }]);
+  const image = Uint8Array.from(atob(transparentPng.split(',')[1]), char=>char.charCodeAt(0));
+  return zipFiles([...result.files, { name: 'summary.txt', text: '\uFEFF' + result.summary }, { name: 'transparent-1x1.png', data: image }]);
 }
