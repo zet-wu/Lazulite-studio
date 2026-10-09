@@ -10,7 +10,7 @@ export function fixture() {
 }
 it('keeps cues outside TTML, round trips project and undoes a whole auto insertion',()=>{
  const p=fixture(), state=createProjectEditorState(p);
- const next=executeProjectCommand(state,{type:'karaoke',command:{kind:'auto'}});
+ const next=executeProjectCommand(state,{type:'karaoke',command:{kind:'auto',groupIds:['main'],thresholds:p.karaoke.defaults}});
  expect(next.present.karaoke.cues).toHaveLength(3);
  expect(serializeProject(next.present).lyrics.draftTtml).toBe(serializeProject(p).lyrics.draftTtml);
  expect(parseProject(serializeProject(next.present))).toEqual(next.present);
@@ -49,4 +49,18 @@ it('rejects missing or overlapping source ranges instead of inventing gaps',()=>
  const p=fixture(), line=p.lyrics.lines[0], anchor={kind:'word' as const,lineId:line.id,leftId:'a',rightId:'b'};
  line.words[0].beginMs=null;expect(anchorRange(p.lyrics,anchor)).toBeNull();
  line.words[0].beginMs=4000;line.words[1].beginMs=4900;expect(anchorRange(p.lyrics,anchor)).toBeNull();
+});
+it('limits all scans to selected groups and undoes thresholds together with cues',()=>{
+ const p=fixture(), other=structuredClone(p.lyrics.lines[0]);other.id='other';other.words=other.words.map(w=>({...w,id:`other-${w.id}`,rubyUnits:w.rubyUnits.map(r=>({...r,id:`other-${r.id}`}))}));
+ p.lyrics.lines.push(other);p.karaoke.lineGroups.other='background';
+ const state=createProjectEditorState(p), next=executeProjectCommand(state,{type:'karaoke',command:{kind:'auto',groupIds:['background'],thresholds:{beforeMs:0,wordMs:0,rubyMs:0}}});
+ expect(next.present.karaoke.cues).toHaveLength(3);expect(next.present.karaoke.cues.every(c=>c.anchor.lineId==='other')).toBe(true);
+ expect(undoProjectCommand(next).present).toBe(p);
+ expect(()=>applyKaraoke(p.lyrics,p.karaoke,{kind:'auto',groupIds:[],thresholds:p.karaoke.defaults})).toThrow('分组');
+});
+it('uses the latest prior occupied endpoint across overlapping and reordered lines',()=>{
+ const p=fixture();p.lyrics.lines=[['a',0,20000],['b',5000,6000],['c',10000,11000]].map(([id,begin,end])=>{const line=createLine(String(id));Object.assign(line.words[0],{beginMs:begin,endMs:end});return line;});
+ p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);
+ expect(autoInsertCues(p.lyrics,p.karaoke).cues).toHaveLength(0);
+ p.lyrics.lines.reverse();expect(autoInsertCues(p.lyrics,p.karaoke).cues).toHaveLength(0);
 });

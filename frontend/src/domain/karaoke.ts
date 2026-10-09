@@ -52,10 +52,12 @@ export function insertCue(lyrics: LyricDocument, karaoke: Karaoke, anchor: CueAn
   }
   return { ...karaoke, cues: [...karaoke.cues, { id: crypto.randomUUID(), text: karaoke.defaults.text, anchor, beginMs, endMs }] };
 }
-export function autoInsertCues(lyrics: LyricDocument, karaoke: Karaoke): Karaoke {
+export function autoInsertCues(lyrics: LyricDocument, karaoke: Karaoke, groupIds = karaoke.groups.map(group => group.id)): Karaoke {
+  if (!groupIds.length || groupIds.some(id => !karaoke.groups.some(group => group.id === id))) throw new Error('请选择有效的目标分组');
   let next = karaoke;
   for (const line of lyrics.lines) {
     const group = karaoke.lineGroups[line.id], first = firstLyric(line);
+    if (!groupIds.includes(group)) continue;
     if (group && first && timed(first)) {
       const peers = lyrics.lines.filter(other => other.id !== line.id && karaoke.lineGroups[other.id] === group && firstLyric(other)?.beginMs !== null && firstLyric(other)?.beginMs! < first.beginMs!);
       const ends = peers.flatMap(other => other.words.filter(word => word.text.trim()).map(word => timed(word) ? word.endMs! : null));
@@ -90,12 +92,16 @@ export function reconcileKaraoke(lyrics: LyricDocument, karaoke: Karaoke): Karao
   });
   return { ...karaoke, lineGroups, cues };
 }
-export type KaraokeCommand = { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto' } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; moves: Record<string, string>; main: string | null; background: string | null } | { kind: 'outputs'; outputs: string[] };
+export type KaraokeCommand = { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; moves: Record<string, string>; main: string | null; background: string | null } | { kind: 'outputs'; outputs: string[] };
 export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: KaraokeCommand): Karaoke {
   let next = karaoke;
   switch (command.kind) {
     case 'insert': next = insertCue(lyrics, karaoke, command.anchor); break;
-    case 'auto': next = autoInsertCues(lyrics, karaoke); break;
+    case 'auto': {
+      const configured = { ...karaoke, defaults: { ...karaoke.defaults, ...command.thresholds } };
+      validateKaraoke(lyrics, configured);
+      next = autoInsertCues(lyrics, configured, command.groupIds); break;
+    }
     case 'remove': next = { ...karaoke, cues: karaoke.cues.filter(cue => cue.id !== command.id) }; break;
     case 'cue': {
       const old = karaoke.cues.find(cue => cue.id === command.id);

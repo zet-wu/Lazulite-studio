@@ -1,5 +1,4 @@
-import { parseProject, serializeProject } from '../adapters/project-codec';
-import { useMemo, useState, useRef, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { anchorKey, anchorRange, cueProblem, type CueAnchor, type KaraokeCommand, type KaraokeCue } from '../domain/karaoke';
 import type { ProjectDocument, ProjectCommand } from '../domain/project-document';
 import { karaokeOutputs, nicokaraZip, prepareNicokara, safeFilename, singerSet } from '../adapters/nicokara';
@@ -31,13 +30,13 @@ export function CueProperties({project,cue,apply}: {project:ProjectDocument;cue:
     <TimePair begin={cue.beginMs} end={cue.endMs} label="导唱" onCommit={(beginMs,endMs)=>{if(beginMs===null||endMs===null)throw new Error('导唱需要完整双端');apply({kind:'cue',id:cue.id,text:cue.text,beginMs,endMs});}}/>
     {problem&&<p role="alert">{problem}</p>}<button data-role="danger" onClick={()=>apply({kind:'remove',id:cue.id})}>删除导唱</button></>;
 }
-export function KaraokeTools({project,apply,title,projectId,exportOpen,setExportOpen,viewIssues}: {project:ProjectDocument;apply:(command:ProjectCommand)=>void;title:string;projectId?:string;exportOpen:boolean;setExportOpen:(open:boolean)=>void;viewIssues:(issues:OutputIssue[])=>void}) {
- const projectFile=useRef<HTMLInputElement>(null);
- const [dialog,setDialog]=useState<'groups'|'defaults'|null>(null), [error,setError]=useState('');
+export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewIssues}: {project:ProjectDocument;apply:(command:ProjectCommand)=>void;title:string;exportOpen:boolean;setExportOpen:(open:boolean)=>void;viewIssues:(issues:OutputIssue[])=>void}) {
+ const [dialog,setDialog]=useState<'groups'|'defaults'|'auto'|null>(null), [error,setError]=useState('');
  const command=(c:KaraokeCommand)=>{try{apply({type:'karaoke',command:c});setError('');return true;}catch(e){setError((e as Error).message);return false;}};
  const sets=useMemo(()=>new Map(project.lyrics.lines.flatMap(line=>line.words.map(word=>{const set=singerSet(project,line,word);return [set.key,set.label||'未指定歌手'] as const;}))),[project.lyrics]);
- return <><div className={styles.tools}><button data-role="secondary" onClick={()=>setDialog('groups')}>分组管理</button><button data-role="secondary" onClick={()=>command({kind:'auto'})}>自动插入导唱符</button><button data-role="secondary" onClick={()=>setDialog('defaults')}>默认导唱符</button><button data-role="primary" onClick={()=>setExportOpen(true)}>导出 Nicokara</button><button data-role="secondary" onClick={()=>downloadKaraoke(JSON.stringify({projectId,document:serializeProject(project)},null,2),`${safeFilename(title)}.studio.json`,'application/json')}>下载项目</button><button data-role="secondary" onClick={()=>projectFile.current?.click()}>重开项目</button><input ref={projectFile} hidden aria-label="重开项目文件" type="file" accept=".json" style={{width:130}} onChange={async event=>{const file=event.target.files?.[0];if(!file)return;try{const value=JSON.parse(await file.text());if(value.projectId!==projectId)throw new Error('请在下载时的原项目中重开此文件，以保留媒体与声学引用');apply({type:'restore-project',project:parseProject(value.document)});setError('');}catch(e){setError((e as Error).message);}event.target.value='';}}/><div className={styles.singers} aria-label="实际歌手组合">{[...sets].map(([id,label])=><span key={id}>{label}</span>)}</div></div>
+ return <><div className={styles.tools}><button data-role="secondary" onClick={()=>setDialog('groups')}>分组管理</button><button data-role="secondary" onClick={()=>setDialog('auto')}>自动插入导唱符</button><button data-role="secondary" onClick={()=>setDialog('defaults')}>默认导唱符</button><button data-role="primary" onClick={()=>setExportOpen(true)}>导出 Nicokara</button><div className={styles.singers} aria-label="实际歌手组合">{[...sets].map(([id,label])=><span key={id}>{label}</span>)}</div></div>
  {error&&!dialog&&<p role="alert">{error}</p>}
+ {dialog==='auto'&&<AutoInsertDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='defaults'&&<DefaultsDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='groups'&&<GroupsDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {exportOpen&&<KaraokeExport project={project} title={title} apply={command} close={()=>setExportOpen(false)} viewIssues={issues=>{setExportOpen(false);viewIssues(issues);}}/>}</>;
@@ -45,7 +44,19 @@ export function KaraokeTools({project,apply,title,projectId,exportOpen,setExport
 function DefaultsDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
  const [value,setValue]=useState(project.karaoke.defaults);
  return <SettingsDialog title="默认导唱符" close={close}>{error&&<p role="alert">{error}</p>}<div className={styles.defaults}><label htmlFor="cue-default-text">导唱文字</label><input id="cue-default-text" value={value.text} onChange={e=>setValue({...value,text:e.target.value})}/>
- {([['beforeMs','行前阈值'],['wordMs','正文行内阈值'],['rubyMs','Ruby 内阈值']] as const).map(([key,label])=><Field key={key} label={`${label}（毫秒）`}><input aria-label={label} type="number" min={0} step={1} value={value[key]} onChange={e=>setValue({...value,[key]:Number(e.target.value)})}/></Field>)}</div><p>仅大于阈值时自动插入；默认文字只影响之后新增的导唱。</p><button data-role="primary" onClick={()=>{if(apply({kind:'settings',defaults:value}))close();}}>应用</button></SettingsDialog>;
+</div><p>默认文字只影响之后新增的导唱。</p><button data-role="primary" onClick={()=>{if(apply({kind:'settings',defaults:value}))close();}}>应用</button></SettingsDialog>;
+}
+function AutoInsertDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
+ const [groups,setGroups]=useState(project.karaoke.groups.map(group=>group.id));
+ const [thresholds,setThresholds]=useState(Object.fromEntries((['beforeMs','wordMs','rubyMs'] as const).map(key=>[key,String(project.karaoke.defaults[key])])));
+ const [inputError,setInputError]=useState('');
+ return <SettingsDialog title="自动插入导唱符" close={close}>{(inputError||error)&&<p role="alert">{inputError||error}</p>}
+ <fieldset><legend>目标输出分组</legend>{project.karaoke.groups.map(group=><label className={styles.output} key={group.id}><input type="checkbox" checked={groups.includes(group.id)} onChange={e=>setGroups(e.target.checked?[...groups,group.id]:groups.filter(id=>id!==group.id))}/>{group.name}</label>)}</fieldset>
+ {([['beforeMs','行前阈值'],['wordMs','正文行内阈值'],['rubyMs','Ruby 内阈值']] as const).map(([key,label])=><Field key={key} label={`${label}（毫秒）`}><input aria-label={label} type="number" min={0} step={1} value={thresholds[key]} onChange={e=>setThresholds({...thresholds,[key]:e.target.value})}/></Field>)}
+ <p>仅大于阈值时自动插入。</p><button data-role="primary" onClick={()=>{
+ if(Object.values(thresholds).some(value=>!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value)))){setInputError('阈值须为非负整数');return;}
+ if(apply({kind:'auto',groupIds:groups,thresholds:{beforeMs:Number(thresholds.beforeMs),wordMs:Number(thresholds.wordMs),rubyMs:Number(thresholds.rubyMs)}}))close();
+ }}>插入</button></SettingsDialog>;
 }
 function Field({label,children}:{label:string;children:ReactNode}) {return <label>{label}{children}</label>;}
 function GroupsDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {

@@ -18,8 +18,8 @@ test('yellow slots insert once on double click, share cue properties and keep or
  await page.locator('[data-top-menu="view"] summary').click();await page.getByRole('button',{name:'夜间模式',exact:true}).click();await page.screenshot({path:test.info().outputPath('karaoke-dark.png')});
 });
 test('auto insertion is idempotent and export ZIP can return from focused validation',async({page})=>{
- await load(page);await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(3);
- await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(3);
+ await load(page);await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await page.getByRole('button',{name:'插入',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(3);
+ await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await page.getByRole('button',{name:'插入',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(3);
  await page.getByRole('button',{name:'导出 Nicokara',exact:true}).click();await expect(page.getByRole('dialog').getByRole('status')).toContainText('0 项阻塞');
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'下载 ZIP',exact:true}).click();expect((await download).suggestedFilename()).toMatch(/-nicokara.zip$/);
  await page.getByRole('button',{name:'查看校验',exact:true}).click();await expect(page.getByLabel('校验格式筛选')).toHaveValue('nicokara');
@@ -30,13 +30,6 @@ test('group edits and a cue remain after mock save',async({page})=>{
  await page.getByRole('button',{name:'分组管理',exact:true}).click();await page.getByLabel('分组名称 main',{exact:true}).fill('主声部');await page.getByRole('button',{name:'应用分组',exact:true}).click();
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'导出 Nicokara',exact:true}).click();await expect(page.getByRole('dialog').getByText('主声部 · 正文',{exact:true})).toBeVisible();
-});
-test('downloaded project reopens cues and groups in the same project, with one undo',async({page})=>{
- await load(page);await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
- const download=page.waitForEvent('download');await page.getByRole('button',{name:'下载项目',exact:true}).click();const file=await (await download).path();
- await page.getByRole('button',{name:'删除导唱',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(0);
- await page.getByLabel('重开项目文件').setInputFiles(file!);await expect(page.locator('main [data-cue-id]')).toHaveCount(1);
- await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(0);
 });
 test('timeline cue selects shared properties, resizes within range and rejects out of bounds',async({page})=>{
  await load(page);await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
