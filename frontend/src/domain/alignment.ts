@@ -14,7 +14,8 @@ export type AlignmentResult = {
   acoustics: Acoustics | null;
 };
 type Pair = { beginMs: TimeMs; endMs: TimeMs };
-export function mergeAlignment(project: ProjectDocument, result: AlignmentResult, durationMs: number, clearUnmatched = false) {
+export function mergeAlignment(project: ProjectDocument, result: AlignmentResult, durationMs: number, clearUnmatched = false, gapThresholdMs: number | null = null) {
+  if (gapThresholdMs !== null && (!Number.isSafeInteger(gapThresholdMs) || gapThresholdMs <= 0)) throw new Error("行内空隙阈值必须为正的安全整数毫秒");
   if (result.alignment.schema !== 'lazulite-japanese-result-v1') throw new Error('自动对齐结果版本无效');
   const next = structuredClone(project), skipped = new Set(project.editing.skippedAlignmentLineIds);
   const units = new Map(result.alignment.units.map(unit => [unit.unit_id, unit]));
@@ -39,10 +40,24 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
   })) throw new Error('对齐结果完整范围或目标映射不匹配');
   const retained: { id: string; reason: string }[] = [];
   const cleared: string[] = [];
+  const adoptedComplete = new Set<string>();
+  let mergedGaps = 0;
+  const segments = [...(result.acoustics ?? project.acoustics).segments].sort((a,b) => a.beginMs - b.beginMs);
+  function continuouslyCovered(begin: number, end: number) {
+    let covered = begin;
+    for (const segment of segments) {
+      if (segment.endMs <= covered) continue;
+      if (segment.beginMs > covered) return false;
+      covered = segment.endMs;
+      if (covered >= end) return true;
+    }
+    return false;
+  }
   const endpoint = (value: Endpoint): TimeMs => value === null ? null : Math.round(value.time * 1000);
   const legal = (pair: Pair) => [pair.beginMs, pair.endMs].every(t => t === null || Number.isSafeInteger(t) && t >= 0 && t <= durationMs) && (pair.beginMs === null || pair.endMs === null || pair.beginMs < pair.endMs);
   function merge(id: string, old: Pair, proposed: Pair): Pair {
     if (!legal(proposed)) { retained.push({id, reason:'非法建议端点'}); return old; }
+    if (proposed.beginMs !== null && proposed.endMs !== null) adoptedComplete.add(id);
     if (clearUnmatched) {
       if (old.beginMs !== null && proposed.beginMs === null || old.endMs !== null && proposed.endMs === null) cleared.push(id);
       return proposed;
@@ -72,17 +87,34 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
     const ends = children.flatMap(c => c.endMs === null ? [] : [c.endMs]);
     return {beginMs: candidate.beginMs === null ? null : Math.min(candidate.beginMs, ...starts), endMs: candidate.endMs === null ? null : Math.max(candidate.endMs, ...ends)};
   }
-  for (const line of next.lyrics.lines) {
+  for (const [lineIndex, line] of next.lyrics.lines.entries()) {
     if (skipped.has(line.id)) continue;
-    let lineChanged = false;
-    for (const word of line.words) {
-      const before = JSON.stringify(word);
-      if (word.rubyUnits.length) {
-        for (const ruby of word.rubyUnits) Object.assign(ruby, adopt(ruby.id, ruby));
-        if (clearUnmatched || JSON.stringify(word) !== before) Object.assign(word, envelope(word, word.rubyUnits.filter(r => !clearUnmatched || scope.get(r.id)!.target_ids.length)));
-      } else Object.assign(word, adopt(word.id, word));
-      lineChanged ||= JSON.stringify(word) !== before;
+    const before = JSON.stringify(line.words);
+    const lineLeaves = line.words.flatMap(word => word.rubyUnits.length ? word.rubyUnits : [word]);
+    for (const leaf of lineLeaves) Object.assign(leaf, adopt(leaf.id, leaf));
+    if (gapThresholdMs !== null) {
+      let previous: (Pair & {id:string}) | undefined;
+      for (const leaf of lineLeaves) {
+        // Only authoritative omitted, finally untimed separators are transparent.
+        if (!scope.get(leaf.id)!.target_ids.length && leaf.beginMs === null && leaf.endMs === null) continue;
+        if (!adoptedComplete.has(leaf.id)) { previous = undefined; continue; }
+        if (previous) {
+          const end = previous.endMs!, start = leaf.beginMs!;
+          if (0 < start - end && start - end < gapThresholdMs && continuouslyCovered(end, start)) {
+            previous.endMs = start;
+            mergedGaps++;
+          }
+        }
+        previous = leaf;
+      }
     }
+    for (const [wordIndex, word] of line.words.entries()) {
+      if (word.rubyUnits.length) {
+        const original = project.lyrics.lines[lineIndex].words[wordIndex];
+        if (clearUnmatched || JSON.stringify(word) !== JSON.stringify(original)) Object.assign(word, envelope(word, word.rubyUnits.filter(r => !clearUnmatched || scope.get(r.id)!.target_ids.length)));
+      }
+    }
+    const lineChanged = JSON.stringify(line.words) !== before;
     if (clearUnmatched || lineChanged) Object.assign(line, envelope(line, line.words.filter(word => clearUnmatched ? (word.rubyUnits.length ? word.rubyUnits.some(r => scope.get(r.id)!.target_ids.length) : scope.get(word.id)!.target_ids.length) : word.text.trim() || word.rubyUnits.length)));
   }
   // Keep evaluated links only when already consistent. Never propagate into skipped rows.
@@ -92,5 +124,5 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
   }
   if (result.acoustics) { validateSegments(result.acoustics.segments, durationMs); next.acoustics = result.acoustics; }
   validateProjectEditing(next.lyrics, next.editing); assertAmll(next.lyrics, next.amll);
-  return { project: JSON.stringify(next) === JSON.stringify(project) ? project : next, retained, cleared };
+  return { project: JSON.stringify(next) === JSON.stringify(project) ? project : next, retained, cleared, mergedGaps };
 }
