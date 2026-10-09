@@ -37,7 +37,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const failure = latest && ['failed','cancelled','interrupted'].includes(latest.status);
   const conflict = pending && latest?.status==='succeeded' && !handled.current.has(pending.id) && pending.baseline!==JSON.stringify(project.acoustics);
   const adopted = sourceResults.find(r=>r.id===project.acoustics.analysisId);
-  const adoptedAvailable = adopted?.audio_state === 'current';
+  const adoptedAvailable = !!adopted && adopted.audio_state !== 'missing';
   const ready = !!project.acoustics.analysisId || project.acoustics.segments.length>0;
   const showing = busy || !!active || !!error || jobs.isError || results.isError || completed.isError || !!conflict || !!(failure && dismissed!==latest.id);
   useEffect(()=>ui.setTimelineReady(ready && !showing),[ready,showing,ui.setTimelineReady]);
@@ -68,7 +68,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
       <div className={styles.segmentTools} ref={ui.setToolsHost}/>
       {ready ? <TopMenu id="audio-analysis" title="音频分析" className={editorStyles.ribbonMenu} activeMenuId={menu} onMenuChange={setMenu}>
         {(!currentAudio || repair || update) && <button data-role="inline" disabled={locked||busy||!!active} title="生成可用人声并分析，替换全部片段及人工修正" onClick={()=>void run()}>{repair?'重新生成人声':update?'更新人声分离结果':'分离人声'}</button>}
-        {(repair||update) && <span>{repair?'人声文件缺失或损坏': '现有人声未匹配当前分离版本'}</span>}
+        {(repair||update) && <span>{repair?'人声文件缺失、损坏或存储版本不支持': '现有人声未匹配当前分离版本'}</span>}
         <button data-role="inline" disabled={locked||busy||!!active||!adoptedAvailable} title="复用现有人声，替换全部片段及人工修正" onClick={()=>void run(project.acoustics.analysisId!)}>重新进行声学分析</button>
         {adoptedAvailable && project.acoustics.analysisId && <a data-role="secondary" href={download(project.acoustics.analysisId)} download>下载人声 WAV</a>}
         {failure && <button data-role="inline" onClick={()=>setDismissed(null)}>查看最近处理结果</button>}

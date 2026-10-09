@@ -232,6 +232,12 @@ def test_cached_separation_reanalysis_repair_and_version_update(tmp_path, monkey
         assert updated != restored and Counted.calls == 4
         assert (tmp_path/'projects'/'p'/'vocals'/restored/'vocals.wav').exists()
         assert client.get('/api/v1/projects/p/vocals').json()['items'][0]['audio_state'] == 'current'
+        # An explicit historical WAV analysis keeps that audio even after model configuration changes.
+        historical = run(restored)
+        assert Counted.calls == 4
+        item = client.get('/api/v1/projects/p/vocals').json()['items'][0]
+        assert item['id'] == historical and item['audio_id'] == restored and item['audio_state'] == 'outdated'
+        assert client.get(f'/api/v1/projects/p/vocals/{historical}/file').content == (tmp_path/'projects/p/vocals'/restored/'vocals.wav').read_bytes()
 
 
 def test_restart_keeps_shared_audio_and_project_deletion_releases_it(tmp_path):

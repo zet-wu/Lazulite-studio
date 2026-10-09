@@ -60,7 +60,7 @@ class VocalRunner:
         if params.get('retry_analysis_id'):
             row, candidate = self.get(project_id, params['retry_analysis_id'])
             if row['source_asset_id'] != params['asset_id']: raise ValueError('人声来源不匹配')
-            if candidate['separation_signature'] == signature and self.audio_available(project_id, candidate): reuse = (row, candidate)
+            if self.audio_available(project_id, candidate): reuse = (row, candidate)
         else:
             with self.db.connect() as c:
                 rows = c.execute('SELECT * FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id, params['asset_id'])).fetchall()
