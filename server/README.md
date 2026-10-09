@@ -48,7 +48,7 @@ AMLL 兼容设置和显示顺序在项目快照中保存；`amll_compatibility.p
 
 自动对齐由 `alignment_projection.py` 从已保存项目构造全局请求，`alignment.py` 校验当前 revision／源音频身份并准备资源，`alignment_worker.py` 在受监管子进程执行固定 NextFire 路线。配置 `STUDIO_NEXTFIRE_PATH` 指向交付模型目录，`STUDIO_ALIGNMENT_DEVICE` 为 `cpu` 或 `cuda`；分离保持 `htdemucs`，设备由 `STUDIO_VOCAL_DEVICE` 配置。`server/requirements-alignment.txt` 引用本轮 Linux CUDA 实测依赖约束；其他平台应选择相容的 Torch 设备构建并单独验证。模型散列由 Lazulite 固定校验。
 
-HTTP 提供只读 `alignment-preview?revision=…` 和内部 `jobs/alignment`，只接受 revision、use_hints 和默认关闭的 line_blank／rest_blank／rest_token 布尔开关，以及 Studio 合并策略 clear_unmatched；任务固定所选组合并传入 Lazulite 0.2.1；路径、模型与输出位置均由服务构造。任务与人声互斥、支持幂等启动和取消，结果保留原始／建议时间及映射，服务不自动改稿。当前页面持有一次应用意图。旧转写／行级／forced／读音任务、项目词典与审核路由已删除；`/reading/analyze` 保留主动注音能力。
+HTTP 提供只读 `alignment-preview?revision=…` 和内部 `jobs/alignment`，只接受 revision、use_hints 和默认关闭的 line_blank／rest_blank／rest_token 布尔开关，以及 Studio 合并策略 clear_unmatched、merge_short_gaps 与正安全整数 gap_threshold_ms（默认 500，合并关闭时规范化为 500）；任务固定所选组合，仅三个实验代价和行首选项传入 Lazulite 0.2.1；路径、模型与输出位置均由服务构造。任务与人声互斥、支持幂等启动和取消，结果保留原始／建议时间及映射，服务不自动改稿。当前页面持有一次应用意图。旧转写／行级／forced／读音任务、项目词典与审核路由已删除；`/reading/analyze` 保留主动注音能力。
 
 `scope` 枚举未跳过行中的全部正文／Ruby 叶对象及其确定的 target_ids，区分正常省略与丢失模型结果。服务校验完整目标后返回；前端按启动快照再次核对范围，清空开启时重算父包络。清空仅修改 Studio 时间，不传入声学配置或改变声学缓存。
 
