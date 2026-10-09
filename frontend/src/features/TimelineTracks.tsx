@@ -1,3 +1,5 @@
+import { KaraokeContext } from './KaraokeContext';
+import { createProjectEditorState, executeProjectCommand } from '../domain/project-document';
 import { KaraokeTrack } from './KaraokeTrack';
 import { useProjectEditing } from './editor/ProjectEditingContext';
 import { projectTimeline } from '../domain/timeline-projection';
@@ -24,6 +26,7 @@ const timed = (begin: number | null, end: number | null): begin is number => beg
 
 export function TimelineTracks({ locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onPan, onError }: Props) {
   const editing = useProjectEditing();
+  const projectContext = useContext(KaraokeContext);
   const tracksRef = useRef<HTMLDivElement>(null);
   const [plotWidth, setPlotWidth] = useState(640);
   useEffect(() => {
@@ -125,6 +128,9 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
         candidate.document = current.side === 'move'
           ? moveTimeline(document, moving, timeMs - current.originalMs, editing)
           : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs, editing);
+        if (projectContext && current.side === 'move' && moving.every(item => item.kind === 'line')) {
+          executeProjectCommand(createProjectEditorState(projectContext.project), { type: 'lyrics', command: { type: 'shift-lines', lineIds: moving.map(item => item.lineId), deltaMs: timeMs - current.originalMs } });
+        }
       } catch (cause) { candidate.error = cause instanceof Error ? cause.message : '时间轴编辑失败'; }
       onError(candidate.error);
     } else if (current.target) candidate.timeMs = current.originalMs;
@@ -148,7 +154,10 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       return;
     }
     if (current.candidate.error) { onError(current.candidate.error); return; }
-    apply({ type: 'replace-document', document: current.candidate.document }); onError('');
+    const moving = selectionTargets(document, selection).some(item => targetId(item) === targetId(current.target!)) ? selectionTargets(document, selection) : [current.target];
+    apply(current.side === 'move' && moving.every(target => target.kind === 'line')
+      ? { type: 'shift-lines', lineIds: moving.map(target => target.lineId), deltaMs: current.candidate.timeMs - current.originalMs }
+      : { type: 'replace-document', document: current.candidate.document }); onError('');
   };
   const boxTargets = useRef<TimelineTarget[]>([]);
   const bar = (target: TimelineTarget, label: string, beginMs: number, endMs: number, active = false, laneLayoutOverride?: ReturnType<typeof packIntervals>) => {

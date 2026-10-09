@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
-import { createProjectDocument, createProjectEditorState, executeProjectCommand, undoProjectCommand } from '../src/domain/project-document';
+import { createProjectDocument, createProjectEditorState, executeProjectCommand, redoProjectCommand, undoProjectCommand } from '../src/domain/project-document';
 import { anchorRange, autoInsertCues, cueProblem, insertCue, reconcileKaraoke, applyKaraoke } from '../src/domain/karaoke';
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
 export function fixture() {
@@ -72,4 +72,17 @@ it('preserves configured markers through names, order, project round trip and at
  const changed=structuredClone(next.present.lyrics);changed.agents.reverse();changed.agents[0].name='Renamed';
  const renamed=executeProjectCommand(next,{type:'lyrics',command:{type:'replace-document',document:changed}});
  expect(renamed.present.karaoke.singerMarkers).toEqual([marker]);expect(parseProject(serializeProject(renamed.present))).toEqual(renamed.present);
+});
+
+it.each([500,-500])('shifts three cue kinds with selected lines atomically (%i)', deltaMs=>{
+ const p=fixture();p.karaoke=autoInsertCues(p.lyrics,p.karaoke);const other=createLine('background');other.backgroundOf=p.lyrics.lines[0].id;p.lyrics.lines.push(other);p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);
+ const state=createProjectEditorState(p);const next=executeProjectCommand(state,{type:'lyrics',command:{type:'shift-lines',lineIds:[p.lyrics.lines[0].id],deltaMs}});
+ expect(next.present.karaoke.cues).toEqual(p.karaoke.cues.map(c=>({...c,beginMs:c.beginMs+deltaMs,endMs:c.endMs+deltaMs})));
+ expect(next.present.lyrics.lines[1]).toEqual(other);expect(next.past).toHaveLength(1);
+ expect(undoProjectCommand(next).present).toBe(p);expect(redoProjectCommand(undoProjectCommand(next)).present).toBe(next.present);
+ expect(parseProject(serializeProject(next.present))).toEqual(next.present);
+});
+it('rejects the whole shift when only a before cue would become negative',()=>{
+ const p=fixture();p.karaoke=autoInsertCues(p.lyrics,p.karaoke);const state=createProjectEditorState(p),before=structuredClone(state);
+ expect(()=>executeProjectCommand(state,{type:'lyrics',command:{type:'shift-lines',lineIds:[p.lyrics.lines[0].id],deltaMs:-3500}})).toThrow('导唱');expect(state).toEqual(before);
 });

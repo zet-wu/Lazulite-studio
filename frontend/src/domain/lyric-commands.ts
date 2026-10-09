@@ -1,3 +1,4 @@
+import { shiftLineTimes } from './batch-editing';
 import { preserveWordAgents, wordAgents, sameAgents, validateAgents, lineAgents } from './amll-compatibility';
 import { createProjectEditing, emptyBeatCount, setEmptyBeat, reconcileEditing, validateProjectEditing, type ProjectEditing } from './project-editing';
 import { lineStructureIssues } from './line-structure';
@@ -10,6 +11,7 @@ import { stampSync, type SyncAction, type SyncCursor, type SyncMode } from './sy
 const MAX_HISTORY = 256;
 
 type AtomicLyricCommand =
+  | { type: 'shift-lines'; lineIds: string[]; deltaMs: number }
   | { type: 'insert-line'; afterLineId: string | null; line?: LyricLine }
   | { type: 'set-background-of'; lineId: string; parentLineId: string | null }
   | { type: 'delete-line'; lineId: string }
@@ -659,6 +661,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
 }
 
 function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editing: ProjectEditing): LyricDocument {
+  if (command.type === 'shift-lines') return (shiftLineTimes(document, command.lineIds, command.deltaMs, editing) as Extract<LyricCommand, {type:'replace-document'}>).document;
   const structured = applyStructure(document, command, editing);
   const wordCommand = command as WordCommand;
   return structured ?? editWord(document, wordCommand.lineId, wordCommand.wordId, (word, line) => {

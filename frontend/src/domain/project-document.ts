@@ -1,4 +1,4 @@
-import { createKaraoke, reconcileKaraoke, applyKaraoke, type Karaoke, type KaraokeCommand } from './karaoke';
+import { cueProblem, createKaraoke, reconcileKaraoke, applyKaraoke, type Karaoke, type KaraokeCommand } from './karaoke';
 import { assertAmll, checkAmll, createAmllSettings, amllDependencies, displayLines, groupDisplayLines, lineAgents, type AmllRule, type AmllSettings } from './amll-compatibility';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
 import { applyLyricTransaction, type LyricCommand } from './lyric-commands';
@@ -100,10 +100,24 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
   } else if (command.type === 'lyrics') {
     const result = applyLyricTransaction(state.present.lyrics, command.command, state.present.editing);
     if (result.lyrics === state.present.lyrics && result.editing === state.present.editing) return state;
+    let karaoke = state.present.karaoke;
+    const commands = command.command.type === 'batch' ? command.command.commands : [command.command];
+    const moved = new Set<string>();
+    for (const item of commands) if (item.type === 'shift-lines') {
+      karaoke = { ...karaoke, cues: karaoke.cues.map(cue => {
+        if (!item.lineIds.includes(cue.anchor.lineId)) return cue;
+        moved.add(cue.id);
+        return { ...cue, beginMs: cue.beginMs + item.deltaMs, endMs: cue.endMs + item.deltaMs };
+      }) };
+    }
+    for (const cue of karaoke.cues) if (moved.has(cue.id)) {
+      const problem = cueProblem(result.lyrics, karaoke, cue);
+      if (problem) throw new Error(`行 ${cue.anchor.lineId} · 导唱 ${cue.id}：${problem}`);
+    }
     const previous=displayLines(state.present.lyrics,state.present.lineOrder);
     const before=previous.filter((line,i)=>line.backgroundOf&&i<previous.findIndex(item=>item.id===line.backgroundOf)).map(line=>line.id);
     const changedOrder=result.lyrics.lines.map(line=>line.id).join(' ')!==state.present.lyrics.lines.map(line=>line.id).join(' ');
-    present = { ...state.present, ...result, lineOrder:changedOrder?groupDisplayLines(result.lyrics,before).map(line=>line.id):state.present.lineOrder };
+    present = { ...state.present, ...result, karaoke, lineOrder:changedOrder?groupDisplayLines(result.lyrics,before).map(line=>line.id):state.present.lineOrder };
   } else {
     validateSegments(command.acoustics.segments, command.durationMs);
     if (command.acoustics === state.present.acoustics) return state;

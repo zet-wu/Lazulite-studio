@@ -4,7 +4,7 @@ import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
 import { useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
-import { replaceWords, shiftLineTimes, smoothWordTimes, syncLineTimes } from '../../domain/batch-editing';
+import { replaceWords, smoothWordTimes, syncLineTimes } from '../../domain/batch-editing';
 import { lineText, type LyricDocument } from '../../domain/lyric-document';
 import type { EditorSelection } from './editing-actions';
 import styles from './semantic-editor.module.css';
@@ -43,8 +43,8 @@ export function BatchToolsPanel({ document, selection, currentLineId, apply, clo
       } else if (operation === 'shift') {
         const amount = Number(amountMs);
         if (!Number.isFinite(amount) || !Number.isSafeInteger(Math.round(amount))) throw new Error('请输入有效的毫秒偏移量');
-        command = shiftLineTimes(document, targets.map((line) => line.id), Math.round(amount), editing);
-        summary = `移动 ${targets.length} 行，词、注音 和对齐时间一同移动`;
+        command = { type: 'shift-lines', lineIds: targets.map(line => line.id), deltaMs: Math.round(amount) };
+        summary = `移动 ${targets.length} 行，词、注音、附属时间和导唱一同移动`;
       } else if (operation === 'smooth') {
         const amount = Number(thresholdMs);
         if (!Number.isFinite(amount) || !Number.isSafeInteger(Math.round(amount))) throw new Error('请输入有效的毫秒阈值');
