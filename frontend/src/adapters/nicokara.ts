@@ -18,7 +18,7 @@ export function nicokaraTime(ms: number) {
   return `[${String(Math.floor(cs / 6000)).padStart(2, '0')}:${String(Math.floor(cs / 100) % 60).padStart(2, '0')}:${String(cs % 100).padStart(2, '0')}]`;
 }
 // Numeric references are decoded by the consumer after field/tag recognition.
-export const encodeKraText = (text: string, ruby = false) => text.replace(ruby ? /[&,\[\]]/g : /[&\[\]]/g, char => `&#${char.codePointAt(0)};`);
+export const encodeKraText = (text: string, ruby = false) => text.replace(ruby ? /[&,\[\]【】]/g : /[&\[\]【】]/g, char => `&#${char.codePointAt(0)};`);
 export const safeFilename = (name: string) => {
   const clean = name.normalize('NFC').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\.{2,}/g, '_').replace(/[. ]+$/g, '').slice(0, 100) || 'project';
   return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(clean) ? `_${clean}` : clean;
@@ -47,7 +47,7 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
   const outputs = karaokeOutputs(project), lyrics = project.lyrics, karaoke = project.karaoke;
   const add = (target: Partial<OutputIssue>, message: string, output: string, code: OutputIssue['code'] = 'serialization') => issues.push({ kind: 'line', lineId: '', missing: [], ...target, code, message, severity: 'error', formats: ['Nicokara'], outputIds: [output] });
   const valid = (begin: TimeMs, end: TimeMs, target: Partial<OutputIssue>, output: string) => {
-    if (begin === null || end === null) { add(target, '缺少完整双端时间', output, 'missing-time'); return false; }
+    if (begin === null || end === null) { add({...target,missing:[...(begin===null?['begin' as const]:[]),...(end===null?['end' as const]:[])]}, '缺少完整双端时间', output, 'missing-time'); return false; }
     if (!Number.isSafeInteger(begin) || !Number.isSafeInteger(end) || begin < 0 || end <= begin || quantize(end) > 5999990) { add(target, '时间必须为正范围，且不超过 [99:59:99]', output, 'invalid-range'); return false; }
     if (quantize(begin) === quantize(end)) { add(target, '有文字单元在厘秒量化后变为零时长', output, 'invalid-range'); return false; }
     return true;
@@ -59,7 +59,17 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
     const value = lyrics.metadata[key]?.join(' / ').replace(/[\r\n\u2028\u2029]+/g, ' ');
     return value ? [`@${tag}=${encodeKraText(value)}`] : [];
   });
-  const usedNames = new Set<string>();
+  const stems = new Map(outputs.map(output=>{
+    const same=outputs.filter(o=>o.groupId===output.groupId&&o.kind===output.kind&&o.language===output.language);
+    const suffix=output.kind==='body'?'':`.${output.kind}.${safeFilename(output.language)}${same.length>1?`.${safeFilename(output.trackId)}`:''}`;
+    return [output.id,`${safeFilename(title)}.${safeFilename(output.groupId)}${suffix}`.slice(0,220)];
+  }));
+  const names=new Map<string,string>(),usedNames=new Set<string>();
+  for(const output of [...outputs].sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0)){
+    const stem=stems.get(output.id)!;let name=`${stem}.kra`,index=1;
+    while(usedNames.has(name.toLowerCase()))name=`${stem}.${index++}.kra`;
+    usedNames.add(name.toLowerCase());names.set(output.id,name);
+  }
   for (const id of [...new Set(selected)]) {
     const output = outputs.find(output => output.id === id);
     if (!output) { add({ karaokeSettings: true }, '所选输出已失效，请重新选择文件', id); continue; }
@@ -111,7 +121,6 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
         textOk(word.text, target, id);
         if (!valid(word.beginMs, word.endMs, target, id)) continue;
         const currentSinger = singerFor(line, word);
-        if (/[【】]/u.test(word.text)) add(target, '正文包含歌手标记分隔符，无法无歧义表达', id);
         segments.push({ text: encodeKraText(leadingSpace + word.text), beginMs: word.beginMs!, endMs: word.endMs!, singer: currentSinger });
         leadingSpace = '';
         const reading: Segment[] = [];
@@ -140,23 +149,23 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
       for (const cue of karaoke.cues.filter(cue => karaoke.lineGroups[cue.anchor.lineId] === output.groupId)) {
         const problem = cueProblem(lyrics, karaoke, cue); if (problem) add({ lineId: cue.anchor.lineId, cueId: cue.id }, problem, id, 'invalid-range');
       }
-      for (const base of bases) for (const line of lines) for (const word of line.words) {
-        if (word.id === base.word.id || word.beginMs === null || !word.text.includes(base.word.text)) continue;
-        const time = quantize(word.beginMs);
-        if (time < base.begin || time > base.end) continue;
-        const match = bases.find(b => b.word.id === word.id);
-        if (word.text === base.word.text && match?.signature === base.signature && match.begin === base.begin) continue;
-        for (const item of [{ lineId: base.lineId, wordId: base.word.id }, { lineId: line.id, wordId: word.id }]) add({ kind: 'word', ...item }, 'Ruby 规则会匹配同文或子串的另一对象，请调整输出分组', id);
+      for (const base of bases) for (const line of lines) {
+        const joined=line.words.map(word=>word.text).join('');
+        for(let at=joined.indexOf(base.word.text);at>=0;at=joined.indexOf(base.word.text,at+1)){
+          let offset=0;
+          const word=line.words.find(word=>{const contains=offset<=at&&offset+word.text.length>at;offset+=word.text.length;return contains;});
+          if(!word||word.beginMs===null)continue;
+          const exact=word.text===base.word.text;
+          if(exact&&word.id===base.word.id)continue;
+          const time=quantize(word.beginMs),match=bases.find(b=>b.word.id===word.id);
+          if(time<base.begin||time>base.end||exact&&match?.signature===base.signature)continue;
+          for(const item of [{lineId:base.lineId,wordId:base.word.id},{lineId:line.id,wordId:word.id}])add({kind:'word',...item},'Ruby 规则会匹配同文或子串的另一对象，请调整输出分组',id);
+        }
       }
     }
     for (const tag of metadata) if (tag.length > 1024) add({ karaokeSettings: true }, '元数据超过规范单行 1024 字符限制', id);
     if (!rows.length) { omitted.push(output.label); continue; }
-    const same = outputs.filter(o => o.groupId === output.groupId && o.kind === output.kind && o.language === output.language);
-    const suffix = output.kind === 'body' ? '' : `.${output.kind}.${safeFilename(output.language)}${same.length > 1 ? `.${safeFilename(output.trackId)}` : ''}`;
-    const stem = `${safeFilename(title)}.${safeFilename(output.groupId)}${suffix}`;
-    let name = `${stem}.kra`, index = 1;
-    while (usedNames.has(name.toLowerCase())) name = `${stem}.${index++}.kra`;
-    usedNames.add(name.toLowerCase());
+    const name = names.get(output.id)!;
     files.push({ name, text: '\uFEFF' + [...metadata, ...rows, ...rules].join('\r\n') + '\r\n', output });
   }
   // Invalid assignments cannot silently drop lyrics from an otherwise selected output.

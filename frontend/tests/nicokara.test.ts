@@ -47,3 +47,8 @@ it('creates an independently readable ZIP with UTF-8 BOM and unique safe names',
  try{writeFileSync(file,zip);const names=JSON.parse(execFileSync('python',['-c','import zipfile,json,sys; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; assert all(z.read(n).startswith(bytes([239,187,191])) for n in z.namelist()); print(json.dumps(z.namelist()))',file],{encoding:'utf8'}));expect(names).toHaveLength(3);expect(new Set(names.map((n:string)=>n.toLowerCase())).size).toBe(3);expect(names.every((n:string)=>!n.includes('/'))).toBe(true);}finally{rmSync(dir,{recursive:true,force:true});}
  expect(safeFilename('CON')).toBe('_CON');
 });
+it('detects a Ruby base crossing a neighboring word boundary',()=>{
+ const p=fixture(),l=p.lyrics.lines[0];l.words[0].text='二人';
+ const other=createLine('二');Object.assign(other.words[0],{beginMs:20000,endMs:20500});other.words.push({...createWord('人'),beginMs:20500,endMs:21000});p.lyrics.lines.push(other);p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);
+ expect(prepareNicokara(p,'s').issues.some(i=>i.message.includes('子串'))).toBe(true);
+});

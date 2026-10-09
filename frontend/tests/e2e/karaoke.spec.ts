@@ -25,7 +25,7 @@ test('auto insertion is idempotent and export ZIP can return from focused valida
  await page.getByRole('button',{name:'查看校验',exact:true}).click();await expect(page.getByLabel('校验格式筛选')).toHaveValue('nicokara');
  await page.getByRole('button',{name:'返回 Nicokara 导出',exact:true}).click();await expect(page.getByRole('dialog',{name:'导出 Nicokara',exact:true})).toBeVisible();
 });
-test('group edits and a cue survive real mock save/reopen',async({page})=>{
+test('group edits and a cue remain after mock save',async({page})=>{
  await load(page);await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
  await page.getByRole('button',{name:'分组管理',exact:true}).click();await page.getByLabel('分组名称 main',{exact:true}).fill('主声部');await page.getByRole('button',{name:'应用分组',exact:true}).click();
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();
