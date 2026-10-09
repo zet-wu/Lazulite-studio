@@ -1,14 +1,14 @@
 .tools { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 16px; border-bottom:1px solid var(--line); }
-.cue, .slot { display:inline-flex; align-items:center; justify-content:center; min-width:30px; background:var(--karaoke-surface) !important; color:var(--karaoke-text) !important; border:1px solid transparent; border-radius:5px; padding:4px 7px; white-space:pre-wrap; cursor:pointer; }
-.cue[aria-pressed="true"] { outline:2px solid var(--blue); outline-offset:1px; }
-.slot { min-width:20px; }
-.cue input { width:8ch; }
+.cue, button.slot[data-role][data-role] { display:inline-block; vertical-align:baseline; min-width:0; min-height:0; max-width:100%; font:inherit; line-height:inherit; background:var(--karaoke-surface); color:var(--karaoke-text); border:0; border-radius:4px; padding:0 3px; white-space:pre-wrap; overflow-wrap:anywhere; cursor:pointer; }
+.cue[aria-pressed="true"], .cue:focus-visible, button.slot[data-role]:focus-visible { outline:2px solid var(--blue); outline-offset:-1px; }
+button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); padding:0; text-align:center; }
+.cue + .cue { margin-left:4px; }
+.cue input { width:8ch; min-height:0; max-width:100%; font:inherit; line-height:inherit; padding:0; border:0; border-radius:0; background:transparent; color:inherit; }
 .groups { display:grid; gap:12px; }
 .group { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
 .group input { width:150px; }
 .defaults { display:grid; grid-template-columns:minmax(120px,1fr) minmax(100px,1fr); gap:8px; align-items:center; }
 .output { display:flex; align-items:center; gap:8px; padding:5px; }
-.singers { display:flex; gap:8px; flex-wrap:wrap; color:var(--muted); font-size:12px; }
 .track { display:grid; grid-template-columns:var(--timeline-label-width) minmax(0,1fr); gap:var(--timeline-gap); align-items:start; }
 .track > strong { padding-left:var(--timeline-label-inset); align-self:center; font-size:10px; color:var(--muted); }
 .lane { position:relative; overflow:hidden; min-height:32px; background:var(--timeline-surface); }

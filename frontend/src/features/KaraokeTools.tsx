@@ -33,11 +33,12 @@ export function CueProperties({project,cue,apply}: {project:ProjectDocument;cue:
 }
 export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewIssues}: {project:ProjectDocument;apply:(command:ProjectCommand)=>void;title:string;exportOpen:boolean;setExportOpen:(open:boolean)=>void;viewIssues:(issues:OutputIssue[])=>void}) {
  const [dialog,setDialog]=useState<'groups'|'defaults'|'auto'|'singers'|null>(null), [error,setError]=useState('');
+ const [autoGroups,setAutoGroups]=useState<string[]|null>(null);
  const command=(c:KaraokeCommand)=>{try{apply({type:'karaoke',command:c});setError('');return true;}catch(e){setError((e as Error).message);return false;}};
- return <><div className={styles.tools}><button data-role="secondary" onClick={()=>setDialog('groups')}>分组管理</button><button data-role="secondary" onClick={()=>setDialog('auto')}>自动插入导唱符</button><button data-role="secondary" onClick={()=>setDialog('defaults')}>默认导唱符</button><button data-role="primary" onClick={()=>setExportOpen(true)}>导出 Nicokara</button><button data-role="secondary" onClick={()=>setDialog('singers')}>歌手标记管理</button></div>
+ return <><div className={styles.tools}><button data-role="secondary" onClick={()=>(setError(''),setDialog('groups'))}>分组管理</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('auto'))}>自动插入导唱符</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('defaults'))}>默认导唱符</button><button data-role="primary" onClick={()=>setExportOpen(true)}>导出 Nicokara</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('singers'))}>歌手标记管理</button></div>
  {error&&!dialog&&<p role="alert">{error}</p>}
  {dialog==='singers'&&<SingerMarkersDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
- {dialog==='auto'&&<AutoInsertDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
+ {dialog==='auto'&&<AutoInsertDialog initialGroups={autoGroups} rememberGroups={setAutoGroups} error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='defaults'&&<DefaultsDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='groups'&&<GroupsDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {exportOpen&&<KaraokeExport project={project} title={title} apply={command} close={()=>setExportOpen(false)} viewIssues={issues=>{setExportOpen(false);viewIssues(issues);}}/>}</>;
@@ -47,8 +48,8 @@ function DefaultsDialog({project,close,apply,error}:{error:string;project:Projec
  return <SettingsDialog title="默认导唱符" close={close}>{error&&<p role="alert">{error}</p>}<div className={styles.defaults}><label htmlFor="cue-default-text">导唱文字</label><input id="cue-default-text" value={value.text} onChange={e=>setValue({...value,text:e.target.value})}/>
 </div><p>默认文字只影响之后新增的导唱。</p><button data-role="primary" onClick={()=>{if(apply({kind:'settings',defaults:value}))close();}}>应用</button></SettingsDialog>;
 }
-function AutoInsertDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
- const [groups,setGroups]=useState(project.karaoke.groups.map(group=>group.id));
+function AutoInsertDialog({project,close,apply,error,initialGroups,rememberGroups}:{initialGroups:string[]|null;rememberGroups:(ids:string[])=>void;error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
+ const [groups,setGroups]=useState(initialGroups?.filter(id=>project.karaoke.groups.some(group=>group.id===id))??project.karaoke.groups.map(group=>group.id));
  const [thresholds,setThresholds]=useState(Object.fromEntries((['beforeMs','wordMs','rubyMs'] as const).map(key=>[key,String(project.karaoke.defaults[key])])));
  const [inputError,setInputError]=useState('');
  return <SettingsDialog title="自动插入导唱符" close={close}>{(inputError||error)&&<p role="alert">{inputError||error}</p>}
@@ -56,7 +57,8 @@ function AutoInsertDialog({project,close,apply,error}:{error:string;project:Proj
  {([['beforeMs','行前阈值'],['wordMs','正文行内阈值'],['rubyMs','Ruby 内阈值']] as const).map(([key,label])=><Field key={key} label={`${label}（毫秒）`}><input aria-label={label} type="number" min={0} step={1} value={thresholds[key]} onChange={e=>setThresholds({...thresholds,[key]:e.target.value})}/></Field>)}
  <p>仅大于阈值时自动插入。</p><button data-role="primary" onClick={()=>{
  if(Object.values(thresholds).some(value=>!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value)))){setInputError('阈值须为非负整数');return;}
- if(apply({kind:'auto',groupIds:groups,thresholds:{beforeMs:Number(thresholds.beforeMs),wordMs:Number(thresholds.wordMs),rubyMs:Number(thresholds.rubyMs)}}))close();
+ setInputError('');
+ if(apply({kind:'auto',groupIds:groups,thresholds:{beforeMs:Number(thresholds.beforeMs),wordMs:Number(thresholds.wordMs),rubyMs:Number(thresholds.rubyMs)}})){rememberGroups(groups);close();}
  }}>插入</button></SettingsDialog>;
 }
 function Field({label,children}:{label:string;children:ReactNode}) {return <label>{label}{children}</label>;}

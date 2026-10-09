@@ -94,5 +94,5 @@ a[data-role="secondary"] { display:inline-flex; align-items:center; justify-cont
 a[data-role="secondary"]:hover { background-image:linear-gradient(var(--state-hover),var(--state-hover)); }
 a[data-role="secondary"]:active { background-image:linear-gradient(var(--state-pressed),var(--state-pressed)); }
 
-:root { --karaoke-surface: #fff0a8; --karaoke-text: #493900; }
-[data-theme="dark"] { --karaoke-surface: #574711; --karaoke-text: #ffeba0; }
+:root { --karaoke-surface: #f5efdb; --karaoke-text: #5b4c25; }
+[data-theme="dark"] { --karaoke-surface: #343128; --karaoke-text: #d8ccab; }

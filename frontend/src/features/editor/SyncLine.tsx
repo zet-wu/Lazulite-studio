@@ -63,12 +63,12 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
       data-current={activeId === id && progress.consumed === index + 1 || undefined} data-passed={activeId === id && progress.consumed > index + 1 || undefined}
       aria-label={`后置空拍 ${index + 1}`} title="右键或 Shift+F10 调整空拍" onClick={event => event.stopPropagation()}><Icon name="sync-beat" size={16}/></button>)}
   </div>;
-  return <section className={styles.syncLine} style={{ '--gutter-digits': gutterDigits } as CSSProperties} data-line-id={line.id} data-background={Boolean(line.backgroundOf) || undefined} data-ignored-sync={ignored || undefined}
+  return <section className={styles.syncLine} style={{ '--gutter-digits': gutterDigits } as CSSProperties} data-line-id={line.id} data-karaoke={Boolean(karaoke)||undefined} data-background={Boolean(line.backgroundOf) || undefined} data-ignored-sync={ignored || undefined}
     data-selected={selected('lines', line.id) || undefined} data-drag-placeholder={placeholder('line', line.backgroundOf ?? line.id) ? '' : undefined} tabIndex={0} aria-label={`歌词行 ${line.words.map(word => word.text).join('') || '空行'}`}
     onKeyDown={event => chooseKey(event, () => selectLine(event.shiftKey, event.ctrlKey || event.metaKey))}
     onClick={event => { if (!(event.target as Element).closest('[data-word-id],button,input')) selectLine(event.shiftKey, event.ctrlKey || event.metaKey); }}>
     <div className={styles.syncLineNumber}>{karaoke?.add}<span className={styles.syncOrdinal}>L{ordinal}</span>{line.backgroundOf && <span>背景</span>}{ignored && <span tabIndex={0} data-tooltip="此行跳过打轴" aria-label="此行跳过打轴"><Icon name="skip"/></span>}</div>
-    <div className={styles.syncWords}>{karaoke && <div className={styles.karaokeBodySlot}>{karaoke.before}</div>}{renderWordDraft(null)}{line.words.map((word, wordIndex) => {
+    <div className={styles.syncWords}>{karaoke && <div className={styles.karaokeBodySlot}><div className={styles.syncBody}>{karaoke.before}</div></div>}{renderWordDraft(null)}{line.words.map((word, wordIndex) => {
       const hasRuby = word.rubyUnits.length > 0;
       const count = !hasRuby && word.text.trim() ? emptyBeatCount(editing, word.id) : 0;
       const hasDraft = rubyDraft?.wordId === word.id;
@@ -95,12 +95,12 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
             <SyncText id={unit.id} text={unit.reading} label={`读音 ${word.text}`} active={activeId === unit.id} draft={draft} commit={reading => apply({ type: 'edit-ruby', lineId: line.id, wordId: word.id, rubyId: unit.id, reading })}/>
           </div>
           {markers(unit.id, 'ruby', Boolean(unit.reading.trim()), () => selectRuby(word, unit.id))}
-        </div>{karaoke && word.rubyUnits[index+1] && <div style={{gridRow:1,gridColumn:index*2+2}}>{karaoke.gap(unit.id, word.rubyUnits[index+1].id, word.id)}</div>}{hasDraft && rubyDraft.afterRubyId === unit.id && rubySlot}</Fragment>)}
+        </div>{karaoke && word.rubyUnits[index+1] && <div className={styles.karaokeRubySlot} style={{gridRow:1,gridColumn:index*2+2}}>{karaoke.gap(unit.id, word.rubyUnits[index+1].id, word.id)}</div>}{hasDraft && rubyDraft.afterRubyId === unit.id && rubySlot}</Fragment>)}
         <div className={styles.syncBody} style={!hasRuby ? { paddingRight: 'var(--beat-space)' } : undefined}>
           <SyncText id={word.id} text={word.text} label={`词 ${word.text}`} active={!hasRuby && activeId === word.id} draft={draft} commit={text => apply({ type: 'edit-word', lineId: line.id, wordId: word.id, text })}/>
         </div>
         {!hasRuby && markers(word.id, 'word', Boolean(word.text.trim()), () => selectWord(word))}
-      </div>{karaoke && line.words[wordIndex+1] && <div className={styles.karaokeBodySlot}>{karaoke.gap(word.id, line.words[wordIndex+1].id)}</div>}{renderWordDraft(word.id)}</Fragment>;
+      </div>{karaoke && line.words[wordIndex+1] && <div className={styles.karaokeBodySlot}><div className={styles.syncBody}>{karaoke.gap(word.id, line.words[wordIndex+1].id)}</div></div>}{renderWordDraft(word.id)}</Fragment>;
     })}<div className={styles.syncAddWord}><button data-role="primary" className="icon-button" title="添加词" aria-label="添加词" onClick={event => { event.stopPropagation(); addWord(); }}><Icon name="add"/></button></div></div>
   </section>;
 }

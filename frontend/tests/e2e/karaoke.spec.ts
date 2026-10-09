@@ -50,3 +50,50 @@ test('fresh selected-output validation locates a retimed cue and returns after r
  await expect(page.getByLabel('导唱结束秒数')).toHaveValue('5.6');await page.getByLabel('导唱结束秒数').fill('5.1');await page.getByLabel('导唱结束秒数').press('Tab');
  await page.getByRole('button',{name:'导出 Nicokara',exact:true}).click();await expect(page.getByRole('dialog').getByRole('status')).toContainText('0 项阻塞');
 });
+test('automatic dialog cancels drafts, checks thresholds and undoes insertion as one change',async({page})=>{
+ await load(page);await expect(page.getByRole('button',{name:'下载项目',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'重开项目',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'默认导唱符',exact:true}).click();await expect(page.getByLabel('行前阈值',{exact:true})).toHaveCount(0);await page.getByRole('button',{name:'关闭默认导唱符'}).click();
+ await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await page.getByLabel('行前阈值',{exact:true}).fill('0');await page.getByRole('button',{name:'关闭自动插入导唱符'}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(0);
+ await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await expect(page.getByLabel('行前阈值',{exact:true})).toHaveValue('3000');await page.getByLabel('行前阈值',{exact:true}).fill('');await page.getByRole('button',{name:'插入',exact:true}).click();await expect(page.getByRole('alert')).toContainText('非负整数');
+ await page.getByLabel('行前阈值',{exact:true}).fill('0');await page.getByRole('button',{name:'插入',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(4);
+ await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(0);
+ await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await expect(page.getByLabel('行前阈值',{exact:true})).toHaveValue('3000');
+});
+test('singer marker drafts cancel, apply once, survive reopening and disable forced decoration',async({page})=>{
+ await load(page);
+ const source=xml.replace('<tt xmlns=', '<tt xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns=').replace('<body>','<head><metadata><ttm:agent xml:id="singer" type="person"><ttm:name>A</ttm:name></ttm:agent></metadata></head><body>').replace('<p xml:id="a"','<p ttm:agent="singer" xml:id="a"');
+ await importLyrics(page,{name:'singer.ttml',mimeType:'application/xml',buffer:Buffer.from(source)});await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();
+ await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');await expect(page.getByLabel('Zoom 值',{exact:true})).toHaveValue('1');await expect(page.getByLabel('强制装饰扫色',{exact:true})).toBeDisabled();
+ await page.getByLabel('触发标记',{exact:true}).fill('cancel');await page.getByRole('button',{name:'关闭歌手标记管理'}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');
+ await page.getByLabel('触发标记',{exact:true}).fill('voice-A');await page.getByLabel('扫色前图片',{exact:true}).fill('images/a.png');await page.getByRole('button',{name:'应用',exact:true}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('voice-A');await page.screenshot({path:test.info().outputPath('singer-markers.png')});await page.getByRole('button',{name:'关闭歌手标记管理'}).click();
+ await page.getByRole('button',{name:'撤销',exact:true}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');await expect(page.getByLabel('扫色前图片',{exact:true})).toHaveValue('transparent-1x1.png');
+});
+for(const theme of ['light','dark'])test(`compact body and Ruby cues share text baselines without marker overlap (${theme})`,async({page})=>{
+ await load(page);if(theme==='dark'){await page.locator('[data-top-menu="view"] summary').click();await page.getByRole('button',{name:'夜间模式',exact:true}).click();}
+ const bodySlot=page.getByRole('button',{name:'插入行内导唱',exact:true}),rubySlot=page.getByRole('button',{name:'插入 Ruby 内导唱',exact:true});
+ const bodyBefore=(await bodySlot.boundingBox())!,rubyBefore=(await rubySlot.boundingBox())!;expect(bodyBefore.width).toBeLessThanOrEqual(22);expect(rubyBefore.width).toBeLessThanOrEqual(18);
+ await bodySlot.click();const body=page.locator('main [data-cue-id]').first(),bodyAfter=(await body.boundingBox())!;expect(Math.abs(bodyAfter.y-bodyBefore.y)).toBeLessThan(1);
+ await rubySlot.click();const ruby=page.locator('main [data-cue-id]').first(),rubyAfter=(await ruby.boundingBox())!;expect(Math.abs(rubyAfter.y-rubyBefore.y)).toBeLessThan(1);
+ await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
+ const metrics=await page.locator('main [data-line-id="a"]').evaluate(line=>{
+  const textBox=(host:Element)=>{const probe=document.createElement('span');probe.style.cssText='display:inline-block;width:0;height:0;padding:0;border:0;vertical-align:baseline';host.append(probe);const y=probe.getBoundingClientRect().y;probe.remove();return {y};};
+  const word=line.querySelector('[data-word-id="b"]')!,ruby=line.querySelector('[data-ruby-id="r1"]')!;
+  const bodyText=textBox(word.querySelector('[class*="syncText"] > span')!),rubyText=textBox(ruby.querySelector('[class*="syncText"] > span')!);
+  return {bodyText,rubyText,cues:[...line.querySelectorAll('[data-cue-id]')].map(cue=>({text:textBox(cue),font:getComputedStyle(cue).font,parentFont:getComputedStyle(cue.parentElement!).font,y:cue.getBoundingClientRect().y,ruby:!!cue.closest('[class*="karaokeRubySlot"]'),bottom:cue.getBoundingClientRect().bottom})),markerTop:line.querySelector('[data-sync-marker]')!.getBoundingClientRect().top};
+ });
+ await test.info().attach(`geometry-${theme}.json`,{body:JSON.stringify(metrics,null,2),contentType:'application/json'});
+ console.log(JSON.stringify(metrics));await page.screenshot({path:test.info().outputPath(`geometry-${theme}.png`)});
+ for(const cue of metrics.cues){expect(Math.abs(cue.text.y-(cue.ruby?metrics.rubyText:metrics.bodyText).y)).toBeLessThan(1);expect(cue.bottom).toBeLessThanOrEqual(metrics.markerTop);}
+ await body.dblclick();const edit=page.locator('main').getByRole('textbox',{name:'导唱文字',exact:true});await edit.fill('●●●');await edit.press('Enter');await expect(page.locator('main [data-cue-id]').filter({hasText:'●●●'})).toBeVisible();
+ await page.screenshot({path:test.info().outputPath(`compact-${theme}.png`)});
+});
+test('wrapped multiline canvas keeps multi-character Ruby and editing above timing markers; normal sync stays unchanged',async({page})=>{
+ await load(page);await page.setViewportSize({width:1000,height:1000});
+ const source=xml.replace('</p><p xml:id="c"',Array.from({length:10},(_,i)=>`<span studio:id="more-${i}" begin="${8+i*2}" end="${9+i*2}">多个正文</span>`).join('')+'</p><p xml:id="c"').replace('end="7"><span','end="30"><span').replace('>あ<','>ながいよみ<');
+ await importLyrics(page,{name:'wrapped.ttml',mimeType:'application/xml',buffer:Buffer.from(source)});await page.getByRole('button',{name:'打轴',exact:true}).click();
+ const positions=()=>page.locator('main [data-word-id]').evaluateAll(nodes=>nodes.map(node=>{const box=node.getBoundingClientRect();return [box.x,box.y,box.height];}));const original=await positions();expect(new Set(original.map(box=>box[1])).size).toBeGreaterThan(2);
+ await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await page.getByRole('button',{name:'插入',exact:true}).click();
+ const cue=page.locator('main [data-cue-id]').first();await cue.dblclick();const input=page.locator('main').getByRole('textbox',{name:'导唱文字',exact:true});await input.fill('●●●');
+ const box=(await input.boundingBox())!;const markerTop=await cue.evaluate(node=>{const slot=node.closest('[class*="karaokeBodySlot"]')!;const style=getComputedStyle(slot);return slot.getBoundingClientRect().y+style.gridTemplateRows.split(' ').slice(0,2).reduce((sum,v)=>sum+parseFloat(v),0);});expect(box.y+box.height).toBeLessThanOrEqual(markerTop);
+ await input.press('Enter');await page.screenshot({path:test.info().outputPath('wrapped-edit.png')});await page.getByRole('button',{name:'打轴',exact:true}).click();expect(await positions()).toEqual(original);
+});

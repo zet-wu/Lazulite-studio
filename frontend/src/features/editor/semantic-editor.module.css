@@ -342,6 +342,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .syncAddWord { display: grid; grid-template-rows: 24px 34px 24px; align-self: flex-start; }
 .syncAddWord > button { grid-row: 2; align-self: center; }
 .syncWords { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px 4px; min-height: 64px; }
+.syncWord, .karaokeBodySlot { display: grid; grid-template-rows: minmax(24px, auto) minmax(34px, auto) minmax(24px, auto); }
 .syncWord { display: grid; grid-template-rows: minmax(24px, auto) minmax(34px, auto) minmax(24px, auto); position: relative; min-width: 24px; max-width: 100%; border-radius: 5px; outline-offset: -2px; }
 .syncBody { grid-row: 2; grid-column: 1 / -1; text-align: center; padding: 0; font-size: 24px; font-weight: 650; line-height: 1.4; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .syncRubyColumn { display: grid; grid-template-rows: subgrid; grid-row: 1 / 4; min-width: 0; }
@@ -373,5 +374,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 
 .inspector .propertyQuote { font-weight: 650; font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-.karaokeBodySlot { margin-top:24px; font-size:24px; font-weight:650; line-height:1.4; display:flex; gap:4px; }
-.karaokeBodySlot:empty { display:none; }
+.karaokeBodySlot { max-width:100%; min-width:0; }
+.karaokeBodySlot:not(:has(.syncBody > *)) { display:none; }
+.syncLine[data-karaoke] .syncRuby, .karaokeRubySlot { line-height:24px; }
+.karaokeRubySlot { font-size:14px; font-weight:600; --karaoke-slot-width:16px; }
