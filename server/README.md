@@ -54,7 +54,7 @@ HTTP 提供只读 `alignment-preview?revision=…` 和内部 `jobs/alignment`，
 
 浏览器来源由 `server.auth.normalize_origin` 校验并规范化，登录与写接口保持精确匹配。根目录 `dev.py` 按 `--origin`、`STUDIO_ORIGIN`、`--web-port` 默认值的优先级选择来源；监听仍限回环，来源端口可以与监听不同。来源错误独立于密码／CSRF 错误，不信任任意转发头。
 
-`karaoke.py` 定义项目 v6 的独立卡拉 OK 配置及边界形状检查。导唱不写入 TTML，也不进入自动对齐投影；可编辑的时间范围问题不会阻止草稿保存。文档 envelope 为 v8，旧快照不转换、不自动清理。
+`karaoke.py` 定义项目 v7 的独立卡拉 OK 配置及边界形状检查。导唱不写入 TTML，也不进入自动对齐投影；可编辑的时间范围问题不会阻止草稿保存。文档 envelope 为 v9，旧快照不转换、不自动清理。
 
 人声输入直接解码为 44.1 kHz 双声道 float32；持久音频策略 v2 为单份 PCM_16 WAV，分析从此文件重读，播放／PCM／波形绕过原曲 48 kHz 代理，下载返回同一文件。旧策略结果不可复用，不迁移或删除旧文件；用户需明确重新分离，原歌词和片段保留。
 

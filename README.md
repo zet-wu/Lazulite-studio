@@ -18,7 +18,7 @@
 
 ## 外部开发文档
 
-开发方案、审阅、过程记录、验收及证据统一保存在并列的 [lyric-workflow](../lyric-workflow/docs/studio/README.md)：[当前状态](../lyric-workflow/docs/studio/current-state.md)、[当前审阅整改方案](../lyric-workflow/docs/studio-align-review/Review-phase0/studio-integration-plan.md)、[前端运行](../lyric-workflow/docs/studio/development/frontend-development.md)、[服务端运行](../lyric-workflow/docs/studio/development/server-development.md)、[依赖许可](../lyric-workflow/docs/studio/reference/dependency-licenses.md)。本仓库不再保存开发过程文档；可执行测试夹具仍随源码维护。
+开发方案、审阅、过程记录、验收及证据统一保存在并列的 [lyric-workflow](../lyric-workflow/docs/studio/README.md)：[当前状态](../lyric-workflow/docs/studio/current-state.md)、[当前审阅整改方案](../lyric-workflow/docs/studio-karaoke-review/Review-phase2/plan.md)、[前端运行](../lyric-workflow/docs/studio/development/frontend-development.md)、[服务端运行](../lyric-workflow/docs/studio/development/server-development.md)、[依赖许可](../lyric-workflow/docs/studio/reference/dependency-licenses.md)。本仓库不再保存开发过程文档；可执行测试夹具仍随源码维护。
 
 日文自动注音由当前画布快照调用 `/api/v1/reading/analyze`，主行和背景行独立选择，提供整行上下文、完整读音编辑和单次原子应用。允许词内拆分、不自动合词；未知或歧义位置留空。新注音按音拍分配整数毫秒时间，已有注音未改时保持原单元与时间。关联对齐字段及专用编辑逻辑已移除。
 
@@ -27,3 +27,5 @@
 歌词下载使用所选格式的六项导出对照。独立 ASS 直接从歌词文档生成正文、背景和全部翻译／音译事件，保留独立时间并量化至厘秒，输出共享样式及按时间分配的默认纵向布局；不提供 ASS Ruby 或媒体内嵌。
 
 音频处理提供全局“自动对齐”：使用正文／假名 Ruby，按显示排布包含主行和背景行，可按行跳过。确认时可选行首辅助，运行中锁定项目编辑并可取消，成功后一次应用、撤销及自动保存；人声首次准备与时间更新同属一个项目事务。
+
+项目管理提供 `.lazp` 工程 ZIP 往返（快照及可选一份源音频）与项目目录逻辑空间明细。人声直接以模型所需双声道输入分离，唯一持久 PCM_16 WAV 供播放、分析、波形、频谱及直接下载。整行平移显式同步项目导唱；普通重打轴保留导唱手调时间。
