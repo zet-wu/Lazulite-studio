@@ -385,18 +385,23 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 
 .translationRow[data-selected], [data-translation-unit-id][data-selected] { outline:2px solid var(--blue); background:var(--blue-soft); }
 
-/* Replacement controls keep DOM order when the dialog becomes narrow. */
-.replaceControls { grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:end; container-type:inline-size; }
-.replaceControls > label, .replaceInputs > label { min-width:0; }
-.replaceControls .replaceTarget { min-width:0; margin:0; padding:0; border:0; display:flex; align-items:center; gap:16px; }
+/* Batch scope and parameters size independently; range fields stay below scope. */
+.batchControls { grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:start; container-type:inline-size; }
+.batchControls > label, .batchScope, .replaceInputs > label { min-width:0; }
+.batchControls label { align-content:start; }
+.batchControls input:not([type="checkbox"]):not([type="radio"]), .batchControls select { height:32px; min-width:0; width:100%; }
+.batchScope { display:grid; gap:8px; }
+.batchRange { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
+.batchControls .batchRange label { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+.batchControls .batchRange input[type="number"] { width:5em; flex:none; }
+.batchControls .replaceTarget { min-width:0; margin:0; padding:0; border:0; display:flex; align-items:center; gap:16px; }
 .replaceTarget legend { padding:0; margin-bottom:4px; font-size:13px; }
-.replaceControls .replaceTarget label { display:inline-flex; align-items:center; gap:5px; min-height:30px; }
+.batchControls .replaceTarget label { display:inline-flex; align-items:center; gap:5px; min-height:30px; }
 .replaceTarget input[type="radio"] { margin:0; padding:0; width:auto; flex:none; accent-color:var(--blue); }
-.replaceControls > .inlineFields { grid-column:1 / -1; flex-wrap:wrap; }
 .replaceInputs { grid-column:1 / -1; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; align-items:end; gap:9px; }
 .replaceInputs input:not([type="checkbox"]) { width:100%; min-width:0; height:32px; }
 .replaceInputs label:has([type="checkbox"]) { min-height:32px; gap:5px; }
 @container (max-width:480px) {
-  .replaceControls > label, .replaceControls > .replaceTarget { grid-column:1 / -1; }
+  .batchControls > label, .batchScope, .batchControls > .replaceTarget { grid-column:1 / -1; }
   .replaceInputs { grid-template-columns:minmax(0,1fr); }
 }
