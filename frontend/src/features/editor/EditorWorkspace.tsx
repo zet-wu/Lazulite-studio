@@ -1,3 +1,6 @@
+import { SongPartField } from './SongPartField';
+import { planSelectionAction, attachmentSelection, attachmentTracks, type SelectionAction } from '../../domain/selection-editing';
+import { createProjectDocument, createProjectEditorState, executeProjectCommand } from '../../domain/project-document';
 import { CueSlot, CueProperties, KaraokeTools } from '../KaraokeTools';
 import type { KaraokeCommand } from '../../domain/karaoke';
 import { MessageBar, useNotice, type Notice } from '../../shared/MessageBar';
@@ -33,11 +36,10 @@ import { RomanizationGenerationDialog } from './RomanizationGenerationDialog';
 import { lineStructureIssues } from '../../domain/line-structure';
 import { useObjectDrag, type DragSource } from './object-drag';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
-import { planWordMerge, planRubyMerge, type LyricCommand } from '../../domain/lyric-commands';
+import type { LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord } from '../../domain/lyric-document';
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, segmentText } from '../../domain/segmentation';
-import { distributeRubyTime, splitReadingMora } from '../../domain/ruby-editing';
 import { copySelection, cutSelection, deleteSelection, invertIds, moveWordsAcrossLine, pastePlain, pasteRich, selectIds, selectionLineId, type EditorClipboard, type EditorSelection } from './editing-actions';
 import { LyricList, type ListMemory } from './LyricList';
 import { LyricLine as LyricLineView } from './LyricLine';
@@ -194,7 +196,7 @@ function EditorWorkspaceContent(props: Props) {
   const [wordDraft, setWordDraft] = useState<{ lineId: string; afterWordId: string | null; serial: number } | null>(null);
   const wordDraftSerial = useRef(0);
   const [splitLineId, setSplitLineId] = useState<string | null>(null);
-  const [contentTransfer, setContentTransfer] = useState<{ trackId: string; contentId: string; targetLineId: string } | null>(null);
+  const [contentTransfer, setContentTransfer] = useState<{ trackId: string; contentId: string; ids: string[]; attachment?: 'translation'; targetLineId: string } | null>(null);
   const [romanizationGeneration, setRomanizationGeneration] = useState<string[] | null>(null);
   const [japaneseRuby, setJapaneseRuby] = useState<string[] | null>(null);
   const canvasComposing = useRef(false), editRejected = useRef(false);
@@ -216,7 +218,7 @@ function EditorWorkspaceContent(props: Props) {
     setSelection(current => {
       if (!current) return current;
       if (current.kind === 'romanization-content') {
-        const contents = document.romanizationTracks.flatMap(track => track.contents);
+        const contents = attachmentTracks(document,current).flatMap(track => track.contents);
         const ids = current.ids.filter(id => contents.some(content => content.id === id));
         return ids.length === current.ids.length ? current : null;
       }
@@ -279,7 +281,7 @@ function EditorWorkspaceContent(props: Props) {
     if (!lineId || !document.lines.some(line => line.id === lineId)) { setLocate(null); return; }
     const selector = target?.kind === 'word' ? `[data-word-id="${CSS.escape(target.wordId)}"]`
       : target?.kind === 'ruby' ? `[data-ruby-id="${CSS.escape(target.rubyId)}"]`
-      : target?.kind === 'romanization' ? `[data-romanization-unit-id="${CSS.escape(target.unitId)}"]` : undefined;
+      : target?.kind === 'romanization' ? `[${target.attachment?'data-translation-unit-id':'data-romanization-unit-id'}="${CSS.escape(target.unitId)}"]` : undefined;
     setLocate({ id: lineId, selector, serial: ++locateSerial.current });
   }, [mode, props.selectedLineId, activePropertyTarget, selection, document]);
   useEffect(() => {
@@ -454,10 +456,10 @@ function EditorWorkspaceContent(props: Props) {
       if (dispatch(result.command)) setSelection(result.selection);
     } catch (error) { setMessage(error instanceof Error ? error.message : '粘贴失败'); }
   };
-  const copyAllowed = (current: EditorSelection | null) => current?.kind !== 'romanization-unit' || document.romanizationTracks.flatMap(track => track.contents.filter(content => content.kind === 'timed' && content.units.some(unit => current.ids.includes(unit.id)))).length <= 1;
+  const copyAllowed = (current: EditorSelection | null) => current?.kind !== 'romanization-unit' || attachmentTracks(document,current).flatMap(track => track.contents.filter(content => content.kind === 'timed' && content.units.some(unit => current.ids.includes(unit.id)))).length <= 1;
   const canCopySelection = copyAllowed(selection);
   useEffect(() => {
-    selectionCommands.current = { copy: () => { try { return copy(); } catch (cause) { setMessage((cause as Error).message); return null; } }, cut: () => { try { return cut(); } catch (cause) { setMessage((cause as Error).message); return null; } }, remove: () => removeSelection(), paste: text => paste(text ? null : clipboard, text), canCopy: Boolean(selection?.ids.length) && canCopySelection, canPaste: Boolean(clipboard), clipboardToken: () => clipboardToken.current };
+    selectionCommands.current = { copy: () => { try { return copy(); } catch (cause) { setMessage((cause as Error).message); return null; } }, cut: () => { try { return cut(); } catch (cause) { setMessage((cause as Error).message); return null; } }, remove: () => removeSelection(), paste: text => paste(text ? null : clipboard, text), canCopy: Boolean(selection?.ids.length) && canCopySelection, canPaste: Boolean(clipboard), clipboardToken: () => clipboardToken.current, openContext };
   });
   const selectAll = (invert: boolean) => {
     if (selection?.kind === 'ruby') {
@@ -465,12 +467,12 @@ function EditorWorkspaceContent(props: Props) {
       const ids = invert ? invertIds(order, selection.ids) : order;
       setSelection({ ...selection, ids, anchorId: ids[0] ?? '', activeId: ids.at(-1) ?? '' });
     } else if (selection?.kind === 'romanization-unit') {
-      const content = document.romanizationTracks.find((track) => track.id === selection.trackId)?.contents.find((item) => item.id === selection.contentId);
-      const order = document.romanizationTracks.find(track => track.id === selection.trackId)?.contents.flatMap(content => content.kind === 'timed' ? content.units.map(unit => unit.id) : []) ?? [];
+      const content = attachmentTracks(document,selection).find((track) => track.id === selection.trackId)?.contents.find((item) => item.id === selection.contentId);
+      const order = attachmentTracks(document,selection).find(track => track.id === selection.trackId)?.contents.flatMap(content => content.kind === 'timed' ? content.units.map(unit => unit.id) : []) ?? [];
       const ids = invert ? invertIds(order, selection.ids) : order;
       setSelection({ ...selection, ids, anchorId: ids[0] ?? '', activeId: ids.at(-1) ?? '' });
     } else if (selection?.kind === 'romanization-content') {
-      const order = document.romanizationTracks.find((track) => track.id === selection.trackId)?.contents.filter((content) => content.lineId === selection.lineId).map((content) => content.id) ?? [];
+      const order = attachmentTracks(document,selection).find((track) => track.id === selection.trackId)?.contents.filter((content) => content.lineId === selection.lineId).map((content) => content.id) ?? [];
       const ids = invert ? invertIds(order, selection.ids) : order;
       setSelection({ ...selection, ids, anchorId: ids[0] ?? '', activeId: ids.at(-1) ?? '' });
     } else if (selection?.kind === 'words') {
@@ -484,6 +486,7 @@ function EditorWorkspaceContent(props: Props) {
   };
   const moveSelectedWords = (direction: -1 | 1) => {
     if (selection?.kind !== 'words' || !selection.ids.length) return;
+    if(selectedWordLineIndexes.length!==1){setMessage('跨来源行移动需要明确目标');return;}
     const edge = direction < 0 ? Math.min(...selectedWordLineIndexes) : Math.max(...selectedWordLineIndexes);
     const target = document.lines[edge + direction];
     if (!target) return;
@@ -535,30 +538,39 @@ function EditorWorkspaceContent(props: Props) {
       requestLocate(line.id, `[data-word-id="${word.id}"]${mode === 'sync' ? '' : ' input[aria-label^="词 "]'}`);
       return true;
     }} /></span>;
-  const mergeAction = (kind: 'words' | 'ruby', ids: string[], multiple: boolean): ContextAction => {
-    const label = multiple ? '合并' : kind === 'words' ? '合并前一词' : '合并前一读音';
-    try {
-      if (kind === 'words') planWordMerge(document, ids); else planRubyMerge(document, ids);
-    } catch (cause) { return { label, disabled: true, reason: (cause as Error).message, run: () => {} }; }
-    return { label, run: () => {
-      if (kind === 'words') {
-        const { line, merged } = planWordMerge(document, ids);
-        if (dispatch({ type: 'merge-words', wordIds: ids })) {
-          setSelection({ kind, lineId: line.id, ids: [merged.id], anchorId: merged.id, activeId: merged.id });
-          props.onSelectUnit?.(line.id, merged.id, null);
-          requestLocate(line.id, `[data-word-id="${merged.id}"]${mode === 'sync' ? '' : ' input[aria-label^="词 "]'}`);
+  const selectionAction = (current: EditorSelection, action: SelectionAction, label: string): ContextAction => {
+    const plan = () => {
+      const command = planSelectionAction(document, current, action, editing);
+      const project = props.project ?? { ...createProjectDocument(document), editing };
+      const next = executeProjectCommand(createProjectEditorState(project), { type: 'lyrics', command }).present;
+      return { command, next };
+    };
+    try { plan(); } catch (cause) { return { id: action, label, disabled: true, reason: (cause as Error).message, run: () => {} }; }
+    return { id: action, label, reason: action === 'redistribute' ? '作用于所涉父词的全部 Ruby，每词一次' : undefined, run: () => {
+      try {
+        const {command,next} = plan();
+        if (!dispatch(command)) return;
+        if (action === 'merge') {
+          let id: string, lineId: string;
+          if (current.kind === 'lines') { const line=next.lyrics.lines.find(line=>current.ids.includes(line.id))!; id=line.id; lineId=id; }
+          else if (current.kind === 'words' || current.kind === 'ruby') { const line=next.lyrics.lines.find(line=>line.words.some(word=>current.kind==='words'?current.ids.includes(word.id):word.rubyUnits.some(unit=>current.ids.includes(unit.id))))!; lineId=line.id; id=current.kind==='words'?line.words.find(word=>current.ids.includes(word.id))!.id:line.words.flatMap(word=>word.rubyUnits).find(unit=>current.ids.includes(unit.id))!.id; }
+          else { const tracks=attachmentTracks(next.lyrics,current); const content=tracks.flatMap(track=>track.contents).find(content=>current.kind==='romanization-content'?current.ids.includes(content.id):content.kind==='timed'&&content.units.some(unit=>current.ids.includes(unit.id)))!; lineId=content.lineId; id=current.kind==='romanization-content'?content.id:content.kind==='timed'?content.units.find(unit=>current.ids.includes(unit.id))!.id:''; }
+          const selected = { ...current, ids:[id], activeId:id, anchorId:id, ...(current.kind==='lines'?{}:{lineId}), ...(current.kind==='romanization-content'?{contentId:id}:{}) };
+          setSelection(selected);
+          const attr=current.kind==='lines'?'data-line-id':current.kind==='words'?'data-word-id':current.kind==='ruby'?'data-ruby-id':current.attachment==='translation'?current.kind==='romanization-content'?'data-translation-id':'data-translation-unit-id':current.kind==='romanization-content'?'data-romanization-content-id':'data-romanization-unit-id';
+          requestLocate(lineId,`[${attr}="${CSS.escape(id)}"]${current.kind==='words'&&mode==='edit'?' input[aria-label^="词 "]':current.kind==='ruby'&&mode==='edit'?' input':''}`);
         }
-      } else {
-        const { line, word, merged } = planRubyMerge(document, ids);
-        if (dispatch({ type: 'merge-ruby', rubyIds: ids })) {
-          setSelection({ kind, lineId: line.id, wordId: word.id, ids: [merged.id], anchorId: merged.id, activeId: merged.id });
-          props.onSelectUnit?.(line.id, word.id, merged.id);
-          requestLocate(line.id, `[data-ruby-id="${merged.id}"]${mode === 'sync' ? '' : ' input'}`);
-        }
-      }
+      } catch(cause) { setMessage((cause as Error).message); }
     } };
   };
   const openContext = (target: HTMLElement, x: number, y: number) => {
+    const cueNode=target.closest<HTMLElement>('[data-cue-id]');
+    if(cueNode) {
+      const cue=props.project?.karaoke.cues.find(cue=>cue.id===cueNode.dataset.cueId);
+      if(!cue)return false;
+      selectCue(cue.id,cue.anchor.lineId);
+      setContextMenu({x,y,target:cueNode,title:'导唱操作',actions:[{id:'edit-cue',label:'编辑导唱',run:()=>selectCue(cue.id,cue.anchor.lineId)},{id:'delete-cue',label:'删除导唱',run:()=>insertKaraoke({kind:'remove',id:cue.id})}]});return true;
+    }
     const beat = target.closest<HTMLElement>('[data-beat-owner]');
     if (beat) {
       const id = beat.dataset.beatOwner!, kind = beat.dataset.beatKind as 'word' | 'ruby', count = emptyBeatCount(editing, id);
@@ -570,145 +582,94 @@ function EditorWorkspaceContent(props: Props) {
       ] }); return true;
     }
     const rubyId = target.closest<HTMLElement>('[data-ruby-id]')?.dataset.rubyId;
-    const romanUnitId = target.closest<HTMLElement>('[data-romanization-unit-id]')?.dataset.romanizationUnitId;
-    const romanContentId = target.closest<HTMLElement>('[data-romanization-content-id]')?.dataset.romanizationContentId;
+    const translationId = target.closest<HTMLElement>('[data-translation-id]')?.dataset.translationId;
+    const contentId = translationId ?? target.closest<HTMLElement>('[data-romanization-content-id]')?.dataset.romanizationContentId;
+    const unitId = translationId ? target.closest<HTMLElement>('[data-translation-unit-id]')?.dataset.translationUnitId : target.closest<HTMLElement>('[data-romanization-unit-id]')?.dataset.romanizationUnitId;
     const wordId = target.closest<HTMLElement>('[data-word-id]')?.dataset.wordId;
     const lineId = target.closest<HTMLElement>('[data-line-id]')?.dataset.lineId;
-    const line = document.lines.find((item) => item.id === lineId);
-    if (!line) return false;
-    const word = line.words.find((item) => item.id === wordId);
-    let effective: EditorSelection;
-    let title = '歌词行';
-    let actions: ContextAction[] = [];
-    if (rubyId && word) {
-      const index = word.rubyUnits.findIndex((unit) => unit.id === rubyId);
-      const unit = word.rubyUnits[index];
-      if (!unit) return false;
-      effective = selection?.kind === 'ruby' && selection.ids.includes(rubyId) ? { ...selection, lineId: line.id, wordId: word.id, activeId: rubyId }
-        : { kind: 'ruby', lineId: line.id, wordId: word.id, ids: [rubyId], anchorId: rubyId, activeId: rubyId };
-      title = '注音 操作';
-      actions = [
-        { label: '添加空拍', disabled: emptyBeatCount(editing, rubyId) >= 32, run: () => dispatch({ type: 'set-empty-beat', kind: 'ruby', id: rubyId, count: emptyBeatCount(editing, rubyId) + 1 }) },
-        { label: '添加读音', run: () => { setRubyShortcut({ wordId: word.id, afterRubyId: rubyId, serial: ++rubyShortcutSerial.current }); } },
-        { label: '拆分读音', disabled: Array.from(unit.reading).length < 2, run: () => dispatch({ type: 'split-ruby', lineId: line.id, wordId: word.id, rubyId, at: Math.floor(Array.from(unit.reading).length / 2) }) },
-        mergeAction('ruby', effective.ids.length > 1 ? effective.ids : word.rubyUnits.slice(Math.max(0, index - 1), index + 1).map(unit => unit.id), effective.ids.length > 1),
-        { label: '向前移动', disabled: index === 0, run: () => dispatch({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId, afterRubyId: word.rubyUnits[index - 2]?.id ?? null }) },
-        { label: '向后移动', disabled: index === word.rubyUnits.length - 1, run: () => dispatch({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId, afterRubyId: word.rubyUnits[index + 1].id }) },
-        { label: '按音拍拆分', disabled: splitReadingMora(unit.reading).length < 2, run: () => {
-          const parts = splitReadingMora(unit.reading).map((reading, partIndex) => ({ ...unit, id: partIndex ? crypto.randomUUID() : unit.id, reading }));
-          const distributed = distributeRubyTime({ ...word, beginMs: unit.beginMs, endMs: unit.endMs }, parts);
-          dispatch({ type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: word.rubyUnits.flatMap((item) => item.id === unit.id ? distributed : [item]), overwrite: true });
-        } },
-        { label: '重分配读音时间', run: () => dispatch({ type: 'redistribute-ruby-time', lineId: line.id, wordId: word.id }) },
-        { label: effective.ids.length > 1 ? `删除所选读音（${effective.ids.length}）` : '删除读音', run: () => removeSelection(effective) },
-      ];
-    } else if (romanContentId) {
-      const track = document.romanizationTracks.find((item) => item.contents.some((content) => content.id === romanContentId));
-      const content = track?.contents.find((item) => item.id === romanContentId);
-      if (!track || !content) return false;
-      if (romanUnitId && content.kind === 'timed') {
-        const index = content.units.findIndex((unit) => unit.id === romanUnitId);
-        const unit = content.units[index];
-        if (!unit) return false;
-        effective = selection?.kind === 'romanization-unit' && selection.ids.includes(unit.id) ? { ...selection, lineId: line.id, trackId: track.id, contentId: content.id, activeId: unit.id }
-          : { kind: 'romanization-unit', lineId: line.id, trackId: track.id, contentId: content.id, ids: [unit.id], anchorId: unit.id, activeId: unit.id };
-        title = '音译单元操作';
-        actions = [
-          { label: '拆分单元', disabled: Array.from(unit.text).length < 2, run: () => dispatch({ type: 'split-romanization-unit', trackId: track.id, contentId: content.id, unitId: unit.id, at: Math.floor(Array.from(unit.text).length / 2) }) },
-          { label: '合并前一单元', disabled: index === 0, run: () => dispatch({ type: 'merge-romanization-units', trackId: track.id, contentId: content.id, firstUnitId: content.units[index - 1].id, secondUnitId: unit.id }) },
-          { label: '向前移动', disabled: index === 0, run: () => dispatch({ type: 'move-romanization-unit', trackId: track.id, contentId: content.id, unitId: unit.id, afterUnitId: content.units[index - 2]?.id ?? null }) },
-          { label: '向后移动', disabled: index === content.units.length - 1, run: () => dispatch({ type: 'move-romanization-unit', trackId: track.id, contentId: content.id, unitId: unit.id, afterUnitId: content.units[index + 1].id }) },
-          { label: effective.ids.length > 1 ? `删除所选单元（${effective.ids.length}）` : '删除单元', run: () => removeSelection(effective) },
-        ];
-      } else {
-        effective = selection?.kind === 'romanization-content' && selection.trackId === track.id && selection.ids.includes(content.id) ? { ...selection, activeId: content.id, contentId: content.id }
-          : { kind: 'romanization-content', lineId: line.id, trackId: track.id, contentId: content.id, ids: [content.id], anchorId: content.id, activeId: content.id };
-        title = '音译内容操作';
-        const siblings = track.contents.filter((item) => item.lineId === line.id);
-        const siblingIndex = siblings.findIndex((item) => item.id === content.id);
-        const previousGlobal = siblingIndex > 0 ? track.contents.findIndex((item) => item.id === siblings[siblingIndex - 1].id) : -1;
-        actions = [
-          { label: '分词并定时', disabled: content.kind === 'timed', run: () => { if (content.kind === 'plain') dispatch({ type: 'set-romanization-content', trackId: track.id, content: { ...content, kind: 'timed', units: (content.text.match(/\S+\s*|\s+/gu) ?? []).map((text) => ({ id: crypto.randomUUID(), text, beginMs: null, endMs: null })) } }); } },
-          { label: '音译内容前移', disabled: siblingIndex === 0, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: track.contents[previousGlobal - 1]?.id ?? null }) },
-          { label: '音译内容后移', disabled: siblingIndex === siblings.length - 1, run: () => dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: line.id, afterContentId: siblings[siblingIndex + 1].id }) },
-          { label: '转移到其他歌词行…', disabled: document.lines.length < 2, run: () => setContentTransfer({ trackId: track.id, contentId: content.id, targetLineId: document.lines.find((item) => item.id !== line.id)?.id ?? '' }) },
-          { label: effective.ids.length > 1 ? `删除所选内容（${effective.ids.length}）` : '删除内容', run: () => removeSelection(effective) },
-          { label: '从音译生成 注音…', run: () => setRubyGeneration({ lineIds: [line.id], trackId: track.id, contentId: content.id }) },
-          { label: '管理轨道…', run: () => setSettingsDialog('tracks') },
-          { label: '轨道前移', run: () => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: -1 }) },
-          { label: '轨道后移', run: () => dispatch({ type: 'move-romanization-track', trackId: track.id, direction: 1 }) },
-        ];
+    const line = document.lines.find(item=>item.id===lineId);
+    if(!line)return false;
+    const word=line.words.find(item=>item.id===wordId);
+    let hit: EditorSelection;
+    if(contentId) {
+      const attachment=translationId?'translation' as const:undefined;
+      const track=attachmentTracks(document,{attachment}).find(track=>track.contents.some(content=>content.id===contentId));
+      if(!track)return false;
+      const id=unitId??contentId;
+      hit={kind:unitId?'romanization-unit':'romanization-content',attachment,trackId:track.id,contentId,lineId:line.id,ids:[id],activeId:id,anchorId:id};
+    } else if(rubyId&&word) hit={kind:'ruby',lineId:line.id,wordId:word.id,ids:[rubyId],activeId:rubyId,anchorId:rubyId};
+    else if(word)hit={kind:'words',lineId:line.id,ids:[word.id],activeId:word.id,anchorId:word.id};
+    else hit={kind:'lines',ids:[line.id],activeId:line.id,anchorId:line.id};
+    const effective: EditorSelection=selection?.kind===hit.kind&&selection.ids.includes(hit.activeId)?{...selection,...hit,ids:selection.ids,anchorId:selection.anchorId}:hit;
+    const multiple=effective.ids.length>1;
+    const single = (id: string,label:string,run:()=>void,reason='需要逐对象编辑，请先单选'): ContextAction => ({id,label,run,disabled:multiple,reason:multiple?reason:undefined});
+    let title='歌词行操作';
+    const actions: ContextAction[]=[];
+    if(effective.kind==='ruby'&&word) {
+      title='注音操作';
+      actions.push(selectionAction(effective,'beat','添加空拍'),single('insert-ruby','添加读音',()=>setRubyShortcut({wordId:word.id,afterRubyId:rubyId,serial:++rubyShortcutSerial.current})),
+        selectionAction(effective,'merge','合并所选'),selectionAction(effective,'previous','向前移动'),selectionAction(effective,'next','向后移动'),selectionAction(effective,'mora','按音拍拆分'),selectionAction(effective,'redistribute','重分配读音时间'));
+      const unit=word.rubyUnits.find(unit=>unit.id===rubyId)!;
+      actions.push({...single('split-ruby','拆分读音',()=>dispatch({type:'split-ruby',lineId:line.id,wordId:word.id,rubyId:unit.id,at:Math.floor(Array.from(unit.reading).length/2)})),disabled:multiple||Array.from(unit.reading).length<2});
+    } else if(effective.kind==='words'&&word) {
+      title='词操作';
+      const index=line.words.indexOf(word);
+      actions.push(selectionAction(effective,'beat','添加空拍'),{id:'insert-before',label:'前插词',run:()=>startWordDraft(line.id,line.words[index-1]?.id??null)},{id:'insert-after',label:'后插词',run:()=>startWordDraft(line.id,word.id)},
+        single('split-word','拆分词',()=>{try{const parts=segmentText(word.text,DEFAULT_SEGMENT_OPTIONS);if(parts.length<2){setSegmentationOpen(true);return;}dispatch({type:'segment-words',changes:[{lineId:line.id,wordId:word.id,words:distributeSegmentTime(word,parts,DEFAULT_SEGMENT_OPTIONS.punctuationWeight,editing)}]});}catch(cause){setMessage((cause as Error).message);}}),selectionAction(effective,'merge','合并所选'),selectionAction(effective,'previous','词前移'),selectionAction(effective,'next','词后移'));
+      for(const direction of [-1,1] as const) {
+        const destination=document.lines[document.lines.indexOf(line)+direction];
+        const sources=document.lines.filter(line=>line.words.some(word=>effective.ids.includes(word.id)));
+        const reason=sources.length!==1?'跨来源行时需要明确目标':!destination?'已到达行边界':undefined;
+        actions.push({id:direction<0?'previous-line':'next-line',label:direction<0?'移到上一行':'移到下一行',disabled:!!reason,reason,run:()=>{if(destination)dispatch(moveWordsAcrossLine(document,effective,destination.id));}});
       }
-    } else if (word) {
-      const index = line.words.findIndex((item) => item.id === word.id);
-      effective = selection?.kind === 'words' && selection.ids.includes(word.id) ? { ...selection, lineId: line.id, activeId: word.id }
-        : { kind: 'words', lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id };
-      title = '词操作';
-      actions = [
-        { label: '添加空拍', disabled: word.rubyUnits.length > 0 || emptyBeatCount(editing, word.id) >= 32, reason: word.rubyUnits.length ? '请对具体读音添加空拍' : undefined, run: () => dispatch({ type: 'set-empty-beat', kind: 'word', id: word.id, count: emptyBeatCount(editing, word.id) + 1 }) },
-        { label: '前插词', run: () => startWordDraft(line.id, line.words[index - 1]?.id ?? null) },
-        { label: '后插词', run: () => startWordDraft(line.id, word.id) },
-        { label: '拆分词', disabled: Array.from(word.text).length < 2, run: () => {
-          try {
-            const parts = segmentText(word.text, DEFAULT_SEGMENT_OPTIONS);
-            if (parts.length < 2) { setSegmentationOpen(true); return; }
-            dispatch({ type: 'segment-words', changes: [{ lineId: line.id, wordId: word.id, words: distributeSegmentTime(word, parts, DEFAULT_SEGMENT_OPTIONS.punctuationWeight, editing) }] });
-          } catch (cause) { setMessage((cause as Error).message); }
-        } },
-        mergeAction('words', effective.ids.length > 1 ? effective.ids : line.words.slice(Math.max(0, index - 1), index + 1).map(item => item.id), effective.ids.length > 1),
-        { label: '词前移', disabled: index === 0, run: () => moveWord(line, word, -1) },
-        { label: '词后移', disabled: index === line.words.length - 1, run: () => moveWord(line, word, 1) },
-        { label: '移到上一行', disabled: document.lines[document.lines.indexOf(line) - 1] === undefined, run: () => {
-          const target = document.lines[document.lines.indexOf(line) - 1];
-          if (target) dispatch(moveWordsAcrossLine(document, effective as Extract<EditorSelection, { kind: 'words' }>, target.id));
-        } },
-        { label: '移到下一行', disabled: document.lines[document.lines.indexOf(line) + 1] === undefined, run: () => {
-          const target = document.lines[document.lines.indexOf(line) + 1];
-          if (target) dispatch(moveWordsAcrossLine(document, effective as Extract<EditorSelection, { kind: 'words' }>, target.id));
-        } },
-        { label: '添加注音', run: () => { setRubyShortcut({ wordId: word.id, serial: ++rubyShortcutSerial.current }); } },
-        { label: '重分配读音时间', disabled: word.rubyUnits.length === 0, run: () => dispatch({ type: 'redistribute-ruby-time', lineId: line.id, wordId: word.id }) },
-        { label: effective.ids.length > 1 ? `删除所选词（${effective.ids.length}）` : '删除词', run: () => removeSelection(effective) },
-      ];
-    } else {
-      const id = line.backgroundOf ?? line.id;
-      effective = selection?.kind === 'lines' && selection.ids.includes(line.id) ? { ...selection, activeId: line.id }
-        : { kind: 'lines', ids: [line.id], anchorId: line.id, activeId: line.id };
-      title = '歌词行操作';
-      actions = [
-        { label: '生成日文注音…', run: () => openJapaneseRuby(effective.ids) },
-        { label: '前插行', run: () => { const index = mainLines.findIndex((item) => item.id === id); dispatch({ type: 'insert-line', afterLineId: mainLines[index - 1]?.id ?? null }); } },
-        { label: '后插行', run: () => dispatch({ type: 'insert-line', afterLineId: id }) },
-        ...(document.romanizationTracks.some(track => track.contents.some(content => content.lineId === line.id))
-          ? [{ label: '从音译生成 注音…', run: () => setRubyGeneration({ lineIds: effective.ids }) }] : []),
-        { label: '生成日文罗马字音译…', run: () => setRomanizationGeneration(effective.ids) },
-        { label: '添加词', run: () => startWordDraft(line.id, line.words.at(-1)?.id ?? null) },
-        { label: '行上移', disabled: Boolean(line.backgroundOf) || mainLines[0]?.id === line.id, run: () => moveLine(line, -1) },
-        { label: '行下移', disabled: Boolean(line.backgroundOf) || mainLines.at(-1)?.id === line.id, run: () => moveLine(line, 1) },
-        { label: '拆分行…', disabled: Boolean(line.backgroundOf) || line.words.length < 2, run: () => { const issues = lineStructureIssues(document, line); if (issues.length) setMessage(issues.join('；')); else setSplitLineId(line.id); } },
-        { label: '合并下一行', disabled: Boolean(line.backgroundOf) || mainLines.at(-1)?.id === line.id, run: () => {
-          const next = mainLines[mainLines.findIndex((item) => item.id === line.id) + 1];
-          if (next) dispatch({ type: 'merge-lines', firstLineId: line.id, secondLineId: next.id });
-        } },
-        { label: '分词…', run: () => setSegmentationOpen(true) },
-        { label: effective.ids.length > 1 ? `删除所选行（${effective.ids.length}）` : '删除行', run: () => removeSelection(effective) },
-      ];
+      actions.push(single('add-ruby','添加注音',()=>setRubyShortcut({wordId:word.id,serial:++rubyShortcutSerial.current})),selectionAction(effective,'redistribute','重分配读音时间'));
+    } else if(effective.kind==='lines') {
+      const parent=line.backgroundOf??line.id;
+      actions.push({id:'generate-ruby',label:'生成日文注音…',run:()=>openJapaneseRuby(effective.ids)},
+        {id:'insert-before',label:'前插行',run:()=>dispatch({type:'insert-line',afterLineId:mainLines[mainLines.findIndex(item=>item.id===parent)-1]?.id??null})},
+        {id:'insert-after',label:'后插行',run:()=>dispatch({type:'insert-line',afterLineId:parent})},
+        {id:'roman-to-ruby',label:'从音译生成 注音…',run:()=>setRubyGeneration({lineIds:effective.ids})},
+        {id:'generate-roman',label:'生成日文罗马字音译…',run:()=>setRomanizationGeneration(effective.ids)},
+        single('insert-word','添加词',()=>startWordDraft(line.id,line.words.at(-1)?.id??null)),
+        selectionAction(effective,'previous','行上移'),selectionAction(effective,'next','行下移'),
+        {...single('split-line','拆分行…',()=>setSplitLineId(line.id)),disabled:multiple||!!line.backgroundOf||line.words.length<2,reason:multiple?'拆行需单选':lineStructureIssues(document,line).join('；')},
+        selectionAction(effective,'merge','合并所选'),{id:'segment',label:'分词…',run:()=>setSegmentationOpen(true)});
+      if(mode==='karaoke'&&props.project) {
+        const count=props.project.karaoke.cues.filter(cue=>effective.ids.includes(cue.anchor.lineId)).length;
+        actions.push({id:'clear-cues',label:multiple?'清除所选行导唱':'清除本行导唱',disabled:!count,reason:count?`清除 ${count} 个导唱，仅所选行`:'所选行没有导唱',run:()=>applyKaraokeCommand({kind:'remove-lines',lineIds:effective.ids})});
+      }
+    } else if(effective.kind==='romanization-content'||effective.kind==='romanization-unit') {
+      const translated=effective.attachment==='translation';
+      title=translated?'翻译操作':'音译操作';
+      actions.push(selectionAction(effective,'merge','合并所选'),selectionAction(effective,'previous','向前移动'),selectionAction(effective,'next','向后移动'));
+      if(effective.kind==='romanization-unit')actions.push(selectionAction(effective,'split','拆分单元'));
+      if(effective.kind==='romanization-content') {
+        actions.push(selectionAction(effective,'tokenize','分词并定时'));
+        let reason: string|undefined;
+        try { attachmentSelection(document,effective); } catch(cause) {reason=(cause as Error).message;}
+        actions.push({id:'transfer',label:'转移到其他歌词行…',disabled:!!reason||document.lines.length<2,reason,run:()=>setContentTransfer({trackId:effective.trackId,contentId:effective.contentId,ids:effective.ids,attachment:effective.attachment,targetLineId:document.lines.find(item=>item.id!==line.id)?.id??''})});
+        if(!translated)actions.push(single('roman-to-ruby','从音译生成 注音…',()=>setRubyGeneration({lineIds:[line.id],trackId:effective.trackId,contentId:effective.contentId}),'多个内容的覆盖语义未定义，请先单选'));
+      }
+      const tracks=attachmentTracks(document,effective), index=tracks.findIndex(track=>track.id===effective.trackId);
+      const resolved=tracks.flatMap(track=>track.contents.flatMap(content=>effective.kind==='romanization-content'?(effective.ids.includes(content.id)?[track.id]:[]):content.kind==='timed'?content.units.filter(unit=>effective.ids.includes(unit.id)).map(()=>track.id):[]));
+      const sameTrack=resolved.length===effective.ids.length&&new Set(resolved).size===1;
+      actions.push({id:'manage-track',label:'管理轨道…',disabled:!sameTrack,reason:!sameTrack?'请选择同一轨道':undefined,run:()=>setSettingsDialog(translated?'translations':'tracks')});
+      for(const direction of [-1,1] as const) actions.push({id:direction<0?'track-previous':'track-next',label:direction<0?'轨道前移':'轨道后移',disabled:!sameTrack||index+direction<0||index+direction>=tracks.length,reason:!sameTrack?'请选择同一轨道':index+direction<0||index+direction>=tracks.length?'已到达轨道边界':undefined,run:()=>{
+        if(!translated)dispatch({type:'move-romanization-track',trackId:effective.trackId,direction});
+        else {const ordered=document.translationTracks.slice(); const [track]=ordered.splice(index,1);ordered.splice(index+direction,0,track);dispatch({type:'set-translation-tracks',source:document.translationTracks,tracks:ordered});}
+      }});
     }
-    if (mode === 'karaoke' && effective.kind === 'lines' && props.project) {
-      const lineIds = effective.ids;
-      const count = props.project.karaoke.cues.filter(cue => lineIds.includes(cue.anchor.lineId)).length;
-      actions.push({ label: lineIds.length > 1 ? '清除所选行导唱' : '清除本行导唱', disabled: !count, reason: count ? `清除 ${count} 个导唱，仅处理所选行` : '所选行没有导唱', run: () => applyKaraokeCommand({ kind: 'remove-lines', lineIds }) });
-    }
+    const noun=effective.kind==='lines'?'行':effective.kind==='words'?'词':effective.kind==='ruby'?'读音':effective.kind==='romanization-content'?'内容':'单元';
+    actions.push({id:'delete',label:multiple?`删除所选${noun}（${effective.ids.length}）`:`删除${noun}`,run:()=>removeSelection(effective)});
     const shared: ContextAction[] = [
       { label: '复制', disabled: !copyAllowed(effective), run: () => { copy(effective); } },
       { label: '剪切', disabled: !copyAllowed(effective), run: () => { cut(effective); } },
       { label: '粘贴', disabled: !clipboard, run: () => paste(clipboard, undefined, effective) },
     ];
-    if (effective.ids.length > 1) actions = actions.map(action => ['合并', '前插词', '后插词', '清除所选行导唱'].includes(action.label) || action.label.startsWith('删除所选') || effective.kind === 'lines' && ['生成日文注音…', '生成日文罗马字音译…', '从音译生成 注音…', '分词…'].includes(action.label) ? action : { ...action, disabled: true });
     setSelection(effective);
     props.onSelectLine?.(line.id);
-    if (effective.kind === 'romanization-content' || effective.kind === 'romanization-unit') props.onSelectRomanization?.(effective.trackId, effective.contentId);
-    setContextMenu({ x, y, title, actions: [...shared, ...actions], target: target.closest<HTMLElement>('[data-ruby-id], [data-romanization-unit-id], [data-romanization-content-id], [data-word-id], [data-line-id]') ?? target });
+    if ((effective.kind === 'romanization-content' || effective.kind === 'romanization-unit') && !effective.attachment) props.onSelectRomanization?.(effective.trackId, effective.contentId);
+    setContextMenu({ x, y, title, actions: [...shared, ...actions], target: target.closest<HTMLElement>('[data-translation-unit-id], [data-translation-id], [data-ruby-id], [data-romanization-unit-id], [data-romanization-content-id], [data-word-id], [data-line-id]') ?? target });
     return true;
   };
   const ownsSelection = (target: EventTarget) => {
@@ -766,7 +727,8 @@ function EditorWorkspaceContent(props: Props) {
       const source = pointerSource(element);
       if (!source) return;
       event.preventDefault();
-      const node = element.closest<HTMLElement>('[data-ruby-id], [data-romanization-unit-id], [data-romanization-content-id], [data-word-id], [data-line-id]')!;
+      if(element.closest('[data-translation-id]'))return;
+      const node = element.closest<HTMLElement>('[data-translation-unit-id], [data-translation-id], [data-ruby-id], [data-romanization-unit-id], [data-romanization-content-id], [data-word-id], [data-line-id]')!;
       (element.closest<HTMLElement>('[data-outline-drag]') ?? node).focus({ preventScroll: true });
       const line = document.lines.find(line => line.id === source.lineId)!;
       const toggle = event.ctrlKey || event.metaKey;
@@ -883,8 +845,8 @@ function EditorWorkspaceContent(props: Props) {
     {mode === 'sync' && <SyncPanel progress={syncProgress} onProgress={setSyncProgress} preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} document={document} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
       onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
     {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canCopy={canCopySelection} canPaste={Boolean(clipboard)}
-      canMoveUp={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes[0] > 0}
-      canMoveDown={selectedWordLineIndexes.length > 0 && selectedWordLineIndexes.at(-1) !== document.lines.length - 1}
+      canMoveUp={selectedWordLineIndexes.length === 1 && selectedWordLineIndexes[0] > 0}
+      canMoveDown={selectedWordLineIndexes.length === 1 && selectedWordLineIndexes.at(-1) !== document.lines.length - 1}
       copy={() => { copy(); }} cut={() => { cut(); }} remove={() => removeSelection()} paste={() => paste(clipboard)}
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
@@ -906,6 +868,7 @@ function EditorWorkspaceContent(props: Props) {
           mode, mode==='karaoke' ? [props.project?.karaoke,selectedCue] : null, ordinalById.get(line.backgroundOf ?? line.id), props.playheadLineId === line.id,
           selection?.kind, selectedTargets.filter(target => target.lineId === line.id).map(targetId),
           selection?.kind === 'romanization-content' && selection.lineId === line.id ? selection.ids : null,
+          selection?.kind === 'romanization-unit' && selection.attachment && selection.lineId === line.id ? selection.ids : null,
           translationVersion.current.serial, attachmentVersions.get(line.id),
           wordDraft?.lineId === line.id ? wordDraft : null,
           line.words.some(word => word.id === rubyShortcut?.wordId) ? rubyShortcut : null,
@@ -965,7 +928,7 @@ function EditorWorkspaceContent(props: Props) {
             const target = activePropertyTarget;
             if (target.kind === 'word') dispatch({ type: 'set-word-time', lineId: target.lineId, wordId: target.wordId, beginMs, endMs });
             else if (target.kind === 'ruby') dispatch({ type: 'set-ruby-time', lineId: target.lineId, wordId: target.wordId, rubyId: target.rubyId, beginMs, endMs });
-            else if (target.kind === 'romanization') { const content = document.romanizationTracks.find(track => track.id === target.trackId)!.contents.find(content => content.id === target.contentId)!; if (content.kind === 'timed') dispatch({ type: 'set-romanization-content', trackId: target.trackId, content: { ...content, units: content.units.map(unit => unit.id === target.unitId ? { ...unit, beginMs, endMs } : unit) } }); }
+            else if (target.kind === 'romanization') { const key=target.attachment==='translation'?'translationTracks':'romanizationTracks'; dispatch({type:'replace-document',document:{...document,[key]:document[key].map(track=>track.id!==target.trackId?track:{...track,contents:track.contents.map(content=>content.id!==target.contentId||content.kind!=='timed'?content:{...content,units:content.units.map(unit=>unit.id===target.unitId?{...unit,beginMs,endMs}:unit)})})}}); }
           }} /> : <small>多对象时间可在时间轴整体平移；端点请单独调整。</small>}
         </>}
         {selection?.ids.length === 1 && activePropertyTarget && propertyWord && (activePropertyTarget.kind === 'ruby' || activePropertyTarget.kind === 'word' && propertyWord.rubyUnits.length === 0) && <EmptyBeatField
@@ -981,6 +944,7 @@ function EditorWorkspaceContent(props: Props) {
           <BooleanField label="跳过对齐" switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={propertyLines.every(line => editing.skippedAlignmentLineIds.includes(line.id))} mixed={propertyLines.some(line => editing.skippedAlignmentLineIds.includes(line.id)) && !propertyLines.every(line => editing.skippedAlignmentLineIds.includes(line.id))} onChange={checked => dispatch({type:'batch', commands:propertyLines.map(line=>({type:'set-skip-alignment',lineId:line.id,skip:checked}))})}/>
           <BooleanField label="跳过打轴" switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} mixed={propertyLines.some(line => editing.ignoredSyncLineIds.includes(line.id)) && !propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} onChange={checked => dispatch({type:'batch', commands:propertyLines.map(line=>({type:'set-ignore-sync',lineId:line.id,ignoreSync:checked}))})}/>
         </>}
+        <SongPartField document={document} lines={propertyLines} apply={dispatch}/>
         {props.project?.amll.simplified ? selectedMainLines.map(line=><BooleanField key={line.id} label="对唱歌词" switchControl checked={line.agentRefs.includes('v2')} onChange={duet=>props.applyProject?.({type:'duet',lineId:line.id,duet})}/>) : <SingerSelection agents={document.agents} lines={propertyLines} apply={dispatch} />}
         {selectedLine.backgroundOf&&props.project&&<BooleanField label="背景置于主行之前" switchControl checked={displayOrder.indexOf(selectedLine)<displayOrder.findIndex(line=>line.id===selectedLine.backgroundOf)} onChange={before=>props.applyProject?.({type:'background-position',lineId:selectedLine.id,before})}/>}
         {selection?.kind !== 'lines' || selection.ids.length <= 1 ? <>
@@ -1021,13 +985,19 @@ function EditorWorkspaceContent(props: Props) {
       <IconButton icon="add" label="新增轨道音译轨道" data-role="inline" onClick={() => dispatch({ type: 'add-romanization-track', track: { id: crypto.randomUUID(), language: null, contents: [] } })}/>
     </div></SettingsDialog>}
     {contentTransfer && (() => {
-      const track = document.romanizationTracks.find((item) => item.id === contentTransfer.trackId);
+      const track = attachmentTracks(document,contentTransfer).find((item) => item.id === contentTransfer.trackId);
       const content = track?.contents.find((item) => item.id === contentTransfer.contentId);
       if (!track || !content) return null;
-      return <SettingsDialog title="转移音译内容" close={() => setContentTransfer(null)} actions={<><button data-role="secondary" onClick={() => setContentTransfer(null)}>取消</button><button data-role="secondary" onClick={() => {
-          const afterContentId = track.contents.filter((item) => item.lineId === contentTransfer.targetLineId).at(-1)?.id ?? null;
-          if (dispatch({ type: 'move-romanization-content', trackId: track.id, contentId: content.id, lineId: contentTransfer.targetLineId, afterContentId })) setContentTransfer(null);
-        }}>应用（一次撤销）</button></>}><p>{content.kind === 'plain' ? content.text : content.units.map((unit) => unit.text).join('')}</p>
+      return <SettingsDialog title="转移附属内容" close={() => setContentTransfer(null)} actions={<><button data-role="secondary" onClick={() => setContentTransfer(null)}>取消</button><button data-role="secondary" onClick={() => {
+          if(!document.lines.some(line=>line.id===contentTransfer.targetLineId)){setMessage('目标行已失效');return;}
+          const selected=track.contents.filter(item=>contentTransfer.ids.includes(item.id));
+          if(selected.length!==contentTransfer.ids.length){setMessage('选中内容已失效');return;}
+          const contents=track.contents.filter(item=>!contentTransfer.ids.includes(item.id));
+          const last=contents.reduce((last,item,i)=>item.lineId===contentTransfer.targetLineId?i:last,-1);
+          contents.splice(last<0?contents.length:last+1,0,...selected.map(item=>({...item,lineId:contentTransfer.targetLineId})));
+          const key=contentTransfer.attachment==='translation'?'translationTracks':'romanizationTracks';
+          if(dispatch({type:'replace-document',document:{...document,[key]:document[key].map(item=>item.id===track.id?{...item,contents}:item)}}))setContentTransfer(null);
+        }}>应用（一次撤销）</button></>}><p>已选 {contentTransfer.ids.length} 份内容</p>
         <label>目标歌词行 <Select value={contentTransfer.targetLineId} onChange={(event) => setContentTransfer({ ...contentTransfer, targetLineId: event.target.value })}>
           {document.lines.filter((line) => line.id !== content.lineId).map((line) => <option key={line.id} value={line.id}>{line.backgroundOf ? '背景 · ' : ''}{lineText(line) || '空行'}</option>)}
         </Select></label>

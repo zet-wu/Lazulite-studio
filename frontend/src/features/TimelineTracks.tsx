@@ -37,15 +37,15 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
   }, [visible.line, visible.word, visible.ruby]);
   const [drag, setDrag] = useState<Drag | null>(null);
   const { selection, setSelection, expanded, commands } = useEditorSelection()!;
-  const expandedLines = document.lines.filter(line => expanded.includes(line.id) && (visible.word || visible.ruby && line.words.some(word => word.rubyUnits.length) || visible.romanization && document.romanizationTracks.some(track => track.contents.some(content => content.lineId === line.id))));
+  const expandedLines = document.lines.filter(line => expanded.includes(line.id) && (visible.word || visible.ruby && line.words.some(word => word.rubyUnits.length) || visible.romanization && [...document.romanizationTracks,...document.translationTracks].some(track => track.contents.some(content => content.lineId === line.id))));
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtual = useVirtualizer({ count: expandedLines.length, getScrollElement: () => scrollRef.current, estimateSize: () => 80, overscan: 3, getItemKey: index => expandedLines[index].id });
   const [menu, setMenu] = useState<{ x: number; y: number; target: HTMLElement } | null>(null);
   const closeMenu = () => { const target = menu?.target; setMenu(null); if (target?.isConnected) target.focus({ preventScroll: true }); };
   const allTargets = useMemo(() => documentTargets(document), [document]);
   const choose = (target: TimelineTarget, shift = false, toggle = false) => {
-    const id = targetId(target), previous = selection?.kind === selectionKind(target) ? selection : null;
-    const order = allTargets.filter(item => item.kind === target.kind && (!shift || target.kind !== 'romanization' || item.kind === 'romanization' && item.trackId === target.trackId)).map(targetId);
+    const id = targetId(target), previous = selection?.kind === selectionKind(target) && (target.kind!=='romanization'||(selection.kind==='romanization-unit'&&selection.attachment===target.attachment)) ? selection : null;
+    const order = allTargets.filter(item => item.kind === target.kind && (target.kind!=='romanization'||item.kind==='romanization'&&item.attachment===target.attachment) && (!shift || target.kind !== 'romanization' || item.kind === 'romanization' && item.trackId === target.trackId)).map(targetId);
     const ids = !shift && !toggle && previous?.ids.includes(id) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
     setSelection(targetSelection(target, ids, shift || toggle || previous?.ids.includes(id) ? previous?.anchorId ?? id : id));
   };
@@ -170,15 +170,15 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     const clippedBegin = Math.max(startMs, beginMs);
     const right = Math.min(endMs, propsEndMs);
     const narrow = (Math.min(endMs, propsEndMs) - clippedBegin) / spanMs * plotWidth < 16;
-    return <div key={key} data-timeline-key={key}
+    return <div key={key} data-timeline-key={key} data-line-id={target.lineId} data-word-id={target.kind==='word'||target.kind==='ruby'?target.wordId:undefined} data-ruby-id={target.kind==='ruby'?target.rubyId:undefined} data-romanization-content-id={target.kind==='romanization'&&!target.attachment?target.contentId:undefined} data-romanization-unit-id={target.kind==='romanization'&&!target.attachment?target.unitId:undefined} data-translation-id={target.kind==='romanization'&&target.attachment?target.contentId:undefined} data-translation-unit-id={target.kind==='romanization'&&target.attachment?target.unitId:undefined}
       className={`${styles.trackBar} ${target.kind === 'line' && document.lines.find(line => line.id === target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${real?.beginMs != null && real?.endMs != null && positionMs >= real.beginMs && positionMs < real.endMs ? styles.trackPlaying : ''}`} role="button" aria-disabled={locked} tabIndex={0} aria-label={label} title={description} aria-description={description} data-temporary-begin={ghostBegin || undefined} data-temporary-end={ghostEnd || undefined}
       style={{ transform: narrow && beginMs === endMs && beginMs === propsEndMs ? 'translateX(-100%)' : undefined, left: pct(clippedBegin), width: `${(right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
       onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
       onFocus={() => { if (!dragRef.current) choose(target); }}
-      onContextMenu={event => { event.preventDefault(); if(locked)return; choose(target); setMenu({ x: event.clientX, y: event.clientY, target: event.currentTarget }); }}
+      onContextMenu={event => { event.preventDefault(); if(locked)return; event.stopPropagation(); if(!commands.current?.openContext(event.currentTarget,event.clientX,event.clientY)){choose(target); setMenu({ x: event.clientX, y: event.clientY, target: event.currentTarget });} }}
       onKeyDown={event => {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(target, event.shiftKey, event.ctrlKey || event.metaKey); }
-        if (!locked && (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10')) { event.preventDefault(); choose(target); const box = event.currentTarget.getBoundingClientRect(); setMenu({ x: box.left, y: box.bottom, target: event.currentTarget }); }
+        if (!locked && (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10')) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); if(!commands.current?.openContext(event.currentTarget,box.left,box.bottom)){choose(target);setMenu({ x: box.left, y: box.bottom, target: event.currentTarget });} }
         if (event.key === 'Delete' && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); }
       }}>
       {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanMs * plotWidth }} /><span className={styles.narrowMarker} title="窄区间，请用时间轴缩放后调整边界" /></>}
@@ -226,6 +226,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
         <strong className={styles.groupLabel}>{label}</strong>
         {visible.word && renderTargets('词', targets.filter(target => target.kind === 'word'))}
         {visible.ruby && targets.some(target => target.kind === 'ruby') && renderTargets('注音', targets.filter(target => target.kind === 'ruby'))}
+        {visible.romanization && document.translationTracks.map((track,index)=>track.contents.filter(content=>content.lineId===item.id).map(content=>content.kind==='timed'?<div key={content.id} style={{display:'contents'}}>{renderTargets(`翻译 ${track.language??'未指定'} ${index+1}`,targets.filter(target=>target.kind==='romanization'&&target.attachment==='translation'&&target.contentId===content.id))}</div>:row(`${label} 翻译 ${index+1}`,<span data-line-id={item.id} data-translation-id={content.id} tabIndex={0} onClick={()=>setSelection({kind:'romanization-content',attachment:'translation',lineId:item.id,trackId:track.id,contentId:content.id,ids:[content.id],anchorId:content.id,activeId:content.id})} onContextMenu={event=>{event.preventDefault();event.stopPropagation();commands.current?.openContext(event.currentTarget,event.clientX,event.clientY);}}>{content.text}</span>)))}
         {visible.romanization && document.romanizationTracks.map((track, index) => track.contents.filter(content => content.lineId === item.id).map(content => content.kind === 'plain' ? row(`${label} 音译 ${track.language ?? '未指定'} ${index + 1}`, <span title={content.text}>普通音译：{content.text}</span>) : <div key={content.id} style={{ display: 'contents' }}>
           {renderTargets(`音译 ${track.language ?? '未指定'} ${index + 1}`, targets.filter(target => target.kind === 'romanization' && target.contentId === content.id))}
           {content.units.some(unit => unit.beginMs === null || unit.endMs === null) && <button data-role="inline" onClick={() => setSelection({ kind: 'romanization-content', lineId: item.id, trackId: track.id, contentId: content.id, ids: [content.id], anchorId: content.id, activeId: content.id })}>未定时音译：在画布补充时间</button>}

@@ -133,7 +133,7 @@ test('multi-row deletion preserves unrelated endpoints and restores rows on undo
 test('P8 merging timed fragments preserves generated separator spaces and native text keys', async ({ page }) => {
   await load(page); const dialog = await generate(page); await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
   await dialog.getByRole('button', { name: '生成音译', exact: true }).click();
-  await edge(page, 'main [data-romanization-unit-id]', 1, { button: 'right' }); await page.getByRole('menuitem', { name: '合并前一单元', exact: true }).click();
+  await edge(page, 'main [data-romanization-unit-id]', 0); await edge(page, 'main [data-romanization-unit-id]', 1, { modifiers: ['Shift'] }); await edge(page, 'main [data-romanization-unit-id]', 1, { button: 'right' }); await page.getByRole('menuitem', { name: '合并所选', exact: true }).click();
   const input = page.getByLabel('音译单元 1', { exact: true }); await expect(input).toHaveValue('ga k ');
   await expect(page.getByLabel('音译单元 1开始秒数')).toHaveValue('0'); await expect(page.getByLabel('音译单元 1结束秒数')).toHaveValue('2');
   await input.click(); await input.press('ControlOrMeta+A'); await input.press('Backspace'); await expect(input).toHaveValue('');

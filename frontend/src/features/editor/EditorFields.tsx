@@ -11,7 +11,7 @@ function parseSeconds(value: string): TimeMs {
   return number;
 }
 
-export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSplit, onMergePrevious, onMove, onNavigate, inputRef }: { value: string; label: string; placeholder?: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number, draft: string) => void; onMergePrevious?: (draft: string) => void; onMove?: (direction: -1 | 1) => void; onNavigate?: (direction: -1 | 1) => void; inputRef?: (node: HTMLInputElement | null) => void }) {
+export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSplit, onMove, onNavigate, inputRef }: { value: string; label: string; placeholder?: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number, draft: string) => void; onMove?: (direction: -1 | 1) => void; onNavigate?: (direction: -1 | 1) => void; inputRef?: (node: HTMLInputElement | null) => void }) {
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
@@ -25,7 +25,6 @@ export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSpl
       if (event.key === 'Enter') ref.current?.blur();
       if (event.key === 'Escape') { cancelled.current = true; setDraft(value); ref.current?.blur(); }
       if (event.key === 'F8' && onSplit) { event.preventDefault(); cancelled.current = true; onSplit(ref.current?.selectionStart ?? 0, draft); }
-      if (event.key === 'Backspace' && onMergePrevious && ref.current?.selectionStart === 0 && ref.current?.selectionEnd === 0) { event.preventDefault(); cancelled.current = true; onMergePrevious(draft); }
       if (event.altKey && onMove && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) { event.preventDefault(); onMove(event.key === 'ArrowLeft' ? -1 : 1); }
       if (event.altKey && onNavigate && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) { event.preventDefault(); onNavigate(event.key === 'ArrowUp' ? -1 : 1); }
     }} />;

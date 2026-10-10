@@ -1,3 +1,4 @@
+import { selectIds } from './editing-actions';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { plainTranslation, type TranslationContent, type LyricDocument, type TranslationTrack } from '../../domain/lyric-document';
 import type { LyricCommand } from '../../domain/lyric-commands';
@@ -10,6 +11,19 @@ import styles from './semantic-editor.module.css';
 function TranslationRow({ item, index, commit, remove, fresh = false }: {
   item: TranslationContent; index: number; commit: (item: TranslationContent) => void; remove: () => void; fresh?: boolean;
 }) {
+  const shared = useEditorSelection();
+  const selected = shared?.selection;
+  const choose = (event: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>, unitId?: string) => {
+    event.stopPropagation();
+    const row=event.currentTarget.closest<HTMLElement>('[data-translation-track]')!;
+    const trackId=row.dataset.translationTrack!;
+    const id=unitId??item.id, kind=unitId?'romanization-unit' as const:'romanization-content' as const;
+    const previous=selected?.kind===kind&&selected.attachment==='translation'?selected:null;
+    const order=unitId&&item.kind==='timed'?item.units.map(unit=>unit.id):Array.from(row.parentElement!.querySelectorAll<HTMLElement>(`[data-translation-track="${CSS.escape(trackId)}"] [data-translation-id]`)).map(node=>node.dataset.translationId!);
+    const shift=event.shiftKey,toggle=event.ctrlKey||event.metaKey;
+    const ids=!shift&&!toggle&&previous?.ids.includes(id)?previous.ids:selectIds(order,previous?.ids??[],previous?.anchorId??id,id,shift,toggle);
+    shared?.setSelection({kind,attachment:'translation',lineId:item.lineId,trackId,contentId:item.id,ids,activeId:id,anchorId:shift||toggle||previous?.ids.includes(id)?previous?.anchorId??id:id});
+  };
   const [draft, setDraft] = useState(item);
   const [error, setError] = useState('');
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -28,12 +42,13 @@ function TranslationRow({ item, index, commit, remove, fresh = false }: {
     if (JSON.stringify(draft) === JSON.stringify(item)) return;
     try { commit(draft); setError(''); } catch (cause) { setError((cause as Error).message); }
   };
-  return <div data-translation-id={item.id} className={styles.translationRow} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={event => {
+  return <div data-translation-id={item.id} tabIndex={0} data-selected={selected?.kind==='romanization-content'&&selected.attachment==='translation'&&selected.ids.includes(item.id)||undefined} className={styles.translationRow} onClick={event=>choose(event)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={event => {
+    if(event.target===event.currentTarget&&(event.key===' '||event.key==='Enter')){event.preventDefault();choose(event);return;}
     if (composing.current || event.nativeEvent.isComposing) return;
     if (event.key === 'Enter') { event.preventDefault(); (event.target as HTMLElement).blur(); }
     if (event.key === 'Escape') { event.stopPropagation(); cancelled.current = true; setDraft(item); setError(''); (event.target as HTMLElement).blur(); if (fresh) remove(); }
   }}>
-    {draft.kind === 'plain' ? <textarea ref={textRef} rows={1} autoFocus={fresh} aria-label={`翻译 ${index + 1}`} value={draft.text} onChange={event => setDraft({ ...draft, text: event.target.value })} onBlur={submit} /> : <div><small>定时翻译</small>{draft.units.map((unit, unitIndex) => <div key={unit.id} data-translation-unit-id={unit.id}>
+    {draft.kind === 'plain' ? <textarea ref={textRef} rows={1} autoFocus={fresh} aria-label={`翻译 ${index + 1}`} value={draft.text} onChange={event => setDraft({ ...draft, text: event.target.value })} onBlur={submit} /> : <div><small>定时翻译</small>{draft.units.map((unit, unitIndex) => <div key={unit.id} data-translation-unit-id={unit.id} tabIndex={0} data-selected={selected?.kind==='romanization-unit'&&selected.attachment==='translation'&&selected.ids.includes(unit.id)||undefined} onClick={event=>choose(event,unit.id)} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key===' '||event.key==='Enter')){event.preventDefault();choose(event,unit.id);}}}>
       <input aria-label={`翻译 ${index + 1} 单元 ${unitIndex + 1}`} value={unit.text} onChange={event => setDraft({ ...draft, units: draft.units.map(value => value.id === unit.id ? { ...value, text: event.target.value } : value) })} onBlur={submit} />
       {(['beginMs', 'endMs'] as const).map(side => <input key={side} type="number" min="0" step="1" placeholder="未定" aria-label={`翻译 ${index + 1} 单元 ${unitIndex + 1} ${side === 'beginMs' ? '开始' : '结束'}毫秒`} value={unit[side] ?? ''} onChange={event => setDraft({ ...draft, units: draft.units.map(value => value.id === unit.id ? { ...value, [side]: event.target.value === '' ? null : Number(event.target.value) } : value) })} onBlur={submit} />)}
     </div>)}</div>}
@@ -50,13 +65,13 @@ export function TranslationEditor({ document, lineId, apply }: { document: Lyric
   const shared = useEditorSelection();
   const items = document.translationTracks.flatMap((track, index) => track.contents.filter(content => content.lineId === lineId).map(content => ({ track, index, content })));
   const submit = (tracks: TranslationTrack[]) => apply({ type: 'set-translation-tracks', source: document.translationTracks, tracks });
-  return <div className={styles.sublyrics} onFocus={() => shared?.setSelection(null)}><div>
+  return <div className={styles.sublyrics}><div>
     <div className={styles.translationToolbar}><strong>翻译</strong>
     <label>新增到 <Select aria-label="新增翻译的轨道" value={targetId} onChange={event => setTrackId(event.target.value)}>{!document.translationTracks.length ? <option value="">新建轨道</option> : <option value="" disabled>请选择轨道</option>}{document.translationTracks.map((track, index) => <option key={track.id} value={track.id}>{translationTrackLabel(track, index)}</option>)}</Select></label>
     <button data-role="inline" className="icon-button" aria-label="新增翻译" title="新增翻译" data-tooltip="新增翻译" disabled={Boolean(adding)} onClick={() => setAdding(plainTranslation('', lineId))}><Icon name="add"/></button>
     {adding && invalidTarget && <small role="alert">原轨道已删除，草稿保留，请重新选择轨道。</small>}
     </div>
-    {items.map(({ track, index: trackIndex, content }, index) => <div key={content.id}>
+    {items.map(({ track, index: trackIndex, content }, index) => <div key={content.id} data-translation-track={track.id}>
       <small>{translationTrackLabel(track, trackIndex)}</small>
       <TranslationRow item={content} index={index} commit={next => submit(document.translationTracks.map(value => value.id !== track.id ? value : { ...value, contents: value.contents.map(item => item.id === content.id ? next : item) }))}
         remove={() => submit(document.translationTracks.map(value => value.id !== track.id ? value : { ...value, contents: value.contents.filter(item => item.id !== content.id) }))} />

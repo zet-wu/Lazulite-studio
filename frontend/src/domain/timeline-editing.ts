@@ -6,7 +6,7 @@ export type TimelineTarget =
   | { kind: 'line'; lineId: string }
   | { kind: 'word'; lineId: string; wordId: string }
   | { kind: 'ruby'; lineId: string; wordId: string; rubyId: string }
-  | { kind: 'romanization'; lineId: string; trackId: string; contentId: string; unitId: string };
+  | { kind: 'romanization'; attachment?: 'translation'; lineId: string; trackId: string; contentId: string; unitId: string };
 
 const changed = (time: TimeMs, delta: number): TimeMs => {
   if (time === null) return null;
@@ -51,16 +51,12 @@ function moveTargets(document: LyricDocument, targets: TimelineTarget[], deltaMs
   }
   if (new Set(targets.map(target => target.kind)).size > 1) throw new Error('只能同时移动同类对象');
   if (targets.every(target => target.kind === 'romanization')) {
-    const keys = new Set(targets.map(target => JSON.stringify([target.trackId, target.contentId, target.lineId, target.unitId])));
-    let found = 0;
-    const romanizationTracks = document.romanizationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.kind === 'plain' ? content : { ...content, units: content.units.map(unit => {
-      if (!keys.has(JSON.stringify([track.id, content.id, content.lineId, unit.id]))) return unit;
-      found++;
-      if (unit.beginMs === null || unit.endMs === null) throw new Error('请先为音译设置完整时间');
-      return { ...unit, beginMs: changed(unit.beginMs, deltaMs), endMs: changed(unit.endMs, deltaMs) };
-    }) }) }));
-    if (found !== keys.size) throw new Error('定时音译单元已不存在');
-    return { ...document, romanizationTracks };
+    let next = document;
+    for (const target of targets) next = editRomanization(next,target,unit=>{
+      if(unit.beginMs===null||unit.endMs===null)throw new Error('请先为附属单元设置完整时间');
+      return {...unit,beginMs:changed(unit.beginMs,deltaMs),endMs:changed(unit.endMs,deltaMs)};
+    });
+    return next;
   }
   let result = document;
   for (const target of targets) {
@@ -141,12 +137,13 @@ export const snapTimelineTime = (timeMs: number, anchors: number[], spanMs: numb
 
 function editRomanization(document: LyricDocument, target: Extract<TimelineTarget, { kind: 'romanization' }>, update: (unit: import('./lyric-document').RomanizationUnit) => import('./lyric-document').RomanizationUnit): LyricDocument {
   let found = false;
-  const romanizationTracks = document.romanizationTracks.map(track => track.id !== target.trackId ? track : { ...track, contents: track.contents.map(content => {
+  const key=target.attachment==='translation'?'translationTracks':'romanizationTracks';
+  const tracks = document[key].map(track => track.id !== target.trackId ? track : { ...track, contents: track.contents.map(content => {
     if (content.id !== target.contentId || content.lineId !== target.lineId || content.kind !== 'timed') return content;
     return { ...content, units: content.units.map(unit => { if (unit.id !== target.unitId) return unit; found = true; return update(unit); }) };
   }) });
   if (!found) throw new Error('定时音译单元已不存在');
-  return { ...document, romanizationTracks };
+  return { ...document, [key]: tracks };
 }
 
 export function moveTimeline(document: LyricDocument, targets: TimelineTarget[], deltaMs: number, editing = createProjectEditing()) {

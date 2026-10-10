@@ -1,4 +1,4 @@
-import type { LyricDocument, LyricWord, TimeMs } from './lyric-document';
+import type { RomanizationTrack, LyricDocument, LyricWord, TimeMs } from './lyric-document';
 
 type Interval = { beginMs: TimeMs; endMs: TimeMs };
 const endpoints = (items: Interval[]) => items.flatMap(item => [item.beginMs, item.endMs]).filter((time): time is number => time !== null);
@@ -39,7 +39,8 @@ export function projectTimeline(document: LyricDocument, durationMs: number | nu
     }) };
   });
   const byId = new Map(lines.map(line => [line.id, line]));
-  return { ...document, lines, romanizationTracks: document.romanizationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.kind === 'plain' ? content : {
+  const projectTracks = <T extends RomanizationTrack>(tracks: T[]): T[] => tracks.map(track => ({ ...track, contents: track.contents.map(content => content.kind === 'plain' ? content : {
     ...content, units: content.units.map((unit, index) => project(unit, content.units[index - 1], content.units[index + 1], byId.get(content.lineId))),
-  }) })) };
+  }) }));
+  return { ...document, lines, romanizationTracks: projectTracks(document.romanizationTracks), translationTracks: projectTracks(document.translationTracks) };
 }

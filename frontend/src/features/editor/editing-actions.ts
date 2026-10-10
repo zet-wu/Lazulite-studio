@@ -1,21 +1,17 @@
 import { wordAgents, lineAgents, sameAgents } from '../../domain/amll-compatibility';
 import { createProjectEditing, remapEditing, type ProjectEditing } from '../../domain/project-editing';
-import type { LyricCommand } from '../../domain/lyric-commands';
+import { applyLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationUnit, type RubyUnit } from '../../domain/lyric-document';
 
-export type EditorSelection =
-  | { kind: 'lines'; ids: string[]; anchorId: string; activeId: string }
-  | { kind: 'words'; lineId: string; ids: string[]; anchorId: string; activeId: string }
-  | { kind: 'ruby'; lineId: string; wordId: string; ids: string[]; anchorId: string; activeId: string }
-  | { kind: 'romanization-content'; lineId: string; trackId: string; contentId: string; ids: string[]; anchorId: string; activeId: string }
-  | { kind: 'romanization-unit'; lineId: string; trackId: string; contentId: string; ids: string[]; anchorId: string; activeId: string };
+import { attachmentTracks, type ObjectSelection } from '../../domain/selection-editing';
+export type EditorSelection = ObjectSelection;
 
 export type EditorClipboard = (
   | { kind: 'lines'; groups: Array<{ line: LyricLine; backgrounds: LyricLine[]; translations: Array<{ trackId: string; content: RomanizationContent }>; romanizations: Array<{ trackId: string; content: RomanizationContent }> }>; text: string }
   | { kind: 'words'; words: LyricWord[]; sources?: Record<string,string[]>; text: string }
   | { kind: 'ruby'; units: RubyUnit[]; text: string }
   | { kind: 'romanization-content'; trackId: string; contents: RomanizationContent[]; text: string }
-  | { kind: 'romanization-unit'; trackId: string; contentId: string; units: RomanizationUnit[]; text: string }) & { editing?: ProjectEditing };
+  | { kind: 'romanization-unit'; trackId: string; contentId: string; units: RomanizationUnit[]; text: string }) & { editing?: ProjectEditing; attachment?: 'translation' };
 
 export const selectionLineId = (selection: EditorSelection | null): string | null => selection?.kind === 'lines' ? selection.activeId || null : selection?.lineId ?? null;
 
@@ -34,7 +30,9 @@ export function invertIds(order: string[], selected: string[]): string[] {
 }
 
 export function copySelection(document: LyricDocument, selection: EditorSelection, editing = createProjectEditing()): EditorClipboard {
-  const result = copyObjects(document, selection);
+  const translated = (selection.kind === 'romanization-content' || selection.kind === 'romanization-unit') && selection.attachment === 'translation';
+  const result = copyObjects(translated ? { ...document, romanizationTracks: document.translationTracks } : document, selection);
+  if(translated)result.attachment='translation';
   const ids = new Map<string, string>();
   const collect = (value: unknown) => { if (!value || typeof value !== 'object') return; if ('id' in value && typeof value.id === 'string') ids.set(value.id, value.id); Object.values(value).forEach(collect); };
   collect(result);
@@ -72,6 +70,10 @@ function copyObjects(document: LyricDocument, selection: EditorSelection): Edito
 }
 
 export function deleteSelection(document: LyricDocument, selection: EditorSelection): LyricCommand {
+  if((selection.kind==='romanization-content'||selection.kind==='romanization-unit')&&selection.attachment==='translation') {
+    const tracks=document.translationTracks.map(track=>({...track,contents:selection.kind==='romanization-content'?track.contents.filter(content=>!selection.ids.includes(content.id)):track.contents.map(content=>content.kind==='plain'?content:{...content,units:content.units.filter(unit=>!selection.ids.includes(unit.id))})}));
+    return {type:'set-translation-tracks',source:document.translationTracks,tracks};
+  }
   if (selection.kind === 'ruby') return { type: 'batch', commands: document.lines.flatMap(line => line.words.flatMap(word => word.rubyUnits.filter(unit => selection.ids.includes(unit.id)).map(unit => ({ type: 'delete-ruby' as const, lineId: line.id, wordId: word.id, rubyId: unit.id })))) };
   if (selection.kind === 'romanization-content') return { type: 'batch', commands: selection.ids.map((contentId) => ({ type: 'delete-romanization-content', trackId: selection.trackId, contentId })) };
   if (selection.kind === 'romanization-unit') {
@@ -120,6 +122,11 @@ function cloneLine(line: LyricLine, id: string, backgroundOf: string | null, ids
 
 function copyId(id: string, ids: Map<string, string>) { const next = crypto.randomUUID(); ids.set(id, next); return next; }
 export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null): { command: LyricCommand; selection: EditorSelection } {
+  if(clipboard.attachment==='translation') {
+    const result=pasteRich({...document,romanizationTracks:document.translationTracks},{...clipboard,attachment:undefined},selection);
+    const tracks=applyLyricCommand({...document,romanizationTracks:document.translationTracks},result.command).romanizationTracks;
+    return {command:{type:'set-translation-tracks',source:document.translationTracks,tracks:tracks.map(track=>({...document.translationTracks.find(item=>item.id===track.id)!,...track}))},selection:{...result.selection,attachment:'translation'} as EditorSelection};
+  }
   const ids = new Map<string, string>();
   const result = pasteObjects(document, clipboard, selection, ids);
   if (!clipboard.editing) return result;
@@ -199,6 +206,11 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
 }
 
 export function pastePlain(document: LyricDocument, text: string, selection: EditorSelection | null): { command: LyricCommand; selection: EditorSelection } {
+  if((selection?.kind==='romanization-content'||selection?.kind==='romanization-unit')&&selection.attachment==='translation') {
+    const result=pastePlain({...document,romanizationTracks:document.translationTracks},text,{...selection,attachment:undefined});
+    const tracks=applyLyricCommand({...document,romanizationTracks:document.translationTracks},result.command).romanizationTracks;
+    return {command:{type:'set-translation-tracks',source:document.translationTracks,tracks:tracks.map(track=>({...document.translationTracks.find(item=>item.id===track.id)!,...track}))},selection:{...result.selection,attachment:'translation'} as EditorSelection};
+  }
   if (selection?.kind === 'ruby') {
     const rubyId = crypto.randomUUID();
     return { command: { type: 'insert-ruby', lineId: selection.lineId, wordId: selection.wordId, afterRubyId: selection.activeId, reading: text, rubyId },

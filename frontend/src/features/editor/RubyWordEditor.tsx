@@ -49,12 +49,6 @@ export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, 
       if (apply({ type: 'batch', commands })) pendingFocus.current = id;
     } catch (cause) { setError(cause instanceof Error ? cause.message : '拆分失败'); }
   };
-  const merge = (unit: RubyUnit, previous: RubyUnit, draft: string) => {
-    const commands: Extract<LyricCommand, { type: 'edit-ruby' | 'merge-ruby' }>[] = [];
-    if (draft !== unit.reading) commands.push({ type: 'edit-ruby', lineId, wordId: word.id, rubyId: unit.id, reading: draft });
-    commands.push({ type: 'merge-ruby', rubyIds: [previous.id, unit.id ] });
-    if (apply({ type: 'batch', commands })) pendingFocus.current = previous.id;
-  };
   const slot = newAfter !== undefined && <div className={styles.rubyTile} key="new-reading"><input ref={newInput} aria-label={`新增读音 ${word.text}`} value={newReading}
     onChange={event => setNewReading(event.target.value)} onBlur={add}
     onCompositionStart={() => { composing.current = true; }}
@@ -62,13 +56,12 @@ export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, 
     onClick={event => event.stopPropagation()}
     onKeyDown={event => { if (event.nativeEvent.isComposing || composing.current) return; if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); } if (event.key === 'Escape') { event.preventDefault(); finished.current = true; setNewAfter(undefined); setNewReading(''); } }} /></div>;
   return <div className={styles.rubyEditor} aria-label={`注音 ${word.text}`}>
-    {(word.rubyUnits.length > 0 || slot) && <div className={styles.rubyAbove}>{newAfter === null && slot}{word.rubyUnits.map((unit, index) => <Fragment key={unit.id}><div key={unit.id} data-ruby-id={unit.id} data-drag-placeholder={placeholderIds?.has(unit.id) ? '' : undefined} tabIndex={0} className={`${styles.rubyTile} ${selectedRubyIds.includes(unit.id) ? styles.selectedRuby : ''}`}
+    {(word.rubyUnits.length > 0 || slot) && <div className={styles.rubyAbove}>{newAfter === null && slot}{word.rubyUnits.map((unit) => <Fragment key={unit.id}><div key={unit.id} data-ruby-id={unit.id} data-drag-placeholder={placeholderIds?.has(unit.id) ? '' : undefined} tabIndex={0} className={`${styles.rubyTile} ${selectedRubyIds.includes(unit.id) ? styles.selectedRuby : ''}`}
       onClick={(event) => { event.stopPropagation(); onSelectRuby(unit.id, event.shiftKey, event.ctrlKey || event.metaKey); }}
       onFocus={(event) => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus]')) onSelectRuby(unit.id); }}>
       <DraftInput value={unit.reading} label={`读音 ${word.text}`} onFocus={() => onSelectRuby(unit.id)}
         onCommit={(reading) => apply({ type: 'edit-ruby', lineId, wordId: word.id, rubyId: unit.id, reading })}
         onSplit={(at, draft) => split(unit, at, draft)}
-        onMergePrevious={index > 0 ? (draft) => merge(unit, word.rubyUnits[index - 1], draft) : undefined}
         inputRef={(node) => { if (node) { inputs.current.set(unit.id, node); if (pendingFocus.current === unit.id) { pendingFocus.current = null; node.focus(); } } else inputs.current.delete(unit.id); }} />
       <TimePair begin={unit.beginMs} end={unit.endMs} label={`读音 ${unit.reading}`} onCommit={(beginMs, endMs) => apply({ type: 'set-ruby-time', lineId, wordId: word.id, rubyId: unit.id, beginMs, endMs })} />
     </div>{newAfter === unit.id && slot}</Fragment>)}</div>}

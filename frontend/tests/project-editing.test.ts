@@ -35,17 +35,17 @@ it('configuration changes are atomic and the same count does not add history', (
   expect(() => apply(state, { type: 'batch', commands: [{ type: 'delete-word', lineId: 'a', wordId: 'a1' }, { type: 'set-empty-beat', id: 'missing', kind: 'ruby', count: 1 }] })).toThrow();
   expect(state.present.editing.emptyBeats.a1.count).toBe(2);
 });
-it('transfers word beats to first Ruby and back, splits/merges by first ID, rejects conflicts', () => {
+it('transfers word beats to first Ruby, retains first merged beat and clears explicitly deleted Ruby beats', () => {
   let state = apply(fixture(), { type: 'set-empty-beat', id: 'a1', kind: 'word', count: 2 });
   state = apply(state, { type: 'add-ruby', lineId: 'a', wordId: 'a1', reading: 'あい', rubyId: 'r' });
   expect(state.present.editing.emptyBeats).toEqual({ r: { kind: 'ruby', count: 2 } });
   state = apply(state, { type: 'split-ruby', lineId: 'a', wordId: 'a1', rubyId: 'r', at: 1, newRubyId: 'r2' });
   expect(emptyBeatCount(state.present.editing, 'r2')).toBe(0);
   const conflict = apply(state, { type: 'set-empty-beat', id: 'r2', kind: 'ruby', count: 1 });
-  expect(() => apply(conflict, { type: 'batch', commands: [{ type: 'delete-ruby', lineId: 'a', wordId: 'a1', rubyId: 'r' }, { type: 'delete-ruby', lineId: 'a', wordId: 'a1', rubyId: 'r2' }] })).toThrow(/空拍/);
+  expect(apply(conflict, { type: 'batch', commands: [{ type: 'delete-ruby', lineId: 'a', wordId: 'a1', rubyId: 'r' }, { type: 'delete-ruby', lineId: 'a', wordId: 'a1', rubyId: 'r2' }] }).present.editing.emptyBeats).toEqual({});
   state = apply(conflict, { type: 'merge-ruby', rubyIds: ['r2', 'r'] });
   state = apply(state, { type: 'delete-ruby', lineId: 'a', wordId: 'a1', rubyId: 'r' });
-  expect(state.present.editing.emptyBeats).toEqual({ a1: { kind: 'word', count: 2 } });
+  expect(state.present.editing.emptyBeats).toEqual({});
 });
 it('copies mapped beats, ignore and internal links without linking to original objects', () => {
   let state = fixture();
@@ -123,9 +123,9 @@ it('keeps alignment skipping independent, copies/splits it and merges only unani
   expect(copied.present.editing.skippedAlignmentLineIds).toContain(copied.present.lyrics.lines.at(-1)!.id);
   state = apply(state, { type: 'split-line', lineId: 'a', beforeWordIds: ['a2'], newLineIds: ['split'], contentTargets: {}, translationTargets: {}, backgroundTargets: {} });
   expect(state.present.editing.skippedAlignmentLineIds).toEqual(['a', 'split']);
-  const merged = apply(state, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'split' });
+  const merged = apply(state, { type: 'merge-lines', lineIds: ['a', 'split' ]});
   expect(merged.present.editing.skippedAlignmentLineIds).toEqual(['a']);
-  const mixed = apply(merged, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' });
+  const mixed = apply(merged, { type: 'merge-lines', lineIds: ['a', 'b' ]});
   expect(mixed.present.editing.skippedAlignmentLineIds).toEqual([]);
   expect(undoProjectCommand(mixed).present).toBe(merged.present);
   expect(redoProjectCommand(undoProjectCommand(mixed)).present).toBe(mixed.present);

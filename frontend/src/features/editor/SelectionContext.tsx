@@ -3,7 +3,7 @@ import type { EditorSelection, EditorClipboard } from './editing-actions';
 
 type Selection = { kind: 'cue'; id: string; lineId: string; anchorId: string } | EditorSelection | { kind: 'segments'; ids: string[]; anchorId: string; activeId: string };
 function useSelectionState() {
-  const commands = useRef<{ copy: () => EditorClipboard | null; cut: () => EditorClipboard | null; remove: () => void; paste: (text?: string) => void; canCopy: boolean; canPaste: boolean; clipboardToken: () => string } | null>(null);
+  const commands = useRef<{ openContext: (target: HTMLElement, x: number, y: number) => boolean; copy: () => EditorClipboard | null; cut: () => EditorClipboard | null; remove: () => void; paste: (text?: string) => void; canCopy: boolean; canPaste: boolean; clipboardToken: () => string } | null>(null);
   const [effective, setEffective] = useState<Selection | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
   const selection = effective?.kind === 'segments' || effective?.kind === 'cue' ? null : effective;

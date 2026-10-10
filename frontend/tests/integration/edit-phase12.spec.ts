@@ -9,11 +9,11 @@ test('P12 merges, splits, drafts and atomic history survive real save, reopen an
   await words.first().click({ position: { x: 3, y: 3 } });
   await words.nth(1).click({ position: { x: 3, y: 3 }, modifiers: ['Shift'] });
   await words.first().click({ position: { x: 3, y: 3 }, button: 'right' });
-  await page.getByRole('menuitem', { name: '合并', exact: true }).click();
+  await page.getByRole('menuitem', { name: '合并所选', exact: true }).click();
   await expect(line.getByLabel('词 今日', { exact: true })).toBeFocused();
   const ruby = line.locator('[data-ruby-id]');
   await ruby.first().click({ position: { x: 3, y: 3 } }); await ruby.last().click({ position: { x: 3, y: 3 }, modifiers: ['Shift'] });
-  await ruby.first().click({ position: { x: 3, y: 3 }, button: 'right' }); await page.getByRole('menuitem', { name: '合并', exact: true }).click();
+  await ruby.first().click({ position: { x: 3, y: 3 }, button: 'right' }); await page.getByRole('menuitem', { name: '合并所选', exact: true }).click();
   await expect(line.getByLabel('读音 今日', { exact: true })).toHaveValue('きょう');
   await page.locator('[data-outline-drag]').first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行…' }).click();
   const dialog = page.getByRole('dialog', { name: '拆分歌词行', exact: true });

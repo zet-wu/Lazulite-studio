@@ -33,7 +33,7 @@ export function KaraokeTrack({startMs,endMs,snap,bpm,anchors,onError}:{startMs:n
  return <div className={styles.track} aria-label="导唱轨道"><strong>导唱</strong><div ref={lane} className={styles.lane} style={{height:Math.max(1,layout.laneCount)*32}}>
  {cues.map(cue=>{const value=drag?.cue.id===cue.id?drag:cue;return <div role="button" tabIndex={0} aria-label={`时间轴导唱 ${cue.text}`} aria-pressed={shared.selectedCue===cue.id} className={styles.bar} key={cue.id} data-cue-id={cue.id} data-invalid={drag?.cue.id===cue.id&&!!drag.error||undefined}
  style={{left:`${(value.beginMs-startMs)/span*100}%`,width:`${(value.endMs-value.beginMs)/span*100}%`,top:(layout.lanes.get(cue.id)??0)*32+3}}
- onClick={()=>shared.selectCue(cue.id,cue.anchor.lineId)} onPointerDown={e=>begin(e,cue,'move')} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
+ onContextMenu={event=>{event.preventDefault();event.stopPropagation();shared.commands.current?.openContext(event.currentTarget,event.clientX,event.clientY);}} onClick={()=>shared.selectCue(cue.id,cue.anchor.lineId)} onPointerDown={e=>begin(e,cue,'move')} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
  onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();shared.selectCue(cue.id,cue.anchor.lineId);}if(e.key==='Delete'&&!locked){e.stopPropagation();apply({type:'karaoke',command:{kind:'remove',id:cue.id}});}}}>
  <button className={styles.handle} aria-label="导唱开始端点" onPointerDown={e=>begin(e,cue,'beginMs')}/><span>{cue.text}</span><button className={styles.handle} aria-label="导唱结束端点" onPointerDown={e=>begin(e,cue,'endMs')}/></div>;})}</div></div>;
 }

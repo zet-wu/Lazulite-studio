@@ -27,7 +27,7 @@ it('selects 注音 independently and opens its card menu while leaving input con
   expect(screen.getByText('注音已选 1')).toBeVisible();
   fireEvent.contextMenu(tile, { clientX: 20, clientY: 30 });
   fireEvent.click(screen.getByRole('menuitem', { name: '向后移动' }));
-  expect(apply).toHaveBeenCalledWith({ type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId: 'r1', afterRubyId: 'r2' });
+  expect(apply.mock.calls[0][0].document.lines[0].words[0].rubyUnits.map((unit: {id:string})=>unit.id)).toEqual(['r2','r1']);
   expect(screen.queryByRole('menu')).toBeNull();
   fireEvent.contextMenu(screen.getAllByRole('textbox', { name: '读音 歌' })[0]);
   expect(screen.queryByRole('menu')).toBeNull();

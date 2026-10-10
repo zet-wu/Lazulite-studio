@@ -17,7 +17,7 @@ type AtomicLyricCommand =
   | { type: 'delete-line'; lineId: string }
   | { type: 'move-line'; lineId: string; afterLineId: string | null }
   | ({ type: 'split-line' } & LineSplitPlan)
-  | { type: 'merge-lines'; firstLineId: string; secondLineId: string }
+  | { type: 'merge-lines'; lineIds: string[] }
   | { type: 'insert-word'; lineId: string; afterWordId: string | null; word: LyricWord }
   | { type: 'delete-word'; lineId: string; wordId: string }
   | { type: 'segment-word'; lineId: string; wordId: string; words: LyricWord[] }
@@ -28,6 +28,7 @@ type AtomicLyricCommand =
   | { type: 'link-line-end'; lineId: string; targetLineId: string }
   | { type: 'unlink-line-end'; lineId: string }
   | { type: 'set-word-agents'; lineId: string; wordId: string; agentRefs: string[] }
+  | { type: 'set-song-part'; lineIds: string[]; value: string | null }
   | { type: 'set-line-agents'; lineId: string; agentRefs: string[] }
   | { type: 'set-skip-alignment'; lineId: string; skip: boolean }
   | { type: 'set-ignore-sync'; lineId: string; ignoreSync: boolean }
@@ -42,7 +43,6 @@ type AtomicLyricCommand =
   | { type: 'delete-romanization-content'; trackId: string; contentId: string }
   | { type: 'move-romanization-content'; trackId: string; contentId: string; afterContentId: string | null; lineId: string }
   | { type: 'split-romanization-unit'; trackId: string; contentId: string; unitId: string; at: number }
-  | { type: 'merge-romanization-units'; trackId: string; contentId: string; firstUnitId: string; secondUnitId: string }
   | { type: 'move-romanization-unit'; trackId: string; contentId: string; unitId: string; afterUnitId: string | null }
   | { type: 'set-metadata'; key: string; values: string[] }
   | { type: 'set-language'; language: string | null }
@@ -137,7 +137,7 @@ function wordFitsLine(word: LyricWord, line: LyricLine) {
 }
 
 /** Resolve every ID from the current document, then check document-order continuity. */
-function consecutive<T extends { id: string }>(siblings: T[], ids: string[]): T[] {
+export function consecutive<T extends { id: string }>(siblings: T[], ids: string[]): T[] {
   const selected = siblings.filter(item => ids.includes(item.id));
   if (ids.length < 2 || new Set(ids).size !== ids.length || selected.length !== ids.length) throw new Error('请选择至少两个有效且同属一处的单元');
   const start = siblings.indexOf(selected[0]);
@@ -145,7 +145,7 @@ function consecutive<T extends { id: string }>(siblings: T[], ids: string[]): T[
   return selected;
 }
 
-function timeEnvelope(units: { beginMs: TimeMs; endMs: TimeMs }[]) {
+export function timeEnvelope(units: { beginMs: TimeMs; endMs: TimeMs }[]) {
   const starts = units.flatMap(unit => unit.beginMs === null ? [] : [unit.beginMs]);
   const ends = units.flatMap(unit => unit.endMs === null ? [] : [unit.endMs]);
   const beginMs = starts.length ? Math.min(...starts) : null;
@@ -180,6 +180,19 @@ export function planRubyMerge(document: LyricDocument, ids: string[]) {
   rubyFitsWord(merged, word);
   wordFitsLine({ ...word, ...timeEnvelope([word, merged]) }, line);
   return { line, word, units, merged };
+}
+
+export function planLineMerge(document: LyricDocument, ids: string[]) {
+  const selected = consecutive(document.lines.filter(line => !line.backgroundOf), ids);
+  const first = selected[0];
+  const merged: LyricLine = { ...first, words: selected.flatMap(line => line.words),
+    beginMs: selected.find(line => line.beginMs !== null)?.beginMs ?? null,
+    endMs: [...selected].reverse().find(line => line.endMs !== null)?.endMs ?? null,
+    agentRefs: [...(selected.find(line => line.agentRefs.length)?.agentRefs ?? [])],
+    songPart: selected.find(line => line.songPart !== null && line.songPart !== '')?.songPart ?? null };
+  validTime(merged.beginMs, merged.endMs);
+  merged.words.forEach(word => { wordFitsLine(word, merged); word.rubyUnits.forEach(unit => rubyFitsWord(unit, word)); });
+  return { selected, merged };
 }
 
 export type LineSplitPlan = {
@@ -290,31 +303,30 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       return { ...document, lines, romanizationTracks, translationTracks };
     }
     case 'merge-lines': {
-      const firstIndex = lineIndex(document, command.firstLineId);
-      const secondIndex = lineIndex(document, command.secondLineId);
-      const first = document.lines[firstIndex], second = document.lines[secondIndex];
-      const issues = lineStructureIssues(document, first, second, editing);
-      if (issues.length) throw new Error(issues.join('；'));
-      if (!editing.skippedAlignmentLineIds.includes(second.id)) editing.skippedAlignmentLineIds = editing.skippedAlignmentLineIds.filter(id => id !== first.id);
-      const merged: LyricLine = { ...first, words: [...first.words, ...second.words], beginMs: first.beginMs ?? second.beginMs, endMs: second.endMs ?? first.endMs };
-      validTime(merged.beginMs, merged.endMs);
-      merged.words.forEach((word) => wordFitsLine(word, merged));
-      const outgoing = editing.endLinks[second.id];
-      delete editing.endLinks[first.id]; delete editing.endLinks[second.id];
-      if (outgoing && ![first.id, second.id].includes(outgoing)) editing.endLinks[first.id] = outgoing;
-      for (const [id, target] of Object.entries(editing.endLinks)) if (target === second.id) editing.endLinks[id] = first.id;
-      const lines = document.lines.filter(line => line.id !== second.id).map(line => line.id === first.id ? merged : line);
-      const romanizationTracks = document.romanizationTracks.map((track) => {
-        const secondContents = track.contents.filter((content) => content.lineId === second.id).map((content) => ({ ...content, lineId: first.id }));
-        const contents = track.contents.filter((content) => content.lineId !== second.id);
-        let lastFirst = -1;
-        contents.forEach((content, index) => { if (content.lineId === first.id) lastFirst = index; });
-        const originalSecond = track.contents.findIndex((content) => content.lineId === second.id);
-        const insertion = lastFirst >= 0 ? lastFirst + 1 : track.contents.slice(0, originalSecond).filter((content) => content.lineId !== second.id).length;
-        contents.splice(insertion, 0, ...secondContents);
+      const { selected, merged } = planLineMerge(document, command.lineIds);
+      const ids = new Set(selected.map(line => line.id));
+      // Skip-alignment is an all-lines flag; ignore-sync retains the first line's flag.
+      if (!selected.every(line => editing.skippedAlignmentLineIds.includes(line.id))) editing.skippedAlignmentLineIds = editing.skippedAlignmentLineIds.filter(id => id !== merged.id);
+      const outgoing = editing.endLinks[selected.at(-1)!.id];
+      for (const [source, target] of Object.entries(editing.endLinks)) if (ids.has(source) || ids.has(target) && target !== merged.id) delete editing.endLinks[source];
+      if (outgoing && !ids.has(outgoing)) editing.endLinks[merged.id] = outgoing;
+      const backgrounds = document.lines.filter(line => line.backgroundOf && ids.has(line.backgroundOf)).map(line => ({ ...line, backgroundOf: merged.id }));
+      const lines = document.lines.flatMap(line => line.id === merged.id ? [merged, ...backgrounds] : ids.has(line.id) || line.backgroundOf && ids.has(line.backgroundOf) ? [] : [line]);
+      const migrate = <T extends { contents: RomanizationContent[] }>(tracks: T[]): T[] => tracks.map(track => {
+        const moved = selected.flatMap(line => track.contents.filter(content => content.lineId === line.id).map(content => ({ ...content, lineId: merged.id })));
+        const firstIndex = track.contents.findIndex(content => ids.has(content.lineId));
+        if (firstIndex < 0) return track;
+        const contents = track.contents.filter(content => !ids.has(content.lineId));
+        contents.splice(firstIndex, 0, ...moved);
         return { ...track, contents };
       });
-      return { ...document, lines, romanizationTracks };
+      return { ...document, lines, romanizationTracks: migrate(document.romanizationTracks), translationTracks: migrate(document.translationTracks) };
+    }
+    case 'set-song-part': {
+      if (command.lineIds.some(id => !document.lines.some(line => line.id === id && !line.backgroundOf))) throw new Error('只能编辑明确选中的主行段落');
+      const value = command.value === '' ? null : command.value;
+      const lines = document.lines.map(line => command.lineIds.includes(line.id) && line.songPart !== value ? { ...line, songPart: value } : line);
+      return lines.every((line, i) => line === document.lines[i]) ? document : { ...document, lines };
     }
     case 'insert-word': {
       const index = lineIndex(document, command.lineId);
@@ -566,7 +578,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       return { ...document, romanizationTracks };
     }
     case 'split-romanization-unit':
-    case 'merge-romanization-units':
     case 'move-romanization-unit': {
       const index = document.romanizationTracks.findIndex((track) => track.id === command.trackId);
       if (index < 0) throw new Error('音译轨道不存在');
@@ -582,13 +593,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
         const [left, right] = splitAtGrapheme(unit.text, command.at);
         const middle = splitTime(unit.beginMs, unit.endMs, Array.from(left).length, Array.from(unit.text).length);
         units.splice(unitIndex, 1, { ...unit, text: left, endMs: middle }, { id: crypto.randomUUID(), text: right, beginMs: middle, endMs: unit.endMs });
-      } else if (command.type === 'merge-romanization-units') {
-        const first = units.findIndex((unit) => unit.id === command.firstUnitId);
-        if (first < 0 || units[first + 1]?.id !== command.secondUnitId) throw new Error('只能合并相邻音译单元');
-        const left = units[first], right = units[first + 1];
-        units.splice(first, 2, { ...left, text: left.text + right.text,
-          beginMs: left.beginMs === null ? right.beginMs : right.beginMs === null ? left.beginMs : Math.min(left.beginMs, right.beginMs),
-          endMs: left.endMs === null ? right.endMs : right.endMs === null ? left.endMs : Math.max(left.endMs, right.endMs) });
       } else {
         const unitIndex = units.findIndex((unit) => unit.id === command.unitId);
         if (unitIndex < 0) throw new Error('音译单元不存在');
@@ -720,8 +724,10 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
         }
         return [{ ...word, rubyUnits: wordCommand.units }];
       }
-      case 'redistribute-ruby-time':
-        return [{ ...word, rubyUnits: distributeRubyTime(word, word.rubyUnits) }];
+      case 'redistribute-ruby-time': {
+        const rubyUnits=distributeRubyTime(word,word.rubyUnits);
+        return JSON.stringify(rubyUnits)===JSON.stringify(word.rubyUnits)?[word]:[{...word,rubyUnits}];
+      }
       case 'set-word-empty-beat':
         setEmptyBeat(editing, word.id, 'word', wordCommand.emptyBeat);
         return [word];

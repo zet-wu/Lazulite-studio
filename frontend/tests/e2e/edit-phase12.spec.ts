@@ -8,7 +8,7 @@ test('P12 reverse selection, mouse/keyboard menus, word and Ruby merge retain se
   await edge(page, 2); await edge(page, 0, { modifiers: ['Shift'] });
   await edge(page, 1, { button: 'right' });
   await expect(page.getByText('词已选 3', { exact: true })).toBeVisible();
-  await page.getByRole('menuitem', { name: '合并', exact: true }).click();
+  await page.getByRole('menuitem', { name: '合并所选', exact: true }).click();
   await expect(row(page).getByLabel('词 今日は', { exact: true })).toBeFocused();
   await expect(row(page).locator('[data-ruby-id]')).toHaveCount(2);
   const ruby = row(page).locator('[data-ruby-id]');
@@ -16,7 +16,7 @@ test('P12 reverse selection, mouse/keyboard menus, word and Ruby merge retain se
   await ruby.last().click({ position: { x: 3, y: 3 }, modifiers: ['Shift'] });
   await ruby.last().press('Shift+F10');
   await expect(page.getByText('注音已选 2', { exact: true })).toBeVisible();
-  await page.getByRole('menuitem', { name: '合并', exact: true }).click();
+  await page.getByRole('menuitem', { name: '合并所选', exact: true }).click();
   await expect(row(page).getByLabel('读音 今日は', { exact: true })).toHaveValue('きょう');
   await expect(row(page).getByLabel('读音 今日は', { exact: true })).toBeFocused();
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(ruby).toHaveCount(2);
@@ -26,14 +26,14 @@ test('P12 reverse selection, mouse/keyboard menus, word and Ruby merge retain se
 
 test('P12 rejects noncontiguous and cross-word Ruby selections and right-click unselected switches to single', async ({ page }) => {
   await edge(page, 0); await edge(page, 2, { modifiers: ['Control'] }); await edge(page, 0, { button: 'right' });
-  await expect(page.getByRole('menuitem', { name: /合并 ·.*连续/ })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: /合并所选 ·.*连续/ })).toBeDisabled();
   await page.keyboard.press('Escape');
-  await edge(page, 3, { button: 'right' }); await expect(page.getByRole('menuitem', { name: '合并前一词', exact: true })).toBeEnabled();
+  await edge(page, 3, { button: 'right' }); await expect(page.getByRole('menuitem', { name: /合并所选.*至少选择两个/ })).toBeDisabled();
   await page.keyboard.press('Escape');
   const ruby = row(page).locator('[data-ruby-id]');
   await ruby.first().click({ position: { x: 3, y: 3 } }); await ruby.last().click({ position: { x: 3, y: 3 }, modifiers: ['Shift'] });
   await ruby.first().click({ position: { x: 3, y: 3 }, button: 'right' });
-  await expect(page.getByRole('menuitem', { name: /合并 ·.*同一正文词/ })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: /合并所选 ·.*同一正文词/ })).toBeDisabled();
 });
 
 for (const entry of ['＋', '添加词', '前插词', '后插词']) test(`P12 ${entry} opens empty draft, commits once and focuses new text`, async ({ page }) => {
@@ -109,12 +109,12 @@ test('P12 three Ruby and background words use the same merge actions; insertion 
   await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
   const ruby = page.locator('main [data-ruby-id]');
   await ruby.nth(2).click({ position: { x: 3, y: 3 } }); await ruby.first().click({ position: { x: 3, y: 3 }, modifiers: ['Shift'] });
-  await ruby.nth(1).click({ position: { x: 3, y: 3 }, button: 'right' }); await page.getByRole('menuitem', { name: '合并', exact: true }).click();
+  await ruby.nth(1).click({ position: { x: 3, y: 3 }, button: 'right' }); await page.getByRole('menuitem', { name: '合并所选', exact: true }).click();
   await expect(ruby).toHaveCount(2); await expect(ruby.first().getByRole('textbox').first()).toHaveValue('がっこ');
   await importPhase12(page);
   const bg = page.locator('main section[data-line-id="bg"] [data-word-id]');
   await bg.first().click({ position: { x: 3, y: 3 } }); await bg.last().click({ position: { x: 3, y: 3 }, modifiers: ['Shift'] });
-  await bg.first().click({ position: { x: 3, y: 3 }, button: 'right' }); await page.getByRole('menuitem', { name: '合并', exact: true }).click();
+  await bg.first().click({ position: { x: 3, y: 3 }, button: 'right' }); await page.getByRole('menuitem', { name: '合并所选', exact: true }).click();
   await expect(page.getByLabel('词 背景', { exact: true })).toBeFocused();
   await edge(page, 0); await edge(page, 2, { modifiers: ['Shift'] }); await edge(page, 1, { button: 'right' });
   await page.getByRole('menuitem', { name: '后插词', exact: true }).click();

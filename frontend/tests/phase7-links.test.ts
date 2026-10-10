@@ -5,7 +5,6 @@ import { expect, it } from 'vitest';
 import { createLine, createWord, createLyricDocument } from '../src/domain/lyric-document';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand, redoLyricCommand } from './helpers/project-history';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
-import { lineStructureIssues } from '../src/domain/line-structure';
 function fixture() {
   const doc = createLyricDocument();
   const editing = createProjectEditing();
@@ -33,26 +32,18 @@ it('splits linked lines preserving incoming links, current endpoint, target upda
 });
 it('merges the internal chain and inherits the last external link and current end', () => {
   const { doc, editing } = fixture(), state = createLyricEditorState(doc, editing);
-  const result = executeLyricCommand(state, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' });
+  const result = executeLyricCommand(state, { type: 'merge-lines', lineIds: ['a', 'b' ]});
   expect(result.present.lines[0]).toMatchObject({ id: 'a', endMs: 4000 });
   expect(executeLyricCommand(result, { type: 'unlink-line-end', lineId: 'a' }).present.lines[0].endMs).toBe(4000);
   expect(undoLyricCommand(result).present).toBe(doc);
 });
-it('reports all real conflicts with source ordinals and safely rebinds identical starts', () => {
-  const { doc, editing } = fixture(); editing.endLinks[doc.lines[3].id] = 'b'; doc.lines[3].endMs = 2000; doc.lines[3].beginMs = 0;
-  doc.translationTracks = [...doc.translationTracks.filter(track => !track.contents.some(content => content.lineId === doc.lines[0].id)), ...([{ id: 'translation-2964', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'en', text: 'a' }]).map(({ language, purpose, ...content }) => ({ id: crypto.randomUUID(), language, purpose, contents: [{ ...content, lineId: doc.lines[0].id }] }))]; doc.translationTracks = [...doc.translationTracks.filter(track => !track.contents.some(content => content.lineId === doc.lines[1].id)), ...([{ id: 'translation-3025', purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'ja', text: 'b' }]).map(({ language, purpose, ...content }) => ({ id: crypto.randomUUID(), language, purpose, contents: [{ ...content, lineId: doc.lines[1].id }] }))];
-  doc.lines[1].agentRefs = ['v2']; doc.lines[1].songPart = 'verse';
-  const issues = lineStructureIssues(doc, doc.lines[0], doc.lines[1], editing);
-  expect(issues).toHaveLength(5); expect(issues.join('；')).toContain('L4行尾链接 → L2');
-  const state = createLyricEditorState(doc, editing);
-  expect(() => executeLyricCommand(state, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' })).toThrow(issues.join('；'));
-  expect(state.present).toBe(doc); expect(state.past).toHaveLength(0);
-  doc.translationTracks = doc.translationTracks.filter(track => !track.contents.some(content => content.lineId === doc.lines[0].id)); doc.translationTracks = doc.translationTracks.filter(track => !track.contents.some(content => content.lineId === doc.lines[1].id)); doc.lines[1].agentRefs = []; doc.lines[1].songPart = null;
-  doc.lines[0].beginMs = 2000; doc.lines[0].words = [];
-  const safe = executeLyricCommand(state, { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' });
-  expect(safe.editing.endLinks[safe.present.lines.at(-1)!.id]).toBe('a');
-  editing.endLinks[doc.lines[0].id] = 'c';
-  expect(lineStructureIssues(doc, doc.lines[0], doc.lines[1], editing)).toEqual(['L1行尾链接 → L3在合并范围外']);
+it('drops references to removed internal boundaries even when their times coincide', () => {
+  const {doc,editing}=fixture();
+  doc.lines[0].beginMs=2000;doc.lines[0].words=[];
+  doc.lines[3].beginMs=0;doc.lines[3].endMs=2000;editing.endLinks.incoming='b';
+  const result=executeLyricCommand(createLyricEditorState(doc,editing),{type:'merge-lines',lineIds:['a','b']});
+  expect(result.editing.endLinks.incoming).toBeUndefined();
+  expect(result.present.lines.find(line=>line.id==='incoming')?.endMs).toBe(2000);
 });
 it('assigns translations independently with romanization and background in one split and roundtrip', () => {
   const { doc, editing } = fixture();
@@ -74,7 +65,7 @@ it('eliminates every internal end link when coincident boundaries merge', () => 
   const { doc, editing } = fixture();
   doc.lines[0].words = []; doc.lines[0].beginMs = 0; doc.lines[0].endMs = 0;
   doc.lines[1].beginMs = 0; doc.lines[1].endMs = 0; editing.endLinks[doc.lines[1].id] = 'a';
-  const result = executeLyricCommand(createLyricEditorState(doc, editing), { type: 'merge-lines', firstLineId: 'a', secondLineId: 'b' });
+  const result = executeLyricCommand(createLyricEditorState(doc, editing), { type: 'merge-lines', lineIds: ['a', 'b' ]});
   expect(result.editing.endLinks[result.present.lines[0].id]).toBeUndefined();
   expect(undoLyricCommand(result).present).toBe(doc);
 });

@@ -1,4 +1,3 @@
-import { createProjectEditing, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine } from './lyric-document';
 
 export function lineLabel(document: LyricDocument, line: LyricLine): string {
@@ -7,30 +6,9 @@ export function lineLabel(document: LyricDocument, line: LyricLine): string {
 }
 
 /** Shared by entry points and the atomic command; only actual conflicts are reported. */
-export function lineStructureIssues(document: LyricDocument, first: LyricLine, second?: LyricLine, editing: ProjectEditing = createProjectEditing()): string[] {
-  const label = (line: LyricLine) => lineLabel(document, line);
+export function lineStructureIssues(document: LyricDocument, first: LyricLine): string[] {
   const issues: string[] = [];
-  if (!second) {
-    if (first.backgroundOf) issues.push(`${label(first)}不能直接拆分`);
-    if (first.words.length < 2) issues.push(`${label(first)}没有可拆分的词边界`);
-    return issues;
-  }
-  const main = document.lines.filter(item => !item.backgroundOf);
-  if (first.backgroundOf || second.backgroundOf || main.indexOf(second) !== main.indexOf(first) + 1) issues.push('只能合并相邻主行');
-  for (const line of [first, second]) {
-    if (document.lines.some(item => item.backgroundOf === line.id)) issues.push(`${label(line)}有背景歌词`);
-    if (document.translationTracks.some(track => track.contents.some(content => content.lineId === line.id))) issues.push(`${label(line)}有翻译`);
-  }
-  if (first.songPart !== second.songPart) issues.push(`${label(first)}与${label(second)}歌曲段落不同`);
-  if (first.agentRefs.join(' ') !== second.agentRefs.join(' ')) issues.push(`${label(first)}与${label(second)}歌手不同`);
-  if (editing.endLinks[first.id] && ![first.id, second.id].includes(editing.endLinks[first.id])) {
-    const target = document.lines.find(item => item.id === editing.endLinks[first.id])!;
-    issues.push(`${label(first)}行尾链接 → ${label(target)}在合并范围外`);
-  }
-  const mergedBegin = first.beginMs ?? second.beginMs;
-  for (const source of document.lines) {
-    if (source.id === first.id || source.id === second.id || editing.endLinks[source.id] !== second.id) continue;
-    if (mergedBegin !== second.beginMs) issues.push(`${label(source)}行尾链接 → ${label(second)}的开始边界将在合并后消失`);
-  }
+  if (first.backgroundOf) issues.push(`${lineLabel(document, first)}不能直接拆分`);
+  if (first.words.length < 2) issues.push(`${lineLabel(document, first)}没有可拆分的词边界`);
   return issues;
 }

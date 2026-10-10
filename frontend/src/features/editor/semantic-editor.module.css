@@ -382,3 +382,5 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .dialogTabs button[data-role].activeTab { background-color:var(--blue-soft); color:var(--blue); border-color:var(--blue); box-shadow:inset 0 -2px var(--blue); }
 .modeTabs button[data-role] { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
 .modeTabs svg { flex-shrink:0; }
+
+.translationRow[data-selected], [data-translation-unit-id][data-selected] { outline:2px solid var(--blue); background:var(--blue-soft); }

@@ -103,6 +103,11 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     let karaoke = state.present.karaoke;
     const commands = command.command.type === 'batch' ? command.command.commands : [command.command];
     const moved = new Set<string>();
+    for (const item of commands) if (item.type === 'merge-lines') {
+      const selected = state.present.lyrics.lines.filter(line => item.lineIds.includes(line.id));
+      const group = selected.map(line => karaoke.lineGroups[line.id]).find(id => id && karaoke.groups.some(group => group.id === id)) ?? '';
+      karaoke = { ...karaoke, lineGroups: { ...karaoke.lineGroups, [selected[0].id]: group } };
+    }
     for (const item of commands) if (item.type === 'shift-lines') {
       karaoke = { ...karaoke, cues: karaoke.cues.map(cue => {
         if (!item.lineIds.includes(cue.anchor.lineId)) return cue;

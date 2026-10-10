@@ -146,7 +146,7 @@ describe('semantic lyric commands', () => {
     expect(split.present.romanizationTracks[0].contents.map((content) => [content.id, content.lineId])).toEqual([['first', main.id], ['second', 'right']]);
     expect(undoLyricCommand(split).present).toBe(withBackground.present);
     const detached = executeLyricCommand(split, { type: 'set-background-of', lineId: 'bg', parentLineId: null });
-    const merged = executeLyricCommand(detached, { type: 'merge-lines', firstLineId: main.id, secondLineId: 'right' });
+    const merged = executeLyricCommand(detached, { type: 'merge-lines', lineIds: [main.id, 'right' ]});
     expect(merged.present.lines[0].words.map((word) => word.id)).toEqual(['front', 'back']);
     expect(merged.present.romanizationTracks[0].contents.map((content) => content.lineId)).toEqual([main.id, main.id]);
     expect(undoLyricCommand(merged).present).toBe(detached.present);

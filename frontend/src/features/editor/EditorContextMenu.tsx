@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import styles from './semantic-editor.module.css';
 
-export type ContextAction = { label: string; run: () => void; disabled?: boolean; reason?: string };
+export type ContextAction = { id?: string; label: string; run: () => void; disabled?: boolean; reason?: string };
 
 export function EditorContextMenu({ x, y, title, actions, close }: { x: number; y: number; title: string; actions: ContextAction[]; close: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
