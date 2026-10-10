@@ -26,14 +26,14 @@ test('P12 reverse selection, mouse/keyboard menus, word and Ruby merge retain se
 
 test('P12 rejects noncontiguous and cross-word Ruby selections and right-click unselected switches to single', async ({ page }) => {
   await edge(page, 0); await edge(page, 2, { modifiers: ['Control'] }); await edge(page, 0, { button: 'right' });
-  await expect(page.getByRole('menuitem', { name: /合并所选 ·.*连续/ })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: '合并所选', exact: true })).toBeDisabled();
   await page.keyboard.press('Escape');
-  await edge(page, 3, { button: 'right' }); await expect(page.getByRole('menuitem', { name: /合并所选.*至少选择两个/ })).toBeDisabled();
+  await edge(page, 3, { button: 'right' }); await expect(page.getByRole('menuitem', { name: '合并所选', exact: true })).toBeDisabled();
   await page.keyboard.press('Escape');
   const ruby = row(page).locator('[data-ruby-id]');
   await ruby.first().click({ position: { x: 3, y: 3 } }); await ruby.last().click({ position: { x: 3, y: 3 }, modifiers: ['Shift'] });
   await ruby.first().click({ position: { x: 3, y: 3 }, button: 'right' });
-  await expect(page.getByRole('menuitem', { name: /合并所选 ·.*同一正文词/ })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: '合并所选', exact: true })).toBeDisabled();
 });
 
 for (const entry of ['＋', '添加词', '前插词', '后插词']) test(`P12 ${entry} opens empty draft, commits once and focuses new text`, async ({ page }) => {

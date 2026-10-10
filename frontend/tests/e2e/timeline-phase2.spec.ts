@@ -114,7 +114,7 @@ test('32 beats remain operable through narrow wrapping and the upper bound is di
  const ruby = page.locator('main [data-ruby-id="r1"]');
  for (let i=0;i<32;i++) { await ruby.click({button:'right'}); await page.getByRole('menuitem',{name:'添加空拍',exact:true}).click(); }
  await expect(page.locator('[data-beat-owner="r1"]')).toHaveCount(32);
- await ruby.click({button:'right'}); await expect(page.getByRole('menuitem',{name:/添加空拍.*32/})).toBeDisabled(); await page.keyboard.press('Escape');
+ await ruby.click({button:'right'}); await expect(page.getByRole('menuitem',{name:'添加空拍',exact:true})).toBeDisabled(); await page.keyboard.press('Escape');
  const second = page.locator('main [data-ruby-id="r2"]');
  for (let i=0;i<32;i++) { await second.click({button:'right'}); await page.getByRole('menuitem',{name:'添加空拍',exact:true}).click(); }
  const scroller=page.getByLabel('歌词列表',{exact:true});
