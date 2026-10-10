@@ -24,3 +24,11 @@ button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); paddin
 .markerList { align-self:start; }
 .markerFields label { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .markerFields input:not([type="checkbox"]), .markerFields select { min-width:0; flex:1; }
+
+.thresholds { display:grid; gap:10px; margin:16px 0; container-type:inline-size; }
+.thresholds label { display:grid; grid-template-columns:minmax(0,1fr) 140px; gap:6px 16px; align-items:center; }
+.thresholds input { box-sizing:border-box; width:100%; min-width:0; padding:5px 8px; border:1px solid var(--line); border-radius:var(--control-radius); background:var(--canvas); color:var(--ink); }
+@container (max-width:360px) {
+  .thresholds label { grid-template-columns:minmax(0,1fr); }
+  .thresholds input { width:140px; max-width:100%; }
+}

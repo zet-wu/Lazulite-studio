@@ -1,5 +1,5 @@
 import { SingerMarkersDialog } from './SingerMarkersDialog';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { anchorKey, anchorRange, cueProblem, type CueAnchor, type KaraokeCommand, type KaraokeCue } from '../domain/karaoke';
 import type { ProjectDocument, ProjectCommand } from '../domain/project-document';
 import { karaokeOutputs, nicokaraZip, prepareNicokara, safeFilename } from '../adapters/nicokara';
@@ -54,14 +54,13 @@ function AutoInsertDialog({project,close,apply,error,initialGroups,rememberGroup
  const [inputError,setInputError]=useState('');
  return <SettingsDialog title="自动插入导唱符" close={close}>{(inputError||error)&&<p role="alert">{inputError||error}</p>}
  <fieldset><legend>目标输出分组</legend>{project.karaoke.groups.map(group=><label className={styles.output} key={group.id}><input type="checkbox" checked={groups.includes(group.id)} onChange={e=>setGroups(e.target.checked?[...groups,group.id]:groups.filter(id=>id!==group.id))}/>{group.name}</label>)}</fieldset>
- {([['beforeMs','行前阈值'],['wordMs','正文行内阈值'],['rubyMs','Ruby 内阈值']] as const).map(([key,label])=><Field key={key} label={`${label}（毫秒）`}><input aria-label={label} type="number" min={0} step={1} value={thresholds[key]} onChange={e=>setThresholds({...thresholds,[key]:e.target.value})}/></Field>)}
- <p>仅大于阈值时自动插入。</p><button data-role="primary" onClick={()=>{
+ <div className={styles.thresholds}>{([['beforeMs','行前阈值'],['wordMs','正文行内阈值'],['rubyMs','Ruby 内阈值']] as const).map(([key,label])=><label key={key}><span>{label}（毫秒）</span><input aria-label={label} type="number" min={0} step={1} value={thresholds[key]} onChange={e=>setThresholds({...thresholds,[key]:e.target.value})}/></label>)}</div>
+ <button data-role="primary" onClick={()=>{
  if(Object.values(thresholds).some(value=>!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value)))){setInputError('阈值须为非负整数');return;}
  setInputError('');
  if(apply({kind:'auto',groupIds:groups,thresholds:{beforeMs:Number(thresholds.beforeMs),wordMs:Number(thresholds.wordMs),rubyMs:Number(thresholds.rubyMs)}})){rememberGroups(groups);close();}
  }}>插入</button></SettingsDialog>;
 }
-function Field({label,children}:{label:string;children:ReactNode}) {return <label>{label}{children}</label>;}
 function GroupsDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
  const [groups,setGroups]=useState(project.karaoke.groups),[moves,setMoves]=useState<Record<string,string>>({}),[main,setMain]=useState(project.karaoke.defaults.main),[background,setBackground]=useState(project.karaoke.defaults.background);
  const removed=project.karaoke.groups.filter(g=>!groups.some(group=>group.id===g.id));
