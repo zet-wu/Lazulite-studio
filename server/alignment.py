@@ -12,9 +12,11 @@ from .alignment_projection import project_alignment
 
 def alignment_unavailable():
     from importlib.util import find_spec
-    from lazulite.alignment.japanese.backend import HASHES
+    from lazulite.alignment.japanese.backend import inspect_model
     path = os.getenv('STUDIO_NEXTFIRE_PATH')
-    if not path or not all((Path(path)/name).is_file() for name in HASHES): return '未配置完整的 NextFire 模型目录（STUDIO_NEXTFIRE_PATH）'
+    if not path: return '未配置日语声学模型目录（STUDIO_NEXTFIRE_PATH）'
+    try: inspect_model(path)
+    except (OSError, ValueError, KeyError, TypeError) as error: return f'日语声学模型配置不可用：{error}'
     if any(find_spec(name) is None for name in ('torch', 'transformers', 'soundfile', 'demucs')): return '缺少自动对齐模型依赖'
     return None
 
@@ -62,7 +64,6 @@ def run_alignment(request, emit, cancelled):
     from lazulite.alignment.japanese.run import align_japanese
     from lazulite.alignment.japanese.run import JapaneseConfig
     from lazulite.alignment.japanese.backend import NextFireBackend, NextFireConfig
-    from lazulite.cache import FileCache
     from .db import Database
     from .vocals import VocalRunner
     db = Database(request['database']); root = Path(request['root']); pid = request['project_id']; params = request['params']
@@ -75,7 +76,7 @@ def run_alignment(request, emit, cancelled):
     acoustics = snapshot['acoustics']; new_acoustics = None
     if acoustics['analysisId']:
         row, metadata = vocal.get(pid, acoustics['analysisId'])
-        if row['status'] != 'ready' or metadata['source_asset_id'] != asset or metadata['separation_signature'] != vocal.separation_signature(asset) or not vocal.audio_available(pid, metadata):
+        if row['status'] != 'ready' or metadata['source_asset_id'] != asset or not vocal.audio_available(pid, metadata):
             raise ValueError('现有人工片段无法匹配完整人声，请先检查音频处理')
     else:
         if acoustics['segments']: raise ValueError('现有片段没有可匹配的人声资源')
@@ -84,21 +85,24 @@ def run_alignment(request, emit, cancelled):
         new_acoustics = {'analysisId': metadata['id'], 'segments': metadata['segments']}
     if cancelled(): raise VocalCancelled()
     samples, rate = sf.read(vocal.audio_path(pid, metadata), dtype='float32', always_2d=True)
-    audio = AudioBuffer(samples.T, rate, metadata['audio_sha256'])
+    audio = AudioBuffer(samples.T, rate, metadata['audio_result_id'])
     def segments(rows):
+        if any(s['beginMs'] < 0 or s['endMs']/1000 > audio.duration + .001 for s in rows):
+            raise ValueError('人声片段超出完整音频范围')
         return tuple(VocalSegment(s['id'], None, s['beginMs']/1000, min(s['endMs']/1000,audio.duration), s['beginMs']/1000, min(s['endMs']/1000,audio.duration), None, None) for s in rows)
     selected = segments(acoustics['segments']) if acoustics['analysisId'] else None
     automatic = VocalAnalysis(audio.source_id, segments(metadata['segments']))
-    with db.connect() as c:
-        original = c.execute('SELECT sha256,duration_ms FROM assets WHERE id=?', (asset,)).fetchone()
-    prepared = prepare_existing_vocals(audio, original_id=original['sha256'], original_duration=audio.duration,
-        analysis=automatic, analysis_identity={'configuration': metadata['analysis_config'], 'source_sha256': metadata['analysis_source_sha256']},
+    prepared = prepare_existing_vocals(audio, original_id=asset,
+        analysis=automatic, analysis_description={'configuration': metadata['analysis_config'], 'reference':'full_scale'},
         segments=selected, separation=metadata['model'])
     if not prepared.segments: raise ValueError('没有可用人声片段')
     backend = NextFireBackend(NextFireConfig(Path(os.environ['STUDIO_NEXTFIRE_PATH']), device=os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu')))
-    result = align_japanese(prepared, JapaneseAlignmentRequest.from_dict(projection['request']), backend=backend,
-        config=JapaneseConfig(hint_mode='auto' if params['use_hints'] else 'off', **{k:params[k] for k in ('line_blank', 'rest_blank', 'rest_token')}), cache=FileCache(root/pid/'cache'/'alignment'),
-        cancel=cancelled, event_sink=lambda event: emit('stage', event.stage, event.completed,event.total,event.message))
+    try:
+        result = align_japanese(prepared, JapaneseAlignmentRequest.from_dict(projection['request']), backend=backend,
+            config=JapaneseConfig(hint_mode='auto' if params['use_hints'] else 'off', **{k:params[k] for k in ('line_blank', 'rest_blank', 'rest_token')}),
+            cancel=cancelled, event_sink=lambda event: emit('stage', event.stage, event.completed,event.total,event.message))
+    finally:
+        backend.close()
     if cancelled(): raise VocalCancelled()
     runner.snapshot(pid, params['revision'])
     if result.status == 'unresolved': raise ValueError('无法计算对齐：' + ', '.join(issue.code for issue in result.issues))
