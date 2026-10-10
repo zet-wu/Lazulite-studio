@@ -70,21 +70,43 @@ export function syncLineTimes(document: LyricDocument, lineIds: string[]): Lyric
   return { type: 'batch', commands };
 }
 
-export function replaceWords(document: LyricDocument, wordIds: string[], search: string, replacement: string, ignoreCase = false, editing = createProjectEditing()): { command: LyricCommand; count: number } {
+export type BatchReplacement = { command: LyricCommand; count: number; changed: number; deletedWords: number; deletedRuby: number; deletedBeats: number };
+
+export function replaceWords(document: LyricDocument, wordIds: string[], search: string, replacement: string, ignoreCase = false, editing = createProjectEditing()): BatchReplacement {
+  return replaceText(document, wordIds, 'words', search, replacement, ignoreCase, editing);
+}
+export function replaceText(document: LyricDocument, ids: string[], kind: 'words' | 'ruby', search: string, replacement: string, ignoreCase = false, editing = createProjectEditing()): BatchReplacement {
   if (!search) throw new Error('查找内容不能为空');
-  const selected = new Set(wordIds);
+  const selected = new Set(ids);
   const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(escaped, ignoreCase ? 'giu' : 'gu');
-  let count = 0;
-  const commands: Extract<LyricCommand, { type: 'edit-word' | 'delete-word' }>[] = [];
+  const result: BatchReplacement = { command: { type: 'batch', commands: [] }, count: 0, changed: 0, deletedWords: 0, deletedRuby: 0, deletedBeats: 0 };
+  const commands: Extract<LyricCommand, { type: 'batch' }>['commands'] = [];
   for (const line of document.lines) for (const word of line.words) {
-    if (!selected.has(word.id)) continue;
-    const matches = word.text.match(pattern);
-    if (!matches?.length) continue;
-    if (word.rubyUnits.length || word.obscene || emptyBeatCount(editing, word.id)) throw new Error(`词“${word.text}”含注音或附属属性，不能批量替换`);
-    const next = word.text.replace(pattern, () => replacement);
-    count += matches.length;
-    commands.push(next ? { type: 'edit-word', lineId: line.id, wordId: word.id, text: next } : { type: 'delete-word', lineId: line.id, wordId: word.id });
+    const objects = kind === 'words' ? [{ id: word.id, text: word.text }] : word.rubyUnits.map(unit => ({ id: unit.id, text: unit.reading }));
+    for (const object of objects) {
+      if (!selected.has(object.id)) continue;
+      const matches = object.text.match(pattern);
+      if (!matches?.length) continue;
+      const next = object.text.replace(pattern, () => replacement);
+      result.count += matches.length;
+      if (next === object.text) continue;
+      result.changed++;
+      if (!next) {
+        if (kind === 'words') { result.deletedWords++; result.deletedRuby += word.rubyUnits.length; result.deletedBeats += emptyBeatCount(editing, word.id) + word.rubyUnits.reduce((sum, unit) => sum + emptyBeatCount(editing, unit.id), 0); }
+        else { result.deletedRuby++; result.deletedBeats += emptyBeatCount(editing, object.id); }
+      }
+      commands.push(kind === 'words'
+        ? next ? { type: 'edit-word', lineId: line.id, wordId: word.id, text: next } : { type: 'delete-word', lineId: line.id, wordId: word.id }
+        : next ? { type: 'edit-ruby', lineId: line.id, wordId: word.id, rubyId: object.id, reading: next } : { type: 'delete-ruby', lineId: line.id, wordId: word.id, rubyId: object.id });
+    }
   }
-  return { command: { type: 'batch', commands }, count };
+  result.command = { type: 'batch', commands };
+  return result;
+}
+export function clearRuby(document: LyricDocument, wordIds: string[], editing = createProjectEditing()) {
+  const words = document.lines.flatMap(line => line.words.filter(word => wordIds.includes(word.id) && word.rubyUnits.length).map(word => ({ line, word })));
+  return { words: words.length, ruby: words.reduce((sum, { word }) => sum + word.rubyUnits.length, 0),
+    beats: words.reduce((sum, { word }) => sum + word.rubyUnits.reduce((n, unit) => n + emptyBeatCount(editing, unit.id), 0), 0),
+    command: { type: 'batch', commands: words.flatMap(({ line, word }) => word.rubyUnits.map(unit => ({ type: 'delete-ruby', lineId: line.id, wordId: word.id, rubyId: unit.id }))) } as LyricCommand };
 }

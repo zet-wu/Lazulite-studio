@@ -739,6 +739,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
         return [updated];
       }
       case 'delete-ruby':
+        delete editing.emptyBeats[wordCommand.rubyId];
         return [{ ...updateRuby(word, wordCommand.rubyId, () => []) }];
       case 'set-ruby-time': {
         validTime(wordCommand.beginMs, wordCommand.endMs);

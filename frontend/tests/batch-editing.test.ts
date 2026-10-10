@@ -33,7 +33,7 @@ describe('E3 batch editing', () => {
     expect(undoLyricCommand(synced).present).toBe(state.present);
   });
 
-  it('replaces selected text in one undo and rejects a 注音 base change', () => {
+  it('replaces selected text in one undo and preserves Ruby on a base change', () => {
     const document = createLyricDocument('hello hello');
     const line = document.lines[0], word = line.words[0];
     const result = replaceWords(document, [word.id], 'hello', 'hi');
@@ -42,7 +42,7 @@ describe('E3 batch editing', () => {
     expect(state.present.lines[0].words[0].text).toBe('hi hi');
     expect(undoLyricCommand(state).present).toBe(document);
     word.rubyUnits.push({ id: 'r', reading: 'ヘロー', beginMs: null, endMs: null });
-    expect(() => replaceWords(document, [word.id], 'hello', 'hi')).toThrow(/注音/);
+    expect(executeLyricCommand(createLyricEditorState(document), replaceWords(document, [word.id], 'hello', 'hi').command).present.lines[0].words[0].rubyUnits).toEqual(word.rubyUnits);
   });
 
   it('persists line end links in project snapshots, tracks target changes and retains the current end', () => {

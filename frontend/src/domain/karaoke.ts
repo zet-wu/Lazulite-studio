@@ -94,7 +94,7 @@ export function reconcileKaraoke(lyrics: LyricDocument, karaoke: Karaoke): Karao
   });
   return { ...karaoke, lineGroups, cues, singerMarkers: initializeSingerMarkers(lyrics, karaoke.singerMarkers) };
 }
-export type KaraokeCommand = { kind: 'singer-markers'; markers: SingerMarker[] } | { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; moves: Record<string, string>; main: string | null; background: string | null } | { kind: 'outputs'; outputs: string[] };
+export type KaraokeCommand = { kind: 'remove-lines'; lineIds: string[] } | { kind: 'singer-markers'; markers: SingerMarker[] } | { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; moves: Record<string, string>; main: string | null; background: string | null } | { kind: 'outputs'; outputs: string[] };
 export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: KaraokeCommand): Karaoke {
   let next = karaoke;
   switch (command.kind) {
@@ -109,6 +109,9 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
       validateKaraoke(lyrics, configured);
       next = autoInsertCues(lyrics, configured, command.groupIds); break;
     }
+    case 'remove-lines':
+      if (command.lineIds.some(id => !lyrics.lines.some(line => line.id === id))) throw new Error('歌词行已失效');
+      next = { ...karaoke, cues: karaoke.cues.filter(cue => !command.lineIds.includes(cue.anchor.lineId)) }; break;
     case 'remove': next = { ...karaoke, cues: karaoke.cues.filter(cue => cue.id !== command.id) }; break;
     case 'cue': {
       const old = karaoke.cues.find(cue => cue.id === command.id);

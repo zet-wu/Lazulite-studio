@@ -694,12 +694,17 @@ function EditorWorkspaceContent(props: Props) {
         { label: effective.ids.length > 1 ? `删除所选行（${effective.ids.length}）` : '删除行', run: () => removeSelection(effective) },
       ];
     }
+    if (mode === 'karaoke' && effective.kind === 'lines' && props.project) {
+      const lineIds = effective.ids;
+      const count = props.project.karaoke.cues.filter(cue => lineIds.includes(cue.anchor.lineId)).length;
+      actions.push({ label: lineIds.length > 1 ? '清除所选行导唱' : '清除本行导唱', disabled: !count, reason: count ? `清除 ${count} 个导唱，仅处理所选行` : '所选行没有导唱', run: () => applyKaraokeCommand({ kind: 'remove-lines', lineIds }) });
+    }
     const shared: ContextAction[] = [
       { label: '复制', disabled: !copyAllowed(effective), run: () => { copy(effective); } },
       { label: '剪切', disabled: !copyAllowed(effective), run: () => { cut(effective); } },
       { label: '粘贴', disabled: !clipboard, run: () => paste(clipboard, undefined, effective) },
     ];
-    if (effective.ids.length > 1) actions = actions.map(action => ['合并', '前插词', '后插词'].includes(action.label) || action.label.startsWith('删除所选') || effective.kind === 'lines' && ['生成日文注音…', '生成日文罗马字音译…', '从音译生成 注音…', '分词…'].includes(action.label) ? action : { ...action, disabled: true });
+    if (effective.ids.length > 1) actions = actions.map(action => ['合并', '前插词', '后插词', '清除所选行导唱'].includes(action.label) || action.label.startsWith('删除所选') || effective.kind === 'lines' && ['生成日文注音…', '生成日文罗马字音译…', '从音译生成 注音…', '分词…'].includes(action.label) ? action : { ...action, disabled: true });
     setSelection(effective);
     props.onSelectLine?.(line.id);
     if (effective.kind === 'romanization-content' || effective.kind === 'romanization-unit') props.onSelectRomanization?.(effective.trackId, effective.contentId);
@@ -1031,7 +1036,7 @@ function EditorWorkspaceContent(props: Props) {
       </SettingsDialog>;
     })()}
     {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
-    {batchToolsOpen && <BatchToolsPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
+    {batchToolsOpen && <BatchToolsPanel project={props.project} document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
     {romanizationGeneration && <RomanizationGenerationDialog document={document} lineIds={romanizationGeneration}
       preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} apply={dispatch} close={() => setRomanizationGeneration(null)} />}
     {japaneseRuby && <JapaneseRubyDialog document={document} lineIds={japaneseRuby} apply={dispatch} close={() => setJapaneseRuby(null)} />}
