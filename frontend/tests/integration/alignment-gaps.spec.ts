@@ -3,7 +3,7 @@ const pid='phase3-media',url=`/api/v1/projects/${pid}/document`;
 async function setup(page:Page){
  const before=await(await page.request.get(url)).json();
  const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="1" end="5"><span studio:id="w1" begin="1" end="2">love</span><span studio:id="space" begin="2" end="2.1"> </span><span studio:id="w2" begin="2.3" end="5">you</span></p></body></tt>';
- const snapshot={...before.document,lyrics:{draftTtml:xml},lineOrder:[],editing:{emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:[],endLinks:{}},acoustics:{analysisId:null,segments:[{id:'s',beginMs:0,endMs:6000}]}};
+ const snapshot={...before.document,karaoke:{...before.document.karaoke,lineGroups:{a:'main'},cues:[]},lyrics:{draftTtml:xml},lineOrder:[],editing:{emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:[],endLinks:{}},acoustics:{analysisId:null,segments:[{id:'s',beginMs:0,endMs:6000}]}};
  expect((await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:pid,revision:before.revision,document:snapshot}})).ok()).toBeTruthy();
  const asset=(await(await page.request.get(`/api/v1/projects/${pid}`)).json()).asset.id;
  const state={params:{} as Record<string,unknown>,starts:0,key:'',status:'running',retry:true,results:0};

@@ -3,7 +3,7 @@ const pid='phase0-packaging',url=`/api/v1/projects/${pid}/document`;
 async function setup(page:Page){
  const before=await(await page.request.get(url)).json();
  const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" studio:null="begin end"><span studio:id="w" studio:null="begin end">love</span></p></body></tt>';
- const snapshot={...before.document,lyrics:{draftTtml:xml},lineOrder:[],editing:{emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:[],endLinks:{}},acoustics:{analysisId:null,segments:[]}};
+ const snapshot={...before.document,karaoke:{...before.document.karaoke,lineGroups:{a:'main'},cues:[]},lyrics:{draftTtml:xml},lineOrder:[],editing:{emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:[],endLinks:{}},acoustics:{analysisId:null,segments:[]}};
  const response=await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:pid,revision:before.revision,document:snapshot}});expect(response.ok()).toBeTruthy();
  const asset=(await(await page.request.get(`/api/v1/projects/${pid}`)).json()).asset.id;
  const state={status:'running',revision:'',starts:0,cancels:0,results:0,disconnects:0,polls:0};

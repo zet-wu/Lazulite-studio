@@ -3,7 +3,7 @@ const pid='phase3-media',url=`/api/v1/projects/${pid}/document`;
 const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><p xml:id="main" studio:null="begin end"><span studio:id="w" studio:null="begin end">love</span><span ttm:role="x-bg" studio:id="bg" studio:null="begin end"><span studio:id="bw" studio:null="begin end">(あ)</span></span></p><p xml:id="skip" begin="6" end="7"><span studio:id="sw" begin="6" end="7">keep</span></p></body></tt>';
 test('global alignment confirms, locks across modes, applies once, saves and cancels without changes',async({page})=>{
  const before=await(await page.request.get(url)).json();
- const snapshot={...before.document,lyrics:{draftTtml:xml},lineOrder:['bg','main','skip'],editing:{...before.document.editing,skippedAlignmentLineIds:['skip']},acoustics:{analysisId:null,segments:[]}};
+ const snapshot={...before.document,karaoke:{...before.document.karaoke,lineGroups:{main:'main',bg:'background',skip:'main'},cues:[]},lyrics:{draftTtml:xml},lineOrder:['bg','main','skip'],editing:{...before.document.editing,skippedAlignmentLineIds:['skip']},acoustics:{analysisId:null,segments:[]}};
  expect((await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:pid,revision:before.revision,document:snapshot}})).ok()).toBeTruthy();
  let status='running',revision='',starts=0,cancelled=0;
  await page.route('**/api/v1/capabilities',route=>route.fulfill({json:{schema_version:'studio-capabilities-v1',items:[{id:'job.alignment',enabled:true,reason:null}]}}));
