@@ -378,3 +378,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .karaokeBodySlot:not(:has(.syncBody > *)) { display:none; }
 .syncLine[data-karaoke] .syncRuby, .karaokeRubySlot { line-height:24px; }
 .karaokeRubySlot { font-size:14px; font-weight:600; --karaoke-slot-width:16px; }
+
+.dialogTabs button[data-role].activeTab { background-color:var(--blue-soft); color:var(--blue); border-color:var(--blue); box-shadow:inset 0 -2px var(--blue); }
+.modeTabs button[data-role] { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+.modeTabs svg { flex-shrink:0; }

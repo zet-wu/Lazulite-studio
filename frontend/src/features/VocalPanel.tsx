@@ -73,6 +73,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
         {adoptedAvailable && project.acoustics.analysisId && <a data-role="secondary" href={download(project.acoustics.analysisId)} download>下载人声 WAV</a>}
         {failure && <button data-role="inline" onClick={()=>setDismissed(null)}>查看最近处理结果</button>}
       </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run()}>{repair?'重新生成人声':update?'更新人声分离结果':currentAudio?'使用已有人声':'分离人声'}</button>}
+      <div className={styles.alignmentTools} ref={ui.setAlignmentHost}/>
     </div>}
     {ui.statusHost && showing && createPortal(<section className={styles.panel} aria-label="音频处理状态">
       {latest && <p role="status">{status[latest.status]}{latest.stage ? ` · ${{separating:'分离人声',analyzing:'声学分析'}[latest.stage]??latest.stage}`:''}</p>}

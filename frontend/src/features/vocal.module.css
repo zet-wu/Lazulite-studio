@@ -35,3 +35,5 @@
 
 .tracks { display:grid; gap:var(--timeline-row-gap); }
 .segment:focus-visible { outline:2px solid var(--blue); outline-offset:-2px; }
+
+.alignmentTools { margin-left:auto; display:flex; align-items:center; flex-wrap:wrap; gap:8px; }

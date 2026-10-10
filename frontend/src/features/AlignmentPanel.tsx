@@ -87,7 +87,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const cancel=()=>{const op=operation.current;if(!op)return;op.cancel=true;setCancelling(true);setProgress('正在取消');if(op.id)void alignmentApi.cancel(op.id).catch(e=>setMessage(`正在取消；${e.message}`));};
   const button=<span className={styles.entry}><button data-role="primary" disabled={!!reason||opening||running||control.locked} title={reason??undefined} onClick={()=>void open()}>{running?'正在对齐':'自动对齐'}</button>{reason&&!running&&<small>{reason}</small>}</span>;
   return <>
-    {visible&&(ui.toolsHost?createPortal(button,ui.toolsHost):button)}
+    {visible&&(ui.alignmentHost?createPortal(button,ui.alignmentHost):button)}
     <MessageBar notice={message}/>
     {running&&<div className={styles.status}><span role="status">{cancelling?'正在取消':progress}</span><button data-role="secondary" disabled={cancelling} onClick={cancel}>{cancelling?'正在取消':'取消'}</button></div>}
     {dialog&&<SettingsDialog title="自动对齐" close={()=>setDialog(false)} actions={<><button data-role="secondary" data-initial-focus onClick={()=>setDialog(false)}>取消</button><button data-role="primary" disabled={!summary?.emitting_count} onClick={()=>void start()}>开始对齐</button></>}>

@@ -6,9 +6,10 @@ function useAudioState() {
   const segmentTarget = shared.effective?.kind === 'segments';
   const [adding, setAdding] = useState(false);
   const [toolsHost, setToolsHost] = useState<HTMLDivElement | null>(null);
+  const [alignmentHost, setAlignmentHost] = useState<HTMLDivElement | null>(null);
   const [statusHost, setStatusHost] = useState<HTMLDivElement | null>(null);
   const [timelineReady, setTimelineReady] = useState(false);
-  return { selected, setSelected, segmentTarget, adding, setAdding, toolsHost, setToolsHost, statusHost, setStatusHost, timelineReady, setTimelineReady };
+  return { selected, setSelected, segmentTarget, adding, setAdding, toolsHost, setToolsHost, alignmentHost, setAlignmentHost, statusHost, setStatusHost, timelineReady, setTimelineReady };
 }
 const Context = createContext<ReturnType<typeof useAudioState> | null>(null);
 export const useAudioReview = () => useContext(Context)!;
