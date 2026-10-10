@@ -109,3 +109,17 @@ it('splits from the word menu with default graphemes and preserved spaces, openi
   expect(screen.getByRole('dialog', { name: '分词' })).toBeVisible();
   expect(apply).toHaveBeenCalledOnce();
 });
+
+it('keeps the selected object and real focus when deletion is rejected', () => {
+  const lyric = createLyricDocument('歌');
+  const apply = vi.fn(() => { throw new Error('删除被拒绝'); });
+  const { container } = render(<MemoryRouter><EditorWorkspace title="测试" document={lyric} apply={apply}
+    undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false} onSave={() => {}} /></MemoryRouter>);
+  const word = container.querySelector<HTMLElement>('[data-word-id]')!;
+  fireEvent.click(word); word.focus();
+  fireEvent.keyDown(word, { key: 'Delete' });
+  expect(apply).toHaveBeenCalledOnce();
+  expect(screen.getByRole('alert')).toHaveTextContent('删除被拒绝');
+  expect(word).toHaveFocus();
+  expect(word.className).toContain('selectedWord');
+});

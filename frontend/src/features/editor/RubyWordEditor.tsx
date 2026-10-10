@@ -58,7 +58,7 @@ export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, 
   return <div className={styles.rubyEditor} aria-label={`注音 ${word.text}`}>
     {(word.rubyUnits.length > 0 || slot) && <div className={styles.rubyAbove}>{newAfter === null && slot}{word.rubyUnits.map((unit) => <Fragment key={unit.id}><div key={unit.id} data-ruby-id={unit.id} data-drag-placeholder={placeholderIds?.has(unit.id) ? '' : undefined} tabIndex={0} className={`${styles.rubyTile} ${selectedRubyIds.includes(unit.id) ? styles.selectedRuby : ''}`}
       onClick={(event) => { event.stopPropagation(); onSelectRuby(unit.id, event.shiftKey, event.ctrlKey || event.metaKey); }}
-      onFocus={(event) => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus]')) onSelectRuby(unit.id); }}>
+      onFocus={(event) => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus], [data-selection-focus]')) onSelectRuby(unit.id); }}>
       <DraftInput value={unit.reading} label={`读音 ${word.text}`} onFocus={() => onSelectRuby(unit.id)}
         onCommit={(reading) => apply({ type: 'edit-ruby', lineId, wordId: word.id, rubyId: unit.id, reading })}
         onSplit={(at, draft) => split(unit, at, draft)}

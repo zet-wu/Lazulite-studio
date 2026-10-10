@@ -1,3 +1,4 @@
+import { focusObject } from './selection-recovery';
 import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { defaultRangeExtractor, useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
 import type { LyricLine } from '../../domain/lyric-document';
@@ -13,30 +14,31 @@ type Props = {
   append?: () => void;
   lineVersion?: (line: LyricLine) => string;
   renderLine: (line: LyricLine, index: number) => ReactNode;
-  locate: { id: string; serial: number; focus?: string; selector?: string } | null;
+  locate: { id: string; serial: number; focus?: string; selector?: string; nearest?: boolean } | null;
 };
 
 /** Only explicit requests scroll this container. At most two measured corrections. */
 type ListProps = Props & { handled: RefObject<number | null> };
 
-function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate, handled }: ListProps, mountTarget?: (index: number | null) => void) {
+function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate, handled }: ListProps, mountTarget?: (index: number | null, nearest?: boolean) => void) {
   useEffect(() => {
     if (!locate || handled.current === locate.serial) return;
     const scroller = scrollRef.current!;
     const index = lines.findIndex(line => line.id === locate.id);
     if (index < 0) return;
-    mountTarget?.(index);
+    const mounted = [...scroller.querySelectorAll<HTMLElement>('[data-line-id]')].some(node => node.dataset.lineId === locate.id);
+    if (!locate.nearest || !mounted) mountTarget?.(index, locate.nearest);
     let frame = 0, attempts = 0, corrections = 0, previous = NaN, stable = 0, settledAt = 0;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = locate.nearest || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let focused = false;
     const targetTop = () => {
       const line = [...scroller.querySelectorAll<HTMLElement>('[data-line-id]')].find(node => node.dataset.lineId === locate.id);
       const selector = locate.selector ?? locate.focus;
-      const target = selector ? line?.querySelector<HTMLElement>(selector) ?? (selector === ':scope' ? line : null) : line;
+      const target = selector ? line?.querySelector<HTMLElement>(selector) ?? (selector === ':scope' || locate.nearest ? line : null) : line;
       if (!target) return null;
-      if (locate.focus && !focused) { target.focus({ preventScroll: true }); focused = true; handled.current = locate.serial; }
+      if (locate.focus && !focused) { focusObject(target); focused = true; handled.current = locate.serial; }
       const row = target.getBoundingClientRect(), view = scroller.getBoundingClientRect();
-      const raw = scroller.scrollTop + row.top - view.top - (row.height >= view.height ? 0 : (view.height - row.height) / 2);
+      const raw = locate.nearest ? scroller.scrollTop + (row.top < view.top ? row.top - view.top : row.bottom > view.bottom ? Math.min(row.top - view.top, row.bottom - view.bottom) : 0) : scroller.scrollTop + row.top - view.top - (row.height >= view.height ? 0 : (view.height - row.height) / 2);
       return Math.max(0, Math.min(scroller.scrollHeight - scroller.clientHeight, raw));
     };
     const cancel = () => { handled.current = locate.serial; cancelAnimationFrame(frame); mountTarget?.(null); scroller.scrollTo({ top: scroller.scrollTop, behavior: 'instant' }); };
@@ -114,8 +116,8 @@ function VirtualLyricList(props: ListProps) {
     };
   }, []);
   // The stable virtualizer instance owns the coarse mount; smooth scrolling uses measured DOM.
-  const mountTarget = useRef((index: number | null) => {
-    if (index !== null) virtualizer.scrollToIndex(index, { align: 'center', behavior: 'auto' });
+  const mountTarget = useRef((index: number | null, nearest = false) => {
+    if (index !== null) virtualizer.scrollToIndex(index, { align: nearest ? 'auto' : 'center', behavior: 'auto' });
     else if (scrollRef.current) virtualizer.scrollToOffset(scrollRef.current.scrollTop, { behavior: 'auto' });
   }).current;
   useLocate(scrollRef, props, mountTarget);

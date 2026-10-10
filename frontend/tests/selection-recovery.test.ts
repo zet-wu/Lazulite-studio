@@ -16,6 +16,7 @@ const ruby = (id:string):EditorSelection=>({kind:'ruby',lineId:'c',wordId:'c2',i
 const content = (id:string,unit=false):EditorSelection=>({kind:unit?'romanization-unit':'romanization-content',attachment:'translation',lineId:'c',trackId:'t',contentId:unit?'y':id,ids:[id],activeId:id,anchorId:id});
 function remove(selection:EditorSelection) {const before=fixture();return recoverSelection(before,applyLyricCommand(before,deleteSelection(before,selection)),selection);}
 describe('nearby selection recovery',()=>{
+ it('does not schedule focus for a valid selection, including freshly inserted objects',()=>{const doc=fixture();const current=word(['c2']);expect(survivingSelection(doc,doc,current)).toBe(current);const next={...doc,lines:[...doc.lines,createLine('', 'new')]};const added=line(['new']);expect(survivingSelection(doc,next,added)).toBe(added);});
  it('uses active position and skips the whole deleted batch',()=>{expect(remove(line(['b','d'],'d'))?.activeId).toBe('c');expect(remove(word(['b3','c2','c3'],'c3'))?.activeId).toBe('c1');});
  it('falls back within the same parent, including empty rows and first Ruby',()=>{expect(remove(word(['c1','c2','c3']))).toEqual(line(['c']));expect(remove(ruby('c2r1'))).toEqual(word(['c2']));expect(remove(ruby('c2r2'))?.activeId).toBe('c2r1');});
  it('uses preceding background or its parent, never unrelated backgrounds',()=>{expect(remove(line(['bg2']))?.activeId).toBe('bg1');expect(remove(line(['bg1']))?.activeId).toBe('c');});

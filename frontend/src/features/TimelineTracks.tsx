@@ -1,3 +1,5 @@
+import { focusObject, selectionSelector, preserveSelectionOnFocus } from './editor/selection-recovery';
+import { selectionLineId } from './editor/editing-actions';
 import { KaraokeContext } from './KaraokeContext';
 import { createProjectEditorState, executeProjectCommand } from '../domain/project-document';
 import { KaraokeTrack } from './KaraokeTrack';
@@ -21,7 +23,7 @@ type Props = { locked?: boolean; document: LyricDocument; selectedLineId: string
   visible: { line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
   externalAnchors?: number[]; durationMs?: number | null;
   apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string) => void };
-type Drag = { source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string } };
+type Drag = { started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string } };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
 
 export function TimelineTracks({ locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onPan, onError }: Props) {
@@ -36,7 +38,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     observer.observe(lane); return () => observer.disconnect();
   }, [visible.line, visible.word, visible.ruby]);
   const [drag, setDrag] = useState<Drag | null>(null);
-  const { selection, setSelection, expanded, commands } = useEditorSelection()!;
+  const { selection, setSelection, expanded, commands, area, focusRequest } = useEditorSelection()!;
   const expandedLines = document.lines.filter(line => expanded.includes(line.id) && (visible.word || visible.ruby && line.words.some(word => word.rubyUnits.length) || visible.romanization && [...document.romanizationTracks,...document.translationTracks].some(track => track.contents.some(content => content.lineId === line.id))));
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtual = useVirtualizer({ count: expandedLines.length, getScrollElement: () => scrollRef.current, estimateSize: () => 80, overscan: 3, getItemKey: index => expandedLines[index].id });
@@ -46,16 +48,16 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
   const choose = (target: TimelineTarget, shift = false, toggle = false) => {
     const id = targetId(target), previous = selection?.kind === selectionKind(target) && (target.kind!=='romanization'||(selection.kind==='romanization-unit'&&selection.attachment===target.attachment)) ? selection : null;
     const order = allTargets.filter(item => item.kind === target.kind && (target.kind!=='romanization'||item.kind==='romanization'&&item.attachment===target.attachment) && (!shift || target.kind !== 'romanization' || item.kind === 'romanization' && item.trackId === target.trackId)).map(targetId);
-    const ids = !shift && !toggle && previous?.ids.includes(id) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
-    setSelection(targetSelection(target, ids, shift || toggle || previous?.ids.includes(id) ? previous?.anchorId ?? id : id));
+    const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
+    setSelection(targetSelection(target, ids, shift || toggle ? previous?.anchorId ?? id : id));
   };
   const contentBar = (trackId: string, content: Extract<RomanizationContent,{kind:'plain'}>, attachment?: 'translation') => {
     const previous=selection?.kind==='romanization-content'&&selection.attachment===attachment&&selection.trackId===trackId?selection:null;
     const chooseContent=(shift=false,toggle=false)=>{
       const tracks=attachment==='translation'?document.translationTracks:document.romanizationTracks;
       const order=tracks.find(track=>track.id===trackId)!.contents.filter(item=>item.lineId===content.lineId).map(item=>item.id);
-      const ids=!shift&&!toggle&&previous?.ids.includes(content.id)?previous.ids:selectIds(order,previous?.ids??[],previous?.anchorId??content.id,content.id,shift,toggle);
-      setSelection({kind:'romanization-content',...(attachment?{attachment}:{}),lineId:content.lineId,trackId,contentId:content.id,ids,activeId:content.id,anchorId:shift||toggle||previous?.ids.includes(content.id)?previous?.anchorId??content.id:content.id});
+      const ids=selectIds(order,previous?.ids??[],previous?.anchorId??content.id,content.id,shift,toggle);
+      setSelection({kind:'romanization-content',...(attachment?{attachment}:{}),lineId:content.lineId,trackId,contentId:content.id,ids,activeId:content.id,anchorId:shift||toggle?previous?.anchorId??content.id:content.id});
     };
     return <span role="button" tabIndex={0} className={previous?.ids.includes(content.id)?styles.trackSelected:undefined} title={content.text} aria-pressed={!!previous?.ids.includes(content.id)} data-line-id={content.lineId} data-translation-id={attachment?content.id:undefined} data-romanization-content-id={!attachment?content.id:undefined}
       onClick={event=>chooseContent(event.shiftKey,event.ctrlKey||event.metaKey)}
@@ -100,12 +102,13 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     if (event.button !== 0 || locked && target !== null) return;
     event.preventDefault(); event.stopPropagation();
     if (target) {
-      (event.currentTarget.closest('[data-timeline-key]') as HTMLElement)?.focus({ preventScroll: true });
-      choose(target, event.shiftKey, event.ctrlKey || event.metaKey);
+      const node = event.currentTarget.closest<HTMLElement>('[data-timeline-key]');
+      if (node) focusObject(node);
+      if (event.shiftKey || event.ctrlKey || event.metaKey || !selectionTargets(document, selection).some(item => targetId(item) === targetId(target))) choose(target, event.shiftKey, event.ctrlKey || event.metaKey);
       if (event.shiftKey || event.ctrlKey || event.metaKey) return;
     }
     const lane = (event.currentTarget.closest('[data-track-lane]') ?? tracksRef.current!.querySelector('[data-track-lane]')) as HTMLElement;
-    const next: Drag = { source: document, target, side, x: event.clientX, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, candidate: { timeMs: originalMs, document, error: '' } };
+    const next: Drag = { started: false, source: document, target, side, x: event.clientX, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, candidate: { timeMs: originalMs, document, error: '' } };
     event.currentTarget.setPointerCapture(event.pointerId);
     capture.current = { element: event.currentTarget, id: event.pointerId };
     if (side !== 'pan') publish({ timeMs: originalMs, valid: true });
@@ -147,7 +150,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       } catch (cause) { candidate.error = cause instanceof Error ? cause.message : '时间轴编辑失败'; }
       onError(candidate.error);
     } else if (current.target) candidate.timeMs = current.originalMs;
-    const next = { ...current, current: event.clientX, candidate };
+    const next = { ...current, started: current.started || Math.abs(event.clientX - current.x) >= 3, current: event.clientX, candidate };
     dragRef.current = next; setDrag(next);
     if (next.side === 'pan') { if (Math.abs(next.current - next.x) >= 4) onPan(next.originalMs - delta); }
     else publish({ timeMs: candidate.timeMs, valid: !candidate.error });
@@ -162,7 +165,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       if (picked.length) setSelection(targetSelection(picked.at(-1)!, picked.map(targetId), targetId(picked[0])));
       return;
     }
-    if (!current.target || Math.abs(current.current - current.x) < 3) {
+    if (!current.target || !current.started) {
       if (current.target) choose(current.target);
       return;
     }
@@ -172,6 +175,34 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       ? { type: 'shift-lines', lineIds: moving.map(target => target.lineId), deltaMs: current.candidate.timeMs - current.originalMs }
       : { type: 'replace-document', document: current.candidate.document }); onError('');
   };
+  useEffect(() => {
+    if (focusRequest?.area !== 'timeline' || focusRequest.selection !== selection) return;
+    const wanted = focusRequest.selection;
+    if (!wanted) { focusObject(tracksRef.current!); return; }
+    const lineId = selectionLineId(wanted)!;
+    const index = expandedLines.findIndex(line => line.id === lineId);
+    if (expandedLines.length > 20 && index >= 0 && !virtual.getVirtualItems().some(item => item.index === index)) virtual.scrollToIndex(index, { align: 'auto' });
+    const target = selectionTargets(projection, wanted).find(item => targetId(item) === wanted.activeId);
+    const interval = target && targetInterval(projection, target);
+    if (interval?.beginMs != null && interval.endMs != null) {
+      if (interval.beginMs < startMs) onPan(interval.beginMs);
+      else if (interval.beginMs > endMs) onPan(Math.max(0, interval.beginMs - (endMs - startMs) + 100));
+    }
+    let frame = 0, attempts = 0;
+    const focus = () => {
+      const selector = wanted.kind === 'romanization-content' ? `${selectionSelector(wanted)}:not([data-timeline-key])` : `[data-timeline-key="${CSS.escape(wanted.activeId)}"]`;
+      const exact = tracksRef.current?.querySelector<HTMLElement>(selector);
+      if (exact) { focusObject(exact); exact.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return; }
+      if (++attempts < 12) { frame = requestAnimationFrame(focus); return; }
+      const parent = tracksRef.current?.querySelector<HTMLElement>(`[data-timeline-key="${CSS.escape(lineId)}"]`);
+      if (parent) {
+        setSelection({ kind: 'lines', ids: [lineId], activeId: lineId, anchorId: lineId });
+        focusObject(parent);
+      } else focusObject(tracksRef.current!);
+    };
+    frame = requestAnimationFrame(focus);
+    return () => cancelAnimationFrame(frame);
+  }, [focusRequest, selection]);
   const boxTargets = useRef<TimelineTarget[]>([]);
   const bar = (target: TimelineTarget, label: string, beginMs: number, endMs: number, active = false, laneLayoutOverride?: ReturnType<typeof packIntervals>) => {
     const key = target.kind === 'line' ? target.lineId : target.kind === 'word' ? target.wordId : target.kind === 'ruby' ? target.rubyId : target.unitId;
@@ -187,7 +218,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       className={`${styles.trackBar} ${target.kind === 'line' && document.lines.find(line => line.id === target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${real?.beginMs != null && real?.endMs != null && positionMs >= real.beginMs && positionMs < real.endMs ? styles.trackPlaying : ''}`} role="button" aria-disabled={locked} tabIndex={0} aria-label={label} title={description} aria-description={description} data-temporary-begin={ghostBegin || undefined} data-temporary-end={ghostEnd || undefined}
       style={{ transform: narrow && beginMs === endMs && beginMs === propsEndMs ? 'translateX(-100%)' : undefined, left: pct(clippedBegin), width: `${(right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
       onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
-      onFocus={() => { if (!dragRef.current) choose(target); }}
+      onFocus={event => { if (!preserveSelectionOnFocus(selection, event.currentTarget) && !dragRef.current) choose(target); }}
       onContextMenu={event => { event.preventDefault(); if(locked)return; event.stopPropagation(); if(!commands.current?.openContext(event.currentTarget,event.clientX,event.clientY)){choose(target); setMenu({ x: event.clientX, y: event.clientY, target: event.currentTarget });} }}
       onKeyDown={event => {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(target, event.shiftKey, event.ctrlKey || event.metaKey); }
@@ -213,7 +244,8 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       apply({ type: 'replace-document', document: changed }); onError('');
     } catch (cause) { onError(cause instanceof Error ? cause.message : '无法闭合空隙'); }
   };
-  return <div ref={tracksRef} className={styles.tracks} aria-label="可编辑时间轴"
+  return <div ref={tracksRef} className={styles.tracks} aria-label="可编辑时间轴" tabIndex={-1} onFocusCapture={() => { area.current = 'timeline'; }}
+    onKeyDown={event => { if (event.key === 'Delete' && !locked && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); } }}
     onCopy={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.copy(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onCut={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.cut(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onPaste={event => { event.preventDefault(); commands.current?.paste(event.clipboardData.getData('application/x-lazulite-lyric') === commands.current.clipboardToken() ? undefined : event.clipboardData.getData('text/plain')); }}>

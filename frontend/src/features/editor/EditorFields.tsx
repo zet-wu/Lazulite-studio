@@ -17,7 +17,7 @@ export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSpl
   const composing = useRef(false);
   const cancelled = useRef(false);
   useEffect(() => setDraft(value), [value]);
-  return <input ref={(node) => { ref.current = node; inputRef?.(node); }} aria-label={label} placeholder={placeholder} value={draft} onChange={(event) => { cancelled.current = false; setDraft(event.target.value); }} onFocus={() => { if (!ref.current?.closest('[data-pointer-focus]')) onFocus?.(); }}
+  return <input ref={(node) => { ref.current = node; inputRef?.(node); }} aria-label={label} placeholder={placeholder} value={draft} onChange={(event) => { cancelled.current = false; setDraft(event.target.value); }} onFocus={() => { if (!ref.current?.closest('[data-pointer-focus], [data-selection-focus]')) onFocus?.(); }}
     onCompositionStart={() => { composing.current = true; }} onCompositionEnd={event => { composing.current = false; if (event.currentTarget !== document.activeElement && event.currentTarget.value !== value) onCommit(event.currentTarget.value); }}
     onBlur={() => { if (composing.current) return; if (cancelled.current) { cancelled.current = false; return; } if (draft !== value) onCommit(draft); }}
     onKeyDown={(event) => {

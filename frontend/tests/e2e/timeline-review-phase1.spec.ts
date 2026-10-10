@@ -90,7 +90,7 @@ test('Ruby range and reverse marquee resolve different word owners and undo one 
  const ruby=page.getByRole('button',{name:/^时间轴注音 /});
  await ruby.first().click(); await ruby.last().click({modifiers:['Shift']});
  await expect(page.getByText('注音已选 3',{exact:true})).toBeVisible();
- await ruby.first().click(); await expect(page.getByText('注音已选 3',{exact:true})).toBeVisible();
+ await ruby.first().click(); await expect(page.getByText('注音已选 1',{exact:true})).toBeVisible();
  const lane=ruby.first().locator('..');const box=(await lane.boundingBox())!;
  await page.keyboard.down('Shift');await page.mouse.move(box.x+box.width*.9,box.y+box.height-1);await page.mouse.down();
  await page.mouse.move(box.x+.1,box.y+box.height-1,{steps:5});await page.mouse.up();await page.keyboard.up('Shift');

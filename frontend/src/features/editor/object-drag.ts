@@ -63,7 +63,7 @@ export function dragCommand(document: LyricDocument, source: DragSource, slot: D
 
 type Preview = { command: LyricCommand; selection: EditorSelection };
 type Marker = { x: number; y: number; width: number; height: number };
-type Session = { source: DragSource; id: number; originX: number; originY: number; x: number; y: number; copy: boolean; started: boolean; onClick?: () => void;
+type Session = { source: DragSource; id: number; originX: number; originY: number; x: number; y: number; copy: boolean; started: boolean; onClick?: () => void; onStart?: () => void;
   ghost: HTMLElement | null; marker: HTMLElement | null; node: HTMLElement; offsetX: number; offsetY: number; key: string; preview: Preview | null; frame: number; slot: DragSlot | null;
   boundary: { node: HTMLElement; before: boolean } | null; edge: { node: HTMLElement; direction: number; since: number } | null; lastTime: number };
 
@@ -227,10 +227,10 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     }
     current.frame = requestAnimationFrame(tick);
   };
-  const start = (source: DragSource, node: HTMLElement, pointerId: number, x: number, y: number, copy: boolean, onClick?: () => void) => {
+  const start = (source: DragSource, node: HTMLElement, pointerId: number, x: number, y: number, copy: boolean, onClick?: () => void, onStart?: () => void) => {
     cleanup();
     const rect = node.getBoundingClientRect();
-    session.current = { source, node, onClick, id: pointerId, originX: x, originY: y, x, y, copy, started: false, ghost: null, marker: null, offsetX: x - rect.left, offsetY: y - rect.top, key: 'pending', preview: null, frame: 0, slot: null, boundary: null, edge: null, lastTime: performance.now() };
+    session.current = { source, node, onClick, onStart, id: pointerId, originX: x, originY: y, x, y, copy, started: false, ghost: null, marker: null, offsetX: x - rect.left, offsetY: y - rect.top, key: 'pending', preview: null, frame: 0, slot: null, boundary: null, edge: null, lastTime: performance.now() };
     suppressClick.current = true;
     root.current!.setPointerCapture(pointerId);
   };
@@ -239,6 +239,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     current.x = x; current.y = y; current.copy = copy;
     if (!current.started && Math.hypot(x - current.originX, y - current.originY) >= 4) {
       current.started = true;
+      current.onStart?.();
       root.current!.dataset.objectDrag = '';
       setDragging(current.source);
       const ghost = current.node.cloneNode(true) as HTMLElement;

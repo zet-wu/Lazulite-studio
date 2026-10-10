@@ -49,7 +49,10 @@ export function survivingSelection(before: LyricDocument, after: LyricDocument, 
   const ids = selection.ids.filter(id => { const node = next.get(id); return node && sameKind(node.selection, selection); });
   if (!ids.length) return selection.ids.length ? recoverSelection(before, after, selection) : selection;
   const activeId = ids.includes(selection.activeId) ? selection.activeId : ids[0];
-  return { ...next.get(activeId)!.selection, ids, activeId, anchorId: ids.includes(selection.anchorId) ? selection.anchorId : activeId };
+  const owner = next.get(activeId)!.selection;
+  const sameOwner = Object.entries(owner).every(([key, value]) => ['ids', 'activeId', 'anchorId'].includes(key) || Reflect.get(selection, key) === value);
+  if (sameOwner && ids.length === selection.ids.length && activeId === selection.activeId && ids.includes(selection.anchorId)) return selection;
+  return { ...owner, ids, activeId, anchorId: ids.includes(selection.anchorId) ? selection.anchorId : activeId };
 }
 
 const objectAttribute = (selection: EditorSelection) => selection.kind === 'lines' ? 'data-line-id' : selection.kind === 'words' ? 'data-word-id' : selection.kind === 'ruby' ? 'data-ruby-id'
@@ -63,7 +66,8 @@ export function preserveSelectionOnFocus(selection: EditorSelection | null, targ
   if (target.closest('[data-selection-focus]')) return true;
   if (!selection) return false;
   const object = target.closest('[data-ruby-id], [data-translation-unit-id], [data-romanization-unit-id], [data-translation-id], [data-romanization-content-id], [data-word-id], [data-line-id]');
-  return !!object && selection.ids.includes(object.getAttribute(objectAttribute(selection)) ?? '');
+  const attr = ['data-ruby-id', 'data-translation-unit-id', 'data-romanization-unit-id', 'data-translation-id', 'data-romanization-content-id', 'data-word-id', 'data-line-id'].find(name => object?.hasAttribute(name));
+  return !!object && attr === objectAttribute(selection) && selection.ids.includes(object.getAttribute(attr) ?? '');
 }
 
 export function focusObject(node: HTMLElement) {

@@ -2,8 +2,12 @@ import { createContext, useContext, useState, useRef, useCallback, type Dispatch
 import type { EditorSelection, EditorClipboard } from './editing-actions';
 
 type Selection = { kind: 'cue'; id: string; lineId: string; anchorId: string } | EditorSelection | { kind: 'segments'; ids: string[]; anchorId: string; activeId: string };
+export type SelectionArea = 'canvas' | 'outline' | 'timeline';
 function useSelectionState() {
-  const commands = useRef<{ openContext: (target: HTMLElement, x: number, y: number) => boolean; copy: () => EditorClipboard | null; cut: () => EditorClipboard | null; remove: () => void; paste: (text?: string) => void; canCopy: boolean; canPaste: boolean; clipboardToken: () => string } | null>(null);
+  const area = useRef<SelectionArea>('canvas');
+  const [focusRequest, setFocusRequest] = useState<{ selection: EditorSelection | null; area: SelectionArea; serial: number } | null>(null);
+  const requestFocus = (selection: EditorSelection | null, destination = area.current) => setFocusRequest(old => ({ selection, area: destination, serial: (old?.serial ?? 0) + 1 }));
+  const commands = useRef<{ openContext: (target: HTMLElement, x: number, y: number) => boolean; copy: () => EditorClipboard | null; cut: () => EditorClipboard | null; remove: (selection?: EditorSelection) => void; paste: (text?: string) => void; canCopy: boolean; canPaste: boolean; clipboardToken: () => string } | null>(null);
   const [effective, setEffective] = useState<Selection | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
   const selection = effective?.kind === 'segments' || effective?.kind === 'cue' ? null : effective;
@@ -29,7 +33,7 @@ function useSelectionState() {
   }), []);
   const selectedCue = effective?.kind === 'cue' ? effective.id : null;
   const selectCue = (id: string, lineId: string) => { setEffective({kind:'cue', id, lineId, anchorId:id}); setExpanded(ids=>ids.includes(lineId)?ids:[...ids,lineId]); };
-  return { selectedCue, selectCue, commands, effective, selection, setSelection, expanded, selectedSegments, setSelectedSegments };
+  return { area, focusRequest, requestFocus, selectedCue, selectCue, commands, effective, selection, setSelection, expanded, selectedSegments, setSelectedSegments };
 }
 const Context = createContext<ReturnType<typeof useSelectionState> | null>(null);
 export const useEditorSelection = () => useContext(Context);

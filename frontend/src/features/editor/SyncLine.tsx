@@ -82,14 +82,14 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
       return <Fragment key={word.id}><div data-word-id={word.id} tabIndex={0} className={styles.syncWord} data-selected={selected('words', word.id) || undefined}
         data-drag-placeholder={placeholder('word', word.id) ? '' : undefined} style={{ '--beat-space': `${count * 16}px`, gridTemplateColumns: `repeat(${Math.max(1, (karaoke ? word.rubyUnits.length*2-1 : word.rubyUnits.length) + Number(hasDraft))}, minmax(0, max-content))` } as CSSProperties}
         onClick={event => { if (!(event.target as Element).closest('[data-ruby-id],button,input')) { event.stopPropagation(); selectWord(word, event.shiftKey, event.ctrlKey || event.metaKey); } }}
-        onFocus={event => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus]')) selectWord(word); }}
+        onFocus={event => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus], [data-selection-focus]')) selectWord(word); }}
         onDoubleClick={event => { if (!(event.target as Element).closest('[data-ruby-id],button,input')) { event.stopPropagation(); draft.open(word.id); } }}
         onKeyDown={event => chooseKey(event, () => selectWord(word, event.shiftKey, event.ctrlKey || event.metaKey), word.id)}>
         {hasDraft && rubyDraft.afterRubyId == null && rubySlot}
         {hasRuby && word.rubyUnits.map((unit, index) => <Fragment key={unit.id}><div className={styles.syncRubyColumn} style={{ gridColumn: index * (karaoke ? 2 : 1) + 1 + Number(hasDraft && (rubyDraft.afterRubyId == null || word.rubyUnits.findIndex(r => r.id === rubyDraft.afterRubyId) < index)), '--beat-space': `${unit.reading.trim() ? emptyBeatCount(editing, unit.id) * 16 : 0}px` } as CSSProperties}>
           <div data-ruby-id={unit.id} tabIndex={0} className={styles.syncRuby} data-selected={selected('ruby', unit.id) || undefined} data-drag-placeholder={placeholder('ruby', unit.id) ? '' : undefined}
             onClick={event => { event.stopPropagation(); selectRuby(word, unit.id, event.shiftKey, event.ctrlKey || event.metaKey); }}
-            onFocus={event => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus]')) selectRuby(word, unit.id); }}
+            onFocus={event => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus], [data-selection-focus]')) selectRuby(word, unit.id); }}
             onDoubleClick={event => { event.stopPropagation(); draft.open(unit.id); }}
             onKeyDown={event => chooseKey(event, () => selectRuby(word, unit.id, event.shiftKey, event.ctrlKey || event.metaKey), unit.id)}>
             <SyncText id={unit.id} text={unit.reading} label={`读音 ${word.text}`} active={activeId === unit.id} draft={draft} commit={reading => apply({ type: 'edit-ruby', lineId: line.id, wordId: word.id, rubyId: unit.id, reading })}/>
