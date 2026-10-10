@@ -380,7 +380,7 @@ function EditorWorkspaceContent(props: Props) {
     } else if(issue.kind==='romanization-content') {
       selectRomanizationContent(line.id,issue.trackId!,issue.contentId!);
       focus=`[data-romanization-content-id="${CSS.escape(issue.contentId!)}"]`;
-    } else if (issue.kind === 'translation-content' || issue.kind === 'translation-unit') { setSelection(null); focus = issue.unitId ? `[data-translation-unit-id="${CSS.escape(issue.unitId)}"] input` : `[data-translation-id="${CSS.escape(issue.contentId!)}"] :is(input, textarea)`; } else selectLine(line);
+    } else if (issue.kind === 'translation-content' || issue.kind === 'translation-unit') { const id=issue.unitId??issue.contentId!; setSelection({kind:issue.unitId?'romanization-unit':'romanization-content',attachment:'translation',lineId:line.id,trackId:issue.trackId!,contentId:issue.contentId!,ids:[id],anchorId:id,activeId:id}); focus = issue.unitId ? `[data-translation-unit-id="${CSS.escape(issue.unitId)}"] input` : `[data-translation-id="${CSS.escape(issue.contentId!)}"] :is(input, textarea)`; } else selectLine(line);
     requestLocate(line.id,focus);
   };
   const assignmentIssues: OutputIssue[] = props.assignmentError ? props.assignmentError.objectIds.map(id=>{

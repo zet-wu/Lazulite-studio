@@ -13,14 +13,14 @@ function TranslationRow({ item, index, commit, remove, fresh = false }: {
 }) {
   const shared = useEditorSelection();
   const selected = shared?.selection;
-  const choose = (event: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>, unitId?: string) => {
+  const choose = (event: {currentTarget:HTMLElement;stopPropagation:()=>void;shiftKey?:boolean;ctrlKey?:boolean;metaKey?:boolean}, unitId?: string) => {
     event.stopPropagation();
     const row=event.currentTarget.closest<HTMLElement>('[data-translation-track]')!;
     const trackId=row.dataset.translationTrack!;
     const id=unitId??item.id, kind=unitId?'romanization-unit' as const:'romanization-content' as const;
     const previous=selected?.kind===kind&&selected.attachment==='translation'?selected:null;
     const order=unitId&&item.kind==='timed'?item.units.map(unit=>unit.id):Array.from(row.parentElement!.querySelectorAll<HTMLElement>(`[data-translation-track="${CSS.escape(trackId)}"] [data-translation-id]`)).map(node=>node.dataset.translationId!);
-    const shift=event.shiftKey,toggle=event.ctrlKey||event.metaKey;
+    const shift=!!event.shiftKey,toggle=!!(event.ctrlKey||event.metaKey);
     const ids=!shift&&!toggle&&previous?.ids.includes(id)?previous.ids:selectIds(order,previous?.ids??[],previous?.anchorId??id,id,shift,toggle);
     shared?.setSelection({kind,attachment:'translation',lineId:item.lineId,trackId,contentId:item.id,ids,activeId:id,anchorId:shift||toggle||previous?.ids.includes(id)?previous?.anchorId??id:id});
   };
@@ -42,7 +42,7 @@ function TranslationRow({ item, index, commit, remove, fresh = false }: {
     if (JSON.stringify(draft) === JSON.stringify(item)) return;
     try { commit(draft); setError(''); } catch (cause) { setError((cause as Error).message); }
   };
-  return <div data-translation-id={item.id} tabIndex={0} data-selected={selected?.kind==='romanization-content'&&selected.attachment==='translation'&&selected.ids.includes(item.id)||undefined} className={styles.translationRow} onClick={event=>choose(event)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={event => {
+  return <div data-translation-id={item.id} tabIndex={0} data-selected={selected?.kind==='romanization-content'&&selected.attachment==='translation'&&selected.ids.includes(item.id)||undefined} className={styles.translationRow} onFocusCapture={event=>{if(!fresh&&(event.target instanceof HTMLInputElement||event.target instanceof HTMLTextAreaElement))choose(event,event.target.closest<HTMLElement>('[data-translation-unit-id]')?.dataset.translationUnitId);}} onClick={event=>choose(event)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={event => {
     if(event.target===event.currentTarget&&(event.key===' '||event.key==='Enter')){event.preventDefault();choose(event);return;}
     if (composing.current || event.nativeEvent.isComposing) return;
     if (event.key === 'Enter') { event.preventDefault(); (event.target as HTMLElement).blur(); }

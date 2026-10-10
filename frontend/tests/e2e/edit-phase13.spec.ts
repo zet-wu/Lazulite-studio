@@ -50,3 +50,10 @@ test('P13 clear-line cue menu ignores prior word selections and restores all cue
  await page.locator('main [data-cue-id]').first().click({button:'right'});await expect(page.getByRole('menuitem',{name:'删除导唱',exact:true})).toBeVisible();await expect(page.getByRole('menuitem',{name:'合并所选',exact:true})).toHaveCount(0);await page.keyboard.press('Escape');
  await page.locator('[data-outline-drag]').first().click({button:'right'});await page.getByRole('menuitem',{name:/清除本行导唱/}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(0);await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(3);
 });
+
+test('P13 plain translation timeline supports keyboard ranges and the shared content merge',async({page})=>{
+ const {loadTimeline}=await import('../fixtures/timeline-setup');await loadTimeline(page);
+ const xml=await page.evaluate(async()=>{const dp='/src/domain/lyric-document.ts',cp='/src/adapters/ttml/lyric-codec.ts';const d=await import(dp),c=await import(cp);const doc=d.createLyricDocument('正文');doc.lines[0].id='plain';doc.lines[0].beginMs=1000;doc.lines[0].endMs=4000;doc.translationTracks=[{id:'t',language:'en',purpose:'subtitle',contents:[{id:'one',lineId:'plain',kind:'plain',text:'One '},{id:'two',lineId:'plain',kind:'plain',text:'Two'}]}];return c.serializeLyricTtml(doc,{draft:true});});
+ await importLyrics(page,{name:'plain.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.locator('[data-outline-drag]').first().click();
+ const first=page.getByRole('button',{name:'One',exact:true}),second=page.getByRole('button',{name:'Two',exact:true});await first.press('Space');await second.press('Shift+Space');await expect(first).toHaveAttribute('aria-pressed','true');await expect(second).toHaveAttribute('aria-pressed','true');await second.press('Shift+F10');await page.getByRole('menuitem',{name:'合并所选',exact:true}).click();await expect(page.getByLabel('翻译 1',{exact:true})).toHaveValue('One Two');await expect(page.locator('main [data-translation-id]')).toHaveCount(1);
+});

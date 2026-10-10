@@ -12,7 +12,7 @@ import { selectIds } from './editor/editing-actions';
 import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { LyricCommand } from '../domain/lyric-commands';
-import type { LyricDocument, LyricWord } from '../domain/lyric-document';
+import type { LyricDocument, LyricWord, RomanizationContent } from '../domain/lyric-document';
 import { moveTimeline, resizeTimeline, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
 import { packIntervals } from '../domain/pack-intervals';
 import styles from './media.module.css';
@@ -48,6 +48,19 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     const order = allTargets.filter(item => item.kind === target.kind && (target.kind!=='romanization'||item.kind==='romanization'&&item.attachment===target.attachment) && (!shift || target.kind !== 'romanization' || item.kind === 'romanization' && item.trackId === target.trackId)).map(targetId);
     const ids = !shift && !toggle && previous?.ids.includes(id) ? previous.ids : selectIds(order, previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
     setSelection(targetSelection(target, ids, shift || toggle || previous?.ids.includes(id) ? previous?.anchorId ?? id : id));
+  };
+  const contentBar = (trackId: string, content: Extract<RomanizationContent,{kind:'plain'}>, attachment?: 'translation') => {
+    const previous=selection?.kind==='romanization-content'&&selection.attachment===attachment&&selection.trackId===trackId?selection:null;
+    const chooseContent=(shift=false,toggle=false)=>{
+      const tracks=attachment==='translation'?document.translationTracks:document.romanizationTracks;
+      const order=tracks.find(track=>track.id===trackId)!.contents.filter(item=>item.lineId===content.lineId).map(item=>item.id);
+      const ids=!shift&&!toggle&&previous?.ids.includes(content.id)?previous.ids:selectIds(order,previous?.ids??[],previous?.anchorId??content.id,content.id,shift,toggle);
+      setSelection({kind:'romanization-content',...(attachment?{attachment}:{}),lineId:content.lineId,trackId,contentId:content.id,ids,activeId:content.id,anchorId:shift||toggle||previous?.ids.includes(content.id)?previous?.anchorId??content.id:content.id});
+    };
+    return <span role="button" tabIndex={0} className={previous?.ids.includes(content.id)?styles.trackSelected:undefined} title={content.text} aria-pressed={!!previous?.ids.includes(content.id)} data-line-id={content.lineId} data-translation-id={attachment?content.id:undefined} data-romanization-content-id={!attachment?content.id:undefined}
+      onClick={event=>chooseContent(event.shiftKey,event.ctrlKey||event.metaKey)}
+      onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();chooseContent(event.shiftKey,event.ctrlKey||event.metaKey);}if(event.key==='ContextMenu'||event.shiftKey&&event.key==='F10'){event.preventDefault();event.stopPropagation();const rect=event.currentTarget.getBoundingClientRect();commands.current?.openContext(event.currentTarget,rect.left,rect.bottom);}}}
+      onContextMenu={event=>{event.preventDefault();event.stopPropagation();commands.current?.openContext(event.currentTarget,event.clientX,event.clientY);}}>{content.text}</span>;
   };
   const dragRef = useRef<Drag | null>(null);
   const { publish } = useContext(TimelineIndicatorContext);
@@ -226,8 +239,8 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
         <strong className={styles.groupLabel}>{label}</strong>
         {visible.word && renderTargets('词', targets.filter(target => target.kind === 'word'))}
         {visible.ruby && targets.some(target => target.kind === 'ruby') && renderTargets('注音', targets.filter(target => target.kind === 'ruby'))}
-        {visible.romanization && document.translationTracks.map((track,index)=>track.contents.filter(content=>content.lineId===item.id).map(content=>content.kind==='timed'?<div key={content.id} style={{display:'contents'}}>{renderTargets(`翻译 ${track.language??'未指定'} ${index+1}`,targets.filter(target=>target.kind==='romanization'&&target.attachment==='translation'&&target.contentId===content.id))}</div>:row(`${label} 翻译 ${index+1}`,<span data-line-id={item.id} data-translation-id={content.id} tabIndex={0} onClick={()=>setSelection({kind:'romanization-content',attachment:'translation',lineId:item.id,trackId:track.id,contentId:content.id,ids:[content.id],anchorId:content.id,activeId:content.id})} onContextMenu={event=>{event.preventDefault();event.stopPropagation();commands.current?.openContext(event.currentTarget,event.clientX,event.clientY);}}>{content.text}</span>)))}
-        {visible.romanization && document.romanizationTracks.map((track, index) => track.contents.filter(content => content.lineId === item.id).map(content => content.kind === 'plain' ? row(`${label} 音译 ${track.language ?? '未指定'} ${index + 1}`, <span title={content.text}>普通音译：{content.text}</span>) : <div key={content.id} style={{ display: 'contents' }}>
+        {visible.romanization && document.translationTracks.map((track,index)=>track.contents.filter(content=>content.lineId===item.id).map(content=>content.kind==='timed'?<div key={content.id} style={{display:'contents'}}>{renderTargets(`翻译 ${track.language??'未指定'} ${index+1}`,targets.filter(target=>target.kind==='romanization'&&target.attachment==='translation'&&target.contentId===content.id))}</div>:row(`${label} 翻译 ${index+1} ${content.id}`,contentBar(track.id,content,'translation'),[],1,`${label} 翻译 ${index+1}`)))}
+        {visible.romanization && document.romanizationTracks.map((track, index) => track.contents.filter(content => content.lineId === item.id).map(content => content.kind === 'plain' ? row(`${label} 音译 ${index+1} ${content.id}`,contentBar(track.id,content),[],1,`${label} 音译 ${track.language ?? '未指定'} ${index+1}`) : <div key={content.id} style={{ display: 'contents' }}>
           {renderTargets(`音译 ${track.language ?? '未指定'} ${index + 1}`, targets.filter(target => target.kind === 'romanization' && target.contentId === content.id))}
           {content.units.some(unit => unit.beginMs === null || unit.endMs === null) && <button data-role="inline" onClick={() => setSelection({ kind: 'romanization-content', lineId: item.id, trackId: track.id, contentId: content.id, ids: [content.id], anchorId: content.id, activeId: content.id })}>未定时音译：在画布补充时间</button>}
         </div>))}

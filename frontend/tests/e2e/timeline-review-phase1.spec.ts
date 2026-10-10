@@ -25,7 +25,7 @@ test('shared multi-line and child selection, envelope capture, independent roman
  await expect(page.getByRole('button', { name: '时间轴词 背景', exact: true })).toBeVisible();
  await expect(page.getByRole('button', { name: '时间轴词 甲', exact: true })).toHaveCount(0);
 });
-test('timed romanization drag preserves body and translation; translation fields preserve units and clear lyric selection', async ({page}) => {
+test('timed romanization drag preserves body and translation; translation fields preserve units and select their independent timed objects', async ({page}) => {
  await setup(page);
  await page.getByLabel('吸附', { exact: true }).uncheck();
  const roman = page.getByRole('button', { name: /^时间轴音译/ }).first();
@@ -40,7 +40,7 @@ test('timed romanization drag preserves body and translation; translation fields
  expect((await roman.boundingBox())!.x).toBeCloseTo(before.x, 0);
  const text = page.getByRole('textbox',{name:'翻译 1 单元 1',exact:true});
  await text.fill(' 新譯文 '); await text.press('Enter');
- await expect(page.getByRole('button',{name:'循环选区',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'循环选区',exact:true})).toBeEnabled();
  await expect(text).toHaveValue(' 新譯文 ');
  await page.getByRole('button',{name:'撤销',exact:true}).click();
  await expect(text).toHaveValue(' 譯文 ');
@@ -104,6 +104,6 @@ test('romanization selection across contents disables partial copy and deletes a
  await roman.first().click();await roman.last().click({modifiers:['Shift']});
  await expect(page.getByText('音译单元已选 2',{exact:true})).toBeVisible();
  await roman.first().click({button:'right'});await expect(page.getByRole('menuitem',{name:'复制',exact:true})).toBeDisabled();
- await page.getByRole('menuitem',{name:'删除所选对象',exact:true}).click();await expect(roman).toHaveCount(0);
+ await page.getByRole('menuitem',{name:/删除所选单元/}).click();await expect(roman).toHaveCount(0);
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(roman).toHaveCount(2);
 });
