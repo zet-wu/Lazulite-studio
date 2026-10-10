@@ -3,8 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import inspect
-from importlib.metadata import version, PackageNotFoundError
 import shutil
 from dataclasses import asdict
 from pathlib import Path
@@ -55,7 +53,7 @@ class VocalRunner:
         directory = self.root / project_id / 'vocals' / result_id
         directory.mkdir(parents=True, exist_ok=True)
         vocal_path = directory / 'vocals.wav'
-        signature = self.separation_signature(params['asset_id'], params['model_name'], params['device'])
+        settings = self.generation_settings(params['asset_id'], params['model_name'], params['device'])
         reuse = None
         if params.get('retry_analysis_id'):
             row, candidate = self.get(project_id, params['retry_analysis_id'])
@@ -66,7 +64,7 @@ class VocalRunner:
                 rows = c.execute('SELECT * FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id, params['asset_id'])).fetchall()
             for row in rows:
                 candidate = json.loads(row['metadata_json'])
-                if candidate['separation_signature'] == signature and self.audio_available(project_id, candidate):
+                if candidate['generation_settings'] == settings and self.audio_available(project_id, candidate):
                     reuse = (row, candidate)
                     break
         if reuse:
@@ -88,13 +86,7 @@ class VocalRunner:
                 separator = self.separator_factory() if self.separator_factory else DemucsSeparator(DemucsConfig(model_name=params['model_name'], device=params['device']))
                 audio = decode_audio(asset_path, sample_rate=44100, channels=2)
                 vocals = separator.separate(audio)
-                # The actual loaded weights, not an unverified caller-supplied label.
-                if hasattr(separator, '_model'):
-                    digest = hashlib.sha256()
-                    for key, tensor in sorted(separator._model.state_dict().items()):
-                        digest.update(key.encode()); digest.update(tensor.detach().cpu().numpy().tobytes())
-                    identity = {'model': params['model_name'], 'weights_sha256': digest.hexdigest(), 'config': asdict(separator.config)}
-                else: identity = separator.cache_identity
+                description = {'model': params['model_name'], 'config': asdict(separator.config)}
             except (ImportError, RuntimeError) as exc:
                 raise EngineUnavailable(f'人声分离不可用：{exc}') from exc
             finally:
@@ -104,12 +96,12 @@ class VocalRunner:
             gain = min(1.0, (1 - 2 ** -15) / peak) if peak else 1.0
             # Multiply in float64 so rounding cannot push the positive peak to 1.
             sf.write(str(vocal_path), vocals.samples.T.astype(np.float64) * gain, vocals.sample_rate, format='WAV', subtype='PCM_16')
-            metadata = {'id': result_id, 'source_asset_id': params['asset_id'], 'model': identity,
+            metadata = {'id': result_id, 'source_asset_id': params['asset_id'], 'model': description,
                         'gain': gain, 'peak_before_gain': peak, 'sample_rate': vocals.sample_rate,
                         'channels': vocals.samples.shape[0], 'frames': vocals.samples.shape[1],
                         'duration_ms': milliseconds(vocals.duration), 'format': 'WAV PCM_16',
-                        'quantization': 'float to signed 16-bit PCM', 'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'analysis_source_sha256': hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
-            metadata.update(audio_result_id=result_id, separation_signature=signature, audio_sha256=self.file_hash(vocal_path))
+                        'quantization': 'float to signed 16-bit PCM', 'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
+            metadata.update(audio_result_id=result_id, generation_settings=settings, audio_sha256=self.file_hash(vocal_path))
             with self.db.transaction() as c:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', str(directory), json.dumps(metadata)))
             del audio, vocals
@@ -117,7 +109,7 @@ class VocalRunner:
         emit('stage', 'analyzing', None, None, '正在分析持久人声的能量与核心片段')
         samples, rate = sf.read(str(vocal_path), dtype='float32', always_2d=True)
         audio = AudioBuffer(samples.T, rate, params['asset_id'])
-        metadata.update(analysis_source_sha256=hashlib.sha256(Path(__import__('inspect').getfile(analyze_vocals)).read_bytes()).hexdigest(), analysis_version='lazulite-vocal-core-v2-main-rms', runtime={'numpy': np.__version__, 'soundfile': sf.__version__, 'scipy': scipy.__version__})
+        metadata.update(analysis_version='lazulite-vocal-core-v2-main-rms', runtime={'numpy': np.__version__, 'soundfile': sf.__version__, 'scipy': scipy.__version__})
         config = VocalConfig()
         analysis = analyze_vocals(audio, config=config)
         # Public Lazulite profile: centered frames of its main-vocal signal.
@@ -143,26 +135,12 @@ class VocalRunner:
         with Path(path).open('rb') as source:
             return hashlib.file_digest(source, 'sha256').hexdigest()
 
-    def separation_signature(self, asset_id, model_name=None, device=None):
-        from lazulite.audio import io, separation
+    def generation_settings(self, asset_id, model_name=None, device=None):
         from lazulite.audio.separation import DemucsConfig
-        config = asdict(DemucsConfig(model_name=model_name or os.getenv('STUDIO_VOCAL_MODEL', 'htdemucs'), device=device or os.getenv('STUDIO_VOCAL_DEVICE', 'cpu')))
-        with self.db.connect() as c:
-            source_hash = c.execute('SELECT sha256 FROM assets WHERE id=?', (asset_id,)).fetchone()[0]
-        # The fixed model catalogue is versioned with Demucs. Record loaded weight
-        # hashes separately for provenance; analysis source changes do not invalidate audio.
-        identity = {'source': source_hash, 'config': config, 'pcm_pipeline': 'demucs-44100-stereo-f32-wav-pcm16-v2',
-                    'implementation': [self.file_hash(inspect.getfile(module)) for module in (io, separation)]}
-        if self.separator_factory:
-            separator = self.separator_factory()
-            try: identity['separator'] = separator.cache_identity
-            finally: separator.close()
-        else:
-            identity['runtime'] = {}
-            for name in ('demucs', 'torch', 'soundfile'):
-                try: identity['runtime'][name] = version(name)
-                except PackageNotFoundError: identity['runtime'][name] = None
-        return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+        config=asdict(DemucsConfig(model_name=model_name or os.getenv('STUDIO_VOCAL_MODEL','htdemucs'),
+                                 device=device or os.getenv('STUDIO_VOCAL_DEVICE','cpu')))
+        return {'source_asset_id':asset_id,'config':config,'audio_format':'WAV PCM_16',
+                'generation_recipe':'demucs-44100-stereo-v1'}
 
     def audio_path(self, project_id, metadata):
         owner, _ = self.get(project_id, metadata['audio_result_id'])

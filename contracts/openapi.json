@@ -3384,9 +3384,6 @@
           "analysis_version": {
             "type": "string"
           },
-          "analysis_source_sha256": {
-            "type": "string"
-          },
           "runtime": {
             "type": "object",
             "additionalProperties": {

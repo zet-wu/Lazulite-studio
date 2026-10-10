@@ -1035,7 +1035,6 @@ export interface components {
                 [key: string]: unknown;
             };
             analysis_version: string;
-            analysis_source_sha256?: string;
             runtime?: {
                 [key: string]: string;
             };

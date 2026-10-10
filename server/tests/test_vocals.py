@@ -11,7 +11,8 @@ from server.revisions import RevisionStore
 from server.tests.media_fixture import add_media_project
 
 class Separator:
-    cache_identity = {'model': 'test-only', 'weights_sha256': 'test-weights'}
+    from lazulite.audio.separation import DemucsConfig
+    config = DemucsConfig(model_name='test-only', device='cpu')
     def separate(self, audio):
         from lazulite.models.audio import AudioBuffer
         samples = np.zeros((2, round(audio.duration * 44100)), dtype=np.float32)
@@ -257,7 +258,7 @@ def test_restart_keeps_shared_audio_and_project_deletion_releases_it(tmp_path):
     for result_id in (first, second):
         _, metadata = runner.get('p',result_id)
         assert metadata['audio_result_id'] == first
-        assert metadata['separation_signature'] and metadata['audio_sha256']
+        assert metadata['generation_settings'] and metadata['audio_sha256']
         assert runner.audio_path('p',metadata) == tmp_path/'projects'/'p'/'vocals'/first/'vocals.wav'
         assert runner.audio_available('p', metadata)
     assert before == {str(p): p.read_bytes() for p in (tmp_path/'projects').rglob('*') if p.is_file()}

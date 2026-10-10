@@ -14,13 +14,13 @@ def build_vocal_router(runner, *, auth, project_exists):
             rows = c.execute('SELECT id,status,metadata_json FROM vocal_results WHERE project_id=? ORDER BY rowid DESC', (pid,)).fetchall()
         import json
         items = []
-        signatures = {}
+        settings = {}
         for row in rows:
             metadata = json.loads(row['metadata_json'])
             asset_id = metadata['source_asset_id']
-            if asset_id not in signatures: signatures[asset_id] = runner.separation_signature(asset_id)
+            if asset_id not in settings: settings[asset_id] = runner.generation_settings(asset_id)
             available = runner.audio_available(pid, metadata)
-            state = 'missing' if not available else 'current' if metadata['separation_signature'] == signatures[asset_id] else 'outdated'
+            state = 'missing' if not available else 'current' if metadata['generation_settings'] == settings[asset_id] else 'outdated'
             items.append({**metadata, 'status': row['status'], 'audio_id': metadata['audio_result_id'], 'audio_state': state})
         return {'items': items}
 
