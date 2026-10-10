@@ -24,11 +24,11 @@ FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针和�
 人声窗口读取复用持久结果中的时长、采样率、声道和已知 WAV 格式，不逐请求执行 ffprobe。能量继续从 mmap 数组读取窗口，使用 NumPy 分组最大值聚合，保持原窗口采样语义。开发启动器分别探测 API 和 Vite，记录失败原因、耗时和恢复；启动期限 20 秒，运行期同一端点持续失败 30 秒才关闭进程树，子进程退出仍触发清理。
 
 
-当前 Lazulite 接入使用 `VocalConfig.frame_length/hop_length`。`analyze_vocals` 返回核心片段及诊断，另由公开的 `build_activity_profile` 获取 `main_rms` 保存为能量：它采用主人声提取和居中取帧，但不做额外时间平滑；不能与默认约 100ms 平滑的 `activity` 或进一步约 400ms 平滑的 `split_activity` 混称。新结果版本 `lazulite-vocal-core-v2-main-rms` 记录当前配置、源码哈希和 SciPy 版本；重分析不原地覆盖旧产物。
+当前 Lazulite 接入使用 `VocalConfig.frame_length/hop_length`。`analyze_vocals` 返回核心片段及诊断，另由公开的 `build_activity_profile` 获取 `main_rms` 保存为能量：它采用主人声提取和居中取帧，但不做额外时间平滑；不能与默认约 100ms 平滑的 `activity` 或进一步约 400ms 平滑的 `split_activity` 混称。新结果版本 `lazulite-vocal-core-v2-main-rms` 记录当前配置、分析语义版本和运行库描述；重分析不原地覆盖旧产物。
 
-人声复用按源资产内容哈希、固定模型配置、Lazulite 分离/解码源码、Demucs/Torch/SoundFile 版本及 PCM 保存版本签名匹配；实际加载权重哈希继续记录在 model 元数据。仅分析源码变化不失效音频。文件完整性按大小/时间戳缓存 SHA256 检查，缺失或损坏允许重新生成；明确重分析指定的历史人声不强制升级模型。默认固定模型按已安装 Demucs 模型目录版本识别，不承诺检测版本不变的私自权重替换。
+人声复用比较 Studio 管理的 `generation_settings`：源资产 ID、实际 Demucs 配置和音频生成规则。模型描述记录公开配置，文件完整性继续使用音频 SHA256；不读取模型私有张量或源码散列。文件缺失或损坏允许重新生成；明确重分析指定的人声继续使用对应完整音频。模型内容原地修改后的重新生成由调用方管理。
 
-音频所有者在自己的结果目录保存一份 WAV，每条分析记录都必须提供 audio_result_id：首次分离引用自身，重分析直接引用原音频所有者。separation_signature 与 audio_sha256 同样必填，不为缺失字段提供旧数据回退。播放、下载及波形缓存统一解析所有者，能量仍按 analysis_id 读取。结果列表附 audio_id 与 audio_state，界面仅暴露当前源的一个人声。启动只清理未注册临时目录，不迁移、合并或改写注册结果；保留所有注册分析和不同内容的音频，避免破坏已保存修订、未保存撤销历史及任务接入。项目删除统一释放它们，不执行无法获知浏览器历史的运行期分析回收。
+音频所有者在自己的结果目录保存一份 WAV，每条分析记录都必须提供 audio_result_id：首次分离引用自身，重分析直接引用原音频所有者。generation_settings 与 audio_sha256 同样必填，不为缺失字段提供旧数据回退。播放、下载及波形缓存统一解析所有者，能量仍按 analysis_id 读取。结果列表附 audio_id 与 audio_state，界面仅暴露当前源的一个人声。启动只清理未注册临时目录，不迁移、合并或改写注册结果；保留所有注册分析和不同内容的音频，避免破坏已保存修订、未保存撤销历史及任务接入。项目删除统一释放它们，不执行无法获知浏览器历史的运行期分析回收。
 
 `POST /api/v1/reading/analyze` 接受 `lines: [{id,text}]` 当前文本快照，沿用会话及写请求来源校验，不创建项目、修订或任务。返回原始 code point 范围、正文及平假名读音；未覆盖范围显式为空，服务不可用返回 503。Sudachi 共用 tokenizer 通过互斥锁序列化分词调用，后续映射不持锁。旧读音任务与项目词典接口已移除。
 
@@ -44,11 +44,11 @@ FastAPI 同源 API，SQLite 管理项目、项目资源索引、修订指针和�
 
 AMLL 兼容设置和显示顺序在项目快照中保存；`amll_compatibility.py` 在持久化边界检查五项限制、简化联动和排布引用。TTML 的词级歌手和多个独立背景由文档验证器接受；Ruby 内部独立歌手仍明确拒绝。新项目使用限制默认值，不迁移旧快照。
 
-自动对齐依赖固定为 `vendor/lazulite/lazulite-0.2.1-py3-none-any.whl`（散列见同目录 `SHA256SUMS`），不再 editable 引用并列旧仓库。从仓库根目录安装 `server/requirements.txt`。模型运行依赖和 NextFire 路径由服务配置管理，歌词获取与媒体基础能力不加载模型。
+自动对齐依赖固定为 `vendor/lazulite/lazulite-0.3.0-py3-none-any.whl`（散列见同目录 `SHA256SUMS`），不再 editable 引用并列旧仓库。从仓库根目录安装 `server/requirements.txt`。模型运行依赖和 NextFire 路径由服务配置管理，歌词获取与媒体基础能力不加载模型。
 
-自动对齐由 `alignment_projection.py` 从已保存项目构造全局请求，`alignment.py` 校验当前 revision／源音频身份并准备资源，`alignment_worker.py` 在受监管子进程执行固定 NextFire 路线。配置 `STUDIO_NEXTFIRE_PATH` 指向交付模型目录，`STUDIO_ALIGNMENT_DEVICE` 为 `cpu` 或 `cuda`；分离保持 `htdemucs`，设备由 `STUDIO_VOCAL_DEVICE` 配置。`server/requirements-alignment.txt` 引用本轮 Linux CUDA 实测依赖约束；其他平台应选择相容的 Torch 设备构建并单独验证。模型散列由 Lazulite 固定校验。
+自动对齐由 `alignment_projection.py` 从已保存项目构造全局请求，`alignment.py` 校验当前 revision／源音频身份并准备资源，`alignment_worker.py` 在受监管子进程执行独立日语 CTC 路线。配置 `STUDIO_NEXTFIRE_PATH` 指向交付模型目录，`STUDIO_ALIGNMENT_DEVICE` 为 `cpu` 或 `cuda`；分离保持 `htdemucs`，设备由 `STUDIO_VOCAL_DEVICE` 配置。`server/requirements-alignment.txt` 引用本轮 Linux CUDA 实测依赖约束；其他平台应选择相容的 Torch 设备构建并单独验证。所选 Wav2Vec2 CTC 适配器仅读小型配置检查可用性；词表、blank、采样率与帧映射由模型配置提供。每次任务使用完整人声和明确的自动分析／人工片段，声学结果仅在任务内使用，不读写对齐缓存；修改后的兼容模型按当前路径加载。已选人声校验项目资产、资源关联和实际时长，不以当前生成设置拒绝人工片段。
 
-HTTP 提供只读 `alignment-preview?revision=…` 和内部 `jobs/alignment`，只接受 revision、use_hints 和默认关闭的 line_blank／rest_blank／rest_token 布尔开关，以及 Studio 合并策略 clear_unmatched、merge_short_gaps 与正安全整数 gap_threshold_ms（默认 500，合并关闭时规范化为 500）；任务固定所选组合，仅三个实验代价和行首选项传入 Lazulite 0.2.1；路径、模型与输出位置均由服务构造。任务与人声互斥、支持幂等启动和取消，结果保留原始／建议时间及映射，服务不自动改稿。当前页面持有一次应用意图。旧转写／行级／forced／读音任务、项目词典与审核路由已删除；`/reading/analyze` 保留主动注音能力。
+HTTP 提供只读 `alignment-preview?revision=…` 和内部 `jobs/alignment`，只接受 revision、use_hints 和默认关闭的 line_blank／rest_blank／rest_token 布尔开关，以及 Studio 合并策略 clear_unmatched、merge_short_gaps 与正安全整数 gap_threshold_ms（默认 500，合并关闭时规范化为 500）；任务固定所选组合，仅三个实验代价和行首选项传入 Lazulite 0.3.0；路径、模型与输出位置均由服务构造。任务与人声互斥、支持幂等启动和取消，结果保留原始／建议时间及映射，服务不自动改稿。当前页面持有一次应用意图。旧转写／行级／forced／读音任务、项目词典与审核路由已删除；`/reading/analyze` 保留主动注音能力。
 
 `scope` 枚举未跳过行中的全部正文／Ruby 叶对象及其确定的 target_ids，区分正常省略与丢失模型结果。服务校验完整目标后返回；前端按启动快照再次核对范围，清空开启时重算父包络。清空仅修改 Studio 时间，不传入声学配置或改变声学缓存。
 

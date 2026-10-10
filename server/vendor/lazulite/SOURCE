@@ -1,3 +1,3 @@
-Lazulite dev 302e11f
-Version: 0.2.1
-Build: python -m pip wheel ../Lazulite --no-deps
+Lazulite dev 15cf123
+Version: 0.3.0
+Build: python -m build (wheel built from sdist)
