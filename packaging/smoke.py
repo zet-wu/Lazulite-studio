@@ -13,6 +13,14 @@ import urllib.request
 import urllib.error
 
 
+def launcher_command(launcher):
+    # The caller runs in launcher.parent. Avoid cmd /c stripping the outer
+    # quotes from an absolute batch path containing spaces and shell operators.
+    if os.name == 'nt':
+        return [os.environ.get('COMSPEC', 'cmd.exe'), '/d', '/c', launcher.name, '--no-browser']
+    return [str(launcher), '--no-browser']
+
+
 def smoke(root, python=None):
     root = Path(root).resolve()
     python = Path(python).absolute() if python else root / ('runtime/python/python.exe' if os.name == 'nt' else 'runtime/python/bin/python3')
@@ -42,7 +50,7 @@ def smoke(root, python=None):
             wrong = urllib.request.Request(origin + '/api/v1/projects', data=b'{"name":"forbidden"}', headers={'Content-Type':'application/json','Origin':'https://evil.test'})
             try: opener.open(wrong); raise AssertionError('external origin allowed')
             except urllib.error.HTTPError as error: assert error.code == 403
-            duplicate_command = ([os.environ.get('COMSPEC', 'cmd.exe'), '/d', '/c', str(launcher), '--no-browser'] if os.name == 'nt' else [str(launcher), '--no-browser']) if launcher.is_file() else command
+            duplicate_command = launcher_command(launcher) if launcher.is_file() else command
             duplicate = subprocess.run(duplicate_command, cwd=root if launcher.is_file() else root / 'app', capture_output=True, text=True, encoding='utf-8', timeout=30)
             assert duplicate.returncode == 0, duplicate.stderr
             with opener.open(origin + '/api/v1/runtime') as response: assert json.load(response)['nonce'] == identity['nonce']
