@@ -25,7 +25,7 @@ FastAPI 提供同源 `/api/v1` API，SQLite 管理项目、资源索引、修订
 
 ## 模型与媒体
 
-Lazulite 0.3.0 wheel 位于 `vendor/lazulite`，基础安装从仓库根目录读取 requirements。`STUDIO_VOCAL_MODEL` 默认 `htdemucs`，`STUDIO_VOCAL_DEVICE` 默认 `cpu`；自动对齐首次分离使用 `htdemucs`。`STUDIO_NEXTFIRE_PATH` 提供本地 Wav2Vec2 CTC 模型目录，`STUDIO_ALIGNMENT_DEVICE` 默认 `cpu`。模型可用性检查读取配置，计算由任务子进程执行。
+Lazulite 源码位于仓库根目录的固定 Git 子模块 `vendor/Lazulite`，基础安装从仓库根目录读取 requirements。`STUDIO_VOCAL_MODEL` 默认 `htdemucs`，`STUDIO_VOCAL_DEVICE` 默认 `cpu`；自动对齐首次分离使用 `htdemucs`。`STUDIO_NEXTFIRE_PATH` 提供本地 Wav2Vec2 CTC 模型目录，`STUDIO_ALIGNMENT_DEVICE` 默认 `cpu`。模型可用性检查读取配置，计算由任务子进程执行。
 
 人声以 44.1 kHz 双声道 float32 输入 Demucs，按整曲峰值处理后保存一份 PCM_16 WAV；分析重读此文件，能量保存 `main_rms`，核心片段和配置保存于独立分析记录。每条记录以 `audio_result_id` 引用音频所有者，重分析复用 WAV。访问及复用通过 WAV 格式、位深、实际帧数、采样率与声道检查可用性，音频所有者 ID 管理持久资源身份；复用条件由源资产、公开配置及生成规则决定。已注册分析与音频保留至项目删除。
 

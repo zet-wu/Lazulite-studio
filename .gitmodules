@@ -1,0 +1,3 @@
+[submodule "vendor/Lazulite"]
+	path = vendor/Lazulite
+	url = https://github.com/wuchenyanmo/Lazulite.git

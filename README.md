@@ -54,12 +54,12 @@ Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 
 
 ### 环境
 
-- Python 3.12 或更高版本：随包 Lazulite wheel 的 `Requires-Python` 为 `>=3.12`。
+- Python 3.12 或更高版本：Lazulite 子模块 的 `Requires-Python` 为 `>=3.12`。
 - Node.js 22.22.2：与仓库 `.node-version` 一致。
 - pnpm 10.30.3：与 `frontend/package.json` 的 `packageManager` 一致。可用 Corepack 执行 `corepack pnpm@10.30.3` 代替下列 `pnpm`。
 - FFmpeg 和 FFprobe：可从服务进程的 PATH 调用，负责媒体探测、解码及打包校验。
 
-以下命令从 LazuliteStudio 仓库根目录运行。基础服务使用仓库内的 Lazulite 0.3.0 wheel，项目可独立检出与安装。
+以下命令从 LazuliteStudio 仓库根目录运行。基础服务从固定的 `vendor/Lazulite` Git 子模块构建安装。首次克隆使用 `git clone --recurse-submodules`；已有检出先运行 `git submodule update --init --recursive`。
 
 ### 安装基础依赖
 
