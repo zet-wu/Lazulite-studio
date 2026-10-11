@@ -81,17 +81,16 @@ jobs:
       - name: Assemble and verify relocated distribution
         shell: bash
         run: python packaging/build.py --target '${{ matrix.target }}' --output "$BUILD_OUTPUT"
-      - name: Upload verified preview components
-        uses: actions/upload-artifact@v4
+      - name: Upload verified portable ZIP
+        uses: actions/upload-artifact@v7
         with:
-          name: LazuliteStudio-${{ matrix.target }}-${{ github.sha }}
-          path: ${{ env.BUILD_OUTPUT }}/artifacts/*
+          path: ${{ env.BUILD_OUTPUT }}/artifacts/LazuliteStudio-${{ matrix.target }}.zip
+          archive: false
           if-no-files-found: error
-          compression-level: 0
           retention-days: 14
       - name: Upload build diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: diagnostics-${{ matrix.target }}-${{ github.run_attempt }}
           path: |

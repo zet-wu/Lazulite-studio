@@ -28,7 +28,7 @@ def smoke(root, python=None):
     command = [str(python), '-E', '-s', '-X', 'utf8', '-m', 'server.portable', '--root', str(root), '--no-browser']
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     flags = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
-    launcher = root / ('启动.bat' if os.name == 'nt' else '启动.command')
+    launcher = root / ('start.bat' if os.name == 'nt' else 'start.command')
     with log.open('w', encoding='utf-8') as output:
         process = subprocess.Popen(command, cwd=root / 'app', stdout=output, stderr=subprocess.STDOUT, **flags)
         try:

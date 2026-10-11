@@ -51,27 +51,27 @@ def test_tar_rejects_escaping_symlink(tmp_path):
         extract(archive, tmp_path / 'out')
 
 
-def test_components_are_independent_and_reconstruct_all_files(tmp_path):
-    root = tmp_path / 'Studio 中文'
-    for path in ('app/a', 'runtime/python/a', 'runtime/python/b', 'models/a'):
+def test_single_zip_reconstructs_complete_folder_and_permissions(tmp_path):
+    root = tmp_path / 'LazuliteStudio-macos-arm64'
+    for path in ('app/a', 'runtime/python/a', 'runtime/python/b', 'models/a', 'start.command'):
         file = root / path
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_bytes(os.urandom(12000))
-    (root / 'app/a').chmod(0o755)
-    archives = package(root, tmp_path / 'archives', limit=21000)
-    assert len(archives) == 4
-    for archive in archives:
-        assert zipfile.is_zipfile(archive)
-        assert archive.stat().st_size < 21000
-        extract(archive, tmp_path / 'extracted')
+    (root / 'start.command').chmod(0o755)
+    archive = package(root, tmp_path / 'archives')
+    assert list((tmp_path / 'archives').iterdir()) == [archive]
+    with zipfile.ZipFile(archive) as source:
+        assert all(name.startswith(root.name + '/') for name in source.namelist())
+        assert not any(name.endswith('.zip') for name in source.namelist())
+    extract(archive, tmp_path / 'extracted')
     for file in root.rglob('*'):
         if file.is_file():
             relocated = tmp_path / 'extracted' / root.name / file.relative_to(root)
             assert digest(relocated) == digest(file)
     if os.name != 'nt':
-        assert (tmp_path / 'extracted' / root.name / 'app/a').stat().st_mode & 0o111
+        assert (tmp_path / 'extracted' / root.name / 'start.command').stat().st_mode & 0o111
     with pytest.raises(ValueError, match='重复'):
-        extract(archives[0], tmp_path / 'extracted')
+        extract(archive, tmp_path / 'extracted')
 
 
 def test_small_package_uses_one_zip(tmp_path):
@@ -79,4 +79,4 @@ def test_small_package_uses_one_zip(tmp_path):
     root.mkdir()
     (root / 'manifest.json').write_text('{}')
     result = package(root, tmp_path / 'out')
-    assert [p.name for p in result] == ['Studio.zip']
+    assert result.name == 'Studio.zip'

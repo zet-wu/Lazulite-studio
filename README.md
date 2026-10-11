@@ -179,7 +179,7 @@ python packaging/build.py --target windows-x64-cpu --output /path/outside/repo/p
 
 构建解释器固定为 `build_python_version`（3.12.10，来自 setup-python 支持矩阵）；随包解释器独立固定为 `python_version`（PBS 3.12.15）。两者共用 CPython 3.12 ABI，随包解释器仍须独立执行安装和冒烟检查。
 
-`target` 可选 `windows-x64-cpu`、`windows-x64-cuda`、`macos-arm64`；输出必须为仓库外的空目录，输入检出必须干净。Windows 构建机需有创建临时防火墙规则的管理员权限且防火墙开启；Mac 使用系统 sandbox-exec。网络隔离仅用于构建时的模型冒烟。构建入口解析完整依赖、构建前端、组装独立运行时和本地模型，检查许可、原生导入与架构，生成 ZIP 后移到中文／空格／特殊字符路径解包验证。通过后 `artifacts/` 包含 ZIP、SHA256SUMS、使用说明和 validation.json；失败保留 build.log，不提供未通过冒烟的 ZIP。超过大小上限时生成多个可独立解压的组件，全部解压到同一目录即为完整包。
+`target` 可选 `windows-x64-cpu`、`windows-x64-cuda`、`macos-arm64`；输出必须为仓库外的空目录，输入检出必须干净。Windows 构建机需有创建临时防火墙规则的管理员权限且防火墙开启；Mac 使用系统 sandbox-exec。网络隔离仅用于构建时的模型冒烟。构建入口解析完整依赖、构建前端、组装独立运行时和本地模型，检查许可、原生导入与架构，生成 ZIP 后移到中文／空格／特殊字符路径解包验证。通过后 `artifacts/` 仅包含一个完整 ZIP（CUDA 也不拆分），文件名和顶层目录为 `LazuliteStudio-<target>`，不含提交哈希。Actions 使用 `actions/upload-artifact@v7` 的 `archive: false` 原样上传 ZIP，下载后只需解压一次，保留 Mac 可执行权限。Windows 使用 `start.bat`，Mac 使用 `start.command`；包内 `USAGE.txt` 从 `packaging/USAGE.txt` 原样复制，可直接在仓库中编辑。用户包不包含 `files.json` 或 `SHA256SUMS`；构建下载、模型与迁移完整性校验仍执行，文件清单和 `validation.json` 仅写入独立 `diagnostics/`。版本与资源集合身份仍保留在 `manifest.json` 中。失败保留 build.log，不提供未通过冒烟的 ZIP。此输出面向 Actions 工件；CUDA 完整 ZIP 超过 GitHub Release 单附件上限，不能直接作为单个 Release 附件上传。
 
 GitHub Actions 的 **Build portable previews** 支持手动选择一个目标或全部目标。三平台任务独立执行，只上传通过验证的预览包，并单独保留诊断工件。流水线不创建 Release。标准 runner 的 CPU 冒烟不代表 CUDA／MPS、最低系统版本或 Gatekeeper 真机验收。
 

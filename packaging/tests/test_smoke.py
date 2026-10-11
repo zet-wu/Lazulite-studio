@@ -13,7 +13,7 @@ from smoke import launcher_command
 def test_batch_launcher_in_relocated_directory(tmp_path):
     root = tmp_path / '解包 测试 (portable) & relocation'
     root.mkdir()
-    launcher = root / '启动.bat'
+    launcher = root / 'start.bat'
     launcher.write_text('@echo off\nchcp 65001 >nul\necho "%~dp0"\necho %~1\n', encoding='utf-8')
     result = subprocess.run(launcher_command(launcher), cwd=root,
                             capture_output=True, encoding='utf-8', timeout=10)

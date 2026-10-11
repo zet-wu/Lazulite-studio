@@ -218,7 +218,7 @@ def build(target, output):
         if path.is_file():
             shutil.copy2(path, diagnostics / path.name)
     shutil.rmtree(dependencies / 'verification')
-    root = work / f'LazuliteStudio-{target}-{commit[:12]}'
+    root = work / f'LazuliteStudio-{target}'
     root.mkdir()
     pnpm = frontend(root, runtime)
     (root / 'app/server').mkdir(parents=True)
@@ -256,7 +256,7 @@ def build(target, output):
     shutil.copy2(ROOT / 'packaging/models.json', root / 'licenses/models.json')
     shutil.copy2(ROOT / 'packaging/runtime-manifest.json', root / 'licenses/runtime-sources.json')
     shutil.copy2(dependencies / (target + '.txt'), root / 'licenses/dependencies.txt')
-    launcher = '启动.bat' if os.name == 'nt' else '启动.command'
+    launcher = 'start.bat' if os.name == 'nt' else 'start.command'
     shutil.copy2(ROOT / 'packaging/launchers' / launcher, root / launcher)
     if os.name != 'nt':
         (root / launcher).chmod(0o755)
@@ -264,37 +264,24 @@ def build(target, output):
                 'target':target, 'database_version':5, 'runtime_set_id':hashlib.sha256((json.dumps(spec, sort_keys=True) + digest(dependencies / (target + '.txt'))).encode()).hexdigest(),
                 'model_set_id':digest(ROOT / 'packaging/models.json'), 'python':runtime['python_version'],
                 'build_python':platform.python_version(),
-                'validation':'preview; see adjacent validation.json for this artifact run',
+                'validation':'preview; see the separate build diagnostics artifact for validation.json',
                 'unverified':['minimum Windows/macOS version', 'CUDA/MPS hardware', 'full-song quality',
                               'Gatekeeper/download quarantine', 'interactive terminal close']}
     write_json(root / 'manifest.json', manifest)
-    (root / '使用说明.txt').write_text(
-        f'Lazulite Studio 预览版 {commit[:12]}（{target}）\n'
-        '将本版本全部 ZIP 解压到同一位置，保持同名顶层目录合并。不要直接在压缩包内运行。\n'
-        f'双击 {launcher}；保留终端窗口，浏览器会在服务就绪后打开。Ctrl+C 停止服务。\n'
-        '新建项目、导入音频、编辑保存并重开；然后试用分离、日语对齐，核对设置中的实际设备。\n'
-        '无需另装 Python、Node、FFmpeg、CUDA Toolkit 或在线下载模型；在线歌词搜索仍需要网络。\n'
-        'CUDA 版需要兼容 NVIDIA 驱动；GPU 不可用时可选择 CPU，计算失败不会自动重跑。\n'
-        'Mac 版未签名、未公证；首次打开可能受系统安全策略限制，请核对来源并按系统提示处理。\n'
-        'data 保存项目和设置，logs 保存日志。停服后可搬移整个目录。更新前备份 data，勿覆盖用户数据。\n'
-        '旧 v4 数据库不自动升级，请从旧版导出工程或使用显式迁移工具。\n'
-        '本包包含非商业许可的 NextFire 权重，请查阅 licenses/models.json 和模型说明。\n'
-        '最低系统版本、实际 GPU、整曲质量与关闭终端行为仍需真机反馈，详见下载旁的 validation.json。\n'
-        '反馈请注明系统 build、设备、驱动、内存、包版本和复现步骤；日志由你自行发送，不自动上传。\n', encoding='utf-8')
+    shutil.copy2(ROOT / 'packaging/USAGE.txt', root / 'USAGE.txt')
     if target == 'macos-arm64':
         write_json(diagnostics / 'removed-host-rpaths.json', remove_unused_host_rpaths(root))
     write_json(diagnostics / 'native-audit.json', audit(root, target))
     files = [{'path':p.relative_to(root).as_posix(), 'size':p.stat().st_size, 'sha256':digest(p)}
              for p in sorted(root.rglob('*')) if p.is_file()]
-    write_json(root / 'files.json', files)
+    write_json(diagnostics / 'files.json', files)
     shutil.rmtree(dependencies)
     shutil.rmtree(downloads)
-    archives = package(root, artifacts)
+    archive = package(root, artifacts)
     name = root.name
     shutil.rmtree(root)
     relocated = work / '解包 测试 (portable) & relocation'
-    for path in archives:
-        extract(path, relocated)
+    extract(archive, relocated)
     root = relocated / name
     for item in files:
         path = root / item['path']
@@ -318,14 +305,12 @@ def build(target, output):
     run(offline, cwd=root / 'app', env=env)
     run([sys.executable, ROOT / 'packaging/smoke.py', '--root', root], cwd=work, env=env)
     shutil.copy2(root / 'smoke.log', diagnostics / 'launcher.log')
-    write_json(artifacts / 'validation.json', {**manifest, 'status':'native-relocated-cpu-smoke-passed',
+    write_json(diagnostics / 'validation.json', {**manifest, 'status':'native-relocated-cpu-smoke-passed',
                'checks':['pip check', 'native architecture/import audit', 'archive file hashes',
                          'Japanese/Chinese/media', 'local Demucs/NextFire CPU with OS network isolation and empty caches',
                          'local service/static/auth/duplicate launcher/graceful shutdown'],
                'network_scope':'Windows per-program outbound firewall rule / macOS sandbox-exec deny network; plus Python socket hook',
-               'archives':[{'file':p.name, 'size':p.stat().st_size, 'sha256':digest(p)} for p in archives]})
-    shutil.copy2(root / '使用说明.txt', artifacts / '使用说明.txt')
-    (artifacts / 'SHA256SUMS').write_text(''.join(f'{digest(p)}  {p.name}\n' for p in archives), encoding='utf-8')
+               'archives':[{'file':archive.name, 'size':archive.stat().st_size, 'sha256':digest(archive)}]})
     print('完整便携包已通过原生解包冒烟：', artifacts)
     shutil.rmtree(relocated)
 

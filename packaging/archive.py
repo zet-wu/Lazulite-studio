@@ -1,4 +1,4 @@
-"""Verified downloads and independently extractable portable ZIP components."""
+"""Verified downloads and a single portable ZIP per target."""
 import hashlib
 from pathlib import Path, PurePosixPath
 import shutil
@@ -6,10 +6,6 @@ import stat
 import tarfile
 import urllib.request
 import zipfile
-
-# Leave room below the per-file 2 GiB release limit, including ZIP headers.
-COMPONENT_LIMIT = 1900 * 1024 * 1024
-
 
 def digest(path):
     with Path(path).open('rb') as stream:
@@ -85,38 +81,10 @@ def write_zip(path, root, files):
                 shutil.copyfileobj(source, output)
 
 
-def package(root, output, limit=COMPONENT_LIMIT):
+def package(root, output):
     root, output = Path(root), Path(output)
     output.mkdir(parents=True, exist_ok=True)
     files = sorted(p for p in root.rglob('*') if p.is_file())
-    full = output / f'{root.name}.zip'
-    write_zip(full, root, files)
-    if full.stat().st_size < limit:
-        return [full]
-    full.unlink()
-    result = []
-    groups = {'app': [], 'runtime': [], 'models': []}
-    for file in files:
-        first = file.relative_to(root).parts[0]
-        groups[first if first in ('runtime', 'models') else 'app'].append(file)
-    for name, members in groups.items():
-        chunk, size, index = [], 0, 1
-        for file in members:
-            # Conservative raw-byte budget leaves headroom for incompressible files.
-            weight = file.stat().st_size + 4096
-            if weight >= limit:
-                raise ValueError(f'单一文件超过组件上限：{file.relative_to(root)}')
-            if chunk and size + weight >= limit:
-                path = output / f'{root.name}-{name}-{index}.zip'
-                write_zip(path, root, chunk)
-                result.append(path)
-                chunk, size, index = [], 0, index + 1
-            chunk.append(file)
-            size += weight
-        if chunk:
-            path = output / f'{root.name}-{name}-{index}.zip'
-            write_zip(path, root, chunk)
-            result.append(path)
-    if any(path.stat().st_size >= limit for path in result):
-        raise ValueError('压缩组件仍超限')
-    return result
+    archive = output / f'{root.name}.zip'
+    write_zip(archive, root, files)
+    return archive
