@@ -7,8 +7,9 @@
 </p>
 
 ---
+## 项目简介
 
-本项目受 [Apple Music-like Lyrics TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 、[StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame) 、[MiliKara](https://github.com/BilyHurington/MiliKara) 的启发，旨在提供一个 [AMLL TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 编辑能力的超集、以及主要针对日语歌词的自动化注音、对齐工具
+本项目受 [Apple Music-like Lyrics TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 、[StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame) 、[MiliKara](https://github.com/BilyHurington/MiliKara) 的启发，旨在提供一个 [AMLL TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 编辑能力的超集、以及主要针对日语歌词的自动化注音、对齐工具。
 
 ## 为什么使用TTML
 Lazulite Studio 使用 [TTML2](https://www.w3.org/TR/ttml2/) 格式作为内部歌词格式与主要交换格式，这是由于TTML2提供了一个标准且可扩展的歌词字幕模型，能够承载远超原始 LRC 和各类基于 LRC 的扩展格式的数据和结构，包括但不限于：
@@ -27,26 +28,54 @@ Lazulite Studio 使用 [TTML2](https://www.w3.org/TR/ttml2/) 格式作为内部�
 - 更丰富的注音（Ruby）容器与布局，如同时在上下显示注音（Ruby）
 - 引用外部图片资源
 
-Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML，这些格式都会不可避免地损失或多或少的信息
+Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML，这些格式都会不可避免地损失或多或少的信息。
 
-## 功能简介
+## 功能特性
 ### 歌词获取
-支持从网易、QQ、酷狗、AMLL TTML DB 四个在线源搜索和获取歌词，并能保留其提供的词级时间和音译/翻译行
+支持从网易、QQ、酷狗、AMLL TTML DB 四个在线源搜索和获取歌词，并能保留其提供的词级时间和音译/翻译行。
 
 ### 音频处理
-以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs)）、声学分析分片、人声能量与频谱图、日语歌曲自动对齐（默认基于 [NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn) 模型，该模型使用 CC-BY-NC-SA-4.0 协议，需注意商用限制）等功能
+以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) Python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs)）、声学分析分片、人声能量与频谱图、日语歌曲自动对齐（默认基于 [NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn) 模型，该模型使用 CC-BY-NC-SA-4.0 协议，需注意商用限制）等功能。
 
 ### 编辑与打轴
-简洁而功能强大的编辑与打轴界面，针对日语歌词提供多种自动化工具，涵盖假名注音和罗马字生成。打轴界面支持空拍、单行打轴、定位回听等功能
+简洁而功能强大的编辑与打轴界面，针对日语歌词提供多种自动化工具，涵盖假名注音和罗马字生成。打轴界面支持空拍、单行打轴、定位回听等功能。
 
 ### 文件打包
-支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC 
+支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC 。
 
 ### NicoKaraMaker 3 兼容
-支持导出能够输入到 [NicoKaraMaker 3](https://github.com/shinta0806/NicoKaraMaker3) 中的歌词文件，支持写入演唱者标记（借鉴自 [StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame)），支持分组文件输出，支持输出独立的翻译和音译轨道文件
+支持导出能够输入到 [NicoKaraMaker 3](https://github.com/shinta0806/NicoKaraMaker3) 中的歌词文件，支持写入演唱者标记（借鉴自 [StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame)），支持分组文件输出，支持输出独立的翻译和音译轨道文件。
 
 ### [Apple Music Like Lyric](https://github.com/amll-dev/applemusic-like-lyrics) 生态兼容
-Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 AMLL 对 TTML 的歌词模型做了一定的简化，舍弃了一些本项目认为很有用的数据承载能力，因此 Lazulite Studio 不保证其产物能够完整无损地被 AMLL 生态系列工具和库导入，也不保证其格式完全符合 [AMLL TTML DB](https://github.com/amll-dev/amll-ttml-db) 投稿的要求，若有较高的对 AMLL 兼容的要求，可以调整设置中的“AMLL 兼容设置”项
+Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 AMLL 对 TTML 的歌词模型做了一定的简化，舍弃了一些本项目认为很有用的数据承载能力，因此 Lazulite Studio 不保证其产物能够完整无损地被 AMLL 生态系列工具和库导入，也不保证其格式完全符合 [AMLL TTML DB](https://github.com/amll-dev/amll-ttml-db) 投稿的要求，若有较高的对 AMLL 兼容的要求，可以调整设置中的“AMLL 兼容设置”项。
+
+
+## 本地包安装与使用
+
+下载适合系统的 7z 包：
+- Windows CPU 版：`LazuliteStudio-windows-x64-cpu.7z`
+- Windows cuda 版：`LazuliteStudio-windows-x64-cuda.7z.001` 与 `LazuliteStudio-windows-x64-cuda.7z.002`（需要 Nvidia 显卡及驱动）
+- Mac 版：`LazuliteStudio-macos-arm64.7z`
+
+使用支持 7z 的解压工具完整解压后打开其中的文件夹，双击启动入口运行。不要直接在压缩包内运行。
+分卷包需下载全部 .7z.001、.7z.002 等文件，放在同一目录，从 .7z.001 开始解压；不要逐卷解压。
+- Windows 启动入口：`start.exe`。
+- macOS 启动脚本：`start.command`。
+
+保留终端窗口，浏览器会在服务就绪后打开，或者手动访问 http://127.0.0.1:15173 。在终端 Ctrl+C 停止服务。
+
+## 应用截图
+![应用截图](docs/images/internet-lyrics.png)
+![应用截图](docs/images/timeline.png)
+![应用截图](docs/images/edit.png)
+![应用截图](docs/images/metadata.png)
+![应用截图](docs/images/singer.png)
+![应用截图](docs/images/rhythm.png)
+![应用截图](docs/images/karaoke.png)
+![应用截图](docs/images/nicokara.png)
+![应用截图](docs/images/amll.png)
+![应用截图](docs/images/file.png)
+![应用截图](docs/images/project.png)
 
 ## 开发与生产构建指南
 
