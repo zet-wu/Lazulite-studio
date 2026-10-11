@@ -85,7 +85,7 @@ class RevisionStore:
             try:
                 conn.execute(
                     "INSERT INTO revisions(id,project_id,parent_id,project_path,created_at) VALUES(?,?,?,?,?)",
-                    (revision, project_id, base, str(path), now),
+                    (revision, project_id, base, self.db.paths.store(path), now),
                 )
                 if (
                     conn.execute(
@@ -144,7 +144,7 @@ class RevisionStore:
                 if row[0] not in protected and row[2] < cutoff:
                     conn.execute('UPDATE revisions SET parent_id=NULL WHERE parent_id=?', (row[0],))
                     conn.execute('DELETE FROM revisions WHERE id=?', (row[0],))
-                    paths.append(Path(row[1]))
+                    paths.append(self.db.paths.resolve(row[1]))
         for path in paths: path.unlink(missing_ok=True)
 
     def read(self, project_id: str, revision: str | None = None) -> tuple[str, dict]:
@@ -158,7 +158,7 @@ class RevisionStore:
             ).fetchone()
         if row is None:
             raise KeyError(project_id if revision is None else revision)
-        path = Path(row[2]).resolve()
+        path = self.db.paths.resolve(row[2])
         root = self.root.resolve()
         if root not in path.parents or path.suffix != ".json":
             raise ValueError("revision path is outside revision store")
@@ -207,15 +207,12 @@ class RevisionStore:
             ).fetchone()
             if row is None:
                 raise KeyError(project_id)
-            self._materialize(project_id, Path(row[0]))
+            self._materialize(project_id, self.db.paths.resolve(row[0]))
 
     @staticmethod
     def _fsync_dir(path: Path) -> None:
-        fd = os.open(path, os.O_RDONLY)
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+        from .atomic_file import fsync_directory
+        fsync_directory(path)
 
     def recover(self) -> None:
         with self.db.connect() as conn:

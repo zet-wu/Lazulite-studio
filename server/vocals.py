@@ -21,7 +21,7 @@ class VocalRunner:
         if not cleanup: return
         # Startup has no live model worker. Discard only unregistered partial products.
         with db.connect() as c:
-            known = {Path(row[0]).resolve() for row in c.execute('SELECT directory FROM vocal_results')}
+            known = {db.paths.resolve(row[0]) for row in c.execute('SELECT directory FROM vocal_results')}
         for directory in self.root.glob('*/vocals/*'):
             if directory.is_dir() and directory.resolve() not in known: shutil.rmtree(directory)
 
@@ -76,7 +76,7 @@ class VocalRunner:
                 metadata.pop(key, None)
             metadata.update(id=result_id, audio_result_id=audio_id)
             with self.db.transaction() as c:
-                c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', str(directory), json.dumps(metadata)))
+                c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', self.db.paths.store(directory), json.dumps(metadata)))
         else:
             emit('stage', 'separating', None, None, '正在分离人声；取消将在阶段结束后生效')
             try:
@@ -101,7 +101,7 @@ class VocalRunner:
                         'quantization': 'float to signed 16-bit PCM', 'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
             metadata.update(audio_result_id=result_id, generation_settings=settings)
             with self.db.transaction() as c:
-                c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', str(directory), json.dumps(metadata)))
+                c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', self.db.paths.store(directory), json.dumps(metadata)))
             del audio, vocals
         boundary()
         emit('stage', 'analyzing', None, None, '正在分析持久人声的能量与核心片段')
@@ -137,7 +137,7 @@ class VocalRunner:
 
     def audio_path(self, project_id, metadata):
         owner, _ = self.get(project_id, metadata['audio_result_id'])
-        return Path(owner['directory']) / 'vocals.wav'
+        return self.db.paths.resolve(owner['directory']) / 'vocals.wav'
 
     def audio_available(self, project_id, metadata):
         import soundfile as sf

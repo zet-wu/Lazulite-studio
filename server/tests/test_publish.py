@@ -141,7 +141,7 @@ def test_publish_untimed_transliteration_whitespace_copy_and_missing_endpoint(tm
         with Database(tmp_path / 'studio.sqlite3').connect() as c:
             import json
             result = json.loads(c.execute('SELECT result_json FROM jobs WHERE id=?', (job,)).fetchone()[0])
-        pure = extract_stpp(Path(result['output_path']))
+        pure = extract_stpp(tmp_path / result['output_path'])
         root = ET.fromstring(pure)
         text = root.find('.//{http://music.apple.com/lyric-ttml-internal}text')
         assert ''.join(text.itertext()) == 'a   ' and len(list(text)) == 2

@@ -1,3 +1,4 @@
+import { preferences } from '../adapters/preferences';
 import { useEffect, useState } from 'react';
 
 export const shortcutActions = {
@@ -36,7 +37,7 @@ export function bindingError(action: ShortcutAction, binding: Binding, bindings:
 }
 export function readBindings(): Bindings {
   let value: unknown;
-  try { value = JSON.parse(localStorage.getItem(storageKey) ?? 'null'); } catch { value = null; }
+  try { value = JSON.parse(preferences.getItem(storageKey) ?? 'null'); } catch { value = null; }
   const result = { ...defaultBindings };
   if (value && typeof value === 'object') {
     const candidate = { ...result, ...value } as Bindings;
@@ -48,12 +49,12 @@ export function readBindings(): Bindings {
     return candidate;
   }
   try {
-    const old = JSON.parse(localStorage.getItem('lazulite-sync-keys') ?? 'null') as Record<string, unknown> | null;
+    const old = JSON.parse(preferences.getItem('lazulite-sync-keys') ?? 'null') as Record<string, unknown> | null;
     if (old) {
       const candidate = { ...result };
       for (const action of Object.keys(shortcutActions) as ShortcutAction[]) if (typeof old[action] === 'string' && shortcutActions[action][0] === '打轴') candidate[action] = plain(old[action]);
       if ((Object.keys(shortcutActions) as ShortcutAction[]).every(action => !bindingError(action, candidate[action], candidate))) {
-        localStorage.setItem(storageKey, JSON.stringify(candidate));
+        preferences.setItem(storageKey, JSON.stringify(candidate));
         return candidate;
       }
     }
@@ -61,7 +62,7 @@ export function readBindings(): Bindings {
   return result;
 }
 export function saveBindings(bindings: Bindings) {
-  localStorage.setItem(storageKey, JSON.stringify(bindings));
+  preferences.setItem(storageKey, JSON.stringify(bindings));
   window.dispatchEvent(new Event('studio-shortcuts-change'));
 }
 export function useShortcuts() {

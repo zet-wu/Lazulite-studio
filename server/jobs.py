@@ -52,12 +52,12 @@ class JobService:
             for row in records:
                 result = json.loads(row['result_json'] or '{}')
                 if result.get('output_path'):
-                    path = Path(result['output_path'])
+                    path = self.db.paths.resolve(result['output_path'])
                     (keep if row['status'] == 'succeeded' and not result.get('superseded') and result.get('report', {}).get('passed') is True else obsolete).add(path)
             # Only at startup: no worker can still be writing an unrecorded temporary file.
             root = getattr(self.publish_runner, 'output_root', None)
             if startup and root:
-                obsolete.update(path for path in Path(root).iterdir() if path.is_file() and path not in keep)
+                obsolete.update(path for path in Path(root).glob('*/exports/*') if path.is_file() and path not in keep)
             for path in obsolete - keep:
                 try:
                     path.unlink(missing_ok=True)
@@ -155,7 +155,7 @@ class JobService:
             if record and record[2] in {'vocal','alignment'}: self.vocal_runner.clean_unregistered(record[1], jid)
             if not published and isinstance(result, dict) and result.get('output_path') and record[2] == 'publish':
                 try:
-                    Path(result['output_path']).unlink(missing_ok=True)
+                    self.db.paths.resolve(result['output_path']).unlink(missing_ok=True)
                 except OSError:
                     logger.warning('Unpublished export cleanup deferred: %s',result['output_path'])
 

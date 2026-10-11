@@ -104,8 +104,8 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
             report = result.get("report")
             path = result.get("output_path")
             passed = isinstance(report, dict) and report.get("passed") is True
-            available = not result.get("superseded") and job["status"] == "succeeded" and passed and bool(path) and Path(path).is_file()
-            status = "superseded" if result.get("superseded") else "unavailable" if job["status"] == "succeeded" and (not path or not Path(path).is_file()) else job["status"]
+            available = not result.get("superseded") and job["status"] == "succeeded" and passed and bool(path) and service.db.paths.resolve(path).is_file()
+            status = "superseded" if result.get("superseded") else "unavailable" if job["status"] == "succeeded" and (not path or not service.db.paths.resolve(path).is_file()) else job["status"]
             items.append({"filename": result.get('filename'), "asset_filename": assets.get(request.get('asset_id')),
                           "container": result.get('container'), "format_label": result.get('format_label'), "track_id": report.get('track_id') if isinstance(report,dict) else None,
                           "id": job["id"], "revision": request.get("revision"), "asset_id": request.get("asset_id"),
@@ -126,7 +126,7 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
                 raise HTTPException(410, {"code":"export_replaced","message":"此产物已被较新的成功产物替换","retryable":False})
             if job['status'] != 'succeeded' or report.get('passed') is not True:
                 raise HTTPException(409, {"code":"export_unavailable","message":"export is not available","retryable":False})
-            path = Path(result.get('output_path', ''))
+            path = service.db.paths.resolve(result.get('output_path', ''))
             try:
                 handle = path.open('rb')
             except (FileNotFoundError, IsADirectoryError):

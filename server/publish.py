@@ -149,7 +149,7 @@ class PublishRunner:
             bound = c.execute('SELECT p.source_asset_id,p.name,a.filename FROM projects p JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?', (project_id,)).fetchone()
         if not bound or bound[0] != request['asset_id']: raise PublishInvalid('bound asset changed')
         from .project_document import read_lyrics
-        source_xml = read_lyrics(row[0])
+        source_xml = read_lyrics(self.revisions.db.paths.resolve(row[0]))
         asset = Path(self.asset_path(project_id))
         from mutagen import File
         from mutagen.mp4 import MP4
@@ -191,7 +191,7 @@ class PublishRunner:
             result.update(format_info)
             result["filename"] = download_filename(bound[1], format_info["extension"])
             # The service owns the output path, including cleanup on failure/cancel.
-            result["output_path"] = str(output)
+            result["output_path"] = self.revisions.db.paths.store(output)
         except Exception:
             output.unlink(missing_ok=True)
             raise

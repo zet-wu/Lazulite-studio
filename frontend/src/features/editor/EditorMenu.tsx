@@ -1,3 +1,4 @@
+import { preferences } from '../../adapters/preferences';
 import { Icon } from '../../shared/Icon';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -28,10 +29,10 @@ type Props = MenuState & {
 export function EditorMenu(props: Props) {
   const [kanaOpen, setKanaOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [dark, setDark] = useState(() => localStorage.getItem('lazulite-editor-theme') === 'dark');
+  const [dark, setDark] = useState(() => preferences.getItem('lazulite-editor-theme') === 'dark');
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-    localStorage.setItem('lazulite-editor-theme', dark ? 'dark' : 'light');
+    preferences.setItem('lazulite-editor-theme', dark ? 'dark' : 'light');
   }, [dark]);
   return <header className={styles.header}>
     <Link to="/projects" className={styles.brand}>Lazulite Studio</Link>

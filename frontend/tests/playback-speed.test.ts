@@ -1,5 +1,6 @@
+import { savedPlaybackSpeed, playbackSpeedKey } from '../src/adapters/playback-speed';
 import { expect, it } from 'vitest';
-import { normalizePlaybackSpeed, savedPlaybackSpeed, speedWheelSteps, playbackSpeedKey } from '../src/domain/playback-speed';
+import { normalizePlaybackSpeed, speedWheelSteps } from '../src/domain/playback-speed';
 it('quantizes and clamps without accumulated floating point drift and restores valid preferences', () => {
   let rate = .1; for (let i = 0; i < 38; i++) rate = normalizePlaybackSpeed(rate + .05);
   expect(rate).toBe(2); for (let i = 0; i < 38; i++) rate = normalizePlaybackSpeed(rate - .05);

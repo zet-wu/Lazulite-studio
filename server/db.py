@@ -55,14 +55,16 @@ CREATE TABLE IF NOT EXISTS job_idempotency (
 
 class Database:
     def __init__(self, path: str | Path):
-        self.path = str(path)
+        self.path = str(Path(path).resolve())
+        from .storage_paths import StoragePaths
+        self.paths = StoragePaths(Path(self.path).parent)
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
             version = conn.execute('PRAGMA user_version').fetchone()[0]
-            if version != 4 and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
-                raise RuntimeError('旧项目存储不兼容；请保留原目录并指定新的 STUDIO_DATA_DIR')
+            if version != 5 and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
+                raise RuntimeError('旧项目存储不兼容（需要 v5）；请保留原库，用旧程序导出 .lazp 或显式运行迁移工具至新目录')
             conn.executescript(SCHEMA)
-            conn.execute('PRAGMA user_version=4')
+            conn.execute('PRAGMA user_version=5')
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

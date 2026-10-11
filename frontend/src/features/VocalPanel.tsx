@@ -1,3 +1,4 @@
+import { scopedSessionKey } from '../adapters/preferences';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,7 +17,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState<string|null>(null);
   const [dismissed, setDismissed] = useState<string|null>(null);
-  const intentKey=`studio-vocal-intent-v1:${projectId}`;
+  const intentKey=scopedSessionKey(`studio-vocal-intent-v1:${projectId}`);
   const [pending, setPending] = useState<{id:string; baseline:string}|null>(()=>{
     const saved=sessionStorage.getItem(intentKey);
     return saved?JSON.parse(saved):null;

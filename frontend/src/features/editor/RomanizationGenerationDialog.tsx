@@ -1,3 +1,4 @@
+import { preferences } from '../../adapters/preferences';
 import { measureTextWidth } from '../../shared/measure-text';
 import { kanaHighlightHint, readKanaHighlight } from './kana-highlight';
 import { Select } from '../../shared/Select';
@@ -86,7 +87,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   const [highlight] = useState(readKanaHighlight);
   const [sourceIds] = useState(lineIds);
   const modeStorage = `lazulite-romanization-mode:${preferenceScope}`;
-  const [kind, setKind] = useState<RomanizationKind>(() => localStorage.getItem(modeStorage) === 'plain' ? 'plain' : 'timed');
+  const [kind, setKind] = useState<RomanizationKind>(() => preferences.getItem(modeStorage) === 'plain' ? 'plain' : 'timed');
   const [rows, setRows] = useState<RomanizationProposal[]>(() => proposeRomanization(source, sourceIds, kind));
   const [trackId, setTrackId] = useState(() => source.romanizationTracks.find(track => track.language === 'ja-Latn')?.id ?? '');
   const [targets, setTargets] = useState<Record<string, string>>({});
@@ -126,7 +127,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
         <label>输出 <Select aria-label="输出" aria-describedby="romanization-mode-help" value={kind} onChange={event => {
           const next = event.target.value as RomanizationKind;
           setKind(next); setRows(proposeRomanization(source, sourceIds, next)); setMessage(''); setFocusedRow(null);
-          localStorage.setItem(modeStorage, next);
+          preferences.setItem(modeStorage, next);
         }}><option value="plain">普通文本</option><option value="timed">定时音译</option></Select></label>
         <small id="romanization-mode-help">切换输出将清除修改</small>
       </div>

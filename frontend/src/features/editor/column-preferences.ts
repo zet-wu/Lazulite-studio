@@ -1,3 +1,4 @@
+import { preferences } from '../../adapters/preferences';
 export type ColumnPreferences = { outlineVisible: boolean; inspectorVisible: boolean; outlineWidth: number; inspectorWidth: number };
 export const COLUMN_STORAGE = 'lazulite-editor-columns';
 export const COLUMN_DEFAULTS: ColumnPreferences = { outlineVisible: true, inspectorVisible: true, outlineWidth: 190, inspectorWidth: 250 };
@@ -5,7 +6,7 @@ export const COLUMN_LIMITS = { outline: { min: 160, max: 360, default: 190 }, in
 export type ColumnSide = keyof typeof COLUMN_LIMITS;
 
 export function readColumnPreferences(): ColumnPreferences {
-  const raw = localStorage.getItem(COLUMN_STORAGE);
+  const raw = preferences.getItem(COLUMN_STORAGE);
   if (!raw) return { ...COLUMN_DEFAULTS };
   let value: unknown;
   try { value = JSON.parse(raw); } catch { return { ...COLUMN_DEFAULTS }; }

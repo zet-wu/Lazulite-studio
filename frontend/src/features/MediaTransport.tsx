@@ -1,3 +1,4 @@
+import { preferences } from '../adapters/preferences';
 import { useEditorSelection } from './editor/SelectionContext';
 import { selectionEnvelope, documentTargets, targetInterval } from './editor/selection-targets';
 import { TimelineIndicators, TimelineIndicatorContext, type TimelinePreview } from './TimelineIndicators';
@@ -10,7 +11,8 @@ import type { Acoustics, VocalSegment } from '../domain/project-document';
 import { IconButton } from '../shared/Controls';
 import { matchesBinding, shortcutInput, useShortcuts } from './shortcuts';
 import { PlaybackSpeed } from './PlaybackSpeed';
-import { normalizePlaybackSpeed, playbackSpeedKey, savedPlaybackSpeed } from '../domain/playback-speed';
+import { normalizePlaybackSpeed } from '../domain/playback-speed';
+import { playbackSpeedKey, savedPlaybackSpeed } from '../adapters/playback-speed';
 import {
   forwardRef,
   useCallback,
@@ -130,7 +132,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [rate, setRate] = useState(savedPlaybackSpeed);
   const changeRate = useCallback((value: number) => {
     const next = normalizePlaybackSpeed(value);
-    setRate(next); localStorage.setItem(playbackSpeedKey, String(next));
+    setRate(next); preferences.setItem(playbackSpeedKey, String(next));
     if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = next; }
   }, []);
   const [start, setStart] = useState(0);

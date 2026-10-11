@@ -43,7 +43,7 @@ def stamp():
 
 def create_app(
     data_dir: str | Path | None = None, settings: Settings | None = None,
-    reading_proposer=None, publisher=None, separator_factory=None,
+    reading_proposer=None, publisher=None, separator_factory=None, runtime_settings=None,
 ) -> FastAPI:
     cfg = settings or Settings.from_env()
     if not cfg.origin or (not cfg.trusted_gateway and not cfg.password):
@@ -51,9 +51,14 @@ def create_app(
             "set STUDIO_ORIGIN and STUDIO_PASSWORD, or enable STUDIO_TRUSTED_GATEWAY"
         )
     root = Path(
-        data_dir or os.getenv("STUDIO_DATA_DIR", Path(__file__).parent / "data-projects-v4")
+        data_dir or os.getenv("STUDIO_DATA_DIR", Path(__file__).parent / "data-projects-v5")
     )
+    root = root.resolve()
     db = Database(root / "studio.sqlite3")
+    from .storage_paths import validate_database_paths
+    validate_database_paths(db)
+    from .runtime_settings import RuntimeSettings, settings_router
+    preferences = runtime_settings or RuntimeSettings(root / "settings.json")
     from .project_deletion import recover_deletions
     recover_deletions(db, root)
     uploads = root / 'uploads'
@@ -147,6 +152,8 @@ def create_app(
         return {
             "schema_version": "studio-session-v1",
             "authenticated": subject is not None,
+            "library_id": preferences.read()["library_id"],
+            "mode": "gateway" if cfg.trusted_gateway else "password",
             "user": {"id": "local", "name": "Local user"} if subject else None,
         }
 
@@ -354,7 +361,7 @@ def create_app(
                 c.execute('INSERT INTO search_conditions VALUES(?,?,?,?)', (pid, conditions['title'], conditions['artist'], conditions['album']))
                 c.execute(
                     "INSERT INTO revisions VALUES(?,?,?,?,?)",
-                    (rev, pid, None, str(path), t),
+                    (rev, pid, None, db.paths.store(path), t),
                 )
                 result = {
                     "schema_version": "studio-project-v1",
@@ -466,7 +473,9 @@ def create_app(
     @api.delete("/projects/{pid}")
     def remove_project(pid: str, _: object = Depends(write)):
         from .project_deletion import delete_project
-        return delete_project(db, root, pid)
+        result = delete_project(db, root, pid)
+        preferences.delete_project(pid)
+        return result
 
     @api.get("/projects/{pid}/lyrics")
     def lyrics(pid: str, revision: str | None = None, _: object = Depends(auth)):
@@ -480,7 +489,7 @@ def create_app(
         if not x:
             fail("revision_not_found", "revision not found", 404)
         from .project_document import read_lyrics, initial_project
-        return Response(read_lyrics(x[0]), media_type="application/ttml+xml", headers={"ETag": f'"{rev}"'})
+        return Response(read_lyrics(db.paths.resolve(x[0])), media_type="application/ttml+xml", headers={"ETag": f'"{rev}"'})
 
     def asset_for(pid):
         r = project(pid)
@@ -606,6 +615,7 @@ def create_app(
     api.include_router(build_sources_router(write=write))
     api.include_router(build_publish_router(job_service, auth=auth, write=write, project_row=project, asset_path=asset_path_for_project))
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
+    api.include_router(settings_router(preferences, auth=auth, write=write))
     app.include_router(api)
     app.add_middleware(UploadLimitMiddleware, limit=MAX_UPLOAD + 1024 * 1024)
     @app.on_event("shutdown")

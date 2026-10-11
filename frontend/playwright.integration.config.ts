@@ -9,7 +9,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: '../server/.venv/bin/python -m uvicorn server.tests.browser_fixture:create_browser_app --factory --app-dir .. --host 127.0.0.1 --port 8015',
+      command: `"${process.env.STUDIO_TEST_PYTHON ?? (process.platform === 'win32' ? '../server/.venv/Scripts/python.exe' : '../server/.venv/bin/python')}" -m uvicorn server.tests.browser_fixture:create_browser_app --factory --app-dir .. --host 127.0.0.1 --port 8015`,
       url: 'http://127.0.0.1:8015/api/v1/session',
       timeout: 30_000,
     },

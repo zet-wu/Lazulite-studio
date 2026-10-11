@@ -1,3 +1,4 @@
+import { libraryIdentity } from '../preferences';
 import { validateKaraoke } from '../../domain/karaoke';
 import { assertAmll, validateAgents } from '../../domain/amll-compatibility';
 import { validateProjectEditing } from '../../domain/project-editing';
@@ -29,7 +30,7 @@ export type RecoveryAdapter = {
 async function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') return Promise.reject(new Error('Local recovery is unavailable in this browser'));
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE, 1);
+    const request = indexedDB.open(`${DATABASE}:${libraryIdentity()}`, 1);
     request.onupgradeneeded = () => request.result.createObjectStore(STORE);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(new Error('Could not open local recovery storage'));

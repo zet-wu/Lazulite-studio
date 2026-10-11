@@ -1,10 +1,4 @@
 export const normalizePlaybackSpeed = (value: number) => Math.max(.1, Math.min(2, Math.round(value * 20) / 20));
-export const playbackSpeedKey = 'studio.playback-rate';
-export function savedPlaybackSpeed() {
-  const raw = localStorage.getItem(playbackSpeedKey);
-  const value = raw === null ? 1 : Number(raw);
-  return Number.isFinite(value) && value >= .1 && value <= 2 ? normalizePlaybackSpeed(value) : 1;
-}
 /** Accumulate small trackpad deltas; line/page deltas are converted to CSS pixels. */
 export function speedWheelSteps(deltaY: number, deltaMode: number, remainder: number, pageHeight: number) {
   const pixels = deltaY * (deltaMode === 1 ? 16 : deltaMode === 2 ? pageHeight : 1);

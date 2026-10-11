@@ -1,3 +1,4 @@
+import { preferences, scopedSessionKey } from './preferences';
 import { createRecoveryAdapter } from './recovery';
 export const PROJECT_DELETED = 'studio-project-deleted';
 const channelName = 'studio-project-lifecycle';
@@ -14,10 +15,10 @@ export function listenProjectDeletion(projectId: string, deleted: () => void) {
   return () => { channel.close(); window.removeEventListener(PROJECT_DELETED, local); };
 }
 export async function clearProjectLocalData(projectId: string) {
-  localStorage.removeItem(`lazulite-romanization-mode:project:${projectId}`);
-  localStorage.removeItem(`studio:sync-offset:project:${projectId}`);
-  localStorage.removeItem(`studio:download:project:${projectId}`);
-  localStorage.removeItem(`studio:workspace-mode:project:${projectId}`);
-  sessionStorage.removeItem(`studio-vocal-intent-v1:${projectId}`);
+  preferences.removeItem(`lazulite-romanization-mode:project:${projectId}`);
+  preferences.removeItem(`studio:sync-offset:project:${projectId}`);
+  preferences.removeItem(`studio:download:project:${projectId}`);
+  preferences.removeItem(`studio:workspace-mode:project:${projectId}`);
+  sessionStorage.removeItem(scopedSessionKey(`studio-vocal-intent-v1:${projectId}`));
   await createRecoveryAdapter().clear(projectId);
 }

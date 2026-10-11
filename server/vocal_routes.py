@@ -33,7 +33,7 @@ def build_vocal_router(runner, *, auth, project_exists):
         if start_ms < 0 or end_ms <= start_ms or not 1 <= buckets <= 4096:
             raise HTTPException(422, '能量视窗无效')
         end_ms = min(end_ms, metadata['duration_ms'])
-        values = np.load(Path(row['directory']) / 'energy.npy', mmap_mode='r', allow_pickle=False)
+        values = np.load(runner.db.paths.resolve(row['directory']) / 'energy.npy', mmap_mode='r', allow_pickle=False)
         hop = metadata['energy_hop_ms']
         first, last = max(0, int(start_ms / hop)), min(len(values), math.ceil(end_ms / hop))
         stride = max(1, math.ceil((last-first) / buckets))

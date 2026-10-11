@@ -1,4 +1,5 @@
-import { Component, useState, type ErrorInfo, type ReactNode } from "react";
+import { loadPreferences } from '../adapters/preferences';
+import { Component, useState, useEffect, type ErrorInfo, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -210,7 +211,20 @@ function SessionGate({ children }: { children: ReactNode }) {
       </main>
     );
   if (query.data && !query.data.authenticated) return <Login />;
-  return children;
+  return <PreferenceGate>{children}</PreferenceGate>;
+}
+function PreferenceGate({ children }: { children: ReactNode }) {
+  const mock = import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCKS === 'true';
+  const query = useQuery({ queryKey: ['preferences'], queryFn: loadPreferences, enabled: !mock, staleTime: Infinity, retry: false });
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const report = (event: Event) => setError((event as CustomEvent<string>).detail);
+    window.addEventListener('studio-preference-error', report);
+    return () => window.removeEventListener('studio-preference-error', report);
+  }, []);
+  if (!mock && query.isPending) return <main className={styles.centerState}>正在读取偏好…</main>;
+  if (!mock && query.isError) return <main className={styles.centerState}>无法读取偏好。<button data-role="secondary" onClick={() => query.refetch()}>重试</button></main>;
+  return <>{error && <div role="alert">{error}<button data-role="secondary" onClick={() => location.reload()}>刷新偏好</button></div>}{children}</>;
 }
 function WorkspaceRoute() {
   const { projectId = "sample-project" } = useParams();

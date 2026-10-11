@@ -118,7 +118,7 @@ def build_archive_router(db, root, revisions, *, auth, write, project_exists):
             with db.transaction() as c:
                 project = project_exists(pid)
                 row = c.execute('SELECT project_path FROM revisions WHERE id=? AND project_id=?', (project['current_revision'], pid)).fetchone()
-                snapshot = read_project(row[0])
+                snapshot = read_project(db.paths.resolve(row[0]))
                 snapshot['acoustics']['analysisId'] = None
                 manifest = {'format':'lazulite-studio-project', 'version':1, 'name':project['name'], 'project':'project.json'}
                 asset = c.execute('SELECT * FROM assets WHERE id=?', (project['source_asset_id'],)).fetchone()
@@ -163,7 +163,7 @@ def build_archive_router(db, root, revisions, *, auth, write, project_exists):
                 validate_archive_references(snapshot)
                 relative = Path('revisions') / f'{rid}.json'
                 revisions._write_atomic(staged_project / relative, json.dumps(snapshot, ensure_ascii=False).encode())
-                c.execute('INSERT INTO revisions VALUES(?,?,?,?,?)', (rid, pid, None, str(destination / relative), now))
+                c.execute('INSERT INTO revisions VALUES(?,?,?,?,?)', (rid, pid, None, db.paths.store(destination / relative), now))
                 c.execute('INSERT INTO search_conditions VALUES(?,?,?,?)', (pid, '', '', ''))
                 staged_project.rename(destination)
             return {'schema_version':'studio-project-v1', 'id':pid, 'name':manifest.name.strip(), 'updated_at':now}

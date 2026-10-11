@@ -65,24 +65,24 @@ def test_recent_success_failure_cancel_and_single_active(tmp_path):
 
 def test_startup_converges_history_and_orphans_and_retries_windows_lock(tmp_path,monkeypatch):
     db=Database(tmp_path/'db.sqlite3')
-    root=tmp_path/'exports';root.mkdir()
+    root=tmp_path/'projects';root.mkdir()
     class Runner: output_root=root
     with db.transaction() as c:
         for pid in ('p','q'):
             c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)',(pid,pid,None,None,'now','now'))
         for i,pid in [(1,'p'),(2,'p'),(3,'q')]:
-            path=root/f'{i}.m4a';path.write_bytes(b'media')
-            c.execute('INSERT INTO jobs(id,project_id,kind,status,request_json,result_json,created_at,updated_at,finished_at) VALUES(?,?,?,?,?,?,?,?,?)',(str(i),pid,'publish','succeeded','{}',json.dumps(dict(output_path=str(path),report=dict(passed=True))),str(i),str(i),str(i)))
-    (root/'interrupted.m4a').write_bytes(b'partial')
+            path=root/pid/'exports'/f'{i}.m4a';path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'media')
+            c.execute('INSERT INTO jobs(id,project_id,kind,status,request_json,result_json,created_at,updated_at,finished_at) VALUES(?,?,?,?,?,?,?,?,?)',(str(i),pid,'publish','succeeded','{}',json.dumps(dict(output_path=db.paths.store(path),report=dict(passed=True))),str(i),str(i),str(i)))
+    (root/'p'/'exports'/'interrupted.m4a').write_bytes(b'partial')
     unlink=Path.unlink
     def locked(path,*args,**kwargs):
         if path.name=='1.m4a': raise PermissionError('Windows file is in use')
         return unlink(path,*args,**kwargs)
     monkeypatch.setattr(Path,'unlink',locked)
     service=JobService(db,publish_runner=Runner())
-    assert {p.name for p in root.iterdir()}=={'1.m4a','2.m4a','3.m4a'}
+    assert {p.name for p in root.glob('*/exports/*')}=={'1.m4a','2.m4a','3.m4a'}
     assert service.result('1')['superseded'] is True
     monkeypatch.setattr(Path,'unlink',unlink)
     service.reconcile_exports()
-    assert {p.name for p in root.iterdir()}=={'2.m4a','3.m4a'}
+    assert {p.name for p in root.glob('*/exports/*')}=={'2.m4a','3.m4a'}
     service.close()

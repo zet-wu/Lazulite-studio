@@ -1,3 +1,4 @@
+import { preferences } from '../../adapters/preferences';
 import { recoverSelection, survivingSelection, selectionSelector, focusObject, preserveSelectionOnFocus } from './selection-recovery';
 import { SongPartField } from './SongPartField';
 import { planSelectionAction, attachmentSelection, attachmentTracks, type SelectionAction } from '../../domain/selection-editing';
@@ -140,11 +141,11 @@ function EditorWorkspaceContent(props: Props) {
   const pageRef = useRef<HTMLDivElement>(null);
   const wordInputs = useRef(new Map<string, HTMLInputElement>());
   const [mode, setMode] = useState<'audio' | 'acquire' | 'edit' | 'sync' | 'karaoke' | 'preview' | 'package'>(() => {
-    const remembered = props.projectId ? localStorage.getItem(`studio:workspace-mode:project:${props.projectId}`) : null;
+    const remembered = props.projectId ? preferences.getItem(`studio:workspace-mode:project:${props.projectId}`) : null;
     if (remembered === 'audio' || remembered === 'acquire' || remembered === 'edit' || remembered === 'karaoke' || remembered === 'sync' || remembered === 'preview' || remembered === 'package') return remembered;
     return props.projectId && !document.lines.some(line => line.words.some(word => word.text.trim())) ? 'acquire' : 'edit';
   });
-  useEffect(() => { if (props.projectId) localStorage.setItem(`studio:workspace-mode:project:${props.projectId}`, mode); }, [props.projectId, mode]);
+  useEffect(() => { if (props.projectId) preferences.setItem(`studio:workspace-mode:project:${props.projectId}`, mode); }, [props.projectId, mode]);
   const [karaokeExportOpen,setKaraokeExportOpen]=useState(false);
   const [karaokeValidation,setKaraokeValidation]=useState(false);
   const {selectedCue,selectCue}=useEditorSelection()!;
@@ -164,7 +165,7 @@ function EditorWorkspaceContent(props: Props) {
     const observer = new ResizeObserver(() => setLayoutWidth(element.clientWidth));
     observer.observe(element); return () => observer.disconnect();
   }, [mode]);
-  const commitColumns = (next: ColumnPreferences) => { setColumns(next); localStorage.setItem(COLUMN_STORAGE, JSON.stringify(next)); };
+  const commitColumns = (next: ColumnPreferences) => { setColumns(next); preferences.setItem(COLUMN_STORAGE, JSON.stringify(next)); };
   const toggleColumn = (side: ColumnSide) => {
     const pane = side === 'outline' ? outlineRef.current : inspectorRef.current;
     if (pane?.contains(pane.ownerDocument.activeElement)) mainRef.current?.focus();
