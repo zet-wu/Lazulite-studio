@@ -113,3 +113,37 @@ def test_invalid_archives_leave_no_project_or_temp_files(tmp_path,fault):
         assert client.get('/api/v1/projects').json()==before
         assert not list(tmp_path.glob('studio-import-*'))
         assert len(list((tmp_path/'projects').iterdir()))==1
+
+
+def test_archive_stream_digest_is_verified_once_and_reused(tmp_path, monkeypatch):
+    import hashlib
+    import server.project_archive as archive_module
+    import server.studio.media as media_module
+    client, _ = setup(tmp_path)
+    calls = []
+    copy = archive_module.copy_with_digest
+    def counted(source, destination):
+        result = copy(source, destination)
+        calls.append(result)
+        return result
+    monkeypatch.setattr(archive_module, 'copy_with_digest', counted)
+    def redundant_hash(*args, **kwargs):
+        raise AssertionError('verified archive audio must not be hashed again')
+    monkeypatch.setattr(media_module, 'content_hash', redundant_hash)
+    with client:
+        exported = client.get('/api/v1/projects/p/archive')
+        assert exported.status_code == 200
+        files = entries(exported.content)
+        digest = hashlib.sha256(files['media/source.wav']).hexdigest()
+        assert calls == [digest]
+        imported = upload(client, exported.content)
+        assert imported.status_code == 200, imported.text
+        assert calls == [digest, digest]
+        manifest = json.loads(files['manifest.json'])
+        manifest['source']['sha256'] = '0' * 64
+        files['manifest.json'] = json.dumps(manifest)
+        before = client.get('/api/v1/projects').json()
+        rejected = upload(client, pack(files))
+        assert rejected.status_code == 422 and 'SHA-256' in rejected.text
+        assert calls == [digest, digest, digest]
+        assert client.get('/api/v1/projects').json() == before

@@ -250,13 +250,15 @@ def create_app(
         successful = False
         try:
             size = 0
+            digest = hashlib.sha256()
             with temporary.open('wb') as out:
                 while chunk := await file.read(1024 * 1024):
                     size += len(chunk)
                     if size > MAX_UPLOAD: fail('upload_too_large', 'upload exceeds limit', 413)
                     out.write(chunk)
+                    digest.update(chunk)
             media = MediaService(directory)
-            asset = await run_in_threadpool(media.import_asset, temporary, file.filename)
+            asset = await run_in_threadpool(media.import_asset, temporary, file.filename, verified_sha256=digest.hexdigest())
             proxy = await run_in_threadpool(media.playback_proxy, asset)
             if await request.is_disconnected(): fail('upload_cancelled', '上传已取消', 409)
             record = [token, asset.content_hash, asset.size, asset.probe.mime_type, asset.original_name, 1,

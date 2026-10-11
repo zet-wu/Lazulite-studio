@@ -40,9 +40,12 @@ class Manifest(BaseModel):
     project: Literal['project.json']
     source: SourceEntry | None = None
 
-def digest(path):
-    with Path(path).open('rb') as file:
-        return hashlib.file_digest(file, 'sha256').hexdigest()
+def copy_with_digest(source, destination):
+    digest = hashlib.sha256()
+    while chunk := source.read(1024**2):
+        destination.write(chunk)
+        digest.update(chunk)
+    return digest.hexdigest()
 
 def read_package(path, stage):
     with zipfile.ZipFile(path) as archive:
@@ -73,8 +76,8 @@ def read_package(path, stage):
             if entry.file_size != manifest.source.size: raise ValueError('源音频大小不匹配')
             source_path = stage / 'source-upload'
             with archive.open(entry) as src, source_path.open('wb') as dst:
-                shutil.copyfileobj(src, dst, 1024**2)
-            if digest(source_path) != manifest.source.sha256: raise ValueError('源音频 SHA-256 不匹配')
+                actual_hash = copy_with_digest(src, dst)
+            if actual_hash != manifest.source.sha256: raise ValueError('源音频 SHA-256 不匹配')
         return manifest, snapshot, source_path
 
 def validate_archive_references(snapshot):
@@ -125,8 +128,10 @@ def build_archive_router(db, root, revisions, *, auth, write, project_exists):
                         suffix = Path(asset['filename'] or '').suffix.lower().lstrip('.')
                         suffix = suffix if re.fullmatch('[a-z0-9]{1,12}', suffix) else 'bin'
                         name = f'media/source.{suffix}'
-                        manifest['source'] = {'path':name, 'filename':asset['filename'] or 'source.bin', 'size':source.stat().st_size, 'sha256':digest(source)}
-                        archive.write(source, name)
+                        entry = zipfile.ZipInfo.from_file(source, name)
+                        with source.open('rb') as src, archive.open(entry, 'w', force_zip64=True) as dst:
+                            source_hash = copy_with_digest(src, dst)
+                        manifest['source'] = {'path':name, 'filename':asset['filename'] or 'source.bin', 'size':entry.file_size, 'sha256':source_hash}
                     archive.writestr('project.json', json.dumps(snapshot, ensure_ascii=False))
                     archive.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False))
             return FileResponse(path, media_type='application/zip', filename=download_filename(project['name'], '.lazp'), background=BackgroundTask(temp.cleanup))
@@ -143,7 +148,7 @@ def build_archive_router(db, root, revisions, *, auth, write, project_exists):
         record = None
         if source:
             media = MediaService(staged_project)
-            asset = media.import_asset(source, manifest.source.filename)
+            asset = media.import_asset(source, manifest.source.filename, verified_sha256=manifest.source.sha256)
             proxy = media.playback_proxy(asset)
             aid = uuid.uuid4().hex
             record = (aid, asset.content_hash, asset.size, asset.probe.mime_type, asset.original_name, 1,

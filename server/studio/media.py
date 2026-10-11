@@ -125,11 +125,12 @@ class MediaService:
         (self.root / "source").mkdir(parents=True, exist_ok=True)
         (self.root / "cache").mkdir(parents=True, exist_ok=True)
 
-    def import_asset(self, temporary_path: Path, original_name: str | None = None) -> Asset:
+    def import_asset(self, temporary_path: Path, original_name: str | None = None, *, verified_sha256: str | None = None) -> Asset:
+        """Import staged bytes; callers may supply the digest computed from the upload/archive stream."""
         source = Path(temporary_path)
         if not source.is_file():
             raise MediaError("uploaded media is missing")
-        digest = content_hash(source)
+        digest = verified_sha256 if verified_sha256 is not None else content_hash(source)
         name = original_name or source.name
         probe = probe_media(source, ffprobe=self.ffprobe)
         destination = _asset_path(self.root, digest)

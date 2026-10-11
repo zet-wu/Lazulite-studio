@@ -131,3 +131,19 @@ def test_restart_restores_uncommitted_delete_and_collects_committed_quarantine(t
     # Simulate bytes left after a committed deletion; no live project can claim these.
     orphan=trash.parent/'already-deleted';orphan.mkdir();(orphan/'file').write_bytes(b'old')
     with client_for(tmp_path):assert not orphan.exists()
+
+
+def test_upload_reuses_digest_computed_from_received_bytes(tmp_path, monkeypatch):
+    import hashlib
+    import server.studio.media as media
+    def redundant_hash(*args, **kwargs):
+        raise AssertionError('uploaded bytes were already hashed while receiving')
+    monkeypatch.setattr(media, 'content_hash', redundant_hash)
+    payload = wav_bytes()
+    with client_for(tmp_path) as client:
+        response = client.post('/api/v1/uploads', files={'file':('music.wav',payload,'audio/wav')}, headers=HEADERS)
+        assert response.status_code == 200, response.text
+        token = response.json()['id']
+        metadata = json.loads((tmp_path/'uploads'/token/'asset.json').read_text())
+        assert metadata[1] == hashlib.sha256(payload).hexdigest()
+        assert (tmp_path/'uploads'/token/'source/original').read_bytes() == payload
