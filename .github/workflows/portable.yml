@@ -1,0 +1,31 @@
+name: Native portable dependency verification
+on:
+  workflow_dispatch:
+jobs:
+  dependencies:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            target: windows-x64-cpu
+          - runner: windows-2022
+            target: windows-x64-cuda
+          - runner: macos-14
+            target: macos-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.15'
+      - run: python packaging/resolve.py --target ${{ matrix.target }} --output native-dependencies
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependencies-${{ matrix.target }}
+          path: |
+            native-dependencies/*.txt
+            native-dependencies/resolution.json

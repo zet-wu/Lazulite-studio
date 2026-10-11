@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "nextfire": {
+    "source": "https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn",
+    "revision": "2ab2b5f46539ee284703c281f286b01d2410ee12",
+    "license": "CC-BY-NC-SA-4.0",
+    "files": [
+      {
+        "name": "config.json",
+        "size": 2034,
+        "sha256": "665dbd5be3a170d0b53f86e702a4f65f755471a2d81c1e0cf35ba566a72bf382",
+        "identity_status": "verified-against-fixed-upstream-revision",
+        "url": "https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn/resolve/2ab2b5f46539ee284703c281f286b01d2410ee12/config.json"
+      },
+      {
+        "name": "processor_config.json",
+        "size": 299,
+        "sha256": "8bc3c8d6d97ea61524d5c15d8554b4baf072d2264c0bda1839bc7a822c200d66",
+        "identity_status": "verified-against-fixed-upstream-revision",
+        "url": "https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn/resolve/2ab2b5f46539ee284703c281f286b01d2410ee12/processor_config.json"
+      },
+      {
+        "name": "vocab.json",
+        "size": 331,
+        "sha256": "26dc928520b2bde28e1c9e7fd425aae6b4eb40cd992bcb0bcc16ca6fada46491",
+        "identity_status": "verified-against-fixed-upstream-revision",
+        "url": "https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn/resolve/2ab2b5f46539ee284703c281f286b01d2410ee12/vocab.json"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "size": 1364,
+        "sha256": "b96525cd12d87182b9edd1613b47bc691f64184ad9d37c8a2f8b44a5fb3b8043",
+        "identity_status": "verified-against-fixed-upstream-revision",
+        "url": "https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn/resolve/2ab2b5f46539ee284703c281f286b01d2410ee12/tokenizer_config.json"
+      },
+      {
+        "name": "added_tokens.json",
+        "size": 30,
+        "sha256": "ad6e3518e1ac75c1f277c3af874f8d73e62efe8bfb9ed78ff1745e6cffdd8318",
+        "identity_status": "verified-against-fixed-upstream-revision",
+        "url": "https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn/resolve/2ab2b5f46539ee284703c281f286b01d2410ee12/added_tokens.json"
+      },
+      {
+        "name": "model.safetensors",
+        "size": 1261938632,
+        "sha256": "4d1d6fbb543534ab32bcceac5f5a42052c7fde3d16a83cbbce858473d5735042",
+        "identity_status": "verified-against-fixed-upstream-revision",
+        "url": "https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn/resolve/2ab2b5f46539ee284703c281f286b01d2410ee12/model.safetensors"
+      },
+      {
+        "name": "README.md",
+        "size": 597,
+        "sha256": "3a23befdfce500c6da47026854b547698166f11d8567670344959d0fb4c1208d",
+        "identity_status": "verified-against-fixed-upstream-revision",
+        "url": "https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn/resolve/2ab2b5f46539ee284703c281f286b01d2410ee12/README.md"
+      }
+    ]
+  },
+  "demucs": {
+    "signature": "955717e8",
+    "license": "MIT",
+    "source": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/955717e8-8726e21a.th",
+    "files": [
+      {
+        "name": "955717e8-8726e21a.th",
+        "size": 84141911,
+        "sha256": "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4"
+      },
+      {
+        "name": "htdemucs.yaml",
+        "size": 21,
+        "sha256": "239c445d0b14454d541ad8bd9bb271c9e536d267e8a4625208744cbb2e7bb66c",
+        "source": "demucs==4.0.1/demucs/remote/htdemucs.yaml"
+      }
+    ]
+  }
+}

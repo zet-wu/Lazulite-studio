@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "status": "candidate-native-validation-required",
+  "python_version": "3.12.15",
+  "python_release": "20261009",
+  "node": "22.22.2",
+  "pnpm": "10.30.3",
+  "database_version": 5,
+  "targets": {
+    "windows-x64-cpu": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.12.15%2B20261009-x86_64-pc-windows-msvc-install_only.tar.gz",
+        "sha256": "194c8f0d9e0de6f1c4576e5dfa67819a48c764be87608b74b8ad43387a57b93b",
+        "size": 46352482
+      },
+      "ffmpeg": {
+        "version": "9.0.2",
+        "source": "https://www.gyan.dev/ffmpeg/builds/",
+        "status": "archive-and-native-audit-required"
+      }
+    },
+    "windows-x64-cuda": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.12.15%2B20261009-x86_64-pc-windows-msvc-install_only.tar.gz",
+        "sha256": "194c8f0d9e0de6f1c4576e5dfa67819a48c764be87608b74b8ad43387a57b93b",
+        "size": 46352482
+      },
+      "ffmpeg": {
+        "version": "9.0.2",
+        "source": "https://www.gyan.dev/ffmpeg/builds/",
+        "status": "archive-and-native-audit-required"
+      }
+    },
+    "macos-arm64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.12.15%2B20261009-aarch64-apple-darwin-install_only.tar.gz",
+        "sha256": "83dcb04777c798bd95f3687acf9ae84b09860272ee6bdfb05be8bcf9447f75b8",
+        "size": 25165569
+      },
+      "ffmpeg": {
+        "version": "9.0.2",
+        "source": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+        "status": "archive-and-native-audit-required"
+      }
+    }
+  }
+}
