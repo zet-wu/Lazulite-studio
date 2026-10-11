@@ -20,7 +20,7 @@ test('short disconnect reconnects the original run and a failed save retains loc
  const state=await setup(page);state.disconnects=2;
  await expect(page.getByRole('alert').filter({hasText:'连接中断'})).toBeVisible();
  await page.getByRole('alert').filter({hasText:'连接中断'}).locator('..').getByRole('button',{name:'关闭提示'}).click();
- await expect(page.getByRole('button',{name:'取消',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'取消任务',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeDisabled();
  let fail=true;
  await page.route(`**${url}`,async route=>{if(route.request().method()==='PUT'&&fail)return route.fulfill({status:500,json:{message:'保存测试失败'}});return route.continue();});
@@ -87,4 +87,26 @@ test('changing the draft revokes CPU retry application intent',async({page})=>{
  await page.getByRole('button',{name:'使用 CPU 重试',exact:true}).click();
  await expect(page.getByRole('alert').filter({hasText:'应用意图已改变'})).toBeVisible();
  expect(retries).toBe(0);expect(state.results).toBe(0);
+});
+test('running controls survive long disconnection and mode switches without releasing editing',async({page})=>{
+ const state=await setup(page);state.disconnects=999;
+ await expect(page.getByRole('alert').filter({hasText:'连接中断'})).toBeVisible();
+ const running=page.locator('[data-message-bar]').filter({has:page.getByRole('button',{name:'取消任务',exact:true})});
+ await expect(running.getByRole('button',{name:'关闭提示'})).toHaveCount(0);
+ await page.clock.install();await page.clock.runFor(31000);
+ await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'取消任务',exact:true})).toBeVisible();
+ state.disconnects=0;state.status='cancelled';await page.clock.runFor(1000);
+ await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeEnabled();
+ await expect(page.getByRole('status').filter({hasText:'已取消对齐'})).toBeVisible();
+});
+test('dismissing a task failure removes its retry action until explicitly reopened',async({page})=>{
+ const state=await setup(page);state.error={cpu_retry:true,message:'GPU 计算失败'};state.status='failed';
+ const failure=page.locator('[data-message-bar]').filter({hasText:'GPU 计算失败'});
+ await expect(failure.getByRole('button',{name:'使用 CPU 重试'})).toBeVisible();
+ await failure.getByRole('button',{name:'关闭提示'}).click();
+ await expect(page.getByRole('button',{name:'使用 CPU 重试'})).toHaveCount(0);
+ await page.getByRole('button',{name:'编辑',exact:true}).click();await page.getByRole('button',{name:'音频处理',exact:true}).click();
+ await expect(failure).toHaveCount(0);await page.getByRole('button',{name:'查看最近对齐结果'}).click();
+ await expect(failure.getByRole('button',{name:'使用 CPU 重试'})).toBeVisible();
 });

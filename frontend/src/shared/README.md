@@ -4,4 +4,4 @@
 
 `Controls` 中的按钮通过 `data-role` 声明 primary、secondary、inline、danger 或 danger-primary，选中态使用 ARIA 属性。`Icon` 提供统一 SVG，IconButton 组合可访问名称、悬停与键盘提示；BooleanField 使用原生 checkbox 支持开关与三态。
 
-`Select` 根据实际弹层尺寸及视口空间定位，保留键盘和焦点行为；歌词引用采用独立文本层级。`Disclosure` 管理按需挂载与 ARIA 关联，`MessageBar` 管理反馈呈现，`measure-text` 提供当前字体的文字测宽。对话框统一内容滚动、固定操作区、焦点圈定与返回。
+`Select` 根据实际弹层尺寸及视口空间定位，保留键盘和焦点行为；歌词引用采用独立文本层级。`Disclosure` 管理按需挂载与 ARIA 关联，`MessageBar` 管理持续状态和事件反馈呈现（可选操作、关闭与时效），事件对象区分同文案的不同发布；关闭收起本次事件和操作，计时器随事件清理，键盘焦点在栏内时暂停自动关闭，`measure-text` 提供当前字体的文字测宽。对话框统一内容滚动、固定操作区、焦点圈定与返回。

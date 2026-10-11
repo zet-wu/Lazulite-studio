@@ -1,4 +1,4 @@
-import { MessageBar, useNotice } from '../shared/MessageBar';
+import { MessageBar, useNotice, type Notice } from '../shared/MessageBar';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
@@ -26,6 +26,11 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const [gapDraft,setGapDraft]=useState('500'),[gapError,setGapError]=useState('');
   const gapId=useId(),gapErrorId=useId();
   const [message,setMessage]=useNotice();
+  const [connection,setConnection]=useNotice();
+  const recent = useRef<Notice | null>(null);
+  const resultMessage = (text: string, role: Notice['role'] = 'alert', timeout?: number, taskId?: string) => {
+    recent.current = setMessage(text, role, timeout, taskId);
+  };
   const [cpuFailure,setCpuFailure] = useState<{id:string; source:string; revision:string; options:ReturnType<typeof defaultAlignmentOptions>}|null>(null);
   const [deviceText,setDeviceText] = useState('');
   const [progress,setProgress]=useState('');
@@ -49,12 +54,13 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
     catch(e){setMessage((e as Error).message);}finally{if(mounted.current)setOpening(false);}
   };
   const start=async(retryCpu = false)=>{
+    if (operation.current) return;
     const threshold=options.merge_short_gaps?Number(gapDraft):500;
     if(options.merge_short_gaps && (!gapDraft.trim() || !Number.isSafeInteger(threshold) || threshold<=0)){setGapError('行内空隙阈值必须为正的安全整数毫秒');return;}
     const failed = retryCpu ? cpuFailure : null;
     if (retryCpu && (!failed || failed.source !== JSON.stringify(project))) { setMessage('歌词、声学内容或应用意图已改变，请重新发起对齐'); return; }
     const selected = failed?.options ?? {...options,gap_threshold_ms:threshold};
-    setDialog(false);setRunning(true);setCancelling(false);setMessage('');setProgress('正在准备');
+    setDialog(false);setRunning(true);setCancelling(false);setMessage('');setConnection('');setDeviceText('');recent.current=null;setProgress('正在准备');
     let lock:ReturnType<AlignmentControl['lock']>;
     try{lock=control.lock();}catch(e){setMessage((e as Error).message);setRunning(false);return;}
     const op={alive:true,cancel:false,id:undefined as string|undefined,lock};operation.current=op;
@@ -69,8 +75,9 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       try {job=failed ? await jobsApi.retryCpu(failed.id,saved.revision,key) : await alignmentApi.start(pid,saved.revision,selected,key);}
       catch(e){if(e instanceof TypeError)job=failed ? await jobsApi.retryCpu(failed.id,saved.revision,key) : await alignmentApi.start(pid,saved.revision,selected,key);else throw e;}
       op.id=job.id;
-      if(!op.alive||op.cancel){await alignmentApi.cancel(job.id);if(op.alive)setMessage('已取消对齐','status',4000);return;}
-      let disconnectedAt = 0;
+      if(!op.alive){void alignmentApi.cancel(job.id).catch(()=>undefined);return;}
+      if(op.cancel) await alignmentApi.cancel(job.id).catch(e=>setConnection(`取消请求失败：${e.message}`));
+      let disconnected = false;
       while(op.alive){
         if(job.request?.devices)setDeviceText(Object.entries(job.request.devices).map(([stage,d])=>`${stage==='vocal'?'人声分离':'自动对齐'}：${d.label}${d.reason ? `（${d.reason}）` : ''}`).join('；'));
         if(job.status==='failed'&&job.error?.cpu_retry)setCpuFailure({id:job.id,source:JSON.stringify(op.lock.source),revision:saved.revision,options:selected});
@@ -81,25 +88,32 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
           if(!op.alive||op.cancel){if(op.alive)setMessage('已取消应用','status',4000);break;}
           if(current.revision!==saved.revision || result.binding.revision!==saved.revision || result.binding.project_id!==pid || result.binding.asset_id!==assetId)throw new Error('项目版本或音频已改变，请重新运行');
           const merged=mergeAlignment(op.lock.source,result,durationMs,selected.clear_unmatched,selected.merge_short_gaps?selected.gap_threshold_ms:null);op.lock.apply(merged.project);
-          setMessage([merged.project===op.lock.source?'未更新歌词时间':'已更新歌词时间', merged.mergedGaps?`合并 ${merged.mergedGaps} 处行内空隙`:'', merged.cleared.length?`清空 ${merged.cleared.length} 个词／注音的缺失端点`:'', merged.retained.length?`${merged.retained.length} 个词／注音部分时间保留原值`:''].filter(Boolean).join('；'), 'status', merged.retained.length||merged.cleared.length?8000:4000);break;
+          resultMessage([merged.project===op.lock.source?'未更新歌词时间':'已更新歌词时间', merged.mergedGaps?`合并 ${merged.mergedGaps} 处行内空隙`:'', merged.cleared.length?`清空 ${merged.cleared.length} 个词／注音的缺失端点`:'', merged.retained.length?`${merged.retained.length} 个词／注音部分时间保留原值`:''].filter(Boolean).join('；'), 'status', merged.retained.length||merged.cleared.length?8000:4000);break;
         }
-        if(['failed','cancelled','interrupted'].includes(job.status)){setMessage(job.error?.message??(job.status==='cancelled'?'已取消对齐':'服务中断，请重新运行'), job.status==='cancelled'?'status':'alert', job.status==='cancelled'?4000:undefined);break;}
-        if(!disconnectedAt)setProgress(op.cancel?'正在取消':({separating:'正在分离人声',analyzing:'正在分析声区',acoustic:'正在计算声学概率',decode:'正在全局对齐'}[job.stage??'']??'正在对齐'));
+        if(['failed','cancelled','interrupted'].includes(job.status)){resultMessage(job.error?.message??(job.status==='cancelled'?'已取消对齐':'服务中断，请重新运行'), job.status==='cancelled'?'status':'alert', job.status==='cancelled'?4000:undefined,job.id);break;}
+        setProgress(op.cancel?'正在取消':job.status==='queued'?'排队中':({separating:'正在分离人声',analyzing:'正在分析声区',acoustic:'正在计算声学概率',decode:'正在全局对齐'}[job.stage??'']??'正在对齐'));
         await new Promise(resolve=>setTimeout(resolve,700));
         if(!op.alive)break;
-        try{job=await alignmentApi.state(job.id);disconnectedAt=0;}catch(e){if(e instanceof TypeError){if(!disconnectedAt)setMessage('连接中断，正在重新确认运行状态');disconnectedAt ||= Date.now();if(Date.now()-disconnectedAt>30000){op.cancel=true;void alignmentApi.cancel(job.id).catch(()=>undefined);throw new Error('服务连接中断，本次结果不再应用；恢复连接后确认状态');}continue;}throw e;}
+        try { job=await alignmentApi.state(job.id); if(disconnected){setConnection('');disconnected=false;} }
+        catch(e) {
+          if(!disconnected) setConnection(`连接中断，正在重新确认运行状态：${(e as Error).message}`);
+          disconnected=true;
+          // The last observed task and lock remain authoritative until a terminal state arrives.
+          continue;
+        }
       }
-    }catch(e){if(op.alive)setMessage((e as Error).message);}
-    finally{op.lock.release();if(operation.current===op)operation.current=null;if(mounted.current)setRunning(false);void jobs.refetch();}
+    }catch(e){if(op.alive)resultMessage((e as Error).message);}
+    finally{op.lock.release();if(operation.current===op)operation.current=null;if(mounted.current){setRunning(false);setConnection('');}void jobs.refetch();}
   };
-  const cancel=()=>{const op=operation.current;if(!op)return;op.cancel=true;setCancelling(true);setProgress('正在取消');if(op.id)void alignmentApi.cancel(op.id).catch(e=>setMessage(`正在取消；${e.message}`));};
-  const button=<span className={styles.entry}><button data-role="primary" disabled={!!reason||opening||running||control.locked} title={reason??undefined} onClick={()=>void open()}>{running?'正在对齐':'自动对齐'}</button>{reason&&!running&&<small>{reason}</small>}</span>;
+  const cancel=()=>{const op=operation.current;if(!op)return;op.cancel=true;setCancelling(true);setProgress('正在取消');if(op.id)void alignmentApi.cancel(op.id).catch(e=>{setCancelling(false);setConnection(`取消请求失败：${e.message}`);});};
+  const button=<span className={styles.entry}><button data-role="primary" disabled={!!reason||opening||running||control.locked} title={reason??undefined} onClick={()=>void open()}>{running?'正在对齐':'自动对齐'}</button>{reason&&!running&&<small>{reason}</small>}{!running&&recent.current&&<button data-role="inline" onClick={()=>{const notice=recent.current!;setMessage(notice.text,notice.role,notice.timeout,notice.taskId);}}>查看最近对齐结果</button>}</span>;
   return <>
     {visible&&(ui.alignmentHost?createPortal(button,ui.alignmentHost):button)}
-    <MessageBar notice={message}/>
-    {visible && deviceText && <p>{deviceText}</p>}
-    {visible && cpuFailure && <button data-role="secondary" disabled={running||control.locked||!!active} onClick={()=>void start(true)}>使用 CPU 重试</button>}
-    {running&&<div className={styles.status}><span role="status">{cancelling?'正在取消':progress}</span><button data-role="secondary" disabled={cancelling} onClick={cancel}>{cancelling?'正在取消':'取消'}</button></div>}
+    {ui.taskHost && running && createPortal(<MessageBar notice={{ text: `自动对齐 · ${progress}${deviceText ? ` · ${deviceText}` : ''}`, role: 'status', origin: null, dismissible: false }} actions={<button data-role="secondary" disabled={cancelling} onClick={cancel}>取消任务</button>}/>, ui.taskHost)}
+    {ui.messageHost && createPortal(<>
+      <MessageBar notice={message} actions={message?.taskId && cpuFailure?.id === message.taskId ? <button data-role="secondary" disabled={running||control.locked||!!active} onClick={()=>void start(true)}>使用 CPU 重试</button> : message?.taskId && message.role==='alert' ? <button data-role="secondary" disabled={running||control.locked||!!reason} onClick={()=>void open()}>重试</button> : undefined}/>
+      <MessageBar notice={connection}/>
+    </>, ui.messageHost)}
     {dialog&&<SettingsDialog title="自动对齐" close={()=>setDialog(false)} actions={<><button data-role="secondary" data-initial-focus onClick={()=>setDialog(false)}>取消</button><button data-role="primary" disabled={!summary?.emitting_count} onClick={()=>void start()}>开始对齐</button></>}>
       <p>请确认假名注音完整且与实际唱法一致。自动对齐使用正文和假名注音，处理期间无法编辑，完成后一次应用未跳过行的时间，可一次撤销。</p>
       <p>将对齐 {summary?.line_count} 行，跳过 {summary?.skipped_count} 行</p>

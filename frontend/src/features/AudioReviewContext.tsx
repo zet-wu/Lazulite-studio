@@ -8,8 +8,10 @@ function useAudioState() {
   const [toolsHost, setToolsHost] = useState<HTMLDivElement | null>(null);
   const [alignmentHost, setAlignmentHost] = useState<HTMLDivElement | null>(null);
   const [statusHost, setStatusHost] = useState<HTMLDivElement | null>(null);
+  const [taskHost, setTaskHost] = useState<HTMLDivElement | null>(null);
+  const [messageHost, setMessageHost] = useState<HTMLDivElement | null>(null);
   const [timelineReady, setTimelineReady] = useState(false);
-  return { selected, setSelected, segmentTarget, adding, setAdding, toolsHost, setToolsHost, alignmentHost, setAlignmentHost, statusHost, setStatusHost, timelineReady, setTimelineReady };
+  return { taskHost, setTaskHost, messageHost, setMessageHost, selected, setSelected, segmentTarget, adding, setAdding, toolsHost, setToolsHost, alignmentHost, setAlignmentHost, statusHost, setStatusHost, timelineReady, setTimelineReady };
 }
 const Context = createContext<ReturnType<typeof useAudioState> | null>(null);
 export const useAudioReview = () => useContext(Context)!;

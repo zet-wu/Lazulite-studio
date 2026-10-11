@@ -3,7 +3,7 @@ import { SettingsDialog } from './SettingsDialog';
 import { preferences } from '../../adapters/preferences';
 import { Icon } from '../../shared/Icon';
 import { Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { LyricFormat } from '../../adapters/lyric-formats';
 import { KanaHighlightDialog } from './KanaHighlightDialog';
 import { ShortcutDialog } from './ShortcutDialog';
@@ -14,6 +14,7 @@ type Props = MenuState & {
   title: string;
   onAmllSettings?: () => void;
   dirty: boolean;
+  editingLocked?: boolean;
   saving?: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -29,6 +30,7 @@ type Props = MenuState & {
 };
 
 export function EditorMenu(props: Props) {
+  const header = useRef<HTMLElement>(null);
   const [devicesOpen, setDevicesOpen] = useState(false);
   const [kanaOpen, setKanaOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -37,7 +39,7 @@ export function EditorMenu(props: Props) {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     preferences.setItem('lazulite-editor-theme', dark ? 'dark' : 'light');
   }, [dark]);
-  return <header className={styles.header}>
+  return <header ref={header} className={styles.header}>
     <Link to="/projects" className={styles.brand}>Lazulite Studio</Link>
     <strong>{props.title}</strong>
     <span>{props.saving ? '保存中' : props.dirty ? '未保存' : '已保存'}</span>
@@ -52,12 +54,12 @@ export function EditorMenu(props: Props) {
       </TopMenu>
       <TopMenu id="settings" title="设置" className={`${styles.settingsMenu} ${styles.deviceSettingsMenu}`} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
         <button data-role="inline" onClick={() => setDevicesOpen(true)}>计算设备…</button>
-        {props.onAmllSettings && <button data-role="inline" onClick={props.onAmllSettings}>AMLL 兼容设置</button>}
+        {props.onAmllSettings && <button data-role="inline" disabled={props.editingLocked} onClick={props.onAmllSettings}>AMLL 兼容设置</button>}
         <button data-role="inline" onClick={() => setShortcutsOpen(true)}>快捷键设置</button>
         <button data-role="inline" onClick={() => setKanaOpen(true)}>音译生成假名高亮</button>
       </TopMenu>
     </div>
-    {devicesOpen && <SettingsDialog title="计算设备" close={() => setDevicesOpen(false)}><DeviceSettings /></SettingsDialog>}
+    {devicesOpen && <SettingsDialog title="计算设备" returnFocus={() => header.current?.querySelector<HTMLElement>('[data-top-menu="settings"] summary') ?? null} close={() => setDevicesOpen(false)}><DeviceSettings /></SettingsDialog>}
     {kanaOpen && <KanaHighlightDialog close={() => setKanaOpen(false)} />}
     {shortcutsOpen && <ShortcutDialog close={() => setShortcutsOpen(false)} />}
   </header>;

@@ -19,3 +19,11 @@ it('expires at four/eight seconds, never expires errors, and cleans old timers',
  fireEvent.click(screen.getByText('成功'));fireEvent.click(screen.getByRole('button',{name:'关闭提示'}));expect(vi.getTimerCount()).toBe(0);
  fireEvent.click(screen.getByText('成功'));view.unmount();expect(vi.getTimerCount()).toBe(0);
 });
+it('keeps running status non-dismissible and pauses timed actions while focused',()=>{
+ vi.useFakeTimers();
+ const view=render(<MessageBar notice={{text:'自动对齐 · 运行中',role:'status',origin:null,dismissible:false,timeout:4000}} actions={<button>取消任务</button>}/>);
+ expect(screen.queryByRole('button',{name:'关闭提示'})).toBeNull();act(()=>vi.advanceTimersByTime(5000));expect(screen.getByText('自动对齐 · 运行中')).toBeVisible();
+ view.rerender(<MessageBar notice={{text:'完成',role:'status',origin:null,timeout:4000}} actions={<button>查看结果</button>}/>);
+ act(()=>screen.getByRole('button',{name:'查看结果'}).focus());act(()=>vi.advanceTimersByTime(10000));expect(screen.getByText('完成')).toBeVisible();
+ act(()=>screen.getByRole('button',{name:'查看结果'}).blur());act(()=>vi.advanceTimersByTime(4000));expect(screen.queryByText('完成')).toBeNull();
+});

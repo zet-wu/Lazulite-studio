@@ -24,11 +24,11 @@ test('reanalysis uses a new result, undo is not readopted, failure returns and s
  await page.route(`**/projects/${pid}/jobs`,async route=>{if(!failed)return route.continue();await route.fulfill({json:{schema_version:'studio-job-list-v1',items:[{id:'failed-phase1',kind:'vocal',status:'failed',request:{retry_analysis_id:old.analysisId},error:{message:'测试分析失败'}}]}});});
  await menu(page);await page.getByRole('button',{name:'重新进行声学分析',exact:true}).click();
  await expect(page.getByRole('alert').filter({hasText:'测试分析失败'})).toBeVisible();
- await page.getByRole('button',{name:'返回上次结果'}).click();await expect(page.locator('[data-segment-id]').first()).toBeVisible();
+ await page.locator('[data-message-bar]').filter({hasText:'测试分析失败'}).getByRole('button',{name:'关闭提示'}).click();await expect(page.locator('[data-segment-id]').first()).toBeVisible();
  await page.getByRole('button',{name:'编辑',exact:true}).click();await page.getByRole('button',{name:'音频处理',exact:true}).click();
  await page.waitForTimeout(1200);await expect(page.getByText('测试分析失败')).toHaveCount(0);
  expect(await current()).toEqual(old);
- await menu(page);await page.getByRole('button',{name:'查看最近处理结果'}).click();await expect(page.getByText('测试分析失败')).toBeVisible();
+ await page.getByRole('button',{name:'查看最近处理结果'}).click();await expect(page.getByText('测试分析失败')).toBeVisible();
 });
 test('wheel consumes waveform and energy at limits, energy geometry stays fixed, add feather and shared select work',async({page})=>{
  const warnings:string[]=[];page.on('console',msg=>{if(msg.text().includes('passive event'))warnings.push(msg.text());});
