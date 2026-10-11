@@ -19,7 +19,7 @@ TARGETS = {'windows-x64-cpu': ('Windows', 'AMD64'), 'windows-x64-cuda': ('Window
 
 def check_source():
     source = ROOT / 'vendor/Lazulite'
-    if not (source / 'pyproject.toml').is_file(): raise RuntimeError('子模块未初始化，请运行 git submodule update --init --recursive；本地未发布 gitlink 需先导入转交 bundle')
+    if not (source / 'pyproject.toml').is_file(): raise RuntimeError('子模块未初始化，请运行 git submodule update --init --recursive')
     expected = subprocess.check_output(['git', 'ls-files', '--stage', 'vendor/Lazulite'], cwd=ROOT, text=True).split()[1]
     actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source, text=True).strip()
     dirty = subprocess.check_output(['git', 'status', '--porcelain'], cwd=source, text=True).strip()
