@@ -25,10 +25,17 @@ def test_download_rejects_bad_identity_and_cleans_partial(tmp_path):
 
 
 @pytest.mark.parametrize('name', ['../escape', '/absolute', 'C:/drive', 'foo\\bar', 'dir/../../escape'])
-def test_zip_rejects_paths_outside_destination(tmp_path, name):
+@pytest.mark.parametrize('zip_separator', ['/', '\\'])
+def test_zip_rejects_paths_outside_destination(tmp_path, monkeypatch, name, zip_separator):
     archive = tmp_path / 'input.zip'
+    # Exercise both ZipInfo separator conventions on every test host.
+    monkeypatch.setattr(zipfile.os, 'sep', zip_separator)
+    entry = zipfile.ZipInfo(name)
+    entry.filename = name  # Preserve the hostile name instead of normalizing it on write.
     with zipfile.ZipFile(archive, 'w') as target:
-        target.writestr(name, 'bad')
+        target.writestr(entry, 'bad')
+    with zipfile.ZipFile(archive) as source:
+        assert source.infolist()[0].orig_filename == name
     with pytest.raises(ValueError):
         extract(archive, tmp_path / 'out')
 

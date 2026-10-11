@@ -51,7 +51,9 @@ def extract(archive, root):
     if zipfile.is_zipfile(archive):
         with zipfile.ZipFile(archive) as source:
             for item in source.infolist():
-                target = member_path(root, item.filename)
+                # ZipInfo normalizes backslashes on Windows; validate before that
+                # transformation so admission rules do not depend on the host OS.
+                target = member_path(root, item.orig_filename)
                 mode = item.external_attr >> 16
                 if stat.S_ISLNK(mode):
                     raise ValueError('ZIP 不允许符号链接')
