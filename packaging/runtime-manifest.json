@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "status": "candidate-native-validation-required",
+  "build_python_version": "3.12.10",
   "python_version": "3.12.15",
   "python_release": "20261009",
   "node": "22.22.2",

@@ -29,3 +29,19 @@ def test_build_rejects_wrong_native_platform_before_downloads(tmp_path, monkeypa
     with pytest.raises(RuntimeError, match='原生架构'):
         build.build('windows-x64-cpu', tmp_path)
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize('target,system,arch', [
+    ('windows-x64-cpu', 'Windows', 'AMD64'),
+    ('windows-x64-cuda', 'Windows', 'AMD64'),
+    ('macos-arm64', 'Darwin', 'arm64'),
+])
+def test_build_host_uses_its_own_version_pin(monkeypatch, target, system, arch):
+    runtime = {'build_python_version':'3.12.10', 'python_version':'3.12.15'}
+    monkeypatch.setattr(build.platform, 'system', lambda: system)
+    monkeypatch.setattr(build.platform, 'machine', lambda: arch)
+    monkeypatch.setattr(build.platform, 'python_version', lambda: '3.12.10')
+    build.check_build_host(target, runtime)
+    monkeypatch.setattr(build.platform, 'python_version', lambda: '3.13.0')
+    with pytest.raises(RuntimeError, match='构建 Python 3.12.10'):
+        build.check_build_host(target, runtime)

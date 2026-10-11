@@ -170,12 +170,14 @@ python -m pip install -r server/requirements-alignment.txt
 
 原生构建机使用 CPython 3.12，按平台运行 `python packaging/resolve.py --target windows-x64-cpu|windows-x64-cuda|macos-arm64 --output <空目录>`（target 选择其中一项）。此入口生成完整依赖锁与 wheelhouse 并验证离线安装，拒绝把 Linux 解析结果冒充目标平台结果。模型摘要使用 `python packaging/verify_models.py <models目录>` 检查，实际入口使用 `python packaging/smoke.py --root <完整目录>` 验证。固定清单在 `packaging/runtime-manifest.json` 和 `packaging/models.json`。
 
-在对应 Windows x64／Mac arm64 构建机，使用清单指定版本的 Python、Node 和 pnpm，运行：
+在对应 Windows x64／Mac arm64 构建机，使用构建 Python 3.12.10 及清单指定版本的 Node 和 pnpm，运行：
 
 ```sh
 python -m pip install pefile==2024.8.26
 python packaging/build.py --target windows-x64-cpu --output /path/outside/repo/portable
 ```
+
+构建解释器固定为 `build_python_version`（3.12.10，来自 setup-python 支持矩阵）；随包解释器独立固定为 `python_version`（PBS 3.12.15）。两者共用 CPython 3.12 ABI，随包解释器仍须独立执行安装和冒烟检查。
 
 `target` 可选 `windows-x64-cpu`、`windows-x64-cuda`、`macos-arm64`；输出必须为仓库外的空目录，输入检出必须干净。Windows 构建机需有创建临时防火墙规则的管理员权限且防火墙开启；Mac 使用系统 sandbox-exec。网络隔离仅用于构建时的模型冒烟。构建入口解析完整依赖、构建前端、组装独立运行时和本地模型，检查许可、原生导入与架构，生成 ZIP 后移到中文／空格／特殊字符路径解包验证。通过后 `artifacts/` 包含 ZIP、SHA256SUMS、使用说明和 validation.json；失败保留 build.log，不提供未通过冒烟的 ZIP。超过大小上限时生成多个可独立解压的组件，全部解压到同一目录即为完整包。
 

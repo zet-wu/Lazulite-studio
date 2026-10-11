@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import platform
 from pathlib import Path
 import subprocess
 import sys
@@ -17,6 +18,8 @@ def main():
     root = args.root.resolve()
     if not Path(sys.executable).resolve().is_relative_to(root / 'runtime/python'):
         raise RuntimeError('冒烟必须使用包内解释器')
+    manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+    assert platform.python_version() == manifest['python'], (platform.python_version(), manifest['python'])
     import fastapi, uvicorn, torch, torchaudio, demucs, transformers, soundfile, lazulite
     from sudachipy import dictionary
     from opencc import OpenCC
