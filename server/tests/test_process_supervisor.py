@@ -5,6 +5,14 @@ import pytest
 from server.process_supervisor import spawn, stop
 
 
+def test_shutdown_rejects_late_http_subprocesses(monkeypatch):
+    from server import process_supervisor
+    monkeypatch.setattr(process_supervisor, '_sealed', False)
+    process_supervisor.seal()
+    with pytest.raises(RuntimeError, match='停止'):
+        spawn([sys.executable, '-c', 'raise AssertionError("must not run")'])
+
+
 @pytest.mark.skipif(os.name == 'nt', reason='POSIX process group assertion; Windows Job Object requires native runner')
 def test_grandchild_is_killed_after_leader_exits(tmp_path):
     marker = tmp_path / 'alive'

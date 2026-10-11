@@ -105,6 +105,8 @@ def launch(root, *, no_browser=False):
         import uvicorn
         class LocalServer(uvicorn.Server):
             def handle_exit(self, sig, frame):
+                from .process_supervisor import seal
+                seal()
                 app.state.jobs.begin_stop()
                 threading.Thread(target=app.state.jobs.close, daemon=True).start()
                 super().handle_exit(sig, frame)

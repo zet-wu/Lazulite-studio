@@ -7,6 +7,13 @@ import time
 
 _lock = threading.RLock()
 _active = {}
+_sealed = False
+
+
+def seal():
+    """Called at portable shutdown before HTTP requests finish draining."""
+    global _sealed
+    with _lock: _sealed = True
 
 
 class WindowsJob:
@@ -41,6 +48,7 @@ def spawn(args, **kwargs):
     if os.name == 'nt': kwargs['creationflags'] = kwargs.get('creationflags', 0) | subprocess.CREATE_NEW_PROCESS_GROUP
     else: kwargs['start_new_session'] = True
     with _lock:
+        if _sealed: raise RuntimeError('服务正在停止，不再启动子进程')
         process = subprocess.Popen(args, **kwargs)
         try:
             job = WindowsJob(process) if os.name == 'nt' else None
