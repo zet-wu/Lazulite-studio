@@ -15,6 +15,7 @@ import os
 import shutil
 import struct
 import subprocess
+from ..process_supervisor import run as run_process
 import tempfile
 import threading
 import wave
@@ -73,7 +74,7 @@ def probe_media(path: Path, *, ffprobe: str = "ffprobe") -> MediaProbe:
     """Probe the first audio stream without decoding the whole input."""
     cmd = [ffprobe, "-v", "error", "-of", "json", "-show_format", "-show_streams", str(path)]
     try:
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        result = run_process(cmd, check=True, capture_output=True, text=True)
         data = json.loads(result.stdout)
     except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
         raise MediaError("media probe failed") from exc
@@ -161,7 +162,7 @@ class MediaService:
             os.close(fd)
             temporary = Path(temporary_name)
             try:
-                subprocess.run(
+                run_process(
                     [self.ffmpeg, "-y", "-v", "error", "-i", str(asset.path), "-map", "0:a:0", "-vn", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", str(temporary)],
                     check=True,
                     capture_output=True,

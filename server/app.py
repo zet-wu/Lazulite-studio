@@ -621,6 +621,7 @@ def create_app(
     api.include_router(build_publish_router(job_service, auth=auth, write=write, project_row=project, asset_path=asset_path_for_project))
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
     api.include_router(settings_router(preferences, auth=auth, write=write))
+    app.state.jobs = job_service
     app.include_router(api)
     if cfg.mode == "local":
         from .local_web import LocalBoundary

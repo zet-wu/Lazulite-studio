@@ -22,6 +22,8 @@ class JobService:
         self.db, self.asset_path, self.publish_runner = db, asset_path, publish_runner
         self.vocal_runner = vocal_runner
         self.alignment_runner = alignment_runner
+        self._closing = False
+        self._closed = False
         self._lock = threading.RLock(); self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="studio-job")
         with db.transaction() as c:
             rows = c.execute("SELECT id FROM jobs WHERE status IN ('queued','running','cancel_requested')").fetchall()
@@ -71,7 +73,8 @@ class JobService:
 
     def create(self, project_id, kind, request, *, idem_key=None, subject="local"):
         digest=json.dumps([subject, kind, request],sort_keys=True,separators=(",",":"),ensure_ascii=False)
-        with self.db.transaction() as c:
+        with self._lock, self.db.transaction() as c:
+            if self._closing: raise ValueError("服务正在停止，不再接受任务")
             if idem_key:
                 old=c.execute("SELECT request_hash,job_id FROM job_idempotency WHERE project_id=? AND idem_key=?",(project_id,idem_key)).fetchone()
                 if old:
@@ -89,11 +92,13 @@ class JobService:
             c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at,state_version) VALUES(?,?,?,?,?,?,?,0)",(jid,project_id,kind,"queued",json.dumps(request, ensure_ascii=False),t,t))
             self._event(c,jid,"state","queued",0,1,"任务已排队")
             if idem_key: c.execute("INSERT INTO job_idempotency VALUES(?,?,?,?)",(project_id,idem_key,digest,jid))
-        self._pool.submit(self._run,jid)
+        with self._lock:
+            if not self._closing: self._pool.submit(self._run,jid)
         return self.get(jid)
 
     def _run(self,jid):
-        with self.db.transaction() as c:
+        with self._lock, self.db.transaction() as c:
+            if self._closing: return
             row=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
             if not row or row[3] != "queued": return
             t=now(); c.execute("UPDATE jobs SET status='running',started_at=?,updated_at=?,state_version=state_version+1 WHERE id=?",(t,t,jid)); self._event(c,jid,"state","running",0,1,"任务开始")
@@ -148,7 +153,7 @@ class JobService:
         except (PublishInvalid, PublishingError) as exc: self._finish_error(jid, "publish_failed", str(exc))
         except (EngineUnavailable, ReadingUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
         except Exception as exc:
-            logger.exception("job %s failed", jid)
+            logger.warning("job %s failed (%s)", jid, type(exc).__name__)
             self._finish_error(jid, "engine_error", str(exc) if kind == "alignment" else "Lazulite engine failed; inspect server logs")
 
         finally:
@@ -159,9 +164,15 @@ class JobService:
                 except OSError:
                     logger.warning('Unpublished export cleanup deferred: %s',result['output_path'])
 
-    def _finish_error(self,jid,code,message):
+    def _finish_error(self,jid,code,message, **extra):
         with self.db.transaction() as c:
-            t=now(); c.execute("UPDATE jobs SET status='failed',error_json=?,updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps({"code":code,"message":message}),t,t,jid)); self._event(c,jid,"state","failed",None,None,message)
+            state = c.execute('SELECT cancel_requested FROM jobs WHERE id=?', (jid,)).fetchone()
+            if state and state[0]:
+                t = now()
+                c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=?", (t,t,jid))
+                self._event(c,jid,'state','cancelled',None,None,'服务停止或取消请求已结束任务')
+                return
+            t=now(); c.execute("UPDATE jobs SET status='failed',error_json=?,updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps({"code":code,"message":message, **extra}),t,t,jid)); self._event(c,jid,"state","failed",None,None,message)
 
     def emit(self,jid,kind,stage,completed=None,total=None,message=None):
         with self.db.transaction() as c: self._event(c,jid,kind,stage,completed,total,message)
@@ -190,7 +201,30 @@ class JobService:
         with self.db.connect() as c: row=c.execute("SELECT result_json FROM jobs WHERE id=?",(jid,)).fetchone()
         return json.loads(row[0]) if row and row[0] else None
 
+    def begin_stop(self):
+        with self._lock:
+            if self._closing: return
+            self._closing = True
+            with self.db.transaction() as c:
+                for row in c.execute("SELECT id,status FROM jobs WHERE status IN ('queued','running','cancel_requested')").fetchall():
+                    state = 'cancelled' if row['status'] == 'queued' else 'cancel_requested'
+                    t = now()
+                    c.execute('UPDATE jobs SET status=?,cancel_requested=1,updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=?', (state,t,t if state == 'cancelled' else None,row['id']))
+                    self._event(c,row['id'],'state',state,None,None,'服务正在停止')
+
     def close(self):
+        self.begin_stop()
+        with self._lock:
+            if self._closed: return
+            self._closed = True
+        import time
+        deadline = time.monotonic() + 1.5
+        while time.monotonic() < deadline:
+            with self.db.connect() as c:
+                if not c.execute("SELECT 1 FROM jobs WHERE status='cancel_requested'").fetchone(): break
+            time.sleep(.05)
         if self.vocal_runner is not None: self.vocal_runner.close()
         if self.alignment_runner is not None: self.alignment_runner.close()
-        self._pool.shutdown(wait=False, cancel_futures=False)
+        from .process_supervisor import close_all
+        close_all()
+        self._pool.shutdown(wait=True, cancel_futures=True)

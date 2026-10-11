@@ -100,7 +100,7 @@ def test_native_negative_media_origin_is_preserved_in_milliseconds(monkeypatch):
     import json
     from types import SimpleNamespace
     from server.studio.media import probe_media
-    monkeypatch.setattr(subprocess, 'run', lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps({
+    monkeypatch.setattr('server.studio.media.run_process', lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps({
         'streams': [{'codec_type':'audio','start_time':'-0.012','duration':'1.0005','sample_rate':'48000','channels':2}],
         'format': {'format_name':'wav'},
     })))
@@ -117,14 +117,15 @@ def test_concurrent_cold_windows_build_one_proxy_and_peak_set(tmp_path, monkeypa
     with wave.open(str(source),'wb') as out:
         out.setnchannels(1);out.setsampwidth(2);out.setframerate(44100);out.writeframes(b'\0\0'*44100)
     media=MediaService(tmp_path/'data');asset=media.import_asset(source)
-    run=subprocess.run;mkdtemp=tempfile.mkdtemp;counts={'decode':0,'peaks':0}
+    from server.studio.media import run_process
+    run=run_process;mkdtemp=tempfile.mkdtemp;counts={'decode':0,'peaks':0}
     def tracked_run(cmd,*a,**kw):
         if cmd[0]=='ffmpeg':counts['decode']+=1
         return run(cmd,*a,**kw)
     def tracked_temp(*a,**kw):
         if '.peaks-' in kw.get('prefix',''):counts['peaks']+=1
         return mkdtemp(*a,**kw)
-    monkeypatch.setattr(subprocess,'run',tracked_run);monkeypatch.setattr(tempfile,'mkdtemp',tracked_temp)
+    monkeypatch.setattr('server.studio.media.run_process',tracked_run);monkeypatch.setattr(tempfile,'mkdtemp',tracked_temp)
     with ThreadPoolExecutor(max_workers=6) as pool:
         windows=list(pool.map(lambda _:media.peaks(asset,level=1,start_ms=0,end_ms=1000),range(6)))
     assert counts=={'decode':1,'peaks':1}

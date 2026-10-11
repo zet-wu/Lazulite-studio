@@ -57,11 +57,16 @@ def launch(root, *, no_browser=False):
     try:
         lock = InstanceLock(data).__enter__()
     except AlreadyRunning:
-        try:
-            identity = json.loads((data / 'runtime/identity.json').read_text(encoding='utf-8'))
-            origin = f'http://127.0.0.1:{identity["port"]}'
-            if identity['data_dir'] != str(data) or not handshake(origin, identity): raise ValueError()
-        except (OSError, ValueError, KeyError):
+        matched = False
+        for _ in range(80):
+            try:
+                identity = json.loads((data / 'runtime/identity.json').read_text(encoding='utf-8'))
+                origin = f'http://127.0.0.1:{identity["port"]}'
+                if identity['data_dir'] == str(data) and handshake(origin, identity):
+                    matched = True; break
+            except (OSError, ValueError, KeyError): pass
+            time.sleep(.25)
+        if not matched:
             raise RuntimeError('数据目录已被占用，但运行身份未就绪或不匹配；请检查原终端')
         if not no_browser: webbrowser.open(origin + '/projects')
         print('已打开正在运行的 Studio：' + origin)
@@ -78,11 +83,18 @@ def launch(root, *, no_browser=False):
         configure_environment(root, manifest)
         logs = root / 'logs'; logs.mkdir(exist_ok=True)
         handler = RotatingFileHandler(logs / 'studio.log', maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
+        class SummaryOnly(logging.Filter):
+            def filter(self, record):
+                if record.exc_info:
+                    record.msg = str(record.msg) + ' (' + record.exc_info[0].__name__ + ')'
+                    record.exc_info = None; record.exc_text = None
+                return True
+        handler.addFilter(SummaryOnly())
         handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s %(message)s'))
         logging.getLogger().addHandler(handler)
         logging.getLogger().setLevel(logging.INFO)
         origin = f'http://127.0.0.1:{port}'
-        identity = {'nonce': uuid.uuid4().hex, 'library_id': value['library_id'], 'data_dir': str(data), 'port': port, 'pid': os.getpid(), 'started_at': time.time(), 'version': manifest['version']}
+        identity = {'nonce': uuid.uuid4().hex, 'library_id': value['library_id'], 'data_dir': str(data), 'port': port, 'pid': os.getpid(), 'started_at': time.time(), 'version': manifest['version'], 'target':manifest['target']}
         from .app import create_app
         from .auth import Settings
         from .local_web import mount_frontend
@@ -91,7 +103,12 @@ def launch(root, *, no_browser=False):
         mount_frontend(app, root / 'app/frontend/dist')
         write_atomic(data / 'runtime/identity.json', json.dumps(identity).encode())
         import uvicorn
-        server = uvicorn.Server(uvicorn.Config(app, host='127.0.0.1', port=port, workers=1, proxy_headers=False, access_log=False, log_config=None))
+        class LocalServer(uvicorn.Server):
+            def handle_exit(self, sig, frame):
+                app.state.jobs.begin_stop()
+                threading.Thread(target=app.state.jobs.close, daemon=True).start()
+                super().handle_exit(sig, frame)
+        server = LocalServer(uvicorn.Config(app, host='127.0.0.1', port=port, workers=1, proxy_headers=False, access_log=False, log_config=None, timeout_graceful_shutdown=10))
         done = threading.Event()
         def ready():
             for _ in range(120):

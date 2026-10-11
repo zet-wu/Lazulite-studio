@@ -12,6 +12,7 @@ import json
 import shutil
 import struct
 import subprocess
+from .process_supervisor import run as run_process
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -101,7 +102,7 @@ def _stpp_track(sample_size: int, offset: int, track_id: int, duration_ms: int, 
 
 def _probe(path: Path, ffprobe: str = "ffprobe") -> dict:
     try:
-        result = subprocess.run([ffprobe, "-v", "error", "-of", "json", "-show_format", "-show_streams", str(path)], check=True, capture_output=True, text=True)
+        result = run_process([ffprobe, "-v", "error", "-of", "json", "-show_format", "-show_streams", str(path)], check=True, capture_output=True, text=True)
         return json.loads(result.stdout)
     except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
         raise PublishingError("ffprobe failed") from exc

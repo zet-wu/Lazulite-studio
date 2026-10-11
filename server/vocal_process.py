@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 
 from .engine import EngineUnavailable
+from . import process_supervisor
 
 PREFIX = 'STUDIO_VOCAL '
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class VocalProcess:
         with self._lock:
             if self._closed:
                 raise RuntimeError('人声工作进程已关闭')
-            process = subprocess.Popen([sys.executable, '-u', '-m', self.module],
+            process = process_supervisor.spawn([sys.executable, '-u', '-m', self.module],
                 cwd=Path(__file__).resolve().parent.parent, stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace')
             self._process = process
@@ -34,7 +35,7 @@ class VocalProcess:
             process.stdin.write(json.dumps(request) + '\n'); process.stdin.flush()
             for line in process.stdout:
                 if not line.startswith(PREFIX):
-                    logger.info('vocal worker: %s', line.rstrip())
+                    logger.debug('model worker emitted diagnostic output')
                     continue
                 message = json.loads(line[len(PREFIX):])
                 if message['kind'] == 'boundary':
@@ -61,11 +62,7 @@ class VocalProcess:
 
     @staticmethod
     def _stop(process):
-        if process.poll() is None:
-            process.terminate()
-            try: process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                process.kill(); process.wait()
+        process_supervisor.stop(process)
 
     def close(self):
         with self._lock:

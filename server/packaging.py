@@ -5,6 +5,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+from .process_supervisor import run as run_process
 from mutagen import File
 from mutagen.id3 import USLT
 from mutagen.mp3 import MP3
@@ -14,7 +15,7 @@ from .publishing import publish_stpp, extract_stpp, stpp_tracks
 
 
 def packet_hashes(path):
-    result = subprocess.run(['ffprobe','-v','error','-select_streams','a','-show_packets','-show_data_hash','sha256','-show_entries','packet=stream_index,data_hash','-of','json',str(path)],check=True,capture_output=True,text=True)
+    result = run_process(['ffprobe','-v','error','-select_streams','a','-show_packets','-show_data_hash','sha256','-show_entries','packet=stream_index,data_hash','-of','json',str(path)],check=True,capture_output=True,text=True)
     # Stream indexes can change when a selected subtitle is replaced; audio order cannot.
     groups = {}
     for p in json.loads(result.stdout)['packets']:
