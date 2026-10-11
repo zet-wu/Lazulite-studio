@@ -168,7 +168,7 @@ python -m pip install -r server/requirements-alignment.txt
 
 完整目录布局为 `app/`、`runtime/python/`、`runtime/ffmpeg/`、`models/`、`manifest.json`；运行后创建 `data/` 和 `logs/`。启动模板在 `packaging/launchers`，生产入口为 `server.portable`。源代码仓库本身不是已组装的便携包。
 
-原生构建机使用 CPython 3.12，按平台运行 `python packaging/resolve.py --target windows-x64-cpu|windows-x64-cuda|macos-arm64 --output <空目录>`（target 选择其中一项）。此入口生成完整依赖锁与 wheelhouse 并验证离线安装，拒绝把 Linux 解析结果冒充目标平台结果。模型摘要使用 `python packaging/verify_models.py <models目录>` 检查，实际入口使用 `python packaging/smoke.py --root <完整目录>` 验证。固定清单在 `packaging/runtime-manifest.json` 和 `packaging/models.json`。
+原生构建机使用 CPython 3.12，按平台运行 `python packaging/resolve.py --target windows-x64-cpu|windows-x64-cuda|macos-arm64 --output <空目录>`（target 选择其中一项）。此入口生成本次解析的版本清单与 wheelhouse；只在最终随包解释器中安装和检查一次。外部固定下载保留来源摘要验证，本地产生的 wheel 不再自算摘要后反复验证。固定来源在 `packaging/runtime-manifest.json` 和 `packaging/models.json`。
 
 在对应 Windows x64／Mac arm64 构建机，使用构建 Python 3.12.10 及清单指定版本的 Node 和 pnpm，运行：
 
@@ -179,16 +179,16 @@ python packaging/build.py --target windows-x64-cpu --output /path/outside/repo/p
 
 构建解释器固定为 `build_python_version`（3.12.10，来自 setup-python 支持矩阵）；随包解释器独立固定为 `python_version`（PBS 3.12.15）。两者共用 CPython 3.12 ABI，随包解释器仍须独立执行安装和冒烟检查。
 
-`target` 可选 `windows-x64-cpu`、`windows-x64-cuda`、`macos-arm64`；输出必须为仓库外的空目录，输入检出必须干净。Windows 构建机需有创建临时防火墙规则的管理员权限且防火墙开启；Mac 使用系统 sandbox-exec。网络隔离仅用于构建时的模型冒烟。构建入口解析完整依赖、构建前端、组装独立运行时和本地模型，检查许可、原生导入与架构，生成 ZIP 后移到中文／空格／特殊字符路径解包验证。通过后 `artifacts/` 包含 7z 包，按 1900 MiB 分卷；只有一卷时命名为 `.7z`，多卷为 `.7z.001`、`.7z.002` 等。所有分卷放在同一目录，从 `.001` 整体解压，不能分别解压。LZMA2 使用 64 MiB 字典和 256 MiB 固实块；构建工具由 `packaging/setup_7zip.py` 固定到官方 7-Zip 26.04。Actions 使用官方 artifact SDK 对每个文件分别原样上传，不添加外层 ZIP。
+`target` 可选 `windows-x64-cpu`、`windows-x64-cuda`、`macos-arm64`；输出必须为仓库外的空目录，输入检出必须干净。构建入口解析依赖、构建前端、组装独立运行时和本地模型，执行一次 `pip check`、原生架构／动态依赖审计、核心模块／词典／媒体及真实启动退出冒烟，然后清理冒烟生成的数据并压缩。不在打包时运行模型推理、服务安全回归或辅助测试集，不重新解包、不扫描全目录哈希。`artifacts/` 包含 7z 包，按 1900 MiB 分卷；只有一卷时命名 `.7z`，多卷为 `.7z.001`、`.7z.002` 等。所有分卷放在同一目录，从 `.001` 整体解压，不能分别解压。LZMA2 使用 64 MiB 字典和 256 MiB 固实块；构建工具由 `packaging/setup_7zip.py` 固定到官方 7-Zip 26.04。Actions 逐文件原样上传，不添加外层 ZIP。
 
-顶层目录 `LazuliteStudio-<target>` 不含提交哈希；Windows 入口为原生 `start.exe`（构建时使用 MSVC，静态链接运行库），Mac 为 `start.command`。Windows 入口不运行批处理，Ctrl+C／Ctrl+Break 交给 Python 服务处理，等待任务清理并正常退出，不显示批处理 Y/N 提示；旧控制台快速编辑模式在运行期间关闭，退出后恢复。Windows Job Object 负责入口异常结束时的子进程回收。正常关闭信号不由 Uvicorn 再次抛出，重复信号不会跳过清理。构建冒烟通过独立控制台发送实际 Ctrl+C／Ctrl+Break，并检查退出码及无中断回溯。
+顶层目录 `LazuliteStudio-<target>` 不含提交哈希；Windows 入口为原生 `start.exe`（构建时使用 MSVC，静态链接运行库），Mac 为 `start.command`。Windows 入口不运行批处理，Ctrl+C／Ctrl+Break 交给 Python 服务处理，等待任务清理并正常退出，不显示批处理 Y/N 提示；旧控制台快速编辑模式在运行期间关闭，退出后恢复。Windows Job Object 负责入口异常结束时的子进程回收。正常关闭信号不由 Uvicorn 再次抛出，重复信号不会跳过清理。构建冒烟只启动一次，通过独立控制台发送 Ctrl+C，并检查正常退出。
 
-包内 `USAGE.txt` 从 `packaging/USAGE.txt` 原样复制。用户包不包含 `files.json` 或 `SHA256SUMS`；下载、模型及迁移完整性校验仍执行，清单和 `validation.json` 仅写入独立 `diagnostics/`，版本与资源集合身份仍保留在 `manifest.json`。失败不提供任何未通过冒烟的分卷。
+包内 `USAGE.txt` 从 `packaging/USAGE.txt` 原样复制。用户包不包含 `files.json` 或 `SHA256SUMS`；诊断只记录版本、实际检查项、产物名称和大小，不生成全文件或归档摘要。下载来源摘要由下载层一次验证；Actions／Release 的传输摘要由 GitHub 提供。构建失败会清除未完成的压缩产物。
 
-GitHub Actions 的 **Build portable previews** 支持手动选择一个目标或全部目标。三平台任务独立执行，只上传通过验证的预览包，并单独保留诊断工件。流水线不创建 Release。标准 runner 的 CPU 冒烟不代表 CUDA／MPS、最低系统版本或 Gatekeeper 真机验收。
+GitHub Actions 的 **Build portable previews** 支持手动选择一个目标或全部目标，也作为 Release 的复用构建入口。**Publish prerelease** 仅支持手动启动，填写已推送的版本标签；它固定标签对应提交，构建全部三平台，然后收集本轮 7z 附件，创建草稿、上传全部分卷后发布为预发布（不设为 Latest）。发布前仅检查附件目标／卷号／单文件大小和标签未移动，不解包、不重算摘要、不重复运行测试。已存在 Release 不覆盖；上传失败留下草稿，检查并删除该草稿后可重新运行。诊断工件不作为 Release 附件。此 workflow 不因 push 或创建标签自动触发。模型或依赖升级需要专项行为验证时，开发者可单独运行 `packaging/model_smoke.py`；断网专项可配合 `model_smoke_windows.ps1` 或 macOS sandbox-exec，不作为每次打包步骤。
 
 固定 Lazulite gitlink 已在公开远端可取得，普通递归检出即可构建。
 
-Windows 依赖输入固定了 `msvc-runtime` wheel 的版本与 SHA256，随包提供 VC++ 运行库及许可，嵌套原生工具旁也部署同一组 DLL；不依赖构建机预装的 VC++ 运行库。macOS 审计区分动态库自身的 `LC_ID_DYLIB` 与加载依赖，检查普通、弱链接、重导出、延迟和向上加载依赖。原生审计汇总缺失项，完整搬迁冒烟仍是上传预览包的前提。
+Windows 依赖输入固定了 `msvc-runtime` wheel 的版本与 SHA256，随包提供 VC++ 运行库及许可，嵌套原生工具旁也部署同一组 DLL；不依赖构建机预装的 VC++ 运行库。macOS 审计区分动态库自身的 `LC_ID_DYLIB` 与加载依赖，检查普通、弱链接、重导出、延迟和向上加载依赖。原生审计汇总缺失项，这些检查避免依赖构建机预装库；运行冒烟在压缩前的完整目录执行一次。
 
 开发测试另安装 `python -m pip install -r server/requirements-dev.txt`；pytest／build 不属于发布运行依赖。

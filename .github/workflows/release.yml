@@ -1,0 +1,58 @@
+name: Publish prerelease
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag (for example v0.1.0-rc.1)'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: prerelease-${{ inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: source
+        name: Resolve release tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          git check-ref-format "refs/tags/$RELEASE_TAG"
+          commit=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+  build:
+    needs: source
+    uses: ./.github/workflows/portable.yml
+    with:
+      target: all
+      source_ref: ${{ needs.source.outputs.commit }}
+  publish:
+    needs: [source, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: LazuliteStudio-*.7z*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish all assets as a prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_COMMIT: ${{ needs.source.outputs.commit }}
+        run: python packaging/release.py --assets release-assets
