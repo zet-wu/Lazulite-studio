@@ -217,9 +217,9 @@ def test_cached_separation_reanalysis_repair_and_version_update(tmp_path, monkey
         assert second != first and Counted.calls == 1
         assert len(list((tmp_path/'projects').rglob('vocals.wav'))) == 1
         assert run() == second
-        # Valid WAV header but changed bytes must also invalidate the cached file.
+        # Truncated PCM must be unavailable even when the RIFF header remains.
         path = tmp_path/'projects'/'p'/'vocals'/first/'vocals.wav'
-        with path.open('ab') as f: f.write(b'corruption')
+        with path.open('r+b') as f: f.truncate(path.stat().st_size - 100)
         assert {r['audio_state'] for r in client.get('/api/v1/projects/p/vocals').json()['items']} == {'missing'}
         repaired = run(second)
         assert Counted.calls == 2 and repaired not in (first, second)
@@ -258,7 +258,7 @@ def test_restart_keeps_shared_audio_and_project_deletion_releases_it(tmp_path):
     for result_id in (first, second):
         _, metadata = runner.get('p',result_id)
         assert metadata['audio_result_id'] == first
-        assert metadata['generation_settings'] and metadata['audio_sha256']
+        assert metadata['generation_settings'] and metadata['audio_result_id']
         assert runner.audio_path('p',metadata) == tmp_path/'projects'/'p'/'vocals'/first/'vocals.wav'
         assert runner.audio_available('p', metadata)
     assert before == {str(p): p.read_bytes() for p in (tmp_path/'projects').rglob('*') if p.is_file()}
@@ -297,3 +297,37 @@ def test_model_receives_direct_stereo_44100_with_sample_zero(tmp_path):
         if rate==48000:
             spectrum=np.abs(np.fft.rfft(audio.samples[0,44100:]))
             assert np.argmax(spectrum)==11000
+
+
+def test_vocal_access_and_reanalysis_use_headers_after_metadata_changes(tmp_path, monkeypatch):
+    import os
+    from server.vocals import VocalRunner
+    client, db = setup(tmp_path)
+    with client:
+        job = client.post('/api/v1/projects/p/jobs/vocal', json={'params': {'asset_id': 'p'}}, headers={'origin': 'http://studio'}).json()
+        assert wait(client, job['id'])['status'] == 'succeeded'
+        metadata = client.get('/api/v1/projects/p/vocals').json()['items'][0]
+    path = tmp_path/'projects/p/vocals'/metadata['audio_result_id']/'vocals.wav'
+    assert 'audio_sha256' not in metadata
+    runner = VocalRunner(db, tmp_path/'projects', Separator, cleanup=False)
+    original_open = Path.open
+    def forbid_full_vocal_read(self, *args, **kwargs):
+        if self == path:
+            raise AssertionError('vocal availability must not scan PCM bytes')
+        return original_open(self, *args, **kwargs)
+    # libsndfile checks format and actual frame count without a Python file scan.
+    monkeypatch.setattr(Path, 'open', forbid_full_vocal_read)
+    try:
+        for _ in range(3):
+            os.utime(path, ns=(path.stat().st_atime_ns, path.stat().st_mtime_ns + 1000000))
+            path.chmod(path.stat().st_mode)
+            assert runner.audio_available('p', metadata)
+        result = runner.run_in_process('p', tmp_path/'projects/p/source/original',
+            {'asset_id':'p', 'model_name':'htdemucs', 'device':'cpu', 'retry_analysis_id':metadata['id']},
+            'reanalysis-without-digest', lambda *args: None, lambda: False)
+        assert result['analysis_id'] != metadata['id']
+        _, reused = runner.get('p', result['analysis_id'])
+        assert reused['audio_result_id'] == metadata['audio_result_id']
+        assert 'audio_sha256' not in reused
+    finally:
+        runner.close()

@@ -1,6 +1,5 @@
 """Persistent vocal products; cancellation is honoured between real model stages."""
 from __future__ import annotations
-import hashlib
 import json
 import os
 import shutil
@@ -17,7 +16,6 @@ class VocalRunner:
         self.db, self.root = db, root
         self.root.mkdir(parents=True, exist_ok=True)
         self.separator_factory = separator_factory
-        self._audio_checks = {}
         from .vocal_process import VocalProcess
         self._worker = VocalProcess()
         if not cleanup: return
@@ -101,7 +99,7 @@ class VocalRunner:
                         'channels': vocals.samples.shape[0], 'frames': vocals.samples.shape[1],
                         'duration_ms': milliseconds(vocals.duration), 'format': 'WAV PCM_16',
                         'quantization': 'float to signed 16-bit PCM', 'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
-            metadata.update(audio_result_id=result_id, generation_settings=settings, audio_sha256=self.file_hash(vocal_path))
+            metadata.update(audio_result_id=result_id, generation_settings=settings)
             with self.db.transaction() as c:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', str(directory), json.dumps(metadata)))
             del audio, vocals
@@ -130,11 +128,6 @@ class VocalRunner:
     def result(project_id, metadata):
         return {'kind': 'vocal', 'analysis_id': metadata['id'], 'binding': {'project_id': project_id, 'asset_id': metadata['source_asset_id']}, 'engine': metadata['model']}
 
-    @staticmethod
-    def file_hash(path):
-        with Path(path).open('rb') as source:
-            return hashlib.file_digest(source, 'sha256').hexdigest()
-
     def generation_settings(self, asset_id, model_name=None, device=None):
         from lazulite.audio.separation import DemucsConfig
         config=asdict(DemucsConfig(model_name=model_name or os.getenv('STUDIO_VOCAL_MODEL','htdemucs'),
@@ -151,18 +144,12 @@ class VocalRunner:
         if metadata['format'] != 'WAV PCM_16': return False
         path = self.audio_path(project_id, metadata)
         try:
-            stat = path.stat()
-            stamp = (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns, metadata['audio_sha256'])
-            cached = self._audio_checks.get(path)
-            if cached and cached[0] == stamp: return cached[1]
+            # Persistent audio is immutable under its owner ID. Read only its
+            # format/frame metadata when serving windows or reusing the source.
             info = sf.info(path)
-            valid = (info.format == 'WAV' and info.subtype == 'PCM_16' and info.frames == metadata['frames'] and info.samplerate == metadata['sample_rate'] and info.channels == metadata['channels'])
-            if valid:
-                valid = self.file_hash(path) == metadata['audio_sha256']
+            return (info.format == 'WAV' and info.subtype == 'PCM_16' and info.frames == metadata['frames'] and info.samplerate == metadata['sample_rate'] and info.channels == metadata['channels'])
         except (OSError, sf.LibsndfileError):
             return False
-        self._audio_checks[path] = (stamp, valid)
-        return valid
 
 
     def get(self, project_id, result_id):
