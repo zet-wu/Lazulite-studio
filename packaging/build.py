@@ -12,7 +12,7 @@ import subprocess
 import sys
 import traceback
 
-from archive import digest, download, extract, package
+from archive import digest, download, extract, extract_package, package
 from native_audit import audit, remove_unused_host_rpaths
 from resolve import ROOT, TARGETS, check_source
 from verify_models import verify
@@ -279,11 +279,11 @@ def build(target, output):
     write_json(diagnostics / 'files.json', files)
     shutil.rmtree(dependencies)
     shutil.rmtree(downloads)
-    archive = package(root, artifacts)
+    archives = package(root, artifacts)
     name = root.name
     shutil.rmtree(root)
     relocated = work / '解包 测试 (portable) & relocation'
-    extract(archive, relocated)
+    extract_package(archives[0], relocated)
     root = relocated / name
     for item in files:
         path = root / item['path']
@@ -312,7 +312,7 @@ def build(target, output):
                          'Japanese/Chinese/media', 'local Demucs/NextFire CPU with OS network isolation and empty caches',
                          'local service/static/auth/duplicate launcher/graceful shutdown'],
                'network_scope':'Windows per-program outbound firewall rule / macOS sandbox-exec deny network; plus Python socket hook',
-               'archives':[{'file':archive.name, 'size':archive.stat().st_size, 'sha256':digest(archive)}]})
+               'archives':[{'file':p.name, 'size':p.stat().st_size, 'sha256':digest(p)} for p in archives]})
     print('完整便携包已通过原生解包冒烟：', artifacts)
     shutil.rmtree(relocated)
 
@@ -345,7 +345,7 @@ def main():
             except Exception:
                 traceback.print_exc()
                 # Archives created before failed smoke must never look publishable.
-                for path in (output / 'artifacts').glob('*.zip'):
+                for path in (output / 'artifacts').glob('*'):
                     path.unlink()
                 raise SystemExit(1)
 

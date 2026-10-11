@@ -1,0 +1,9 @@
+name: Upload portable archives
+description: Upload each verified 7z volume without an outer archive
+inputs:
+  path:
+    description: Directory containing verified archives
+    required: true
+runs:
+  using: node24
+  main: index.cjs

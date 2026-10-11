@@ -62,14 +62,15 @@ def test_failed_smoke_does_not_leave_publishable_archives(tmp_path, monkeypatch)
     def fail(target, output):
         artifacts = output / 'artifacts'
         artifacts.mkdir()
-        (artifacts / 'unverified.zip').write_bytes(b'not verified')
+        (artifacts / 'unverified.7z.001').write_bytes(b'not verified')
+        (artifacts / 'unverified.7z.002').write_bytes(b'not verified')
         raise RuntimeError('simulated smoke failure')
     monkeypatch.setattr(build, 'build', fail)
     monkeypatch.setattr(sys, 'argv', ['build.py', '--target', 'windows-x64-cpu', '--output', str(output)])
     with pytest.raises(SystemExit) as error:
         build.main()
     assert error.value.code == 1
-    assert not list((output / 'artifacts').glob('*.zip'))
+    assert not list((output / 'artifacts').iterdir())
     assert 'simulated smoke failure' in (output / 'build.log').read_text()
 
 

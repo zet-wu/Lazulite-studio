@@ -179,7 +179,11 @@ python packaging/build.py --target windows-x64-cpu --output /path/outside/repo/p
 
 构建解释器固定为 `build_python_version`（3.12.10，来自 setup-python 支持矩阵）；随包解释器独立固定为 `python_version`（PBS 3.12.15）。两者共用 CPython 3.12 ABI，随包解释器仍须独立执行安装和冒烟检查。
 
-`target` 可选 `windows-x64-cpu`、`windows-x64-cuda`、`macos-arm64`；输出必须为仓库外的空目录，输入检出必须干净。Windows 构建机需有创建临时防火墙规则的管理员权限且防火墙开启；Mac 使用系统 sandbox-exec。网络隔离仅用于构建时的模型冒烟。构建入口解析完整依赖、构建前端、组装独立运行时和本地模型，检查许可、原生导入与架构，生成 ZIP 后移到中文／空格／特殊字符路径解包验证。通过后 `artifacts/` 仅包含一个完整 ZIP（CUDA 也不拆分），文件名和顶层目录为 `LazuliteStudio-<target>`，不含提交哈希。Actions 使用 `actions/upload-artifact@v7` 的 `archive: false` 原样上传 ZIP，下载后只需解压一次，保留 Mac 可执行权限。Windows 使用 `start.bat`，Mac 使用 `start.command`；包内 `USAGE.txt` 从 `packaging/USAGE.txt` 原样复制，可直接在仓库中编辑。用户包不包含 `files.json` 或 `SHA256SUMS`；构建下载、模型与迁移完整性校验仍执行，文件清单和 `validation.json` 仅写入独立 `diagnostics/`。版本与资源集合身份仍保留在 `manifest.json` 中。失败保留 build.log，不提供未通过冒烟的 ZIP。此输出面向 Actions 工件；CUDA 完整 ZIP 超过 GitHub Release 单附件上限，不能直接作为单个 Release 附件上传。
+`target` 可选 `windows-x64-cpu`、`windows-x64-cuda`、`macos-arm64`；输出必须为仓库外的空目录，输入检出必须干净。Windows 构建机需有创建临时防火墙规则的管理员权限且防火墙开启；Mac 使用系统 sandbox-exec。网络隔离仅用于构建时的模型冒烟。构建入口解析完整依赖、构建前端、组装独立运行时和本地模型，检查许可、原生导入与架构，生成 ZIP 后移到中文／空格／特殊字符路径解包验证。通过后 `artifacts/` 包含 7z 包，按 1900 MiB 分卷；只有一卷时命名为 `.7z`，多卷为 `.7z.001`、`.7z.002` 等。所有分卷放在同一目录，从 `.001` 整体解压，不能分别解压。LZMA2 使用 64 MiB 字典和 256 MiB 固实块；构建工具由 `packaging/setup_7zip.py` 固定到官方 7-Zip 26.04。Actions 使用官方 artifact SDK 对每个文件分别原样上传，不添加外层 ZIP。
+
+顶层目录 `LazuliteStudio-<target>` 不含提交哈希；Windows 入口为原生 `start.exe`（构建时使用 MSVC，静态链接运行库），Mac 为 `start.command`。Windows 入口不运行批处理，Ctrl+C／Ctrl+Break 交给 Python 服务处理，等待任务清理并正常退出，不显示批处理 Y/N 提示；旧控制台快速编辑模式在运行期间关闭，退出后恢复。Windows Job Object 负责入口异常结束时的子进程回收。正常关闭信号不由 Uvicorn 再次抛出，重复信号不会跳过清理。构建冒烟通过独立控制台发送实际 Ctrl+C／Ctrl+Break，并检查退出码及无中断回溯。
+
+包内 `USAGE.txt` 从 `packaging/USAGE.txt` 原样复制。用户包不包含 `files.json` 或 `SHA256SUMS`；下载、模型及迁移完整性校验仍执行，清单和 `validation.json` 仅写入独立 `diagnostics/`，版本与资源集合身份仍保留在 `manifest.json`。失败不提供任何未通过冒烟的分卷。
 
 GitHub Actions 的 **Build portable previews** 支持手动选择一个目标或全部目标。三平台任务独立执行，只上传通过验证的预览包，并单独保留诊断工件。流水线不创建 Release。标准 runner 的 CPU 冒烟不代表 CUDA／MPS、最低系统版本或 Gatekeeper 真机验收。
 

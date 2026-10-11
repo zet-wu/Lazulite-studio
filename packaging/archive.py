@@ -1,5 +1,7 @@
-"""Verified downloads and a single portable ZIP per target."""
+"""Verified downloads and portable 7z archives with optional volumes."""
 import hashlib
+import os
+import subprocess
 from pathlib import Path, PurePosixPath
 import shutil
 import stat
@@ -69,22 +71,46 @@ def extract(archive, root):
             source.extractall(root, filter='data')
 
 
-def write_zip(path, root, files):
-    with zipfile.ZipFile(path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
-        for file in files:
-            if not file.resolve().is_relative_to(root.resolve()):
-                raise ValueError(f'组件符号链接越界：{file}')
-            # Dereference in-tree PBS symlinks, preserving executable permissions.
-            info = zipfile.ZipInfo.from_file(file.resolve(), (Path(root.name) / file.relative_to(root)).as_posix())
-            info.compress_type = zipfile.ZIP_DEFLATED
-            with file.open('rb') as source, archive.open(info, 'w', force_zip64=True) as output:
-                shutil.copyfileobj(source, output)
+def seven_zip():
+    executable = os.environ.get('STUDIO_7ZIP') or shutil.which('7zz') or shutil.which('7z')
+    if not executable:
+        raise RuntimeError('构建需要 7-Zip；先运行 packaging/setup_7zip.py')
+    return executable
 
 
-def package(root, output):
-    root, output = Path(root), Path(output)
+def package(root, output, volume_size=1900 * 1024 * 1024):
+    root, output = Path(root).resolve(), Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    files = sorted(p for p in root.rglob('*') if p.is_file())
-    archive = output / f'{root.name}.zip'
-    write_zip(archive, root, files)
-    return archive
+    for path in root.rglob('*'):
+        if not path.resolve().is_relative_to(root):
+            raise ValueError(f'归档符号链接越界：{path}')
+    # PBS aliases must remain usable with extractors that do not restore links.
+    for path in sorted(root.rglob('*')):
+        if path.is_symlink():
+            if not path.is_file():
+                raise ValueError(f'不支持归档目录符号链接：{path}')
+            source = path.resolve()
+            path.unlink()
+            shutil.copy2(source, path)
+    archive = output / f'{root.name}.7z'
+    # Bounded solid blocks and dictionary keep extraction memory practical.
+    subprocess.run([seven_zip(), 'a', '-t7z', '-mx=7', '-m0=LZMA2', '-md=64m',
+                    '-ms=256m', '-mmt=2', f'-v{volume_size}b', str(archive), root.name],
+                   cwd=root.parent, check=True)
+    volumes = sorted(output.glob(archive.name + '.*'))
+    if not volumes:
+        raise RuntimeError('7-Zip 没有生成分卷')
+    if len(volumes) == 1:
+        volumes[0].rename(archive)
+        return [archive]
+    return volumes
+
+
+def extract_package(first_volume, destination):
+    # Only for our newly built, verified archive, not arbitrary user input.
+    destination = Path(destination).resolve()
+    destination.mkdir(parents=True, exist_ok=True)
+    if any(destination.iterdir()):
+        raise ValueError('验证解包目录必须为空')
+    subprocess.run([seven_zip(), 'x', '-y', str(Path(first_volume).resolve()),
+                    '-o' + str(destination)], check=True)
