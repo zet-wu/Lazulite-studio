@@ -170,6 +170,17 @@ python -m pip install -r server/requirements-alignment.txt
 
 原生构建机使用 CPython 3.12，按平台运行 `python packaging/resolve.py --target windows-x64-cpu|windows-x64-cuda|macos-arm64 --output <空目录>`（target 选择其中一项）。此入口生成完整依赖锁与 wheelhouse 并验证离线安装，拒绝把 Linux 解析结果冒充目标平台结果。模型摘要使用 `python packaging/verify_models.py <models目录>` 检查，实际入口使用 `python packaging/smoke.py --root <完整目录>` 验证。固定清单在 `packaging/runtime-manifest.json` 和 `packaging/models.json`。
 
-当前 gitlink 包含尚未上传的 Lazulite 本地修复。仅从公开仓库递归克隆暂时无法取得它；需要先从本地 Lazulite 检出或交付的增量 Git bundle 取得固定提交，再执行子模块更新。没有自动上传或发布行为。
+在对应 Windows x64／Mac arm64 构建机，使用清单指定版本的 Python、Node 和 pnpm，运行：
+
+```sh
+python -m pip install pefile==2024.8.26
+python packaging/build.py --target windows-x64-cpu --output /path/outside/repo/portable
+```
+
+`target` 可选 `windows-x64-cpu`、`windows-x64-cuda`、`macos-arm64`；输出必须为仓库外的空目录，输入检出必须干净。Windows 构建机需有创建临时防火墙规则的管理员权限且防火墙开启；Mac 使用系统 sandbox-exec。网络隔离仅用于构建时的模型冒烟。构建入口解析完整依赖、构建前端、组装独立运行时和本地模型，检查许可、原生导入与架构，生成 ZIP 后移到中文／空格／特殊字符路径解包验证。通过后 `artifacts/` 包含 ZIP、SHA256SUMS、使用说明和 validation.json；失败保留 build.log，不提供未通过冒烟的 ZIP。超过大小上限时生成多个可独立解压的组件，全部解压到同一目录即为完整包。
+
+GitHub Actions 的 **Build portable previews** 支持手动选择一个目标或全部目标。三平台任务独立执行，只上传通过验证的预览包，并单独保留诊断工件。流水线不创建 Release。标准 runner 的 CPU 冒烟不代表 CUDA／MPS、最低系统版本或 Gatekeeper 真机验收。
+
+固定 Lazulite gitlink 已在公开远端可取得，普通递归检出即可构建。
 
 开发测试另安装 `python -m pip install -r server/requirements-dev.txt`；pytest／build 不属于发布运行依赖。

@@ -1,31 +1,102 @@
-name: Native portable dependency verification
+name: Build portable previews
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: '构建目标（默认三个平台）'
+        type: choice
+        default: all
+        options:
+          - all
+          - windows-x64-cpu
+          - windows-x64-cuda
+          - macos-arm64
+permissions:
+  contents: read
+concurrency:
+  group: portable-${{ github.ref }}-${{ inputs.target }}
+  cancel-in-progress: false
 jobs:
-  dependencies:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.select.outputs.targets }}
+    steps:
+      - id: select
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          python - <<'PY'
+          import json, os
+          values = [
+              {'runner': 'windows-2022', 'target': 'windows-x64-cpu'},
+              {'runner': 'windows-2022', 'target': 'windows-x64-cuda'},
+              {'runner': 'macos-14', 'target': 'macos-arm64'},
+          ]
+          values = [v for v in values if os.environ['TARGET'] in ('all', v['target'])]
+          if not values:
+              raise SystemExit('invalid target')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('targets=' + json.dumps({'include': values}) + '\n')
+          PY
+  build:
+    needs: matrix
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - runner: windows-2022
-            target: windows-x64-cpu
-          - runner: windows-2022
-            target: windows-x64-cuda
-          - runner: macos-14
-            target: macos-arm64
+      matrix: ${{ fromJSON(needs.matrix.outputs.targets) }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    env:
+      PYTHONUTF8: '1'
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+      PIP_NO_CACHE_DIR: '1'
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.15'
-      - run: python packaging/resolve.py --target ${{ matrix.target }} --output native-dependencies
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - uses: actions/setup-node@v4
         with:
-          name: dependencies-${{ matrix.target }}
+          node-version: '22.22.2'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.30.3'
+          run_install: false
+      - name: Set build output directory
+        shell: python
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          import os
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              output.write('BUILD_OUTPUT=' + os.path.join(os.environ['RUNNER_TEMP'], 'portable-' + os.environ['BUILD_TARGET']) + '\n')
+      - name: Install build-only validation tools
+        run: python -m pip install pytest==8.3.5 pefile==2024.8.26
+      - name: Validate packaging helpers
+        run: python -m pytest packaging/tests -q
+      - name: Assemble and verify relocated distribution
+        shell: bash
+        run: python packaging/build.py --target '${{ matrix.target }}' --output "$BUILD_OUTPUT"
+      - name: Upload verified preview components
+        uses: actions/upload-artifact@v4
+        with:
+          name: LazuliteStudio-${{ matrix.target }}-${{ github.sha }}
+          path: ${{ env.BUILD_OUTPUT }}/artifacts/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics-${{ matrix.target }}-${{ github.run_attempt }}
           path: |
-            native-dependencies/*.txt
-            native-dependencies/resolution.json
+            ${{ env.BUILD_OUTPUT }}/build.log
+            ${{ env.BUILD_OUTPUT }}/diagnostics/**
+            ${{ env.BUILD_OUTPUT }}/work/dependencies/*.json
+            ${{ env.BUILD_OUTPUT }}/work/dependencies/*.txt
+          if-no-files-found: warn
+          retention-days: 14
