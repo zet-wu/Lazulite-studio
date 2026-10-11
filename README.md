@@ -163,3 +163,13 @@ python -m pip install -r server/requirements-alignment.txt
 该文件包含人声依赖并引用 `constraints-alignment.txt` 的 Linux CUDA 设备栈约束。Windows/macOS 的 Torch／torchaudio 安装需选用相容的平台构建；此处是当前仓库安装入口，目标平台完整依赖组合仍需发布验证，不能据 Linux 环境断言安装通过。
 
 准备本地 C2C 对齐模型目录，包含 `config.json`、`processor_config.json`、`vocab.json`、`model.safetensors` 等模型资源，设置 `STUDIO_NEXTFIRE_PATH` 为目录绝对路径。`STUDIO_ALIGNMENT_DEVICE` 使用 `cpu` 或 `cuda`，默认 `cpu`；自动对齐首次准备人声使用 `htdemucs` 和 `STUDIO_VOCAL_DEVICE`。设置页显示当前能力和缺失原因。
+
+## 便携入口与原生依赖准备
+
+完整目录布局为 `app/`、`runtime/python/`、`runtime/ffmpeg/`、`models/`、`manifest.json`；运行后创建 `data/` 和 `logs/`。启动模板在 `packaging/launchers`，生产入口为 `server.portable`。源代码仓库本身不是已组装的便携包。
+
+原生构建机使用 CPython 3.12，按平台运行 `python packaging/resolve.py --target windows-x64-cpu|windows-x64-cuda|macos-arm64 --output <空目录>`（target 选择其中一项）。此入口生成完整依赖锁与 wheelhouse 并验证离线安装，拒绝把 Linux 解析结果冒充目标平台结果。模型摘要使用 `python packaging/verify_models.py <models目录>` 检查，实际入口使用 `python packaging/smoke.py --root <完整目录>` 验证。固定清单在 `packaging/runtime-manifest.json` 和 `packaging/models.json`。
+
+当前 gitlink 包含尚未上传的 Lazulite 本地修复。仅从公开仓库递归克隆暂时无法取得它；需要先从本地 Lazulite 检出或交付的增量 Git bundle 取得固定提交，再执行子模块更新。没有自动上传或发布行为。
+
+开发测试另安装 `python -m pip install -r server/requirements-dev.txt`；pytest／build 不属于发布运行依赖。

@@ -34,7 +34,7 @@ Studio 是浏览器前端与本地／同源 API 组成的单工作台，登录�
 
 时间为整数毫秒或 `null`。媒体元素的秒值、PCM 样本坐标和模型秒数在各自边界转换。TTML 相对时间先解析为实际端点再量化至毫秒，输出使用三位毫秒时钟；文本坐标使用 Unicode code point，并校验字素边界。
 
-`project-document.ts` 执行歌词、声学与卡拉 OK 命令，统一保留 256 次项目历史。批量编辑一次原子提交。选区、焦点、播放时钟和浏览器偏好由界面状态持有。
+`project-document.ts` 执行歌词、声学与卡拉 OK 命令，统一保留 256 次项目历史。批量编辑一次原子提交。选区、焦点和播放时钟由界面状态持有；长期偏好通过服务端字段级 API 保存。
 
 ## 编辑事务
 
@@ -72,9 +72,9 @@ AMLL core/react 0.5.2 按需加载，读取当前草稿的播放投影。Studio 
 
 ## 保存、资源与任务
 
-`useProjectDocument` 管理本地副本、dirty、revision／ETag、保存序号和冲突。IndexedDB 保存项目检查点及基础修订。HTTP 文档中的 `lyrics.draftTtml` 承载草稿歌词；服务校验后写不可变 JSON 修订，通过 SQLite compare-and-swap 更新当前指针。草稿读取保留待修正时间，正式输出执行目标格式校验。
+`useProjectDocument` 管理本地副本、dirty、revision／ETag、保存序号和冲突。IndexedDB 按稳定 library ID 分库保存项目检查点及基础修订；旧来源的恢复记录不自动导入。HTTP 文档中的 `lyrics.draftTtml` 承载草稿歌词；服务校验后写不可变 JSON 修订，通过 SQLite compare-and-swap 更新当前指针。草稿读取保留待修正时间，正式输出执行目标格式校验。
 
-数据目录默认 `server/data-projects-v4`，`STUDIO_DATA_DIR` 可指定其他位置。SQLite 保存资源索引、修订指针、会话、幂等记录及任务。每个 `projects/<id>` 目录含 `source/original`、`cache`、`revisions`、`vocals`、`exports`；相同源文件在不同项目分别存储。上传在临时区校验、探测和建代理，再由创建项目／首次接入事务确认归属。
+数据目录默认 `server/data-projects-v5`，`STUDIO_DATA_DIR` 可指定其他位置。SQLite 保存资源索引、修订指针、会话、幂等记录及任务。每个 `projects/<id>` 目录含 `source/original`、`cache`、`revisions`、`vocals`、`exports`；相同源文件在不同项目分别存储。上传在临时区校验、探测和建代理，再由创建项目／首次接入事务确认归属。
 
 修订回收保护当前及任务引用，并保留其余最新 100 份和 7 天内修订。项目删除检查活动任务，隔离目录后清理索引，失败回移；启动按数据库状态恢复。空间接口按需统计项目目录逻辑字节，分类为源音频、人声结果、缓存、快照及其他文件。
 
@@ -101,3 +101,12 @@ TTML codec 支持 Studio 的正文、Ruby、背景、歌手及翻译／音译表
 领域层依赖纯数据与规则，适配器处理文件和服务，功能组件组合用户操作。共享主题与控件统一明暗色、按钮角色、焦点、消息及展开行为。
 
 Vite 开发服务器通过 `/api` 代理访问 Uvicorn。生产前端为 `frontend/dist` 静态产物，由 Web 服务器提供 SPA 回退和同源 API 代理。服务精确校验 `STUDIO_ORIGIN`，密码模式使用会话 cookie 与 CSRF；受信任网关模式由部署显式启用。构建与启动命令见[README](../README.md)。
+
+
+## 便携运行边界
+
+`server/portable.py` 组装目录、文件锁、固定回环地址、实例握手及离线环境；`local_web.py` 校验 Host／Origin 并挂载生产 dist。`runtime_settings.py` 管理偏好和资料库身份，`storage_paths.py` 管理 v5 资源引用。领域模块不读浏览器偏好；前端 `adapters/preferences.ts` 在编辑器挂载前载入服务端值。
+
+`runtime_devices.py` 在独立短生命周期进程探测设备，将分离／对齐快照固化到任务。CPU 重试经过旧任务归属、revision 和源音频检查；前端继续检查草稿与应用意图，成功仍通过原子项目命令应用。`process_supervisor.py` 负责模型、FFmpeg 与派生进程，JobService 在停服前封闭队列。
+
+`vendor/Lazulite` 是固定 gitlink；计算库从该源码构建 wheel 安装，服务不拼接兄弟仓库路径。`packaging/requirements/*.in` 是候选输入，原生 `resolve.py` 输出完整带哈希锁、轮子和来源报告，并在独立环境离线安装、执行 pip check／导入。候选输入不能代替目标平台验证或发布包。

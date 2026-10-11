@@ -15,8 +15,11 @@
       },
       "ffmpeg": {
         "version": "9.0.2",
-        "source": "https://www.gyan.dev/ffmpeg/builds/",
-        "status": "archive-and-native-audit-required"
+        "source": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip",
+        "status": "source-locked-native-audit-pending",
+        "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
+        "checksum_source": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip.sha256",
+        "license": "GPL-3.0-or-later"
       }
     },
     "windows-x64-cuda": {
@@ -27,8 +30,11 @@
       },
       "ffmpeg": {
         "version": "9.0.2",
-        "source": "https://www.gyan.dev/ffmpeg/builds/",
-        "status": "archive-and-native-audit-required"
+        "source": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip",
+        "status": "source-locked-native-audit-pending",
+        "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
+        "checksum_source": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip.sha256",
+        "license": "GPL-3.0-or-later"
       }
     },
     "macos-arm64": {
@@ -40,7 +46,16 @@
       "ffmpeg": {
         "version": "9.0.2",
         "source": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
-        "status": "archive-and-native-audit-required"
+        "status": "source-downloaded-and-hashed-native-build-pending",
+        "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
+        "size": 12040788,
+        "configure": [
+          "--disable-autodetect",
+          "--disable-ffplay",
+          "--disable-doc",
+          "--disable-shared",
+          "--enable-static"
+        ]
       }
     }
   }
