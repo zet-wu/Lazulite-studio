@@ -23,7 +23,6 @@ def test_remove_only_foreign_installer_templates(tmp_path):
     report = build.remove_foreign_installer_templates(tmp_path)
     assert {item['path'] for item in report} == {
         'runtime/python/Lib/site-packages/' + name for name in removed}
-    assert all(len(item['sha256']) == 64 for item in report)
     assert all(not (site / name).exists() for name in removed)
     assert all((site / name).is_file() for name in retained)
     assert build.remove_foreign_installer_templates(tmp_path) == []

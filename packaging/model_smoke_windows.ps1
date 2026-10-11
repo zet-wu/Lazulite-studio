@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Models
 )
 $ErrorActionPreference = 'Stop'
-# Build-machine-only rule, scoped to the relocated interpreter. Never shipped.
+# Build-machine-only rule, scoped to the interpreter under test. Never shipped.
 if (@(Get-NetFirewallProfile | Where-Object { $_.Enabled -ne 'True' }).Count -gt 0) {
     throw 'Offline model verification requires enabled Windows Firewall profiles.'
 }

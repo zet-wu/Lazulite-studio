@@ -1,4 +1,4 @@
-"""Run with the relocated distribution interpreter and a build-tool-free PATH."""
+"""Run with the assembled distribution interpreter and a build-tool-free PATH."""
 import argparse
 import json
 import os

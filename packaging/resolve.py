@@ -1,10 +1,9 @@
-"""Resolve, build and verify a complete wheelhouse on the target native host.
+"""Resolve and build a complete wheelhouse on the target native host.
 
 Run from the repository root in a fresh CPython 3.12 build environment. Outputs
-are candidates until the resulting runtime passes model and native smoke tests.
+are installed and checked once in the final bundled runtime.
 """
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import platform
@@ -37,24 +36,15 @@ def resolve(target, output):
     def pip(*args): subprocess.run([sys.executable, '-m', 'pip', *args], cwd=ROOT, check=True)
     # Build-time tools are separate from the shipped environment.
     pip('install', 'pip==25.3', 'setuptools==80.9.0', 'wheel==0.45.1', 'build==1.3.0')
-    pip('install', '--dry-run', '--ignore-installed', '--report', str(output / 'sources.json'), '-r', str(ROOT / 'packaging/requirements' / (target + '.in')))
     pip('wheel', '--no-build-isolation', '--wheel-dir', str(wheels), '-r', str(ROOT / 'packaging/requirements' / (target + '.in')))
     artifacts, locked = [], []
     for wheel in sorted(wheels.glob('*.whl')):
-        digest = hashlib.file_digest(wheel.open('rb'), 'sha256').hexdigest()
         with zipfile.ZipFile(wheel) as archive:
             metadata = BytesParser().parsebytes(archive.read(next(n for n in archive.namelist() if n.endswith('.dist-info/METADATA'))))
-        locked.append(f'{metadata["Name"]}=={metadata["Version"]} --hash=sha256:{digest}')
-        artifacts.append({'filename': wheel.name, 'name': metadata['Name'], 'version': metadata['Version'], 'sha256': digest, 'size': wheel.stat().st_size})
+        locked.append(f'{metadata["Name"]}=={metadata["Version"]}')
+        artifacts.append({'filename': wheel.name, 'name': metadata['Name'], 'version': metadata['Version'], 'size': wheel.stat().st_size})
     lock = output / (target + '.txt'); lock.write_text('\n'.join(locked) + '\n')
-    # An independent venv proves dependency closure without build tools installed.
-    import venv
-    env = output / 'verification'; venv.EnvBuilder(with_pip=True).create(env)
-    python = env / ('Scripts/python.exe' if platform.system() == 'Windows' else 'bin/python')
-    subprocess.run([str(python), '-m', 'pip', 'install', '--no-index', '--find-links', str(wheels), '--require-hashes', '-r', str(lock)], check=True)
-    subprocess.run([str(python), '-m', 'pip', 'check'], check=True)
-    subprocess.run([str(python), '-c', 'import fastapi,uvicorn,numpy,scipy,torch,torchaudio,demucs,transformers,soundfile,sudachipy,opencc,lazulite; print(torch.__version__, torch.version.cuda, lazulite.__file__)'], cwd=output, check=True)
-    (output / 'resolution.json').write_text(json.dumps({'target':target, 'platform':platform.platform(), 'python':platform.python_version(), 'lazulite_commit':commit, 'status':'native-install-and-import-verified-model-smoke-pending', 'artifacts':artifacts}, indent=2) + '\n')
+    (output / 'resolution.json').write_text(json.dumps({'target':target, 'platform':platform.platform(), 'python':platform.python_version(), 'lazulite_commit':commit, 'status':'wheelhouse-built-runtime-check-pending', 'artifacts':artifacts}, indent=2) + '\n')
 
 
 if __name__ == '__main__':

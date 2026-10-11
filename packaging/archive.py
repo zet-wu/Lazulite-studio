@@ -22,9 +22,12 @@ def download(url, destination, sha256, size=None):
             return destination
     partial = destination.with_suffix(destination.suffix + '.partial')
     try:
+        checksum = hashlib.sha256()
         with urllib.request.urlopen(url, timeout=120) as source, partial.open('wb') as target:
-            shutil.copyfileobj(source, target)
-        if digest(partial) != sha256 or size is not None and partial.stat().st_size != size:
+            while block := source.read(1024 * 1024):
+                target.write(block)
+                checksum.update(block)
+        if checksum.hexdigest() != sha256 or size is not None and partial.stat().st_size != size:
             raise ValueError(f'下载摘要或大小不匹配：{url}')
         partial.replace(destination)
     finally:

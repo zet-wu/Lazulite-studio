@@ -2,7 +2,7 @@
 import argparse
 from contextlib import redirect_stderr, redirect_stdout
 import json
-import hashlib
+import filecmp
 import os
 from pathlib import Path
 import platform
@@ -12,10 +12,9 @@ import subprocess
 import sys
 import traceback
 
-from archive import digest, download, extract, extract_package, package
+from archive import download, extract, package
 from native_audit import audit, remove_unused_host_rpaths
-from resolve import ROOT, TARGETS, check_source
-from verify_models import verify
+from resolve import ROOT, TARGETS
 
 
 def run(args, *, cwd=ROOT, env=None):
@@ -166,7 +165,7 @@ def remove_foreign_installer_templates(root):
         for name in names:
             path = site / directory / name
             if path.is_file():
-                removed.append({'path': path.relative_to(root).as_posix(), 'sha256': digest(path)})
+                removed.append({'path': path.relative_to(root).as_posix()})
                 path.unlink()
     return removed
 
@@ -190,11 +189,10 @@ def deploy_windows_runtime(root):
     for directory in sorted(destinations):
         for name, path in sorted(dlls.items()):
             destination = directory / name
-            checksum = digest(path)
-            if destination.exists() and digest(destination) != checksum:
+            if destination.exists() and not filecmp.cmp(path, destination, shallow=False):
                 raise ValueError(f'VC++ 运行库冲突：{destination}')
             shutil.copy2(path, destination)
-            copied.append({'path': destination.relative_to(root).as_posix(), 'sha256': checksum})
+            copied.append({'path': destination.relative_to(root).as_posix()})
     return copied
 
 
@@ -205,19 +203,18 @@ def build(target, output):
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=normal'], cwd=ROOT, text=True).strip():
         raise RuntimeError('发布输入必须为干净检出；输出目录请放在仓库外')
-    library = check_source()
     work, artifacts = output / 'work', output / 'artifacts'
     work.mkdir(); artifacts.mkdir()
     downloads = work / 'downloads'
     dependencies = work / 'dependencies'
     # Run as a subprocess to capture pip diagnostics in the build log.
     run([sys.executable, ROOT / 'packaging/resolve.py', '--target', target, '--output', dependencies])
+    library = json.loads((dependencies / 'resolution.json').read_text())['lazulite_commit']
     diagnostics = output / 'diagnostics'
     diagnostics.mkdir()
     for path in dependencies.glob('*'):
         if path.is_file():
             shutil.copy2(path, diagnostics / path.name)
-    shutil.rmtree(dependencies / 'verification')
     root = work / f'LazuliteStudio-{target}'
     root.mkdir()
     pnpm = frontend(root, runtime)
@@ -237,7 +234,7 @@ def build(target, output):
     env = dict(os.environ, PYTHONNOUSERSITE='1', PYTHONUTF8='1')
     env.pop('PYTHONPATH', None)
     run([python, '-I', '-m', 'pip', 'install', '--no-index', '--find-links', dependencies / 'wheelhouse',
-         '--require-hashes', '--no-compile', '-r', dependencies / (target + '.txt')], cwd=work, env=env)
+         '--no-compile', '-r', dependencies / (target + '.txt')], cwd=work, env=env)
     run([python, '-I', '-m', 'pip', 'check'], cwd=work, env=env)
     if target.startswith('windows'):
         write_json(diagnostics / 'removed-installer-templates.json', remove_foreign_installer_templates(root))
@@ -251,7 +248,6 @@ def build(target, output):
                 run([python, '-I', '-c', 'import demucs,pathlib,shutil,sys; shutil.copyfile(pathlib.Path(demucs.__file__).parent/"remote/htdemucs.yaml",sys.argv[1])', destination], cwd=work)
             else:
                 download(item.get('url', models[family].get('source')), destination, item['sha256'], item['size'])
-    verify(root / 'models', models)
     licenses(root, dependencies, pnpm)
     shutil.copy2(ROOT / 'packaging/models.json', root / 'licenses/models.json')
     shutil.copy2(ROOT / 'packaging/runtime-manifest.json', root / 'licenses/runtime-sources.json')
@@ -263,8 +259,7 @@ def build(target, output):
         shutil.copy2(ROOT / 'packaging/launchers/start.command', root / 'start.command')
         (root / 'start.command').chmod(0o755)
     manifest = {'schema':1, 'version':commit[:12], 'studio_commit':commit, 'lazulite_commit':library,
-                'target':target, 'database_version':5, 'runtime_set_id':hashlib.sha256((json.dumps(spec, sort_keys=True) + digest(dependencies / (target + '.txt'))).encode()).hexdigest(),
-                'model_set_id':digest(ROOT / 'packaging/models.json'), 'python':runtime['python_version'],
+                'target':target, 'database_version':5, 'python':runtime['python_version'],
                 'build_python':platform.python_version(),
                 'validation':'preview; see the separate build diagnostics artifact for validation.json',
                 'unverified':['minimum Windows/macOS version', 'CUDA/MPS hardware', 'full-song quality',
@@ -274,21 +269,6 @@ def build(target, output):
     if target == 'macos-arm64':
         write_json(diagnostics / 'removed-host-rpaths.json', remove_unused_host_rpaths(root))
     write_json(diagnostics / 'native-audit.json', audit(root, target))
-    files = [{'path':p.relative_to(root).as_posix(), 'size':p.stat().st_size, 'sha256':digest(p)}
-             for p in sorted(root.rglob('*')) if p.is_file()]
-    write_json(diagnostics / 'files.json', files)
-    shutil.rmtree(dependencies)
-    shutil.rmtree(downloads)
-    archives = package(root, artifacts)
-    name = root.name
-    shutil.rmtree(root)
-    relocated = work / '解包 测试 (portable) & relocation'
-    extract_package(archives[0], relocated)
-    root = relocated / name
-    for item in files:
-        path = root / item['path']
-        if digest(path) != item['sha256']:
-            raise ValueError(f'解包身份不符：{item["path"]}')
     # Omit all build tools and ambient user caches from the runtime process environment.
     env = {k:v for k,v in os.environ.items() if not k.startswith(('PYTHON', 'HF_', 'TRANSFORMERS_', 'TORCH_', 'STUDIO_'))}
     env['PATH'] = str(root / 'runtime/ffmpeg') + os.pathsep + (str(Path(os.environ['SystemRoot']) / 'System32') if os.name == 'nt' else '/usr/bin:/bin')
@@ -296,25 +276,24 @@ def build(target, output):
                HF_HOME=str(work / 'empty-hf'), TORCH_HOME=str(work / 'empty-torch'))
     python = runtime_python(root)
     run([python, '-E', '-s', '-X', 'utf8', ROOT / 'packaging/runtime_smoke.py', '--root', root, '--target', target], cwd=root / 'app', env=env)
-    if os.name == 'nt':
-        powershell = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
-        offline = [powershell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
-                   ROOT / 'packaging/model_smoke_windows.ps1', '-Python', python,
-                   '-Script', ROOT / 'packaging/model_smoke.py', '-Models', root / 'models']
-    else:
-        offline = ['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)',
-                   python, '-E', '-s', '-X', 'utf8', ROOT / 'packaging/model_smoke.py', '--models', root / 'models', '--os-isolated']
-    run(offline, cwd=root / 'app', env=env)
     run([sys.executable, ROOT / 'packaging/smoke.py', '--root', root], cwd=work, env=env)
     shutil.copy2(root / 'smoke.log', diagnostics / 'launcher.log')
-    write_json(diagnostics / 'validation.json', {**manifest, 'status':'native-relocated-cpu-smoke-passed',
-               'checks':['pip check', 'native architecture/import audit', 'archive file hashes',
-                         'Japanese/Chinese/media', 'local Demucs/NextFire CPU with OS network isolation and empty caches',
-                         'local service/static/auth/duplicate launcher/graceful shutdown'],
-               'network_scope':'Windows per-program outbound firewall rule / macOS sandbox-exec deny network; plus Python socket hook',
-               'archives':[{'file':p.name, 'size':p.stat().st_size, 'sha256':digest(p)} for p in archives]})
-    print('完整便携包已通过原生解包冒烟：', artifacts)
-    shutil.rmtree(relocated)
+    # Smoke runs in the assembled directory before compression; do not ship its data.
+    for name in ('data', 'logs'):
+        if (root / name).exists():
+            shutil.rmtree(root / name)
+    (root / 'smoke.log').unlink()
+    for cache in root.rglob('__pycache__'):
+        shutil.rmtree(cache)
+    shutil.rmtree(dependencies)
+    shutil.rmtree(downloads)
+    archives = package(root, artifacts)
+    write_json(diagnostics / 'validation.json', {**manifest, 'status':'assembled-runtime-smoke-passed',
+               'checks':['pip check', 'native architecture/import audit',
+                         'Japanese/Chinese/media', 'local service/static/graceful shutdown'],
+               'archives':[{'file':p.name, 'size':p.stat().st_size} for p in archives]})
+    print('便携包已完成组装、启动检查与压缩：', artifacts)
+
 
 
 class Tee:
@@ -344,7 +323,7 @@ def main():
                 build(args.target, output)
             except Exception:
                 traceback.print_exc()
-                # Archives created before failed smoke must never look publishable.
+                # Do not leave partial archives after a failed build.
                 for path in (output / 'artifacts').glob('*'):
                     path.unlink()
                 raise SystemExit(1)

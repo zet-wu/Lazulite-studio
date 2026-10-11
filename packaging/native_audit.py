@@ -110,7 +110,7 @@ def audit(root, target):
         raise ValueError('原生依赖审计失败：\n' + '\n'.join(errors))
     return {'target':target, 'binaries':report,
             'declared_macos_minimum':'.'.join(map(str, max(minimum_versions))) if minimum_versions else None,
-            'scope':'static imports and architecture; actual loader verified by relocated smoke; minimum OS/GPU unverified'}
+            'scope':'static imports and architecture; actual loader verified by assembled runtime smoke; minimum OS/GPU unverified'}
 
 
 def remove_unused_host_rpaths(root):
@@ -119,7 +119,6 @@ def remove_unused_host_rpaths(root):
     Direct external dependencies remain errors. Never redirect them to arbitrary
     same-named libraries. Re-sign modified Mach-O files before the final audit.
     """
-    from archive import digest
     changes = []
     for path in sorted(Path(root).rglob('*')):
         if not path.is_file() or path.is_symlink() or path.suffix not in ('.so', '.dylib'):
@@ -139,11 +138,9 @@ def remove_unused_host_rpaths(root):
         imports = macho_dependencies(commands)
         if any(name.startswith('@rpath/') for name in imports):
             raise ValueError(f'存在 @rpath 依赖，不能自动删除构建机搜索路径：{path}')
-        before = digest(path)
         for name in dict.fromkeys(host_paths):
             subprocess.run(['install_name_tool', '-delete_rpath', name, str(path)], check=True)
         subprocess.run(['codesign', '--force', '--sign', '-', str(path)], check=True)
         subprocess.run(['codesign', '--verify', '--strict', str(path)], check=True)
-        changes.append({'file':path.relative_to(root).as_posix(), 'removed_rpaths':host_paths,
-                        'before_sha256':before, 'after_sha256':digest(path)})
+        changes.append({'file':path.relative_to(root).as_posix(), 'removed_rpaths':host_paths})
     return changes
