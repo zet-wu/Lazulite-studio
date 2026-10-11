@@ -32,7 +32,7 @@ def test_delete_project_releases_owned_resources_and_preserves_other_project(tmp
         (vocal / 'energy.npy').write_bytes(b'energy')
         proxy = tmp_path / 'projects' / pid / 'cache' / 'vocal-voice.wav'; proxy.parent.mkdir(exist_ok=True); proxy.write_bytes(b'proxy')
         peaks = tmp_path / 'projects' / pid / 'cache' / 'vocal-voice.peaks-v1'; peaks.mkdir(); (peaks / 'l0.peaks').write_bytes(b'peaks')
-        c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', ('voice',pid,asset['id'],'ready',str(vocal),'{}'))
+        c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', ('voice',pid,asset['id'],'ready',db.paths.store(vocal),'{}'))
     assert client.delete(f'/api/v1/projects/{pid}', headers=headers).status_code == 200
     assert not list(vocal.glob('*')) and not proxy.exists() and not list(peaks.glob('*'))
     assert client.get(f'/api/v1/projects/{pid}/document').status_code == 404

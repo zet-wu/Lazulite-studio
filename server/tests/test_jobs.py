@@ -36,9 +36,10 @@ def seed_project(db, root=None):
         conn.execute("INSERT INTO assets VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", ("a", "a" * 64, 1, "audio/wav", "demo.wav", 1, 1, 0, 16000, 1, "{}", "t"))
         conn.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)", ("p", "demo", "a", "r", "t", "t"))
         if root is not None:
-            path = root / "r.json"
+            path = root / "projects/p/revisions/r.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>', 'a')))
-            conn.execute("INSERT INTO revisions VALUES(?,?,?,?,?)", ("r", "p", None, str(path), "t"))
+            conn.execute("INSERT INTO revisions VALUES(?,?,?,?,?)", ("r", "p", None, db.paths.store(path), "t"))
 
 
 def test_job_persists_result_and_idempotency(tmp_path):
