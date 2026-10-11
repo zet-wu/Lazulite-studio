@@ -8,6 +8,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import build
 
 
+def test_remove_only_foreign_installer_templates(tmp_path):
+    site = tmp_path / 'runtime/python/Lib/site-packages'
+    removed = ['setuptools/' + name for name in (
+        'cli.exe', 'gui.exe', 'cli-32.exe', 'gui-32.exe', 'cli-arm64.exe', 'gui-arm64.exe')]
+    removed += ['pip/_vendor/distlib/' + name for name in ('t32.exe', 'w32.exe', 't64-arm.exe', 'w64-arm.exe')]
+    retained = ['setuptools/cli-64.exe', 'setuptools/gui-64.exe',
+                'pip/_vendor/distlib/t64.exe', 'pip/_vendor/distlib/w64.exe',
+                'other/cli-32.exe', 'setuptools/unexpected.exe', 'setuptools/__init__.py']
+    for name in removed + retained:
+        path = site / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'fixture')
+    report = build.remove_foreign_installer_templates(tmp_path)
+    assert {item['path'] for item in report} == {
+        'runtime/python/Lib/site-packages/' + name for name in removed}
+    assert all(len(item['sha256']) == 64 for item in report)
+    assert all(not (site / name).exists() for name in removed)
+    assert all((site / name).is_file() for name in retained)
+    assert build.remove_foreign_installer_templates(tmp_path) == []
+
+
 def test_failed_smoke_does_not_leave_publishable_archives(tmp_path, monkeypatch):
     output = tmp_path / 'build'
     def fail(target, output):
@@ -26,7 +47,7 @@ def test_failed_smoke_does_not_leave_publishable_archives(tmp_path, monkeypatch)
 
 def test_build_rejects_wrong_native_platform_before_downloads(tmp_path, monkeypatch):
     monkeypatch.setattr(build.platform, 'system', lambda: 'Linux')
-    with pytest.raises(RuntimeError, match='原生架构'):
+    with pytest.raises(RuntimeError, match='ԭ���ܹ�'):
         build.build('windows-x64-cpu', tmp_path)
     assert list(tmp_path.iterdir()) == []
 
@@ -43,7 +64,7 @@ def test_build_host_uses_its_own_version_pin(monkeypatch, target, system, arch):
     monkeypatch.setattr(build.platform, 'python_version', lambda: '3.12.10')
     build.check_build_host(target, runtime)
     monkeypatch.setattr(build.platform, 'python_version', lambda: '3.13.0')
-    with pytest.raises(RuntimeError, match='构建 Python 3.12.10'):
+    with pytest.raises(RuntimeError, match='���� Python 3.12.10'):
         build.check_build_host(target, runtime)
 
 
