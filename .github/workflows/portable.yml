@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: '构建目标（默认三个平台）'
+        description: 'target'
         type: choice
         default: all
         options:
