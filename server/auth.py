@@ -9,10 +9,18 @@ class Settings:
     password: str | None = None
     trusted_gateway: bool = False
     origin: str | None = None
+    mode: str = 'password'
 
     def __post_init__(self):
         if self.origin is not None:
             object.__setattr__(self, "origin", normalize_origin(self.origin))
+        if self.mode not in {'password', 'local'}:
+            raise ValueError('未知运行模式')
+        if self.mode == 'local':
+            from urllib.parse import urlsplit
+            url = urlsplit(self.origin or '')
+            if url.scheme != 'http' or url.hostname != '127.0.0.1' or self.trusted_gateway or self.password:
+                raise ValueError('本机模式只允许 127.0.0.1 HTTP 来源，不接受密码或代理认证')
 
     @classmethod
     def from_env(cls):

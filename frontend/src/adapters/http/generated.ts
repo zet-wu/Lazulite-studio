@@ -719,6 +719,9 @@ export interface components {
                 id: string;
                 name: string;
             } | null;
+            /** @enum {string} */
+            mode?: "password" | "gateway" | "local";
+            library_id?: string;
         };
         Capability: {
             id: string;

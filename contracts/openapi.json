@@ -2130,6 +2130,17 @@
               "id",
               "name"
             ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "password",
+              "gateway",
+              "local"
+            ]
+          },
+          "library_id": {
+            "type": "string"
           }
         }
       },

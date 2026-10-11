@@ -43,10 +43,10 @@ def stamp():
 
 def create_app(
     data_dir: str | Path | None = None, settings: Settings | None = None,
-    reading_proposer=None, publisher=None, separator_factory=None, runtime_settings=None,
+    reading_proposer=None, publisher=None, separator_factory=None, runtime_settings=None, runtime_identity=None, runtime_manifest=None,
 ) -> FastAPI:
     cfg = settings or Settings.from_env()
-    if not cfg.origin or (not cfg.trusted_gateway and not cfg.password):
+    if not cfg.origin or (cfg.mode != "local" and not cfg.trusted_gateway and not cfg.password):
         raise RuntimeError(
             "set STUDIO_ORIGIN and STUDIO_PASSWORD, or enable STUDIO_TRUSTED_GATEWAY"
         )
@@ -93,6 +93,7 @@ def create_app(
 
     def auth(request: Request):
         token = request.cookies.get("studio_session")
+        if cfg.mode == "local": return "local"
         if cfg.trusted_gateway:
             return "gateway"
         if not token:
@@ -113,7 +114,7 @@ def create_app(
         ):
             fail("origin_forbidden", "访问地址与服务允许的来源不一致，请检查浏览器地址及 --origin／STUDIO_ORIGIN 配置", 403)
         csrf = request.cookies.get("studio_csrf")
-        if not cfg.trusted_gateway and (
+        if cfg.mode != "local" and not cfg.trusted_gateway and (
             not csrf or csrf != request.headers.get("x-csrf-token")
         ):
             fail("csrf_failed", "csrf token required", 403)
@@ -153,7 +154,7 @@ def create_app(
             "schema_version": "studio-session-v1",
             "authenticated": subject is not None,
             "library_id": preferences.read()["library_id"],
-            "mode": "gateway" if cfg.trusted_gateway else "password",
+            "mode": "local" if cfg.mode == "local" else "gateway" if cfg.trusted_gateway else "password",
             "user": {"id": "local", "name": "Local user"} if subject else None,
         }
 
@@ -211,6 +212,10 @@ def create_app(
         out.delete_cookie("studio_session")
         out.delete_cookie("studio_csrf")
         return out
+
+    @api.get("/runtime")
+    def runtime(_=Depends(auth)):
+        return runtime_identity or {"library_id": preferences.read()["library_id"]}
 
     @api.get("/capabilities")
     def capabilities():
@@ -617,6 +622,9 @@ def create_app(
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
     api.include_router(settings_router(preferences, auth=auth, write=write))
     app.include_router(api)
+    if cfg.mode == "local":
+        from .local_web import LocalBoundary
+        app.add_middleware(LocalBoundary, origin=cfg.origin)
     app.add_middleware(UploadLimitMiddleware, limit=MAX_UPLOAD + 1024 * 1024)
     @app.on_event("shutdown")
     async def shutdown_jobs():
