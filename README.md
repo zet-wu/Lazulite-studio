@@ -185,4 +185,6 @@ GitHub Actions 的 **Build portable previews** 支持手动选择一个目标或
 
 固定 Lazulite gitlink 已在公开远端可取得，普通递归检出即可构建。
 
+Windows 依赖输入固定了 `msvc-runtime` wheel 的版本与 SHA256，随包提供 VC++ 运行库及许可，嵌套原生工具旁也部署同一组 DLL；不依赖构建机预装的 VC++ 运行库。macOS 审计区分动态库自身的 `LC_ID_DYLIB` 与加载依赖，检查普通、弱链接、重导出、延迟和向上加载依赖。原生审计汇总缺失项，完整搬迁冒烟仍是上传预览包的前提。
+
 开发测试另安装 `python -m pip install -r server/requirements-dev.txt`；pytest／build 不属于发布运行依赖。

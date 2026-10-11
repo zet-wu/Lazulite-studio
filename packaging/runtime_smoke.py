@@ -25,6 +25,13 @@ def main():
     from opencc import OpenCC
     assert dictionary.Dictionary().create().tokenize('日本語')
     assert OpenCC('t2s').convert('歌詞') == '歌词'
+    if os.name == 'nt':
+        # Test the nested native tool too: its DLL search starts beside opencc.exe,
+        # not beside the interpreter which imports the Python extension.
+        tools = list((root / 'runtime/python/Lib/site-packages/opencc').rglob('opencc.exe'))
+        assert len(tools) == 1, tools
+        assert (tools[0].parent / 'msvcp140.dll').is_file()
+        subprocess.run([str(tools[0]), '--version'], check=True)
     sys.path.insert(0, str(root / 'app'))
     from server import furigana
     assert furigana.load_index()

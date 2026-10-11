@@ -29,6 +29,34 @@ def test_remove_only_foreign_installer_templates(tmp_path):
     assert build.remove_foreign_installer_templates(tmp_path) == []
 
 
+def test_windows_runtime_is_deployed_beside_nested_tools(tmp_path):
+    runtime = tmp_path / 'runtime/python'
+    scripts = runtime / 'Scripts'
+    scripts.mkdir(parents=True)
+    names = ('msvcp140.dll', 'msvcp140_2.dll', 'vcruntime140.dll', 'vcruntime140_1.dll', 'vcomp140.dll')
+    for name in names + ('unrelated.dll',):
+        (scripts / name).write_bytes(name.encode())
+    for name in ('python.exe', 'Scripts/pip.exe', 'Lib/site-packages/opencc/clib/bin/opencc.exe',
+                 'Lib/site-packages/another/tool.exe'):
+        path = runtime / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'fixture')
+    report = build.deploy_windows_runtime(tmp_path)
+    assert len(report) == 2 * len(names)
+    for directory in ('opencc/clib/bin', 'another'):
+        folder = runtime / 'Lib/site-packages' / directory
+        for name in names:
+            assert (folder / name).read_bytes() == name.encode()
+        assert not (folder / 'unrelated.dll').exists()
+    conflict = runtime / 'Lib/site-packages/another/msvcp140.dll'
+    conflict.write_bytes(b'different version')
+    with pytest.raises(ValueError, match='冲突'):
+        build.deploy_windows_runtime(tmp_path)
+    (scripts / 'msvcp140.dll').unlink()
+    with pytest.raises(ValueError, match='缺少'):
+        build.deploy_windows_runtime(tmp_path)
+
+
 def test_failed_smoke_does_not_leave_publishable_archives(tmp_path, monkeypatch):
     output = tmp_path / 'build'
     def fail(target, output):

@@ -171,6 +171,33 @@ def remove_foreign_installer_templates(root):
     return removed
 
 
+def deploy_windows_runtime(root):
+    """Keep VC++ DLLs beside standalone executables as well as python.exe.
+
+    msvc-runtime installs its pinned DLL set into the Python prefix and Scripts.
+    Nested tools such as OpenCC cannot use python.exe's application directory.
+    Never source these redistributable DLLs from the build host's System32.
+    """
+    runtime = root / 'runtime/python'
+    source = runtime / 'Scripts'
+    prefixes = ('msvcp140', 'vcruntime140', 'concrt140', 'vcomp140', 'vcamp140', 'vccorlib140')
+    dlls = {p.name.lower(): p for p in source.glob('*.dll') if p.name.lower().startswith(prefixes)}
+    required = {'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll'}
+    if not required.issubset(dlls):
+        raise ValueError(f'缺少锁定的 VC++ 运行库：{sorted(required - dlls.keys())}')
+    destinations = {p.parent for p in runtime.rglob('*.exe')} - {runtime, source}
+    copied = []
+    for directory in sorted(destinations):
+        for name, path in sorted(dlls.items()):
+            destination = directory / name
+            checksum = digest(path)
+            if destination.exists() and digest(destination) != checksum:
+                raise ValueError(f'VC++ 运行库冲突：{destination}')
+            shutil.copy2(path, destination)
+            copied.append({'path': destination.relative_to(root).as_posix(), 'sha256': checksum})
+    return copied
+
+
 def build(target, output):
     runtime = json.loads((ROOT / 'packaging/runtime-manifest.json').read_text())
     models = json.loads((ROOT / 'packaging/models.json').read_text())
@@ -214,6 +241,7 @@ def build(target, output):
     run([python, '-I', '-m', 'pip', 'check'], cwd=work, env=env)
     if target.startswith('windows'):
         write_json(diagnostics / 'removed-installer-templates.json', remove_foreign_installer_templates(root))
+        write_json(diagnostics / 'app-local-vc-runtime.json', deploy_windows_runtime(root))
     ffmpeg(root, spec['ffmpeg'], downloads, work)
     for family in ('demucs', 'nextfire'):
         for item in models[family]['files']:
