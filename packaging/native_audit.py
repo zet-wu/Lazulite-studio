@@ -26,6 +26,22 @@ def macho_dependencies(commands):
     return dependencies
 
 
+def macho_minimum_versions(commands):
+    versions = []
+    for block in re.split(r'(?m)^Load command \d+\s*$', commands)[1:]:
+        if re.search(r'(?m)^\s*cmd\s+LC_BUILD_VERSION\s*$', block):
+            field = 'minos'  # Its nested build tool also has a "version" field.
+        elif re.search(r'(?m)^\s*cmd\s+LC_VERSION_MIN_MACOSX\s*$', block):
+            field = 'version'
+        else:
+            continue
+        match = re.search(r'(?m)^\s*' + field + r'\s+(\d+\.\d+(?:\.\d+)?)\s*$', block)
+        if not match:
+            raise ValueError('无法解析 Mach-O 最低系统版本')
+        versions.append(tuple(map(int, match[1].split('.'))))
+    return versions
+
+
 def audit(root, target):
     root = Path(root).resolve()
     report = []
@@ -84,8 +100,7 @@ def audit(root, target):
                     errors.append(f'包外动态依赖：{path}: {name}')
                 if name.startswith('@') and Path(name).name not in bundled:
                     errors.append(f'包内动态依赖缺失：{path}: {name}')
-            for value in re.findall(r'(?:minos|version)\s+(\d+\.\d+(?:\.\d+)?)', '\n'.join(block for block in commands.split('Load command') if 'LC_BUILD_VERSION' in block or 'LC_VERSION_MIN_MACOSX' in block)):
-                minimum_versions.append(tuple(map(int, value.split('.'))))
+            minimum_versions.extend(macho_minimum_versions(commands))
             if '/opt/homebrew' in load_commands or '/Users/runner' in load_commands:
                 # Debug strings are not included in otool load commands.
                 errors.append(f'构建机路径出现在 Mach-O load commands：{path}')

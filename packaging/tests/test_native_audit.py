@@ -4,7 +4,16 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from native_audit import audit, macho_dependencies
+from native_audit import audit, macho_dependencies, macho_minimum_versions
+
+
+def test_macos_minimum_ignores_sdk_and_nested_linker_version():
+    commands = ('Load command 0\n cmd LC_BUILD_VERSION\n minos 11.0\n sdk 26.5\n'
+                ' ntools 1\n tool 3\n version 1267.0\n'
+                'Load command 1\n cmd LC_VERSION_MIN_MACOSX\n version 10.9\n sdk 15.0\n')
+    assert macho_minimum_versions(commands) == [(11, 0), (10, 9)]
+    with pytest.raises(ValueError, match='最低系统版本'):
+        macho_minimum_versions(commands.replace('minos 11.0', 'invalid'))
 
 
 def test_macos_records_declared_minimum_and_rejects_missing_dependency(tmp_path, monkeypatch):
