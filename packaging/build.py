@@ -102,7 +102,10 @@ def licenses(root, dependencies, pnpm):
     import zipfile
     for wheel in (dependencies / 'wheelhouse').glob('*.whl'):
         with zipfile.ZipFile(wheel) as archive:
-            for member in archive.namelist():
+            for item in archive.infolist():
+                if item.is_dir():
+                    continue
+                member = item.filename
                 lower = member.lower()
                 if '.dist-info/' in lower and (lower.endswith('/metadata') or any(word in lower for word in ('license', 'copying', 'notice'))):
                     target = destination / 'python' / wheel.stem / member
