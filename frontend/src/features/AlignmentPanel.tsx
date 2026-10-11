@@ -76,7 +76,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       catch(e){if(e instanceof TypeError)job=failed ? await jobsApi.retryCpu(failed.id,saved.revision,key) : await alignmentApi.start(pid,saved.revision,selected,key);else throw e;}
       op.id=job.id;
       if(!op.alive){void alignmentApi.cancel(job.id).catch(()=>undefined);return;}
-      if(op.cancel) await alignmentApi.cancel(job.id).catch(e=>setConnection(`取消请求失败：${e.message}`));
+      if(op.cancel) await alignmentApi.cancel(job.id).catch(e=>{setCancelling(false);setConnection(`取消请求失败：${e.message}`);});
       let disconnected = false;
       while(op.alive){
         if(job.request?.devices)setDeviceText(Object.entries(job.request.devices).map(([stage,d])=>`${stage==='vocal'?'人声分离':'自动对齐'}：${d.label}${d.reason ? `（${d.reason}）` : ''}`).join('；'));
@@ -91,6 +91,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
           resultMessage([merged.project===op.lock.source?'未更新歌词时间':'已更新歌词时间', merged.mergedGaps?`合并 ${merged.mergedGaps} 处行内空隙`:'', merged.cleared.length?`清空 ${merged.cleared.length} 个词／注音的缺失端点`:'', merged.retained.length?`${merged.retained.length} 个词／注音部分时间保留原值`:''].filter(Boolean).join('；'), 'status', merged.retained.length||merged.cleared.length?8000:4000);break;
         }
         if(['failed','cancelled','interrupted'].includes(job.status)){resultMessage(job.error?.message??(job.status==='cancelled'?'已取消对齐':'服务中断，请重新运行'), job.status==='cancelled'?'status':'alert', job.status==='cancelled'?4000:undefined,job.id);break;}
+        if(job.status==='cancel_requested'){op.cancel=true;setCancelling(true);}
         setProgress(op.cancel?'正在取消':job.status==='queued'?'排队中':({separating:'正在分离人声',analyzing:'正在分析声区',acoustic:'正在计算声学概率',decode:'正在全局对齐'}[job.stage??'']??'正在对齐'));
         await new Promise(resolve=>setTimeout(resolve,700));
         if(!op.alive)break;

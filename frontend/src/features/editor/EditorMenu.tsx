@@ -44,7 +44,7 @@ export function EditorMenu(props: Props) {
     <strong>{props.title}</strong>
     <span>{props.saving ? '保存中' : props.dirty ? '未保存' : '已保存'}</span>
     <div className={styles.actions}>
-      <button data-role="primary" className={styles.primaryButton} onClick={props.onSave} disabled={props.saving}>保存</button>
+      <button data-role="primary" className={styles.primaryButton} onClick={props.onSave} disabled={props.saving || props.editingLocked}>保存</button>
       <button data-role="inline" onClick={props.undo} disabled={!props.canUndo}>撤销</button>
       <button data-role="inline" onClick={props.redo} disabled={!props.canRedo}>重做</button>
       <TopMenu id="view" title="视图" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>

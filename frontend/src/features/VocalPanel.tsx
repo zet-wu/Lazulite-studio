@@ -60,6 +60,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const adopt = () => { if(locked)return;
     if(!pending || !result || result.status!=='ready') return;
     try {
+      if(result.source_asset_id!==sourceAssetId)throw new Error('音源已改变，请重新发起人声处理');
       apply({type:'acoustics', acoustics:{analysisId:result.id,segments:result.segments!.map(s=>({...s}))},durationMs});
       handled.current.add(pending.id); setPending(null); setError('');
     } catch(e) {setError((e as Error).message);}
@@ -70,7 +71,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const run = async (reuse?: string) => {
     if(locked)return;
     if (!sourceAssetId || submitting.current || active) return;
-    submitting.current=true;cancelRequested.current=false;
+    submitting.current=true;cancelRequested.current=false;setCancelling(false);
     const baseline=JSON.stringify(project.acoustics);
     setBusy(true); setError(''); publish(null); setDismissed(null);
     try { const job=await jobsApi.createVocal(projectId, sourceAssetId, reuse); setPending({id:job.id,baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); }
@@ -81,7 +82,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     if(locked || submitting.current || active)return;
     if (!latest || !pending || pending.id !== latest.id || pending.baseline !== JSON.stringify(project.acoustics) || latest.request?.asset_id !== sourceAssetId) { setError('声学内容或本页应用意图已改变，请重新发起任务'); return; }
     if (!latest.request?.bound_revision) { setError('任务缺少可重试的项目版本'); return; }
-    submitting.current=true; cancelRequested.current=false; setBusy(true); setError(''); publish(null);
+    submitting.current=true; cancelRequested.current=false; setCancelling(false); setBusy(true); setError(''); publish(null);
     try { const job = await jobsApi.retryCpu(latest.id, latest.request.bound_revision); setPending({id:job.id, baseline:pending.baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await jobs.refetch(); }
     catch(e) { setError((e as Error).message); }
     finally { submitting.current=false; setBusy(false); }

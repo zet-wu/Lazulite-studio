@@ -59,3 +59,10 @@ it('a failed mode switch cannot reuse previous results and retry protects new ma
  fireEvent.change(screen.getByLabelText('今日完整读音'),{target:{value:'こんにち'}});fireEvent.click(screen.getByRole('button',{name:'重试'}));
  await waitFor(()=>expect(screen.getByRole('button',{name:'应用'})).toBeEnabled());expect(screen.getByLabelText('今日完整读音')).toHaveValue('こんにち');
 });
+it('retains manual application after a reading service failure',async()=>{
+ const source=createLyricDocument('今日'),apply=vi.fn(()=>true),close=vi.fn();vi.mocked(analyzeReadings).mockRejectedValue(new Error('服务不可用'));
+ render(<JapaneseRubyDialog document={source} lineIds={[source.lines[0].id]} apply={apply} close={close}/>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('服务不可用');fireEvent.change(screen.getByLabelText('今日完整读音'),{target:{value:'きょう'}});
+ expect(screen.getByRole('button',{name:'应用'})).toBeEnabled();fireEvent.click(screen.getByRole('button',{name:'应用'}));
+ expect(apply).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();expect(source.lines[0].words[0].rubyUnits).toHaveLength(0);
+});

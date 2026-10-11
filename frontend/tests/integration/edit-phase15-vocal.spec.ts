@@ -7,14 +7,14 @@ async function setup(page:Page,old=true){
  const url=`/api/v1/projects/${pid}/document`,envelope=await(await page.request.get(url)).json();
  if(old){envelope.document.acoustics={analysisId:null,segments:[{id:'old1',beginMs:100,endMs:500},{id:'old2',beginMs:800,endMs:1200}]};
   expect((await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':envelope.revision},data:envelope})).ok()).toBe(true);}
- const state={started:false,status:'queued',cancelFails:true,readsFail:false,retries:0};
+ const state={started:false,status:'queued',cancelFails:true,readsFail:false,retries:0,resultAsset:asset};
  const job=()=>({id:'p15-vocal',kind:'vocal',status:state.status,stage:'separating',request:{asset_id:asset,bound_revision:envelope.revision,devices:{vocal:{preferred:'auto',actual:'cuda',label:'CUDA'}}},error:state.status==='failed'?{message:'GPU 人声测试失败',cpu_retry:true}:null});
  await page.route(`**/projects/${pid}/jobs/vocal`,route=>{state.started=true;return route.fulfill({json:job()});});
  await page.route(`**/projects/${pid}/jobs`,route=>state.readsFail?route.fulfill({status:503,json:{message:'测试连接中断'}}):route.fulfill({json:{schema_version:'studio-job-list-v1',items:state.started?[job()]:[]}}));
  await page.route('**/jobs/p15-vocal/cancel',route=>{if(state.cancelFails)return route.fulfill({status:500,json:{message:'取消测试失败'}});state.status='cancel_requested';return route.fulfill({json:job()});});
  await page.route('**/jobs/p15-vocal/retry-cpu',route=>{state.retries++;state.status='running';return route.fulfill({json:job()});});
  await page.route('**/jobs/p15-vocal/result',route=>route.fulfill({json:{kind:'vocal',analysis_id:'result15'}}));
- await page.route(`**/projects/${pid}/vocals`,route=>route.fulfill({json:{items:state.status==='succeeded'?[{id:'result15',status:'ready',source_asset_id:asset,audio_id:'audio15',audio_state:'current',segments:[{id:'new15',beginMs:300,endMs:900}]}]:[]}}));
+ await page.route(`**/projects/${pid}/vocals`,route=>route.fulfill({json:{items:state.status==='succeeded'?[{id:'result15',status:'ready',source_asset_id:state.resultAsset,audio_id:'audio15',audio_state:'current',segments:[{id:'new15',beginMs:300,endMs:900}]}]:[]}}));
  await page.goto(`/projects/${pid}/edit`);await page.getByRole('button',{name:'音频处理',exact:true}).click();
  if(old)await page.locator('[data-top-menu="audio-analysis"] summary').click();
  await page.getByRole('button',{name:'分离人声',exact:true}).click();
@@ -52,4 +52,10 @@ test('no-result state stays actionable and cancellation waits for the terminal s
  await page.getByRole('button',{name:'取消任务',exact:true}).click();await expect(page.getByRole('button',{name:'取消任务',exact:true})).toBeDisabled();
  state.status='cancelled';await expect(page.getByRole('status').filter({hasText:'人声处理已取消'})).toBeVisible();
  await expect(page.getByRole('button',{name:'分离人声',exact:true})).toBeEnabled();await expect(page.getByText('尚无可用片段，请通过音频工具分离人声。')).toBeVisible();
+});
+
+test('a stale source result is rejected without replacing existing segments',async({page})=>{
+ const {state}=await setup(page);state.resultAsset='other-source';state.status='succeeded';
+ await expect(page.getByRole('alert').filter({hasText:'音源已改变'})).toBeVisible();
+ await expect(page.locator('[data-segment-id="old1"]')).toBeVisible();await expect(page.locator('[data-segment-id="new15"]')).toHaveCount(0);
 });
