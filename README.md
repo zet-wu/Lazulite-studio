@@ -185,7 +185,7 @@ python packaging/build.py --target windows-x64-cpu --output /path/outside/repo/p
 
 包内 `USAGE.txt` 从 `packaging/USAGE.txt` 原样复制。用户包不包含 `files.json` 或 `SHA256SUMS`；诊断只记录版本、实际检查项、产物名称和大小，不生成全文件或归档摘要。下载来源摘要由下载层一次验证；Actions／Release 的传输摘要由 GitHub 提供。构建失败会清除未完成的压缩产物。
 
-GitHub Actions 的 **Build portable previews** 支持手动选择一个目标或全部目标，也作为 Release 的复用构建入口。**Publish prerelease** 仅支持手动启动，填写已推送的版本标签；它固定标签对应提交，构建全部三平台，然后收集本轮 7z 附件，创建草稿、上传全部分卷后发布为预发布（不设为 Latest）。发布前仅检查附件目标／卷号／单文件大小和标签未移动，不解包、不重算摘要、不重复运行测试。已存在 Release 不覆盖；上传失败留下草稿，检查并删除该草稿后可重新运行。诊断工件不作为 Release 附件。此 workflow 不因 push 或创建标签自动触发。模型或依赖升级需要专项行为验证时，开发者可单独运行 `packaging/model_smoke.py`；断网专项可配合 `model_smoke_windows.ps1` 或 macOS sandbox-exec，不作为每次打包步骤。
+GitHub Actions 的 **Build portable previews** 支持手动选择一个目标或全部目标，也作为 Release 的复用构建入口。**Prepare release draft** 仅手动启动，输入新版本号或已有标签；已有 Git 标签使用标签提交，新标签使用启动 Action 时所选分支的提交。三平台全部构建完成后，创建或复用该版本的 Release 草稿、上传 7z 附件，并保持草稿状态，由用户在 GitHub 手动发布。复用草稿保留人工标题和说明，替换本工具管理的旧安装包；其他附件保留。失败可重新运行，无需删除草稿；已公开的 Release 不覆盖。诊断工件不作为 Release 附件，不重新解包或执行测试。模型或依赖升级需要专项行为验证时，可单独运行 `packaging/model_smoke.py`，不作为每次打包步骤。
 
 固定 Lazulite gitlink 已在公开远端可取得，普通递归检出即可构建。
 

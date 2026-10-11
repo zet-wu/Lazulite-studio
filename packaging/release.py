@@ -1,5 +1,6 @@
-"""Publish completed archives; never unpack or hash them again."""
+"""Prepare a release draft with completed archives; never publish automatically."""
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -24,28 +25,44 @@ def assets_in(directory):
     return files
 
 
-def publish(directory):
+def api(endpoint, *args):
+    return json.loads(subprocess.check_output(['gh', 'api', endpoint, *args], text=True))
+
+
+def prepare_draft(directory):
     files = assets_in(directory)
     tag = os.environ['RELEASE_TAG']
     commit = os.environ['RELEASE_COMMIT']
-    actual = subprocess.check_output(['gh', 'api',
-        'repos/{owner}/{repo}/commits/' + quote(tag, safe=''), '--jq', '.sha'], text=True).strip()
-    if actual != commit:
-        raise ValueError('标签已移动，拒绝将其他提交的构建发布到该标签')
-    # Fail on existing releases instead of overwriting published user downloads.
-    # A failed upload leaves a draft for inspection; delete that draft before retrying.
+    refs = api('repos/{owner}/{repo}/git/matching-refs/tags/' + quote(tag, safe=''))
+    if any(ref['ref'] == 'refs/tags/' + tag for ref in refs):
+        actual = api('repos/{owner}/{repo}/commits/' + quote(tag, safe=''))['sha']
+        if actual != commit:
+            raise ValueError('标签已移动，拒绝将其他提交的构建附到该标签')
+    pages = api('repos/{owner}/{repo}/releases', '--paginate', '--slurp')
+    existing = next((item for page in pages for item in page if item['tag_name'] == tag), None)
+    if existing and not existing['draft']:
+        raise ValueError('该版本已经发布，请使用新版本号；不会覆盖已发布附件')
     notes = f'''Lazulite Studio {tag} 预发布\n\n源码提交：{commit}\n\n下载适合系统的完整 .7z 包。CUDA 若有分卷，下载全部 .7z.001、.7z.002 等文件，放在同一目录，从 .001 解压。\n\nWindows：双击 start.exe；macOS：双击 start.command。详细说明见包内 USAGE.txt。\n\nmacOS 未经开发者签名或公证；此版本标记为预发布，供试用反馈。\n'''
-    with tempfile.TemporaryDirectory() as temp:
-        body = Path(temp) / 'release-notes.txt'
-        body.write_text(notes, encoding='utf-8')
-        subprocess.run(['gh', 'release', 'create', tag, '--verify-tag', '--draft', '--prerelease',
-                        '--title', f'Lazulite Studio {tag}', '--notes-file', str(body)], check=True)
+    if existing:
+        # Preserve the user's title and release notes. Pin a new tag to the built SHA.
+        subprocess.run(['gh', 'release', 'edit', tag, '--draft', '--prerelease',
+                        '--target', commit], check=True)
+        # Clear old managed archives so a failed rerun cannot mix build versions.
+        for asset in existing['assets']:
+            if re.fullmatch(r'LazuliteStudio-(windows-x64-cpu|windows-x64-cuda|macos-arm64)\.7z(?:\.\d{3,})?', asset['name']):
+                subprocess.run(['gh', 'release', 'delete-asset', tag, asset['name'], '--yes'], check=True)
+    else:
+        with tempfile.TemporaryDirectory() as temp:
+            body = Path(temp) / 'release-notes.txt'
+            body.write_text(notes, encoding='utf-8')
+            subprocess.run(['gh', 'release', 'create', tag, '--target', commit, '--draft', '--prerelease',
+                            '--title', f'Lazulite Studio {tag}', '--notes-file', str(body)], check=True)
     for path in files:
         subprocess.run(['gh', 'release', 'upload', tag, str(path)], check=True)
-    subprocess.run(['gh', 'release', 'edit', tag, '--draft=false', '--prerelease', '--latest=false'], check=True)
+    print(f'Release draft {tag} is ready; review and publish it on GitHub.')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--assets', type=Path, required=True)
-    publish(parser.parse_args().assets)
+    prepare_draft(parser.parse_args().assets)

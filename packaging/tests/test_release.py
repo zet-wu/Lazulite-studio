@@ -26,35 +26,70 @@ def test_release_rejects_missing_platform_and_volume_gap(tmp_path):
         release.assets_in(tmp_path)
 
 
-def test_upload_failure_keeps_release_unpublished(tmp_path, monkeypatch):
+@pytest.fixture
+def draft_setup(tmp_path, monkeypatch):
     archives(tmp_path)
-    monkeypatch.setenv('RELEASE_TAG', 'v0.1.0-rc.1')
+    monkeypatch.setenv('RELEASE_TAG', 'v0.1.0-preview')
     monkeypatch.setenv('RELEASE_COMMIT', 'abc')
-    monkeypatch.setattr(release.subprocess, 'check_output', lambda *a, **k: 'abc\n')
+    state = {'refs': [], 'releases': [[]], 'sha': 'abc'}
+    def api(endpoint, *args):
+        if 'matching-refs' in endpoint:
+            return state['refs']
+        if '/commits/' in endpoint:
+            return {'sha': state['sha']}
+        return state['releases']
+    monkeypatch.setattr(release, 'api', api)
     calls = []
-    def run(args, **kwargs):
+    monkeypatch.setattr(release.subprocess, 'run', lambda args, **k: calls.append(args))
+    return tmp_path, state, calls
+
+
+def test_new_tag_creates_draft_at_built_commit(draft_setup):
+    root, state, calls = draft_setup
+    release.prepare_draft(root)
+    assert [call[2] for call in calls] == ['create', 'upload', 'upload', 'upload', 'upload']
+    assert '--draft' in calls[0] and '--prerelease' in calls[0]
+    assert calls[0][calls[0].index('--target') + 1] == 'abc'
+    assert '--verify-tag' not in calls[0]
+
+
+def test_existing_draft_preserves_notes_and_removes_stale_volumes(draft_setup):
+    root, state, calls = draft_setup
+    state['releases'] = [[{'tag_name': 'v0.1.0-preview', 'draft': True, 'assets': [
+        {'name': 'LazuliteStudio-windows-x64-cuda.7z.003'}, {'name': 'manual.txt'}]}]]
+    release.prepare_draft(root)
+    assert calls[0][2] == 'edit' and '--draft' in calls[0]
+    assert '--notes-file' not in calls[0] and '--title' not in calls[0]
+    assert calls[1][2] == 'delete-asset' and calls[1][4].endswith('.003')
+    assert not any('manual.txt' in call or '--draft=false' in call for call in calls)
+    assert sum(call[2] == 'upload' for call in calls) == 4
+
+
+def test_existing_tag_must_still_match_build(draft_setup):
+    root, state, calls = draft_setup
+    state['refs'] = [{'ref': 'refs/tags/v0.1.0-preview'}]
+    state['sha'] = 'changed'
+    with pytest.raises(ValueError, match='标签已移动'):
+        release.prepare_draft(root)
+    assert not calls
+
+
+def test_published_release_is_never_changed(draft_setup):
+    root, state, calls = draft_setup
+    state['releases'] = [[{'tag_name': 'v0.1.0-preview', 'draft': False}]]
+    with pytest.raises(ValueError, match='已经发布'):
+        release.prepare_draft(root)
+    assert not calls
+
+
+def test_upload_failure_does_not_publish(draft_setup, monkeypatch):
+    root, state, calls = draft_setup
+    def fail(args, **kwargs):
         calls.append(args)
         if args[2] == 'upload':
             raise RuntimeError('upload failed')
-    monkeypatch.setattr(release.subprocess, 'run', run)
+    monkeypatch.setattr(release.subprocess, 'run', fail)
     with pytest.raises(RuntimeError, match='upload failed'):
-        release.publish(tmp_path)
-    assert '--draft' in calls[0] and '--prerelease' in calls[0]
-    assert not any(call[2] == 'edit' for call in calls)
-
-
-def test_publish_only_after_all_uploads_and_reject_moved_tag(tmp_path, monkeypatch):
-    archives(tmp_path)
-    monkeypatch.setenv('RELEASE_TAG', 'v0.1.0-rc.1')
-    monkeypatch.setenv('RELEASE_COMMIT', 'abc')
-    monkeypatch.setattr(release.subprocess, 'check_output', lambda *a, **k: 'abc\n')
-    calls = []
-    monkeypatch.setattr(release.subprocess, 'run', lambda args, **k: calls.append(args))
-    release.publish(tmp_path)
-    assert [call[2] for call in calls] == ['create', 'upload', 'upload', 'upload', 'upload', 'edit']
-    assert '--draft=false' in calls[-1] and '--latest=false' in calls[-1]
-    calls.clear()
-    monkeypatch.setattr(release.subprocess, 'check_output', lambda *a, **k: 'changed\n')
-    with pytest.raises(ValueError, match='标签已移动'):
-        release.publish(tmp_path)
-    assert not calls
+        release.prepare_draft(root)
+    assert '--draft' in calls[0]
+    assert not any('--draft=false' in call for call in calls)

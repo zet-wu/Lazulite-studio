@@ -1,9 +1,9 @@
-name: Publish prerelease
+name: Prepare release draft
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing release tag (for example v0.1.0-rc.1)'
+        description: 'Release tag, new or existing (for example v0.1.0-preview)'
         required: true
         type: string
 permissions:
@@ -22,12 +22,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - id: source
-        name: Resolve release tag
+        name: Select source for release draft
         env:
           RELEASE_TAG: ${{ inputs.tag }}
+          SOURCE_COMMIT: ${{ github.sha }}
         run: |
           git check-ref-format "refs/tags/$RELEASE_TAG"
-          commit=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            commit=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+          else
+            commit="$SOURCE_COMMIT"
+          fi
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
   build:
     needs: source
@@ -35,7 +40,7 @@ jobs:
     with:
       target: all
       source_ref: ${{ needs.source.outputs.commit }}
-  publish:
+  draft:
     needs: [source, build]
     runs-on: ubuntu-latest
     permissions:
@@ -49,7 +54,7 @@ jobs:
           pattern: LazuliteStudio-*.7z*
           merge-multiple: true
           path: release-assets
-      - name: Publish all assets as a prerelease
+      - name: Create or update draft and upload assets
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
