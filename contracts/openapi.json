@@ -2423,8 +2423,7 @@
           "metadata_preserved",
           "lyrics_preserved",
           "subtitle_codec",
-          "track_id",
-          "ttml_sha256"
+          "track_id"
         ],
         "properties": {
           "passed": {
@@ -2450,12 +2449,6 @@
           },
           "sample_count": {
             "type": "integer"
-          },
-          "ttml_sha256": {
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "lyrics_preserved": {
             "type": "boolean"
@@ -2657,12 +2650,6 @@
               },
               "revision": {
                 "type": "string"
-              },
-              "revision_sha256": {
-                "type": [
-                  "string",
-                  "null"
-                ]
               }
             }
           },
@@ -2855,9 +2842,6 @@
             ]
           },
           "etag": {
-            "type": "string"
-          },
-          "sha256": {
             "type": "string"
           },
           "client_seq": {

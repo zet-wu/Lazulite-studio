@@ -5,7 +5,6 @@ authentication and project lookup policy.
 """
 from __future__ import annotations
 
-import hashlib
 import re
 import xml.etree.ElementTree as ET
 from typing import Callable
@@ -124,15 +123,12 @@ class DocumentService:
 
     def get(self, project_id: str, revision: str | None = None) -> dict:
         rev, snapshot = self.revisions.read(project_id, revision)
-        import json
-        digest = hashlib.sha256(json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
         return {
             "schema_version": "studio-document-v9",
             "project_id": project_id,
             "revision": rev,
             "etag": f'"{rev}"',
             "document": snapshot,
-            "sha256": digest,
         }
 
     def resolve_revision(self, project_id: str, revision: str | None) -> str:

@@ -802,7 +802,6 @@ export interface components {
             subtitle_handler?: string;
             subtitle_codec: string | null;
             sample_count?: number;
-            ttml_sha256: string | null;
             lyrics_preserved: boolean;
             track_id: number | null;
         };
@@ -853,7 +852,6 @@ export interface components {
                 project_id: string;
                 asset_id: string;
                 revision: string;
-                revision_sha256?: string | null;
             };
             /** @enum {unknown} */
             kind?: "alignment" | "vocal" | "publish";
@@ -906,7 +904,6 @@ export interface components {
             project_id: string;
             revision: string | null;
             etag?: string;
-            sha256?: string;
             client_seq?: number | null;
             document: {
                 /** @constant */

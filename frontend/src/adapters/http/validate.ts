@@ -25,7 +25,7 @@ export const SCHEMA_VERSION = {
 export function isDocumentEnvelope(value: unknown): value is DocumentEnvelope {
   return object(value) && value.schema_version === "studio-document-v9" && string(value.project_id) &&
     string(value.revision) && object(value.document) && value.document.schemaVersion === "studio-project-v7" &&
-    object(value.document.lyrics) && string(value.document.lyrics.draftTtml) && object(value.document.editing) && object(value.document.acoustics) && (value.document.acoustics.analysisId === null || string(value.document.acoustics.analysisId)) && Array.isArray(value.document.acoustics.segments) && string(value.sha256);
+    object(value.document.lyrics) && string(value.document.lyrics.draftTtml) && object(value.document.editing) && object(value.document.acoustics) && (value.document.acoustics.analysisId === null || string(value.document.acoustics.analysisId)) && Array.isArray(value.document.acoustics.segments);
 }
 export function isImportCandidate(value: unknown): value is ImportProposal {
   return object(value) && value.schema_version === 'studio-import-v1' && string(value.project_id) && string(value.input_revision) && object(value.candidate) && Array.isArray(value.diagnostics) && value.saved === false;

@@ -53,14 +53,14 @@ class RevisionStore:
     ) -> dict:
         with self.db.connect() as conn:
             snapshot = validate_project(snapshot, conn, project_id)
-        ttml = snapshot['lyrics']['draftTtml']
         encoded = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
-        digest = hashlib.sha256(encoded).hexdigest()
-        request_hash = hashlib.sha256(
-            json.dumps(
-                [subject, project_id, base, digest, client_seq], separators=(",", ":")
-            ).encode()
-        ).hexdigest()
+        if operation_id:
+            digest = hashlib.sha256(encoded).hexdigest()
+            request_hash = hashlib.sha256(
+                json.dumps(
+                    [subject, project_id, base, digest, client_seq], separators=(",", ":")
+                ).encode()
+            ).hexdigest()
         now = datetime.now(timezone.utc).isoformat()
         with self.db.transaction() as conn:
             if operation_id:
@@ -98,7 +98,6 @@ class RevisionStore:
                 result = {
                     "id": revision,
                     "etag": f'"{revision}"',
-                    "sha256": digest,
                     "created_at": now,
                 }
                 if client_seq is not None:

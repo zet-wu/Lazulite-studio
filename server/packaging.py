@@ -69,7 +69,7 @@ def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str, targ
         if target_track_id is None and len(new_ids) != 1: raise ValueError('新增 STPP 轨道无法唯一确认')
         target = target_track_id if target_track_id is not None else new_ids.pop()
         if extract_stpp(output,target) != ttml: raise ValueError('STPP 回读不一致')
-    return {'report':{'passed':True,'audio_preserved':True,'metadata_preserved':True,'lyrics_preserved':True,'audio_streams':len(before_audio),'subtitle_codec':'stpp' if isinstance(checked,MP4) else None,'track_id':target if isinstance(checked,MP4) else None,'ttml_sha256':hashlib.sha256(ttml).hexdigest() if ttml else None}}
+    return {'report':{'passed':True,'audio_preserved':True,'metadata_preserved':True,'lyrics_preserved':True,'audio_streams':len(before_audio),'subtitle_codec':'stpp' if isinstance(checked,MP4) else None,'track_id':target if isinstance(checked,MP4) else None}}
 
 
 def mp4_snapshot(path, excluded_track_id=None):

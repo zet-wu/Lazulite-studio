@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
 from typing import Any, Mapping, Protocol, Sequence
 from threading import Lock
 
@@ -12,15 +11,9 @@ from pydantic import BaseModel, Field
 from .furigana import load_index, token_segments
 
 
-def _proposal_id(line_id: str, start: int, end: int, base: str, reading: str) -> str:
-    value = f"{line_id}\0{start}\0{end}\0{base}\0{reading}".encode()
-    return "reading-" + hashlib.sha256(value).hexdigest()[:24]
-
-
 @dataclass(frozen=True, slots=True)
 class ReadingProposal:
     line_id: str
-    proposal_id: str
     base_start: int
     base_end: int
     base: str
@@ -31,7 +24,6 @@ class ReadingProposal:
     def as_dict(self) -> dict[str, Any]:
         return {
             "line_id": self.line_id,
-            "proposal_id": self.proposal_id,
             "base_start": self.base_start,
             "base_end": self.base_end,
             "base": self.base,
@@ -93,7 +85,7 @@ class SudachiReadingProposer:
                         if not _contains_japanese(base) or not reading or reading == '*' or _hiragana(base) == reading:
                             continue
                         output.append(ReadingProposal(
-                            line_id=line_id, proposal_id=_proposal_id(line_id, start, end, base, reading),
+                            line_id=line_id,
                             base_start=start, base_end=end, base=base, reading=reading,
                             source='sudachi', needs_review=True,
                         ))
@@ -117,7 +109,6 @@ def _coerce_proposal(value: ReadingProposal | Mapping[str, Any], lines: Mapping[
         raise ValueError("proposal range does not match line text")
     return ReadingProposal(
         line_id=line_id,
-        proposal_id=str(data.get("proposal_id") or _proposal_id(line_id, start, end, base, reading)),
         base_start=start,
         base_end=end,
         base=base,

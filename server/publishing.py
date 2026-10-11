@@ -8,7 +8,6 @@ database, which also makes its round-trip checks useful in the HTTP layer.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
 import struct
@@ -31,8 +30,6 @@ class PublishReport:
     subtitle_handler: str
     subtitle_codec: str
     sample_count: int
-    ttml_sha256: str
-    audio_bytes_preserved: bool
 
 
 def _box(kind: bytes, payload: bytes) -> bytes:
@@ -145,23 +142,6 @@ def _read_payload(path: Path, pos: int, size: int, header_size: int) -> bytes:
     if len(payload) != size - header_size:
         raise PublishingError("truncated ISO BMFF box")
     return payload
-
-
-def _range_digest(path: Path, boxes) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for kind, pos, size, _ in boxes:
-            if kind == b"free":
-                continue
-            source.seek(pos)
-            remaining = size
-            while remaining:
-                block = source.read(min(1024 * 1024, remaining))
-                if not block:
-                    raise PublishingError("truncated media box")
-                digest.update(block)
-                remaining -= len(block)
-    return digest.hexdigest()
 
 
 def _movie_clock(moov: bytes) -> tuple[int, int]:
@@ -289,11 +269,8 @@ def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str 
     embedded = extract_stpp(output, target_track_id or _track_id(moov))
     if embedded != sample:
         raise PublishingError("stpp round-trip sample mismatch")
-    source_size = source.stat().st_size
-    audio_preserved = _range_digest(source, [item for item in top if item[0] != b"moov"]) == _range_digest(output, [item for item in _scan_top(output) if item[1] < source_size and item[0] != b"free"])
-    if not audio_preserved:
-        raise PublishingError("original media bytes changed during publish")
-    return PublishReport(output, audio_after[0].get("codec_name"), len(audio_after), True, "subt", "stpp", 1, hashlib.sha256(sample).hexdigest(), True)
+    # package_media checks original payloads against the final tagged file.
+    return PublishReport(output, audio_after[0].get("codec_name"), len(audio_after), True, "subt", "stpp", 1)
 
 
 def extract_stpp(path: Path, track_id: int | None = None) -> bytes:

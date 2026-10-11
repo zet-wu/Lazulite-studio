@@ -88,3 +88,21 @@ def test_initial_revision_is_idempotent_and_recovery_replaces_stale_draft(
     assert "two" in read_lyrics(draft)
     with db.connect() as conn:
         assert conn.execute("SELECT count(*) FROM revisions").fetchone()[0] == 2
+
+
+def test_revision_without_idempotency_uses_revision_identity(tmp_path, monkeypatch):
+    import server.revisions as revisions
+    from server.documents import DocumentService
+    db = Database(tmp_path / 'db.sqlite')
+    store = RevisionStore(db, tmp_path / 'projects')
+    with db.transaction() as conn:
+        conn.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)', ('p','demo',None,None,'now','now'))
+    def no_content_digest(*args, **kwargs):
+        raise AssertionError('plain save and document reads only need revision identity')
+    monkeypatch.setattr(revisions.hashlib, 'sha256', no_content_digest)
+    result = store.create('p', initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>', None), None)
+    assert 'sha256' not in result
+    document = DocumentService(store).get('p')
+    assert document['revision'] == result['id']
+    assert document['etag'] == result['etag']
+    assert 'sha256' not in document

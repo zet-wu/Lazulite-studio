@@ -10,7 +10,6 @@ export type PublishReport = {
   subtitle_handler?: string;
   subtitle_codec?: string;
   sample_count?: number;
-  ttml_sha256?: string;
 };
 
 export type ExportItem = {

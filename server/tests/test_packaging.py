@@ -54,3 +54,28 @@ def test_two_stpp_tracks_preserves_unselected_sample(tmp_path):
     package_media(first,output,TTML.replace(b'synthetic',b'updated'),LRC,2)
     assert extract_stpp(output,99)==sample
     assert extract_stpp(output,2)==TTML.replace(b'synthetic',b'updated')
+
+
+@pytest.mark.parametrize('part,message', [('audio', '音频载荷'), ('other', '原始媒体数据')])
+def test_final_mp4_verification_rejects_corruption_after_tag_write(tmp_path, monkeypatch, part, message):
+    from mutagen.mp4 import MP4
+    from server.publishing import _box, _scan_top
+    source, output = tmp_path/'source.m4a', tmp_path/'output.m4a'
+    subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','sine=duration=1','-c:a','aac',str(source)],check=True)
+    # This original mdat has bytes outside the audio packet set.
+    with source.open('ab') as file:
+        file.write(_box(b'mdat', b'preserved auxiliary media'))
+    save = MP4.save
+    def corrupt_after_save(self, *args, **kwargs):
+        result = save(self, *args, **kwargs)
+        mdats = [box for box in _scan_top(output) if box[0] == b'mdat']
+        _, offset, _, header = mdats[0 if part == 'audio' else 1]
+        with output.open('r+b') as file:
+            file.seek(offset + header)
+            byte = file.read(1)
+            file.seek(offset + header)
+            file.write(bytes([byte[0] ^ 1]))
+        return result
+    monkeypatch.setattr(MP4, 'save', corrupt_after_save)
+    with pytest.raises(ValueError, match=message):
+        package_media(source, output, TTML, LRC)

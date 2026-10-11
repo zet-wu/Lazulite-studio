@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, threading, uuid, hashlib, logging
+import json, threading, uuid, logging
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -121,14 +121,10 @@ class JobService:
                     bound_revision = request.get("revision")
                     bound_asset = request.get("asset_id")
                     if kind == "alignment" and (project is None or project["current_revision"] != bound_revision or project["source_asset_id"] != bound_asset): raise ValueError("项目版本或源音频已改变，请重新运行")
-                    rev = c.execute("SELECT project_path FROM revisions WHERE id=? AND project_id=?", (bound_revision, record[1])).fetchone()
-                    if not rev:
+                    if not c.execute("SELECT 1 FROM revisions WHERE id=? AND project_id=?", (bound_revision, record[1])).fetchone():
                         raise RuntimeError("bound revision disappeared")
-                    with open(rev[0], "rb") as source:
-                        revision_hash = hashlib.sha256(source.read()).hexdigest()
                 result["binding"] = {"project_id": record[1], "asset_id": bound_asset,
-                                     "revision": bound_revision,
-                                     "revision_sha256": revision_hash}
+                                     "revision": bound_revision}
             with self._lock, self.db.transaction() as c:
                 cancelled = c.execute('SELECT cancel_requested FROM jobs WHERE id=?', (jid,)).fetchone()
                 if kind in {'publish', 'vocal', 'alignment'} and cancelled[0]:
