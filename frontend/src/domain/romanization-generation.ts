@@ -130,7 +130,7 @@ export function prepareRomanization(document: LyricDocument, source: LyricDocume
     if (target !== 'append' && !existing.some(content => content.id === target)) throw new Error('替换的音译内容不存在');
     return [{ row, target }];
   });
-  if (!prepared.length) throw new Error('没有可生成内容（未选择内容或结果为空，未替换）');
+  if (!prepared.length) throw new Error('没有可生成内容');
   return { track, prepared };
 }
 export function romanizationGenerationCommand(document: LyricDocument, source: LyricDocument, rows: RomanizationProposal[], choices: RomanizationChoices): LyricCommand {

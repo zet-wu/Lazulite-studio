@@ -68,7 +68,7 @@ export function JapaneseRubyDialog({ document, lineIds, apply, close }: { docume
  return <SettingsDialog title="生成日文注音" subtitle={`${rows.length} 行`} close={()=>{if(!composing)close();}}
   actions={<><button data-role="secondary" onClick={close} disabled={composing}>取消</button><button data-role="primary" onClick={submit} disabled={composing||pending||stale||!changed}>应用</button></>}>
   <div className={styles.rubyGeneration}>
-  <p>编辑完整读音；空白项跳过。时间按比例估算，应用后可在时间轴调整。</p>
+  <p>空白项跳过生成。</p>
   <label className={styles.japaneseRubyMerge}><input type="checkbox" checked={autoMerge} disabled={composing||stale} onChange={event=>{
     if(composing)return;
     edited.current.clear();setActive(null);setPending(true);setError('');setRows(proposeJapaneseRuby(source,ids,[]));setAutoMerge(event.target.checked);
