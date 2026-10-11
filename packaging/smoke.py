@@ -19,8 +19,10 @@ def smoke(root, python=None):
     log = root / 'smoke.log'
     command = [str(python), '-E', '-s', '-m', 'server.portable', '--root', str(root), '--no-browser']
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    with log.open('w') as output:
-        process = subprocess.Popen(command, cwd=root / 'app', stdout=output, stderr=subprocess.STDOUT)
+    flags = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
+    launcher = root / ('启动.bat' if os.name == 'nt' else '启动.command')
+    with log.open('w', encoding='utf-8') as output:
+        process = subprocess.Popen(command, cwd=root / 'app', stdout=output, stderr=subprocess.STDOUT, **flags)
         try:
             for _ in range(160):
                 if process.poll() is not None: raise RuntimeError(log.read_text())
@@ -40,17 +42,18 @@ def smoke(root, python=None):
             wrong = urllib.request.Request(origin + '/api/v1/projects', data=b'{"name":"forbidden"}', headers={'Content-Type':'application/json','Origin':'https://evil.test'})
             try: opener.open(wrong); raise AssertionError('external origin allowed')
             except urllib.error.HTTPError as error: assert error.code == 403
-            duplicate = subprocess.run(command, cwd=root / 'app', capture_output=True, text=True, timeout=30)
+            duplicate_command = ([os.environ.get('COMSPEC', 'cmd.exe'), '/d', '/c', str(launcher), '--no-browser'] if os.name == 'nt' else [str(launcher), '--no-browser']) if launcher.is_file() else command
+            duplicate = subprocess.run(duplicate_command, cwd=root if launcher.is_file() else root / 'app', capture_output=True, text=True, timeout=30)
             assert duplicate.returncode == 0, duplicate.stderr
             with opener.open(origin + '/api/v1/runtime') as response: assert json.load(response)['nonce'] == identity['nonce']
             print(json.dumps({'ready':True,'session':'local','static':True,'api_404':True,'origin_rejected':True,'duplicate_same_instance':True,'runtime_override':str(python)}))
         finally:
             if process.poll() is None:
-                process.send_signal(signal.SIGINT)
+                process.send_signal(signal.CTRL_BREAK_EVENT if os.name == 'nt' else signal.SIGINT)
                 try: process.wait(timeout=20)
                 except subprocess.TimeoutExpired: process.kill(); process.wait(); raise RuntimeError('shutdown timeout')
         assert process.returncode in (0, -signal.SIGINT), process.returncode
-        print('Ctrl+C shutdown completed')
+        print('graceful shutdown completed (CTRL_BREAK on Windows, SIGINT on POSIX)')
 
 
 if __name__ == '__main__':

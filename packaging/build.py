@@ -243,14 +243,22 @@ def build(target, output):
                HF_HOME=str(work / 'empty-hf'), TORCH_HOME=str(work / 'empty-torch'))
     python = runtime_python(root)
     run([python, '-E', '-s', ROOT / 'packaging/runtime_smoke.py', '--root', root, '--target', target], cwd=root / 'app', env=env)
-    run([python, '-E', '-s', ROOT / 'packaging/model_smoke.py', '--models', root / 'models'], cwd=root / 'app', env=env)
+    if os.name == 'nt':
+        powershell = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+        offline = [powershell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+                   ROOT / 'packaging/model_smoke_windows.ps1', '-Python', python,
+                   '-Script', ROOT / 'packaging/model_smoke.py', '-Models', root / 'models']
+    else:
+        offline = ['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)',
+                   python, '-E', '-s', ROOT / 'packaging/model_smoke.py', '--models', root / 'models', '--os-isolated']
+    run(offline, cwd=root / 'app', env=env)
     run([sys.executable, ROOT / 'packaging/smoke.py', '--root', root], cwd=work, env=env)
     shutil.copy2(root / 'smoke.log', diagnostics / 'launcher.log')
     write_json(artifacts / 'validation.json', {**manifest, 'status':'native-relocated-cpu-smoke-passed',
                'checks':['pip check', 'native architecture/import audit', 'archive file hashes',
-                         'Japanese/Chinese/media', 'local Demucs/NextFire CPU with Python socket access denied',
+                         'Japanese/Chinese/media', 'local Demucs/NextFire CPU with OS network isolation and empty caches',
                          'local service/static/auth/duplicate launcher/graceful shutdown'],
-               'network_scope':'Python socket audit hook in model process, not OS firewall isolation',
+               'network_scope':'Windows per-program outbound firewall rule / macOS sandbox-exec deny network; plus Python socket hook',
                'archives':[{'file':p.name, 'size':p.stat().st_size, 'sha256':digest(p)} for p in archives]})
     shutil.copy2(root / '使用说明.txt', artifacts / '使用说明.txt')
     (artifacts / 'SHA256SUMS').write_text(''.join(f'{digest(p)}  {p.name}\n' for p in archives), encoding='utf-8')

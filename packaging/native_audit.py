@@ -28,7 +28,7 @@ def audit(root, target):
                         continue
                     if name in ('nvcuda.dll', 'nvml.dll') and target.endswith('cuda'):
                         continue  # Driver-provided; CUDA hardware validation remains separate.
-                    if name.startswith(('vcruntime', 'msvcp', 'concrt')) or not (system / name).is_file():
+                    if name.startswith(('vcruntime', 'msvcp1', 'msvcr1', 'concrt', 'vcomp')) or not (system / name).is_file():
                         missing.append(name)
                 if missing:
                     raise ValueError(f'未闭合 DLL：{path.relative_to(root)}: {missing}')
@@ -42,7 +42,7 @@ def audit(root, target):
                 continue
             with path.open('rb') as stream:
                 magic = stream.read(4)
-            if magic not in (b'\xcf\xfa\xed\xfe', b'\xfe\xed\xfa\xcf', b'\xca\xfe\xba\xbe', b'\xbe\xba\xfe\xca'):
+            if magic not in (b'\xcf\xfa\xed\xfe', b'\xfe\xed\xfa\xcf', b'\xca\xfe\xba\xbe', b'\xbe\xba\xfe\xca', b'\xca\xfe\xba\xbf', b'\xbf\xba\xfe\xca'):
                 continue
             arch = subprocess.check_output(['lipo', '-archs', str(path)], text=True).strip()
             if 'arm64' not in arch.split():
