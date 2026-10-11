@@ -104,7 +104,7 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
       {operation === 'shift' && <label>偏移毫秒（负数为提前）<input type="number" step="1" value={amountMs} onChange={(event) => setAmountMs(event.target.value)} /></label>}
       {operation === 'smooth' && <label>相邻词间隙或重叠阈值（毫秒）<input type="number" min="0" step="1" value={thresholdMs} onChange={(event) => setThresholdMs(event.target.value)} /></label>}
     </div>}
-    <p className={styles.toolHint}>{operation === 'clear-ruby' ? '清除范围内正文词的全部 Ruby 及其空拍、失效导唱；正文及独立音译／翻译保持。' : operation === 'replace' ? '空结果删除对应对象。' : operation === 'shift' ? `目标：${targets.length} 行；行、词、注音、附属时间和导唱一起平移，负值越界时整次取消。` : operation === 'smooth' ? `目标：${targets.length} 行；仅填平阈值内的 CJK 相邻词边界，注音/对齐边界保持原样。` : operation === 'sync' ? `目标：${targets.length} 行；行首尾取已定时间词的包络，未定词不变；改变已链接行的结束时间会取消链接。` : (current && editing.endLinks[current.id]) ? `当前行链接到 ${editing.endLinks[current.id]}；取消后保留当前结束时间。` : '将当前主唱行结束时间链接到下一主唱行的开始时间；词和 注音 时间不变。'}</p>
+    <p className={styles.toolHint}>{operation === 'clear-ruby' ? '清除范围内正文词的全部 Ruby 及其空拍、失效导唱；正文及独立音译／翻译保持。' : operation === 'replace' ? '空结果删除对应对象。' : operation === 'shift' ? `目标：${targets.length} 行` : operation === 'smooth' ? `目标：${targets.length} 行；仅填平阈值内的 CJK 相邻词边界，注音/对齐边界保持原样。` : operation === 'sync' ? `目标：${targets.length} 行；行首尾取已定时间词的包络，未定词不变；改变已链接行的结束时间会取消链接。` : (current && editing.endLinks[current.id]) ? `当前行链接到 ${editing.endLinks[current.id]}；取消后保留当前结束时间。` : '将当前主唱行结束时间链接到下一主唱行的开始时间。'}</p>
 
     {(preview || previewError) && <p role="status">{previewError || preview?.summary}{preview && !preview.changed ? operation === 'clear-ruby' ? '；无可清除的注音' : '；没有实际变化' : ''}</p>}
     {message && <p role="alert">{message}</p>}
