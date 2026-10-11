@@ -48,12 +48,12 @@ it('rejects an inverted existing envelope atomically',()=>{
 it('applies all 2000 rows, including rows never mounted in the preview',()=>{
  const d=createLyricDocument();d.lines=Array.from({length:2000},(_,i)=>createLine('今日',`line${i}`));const rows=proposeJapaneseRuby(d,d.lines.map(l=>l.id),d.lines.map(l=>range('今日','きょう',l.id)));const command=japaneseRubyCommand(d,d,rows);if(command.type!=='replace-document')throw Error();expect(command.document.lines).toHaveLength(2000);expect(command.document.lines.every(l=>l.words[0].rubyUnits.map(u=>u.reading).join('|')==='きょ|う')).toBe(true);
 });
-it('anchors entire ranges before projection and coalesces fine kanji within existing words',()=>{
+it('anchors entire ranges and preserves reliable fine kanji boundaries inside words',()=>{
  for(const texts of [['夜','空','見','上','げ'],['夜空','見上','げ'],['夜空','見上げ']]){
   const d=createLyricDocument(),l=d.lines[0];l.words=texts.map(t=>createWord(t));
   const rows=proposeJapaneseRuby(d,[l.id],[range('夜','よ',l.id),range('空','ぞら',l.id,1),range('見','み',l.id,2),range('上げ','あげ',l.id,3)]);
-  expect(rows[0].blocks.map(b=>[b.text,b.reading])).toEqual(texts[0]==='夜'?[['夜','よ'],['空','ぞら'],['見','み'],['上','あ'],['げ','']]:[['夜空','よぞら'],['見上','みあ'],['げ','']]);
-  const c=japaneseRubyCommand(d,d,rows);if(c.type!=='replace-document')throw Error();expect(c.document.lines[0].words.map(w=>w.text)).toEqual(texts[0]==='夜'?texts:['夜空','見上','げ']);
+  expect(rows[0].blocks.map(b=>[b.text,b.reading])).toEqual([['夜','よ'],['空','ぞら'],['見','み'],['上','あ'],['げ','']]);
+  const c=japaneseRubyCommand(d,d,rows);if(c.type!=='replace-document')throw Error();expect(c.document.lines[0].words.map(w=>w.text)).toEqual(['夜','空','見','上','げ']);
  }
  const d=createLyricDocument(),l=d.lines[0];l.words=['見上','げ'].map(t=>createWord(t));
  expect(proposeJapaneseRuby(d,[l.id],[range('見上げ','みあげ',l.id)])[0].blocks.map(b=>b.reading)).toEqual(['みあ','']);
@@ -63,4 +63,74 @@ it('leaves indivisible compounds and split graphemes empty',()=>{
   const d=createLyricDocument(),l=d.lines[0];l.words=Array.from(base).map(t=>createWord(t));expect(proposeJapaneseRuby(d,[l.id],[range(base,reading,l.id)])[0].blocks.every(b=>!b.reading)).toBe(true);
  }
  const d=createLyricDocument('漢\u{E0100}');const l=d.lines[0];expect(proposeJapaneseRuby(d,[l.id],[range('漢','かん',l.id),range('\u{E0100}','',l.id,1)])[0].blocks.map(b=>[b.text,b.reading])).toEqual([['漢\u{E0100}','']]);
+});
+it('keeps the finest reliable 坂道 blocks in either one word or an entire sentence',()=>{
+ for(const texts of [['坂道'],['この坂道を'],['坂','道']]){
+  const d=createLyricDocument(),l=d.lines[0];l.words=texts.map(text=>createWord(text));
+  const offset=texts[0].startsWith('この')?2:0;
+  const rows=proposeJapaneseRuby(d,[l.id],[range('坂','さか',l.id,offset),range('道','みち',l.id,offset+1)],true);
+  expect(rows[0].blocks.filter(b=>b.reading).map(b=>[b.text,b.reading])).toEqual([['坂','さか'],['道','みち']]);
+  expect(rows[0].blocks.some(b=>b.spans)).toBe(false);
+ }
+});
+it('merges only an indivisible cross-word range, splitting its original words proportionally',()=>{
+ const d=createLyricDocument(),l=d.lines[0];l.words=['あ今','日を坂道'].map(t=>createWord(t));
+ Object.assign(l.words[0],{beginMs:100,endMs:300});Object.assign(l.words[1],{beginMs:400,endMs:800,obscene:true});
+ const rows=proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id,1),range('坂','さか',l.id,4),range('道','みち',l.id,5)],true);
+ expect(rows[0].blocks.map(b=>b.text)).toEqual(['あ','今日','を','坂','道']);expect(rows[0].blocks[1].spans).toHaveLength(2);
+ const state=executeLyricCommand(createLyricEditorState(d),japaneseRubyCommand(d,d,rows));
+ expect(state.present.lines[0].words.map(w=>w.text)).toEqual(['あ','今日','を','坂','道']);
+ expect(state.present.lines[0].words[1]).toMatchObject({beginMs:200,endMs:500,obscene:true});
+ expect(state.present.lines[0].words[1].rubyUnits.map(u=>[u.reading,u.beginMs,u.endMs])).toEqual([['きょ',200,350],['う',350,500]]);
+ rows[0].blocks[1].reading='  ';
+ const skipped=executeLyricCommand(createLyricEditorState(d),japaneseRubyCommand(d,d,rows));
+ expect(skipped.present.lines[0].words.map(w=>w.text)).toEqual(['あ今','日を','坂','道']);
+ expect(undoLyricCommand(state).present).toBe(d);expect(redoLyricCommand(undoLyricCommand(state)).present).toEqual(state.present);
+});
+it.each([0,3])('uses the first merged word empty beat, including zero (%s)',count=>{
+ const d=createLyricDocument(),l=d.lines[0];l.words=['今','日'].map(t=>createWord(t));
+ const editing=createProjectEditing();setEmptyBeat(editing,l.words[0].id,'word',count);setEmptyBeat(editing,l.words[1].id,'word',5);
+ const rows=proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)],true);
+ const state=executeLyricCommand(createLyricEditorState(d,editing),japaneseRubyCommand(d,d,rows));
+ const merged=state.present.lines[0].words[0];expect(merged.id).toBe(l.words[0].id);expect(emptyBeatCount(state.editing,merged.rubyUnits[0].id)).toBe(count);
+ expect(state.editing.emptyBeats[l.words[1].id]).toBeUndefined();expect(undoLyricCommand(state).editing).toEqual(editing);
+});
+it('does not merge across existing ruby, whitespace, punctuation, or independent lines',()=>{
+ for(const texts of [['今','日'],['今',' ','日'],['今','、','日']]){
+  const d=createLyricDocument(),l=d.lines[0];l.words=texts.map(t=>createWord(t));
+  if(texts.length===2)l.words[0].rubyUnits=[{id:'old',reading:'いま',beginMs:null,endMs:null}];
+  const rows=proposeJapaneseRuby(d,[l.id],[range(texts.join(''),'きょう',l.id)],true);
+  expect(rows[0].blocks.some(b=>b.spans)).toBe(false);
+ }
+ const d=createLyricDocument('今\n日');const rows=proposeJapaneseRuby(d,d.lines.map(l=>l.id),[],true);expect(rows.every(r=>r.blocks.every(b=>!b.spans))).toBe(true);
+});
+it.each([[null,9],[2,null],[null,null],[2,3]])('merging retains known endpoint envelope %s %s',(beginMs,endMs)=>{
+ const d=createLyricDocument(),l=d.lines[0];l.words=['今','日'].map(t=>createWord(t));l.words[0].beginMs=beginMs;l.words[1].endMs=endMs;
+ const state=executeLyricCommand(createLyricEditorState(d),japaneseRubyCommand(d,d,proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)],true)));
+ expect(state.present.lines[0].words[0]).toMatchObject({beginMs,endMs});
+});
+it('merging reconciles invalid cue anchors and keeps external links in the same project history',()=>{
+ const d=createLyricDocument(),l=d.lines[0];l.beginMs=0;l.endMs=1000;
+ l.words=[{...createWord('今'),beginMs:100,endMs:300},{...createWord('日'),beginMs:500,endMs:700}];
+ const next={...createLine('かな'),beginMs:1000,endMs:2000};d.lines.push(next);
+ const editing=createProjectEditing();editing.endLinks[l.id]=next.id;
+ const initial=createLyricEditorState(d,editing);
+ initial.project.present.karaoke.cues=[{id:'between',text:'●',anchor:{kind:'word',lineId:l.id,leftId:l.words[0].id,rightId:l.words[1].id},beginMs:300,endMs:500},{id:'before',text:'●',anchor:{kind:'before',lineId:l.id},beginMs:0,endMs:100}];
+ const state=executeLyricCommand(initial,japaneseRubyCommand(d,d,proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)],true)));
+ expect(state.project.present.karaoke.cues.map(c=>c.id)).toEqual(['before']);expect(state.editing.endLinks).toEqual(editing.endLinks);
+ expect(undoLyricCommand(state).project.present).toEqual(initial.project.present);expect(redoLyricCommand(undoLyricCommand(state)).project.present).toEqual(state.project.present);
+});
+it('rejects merged incompatible agents and existing ruby beat loss without modifying any source',()=>{
+ const d=createLyricDocument(),l=d.lines[0];d.agents=[{id:'a',name:null,type:'person'},{id:'b',name:null,type:'person'}];
+ l.words=[{...createWord('今'),agentRefs:['a']},{...createWord('日'),agentRefs:['b']}];const before=structuredClone(d);
+ expect(()=>japaneseRubyCommand(d,d,proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)],true))).toThrow('统一有效歌手');expect(d).toEqual(before);
+ const source=createLyricDocument('今日'),word=source.lines[0].words[0];word.rubyUnits=[{id:'kept',reading:'きょう',beginMs:null,endMs:null}];
+ const editing=createProjectEditing();setEmptyBeat(editing,'kept','ruby',2);const rows=proposeJapaneseRuby(source,[source.lines[0].id],[]);rows[0].blocks[0].reading='こんにち';
+ const initial=createLyricEditorState(source,editing);expect(()=>executeLyricCommand(initial,japaneseRubyCommand(source,source,rows))).toThrow('空拍');expect(initial.present).toBe(source);expect(initial.past).toHaveLength(0);
+});
+it.each([[2,3],[null,3],[2,null]])('splitting retains exact outer endpoints and never invents partial internal time (%s, %s)',(beginMs,endMs)=>{
+ const d=createLyricDocument('坂道'),l=d.lines[0];Object.assign(l.words[0],{beginMs,endMs});
+ const state=executeLyricCommand(createLyricEditorState(d),japaneseRubyCommand(d,d,proposeJapaneseRuby(d,[l.id],[range('坂','さか',l.id),range('道','みち',l.id,1)])));
+ const words=state.present.lines[0].words;expect(words[0].beginMs).toBe(beginMs);expect(words[1].endMs).toBe(endMs);
+ expect(words[0].endMs).toBe(beginMs===null||endMs===null?null:3);expect(words[1].beginMs).toBe(words[0].endMs);
 });

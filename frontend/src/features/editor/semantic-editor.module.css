@@ -307,7 +307,8 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .japaneseRubyBlock { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; max-width: 100%; min-width: 0; }
 .japaneseRubyText { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 20px; font-weight: 550; }
 .japaneseRubyLabel { font-size: 12px; opacity: .75; }
-.japaneseRubyBlock small { font-size: 11px; }
+.japaneseRubyBlock small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.japaneseRubyMerge { display: flex; align-items: center; gap: 8px; }
 .japaneseRubyMissing { border: 1px solid var(--danger) !important; }
 
 .translationTrackSection { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding-block: 8px; border-bottom: 1px solid var(--line); }

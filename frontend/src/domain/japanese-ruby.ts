@@ -1,15 +1,15 @@
-import { createProjectEditing, emptyBeatCount } from './project-editing';
 import { toHiragana } from 'wanakana';
 export type ReadingRange = { line_id: string; base_start: number; base_end: number; base: string; reading: string };
 import { lineText, rubyReading, type LyricDocument, type LyricWord } from './lyric-document';
-import type { LyricCommand } from './lyric-commands';
+import { planWordMerge, type LyricCommand } from './lyric-commands';
 import { makeRubyUnits, splitReadingMora } from './ruby-editing';
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 const han = /[\p{Script=Han}々〆]/u;
 const length = (text: string) => Array.from(text).length;
 const slice = (text: string, start: number, end: number) => Array.from(text).slice(start, end).join('');
-export type ReadingBlock = { key: string; wordId: string; start: number; end: number; text: string; reading: string; editable: boolean; existing: boolean };
+export type ReadingSpan = { wordId: string; start: number; end: number };
+export type ReadingBlock = { key: string; wordId: string; start: number; end: number; text: string; reading: string; editable: boolean; existing: boolean; spans?: ReadingSpan[] };
 export type ReadingRow = { lineId: string; background: boolean; blocks: ReadingBlock[] };
 
 function runs(text: string) {
@@ -51,7 +51,7 @@ function mapReading(text: string, reading: string): string[] | null {
   return solutions.length === 1 ? solutions[0] : null;
 }
 
-export function proposeJapaneseRuby(source: LyricDocument, ids: string[], ranges: ReadingRange[]): ReadingRow[] {
+export function proposeJapaneseRuby(source: LyricDocument, ids: string[], ranges: ReadingRange[], autoMerge = false): ReadingRow[] {
   const selected = new Set(ids), byLine = new Map<string, ReadingRange[]>();
   for (const range of ranges) {
     const entries = byLine.get(range.line_id) ?? []; entries.push(range); byLine.set(range.line_id, entries);
@@ -70,6 +70,15 @@ export function proposeJapaneseRuby(source: LyricDocument, ids: string[], ranges
         base_start: range.base_start + part.start, base_end: range.base_start + part.end,
         reading: values?.[index] ?? '' }));
     });
+    let wordOffset = 0;
+    const wordRanges = line.words.map(word => { const start = wordOffset; wordOffset += length(word.text); return { word, start, end: wordOffset }; });
+    const graphemes = new Set([0]); let cpOffset = 0;
+    for (const {segment} of segmenter.segment(text)) { cpOffset += length(segment); graphemes.add(cpOffset); }
+    const merges = autoMerge ? anchored.filter(range => {
+      const owners = wordRanges.filter(item => item.start < range.base_end && item.end > range.base_start);
+      return range.reading && runs(range.base).every(part => part.kanji) && owners.length > 1 && owners.every(item => !item.word.rubyUnits.length)
+        && graphemes.has(range.base_start) && graphemes.has(range.base_end);
+    }) : [];
     let offset = 0;
     const blocks = line.words.flatMap(word => {
       const start = offset; offset += length(word.text);
@@ -77,7 +86,12 @@ export function proposeJapaneseRuby(source: LyricDocument, ids: string[], ranges
       if (word.rubyUnits.length) return [block(0, length(word.text), rubyReading(word), true)];
       const boundaries = new Set([0]); let cp = 0;
       for (const item of segmenter.segment(word.text)) { cp += length(item.segment); boundaries.add(cp); }
-      const candidates = anchored.filter(r => r.base_start >= start && r.base_end <= offset && boundaries.has(r.base_start - start) && boundaries.has(r.base_end - start));
+      const candidates = anchored.flatMap(r => {
+        if (r.base_start >= start && r.base_end <= offset && boundaries.has(r.base_start-start) && boundaries.has(r.base_end-start)) return [r];
+        if (!merges.includes(r) || r.base_start >= offset || r.base_end <= start) return [];
+        const a = Math.max(start,r.base_start), b = Math.min(offset,r.base_end);
+        return boundaries.has(a-start) && boundaries.has(b-start) ? [{...r,base_start:a,base_end:b,reading:''}] : [];
+      });
       const result: ReadingBlock[] = []; let cursor = 0;
       const append = (a: number, b: number, reading: string) => {
         const value = slice(word.text, a, b), parts = runs(value), mapped = mapReading(value, reading);
@@ -85,17 +99,25 @@ export function proposeJapaneseRuby(source: LyricDocument, ids: string[], ranges
       };
       for (const r of candidates) { const a = r.base_start - start, b = r.base_end - start; if (a > cursor) append(cursor, a, ''); append(a, b, r.reading); cursor = b; }
       if (cursor < length(word.text)) append(cursor, length(word.text), '');
-      // Fine dictionary boundaries serve existing words; do not force new kanji words.
+      // Preserve reliable kanji boundaries even inside a single original word.
       const merged: ReadingBlock[] = [];
       for (const item of result) {
         const last = merged.at(-1);
-        if (last && last.end === item.start && last.editable === item.editable && Boolean(last.reading) === Boolean(item.reading)) {
+        if (last && last.end === item.start && !last.editable && !item.editable) {
           last.end = item.end; last.text += item.text; last.reading += item.reading;
           last.key = `${word.id}:${last.start}:${last.end}`;
         } else merged.push(item);
       }
       return merged;
     });
+    for (const range of merges) {
+      let position = 0;
+      const covered = blocks.filter(block => { const start = position; position += length(block.text); return start >= range.base_start && position <= range.base_end; });
+      if (covered.length < 2 || covered.map(b=>b.text).join('') !== range.base) continue;
+      const first = blocks.indexOf(covered[0]);
+      blocks.splice(first, covered.length, {...covered[0], key:`merge:${covered.map(b=>b.key).join('|')}`, text:range.base, reading:range.reading,
+        spans:covered.map(({wordId,start,end})=>({wordId,start,end}))});
+    }
     return { lineId: line.id, background: !!line.backgroundOf, blocks };
   });
 }
@@ -105,41 +127,62 @@ export function hasJapaneseRubyChanges(rows: ReadingRow[], source: LyricDocument
   return rows.some(row => row.blocks.some(b => b.editable && b.reading.trim() && (!b.existing || b.reading !== rubyReading(words.get(b.wordId)!))));
 }
 
-export function japaneseRubyCommand(current: LyricDocument, source: LyricDocument, rows: ReadingRow[], editing = createProjectEditing()): LyricCommand {
+export function japaneseRubyCommand(current: LyricDocument, source: LyricDocument, rows: ReadingRow[]): LyricCommand {
   if (current !== source) throw new Error('源文档已变化，请重新打开生成');
   if (!hasJapaneseRubyChanges(rows, source)) throw new Error('没有可应用的注音修改');
   const rowMap = new Map(rows.map(row => [row.lineId, row]));
   if (rowMap.size !== rows.length || rows.some(row => !source.lines.some(line => line.id === row.lineId))) throw new Error('提案行标识不符');
   const lines = source.lines.map(line => {
     const row = rowMap.get(line.id); if (!row) return line;
-    const groups = new Map<string, ReadingBlock[]>();
-    for (const b of row.blocks) { const group = groups.get(b.wordId) ?? []; group.push(b); groups.set(b.wordId, group); }
-    const words = line.words.flatMap(word => {
-      const blocks = groups.get(word.id);
-      if (!blocks || blocks.map(b => b.text).join('') !== word.text) throw new Error('提案正文结构不完整');
-      const boundaries = new Set([0]); let end = 0;
-      for (const { segment } of segmenter.segment(word.text)) { end += length(segment); boundaries.add(end); }
-      let cursor = 0;
-      for (const b of blocks) { if (!boundaries.has(b.end) || b.start !== cursor || b.end <= b.start || slice(word.text, b.start, b.end) !== b.text) throw new Error('提案正文范围不符'); cursor = b.end; }
+    // Validate the preview as an exact, ordered coverage of the source before preparing any edits.
+    const groups = new Map<string, Array<{block: ReadingBlock; span: ReadingSpan}>>();
+    let wordIndex = 0, cursor = 0;
+    for (const block of row.blocks) {
+      const spans = block.spans ?? [{wordId:block.wordId,start:block.start,end:block.end}];
+      if (!spans.length || block.spans && (spans.length < 2 || block.existing || !runs(block.text).every(part=>part.kanji))) throw new Error('合并提案范围无效');
+      let body = '';
+      for (const span of spans) {
+        const word = line.words[wordIndex];
+        const boundaries = new Set([0]); let at = 0;
+        if (word) for (const {segment} of segmenter.segment(word.text)) { at += length(segment); boundaries.add(at); }
+        if (!word || span.wordId !== word.id || span.start !== cursor || span.end <= span.start || !boundaries.has(span.start) || !boundaries.has(span.end)
+          || block.spans && word.rubyUnits.length) throw new Error('提案正文范围不符');
+        body += slice(word.text,span.start,span.end);
+        const group = groups.get(word.id) ?? []; group.push({block,span}); groups.set(word.id,group);
+        cursor = span.end;
+        if (cursor === length(word.text)) { wordIndex++; cursor=0; }
+      }
+      if (body !== block.text) throw new Error('提案正文结构不完整');
+    }
+    if (wordIndex !== line.words.length || cursor) throw new Error('提案正文结构不完整');
+    const parts = new Map<ReadingBlock, string[]>();
+    let words = line.words.flatMap(word => {
+      const blocks = groups.get(word.id)!;
       if (word.rubyUnits.length) {
-        if (blocks.length !== 1 || !blocks[0].existing) throw new Error('已有注音结构不符');
-        const reading = blocks[0].reading;
+        if (blocks.length !== 1 || !blocks[0].block.existing) throw new Error('已有注音结构不符');
+        const reading = blocks[0].block.reading;
         if (!reading.trim() || reading === rubyReading(word)) return [word];
         const starts = word.rubyUnits.flatMap(u => u.beginMs === null ? [] : [u.beginMs]), ends = word.rubyUnits.flatMap(u => u.endMs === null ? [] : [u.endMs]);
         if (starts.length && ends.length && Math.min(...starts) > Math.max(...ends)) throw new Error('已有注音时间包络无效');
         return [{ ...word, rubyUnits: makeRubyUnits({ ...word, beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null }, splitReadingMora(reading)) }];
       }
-      const accepted = blocks.filter(b => b.editable && b.reading.trim());
+      const accepted = blocks.filter(({block}) => block.editable && block.reading.trim());
       if (!accepted.length) return [word];
-      const cuts = [...new Set([0, length(word.text), ...accepted.flatMap(b => [b.start, b.end])])].sort((a,b) => a-b);
-      if (cuts.length > 2 && emptyBeatCount(editing, word.id)) throw new Error('带空拍的词不能自动拆分，请先调整空拍');
+      const cuts = [...new Set([0, length(word.text), ...accepted.flatMap(({span}) => [span.start, span.end])])].sort((a,b) => a-b);
       const boundary = (at: number) => at === 0 ? word.beginMs : at === length(word.text) ? word.endMs : word.beginMs === null || word.endMs === null ? null : word.beginMs + Math.round((word.endMs-word.beginMs)*at/length(word.text));
       return cuts.slice(0,-1).map((a,index): LyricWord => {
-        const b = cuts[index+1], reading = accepted.find(item => item.start === a && item.end === b)?.reading;
+        const b = cuts[index+1], block = accepted.find(({span}) => span.start === a && span.end === b)?.block;
         const part = { ...word, id: index ? crypto.randomUUID() : word.id, text: slice(word.text,a,b), beginMs: boundary(a), endMs: boundary(b) };
-        return reading ? { ...part, rubyUnits: makeRubyUnits(part, splitReadingMora(reading)) } : part;
+        if (block?.spans) { const ids = parts.get(block) ?? []; ids.push(part.id); parts.set(block,ids); return part; }
+        return block ? { ...part, rubyUnits: makeRubyUnits(part, splitReadingMora(block.reading)) } : part;
       });
     });
+    for (const [block,ids] of parts) {
+      const document = {...source, lines:source.lines.map(item=>item===line?{...line,words}:item)};
+      const {merged} = planWordMerge(document,ids);
+      const accepted = {...merged,rubyUnits:makeRubyUnits(merged,splitReadingMora(block.reading))};
+      words = words.flatMap(word=>word.id===ids[0]?[accepted]:ids.includes(word.id)?[]:[word]);
+    }
     return { ...line, words };
   });
   return { type: 'replace-document', document: { ...source, lines } };
