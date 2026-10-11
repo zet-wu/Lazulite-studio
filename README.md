@@ -1,54 +1,165 @@
-# Lazulite Studio
+<p align="center">
+  <img src="./docs/icon/lazulite-studio-icon.png" alt="Lazulite icon" width="128" height="128">
+</p>
+<h1 align="center">Lazulite Studio</h1>
+<p align="center">
+  基于 TTML 歌词格式的打轴工具，集丰富的歌词编辑能力、精确打轴、自动化工具为一体。
+</p>
 
-面向桌面浏览器的歌词制作工作台，提供歌词获取、音频处理、歌词编辑、打轴、AMLL 预览、卡拉 OK 制作与文件打包。
+---
 
-React 前端管理项目草稿、统一撤销历史和试听；FastAPI 服务管理项目资源、保存修订、模型任务及媒体打包。TTML 承载歌词保存与交换，`.lazp` 工程包保存项目快照及可选源音频。每个项目独立保存资源，音乐可按需接入。
+本项目受 [Apple Music-like Lyrics TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 、[StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame) 、[MiliKara](https://github.com/BilyHurington/MiliKara) 的启发，旨在提供一个 [AMLL TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 编辑能力的超集、以及主要针对日语歌词的自动化注音、对齐工具
 
-## 功能
+## 为什么使用TTML
+Lazulite Studio 使用 [TTML2](https://www.w3.org/TR/ttml2/) 格式作为内部歌词格式与主要交换格式，这是由于TTML2提供了一个标准且可扩展的歌词字幕模型，能够承载远超原始 LRC 和各类基于 LRC 的扩展格式的数据和结构，包括但不限于：
+- 完善的注音（Ruby）结构支持
+- 完整的行级、词级、注音（Ruby）级时间
+- 稳定的行级 ID，原生能够表达引用、从属等结构
+- 背景行指定以及从属主行结构
+- 重叠主行、重叠的多个背景（原生支持叠唱、重唱）
+- 无上限的、可分别指定语言（BCP 47标准）的独立翻译和音译轨道，支持与正文的从属关系和与正文独立的行级和词级时间
+- 原生的演唱者字段，使用稳定的 ID 管理引用
+- 精细到词级的演唱者指定
 
-- 从本地文件、文本、音频内嵌歌词及网易、QQ、酷狗、AMLL TTML DB 获取歌词。
-- 编辑正文、Ruby 注音、背景行、多轨翻译／音译、行级与词级歌手及毫秒时间。
-- 使用连续／单行打轴、可缩放时间轴、A/B 循环与保音高变速试听。
-- 使用日文自动注音、罗马字生成、Demucs 人声分离、声学片段和日语自动对齐。
-- 导出 TTML、LRC 等歌词、ASS 字幕及 NicoKaraMaker 3 `.kra` ZIP；将歌词写入 MP4/M4A、MP3、FLAC 副本。
+还有一些 Lazulite Studio 暂不提供编辑能力，但TTML能够原生承载的数据，为下游的各类工具提供了极大的扩展性：
+- 演唱者字段能够表达虚拟角色与其声优的扮演关系并区分两者
+- 颜色、位置、动画等字幕样式
+- 更丰富的注音（Ruby）容器与布局，如同时在上下显示注音（Ruby）
+- 引用外部图片资源
 
-## 开发与构建
+Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML，这些格式都会不可避免地损失或多或少的信息
 
-环境：Python 3.12+、Node.js（版本见 `.node-version`）、pnpm 10.30.3，以及 PATH 中的 FFmpeg/FFprobe。以下命令在仓库根目录运行；Windows PowerShell 使用 `server/.venv/Scripts/Activate.ps1` 激活环境。
+## 功能简介
+### 歌词获取
+支持从网易、QQ、酷狗、AMLL TTML DB 四个在线源搜索和获取歌词，并能保留其提供的词级时间和音译/翻译行
+
+### 音频处理
+以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs)）、声学分析分片、人声能量与频谱图、日语歌曲自动对齐（默认基于 [NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn) 模型，该模型使用 CC-BY-NC-SA-4.0 协议，需注意商用限制）等功能
+
+### 编辑与打轴
+简洁而功能强大的编辑与打轴界面，针对日语歌词提供多种自动化工具，涵盖假名注音和罗马字生成。打轴界面支持空拍、单行打轴、定位回听等功能
+
+### 文件打包
+支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC 
+
+### NicoKaraMaker 3 兼容
+支持导出能够输入到 [NicoKaraMaker 3](https://github.com/shinta0806/NicoKaraMaker3) 中的歌词文件，支持写入演唱者标记（借鉴自 [StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame)），支持分组文件输出，支持输出独立的翻译和音译轨道文件
+
+### [Apple Music Like Lyric](https://github.com/amll-dev/applemusic-like-lyrics) 生态兼容
+Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 AMLL 对 TTML 的歌词模型做了一定的简化，舍弃了一些本项目认为很有用的数据承载能力，因此 Lazulite Studio 不保证其产物能够完整无损地被 AMLL 生态系列工具和库导入，也不保证其格式完全符合 [AMLL TTML DB](https://github.com/amll-dev/amll-ttml-db) 投稿的要求，若有较高的对 AMLL 兼容的要求，可以调整设置中的“AMLL 兼容设置”项
+
+## 开发与生产构建指南
+
+本节适用于希望对 Lazulite 进行开发，或希望在服务器部署并从异机访问的用户，监听外部端口时务必注意鉴权。
+
+### 环境
+
+- Python 3.12 或更高版本：随包 Lazulite wheel 的 `Requires-Python` 为 `>=3.12`。
+- Node.js 22.22.2：与仓库 `.node-version` 一致。
+- pnpm 10.30.3：与 `frontend/package.json` 的 `packageManager` 一致。可用 Corepack 执行 `corepack pnpm@10.30.3` 代替下列 `pnpm`。
+- FFmpeg 和 FFprobe：可从服务进程的 PATH 调用，负责媒体探测、解码及打包校验。
+
+以下命令从 LazuliteStudio 仓库根目录运行。基础服务使用仓库内的 Lazulite 0.3.0 wheel，项目可独立检出与安装。
+
+### 安装基础依赖
+
+macOS／Linux shell：
 
 ```sh
-python -m venv server/.venv
+python3 -m venv server/.venv
 source server/.venv/bin/activate
 python -m pip install -r server/requirements.txt
 pnpm --dir frontend install --frozen-lockfile
 ```
 
-在已激活虚拟环境的终端配置服务并启动：
+Windows PowerShell：
+
+```powershell
+py -3 -m venv server/.venv
+& ./server/.venv/Scripts/Activate.ps1
+python -m pip install -r server/requirements.txt
+pnpm --dir frontend install --frozen-lockfile
+```
+
+虚拟环境创建用的 Python 须满足上述版本。PowerShell 若限制激活脚本，可直接用 `./server/.venv/Scripts/python.exe` 替代 `python` 执行后续命令。
+
+基础依赖包含 API、歌词获取、日文读音及媒体处理所需的 Python 库。JmdictFurigana 数据随仓库交付，服务读取固定资源。人声分离和自动对齐使用下文可选运行时。
+
+### 开发运行
+
+终端一在仓库根目录激活虚拟环境，配置浏览器来源与登录密码，启动服务端。
+
+macOS／Linux：
 
 ```sh
-export STUDIO_PASSWORD='replace-with-your-password'
 export STUDIO_ORIGIN='http://127.0.0.1:5173'
+export STUDIO_PASSWORD='replace-with-your-password'
 python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --reload --reload-dir server
 ```
 
-PowerShell 的环境变量写法为 `$env:STUDIO_PASSWORD='replace-with-your-password'`、`$env:STUDIO_ORIGIN='http://127.0.0.1:5173'`。另开终端运行 `pnpm --dir frontend dev`，访问 `http://127.0.0.1:5173`。Vite 将 `/api` 代理至 `http://127.0.0.1:8000`，可用 `STUDIO_API_TARGET` 配置目标；`STUDIO_ORIGIN` 对应浏览器实际访问来源。
+Windows PowerShell：
 
-生产构建运行 `pnpm --dir frontend build`，静态产物为 `frontend/dist`。由 Web 服务器提供静态文件、SPA 路由回退，并将同源 `/api/` 代理至 Uvicorn。API 使用上述 factory 入口，生产运行采用单 worker，配置实际浏览器来源并省略 reload 参数。SSE 代理需关闭缓冲并允许长连接。服务进程管理项目内任务与文件锁，数据目录由 `STUDIO_DATA_DIR` 指定，默认 `server/data-projects-v4`。
-
-可选人声运行时：`python -m pip install -r server/requirements-vocal.txt`。自动对齐运行时：`python -m pip install -r server/requirements-alignment.txt`；其中设备栈约束面向 Linux CUDA，Windows/macOS 部署应选用匹配平台的 Torch/torchaudio 组合。`STUDIO_NEXTFIRE_PATH` 指定本地模型目录，`STUDIO_ALIGNMENT_DEVICE` 和 `STUDIO_VOCAL_DEVICE` 默认 `cpu`。依赖与模型可用性由设置页展示。
-
-## 验证
-
-```sh
-python -m pytest -q server/tests
-pnpm --dir frontend test
-pnpm --dir frontend build
-pnpm --dir frontend exec playwright install chromium
-pnpm --dir frontend test:e2e
+```powershell
+$env:STUDIO_ORIGIN='http://127.0.0.1:5173'
+$env:STUDIO_PASSWORD='replace-with-your-password'
+python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --reload --reload-dir server
 ```
 
-## 架构入口
+终端二在仓库根目录启动前端：
 
-- [项目架构](docs/architecture.md)
-- [前端](frontend/README.md)、[服务端](server/README.md)、[接口契约](contracts/README.md)
-- [开发约定](AGENTS.md)、[随包第三方资源](server/vendor/README.md)
+```sh
+pnpm --dir frontend dev
+```
+
+浏览器访问 `http://127.0.0.1:5173`，输入配置的密码。Vite 将 `/api` 代理至 `http://127.0.0.1:8000`。API 端口变化时，在启动前端的终端设置 `STUDIO_API_TARGET`，例如 `http://127.0.0.1:8100`。浏览器地址变化时，修改 API 终端的 `STUDIO_ORIGIN` 并重启服务。
+
+`STUDIO_ORIGIN` 为一个完整 HTTP(S) 来源，由协议、主机和可选端口构成；例如 `http://127.0.0.1:15173`。SSH 转发时填写浏览器实际访问的来源。`localhost` 与 `127.0.0.1` 是不同来源。
+
+仅调试前端界面可运行 `pnpm --dir frontend dev:mock`，它在开发环境启动 MSW 模拟 API。
+
+### 生产构建与运行
+
+```sh
+pnpm --dir frontend build
+```
+
+产物位于 `frontend/dist`。配置 Web 服务器，以该目录为静态根目录，页面路由回退到 `index.html`，同源 `/api/` 请求转发至 API。API 在已激活虚拟环境的仓库根目录运行：
+
+```sh
+python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --workers 1
+```
+
+服务继承进程环境中的 `STUDIO_PASSWORD`、`STUDIO_ORIGIN` 和可选 `STUDIO_DATA_DIR`。`STUDIO_ORIGIN` 填写最终浏览器访问来源。任务队列、文件切换及下载锁由 API 进程管理，因此单个数据目录使用一个 API worker，由操作系统服务管理器维持进程生命周期。
+
+Web 服务器需要以下配置：
+
+| 项目 | 配置要求 |
+| --- | --- |
+| 页面 | 静态文件及 SPA `index.html` 回退 |
+| API | 保留 `/api/` 前缀转发至 Uvicorn |
+| Cookie／请求头 | 透传 cookie、Origin、CSRF、Range 及条件请求头 |
+| SSE | 关闭事件流缓冲，设置适合长连接的超时 |
+| 上传 | 代理请求上限与产品接口协调：音频上传 500 MiB；工程包可含至多 2 GiB 源音频及受限快照 |
+| 超时 | 允许上传后的媒体探测／代理生成和较大工程包传输完成 |
+
+生产静态站点使用编译后的文件，`vite preview` 用于本机构建预览。前端 API 使用相对路径，同源代理是部署组成部分。
+
+### 可选人声与自动对齐
+
+人声分离：
+
+```sh
+python -m pip install -r server/requirements-vocal.txt
+```
+
+配置 `STUDIO_VOCAL_MODEL`（默认 `htdemucs`）和 `STUDIO_VOCAL_DEVICE`（默认 `cpu`）。Demucs 使用 Torch 模型缓存，首次获取权重需要网络；`TORCH_HOME` 可配置缓存目录。
+
+自动对齐：
+
+```sh
+python -m pip install -r server/requirements-alignment.txt
+```
+
+该文件包含人声依赖并引用 `constraints-alignment.txt` 的 Linux CUDA 设备栈约束。Windows/macOS 的 Torch／torchaudio 安装需选用相容的平台构建；此处是当前仓库安装入口，目标平台完整依赖组合仍需发布验证，不能据 Linux 环境断言安装通过。
+
+准备本地 C2C 对齐模型目录，包含 `config.json`、`processor_config.json`、`vocab.json`、`model.safetensors` 等模型资源，设置 `STUDIO_NEXTFIRE_PATH` 为目录绝对路径。`STUDIO_ALIGNMENT_DEVICE` 使用 `cpu` 或 `cuda`，默认 `cpu`；自动对齐首次准备人声使用 `htdemucs` 和 `STUDIO_VOCAL_DEVICE`。设置页显示当前能力和缺失原因。
