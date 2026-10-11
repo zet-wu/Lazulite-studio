@@ -1,11 +1,7 @@
 # Shared：通用界面与工具
 
-当前包含 `Icon.tsx`、`Controls.tsx` 和 `tokens.css`，供应用与功能组件复用。布局样式主要位于各组件的 CSS Modules。
+共享层提供通用控件与显示工具，业务规则由 domain 和 features 管理。`tokens.css` 定义紧凑桌面的语义颜色、文字、间距、圆角及明暗主题；组件布局由 CSS Modules 表达。
 
-这里只放无业务依赖的 UI 与工具，不引用项目、歌词、任务或后端类型。领域时间校验和文本坐标规则仍由 domain 管理；按真实复用需求提取公共组件，不预建通用组件框架。
+`Controls` 中的按钮通过 `data-role` 声明 primary、secondary、inline、danger 或 danger-primary，选中态使用 ARIA 属性。`Icon` 提供统一 SVG，IconButton 组合可访问名称、悬停与键盘提示；BooleanField 使用原生 checkbox 支持开关与三态。
 
-tokens.css 为紧凑桌面定义表面层次、强调色上的文本、hover/pressed 状态层、文字角色与间距/圆角；明暗主题使用相同语义角色。Editor 的按钮、无框菜单、固定面板标题与对话框复用这些变量，不依赖额外组件库。
-
-按钮以 data-role 显式声明 primary/secondary/inline/danger/danger-primary，选中另用 aria-pressed 或 aria-current。IconButton 使用统一 SVG、可访问名称、悬停和键盘提示；BooleanField 复用真实 checkbox，单行用 switch，批量支持 indeterminate。
-
-Icon 同时提供填充 circle／窄 rect 打轴图形及勾选、警告、音符等内联 SVG；图形仅装饰，名称与状态由控件表达，调用方决定语义颜色。
+`Select` 根据实际弹层尺寸及视口空间定位，保留键盘和焦点行为；歌词引用采用独立文本层级。`Disclosure` 管理按需挂载与 ARIA 关联，`MessageBar` 管理反馈呈现，`measure-text` 提供当前字体的文字测宽。对话框统一内容滚动、固定操作区、焦点圈定与返回。

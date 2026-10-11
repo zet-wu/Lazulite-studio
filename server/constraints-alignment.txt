@@ -1,4 +1,4 @@
-# 本轮 Linux CUDA 实测约束；Torch 本地 CUDA 后缀由部署环境选择。
+# Linux CUDA dependency constraints; select the Torch CUDA build for the deployment environment.
 torch==2.14.1
 torchaudio==2.11.0
 transformers==4.57.6

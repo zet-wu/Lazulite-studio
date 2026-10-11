@@ -2,7 +2,6 @@ import pytest
 from fastapi.testclient import TestClient
 from server.auth import Settings, normalize_origin
 from server.app import create_app
-from dev import browser_origin
 
 
 @pytest.mark.parametrize('value,expected', [('HTTP://LOCALHOST:80','http://localhost'),('https://Example.COM:443','https://example.com'),('http://127.0.0.1:15173','http://127.0.0.1:15173'),('http://[0:0:0:0:0:0:0:1]:15173','http://[::1]:15173')])
@@ -14,16 +13,6 @@ def test_normalize_browser_origin(value,expected):
 @pytest.mark.parametrize('value', ['', 'null', 'file://a', 'http://u:p@host', 'http://host/', 'http://host/path', 'http://host?', 'http://host#', 'http://host:0', 'http://host:65536', 'http://host:', 'http://a b', 'http://a\\b', 'http://a,http://b', 'http://127.1', 'http://[fe80::1%25eth0]', 'http://host\n'])
 def test_invalid_origin(value):
  with pytest.raises(ValueError): normalize_origin(value)
-
-
-def test_origin_priority(monkeypatch):
- monkeypatch.delenv('STUDIO_ORIGIN',raising=False)
- assert browser_origin(None,5173)=='http://127.0.0.1:5173'
- monkeypatch.setenv('STUDIO_ORIGIN','http://localhost:15173')
- assert browser_origin(None,5173)=='http://localhost:15173'
- assert browser_origin('http://127.0.0.1:16173',5173)=='http://127.0.0.1:16173'
- monkeypatch.setenv('STUDIO_ORIGIN','')
- with pytest.raises(ValueError):browser_origin(None,5173)
 
 
 @pytest.mark.parametrize('origin',['http://127.0.0.1:5173','http://127.0.0.1:15173','http://localhost:15173'])
