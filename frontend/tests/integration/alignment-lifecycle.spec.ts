@@ -47,7 +47,13 @@ test('leaving revokes adoption and reopening does not inherit the lock',async({p
 
 for(const theme of ['light','dark'])test(`feedback timeout, keyboard dismiss and repeated operation in ${theme}`,async({page})=>{
  await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
- const state=await setup(page);state.status='succeeded';
+ const state=await setup(page);
+ await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
+ const running=page.locator('[data-message-bar]').filter({has:page.getByRole('button',{name:'取消任务',exact:true})});
+ const header=(await page.locator('header').boundingBox())!, nav=(await page.getByRole('navigation',{name:'工作模式'}).boundingBox())!, bar=(await running.boundingBox())!;
+ expect(bar.y).toBeGreaterThanOrEqual(header.y+header.height);expect(bar.y+bar.height).toBeLessThanOrEqual(nav.y);expect(bar.height).toBeLessThan(60);
+ await page.screenshot({path:test.info().outputPath(`task-${theme}.png`)});
+ state.status='succeeded';
  const success=page.getByRole('status').filter({hasText:'已更新歌词时间'});await expect(success).toBeVisible();
  const close=success.locator('..').getByRole('button',{name:'关闭提示'});await expect(close.locator('svg')).toHaveCount(1);await expect(close).toHaveText('');
  await close.focus();await page.screenshot({path:test.info().outputPath(`message-${theme}.png`)});await close.press('Enter');await expect(success).toHaveCount(0);
