@@ -62,6 +62,11 @@ export function savePreference(key: string, value: string | null): Promise<void>
     if (!response.ok) throw new Error(response.status === 409 ? '偏好发生冲突，请刷新后重试' : '偏好保存失败，请重试');
     const saved = await response.json() as Preferences;
     if (current) current.revision = saved.revision;
+  }).catch(error => {
+    if (current && current.values[key] === (value ?? undefined)) {
+      if (before === undefined) delete current.values[key]; else current.values[key] = before;
+    }
+    throw error;
   });
   pending = operation.catch((error: unknown) => {
     window.dispatchEvent(new CustomEvent('studio-preference-error', { detail: error instanceof Error ? error.message : '偏好保存失败' }));

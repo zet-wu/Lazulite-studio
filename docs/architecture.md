@@ -110,3 +110,5 @@ Vite 开发服务器通过 `/api` 代理访问 Uvicorn。生产前端为 `fronte
 `runtime_devices.py` 在独立短生命周期进程探测设备，将分离／对齐快照固化到任务。CPU 重试经过旧任务归属、revision 和源音频检查；前端继续检查草稿与应用意图，成功仍通过原子项目命令应用。`process_supervisor.py` 负责模型、FFmpeg 与派生进程，JobService 在停服前封闭队列。
 
 `vendor/Lazulite` 是固定 gitlink；计算库从该源码构建 wheel 安装，服务不拼接兄弟仓库路径。`packaging/requirements/*.in` 是候选输入，原生 `resolve.py` 输出完整带哈希锁、轮子和来源报告，并在独立环境离线安装、执行 pip check／导入。候选输入不能代替目标平台验证或发布包。
+
+计算设备偏好由 `features/DeviceSettings` 统一读取与保存；独立设置页和编辑器设置弹窗共用控件。本机 CPU 包固定显示 CPU，其他本机包提供自动／CPU，远程服务由服务配置。编辑锁不阻止查看和修改后续任务的设备偏好，实际执行设备以任务快照为准。

@@ -405,3 +405,6 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
   .batchControls > label, .batchScope, .batchControls > .replaceTarget { grid-column:1 / -1; }
   .replaceInputs { grid-template-columns:minmax(0,1fr); }
 }
+
+.deviceSettingsMenu > div { width: max-content; min-width: 200px; max-width: calc(100vw - 32px); }
+.deviceSettingsMenu > div button { white-space: normal; }

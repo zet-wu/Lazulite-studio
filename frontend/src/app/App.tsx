@@ -1,4 +1,5 @@
-import { loadPreferences, preferences, savePreference } from '../adapters/preferences';
+import { DeviceSettings } from '../features/DeviceSettings';
+import { loadPreferences, preferences } from '../adapters/preferences';
 import { Component, useState, useEffect, type ErrorInfo, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -135,17 +136,6 @@ function Login() {
       </div>
     </main>
   );
-}
-function DeviceSettings() {
-  const session = useQuery({queryKey:['session'],queryFn:studioApi.getSession});
-  const runtime = useQuery({queryKey:['runtime'],queryFn:async()=>{const r=await fetch('/api/v1/runtime');return await r.json() as {target?:string};}});
-  const [values, setValues] = useState(() => ({vocal:preferences.getItem('device.vocal') ?? 'auto', alignment:preferences.getItem('device.alignment') ?? 'auto'}));
-  const [error,setError] = useState('');
-  if (session.data?.mode !== 'local') return null;
-  return <section><h2>计算设备</h2>{(['vocal','alignment'] as const).map(stage => <label key={stage}>{stage === 'vocal' ? '人声分离' : '自动对齐'}<select value={runtime.data?.target==='windows-x64-cpu'?'auto':values[stage]} onChange={async e => {
-    const value=e.target.value; setError('');
-    try { await savePreference(`device.${stage}`,value); setValues(old=>({...old,[stage]:value})); } catch(e) { setError((e as Error).message); }
-  }}><option value="auto">{runtime.data?.target==='windows-x64-cpu'?'CPU（本包）':'自动'}</option>{runtime.data?.target!=='windows-x64-cpu'&&<option value="cpu">CPU</option>}</select></label>)}<p>修改仅影响后续任务。GPU 执行失败后可手动使用 CPU 重试。</p>{error&&<p role="alert">{error}</p>}</section>;
 }
 function Settings() {
   const query = useQuery({

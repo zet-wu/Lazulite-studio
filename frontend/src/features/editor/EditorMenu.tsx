@@ -1,3 +1,5 @@
+import { DeviceSettings } from '../DeviceSettings';
+import { SettingsDialog } from './SettingsDialog';
 import { preferences } from '../../adapters/preferences';
 import { Icon } from '../../shared/Icon';
 import { Link } from 'react-router-dom';
@@ -27,6 +29,7 @@ type Props = MenuState & {
 };
 
 export function EditorMenu(props: Props) {
+  const [devicesOpen, setDevicesOpen] = useState(false);
   const [kanaOpen, setKanaOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [dark, setDark] = useState(() => preferences.getItem('lazulite-editor-theme') === 'dark');
@@ -47,12 +50,14 @@ export function EditorMenu(props: Props) {
         <button data-role="inline" aria-label="显示属性栏" aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}><Icon name="check"/>显示属性栏</button>
         <button data-role="inline" onClick={() => setDark((value) => !value)}>{dark ? '日间模式' : '夜间模式'}</button>
       </TopMenu>
-      <TopMenu id="settings" title="设置" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
+      <TopMenu id="settings" title="设置" className={`${styles.settingsMenu} ${styles.deviceSettingsMenu}`} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
+        <button data-role="inline" onClick={() => setDevicesOpen(true)}>计算设备…</button>
         {props.onAmllSettings && <button data-role="inline" onClick={props.onAmllSettings}>AMLL 兼容设置</button>}
         <button data-role="inline" onClick={() => setShortcutsOpen(true)}>快捷键设置</button>
         <button data-role="inline" onClick={() => setKanaOpen(true)}>音译生成假名高亮</button>
       </TopMenu>
     </div>
+    {devicesOpen && <SettingsDialog title="计算设备" close={() => setDevicesOpen(false)}><DeviceSettings /></SettingsDialog>}
     {kanaOpen && <KanaHighlightDialog close={() => setKanaOpen(false)} />}
     {shortcutsOpen && <ShortcutDialog close={() => setShortcutsOpen(false)} />}
   </header>;
