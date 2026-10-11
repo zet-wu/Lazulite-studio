@@ -47,7 +47,7 @@ def test_failed_smoke_does_not_leave_publishable_archives(tmp_path, monkeypatch)
 
 def test_build_rejects_wrong_native_platform_before_downloads(tmp_path, monkeypatch):
     monkeypatch.setattr(build.platform, 'system', lambda: 'Linux')
-    with pytest.raises(RuntimeError, match='ԭ���ܹ�'):
+    with pytest.raises(RuntimeError, match='原生架构'):
         build.build('windows-x64-cpu', tmp_path)
     assert list(tmp_path.iterdir()) == []
 
@@ -64,7 +64,7 @@ def test_build_host_uses_its_own_version_pin(monkeypatch, target, system, arch):
     monkeypatch.setattr(build.platform, 'python_version', lambda: '3.12.10')
     build.check_build_host(target, runtime)
     monkeypatch.setattr(build.platform, 'python_version', lambda: '3.13.0')
-    with pytest.raises(RuntimeError, match='���� Python 3.12.10'):
+    with pytest.raises(RuntimeError, match='构建 Python 3.12.10'):
         build.check_build_host(target, runtime)
 
 

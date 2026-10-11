@@ -41,10 +41,10 @@ def frontend(output, runtime):
     node = subprocess.check_output(['node', '--version'], text=True).strip().removeprefix('v')
     pnpm = shutil.which('pnpm')
     if node != runtime['node'] or not pnpm:
-        raise RuntimeError(f'��Ҫ Node {runtime["node"]} �� pnpm {runtime["pnpm"]}')
+        raise RuntimeError(f'需要 Node {runtime["node"]} 和 pnpm {runtime["pnpm"]}')
     version = subprocess.check_output([pnpm, '--version'], text=True).strip()
     if version != runtime['pnpm']:
-        raise RuntimeError(f'pnpm �汾��ƥ�䣺{version}')
+        raise RuntimeError(f'pnpm 版本不匹配：{version}')
     run([pnpm, '--dir', 'frontend', 'install', '--frozen-lockfile'])
     env = dict(os.environ, VITE_ENABLE_MOCKS='false')
     run([pnpm, '--dir', 'frontend', 'build'], env=env)
@@ -55,7 +55,7 @@ def frontend(output, runtime):
         if path.suffix in ('.html', '.css'):
             content = path.read_text(encoding='utf-8')
             if re.search(r'''(?:src|href)\s*=\s*["'](?:https?:)?//|(?:url\(|@import\s+)["']?(?:https?:)?//''', content):
-                raise ValueError(f'ǰ��������Դ�����ⲿ��ַ��{path}')
+                raise ValueError(f'前端启动资源引用外部地址：{path}')
     return pnpm
 
 
@@ -69,7 +69,7 @@ def ffmpeg(root, spec, downloads, work):
         for name in ('ffmpeg.exe', 'ffprobe.exe'):
             matches = list(unpacked.rglob(name))
             if len(matches) != 1:
-                raise ValueError(f'FFmpeg �鵵û��Ψһ�� {name}')
+                raise ValueError(f'FFmpeg 归档没有唯一的 {name}')
             shutil.copy2(matches[0], dest / name)
     else:
         source_root = next(unpacked.glob('ffmpeg-*'))
@@ -97,7 +97,7 @@ def licenses(root, dependencies, pnpm):
     if (ROOT / 'LICENSE').exists():
         shutil.copy2(ROOT / 'LICENSE', destination / 'Studio-LICENSE')
     else:
-        (destination / 'Studio-NOTICE.txt').write_text('Studio Դ��ֿ�δ������������֤�����ļ����������Ȩ����\n', encoding='utf-8')
+        (destination / 'Studio-NOTICE.txt').write_text('Studio 源码仓库未声明独立许可证；本文件不授予额外权利。\n', encoding='utf-8')
     # Wheel license files remain in installed dist-info directories. Preserve metadata too.
     import zipfile
     for wheel in (dependencies / 'wheelhouse').glob('*.whl'):
@@ -139,13 +139,13 @@ def licenses(root, dependencies, pnpm):
         return value
     write_json(destination / 'frontend-dependencies.json', without_host_paths(collected))
     if not seen:
-        raise RuntimeError('�޷��ռ�ǰ��������������')
+        raise RuntimeError('无法收集前端生产依赖许可')
 
 
 def check_build_host(target, runtime):
     expected = runtime['build_python_version']
     if (platform.system(), platform.machine()) != TARGETS[target] or platform.python_version() != expected:
-        raise RuntimeError(f'{target} ��Ҫ��Ӧԭ���ܹ��Ĺ��� Python {expected}')
+        raise RuntimeError(f'{target} 需要对应原生架构的构建 Python {expected}')
 
 
 def remove_foreign_installer_templates(root):
@@ -177,7 +177,7 @@ def build(target, output):
     check_build_host(target, runtime)
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=normal'], cwd=ROOT, text=True).strip():
-        raise RuntimeError('�����������Ϊ�ɾ���������Ŀ¼����ڲֿ���')
+        raise RuntimeError('发布输入必须为干净检出；输出目录请放在仓库外')
     library = check_source()
     work, artifacts = output / 'work', output / 'artifacts'
     work.mkdir(); artifacts.mkdir()
@@ -228,7 +228,7 @@ def build(target, output):
     shutil.copy2(ROOT / 'packaging/models.json', root / 'licenses/models.json')
     shutil.copy2(ROOT / 'packaging/runtime-manifest.json', root / 'licenses/runtime-sources.json')
     shutil.copy2(dependencies / (target + '.txt'), root / 'licenses/dependencies.txt')
-    launcher = '����.bat' if os.name == 'nt' else '����.command'
+    launcher = '启动.bat' if os.name == 'nt' else '启动.command'
     shutil.copy2(ROOT / 'packaging/launchers' / launcher, root / launcher)
     if os.name != 'nt':
         (root / launcher).chmod(0o755)
@@ -240,19 +240,19 @@ def build(target, output):
                 'unverified':['minimum Windows/macOS version', 'CUDA/MPS hardware', 'full-song quality',
                               'Gatekeeper/download quarantine', 'interactive terminal close']}
     write_json(root / 'manifest.json', manifest)
-    (root / 'ʹ��˵��.txt').write_text(
-        f'Lazulite Studio Ԥ���� {commit[:12]}��{target}��\n'
-        '�����汾ȫ�� ZIP ��ѹ��ͬһλ�ã�����ͬ������Ŀ¼�ϲ�����Ҫֱ����ѹ���������С�\n'
-        f'˫�� {launcher}�������ն˴��ڣ���������ڷ��������򿪡�Ctrl+C ֹͣ����\n'
-        '�½���Ŀ��������Ƶ���༭���沢�ؿ���Ȼ�����÷��롢������룬�˶������е�ʵ���豸��\n'
-        '������װ Python��Node��FFmpeg��CUDA Toolkit ����������ģ�ͣ����߸����������Ҫ���硣\n'
-        'CUDA ����Ҫ���� NVIDIA ������GPU ������ʱ��ѡ�� CPU������ʧ�ܲ����Զ����ܡ�\n'
-        'Mac ��δǩ����δ��֤���״δ򿪿�����ϵͳ��ȫ�������ƣ���˶���Դ����ϵͳ��ʾ������\n'
-        'data ������Ŀ�����ã�logs ������־��ͣ����ɰ�������Ŀ¼������ǰ���� data���𸲸��û����ݡ�\n'
-        '�� v4 ���ݿⲻ�Զ���������Ӿɰ浼�����̻�ʹ����ʽǨ�ƹ��ߡ�\n'
-        '������������ҵ���ɵ� NextFire Ȩ�أ������ licenses/models.json ��ģ��˵����\n'
-        '���ϵͳ�汾��ʵ�� GPU������������ر��ն���Ϊ���������������������Ե� validation.json��\n'
-        '������ע��ϵͳ build���豸���������ڴ桢���汾�͸��ֲ��裻��־�������з��ͣ����Զ��ϴ���\n', encoding='utf-8')
+    (root / '使用说明.txt').write_text(
+        f'Lazulite Studio 预览版 {commit[:12]}（{target}）\n'
+        '将本版本全部 ZIP 解压到同一位置，保持同名顶层目录合并。不要直接在压缩包内运行。\n'
+        f'双击 {launcher}；保留终端窗口，浏览器会在服务就绪后打开。Ctrl+C 停止服务。\n'
+        '新建项目、导入音频、编辑保存并重开；然后试用分离、日语对齐，核对设置中的实际设备。\n'
+        '无需另装 Python、Node、FFmpeg、CUDA Toolkit 或在线下载模型；在线歌词搜索仍需要网络。\n'
+        'CUDA 版需要兼容 NVIDIA 驱动；GPU 不可用时可选择 CPU，计算失败不会自动重跑。\n'
+        'Mac 版未签名、未公证；首次打开可能受系统安全策略限制，请核对来源并按系统提示处理。\n'
+        'data 保存项目和设置，logs 保存日志。停服后可搬移整个目录。更新前备份 data，勿覆盖用户数据。\n'
+        '旧 v4 数据库不自动升级，请从旧版导出工程或使用显式迁移工具。\n'
+        '本包包含非商业许可的 NextFire 权重，请查阅 licenses/models.json 和模型说明。\n'
+        '最低系统版本、实际 GPU、整曲质量与关闭终端行为仍需真机反馈，详见下载旁的 validation.json。\n'
+        '反馈请注明系统 build、设备、驱动、内存、包版本和复现步骤；日志由你自行发送，不自动上传。\n', encoding='utf-8')
     write_json(diagnostics / 'native-audit.json', audit(root, target))
     files = [{'path':p.relative_to(root).as_posix(), 'size':p.stat().st_size, 'sha256':digest(p)}
              for p in sorted(root.rglob('*')) if p.is_file()]
@@ -262,14 +262,14 @@ def build(target, output):
     archives = package(root, artifacts)
     name = root.name
     shutil.rmtree(root)
-    relocated = work / '��� ���� (portable) & relocation'
+    relocated = work / '解包 测试 (portable) & relocation'
     for path in archives:
         extract(path, relocated)
     root = relocated / name
     for item in files:
         path = root / item['path']
         if digest(path) != item['sha256']:
-            raise ValueError(f'������ݲ�����{item["path"]}')
+            raise ValueError(f'解包身份不符：{item["path"]}')
     # Omit all build tools and ambient user caches from the runtime process environment.
     env = {k:v for k,v in os.environ.items() if not k.startswith(('PYTHON', 'HF_', 'TRANSFORMERS_', 'TORCH_', 'STUDIO_'))}
     env['PATH'] = str(root / 'runtime/ffmpeg') + os.pathsep + (str(Path(os.environ['SystemRoot']) / 'System32') if os.name == 'nt' else '/usr/bin:/bin')
@@ -294,9 +294,9 @@ def build(target, output):
                          'local service/static/auth/duplicate launcher/graceful shutdown'],
                'network_scope':'Windows per-program outbound firewall rule / macOS sandbox-exec deny network; plus Python socket hook',
                'archives':[{'file':p.name, 'size':p.stat().st_size, 'sha256':digest(p)} for p in archives]})
-    shutil.copy2(root / 'ʹ��˵��.txt', artifacts / 'ʹ��˵��.txt')
+    shutil.copy2(root / '使用说明.txt', artifacts / '使用说明.txt')
     (artifacts / 'SHA256SUMS').write_text(''.join(f'{digest(p)}  {p.name}\n' for p in archives), encoding='utf-8')
-    print('������Я����ͨ��ԭ�����ð�̣�', artifacts)
+    print('完整便携包已通过原生解包冒烟：', artifacts)
     shutil.rmtree(relocated)
 
 
@@ -319,7 +319,7 @@ def main():
     args = parser.parse_args()
     output = args.output.resolve()
     if output.is_relative_to(ROOT) or output.exists() and any(output.iterdir()):
-        parser.error('output ����Ϊ�ֿ���Ŀ�Ŀ¼')
+        parser.error('output 必须为仓库外的空目录')
     output.mkdir(parents=True, exist_ok=True)
     with (output / 'build.log').open('w', encoding='utf-8') as log:
         with redirect_stdout(Tee(sys.stdout, log)), redirect_stderr(Tee(sys.stderr, log)):

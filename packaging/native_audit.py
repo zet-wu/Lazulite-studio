@@ -18,7 +18,7 @@ def audit(root, target):
             pe = pefile.PE(str(path), fast_load=True)
             try:
                 if pe.FILE_HEADER.Machine != 0x8664:
-                    raise ValueError(f'�� x64 PE��{path}')
+                    raise ValueError(f'非 x64 PE：{path}')
                 pe.parse_data_directories(directories=[1, 13])
                 imports = [entry.dll.decode().lower() for attr in ('DIRECTORY_ENTRY_IMPORT', 'DIRECTORY_ENTRY_DELAY_IMPORT')
                            for entry in getattr(pe, attr, [])]
@@ -31,7 +31,7 @@ def audit(root, target):
                     if name.startswith(('vcruntime', 'msvcp1', 'msvcr1', 'concrt', 'vcomp')) or not (system / name).is_file():
                         missing.append(name)
                 if missing:
-                    raise ValueError(f'δ�պ� DLL��{path.relative_to(root)}: {missing}')
+                    raise ValueError(f'未闭合 DLL：{path.relative_to(root)}: {missing}')
                 report.append({'file':path.relative_to(root).as_posix(), 'imports':imports})
             finally:
                 pe.close()
@@ -46,25 +46,25 @@ def audit(root, target):
                 continue
             arch = subprocess.check_output(['lipo', '-archs', str(path)], text=True).strip()
             if 'arm64' not in arch.split():
-                raise ValueError(f'�� arm64 Mach-O��{path}')
+                raise ValueError(f'非 arm64 Mach-O：{path}')
             dependencies = subprocess.check_output(['otool', '-arch', 'arm64', '-L', str(path)], text=True)
             commands = subprocess.check_output(['otool', '-arch', 'arm64', '-l', str(path)], text=True)
             # otool prefixes its output with the input filename, which is an
             # absolute build path. Only inspect actual load commands below it.
             if 'Load command ' not in commands:
-                raise ValueError(f'�޷���ȡ Mach-O load commands��{path}')
+                raise ValueError(f'无法读取 Mach-O load commands：{path}')
             load_commands = commands.split('Load command ', 1)[1]
             for line in dependencies.splitlines()[1:]:
                 name = line.strip().split(' (', 1)[0]
                 if name.startswith('/') and not name.startswith(('/usr/lib/', '/System/Library/')):
-                    raise ValueError(f'���⶯̬������{path}: {name}')
+                    raise ValueError(f'包外动态依赖：{path}: {name}')
                 if name.startswith('@') and Path(name).name not in bundled:
-                    raise ValueError(f'���ڶ�̬����ȱʧ��{path}: {name}')
+                    raise ValueError(f'包内动态依赖缺失：{path}: {name}')
             for value in re.findall(r'(?:minos|version)\s+(\d+\.\d+(?:\.\d+)?)', '\n'.join(block for block in commands.split('Load command') if 'LC_BUILD_VERSION' in block or 'LC_VERSION_MIN_MACOSX' in block)):
                 minimum_versions.append(tuple(map(int, value.split('.'))))
             if '/opt/homebrew' in load_commands or '/Users/runner' in load_commands:
                 # Debug strings are not included in otool load commands.
-                raise ValueError(f'������·�������� Mach-O load commands��{path}')
+                raise ValueError(f'构建机路径出现在 Mach-O load commands：{path}')
             report.append({'file':path.relative_to(root).as_posix(), 'arch':arch,
                            'dependencies':dependencies, 'load_commands':commands})
     return {'target':target, 'binaries':report,
