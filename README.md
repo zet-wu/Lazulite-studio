@@ -41,7 +41,7 @@ Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML�
 简洁而功能强大的编辑与打轴界面，针对日语歌词提供多种自动化工具，涵盖假名注音和罗马字生成。打轴界面支持空拍、单行打轴、定位回听等功能。
 
 ### 文件打包
-支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC 。
+支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，可配合 [zet-wu/MusicBox](https://github.com/zet-wu/MusicBox) 本地音乐播放器使用。也支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC ，兼容大部分播放器。
 
 ### NicoKaraMaker 3 兼容
 支持导出能够输入到 [NicoKaraMaker 3](https://github.com/shinta0806/NicoKaraMaker3) 中的歌词文件，支持写入演唱者标记（借鉴自 [StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame)），支持分组文件输出，支持输出独立的翻译和音译轨道文件。
@@ -63,6 +63,8 @@ Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 
 - macOS 启动脚本：`start.command`。
 
 保留终端窗口，浏览器会在服务就绪后打开，或者手动访问 http://127.0.0.1:15173 。在终端 Ctrl+C 停止服务。
+
+使用可参考[Lazulite Studio 简易教程](docs/usage-tutorial.md)
 
 ## 应用截图
 ![应用截图](docs/images/internet-lyrics.png)
