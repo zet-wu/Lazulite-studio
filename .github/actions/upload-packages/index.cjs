@@ -1,8 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const {DefaultArtifactClient} = require('@actions/artifact');
 
 (async () => {
+  const {DefaultArtifactClient} = await import('@actions/artifact');
   const root = path.resolve(process.env.INPUT_PATH);
   const files = fs.readdirSync(root).sort();
   if (!files.length || files.some(name => !/\.7z(?:\.\d{3,})?$/.test(name))) {
