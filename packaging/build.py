@@ -13,7 +13,7 @@ import sys
 import traceback
 
 from archive import digest, download, extract, package
-from native_audit import audit
+from native_audit import audit, remove_unused_host_rpaths
 from resolve import ROOT, TARGETS, check_source
 from verify_models import verify
 
@@ -281,6 +281,8 @@ def build(target, output):
         '本包包含非商业许可的 NextFire 权重，请查阅 licenses/models.json 和模型说明。\n'
         '最低系统版本、实际 GPU、整曲质量与关闭终端行为仍需真机反馈，详见下载旁的 validation.json。\n'
         '反馈请注明系统 build、设备、驱动、内存、包版本和复现步骤；日志由你自行发送，不自动上传。\n', encoding='utf-8')
+    if target == 'macos-arm64':
+        write_json(diagnostics / 'removed-host-rpaths.json', remove_unused_host_rpaths(root))
     write_json(diagnostics / 'native-audit.json', audit(root, target))
     files = [{'path':p.relative_to(root).as_posix(), 'size':p.stat().st_size, 'sha256':digest(p)}
              for p in sorted(root.rglob('*')) if p.is_file()]
@@ -304,7 +306,7 @@ def build(target, output):
     env.update(PYTHONNOUSERSITE='1', PYTHONUTF8='1', HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1',
                HF_HOME=str(work / 'empty-hf'), TORCH_HOME=str(work / 'empty-torch'))
     python = runtime_python(root)
-    run([python, '-E', '-s', ROOT / 'packaging/runtime_smoke.py', '--root', root, '--target', target], cwd=root / 'app', env=env)
+    run([python, '-E', '-s', '-X', 'utf8', ROOT / 'packaging/runtime_smoke.py', '--root', root, '--target', target], cwd=root / 'app', env=env)
     if os.name == 'nt':
         powershell = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
         offline = [powershell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
@@ -312,7 +314,7 @@ def build(target, output):
                    '-Script', ROOT / 'packaging/model_smoke.py', '-Models', root / 'models']
     else:
         offline = ['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)',
-                   python, '-E', '-s', ROOT / 'packaging/model_smoke.py', '--models', root / 'models', '--os-isolated']
+                   python, '-E', '-s', '-X', 'utf8', ROOT / 'packaging/model_smoke.py', '--models', root / 'models', '--os-isolated']
     run(offline, cwd=root / 'app', env=env)
     run([sys.executable, ROOT / 'packaging/smoke.py', '--root', root], cwd=work, env=env)
     shutil.copy2(root / 'smoke.log', diagnostics / 'launcher.log')

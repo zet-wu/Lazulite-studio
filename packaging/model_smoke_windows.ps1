@@ -11,7 +11,7 @@ if (@(Get-NetFirewallProfile | Where-Object { $_.Enabled -ne 'True' }).Count -gt
 $ruleName = 'LazuliteStudio-ModelSmoke-' + [guid]::NewGuid().ToString()
 try {
     New-NetFirewallRule -Name $ruleName -DisplayName $ruleName -Direction Outbound -Program $Python -Action Block -Profile Any | Out-Null
-    & $Python -E -s $Script --models $Models --os-isolated
+    & $Python -E -s -X utf8 $Script --models $Models --os-isolated
     if ($LASTEXITCODE -ne 0) { throw "Offline model verification failed: $LASTEXITCODE" }
 }
 finally {

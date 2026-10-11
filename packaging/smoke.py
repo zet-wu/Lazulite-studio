@@ -17,7 +17,7 @@ def smoke(root, python=None):
     root = Path(root).resolve()
     python = Path(python).absolute() if python else root / ('runtime/python/python.exe' if os.name == 'nt' else 'runtime/python/bin/python3')
     log = root / 'smoke.log'
-    command = [str(python), '-E', '-s', '-m', 'server.portable', '--root', str(root), '--no-browser']
+    command = [str(python), '-E', '-s', '-X', 'utf8', '-m', 'server.portable', '--root', str(root), '--no-browser']
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     flags = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
     launcher = root / ('启动.bat' if os.name == 'nt' else '启动.command')
@@ -25,9 +25,9 @@ def smoke(root, python=None):
         process = subprocess.Popen(command, cwd=root / 'app', stdout=output, stderr=subprocess.STDOUT, **flags)
         try:
             for _ in range(160):
-                if process.poll() is not None: raise RuntimeError(log.read_text())
+                if process.poll() is not None: raise RuntimeError(log.read_text(encoding='utf-8'))
                 try:
-                    identity = json.loads((root / 'data/runtime/identity.json').read_text())
+                    identity = json.loads((root / 'data/runtime/identity.json').read_text(encoding='utf-8'))
                     origin = f'http://127.0.0.1:{identity["port"]}'
                     with opener.open(origin + '/api/v1/runtime', timeout=.5) as response:
                         assert json.load(response)['nonce'] == identity['nonce']
@@ -43,7 +43,7 @@ def smoke(root, python=None):
             try: opener.open(wrong); raise AssertionError('external origin allowed')
             except urllib.error.HTTPError as error: assert error.code == 403
             duplicate_command = ([os.environ.get('COMSPEC', 'cmd.exe'), '/d', '/c', str(launcher), '--no-browser'] if os.name == 'nt' else [str(launcher), '--no-browser']) if launcher.is_file() else command
-            duplicate = subprocess.run(duplicate_command, cwd=root if launcher.is_file() else root / 'app', capture_output=True, text=True, timeout=30)
+            duplicate = subprocess.run(duplicate_command, cwd=root if launcher.is_file() else root / 'app', capture_output=True, text=True, encoding='utf-8', timeout=30)
             assert duplicate.returncode == 0, duplicate.stderr
             with opener.open(origin + '/api/v1/runtime') as response: assert json.load(response)['nonce'] == identity['nonce']
             print(json.dumps({'ready':True,'session':'local','static':True,'api_404':True,'origin_rejected':True,'duplicate_same_instance':True,'runtime_override':str(python)}))

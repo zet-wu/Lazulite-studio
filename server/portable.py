@@ -37,6 +37,7 @@ def configure_environment(root, manifest):
         if not (binaries / (name + suffix)).is_file(): raise RuntimeError(f'缺少包内 {name}，请恢复完整运行时组件')
     os.environ['PATH'] = os.pathsep.join([str(binaries), str(python), os.environ.get('PATH', '')])
     os.environ['PYTHONNOUSERSITE'] = '1'
+    os.environ['PYTHONUTF8'] = '1'  # Inherited by model/device child interpreters.
     os.environ.pop('PYTHONPATH', None)
     for key in ('STUDIO_VOCAL_DEVICE', 'STUDIO_ALIGNMENT_DEVICE', 'PYTORCH_ENABLE_MPS_FALLBACK'):
         os.environ.pop(key, None)
