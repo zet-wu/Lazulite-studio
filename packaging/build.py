@@ -256,10 +256,12 @@ def build(target, output):
     shutil.copy2(ROOT / 'packaging/models.json', root / 'licenses/models.json')
     shutil.copy2(ROOT / 'packaging/runtime-manifest.json', root / 'licenses/runtime-sources.json')
     shutil.copy2(dependencies / (target + '.txt'), root / 'licenses/dependencies.txt')
-    launcher = 'start.bat' if os.name == 'nt' else 'start.command'
-    shutil.copy2(ROOT / 'packaging/launchers' / launcher, root / launcher)
-    if os.name != 'nt':
-        (root / launcher).chmod(0o755)
+    if os.name == 'nt':
+        from windows_launcher import compile_launcher
+        compile_launcher(root / 'start.exe', work / 'launcher-build')
+    else:
+        shutil.copy2(ROOT / 'packaging/launchers/start.command', root / 'start.command')
+        (root / 'start.command').chmod(0o755)
     manifest = {'schema':1, 'version':commit[:12], 'studio_commit':commit, 'lazulite_commit':library,
                 'target':target, 'database_version':5, 'runtime_set_id':hashlib.sha256((json.dumps(spec, sort_keys=True) + digest(dependencies / (target + '.txt'))).encode()).hexdigest(),
                 'model_set_id':digest(ROOT / 'packaging/models.json'), 'python':runtime['python_version'],

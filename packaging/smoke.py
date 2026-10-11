@@ -8,27 +8,26 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+import sys
 import time
 import urllib.request
 import urllib.error
 
 
 def launcher_command(launcher):
-    # The caller runs in launcher.parent. Avoid cmd /c stripping the outer
-    # quotes from an absolute batch path containing spaces and shell operators.
-    if os.name == 'nt':
-        return [os.environ.get('COMSPEC', 'cmd.exe'), '/d', '/c', launcher.name, '--no-browser']
     return [str(launcher), '--no-browser']
 
 
-def smoke(root, python=None):
+def smoke(root, python=None, console_event=0):
     root = Path(root).resolve()
     python = Path(python).absolute() if python else root / ('runtime/python/python.exe' if os.name == 'nt' else 'runtime/python/bin/python3')
     log = root / 'smoke.log'
     command = [str(python), '-E', '-s', '-X', 'utf8', '-m', 'server.portable', '--root', str(root), '--no-browser']
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    flags = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
-    launcher = root / ('start.bat' if os.name == 'nt' else 'start.command')
+    flags = {'creationflags': subprocess.CREATE_NEW_CONSOLE} if os.name == 'nt' else {'start_new_session': True}
+    launcher = root / ('start.exe' if os.name == 'nt' else 'start.command')
+    if launcher.is_file():
+        command = launcher_command(launcher)
     with log.open('w', encoding='utf-8') as output:
         process = subprocess.Popen(command, cwd=root / 'app', stdout=output, stderr=subprocess.STDOUT, **flags)
         try:
@@ -57,11 +56,17 @@ def smoke(root, python=None):
             print(json.dumps({'ready':True,'session':'local','static':True,'api_404':True,'origin_rejected':True,'duplicate_same_instance':True,'runtime_override':str(python)}))
         finally:
             if process.poll() is None:
-                process.send_signal(signal.CTRL_BREAK_EVENT if os.name == 'nt' else signal.SIGINT)
+                if os.name == 'nt':
+                    subprocess.run([sys.executable, str(Path(__file__).with_name('windows_console.py')),
+                                    str(process.pid), str(console_event)], check=True, timeout=10,
+                                   creationflags=subprocess.CREATE_NO_WINDOW)
+                else:
+                    process.send_signal(signal.SIGINT)
                 try: process.wait(timeout=20)
                 except subprocess.TimeoutExpired: process.kill(); process.wait(); raise RuntimeError('shutdown timeout')
-        assert process.returncode in (0, -signal.SIGINT), process.returncode
-        print('graceful shutdown completed (CTRL_BREAK on Windows, SIGINT on POSIX)')
+        assert process.returncode == 0, (process.returncode, log.read_text(encoding='utf-8'))
+        assert not any(word in log.read_text(encoding='utf-8') for word in ('Traceback', 'KeyboardInterrupt', 'CancelledError', 'Terminate batch job'))
+        print(f'graceful shutdown completed (console event {console_event} on Windows, SIGINT on POSIX)')
 
 
 if __name__ == '__main__':
@@ -70,3 +75,5 @@ if __name__ == '__main__':
     parser.add_argument('--python', type=Path)
     args = parser.parse_args()
     smoke(args.root, args.python)
+    if os.name == 'nt':
+        smoke(args.root, args.python, console_event=1)

@@ -6,7 +6,6 @@ from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 import socket
-import signal
 import sys
 import threading
 import time
@@ -105,22 +104,8 @@ def launch(root, *, no_browser=False):
         mount_frontend(app, root / 'app/frontend/dist')
         write_atomic(data / 'runtime/identity.json', json.dumps(identity).encode())
         import uvicorn
-        class LocalServer(uvicorn.Server):
-            def handle_exit(self, sig, frame):
-                from .process_supervisor import seal
-                seal()
-                app.state.jobs.begin_stop()
-                threading.Thread(target=app.state.jobs.close, daemon=True).start()
-                if os.name == 'nt' and sig == signal.SIGBREAK:
-                    # This handler is ours; do not ask Uvicorn to replay SIGBREAK
-                    # after restoring its handlers (which can terminate Windows).
-                    self.should_exit = True
-                else:
-                    super().handle_exit(sig, frame)
-        server = LocalServer(uvicorn.Config(app, host='127.0.0.1', port=port, workers=1, proxy_headers=False, access_log=False, log_config=None, timeout_graceful_shutdown=10))
-        if os.name == 'nt':
-            # A process-group CTRL_BREAK follows the same graceful path as Ctrl+C.
-            signal.signal(signal.SIGBREAK, server.handle_exit)
+        from .local_server import LocalServer
+        server = LocalServer(uvicorn.Config(app, host='127.0.0.1', port=port, workers=1, proxy_headers=False, access_log=False, log_config=None, timeout_graceful_shutdown=10), app.state.jobs)
         done = threading.Event()
         def ready():
             for _ in range(120):
@@ -153,6 +138,9 @@ def main():
                 settings._write(value)
             return
         launch(args.root, no_browser=args.no_browser)
+    except KeyboardInterrupt:
+        # Covers Ctrl+C during initial imports, before the server installs handlers.
+        print('Studio 已停止。', flush=True)
     except (OSError, ValueError, RuntimeError) as exc:
         print(f'无法启动 Studio：{exc}', file=sys.stderr, flush=True)
         raise SystemExit(1)
