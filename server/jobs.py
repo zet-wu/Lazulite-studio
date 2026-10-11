@@ -11,6 +11,7 @@ from .reading import ReadingUnavailable
 from .publish import PublishInvalid
 from .publishing import PublishingError
 from .vocals import VocalCancelled
+from .runtime_devices import DeviceFailure, RuntimeDevices
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +19,11 @@ def now(): return datetime.now(timezone.utc).isoformat()
 
 class JobService:
     """Durable single-slot executor. Every lifecycle transition is committed before notification."""
-    def __init__(self, db: Database, *, asset_path=None, publish_runner=None, vocal_runner=None, alignment_runner=None):
+    def __init__(self, db: Database, *, asset_path=None, publish_runner=None, vocal_runner=None, alignment_runner=None, devices=None):
         self.db, self.asset_path, self.publish_runner = db, asset_path, publish_runner
         self.vocal_runner = vocal_runner
         self.alignment_runner = alignment_runner
+        self.devices = devices or RuntimeDevices()
         self._closing = False
         self._closed = False
         self._lock = threading.RLock(); self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="studio-job")
@@ -108,6 +110,15 @@ class JobService:
             with self.db.connect() as c: record=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
             if not record: return
             request=json.loads(record[4]); kind=record[2]
+            if kind in {'vocal', 'alignment'}:
+                self.emit(jid, 'stage', 'preparing', None, None, '正在检查计算设备')
+                request['devices'] = self.devices.snapshot(kind, cpu_retry=request.get('cpu_retry', False))
+                if kind == 'vocal': request['device'] = request['devices']['vocal']['actual']
+                with self.db.transaction() as c:
+                    c.execute('UPDATE jobs SET request_json=? WHERE id=?', (json.dumps(request), jid))
+                for snapshot in request['devices'].values():
+                    if not snapshot.get('runtime_ok', True): raise EngineUnavailable(snapshot['reason'])
+                if self.get(jid)['status'] == 'cancel_requested': raise VocalCancelled()
             if kind == "vocal":
                 result = self.vocal_runner.run(record[1], self.asset_path(record[1]), request, jid,
                     lambda *x: self.emit(jid, *x), lambda: self.get(jid)['status'] == 'cancel_requested')
@@ -145,6 +156,8 @@ class JobService:
                 t=now(); c.execute("UPDATE jobs SET status='succeeded',result_json=?,engine_json=?,updated_at=?,finished_at=?,state_version=state_version+1 WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps(result,ensure_ascii=False),json.dumps(result.get("engine",{})),t,t,jid)); self._event(c,jid,"state","succeeded",1,1,"任务完成")
             published = True
             if kind == 'publish': self.reconcile_exports()
+        except DeviceFailure as exc:
+            self._finish_error(jid, 'device_failed', str(exc), stage=exc.stage, cpu_retry=True)
         except VocalCancelled:
             with self.db.transaction() as c:
                 t = now()

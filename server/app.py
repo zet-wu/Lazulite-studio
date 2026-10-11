@@ -603,6 +603,7 @@ def create_app(
                 try: result, _ = vocal_runner.get(pid, params['retry_analysis_id'])
                 except KeyError: fail('job_input_invalid', '可重用人声不存在', 422)
                 if result['source_asset_id'] != row[2] or result['status'] not in {'separated', 'ready'}: fail('job_input_invalid', '只可分析当前源音频的人声结果', 422)
+            params['bound_revision'] = row[3]
             params['model_name'] = os.getenv('STUDIO_VOCAL_MODEL', 'htdemucs')
             params['device'] = os.getenv('STUDIO_VOCAL_DEVICE', 'cpu')
             return
@@ -611,7 +612,10 @@ def create_app(
         fail('job_kind_removed', '不支持此任务类别', 422)
 
     publish_runner = PublishRunner(revisions, asset_path_for_project, root / "projects", publisher=publisher)
-    job_service = JobService(db, asset_path=asset_path_for_project, publish_runner=publish_runner, vocal_runner=vocal_runner, alignment_runner=alignment_runner)
+    from .runtime_devices import RuntimeDevices
+    devices = RuntimeDevices(preferences if cfg.mode == "local" else None,
+                             (runtime_manifest or {'target':'windows-x64-cpu'}) if cfg.mode == 'local' else None)
+    job_service = JobService(db, devices=devices, asset_path=asset_path_for_project, publish_runner=publish_runner, vocal_runner=vocal_runner, alignment_runner=alignment_runner)
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
     api.include_router(build_vocal_router(vocal_runner, auth=auth, project_exists=project))
     api.include_router(build_analysis_router(configured_reading_proposer, write=write))

@@ -61,6 +61,14 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     catch(e) { setError(e instanceof Error ? e.message : '无法创建人声任务'); }
     finally { setBusy(false); }
   };
+  const retryCpu = async () => {
+    if (!latest || !pending || pending.id !== latest.id || pending.baseline !== JSON.stringify(project.acoustics)) { setError('声学内容或本页应用意图已改变，请重新发起任务'); return; }
+    if (!latest.request?.bound_revision) { setError('任务缺少可重试的项目版本'); return; }
+    setBusy(true); setError('');
+    try { const job = await jobsApi.retryCpu(latest.id, latest.request.bound_revision); setPending({id:job.id, baseline:pending.baseline}); await jobs.refetch(); }
+    catch(e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  };
   const retry=()=>void run(result?.id ?? latest?.request?.retry_analysis_id);
   const download=(id:string)=>`/api/v1/projects/${encodeURIComponent(projectId)}/vocals/${encodeURIComponent(id)}/file`;
   const status = { queued: '排队中', running: '处理中', cancel_requested: '正在取消，等待当前阶段结束', cancelled: '已取消', failed: '失败', interrupted: '服务重启，任务已中断', succeeded: '正在接入结果' };
@@ -78,6 +86,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     </div>}
     {ui.statusHost && showing && createPortal(<section className={styles.panel} aria-label="音频处理状态">
       {latest && <p role="status">{status[latest.status]}{latest.stage ? ` · ${{separating:'分离人声',analyzing:'声学分析'}[latest.stage]??latest.stage}`:''}</p>}
+      {latest?.request?.devices && Object.entries(latest.request.devices).map(([stage, device]) => <p key={stage}>{stage === 'vocal' ? '人声分离' : '自动对齐'}：{device.label}{device.reason ? ` · ${device.reason}` : ''}</p>)}
       {(error||latest?.error||jobs.isError||results.isError||completed.isError) && <p role="alert">{error||latest?.error?.message||'任务或结果读取失败'}</p>}
       {(jobs.isError||results.isError||completed.isError) && <button data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();if(completed.isError)void completed.refetch();}}>重试读取</button>}
       {active && <button data-role="secondary" disabled={active.status==='cancel_requested'} onClick={()=>void jobsApi.cancel(active.id).then(()=>jobs.refetch()).catch(e=>setError(e.message))}>取消任务</button>}
@@ -85,6 +94,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
       {!active && !busy && !conflict && !jobs.isError && !results.isError && !completed.isError && <>
         {ready && <IconButton icon="back" label="返回上次结果" onClick={()=>{setDismissed(latest?.id??null);setError('');}}/>}
         <button data-role="secondary" onClick={retry}>重试</button>
+        {latest?.error?.cpu_retry && <button data-role="primary" disabled={locked || busy} onClick={() => void retryCpu()}>使用 CPU 重试</button>}
       </>}
     </section>,ui.statusHost)}
   </>;

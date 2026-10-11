@@ -1654,6 +1654,134 @@
           }
         }
       }
+    },
+    "/settings": {
+      "get": {
+        "operationId": "getPreferences",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimePreferences"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchPreferences",
+        "parameters": [
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimePreferences"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/runtime": {
+      "get": {
+        "operationId": "getRuntime",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{jid}/retry-cpu": {
+      "post": {
+        "operationId": "retryJobCpu",
+        "parameters": [
+          {
+            "name": "jid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "revision"
+                ],
+                "properties": {
+                  "revision": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4094,6 +4222,57 @@
                 "minimum": 0
               }
             }
+          }
+        }
+      },
+      "RuntimePreferences": {
+        "type": "object",
+        "required": [
+          "version",
+          "revision",
+          "library_id",
+          "imported",
+          "values"
+        ],
+        "properties": {
+          "version": {
+            "const": 1
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "imported": {
+            "type": "boolean"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PreferencePatch": {
+        "type": "object",
+        "required": [
+          "changes"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "changes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "import_legacy": {
+            "type": "boolean"
           }
         }
       }

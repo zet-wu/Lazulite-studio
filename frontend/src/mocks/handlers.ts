@@ -9,7 +9,18 @@ const error = (status: number, code: string, message: string, retryable = false)
 let currentDocument: typeof document = JSON.parse(sessionStorage.getItem('studio-mock-document') ?? 'null') ?? document;
 let searchConditions={title:'',artist:'',album:''};
 
+const mockPreferences = {version:1,revision:0,library_id:'00000000000000000000000000000001',imported:true,values:{} as Record<string,string>};
 export const handlers = [
+  http.get(`${root}/runtime`,()=>response({library_id:mockPreferences.library_id})),
+  http.get(`${root}/settings`,()=>HttpResponse.json(mockPreferences,{headers:{ETag:`"${mockPreferences.revision}"`}})),
+  http.patch(`${root}/settings`,async({request})=>{
+    if(request.headers.get('if-match')!==`"${mockPreferences.revision}"`)return error(409,'settings_conflict','偏好发生冲突');
+    const body=await request.json() as {changes:Record<string,string|null>};
+    for(const [key,value] of Object.entries(body.changes)){if(value===null)delete mockPreferences.values[key];else mockPreferences.values[key]=value;}
+    mockPreferences.revision++;return response(mockPreferences);
+  }),
+  http.post(`${root}/jobs/:jid/retry-cpu`,()=>error(409,'retry_unavailable','演示任务不执行模型重试')),
+
   http.get(`${root}/projects/:projectId/storage`,()=>response({total_bytes:11534336,categories:{source:8388608,vocals:1048576,cache:1048576,snapshots:1048576,other:0},measured_at:new Date().toISOString()})),
   http.get(`${root}/projects/:projectId/archive`, () => new HttpResponse(zipFiles([
     {name:'manifest.json',text:JSON.stringify({format:'lazulite-studio-project',version:1,name:sampleProject.name,project:'project.json'})},

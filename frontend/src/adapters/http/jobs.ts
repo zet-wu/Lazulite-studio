@@ -2,7 +2,7 @@ import type { Capabilities } from "./client";
 import { requestHeaders } from "./client";
 import { isCapabilities } from "./validate";
 
-export type JobRequest = {retry_analysis_id?:string; revision?:string; asset_id:string};
+export type JobRequest = {retry_analysis_id?:string; revision?:string; bound_revision?:string; devices?: Record<string, { preferred: string; actual: string; label: string; reason?: string | null }>; asset_id:string};
 export type JobStatus =
   | "queued"
   | "running"
@@ -22,7 +22,7 @@ export type Job = {
   total?: number | null;
   request?: JobRequest;
   result_available?: boolean;
-  error?: { code?: string; message?: string } | null;
+  error?: { code?: string; message?: string; cpu_retry?: boolean; stage?: string } | null;
 };
 export type JobsResponse = {
   schema_version: "studio-job-list-v1";
@@ -70,6 +70,7 @@ const isJob = (value: unknown): value is Job =>
   typeof value.kind === "string" &&
   typeof value.status === "string";
 export const jobsApi = {
+  retryCpu: (jobId: string, revision: string, key = crypto.randomUUID()) => call<Job>(`/jobs/${encodeURIComponent(jobId)}/retry-cpu`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ revision }) }),
   createVocal: (projectId: string, asset_id: string, retry_analysis_id?: string) => call<Job>(`/projects/${encodeURIComponent(projectId)}/jobs/vocal`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ params: { asset_id, ...(retry_analysis_id ? {retry_analysis_id} : {}) } }) }),
   capabilities: () =>
     call<Capabilities>("/capabilities").then((value) =>

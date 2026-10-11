@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 from .engine import EngineUnavailable
 from .time_units import milliseconds
+from .runtime_devices import DeviceFailure, device_failure
 
 class VocalCancelled(Exception): pass
 
@@ -81,12 +82,13 @@ class VocalRunner:
             emit('stage', 'separating', None, None, '正在分离人声；取消将在阶段结束后生效')
             try:
                 from lazulite.audio.separation import DemucsSeparator, DemucsConfig
-                separator = self.separator_factory() if self.separator_factory else DemucsSeparator(DemucsConfig(model_name=params['model_name'], device=params['device']))
+                separator = self.separator_factory() if self.separator_factory else DemucsSeparator(DemucsConfig(model_name=params['model_name'], device=params['device'], model_repo=os.getenv('STUDIO_DEMUCS_REPO')))
                 audio = decode_audio(asset_path, sample_rate=44100, channels=2)
                 vocals = separator.separate(audio)
-                description = {'model': params['model_name'], 'config': asdict(separator.config)}
-            except (ImportError, RuntimeError) as exc:
-                raise EngineUnavailable(f'人声分离不可用：{exc}') from exc
+                description = {'model': params['model_name'], 'config': {k:v for k,v in asdict(separator.config).items() if k != 'model_repo'}}
+            except (ImportError, OSError, RuntimeError) as exc:
+                if device_failure(exc, params['device']): raise DeviceFailure('vocal', params['device']) from exc
+                raise EngineUnavailable('人声模型加载或计算失败，请检查包内模型、依赖及输入音频') from exc
             finally:
                 if 'separator' in locals(): separator.close()
             if not np.isfinite(vocals.samples).all(): raise ValueError('分离人声包含非有限样本')
@@ -132,6 +134,8 @@ class VocalRunner:
         from lazulite.audio.separation import DemucsConfig
         config=asdict(DemucsConfig(model_name=model_name or os.getenv('STUDIO_VOCAL_MODEL','htdemucs'),
                                  device=device or os.getenv('STUDIO_VOCAL_DEVICE','cpu')))
+        config.pop('model_repo', None)
+        config.pop('device', None)
         return {'source_asset_id':asset_id,'config':config,'audio_format':'WAV PCM_16',
                 'generation_recipe':'demucs-44100-stereo-v1'}
 

@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from dataclasses import asdict
 from .engine import EngineUnavailable
+from .runtime_devices import DeviceFailure, device_failure
 from .vocals import VocalCancelled
 from .vocal_process import VocalProcess
 from .project_document import read_project
@@ -80,7 +81,7 @@ def run_alignment(request, emit, cancelled):
             raise ValueError('现有人工片段无法匹配完整人声，请先检查音频处理')
     else:
         if acoustics['segments']: raise ValueError('现有片段没有可匹配的人声资源')
-        result = vocal.run_in_process(pid, Path(request['asset_path']), {'asset_id': asset, 'model_name': 'htdemucs', 'device': os.getenv('STUDIO_VOCAL_DEVICE','cpu')}, request['job_id'], emit, cancelled)
+        result = vocal.run_in_process(pid, Path(request['asset_path']), {'asset_id': asset, 'model_name': 'htdemucs', 'device': params.get('devices', {}).get('vocal', {}).get('actual', os.getenv('STUDIO_VOCAL_DEVICE','cpu'))}, request['job_id'], emit, cancelled)
         _, metadata = vocal.get(pid, result['analysis_id'])
         new_acoustics = {'analysisId': metadata['id'], 'segments': metadata['segments']}
     if cancelled(): raise VocalCancelled()
@@ -96,11 +97,15 @@ def run_alignment(request, emit, cancelled):
         analysis=automatic, analysis_description={'configuration': metadata['analysis_config'], 'reference':'full_scale'},
         segments=selected, separation=metadata['model'])
     if not prepared.segments: raise ValueError('没有可用人声片段')
-    backend = NextFireBackend(NextFireConfig(Path(os.environ['STUDIO_NEXTFIRE_PATH']), device=os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu')))
+    backend = NextFireBackend(NextFireConfig(Path(os.environ['STUDIO_NEXTFIRE_PATH']), device=params.get('devices', {}).get('alignment', {}).get('actual', os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu'))))
     try:
         result = align_japanese(prepared, JapaneseAlignmentRequest.from_dict(projection['request']), backend=backend,
             config=JapaneseConfig(hint_mode='auto' if params['use_hints'] else 'off', **{k:params[k] for k in ('line_blank', 'rest_blank', 'rest_token')}),
             cancel=cancelled, event_sink=lambda event: emit('stage', event.stage, event.completed,event.total,event.message))
+    except RuntimeError as exc:
+        device = params.get('devices', {}).get('alignment', {}).get('actual', os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu'))
+        if device_failure(exc, device): raise DeviceFailure('alignment', device) from exc
+        raise
     finally:
         backend.close()
     if cancelled(): raise VocalCancelled()
@@ -109,4 +114,8 @@ def run_alignment(request, emit, cancelled):
     expected = [(m['unit_id'],m['line_id']) for m in projection['mapping']]
     if [(u.unit_id,u.line_id) for u in result.units] != expected:
         raise ValueError('对齐结果与完整投影目标不匹配')
-    return {'kind':'alignment', 'alignment':asdict(result), 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'summary':projection['summary']}
+    # Execution metadata must not persist the installation path of the model.
+    result_data = asdict(result)
+    backend_info = result_data.get('execution', {}).get('backend', {})
+    backend_info.pop('model_path', None)
+    return {'kind':'alignment', 'alignment':result_data, 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'summary':projection['summary']}

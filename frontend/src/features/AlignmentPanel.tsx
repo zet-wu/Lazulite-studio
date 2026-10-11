@@ -26,6 +26,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const [gapDraft,setGapDraft]=useState('500'),[gapError,setGapError]=useState('');
   const gapId=useId(),gapErrorId=useId();
   const [message,setMessage]=useNotice();
+  const [cpuFailure,setCpuFailure] = useState<{id:string; source:string; revision:string; options:ReturnType<typeof defaultAlignmentOptions>}|null>(null);
+  const [deviceText,setDeviceText] = useState('');
   const [progress,setProgress]=useState('');
   const [running,setRunning]=useState(false),[cancelling,setCancelling]=useState(false);
   const [opening,setOpening]=useState(false);
@@ -46,10 +48,12 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
     try {const saved=await control.save();if(!saved)throw new Error('请先完成保存');const data=await alignmentApi.preview(pid,saved.revision);if(mounted.current){setSummary(data);setDialog(true);}}
     catch(e){setMessage((e as Error).message);}finally{if(mounted.current)setOpening(false);}
   };
-  const start=async()=>{
+  const start=async(retryCpu = false)=>{
     const threshold=options.merge_short_gaps?Number(gapDraft):500;
     if(options.merge_short_gaps && (!gapDraft.trim() || !Number.isSafeInteger(threshold) || threshold<=0)){setGapError('行内空隙阈值必须为正的安全整数毫秒');return;}
-    const selected = {...options,gap_threshold_ms:threshold};
+    const failed = retryCpu ? cpuFailure : null;
+    if (retryCpu && (!failed || failed.source !== JSON.stringify(project))) { setMessage('歌词、声学内容或应用意图已改变，请重新发起对齐'); return; }
+    const selected = failed?.options ?? {...options,gap_threshold_ms:threshold};
     setDialog(false);setRunning(true);setCancelling(false);setMessage('');setProgress('正在准备');
     let lock:ReturnType<AlignmentControl['lock']>;
     try{lock=control.lock();}catch(e){setMessage((e as Error).message);setRunning(false);return;}
@@ -57,15 +61,19 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
     try {
       const saved=await control.save();if(!saved)throw new Error('无法确认保存版本');
       if(!op.alive||op.cancel){if(op.alive)setMessage('已取消对齐','status',4000);return;}
+      if (failed && saved.revision !== failed.revision) throw new Error('项目版本已改变，请重新发起对齐');
+      setCpuFailure(null);
       const key=crypto.randomUUID();
       // A lost launch response is retried with the same key, never a second model execution.
       let job;
-      try {job=await alignmentApi.start(pid,saved.revision,selected,key);}
-      catch(e){if(e instanceof TypeError)job=await alignmentApi.start(pid,saved.revision,selected,key);else throw e;}
+      try {job=failed ? await jobsApi.retryCpu(failed.id,saved.revision,key) : await alignmentApi.start(pid,saved.revision,selected,key);}
+      catch(e){if(e instanceof TypeError)job=failed ? await jobsApi.retryCpu(failed.id,saved.revision,key) : await alignmentApi.start(pid,saved.revision,selected,key);else throw e;}
       op.id=job.id;
       if(!op.alive||op.cancel){await alignmentApi.cancel(job.id);if(op.alive)setMessage('已取消对齐','status',4000);return;}
       let disconnectedAt = 0;
       while(op.alive){
+        if(job.request?.devices)setDeviceText(Object.entries(job.request.devices).map(([stage,d])=>`${stage==='vocal'?'人声分离':'自动对齐'}：${d.label}${d.reason ? `（${d.reason}）` : ''}`).join('；'));
+        if(job.status==='failed'&&job.error?.cpu_retry)setCpuFailure({id:job.id,source:JSON.stringify(op.lock.source),revision:saved.revision,options:selected});
         if(job.status==='succeeded'){
           if(op.cancel){setMessage('已取消应用','status',4000);break;}
           const result=await alignmentApi.result(job.id);
@@ -89,6 +97,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   return <>
     {visible&&(ui.alignmentHost?createPortal(button,ui.alignmentHost):button)}
     <MessageBar notice={message}/>
+    {visible && deviceText && <p>{deviceText}</p>}
+    {visible && cpuFailure && <button data-role="secondary" disabled={running||control.locked||!!active} onClick={()=>void start(true)}>使用 CPU 重试</button>}
     {running&&<div className={styles.status}><span role="status">{cancelling?'正在取消':progress}</span><button data-role="secondary" disabled={cancelling} onClick={cancel}>{cancelling?'正在取消':'取消'}</button></div>}
     {dialog&&<SettingsDialog title="自动对齐" close={()=>setDialog(false)} actions={<><button data-role="secondary" data-initial-focus onClick={()=>setDialog(false)}>取消</button><button data-role="primary" disabled={!summary?.emitting_count} onClick={()=>void start()}>开始对齐</button></>}>
       <p>请确认假名注音完整且与实际唱法一致。自动对齐使用正文和假名注音，处理期间无法编辑，完成后一次应用未跳过行的时间，可一次撤销。</p>

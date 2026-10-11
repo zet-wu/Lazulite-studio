@@ -11,6 +11,8 @@ import type {
 export const session: Session = {
   schema_version: "studio-session-v1",
   authenticated: true,
+  mode: "gateway",
+  library_id: "00000000000000000000000000000001",
   user: { id: "demo-user", name: "Demo editor" },
 };
 export const capabilities: Capabilities = {

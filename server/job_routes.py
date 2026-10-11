@@ -12,6 +12,9 @@ class JobRequest(BaseModel):
 class JobParams(BaseModel):
     params: dict = {}
 
+class CpuRetry(BaseModel):
+    revision: str
+
 def create_job_router(service, project_exists, *, auth_dependency=None, write_dependency=None, validate_request=None):
     router=APIRouter()
     read_dependencies = []
@@ -47,6 +50,26 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
         item=service.get(jid)
         if not item: raise HTTPException(404, {"code":"job_not_found","message":"job not found","retryable":False})
         return item
+    @router.post('/jobs/{jid}/retry-cpu', status_code=202, **write_auth)
+    def retry_cpu(jid: str, body: CpuRetry, request: Request, subject=Depends(write_dependency) if write_dependency else None):
+        old = owned(jid)
+        if old['status'] != 'failed' or not (old.get('error') or {}).get('cpu_retry') or old['kind'] not in {'vocal','alignment'}:
+            raise HTTPException(409, '此失败不支持 CPU 重试，请按错误说明处理')
+        params = old['request']
+        revision = params.get('revision', params.get('bound_revision'))
+        with service.db.connect() as c:
+            project = c.execute('SELECT current_revision,source_asset_id FROM projects WHERE id=?', (old['project_id'],)).fetchone()
+        if not project or project[0] != revision or body.revision != revision or project[1] != params['asset_id']:
+            raise HTTPException(409, '项目版本或源音频已改变，请重新发起任务')
+        public = {'asset_id', 'retry_analysis_id'} if old['kind'] == 'vocal' else {'revision','use_hints','line_blank','rest_blank','rest_token','clear_unmatched','merge_short_gaps','gap_threshold_ms'}
+        fresh = {k:v for k,v in params.items() if k in public}
+        if validate_request: validate_request(old['project_id'], old['kind'], fresh)
+        fresh['cpu_retry'] = True
+        fresh['retry_of'] = jid
+        try:
+            return service.create(old['project_id'], old['kind'], fresh, idem_key=request.headers.get('idempotency-key'), subject=subject or 'local')
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
     @router.get("/jobs/{jid}", **read_auth)
     def get(jid): return owned(jid)
     @router.post("/jobs/{jid}/cancel", **write_auth)

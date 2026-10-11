@@ -1,7 +1,7 @@
 """Private newline protocol for the supervised vocal worker; no HTTP or new history."""
 import json
 import sys
-import traceback
+from .runtime_devices import DeviceFailure
 from pathlib import Path
 from .db import Database
 from .engine import EngineUnavailable
@@ -25,13 +25,14 @@ def main():
             lambda *values: send('event', values=values), cancelled)
         send('result', value=result)
         return 0
+    except DeviceFailure as exc:
+        send('error', type='device', stage=exc.stage, device=exc.device, message=str(exc))
     except VocalCancelled:
         send('error', type='cancelled', message='人声任务已在阶段边界停止')
     except EngineUnavailable as exc:
         send('error', type='unavailable', message=str(exc))
     except Exception as exc:
-        traceback.print_exc()
-        send('error', type='failed', message=str(exc))
+        send('error', type='failed', message=f'模型处理失败（{type(exc).__name__}），请检查模型及输入音频')
     return 1
 
 if __name__ == '__main__':

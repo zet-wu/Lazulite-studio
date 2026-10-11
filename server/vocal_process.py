@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 
 from .engine import EngineUnavailable
+from .runtime_devices import DeviceFailure
 from . import process_supervisor
 
 PREFIX = 'STUDIO_VOCAL '
@@ -48,6 +49,7 @@ class VocalProcess:
                     error = message
             code = process.wait()
             if error:
+                if error['type'] == 'device': raise DeviceFailure(error['stage'], error['device'])
                 if error['type'] == 'cancelled': raise VocalCancelled()
                 if error['type'] == 'unavailable': raise EngineUnavailable(error['message'])
                 raise RuntimeError(error['message'])
