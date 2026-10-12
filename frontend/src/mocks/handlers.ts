@@ -32,6 +32,7 @@ export const handlers = [
     { id: 'two', label: 'USLT · jpn', format: 'lrc', content: '[00:02.000]別の歌詞' },
   ] })),
   http.get(`${root}/projects/:projectId/vocals`, () => HttpResponse.json({items:[]})),
+  http.get(`${root}/projects/:projectId/source-metadata`, () => response({asset_id:sampleProject.asset?.id,conditions:{title:"源音频标题",artist:"",album:""}})),
   http.get(`${root}/projects/:projectId/search-conditions`, () => response(searchConditions)),
   http.put(`${root}/projects/:projectId/search-conditions`, async ({request}) => { searchConditions=await request.json() as typeof searchConditions; return response(searchConditions); }),
   http.get(`${root}/session`, () => scenario() === 'expired' ? error(401, 'session_expired', '登录已过期') : response(session)),

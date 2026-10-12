@@ -1782,6 +1782,64 @@
           }
         }
       }
+    },
+    "/projects/{projectId}/source-metadata": {
+      "get": {
+        "operationId": "getProjectSourceMetadata",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "项目保存的最终搜索字符串",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "asset_id",
+                    "conditions"
+                  ],
+                  "properties": {
+                    "asset_id": {
+                      "type": "string"
+                    },
+                    "conditions": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "title",
+                        "artist",
+                        "album"
+                      ],
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "artist": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "album": {
+                          "type": "string",
+                          "maxLength": 2000
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "读取当前源音频搜索元数据"
+      }
     }
   },
   "components": {

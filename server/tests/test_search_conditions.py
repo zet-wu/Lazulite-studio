@@ -28,3 +28,23 @@ def test_tags_all_nonempty_values_and_filename_fallback(tmp_path):
     assert initial_conditions(path, 'uploaded.music.flac') == expected
     del audio['title']; audio.save()
     assert initial_conditions(path, 'uploaded.music.flac')['title'] == 'uploaded.music'
+
+
+def test_explicit_source_metadata_does_not_write_search_or_lyrics(tmp_path):
+    client, headers, asset, (pid, other), db = setup_project(tmp_path)
+    search = f'/api/v1/projects/{pid}/search-conditions'
+    source = f'/api/v1/projects/{pid}/source-metadata'
+    original = {'title': '手填', 'artist': '原艺术家', 'album': '原专辑'}
+    client.put(search, json=original, headers=headers)
+    before = client.get(f'/api/v1/projects/{pid}/document').json()
+    result = client.get(source)
+    assert result.status_code == 200
+    assert result.json()['conditions'] == {'title': 'song', 'artist': '', 'album': ''}
+    assert result.json()['asset_id']
+    assert client.get(search).json() == original
+    assert client.get(f'/api/v1/projects/{pid}/document').json() == before
+    (tmp_path / 'projects' / pid / 'source' / 'original').unlink()
+    assert client.get(source).status_code == 422
+    assert client.get(search).json() == original
+    empty = client.post('/api/v1/projects', json={'name':'empty'}, headers=headers).json()['id']
+    assert client.get(f'/api/v1/projects/{empty}/source-metadata').status_code == 422

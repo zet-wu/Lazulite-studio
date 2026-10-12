@@ -467,6 +467,17 @@ def create_app(
         with db.connect() as c:
             return read_conditions(c, pid)
 
+    @api.get("/projects/{pid}/source-metadata")
+    def get_source_metadata(pid: str, _: object = Depends(auth)):
+        _, asset = asset_for(pid)
+        if not asset:
+            fail("source_audio_missing", "请先上传源音频", 422)
+        try:
+            values = SearchConditions(**initial_conditions(root / 'projects' / pid / 'source' / 'original', asset[4] or '')).model_dump()
+        except Exception:
+            fail("source_metadata_failed", "源音频标签读取失败，请重试", 422)
+        return {"asset_id": asset[0], "conditions": values}
+
     @api.put("/projects/{pid}/search-conditions")
     def put_search_conditions(pid: str, body: SearchConditions, _: object = Depends(write)):
         with db.transaction() as c:

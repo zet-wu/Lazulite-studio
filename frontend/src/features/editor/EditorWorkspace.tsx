@@ -130,7 +130,7 @@ function EditorWorkspaceContent(props: Props) {
   const editing = useProjectEditing();
   const audioReview = useAudioReview();
   const { document, apply } = props;
-  const searchConditions = useSearchConditions(props.projectId);
+  const searchConditions = useSearchConditions(props.projectId, props.sourceAssetId);
   const [acquisitionStore] = useState(() => new AcquisitionStore());
   useEffect(() => { acquisitionStore.activate(); return () => acquisitionStore.dispose(); }, [acquisitionStore]);
   const { selection, setSelection, area: selectionArea, focusRequest, requestFocus, commands: selectionCommands } = useEditorSelection()!;

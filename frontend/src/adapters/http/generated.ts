@@ -655,6 +655,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/source-metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取当前源音频搜索元数据 */
+        get: operations["getProjectSourceMetadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2738,6 +2755,36 @@ export interface operations {
                 };
             };
             409: components["responses"]["Error"];
+        };
+    };
+    getProjectSourceMetadata: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 项目保存的最终搜索字符串 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        asset_id: string;
+                        conditions: {
+                            title: string;
+                            artist: string;
+                            album: string;
+                        };
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
         };
     };
 }

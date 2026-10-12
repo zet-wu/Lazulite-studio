@@ -2,11 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { requestHeaders } from '../adapters/http/client';
 export type SearchConditions = { title: string; artist: string; album: string };
 export const EMPTY_CONDITIONS: SearchConditions = { title: '', artist: '', album: '' };
-export function useSearchConditions(projectId?: string) {
+export function useSearchConditions(projectId?: string, sourceAssetId?: string) {
   const [values, setValues] = useState<SearchConditions>(EMPTY_CONDITIONS);
   const [ready, setReady] = useState(!projectId), [error, setError] = useState('');
   const latest = useRef(values), pending = useRef<SearchConditions | null>(null), saving = useRef(false);
   const alive = useRef(true);
+  const [readingMetadata, setReadingMetadata] = useState(false), [metadataError, setMetadataError] = useState('');
+  const metadataRequest = useRef<AbortController | null>(null), editVersion = useRef(0);
+  const identity = `${projectId ?? ''}:${sourceAssetId ?? ''}`;
+  const currentIdentity = useRef(identity); currentIdentity.current = identity;
+  useEffect(() => {
+    metadataRequest.current?.abort(); setReadingMetadata(false); setMetadataError('');
+    return () => metadataRequest.current?.abort();
+  }, [identity]);
   const url = `/api/v1/projects/${encodeURIComponent(projectId ?? '')}/search-conditions`;
   const load = async (signal?: AbortSignal) => {
     try {
@@ -40,10 +48,30 @@ export function useSearchConditions(projectId?: string) {
       }
     } finally { saving.current = false; }
   };
-  const change = (field: keyof SearchConditions, value: string) => {
-    const next = { ...latest.current, [field]: value };
+  const replace = (next: SearchConditions) => {
+    editVersion.current++;
+    metadataRequest.current?.abort(); setReadingMetadata(false); setMetadataError('');
     latest.current = next; setValues(next);
     if (projectId) { pending.current = next; void flush(); }
   };
-  return { values, ready, error, change, retry: () => ready ? flush() : load() };
+  const change = (field: keyof SearchConditions, value: string) => replace({ ...latest.current, [field]: value });
+  const fillMetadata = async () => {
+    if (!projectId || !sourceAssetId || !ready) return;
+    metadataRequest.current?.abort();
+    const controller = new AbortController(); metadataRequest.current = controller;
+    const version = editVersion.current, capturedIdentity = identity;
+    const current = () => alive.current && !controller.signal.aborted && editVersion.current === version && currentIdentity.current === capturedIdentity;
+    setReadingMetadata(true); setMetadataError('');
+    try {
+      const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/source-metadata`, {credentials:'include',headers:requestHeaders(),signal:controller.signal});
+      if (!response.ok) throw new Error('源音频标签读取失败，请重试');
+      const result = await response.json();
+      if (!current()) return;
+      if (result.asset_id !== sourceAssetId) throw new Error('源音频已变化，请重新填入');
+      if (!result.conditions || ['title','artist','album'].some(key => typeof result.conditions[key] !== 'string')) throw new Error('源音频标签响应无效');
+      replace(result.conditions);
+    } catch (cause) { if (current()) setMetadataError(cause instanceof Error ? cause.message : '源音频标签读取失败'); }
+    finally { if (metadataRequest.current === controller) setReadingMetadata(false); }
+  };
+  return { values, ready, error, change, retry: () => ready ? flush() : load(), fillMetadata, readingMetadata, metadataError, hasSource: !!sourceAssetId };
 }

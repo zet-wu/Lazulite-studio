@@ -1,4 +1,4 @@
-"""Final acquisition strings; tags are read exactly once when a project is created."""
+"""Acquisition strings and shared source-audio tag parsing."""
 from pathlib import Path
 from mutagen import File
 from mutagen.mp4 import MP4
