@@ -112,3 +112,17 @@ it.each([['a','b','a'],['a','b','c'],['b','a'],['b']])('skips the exact singer s
  marker.skip=false;expect(prepareNicokara(p,'s').issues.length).toBeGreaterThan(0);
  marker.skip=true;line.words[0].agentRefs=['b','missing'];expect(prepareNicokara(p,'s').issues.some(i=>i.message==='歌手引用已失效')).toBe(true);
 });
+it('numbers complete auxiliary lists consistently even when selecting only the second same-language track',()=>{
+ const p=fixture(),line=p.lyrics.lines[0];p.lyrics.translationTracks=['uuid-first','uuid-second'].map((id,i)=>({id,language:'zh-CN',purpose:'subtitle',contents:[{id:`c${i}`,lineId:line.id,kind:'plain',text:'译文'}]}));
+ p.karaoke.outputs=[outputId('main','translation','uuid-second')];
+ let out=prepareNicokara(p,'song');expect(out.issues).toEqual([]);expect(out.files[0].name).toBe('song.main.translation.zh-CN.track2.kra');expect(out.files[0].output.label).toBe('主歌词 · 翻译 2 · zh-CN');expect(out.summary).not.toContain('uuid-');
+ p.lyrics.translationTracks.reverse();out=prepareNicokara(p,'song');expect(out.files[0].name).toContain('.track1.kra');expect(out.files[0].output.trackId).toBe('uuid-second');
+});
+it('reports ungrouped rows as project issues independently of output selection',()=>{
+ const p=fixture();p.karaoke.lineGroups[p.lyrics.lines[0].id]='';
+ for(const selected of [[],[outputId('main')]]){
+ const out=prepareNicokara(p,'s',selected),issue=out.issues.find(i=>i.lineId===p.lyrics.lines[0].id)!;
+ expect(issue.message).toContain('第 1 行 · 主歌词');expect(issue.outputIds).toEqual([]);expect(issue.karaokeSettings).toBe(true);
+ if(!selected.length)expect(out.issues.some(i=>i.message==='请选择输出文件')).toBe(true);
+ }
+});

@@ -6,11 +6,11 @@ import type { LyricLine, LyricWord, TimeMs } from '../domain/lyric-document';
 import type { ProjectDocument } from '../domain/project-document';
 import { DocumentOutputError, outputIssueKey, type OutputIssue } from './output-validation';
 
-export type KaraokeOutput = { id: string; groupId: string; kind: 'body' | 'translation' | 'romanization'; trackId: string; language: string; label: string };
+export type KaraokeOutput = { id: string; groupId: string; kind: 'body' | 'translation' | 'romanization'; trackId: string; trackNumber: number; language: string; label: string };
 export function karaokeOutputs(project: ProjectDocument): KaraokeOutput[] {
   return project.karaoke.groups.flatMap(group => [
-    { id: outputId(group.id), groupId: group.id, kind: 'body' as const, trackId: '', language: '', label: `${group.name} · 正文` },
-    ...(['translation', 'romanization'] as const).flatMap(kind => project.lyrics[kind === 'translation' ? 'translationTracks' : 'romanizationTracks'].map(track => ({ id: outputId(group.id, kind, track.id), groupId: group.id, kind, trackId: track.id, language: track.language || 'und', label: `${group.name} · ${kind === 'translation' ? '翻译' : '音译'} · ${track.language || 'und'} · ${track.id}` }))),
+    { id: outputId(group.id), groupId: group.id, kind: 'body' as const, trackId: '', trackNumber: 0, language: '', label: `${group.name} · 正文` },
+    ...(['translation', 'romanization'] as const).flatMap(kind => project.lyrics[kind === 'translation' ? 'translationTracks' : 'romanizationTracks'].map((track,index) => ({ id: outputId(group.id, kind, track.id), groupId: group.id, kind, trackId: track.id, trackNumber: index + 1, language: track.language || 'und', label: `${group.name} · ${kind === 'translation' ? '翻译' : '音译'} ${index + 1} · ${track.language || 'und'}` }))),
   ]);
 }
 export const quantize = (ms: number) => Math.floor(ms / 10) * 10;
@@ -48,7 +48,7 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
   const issues: OutputIssue[] = [], files: { name: string; text: string; output: KaraokeOutput }[] = [], omitted: string[] = [];
   const emittedMarkers: (SegmentSinger & { outputId: string })[] = [];
   const outputs = karaokeOutputs(project), lyrics = project.lyrics, karaoke = project.karaoke;
-  const add = (target: Partial<OutputIssue>, message: string, output: string, code: OutputIssue['code'] = 'serialization') => issues.push({ kind: 'line', lineId: '', missing: [], ...target, code, message, severity: 'error', formats: ['Nicokara'], outputIds: [output] });
+  const add = (target: Partial<OutputIssue>, message: string, output: string | null, code: OutputIssue['code'] = 'serialization') => issues.push({ kind: 'line', lineId: '', missing: [], ...target, code, message, severity: 'error', formats: ['Nicokara'], outputIds: output === null ? [] : [output] });
   const valid = (begin: TimeMs, end: TimeMs, target: Partial<OutputIssue>, output: string) => {
     if (begin === null || end === null) { add({...target,missing:[...(begin===null?['begin' as const]:[]),...(end===null?['end' as const]:[])]}, '缺少完整双端时间', output, 'missing-time'); return false; }
     if (!Number.isSafeInteger(begin) || !Number.isSafeInteger(end) || begin < 0 || end <= begin || quantize(end) > 5999990) { add(target, '时间必须为正范围，且不超过 [99:59:99]', output, 'invalid-range'); return false; }
@@ -64,7 +64,7 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
   });
   const stems = new Map(outputs.map(output=>{
     const same=outputs.filter(o=>o.groupId===output.groupId&&o.kind===output.kind&&o.language===output.language);
-    const suffix=output.kind==='body'?'':`.${output.kind}.${safeFilename(output.language)}${same.length>1?`.${safeFilename(output.trackId)}`:''}`;
+    const suffix=output.kind==='body'?'':`.${output.kind}.${safeFilename(output.language)}${same.length>1?`.track${output.trackNumber}`:''}`;
     return [output.id,`${safeFilename(title)}.${safeFilename(output.groupId)}${suffix}`.slice(0,220)];
   }));
   const names=new Map<string,string>(),usedNames=new Set<string>();
@@ -186,8 +186,9 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
     if (current.key!==other.key && (current.marker.trigger.includes(other.marker.trigger)||other.marker.trigger.includes(current.marker.trigger))) add(current.target,'不同歌手集合的触发标记相同或相互包含，请在歌手标记管理中消歧',current.outputId);
   }
   // Invalid assignments cannot silently drop lyrics from an otherwise selected output.
-  for (const line of lyrics.lines) if (!karaoke.groups.some(group => group.id === karaoke.lineGroups[line.id]) && selected.length) add({ lineId: line.id, karaokeSettings: true }, '歌词行缺少有效输出分组', selected[0]);
-  if (!selected.length || !files.length && !issues.length) add({ karaokeSettings: true }, '请选择至少一个有实际内容的输出文件', selected[0] ?? '');
+  for (const [index,line] of lyrics.lines.entries()) if (!karaoke.groups.some(group => group.id === karaoke.lineGroups[line.id])) add({ lineId: line.id, karaokeSettings: true }, `第 ${index+1} 行 · ${line.backgroundOf?'背景':'主歌词'} · ${line.words.map(word=>word.text).join('').slice(0,40)}：未选择有效输出分组`, null);
+  if (!selected.length) add({ karaokeSettings: true }, '请选择输出文件', null);
+  else if (!files.length && !issues.length) add({ karaokeSettings: true }, '请选择至少一个有实际内容的输出文件', null);
   const merged = new Map<string, OutputIssue>();
   for (const issue of issues) { const key = outputIssueKey(issue) + issue.message; const previous = merged.get(key); merged.set(key, previous ? { ...previous, outputIds: [...new Set([...previous.outputIds!, ...issue.outputIds!])] } : issue); }
   return { files, issues: [...merged.values()], omitted, summary: [...files.map(file => `${file.name} — ${file.output.label}`), ...omitted.map(label => `空输出已省略：${label}`), '时间向下量化为厘秒；源项目毫秒时间不变。', '翻译／音译按整句输出；请在 NKM3 中将扫色前后颜色设为相同以显示静态字幕。', '歌手标记写入输出副本；未指定歌手时沿用已输出声部。'].join('\r\n') + '\r\n' };
