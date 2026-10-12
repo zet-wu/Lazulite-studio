@@ -56,7 +56,7 @@ it('a failed mode switch cannot reuse previous results and retry protects new ma
  await waitFor(()=>expect(screen.getByLabelText('今日完整读音')).toHaveValue('きょう'));
  fireEvent.change(screen.getByLabelText('今日完整读音'),{target:{value:'旧修改'}});fireEvent.click(screen.getByRole('checkbox'));
  expect(await screen.findByRole('alert')).toHaveTextContent('新模式分析失败');expect(screen.getByLabelText('今日完整读音')).toHaveValue('');expect(screen.getByRole('button',{name:'应用'})).toBeDisabled();
- fireEvent.change(screen.getByLabelText('今日完整读音'),{target:{value:'こんにち'}});fireEvent.click(screen.getByRole('button',{name:'重试'}));
+ fireEvent.change(screen.getByLabelText('今日完整读音'),{target:{value:'こんにち'}});fireEvent.click(screen.getByRole('button',{name:'重试读取日文读音'}));
  await waitFor(()=>expect(screen.getByRole('button',{name:'应用'})).toBeEnabled());expect(screen.getByLabelText('今日完整读音')).toHaveValue('こんにち');
 });
 it('retains manual application after a reading service failure',async()=>{

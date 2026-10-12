@@ -1,3 +1,4 @@
+import { projectErrorText } from '../project-error';
 import { preferences } from '../../adapters/preferences';
 import { recoverSelection, survivingSelection, selectionSelector, focusObject, preserveSelectionOnFocus } from './selection-recovery';
 import { SongPartField } from './SongPartField';
@@ -187,7 +188,8 @@ function EditorWorkspaceContent(props: Props) {
       onCommit={width => commitColumns({ ...columns, [`${side}Width`]: width })} />;
   };
   const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | 'translations' | null>(null);
-  const [message, setMessage] = useNotice();
+  const [message, publishMessage] = useNotice();
+  const setMessage: typeof publishMessage = useLiveCallback((text,...options) => publishMessage(text && props.project ? projectErrorText(props.project,text) : text,...options));
   const [segmentationOpen, setSegmentationOpen] = useState(false);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number; afterRubyId?: string | null } | null>(null);
@@ -312,6 +314,7 @@ function EditorWorkspaceContent(props: Props) {
   const occupiedParents = new Set(document.lines.filter(line => line.backgroundOf && line.id !== selectedLine?.id).map(line => line.backgroundOf));
   const propertyLines = selectedLine?.backgroundOf && !(selection?.kind === 'lines' && selection.ids.includes(selectedLine.id)) ? [selectedLine]
     : selection?.kind === 'lines' && selection.ids.length ? document.lines.filter(line => selection.ids.includes(line.id)) : selectedLine ? [selectedLine] : [];
+  const propertyGroups = new Set(propertyLines.map(line=>props.project?.karaoke.lineGroups[line.id]??''));
   const selectedMainLines = propertyLines.filter(line => !line.backgroundOf);
   const selectedWordLineIndexes = selection?.kind === 'words'
     ? document.lines.flatMap((line, index) => line.words.some((word) => selection.ids.includes(word.id)) ? [index] : []) : [];
@@ -972,7 +975,7 @@ function EditorWorkspaceContent(props: Props) {
         {selection?.kind === 'words' && selection.ids.length === 1 && propertyWord && activePropertyTarget?.kind === 'word' && <BooleanField label="不雅用语" switchControl checked={propertyWord.obscene} onChange={obscene => dispatch({ type: 'set-word-obscene', lineId: activePropertyTarget.lineId, wordId: propertyWord.id, obscene })}/>}
         {selection?.kind==='words'&&selection.ids.length===1&&propertyWord&&activePropertyTarget?.kind==='word'&&!props.project?.amll.noWordAgents&&<fieldset className={styles.singerSelection}><legend>词级歌手</legend>{document.agents.map(agent=><label key={agent.id}><input type="checkbox" aria-label={`词级歌手 ${agent.name??agent.id}`} checked={propertyWord.agentRefs?.includes(agent.id)??false} onChange={event=>dispatch({type:'set-word-agents',lineId:activePropertyTarget.lineId,wordId:propertyWord.id,agentRefs:event.target.checked?[...(propertyWord.agentRefs??[]),agent.id]:(propertyWord.agentRefs??[]).filter(id=>id!==agent.id)})}/>{agent.name??agent.id}</label>)}</fieldset>}
         {selection?.kind === 'lines' && <>
-        {mode==='karaoke'&&props.project&&<label>输出分组<Select aria-label="输出分组" style={{color:propertyLines.every(l=>!props.project!.karaoke.lineGroups[l.id])?'var(--muted)':undefined}} value={new Set(propertyLines.map(l=>props.project!.karaoke.lineGroups[l.id]??'')).size>1?'__mixed':props.project.karaoke.lineGroups[propertyLines[0]?.id]??''} onChange={e=>insertKaraoke({kind:'assign',lineIds:propertyLines.map(l=>l.id),groupId:e.target.value})}><option value="__mixed" disabled>多个值</option><option value="">未选择分组</option>{props.project.karaoke.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</Select></label>}
+        {mode==='karaoke'&&props.project&&<label>输出分组<Select aria-label="输出分组" style={{color:propertyLines.every(l=>!props.project!.karaoke.lineGroups[l.id])?'var(--muted)':undefined}} value={propertyGroups.size>1?'__mixed':props.project.karaoke.lineGroups[propertyLines[0]?.id]??''} onChange={e=>insertKaraoke({kind:'assign',lineIds:propertyLines.map(l=>l.id),groupId:e.target.value})}>{propertyGroups.size>1&&<option value="__mixed" disabled>多个值</option>}<option value="">未选择分组</option>{props.project.karaoke.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</Select></label>}
         {selection.ids.length === 1 && <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${ordinalById.get(selectedLine.backgroundOf??selectedLine.id)}${selectedLine.backgroundOf?' 背景':''}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />}
         {selection?.kind === 'lines' && selection.ids.length > 1 && <small>多行时间请使用整体偏移或时间轴平移。</small>}
         {propertyLines.length > 0 && <>

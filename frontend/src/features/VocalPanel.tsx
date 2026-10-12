@@ -1,3 +1,4 @@
+import { IconButton } from '../shared/Controls';
 import { MessageBar, useNotice } from '../shared/MessageBar';
 import { scopedSessionKey } from '../adapters/preferences';
 import { useEffect, useRef, useState } from 'react';
@@ -114,11 +115,11 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     {ui.taskHost && (active || busy) && createPortal(<MessageBar notice={{ text: `人声处理 · ${task ? cancelling ? '正在取消' : status[task.status] : '正在准备'}${task?.stage ? ` · ${{separating:'分离人声',analyzing:'声学分析'}[task.stage] ?? task.stage}` : ''}${deviceText ? ` · ${deviceText}` : ''}`, role:'status', origin:null, dismissible:false }} actions={<button data-role="secondary" disabled={cancelling || active?.status==='cancel_requested'} onClick={()=>void cancel()}>取消任务</button>}/>,ui.taskHost)}
     {ui.messageHost && createPortal(<>
       <MessageBar notice={notice} actions={notice?.taskId===latest?.id && failure && latest.status!=='cancelled' ? <>
-        <button data-role="secondary" disabled={locked||busy||!!active} onClick={retry}>重试</button>
+        <IconButton icon="refresh" label="重试人声处理" data-role="secondary" disabled={locked||busy||!!active} onClick={retry}/>
         {latest.error?.cpu_retry && <button data-role="secondary" disabled={locked||busy||!!active} onClick={()=>void retryCpu()}>使用 CPU 重试</button>}
       </> : undefined}/>
-      <MessageBar notice={issue} actions={!active && !busy ? <button data-role="secondary" disabled={locked} onClick={()=>{if(pending && result?.status==='ready' && latest?.status==='succeeded')setError('');else retry();}}>重试</button> : undefined}/>
-      <MessageBar notice={readError} actions={<button data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();if(completed.isError)void completed.refetch();}}>重试读取</button>}/>
+      <MessageBar notice={issue} actions={!active && !busy ? <IconButton icon="refresh" label="重试人声处理" data-role="secondary" disabled={locked} onClick={()=>{if(pending && result?.status==='ready' && latest?.status==='succeeded')setError('');else retry();}}/> : undefined}/>
+      <MessageBar notice={readError} actions={<IconButton icon="refresh" label="重试读取人声任务和结果" data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();if(completed.isError)void completed.refetch();}}/>}/>
     </>,ui.messageHost)}
     {ui.statusHost && (conflictVisible || !ready) && createPortal(<section className={styles.panel} aria-label="音频处理结果">
       {conflictVisible ? <><p>声学内容已改变，本次结果已保留。</p><button data-role="primary" disabled={locked} onClick={adopt}>替换当前片段</button>{ready && <button data-role="secondary" onClick={()=>setDismissed(latest!.id)}>返回上次结果</button>}</> : <p>{active||busy?'正在处理音频，可在上方查看任务状态。':'尚无可用片段，请通过音频工具分离人声。'}</p>}

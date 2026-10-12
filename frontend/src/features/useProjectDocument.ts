@@ -1,3 +1,4 @@
+import { projectErrorText } from './project-error';
 import { useNotice } from '../shared/MessageBar';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listenProjectDeletion, clearProjectLocalData } from "../adapters/project-lifecycle";
@@ -137,7 +138,7 @@ export function useProjectDocument(
       if ((caught as { status?: number }).status === 404) { deletedRef.current = true; setDeleted(true); }
       if ((caught as { status?: number }).status === 412) setConflict(true);
       setError(
-        caught instanceof Error ? caught.message : "保存失败，修改已保留",
+        caught instanceof Error ? projectErrorText(captured, caught.message) : "保存失败，修改已保留",
       );
       if (forPackaging) throw caught;
     } finally {

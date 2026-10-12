@@ -92,7 +92,7 @@ for (const theme of ['light', 'dark']) test(`timeline geometry and hidden layers
   await page.screenshot({ path: test.info().outputPath(`footer-${theme}.png`) });
   await page.route('**/pcm*', route => route.abort());
   await page.getByLabel('波形／声谱图音源', { exact: true }).selectOption('');
-  await expect(page.getByRole('button', { name: '重试声谱图', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '重试加载声谱图', exact: true })).toBeVisible();
   (await measure()).gaps.forEach(gap => expect(gap).toBeCloseTo(4, 0));
   await page.screenshot({ path: test.info().outputPath(`error-${theme}.png`) });
 });

@@ -78,7 +78,7 @@ it('attaches all whitespace without extending times, preserves empty replacement
   const track = state.present.romanizationTracks[0];
   const empty = rows.map(row => ({ ...row, groups: row.groups.map(unit => ({ ...unit, text: ' \t　' })) }));
   expect(() => romanizationGenerationCommand(doc, doc, empty, choices)).toThrow('没有可生成内容');
-  expect(() => romanizationGenerationCommand(state.present, state.present, empty, { trackId: track.id, targets: { [doc.lines[0].id]: content.id } })).toThrow('结果为空，未替换');
+  expect(() => romanizationGenerationCommand(state.present, state.present, empty, { trackId: track.id, targets: { [doc.lines[0].id]: content.id } })).toThrow('没有可生成内容');
   expect(track.contents[0]).toBe(content);
 });
 it('omits empty results with every timing shape and retains English text with valid Ruby', () => {

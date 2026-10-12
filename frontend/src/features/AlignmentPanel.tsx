@@ -1,3 +1,4 @@
+import { IconButton } from '../shared/Controls';
 import { MessageBar, useNotice, type Notice } from '../shared/MessageBar';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -112,7 +113,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
     {visible&&(ui.alignmentHost?createPortal(button,ui.alignmentHost):button)}
     {ui.taskHost && running && createPortal(<MessageBar notice={{ text: `自动对齐 · ${progress}${deviceText ? ` · ${deviceText}` : ''}`, role: 'status', origin: null, dismissible: false }} actions={<button data-role="secondary" disabled={cancelling} onClick={cancel}>取消任务</button>}/>, ui.taskHost)}
     {ui.messageHost && createPortal(<>
-      <MessageBar notice={message} actions={message?.taskId && cpuFailure?.id === message.taskId ? <button data-role="secondary" disabled={running||control.locked||!!active} onClick={()=>void start(true)}>使用 CPU 重试</button> : message?.taskId && message.role==='alert' ? <button data-role="secondary" disabled={running||control.locked||!!reason} onClick={()=>void open()}>重试</button> : undefined}/>
+      <MessageBar notice={message} actions={message?.taskId && cpuFailure?.id === message.taskId ? <button data-role="secondary" disabled={running||control.locked||!!active} onClick={()=>void start(true)}>使用 CPU 重试</button> : message?.taskId && message.role==='alert' ? <IconButton icon="refresh" label="重试自动对齐" data-role="secondary" disabled={running||control.locked||!!reason} onClick={()=>void open()}/> : undefined}/>
       <MessageBar notice={connection}/>
     </>, ui.messageHost)}
     {dialog&&<SettingsDialog title="自动对齐" close={()=>setDialog(false)} actions={<><button data-role="secondary" data-initial-focus onClick={()=>setDialog(false)}>取消</button><button data-role="primary" disabled={!summary?.emitting_count} onClick={()=>void start()}>开始对齐</button></>}>

@@ -1,3 +1,4 @@
+import { IconButton } from '../../shared/Controls';
 import { measureTextWidth } from '../../shared/measure-text';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
@@ -73,7 +74,7 @@ export function JapaneseRubyDialog({ document, lineIds, apply, close }: { docume
     if(composing)return;
     edited.current.clear();setActive(null);setPending(true);setError('');setRows(proposeJapaneseRuby(source,ids,[]));setAutoMerge(event.target.checked);
   }}/>自动合并多汉字词</label>
-  {pending&&<p role="status">正在分析日文正文…</p>}{error&&<div role="alert">{error} <button data-role="secondary" disabled={pending||composing} onClick={()=>setAttempt(n=>n+1)}>重试</button></div>}
+  {pending&&<p role="status">正在分析日文正文…</p>}{error&&<div role="alert">{error} <IconButton icon="refresh" label="重试读取日文读音" data-role="secondary" disabled={pending||composing} onClick={()=>setAttempt(n=>n+1)}/></div>}
   {stale&&<p role="alert">源文档已变化，请重新打开生成。</p>}
   <div ref={scroll} className={`${styles.rubyGenerationRows} ${virtual?styles.rubyGenerationRowsVirtual:''}`} data-japanese-rows={rows.length}>
    <div style={virtual?{height:virtualizer.getTotalSize(),position:'relative'}:{display:'grid',gap:12}}>

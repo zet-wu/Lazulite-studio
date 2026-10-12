@@ -38,10 +38,10 @@ test('preposed audio outline keeps explicit selection and large compatibility re
  await rule.getByRole('button',{name:/再显示 50 项/}).click();await expect(rule.locator('li')).toHaveCount(100);await rule.getByRole('checkbox',{name:'选择 word89',exact:true}).check();await expect(rule.getByText('范围：选中 1 项')).toBeVisible();const scrollBefore=await rule.locator('ul').evaluate(el=>el.scrollTop);await rule.getByRole('button',{name:/^清除词级歌手/}).click();await expect(rule.getByText('1199 个词，涉及 1 行')).toBeVisible();expect(Math.abs(await rule.locator('ul').evaluate(el=>el.scrollTop)-scrollBefore)).toBeLessThan(40);
  await rule.getByRole('button',{name:'word90',exact:true}).focus();await page.keyboard.press('Enter');await expect(page.getByRole('textbox',{name:'词 word90',exact:true}).locator('xpath=ancestor::*[@data-word-id][1]')).toBeFocused();await expect(page.getByLabel('词级歌手 a',{exact:true})).toBeChecked();
 });
-test('removes obsolete recovery databases while preserving current and unrelated data',async({page})=>{
+test('preserves older recovery databases while isolating the current project format',async({page})=>{
  await page.goto('/projects');await page.evaluate(async()=>{
-  for(const name of ['lazulite-studio-recovery','lazulite-studio-recovery-project-v3','unrelated-app'])await new Promise<void>((resolve,reject)=>{const request=indexedDB.open(name,1);request.onupgradeneeded=()=>request.result.createObjectStore('sample');request.onsuccess=()=>{request.result.close();resolve();};request.onerror=()=>reject(request.error);});
+  for(const name of ['lazulite-studio-recovery','lazulite-studio-recovery-project-v3','lazulite-studio-recovery-project-v7:00000000000000000000000000000001','unrelated-app'])await new Promise<void>((resolve,reject)=>{const request=indexedDB.open(name,1);request.onupgradeneeded=()=>request.result.createObjectStore('sample');request.onsuccess=()=>{request.result.close();resolve();};request.onerror=()=>reject(request.error);});
  });
  await page.goto('/projects/sample-project/edit?scenario=no-music');await expect(page.getByRole('button',{name:'编辑',exact:true})).toBeVisible();
- await expect.poll(()=>page.evaluate(async()=>(await indexedDB.databases()).map(db=>db.name).sort())).toEqual(['lazulite-studio-recovery-project-v7','unrelated-app']);
+ await expect.poll(()=>page.evaluate(async()=>(await indexedDB.databases()).map(db=>db.name).sort())).toEqual(['lazulite-studio-recovery','lazulite-studio-recovery-project-v3','lazulite-studio-recovery-project-v7:00000000000000000000000000000001','lazulite-studio-recovery-project-v8:legacy','unrelated-app']);
 });

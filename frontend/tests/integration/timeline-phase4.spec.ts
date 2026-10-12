@@ -86,7 +86,7 @@ test('upload failure and cancellation keep project empty and allow retry',async(
   await page.route('**/api/v1/uploads',async ()=>{ /* Hold this request until the user cancels it. */ });
   await input.setInputFiles({name:'cancel.wav',mimeType:'audio/wav',buffer:await audio.body()});await page.getByRole('button',{name:'取消上传',exact:true}).click();
   await expect(page.getByRole('alert')).toContainText('取消');expect((await(await page.request.get(`/api/v1/projects/${id}`)).json()).asset).toBeNull();
-  await page.unroute('**/api/v1/uploads');await page.getByRole('button',{name:'重试上传',exact:true}).click();await expect(input).toHaveCount(0);
+  await page.unroute('**/api/v1/uploads');await page.getByRole('button',{name:'重试上传音乐',exact:true}).click();await expect(input).toHaveCount(0);
   await expect(page.getByRole('textbox',{name:'词 Alpha',exact:true})).toHaveValue('Alpha');
 });
 

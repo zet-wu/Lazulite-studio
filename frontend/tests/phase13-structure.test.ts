@@ -131,6 +131,6 @@ it('sets arbitrary song parts atomically, no-op adds no history, and preserves a
   expect(executeProjectCommand(next,{type:'lyrics',command:{type:'set-song-part',lineIds:['a','b'],value:'My Verse'}})).toBe(next);
   const xml=serializeLyricTtml(next.present.lyrics,{draft:true});expect(xml).toContain('itunes:songPart="My Verse"');expect(xml).not.toContain('song-part');
   expect(parseLyricTtml(xml,{draft:true}).lines.slice(0,2).map(line=>line.songPart)).toEqual(['My Verse','My Verse']);
-  const cleared=executeProjectCommand(next,{type:'lyrics',command:{type:'set-song-part',lineIds:['a','b'],value:''}});
-  expect(cleared.present.lyrics.lines[0].songPart).toBeNull();expect(undoProjectCommand(cleared).present).toBe(next.present);
+  const cleared=executeProjectCommand(next,{type:'lyrics',command:{type:'set-song-part',lineIds:['a','b'],value:' \t　'}});
+  expect(cleared.present.lyrics.lines[0].songPart).toBeNull();expect(serializeLyricTtml(cleared.present.lyrics,{draft:true})).not.toContain('songPart=\"\"');expect(undoProjectCommand(cleared).present).toBe(next.present);
 });

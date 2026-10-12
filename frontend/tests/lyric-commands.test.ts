@@ -178,7 +178,7 @@ describe('semantic lyric commands', () => {
     expect((state.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === state.present.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))[0] as { text: string }).text).toBe('今天也');
     expect(undoLyricCommand(state).present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === undoLyricCommand(state).present.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([]);
     expect(undoLyricCommand(undoLyricCommand(state)).present).toBe(document);
-    expect(() => executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: null, word: createWord('重', first.id) })).toThrow(/already exists/);
+    expect(() => executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: null, word: createWord('重', first.id) })).toThrow(/身份重复/);
   });
 
   it('moves a timed 注音 word across lines without changing its identity or timing', () => {

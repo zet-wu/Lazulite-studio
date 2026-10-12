@@ -78,11 +78,10 @@ function GroupsDialog({project,close,apply,error}:{error:string;project:ProjectD
  const update=(key:string,patch:Partial<typeof rows[number]>)=>setRows(rows.map(row=>row.key===key?{...row,...patch}:row));
  return <SettingsDialog title="分组管理" close={close}>
  <table className={styles.groupTable}><thead><tr><th>ID</th><th>名称</th><th aria-label="操作"/></tr></thead><tbody>{rows.map((row,index)=><tr key={row.key}>
- <td><input aria-label={`分组 ${index+1} ID`} aria-invalid={!!problem} value={row.id} onChange={event=>update(row.key,{id:event.target.value})}/></td>
+ <td><input aria-label={`分组 ${index+1} ID`} aria-invalid={problem?.startsWith(`第 ${index+1} 组`)||false} aria-describedby={problem?.startsWith(`第 ${index+1} 组`)?'group-id-error':undefined} value={row.id} onChange={event=>update(row.key,{id:event.target.value})}/>{problem?.startsWith(`第 ${index+1} 组`)&&<small id="group-id-error" role="alert">{problem}</small>}</td>
  <td><input aria-label={`分组 ${index+1} 名称`} value={row.name} onChange={event=>update(row.key,{name:event.target.value})}/></td>
  <td>{([-1,1] as const).map(direction=><IconButton key={direction} icon={direction<0?'up':'down'} label={`${direction<0?'上移':'下移'}分组 ${index+1}`} disabled={index+direction<0||index+direction>=rows.length} onClick={()=>{const next=[...rows];[next[index],next[index+direction]]=[next[index+direction],next[index]];setRows(next);}}/>)}<IconButton icon="trash" label={`删除分组 ${index+1}`} data-role="danger" onClick={()=>setRows(rows.filter(item=>item.key!==row.key))}/></td>
  </tr>)}</tbody></table>
- {problem&&<p role="alert">{problem}</p>}
  <IconButton icon="add" label="新增分组" onClick={()=>setRows([...rows,{id:nextGroupId([...project.karaoke.groups,...groups]),name:'新分组',key:crypto.randomUUID(),originalId:''}])}/>
  {count>0&&<p>应用后将有 {count} 行未选择分组。</p>}{error&&<p role="alert">{error}</p>}
  <button data-role="primary" disabled={!!problem} onClick={()=>{if(apply({kind:'groups',groups,renames}))close();}}>应用分组</button>

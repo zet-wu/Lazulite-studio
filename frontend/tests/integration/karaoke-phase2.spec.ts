@@ -8,14 +8,14 @@ test('project manager exports and imports saved cues and markers without audio',
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();
  let saved=await(await page.request.get(`/api/v1/projects/${id}/document`)).json();
  const full={...saved.document,lineOrder:['a'],acoustics:{analysisId:null,segments:[{id:'hand',beginMs:123,endMs:4567}]}};
- full.karaoke.groups.push({id:'custom',name:'自定义组'});full.karaoke.lineGroups.a='custom';full.karaoke.singerMarkers[0].marginRight=-123;
+ full.karaoke.groups.push({id:'custom',name:'自定义组'});full.karaoke.lineGroups.a='custom';full.karaoke.singerMarkers[0].marginRight=-123;full.karaoke.singerMarkers[0].skip=true;full.karaoke.groups=[];full.karaoke.lineGroups.a='';full.karaoke.outputs=[];
  const response=await page.request.put(`/api/v1/projects/${id}/document`,{headers:{origin:'http://127.0.0.1:5175','if-match':saved.revision},data:{schema_version:saved.schema_version,project_id:id,revision:saved.revision,document:full}});expect(response.ok()).toBeTruthy();
  saved=await(await page.request.get(`/api/v1/projects/${id}/document`)).json();
  await page.goto('/projects');const downloading=page.waitForEvent('download');await page.getByRole('button',{name:'导出项目 Karaoke phase2',exact:true}).click();const download=await downloading;expect(download.suggestedFilename()).toBe('Karaoke phase2.lazp');await download.saveAs(test.info().outputPath('actual-project.lazp'));
  const imported=page.waitForResponse(r=>r.url().endsWith('/project-archives')&&r.request().method()==='POST');
  await page.getByLabel('Lazulite Studio 工程（*.lazp）').setInputFiles((await download.path())!);const result=await imported;expect(result.ok()).toBeTruthy();const newId=(await result.json()).id;expect(newId).not.toBe(id);
  const restored=await(await page.request.get(`/api/v1/projects/${newId}/document`)).json();expect(restored.document).toEqual(saved.document);
- await page.goto(`/projects/${newId}/edit`);await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('phase2-voice');await page.getByRole('button',{name:'关闭歌手标记管理'}).click();
+ await page.goto(`/projects/${newId}/edit`);await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('phase2-voice');await expect(page.getByLabel('跳过生成',{exact:true})).toBeChecked();await expect(page.getByLabel('触发标记',{exact:true})).toBeDisabled();await page.getByRole('button',{name:'关闭歌手标记管理'}).click();
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();
 });
 
