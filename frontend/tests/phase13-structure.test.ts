@@ -15,7 +15,7 @@ function fixture() {
   lyrics.translationTracks=[{id:'t',language:'en',purpose:'subtitle',contents:[{id:'tc',kind:'plain',lineId:'c',text:' C '},{id:'ta',kind:'timed',lineId:'a',units:[{id:'tu',text:'A',beginMs:1000,endMs:1500}]},{id:'tb',kind:'plain',lineId:'b',text:'B'}]}];
   lyrics.romanizationTracks=[{id:'r',language:'ja-Latn',contents:[{id:'ra',kind:'plain',lineId:'a',text:'A'},{id:'rc',kind:'plain',lineId:'c',text:' C'}]}];
   const project=createProjectDocument(lyrics);
-  project.karaoke.groups=[{id:'g',name:'G'}];project.karaoke.defaults.main='g';project.karaoke.defaults.background='g';project.karaoke.lineGroups={a:'',b:'',c:'g',d:'g'};
+  project.karaoke.groups=[{id:'g',name:'G'}];project.karaoke.lineGroups={a:'',b:'',c:'g',d:'g'};
   return project;
 }
 it('merges the entire main selection with separately inherited attributes, attached contents, backgrounds and atomic roundtrip',()=>{

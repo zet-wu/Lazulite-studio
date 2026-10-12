@@ -102,6 +102,10 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     if (result.lyrics === state.present.lyrics && result.editing === state.present.editing) return state;
     let karaoke = state.present.karaoke;
     const commands = command.command.type === 'batch' ? command.command.commands : [command.command];
+    for (const item of commands) if (item.type === 'split-line') {
+      const group = karaoke.lineGroups[item.lineId] ?? '';
+      karaoke = { ...karaoke, lineGroups: { ...karaoke.lineGroups, ...Object.fromEntries(item.newLineIds.map(id => [id, group])) } };
+    }
     const moved = new Set<string>();
     for (const item of commands) if (item.type === 'merge-lines') {
       const selected = state.present.lyrics.lines.filter(line => item.lineIds.includes(line.id));
@@ -117,7 +121,7 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     }
     for (const cue of karaoke.cues) if (moved.has(cue.id)) {
       const problem = cueProblem(result.lyrics, karaoke, cue);
-      if (problem) throw new Error(`行 ${cue.anchor.lineId} · 导唱 ${cue.id}：${problem}`);
+      if (problem) throw new Error(`第 ${result.lyrics.lines.findIndex(line=>line.id===cue.anchor.lineId)+1} 行 · 导唱「${cue.text}」：${problem}`);
     }
     const previous=displayLines(state.present.lyrics,state.present.lineOrder);
     const before=previous.filter((line,i)=>line.backgroundOf&&i<previous.findIndex(item=>item.id===line.backgroundOf)).map(line=>line.id);
@@ -128,7 +132,7 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     if (command.acoustics === state.present.acoustics) return state;
     present = { ...state.present, acoustics: command.acoustics };
   }
-  if (present.lyrics !== state.present.lyrics) present = { ...present, karaoke: reconcileKaraoke(present.lyrics, present.karaoke) };
+  if (present.lyrics !== state.present.lyrics) present = { ...present, karaoke: reconcileKaraoke(present.lyrics, present.karaoke, state.present.lyrics) };
   const lineIds=new Set(present.lyrics.lines.map(line=>line.id));
   present = { ...present, lineOrder: present.lineOrder.filter(id=>lineIds.has(id)) };
   assertAmll(present.lyrics, present.amll);

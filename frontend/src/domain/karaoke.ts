@@ -7,13 +7,13 @@ export type Karaoke = {
   singerMarkers: SingerMarker[];
   groups: { id: string; name: string }[];
   lineGroups: Record<string, string>;
-  defaults: { main: string | null; background: string | null; text: string; beforeMs: number; wordMs: number; rubyMs: number };
+  defaults: { text: string; beforeMs: number; wordMs: number; rubyMs: number };
   cues: KaraokeCue[];
   outputs: string[];
 };
 export const outputId = (groupId: string, kind = 'body', trackId = '') => JSON.stringify([groupId, kind, trackId]);
 export function createKaraoke(lyrics: LyricDocument): Karaoke {
-  return { singerMarkers: initializeSingerMarkers(lyrics, []), groups: [{ id: 'main', name: '主歌词' }, { id: 'background', name: '背景歌词' }], lineGroups: Object.fromEntries(lyrics.lines.map(line => [line.id, line.backgroundOf ? 'background' : 'main'])), defaults: { main: 'main', background: 'background', text: '●', beforeMs: 3000, wordMs: 500, rubyMs: 500 }, cues: [], outputs: [outputId('main'), outputId('background')] };
+  return { singerMarkers: initializeSingerMarkers(lyrics, []), groups: [{ id: 'main', name: '主歌词' }, { id: 'background', name: '背景歌词' }], lineGroups: Object.fromEntries(lyrics.lines.map(line => [line.id, line.backgroundOf ? 'background' : 'main'])), defaults: { text: '●', beforeMs: 3000, wordMs: 500, rubyMs: 500 }, cues: [], outputs: [outputId('main'), outputId('background')] };
 }
 export const anchorKey = (anchor: CueAnchor) => JSON.stringify(anchor.kind === 'before' ? [anchor.kind,anchor.lineId] : [anchor.kind,anchor.leftId,anchor.rightId]);
 const timed = (item: { beginMs: number | null; endMs: number | null }) => item.beginMs !== null && item.endMs !== null && item.beginMs >= 0 && item.endMs > item.beginMs;
@@ -76,8 +76,15 @@ export function autoInsertCues(lyrics: LyricDocument, karaoke: Karaoke, groupIds
   return next;
 }
 /** Structural edits update identity ownership only. Retiming never moves a cue. */
-export function reconcileKaraoke(lyrics: LyricDocument, karaoke: Karaoke): Karaoke {
-  const lineGroups = Object.fromEntries(lyrics.lines.map(line => [line.id, karaoke.lineGroups[line.id] ?? karaoke.defaults[line.backgroundOf ? 'background' : 'main'] ?? '']));
+export function reconcileKaraoke(lyrics: LyricDocument, karaoke: Karaoke, previous?: LyricDocument): Karaoke {
+  const standard = (id: string) => karaoke.groups.some(group => group.id === id);
+  const lineGroups = Object.fromEntries(lyrics.lines.map(line => {
+    const target = line.backgroundOf ? 'background' : 'main';
+    let group = karaoke.lineGroups[line.id] ?? (standard(target) ? target : '');
+    const old = previous?.lines.find(item => item.id === line.id);
+    if (old && !!old.backgroundOf !== !!line.backgroundOf && standard('main') && standard('background') && group === (old.backgroundOf ? 'background' : 'main')) group = target;
+    return [line.id, group];
+  }));
   const cues = karaoke.cues.flatMap(cue => {
     const anchor = cue.anchor;
     if (anchor.kind === 'before') return lyrics.lines.some(line => line.id === anchor.lineId) ? [cue] : [];
@@ -94,7 +101,23 @@ export function reconcileKaraoke(lyrics: LyricDocument, karaoke: Karaoke): Karao
   });
   return { ...karaoke, lineGroups, cues, singerMarkers: initializeSingerMarkers(lyrics, karaoke.singerMarkers) };
 }
-export type KaraokeCommand = { kind: 'remove-lines'; lineIds: string[] } | { kind: 'singer-markers'; markers: SingerMarker[] } | { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; moves: Record<string, string>; main: string | null; background: string | null } | { kind: 'outputs'; outputs: string[] };
+export function nextGroupId(groups: Karaoke['groups']): string {
+  const used = new Set(groups.map(group => group.id.trim().toLowerCase()));
+  let n = 1; while (used.has(`group${n}`)) n++;
+  return `group${n}`;
+}
+export function groupIdProblem(original: Karaoke['groups'], groups: Karaoke['groups'], renames: Record<string, string>): string | null {
+  const used = new Set<string>();
+  for (const [index, group] of groups.entries()) {
+    const id = group.id.trim();
+    const unchanged = original.some(old => old.id === id && renames[old.id] === id);
+    if (!id || !unchanged && !/^[A-Za-z][A-Za-z0-9_-]*$/.test(id)) return `第 ${index + 1} 组 ID 须以英文字母开头，后接字母、数字、下划线或连字符`;
+    if (used.has(id.toLowerCase())) return `第 ${index + 1} 组 ID 重复（不区分大小写）`;
+    used.add(id.toLowerCase());
+  }
+  return null;
+}
+export type KaraokeCommand = { kind: 'remove-lines'; lineIds: string[] } | { kind: 'singer-markers'; markers: SingerMarker[] } | { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; renames: Record<string, string> } | { kind: 'outputs'; outputs: string[] };
 export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: KaraokeCommand): Karaoke {
   let next = karaoke;
   switch (command.kind) {
@@ -122,14 +145,24 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
       next = { ...karaoke, cues: karaoke.cues.map(item => item.id === cue.id ? cue : item) }; break;
     }
     case 'assign':
-      if (!karaoke.groups.some(group => group.id === command.groupId) || command.lineIds.some(id => !lyrics.lines.some(line => line.id === id))) throw new Error('分组或歌词行已失效');
+      if (command.groupId !== '' && !karaoke.groups.some(group => group.id === command.groupId) || command.lineIds.some(id => !lyrics.lines.some(line => line.id === id))) throw new Error('分组或歌词行已失效');
       next = { ...karaoke, lineGroups: { ...karaoke.lineGroups, ...Object.fromEntries(command.lineIds.map(id => [id, command.groupId])) } }; break;
     case 'settings': next = { ...karaoke, defaults: command.defaults }; break;
     case 'outputs': next = { ...karaoke, outputs: command.outputs }; break;
     case 'groups': {
-      const lineGroups = Object.fromEntries(Object.entries(karaoke.lineGroups).map(([lineId, groupId]) => [lineId, command.moves[groupId] ?? groupId]));
-      if (Object.values(lineGroups).some(id => !command.groups.some(group => group.id === id))) throw new Error('请为被删除分组的歌词选择迁往的有效组');
-      next = { ...karaoke, groups: command.groups, lineGroups, defaults: { ...karaoke.defaults, main: command.main, background: command.background }, outputs: karaoke.outputs.filter(id => command.groups.some(group => JSON.parse(id)[0] === group.id)) }; break;
+      const groups = command.groups.map(group => ({ ...group, id: group.id.trim() }));
+      const problem = groupIdProblem(karaoke.groups, groups, command.renames);
+      if (problem) throw new Error(problem);
+      const resolve = (id: string) => {
+        const renamed = command.renames[id];
+        return renamed !== undefined && groups.some(group => group.id === renamed) ? renamed : '';
+      };
+      const lineGroups = Object.fromEntries(Object.entries(karaoke.lineGroups).map(([lineId, groupId]) => [lineId, resolve(groupId)]));
+      const outputs = karaoke.outputs.flatMap(id => {
+        const [groupId, kind, trackId] = JSON.parse(id), target = resolve(groupId);
+        return target ? [outputId(target, kind, trackId)] : [];
+      });
+      next = { ...karaoke, groups, lineGroups, outputs }; break;
     }
   }
   validateKaraoke(lyrics, next);
@@ -141,7 +174,6 @@ export function validateKaraoke(lyrics: LyricDocument, value: Karaoke) {
   validateSingerMarkers(value.singerMarkers);
   const ids = new Set<string>();
   for (const group of value.groups) { if (typeof group.id !== 'string' || !group.id || ids.has(group.id) || typeof group.name !== 'string' || !group.name.trim()) throw new Error('分组名称或标识无效'); ids.add(group.id); }
-  if (!ids.size || ['main', 'background'].some(key => { const id = value.defaults[key as 'main' | 'background']; return id !== null && !ids.has(id); })) throw new Error('默认分组无效');
   if (typeof value.defaults.text !== 'string' || !value.defaults.text.length || [value.defaults.beforeMs, value.defaults.wordMs, value.defaults.rubyMs].some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('导唱默认文字或阈值无效');
   if (Object.entries(value.lineGroups).some(([id, group]) => !lyrics.lines.some(line => line.id === id) || typeof group !== 'string')) throw new Error('歌词分组引用无效');
   ids.clear();

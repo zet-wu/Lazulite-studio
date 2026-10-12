@@ -6,7 +6,8 @@ import { karaokeOutputs, nicokaraZip, prepareNicokara, safeFilename } from '../a
 import { SettingsDialog } from './editor/SettingsDialog';
 import { DraftInput, TimePair } from './editor/EditorFields';
 import { useEditorSelection } from './editor/SelectionContext';
-import { Select } from '../shared/Select';
+import { IconButton } from '../shared/Controls';
+import { groupIdProblem, nextGroupId } from '../domain/karaoke';
 import type { OutputIssue } from '../adapters/output-validation';
 import styles from './karaoke.module.css';
 export function downloadKaraoke(data: BlobPart, name: string, type: string) {
@@ -40,7 +41,7 @@ export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewI
  {dialog==='singers'&&<SingerMarkersDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='auto'&&<AutoInsertDialog initialGroups={autoGroups} rememberGroups={setAutoGroups} error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='defaults'&&<DefaultsDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
- {dialog==='groups'&&<GroupsDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
+ {dialog==='groups'&&<GroupsDialog error={error} project={project} close={()=>setDialog(null)} apply={c=>{const ok=command(c);if(ok&&c.kind==='groups')setAutoGroups(ids=>ids?.flatMap(id=>c.renames[id]?[c.renames[id]]:[])??null);return ok;}}/>}
  {exportOpen&&<KaraokeExport project={project} title={title} apply={command} close={()=>setExportOpen(false)} viewIssues={issues=>{setExportOpen(false);viewIssues(issues);}}/>}</>;
 }
 function DefaultsDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
@@ -62,14 +63,26 @@ function AutoInsertDialog({project,close,apply,error,initialGroups,rememberGroup
  }}>插入</button></SettingsDialog>;
 }
 function GroupsDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
- const [groups,setGroups]=useState(project.karaoke.groups),[moves,setMoves]=useState<Record<string,string>>({}),[main,setMain]=useState(project.karaoke.defaults.main),[background,setBackground]=useState(project.karaoke.defaults.background);
- const removed=project.karaoke.groups.filter(g=>!groups.some(group=>group.id===g.id));
- return <SettingsDialog title="分组管理" close={close}>{error&&<p role="alert">{error}</p>}<div className={styles.groups}>{groups.map((group,index)=><div className={styles.group} key={group.id}><input aria-label={`分组名称 ${group.id}`} value={group.name} onChange={e=>setGroups(groups.map(g=>g.id===group.id?{...g,name:e.target.value}:g))}/><small>{group.id}</small><button data-role="inline" disabled={!index} onClick={()=>{const next=[...groups];[next[index-1],next[index]]=[next[index],next[index-1]];setGroups(next);}}>上移</button><button data-role="inline" disabled={index===groups.length-1} onClick={()=>{const next=[...groups];[next[index+1],next[index]]=[next[index],next[index+1]];setGroups(next);}}>下移</button><button data-role="danger" disabled={groups.length===1} onClick={()=>{setGroups(groups.filter(g=>g.id!==group.id));if(main===group.id)setMain(null);if(background===group.id)setBackground(null);}}>删除</button></div>)}
- <button data-role="secondary" onClick={()=>setGroups([...groups,{id:crypto.randomUUID(),name:'新分组'}])}>新增分组</button>
- {removed.filter(g=>Object.values(project.karaoke.lineGroups).includes(g.id)).map(g=><label key={g.id}>{g.name} 的歌词迁往<Select value={moves[g.id]??''} onChange={e=>setMoves({...moves,[g.id]:e.target.value})}><option value="">请选择</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</Select></label>)}
- {([['新主行默认组',main,setMain],['新背景行默认组',background,setBackground]] as const).map(([label,value,set])=><label key={label}>{label}<Select value={value??''} onChange={e=>set(e.target.value||null)}><option value="">新行需手动分组</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</Select></label>)}
- <button data-role="primary" onClick={()=>{if(apply({kind:'groups',groups,moves,main,background}))close();}}>应用分组</button></div></SettingsDialog>;
+ const [rows,setRows]=useState(()=>project.karaoke.groups.map(group=>({...group,key:crypto.randomUUID(),originalId:group.id})));
+ const groups=rows.map(({id,name})=>({id:id.trim(),name}));
+ const renames=Object.fromEntries(rows.filter(row=>row.originalId).map(row=>[row.originalId,row.id.trim()]));
+ const problem=groupIdProblem(project.karaoke.groups,groups,renames);
+ const removed=project.karaoke.groups.filter(group=>!rows.some(row=>row.originalId===group.id));
+ const count=Object.values(project.karaoke.lineGroups).filter(id=>removed.some(group=>group.id===id)).length;
+ const update=(key:string,patch:Partial<typeof rows[number]>)=>setRows(rows.map(row=>row.key===key?{...row,...patch}:row));
+ return <SettingsDialog title="分组管理" close={close}>
+ <table className={styles.groupTable}><thead><tr><th>ID</th><th>名称</th><th aria-label="操作"/></tr></thead><tbody>{rows.map((row,index)=><tr key={row.key}>
+ <td><input aria-label={`分组 ${index+1} ID`} aria-invalid={!!problem} value={row.id} onChange={event=>update(row.key,{id:event.target.value})}/></td>
+ <td><input aria-label={`分组 ${index+1} 名称`} value={row.name} onChange={event=>update(row.key,{name:event.target.value})}/></td>
+ <td>{([-1,1] as const).map(direction=><IconButton key={direction} icon={direction<0?'up':'down'} label={`${direction<0?'上移':'下移'}分组 ${index+1}`} disabled={index+direction<0||index+direction>=rows.length} onClick={()=>{const next=[...rows];[next[index],next[index+direction]]=[next[index+direction],next[index]];setRows(next);}}/>)}<IconButton icon="trash" label={`删除分组 ${index+1}`} data-role="danger" onClick={()=>setRows(rows.filter(item=>item.key!==row.key))}/></td>
+ </tr>)}</tbody></table>
+ {problem&&<p role="alert">{problem}</p>}
+ <IconButton icon="add" label="新增分组" onClick={()=>setRows([...rows,{id:nextGroupId([...project.karaoke.groups,...groups]),name:'新分组',key:crypto.randomUUID(),originalId:''}])}/>
+ {count>0&&<p>应用后将有 {count} 行未选择分组。</p>}{error&&<p role="alert">{error}</p>}
+ <button data-role="primary" disabled={!!problem} onClick={()=>{if(apply({kind:'groups',groups,renames}))close();}}>应用分组</button>
+ </SettingsDialog>;
 }
+
 function KaraokeExport({project,title,apply,close,viewIssues}:{project:ProjectDocument;title:string;apply:(c:KaraokeCommand)=>boolean;close:()=>void;viewIssues:(issues:OutputIssue[])=>void}) {
  const result=useMemo(()=>prepareNicokara(project,title),[project,title]);const [error,setError]=useState('');
  return <SettingsDialog title="导出 Nicokara" close={close}>{karaokeOutputs(project).map(output=><label className={styles.output} key={output.id}><input type="checkbox" checked={project.karaoke.outputs.includes(output.id)} onChange={e=>apply({kind:'outputs',outputs:e.target.checked?[...project.karaoke.outputs,output.id]:project.karaoke.outputs.filter(id=>id!==output.id)})}/>{output.label}</label>)}

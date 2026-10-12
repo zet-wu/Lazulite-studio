@@ -1227,10 +1227,6 @@ export interface components {
         };
         /** Defaults */
         KaraokeDefaults: {
-            /** Main */
-            main: string | null;
-            /** Background */
-            background: string | null;
             /** Text */
             text: string;
             /** Beforems */

@@ -3156,7 +3156,6 @@
                     "items": {
                       "$ref": "#/components/schemas/KaraokeGroup"
                     },
-                    "minItems": 1,
                     "title": "Groups",
                     "type": "array"
                   },
@@ -3964,28 +3963,6 @@
       "KaraokeDefaults": {
         "additionalProperties": false,
         "properties": {
-          "main": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Main"
-          },
-          "background": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Background"
-          },
           "text": {
             "minLength": 1,
             "title": "Text",
@@ -4008,8 +3985,6 @@
           }
         },
         "required": [
-          "main",
-          "background",
           "text",
           "beforeMs",
           "wordMs",

@@ -10,8 +10,6 @@ class Group(Model):
     name: str = Field(min_length=1)
 
 class Defaults(Model):
-    main: str | None
-    background: str | None
     text: str = Field(min_length=1)
     beforeMs: StrictInt = Field(ge=0)
     wordMs: StrictInt = Field(ge=0)
@@ -57,7 +55,7 @@ class SingerMarker(Model):
 
 class Karaoke(Model):
     singerMarkers: list[SingerMarker]
-    groups: list[Group] = Field(min_length=1)
+    groups: list[Group]
     lineGroups: dict[str, str]
     defaults: Defaults
     cues: list[Cue]
@@ -72,8 +70,6 @@ class Karaoke(Model):
         groups = {g.id for g in self.groups}
         if len(groups) != len(self.groups) or len({c.id for c in self.cues}) != len(self.cues):
             raise ValueError('duplicate karaoke identity')
-        if any(g is not None and g not in groups for g in [self.defaults.main, self.defaults.background]):
-            raise ValueError('invalid default group')
         for output in self.outputs:
             parts = json.loads(output)
             if not isinstance(parts, list) or len(parts) != 3 or not all(isinstance(p, str) for p in parts) or parts[1] not in ['body', 'translation', 'romanization']:
@@ -91,5 +87,5 @@ def initial_karaoke(ttml):
             key = node.get(studio+'id') or node.get(xml+'id')
             if key: groups[key] = 'background' if node.get(ttm+'role') == 'x-bg' else 'main'
     return {'singerMarkers': [], 'groups': [{'id': 'main', 'name': '主歌词'}, {'id': 'background', 'name': '背景歌词'}],
-            'lineGroups': groups, 'defaults': {'main': 'main', 'background': 'background', 'text': '●', 'beforeMs': 3000, 'wordMs': 500, 'rubyMs': 500},
+            'lineGroups': groups, 'defaults': {'text': '●', 'beforeMs': 3000, 'wordMs': 500, 'rubyMs': 500},
             'cues': [], 'outputs': ['["main","body",""]', '["background","body",""]']}

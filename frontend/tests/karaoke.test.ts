@@ -43,7 +43,7 @@ it('moves adjacent anchors to their new line, removes broken adjacency and prese
  const next=structuredClone(p.lyrics), other=createLine('');other.words=next.lines[0].words;next.lines[0].words=[];next.lines.push(other);
  const moved=reconcileKaraoke(next,p.karaoke);expect(moved.cues.filter(c=>c.anchor.kind!=='before').every(c=>c.anchor.lineId===other.id)).toBe(true);
  other.words.splice(1,0,createWord('x'));expect(reconcileKaraoke(next,moved).cues.some(c=>c.anchor.kind==='word')).toBe(false);
- expect(()=>applyKaraoke(p.lyrics,p.karaoke,{kind:'groups',groups:[{id:'background',name:'B'}],moves:{},main:null,background:'background'})).toThrow('迁往');
+ expect(applyKaraoke(p.lyrics,p.karaoke,{kind:'groups',groups:[{id:'background',name:'B'}],renames:{background:'background'}}).lineGroups[p.lyrics.lines[0].id]).toBe('');
 });
 it('rejects missing or overlapping source ranges instead of inventing gaps',()=>{
  const p=fixture(), line=p.lyrics.lines[0], anchor={kind:'word' as const,lineId:line.id,leftId:'a',rightId:'b'};
