@@ -8,7 +8,7 @@
 
 词级 `obscene` 写 `amll:obscene` 与标准 `ttm:role="expletive"`，读取任一标记并检查冲突。歌手定义支持 `actorRef`，codec 校验引用；歌词编辑界面提供歌手身份、名称、类型及顺序管理。
 
-`project-codec.ts` 读写项目 v7：lyrics 在 JSON 边界保存为 draftTtml，editing、acoustics、amll、lineOrder、karaoke 独立保存并验证引用。`recovery` 用 IndexedDB 保存 project-v7／record 7 检查点及基础修订。源音频身份由项目资源接口提供。
+`project-codec.ts` 读写项目 v8：lyrics 在 JSON 边界保存为 draftTtml，editing、acoustics、amll、lineOrder、karaoke 独立保存并验证引用。`recovery` 用 IndexedDB 保存 project-v8／record 8 检查点及基础修订。源音频身份由项目资源接口提供。
 
 ## 格式投影
 
@@ -16,7 +16,7 @@
 
 `ass.ts` 从正文、背景和附属内容生成事件，先量化绝对端点至厘秒，再计算相对 karaoke 时长；普通附属取所属行时间，定时附属取自身包络。事件使用四类角色样式与按时间分配的纵向行位，画布宽 1920、高至少 1080，真实间隙用空计时段表示。
 
-`nicokara.ts` 按组与轨道生成 `.kra` 文件和 UTF-8 ZIP，使用项目导唱、歌手标记及 Emoji 声明，附带透明占位图片。Ruby 绝对端点先量化，齐平时省略 reading 尾标签。碰撞、时间范围与所选输出问题由同一准备函数返回。
+`nicokara.ts` 按组与轨道生成 `.kra` 文件和 UTF-8 ZIP，使用项目导唱、歌手标记及 Emoji 声明，附带透明占位图片。Ruby 绝对端点先量化，齐平时省略 reading 尾标签。碰撞、时间范围、所选输出及项目级未分组问题由同一准备函数返回。附属轨道使用完整列表序号，重复语言的文件名加 `trackN`；同一映射用于标签、文件名及说明清单。被跳过歌手集合不发声明且保留输出声部状态，每文件独立。
 
 `output-validation.ts` 与各格式准备函数共享检查，问题携带稳定对象 ID、类别及严重度。`format-description.ts` 描述当前选择的表达差异。正式输出执行实际格式校验，草稿保存保留可继续编辑的状态。
 
