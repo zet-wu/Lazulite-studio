@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
-import { phase7Ttml } from '../fixtures/phase7';
+import { japaneseReadingTtml } from '../fixtures/japanese-reading';
 
 for (const startKey of ['s', 'Shift+G']) test(`timing keys work after button clicks (${startKey})`, async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
-  await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
+  await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(japaneseReadingTtml) });
   if (startKey !== 's') {
     await page.locator('[data-top-menu="settings"] summary').click();
     await page.getByRole('button', { name: '快捷键设置', exact: true }).click();

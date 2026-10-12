@@ -7,7 +7,7 @@ from server.auth import Settings
 from server.project_document import initial_project
 from server.amll_compatibility import validate_amll
 from server.tests.test_documents import setup_project
-XML=(Path(__file__).parents[2]/'tests/fixtures/ttml/amll-phase0-rich.ttml').read_text()
+XML=(Path(__file__).parents[2]/'tests/fixtures/ttml/amll-rich.ttml').read_text()
 
 def project():
     value=initial_project(XML,None)

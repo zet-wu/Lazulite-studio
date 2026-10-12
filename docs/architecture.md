@@ -17,6 +17,14 @@ Studio 是浏览器前端与本地／同源 API 组成的单工作台，登录�
 
 入口为 `/projects`、`/projects/:projectId/edit`、`/login`、`/settings`；`/editor` 重定向项目列表。Workspace 组合 EditorWorkspace、保存状态、恢复与媒体生命周期，各模式共享项目草稿及播放状态。音乐可选，首次接入通过项目资源接口完成。
 
+## 测试边界与组织
+
+`frontend/tests/*.test.ts` 与源码旁的组件测试覆盖领域事务、格式交换、恢复及状态逻辑。`frontend/tests/e2e` 使用模拟服务验证选择、焦点、拖动、键盘和异步界面；文件以功能命名。`frontend/tests/integration` 连接独立临时 FastAPI 服务，按 `project`、`editor`、`timeline`、`media`、`vocal`、`karaoke`、`ruby`、`alignment`、`search`、`output`、`preview`、`settings` 模块验证保存重开、工程交换、资源与任务生命周期。外部搜索或计算任务可以使用显式响应夹具。
+
+`frontend/tests/performance` 面向生产构建，验证长文档、虚拟列表、音频缓存等资源边界，并附带测量数据。`frontend/tests/fixtures` 提供按内容命名的合成数据与操作助手，跨语言 TTML 输入放在根目录 `tests/fixtures/ttml`。`server/tests/browser_fixture.py` 在临时目录建立测试项目，服务退出时回收；测试不依赖开发数据目录。测试标题、夹具、项目身份与产物均按功能或行为命名。
+
+保留能够发现行为回归的断言：原子编辑与撤销、持久化、格式交换、任务竞态、焦点及资源边界。相同布局在多个环境中的重复巡检、仅验证夹具自身规模的断言和一次性内部探针不作为常驻套件。
+
 ## 权威状态与时间
 
 `ProjectDocument` 是唯一可编辑项目状态。`lyrics` 保存结构化歌词，`editing` 保存空拍、打轴忽略、跳过对齐和行尾链接，`acoustics` 保存分析引用及可编辑片段，`amll` 保存兼容限制，`lineOrder` 保存显示排布，`karaoke` 保存导唱、分组与输出配置。

@@ -123,7 +123,7 @@ describe("useProjectDocument save lifecycle", () => {
   });
 
   it("saves generated 注音 with its source tracks and reopens the same semantics", async () => {
-    const source = readFileSync("../tests/fixtures/ttml/phase2-multitrack.ttml", "utf8");
+    const source = readFileSync("../tests/fixtures/ttml/multitrack.ttml", "utf8");
     let savedXml: ProjectSnapshot;
     saveMock.mockImplementation(async (xml: ProjectSnapshot) => {
       savedXml = xml;

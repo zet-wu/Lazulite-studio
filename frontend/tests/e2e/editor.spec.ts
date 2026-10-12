@@ -41,7 +41,7 @@ test('edits and exports a rich local draft with canvas undo and redo', async ({ 
 });
 
 test('generates 注音 explicitly from one track and preserves source content on undo', async ({ page }) => {
-  await importTtml(page, 'phase2-multitrack');
+  await importTtml(page, 'multitrack');
   const line = page.locator('main section[data-line-id="line-a"]');
   await expect(line.locator('[data-romanization-content-id]')).toHaveCount(3);
   await line.locator('[data-romanization-content-id]').first().getByText('音译 · ja-Latn').click({ button: 'right' });
@@ -151,7 +151,7 @@ test('selects and reorders 注音 independently of its base word', async ({ page
 });
 
 test('edits a transliteration unit without changing the main word', async ({ page }) => {
-  await importTtml(page, 'phase2-multitrack');
+  await importTtml(page, 'multitrack');
   const line = page.locator('main section[data-line-id="line-a"]');
   const unit = line.locator('[data-romanization-content-id]').first().getByRole('textbox', { name: '音译单元 1', exact: true });
   await unit.fill('fuu ');

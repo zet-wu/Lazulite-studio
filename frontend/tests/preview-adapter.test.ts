@@ -22,14 +22,14 @@ it('maps timed 注音, translations, background and duet without mutating a draf
 });
 
 it('keeps all nine L4 syllables when the player cannot express their word grouping', () => {
-  const document = parseLyricTtml(readFileSync('../tests/fixtures/ttml/phase2-powder-snow.ttml', 'utf8'));
+  const document = parseLyricTtml(readFileSync('../tests/fixtures/ttml/ruby-romanization.ttml', 'utf8'));
   const before = document.romanizationTracks[0].contents.find((content) => content.lineId === 'L4');
   const preview = toAmllLines(document, false, true).find((item) => item.id === 'L4')?.lyric;
   expect(preview?.romanLyric).toBe('ko na yu ki ga so ra ka ra ');
   expect(document.romanizationTracks[0].contents.find((content) => content.lineId === 'L4')).toBe(before);
 });
 
-it('P4 projects independent background before, after and beyond its parent without extending parent', () => {
+it('projects independent background before, after and beyond its parent without extending parent', () => {
   const document = createLyricDocument('主行');
   const main = document.lines[0]; main.beginMs = 1000; main.endMs = 2000;
   const bg = createLine('背景'); bg.backgroundOf = main.id; bg.beginMs = 2000; bg.endMs = 5000;

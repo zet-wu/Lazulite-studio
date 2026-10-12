@@ -45,7 +45,7 @@ it('preserves timed translation separators in draft and final TTML, without flat
 });
 
 it('retains background edge separator units around decorative parentheses in final TTML', async()=>{
- const { phase10Document } = await import('./fixtures/phase10'); const doc=phase10Document();
+ const { translationWhitespaceDocument } = await import('./fixtures/translation-whitespace'); const doc=translationWhitespaceDocument();
  const before=doc.translationTracks[1].contents[0],after=parseLyricTtml(exportLyricFile(doc,'ttml')).translationTracks[1].contents[0];
  if(before.kind!=='timed'||after.kind!=='timed')throw Error('timed fixture');
  expect(after.units.map(({text,beginMs,endMs})=>({text,beginMs,endMs}))).toEqual(before.units.map(({text,beginMs,endMs})=>({text,beginMs,endMs})));

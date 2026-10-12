@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
-import { phase7Ttml } from '../fixtures/phase7';
+import { japaneseReadingTtml } from '../fixtures/japanese-reading';
 
 test('multi-character ruby base stays horizontal below readings', async ({ page }) => {
   await page.goto('/projects/sample-project/edit?scenario=no-music');
-  await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
+  await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(japaneseReadingTtml) });
   await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   const body = page.getByRole('region', { name: 'AMLL 预览' }).locator('[class*="_wordBody"]').filter({ hasText: '学校' }).first();
   await expect(body).toBeVisible();

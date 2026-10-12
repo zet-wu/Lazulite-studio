@@ -74,7 +74,7 @@ describe('explicit transliteration to 注音', () => {
   });
 });
 
-describe('P4 注音 candidate tolerance and grouped defaults', () => {
+describe('注音 candidate tolerance and grouped defaults', () => {
   function fixture(beginMs: number | null, endMs: number | null) {
     const document = createLyricDocument('合成');
     const line = document.lines[0];

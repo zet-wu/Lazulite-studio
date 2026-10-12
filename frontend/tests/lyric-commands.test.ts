@@ -218,7 +218,7 @@ describe('semantic lyric commands', () => {
   });
 });
 
-it.each(['child', 'link', 'referenced'])('P3-05 rejects background %s without modifying document or history', reason => {
+it.each(['child', 'link', 'referenced'])('rejects background %s without modifying document or history', reason => {
   const document = createLyricDocument('主唱');
   const main = document.lines[0], source = createLine('源歌词', 'source');
   main.beginMs = 1000; main.endMs = 10000;
@@ -234,7 +234,7 @@ it.each(['child', 'link', 'referenced'])('P3-05 rejects background %s without mo
   expect(state.past).toHaveLength(0);
 });
 
-it.each([[0, 500], [2000, 5000], [0, 5000], [null, null]])('P4 background %s–%s preserves independent time on attach/rebind/detach and undo', (beginMs, endMs) => {
+it.each([[0, 500], [2000, 5000], [0, 5000], [null, null]])('background %s–%s preserves independent time on attach/rebind/detach and undo', (beginMs, endMs) => {
   const document = createLyricDocument('主行');
   const main = document.lines[0], source = createLine('背景', 'bg'), another = createLine('另一主行', 'another');
   main.beginMs = 1000; main.endMs = 2000;

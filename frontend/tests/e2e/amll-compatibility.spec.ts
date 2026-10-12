@@ -1,7 +1,7 @@
 import {expect,test,type Page} from '@playwright/test';
 import {readFileSync} from 'node:fs';
 import {importLyrics} from '../fixtures/import-lyrics';
-const xml=readFileSync('../tests/fixtures/ttml/amll-phase0-rich.ttml','utf8');
+const xml=readFileSync('../tests/fixtures/ttml/amll-rich.ttml','utf8');
 async function settings(page:Page) {await page.locator('[data-top-menu="settings"] > summary').click();await page.getByRole('button',{name:'AMLL 兼容设置',exact:true}).click();}
 async function unrestricted(page:Page) {await settings(page);await page.getByRole('switch',{name:'禁用多行背景',exact:true}).uncheck();await page.getByRole('switch',{name:'禁用词级歌手',exact:true}).uncheck();await page.keyboard.press('Escape');}
 async function load(page:Page) {await page.goto('/projects/sample-project/edit?scenario=no-music');await unrestricted(page);await importLyrics(page,{name:'rich.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});}

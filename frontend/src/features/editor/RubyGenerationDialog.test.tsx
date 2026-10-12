@@ -33,7 +33,7 @@ it('automatically extends time in one command without confirmation', () => {
   expect(screen.getByRole('button', { name: '生成 注音' })).toBeDisabled();
 });
 
-it('P4 default skips are visible, false overrides persist, output resets and all skipped creates no command', () => {
+it('default skips are visible, false overrides persist, output resets and all skipped creates no command', () => {
   const lyric = createLyricDocument('が');
   const line = lyric.lines[0];
   line.beginMs = 0; line.endMs = 1000;
@@ -64,7 +64,7 @@ it('P4 default skips are visible, false overrides persist, output resets and all
   expect(apply).toHaveBeenCalledOnce();
 });
 
-it('P4 target changes clear only affected groups and regroup defaults before skipping', () => {
+it('target changes clear only affected groups and regroup defaults before skipping', () => {
   const lyric = createLyricDocument('合成'), line = lyric.lines[0];
   line.beginMs = 0; line.endMs = 3000;
   line.words = ['が', 'な', 'か'].map((text, i) => ({ ...createWord(text), beginMs: i * 1000, endMs: (i + 1) * 1000 }));

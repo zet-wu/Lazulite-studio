@@ -18,7 +18,7 @@ describe('timeline viewport', () => {
   });
 });
 
-it('P4 allows existing zoom to expose millisecond endpoints and clamps at 10ms', () => {
+it('allows existing zoom to expose millisecond endpoints and clamps at 10ms', () => {
   const next = zoomViewport({ startMs: 2000, spanMs: 1000 }, 120000, 0.001, 0);
   expect(next).toEqual({ startMs: 2000, spanMs: 10 });
   expect(zoomViewport({ startMs: 0, spanMs: 5 }, 5, 0.5, 0)).toEqual({ startMs: 0, spanMs: 5 });

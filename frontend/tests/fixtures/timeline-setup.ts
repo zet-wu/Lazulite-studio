@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { importLyrics } from './import-lyrics';
-const xml=readFileSync(new URL('./ruby-phase2.ttml',import.meta.url));
+const xml=readFileSync(new URL('./timeline-rich.ttml',import.meta.url));
 export async function loadTimeline(page:Page, audio=false, segments = [{id:'s1',beginMs:1000,endMs:3000}]) {
   await page.addInitScript(segments => {
     const original=window.fetch;

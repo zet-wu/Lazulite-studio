@@ -1,7 +1,7 @@
 import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Locator } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
-import { largeKana, longRuby, mixedRubyKana } from '../fixtures/phase8';
+import { largeKana, longRuby, mixedRubyKana } from '../fixtures/ruby-kana';
 
 async function geometry(dialog: Locator) {
   return dialog.locator('[data-source-word]').evaluateAll(words => words.map(word => {

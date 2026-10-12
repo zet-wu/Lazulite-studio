@@ -15,9 +15,9 @@ describe('semantic TTML codec', () => {
       : { lineId: content.lineId, kind: content.kind, units: content.units.map(({ text, beginMs, endMs }) => ({ text, beginMs, endMs })) }),
   }));
 
-  it.each(['phase2-multitrack', 'phase2-powder-snow'])('roundtrips %s track order, references, units, timing and spaces', (name) => {
+  it.each(['multitrack', 'ruby-romanization'])('roundtrips %s track order, references, units, timing and spaces', (name) => {
     const imported = parseLyricTtml(readFileSync(`../tests/fixtures/ttml/${name}.ttml`, 'utf8'));
-    if (name === 'phase2-powder-snow') {
+    if (name === 'ruby-romanization') {
       expect(imported.romanizationTracks).toHaveLength(1);
       expect(imported.romanizationTracks[0].contents).toHaveLength(38);
       expect(imported.romanizationTracks[0].contents.flatMap((content) => content.kind === 'timed' ? content.units : [])).toHaveLength(355);
@@ -181,7 +181,7 @@ describe('semantic TTML codec', () => {
 
 });
 
-it.each(['draft', 'exchange'] as const)('P4 %s roundtrip preserves independent background and extends only body duration', mode => {
+it.each(['draft', 'exchange'] as const)('%s roundtrip preserves independent background and extends only body duration', mode => {
   const document = parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="parent" begin="1" end="2"><span begin="1" end="2">主行</span></p><p xml:id="background" begin="2" end="5"><span begin="2" end="4">背景</span></p></div></body></tt>');
   const attached = executeLyricCommand(createLyricEditorState(document), { type: 'set-background-of', lineId: 'background', parentLineId: 'parent' }).present;
   const xml = serializeLyricTtml(attached, { draft: mode === 'draft' });

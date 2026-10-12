@@ -1,6 +1,6 @@
 import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Page } from '@playwright/test';
-import { phase7Ttml } from '../fixtures/phase7';
+import { japaneseReadingTtml } from '../fixtures/japanese-reading';
 
 async function generate(page: Page) {
   await page.locator('[data-outline-drag]').first().click({ button: 'right' });
@@ -10,7 +10,7 @@ async function generate(page: Page) {
 
 test('Project generation mode survives reopening and file imports', async ({ page }) => {
   await page.goto('/projects/sample-project/edit?scenario=no-music');
-  const load = (name: string) => importLyrics(page, { name, mimeType: 'application/xml', buffer: Buffer.from(phase7Ttml) });
+  const load = (name: string) => importLyrics(page, { name, mimeType: 'application/xml', buffer: Buffer.from(japaneseReadingTtml) });
   await load('first.ttml'); let dialog = await generate(page);
   await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue('timed');
   await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
@@ -44,7 +44,7 @@ test('First ja-Latn track is reused, populated lines stay skipped and new remain
       { id: 'second-ja', language: 'ja-Latn', contents: [] },
     ];
     return codec.serializeLyricTtml(doc, { draft: true });
-  }, phase7Ttml);
+  }, japaneseReadingTtml);
   await importLyrics(page, { name: 'tracks.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   let dialog = await generate(page);
   await expect(dialog.getByLabel('目标轨道')).toHaveValue('first-ja');
