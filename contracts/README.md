@@ -6,7 +6,7 @@
 
 | 接口组 | 主要边界 |
 | --- | --- |
-| 文档 GET／PUT | `studio-document-v9` envelope、`studio-project-v7` JSON、revision／ETag／If-Match；歌词为 `lyrics.draftTtml` |
+| 文档 GET／PUT | `studio-document-v9` envelope、`studio-project-v8` JSON、revision／ETag／If-Match；歌词为 `lyrics.draftTtml` |
 | 上传与项目音乐 | 临时 upload_id 经创建或首次接入归属项目，项目 asset 是音源身份 |
 | audio／waveform／pcm | 整数毫秒窗口；可选 vocal 选择已注册人声，默认原曲 |
 | reading/analyze | 当前行 id／text 快照，返回原文 code point 范围及读音 |

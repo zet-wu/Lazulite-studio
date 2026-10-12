@@ -958,7 +958,7 @@ export interface components {
             client_seq?: number | null;
             document: {
                 /** @constant */
-                schemaVersion: "studio-project-v7";
+                schemaVersion: "studio-project-v8";
                 lyrics: {
                     draftTtml: string;
                 };
@@ -1304,6 +1304,7 @@ export interface components {
             marginRight: number;
             /** Marginbottom */
             marginBottom: number;
+            skip: boolean;
         };
         ProjectStorage: {
             total_bytes: number;

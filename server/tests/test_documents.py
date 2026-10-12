@@ -182,7 +182,7 @@ def test_karaoke_project_save_reopen_keeps_cues_outside_ttml(tmp_path):
     cue = {'id': 'cue-1', 'text': '●●', 'anchor': {'kind': 'before', 'lineId': 'a'}, 'beginMs': 3000, 'endMs': 3900}
     snapshot['karaoke']['cues'] = [cue]
     snapshot['karaoke']['groups'][0]['name'] = 'Custom'
-    snapshot['karaoke']['singerMarkers'] = [{'agentIds': ['a', 'b'], 'trigger': 'Duet', 'beforeImage': 'external.png', 'afterImage': '', 'sizeMode': 'Zoom', 'zoom': '1', 'noDecor': True, 'forceWipeDecor': False, 'marginLeft': 0, 'marginRight': -170, 'marginBottom': 0}]
+    snapshot['karaoke']['singerMarkers'] = [{'agentIds': ['a', 'b'], 'skip': True, 'trigger': 'Duet', 'beforeImage': 'external.png', 'afterImage': '', 'sizeMode': 'Zoom', 'zoom': '1', 'noDecor': True, 'forceWipeDecor': False, 'marginLeft': 0, 'marginRight': -170, 'marginBottom': 0}]
     headers = {'origin': 'http://studio', 'if-match': before.headers['etag']}
     body = {'schema_version': 'studio-document-v9', 'project_id': 'p', 'revision': before.json()['revision'], 'document': snapshot}
     invalid = deepcopy(body)

@@ -18,12 +18,15 @@ export function SingerMarkersDialog({project,close,apply,error}:{project:Project
       <div className={styles.markerList} aria-label="歌手及合唱组合">{sets.map(set=><button key={set.key} data-role="secondary" aria-pressed={set.key===selected} onClick={()=>setSelected(set.key)}>{set.label}</button>)}</div>
       {marker?<div className={styles.markerFields}>
         <strong>{sets.find(set=>set.key===selected)?.label}</strong>
+        <label><input type="checkbox" checked={marker.skip} onChange={event=>update({skip:event.target.checked})}/>跳过生成</label>
+        <fieldset disabled={marker.skip} className={styles.markerFields}>
         {([['trigger','触发标记'],['beforeImage','扫色前图片'],['afterImage','扫色后图片']] as const).map(([key,label])=><label key={key}>{label}<input value={marker[key]} onChange={event=>update({[key]:event.target.value})}/></label>)}
         <label>图片尺寸模式<Select value={marker.sizeMode} onChange={event=>update({sizeMode:event.target.value as SingerMarker['sizeMode']})}><option value="Zoom">Zoom</option><option value="Fix">Fix</option></Select></label>
         {marker.sizeMode==='Zoom'&&<label>Zoom 值<input value={marker.zoom} onChange={event=>update({zoom:event.target.value})}/></label>}
         <label><input type="checkbox" checked={marker.noDecor} onChange={event=>update({noDecor:event.target.checked})}/>NoDecor</label>
         <label><input type="checkbox" disabled={marker.noDecor} checked={marker.forceWipeDecor&&!marker.noDecor} onChange={event=>update({forceWipeDecor:event.target.checked})}/>ForceWipeDecor</label>
         {([['marginLeft','左边距'],['marginRight','右边距'],['marginBottom','底部边距']] as const).map(([key,label])=><label key={key}>{label}<input type="number" step={1} value={Number.isNaN(marker[key])?'':marker[key]} onChange={event=>update({[key]:event.target.value===''?NaN:Number(event.target.value)})}/></label>)}
+        </fieldset>
       </div>:<p>当前歌词没有指定歌手。</p>}
     </div>
     <button data-role="primary" onClick={()=>{if(apply({kind:'singer-markers',markers}))close();}}>应用</button>

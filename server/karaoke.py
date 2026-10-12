@@ -43,6 +43,7 @@ class Cue(Model):
 
 class SingerMarker(Model):
     agentIds: list[str] = Field(min_length=1)
+    skip: bool
     trigger: str
     beforeImage: str
     afterImage: str

@@ -87,7 +87,7 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
       if (value.missing) add(target, '歌手引用已失效', id);
       if (!value.ids.length) return undefined;
       const marker = karaoke.singerMarkers.find(marker=>singerKey(marker.agentIds)===value.key) ?? defaultSingerMarker(value);
-      return { key: value.key, marker, target };
+      return marker.skip ? undefined : { key: value.key, marker, target };
     };
     const cueSegment = (cue: KaraokeCue): Segment | null => {
       const target = { lineId: cue.anchor.lineId, cueId: cue.id }, problem = cueProblem(lyrics, karaoke, cue);

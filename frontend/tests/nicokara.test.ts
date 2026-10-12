@@ -101,3 +101,14 @@ it('encodes the reviewed chest example and preserves a genuine 20 ms trailing si
  word.rubyUnits[1].endMs=32900;
  expect(prepareNicokara(p,'review').files[0].text).toContain('@Ruby1=胸,む[00:00:17]ね[00:00:31],[00:32:59],[00:32:92]');
 });
+
+it.each([['a','b','a'],['a','b','c'],['b','a'],['b']])('skips the exact singer set without resetting emitted voice: %j', (...agents) => {
+ const p=fixture(),line=p.lyrics.lines[0];p.lyrics.agents=['a','b','c'].map(id=>({id,name:id.toUpperCase(),type:'person' as const}));
+ line.words=agents.map((id,index)=>({...createWord('字'),beginMs:index*1000,endMs:(index+1)*1000,agentRefs:[id]}));
+ p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);const marker=p.karaoke.singerMarkers.find(m=>m.agentIds[0]==='b')!;Object.assign(marker,{skip:true,trigger:'',beforeImage:'',zoom:'invalid'});
+ const out=prepareNicokara(p,'s');expect(out.issues).toEqual([]);expect(out.files[0].text).not.toContain('【B】');
+ expect((out.files[0].text.match(/@Emoji/g)??[]).length).toBe(new Set(agents.filter(a=>a!=='b')).size);
+ if(agents.includes('a'))expect(out.files[0].text.match(/【A】/g)).toHaveLength(2);
+ marker.skip=false;expect(prepareNicokara(p,'s').issues.length).toBeGreaterThan(0);
+ marker.skip=true;line.words[0].agentRefs=['b','missing'];expect(prepareNicokara(p,'s').issues.some(i=>i.message==='歌手引用已失效')).toBe(true);
+});

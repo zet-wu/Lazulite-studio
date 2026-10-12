@@ -3003,7 +3003,7 @@
             ],
             "properties": {
               "schemaVersion": {
-                "const": "studio-project-v7"
+                "const": "studio-project-v8"
               },
               "lyrics": {
                 "type": "object",
@@ -4158,6 +4158,9 @@
           "marginBottom": {
             "title": "Marginbottom",
             "type": "integer"
+          },
+          "skip": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -4171,7 +4174,8 @@
           "forceWipeDecor",
           "marginLeft",
           "marginRight",
-          "marginBottom"
+          "marginBottom",
+          "skip"
         ],
         "title": "SingerMarker",
         "type": "object"
