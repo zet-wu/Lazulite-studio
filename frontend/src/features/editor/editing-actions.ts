@@ -11,7 +11,7 @@ export type EditorClipboard = (
   | { kind: 'words'; words: LyricWord[]; sources?: Record<string,string[]>; text: string }
   | { kind: 'ruby'; units: RubyUnit[]; text: string }
   | { kind: 'romanization-content'; trackId: string; contents: RomanizationContent[]; text: string }
-  | { kind: 'romanization-unit'; trackId: string; contentId: string; units: RomanizationUnit[]; text: string }) & { editing?: ProjectEditing; attachment?: 'translation' };
+  | { kind: 'romanization-unit'; trackId: string; contentId: string; units: RomanizationUnit[]; text: string }) & { lineGroups?: Record<string,string>; editing?: ProjectEditing; attachment?: 'translation' };
 
 export const selectionLineId = (selection: EditorSelection | null): string | null => selection?.kind === 'lines' ? selection.activeId || null : selection?.lineId ?? null;
 
@@ -29,14 +29,14 @@ export function invertIds(order: string[], selected: string[]): string[] {
   return order.filter((id) => !selected.includes(id));
 }
 
-export function copySelection(document: LyricDocument, selection: EditorSelection, editing = createProjectEditing()): EditorClipboard {
+export function copySelection(document: LyricDocument, selection: EditorSelection, editing = createProjectEditing(), lineGroups?: Record<string,string>): EditorClipboard {
   const translated = (selection.kind === 'romanization-content' || selection.kind === 'romanization-unit') && selection.attachment === 'translation';
   const result = copyObjects(translated ? { ...document, romanizationTracks: document.translationTracks } : document, selection);
   if(translated)result.attachment='translation';
   const ids = new Map<string, string>();
   const collect = (value: unknown) => { if (!value || typeof value !== 'object') return; if ('id' in value && typeof value.id === 'string') ids.set(value.id, value.id); Object.values(value).forEach(collect); };
   collect(result);
-  return { ...result, editing: remapEditing(editing, ids) };
+  return { ...result, lineGroups: lineGroups && Object.fromEntries([...ids.keys()].filter(id=>id in lineGroups).map(id=>[id,lineGroups[id]])), editing: remapEditing(editing, ids) };
 }
 function copyObjects(document: LyricDocument, selection: EditorSelection): EditorClipboard {
   if (selection.kind === 'ruby') {
@@ -187,10 +187,10 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
   for (const group of clipboard.groups) {
     const id = `line-${crypto.randomUUID()}`;
     const line = cloneLine(group.line, id, null, idMap);
-    commands.push({ type: 'insert-line', afterLineId: after, line });
+    commands.push({ type: 'insert-line', afterLineId: after, line, sourceGroupId: clipboard.lineGroups?.[group.line.id] });
     for (const original of group.backgrounds) {
       const background = cloneLine(original, `bg-${crypto.randomUUID()}`, null, idMap);
-      commands.push({ type: 'insert-line', afterLineId: id, line: background });
+      commands.push({ type: 'insert-line', afterLineId: id, line: background, sourceGroupId: clipboard.lineGroups?.[original.id] });
       commands.push({ type: 'set-background-of', lineId: background.id, parentLineId: id });
     }
     for (const { trackId, content } of group.romanizations) commands.push({ type: 'insert-romanization-content', trackId, content: content.kind === 'plain'

@@ -1,3 +1,4 @@
+import { IconButton } from '../shared/Controls';
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { studioApi, uploadMusic } from '../adapters/http/client';
@@ -32,6 +33,6 @@ export function MusicUpload({ projectId }: { projectId: string }) {
   return <footer className={styles.musicUpload} aria-label="项目音乐"><span>未上传音乐；歌词可编辑、保存及下载。</span>
     <button data-role="secondary" disabled={busy} onClick={() => input.current?.click()}>上传音乐文件</button><input hidden ref={input} aria-label="上传音乐文件" type="file" accept="audio/*,video/mp4,.m4a" disabled={busy} onChange={event => { const next = event.target.files?.[0]; if (next) { setFile(next); void upload(next); } }}/>
     {busy && <><progress aria-label="音乐上传进度" max={1} value={progress}/><span>{committing ? '正在接入音乐…' : progress >= 1 ? '正在处理音乐…' : `上传 ${Math.round(progress * 100)}%`}</span><button data-role="secondary" disabled={committing} onClick={() => controller.current?.abort()}>取消上传</button></>}
-    {error && <span role="alert">{error}{file && !busy && <button data-role="secondary" onClick={() => void upload(file)}>重试上传</button>}</span>}
+    {error && <span role="alert">{error}{file && !busy && <IconButton icon="refresh" label="重试上传音乐" data-role="secondary" onClick={() => void upload(file)}/>}</span>}
   </footer>;
 }

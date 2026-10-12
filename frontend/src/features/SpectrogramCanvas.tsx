@@ -1,3 +1,4 @@
+import { IconButton } from '../shared/Controls';
 import { TimelineIndicators } from './TimelineIndicators';
 import { useEffect, useRef, useState } from 'react';
 import { studioApi } from '../adapters/http/client';
@@ -139,6 +140,6 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
     data-spectrum-stats={JSON.stringify({ ...stats.current, cacheSize: cache.current.size, evictions: cache.current.evictions, pending: pending.current.size })}>
     <div className={styles.spectrumPlot}><canvas ref={canvas} aria-label="声谱图" data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
     {ready < wanted.current.length && !displayError && <small role="status">声谱图加载中…</small>}
-    {displayError && <small role="alert">{displayError} <button data-role="secondary" onClick={() => { failed.current.clear(); setError(''); setRetry(value => value + 1); }}>重试声谱图</button></small>}
+    {displayError && <small role="alert">{displayError} <IconButton icon="refresh" label="重试加载声谱图" data-role="secondary" onClick={() => { failed.current.clear(); setError(''); setRetry(value => value + 1); }}/></small>}
   </div>;
 }

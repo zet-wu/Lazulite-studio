@@ -4,9 +4,6 @@
 button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); padding:0; text-align:center; }
 .cue + .cue { margin-left:4px; }
 .cue input { width:8ch; min-height:0; max-width:100%; font:inherit; line-height:inherit; padding:0; border:0; border-radius:0; background:transparent; color:inherit; }
-.groups { display:grid; gap:12px; }
-.group { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
-.group input { width:150px; }
 .defaults { display:grid; grid-template-columns:minmax(120px,1fr) minmax(100px,1fr); gap:8px; align-items:center; }
 .output { display:flex; align-items:center; gap:8px; padding:5px; }
 .track { display:grid; grid-template-columns:var(--timeline-label-width) minmax(0,1fr); gap:var(--timeline-gap); align-items:start; }

@@ -35,3 +35,14 @@ it('uses minimum readable number and validates edited IDs without rewriting lega
  expect(groupIdProblem(old,[{id:'1new',name:'新'}],{'1234-uuid':'1new'})).toContain('英文字母');
  expect(groupIdProblem([],[{id:'Main',name:'1'},{id:'main',name:'2'}],{})).toContain('重复');
 });
+
+it('copies explicit custom/unassigned group membership with each source line in one transaction',async()=>{
+ const {copySelection,pasteRich}=await import('../src/features/editor/editing-actions');
+ const lyrics=createLyricDocument();lyrics.lines=[createLine('主','a'),{...createLine('背景','b'),backgroundOf:'a'}];
+ const p=createProjectDocument(lyrics);p.karaoke.groups.push({id:'custom',name:'自定义'});p.karaoke.lineGroups={a:'custom',b:''};
+ const selection={kind:'lines' as const,ids:['a'],anchorId:'a',activeId:'a'};
+ const clipboard=copySelection(lyrics,selection,p.editing,p.karaoke.lineGroups),paste=pasteRich(lyrics,clipboard,selection);
+ const state=createProjectEditorState(p),next=executeProjectCommand(state,{type:'lyrics',command:paste.command});
+ const copied=next.present.lyrics.lines.filter(line=>!['a','b'].includes(line.id));expect(copied).toHaveLength(2);
+ expect(copied.map(line=>next.present.karaoke.lineGroups[line.id])).toEqual(['custom','']);expect(undoProjectCommand(next).present).toBe(p);
+});

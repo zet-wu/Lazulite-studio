@@ -699,15 +699,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           循环选区
         </button>
         {error ? (
-          <button data-role="secondary" className={styles.error} onClick={retryMedia}>
-            {error} · 重试
-          </button>
+          <span className={styles.error} role="alert">{error}<IconButton icon="refresh" label="重试加载音频" onClick={retryMedia}/></span>
         ) : !asset ? (
           <span className={styles.note}>未连接媒体</span>
         ) : waveform.isError ? (
-          <button data-role="secondary" className={styles.error} onClick={() => waveform.refetch()}>
-            波形加载失败 · 重试
-          </button>
+          <span className={styles.error} role="alert">波形加载失败<IconButton icon="refresh" label="重试加载波形" onClick={() => void waveform.refetch()}/></span>
         ) : null}
       </div>
       </>}

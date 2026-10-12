@@ -422,7 +422,7 @@ function EditorWorkspaceContent(props: Props) {
     try { applyKaraokeCommand(command); } catch { return; }
   };
   const previousCues=useRef(props.project?.karaoke.cues??[]);
-  useEffect(()=>{const old=previousCues.current,next=props.project?.karaoke.cues??[];const removed=old.filter(c=>!next.some(n=>n.id===c.id));if(pendingCue.current){const inserted=next.find(c=>!old.some(o=>o.id===c.id));if(inserted)selectCue(inserted.id,inserted.anchor.lineId);pendingCue.current=false;}const removedActive = removed.find(item => item.id === selectedCue); if (removedActive && document.lines.some(line => line.id === removedActive.anchor.lineId)) { const id = removedActive.anchor.lineId; const next: EditorSelection = {kind:'lines',ids:[id],anchorId:id,activeId:id}; setSelection(next); requestFocus(next); } if(removed.length)setMessage(`已移除 ${removed.length} 个导唱；可与本次操作一起撤销`,'status',4000);previousCues.current=next;},[props.project]);
+  useEffect(()=>{const old=previousCues.current,next=props.project?.karaoke.cues??[];const removed=old.filter(c=>!next.some(n=>n.id===c.id));if(pendingCue.current){const inserted=next.find(c=>!old.some(o=>o.id===c.id));if(inserted)selectCue(inserted.id,inserted.anchor.lineId);pendingCue.current=false;}const removedActive = removed.find(item => item.id === selectedCue); if (removedActive && document.lines.some(line => line.id === removedActive.anchor.lineId)) { const id = removedActive.anchor.lineId; const next: EditorSelection = {kind:'lines',ids:[id],anchorId:id,activeId:id}; setSelection(next); requestFocus(next); } previousCues.current=next;},[props.project]);
   const dispatch = useLiveCallback((command: LyricCommand) => {
     try { apply(command); editRejected.current = false; setMessage(''); return true; }
     catch (error) { editRejected.current = true; setMessage(error instanceof Error ? error.message : '编辑失败'); return false; }
@@ -435,7 +435,7 @@ function EditorWorkspaceContent(props: Props) {
     const current = target ?? currentSelection();
     if (!current?.ids.length) return null;
     if (!copyAllowed(current)) { setMessage('跨内容音译复制暂不支持，请选择同一份内容'); return null; }
-    const next = copySelection(document, current, editing);
+    const next = copySelection(document, current, editing, props.project?.karaoke.lineGroups);
     clipboardToken.current = crypto.randomUUID();
     setClipboard(next);
     setMessage('已复制到编辑器剪贴板', 'status');
@@ -445,7 +445,7 @@ function EditorWorkspaceContent(props: Props) {
     const current = target ?? currentSelection();
     if (!current?.ids.length) return null;
     if (!copyAllowed(current)) { setMessage('跨内容音译复制暂不支持，请选择同一份内容'); return null; }
-    const next = copySelection(document, current, editing);
+    const next = copySelection(document, current, editing, props.project?.karaoke.lineGroups);
     const command = cutSelection(document, current);
     pendingRemoval.current = { before: document, selection: current };
     if (dispatch(command)) {
@@ -940,7 +940,7 @@ function EditorWorkspaceContent(props: Props) {
               return <div key={track.id}>
                 <div className={styles.romanizationTrackHeader}>
                   <span>L{ordinalById.get(line.backgroundOf ?? line.id)}{line.backgroundOf ? ' · 背景' : ''} · 音译轨道 {trackIndex + 1} · {track.language ?? '未指定语言'}</span>
-                  <button data-role="secondary" onClick={() => dispatch({ type: 'insert-romanization-content', trackId: track.id, content: { id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: '' } })}>添加音译</button>
+                  <IconButton icon="add" label="添加音译" data-role="secondary" onClick={() => dispatch({ type: 'insert-romanization-content', trackId: track.id, content: { id: crypto.randomUUID(), lineId: line.id, kind: 'plain', text: '' } })}/>
                 </div>
                 {contents.map((content) => <RomanizationRow key={content.id} track={track} content={content}
                     placeholder={drag.isPlaceholder('romanization-content', content.id)} placeholderUnitIds={drag.placeholders?.kind === 'romanization-unit' ? drag.placeholders.ids : undefined}
@@ -973,7 +973,7 @@ function EditorWorkspaceContent(props: Props) {
         {selection?.kind==='words'&&selection.ids.length===1&&propertyWord&&activePropertyTarget?.kind==='word'&&!props.project?.amll.noWordAgents&&<fieldset className={styles.singerSelection}><legend>词级歌手</legend>{document.agents.map(agent=><label key={agent.id}><input type="checkbox" aria-label={`词级歌手 ${agent.name??agent.id}`} checked={propertyWord.agentRefs?.includes(agent.id)??false} onChange={event=>dispatch({type:'set-word-agents',lineId:activePropertyTarget.lineId,wordId:propertyWord.id,agentRefs:event.target.checked?[...(propertyWord.agentRefs??[]),agent.id]:(propertyWord.agentRefs??[]).filter(id=>id!==agent.id)})}/>{agent.name??agent.id}</label>)}</fieldset>}
         {selection?.kind === 'lines' && <>
         {mode==='karaoke'&&props.project&&<label>输出分组<Select aria-label="输出分组" style={{color:propertyLines.every(l=>!props.project!.karaoke.lineGroups[l.id])?'var(--muted)':undefined}} value={new Set(propertyLines.map(l=>props.project!.karaoke.lineGroups[l.id]??'')).size>1?'__mixed':props.project.karaoke.lineGroups[propertyLines[0]?.id]??''} onChange={e=>insertKaraoke({kind:'assign',lineIds:propertyLines.map(l=>l.id),groupId:e.target.value})}><option value="__mixed" disabled>多个值</option><option value="">未选择分组</option>{props.project.karaoke.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</Select></label>}
-        {selection.ids.length === 1 && <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${selectedLine.id}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />}
+        {selection.ids.length === 1 && <TimePair begin={selectedLine.beginMs} end={selectedLine.endMs} label={`行 ${ordinalById.get(selectedLine.backgroundOf??selectedLine.id)}${selectedLine.backgroundOf?' 背景':''}`} onCommit={(beginMs, endMs) => dispatch({ type: 'set-line-time', lineId: selectedLine.id, beginMs, endMs })} />}
         {selection?.kind === 'lines' && selection.ids.length > 1 && <small>多行时间请使用整体偏移或时间轴平移。</small>}
         {propertyLines.length > 0 && <>
           <BooleanField label="跳过对齐" switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={propertyLines.every(line => editing.skippedAlignmentLineIds.includes(line.id))} mixed={propertyLines.some(line => editing.skippedAlignmentLineIds.includes(line.id)) && !propertyLines.every(line => editing.skippedAlignmentLineIds.includes(line.id))} onChange={checked => dispatch({type:'batch', commands:propertyLines.map(line=>({type:'set-skip-alignment',lineId:line.id,skip:checked}))})}/>

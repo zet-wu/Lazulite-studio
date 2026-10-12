@@ -32,7 +32,7 @@ it('deletes immediately in the draft, clears target and selection, and allows ca
   const document = createLyricDocument('行'); const content = plainTranslation('text', document.lines[0].id);
   document.translationTracks = [{ id: 'a', language: 'en', purpose: 'subtitle', contents: [content] }];
   const apply = vi.fn(() => true), close = vi.fn(); render(<TranslationTrackDialog document={document} apply={apply} close={close} />);
-  fireEvent.click(screen.getByLabelText(`选择翻译内容 ${content.id}`));
+  fireEvent.click(screen.getByLabelText(/选择翻译轨道 1 · .* · 内容 1/));
   fireEvent.change(screen.getByLabelText('翻译归轨目标'), { target: { value: 'a' } });
   fireEvent.click(screen.getByRole('button', { name: '删除轨道及 1 份内容（轨道 1）' }));
   expect(screen.getByLabelText('翻译归轨目标')).toHaveValue('');
@@ -53,7 +53,7 @@ it('selects all content across tracks with mixed states and reports only actual 
   document.translationTracks.push({ id: 'empty', language: null, purpose: 'subtitle', contents: [] });
   const apply = vi.fn((_command: LyricCommand) => true); render(<TranslationTrackDialog document={document} apply={apply} close={vi.fn()} />);
   const global = screen.getByRole('checkbox', { name: '全选内容' });
-  fireEvent.click(screen.getByLabelText(`选择翻译内容 ${document.translationTracks[0].contents[0].id}`));
+  fireEvent.click(screen.getByLabelText(/选择翻译轨道 1 · .* · 内容 1/));
   expect(global).toHaveAttribute('aria-checked', 'mixed'); expect((global as HTMLInputElement).indeterminate).toBe(true);
   fireEvent.click(global); expect(global).toBeChecked();
   expect(screen.getAllByRole('checkbox', { name: '全选本轨内容' }).at(-1)).toBeDisabled();

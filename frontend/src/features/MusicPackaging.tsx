@@ -1,3 +1,4 @@
+import { IconButton } from '../shared/Controls';
 import { Disclosure } from '../shared/Disclosure';
 import { useProjectEditing } from './editor/ProjectEditingContext';
 import type { ProjectEditing } from '../domain/project-editing';
@@ -50,11 +51,11 @@ export function MusicPackaging({ projectId, document, saveForPackaging, onIssues
  <label>内嵌歌词 <Select value={kind} onChange={e=>setKind(e.target.value as LrcKind)}><option value="lrc">普通 LRC</option><option value="elrc">扩展 LRC（尖括号）</option></Select></label>
  {info.data?.container === 'mp3' && <p className={styles.hint}>目标：USLT，语言 eng，空描述；其他语言／描述保留。</p>}
  {info.data?.tracks.length ? <label>覆盖 STPP 轨道 <Select aria-label="覆盖 STPP 轨道" value={track ?? ''} onChange={e=>setTrack(e.target.value ? Number(e.target.value) : null)}><option value="">请选择目标轨道</option>{info.data.tracks.map(t=><option key={t.track_id} value={t.track_id}>{t.track_id} · {t.language} · {t.name || '未命名'}</option>)}</Select></label> : info.data?.container === 'mp4' ? <p className={styles.hint}>源文件没有 STPP，将新增歌词轨道。</p> : null}
- {info.isError && <p role="alert">读取失败 <button data-role="secondary" onClick={()=>void info.refetch()}>重试</button></p>}
+ {info.isError && <p role="alert">读取失败 <IconButton icon="refresh" label="重试读取音乐打包信息" data-role="secondary" onClick={()=>void info.refetch()}/></p>}
  {info.data && !info.data.supported && <p role="alert">{info.data.error ?? '源音频格式不支持打包；可下载歌词文件。'}</p>}
  <div className={styles.actions}><button data-role="primary" onClick={()=>void publish()} disabled={busy || Boolean(exports.data?.items.some(item=>active.has(item.status))) || !info.data?.supported || Boolean(info.data.tracks.length && !track)}>{busy ? '保存并提交中…' : '打包文件'}</button>{recent?.download_url && !exports.isError ? <a data-role="secondary" href={recent.download_url}>下载产物</a> : <button data-role="secondary" disabled>下载产物</button>}</div>
  {message && <p role="status">{message}</p>}{captured && captured !== document && <p>当前歌词有较新修改，已提交任务使用之前捕获的修订。</p>}
- <h2>打包任务与最近产物</h2>{exports.isError && <p>记录读取失败 <button data-role="secondary" onClick={()=>void exports.refetch()}>重试</button></p>}
+ <h2>打包任务与最近产物</h2>{exports.isError && <p>记录读取失败 <IconButton icon="refresh" label="重试读取打包任务记录" data-role="secondary" onClick={()=>void exports.refetch()}/></p>}
  {visible.map(item=>{
    const passed=item.status==='succeeded' && item.report?.passed===true;
    const label=item.lrc_kind==='elrc' ? '扩展 LRC' : '普通 LRC';

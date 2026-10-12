@@ -102,6 +102,10 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     if (result.lyrics === state.present.lyrics && result.editing === state.present.editing) return state;
     let karaoke = state.present.karaoke;
     const commands = command.command.type === 'batch' ? command.command.commands : [command.command];
+    for (const item of commands) if (item.type === 'insert-line' && item.line && item.sourceGroupId !== undefined) {
+      const group = karaoke.groups.some(group=>group.id===item.sourceGroupId) ? item.sourceGroupId : '';
+      karaoke = { ...karaoke, lineGroups: { ...karaoke.lineGroups, [item.line.id]: group } };
+    }
     for (const item of commands) if (item.type === 'split-line') {
       const group = karaoke.lineGroups[item.lineId] ?? '';
       karaoke = { ...karaoke, lineGroups: { ...karaoke.lineGroups, ...Object.fromEntries(item.newLineIds.map(id => [id, group])) } };

@@ -1,3 +1,6 @@
+import { TopMenu } from './editor/TopMenu';
+import editorStyles from './editor/semantic-editor.module.css';
+import { lineLabel } from '../domain/line-structure';
 import { SingerMarkersDialog } from './SingerMarkersDialog';
 import { useMemo, useState } from 'react';
 import { anchorKey, anchorRange, cueProblem, type CueAnchor, type KaraokeCommand, type KaraokeCue } from '../domain/karaoke';
@@ -28,15 +31,18 @@ export function CueSlot({project, anchor, apply}: {project:ProjectDocument;ancho
 }
 export function CueProperties({project,cue,apply}: {project:ProjectDocument;cue:KaraokeCue;apply:(command:KaraokeCommand)=>void}) {
   const problem=cueProblem(project.lyrics,project.karaoke,cue);
-  return <><h3>导唱</h3><label>文字 <DraftInput value={cue.text} label="导唱文字" onCommit={text=>apply({kind:'cue',id:cue.id,text,beginMs:cue.beginMs,endMs:cue.endMs})}/></label>
+  return <><p>所在行：{lineLabel(project.lyrics,project.lyrics.lines.find(line=>line.id===cue.anchor.lineId)!)}</p><p>导唱：已选 1</p><div className={editorStyles.propertyQuote}><DraftInput value={cue.text} label="导唱文字" onCommit={text=>apply({kind:'cue',id:cue.id,text,beginMs:cue.beginMs,endMs:cue.endMs})}/></div>
     <TimePair begin={cue.beginMs} end={cue.endMs} label="导唱" onCommit={(beginMs,endMs)=>{if(beginMs===null||endMs===null)throw new Error('导唱需要完整双端');apply({kind:'cue',id:cue.id,text:cue.text,beginMs,endMs});}}/>
-    {problem&&<p role="alert">{problem}</p>}<button data-role="danger" onClick={()=>apply({kind:'remove',id:cue.id})}>删除导唱</button></>;
+    {problem&&<p role="alert">{problem}</p>}</>;
 }
 export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewIssues}: {project:ProjectDocument;apply:(command:ProjectCommand)=>void;title:string;exportOpen:boolean;setExportOpen:(open:boolean)=>void;viewIssues:(issues:OutputIssue[])=>void}) {
  const [dialog,setDialog]=useState<'groups'|'defaults'|'auto'|'singers'|null>(null), [error,setError]=useState('');
+ const [activeMenuId,setActiveMenuId]=useState<string|null>(null);
  const [autoGroups,setAutoGroups]=useState<string[]|null>(null);
  const command=(c:KaraokeCommand)=>{try{apply({type:'karaoke',command:c});setError('');return true;}catch(e){setError((e as Error).message);return false;}};
- return <><div className={styles.tools}><button data-role="secondary" onClick={()=>(setError(''),setDialog('groups'))}>分组管理</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('auto'))}>自动插入导唱符</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('defaults'))}>默认导唱符</button><button data-role="primary" onClick={()=>setExportOpen(true)}>导出 Nicokara</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('singers'))}>歌手标记管理</button></div>
+ return <><div className={styles.tools}>
+ <TopMenu id="cue-tools" title="导唱符 ▾" className={editorStyles.settingsMenu} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId}><button data-role="inline" onClick={()=>(setError(''),setDialog('auto'))}>自动插入导唱符</button><button data-role="inline" onClick={()=>(setError(''),setDialog('defaults'))}>默认导唱符</button></TopMenu>
+ <button data-role="secondary" onClick={()=>(setError(''),setDialog('groups'))}>分组管理</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('singers'))}>歌手标记管理</button><button data-role="primary" onClick={()=>setExportOpen(true)}>导出 NicoKara</button></div>
  {error&&!dialog&&<p role="alert">{error}</p>}
  {dialog==='singers'&&<SingerMarkersDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='auto'&&<AutoInsertDialog initialGroups={autoGroups} rememberGroups={setAutoGroups} error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
@@ -46,17 +52,17 @@ export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewI
 }
 function DefaultsDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
  const [value,setValue]=useState(project.karaoke.defaults);
- return <SettingsDialog title="默认导唱符" close={close}>{error&&<p role="alert">{error}</p>}<div className={styles.defaults}><label htmlFor="cue-default-text">导唱文字</label><input id="cue-default-text" value={value.text} onChange={e=>setValue({...value,text:e.target.value})}/>
+ return <SettingsDialog title="默认导唱符" returnFocus={()=>document.querySelector<HTMLElement>('[data-top-menu="cue-tools"] summary')} close={close}>{error&&<p role="alert">{error}</p>}<div className={styles.defaults}><label htmlFor="cue-default-text">导唱文字</label><input id="cue-default-text" value={value.text} onChange={e=>setValue({...value,text:e.target.value})}/>
 </div><p>默认文字只影响之后新增的导唱。</p><button data-role="primary" onClick={()=>{if(apply({kind:'settings',defaults:value}))close();}}>应用</button></SettingsDialog>;
 }
 function AutoInsertDialog({project,close,apply,error,initialGroups,rememberGroups}:{initialGroups:string[]|null;rememberGroups:(ids:string[])=>void;error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
  const [groups,setGroups]=useState(initialGroups?.filter(id=>project.karaoke.groups.some(group=>group.id===id))??project.karaoke.groups.map(group=>group.id));
  const [thresholds,setThresholds]=useState(Object.fromEntries((['beforeMs','wordMs','rubyMs'] as const).map(key=>[key,String(project.karaoke.defaults[key])])));
  const [inputError,setInputError]=useState('');
- return <SettingsDialog title="自动插入导唱符" close={close}>{(inputError||error)&&<p role="alert">{inputError||error}</p>}
+ return <SettingsDialog title="自动插入导唱符" returnFocus={()=>document.querySelector<HTMLElement>('[data-top-menu="cue-tools"] summary')} close={close}>{(inputError||error)&&<p role="alert">{inputError||error}</p>}
  <fieldset><legend>目标输出分组</legend>{project.karaoke.groups.map(group=><label className={styles.output} key={group.id}><input type="checkbox" checked={groups.includes(group.id)} onChange={e=>setGroups(e.target.checked?[...groups,group.id]:groups.filter(id=>id!==group.id))}/>{group.name}</label>)}</fieldset>
  <div className={styles.thresholds}>{([['beforeMs','行前阈值'],['wordMs','正文行内阈值'],['rubyMs','Ruby 内阈值']] as const).map(([key,label])=><label key={key}><span>{label}（毫秒）</span><input aria-label={label} type="number" min={0} step={1} value={thresholds[key]} onChange={e=>setThresholds({...thresholds,[key]:e.target.value})}/></label>)}</div>
- <button data-role="primary" onClick={()=>{
+ <button data-role="primary" disabled={!groups.length} onClick={()=>{
  if(Object.values(thresholds).some(value=>!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value)))){setInputError('阈值须为非负整数');return;}
  setInputError('');
  if(apply({kind:'auto',groupIds:groups,thresholds:{beforeMs:Number(thresholds.beforeMs),wordMs:Number(thresholds.wordMs),rubyMs:Number(thresholds.rubyMs)}})){rememberGroups(groups);close();}

@@ -1,3 +1,4 @@
+import { IconButton } from '../shared/Controls';
 import { Select } from '../shared/Select';
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
@@ -201,7 +202,7 @@ function ProjectStorage({id}:{id:string}) {
   return <div className={styles.projectStorage}>
     <details><summary>{query.isError?'统计失败':query.data?size(query.data.total_bytes):'正在统计…'}</summary>
       {query.data&&!query.isError&&<dl>{([['source','源音频'],['vocals','人声结果'],['cache','可重建缓存'],['snapshots','项目快照'],['other','其他文件']] as const).map(([key,label])=><div key={key}><dt>{label}</dt><dd>{size(query.data.categories[key])}</dd></div>)}</dl>}
-      <button data-role="inline" disabled={query.isFetching} onClick={()=>void query.refetch()}>刷新空间统计</button>
+      <IconButton icon="refresh" label="刷新空间统计" data-role="inline" aria-busy={query.isFetching} disabled={query.isFetching} onClick={()=>void query.refetch()}/>
     </details>
   </div>;
 }

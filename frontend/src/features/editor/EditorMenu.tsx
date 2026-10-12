@@ -1,3 +1,4 @@
+import { IconButton } from '../../shared/Controls';
 import { DeviceSettings } from '../DeviceSettings';
 import { SettingsDialog } from './SettingsDialog';
 import { preferences } from '../../adapters/preferences';
@@ -44,9 +45,9 @@ export function EditorMenu(props: Props) {
     <strong>{props.title}</strong>
     <span>{props.saving ? '保存中' : props.dirty ? '未保存' : '已保存'}</span>
     <div className={styles.actions}>
-      <button data-role="primary" className={styles.primaryButton} onClick={props.onSave} disabled={props.saving || props.editingLocked}>保存</button>
-      <button data-role="inline" onClick={props.undo} disabled={!props.canUndo}>撤销</button>
-      <button data-role="inline" onClick={props.redo} disabled={!props.canRedo}>重做</button>
+      <IconButton icon="save" label="保存" data-role="primary" className={styles.primaryButton} onClick={props.onSave} disabled={props.saving || props.editingLocked}/>
+      <IconButton icon="undo" label="撤销" data-role="inline" onClick={props.undo} disabled={!props.canUndo}/>
+      <IconButton icon="redo" label="重做" data-role="inline" onClick={props.redo} disabled={!props.canRedo}/>
       <TopMenu id="view" title="视图" className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
         <button data-role="inline" aria-label="显示大纲" aria-pressed={props.outlineVisible} onClick={props.onToggleOutline}><Icon name="check"/>显示大纲</button>
         <button data-role="inline" aria-label="显示属性栏" aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}><Icon name="check"/>显示属性栏</button>

@@ -1,3 +1,4 @@
+import { IconButton } from '../shared/Controls';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { studioApi, requestHeaders } from '../adapters/http/client';
@@ -12,7 +13,7 @@ export function DeviceSettings() {
   } });
   const [values, setValues] = useState(() => ({ vocal: preferences.getItem('device.vocal') ?? 'auto', alignment: preferences.getItem('device.alignment') ?? 'auto' }));
   const [error, setError] = useState(''), [saving, setSaving] = useState(false);
-  if (session.isError || runtime.isError) return <p role="alert">无法读取计算设备设置。<button data-role="secondary" onClick={() => { void session.refetch(); void runtime.refetch(); }}>重试读取</button></p>;
+  if (session.isError || runtime.isError) return <p role="alert">无法读取计算设备设置。<IconButton icon="refresh" label="重试读取计算设备设置" data-role="secondary" onClick={() => { void session.refetch(); void runtime.refetch(); }}/></p>;
   if (!session.data || (session.data.mode === 'local' && !runtime.data)) return <p role="status">正在读取计算设备设置…</p>;
   if (session.data.mode !== 'local') return <p>计算设备由服务配置。</p>;
   const cpuOnly = runtime.data?.target === 'windows-x64-cpu';

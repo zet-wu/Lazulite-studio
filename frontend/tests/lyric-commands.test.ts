@@ -213,7 +213,7 @@ describe('semantic lyric commands', () => {
     expect(() => executeLyricCommand(state, { type: 'batch', commands: [
       { type: 'split-word', lineId, wordId, at: 2, newWordId: 'rest' },
       { type: 'edit-word', lineId, wordId: 'missing', text: '失敗' },
-    ] })).toThrow(/Word not found/);
+    ] })).toThrow(/歌词词已不存在/);
     expect(state.present).toBe(document);
   });
 });

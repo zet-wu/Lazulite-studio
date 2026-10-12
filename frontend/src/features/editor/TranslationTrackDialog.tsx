@@ -44,7 +44,6 @@ export function TranslationTrackDialog({ document, apply, close }: { document: L
     <div className={styles.trackManager}>{tracks.map((track, index) => <section className={styles.translationTrackSection} key={track.id}>
       <strong>{translationTrackLabel(track, index)}</strong>
       <label>语言 <input aria-label={`翻译轨道 ${index + 1}语言`} placeholder="未指定语言" value={track.language ?? ''} onChange={event => update({ ...track, language: event.target.value || null })} /></label>
-      <button data-role="inline" onClick={() => update({ ...track, language: null })}>清除语言</button>
       <label>类型 <Select aria-label={`翻译轨道 ${index + 1}类型`} value={track.purpose} onChange={event => update({ ...track, purpose: event.target.value as TranslationTrack['purpose'] })}><option value="subtitle">subtitle</option><option value="replacement">replacement</option></Select></label>
       <small>{new Set(track.contents.map(content => content.lineId)).size} 行 · {track.contents.length} 份内容</small>
       {([-1, 1] as const).map(direction => <IconButton key={direction} icon={direction < 0 ? 'up' : 'down'} disabled={index + direction < 0 || index + direction >= tracks.length} label={`${direction < 0 ? '上移' : '下移'}翻译轨道 ${index + 1}`} onClick={() => { const next = tracks.slice(); [next[index], next[index + direction]] = [next[index + direction], next[index]]; setTracks(next); }} />)}
@@ -54,11 +53,11 @@ export function TranslationTrackDialog({ document, apply, close }: { document: L
         if (targetId === track.id) setTargetId('');
       }} />
       <BooleanField label="全选本轨内容" {...selectionProps(track.contents.map(content => content.id))} />
-      <div className={styles.translationTrackContents}>{track.contents.map(content => {
+      <div className={styles.translationTrackContents}>{track.contents.map((content,contentIndex) => {
         const line = source.lines.find(line => line.id === content.lineId)!;
         const body = lineText(line), translation = translationText(content);
         return <label key={content.id} className={styles.translationReference}>
-          <input type="checkbox" aria-label={`选择翻译内容 ${content.id}`} aria-describedby={`translation-reference-${content.id}`} checked={selected.includes(content.id)} onChange={event => setSelected(ids => event.target.checked ? [...ids, content.id] : ids.filter(id => id !== content.id))} />
+          <input type="checkbox" aria-label={`选择翻译轨道 ${index+1} · ${lineLabel(source,line)} · 内容 ${contentIndex+1}`} aria-describedby={`translation-reference-${content.id}`} checked={selected.includes(content.id)} onChange={event => setSelected(ids => event.target.checked ? [...ids, content.id] : ids.filter(id => id !== content.id))} />
           <small>{lineLabel(source, line)}</small>
           <span className={styles.translationBody}>{shortReference(body)}</span>
           <span className={styles.translationText}>{shortReference(translation)}</span>
@@ -69,7 +68,7 @@ export function TranslationTrackDialog({ document, apply, close }: { document: L
         </label>;
       })}</div>
     </section>)}</div>
-    <button data-role="secondary" onClick={addTrack}>新增翻译轨道</button>
+    <IconButton icon="add" label="新增翻译轨道" onClick={addTrack}/>
     <fieldset><legend>内容归轨</legend><p>已选择 {selected.length} 份内容；实际转入 {movedCount} 份，将移除 {removedCount} 条本次搬空的源轨道。源轨道见各内容上方。文字、所属行及时间不变，语言和类型改用目标轨道属性；目标已有内容将保留，新内容追加到末尾。</p>
       <label>目标轨道 <Select aria-label="翻译归轨目标" value={targetId} onChange={event => setTargetId(event.target.value)}><option value="">选择目标轨道</option>{tracks.map((track, index) => <option key={track.id} value={track.id}>{translationTrackLabel(track, index)}</option>)}</Select></label>
       <button data-role="secondary" disabled={!movedCount || !tracks.some(track => track.id === targetId) || stale} onClick={() => { try { setTracks(transferTranslations({ ...source, translationTracks: tracks }, selected, targetId)); setSelected([]); } catch (cause) { setError((cause as Error).message); } }}>转入目标轨道</button>

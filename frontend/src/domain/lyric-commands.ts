@@ -12,7 +12,7 @@ const MAX_HISTORY = 256;
 
 type AtomicLyricCommand =
   | { type: 'shift-lines'; lineIds: string[]; deltaMs: number }
-  | { type: 'insert-line'; afterLineId: string | null; line?: LyricLine }
+  | { type: 'insert-line'; afterLineId: string | null; line?: LyricLine; sourceGroupId?: string }
   | { type: 'set-background-of'; lineId: string; parentLineId: string | null }
   | { type: 'delete-line'; lineId: string }
   | { type: 'move-line'; lineId: string; afterLineId: string | null }
@@ -94,7 +94,7 @@ function editWord(document: LyricDocument, lineId: string, wordId: string, updat
   const lines = document.lines.map((line) => {
     if (line.id !== lineId) return line;
     const index = line.words.findIndex((word) => word.id === wordId);
-    if (index < 0) throw new Error(`Word not found: ${wordId}`);
+    if (index < 0) throw new Error('歌词词已不存在，请重新选择');
     found = true;
     const words = line.words.slice();
     const replacement = update(words[index], line);
@@ -102,13 +102,13 @@ function editWord(document: LyricDocument, lineId: string, wordId: string, updat
     words.splice(index, 1, ...replacement);
     return { ...line, words };
   });
-  if (!found) throw new Error(`Line not found: ${lineId}`);
+  if (!found) throw new Error('歌词行已不存在，请重新选择');
   return lines.every((line, index) => line === document.lines[index]) ? document : { ...document, lines };
 }
 
 function updateRuby(word: LyricWord, rubyId: string, update: (unit: RubyUnit) => RubyUnit[]): LyricWord {
   const index = word.rubyUnits.findIndex((unit) => unit.id === rubyId);
-  if (index < 0) throw new Error(`注音单元不存在： ${rubyId}`);
+  if (index < 0) throw new Error('注音单元已不存在，请重新选择');
   const units = word.rubyUnits.slice();
   const replacement = update(units[index]);
   if (replacement.length === 1 && replacement[0] === units[index]) return word;
@@ -118,13 +118,13 @@ function updateRuby(word: LyricWord, rubyId: string, update: (unit: RubyUnit) =>
 
 function lineIndex(document: LyricDocument, id: string): number {
   const index = document.lines.findIndex((line) => line.id === id);
-  if (index < 0) throw new Error(`Line not found: ${id}`);
+  if (index < 0) throw new Error('歌词行已不存在，请重新选择');
   return index;
 }
 
 function afterLineGroup(lines: LyricLine[], id: string): number {
   const index = lines.findIndex((line) => line.id === id);
-  if (index < 0) throw new Error(`Line not found: ${id}`);
+  if (index < 0) throw new Error('歌词行已不存在，请重新选择');
   const line = lines[index];
   if (line.backgroundOf) throw new Error('Use the parent line as the insertion anchor');
   const background = lines.reduce((last,item,i)=>item.backgroundOf===id?i:last,-1);
@@ -225,7 +225,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
     case 'sync-stamp': return stampSync(document, command.cursor, command.action, command.timeMs, command.mode, editing);
     case 'insert-line': {
       const line = command.line ?? createLine('');
-      if (document.lines.some((item) => item.id === line.id)) throw new Error(`Line id already exists: ${line.id}`);
+      if (document.lines.some((item) => item.id === line.id)) throw new Error('新增歌词行与已有行身份重复，请重新插入');
       if (line.backgroundOf) throw new Error('Insert a background vocal with its parent line');
       const after = command.afterLineId === null ? -1 : afterLineGroup(document.lines, command.afterLineId);
       const lines = document.lines.slice();
@@ -324,18 +324,18 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
     }
     case 'set-song-part': {
       if (command.lineIds.some(id => !document.lines.some(line => line.id === id && !line.backgroundOf))) throw new Error('只能编辑明确选中的主行段落');
-      const value = command.value === '' ? null : command.value;
+      const value = command.value?.trim() ? command.value : null;
       const lines = document.lines.map(line => command.lineIds.includes(line.id) && line.songPart !== value ? { ...line, songPart: value } : line);
       return lines.every((line, i) => line === document.lines[i]) ? document : { ...document, lines };
     }
     case 'insert-word': {
       const index = lineIndex(document, command.lineId);
       const line = document.lines[index];
-      if (document.lines.some((item) => item.words.some((word) => word.id === command.word.id))) throw new Error(`Word id already exists: ${command.word.id}`);
+      if (document.lines.some((item) => item.words.some((word) => word.id === command.word.id))) throw new Error('新增词与已有词身份重复，请重新插入');
       if (!command.word.text) throw new Error('Word text must be non-empty');
       wordFitsLine(command.word, line);
       const after = command.afterWordId === null ? -1 : line.words.findIndex((word) => word.id === command.afterWordId);
-      if (command.afterWordId !== null && after < 0) throw new Error(`Word not found: ${command.afterWordId}`);
+      if (command.afterWordId !== null && after < 0) throw new Error('歌词词已不存在，请重新选择');
       const words = line.words.slice();
       words.splice(after + 1, 0, command.word);
       const lines = document.lines.slice();
@@ -345,7 +345,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
     case 'delete-word': {
       const index = lineIndex(document, command.lineId);
       const line = document.lines[index];
-      if (!line.words.some((word) => word.id === command.wordId)) throw new Error(`Word not found: ${command.wordId}`);
+      if (!line.words.some((word) => word.id === command.wordId)) throw new Error('歌词词已不存在，请重新选择');
       const lines = document.lines.slice();
       lines[index] = { ...line, words: line.words.filter((word) => word.id !== command.wordId) };
       return { ...document, lines };
@@ -409,12 +409,12 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       const from = document.lines[fromIndex];
       const to = document.lines[toIndex];
       const word = from.words.find((item) => item.id === command.wordId);
-      if (!word) throw new Error(`Word not found: ${command.wordId}`);
+      if (!word) throw new Error('歌词词已不存在，请重新选择');
       if (command.afterWordId === word.id) throw new Error('Cannot move a word after itself');
       wordFitsLine(word, to);
       const destination = to.words.filter((item) => item.id !== word.id);
       const after = command.afterWordId === null ? -1 : destination.findIndex((item) => item.id === command.afterWordId);
-      if (command.afterWordId !== null && after < 0) throw new Error(`Word not found: ${command.afterWordId}`);
+      if (command.afterWordId !== null && after < 0) throw new Error('歌词词已不存在，请重新选择');
       destination.splice(after + 1, 0, preserveWordAgents(document,from,to,word));
       const lines = document.lines.slice();
       if (fromIndex === toIndex) {
