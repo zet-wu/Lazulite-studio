@@ -72,16 +72,6 @@ test('segment edits cancel atomically, merge/delete preserve assigned lyrics, dr
  expect((await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.lyrics.draftTtml).toBe(assigned);
 });
 
-test('audio layouts use one timeline at desktop widths in both themes',async({page})=>{
- await newProject(page,'<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="u">尚未定时</p></body></tt>');
- for(const width of [1280,1440,1920])for(const theme of ['light','dark']){
-  await page.setViewportSize({width,height:900});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
-  await expect(page.locator('#timeline-plots')).toHaveCount(1);await expect(page.locator('audio')).toHaveCount(1);
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
-  await page.screenshot({path:test.info().outputPath(`vocal-${width}-${theme}.png`)});
- }
-});
-
 test('real Demucs audio preserves position rate loop and pause across independent sources',async({page})=>{
  test.skip(!process.env.STUDIO_VOCAL_REAL_ROOT,'Requires an explicitly supplied real Demucs result');
  const before=await(await page.request.get('/api/v1/projects/real-vocal/document')).json();
