@@ -10,13 +10,13 @@ test('page text copy and cut preserve lyrics; hidden object selection cannot pas
   await load(page);
   await page.locator('[data-outline-drag]').first().click();
   const count = await page.locator('[data-outline-drag]').count();
-  await page.getByRole('button', { name: '项目辅助', exact: true }).click();
-  await page.getByRole('heading', { name: '项目辅助' }).evaluate(e => {
+  await page.getByRole('button', { name: '歌词获取', exact: true }).click();
+  await page.getByRole('heading', { name: '歌词获取', exact: true }).evaluate(e => {
     const range = document.createRange(); range.selectNodeContents(e);
     getSelection()!.removeAllRanges(); getSelection()!.addRange(range);
   });
   await page.keyboard.press('Control+c');
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('项目辅助');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('歌词获取');
   await page.keyboard.press('Control+x');
   await page.evaluate(() => getSelection()!.removeAllRanges());
   await page.keyboard.press('Control+v');

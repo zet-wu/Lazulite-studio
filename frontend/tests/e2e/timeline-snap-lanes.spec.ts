@@ -14,7 +14,7 @@ test('timeline snap affects line moves and boundary resize while later touching 
   expect(await third.evaluate(e => getComputedStyle(e).top)).toBe('1px');
   expect(await fourth.evaluate(e => getComputedStyle(e).top)).toBe('1px');
   await lines.nth(4).click();
-  const start = page.getByRole('textbox', { name: '行 t4开始秒数', exact: true });
+  const start = page.getByRole('textbox', { name: '行 5开始秒数', exact: true });
   const bar = page.getByRole('button', { name: '时间轴行 L5', exact: true });
   const move = async () => {
     const box = (await bar.boundingBox())!;
@@ -27,7 +27,7 @@ test('timeline snap affects line moves and boundary resize while later touching 
   expect(Math.abs(Number(await start.inputValue()) - 7.49)).toBeLessThan(.002);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await page.getByLabel('吸附', { exact: true }).check(); await lines.nth(3).click();
-  const end = page.getByRole('textbox', { name: '行 t3结束秒数', exact: true });
+  const end = page.getByRole('textbox', { name: '行 4结束秒数', exact: true });
   const handle = fourth.getByLabel('时间轴行 L4结束边界'); const box = (await fourth.boundingBox())!, edge = (await handle.boundingBox())!;
   await page.mouse.move(edge.x + edge.width / 2, edge.y + edge.height / 2); await page.mouse.down();
   await page.mouse.move(edge.x + edge.width / 2 + box.width * 1.49, edge.y + edge.height / 2, { steps: 4 }); await page.mouse.up();

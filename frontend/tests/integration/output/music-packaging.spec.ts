@@ -5,6 +5,7 @@ test('real saved editor snapshot produces a verified music file and does not res
  await page.goto('/projects/music-packaging/edit');
  await importLyrics(page,{name:'packaging.ttml',mimeType:'application/xml',buffer:Buffer.from('<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="1" end="3"><span begin="1" end="2">合成</span><span> </span><span begin="2" end="3">测试</span></p></body></tt>')});
  await page.getByRole('button',{name:'文件打包',exact:true}).click();
+ await page.getByRole('combobox', { name: '内嵌歌词', exact: true }).selectOption({ label: '普通 LRC' });
  await expect(page.getByRole('button',{name:'打包文件'})).toBeEnabled();
  // Wait for the ordinary autosave already queued by import, if it won the race.
  await expect(page.locator('header').getByText('已保存',{exact:true})).toBeVisible();

@@ -57,13 +57,13 @@ test('lyric candidate matches committed snapped time and invalid/cancelled edits
   await drag(page, end, -.2); await guides(page, false);
   await expect(page.getByText('行边界不能排除词', { exact: true })).toBeVisible();
   await page.mouse.up(); await expect(page.locator('[data-drag-guide]')).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: '行 main结束秒数' })).toHaveCount(0); // audio mode has no inspector
+  await expect(page.getByRole('textbox', { name: '行 1结束秒数' })).toHaveCount(0); // audio mode has no inspector
   await drag(page, word, .05); await guides(page);
   await word.evaluate(el => { for (let id = 1; id < 5; id++) if (el.hasPointerCapture(id)) el.releasePointerCapture(id); });
   await page.mouse.up(); await expect(page.locator('[data-drag-guide]')).toHaveCount(0);
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   await page.locator('[data-line-id="main"] > [data-outline-drag]').click();
-  await expect(page.getByRole('textbox', { name: '行 main结束秒数' })).toHaveValue('9');
+  await expect(page.getByRole('textbox', { name: '行 1结束秒数' })).toHaveValue('9');
 });
 test('segment move and edges share the committed candidate and clear on capture loss', async ({ page }) => {
   await loadTimeline(page, true);

@@ -76,7 +76,7 @@ test('packaging error links focus body, background and 注音 with visible main 
  for(const [name,selector] of targets){
   await page.getByRole('button',{name:'文件打包',exact:true}).click();
   await page.getByRole('button',{name:'打包文件',exact:true}).click();
-  await expect(page.getByRole('alert')).toContainText('有 6 项需要处理');
+  await expect(page.getByRole('alert').filter({hasText:'有 6 项需要处理'})).toBeVisible();
   const link=page.getByRole('button',{name,exact:true});await link.focus();await page.keyboard.press('Enter');
   await expect(page.locator('main '+selector)).toBeFocused();
  }

@@ -30,6 +30,6 @@ test('global alignment confirms, locks across modes, applies once, saves and can
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('studio:null="begin end"');
  await page.getByRole('button',{name:'重做',exact:true}).click();await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('begin="00:03.000"');await page.reload();await page.getByRole('button',{name:'音频处理',exact:true}).click();
  await page.getByRole('button',{name:'自动对齐',exact:true}).click();await expect(dialog.getByRole('checkbox',{name:'使用已有行起始时间辅助对齐'})).not.toBeChecked();await expect(dialog.getByRole('checkbox',{name:'使用已有行起始时间辅助对齐'})).toBeEnabled();
- status='running';await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();await page.getByRole('button',{name:'取消',exact:true}).click();await expect.poll(()=>cancelled).toBe(1);await expect(page.getByRole('status').filter({hasText:'已取消对齐'})).toBeVisible();
+ status='running';await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();await page.getByRole('button',{name:'取消任务',exact:true}).click();await expect.poll(()=>cancelled).toBe(1);await expect(page.getByRole('status').filter({hasText:'已取消对齐'})).toBeVisible();
  expect(starts).toBe(2);
 });

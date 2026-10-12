@@ -48,7 +48,7 @@ test('background content transfer and clipboard deletion preserve its parent', a
   const bg = page.locator('main section[data-line-id="L1-bg"]');
   await bg.locator('[data-romanization-content-id]').getByText('音译 · ja-Latn', { exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: '转移到其他歌词行…', exact: true }).click();
-  const transfer = page.getByRole('dialog', { name: '转移音译内容' });
+  const transfer = page.getByRole('dialog', { name: '转移附属内容' });
   await transfer.getByLabel('目标歌词行').selectOption('L2'); await transfer.getByRole('button', { name: '应用（一次撤销）' }).click();
   await expect(bg.locator('[data-romanization-content-id]')).toHaveCount(0);
   await page.getByRole('button', { name: '撤销', exact: true }).click();

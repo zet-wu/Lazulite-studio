@@ -2,7 +2,7 @@ import { importLyrics } from '../../fixtures/import-lyrics';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { japaneseReadingTtml } from '../../fixtures/japanese-reading';
-for (const kind of ['plain', 'timed']) test(`${kind} manual result and placeholders persist in real service and final TTML`, async ({ page }) => {
+for (const kind of ['plain', 'timed']) test(`${kind} manual results persist and unavailable readings stay omitted in real service and final TTML`, async ({ page }) => {
   await page.goto('/projects/background-playback/edit');
   await importLyrics(page, { name: 'generation-persistence.ttml', mimeType: 'application/xml', buffer: Buffer.from(japaneseReadingTtml) });
   const outline = page.locator('[data-outline-drag]'); await expect(outline).toHaveCount(3);
@@ -21,11 +21,10 @@ for (const kind of ['plain', 'timed']) test(`${kind} manual result and placehold
   }, xml);
   const draft = await semantics(saved.document.lyrics.draftTtml);
   expect(draft.lines.map(line => line.text)).toEqual(['学校', 'しんよう', '漢字']);
-  if (kind === 'plain') expect(draft.contents).toEqual([{ kind, text: ' manual  ' }, { kind, text: 'shin you' }, { kind, text: ' ' }]);
+  if (kind === 'plain') expect(draft.contents).toEqual([{ kind, text: ' manual  ' }, { kind, text: 'shin you' }]);
   else expect(draft.contents).toEqual([
     { kind, units: [{ text: ' manual  ', beginMs: 0, endMs: 1e3 }, { text: 'k ', beginMs: 1e3, endMs: 2e3 }, { text: 'ko ', beginMs: 2e3, endMs: 3e3 }, { text: 'u', beginMs: 3e3, endMs: 4e3 }] },
     { kind, units: [{ text: 'shin ', beginMs: 4e3, endMs: 5e3 }, { text: 'you', beginMs: 5e3, endMs: 6e3 }] },
-    { kind, units: [{ text: ' ', beginMs: 6e3, endMs: 8e3 }] },
   ]);
   await page.reload(); await expect(outline).toHaveCount(3);
   await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();

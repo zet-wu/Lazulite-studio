@@ -91,7 +91,7 @@ test('inspector only mounts fields for the effective object type', async ({ page
   await word(page, 'A').click(); await expect(page.getByLabel('选中对象开始秒数')).toHaveValue('1'); await expect(page.getByLabel('跳过打轴', { exact: true })).toHaveCount(0); await expect(page.getByLabel('背景歌词', { exact: true })).toHaveCount(0);
   await page.locator('main [data-ruby-id="r1"]').click(); await expect(page.getByLabel('选中对象开始秒数')).toHaveValue('3'); await expect(page.getByLabel('背景歌词', { exact: true })).toHaveCount(0);
   await word(page, 'A').click(); await word(page, 'B').click({ modifiers: ['Control'] }); await expect(page.getByLabel('选中对象开始秒数')).toHaveCount(0); await expect(page.getByText('多对象时间可在时间轴整体平移；端点请单独调整。')).toBeVisible();
-  await page.locator('main [data-line-id="a"] [class*="syncOrdinal"]').click(); await expect(page.getByLabel('跳过打轴', { exact: true })).toBeVisible(); await expect(page.getByLabel('行 a开始秒数')).toBeVisible();
+  await page.locator('main [data-line-id="a"] [class*="syncOrdinal"]').click(); await expect(page.getByLabel('跳过打轴', { exact: true })).toBeVisible(); await expect(page.getByLabel('行 1开始秒数')).toBeVisible();
 });
 
 test('word-only obscene toggles, undo and project save preserve plain/ruby/background words', async ({ page }) => {

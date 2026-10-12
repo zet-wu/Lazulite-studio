@@ -65,7 +65,7 @@ test('disabled invalid draft is normalized without blocking launch',async({page}
 for(const ending of ['cancel','failed','conflict'])test(`enabled gap policy does not apply after ${ending}`,async({page})=>{
  const state=await setup(page),before=(await(await page.request.get(url)).json());
  await page.getByRole('checkbox',{name:'将短于 ms 的行内空隙并入前词'}).check();await page.getByRole('button',{name:'开始对齐',exact:true}).click();await expect.poll(()=>state.starts).toBe(2);
- if(ending==='cancel'){await page.getByRole('button',{name:'取消',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'已取消'})).toBeVisible();}
+ if(ending==='cancel'){await page.getByRole('button',{name:'取消任务',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'已取消'})).toBeVisible();}
  else if(ending==='failed'){state.status='failed';await expect(page.getByRole('alert').filter({hasText:'服务中断'})).toBeVisible();}
  else {expect((await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:pid,revision:before.revision,document:before.document}})).ok()).toBeTruthy();state.status='succeeded';await expect(page.getByRole('alert').filter({hasText:'项目版本或音频已改变'})).toBeVisible();}
  expect((await(await page.request.get(url)).json()).document).toEqual(before.document);

@@ -17,11 +17,12 @@ for (const scope of ['partial', 'all']) test(`document translation tracks surviv
     return serializeLyricTtml(d, { draft: true });
   });
   await importLyrics(page, { name: 'tracks.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
-  await page.locator('main section[data-line-id="a"]').getByRole('button', { name: '管理翻译轨道…' }).click();
+  await page.locator('[data-top-menu=lyrics-settings] summary').click();
+  await page.getByRole('button', { name: '管理翻译轨道…', exact: true }).click();
   const manager = page.getByRole('dialog', { name: '翻译轨道管理' });
   await manager.getByRole('button', { name: '下移翻译轨道 1', exact: true }).click();
   if (scope === 'all') await manager.getByRole('checkbox', { name: '全选内容', exact: true }).check();
-  else await manager.getByRole('checkbox', { name: /^选择翻译内容 / }).nth(2).check();
+  else await manager.getByRole('checkbox', { name: /^选择翻译轨道 / }).nth(2).check();
   await manager.getByLabel('翻译归轨目标').selectOption('two');
   await manager.getByRole('button', { name: '转入目标轨道', exact: true }).click();
   await manager.getByRole('button', { name: '应用', exact: true }).click();

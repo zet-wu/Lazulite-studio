@@ -108,7 +108,7 @@ test('wheel zoom keeps clipped edges uneditable and pointercancel leaves no tran
   await wave.hover();
   await page.mouse.wheel(0, -100);
   await expect.poll(async () => (await bar.boundingBox())!.width).toBeGreaterThan(width);
-  const begin = page.getByRole('textbox', { name: '行 ordinary开始秒数', exact: true });
+  const begin = page.getByRole('textbox', { name: '行 1开始秒数', exact: true });
   const before = await begin.inputValue();
   const box = (await bar.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();

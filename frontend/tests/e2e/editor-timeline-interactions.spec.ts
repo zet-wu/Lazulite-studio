@@ -376,15 +376,15 @@ test('narrow blocks use existing zoom then normal endpoints without adding heigh
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
   await page.mouse.move(a.x + a.width / 2 - 12, a.y + a.height / 2, { steps: 3 });
   await page.keyboard.press('Escape'); await page.mouse.up();
-  await expect(page.getByRole('textbox', { name: '行 narrow开始秒数', exact: true })).toHaveValue('2');
+  await expect(page.getByRole('textbox', { name: '行 1开始秒数', exact: true })).toHaveValue('2');
   for (const side of ['开始边界', '结束边界']) {
     const box = (await bar.getByLabel('时间轴行 L1' + side).boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + (side === '开始边界' ? -12 : 12), box.y + box.height / 2, { steps: 3 }); await page.mouse.up();
     await page.getByRole('button', { name: '撤销', exact: true }).click();
   }
-  await expect(page.getByRole('textbox', { name: '行 narrow开始秒数', exact: true })).toHaveValue('2');
-  await expect(page.getByRole('textbox', { name: '行 narrow结束秒数', exact: true })).toHaveValue('2.001');
+  await expect(page.getByRole('textbox', { name: '行 1开始秒数', exact: true })).toHaveValue('2');
+  await expect(page.getByRole('textbox', { name: '行 1结束秒数', exact: true })).toHaveValue('2.001');
   await page.screenshot({ path: test.info().outputPath('narrow-existing-zoom.png') });
 });
 

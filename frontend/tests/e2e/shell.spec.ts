@@ -7,8 +7,8 @@ test('opens a project, selects a line and keeps edit navigation visible', async 
   await page.locator('[data-outline-drag]').nth(1).click();
   await expect(page.getByText('已选行：L2')).toBeVisible();
   await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '项目辅助' }).click();
-  await expect(page.getByRole('heading', { name: '项目辅助' })).toBeVisible();
+  await page.getByRole('button', { name: '歌词获取' }).click();
+  await expect(page.getByRole('heading', { name: '歌词获取' })).toBeVisible();
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
 });

@@ -23,9 +23,8 @@ test('注音 main-row right click preserves multi-selection and updates content/
   await dialog.getByLabel('字符输出').selectOption('roman');
   await dialog.getByLabel('音译轨道').selectOption({ label: '轨道 2 · ja' });
   await expect(dialog).toContainText('生成 1 / 3 行');
-  await dialog.locator('summary').click();
-  await dialog.locator('fieldset input[type=checkbox]').first().uncheck();
-  await expect(dialog).toContainText('生成 0 / 3 行');
+  await dialog.getByLabel('跳过生成', { exact: true }).check();
+  await expect(dialog.getByRole('status')).toHaveText('所有单元均跳过，无需生成');
   await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeDisabled();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await outline.nth(1).click({ button: 'right' });

@@ -4,7 +4,7 @@ import { importLyrics } from '../fixtures/import-lyrics';
 const fixture = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:tts="http://www.w3.org/ns/ttml#styling"><head><metadata><iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><translations><translation type="replacement" xml:lang="zh-Hant"><text for="a"><span begin="1.000" end="2.000"> 譯文 </span></text></translation></translations><transliterations><transliteration xml:lang="ja-Latn"><text for="a"><span begin="1.000" end="2.000">a </span></text><text for="b"><span begin="4.000" end="5.000">b </span></text></transliteration></transliterations></iTunesMetadata></metadata></head><body><p xml:id="a" begin="1.000" end="3.000"><span begin="1.000" end="2.000">甲</span><span begin="2.000" end="3.000">乙</span><span ttm:role="x-bg" begin="2.000" end="3.000"><span begin="2.000" end="3.000">(背景)</span></span></p><p xml:id="b" begin="4.000" end="6.000"><span begin="4.000" end="5.000">丙</span><span begin="5.000" end="6.000">丁</span></p></body></tt>`;
 async function setup(page: import('@playwright/test').Page) {
  await loadTimeline(page);
- await importLyrics(page, { name: 'timeline-review.ttml', mimeType: 'application/xml', buffer: Buffer.from(fixture) });
+ await importLyrics(page, { name: 'translation-replacement.ttml', mimeType: 'application/xml', buffer: Buffer.from(fixture) });
  await page.getByRole('button', { name: '时间轴行 L1', exact: true }).click();
 }
 test('shared multi-line and child selection, envelope capture, independent romanization layer and background activation', async ({page}) => {
@@ -32,9 +32,9 @@ test('timed romanization drag preserves body and translation; translation fields
  const before = (await roman.boundingBox())!;
  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2); await page.mouse.down();
  await page.mouse.move(before.x + before.width / 2 + 25, before.y + before.height / 2, {steps:4}); await page.mouse.up();
- await expect(page.getByRole('textbox', {name:'行 a开始秒数',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('textbox', {name:'行 1开始秒数',exact:true})).toHaveCount(0);
  await page.locator('[data-line-id="a"] > [data-outline-drag]').click();
- await expect(page.getByRole('textbox', {name:'行 a开始秒数',exact:true})).toHaveValue('1');
+ await expect(page.getByRole('textbox', {name:'行 1开始秒数',exact:true})).toHaveValue('1');
  await expect(page.getByRole('spinbutton', {name:'翻译 1 单元 1 开始毫秒',exact:true})).toHaveValue('1000');
  await page.getByRole('button',{name:'撤销',exact:true}).click();
  expect((await roman.boundingBox())!.x).toBeCloseTo(before.x, 0);

@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { importLyrics } from '../../fixtures/import-lyrics';
 
 test('timed replacement translations survive real save, reload, final download and structured reimport', async ({ page }) => {
- const source = await readFile(new URL('../../../tests/fixtures/ttml/timeline-translation-external.ttml', import.meta.url), 'utf8');
+ const source = await readFile(new URL('../../../../tests/fixtures/ttml/timeline-translation-external.ttml', import.meta.url), 'utf8');
  await page.goto('/projects/background-playback/edit');
  await importLyrics(page, { name:'translations.ttml', mimeType:'application/xml', buffer:Buffer.from(source) });
  const line = page.locator('main section[data-line-id="L1"]');

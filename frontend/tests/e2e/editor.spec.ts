@@ -59,7 +59,7 @@ test('generates 注音 explicitly from one track and preserves source content on
   await expect(line.locator('[data-romanization-content-id]')).toHaveCount(3);
 });
 
-test('opens lyric metadata and singers in edit mode and keeps the auxiliary page', async ({ page }) => {
+test('opens lyric metadata and singers in edit mode and returns from lyric acquisition', async ({ page }) => {
   await importTtml(page);
   await openMenu(page, '歌词设置');
   await page.getByRole('button', { name: '歌词元数据' }).click();
@@ -69,8 +69,8 @@ test('opens lyric metadata and singers in edit mode and keeps the auxiliary page
   await page.getByRole('button', { name: '歌手管理' }).click();
   await expect(page.getByRole('dialog', { name: '歌手管理' })).toBeVisible();
   await page.getByRole('button', { name: '关闭歌手管理' }).click();
-  await page.getByRole('button', { name: '项目辅助' }).click();
-  await expect(page.getByRole('heading', { name: '项目辅助' })).toBeVisible();
+  await page.getByRole('button', { name: '歌词获取' }).click();
+  await expect(page.getByRole('heading', { name: '歌词获取' })).toBeVisible();
   await page.getByRole('button', { name: '编辑', exact: true }).click();
   await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
 });

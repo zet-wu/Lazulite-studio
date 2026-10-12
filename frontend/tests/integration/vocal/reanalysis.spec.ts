@@ -88,11 +88,12 @@ test('processing intent survives reload and snapped creation uses shared beat se
   if(hold)body.items=body.items.map((j:{id:string;status:string})=>j.id===oldId?j:{...j,status:'running'});
   await route.fulfill({json:body});
  });
+ const started=page.waitForResponse(r=>r.url().endsWith(`/projects/${pid}/jobs/vocal`)&&r.request().method()==='POST');
  await menu(page);await page.getByRole('button',{name:'重新进行声学分析',exact:true}).click();
- await expect.poll(()=>page.evaluate(pid=>sessionStorage.getItem(`studio-vocal-intent-v1:${pid}`),pid)).toBeTruthy();
- const intent=await page.evaluate(pid=>JSON.parse(sessionStorage.getItem(`studio-vocal-intent-v1:${pid}`)!),pid);
+ const job=await (await started).json();
+ await expect(page.getByRole('button',{name:'取消任务',exact:true})).toBeVisible();
  hold=false;await page.reload();await page.getByRole('button',{name:'音频处理',exact:true}).click();
- await expect.poll(async()=>(await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.acoustics.analysisId).toBe(intent.id);
+ await expect.poll(async()=>(await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.acoustics.analysisId).toBe(job.id);
  await page.getByRole('button',{name:'新建人声片段',exact:true}).click();
  const r=(await page.getByRole('slider',{name:'波形进度',exact:true}).boundingBox())!;
  await page.mouse.move(r.x+r.width*.252,r.y+20);await page.mouse.down();await page.mouse.move(r.x+r.width*.373,r.y+20,{steps:3});await page.mouse.up();

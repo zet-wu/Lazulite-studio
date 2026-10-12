@@ -1,3 +1,4 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { performanceTtml } from '../fixtures/large-document';
@@ -12,7 +13,7 @@ test('production large 注音 proposals and native playing response', async ({ p
   await page.goto(process.env.STUDIO_PERF_AUDIO ? '/projects/real/edit' : '/projects/synthetic/edit');
   const xml = performanceTtml().replace(/<text for="p(\d+)"><span begin="[^"]*" end="[^"]*">rom<\/span><\/text>/g, (_, i) =>
     `<text for="p${i}"><span begin="${(Number(i) * .3).toFixed(3)}" end="${(Number(i) * .3 + .024).toFixed(3)}">ko</span></text>`);
-  await page.locator('input[type=file]').last().setInputFiles({ name: 'ruby-performance.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await importLyrics(page, { name: 'ruby-performance.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await expect(page.locator('[data-outline-drag]')).toHaveCount(2000, { timeout: 30_000 });
   await page.locator('[data-outline-drag]').first().click();
   await page.locator('[data-top-menu="clipboard"] summary').click();
@@ -28,6 +29,7 @@ test('production large 注音 proposals and native playing response', async ({ p
     expect(await dialog.getByLabel('目标词').count()).toBeLessThan(80);
   } else await expect(dialog.getByLabel('目标词')).toHaveCount(2000);
   const proposalOpenMs = performance.now() - began;
+  await dialog.getByLabel('目标词').first().selectOption({ label: '1 · w0 · 时间重叠' });
   let started = performance.now();
   await dialog.getByLabel('字符输出').selectOption('katakana');
   await expect(dialog.getByLabel('目标 注音').first()).toHaveValue('コ');

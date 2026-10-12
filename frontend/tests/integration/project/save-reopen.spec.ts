@@ -24,7 +24,7 @@ test('generates 注音, saves through FastAPI and reopens the complete current d
   await expect(line.locator('[data-romanization-content-id]')).toHaveCount(3);
   expect(await content.locator('input').evaluateAll((items) => items.map((item) => (item as HTMLInputElement).value))).toEqual(source);
   await page.locator('[data-line-id="line-a"] [data-outline-drag]').click();
-  await expect(page.getByRole('textbox', { name: '行 line-a开始秒数' })).toHaveValue('0.999');
+  await expect(page.getByRole('textbox', { name: '行 1开始秒数' })).toHaveValue('0.999');
   const reopened = await (await page.request.get('/api/v1/projects/multitrack-project/document')).json();
   expect(reopened.revision).toBe(saved.revision);
   expect(reopened.document.lyrics.draftTtml).toBe(saved.document.lyrics.draftTtml);

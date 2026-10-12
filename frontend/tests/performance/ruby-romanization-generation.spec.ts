@@ -1,3 +1,4 @@
+import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 const largeKana = () => `<tt xmlns="http://www.w3.org/ns/ttml"><body><div>${Array.from({ length: 2000 }, (_, i) => {
@@ -6,7 +7,7 @@ const largeKana = () => `<tt xmlns="http://www.w3.org/ns/ttml"><body><div>${Arra
 }).join('')}</div></body></tt>`.replace('<tt xmlns=', '<tt xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns=');
 
 test('production 2000-row translation draft and kana proposal keep bounded mounts and preserve one history', async ({ page }) => {
-  await page.goto('/projects/no-music/edit'); await page.locator('input[type=file]').setInputFiles({ name: 'large-kana.ttml', mimeType: 'application/xml', buffer: Buffer.from(largeKana()) });
+  await page.goto('/projects/no-music/edit'); await importLyrics(page, { name: 'large-kana.ttml', mimeType: 'application/xml', buffer: Buffer.from(largeKana()) });
   const outline = page.locator('[data-outline-drag]'); await expect(outline).toHaveCount(2000);
   const text = page.locator('main section[data-line-id="k0"]').getByLabel('翻译 1', { exact: true });
   await text.fill('很长翻译 '.repeat(100));
@@ -18,14 +19,15 @@ test('production 2000-row translation draft and kana proposal keep bounded mount
   await page.locator('[data-top-menu="tools"] summary').click();
   const began = Date.now(); await page.getByRole('button', { name: '生成日文罗马字音译…', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true }); await expect(dialog).toContainText('生成 2000 / 2000 行');
+  await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
   const openedMs = Date.now() - began;
   const mounted = await page.locator('[data-roman-proposal]').count(); expect(mounted).toBeGreaterThan(0); expect(mounted).toBeLessThan(30);
   await dialog.locator('[data-proposal-count]').evaluate(e => { e.scrollTop = e.scrollHeight; });
   await expect(dialog.getByLabel('L2000音译')).toHaveValue('ka ka ka ka ka ka ka ka ka ka');
-  await dialog.getByRole('button', { name: '取消', exact: true }).click(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await page.locator('[data-top-menu="tools"] summary').click(); await page.getByRole('button', { name: '生成日文罗马字音译…', exact: true }).click();
   const applied = Date.now(); await dialog.getByRole('button', { name: '生成音译', exact: true }).click();
   await expect(dialog).toHaveCount(0); const appliedMs = Date.now() - applied;
-  await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await writeFile(test.info().outputPath('ruby-romanization-generation-performance.json'), JSON.stringify({ openedMs, appliedMs, mountedProposals: mounted, sourceRows: 2000, sourceWords: 20000, scope: 'Production build; Playwright interaction-to-visible-result wall time, not domain or next-RAF latency; no historical budget closure.' }, null, 2));
 });
