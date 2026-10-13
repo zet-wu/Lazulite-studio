@@ -126,3 +126,15 @@ it('reports ungrouped rows as project issues independently of output selection',
  if(!selected.length)expect(out.issues.some(i=>i.message==='请选择输出文件')).toBe(true);
  }
 });
+it('writes per-file offsets once without changing absolute or Ruby timings or empty outputs',()=>{
+ const p=fixture(),line=p.lyrics.lines[0];
+ p.lyrics.translationTracks=[{id:'t',language:'en',purpose:'subtitle',contents:[{id:'c',lineId:line.id,kind:'plain',text:'love'}]}];
+ const body=outputId('main'),translation=outputId('main','translation','t');
+ p.karaoke.outputs.push(translation);const before=prepareNicokara(p,'s');
+ p.karaoke.offsets={[body]:-30000,[translation]:123,[outputId('background')]:500};
+ const after=prepareNicokara(p,'s');expect(after.issues).toEqual([]);expect(after.omitted).toEqual(before.omitted);
+ for(const file of after.files){expect(file.text.match(/@Offset=/g)).toHaveLength(1);expect(file.text.replace(/@Offset=-?\d+\r\n/,'')).toBe(before.files.find(f=>f.output.id===file.output.id)!.text);}
+ expect(after.files.find(f=>f.output.id===body)!.text).toContain('@Offset=-30000\r\n');
+ expect(after.files.find(f=>f.output.id===translation)!.text).toContain('@Offset=123\r\n');
+ p.karaoke.offsets[body]=0;expect(prepareNicokara(p,'s').files.find(f=>f.output.id===body)!.text).not.toContain('@Offset=');
+});

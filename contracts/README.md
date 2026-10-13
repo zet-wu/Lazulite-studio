@@ -6,7 +6,7 @@
 
 | 接口组 | 主要边界 |
 | --- | --- |
-| 文档 GET／PUT | `studio-document-v9` envelope、`studio-project-v8` JSON、revision／ETag／If-Match；歌词为 `lyrics.draftTtml` |
+| 文档 GET／PUT | `studio-document-v9` envelope、`studio-project-v9` JSON、revision／ETag／If-Match；歌词为 `lyrics.draftTtml` |
 | 上传与项目音乐 | 临时 upload_id 经创建或首次接入归属项目，项目 asset 是音源身份 |
 | audio／waveform／pcm | 整数毫秒窗口；可选 vocal 选择已注册人声，默认原曲 |
 | reading/analyze | 当前行 id／text 快照，返回原文 code point 范围及读音 |
@@ -14,7 +14,7 @@
 | 人声结果／能量／下载 | 分析 ID 与音频所有者 ID 分开，复用任务可返回已有 analysis_id |
 | 发布 | revision、asset_id、lrc_kind、lrc_text 和可选 target_track_id；MP4/M4A 的 none + null 保留已有歌词标签，lrc／elrc 提供非空文本；通过回读报告后下载 |
 | embedded-lyrics | 项目源音频候选，返回内容／格式或候选错误 |
-| archive／project-archives | `.lazp` ZIP，manifest v1、项目 v8、可选一份源音频，导入创建独立项目 |
+| archive／project-archives | `.lazp` ZIP，manifest v1、项目 v9、可选一份源音频，导入创建独立项目 |
 | source-metadata | 当前源音频 asset_id 与搜索条件三字段；读取与保存条件分别提交 |
 | storage | total_bytes、五类 categories、measured_at，按项目目录逻辑字节统计 |
 

@@ -35,3 +35,11 @@ button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); paddin
 .groupTable input { width:100%; min-width:100px; box-sizing:border-box; }
 .groupTable td:last-child { white-space:nowrap; }
 .markerFields fieldset { border:0; padding:0; margin:0; }
+
+.groupActions { display:flex; gap:4px; flex-wrap:wrap; }
+.outputGrid { display:grid; grid-template-columns:minmax(0,1fr) 110px; gap:8px 12px; align-items:center; }
+.outputRow { display:contents; }
+.outputGrid .output { min-width:0; overflow-wrap:anywhere; }
+.outputGrid .output input { flex-shrink:0; }
+.offset { box-sizing:border-box; width:100%; min-width:0; }
+.offset[aria-invalid="true"] { border-color:var(--danger); box-shadow:inset 0 0 0 1px var(--danger); }

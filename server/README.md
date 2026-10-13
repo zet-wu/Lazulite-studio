@@ -44,7 +44,7 @@ TTML 草稿保存保留待修正时间与 Studio 身份，发布阶段检查实�
 
 `python -m server.portable --root <完整包目录>` 只绑定 `127.0.0.1`，默认端口 15173，提供生产前端与 API 同源入口。运行模式为 local，免口令，但所有请求必须匹配 Host，写入必须匹配 Origin。私人部署继续使用上述密码／网关入口；本机模式不继承宿主设备设置。启动器在初始化／清理前取得 OS 文件锁，重复启动通过 nonce、资料库 ID、目录和端口握手。仅在 readiness 成功后打开浏览器。
 
-便携包 `data/projects` 保存 SQLite 与项目树，`data/settings.json` 保存资料库身份及长期偏好；偏好 API 为 `GET/PATCH /api/v1/settings`，PATCH 需要 `If-Match` 并只修改提交字段。数据库为 v5，资源路径只记录相对数据根的 POSIX 路径；启动清理前验证归属、缺失修订及符号链接。项目 v8／歌词 v10／文档 v9／工程包 v1。
+便携包 `data/projects` 保存 SQLite 与项目树，`data/settings.json` 保存资料库身份及长期偏好；偏好 API 为 `GET/PATCH /api/v1/settings`，PATCH 需要 `If-Match` 并只修改提交字段。数据库为 v5，资源路径只记录相对数据根的 POSIX 路径；启动清理前验证归属、缺失修订及符号链接。项目 v9／歌词 v10／文档 v9／工程包 v1。
 
 已有 v4 库不能直接打开。停服并备份后，可用旧程序导出 `.lazp` 到新库（不含完整人声与历史修订），或显式执行：
 
@@ -59,4 +59,4 @@ python -m server.migrate_storage /path/to/v4-copy --destination /path/to/new-v5
 
 停服先拒绝新任务、取消排队、请求运行任务停止，再在宽限后回收模型及 FFmpeg 进程树。POSIX 使用独立进程组；Windows 使用 kill-on-close Job Object。轮换日志为 5 MiB × 3 份备份，常规日志省略模型原始输出和 traceback，不自动上传。
 
-卡拉数据模型允许空分组列表；导唱默认值由文字和三个阈值组成，标准组角色由 ID 决定。歌手集合配置含必需 `skip`，与项目 v8 快照一同通过保存及归档往返。源音频标签接口 `GET /api/v1/projects/{pid}/source-metadata` 复用创建项目标签解析，返回当前 `asset_id` 与 `title`／`artist`／`album`，由调用方明确保存搜索条件。标签失败返回对象级错误说明。
+卡拉数据模型允许空分组列表；导唱默认值由文字和三个阈值组成，标准组角色由 ID 决定。歌手集合配置含必需 `skip`，与项目 v9 快照一同通过保存及归档往返。源音频标签接口 `GET /api/v1/projects/{pid}/source-metadata` 复用创建项目标签解析，返回当前 `asset_id` 与 `title`／`artist`／`album`，由调用方明确保存搜索条件。标签失败返回对象级错误说明。

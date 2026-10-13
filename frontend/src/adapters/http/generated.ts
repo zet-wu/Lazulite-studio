@@ -972,7 +972,7 @@ export interface components {
             client_seq?: number | null;
             document: {
                 /** @constant */
-                schemaVersion: "studio-project-v8";
+                schemaVersion: "studio-project-v9";
                 lyrics: {
                     draftTtml: string;
                 };
@@ -1020,6 +1020,9 @@ export interface components {
                     /** Outputs */
                     outputs: string[];
                     singerMarkers: components["schemas"]["KaraokeSingerMarker"][];
+                    offsets: {
+                        [key: string]: number;
+                    };
                 };
             };
         };

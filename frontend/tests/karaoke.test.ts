@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
 import { createProjectDocument, createProjectEditorState, executeProjectCommand, redoProjectCommand, undoProjectCommand } from '../src/domain/project-document';
-import { anchorRange, autoInsertCues, cueProblem, insertCue, reconcileKaraoke, applyKaraoke } from '../src/domain/karaoke';
+import { outputId, anchorRange, autoInsertCues, cueProblem, insertCue, reconcileKaraoke, applyKaraoke } from '../src/domain/karaoke';
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
 export function fixture() {
  const lyrics=createLyricDocument('愛'); const line=lyrics.lines[0]; line.beginMs=4000;line.endMs=7000;
@@ -92,4 +92,18 @@ it('linked end propagation does not shift cues of an unselected line',()=>{
  const before=p.karaoke.cues.find(c=>c.anchor.lineId===previous.id)!;
  const next=executeProjectCommand(createProjectEditorState(p),{type:'lyrics',command:{type:'shift-lines',lineIds:[selected.id],deltaMs:500}}).present;
  expect(next.lyrics.lines[0].endMs).toBe(4500);expect(next.karaoke.cues.find(c=>c.id===before.id)).toEqual(before);
+});
+it('persists output offsets in one history step and migrates or removes their identities',()=>{
+ const p=fixture(),body=outputId('main'),track=outputId('main','translation','t');
+ p.lyrics.translationTracks=[{id:'t',language:'en',purpose:'subtitle',contents:[]}];
+ let state=executeProjectCommand(createProjectEditorState(p),{type:'karaoke',command:{kind:'offsets',offsets:{[body]:-150,[track]:200}}});
+ expect(state.past).toHaveLength(1);expect(undoProjectCommand(state).present.karaoke.offsets).toEqual({});
+ expect(parseProject(serializeProject(state.present)).karaoke.offsets).toEqual(state.present.karaoke.offsets);
+ state=executeProjectCommand(state,{type:'karaoke',command:{kind:'groups',groups:[{id:'renamed',name:'name'},{id:'background',name:'bg'}],renames:{main:'renamed',background:'background'}}});
+ expect(state.present.karaoke.offsets).toEqual({[outputId('renamed')]:-150,[outputId('renamed','translation','t')]:200});
+ const lyrics=structuredClone(state.present.lyrics);lyrics.translationTracks=[];
+ state=executeProjectCommand(state,{type:'lyrics',command:{type:'replace-document',document:lyrics}});
+ expect(state.present.karaoke.offsets).toEqual({[outputId('renamed')]:-150});
+ state=executeProjectCommand(state,{type:'karaoke',command:{kind:'groups',groups:[],renames:{}}});
+ expect(state.present.karaoke.offsets).toEqual({});
 });

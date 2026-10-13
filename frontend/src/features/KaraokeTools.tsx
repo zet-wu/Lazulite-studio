@@ -3,7 +3,7 @@ import { SelectionSummary } from './editor/SelectionSummary';
 import editorStyles from './editor/semantic-editor.module.css';
 import { lineLabel } from '../domain/line-structure';
 import { SingerMarkersDialog } from './SingerMarkersDialog';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { anchorKey, anchorRange, cueProblem, type CueAnchor, type KaraokeCommand, type KaraokeCue } from '../domain/karaoke';
 import type { ProjectDocument, ProjectCommand } from '../domain/project-document';
 import { karaokeOutputs, nicokaraZip, prepareNicokara, safeFilename } from '../adapters/nicokara';
@@ -83,7 +83,7 @@ function GroupsDialog({project,close,apply,error}:{error:string;project:ProjectD
  <table className={styles.groupTable}><thead><tr><th>ID</th><th>名称</th><th aria-label="操作"/></tr></thead><tbody>{rows.map((row,index)=><tr key={row.key}>
  <td><input aria-label={`分组 ${index+1} ID`} aria-invalid={problem?.startsWith(`第 ${index+1} 组`)||false} aria-describedby={problem?.startsWith(`第 ${index+1} 组`)?'group-id-error':undefined} value={row.id} onChange={event=>update(row.key,{id:event.target.value})}/>{problem?.startsWith(`第 ${index+1} 组`)&&<small id="group-id-error" role="alert">{problem}</small>}</td>
  <td><input aria-label={`分组 ${index+1} 名称`} value={row.name} onChange={event=>update(row.key,{name:event.target.value})}/></td>
- <td>{([-1,1] as const).map(direction=><IconButton key={direction} icon={direction<0?'up':'down'} label={`${direction<0?'上移':'下移'}分组 ${index+1}`} disabled={index+direction<0||index+direction>=rows.length} onClick={()=>{const next=[...rows];[next[index],next[index+direction]]=[next[index+direction],next[index]];setRows(next);}}/>)}<IconButton icon="trash" label={`删除分组 ${index+1}`} data-role="danger" onClick={()=>setRows(rows.filter(item=>item.key!==row.key))}/></td>
+ <td><div className={styles.groupActions}>{([-1,1] as const).map(direction=><IconButton key={direction} icon={direction<0?'up':'down'} label={`${direction<0?'上移':'下移'}分组 ${index+1}`} disabled={index+direction<0||index+direction>=rows.length} onClick={()=>{const next=[...rows];[next[index],next[index+direction]]=[next[index+direction],next[index]];setRows(next);}}/>)}<IconButton icon="trash" label={`删除分组 ${index+1}`} data-role="danger" onClick={()=>setRows(rows.filter(item=>item.key!==row.key))}/></div></td>
  </tr>)}</tbody></table>
  <IconButton icon="add" label="新增分组" onClick={()=>setRows([...rows,{id:nextGroupId([...project.karaoke.groups,...groups]),name:'新分组',key:crypto.randomUUID(),originalId:''}])}/>
  {count>0&&<p>应用后将有 {count} 行未选择分组。</p>}{error&&<p role="alert">{error}</p>}
@@ -91,9 +91,34 @@ function GroupsDialog({project,close,apply,error}:{error:string;project:ProjectD
  </SettingsDialog>;
 }
 
-function KaraokeExport({project,title,apply,close,viewIssues}:{project:ProjectDocument;title:string;apply:(c:KaraokeCommand)=>boolean;close:()=>void;viewIssues:(issues:OutputIssue[])=>void}) {
+export function KaraokeExport({project,title,apply,close,viewIssues}:{project:ProjectDocument;title:string;apply:(c:KaraokeCommand)=>boolean;close:()=>void;viewIssues:(issues:OutputIssue[])=>void}) {
  const result=useMemo(()=>prepareNicokara(project,title),[project,title]);const [error,setError]=useState('');
- return <SettingsDialog title="导出 Nicokara" close={close}>{karaokeOutputs(project).map(output=><label className={styles.output} key={output.id}><input type="checkbox" checked={project.karaoke.outputs.includes(output.id)} onChange={e=>apply({kind:'outputs',outputs:e.target.checked?[...project.karaoke.outputs,output.id]:project.karaoke.outputs.filter(id=>id!==output.id)})}/>{output.label}</label>)}
+ const [drafts,setDrafts]=useState<Record<string,string>>({}),[invalid,setInvalid]=useState<Set<string>>(new Set());
+ const inputs=useRef(new Map<string,HTMLInputElement>());
+ const valid=(value:string)=>/^[+-]?\d+$/.test(value)&&Number.isSafeInteger(Number(value));
+ const commit=(ids:string[])=>{
+   const bad=ids.filter(id=>drafts[id]!==undefined&&!valid(drafts[id]));
+   setInvalid(previous=>new Set([...previous].filter(id=>!ids.includes(id)).concat(bad)));
+   if(bad.length)return {bad,project};
+   const offsets=Object.fromEntries(ids.filter(id=>drafts[id]!==undefined).map(id=>[id,Number(drafts[id])]));
+   if(Object.keys(offsets).length&&!apply({kind:'offsets',offsets}))return null;
+   setDrafts(previous=>Object.fromEntries(Object.entries(previous).filter(([id])=>!ids.includes(id))));
+   return {bad,project:{...project,karaoke:{...project.karaoke,offsets:{...project.karaoke.offsets,...offsets}}}};
+ };
+ const download=()=>{
+   const submitted=commit(project.karaoke.outputs);if(!submitted)return;
+   if(submitted.bad.length){inputs.current.get(submitted.bad[0])?.focus();return;}
+   try{downloadKaraoke(nicokaraZip(submitted.project,title),`${safeFilename(title)}-nicokara.zip`,'application/zip');setError('');}catch(e){setError((e as Error).message);}
+ };
+ return <SettingsDialog title="导出 Nicokara" close={close} actions={<><button data-role="secondary" onClick={()=>viewIssues(result.issues)}>查看校验</button><button data-role="primary" onClick={download}>下载 ZIP</button></>}>
+ <p id="offset-help">单位：毫秒；正数延后，负数提前</p>
+ <div className={styles.outputGrid}><span>输出文件</span><span>@Offset</span>{karaokeOutputs(project).map(output=>{
+   const selected=project.karaoke.outputs.includes(output.id);
+   return <div className={styles.outputRow} key={output.id}><label className={styles.output}><input type="checkbox" checked={selected} onChange={e=>apply({kind:'outputs',outputs:e.target.checked?[...project.karaoke.outputs,output.id]:project.karaoke.outputs.filter(id=>id!==output.id)})}/>{output.label}</label>
+   <input className={styles.offset} aria-label={`${output.label} @Offset`} aria-describedby="offset-help" aria-invalid={invalid.has(output.id)} disabled={!selected} value={drafts[output.id]??String(project.karaoke.offsets[output.id]??0)} ref={node=>{if(node)inputs.current.set(output.id,node);else inputs.current.delete(output.id);}}
+   onChange={e=>{const value=e.target.value;setDrafts(previous=>({...previous,[output.id]:value}));if(valid(value))setInvalid(previous=>new Set([...previous].filter(id=>id!==output.id)));}}
+   onBlur={()=>{if(selected)commit([output.id]);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();commit([output.id]);}}}/></div>;
+ })}</div>
  <p role="status">所选文件：{result.files.length} 个有内容，{result.issues.length} 项阻塞</p>{result.issues.length>0&&<p>{result.issues[0].message}</p>}{result.omitted.length>0&&<p>省略 {result.omitted.length} 个空输出</p>}
- <button data-role="secondary" onClick={()=>viewIssues(result.issues)}>查看校验</button><button data-role="primary" onClick={()=>{try{downloadKaraoke(nicokaraZip(project,title),`${safeFilename(title)}-nicokara.zip`,'application/zip');setError('');}catch(e){setError((e as Error).message);}}}>下载 ZIP</button>{error&&<p role="alert">{error}</p>}</SettingsDialog>;
+ {error&&<p role="alert">{error}</p>}</SettingsDialog>;
 }

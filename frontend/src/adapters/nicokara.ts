@@ -180,7 +180,7 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
     for (const tag of metadata) if (tag.length > 1024) add({ karaokeSettings: true }, '元数据超过规范单行 1024 字符限制', id);
     if (!rows.length) { omitted.push(output.label); continue; }
     const name = names.get(output.id)!;
-    files.push({ name, text: '\uFEFF' + [...metadata, ...rows, ...rules, ...[...declarations.values()].map((value,index)=>emojiDeclaration(value.marker,index+1))].join('\r\n') + '\r\n', output });
+    files.push({ name, text: '\uFEFF' + [...metadata, ...(karaoke.offsets[id] ? [`@Offset=${karaoke.offsets[id]}`] : []), ...rows, ...rules, ...[...declarations.values()].map((value,index)=>emojiDeclaration(value.marker,index+1))].join('\r\n') + '\r\n', output });
   }
   for (const current of emittedMarkers) for (const other of emittedMarkers) {
     if (current.key!==other.key && (current.marker.trigger.includes(other.marker.trigger)||other.marker.trigger.includes(current.marker.trigger))) add(current.target,'不同歌手集合的触发标记相同或相互包含，请在歌手标记管理中消歧',current.outputId);

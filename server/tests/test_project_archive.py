@@ -35,6 +35,7 @@ def test_source_archive_independent_service_round_trip(tmp_path):
         assert wait(client,job['id'])['status']=='succeeded'
         envelope=client.get('/api/v1/projects/p/document').json()
         snapshot=envelope['document']
+        snapshot['karaoke']['offsets']={'["main","body",""]':-250}
         snapshot['acoustics']={'analysisId':job['id'],'segments':[{'id':'manual','beginMs':25,'endMs':750}]}
         RevisionStore(db,source/'projects').create('p',snapshot,envelope['revision'])
         archive=client.get('/api/v1/projects/p/archive')

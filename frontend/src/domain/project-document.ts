@@ -7,7 +7,7 @@ import { createLyricDocument, type LyricDocument } from './lyric-document';
 export type VocalSegment = { id: string; beginMs: number; endMs: number };
 export type Acoustics = { analysisId: string | null; segments: VocalSegment[] };
 export type ProjectDocument = {
-  schemaVersion: 'studio-project-v8';
+  schemaVersion: 'studio-project-v9';
   lyrics: LyricDocument;
   karaoke: Karaoke;
   amll: AmllSettings;
@@ -19,7 +19,7 @@ export type ProjectSnapshot = Omit<ProjectDocument, 'lyrics'> & { lyrics: { draf
 export type ProjectEditorState = { present: ProjectDocument; past: ProjectDocument[]; future: ProjectDocument[] };
 export type ProjectCommand = { type: 'karaoke'; command: KaraokeCommand } | { type: 'alignment'; source: ProjectDocument; project: ProjectDocument } | { type: 'amll-setting'; rule: AmllRule; enabled: boolean } | { type: 'background-position'; lineId: string; before: boolean } | { type: 'amll-batch'; rule: AmllRule; ids?: string[]; duetAgents?: string[] } | { type: 'duet'; lineId: string; duet: boolean } | { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics; durationMs: number };
 export function createProjectDocument(lyrics = createLyricDocument()): ProjectDocument {
-  return { schemaVersion: 'studio-project-v8', lyrics, karaoke: createKaraoke(lyrics), amll: createAmllSettings(), lineOrder: [], editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
+  return { schemaVersion: 'studio-project-v9', lyrics, karaoke: createKaraoke(lyrics), amll: createAmllSettings(), lineOrder: [], editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
 }
 export function validateSegments(segments: VocalSegment[], durationMs: number) {
   const ids = new Set<string>();

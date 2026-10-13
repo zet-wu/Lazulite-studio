@@ -3068,7 +3068,7 @@
             ],
             "properties": {
               "schemaVersion": {
-                "const": "studio-project-v8"
+                "const": "studio-project-v9"
               },
               "lyrics": {
                 "type": "object",
@@ -3253,6 +3253,14 @@
                     "items": {
                       "$ref": "#/components/schemas/KaraokeSingerMarker"
                     }
+                  },
+                  "offsets": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
                   }
                 },
                 "required": [
@@ -3261,7 +3269,8 @@
                   "defaults",
                   "cues",
                   "outputs",
-                  "singerMarkers"
+                  "singerMarkers",
+                  "offsets"
                 ],
                 "title": "Karaoke",
                 "type": "object"

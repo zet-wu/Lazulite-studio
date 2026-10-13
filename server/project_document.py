@@ -42,7 +42,7 @@ class AmllSettings(BaseModel):
 
 class ProjectSnapshot(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    schemaVersion: Literal['studio-project-v8']
+    schemaVersion: Literal['studio-project-v9']
     karaoke: Karaoke
     amll: AmllSettings
     lineOrder: list[str]
@@ -52,7 +52,7 @@ class ProjectSnapshot(BaseModel):
 
 def initial_project(ttml: str, asset_id: str | None) -> dict:
     from .amll_compatibility import DEFAULTS
-    return {'schemaVersion': 'studio-project-v8', 'karaoke': initial_karaoke(ttml), 'amll': dict(DEFAULTS), 'lineOrder': [],
+    return {'schemaVersion': 'studio-project-v9', 'karaoke': initial_karaoke(ttml), 'amll': dict(DEFAULTS), 'lineOrder': [],
             'editing': {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
 
 def read_project(path: str | Path) -> dict:

@@ -8,7 +8,7 @@
 
 词级 `obscene` 写 `amll:obscene` 与标准 `ttm:role="expletive"`，读取任一标记并检查冲突。歌手定义支持 `actorRef`，codec 校验引用；歌词编辑界面提供歌手身份、名称、类型及顺序管理。
 
-`project-codec.ts` 读写项目 v8：lyrics 在 JSON 边界保存为 draftTtml，editing、acoustics、amll、lineOrder、karaoke 独立保存并验证引用。`recovery` 用 IndexedDB 保存 project-v8／record 8 检查点及基础修订。源音频身份由项目资源接口提供。
+`project-codec.ts` 读写项目 v9：lyrics 在 JSON 边界保存为 draftTtml，editing、acoustics、amll、lineOrder、karaoke 独立保存并验证引用。`recovery` 用 IndexedDB 保存 project-v9／record 9 检查点及基础修订。源音频身份由项目资源接口提供。
 
 ## 格式投影
 
