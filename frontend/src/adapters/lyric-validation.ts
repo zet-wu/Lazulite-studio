@@ -9,8 +9,9 @@ export const checkedFormats = exportFormats.map(([format]) => format);
 function* validationSteps(document: LyricDocument, editing?: ProjectEditing): Generator<void, OutputIssue[]> {
   const result = new Map<string, OutputIssue>();
   const add = (issue: OutputIssue, format: string, severity: NonNullable<OutputIssue['severity']>) => {
-    const key = `${outputIssueKey(issue)}:${severity}`, previous = result.get(key);
-    result.set(key, { ...issue, severity, formats: [...new Set([...(previous?.formats ?? []), format])] });
+    const key = outputIssueKey(issue), previous = result.get(key);
+    if (previous?.severity === 'error' && severity === 'warning') return;
+    result.set(key, { ...issue, severity, formats: [...new Set([...(previous?.severity === severity ? previous.formats ?? [] : []), format])] });
   };
   for (const format of checkedFormats) {
     try { exportLyricFile(document, format,editing); }

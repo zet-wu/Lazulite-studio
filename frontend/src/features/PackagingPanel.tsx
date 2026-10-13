@@ -30,14 +30,18 @@ export function PackagingPanel(props: { validationFilter?:ValidationFilter; onVa
  const choose=(next:ValidationTab)=>{setLocalTab(next);props.onValidationTab?.(next);};
  const {result,current}=useAutomaticValidation(props.document,editing,props.project?.amll,props.projectId,tab);
  const combined=new Map<string,OutputIssue>();
- for(const issue of [...(result?.issues??[]),...(nicokara?.issues??[])]){const key=outputIssueKey(issue)+issue.severity,old=combined.get(key);combined.set(key,old?{...old,formats:[...new Set([...(old.formats??[]),...(issue.formats??[])])],outputIds:[...new Set([...(old.outputIds??[]),...(issue.outputIds??[])])]}:issue);}
+ for(const issue of [...(result?.issues??[]),...(nicokara?.issues??[])]) {
+   const key=outputIssueKey(issue), old=combined.get(key);
+   if(old?.severity==='error'&&issue.severity==='warning')continue;
+   combined.set(key,old&&old.severity===issue.severity?{...old,formats:[...new Set([...(old.formats??[]),...(issue.formats??[])])],outputIds:[...new Set([...(old.outputIds??[]),...(issue.outputIds??[])])]}:issue);
+ }
  const [musicBlocking,setMusicBlocking]=useState<OutputIssue[]>([]);
  const [blocking,setBlocking] = useState<OutputIssue[]>([]), [message,setMessage] = useState('');
  const [format, setFormat] = usePreference<LyricFormat>(`studio:download:${props.projectId ? `project:${props.projectId}` : `local:${props.title}`}`, 'ttml', (v): v is LyricFormat => exportFormats.some(([id])=>id===v));
- useEffect(()=>{setBlocking([]);setMessage('');},[editing,props.document,props.projectId,format]);
+ useEffect(()=>{setBlocking([]);setMessage('');},[editing,props.document,props.projectId,props.project?.karaoke,format]);
 
  const visibleIssues=filter==='nicokara'?nicokara?.issues??[]:[...combined.values()].filter(issue=>filter==='all'||issue.severity==='error'&&issue.formats?.includes(filter.toUpperCase()));
- return <div className={styles.page}><section ref={validationPane} className={styles.pane}>
+ return <div className={`${styles.page} ${styles.packagingPage}`}><section ref={validationPane} className={styles.pane}>
  <div className={styles.validationTabs} role="tablist" aria-label="校验类型">{(['lyrics','amll'] as const).map((value,index)=><button key={value} id={`validation-tab-${value}`} data-role="secondary" role="tab" aria-selected={tab===value} aria-controls={`validation-panel-${value}`} tabIndex={tab===value?0:-1}
  onClick={()=>choose(value)} onKeyDown={event=>{
    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;

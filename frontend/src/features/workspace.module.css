@@ -905,3 +905,5 @@
 .projectStorage summary { cursor:pointer; }
 .projectStorage dl > div { display:flex; justify-content:space-between; margin:5px 0; }
 .projectStorage dd { margin:0; }
+
+.recoveryActions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-block:8px; }

@@ -58,3 +58,11 @@ test('music packaging checks current data and blocks invalid output',async({page
  await importLyrics(page,{name:'untimed.txt',mimeType:'text/plain',buffer:Buffer.from('untimed')});await page.getByRole('button',{name:'文件打包',exact:true}).click();
  await page.getByRole('button',{name:'打包文件',exact:true}).click();await expect(page.locator('[data-blocking=true]')).not.toHaveCount(0);
 });
+
+test('tag-only source replaces a remembered no-LRC preference with ordinary LRC',async({page})=>{
+ await page.goto('/projects/sample-project/edit');await expect(page.getByRole('button',{name:'编辑',exact:true})).toBeVisible();
+ const mock=async(container:'mp4'|'mp3')=>page.evaluate(container=>{const original=window.fetch;window.fetch=(...args)=>String(args[0]).endsWith('/packaging')?Promise.resolve(Response.json({filename:`source.${container}`,format_label:container,asset_id:'sample-asset',supported:true,container,tracks:[],error:null})):original(...args);},container);
+ await mock('mp4');await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByRole('combobox',{name:'内嵌歌词',exact:true}).selectOption('none');await page.getByRole('button',{name:'编辑',exact:true}).click();
+ await page.reload();await expect(page.getByRole('button',{name:'编辑',exact:true})).toBeVisible();await mock('mp3');await page.getByRole('button',{name:'文件打包',exact:true}).click();
+ await expect(page.getByRole('combobox',{name:'内嵌歌词',exact:true})).toHaveValue('lrc');await expect(page.getByRole('combobox',{name:'内嵌歌词',exact:true}).locator('option[value=none]')).toHaveCount(0);
+});

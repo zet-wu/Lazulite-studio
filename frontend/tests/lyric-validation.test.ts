@@ -16,7 +16,8 @@ it('checks actual output gates and merges affected formats without blocking TXT 
   expect(() => exportLyricFile(doc, 'ttml')).not.toThrow();
   doc.lines[0].words[1].endMs = null;
   expect(() => exportLyricFile(doc, 'txt')).not.toThrow();
-  expect(validateLyrics(doc).some(issue => issue.code === 'missing-time')).toBe(true);
+  const missing=validateLyrics(doc).filter(issue => issue.code === 'missing-time'&&issue.wordId===doc.lines[0].words[1].id);
+  expect(missing).toHaveLength(1);expect(missing[0].severity).toBe('error');
 });
 it('keeps rich valid lyrics out of the issue list and describes actual ASS output once', async () => {
   const { describeLyricFormat } = await import('../src/adapters/format-description');

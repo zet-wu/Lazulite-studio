@@ -6,13 +6,25 @@ test('auto checks and replaces operation blockers without restricting plain text
  await open(page);await page.getByRole('tab',{name:'歌词校验',exact:true}).click();await expect(page.getByRole('tab',{name:'歌词校验'})).toBeVisible();
  await page.getByRole('button',{name:/^缺少时间/}).click();
  await page.getByRole('button',{name:/^第 1 行/}).click();
- const problem=page.getByRole('button',{name:/音译第 1 单元：缺少结束时间/}).first();await expect(problem).toBeVisible();
+ const problem=page.getByRole('button',{name:/音译.*第 1 单元：缺少结束时间/}).first();await expect(problem).toBeVisible();
  await expect(page.locator('[data-blocking=true]')).toHaveCount(0);
  await page.getByRole('button',{name:'下载歌词',exact:true}).click();await expect(page.locator('[data-blocking=true]')).toHaveCount(1);
  await page.getByLabel('导出格式').selectOption('txt');await expect(page.locator('[data-blocking=true]')).toHaveCount(0);
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();await download;
  await page.getByLabel('导出格式').selectOption('elrc');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
  await expect(page.locator('[data-blocking=true]').getByRole('button',{name:/第 2 词/})).toBeVisible();
+ await page.getByLabel('校验格式筛选').selectOption('ttml');
+ const pane=page.getByRole('tabpanel',{name:'歌词校验'});await pane.getByRole('button',{name:/^缺少时间/}).click();await pane.getByRole('button',{name:/^第 1 行/}).click();
  await expect(problem).not.toHaveAttribute('aria-description',/本次操作受阻/);
  await problem.focus();await page.keyboard.press('Enter');await expect(page.getByRole('button',{name:'编辑',exact:true})).toHaveAttribute('aria-current','page');
+});
+
+test('format filter shows only blockers and does not change download preference',async({page})=>{
+ await open(page);await page.getByLabel('校验格式筛选').selectOption('txt');
+ await expect(page.getByText('当前检查未发现阻塞此格式的问题',{exact:true})).toBeVisible();
+ await expect(page.getByLabel('导出格式')).toHaveValue('ttml');
+ await page.getByLabel('校验格式筛选').selectOption('ttml');
+ await expect(page.getByText('当前检查未发现阻塞此格式的问题',{exact:true})).toHaveCount(0);
+ await page.getByLabel('导出格式').selectOption('elrc');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
+ await expect(page.getByLabel('校验格式筛选')).toHaveValue('elrc');
 });

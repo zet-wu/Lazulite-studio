@@ -61,3 +61,11 @@
 .validationTabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
 .validationBranch > div { padding-left: 24px; }
+
+.packagingPage { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.packagingPage .downloadRow > label { display:flex; align-items:center; gap:8px; flex-wrap:wrap; max-width:100%; }
+.packagingPage .downloadRow select { min-width:0; max-width:100%; }
+@media (max-width:900px) {
+  .packagingPage { grid-template-columns:minmax(0,1fr); overflow:auto; align-content:start; }
+  .packagingPage > .pane { overflow:visible; }
+}
