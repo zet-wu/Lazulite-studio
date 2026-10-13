@@ -1,4 +1,3 @@
-.tools { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 16px; border-bottom:1px solid var(--line); }
 .cue, button.slot[data-role][data-role] { display:inline-block; vertical-align:baseline; min-width:0; min-height:0; max-width:100%; font:inherit; line-height:inherit; background:var(--karaoke-surface); color:var(--karaoke-text); border:0; border-radius:4px; padding:0 3px; white-space:pre-wrap; overflow-wrap:anywhere; cursor:pointer; }
 .cue[aria-pressed="true"], .cue:focus-visible, button.slot[data-role]:focus-visible { outline:2px solid var(--blue); outline-offset:-1px; }
 button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); padding:0; text-align:center; }

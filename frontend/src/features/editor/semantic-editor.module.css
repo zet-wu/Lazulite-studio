@@ -19,6 +19,7 @@
 .ribbon small { color: var(--muted); }
 .ribbonMenu { position: relative; }
 .ribbonMenu summary { cursor: pointer; list-style: none; border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; }
+.settingsMenu summary::-webkit-details-marker, .ribbonMenu summary::-webkit-details-marker { display: none; }
 .ribbonMenu > div { position: absolute; top: 100%; left: 0; z-index: 12; display: grid; min-width: 190px; padding: 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); box-shadow: 0 5px 16px #0003; }
 .layout { flex: 1; display: grid; grid-template-columns: 190px minmax(0,1fr) 250px; min-width: 0; min-height: 0; overflow: hidden; }
 .outline, .inspector { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--panel); padding: 0; border-right: 1px solid var(--line); }
@@ -293,7 +294,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 
 .inspector .panelBody > label, .inspector .panelBody > fieldset { margin:0; }
 .inspector .singerSelection.singerSelection label { display:flex; gap:8px; min-height:26px; }
-.syncPanel button[data-role][data-role] { min-height:26px; padding:4px 6px; }
+.syncPanel button[data-role][data-role], .ribbon > button[data-role][data-role] { min-height:26px; padding:4px 6px; font:inherit; }
 
 .romanGenerationOptions { align-items:center; }
 .romanGenerationOptions label { display:flex; align-items:center; }

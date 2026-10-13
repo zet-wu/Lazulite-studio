@@ -1,4 +1,5 @@
 import type { EditorSelection } from './editing-actions';
+import { SelectionSummary } from './SelectionSummary';
 import { TopMenu, type MenuState } from './TopMenu';
 import styles from './semantic-editor.module.css';
 
@@ -35,7 +36,7 @@ type Props = MenuState & {
 export function EditorRibbon(props: Props) {
   const { selection } = props;
   return <div className={styles.ribbon} aria-label="编辑操作">
-    <span>{selection ? `${selection.kind === 'words' ? '词' : selection.kind === 'lines' ? '行' : selection.kind === 'ruby' ? '注音' : selection.kind === 'romanization-unit' ? selection.attachment === 'translation' ? '翻译单元' : '音译单元' : selection.attachment === 'translation' ? '翻译内容' : '音译内容'}已选 ${selection.ids.length}` : '当前行'}</span>
+    <SelectionSummary selection={selection} />
     <TopMenu id="clipboard" title="选择与剪贴" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
       <button data-role="inline" onClick={props.copy} disabled={!selection?.ids.length || !props.canCopy}>复制</button>
       <button data-role="inline" onClick={props.cut} disabled={!selection?.ids.length || !props.canCopy}>剪切</button>

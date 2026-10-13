@@ -1,4 +1,5 @@
 import { TopMenu } from './editor/TopMenu';
+import { SelectionSummary } from './editor/SelectionSummary';
 import editorStyles from './editor/semantic-editor.module.css';
 import { lineLabel } from '../domain/line-structure';
 import { SingerMarkersDialog } from './SingerMarkersDialog';
@@ -36,12 +37,14 @@ export function CueProperties({project,cue,apply}: {project:ProjectDocument;cue:
     {problem&&<p role="alert">{problem}</p>}</>;
 }
 export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewIssues}: {project:ProjectDocument;apply:(command:ProjectCommand)=>void;title:string;exportOpen:boolean;setExportOpen:(open:boolean)=>void;viewIssues:(issues:OutputIssue[])=>void}) {
+ const {selection,selectedCue}=useEditorSelection()!;
  const [dialog,setDialog]=useState<'groups'|'defaults'|'auto'|'singers'|null>(null), [error,setError]=useState('');
  const [activeMenuId,setActiveMenuId]=useState<string|null>(null);
  const [autoGroups,setAutoGroups]=useState<string[]|null>(null);
  const command=(c:KaraokeCommand)=>{try{apply({type:'karaoke',command:c});setError('');return true;}catch(e){setError((e as Error).message);return false;}};
- return <><div className={styles.tools}>
- <TopMenu id="cue-tools" title="导唱符 ▾" className={editorStyles.settingsMenu} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId}><button data-role="inline" onClick={()=>(setError(''),setDialog('auto'))}>自动插入导唱符</button><button data-role="inline" onClick={()=>(setError(''),setDialog('defaults'))}>默认导唱符</button></TopMenu>
+ return <><div className={editorStyles.ribbon} aria-label="卡拉 OK 操作">
+ <SelectionSummary selection={selection} selectedCue={selectedCue} />
+ <TopMenu id="cue-tools" title="导唱符" className={editorStyles.ribbonMenu} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId}><button data-role="inline" onClick={()=>(setError(''),setDialog('auto'))}>自动插入导唱符</button><button data-role="inline" onClick={()=>(setError(''),setDialog('defaults'))}>默认导唱符</button></TopMenu>
  <button data-role="secondary" onClick={()=>(setError(''),setDialog('groups'))}>分组管理</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('singers'))}>歌手标记管理</button><button data-role="primary" onClick={()=>setExportOpen(true)}>导出 NicoKara</button></div>
  {error&&!dialog&&<p role="alert">{error}</p>}
  {dialog==='singers'&&<SingerMarkersDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
