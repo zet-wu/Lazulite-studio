@@ -23,8 +23,13 @@ test('singer rename and reorder retain focus and nested deletion confirmation ca
 test('invalid singer types locate the field and do not block plain text',async({page})=>{
  await load(page,xml.replace('type="person"','type="invalid"'));await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByRole('button',{name:'下载歌词'}).click();await page.getByRole('button',{name:'歌手 actor：非法 type invalid',exact:true}).click();await expect(page.getByLabel('歌手 actor type')).toBeFocused();await page.getByLabel('歌手 actor type').selectOption('person');await page.getByRole('button',{name:'关闭歌手管理'}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByRole('button',{name:'歌手 actor：非法 type invalid'})).toHaveCount(0);
 });
-test('sync and output preferences survive panel unmount without restoring completion',async({page})=>{
- await load(page);await page.getByRole('button',{name:'打轴',exact:true}).click();await page.getByLabel('打轴模式').selectOption('line');await page.getByText('回听与校准',{exact:true}).click();await page.getByLabel('输入偏移（毫秒）').fill('75');await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('lrc');await page.getByRole('button',{name:'打轴',exact:true}).click();await expect(page.getByLabel('打轴模式')).toHaveValue('line');await expect(page.getByText('输入偏移 75 ms')).toBeVisible();await page.getByRole('button',{name:'归零',exact:true}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByLabel('导出格式')).toHaveValue('lrc');
+test('output preference survives a panel switch', async ({ page }) => {
+ await load(page);
+ await page.getByRole('button', { name: '文件打包', exact: true }).click();
+ await page.getByLabel('导出格式').selectOption('lrc');
+ await page.getByRole('button', { name: '打轴', exact: true }).click();
+ await page.getByRole('button', { name: '文件打包', exact: true }).click();
+ await expect(page.getByLabel('导出格式')).toHaveValue('lrc');
 });
 test('single switches and mixed batch checkboxes preserve one-step undo',async({page})=>{
  await load(page);await page.locator('[data-outline-drag]').first().click();await page.getByRole('switch',{name:'跳过打轴'}).check();

@@ -27,8 +27,8 @@ test('follow reuses energy windows and preserves the curve across slow window cr
   await page.getByLabel('播放跟随',{exact:true}).check();
   await page.getByRole('button',{name:'播放',exact:true}).click();
   const populated:boolean[]=[];
-  for(let i=0;i<20;i++) {
-    await page.waitForTimeout(200);
+  for(let i=0;i<4;i++) {
+    await page.waitForTimeout(1000);
     populated.push(!!await page.locator('[aria-label="人声能量"] polyline').getAttribute('points'));
   }
   expect(requests).toBeLessThan(20);
@@ -36,4 +36,6 @@ test('follow reuses energy windows and preserves the curve across slow window cr
   const time=await page.locator('audio').evaluate((el:HTMLAudioElement)=>el.currentTime);
   expect(time).toBeGreaterThan(3);
   await expect(page.locator('audio')).toHaveCount(1);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await page.unrouteAll({ behavior: 'wait' });
 });

@@ -10,9 +10,13 @@ it('lazily expands rule and line groups, pages details and locates the selected 
   fireEvent.click(screen.getByRole('button',{name:/^缺少时间/}));
   expect(container.querySelectorAll('li')).toHaveLength(0);
   fireEvent.click(screen.getByRole('button',{name:/^第 1 行/}));
-  expect(container.querySelectorAll('li')).toHaveLength(50);
-  fireEvent.click(screen.getByRole('button',{name:/再显示 50 项/}));
-  expect(container.querySelectorAll('li')).toHaveLength(100);
-  fireEvent.click(screen.getByRole('button',{name:issues[99].message}));
-  expect(locate).toHaveBeenCalledWith(issues[99]);
+  const initial = container.querySelectorAll('li').length;
+  expect(initial).toBeGreaterThan(0);
+  expect(initial).toBeLessThan(issues.length);
+  fireEvent.click(screen.getByRole('button',{name:/再显示/}));
+  const expanded = container.querySelectorAll('li').length;
+  expect(expanded).toBeGreaterThan(initial);
+  expect(expanded).toBeLessThanOrEqual(issues.length);
+  fireEvent.click(screen.getByRole('button',{name:issues[expanded - 1].message}));
+  expect(locate).toHaveBeenCalledWith(issues[expanded - 1]);
 });

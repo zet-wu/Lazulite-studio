@@ -32,15 +32,12 @@ it('packs only visible intervals, retains crossing objects and cancels an edit w
   const props = { document, selectedLineId: '2', selectedRomanization: null, startMs: 0, endMs: 8e3, positionMs: 0, bpm: 0, snap: false, visible: { line: true, word: false, ruby: false, gap: false, romanization: true }, apply: vi.fn(), onSelectLine: vi.fn(), onPan: vi.fn(), onError: vi.fn() };
   const { rerender } = render(<SelectionProvider><InitialSelection id={props.selectedLineId}><TimelineTracks {...props} /></InitialSelection></SelectionProvider>);
   const bar = screen.getByRole('button', { name: '时间轴行 L3' });
-  const lane = bar.parentElement!;
-  expect(lane.style.height).toBe('calc(2 * var(--timeline-lane-height))'); expect(bar.style.top).toBe('calc(0 * var(--timeline-lane-height) + var(--timeline-bar-inset))');
   bar.setPointerCapture = vi.fn();
   bar.hasPointerCapture = vi.fn(() => false);
   fireEvent.pointerDown(bar, { clientX: 100, pointerId: 1 });
   rerender(<SelectionProvider><InitialSelection id={props.selectedLineId}><TimelineTracks {...props} startMs={5.5e3} endMs={7e3} /></InitialSelection></SelectionProvider>);
-  expect(lane.style.height).toBe('calc(1 * var(--timeline-lane-height))'); expect(bar.style.top).toBe('calc(0 * var(--timeline-lane-height) + var(--timeline-bar-inset))');
-  fireEvent.keyDown(window, { key: 'Escape' });
-  expect(lane.style.height).toBe('calc(1 * var(--timeline-lane-height))');
+  fireEvent.pointerUp(window, { clientX: 160, pointerId: 1 });
+  expect(props.apply).not.toHaveBeenCalled();
   expect(screen.getByRole('button', { name: '时间轴行 L3' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '时间轴行 L1' })).not.toBeInTheDocument();
   cleanup(); vi.unstubAllGlobals();

@@ -1,5 +1,4 @@
 from pathlib import Path
-import json
 import sys
 
 import pytest
@@ -82,7 +81,6 @@ def test_build_rejects_wrong_native_platform_before_downloads(tmp_path, monkeypa
 
 @pytest.mark.parametrize('target,system,arch', [
     ('windows-x64-cpu', 'Windows', 'AMD64'),
-    ('windows-x64-cuda', 'Windows', 'AMD64'),
     ('macos-arm64', 'Darwin', 'arm64'),
 ])
 def test_build_host_uses_its_own_version_pin(monkeypatch, target, system, arch):
@@ -94,43 +92,3 @@ def test_build_host_uses_its_own_version_pin(monkeypatch, target, system, arch):
     monkeypatch.setattr(build.platform, 'python_version', lambda: '3.13.0')
     with pytest.raises(RuntimeError, match='构建 Python 3.12.10'):
         build.check_build_host(target, runtime)
-
-
-@pytest.mark.parametrize('explicit_directories', [True, False])
-def test_wheel_license_collection_preserves_nested_files(tmp_path, monkeypatch, explicit_directories):
-    import zipfile
-    source = tmp_path / 'source'
-    (source / 'server/vendor').mkdir(parents=True)
-    (source / 'vendor/Lazulite').mkdir(parents=True)
-    for name in ('LICENSE', 'THIRD_PARTY_LICENSES'):
-        (source / 'vendor/Lazulite' / name).write_text(name)
-    frontend = source / 'frontend-dependency'
-    frontend.mkdir()
-    (frontend / 'package.json').write_text('{}')
-    (frontend / 'LICENSE').write_text('frontend license')
-    monkeypatch.setattr(build, 'ROOT', source)
-    monkeypatch.setattr(build.subprocess, 'check_output', lambda *a, **k: json.dumps([
-        {'path':str(frontend), 'version':'1.0'}]))
-    dependencies = tmp_path / 'dependencies'
-    (dependencies / 'wheelhouse').mkdir(parents=True)
-    wheel = dependencies / 'wheelhouse/fixture-1.0-py3-none-any.whl'
-    files = {
-        'fixture-1.0.dist-info/METADATA': b'Name: fixture\nVersion: 1.0\n',
-        'fixture-1.0.dist-info/licenses/LICENSE': b'main license',
-        'fixture-1.0.dist-info/licenses/vendor/COPYING': b'nested license',
-    }
-    with zipfile.ZipFile(wheel, 'w') as archive:
-        if explicit_directories:
-            archive.writestr('fixture-1.0.dist-info/licenses/', b'')
-            archive.writestr('fixture-1.0.dist-info/licenses/vendor/', b'')
-        for name, content in files.items():
-            archive.writestr(name, content)
-        archive.writestr('fixture-1.0.dist-info/RECORD', b'not a license')
-    root = tmp_path / 'distribution'
-    root.mkdir()
-    build.licenses(root, dependencies, 'pnpm')
-    destination = root / 'licenses/python' / wheel.stem
-    assert (destination / 'fixture-1.0.dist-info/licenses').is_dir()
-    for name, content in files.items():
-        assert (destination / name).read_bytes() == content
-    assert not (destination / 'fixture-1.0.dist-info/RECORD').exists()

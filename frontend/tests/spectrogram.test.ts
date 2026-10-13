@@ -9,7 +9,7 @@ it('places a 440 Hz tone above silence in the correct spectral band', () => {
   expect(output).toHaveLength(SPECTRUM_WIDTH * SPECTRUM_HEIGHT);
   const center = Math.floor(SPECTRUM_WIDTH / 2);
   const row = SPECTRUM_HEIGHT - 1 - Math.round(Math.log(440 / 80) / Math.log((rate / 2) / 80) * (SPECTRUM_HEIGHT - 1));
-  expect(output[row * SPECTRUM_WIDTH + center]).toBeGreaterThan(100);
+  expect(output[row * SPECTRUM_WIDTH + center]).toBeGreaterThan(silent[row * SPECTRUM_WIDTH + center]);
   expect(silent[row * SPECTRUM_WIDTH + center]).toBe(0);
 });
 

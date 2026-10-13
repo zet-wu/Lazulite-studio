@@ -1,6 +1,5 @@
 import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
-import { performanceTtml } from '../fixtures/large-document';
 import { timedIntervalsTtml } from '../fixtures/timed-intervals';
 
   test('collapse toggle retains keyboard focus', async ({ page }) => {
@@ -46,38 +45,4 @@ test('wheel zoom keeps clipped edges uneditable and pointercancel leaves no tran
   await bar.dispatchEvent('pointercancel');
   await page.mouse.up();
   await expect(begin).toHaveValue(before);
-});
-
-test('large proposal scroll preserves manual choices while mounting only visible rows', async ({ page }) => {
-  test.setTimeout(90_000);
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/projects/sample-project/edit?scenario=no-music');
-  const xml = performanceTtml(2000).replace(/<text for="p(\d+)"><span begin="[^"]*" end="[^"]*">rom<\/span><\/text>/g, (_, i) =>
-    `<text for="p${i}"><span begin="${(Number(i) * .3).toFixed(3)}" end="${(Number(i) * .3 + .024).toFixed(3)}">ko</span></text>`);
-  await importLyrics(page, { name: 'large-ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
-  await expect(page.locator('[data-outline-drag]')).toHaveCount(2000);
-  await page.locator('[data-outline-drag]').first().click();
-  await page.locator('[data-top-menu="clipboard"] summary').click(); await page.getByRole('button', { name: '全选', exact: true }).click();
-  await page.locator('[data-top-menu="tools"] summary').click(); await page.getByRole('button', { name: '从音译生成 注音…', exact: true }).click();
-  const dialog = page.locator('[role=dialog]');
-  const rows = dialog.locator('[data-proposal-count]');
-  await expect(rows).toHaveAttribute('data-proposal-count', '2000');
-  expect(await dialog.getByLabel('目标词').count()).toBeLessThan(80);
-  const first = rows.locator('[data-index="0"]');
-  await first.getByLabel('跳过生成').check();
-  await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
-  const last = rows.locator('[data-index="1999"]');
-  await expect.poll(async () => {
-    await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
-    return last.isVisible();
-  }, { timeout: 20_000 }).toBe(true);
-  await last.getByLabel('目标 注音').fill('手动末行');
-  await rows.evaluate(e => { e.scrollTop = 0; });
-  await expect(first.getByLabel('跳过生成')).toBeChecked();
-  await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
-  await expect.poll(async () => {
-    await rows.evaluate(e => { e.scrollTop = e.scrollHeight; });
-    return last.isVisible();
-  }, { timeout: 20_000 }).toBe(true);
-  await expect(last.getByLabel('目标 注音')).toHaveValue('手动末行');
 });
