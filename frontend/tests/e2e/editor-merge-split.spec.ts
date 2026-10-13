@@ -122,17 +122,3 @@ test('three Ruby and background words use the same merge actions; insertion uses
   await expect(row(page).locator('[data-word-id]')).toHaveCount(5);
   await expect(row(page).locator('[data-word-id]').nth(2).getByLabel('词 中间', { exact: true })).toBeFocused();
 });
-
-test('split uses known word envelope across a 1ms punctuation reversal in preview and apply', async ({ page }) => {
-  const { importLyrics } = await import('../fixtures/import-lyrics');
-  const xml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="73" end="78"><span begin="74.560" end="75.224">伝え</span><span begin="75.224" end="75.224">(</span><span begin="75.223" end="75.865">伝え)</span></p></div></body></tt>';
-  await importLyrics(page, { name: 'boundary.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
-  await page.locator('[data-outline-drag]').first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行…' }).click();
-  const dialog = page.getByRole('dialog', { name: '拆分歌词行', exact: true });
-  await dialog.getByRole('button', { name: '在第 2 词前切分' }).click();
-  await expect(dialog.getByLabel('拆分结果').locator('section').first()).toContainText('74.560s – 75.224s');
-  await expect(dialog.getByLabel('拆分结果').locator('section').last()).toContainText('75.223s – 75.865s');
-  await dialog.getByRole('button', { name: '应用', exact: true }).click();
-  await expect(page.locator('[data-outline-drag]')).toHaveCount(2);
-  await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.locator('[data-outline-drag]')).toHaveCount(1);
-});

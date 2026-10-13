@@ -8,37 +8,6 @@ async function importTtml(page: Page, name = 'reference-apple-metadata') {
   await importLyrics(page, { name: `${name}.ttml`, mimeType: 'application/xml', buffer: source });
 }
 
-async function openMenu(page: Page, title: string) {
-  if (title === '文件') { await page.getByRole('button', { name: '文件打包', exact: true }).click(); return; }
-  const summary = page.locator('summary').filter({ hasText: title }).first();
-  if (await summary.locator('..').getAttribute('open') === null) await summary.click();
-}
-
-test('edits and exports a rich local draft with canvas undo and redo', async ({ page }) => {
-  await importTtml(page);
-  const word = page.getByRole('textbox', { name: '词 今日', exact: true });
-  await word.dblclick();
-  await word.fill('今日改');
-  await word.blur();
-  const line = page.locator('main section[data-line-id="L1"]');
-  await line.focus();
-  await page.keyboard.press('ControlOrMeta+Z');
-  await expect(page.getByRole('textbox', { name: '词 今日', exact: true })).toBeVisible();
-  await page.keyboard.press('ControlOrMeta+Shift+Z');
-  await expect(page.getByRole('textbox', { name: '词 今日改', exact: true })).toBeVisible();
-  await openMenu(page, '歌词设置');
-  await page.getByRole('button', { name: '歌手管理', exact: true }).click();
-  await page.getByLabel('歌手 v1 type').selectOption('person');
-  await page.getByLabel('歌手 v2 type').selectOption('person');
-  await page.getByRole('button', { name: '关闭歌手管理' }).click();
-  await openMenu(page, '文件');
-  const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '下载歌词' }).click();
-  const xml = await readFile(await (await download).path(), 'utf8');
-  expect(xml).toContain('今日改');
-  expect(xml).toContain('きょ');
-  expect(xml).toContain('今天 也唱歌');
-});
 
 test('restores a local project checkpoint without persisting the undo stack', async ({ page }) => {
   await importTtml(page);

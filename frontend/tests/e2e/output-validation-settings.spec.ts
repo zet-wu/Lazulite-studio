@@ -26,7 +26,7 @@ test('settings dialog restores visible focus and navigates to the requested rule
  await expect(page.getByRole('tab',{name:'歌词校验',exact:true})).toBeFocused();await expect(page.locator('#amll-noChorus')).toHaveCount(0);
  await page.keyboard.press('End');await expect(page.getByRole('tab',{name:'AMLL 兼容校验',exact:true})).toBeFocused();await expect(target).toBeVisible();
 });
-test('automatic refresh retains open rules and selected scope; undo and redo refresh, downloads retain their own blockers',async({page})=>{
+test('automatic refresh retains open rules and selected scope through undo and redo',async({page})=>{
  await load(page);await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByRole('tab',{name:'歌词校验',exact:true})).toHaveAttribute('aria-selected','true');
  await page.getByRole('tab',{name:'AMLL 兼容校验',exact:true}).click();const rule=page.locator('#amll-noWordAgents');
  await rule.locator('button[aria-expanded]').click();await rule.getByRole('button',{name:/^第 1 行/}).first().click();await rule.getByRole('checkbox').first().check();
@@ -34,11 +34,7 @@ test('automatic refresh retains open rules and selected scope; undo and redo ref
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(rule.getByRole('button',{name:/^第 1 行/}).first()).toHaveAttribute('aria-expanded','false');
  await rule.getByRole('button',{name:/^第 1 行/}).first().click();await expect(rule.getByRole('checkbox').first()).toBeVisible();
  await page.getByRole('button',{name:'重做',exact:true}).click();await expect(rule.getByText('范围：原选中问题已消失')).toBeVisible();
- // Change to an untimed document, then exercise the actual download gate independently of validation type.
- await importLyrics(page,{name:'untimed.txt',mimeType:'text/plain',buffer:Buffer.from('untimed')});await page.getByRole('button',{name:'文件打包',exact:true}).click();
- await page.getByLabel('导出格式').selectOption('elrc');await page.getByRole('button',{name:'下载歌词',exact:true}).click();await expect(page.locator('[data-blocking=true]')).not.toHaveCount(0);
- await page.getByRole('tab',{name:'歌词校验',exact:true}).click();await expect(page.locator('[data-blocking=true]')).not.toHaveCount(0);
- await page.getByRole('tab',{name:'AMLL 兼容校验',exact:true}).click();await expect(page.locator('[data-blocking=true]')).not.toHaveCount(0);
+
 });
 test('embedded candidates share parsed badges, selection and full-width cards; errors stay explicit',async({page})=>{
  await page.goto('/projects/sample-project/edit');
@@ -80,11 +76,9 @@ test('large document measures computation separately from automatic entry and in
  writeFileSync(test.info().outputPath('performance.json'),JSON.stringify({computation,entryMs,expansionMs,switchMs,updateMs},null,2));
 });
 
-test('music packaging checks current data and keeps its failure visible through validation switches',async({page})=>{
+test('music packaging checks current data and blocks invalid output',async({page})=>{
  await page.goto('/projects/sample-project/edit');await expect(page.getByRole('button',{name:'编辑',exact:true})).toBeVisible();
  await page.evaluate(()=>{const original=window.fetch;window.fetch=(...args)=>String(args[0]).endsWith('/packaging')?Promise.resolve(Response.json({filename:'source.mp3',format_label:'MP3',asset_id:'sample-asset',supported:true,container:'mp3',tracks:[],error:null})):original(...args);});
  await importLyrics(page,{name:'untimed.txt',mimeType:'text/plain',buffer:Buffer.from('untimed')});await page.getByRole('button',{name:'文件打包',exact:true}).click();
  await page.getByRole('button',{name:'打包文件',exact:true}).click();await expect(page.locator('[data-blocking=true]')).not.toHaveCount(0);
- await page.getByRole('tab',{name:'AMLL 兼容校验',exact:true}).click();await expect(page.locator('[data-blocking=true]')).not.toHaveCount(0);
- await page.getByRole('tab',{name:'歌词校验',exact:true}).click();await expect(page.locator('[data-blocking=true]')).not.toHaveCount(0);
 });

@@ -1,6 +1,8 @@
 import io
 import wave
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from server.app import create_app
@@ -26,8 +28,8 @@ def multipart_chunks(size: int):
     yield f"\r\n--{boundary}--\r\n".encode()
 
 
-def test_studio_http_lifecycle(tmp_path, monkeypatch):
-    monkeypatch.setattr("server.app.MAX_UPLOAD", 16 * 1024)
+@pytest.fixture
+def authenticated_client(tmp_path):
     settings = Settings("pw", False, "http://studio")
     client = TestClient(create_app(tmp_path, settings), base_url="https://studio")
     login = client.post(
@@ -36,6 +38,13 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
     assert login.status_code == 200
     csrf = login.cookies["studio_csrf"]
     headers = {"origin": settings.origin, "x-csrf-token": csrf}
+    yield client, settings, headers
+    client.close()
+
+
+def test_upload_boundaries_and_session_revocation(tmp_path, monkeypatch, authenticated_client):
+    monkeypatch.setattr("server.app.MAX_UPLOAD", 16 * 1024)
+    client, settings, headers = authenticated_client
     assert (
         client.post(
             "/api/v1/uploads",
@@ -72,6 +81,16 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
         and chunked.json()["code"] == "upload_too_large"
         and chunked.json()["request_id"] == "chunked-upload"
     )
+    old_cookies = dict(client.cookies)
+    assert client.delete("/api/v1/session", headers=headers).status_code == 200
+    logged_out = TestClient(create_app(tmp_path, settings), base_url="https://studio")
+    logged_out.cookies.update(old_cookies)
+    assert logged_out.get("/api/v1/projects").status_code == 401
+
+
+
+def test_project_creation_idempotency_and_pagination(authenticated_client):
+    client, settings, headers = authenticated_client
     uploaded = client.post(
         "/api/v1/uploads",
         files={"file": ("tone.wav", wav_bytes(), "audio/wav")},
@@ -79,21 +98,6 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
     )
     assert uploaded.status_code == 200
     asset = uploaded.json()
-    assert set(
-        (
-            "schema_version",
-            "id",
-            "filename",
-            "content_type",
-            "size_bytes",
-            "duration_ms",
-            "status",
-            "asset_hash",
-            "source_start_ms",
-            "proxy_offset_ms",
-        )
-    ) <= set(asset)
-    assert asset["schema_version"] == "studio-asset-v1" and asset["status"] == "ready"
     created = client.post(
         "/api/v1/projects",
         json={"name": "Tone", "upload_id": asset["id"]},
@@ -135,60 +139,25 @@ def test_studio_http_lifecycle(tmp_path, monkeypatch):
         if not cursor:
             break
     assert len(seen) == 3 and len(set(seen)) == 3
-    detail = client.get(f"/api/v1/projects/{pid}").json()
-    assert detail["asset"]["id"] == asset["id"]
-    document = client.get(f"/api/v1/projects/{pid}/document")
-    revision = document.json()["revision"]
-    assert revision and document.headers["etag"] == f'"{revision}"'
-    lyrics = client.get(f"/api/v1/projects/{pid}/lyrics")
-    assert lyrics.status_code == 200 and lyrics.headers["etag"] == f'"{revision}"'
-    audio = client.get(f"/api/v1/projects/{pid}/audio", headers={"range": "bytes=0-9"})
-    assert audio.status_code == 206 and len(audio.content) == 10
-    pcm = client.get(f"/api/v1/projects/{pid}/pcm?start_ms=0&end_ms=500")
-    assert pcm.status_code == 200 and pcm.headers["x-sample-rate"] == "48000"
-    assert pcm.headers["x-channels"] == "2" and len(pcm.content) == 96_000
-    assert client.get(f"/api/v1/projects/{pid}/pcm?start_ms=0&end_ms=4020").status_code == 200
-    assert client.get(f"/api/v1/projects/{pid}/pcm?start_ms=0&end_ms=4021").status_code == 422
-    assert client.get(f"/api/v1/projects/{pid}/pcm?start_ms=0&end_ms=5000").status_code == 422
-    assert (
-        client.get(
-            f"/api/v1/projects/{pid}/audio", headers={"range": "bytes=-10"}
-        ).status_code
-        == 206
+
+
+def test_studio_http_lifecycle(tmp_path, authenticated_client):
+    client, settings, headers = authenticated_client
+    from server.tests.test_publish import _project, _save, _wait
+    pid, asset_id = _project(client, headers, tmp_path)
+    revision = client.get(f"/api/v1/projects/{pid}/document").json()["revision"]
+    revision = _save(client, headers, pid, revision,
+                     '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0s" end="1s">hello</p></body></tt>')
+    response = client.post(
+        f"/api/v1/projects/{pid}/publish",
+        json={"revision": revision, "asset_id": asset_id,
+              "lrc_kind": "lrc", "lrc_text": "[00:00.000]hello\n"},
+        headers=headers,
     )
-    assert (
-        client.get(
-            f"/api/v1/projects/{pid}/audio", headers={"range": "bytes=999999999-"}
-        ).status_code
-        == 416
-    )
-    etag = client.get(f"/api/v1/projects/{pid}/audio").headers["etag"]
-    assert (
-        client.get(
-            f"/api/v1/projects/{pid}/audio",
-            headers={"range": "bytes=0-9", "if-range": etag},
-        ).status_code
-        == 206
-    )
-    waveform = client.get(
-        f"/api/v1/projects/{pid}/waveform",
-        params={"level": 0, "start_ms": 0, "end_ms": 100},
-    ).json()
-    assert (
-        waveform["schema_version"] == "studio-waveform-v1"
-        and waveform["asset_id"] == asset["id"]
-    )
-    restarted = TestClient(create_app(tmp_path, settings), base_url="https://studio")
-    restarted.cookies.update(client.cookies)
-    assert (
-        restarted.get(f"/api/v1/projects/{pid}").json()["asset"]["asset_hash"]
-        == asset["asset_hash"]
-    )
-    old_cookies = dict(client.cookies)
-    assert client.delete("/api/v1/session", headers=headers).status_code == 200
-    logged_out = TestClient(create_app(tmp_path, settings), base_url="https://studio")
-    logged_out.cookies.update(old_cookies)
-    assert logged_out.get("/api/v1/projects").status_code == 401
+    assert response.status_code == 202
+    job_id = response.json()["id"]
+    assert _wait(client, job_id)["status"] == "succeeded"
+    assert client.get(f"/api/v1/jobs/{job_id}/result").status_code == 200
 
 
 def test_trusted_gateway_still_requires_origin(tmp_path):

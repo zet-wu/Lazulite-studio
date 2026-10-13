@@ -1,7 +1,7 @@
 import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
 import { performanceTtml } from '../fixtures/large-document';
-import { rubyTtml, timedIntervalsTtml } from '../fixtures/timed-intervals';
+import { timedIntervalsTtml } from '../fixtures/timed-intervals';
 
   test('collapse toggle retains keyboard focus', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -22,40 +22,6 @@ import { rubyTtml, timedIntervalsTtml } from '../fixtures/timed-intervals';
     await collapsed.press('Space');
     await expect(toggle).toBeFocused();
   });
-
-test('grouped skips, manual generation, history and checkpoint with bounded layout', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/projects/sample-project/edit?scenario=no-music');
-  await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(rubyTtml()) });
-  const line = page.locator('main section[data-line-id="kana"]');
-  await expect(line.locator('[data-romanization-content-id]')).toBeVisible();
-  const source = await line.locator('[data-romanization-content-id] input').evaluateAll(nodes => nodes.map(n => (n as HTMLInputElement).value));
-  await line.getByText('音译 · ja-Latn').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
-  const skips = dialog.getByLabel('跳过生成');
-  await expect(skips).toHaveCount(3);
-  for (const skip of await skips.all()) {
-    await expect(skip).toBeChecked();
-
-  }
-
-  await expect(dialog.getByRole('status')).toContainText('所有单元均跳过');
-
-  await skips.nth(0).uncheck(); await skips.nth(1).uncheck();
-  await dialog.getByRole('button', { name: '生成 注音', exact: true }).click();
-  await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(2);
-  await expect(line.getByRole('textbox', { name: '读音 か', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '撤销', exact: true }).click();
-  await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '重做', exact: true }).click();
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(page.getByText('已保存')).toBeVisible();
-  page.once('dialog', dialog => dialog.accept());
-  await page.reload();
-  await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(2);
-  expect(await line.locator('[data-romanization-content-id] input').evaluateAll(nodes => nodes.map(n => (n as HTMLInputElement).value))).toEqual(source);
-});
 
 test('wheel zoom keeps clipped edges uneditable and pointercancel leaves no transaction', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');

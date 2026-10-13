@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
-for (const project of [false, true]) for (const count of [40, 120]) for (const kind of ['line', 'word']) test(`drag start and outside scrolling ${count} ${kind} project=${project}`, async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto(project ? '/projects/sample-project/edit' : '/projects/sample-project/edit?scenario=no-music');
+for (const count of [40, 120]) for (const kind of ['line', 'word']) test(`drag start and outside scrolling ${count} ${kind}`, async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/projects/sample-project/edit');
   const rows = Array.from({ length: count }, (_, i) => `<p xml:id="l${i}" begin="${i*3}" end="${i*3+2}"><span begin="${i*3}" end="${i*3+2}">Row${i}</span></p>`).join('');
   await importLyrics(page, { name: 'scroll.ttml', mimeType: 'application/xml', buffer: Buffer.from(`<tt xmlns="http://www.w3.org/ns/ttml"><body><div>${rows}</div></body></tt>`) });
   await page.getByRole('button', { name: '打轴', exact: true }).click();

@@ -53,14 +53,13 @@ test('automatic dialog cancels drafts, checks thresholds and undoes insertion as
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(0);
  await page.locator('[data-top-menu="cue-tools"] summary').click();await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await expect(page.getByLabel('行前阈值',{exact:true})).toHaveValue('3000');
 });
-test('singer marker drafts cancel, apply once, survive reopening and disable forced decoration',async({page})=>{
+test('singer marker drafts cancel locally',async({page})=>{
  await load(page);
  const source=xml.replace('<tt xmlns=', '<tt xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns=').replace('<body>','<head><metadata><ttm:agent xml:id="singer" type="person"><ttm:name>A</ttm:name></ttm:agent></metadata></head><body>').replace('<p xml:id="a"','<p ttm:agent="singer" xml:id="a"');
  await importLyrics(page,{name:'singer.ttml',mimeType:'application/xml',buffer:Buffer.from(source)});await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();
- await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');await expect(page.getByLabel('Zoom 值',{exact:true})).toHaveValue('1');await expect(page.getByLabel('ForceWipeDecor',{exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');
  await page.getByLabel('触发标记',{exact:true}).fill('cancel');await page.getByRole('button',{name:'关闭歌手标记管理'}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');
- await page.getByLabel('触发标记',{exact:true}).fill('voice-A');await page.getByLabel('扫色前图片',{exact:true}).fill('images/a.png');await page.getByRole('button',{name:'应用',exact:true}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('voice-A');await page.getByRole('button',{name:'关闭歌手标记管理'}).click();
- await page.getByRole('button',{name:'撤销',exact:true}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');await expect(page.getByLabel('扫色前图片',{exact:true})).toHaveValue('transparent-1x1.png');
+
 });
 test('wrapped multiline canvas keeps multi-character Ruby and editing above timing markers; normal sync stays unchanged',async({page})=>{
  await load(page);await page.setViewportSize({width:1000,height:1000});

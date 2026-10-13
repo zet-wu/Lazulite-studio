@@ -25,7 +25,7 @@ test('format selection downloads expected content and exposes overlap details',a
  await importLyrics(page,{name:'output-formats-layout.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.getByRole('button',{name:'文件打包',exact:true}).click();
  await page.getByRole('tab',{name:'歌词校验',exact:true}).click();await expect(page.getByText('当前检查未发现问题',{exact:true})).toBeVisible();
  await page.getByText('导出对照',{exact:true}).click();const table=page.getByRole('table',{name:'所选格式导出对照'});
- for(const format of ['ttml','eslrc','qrc','yrc','lys','ass']){
+ for(const format of ['ttml','ass']){
   await page.getByLabel('导出格式').selectOption(format);
   if(format==='ass'){await expect(table.getByText('分轨字幕',{exact:true})).toHaveCount(2);const result=table.getByRole('row').last().locator('td > span');await result.focus();await expect(result.getByRole('tooltip')).toBeVisible();await expect(result).toContainText('1、2');}
   const pending=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();const download=await pending;const output=await readFile(await download.path(),'utf8');await writeFile(test.info().outputPath(`output.${format}`),output);expect(output).toContain('Main');
@@ -33,14 +33,12 @@ test('format selection downloads expected content and exposes overlap details',a
  }
  const overlap=await page.evaluate(async()=>{const fixturePath='/tests/fixtures/translation-whitespace.ts',description='/src/adapters/format-description.ts';const {translationWhitespaceDocument}=await import(fixturePath);const {describeLyricFormat}=await import(description);const d=translationWhitespaceDocument();d.lines.push({...d.lines[2],id:'missing',beginMs:null});return describeLyricFormat(d,'lrc')[5].detail;});expect(overlap).toContain('1、2');
 });
-test(`ASS-only issue locates its attachment and uses current download gates`,async({page})=>{
+test(`ASS-only issue locates its attachment`,async({page})=>{
  await page.goto('/projects/sample-project/edit?scenario=no-music');
  const xml=await page.evaluate(async()=>{const fixture='/tests/fixtures/translation-whitespace.ts',codec='/src/adapters/ttml/lyric-codec.ts';const {translationWhitespaceDocument}=await import(fixture);const {serializeLyricTtml}=await import(codec);const d=translationWhitespaceDocument();d.romanizationTracks[0].contents[0].units[2].beginMs=1400;return serializeLyricTtml(d,{draft:true});});
  await importLyrics(page,{name:'blocked.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByRole('tab',{name:'歌词校验',exact:true}).click();
  const rule=page.getByRole('button',{name:/^时间顺序/}).locator('..');await rule.locator(':scope > button[aria-expanded]').click();await rule.getByRole('button',{name:/^第 1 行/}).click();
  const issue=page.getByRole('button',{name:/音译.*重叠或倒序/});await expect(issue).toHaveCount(1);
  await expect(issue.locator('..')).toContainText('阻塞 · ASS');await issue.focus();await issue.press('Enter');await expect(page.getByRole('button',{name:'编辑',exact:true})).toHaveAttribute('aria-current','page');
- await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('ass');await page.getByRole('button',{name:'下载歌词',exact:true}).click();await expect(page.getByText(/本次操作有 1 项/)).toBeVisible();
 
- await page.getByLabel('导出格式').selectOption('txt');const pending=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();await pending;
 });

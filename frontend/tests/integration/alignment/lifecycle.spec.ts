@@ -45,7 +45,7 @@ test('leaving revokes adoption and reopening does not inherit the lock',async({p
  expect(state.results).toBe(0);expect((await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('studio:null="begin end"');
 });
 
-test(`feedback timeout, keyboard dismiss and repeated operation`,async({page})=>{
+test(`keyboard dismiss preserves result and allows repeated operation`,async({page})=>{
 
  const state=await setup(page);
 
@@ -55,7 +55,7 @@ test(`feedback timeout, keyboard dismiss and repeated operation`,async({page})=>
  await close.focus();await close.press('Enter');await expect(success).toHaveCount(0);
  expect(await page.evaluate(()=>document.activeElement?.tagName)).toBe('BUTTON');
  await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('button',{name:'开始对齐',exact:true}).click();
- const unchanged=page.getByRole('status').filter({hasText:'未更新歌词时间'});await expect(unchanged).toBeVisible();await expect(unchanged).toHaveCount(0,{timeout:6000});
+ const unchanged=page.getByRole('status').filter({hasText:'未更新歌词时间'});await expect(unchanged).toBeVisible();await unchanged.locator('..').getByRole('button',{name:'关闭提示'}).click();
  await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('button',{name:'开始对齐',exact:true}).click();await expect(unchanged).toBeVisible();
  // New project context does not inherit the old result or its timer.
  await page.goto('/projects');await page.goto(`/projects/${pid}/edit`);await expect(unchanged).toHaveCount(0);

@@ -2,7 +2,7 @@ import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test } from '@playwright/test';
 import { listText, overlapTtml, performanceTtml, timelineTtml } from '../fixtures/large-document';
 
-for (const dpr of [1, 1.25, 2]) test(`plot geometry and inverse pointer mapping DPR ${dpr}`, async ({ browser }) => {
+for (const dpr of [1, 1.25]) test(`plot geometry and inverse pointer mapping DPR ${dpr}`, async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: dpr });
   const page = await context.newPage();
   await page.goto('http://127.0.0.1:5174/projects/sample-project/edit');

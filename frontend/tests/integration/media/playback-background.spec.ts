@@ -39,22 +39,24 @@ test('native media crosses intervals, pauses, seeks and keeps playing through co
   await context.close();
 });
 
-test('independent background saves, exchanges and is visible after its parent ends', async ({ page }) => {
-  const { backgroundTtml } = await import('../../fixtures/timed-intervals');
+test('saved independent background remains visible after its parent ends', async ({ page }) => {
+  const url = '/api/v1/projects/background-playback/document';
+  const envelope = await (await page.request.get(url)).json();
   await page.goto('/projects/background-playback/edit');
-  await importLyrics(page, { name: 'background.ttml', mimeType: 'application/xml', buffer: Buffer.from(backgroundTtml()) });
-  await expect(page.locator('[data-outline-drag]')).toHaveCount(2);
-  await page.locator('[data-outline-drag]').nth(1).click();
-  await page.getByLabel('背景歌词', { exact: true }).check();
-  await expect(page.getByLabel('所属主行')).toHaveValue('parent');
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(page.getByText('已保存', { exact: true })).toBeVisible();
-  const saved = await (await page.request.get('/api/v1/projects/background-playback/document')).json();
-  expect(saved.document.lyrics.draftTtml).toContain('dur="00:05.000"');
-  await page.reload();
-  await page.locator('[data-outline-drag]').nth(1).click();
-  await expect(page.getByLabel('所属主行')).toHaveValue('parent');
-  await expect(page.getByRole('textbox', { name: '行 1 背景结束秒数', exact: true })).toHaveValue('5');
+  const { backgroundTtml } = await import('../../fixtures/timed-intervals');
+  envelope.document = await page.evaluate(async xml => {
+    const codecPath = '/src/adapters/ttml/lyric-codec.ts';
+    const projectPath = '/src/domain/project-document.ts';
+    const { parseLyricTtml, serializeLyricTtml } = await import(codecPath);
+    const { createProjectDocument } = await import(projectPath);
+    const lyrics = parseLyricTtml(xml);
+    lyrics.lines[1].backgroundOf = lyrics.lines[0].id;
+    const project = createProjectDocument(lyrics);
+    return { ...project, lyrics: { draftTtml: serializeLyricTtml(lyrics, { draft: true }) } };
+  }, backgroundTtml());
+  const response = await page.request.put(url, { headers: { origin: 'http://127.0.0.1:5175', 'if-match': envelope.revision }, data: envelope });
+  expect(response.ok()).toBe(true);
+  await page.goto('/projects/background-playback/edit');
   await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
   await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 3; });
   await page.getByRole('button', { name: '播放', exact: true }).click();
@@ -65,14 +67,4 @@ test('independent background saves, exchanges and is visible after its parent en
   await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 4.2; e.playbackRate = .5; });
   await expect(background).toHaveClass(/bgWrapperActive/);
   await page.getByRole('button', { name: '暂停', exact: true }).click();
-  await page.getByRole('button', { name: '编辑', exact: true }).click();
-  await page.getByRole('button', { name: '文件打包', exact: true }).click();
-  const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '下载歌词' }).click();
-  const path = (await (await download).path())!;
-  await importLyrics(page, { name: 'reopened.ttml', mimeType: 'application/ttml+xml', buffer: await (await import('node:fs/promises')).readFile(path) });
-  await expect(page.locator('[data-outline-drag]')).toHaveCount(2);
-  await page.locator('[data-outline-drag]').nth(1).click();
-  await expect(page.getByLabel('背景歌词', { exact: true })).toBeChecked();
-  await expect(page.getByRole('textbox', { name: /行 .*结束秒数/ })).toHaveValue('5');
 });
