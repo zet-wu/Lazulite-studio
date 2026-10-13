@@ -13,5 +13,4 @@ test('local device preferences persist and a failed write can be retried',async(
  await page.getByRole('button',{name:'关闭计算设备'}).click();await expect(page.locator('[data-top-menu="settings"] summary')).toBeFocused();
  await page.reload();await open();await expect(page.getByLabel('人声分离计算设备')).toHaveValue('cpu');await expect(page.getByLabel('自动对齐计算设备')).toHaveValue('auto');
  await page.getByLabel('人声分离计算设备').selectOption('auto');await expect(page.getByLabel('人声分离计算设备')).toHaveValue('auto');
- await page.screenshot({path:test.info().outputPath('device-settings.png')});
 });

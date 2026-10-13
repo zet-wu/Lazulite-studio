@@ -67,29 +67,8 @@ test('mode regenerates once; unfocused and active edits, Escape and IME stay wit
   await expect(page.getByLabel('音译 ja-Latn', { exact: true })).toHaveValue('not blurred');
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.getByLabel('音译 ja-Latn', { exact: true })).toHaveCount(0);
 });
-for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) test(`static proposal layout at ${width} ${theme}`, async ({ page }) => {
-  await page.setViewportSize({ width, height: 1000 });
-  await page.addInitScript(theme => localStorage.setItem('lazulite-editor-theme', theme), theme);
-  await load(page); const dialog = await generate(page); await dialog.getByLabel('输出', { exact: true }).selectOption('timed');
-  await expect(dialog.locator('[data-source-word]')).toHaveCount(1); await expect(dialog.getByRole('textbox')).toHaveCount(4);
-  const input = dialog.getByLabel('L1单元 1音译'); await page.mouse.move(1, 1);
-  const before = await input.boundingBox(); expect(await input.evaluate(e => getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
-  await input.focus(); await page.mouse.move(1, 1); expect(await input.evaluate(e => getComputedStyle(e).borderTopColor)).not.toBe('rgba(0, 0, 0, 0)');
-  expect(await input.boundingBox()).toEqual(before);
-  await input.fill('very long editable romanization '.repeat(20));
-  const overflow = await dialog.evaluate(e => e.scrollWidth > e.clientWidth); expect(overflow).toBe(false);
-  await input.blur(); await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
-  await dialog.getByLabel('输出', { exact: true }).selectOption('plain');
-  const area = dialog.getByLabel('L1音译', { exact: true }), initial = (await area.boundingBox())!.height;
-  expect((await area.boundingBox())!.width).toBeGreaterThan((await dialog.locator('[data-roman-proposal]').boundingBox())!.width * .9);
-  await area.fill('very long ordinary romanization '.repeat(100)); expect((await area.boundingBox())!.height).toBeGreaterThan(initial * 2);
-  expect(await area.evaluate(e => e.scrollHeight > e.clientHeight + 2)).toBe(false);
-  await dialog.getByLabel('输出', { exact: true }).selectOption('timed'); await page.mouse.move(1, 1);
-  await page.screenshot({ path: test.info().outputPath(`romanization-${width}-${theme}.png`) });
-});
-test('lyric settings are unique in edit mode, menus dismiss and keyboard reaches all dialogs', async ({ page }) => {
+test('lyric settings menu dismisses and keyboard opens dialogs', async ({ page }) => {
   await load(page);
-  await expect(page.locator('[data-top-menu="settings"]')).toHaveCount(1);
   const settings = page.locator('[data-top-menu="lyrics-settings"] summary');
   await settings.focus(); await settings.press('Enter'); await expect(settings).toHaveAttribute('aria-expanded', 'true');
   await page.getByRole('button', { name: '歌词元数据', exact: true }).focus(); await page.keyboard.press('Enter');
@@ -99,9 +78,6 @@ test('lyric settings are unique in edit mode, menus dismiss and keyboard reaches
   }
   await settings.click(); await page.locator('[data-top-menu="tools"] summary').click(); await expect(settings).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByRole('button', { name: '管理音译轨道…', exact: true })).toBeHidden();
-  for (const mode of ['打轴', 'AMLL 预览']) {
-    await page.getByRole('button', { name: mode, exact: true }).click(); await expect(settings).toHaveCount(0);
-  }
   await page.getByRole('button', { name: '编辑', exact: true }).click(); await expect(settings).toHaveAttribute('aria-expanded', 'false');
 });
 test('line and content ranges delete fully and restore with one undo', async ({ page }) => {

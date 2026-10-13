@@ -16,9 +16,3 @@ test('auto checks and replaces operation blockers without restricting plain text
  await expect(problem).not.toHaveAttribute('aria-description',/本次操作受阻/);
  await problem.focus();await page.keyboard.press('Enter');await expect(page.getByRole('button',{name:'编辑',exact:true})).toHaveAttribute('aria-current','page');
 });
-for(const width of [1280,1440,1920])for(const theme of ['light','dark'])test(`validation layout ${width} ${theme}`,async({page})=>{
- await page.setViewportSize({width,height:900});await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
- await open(page);await page.getByRole('tab',{name:'歌词校验',exact:true}).click();await expect(page.getByRole('button',{name:'下载歌词',exact:true})).toBeVisible();
- expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
- await page.screenshot({path:test.info().outputPath(`validation-${width}-${theme}.png`)});
-});

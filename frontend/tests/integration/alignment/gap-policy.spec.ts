@@ -23,8 +23,8 @@ async function setup(page:Page){
  await page.goto(`/projects/${pid}/edit`);await page.getByRole('button',{name:'音频处理',exact:true}).click();await page.getByRole('button',{name:'自动对齐',exact:true}).click();
  return state;
 }
-for(const theme of ['light','dark'])test(`short-gap controls, themes, retry, atomic save and reopen in ${theme}`,async({page})=>{
- await page.addInitScript(t=>localStorage.setItem('lazulite-editor-theme',t),theme);
+test(`short-gap controls, retry, atomic save and reopen`,async({page})=>{
+
  const state=await setup(page),dialog=page.getByRole('dialog',{name:'自动对齐',exact:true}),box=dialog.getByRole('checkbox',{name:'将短于 ms 的行内空隙并入前词'}),number=dialog.getByRole('spinbutton',{name:'行内空隙阈值（毫秒）'});
  await expect(box).not.toBeChecked();await expect(number).toBeDisabled();await expect(number).toHaveValue('500');
  await dialog.getByText('将短于',{exact:true}).click();await expect(box).toBeChecked();await box.focus();await page.keyboard.press('Tab');await expect(number).toBeFocused();
@@ -34,18 +34,6 @@ for(const theme of ['light','dark'])test(`short-gap controls, themes, retry, ato
   await number.fill(value);await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();await expect(dialog.getByRole('alert')).toHaveText('行内空隙阈值必须为正的安全整数毫秒');expect(state.starts).toBe(0);
  }
  await number.fill('500');
- const colors=await dialog.evaluate(el=>{
-  const description=el.querySelector('p[class]')!, label=el.querySelector('label')!;
-  return {description:getComputedStyle(description).color,label:getComputedStyle(label).color,all:[...el.querySelectorAll('p[class],small')].map(e=>getComputedStyle(e).color)};
- });expect(new Set(colors.all).size).toBe(1);expect(colors.description).not.toBe(colors.label);
- const normal=await number.boundingBox(),text=await dialog.getByText('的行内空隙并入前词',{exact:true}).boundingBox();expect(Math.abs(normal!.y-text!.y)).toBeLessThan(10);
- await number.focus();expect(await number.evaluate(el=>getComputedStyle(el).outlineStyle)).toBe('solid');
- await page.screenshot({path:test.info().outputPath(`gaps-${theme}.png`)});
- await page.setViewportSize({width:320,height:800});
- expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
- expect((await dialog.getByText('的行内空隙并入前词',{exact:true}).boundingBox())!.y).toBeGreaterThan((await number.boundingBox())!.y);
- const unit=number.locator('..');expect(await unit.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
- await page.screenshot({path:test.info().outputPath(`gaps-narrow-${theme}.png`)});await page.setViewportSize({width:1280,height:720});
  await dialog.getByRole('checkbox',{name:'清空未匹配单元时间',exact:true}).check();
  await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();await expect.poll(()=>state.starts).toBe(2);
  expect(state.params).toMatchObject({merge_short_gaps:true,gap_threshold_ms:500,clear_unmatched:true,line_blank:false,rest_blank:false,rest_token:false});

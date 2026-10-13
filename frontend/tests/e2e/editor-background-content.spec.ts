@@ -41,7 +41,6 @@ test('background editing, mixed singer selection, relation and generation use ex
   await expect(ruby).toHaveCount(0);
   await expect(main.locator('[data-romanization-content-id]')).toHaveCount(1);
   await expect(page.getByText(/Lundefined/)).toHaveCount(0);
-  await page.screenshot({ path: test.info().outputPath('background-editor.png') });
 });
 test('background content transfer and clipboard deletion preserve its parent', async ({ page }) => {
   await load(page);
@@ -70,5 +69,4 @@ test('AMLL renders background sublyrics while its singer layout remains a consum
   const geometry = await player.evaluate(el => Array.from(el.querySelectorAll('*')).filter(node => node.childElementCount === 0 && ['主行译文', '背景译文'].includes(node.textContent ?? '')).map(node => ({ text: node.textContent, x: node.getBoundingClientRect().x, width: node.getBoundingClientRect().width, parentClass: node.parentElement?.className })));
   const { writeFile } = await import('node:fs/promises');
   await writeFile(test.info().outputPath('background-preview.json'), JSON.stringify(geometry, null, 2));
-  await page.screenshot({ path: test.info().outputPath('background-preview.png') });
 });

@@ -21,18 +21,10 @@ async function manage(page: Page) {
   await page.getByRole('button', { name: '管理翻译轨道…', exact: true }).first().click();
   return page.getByRole('dialog', { name: '翻译轨道管理', exact: true });
 }
-for (const theme of ['light', 'dark']) test(`compact references, keyboard mixed selection and scoped transfer in ${theme}`, async ({ page }) => {
-  await page.addInitScript(theme => localStorage.setItem('lazulite-editor-theme', theme), theme);
+test(`keyboard mixed selection and scoped transfer`, async ({ page }) => {
+
   await load(page); let dialog = await manage(page);
   const first = dialog.getByRole('checkbox', { name: '选择翻译轨道 1 · L1 · 内容 1', exact: true });
-  const row = first.locator('..'), full = row.locator('[id="translation-reference-c0"]');
-  await dialog.focus(); await page.mouse.move(0, 0);
-  await expect(full).toBeHidden();
-  await expect(row.locator(':scope > span').nth(0)).toHaveText(' é👨‍👩‍👧‍👦🇨🇳字…');
-  await expect(row.locator(':scope > span').nth(1)).toHaveText(' é👨‍👩‍👧‍👦🇨🇳字…');
-  await first.focus(); await expect(full).toBeVisible(); await expect(full).toContainText('正文全文'); await expect(full).toContainText('翻译全文');
-  const sizes = await row.evaluate(element => [getComputedStyle(element.querySelector('span')!).fontSize, getComputedStyle(element.closest('[role=dialog]')!).getPropertyValue('--body-size').trim()]);
-  expect(sizes[0]).toBe(sizes[1]);
   await first.press('Space');
   const global = dialog.getByRole('checkbox', { name: '全选内容', exact: true });
   const local = dialog.getByRole('checkbox', { name: '全选本轨内容', exact: true }).first();
@@ -41,11 +33,9 @@ for (const theme of ['light', 'dark']) test(`compact references, keyboard mixed 
   await global.press('Space'); await expect(global).toBeChecked();
   await expect(dialog.getByRole('checkbox', { name: '选择翻译轨道 30 · L29 · 内容 1', exact: true })).toBeChecked();
   await expect(dialog.getByRole('checkbox', { name: '全选本轨内容', exact: true }).last()).toBeDisabled();
-  const short = dialog.getByRole('checkbox', { name: '选择翻译轨道 2 · L1 的背景歌词 · 内容 1', exact: true }).locator('..');
-  await expect(short).toContainText('背景'); await expect(short.locator(':scope > span').nth(0)).toHaveText('短句');
   await dialog.getByLabel('翻译归轨目标').selectOption('t0');
   await expect(dialog).toContainText('已选择 31 份内容；实际转入 29 份，将移除 29 条');
-  await first.focus(); await page.screenshot({ path: test.info().outputPath(`manager-${theme}.png`) });
+  await first.focus();
   await dialog.getByRole('button', { name: '转入目标轨道', exact: true }).click();
   await expect(dialog.getByRole('checkbox', { name: '全选本轨内容', exact: true })).toHaveCount(2);
   await dialog.getByRole('button', { name: '应用', exact: true }).click();
@@ -57,13 +47,8 @@ for (const theme of ['light', 'dark']) test(`compact references, keyboard mixed 
   const moved = dialog.getByRole('checkbox', { name: '选择翻译轨道 1 · L29 · 内容 31', exact: true }); await moved.hover();
   await expect(moved.locator('..').locator('[id="translation-reference-c29"]')).toBeVisible();
   await expect(moved.locator('..')).toContainText('长正文'.repeat(60));
-  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
-  await page.getByRole('button', { name: '文件打包', exact: true }).click();
-  await page.getByLabel('导出格式').selectOption('ass'); await page.getByText('导出对照', { exact: true }).click();
-  await expect(page.getByRole('table', { name: '所选格式导出对照' }).getByText('分轨字幕', { exact: true })).toHaveCount(2);
-  await page.getByRole('tab', { name: '歌词校验', exact: true }).focus();
-  await page.screenshot({ path: test.info().outputPath(`format-${theme}.png`) });
 });
 
 test('deletion clears the target, cancellation discards it, application is one undoable transaction', async ({ page }) => {

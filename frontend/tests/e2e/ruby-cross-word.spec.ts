@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
 const ruby=(text:string,readings:string[])=>`<span begin="0" end="1" xmlns:tts="http://www.w3.org/ns/ttml#styling" tts:ruby="container"><span tts:ruby="base">${text}</span><span tts:ruby="textContainer">${readings.map((r,i)=>`<span tts:ruby="text" begin="${i/10}" end="${(i+1)/10}">${r}</span>`).join('')}</span></span>`;
 export const dragXml=`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><p xml:id="main" begin="0" end="4">${ruby('元',['あ','い','う'])}<span begin="2" end="3">先</span>${ruby('隣',['え','お'])}<span ttm:role="x-bg" begin="0" end="4">${ruby('背',['か'])}<span begin="2" end="3">景</span></span></p><p xml:id="other" begin="4" end="8"><span begin="4" end="8">別</span></p></body></tt>`;
@@ -13,7 +13,7 @@ test('empty target receives selected group, preserves IDs/times, focus, undo and
  await load(page);const source=page.getByLabel('词 元',{exact:true}).locator('xpath=ancestor::*[@data-word-id]'),target=page.getByLabel('词 先',{exact:true}).locator('xpath=ancestor::*[@data-word-id]');
  const units=source.locator('[data-ruby-id]');const ids=await units.evaluateAll(es=>es.map(e=>e.getAttribute('data-ruby-id')));
  await units.first().click({position:{x:2,y:2}});await units.nth(1).click({modifiers:['Shift'],position:{x:2,y:2}});await expect(page.getByText('注音已选 2')).toBeVisible();
- await move(page,units.first(),target,false);await expect(source.locator('[data-drag-placeholder]')).toHaveCount(2);await expect(target.locator('[data-ruby-id]')).toHaveCount(0);await expect(page.locator('[class*="dragInsertion"]')).toBeVisible();await page.screenshot({path:'/tmp/ruby-cross-word-receiver.png'});await page.mouse.up();
+ await move(page,units.first(),target,false);await expect(source.locator('[data-drag-placeholder]')).toHaveCount(2);await expect(target.locator('[data-ruby-id]')).toHaveCount(0);await expect(page.locator('[class*="dragInsertion"]')).toBeVisible();await page.mouse.up();
  await expect(page.locator('[data-ruby-drag-size]')).toHaveCount(0);
  await expect(target.locator('[data-ruby-id]')).toHaveCount(2);expect(await target.locator('[data-ruby-id]').evaluateAll(es=>es.map(e=>e.getAttribute('data-ruby-id')))).toEqual(ids.slice(0,2));
  await expect(target.locator('[data-ruby-id]').first()).toBeFocused();await expect(page.getByText('注音已选 2')).toBeVisible();await expect(source.locator('[data-ruby-id]')).toHaveCount(1);
@@ -40,13 +40,10 @@ test('cross lyric lines, background transfer, Esc and original position add no m
  // One undo is still the import, proving none of the attempted moves made history.
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.getByLabel('词 元',{exact:true})).toHaveCount(0);
 });
-test('same lyric line allows moving across wrapped visual rows in both themes',async({page})=>{
- for(const theme of ['light','dark']){
-  await page.addInitScript(t=>localStorage.setItem('lazulite-editor-theme',t),theme);await page.setViewportSize({width:1280,height:900});
+test('same lyric line allows moving across wrapped visual rows',async({page})=>{
+  await page.setViewportSize({width:1280,height:900});
   await load(page,`<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="main">${ruby('元',['あ'])}${Array.from({length:12},(_,i)=>`<span>かな${i}</span>`).join('')}<span>末</span></p></body></tt>`);
   const source=page.getByLabel('词 元',{exact:true}).locator('xpath=ancestor::*[@data-word-id]'),target=page.getByLabel('词 末',{exact:true}).locator('xpath=ancestor::*[@data-word-id]');
   expect((await target.boundingBox())!.y).toBeGreaterThan((await source.boundingBox())!.y+20);
   await move(page,source.locator('[data-ruby-id]'),target);await expect(target.getByLabel('读音 末',{exact:true})).toHaveValue('あ');
-  await page.screenshot({path:`/tmp/ruby-cross-word-${theme}.png`});
- }
 });

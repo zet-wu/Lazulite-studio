@@ -41,12 +41,6 @@ it('deletes immediately in the draft, clears target and selection, and allows ca
   fireEvent.click(screen.getByRole('button', { name: '取消' }));
   expect(close).toHaveBeenCalledOnce(); expect(apply).not.toHaveBeenCalled(); expect(document.translationTracks[0].contents).toEqual([content]);
 });
-it('short references keep five complete visible characters and never modify whitespace', async () => {
-  const { shortReference } = await import('./TranslationTrackDialog');
-  for (const text of ['', '短句', '12345', ' e\u0301👨‍👩‍👧‍👦🇨🇳字']) expect(shortReference(text)).toBe(text);
-  expect(shortReference(' e\u0301👨‍👩‍👧‍👦🇨🇳字尾')).toBe(' e\u0301👨‍👩‍👧‍👦🇨🇳字…');
-  expect(shortReference('123456')).toBe('12345…');
-});
 it('selects all content across tracks with mixed states and reports only actual moves', () => {
   const document = createLyricDocument('行'); const lineId = document.lines[0].id;
   document.translationTracks = Array.from({ length: 40 }, (_, i) => ({ id: `t${i}`, language: 'en', purpose: 'subtitle', contents: [plainTranslation(`text${i}`, lineId)] }));

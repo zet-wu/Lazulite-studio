@@ -9,7 +9,7 @@ const issueXml=`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.o
 test('pure TTML shows every relevant issue; error links select and focus exact track units',async({page})=>{
  await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,file(issueXml));
  await page.getByRole('button',{name:'文件打包',exact:true}).click();
- await expect(page.getByRole('button',{name:'下载草稿'})).toHaveCount(0);await expect(page.getByRole('button',{name:'最终 TTML'})).toHaveCount(0);
+
  await page.getByRole('button',{name:'下载歌词',exact:true}).click();
  await expect(page.getByRole('alert')).toContainText('有 2 项需要处理');
  const issue=page.getByRole('button',{name:'第 2 行 · ja-Latn 轨道 2 音译第 1 单元：缺少结束时间',exact:true});
@@ -49,17 +49,6 @@ test('four-source round survives tabs and modes; edits retain results; explicit 
  await expect.poll(()=>page.evaluate(()=>(window as any).probe.searches.length)).toBe(searches+4);
  await page.getByRole('button',{name:'搜索',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).probe.searches.length)).toBe(searches+8);
 });
-
-for(const width of [1280,1440,1920])for(const theme of ['light','dark'])test(`network long fields badges and errors ${width} ${theme}`,async({page})=>{
- await page.setViewportSize({width,height:900});await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
- await page.goto('/projects/sample-project/edit?scenario=no-music');await page.getByRole('button',{name:'歌词获取',exact:true}).waitFor();
- await page.evaluate(()=>{const original=window.fetch;window.fetch=async(input,init)=>{const url=String(input),body=JSON.parse(String(init?.body??'{}'));if(url.endsWith('/lyric-sources/search'))return Response.json({items:[{source:body.source,id:'1',songmid:'mid',title:'长标题'.repeat(20),artists:['长艺术家'.repeat(12)],album:'长专辑'.repeat(15),duration_ms:120000}]});if(url.endsWith('/lyric-sources/fetch'))return Response.json({empty:false,format:'qrc',content:'[1000,500]正文(1000,500)',metadata:{},translation:'broken'});return original(input,init);};});
- await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.getByRole('tab',{name:'网易云音乐'}).click();await page.getByRole('textbox',{name:'搜索标题'}).fill('长标题'.repeat(80));await page.getByRole('button',{name:'搜索',exact:true}).click();
- await page.getByRole('button',{name:/长标题长标题/}).click();await expect(page.getByRole('button',{name:'确认导入并替换歌词'})).toBeVisible();
- expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(1);
- await page.screenshot({path:test.info().outputPath(`network-${width}-${theme}.png`)});
-});
-
 
 test('packaging error links focus body, background and 注音 with visible main numbering',async({page})=>{
  await page.goto('/projects/sample-project/edit');

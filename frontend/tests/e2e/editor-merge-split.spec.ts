@@ -68,7 +68,7 @@ test('three-way split preview, keyboard boundary, invalidated background, cancel
   await open(); await dialog.getByRole('button', { name: '在第 2 词前切分' }).click(); await dialog.getByRole('button', { name: '在第 4 词前切分' }).click();
   await dialog.getByLabel('背景歌词归属').selectOption({ label: '第 3 行' });
   await dialog.getByLabel('翻译 1归属').selectOption({ label: '第 2 行' });
-  await page.screenshot({ path: test.info().outputPath('split.png') });
+
   await dialog.getByRole('button', { name: '应用', exact: true }).click(); await expect(page.locator('[data-outline-drag]')).toHaveCount(4);
   await expect(page.locator('main section[data-line-id]').nth(1).getByLabel('翻译 1', { exact: true })).toHaveValue(' today ');
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(page.locator('[data-outline-drag]')).toHaveCount(2);
@@ -121,21 +121,6 @@ test('three Ruby and background words use the same merge actions; insertion uses
   await row(page).getByRole('textbox', { name: '添加词', exact: true }).fill('中间'); await page.keyboard.press('Enter');
   await expect(row(page).locator('[data-word-id]')).toHaveCount(5);
   await expect(row(page).locator('[data-word-id]').nth(2).getByLabel('词 中间', { exact: true })).toBeFocused();
-});
-
-for (const theme of ['light', 'dark'] as const) test(`long line boundaries wrap in ${theme}`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: theme });
-  const { importLyrics } = await import('../fixtures/import-lyrics');
-  const xml = `<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p>${Array.from({ length: 80 }, (_, i) => `<span>长词${i}</span>`).join('')}</p></div></body></tt>`;
-  await importLyrics(page, { name: 'long.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
-  await page.locator('[data-outline-drag]').first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行…' }).click();
-  const dialog = page.getByRole('dialog', { name: '拆分歌词行', exact: true });
-  const boundaries = dialog.getByLabel('拆行切点');
-  expect(await boundaries.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  expect((await dialog.getByRole('button', { name: '在第 80 词前切分' }).boundingBox())!.y).toBeGreaterThan((await dialog.getByRole('button', { name: '在第 2 词前切分' }).boundingBox())!.y);
-  await dialog.getByRole('button', { name: '在第 20 词前切分' }).click(); await dialog.getByRole('button', { name: '在第 60 词前切分' }).click();
-  await expect(dialog.getByLabel('拆分结果').locator('section')).toHaveCount(3);
-  await page.screenshot({ path: test.info().outputPath(`long-split-${theme}.png`) });
 });
 
 test('split uses known word envelope across a 1ms punctuation reversal in preview and apply', async ({ page }) => {

@@ -116,33 +116,11 @@ test('AMLL receives real whitespace text nodes with visible word gaps', async ({
     return result;
   });
   expect(spaces.filter(item => item.width > 0).length).toBeGreaterThanOrEqual(3);
-  await page.screenshot({ path: test.info().outputPath('preview-spaces.png') });
+
   await page.getByRole('checkbox', { name: '音译', exact: true }).uncheck();
   await page.getByRole('checkbox', { name: '翻译', exact: true }).uncheck();
   await expect(player).toContainText('I still love you');
   await writeFile(test.info().outputPath('preview-spaces.json'), JSON.stringify(spaces));
-});
-
-for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) test(`selection surfaces ${theme} ${width}`, async ({ page }) => {
-  await page.setViewportSize({ width, height: 900 }); await load(page);
-  await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
-  const contents = row(page).locator('[data-romanization-content-id]');
-  await contents.first().locator('strong').click(); await contents.nth(1).locator('strong').click({ modifiers: ['ControlOrMeta'] });
-  const expected = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--blue-soft').trim());
-  for (const content of [contents.first(), contents.nth(1)]) {
-    await expect(content).toHaveClass(/selectedRomanization/);
-    expect(await content.evaluate(e => getComputedStyle(e).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
-  }
-  const unit = contents.first().locator('[data-romanization-unit-id]').first();
-  await page.screenshot({ path: test.info().outputPath('content-selection.png') });
-  await unit.click({ position: { x: 3, y: 3 } }); await expect(unit).toHaveClass(/selectedWord/);
-  await unit.getByLabel('音译单元 1', { exact: true }).focus();
-  await page.screenshot({ path: test.info().outputPath('unit-focus.png') });
-  await page.keyboard.press('Tab'); await unit.focus(); expect(await unit.evaluate(e => getComputedStyle(e).outlineStyle)).toBe('solid');
-  await expect(contents.first()).not.toHaveClass(/selectedRomanization/);
-  const geometry = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth }));
-  expect(geometry.scrollWidth).toBeLessThanOrEqual(width);
-  await writeFile(test.info().outputPath('geometry.json'), JSON.stringify({ ...geometry, expected }));
 });
 
 test('virtual input survives scrolling and remounts new untimed words without disabling bounded mounting', async ({ page }) => {
@@ -161,7 +139,6 @@ test('virtual input survives scrolling and remounts new untimed words without di
   await scroll.evaluate(e => e.scrollTop = e.scrollHeight); await page.getByRole('button', { name: '撤销', exact: true }).click();
   await scroll.evaluate(e => e.scrollTop = 0); await expect(line.getByRole('textbox', { name: '词 保留草稿', exact: true })).toHaveCount(0);
 });
-
 
 test('western splitting and inline space-only words preserve independent whitespace through history and export', async ({ page }) => {
   await load(page); const line = row(page, 'cjk');

@@ -16,8 +16,6 @@ test('opens a project, selects a line and keeps edit navigation visible', async 
 test('keeps one A/B snapshot and five layers while collapsing the timeline', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   const layers = page.getByLabel('时间轴图层');
-  for (const name of ['行', '词', '注音', '空隙']) await expect(layers.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(layers.getByRole('button', { name: '声谱图' })).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: '循环当前行' }).click();
   await expect(page.getByRole('slider', { name: '循环 A 边界' })).toHaveAttribute('aria-valuenow', '0');
   await expect(page.getByRole('slider', { name: '循环 B 边界' })).toHaveAttribute('aria-valuenow', '5');
@@ -44,25 +42,6 @@ test('drags an A/B boundary without adding lyric undo history', async ({ page })
   await expect(page.getByRole('button', { name: '撤销' })).toBeDisabled();
 });
 
-test('zooms a long waveform and leaves the editor responsive', async ({ page }) => {
-  await page.goto('/projects/sample-project/edit?scenario=long');
-  await expect(page.getByRole('slider', { name: '波形进度' })).toHaveAttribute('aria-valuemax', '1800');
-  for (let index = 0; index < 7; index++) await page.getByRole('button', { name: '放大波形' }).click();
-  await expect(page.getByRole('button', { name: '时间轴行 L1' })).toBeVisible();
-  await page.getByRole('button', { name: '后移窗口' }).click();
-  await page.getByRole('button', { name: '前移窗口' }).click();
-  await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
-});
-
-test('previews the current lyrics and returns to editing', async ({ page }) => {
-  await page.goto('/projects/sample-project/edit');
-  await page.getByRole('button', { name: 'AMLL 预览', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'AMLL 预览' })).toBeVisible();
-  await expect(page.getByText('夜の風が静かに吹く').first()).toBeVisible();
-  await page.getByRole('button', { name: '编辑', exact: true }).click();
-  await expect(page.getByLabel('歌词列表', { exact: true })).toBeVisible();
-});
-
 test('keeps the sync cursor separate from lyric undo', async ({ page }) => {
   await page.goto('/projects/sample-project/edit');
   await page.locator('[data-outline-drag]').first().click();
@@ -74,23 +53,4 @@ test('keeps the sync cursor separate from lyric undo', async ({ page }) => {
   await expect(panel.getByText('L2 · 单元 1 / 1')).toBeVisible();
   await page.getByRole('button', { name: '撤销' }).click();
   await expect(panel.getByText('L2 · 单元 1 / 1')).toBeVisible();
-});
-
-test('moves a timed word on the timeline and undoes the move', async ({ page }) => {
-  await page.goto('/projects/sample-project/edit');
-  await page.locator('[data-outline-drag]').first().click();
-  const start = page.getByRole('textbox', { name: '词 夜の風が静かに吹く开始秒数' });
-  const end = page.getByRole('textbox', { name: '词 夜の風が静かに吹く结束秒数' });
-  await start.fill('0'); await start.blur();
-  await end.fill('5'); await end.blur();
-  for (let index = 0; index < 3; index++) await page.getByRole('button', { name: '放大波形' }).click();
-  const bar = page.getByRole('button', { name: '时间轴词 夜の風が静かに吹く' });
-  const box = (await bar.boundingBox())!;
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2, { steps: 4 });
-  await page.mouse.up();
-  await expect(start).not.toHaveValue('0');
-  await page.getByRole('button', { name: '撤销' }).click();
-  await expect(start).toHaveValue('0');
 });

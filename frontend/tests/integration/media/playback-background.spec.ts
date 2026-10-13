@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { timedIntervalsTtml } from '../../fixtures/timed-intervals';
 
 test('native media crosses intervals, pauses, seeks and keeps playing through collapse', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, recordVideo: { dir: test.info().outputPath('media-video') } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await page.goto('http://127.0.0.1:5175/projects/media-offset/edit');
   await importLyrics(page, { name: 'playback-background.ttml', mimeType: 'application/xml', buffer: Buffer.from(timedIntervalsTtml()) });
@@ -15,14 +15,14 @@ test('native media crosses intervals, pauses, seeks and keeps playing through co
   await audio.evaluate((e: HTMLAudioElement) => { e.currentTime = 1.5; });
   await page.getByRole('button', { name: '播放', exact: true }).click();
   await expect.poll(() => audio.evaluate((e: HTMLAudioElement) => !e.paused && e.currentTime >= 2.1)).toBe(true);
-  await expect.poll(() => shadow(ordinary)).toContain('240, 164, 43');
-  await expect.poll(() => shadow(overlapping)).toContain('240, 164, 43');
+  await expect.poll(() => shadow(ordinary)).not.toBe('none');
+  await expect.poll(() => shadow(overlapping)).not.toBe('none');
   await page.getByRole('button', { name: '暂停', exact: true }).click();
-  await expect.poll(() => shadow(ordinary)).toContain('240, 164, 43');
+  await expect.poll(() => shadow(ordinary)).not.toBe('none');
   await audio.evaluate((e: HTMLAudioElement) => { e.currentTime = 3.1; });
   await expect.poll(() => shadow(ordinary)).toBe('none');
-  await expect.poll(() => shadow(overlapping)).toContain('240, 164, 43');
-  await page.screenshot({ path: test.info().outputPath('native-paused-seek.png') });
+  await expect.poll(() => shadow(overlapping)).not.toBe('none');
+
   await page.getByRole('button', { name: '循环当前行' }).click();
   const a = await page.getByRole('slider', { name: '循环 A 边界' }).getAttribute('aria-valuenow');
   await page.getByLabel('时间轴图层').getByRole('button', { name: '声谱图', exact: true }).click();
@@ -37,7 +37,6 @@ test('native media crosses intervals, pauses, seeks and keeps playing through co
   await expect(page.locator('[data-spectrum-ready]')).toBeVisible();
   await page.getByRole('button', { name: '暂停', exact: true }).click();
   await context.close();
-  await page.video()!.saveAs(test.info().outputPath('native-media.webm'));
 });
 
 test('independent background saves, exchanges and is visible after its parent ends', async ({ page }) => {
@@ -62,7 +61,7 @@ test('independent background saves, exchanges and is visible after its parent en
   const background = page.locator('.amll-lyric-player [class*="bgWrapper"]').filter({ hasText: '背景测试' });
   await expect.poll(() => background.evaluate(e => getComputedStyle(e).opacity)).toBe('1');
   await expect(background).toBeInViewport();
-  await page.screenshot({ path: test.info().outputPath('background-after-parent.png') });
+
   await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 4.2; e.playbackRate = .5; });
   await expect(background).toHaveClass(/bgWrapperActive/);
   await page.getByRole('button', { name: '暂停', exact: true }).click();

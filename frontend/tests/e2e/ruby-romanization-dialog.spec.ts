@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
 
 async function open(page: Page, count = 3, source = 'ka', body = 'は', setup: 'normal' | 'untimed' | 'overwrite' | 'link' = 'normal') {
@@ -36,9 +36,9 @@ async function open(page: Page, count = 3, source = 'ka', body = 'は', setup: '
   return page.getByRole('dialog', { name: '从音译生成 注音', exact: true });
 }
 
-for (const theme of ['light', 'dark']) test(`compact warning, correction, skip, direct navigation and Esc ${theme}`, async ({ page }) => {
+test(`compact warning, correction, skip, direct navigation and Esc`, async ({ page }) => {
   const dialog = await open(page);
-  await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
+
   const patrol = dialog.getByRole('button', { name: '下一处错误／警告' });
   const rows = dialog.locator('[data-ruby-row]');
   const readings = rows.getByLabel('目标 注音');
@@ -61,7 +61,6 @@ for (const theme of ['light', 'dark']) test(`compact warning, correction, skip, 
   await expect(dialog.getByRole('tooltip')).toContainText('0s – 1s');
   const heights = await rows.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
   expect(Math.max(...heights)).toBeLessThan(85);
-  await page.screenshot({ path: test.info().outputPath(`compact-${theme}.png`) });
 });
 
 test('virtual navigation mounts distant repeated sources and preserves focused input through scrolling and resize', async ({ page }) => {

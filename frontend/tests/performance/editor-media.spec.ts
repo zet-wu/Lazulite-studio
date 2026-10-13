@@ -53,7 +53,7 @@ test('production media traverses a long document with bounded cache and eviction
     for (let i = 0; i < 6; i++) await page.getByRole('button', { name: '放大波形' }).click();
     await ready();
     sessions.push({ project, duration, setupReadyMs, stats, computeP50: percentile(compute, .5), computeP95: percentile(compute, .95), requestP95: percentile(network, .95), readyP95: percentile(readiness, .95) });
-    await page.screenshot({ path: test.info().outputPath(`${project}-production.png`) });
+
   }
   report.elapsedMs = Date.now() - began; report.sessions = sessions;
   report.measures = await page.evaluate(() => (window as unknown as { perfMeasures: unknown }).perfMeasures);

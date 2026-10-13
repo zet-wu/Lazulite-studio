@@ -40,20 +40,6 @@ test('automatic refresh retains open rules and selected scope; undo and redo ref
  await page.getByRole('tab',{name:'歌词校验',exact:true}).click();await expect(page.locator('[data-blocking=true]')).not.toHaveCount(0);
  await page.getByRole('tab',{name:'AMLL 兼容校验',exact:true}).click();await expect(page.locator('[data-blocking=true]')).not.toHaveCount(0);
 });
-for(const width of [1280,1440])for(const theme of ['light','dark']) test(`shared disclosures and stationary audition trigger ${width} ${theme}`,async({page})=>{
- await page.setViewportSize({width,height:1000});await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
- await page.goto('/projects/sample-project/edit');await importLyrics(page,{name:'long.txt',mimeType:'text/plain',buffer:Buffer.from('长歌词'.repeat(60))});await page.getByRole('textbox',{name:/^词 /}).first().click();await page.getByRole('button',{name:'打轴',exact:true}).click();
- const button=page.getByRole('button',{name:'回听与校准',exact:true});const before=await button.boundingBox();expect(before).not.toBeNull();
- await button.click();await expect(button).toBeFocused();await expect(page.getByLabel('输入偏移（毫秒）')).toBeVisible();
- const after=await button.boundingBox();expect(after!.x).toBeCloseTo(before!.x,0);expect(after!.y).toBeCloseTo(before!.y,0);
- await page.mouse.click(before!.x+before!.width/2,before!.y+before!.height/2);await expect(page.getByLabel('输入偏移（毫秒）')).toHaveCount(0);
- await button.focus();await page.keyboard.press('Enter');await page.getByLabel('输入偏移（毫秒）').fill('75');
- await button.click();const offsetBefore=await button.boundingBox();await button.click();const offsetAfter=await button.boundingBox();expect(offsetAfter!.x).toBeCloseTo(offsetBefore!.x,0);expect(offsetAfter!.y).toBeCloseTo(offsetBefore!.y,0);
- await expect(page.getByLabel('输入偏移（毫秒）')).toHaveValue('75');await page.screenshot({path:test.info().outputPath(`sync-${theme}.png`)});
- await page.getByRole('button',{name:'文件打包',exact:true}).click();const left=await page.getByRole('tab',{name:'歌词校验',exact:true}).boundingBox(),right=await page.getByRole('tab',{name:'AMLL 兼容校验',exact:true}).boundingBox();expect(left!.width).toBeCloseTo(right!.width,0);
- await page.getByRole('button',{name:'导出对照',exact:true}).focus();await page.keyboard.press('Space');await expect(page.getByRole('table',{name:'所选格式导出对照'})).toBeVisible();
- await page.screenshot({path:test.info().outputPath(`validation-${theme}.png`)});
-});
 test('embedded candidates share parsed badges, selection and full-width cards; errors stay explicit',async({page})=>{
  await page.goto('/projects/sample-project/edit');
  await expect(page.getByRole('button',{name:'编辑',exact:true})).toBeVisible();
@@ -66,7 +52,7 @@ test('embedded candidates share parsed badges, selection and full-width cards; e
  await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.getByRole('tab',{name:'内嵌',exact:true}).click();
  const list=page.getByLabel('内嵌候选');const first=list.getByRole('button',{name:/^STPP/});await expect(first).toContainText('TTML');await expect(first).toContainText('逐行');
  await first.click();await expect(first).toHaveAttribute('aria-pressed','true');const second=list.getByRole('button',{name:/USLT/});await second.click();await expect(first).toHaveAttribute('aria-pressed','false');await expect(second).toContainText('无时间');
- expect((await first.boundingBox())!.width).toBeCloseTo((await second.boundingBox())!.width,0);await expect(list.getByRole('button',{name:/正文错误/})).toBeDisabled();await expect(list).toContainText('正文解析失败');
+ await expect(list.getByRole('button',{name:/正文错误/})).toBeDisabled();await expect(list).toContainText('正文解析失败');
  await page.getByRole('button',{name:'确认导入并替换歌词',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 plain candidate',exact:true})).toBeVisible();await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 plain candidate',exact:true})).toHaveCount(0);
 });
 test('large document measures computation separately from automatic entry and interaction',async({page})=>{

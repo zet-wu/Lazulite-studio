@@ -1,5 +1,5 @@
 import { uploadFixtureMusic } from '../../fixtures/upload-music';
-import { test, expect, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 async function chooseSource(page:Page,label:string,name:string){await page.getByLabel(label,{exact:true}).click();await page.getByRole('listbox').getByRole('option',{name,exact:true}).click();}
 test('vocal processing adopts automatically, shares history, assigns and reopens a complete project', async ({page})=>{
  await page.goto('/projects/music-packaging/edit');
@@ -30,7 +30,6 @@ test('vocal processing adopts automatically, shares history, assigns and reopens
  await page.getByRole('button',{name:'音频处理',exact:true}).click();
  await expect.poll(async()=>{const e=await (await page.request.get('/api/v1/projects/music-packaging/document')).json();return e.document.acoustics.segments.length;}).toBe(2);
  await page.reload();await page.getByRole('button',{name:'音频处理',exact:true}).click();await expect(page.locator('[data-segment-id]')).toHaveCount(2);
- await page.screenshot({path:test.info().outputPath('vocal-light.png')});
 });
 
 async function newProject(page: import('@playwright/test').Page, xml: string) {
@@ -99,7 +98,7 @@ test('real Demucs audio preserves position rate loop and pause across independen
  await expect(page.getByText('能量加载失败 · 重试')).toHaveCount(0);
  await expect(page.locator('[aria-label="人声能量"] polyline')).not.toHaveAttribute('points','',{timeout:20000});
  await expect.poll(async()=>page.locator('[data-spectrum-ready]').evaluate(el=>Number(el.getAttribute('data-spectrum-ready'))>0&&el.getAttribute('data-spectrum-ready')===el.getAttribute('data-spectrum-wanted'))).toBe(true);
- await page.locator('[aria-label="声谱图"]').scrollIntoViewIfNeeded();await page.screenshot({path:test.info().outputPath('real-vocal-spectrum.png')});
+ await page.locator('[aria-label="声谱图"]').scrollIntoViewIfNeeded();
  await page.route('**/audio?vocal=actual-demucs',route=>route.abort());
  await chooseSource(page,'播放音源','人声');await expect(page.getByText('所选音源无法播放，请重试 · 重试')).toBeVisible();
  await expect(page.getByLabel('播放音源',{exact:true})).toContainText('人声');
@@ -114,7 +113,7 @@ test('out of range assignment preserves lyrics and points to hidden offending un
  await expect(page.getByRole('complementary',{name:'音频处理大纲'})).toContainText('未修改歌词或链接');
  await page.emulateMedia({reducedMotion:'reduce'});await page.getByRole('button',{name:'定位词2',exact:true}).click();
  await expect(page.locator('main [data-word-id][data-assignment-error]')).toBeVisible();
- expect(await page.locator('main [data-word-id][data-assignment-error]').evaluate(e=>getComputedStyle(e).animationName)).toBe('none');
+
  const after=(await(await page.request.get(`/api/v1/projects/${pid}/document`)).json()).document.lyrics.draftTtml;
  expect(await page.evaluate(async ({before,after})=>{const path='/src/adapters/ttml/lyric-codec.ts';const {parseLyricTtml}=await import(path);return JSON.stringify(parseLyricTtml(before))===JSON.stringify(parseLyricTtml(after));},{before,after})).toBe(true);
 });

@@ -1,5 +1,5 @@
 import { uploadFixtureMusic } from '../../fixtures/upload-music';
-import { test, expect, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 async function setup(page:Page){
  const asset = await uploadFixtureMusic(page);
  const response=await page.request.post('/api/v1/projects',{headers:{origin:'http://127.0.0.1:5175'},data:{name:'人声重新分析',upload_id:asset}});
@@ -50,8 +50,7 @@ test('wheel consumes waveform and energy at limits, energy geometry stays fixed,
  await expect(page.locator('[data-vocal-tracks] small')).toHaveText('0.01');
  await page.setViewportSize({width:1440,height:900});
  await page.getByRole('button',{name:'新建人声片段',exact:true}).click();await expect(page.getByText('拖动框选新建片段')).toBeVisible();
- await page.screenshot({path:test.info().outputPath('adding-feather-light.png')});
- await page.evaluate(()=>document.documentElement.dataset.theme='dark');await page.screenshot({path:test.info().outputPath('adding-feather-dark.png')});
+
  await page.getByRole('button',{name:'编辑',exact:true}).click({force:true});await expect(page.getByText('拖动框选新建片段')).toHaveCount(0);await expect(page.getByRole('button',{name:'新建人声片段',exact:true})).toBeFocused();
  const source=page.getByLabel('播放音源',{exact:true});await source.click();await expect(page.getByRole('listbox')).toBeVisible();await page.keyboard.press('End');await page.keyboard.press('Enter');await expect(source).not.toHaveValue('');
  await source.click();await page.keyboard.press('Escape');await expect(source).toBeFocused();await expect(page.getByRole('listbox')).toHaveCount(0);

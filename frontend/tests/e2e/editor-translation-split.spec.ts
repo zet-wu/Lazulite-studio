@@ -1,6 +1,5 @@
 import { importLyrics } from '../fixtures/import-lyrics';
 import { expect, test, type Page } from '@playwright/test';
-import { writeFile } from 'node:fs/promises';
 import { inlineEditingTtml } from '../fixtures/inline-editing';
 import { japaneseReadingTtml as xml } from '../fixtures/japanese-reading';
 async function load(page: Page, text = xml) {
@@ -57,19 +56,4 @@ test('split previews and assigns translations with cancellation and one undo', a
   await expect(rows.nth(0).getByLabel('翻译 1', { exact: true })).toHaveValue('song');
   await expect(rows.nth(1).getByLabel('翻译 1', { exact: true })).toHaveValue('译文');
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(outline).toHaveCount(3);
-});
-for (const width of [1280, 1440, 1920]) for (const theme of ['light', 'dark']) test(`translation autoheight and split result at ${width} ${theme}`, async ({ page }) => {
-  await page.setViewportSize({ width, height: 1000 }); await page.emulateMedia({ colorScheme: theme as 'light' | 'dark' }); await load(page, inlineEditingTtml());
-  const text = page.locator('main section[data-line-id="english"]').getByLabel('翻译 1', { exact: true });
-  const initial = (await text.boundingBox())!.height;
-  await text.fill('很长的翻译内容 '.repeat(80));
-  await expect.poll(async () => (await text.boundingBox())!.height).toBeGreaterThan(initial * 2);
-  expect(await text.evaluate((e: HTMLTextAreaElement) => e.scrollHeight > e.clientHeight)).toBe(true);
-  await text.fill('短'); await expect.poll(async () => (await text.boundingBox())!.height).toBe(initial);
-  await text.press('Escape'); await expect(text).toHaveValue('song');
-  await page.locator('[data-outline-drag]').first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行…' }).click();
-  await page.screenshot({ path: test.info().outputPath(`split-${width}-${theme}.png`) });
-  const boxes = await page.getByLabel('拆分结果').locator('section').evaluateAll(nodes => nodes.map(e => ({ width: e.clientWidth, scroll: e.scrollWidth })));
-  expect(boxes.every(box => box.scroll <= box.width)).toBe(true);
-  await writeFile(test.info().outputPath('layout.json'), JSON.stringify({ width, theme, initial, boxes }));
 });

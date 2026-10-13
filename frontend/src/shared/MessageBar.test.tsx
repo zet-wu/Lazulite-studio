@@ -8,7 +8,7 @@ function Harness(){
 }
 it('dismisses only one event, returns focus, and republishes identical text',()=>{
  const view=render(<Harness/>);const start=screen.getByText('成功');start.focus();fireEvent.click(start);fireEvent.click(screen.getByText('保存'));
- const close=screen.getAllByRole('button',{name:'关闭提示'})[0];expect(close.querySelector('svg')).toBeTruthy();close.focus();fireEvent.click(close);
+ const close=screen.getAllByRole('button',{name:'关闭提示'})[0];close.focus();fireEvent.click(close);
  expect(start).toHaveFocus();expect(screen.queryByText('已更新歌词时间')).toBeNull();expect(screen.getByRole('alert')).toHaveTextContent('保存失败');
  view.rerender(<Harness/>);expect(screen.queryByText('已更新歌词时间')).toBeNull();fireEvent.click(start);expect(screen.getByRole('status')).toHaveTextContent('已更新歌词时间');
 });

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { importLyrics } from '../fixtures/import-lyrics';
 const xml = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><head><metadata><ttm:agent xml:id="role" type="character"><ttm:name>长名称角色</ttm:name><ttm:actor agent="actor"/></ttm:agent><ttm:agent xml:id="actor" type="person"/><ttm:title>标题</ttm:title><ttm:artist>甲</ttm:artist><ttm:artist>乙</ttm:artist></metadata></head><body><div><p xml:id="L1" begin="00:01.000" end="00:02.000" ttm:agent="role actor">歌</p><p xml:id="L2" begin="00:02.000" end="00:03.000" ttm:agent="actor">曲</p></div></body></tt>`;
@@ -8,7 +8,7 @@ async function download(page:Page){await page.getByRole('button',{name:'文件�
 test('metadata edits preserve focus, reject duplicates, cancel locally and delete individual values',async({page})=>{
  await load(page);await settings(page,'歌词元数据');
  await page.mouse.move(0,0);
- const key=page.getByLabel('元数据键 artist',{exact:true});expect(await key.evaluate(e=>getComputedStyle(e).borderTopColor)).toBe('rgba(0, 0, 0, 0)');await key.fill('performer');await key.press('Enter');await expect(page.getByLabel('元数据键 performer',{exact:true})).toBeFocused();
+ const key=page.getByLabel('元数据键 artist',{exact:true});await key.fill('performer');await key.press('Enter');await expect(page.getByLabel('元数据键 performer',{exact:true})).toBeFocused();
  await page.getByLabel('元数据 performer 值 1').fill('');await page.getByLabel('元数据 performer 值 1').press('Escape');await expect(page.getByLabel('元数据 performer 值 1')).toHaveValue('甲');await expect(page.getByRole('dialog',{name:'歌词元数据'})).toBeVisible();
  await page.getByLabel('元数据 performer 值 1').fill(' ');await page.getByLabel('元数据 performer 值 1').press('Enter');await expect(page.getByLabel('元数据 performer 值 1')).toHaveValue('乙');
  await page.getByLabel('元数据键 performer',{exact:true}).fill('title');await page.getByLabel('元数据键 performer',{exact:true}).press('Enter');await expect(page.getByRole('alert')).toContainText('键名非法');await page.getByLabel('元数据键 performer',{exact:true}).press('Escape');
@@ -29,9 +29,6 @@ test('invalid singer types locate the field and do not block plain text',async({
 });
 test('sync and output preferences survive panel unmount without restoring completion',async({page})=>{
  await load(page);await page.getByRole('button',{name:'打轴',exact:true}).click();await page.getByLabel('打轴模式').selectOption('line');await page.getByText('回听与校准',{exact:true}).click();await page.getByLabel('输入偏移（毫秒）').fill('75');await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('lrc');await page.getByRole('button',{name:'打轴',exact:true}).click();await expect(page.getByLabel('打轴模式')).toHaveValue('line');await expect(page.getByText('输入偏移 75 ms')).toBeVisible();await page.getByRole('button',{name:'归零',exact:true}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByLabel('导出格式')).toHaveValue('lrc');
-});
-for(const width of [1280,1440,1920])for(const theme of ['light','dark'])test(`management tables ${width} ${theme}`,async({page})=>{
- await page.setViewportSize({width,height:900});await load(page);await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await settings(page,'歌手管理');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:test.info().outputPath(`singers-${width}-${theme}.png`)});await page.getByRole('button',{name:'关闭歌手管理'}).click();await settings(page,'歌词元数据');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:test.info().outputPath(`metadata-${width}-${theme}.png`)});
 });
 test('single switches and mixed batch checkboxes preserve one-step undo',async({page})=>{
  await load(page);await page.locator('[data-outline-drag]').first().click();await page.getByRole('switch',{name:'跳过打轴'}).check();

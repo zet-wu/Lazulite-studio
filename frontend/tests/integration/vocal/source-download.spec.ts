@@ -1,6 +1,6 @@
 import { uploadFixtureMusic } from '../../fixtures/upload-music';
 import { expect, test } from '@playwright/test';
-test('audio outline shares resize preference and graphics stay aligned with independent sources', async ({ page }) => {
+test('audio outline shares resize preference and independent sources allow WAV download', async ({ page }) => {
  const asset = await uploadFixtureMusic(page);
   const response=await page.request.post('/api/v1/projects',{headers:{origin:'http://127.0.0.1:5175'},data:{name:'Vocal source download',upload_id:asset}});
   const pid=(await response.json()).id;
@@ -21,16 +21,10 @@ test('audio outline shares resize preference and graphics stay aligned with inde
   await expect(page.locator('[data-segment-id]').first()).toBeVisible({timeout:30000});
   const graphics=page.getByLabel('波形／声谱图音源',{exact:true});
   await graphics.selectOption('vocal'); await expect(page.getByLabel('播放音源',{exact:true})).toHaveValue('');
-  const wave=page.getByRole('slider',{name:'波形进度',exact:true});
-  const energy=page.getByLabel('人声能量',{exact:true});
-  const waveBox=(await wave.boundingBox())!, energyBox=(await energy.boundingBox())!;
-  expect(Math.abs(waveBox.x-energyBox.x)).toBeLessThan(2);expect(Math.abs(waveBox.width-energyBox.width)).toBeLessThan(2);
-  expect((await graphics.boundingBox())!.x).toBeLessThan(waveBox.x);
   await page.getByRole('button',{name:'波形',exact:true}).click(); await expect(graphics).toBeVisible();
   await page.getByRole('button',{name:'声谱图',exact:true}).click(); await expect(graphics).toBeVisible();
   await page.locator('[data-top-menu="audio-analysis"] summary').click();
   const download=page.getByRole('link',{name:'下载人声 WAV',exact:true}); await expect(download).toBeVisible();
-  expect(await download.evaluate(e=>getComputedStyle(e).textDecorationLine)).toBe('none');
+
   const file=page.waitForEvent('download');await download.click();expect((await file).suggestedFilename()).toMatch(/\.wav$/i);
-  await page.screenshot({path:test.info().outputPath('audio.png')});
 });

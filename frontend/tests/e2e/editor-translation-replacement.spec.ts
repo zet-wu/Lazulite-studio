@@ -83,7 +83,6 @@ test('all expanded rows remain selected while child groups mount only near the v
  await groups.first().locator('..').locator('..').evaluate(element=>{element.scrollTop=element.scrollHeight;});
  await expect(page.getByRole('region',{name:'L2000 子轨',exact:true})).toBeVisible();
  await expect(page.getByText('行已选 2000',{exact:true})).toBeVisible();
- await page.screenshot({path:test.info().outputPath('expanded-2000.png')});
 });
 test('Ruby range and reverse marquee resolve different word owners and undo one grouped delete', async ({page}) => {
  await loadTimeline(page);

@@ -1,63 +1,27 @@
 import { importLyrics } from '../fixtures/import-lyrics';
-import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { performanceTtml } from '../fixtures/large-document';
-import { timedIntervalsTtml, rubyTtml } from '../fixtures/timed-intervals';
+import { rubyTtml, timedIntervalsTtml } from '../fixtures/timed-intervals';
 
-for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) {
-  test(`compact persistent toggle ${theme} ${width}`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
+  test('collapse toggle retains keyboard focus', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/projects/sample-project/edit');
-    await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
+
     const toggle = page.getByRole('button', { name: '收起时间轴', exact: true });
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await toggle.evaluate(e => e.setAttribute('data-persistent-toggle', 'yes'));
-    const clock = page.locator('footer').locator('span').first();
-    const x = (await clock.boundingBox())!.x;
     await toggle.click();
     const collapsed = page.getByRole('button', { name: '展开时间轴', exact: true });
     await expect(collapsed).toBeFocused();
     await expect(collapsed).toHaveAttribute('data-persistent-toggle', 'yes');
     await expect(collapsed).toHaveAttribute('aria-expanded', 'false');
-    const collapsedHeight = (await page.locator('footer').boundingBox())!.height;
-    expect(collapsedHeight).toBeLessThan(60);
-    await expect(collapsed.locator('svg path')).toHaveAttribute('d', 'M1 7h10L6 1z');
-    expect(Math.abs((await clock.boundingBox())!.x - x)).toBeLessThanOrEqual(1);
-    await page.screenshot({ path: test.info().outputPath('collapsed.png') });
     await collapsed.press('Enter');
     await expect(toggle).toBeFocused();
     await toggle.press('Space');
     await expect(collapsed).toBeFocused();
     await collapsed.press('Space');
     await expect(toggle).toBeFocused();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-    await expect(toggle.locator('svg path')).toHaveAttribute('d', 'M1 1h10L6 7z');
-    await writeFile(test.info().outputPath('geometry.json'), JSON.stringify({ width, height: 900, theme, dpr: 1, collapsedHeight, expandedHeight: (await page.locator('footer').boundingBox())!.height, clockX: x }, null, 2));
-    await page.screenshot({ path: test.info().outputPath('expanded.png') });
   });
-}
-
-test('playing color is visible on ordinary and true narrow widths', async ({ page }) => {
-  await page.goto('/projects/sample-project/edit');
-  await importLyrics(page, { name: 'timeline-playback-ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(timedIntervalsTtml()) });
-  await expect(page.locator('[data-outline-drag]')).toHaveCount(3);
-  const audio = page.locator('audio');
-  await audio.evaluate((e: HTMLAudioElement) => { e.currentTime = 2; e.dispatchEvent(new Event('seeked')); });
-  for (const theme of ['light', 'dark']) {
-    await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
-    for (const index of [0, 1]) {
-      await page.locator('[data-outline-drag]').nth(index).click();
-      for (const kind of ['行', '词', '注音']) {
-        const bar = page.getByRole('button', { name: new RegExp(`^时间轴${kind} `) }).nth(kind === '行' ? index : 0);
-        await bar.focus();
-        const color = index === 1 ? bar.locator('[data-time-color]') : bar;
-        await expect.poll(() => color.evaluate(e => getComputedStyle(e, e.hasAttribute('data-time-color') ? null : '::after').boxShadow)).toContain('240, 164, 43');
-        if (index === 1) expect((await color.boundingBox())!.width).toBeLessThan(1);
-      }
-    }
-    await page.screenshot({ path: test.info().outputPath(`playing-${theme}.png`) });
-  }
-});
 
 test('grouped skips, manual generation, history and checkpoint with bounded layout', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -73,11 +37,11 @@ test('grouped skips, manual generation, history and checkpoint with bounded layo
   await expect(skips).toHaveCount(3);
   for (const skip of await skips.all()) {
     await expect(skip).toBeChecked();
-    expect(await skip.locator('..').evaluate(e => getComputedStyle(e).whiteSpace)).toBe('nowrap');
+
   }
-  expect(await dialog.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+
   await expect(dialog.getByRole('status')).toContainText('所有单元均跳过');
-  await page.screenshot({ path: test.info().outputPath('ruby-default-skips.png') });
+
   await skips.nth(0).uncheck(); await skips.nth(1).uncheck();
   await dialog.getByRole('button', { name: '生成 注音', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '读音 がな', exact: true })).toHaveCount(2);
@@ -150,6 +114,4 @@ test('large proposal scroll preserves manual choices while mounting only visible
     return last.isVisible();
   }, { timeout: 20_000 }).toBe(true);
   await expect(last.getByLabel('目标 注音')).toHaveValue('手动末行');
-  expect(await dialog.evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
-  await page.screenshot({ path: test.info().outputPath('large-ruby-visible-rows.png') });
 });

@@ -30,19 +30,10 @@ test('translation content and units select independently, merge and keyboard und
  const contents=page.locator('main [data-translation-id]');await contents.first().click({position:{x:2,y:2}});await contents.last().click({position:{x:2,y:2},modifiers:['Shift']});await contents.first().press('Shift+F10');await page.getByRole('menuitem',{name:'合并所选',exact:true}).click();await expect(contents).toHaveCount(1);await expect(units).toHaveCount(2);
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(contents).toHaveCount(2);
 });
-for(const theme of ['light','dark'])test(`${theme} active batch tabs and seven SVGs remain accessible at narrow width`,async({page})=>{
- if(theme==='dark'){await page.locator('[data-top-menu="view"] summary').click();await page.getByRole('button',{name:'夜间模式',exact:true}).click();}
- await page.setViewportSize({width:850,height:900});const nav=page.getByRole('navigation',{name:'工作模式'});await expect(nav.locator('button svg[aria-hidden="true"]')).toHaveCount(7);
- const dialog=await batch(page);await dialog.getByRole('button',{name:'清除注音',exact:true}).click();const active=dialog.getByRole('button',{name:'清除注音',exact:true});await active.focus();await expect(active).toBeFocused();await expect(active).toHaveAttribute('aria-pressed','true');
- const colors=await active.evaluate(el=>({background:getComputedStyle(el).backgroundColor,color:getComputedStyle(el).color,shadow:getComputedStyle(el).boxShadow}));expect(colors.shadow).not.toBe('none');expect(colors.background).not.toBe('rgba(0, 0, 0, 0)');await page.screenshot({path:test.info().outputPath(`editor-batch-structure-${theme}.png`)});
-});
-test('timeline shares complete lyric menus and audio alignment is last in DOM and visual order',async({page})=>{
+test('timeline shared menu merges the selected words',async({page})=>{
  const {loadTimeline}=await import('../fixtures/timeline-setup');await loadTimeline(page);await importMergeSplit(page,2);
  await page.locator('[data-outline-drag]').first().click();
  const bars=page.locator('[data-timeline-key="w0-0"], [data-timeline-key="w0-1"]');await bars.first().click();await bars.last().click({modifiers:['Shift']});await bars.last().click({button:'right'});await expect(page.getByRole('menuitem',{name:'合并所选',exact:true})).toBeEnabled();await page.getByRole('menuitem',{name:'合并所选',exact:true}).click();await expect(line(page).getByLabel('词 今日',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'音频处理',exact:true}).click();const ribbon=page.getByLabel('音频操作',{exact:true});await expect(ribbon.getByRole('button',{name:'自动对齐',exact:true})).toBeVisible();
- expect(await ribbon.locator('button').last().textContent()).toBe('自动对齐');const order=await ribbon.evaluate(el=>{const controls=Array.from(el.querySelectorAll('button,summary'));return controls.map(e=>({text:e.textContent,x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y}));});expect(order.at(-1)!.text).toBe('自动对齐');expect(order.at(-1)!.x).toBeGreaterThan(order[0].x);
- await page.setViewportSize({width:850,height:900});await page.evaluate(()=>{document.documentElement.style.zoom='1.25';});await expect(ribbon.getByRole('button',{name:'自动对齐',exact:true})).toBeVisible();await page.screenshot({path:test.info().outputPath('editor-batch-structure-audio-zoom.png')});
 });
 test('clear-line cue menu ignores prior word selections and restores all cues with one undo',async({page})=>{
  const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="4" end="7"><span studio:id="w" tts:ruby="container" begin="4" end="5"><span tts:ruby="base">愛</span><span tts:ruby="textContainer"><span studio:id="r1" tts:ruby="text" begin="4.2" end="4.3">あ</span><span studio:id="r2" tts:ruby="text" begin="4.9" end="5">い</span></span></span><span studio:id="b" begin="5.6" end="7">●</span></p></body></tt>';

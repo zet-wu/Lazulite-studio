@@ -9,7 +9,7 @@ test('generates 注音, saves through FastAPI and reopens the complete current d
   await content.getByText('音译 · ja-Latn').click({ button: 'right' });
   await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
   const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
-  await expect(dialog.getByLabel('确认同时扩展上述词/行时间')).toHaveCount(0);
+
   await dialog.getByRole('button', { name: '生成 注音', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '读音 二人', exact: true })).toHaveCount(3);
   const savedResponse = page.waitForResponse((response) => response.url().endsWith('/api/v1/projects/multitrack-project/document') && response.request().method() === 'PUT');

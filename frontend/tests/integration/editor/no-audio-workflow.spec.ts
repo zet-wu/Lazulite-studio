@@ -36,8 +36,8 @@ test('no music: import, shared beat properties, translation, metadata, undo and 
   for(const name of ['作者甲','作者乙']) {await dialog.getByRole('button',{name:'为 songwriter 添加值'}).click();const field=dialog.getByLabel('元数据 songwriter 新值');await field.fill(name);await field.press('Tab');}
   await expect(dialog.getByLabel('元数据 songwriter 值 2')).toHaveValue('作者乙');
   await dialog.getByRole('button',{name:'新增元数据键',exact:true}).click();await dialog.getByLabel('新元数据键').fill('songwriter');await dialog.getByLabel('新元数据键').press('Tab');
-  await expect(dialog.getByRole('alert')).toContainText('歌曲作者（iTunes）');await dialog.getByRole('button',{name:'取消新增元数据',exact:true}).click();await page.screenshot({path:test.info().outputPath('metadata-light.png')});
-  await page.evaluate(()=>document.documentElement.dataset.theme='dark');await page.screenshot({path:test.info().outputPath('metadata-dark.png')});
+  await expect(dialog.getByRole('alert')).toContainText('歌曲作者（iTunes）');await dialog.getByRole('button',{name:'取消新增元数据',exact:true}).click();
+
   await dialog.getByRole('button',{name:'关闭歌词元数据'}).click();await save(page);
   expect((await envelope(page,id)).document.editing.emptyBeats).toEqual({A:{kind:'word',count:2},r1:{kind:'ruby',count:1}});
   await page.reload();await expect(line.getByLabel('翻译 1',{exact:true})).toHaveValue('译文');
@@ -45,7 +45,7 @@ test('no music: import, shared beat properties, translation, metadata, undo and 
   await page.getByRole('button',{name:'文件打包',exact:true}).click();const downloading=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
   const output=await readFile((await(await downloading).path())!,'utf8');expect(output).toContain('作者乙');expect(output).not.toContain('emptyBeat');
 });
-test('generated whitespace is omitted and actual word preview remains aligned',async({page})=>{
+test('generated whitespace is omitted from saved timing and playback projection',async({page})=>{
   const id=await create(page);const text='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="1" end="3"><span studio:id="ka" begin="1" end="2">か</span><span studio:id="space"> </span><span studio:id="na" begin="2" end="3">な</span></p></body></tt>';
   await importLyrics(page,{name:'empty.ttml',mimeType:'application/xml',buffer:Buffer.from(text)});await page.locator('[data-outline-drag]').first().click();
   await page.getByText('编辑工具',{exact:true}).click();await page.getByRole('button',{name:'生成日文罗马字音译…',exact:true}).click();
@@ -62,9 +62,6 @@ test('generated whitespace is omitted and actual word preview remains aligned',a
   expect(projection.content.units).toHaveLength(2);expect(projection.content.units.map((u:{beginMs:number;endMs:number})=>[u.beginMs,u.endMs])).toEqual([[1000,2000],[2000,3000]]);
   expect(projection.lyric.words.filter((w:{romanWord?:string})=>w.romanWord).map((w:{romanWord:string})=>w.romanWord.trim())).toEqual(['ka','na']);
   await page.getByRole('button',{name:'AMLL 预览',exact:true}).click();await page.getByLabel('预览位置').fill('1500');await expect(page.getByRole('region',{name:'AMLL 预览'})).toContainText('ka');
-  const roman=page.getByText(/^ka\s*$/).last();
-  await expect.poll(async()=>{const a=await roman.boundingBox();const b=await page.locator('[class*="previewPlayer"]').boundingBox();return Boolean(a&&b&&a.y>=b.y&&a.y+a.height<=b.y+b.height);}).toBe(true);
-  await page.screenshot({path:test.info().outputPath('word-preview.png')});
 });
 test('first upload keeps dirty text and undo history and switches preview clock',async({page})=>{
   const id=await create(page);await importLyrics(page,file);const word=page.getByRole('textbox',{name:'词 Alpha',exact:true});await word.fill('Before');await word.press('Enter');

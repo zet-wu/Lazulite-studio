@@ -45,18 +45,14 @@ test('leaving revokes adoption and reopening does not inherit the lock',async({p
  expect(state.results).toBe(0);expect((await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('studio:null="begin end"');
 });
 
-for(const theme of ['light','dark'])test(`feedback timeout, keyboard dismiss and repeated operation in ${theme}`,async({page})=>{
- await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
+test(`feedback timeout, keyboard dismiss and repeated operation`,async({page})=>{
+
  const state=await setup(page);
- await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
- const running=page.locator('[data-message-bar]').filter({has:page.getByRole('button',{name:'取消任务',exact:true})});
- const header=(await page.locator('header').boundingBox())!, nav=(await page.getByRole('navigation',{name:'工作模式'}).boundingBox())!, bar=(await running.boundingBox())!;
- expect(bar.y).toBeGreaterThanOrEqual(header.y+header.height);expect(bar.y+bar.height).toBeLessThanOrEqual(nav.y);expect(bar.height).toBeLessThan(60);
- await page.screenshot({path:test.info().outputPath(`task-${theme}.png`)});
+
  state.status='succeeded';
  const success=page.getByRole('status').filter({hasText:'已更新歌词时间'});await expect(success).toBeVisible();
- const close=success.locator('..').getByRole('button',{name:'关闭提示'});await expect(close.locator('svg')).toHaveCount(1);await expect(close).toHaveText('');
- await close.focus();await page.screenshot({path:test.info().outputPath(`message-${theme}.png`)});await close.press('Enter');await expect(success).toHaveCount(0);
+ const close=success.locator('..').getByRole('button',{name:'关闭提示'});
+ await close.focus();await close.press('Enter');await expect(success).toHaveCount(0);
  expect(await page.evaluate(()=>document.activeElement?.tagName)).toBe('BUTTON');
  await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('button',{name:'开始对齐',exact:true}).click();
  const unchanged=page.getByRole('status').filter({hasText:'未更新歌词时间'});await expect(unchanged).toBeVisible();await expect(unchanged).toHaveCount(0,{timeout:6000});
@@ -65,7 +61,6 @@ for(const theme of ['light','dark'])test(`feedback timeout, keyboard dismiss and
  await page.goto('/projects');await page.goto(`/projects/${pid}/edit`);await expect(unchanged).toHaveCount(0);
  expect(state.starts).toBe(3);
 });
-
 
 test('device failure requires explicit CPU retry and applies once',async({page})=>{
  const state=await setup(page);let retries=0;

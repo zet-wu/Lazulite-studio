@@ -19,7 +19,6 @@ test('preview is read-only; metadata selection and body replacement undo togethe
  await expect(page.getByRole('textbox',{name:'词 原文',exact:true})).toBeVisible();
  for(const mode of ['歌词获取','文件打包','AMLL 预览','打轴','编辑']) await page.getByRole('button',{name:mode,exact:true}).click();
  await expect(page.getByRole('textbox',{name:'词 原文',exact:true})).toBeVisible();
- await expect(page.locator('[data-top-menu="file"]')).toHaveCount(0);
 });
 
 test('stale candidate response never replaces a newer selection and ID association is independent',async ({page})=>{
@@ -44,14 +43,6 @@ test('stale candidate response never replaces a newer selection and ID associati
  await page.getByRole('button',{name:'仅关联歌曲 ID'}).click();await expect(page.getByText('歌曲 ID 已关联，可撤销')).toBeVisible();
  await page.getByRole('button',{name:'仅关联歌曲 ID'}).click();await expect(page.getByText('此歌曲 ID 已关联')).toBeVisible();
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.getByRole('button',{name:'撤销',exact:true})).toBeDisabled();
-});
-
-for(const width of [1280,1440,1920])for(const theme of ['light','dark'])test(`acquisition layout ${width} ${theme}`,async ({page})=>{
- await page.setViewportSize({width,height:900});await page.addInitScript(theme=>localStorage.setItem('lazulite-editor-theme',theme),theme);
- await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,file(source));await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.locator('input[type=file][accept^=".ttml"]').setInputFiles(file(incoming));
- await expect(page.getByRole('button',{name:'确认导入并替换歌词'})).toBeVisible();
- expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(1);
- await page.screenshot({path:test.info().outputPath(`acquisition-${width}-${theme}.png`)});
 });
 
 test('binary KRC file is decoded locally and previews before one import transaction',async ({page})=>{

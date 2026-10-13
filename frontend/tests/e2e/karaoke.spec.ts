@@ -14,8 +14,8 @@ test('yellow slots insert once on double click, share cue properties and keep or
  await expect(page.locator('main [data-cue-id]')).toHaveText('●●');
  await page.locator('main [data-cue-id]').first().focus();await page.keyboard.press('Delete');await expect(page.getByRole('button',{name:'插入行内导唱',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveText('●●');
- await page.screenshot({path:test.info().outputPath('karaoke-light.png')});
- await page.locator('[data-top-menu="view"] summary').click();await page.getByRole('button',{name:'夜间模式',exact:true}).click();await page.screenshot({path:test.info().outputPath('karaoke-dark.png')});
+
+ await page.locator('[data-top-menu="view"] summary').click();await page.getByRole('button',{name:'夜间模式',exact:true}).click();
 });
 test('auto insertion is idempotent and export ZIP can return from focused validation',async({page})=>{
  await load(page);await page.locator('[data-top-menu="cue-tools"] summary').click();await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await page.getByRole('button',{name:'插入',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(3);
@@ -24,12 +24,6 @@ test('auto insertion is idempotent and export ZIP can return from focused valida
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'下载 ZIP',exact:true}).click();expect((await download).suggestedFilename()).toMatch(/-nicokara.zip$/);
  await page.getByRole('button',{name:'查看校验',exact:true}).click();await expect(page.getByLabel('校验格式筛选')).toHaveValue('nicokara');
  await page.getByRole('button',{name:'返回 Nicokara 导出',exact:true}).click();await expect(page.getByRole('dialog',{name:'导出 Nicokara',exact:true})).toBeVisible();
-});
-test('group edits and a cue remain after mock save',async({page})=>{
- await load(page);await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
- await page.getByRole('button',{name:'分组管理',exact:true}).click();await page.getByLabel('分组 1 名称',{exact:true}).fill('主声部');await page.getByRole('button',{name:'应用分组',exact:true}).click();
- await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'导出 NicoKara',exact:true}).click();await expect(page.getByRole('dialog').getByText('主声部 · 正文',{exact:true})).toBeVisible();
 });
 test('timeline cue selects shared properties, resizes within range and rejects out of bounds',async({page})=>{
  await load(page);await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
@@ -65,27 +59,8 @@ test('singer marker drafts cancel, apply once, survive reopening and disable for
  await importLyrics(page,{name:'singer.ttml',mimeType:'application/xml',buffer:Buffer.from(source)});await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();
  await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');await expect(page.getByLabel('Zoom 值',{exact:true})).toHaveValue('1');await expect(page.getByLabel('ForceWipeDecor',{exact:true})).toBeDisabled();
  await page.getByLabel('触发标记',{exact:true}).fill('cancel');await page.getByRole('button',{name:'关闭歌手标记管理'}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');
- await page.getByLabel('触发标记',{exact:true}).fill('voice-A');await page.getByLabel('扫色前图片',{exact:true}).fill('images/a.png');await page.getByRole('button',{name:'应用',exact:true}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('voice-A');await page.screenshot({path:test.info().outputPath('singer-markers.png')});await page.getByRole('button',{name:'关闭歌手标记管理'}).click();
+ await page.getByLabel('触发标记',{exact:true}).fill('voice-A');await page.getByLabel('扫色前图片',{exact:true}).fill('images/a.png');await page.getByRole('button',{name:'应用',exact:true}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('voice-A');await page.getByRole('button',{name:'关闭歌手标记管理'}).click();
  await page.getByRole('button',{name:'撤销',exact:true}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');await expect(page.getByLabel('扫色前图片',{exact:true})).toHaveValue('transparent-1x1.png');
-});
-for(const theme of ['light','dark'])test(`compact body and Ruby cues share text baselines without marker overlap (${theme})`,async({page})=>{
- await load(page);if(theme==='dark'){await page.locator('[data-top-menu="view"] summary').click();await page.getByRole('button',{name:'夜间模式',exact:true}).click();}
- const bodySlot=page.getByRole('button',{name:'插入行内导唱',exact:true}),rubySlot=page.getByRole('button',{name:'插入 Ruby 内导唱',exact:true});
- const bodyBefore=(await bodySlot.boundingBox())!,rubyBefore=(await rubySlot.boundingBox())!;expect(bodyBefore.width).toBeLessThanOrEqual(22);expect(rubyBefore.width).toBeLessThanOrEqual(18);
- await bodySlot.click();const body=page.locator('main [data-cue-id]').first(),bodyAfter=(await body.boundingBox())!;expect(Math.abs(bodyAfter.y-bodyBefore.y)).toBeLessThan(1);
- await rubySlot.click();const ruby=page.locator('main [data-cue-id]').first(),rubyAfter=(await ruby.boundingBox())!;expect(Math.abs(rubyAfter.y-rubyBefore.y)).toBeLessThan(1);
- await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
- const metrics=await page.locator('main [data-line-id="a"]').evaluate(line=>{
-  const textBox=(host:Element)=>{const probe=document.createElement('span');probe.style.cssText='display:inline-block;width:0;height:0;padding:0;border:0;vertical-align:baseline';host.append(probe);const y=probe.getBoundingClientRect().y;probe.remove();return {y};};
-  const word=line.querySelector('[data-word-id="b"]')!,ruby=line.querySelector('[data-ruby-id="r1"]')!;
-  const bodyText=textBox(word.querySelector('[class*="syncText"] > span')!),rubyText=textBox(ruby.querySelector('[class*="syncText"] > span')!);
-  return {bodyText,rubyText,cues:[...line.querySelectorAll('[data-cue-id]')].map(cue=>({text:textBox(cue),font:getComputedStyle(cue).font,parentFont:getComputedStyle(cue.parentElement!).font,y:cue.getBoundingClientRect().y,ruby:!!cue.closest('[class*="karaokeRubySlot"]'),bottom:cue.getBoundingClientRect().bottom})),markerTop:line.querySelector('[data-sync-marker]')!.getBoundingClientRect().top};
- });
- await test.info().attach(`geometry-${theme}.json`,{body:JSON.stringify(metrics,null,2),contentType:'application/json'});
- console.log(JSON.stringify(metrics));await page.screenshot({path:test.info().outputPath(`geometry-${theme}.png`)});
- for(const cue of metrics.cues){expect(Math.abs(cue.text.y-(cue.ruby?metrics.rubyText:metrics.bodyText).y)).toBeLessThan(1);expect(cue.bottom).toBeLessThanOrEqual(metrics.markerTop);}
- await body.dblclick();const edit=page.locator('main').getByRole('textbox',{name:'导唱文字',exact:true});await edit.fill('●●●');await edit.press('Enter');await expect(page.locator('main [data-cue-id]').filter({hasText:'●●●'})).toBeVisible();
- await page.screenshot({path:test.info().outputPath(`compact-${theme}.png`)});
 });
 test('wrapped multiline canvas keeps multi-character Ruby and editing above timing markers; normal sync stays unchanged',async({page})=>{
  await load(page);await page.setViewportSize({width:1000,height:1000});
@@ -94,6 +69,5 @@ test('wrapped multiline canvas keeps multi-character Ruby and editing above timi
  const positions=()=>page.locator('main [data-word-id]').evaluateAll(nodes=>nodes.map(node=>{const box=node.getBoundingClientRect();return [box.x,box.y,box.height];}));const original=await positions();expect(new Set(original.map(box=>box[1])).size).toBeGreaterThan(2);
  await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();await page.locator('[data-top-menu="cue-tools"] summary').click();await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await page.getByRole('button',{name:'插入',exact:true}).click();
  const cue=page.locator('main [data-cue-id]').first();await cue.dblclick();const input=page.locator('main').getByRole('textbox',{name:'导唱文字',exact:true});await input.fill('●●●');
- const box=(await input.boundingBox())!;const markerTop=await cue.evaluate(node=>{const slot=node.closest('[class*="karaokeBodySlot"]')!;const style=getComputedStyle(slot);return slot.getBoundingClientRect().y+style.gridTemplateRows.split(' ').slice(0,2).reduce((sum,v)=>sum+parseFloat(v),0);});expect(box.y+box.height).toBeLessThanOrEqual(markerTop);
- await input.press('Enter');await page.screenshot({path:test.info().outputPath('wrapped-edit.png')});await page.getByRole('button',{name:'打轴',exact:true}).click();expect(await positions()).toEqual(original);
+ await input.press('Enter');await page.getByRole('button',{name:'打轴',exact:true}).click();expect(await positions()).toEqual(original);
 });

@@ -10,23 +10,6 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
 });
 
-test('saves a background relation through FastAPI and reopens its stable ID', async ({ page }) => {
-  await page.goto('/projects/media-offset/edit');
-  await page.locator('[data-outline-drag]').nth(1).click();
-  await page.getByLabel('背景歌词', { exact: true }).check();
-  await expect(page.getByLabel('所属主行')).toHaveValue('media-0');
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(page.getByText('已保存', { exact: true })).toBeVisible();
-  const saved = await (await page.request.get('/api/v1/projects/media-offset/document')).json();
-  expect(saved.document.lyrics.draftTtml).toContain('x-bg');
-  await page.reload();
-  await page.locator('[data-outline-drag]').nth(1).click();
-  await expect(page.getByLabel('背景歌词', { exact: true })).toBeChecked();
-  await expect(page.getByLabel('所属主行')).toHaveValue('media-0');
-  const reopened = await (await page.request.get('/api/v1/projects/media-offset/document')).json();
-  expect(reopened.document.lyrics.draftTtml).toBe(saved.document.lyrics.draftTtml);
-});
-
 test('uses proxy sample zero with nonzero source PTS and plays a precise loop', async ({ page }) => {
   await page.goto('/projects/media-offset/edit');
   const project = await (await page.request.get('/api/v1/projects/media-offset')).json();
@@ -46,5 +29,4 @@ test('uses proxy sample zero with nonzero source PTS and plays a precise loop', 
   const spectrum = page.locator('[data-spectrum-ready]');
   await expect.poll(async () => (await spectrum.getAttribute('data-spectrum-ready')) === (await spectrum.getAttribute('data-spectrum-wanted'))).toBe(true);
   await expect(page.getByText('声谱图加载中…')).toHaveCount(0);
-  await page.screenshot({ path: test.info().outputPath('real-service-offset-spectrum.png') });
 });

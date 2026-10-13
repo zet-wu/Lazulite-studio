@@ -1,7 +1,7 @@
 import {expect,test} from '@playwright/test';
-for(const theme of ['light','dark'])test(`experimental options, clearing, undo and reopening in ${theme}`,async({page})=>{
+test(`experimental options, clearing, undo and reopening`,async({page})=>{
  const pid='media-offset',url=`/api/v1/projects/${pid}/document`;
- await page.addInitScript(t=>localStorage.setItem('lazulite-editor-theme',t),theme);
+
  const before=await(await page.request.get(url)).json();
  const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="1" end="5"><span studio:id="left" begin="1" end="2">♪</span><span studio:id="w" begin="2" end="4">love</span><span studio:id="right" begin="4" end="5">！</span></p><p xml:id="skip" begin="6" end="7"><span studio:id="sw" begin="6" end="7">keep</span></p></body></tt>';
  const snapshot={...before.document,karaoke:{...before.document.karaoke,lineGroups:{a:'main',skip:'main'},cues:[]},lyrics:{draftTtml:xml},lineOrder:[],editing:{emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:['skip'],endLinks:{}},acoustics:{analysisId:null,segments:[]}};
@@ -25,7 +25,7 @@ for(const theme of ['light','dark'])test(`experimental options, clearing, undo a
   const box=dialog.getByRole('checkbox',{name:new RegExp('^'+label+' ')});await expect(box).toBeEnabled();await box.setChecked(Boolean(bits&(1<<i)));await expect(box).toBeChecked({checked:Boolean(bits&(1<<i))});
  }
  await dialog.getByRole('checkbox',{name:'清空未匹配单元时间',exact:true}).check();
- await page.screenshot({path:test.info().outputPath(`alignment-options-${theme}.png`)});
+
  await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();
  await expect.poll(()=>starts).toBe(2);expect(params).toMatchObject({use_hints:false,line_blank:true,rest_blank:true,rest_token:true,clear_unmatched:true});
  await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeDisabled();

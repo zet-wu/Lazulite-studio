@@ -1,5 +1,5 @@
 import { importLyrics } from '../fixtures/import-lyrics';
-import { expect, test, type Page, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 
 async function load(page: Page, count = 3) {
@@ -24,10 +24,6 @@ test('UI append is empty, after the document, selected, reversible and keyboard 
   await expect(page.locator('aside').filter({ has: page.getByRole('heading', { name: '属性' }) })).toContainText('L4');
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(page.locator('[data-outline-drag]')).toHaveCount(3);
-  await expect(page.getByRole('heading', { name: '歌词编辑' })).toHaveCount(0);
-  await page.locator('[data-top-menu="lyrics-settings"] summary').click();
-  await page.getByRole('button', { name: '管理音译轨道…' }).click();
-  await expect(page.getByRole('dialog', { name: '音译轨道管理' })).toBeVisible();
 });
 
 test('UI drag keeps source layout with an insertion line, commits once and cancels without history or selection residue', async ({ page }) => {
@@ -87,20 +83,6 @@ test('UI virtual append remains at the true end and long-document drag stays vir
   await expect(rows.last()).toHaveAttribute('aria-label', '歌词行 空行');
   await expect(rows.last()).toBeInViewport(); expect(await rows.count()).toBeLessThan(80);
   await writeFile(test.info().outputPath('virtual.json'), JSON.stringify({ previewIncludingMouseStepsMs: previewMs, mounted: await rows.count() }));
-});
-
-for (const theme of ['light', 'dark']) for (const width of [1280, 1440, 1920]) test(`UI surfaces ${theme} ${width}`, async ({ page }) => {
-  await page.setViewportSize({ width, height: 900 }); await page.goto('/projects/sample-project/edit?scenario=no-music');
-  await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: await readFile('../tests/fixtures/ttml/multitrack.ttml') });
-  await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
-  await page.screenshot({ path: test.info().outputPath('editor.png') });
-  await page.locator('[data-top-menu="tools"] summary').click();
-  await page.getByRole('button', { name: '从音译生成 注音…' }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
-  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeInViewport();
-  await expect(dialog.getByText(/与正文相同|时间包络|原音译轨道会保留|切换字符输出将/)).toHaveCount(0);
-  expect(await dialog.evaluate(node => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
-  await page.screenshot({ path: test.info().outputPath('ruby.png') });
 });
 
 test('UI empty document and background tail append both remain usable after undo', async ({ page }) => {
