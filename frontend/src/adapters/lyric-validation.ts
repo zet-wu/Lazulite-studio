@@ -1,10 +1,10 @@
 import type { ProjectEditing } from '../domain/project-editing';
 import type { LyricDocument } from '../domain/lyric-document';
 import { isPunctuation } from '../domain/preview-adapter';
-import { exportLyricFile, type LyricFormat } from './lyric-formats';
-import { collectOutputIssues, DocumentOutputError, outputIssueKey, type OutputIssue } from './output-validation';
+import { exportLyricFile, exportFormats } from './lyric-formats';
+import { DocumentOutputError, outputIssueKey, type OutputIssue } from './output-validation';
 
-export const checkedFormats: Exclude<LyricFormat, 'krc'>[] = ['ttml', 'txt', 'lrc', 'elrc', 'eslrc', 'qrc', 'yrc', 'lys', 'ass'];
+export const checkedFormats = exportFormats.map(([format]) => format);
 /** Runs the actual serializers in memory; no download, persistence or history effects. */
 function* validationSteps(document: LyricDocument, editing?: ProjectEditing): Generator<void, OutputIssue[]> {
   const result = new Map<string, OutputIssue>();
@@ -20,8 +20,6 @@ function* validationSteps(document: LyricDocument, editing?: ProjectEditing): Ge
     }
     yield;
   }
-  collectOutputIssues(document, 'publish',editing).forEach(issue => add(issue, '发布歌词', 'error'));
-  yield;
   for (const line of document.lines) {
     for (const word of line.words) {
       if (isPunctuation(word.text)) {

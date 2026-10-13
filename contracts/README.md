@@ -12,13 +12,13 @@
 | reading/analyze | 当前行 id／text 快照，返回原文 code point 范围及读音 |
 | alignment-preview／jobs/alignment | 已保存 revision、提示及结果策略；scope 与目标映射用于完整性核对 |
 | 人声结果／能量／下载 | 分析 ID 与音频所有者 ID 分开，复用任务可返回已有 analysis_id |
-| 发布 | revision、asset_id、lrc_kind、lrc_text 和可选 target_track_id；通过回读报告后下载 |
+| 发布 | revision、asset_id、lrc_kind、lrc_text 和可选 target_track_id；MP4/M4A 的 none + null 保留已有歌词标签，lrc／elrc 提供非空文本；通过回读报告后下载 |
 | embedded-lyrics | 项目源音频候选，返回内容／格式或候选错误 |
 | archive／project-archives | `.lazp` ZIP，manifest v1、项目 v8、可选一份源音频，导入创建独立项目 |
 | source-metadata | 当前源音频 asset_id 与搜索条件三字段；读取与保存条件分别提交 |
 | storage | total_bytes、五类 categories、measured_at，按项目目录逻辑字节统计 |
 
-项目 editing 保存空拍、忽略行、跳过对齐和行尾链接，karaoke 保存导唱及输出配置；服务在保存边界验证身份、类型、范围和引用。草稿与发布时间门控分别服务继续编辑和正式输出。
+项目 editing 保存空拍、忽略行、跳过对齐和行尾链接，karaoke 保存导唱及输出配置；服务在保存边界验证身份、类型、范围和引用。普通 TTML 与 STPP 共用歌词规则；媒体边界负责源资产、容器和写入回读。
 
 会话与写请求使用精确来源匹配，密码模式结合会话 cookie、CSRF cookie 和 `X-CSRF-Token`。能力由实际配置和运行依赖决定。整体实现见[服务端架构](../server/README.md)。
 

@@ -23,18 +23,19 @@ def packet_hashes(path):
     return list(groups.values())
 
 
-def tag_snapshot(media):
+def tag_snapshot(media, preserve_lyrics=False):
     if isinstance(media, MP3):
         return {k:deepcopy(v) for k,v in (media.tags or {}).items() if k != 'USLT::eng'}, list(getattr(media.tags,'unknown_frames',[]))
     key = '\xa9lyr' if isinstance(media, MP4) else 'lyrics'
     extra = [(block.code, block.write()) for block in media.metadata_blocks if block.code not in (1, 4)] if isinstance(media, FLAC) else []
-    return {k:deepcopy(v) for k,v in (media.tags or {}).items() if k.lower() != key}, extra
+    return {k:deepcopy(v) for k,v in (media.tags or {}).items() if preserve_lyrics or k.lower() != key}, extra
 
 
-def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str, target_track_id=None):
+def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str | None, target_track_id=None):
     media = File(source)
     if not isinstance(media,(MP3, FLAC, MP4)): raise ValueError('仅支持 MP4/M4A、MP3 和 FLAC')
-    before_tags, before_extra = tag_snapshot(media)
+    if lrc is None and not isinstance(media, MP4): raise ValueError('此容器需要写入 LRC')
+    before_tags, before_extra = tag_snapshot(media, lrc is None)
     before_audio = packet_hashes(source)
     if not before_audio: raise ValueError('源文件没有音轨')
     if isinstance(media, MP4):
@@ -46,7 +47,7 @@ def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str, targ
         if target_track_id is not None: raise ValueError('此容器没有 STPP 轨道')
         shutil.copyfile(source, output)
     result = File(output)
-    if result.tags is None: result.add_tags()
+    if lrc is not None and result.tags is None: result.add_tags()
     if isinstance(result,MP3):
         # Only the English/default-description target; other language/descriptions survive.
         result.tags.add(USLT(encoding=3, lang='eng', desc='', text=lrc))
@@ -54,13 +55,14 @@ def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str, targ
         result.save(v2_version=version)
     elif isinstance(result,FLAC):
         result['LYRICS'] = [lrc]; result.save()
-    else:
+    elif lrc is not None:
         result['\xa9lyr'] = [lrc]; result.save()
     checked = File(output)
-    after_tags, after_extra = tag_snapshot(checked)
+    after_tags, after_extra = tag_snapshot(checked, lrc is None)
     if before_tags != after_tags or before_extra != after_extra: raise ValueError('非目标元数据或封面回读不一致')
-    actual = checked.tags.get('USLT::eng').text if isinstance(checked,MP3) else checked['\xa9lyr' if isinstance(checked,MP4) else 'LYRICS'][0]
-    if actual != lrc: raise ValueError('歌词标签回读不一致')
+    if lrc is not None:
+        actual = checked.tags.get('USLT::eng').text if isinstance(checked,MP3) else checked['\xa9lyr' if isinstance(checked,MP4) else 'LYRICS'][0]
+        if actual != lrc: raise ValueError('歌词标签回读不一致')
     if before_audio != packet_hashes(output): raise ValueError('音频载荷回读不一致')
     if isinstance(checked,MP4):
         after_tracks, after_mdats = mp4_snapshot(output, target_track_id)

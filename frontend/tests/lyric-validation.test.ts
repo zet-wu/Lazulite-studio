@@ -47,10 +47,10 @@ it('describes background and timing projections without treating them as source 
   expect(exportLyricFile(doc, 'lrc')).toContain('[00:01.000]');
   expect(describeLyricFormat(doc, 'lrc')[0].detail).toContain('段尾');
 });
-it('merges the same missing translation endpoint across TTML, ASS and publishing',()=>{
+it('merges the same missing translation endpoint across TTML and ASS',()=>{
  const doc=createLyricDocument('a');const line=doc.lines[0];line.beginMs=0;line.endMs=1000;line.words[0].beginMs=0;line.words[0].endMs=1000;
  doc.translationTracks=[{id:'t',language:'en',purpose:'subtitle',contents:[{id:'c',lineId:line.id,kind:'timed',units:[{id:'u',text:'word',beginMs:100,endMs:null}]}]}];
- const issues=validateLyrics(doc).filter(issue=>issue.unitId==='u');expect(issues).toHaveLength(1);expect(issues[0].formats).toEqual(['TTML','ASS','发布歌词']);
+ const issues=validateLyrics(doc).filter(issue=>issue.unitId==='u');expect(issues).toHaveLength(1);expect(issues[0].formats).toEqual(['TTML','ASS']);
 });
 
 it('incremental execution yields with identical full results and aborts stale work',async()=>{
@@ -58,4 +58,13 @@ it('incremental execution yields with identical full results and aborts stale wo
  expect(await validateLyricsIncrementally(document,editing,new AbortController().signal)).toEqual(validateLyrics(document,editing));
  const controller=new AbortController();const pending=validateLyricsIncrementally(document,editing,controller.signal);controller.abort();
  await expect(pending).rejects.toMatchObject({name:'AbortError'});
+});
+
+it('allows partial body and Ruby TTML endpoints while retaining sidecar blockers',()=>{
+ const doc=createLyricDocument('字'),line=doc.lines[0],word=line.words[0];
+ word.beginMs=200;word.rubyUnits=[{id:'ruby',reading:'じ',beginMs:null,endMs:2000}];
+ const xml=exportLyricFile(doc,'ttml');
+ expect(xml).not.toContain('studio:');expect(xml).toContain('begin="00:00.200"');expect(xml).toContain('end="00:02.000"');
+ expect(validateLyrics(doc).filter(issue=>issue.formats?.includes('TTML'))).toEqual([]);
+ expect(()=>exportLyricFile(doc,'lrc')).toThrow();
 });

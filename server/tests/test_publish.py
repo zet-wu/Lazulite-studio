@@ -84,8 +84,8 @@ def test_publish_http_validation_and_download_auth_gate(tmp_path):
     bad = _save(client, headers, pid, revision, '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p begin="0s" end="1s"><span studio:null="begin end">x</span></p></body></tt>')
     assert client.post(f"/api/v1/projects/{pid}/publish", json={"revision": bad, "asset_id": asset, "lrc_kind":"lrc", "lrc_text":"[00:00.000]hello\n[00:01.000]\n"}, headers={**headers, "idempotency-key": "bad"}).status_code == 202
     failed = _wait(client, client.get(f"/api/v1/projects/{pid}/exports").json()["items"][0]["id"])
-    assert failed["status"] == "failed" and failed["error"]["code"] == "publish_failed"
-    assert client.get(f"/api/v1/projects/{pid}/exports/{failed['id']}/download").status_code == 409
+    assert failed["status"] == "succeeded" and failed["error"] is None
+    assert client.get(f"/api/v1/projects/{pid}/exports/{failed['id']}/download").status_code == 200
     unauthenticated = TestClient(create_app(tmp_path, settings), base_url="https://studio")
     assert unauthenticated.get(f"/api/v1/projects/{pid}/exports/{failed['id']}/download").status_code == 401
     assert client.post(f"/api/v1/projects/{pid}/publish", json={"revision": "missing", "asset_id": asset, "lrc_kind":"lrc", "lrc_text":"[00:00.000]hello\n[00:01.000]\n"}, headers=headers).status_code == 422
@@ -258,11 +258,47 @@ def test_video_classification_and_portable_download_names(tmp_path):
 
 def test_translation_publication_never_flattens_unknown_timing(tmp_path):
     from pathlib import Path
-    from server.publish import validate_publish_ttml, PublishInvalid
+    from server.publish import validate_output_ttml, PublishInvalid
     import pytest
     source = Path(__file__).resolve().parents[2] / 'tests/fixtures/ttml/timeline-translation-external.ttml'
     xml = source.read_text(encoding='utf-8')
-    assert validate_publish_ttml(xml, xml=True)['passed']
+    assert validate_output_ttml(xml, xml=True)['passed']
     for invalid in [xml.replace('begin="500ms"', '', 1), xml.replace('type="replacement"', 'type="other"', 1)]:
         with pytest.raises(PublishInvalid):
-            validate_publish_ttml(invalid, xml=True)
+            validate_output_ttml(invalid, xml=True)
+
+
+def test_stpp_optional_timing_preserves_source_tags_without_lrc(tmp_path):
+    from mutagen.mp4 import MP4
+    from server.publishing import extract_stpp
+    import xml.etree.ElementTree as ET
+    source = tmp_path / 'source.m4a'
+    _m4a(source)
+    tags = MP4(source); tags['\xa9lyr'] = ['original lyrics']; tags['\xa9nam'] = ['title']; tags.save()
+    settings = Settings('pw', False, 'http://studio')
+    with TestClient(create_app(tmp_path / 'data', settings), base_url='https://studio') as client:
+        headers = _headers(client, settings)
+        asset = client.post('/api/v1/uploads', files={'file': ('source.m4a', source.read_bytes(), 'audio/mp4')}, headers=headers).json()['id']
+        pid = client.post('/api/v1/projects', json={'name': 'optional timing', 'upload_id': asset}, headers=headers).json()['id']
+        revision = client.get(f'/api/v1/projects/{pid}/document').json()['revision']
+        xml = '''<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:studio="urn:lazulite:studio:draft"><body><p studio:null="begin end"><span studio:null="begin">untimed</span><span begin="0.2s">partial</span><span tts:ruby="container"><span tts:ruby="base">字</span><span tts:ruby="text"><span end="2s">じ</span></span></span></p><p begin="0s" end="2s"/><p begin="0s" end="0s"/></body></tt>'''
+        revision = _save(client, headers, pid, revision, xml)
+        body = {'revision': revision, 'asset_id': asset, 'lrc_kind': 'none', 'lrc_text': None}
+        url = f'/api/v1/projects/{pid}/publish'
+        for invalid in ({**body, 'lrc_text': ''}, {**body, 'lrc_kind': 'lrc'}):
+            assert client.post(url, json=invalid, headers=headers).status_code == 422
+        job = client.post(url, json=body, headers=headers).json()['id']
+        assert _wait(client, job)['status'] == 'succeeded'
+        item = client.get(f'/api/v1/projects/{pid}/exports').json()['items'][0]
+        output = tmp_path / 'output.m4a'; output.write_bytes(client.get(item['download_url']).content)
+        assert MP4(output)['\xa9lyr'] == ['original lyrics']
+        assert MP4(output)['\xa9nam'] == ['title']
+        root = ET.fromstring(extract_stpp(output)); ns = '{http://www.w3.org/ns/ttml}'
+        lines = root.findall(f'.//{ns}p')
+        assert len(lines) == 3 and lines[0].get('begin') is None and lines[0].get('end') is None
+        spans = lines[0].findall(f'{ns}span')
+        assert spans[0].get('begin') is None and spans[0].get('end') is None
+        assert spans[1].get('begin') == '00:00.200' and spans[1].get('end') is None
+        assert 'untimedpartial字じ' == ''.join(lines[0].itertext())
+        assert all(not key.startswith('{urn:lazulite:studio:draft}') for node in root.iter() for key in node.attrib)
+        assert item['report']['audio_preserved'] and item['report']['metadata_preserved']

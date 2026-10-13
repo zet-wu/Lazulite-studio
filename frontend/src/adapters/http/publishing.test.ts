@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { publishingApi } from "./publishing";
-import { parseLyricTtml } from "../ttml/lyric-codec";
-import { validatePublishDocument as validate } from "../publish-validation";
-const validatePublishDocument = (xml: string) => validate(parseLyricTtml(xml));
-
 describe("publishing adapter", () => {
   afterEach(() => vi.unstubAllGlobals());
   it("keeps structured export errors", async () => {
@@ -35,11 +31,9 @@ describe("publishing adapter", () => {
     });
   });
 
-  it("rejects invalid TTML before a publish request can be made", () => {
-    expect(() =>
-      validatePublishDocument(
-        '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p>missing timing</p></div></body></tt>',
-      ),
-    ).toThrow();
+  it("expresses preserving lyric tags with an explicit null payload", async () => {
+    const fetcher=vi.fn(async(_url: string, _options?: RequestInit)=>Response.json({id:'job'}));vi.stubGlobal('fetch',fetcher);
+    await publishingApi.publish('p','r','a',{lrc_kind:'none',lrc_text:null,target_track_id:null});
+    expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string)).toMatchObject({lrc_kind:'none',lrc_text:null});
   });
 });

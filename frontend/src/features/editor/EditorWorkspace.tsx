@@ -1,3 +1,4 @@
+import type { ValidationFilter } from '../../adapters/lyric-formats';
 import { projectErrorText } from '../project-error';
 import { preferences } from '../../adapters/preferences';
 import { recoverSelection, survivingSelection, selectionSelector, focusObject, preserveSelectionOnFocus } from './selection-recovery';
@@ -148,7 +149,7 @@ function EditorWorkspaceContent(props: Props) {
   });
   useEffect(() => { if (props.projectId) preferences.setItem(`studio:workspace-mode:project:${props.projectId}`, mode); }, [props.projectId, mode]);
   const [karaokeExportOpen,setKaraokeExportOpen]=useState(false);
-  const [karaokeValidation,setKaraokeValidation]=useState(false);
+  const [karaokeValidation,setKaraokeValidation]=useState<ValidationFilter>('all');
   const {selectedCue,selectCue}=useEditorSelection()!;
   const cue=props.project?.karaoke.cues.find(c=>c.id===selectedCue);
   const [validationTab,setValidationTab]=useState<ValidationTab>('lyrics');
@@ -877,9 +878,9 @@ function EditorWorkspaceContent(props: Props) {
     </div> : <section className={styles.auxiliaryPlaceholder}><h1>人声分离与声学分析</h1><p>请从底部上传音乐文件，再进行人声处理。歌词可继续编辑、保存和下载。</p></section>)}
     <fieldset disabled={props.alignment?.locked} style={{display:"contents"}}>
     {mode === 'acquire' && <LyricAcquisition projectId={props.projectId} sourceAssetId={props.sourceAssetId} store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
-    {mode === 'package' && <PackagingPanel {...props} karaokeOnly={karaokeValidation} onKaraokeOnly={setKaraokeValidation} resumeKaraoke={()=>{setMode("karaoke");setKaraokeExportOpen(true);}} validationTab={validationTab} onValidationTab={setValidationTab} focusRule={focusRule} onRuleLocated={()=>setFocusRule(undefined)} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
+    {mode === 'package' && <PackagingPanel {...props} validationFilter={karaokeValidation} onValidationFilter={setKaraokeValidation} resumeKaraoke={()=>{setMode("karaoke");setKaraokeExportOpen(true);}} validationTab={validationTab} onValidationTab={setValidationTab} focusRule={focusRule} onRuleLocated={()=>setFocusRule(undefined)} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
     {mode === 'preview' && <Suspense fallback={<p>正在载入预览…</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={id => { const line = document.lines.find(line => line.id === id); if (line) selectLine(line); }} /></Suspense>}
-    {mode === 'karaoke' && props.project && props.applyProject && <KaraokeTools project={props.project} apply={props.applyProject} title={props.title} exportOpen={karaokeExportOpen} setExportOpen={setKaraokeExportOpen} viewIssues={()=>{setMode('package');setValidationTab('lyrics');setKaraokeValidation(true);}}/>}
+    {mode === 'karaoke' && props.project && props.applyProject && <KaraokeTools project={props.project} apply={props.applyProject} title={props.title} exportOpen={karaokeExportOpen} setExportOpen={setKaraokeExportOpen} viewIssues={()=>{setMode('package');setValidationTab('lyrics');setKaraokeValidation('nicokara');}}/>}
     {mode === 'sync' && <SyncPanel progress={syncProgress} onProgress={setSyncProgress} preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} document={document} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
       onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
     {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canCopy={canCopySelection} canPaste={Boolean(clipboard)}

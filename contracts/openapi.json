@@ -2446,54 +2446,61 @@
         "additionalProperties": false
       },
       "PublishRequest": {
-        "additionalProperties": false,
         "properties": {
           "revision": {
+            "type": "string",
             "minLength": 1,
-            "title": "Revision",
-            "type": "string"
+            "title": "Revision"
           },
           "asset_id": {
+            "type": "string",
             "minLength": 1,
-            "title": "Asset Id",
-            "type": "string"
+            "title": "Asset Id"
           },
           "lrc_kind": {
+            "type": "string",
             "enum": [
+              "none",
               "lrc",
               "elrc"
             ],
-            "title": "Lrc Kind",
-            "type": "string"
+            "title": "Lrc Kind"
           },
           "lrc_text": {
-            "maxLength": 4000000,
-            "minLength": 1,
-            "title": "Lrc Text",
-            "type": "string"
-          },
-          "target_track_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
-                "type": "integer"
+                "type": "string",
+                "maxLength": 4000000,
+                "minLength": 1
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "title": "Lrc Text"
+          },
+          "target_track_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Target Track Id"
           }
         },
+        "additionalProperties": false,
+        "type": "object",
         "required": [
           "revision",
           "asset_id",
           "lrc_kind",
           "lrc_text"
         ],
-        "title": "PublishRequest",
-        "type": "object"
+        "title": "PublishRequest"
       },
       "Export": {
         "type": "object",

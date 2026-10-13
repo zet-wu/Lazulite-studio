@@ -21,7 +21,7 @@ export type ExportItem = {
   container?: string | null;
   format_label?: string | null;
   track_id?: number | null;
-  lrc_kind?: 'lrc' | 'elrc';
+  lrc_kind?: 'none' | 'lrc' | 'elrc';
   target_track_id?: number | null;
   status:
     | "queued"
@@ -142,7 +142,7 @@ export const publishingApi = {
     projectId: string,
     revision: string,
     assetId: string,
-    options: { lrc_kind: 'lrc' | 'elrc'; lrc_text: string; target_track_id: number | null },
+    options: { lrc_kind: 'none' | 'lrc' | 'elrc'; lrc_text: string | null; target_track_id: number | null },
   ): Promise<PublishJob> =>
     parse(
       await fetch(`${root}/projects/${encodeURIComponent(projectId)}/publish`, {

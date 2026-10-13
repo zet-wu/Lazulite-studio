@@ -10,6 +10,12 @@ import { createLine, createLyricDocument, createWord, type LyricDocument, type R
 import { parseLyricTtml, serializeLyricTtml } from './ttml/lyric-codec';
 
 export type LyricFormat = 'ttml' | 'txt' | 'lrc' | 'elrc' | 'eslrc' | 'qrc' | 'krc' | 'yrc' | 'lys' | 'ass';
+export const exportFormats = [
+  ['ttml', 'TTML'], ['txt', '纯文本 TXT'], ['lrc', '普通 LRC'], ['elrc', '扩展 LRC（尖括号）'],
+  ['eslrc', 'ESLRC（正文后方括号）'], ['qrc', 'QRC'], ['yrc', 'YRC'], ['lys', 'LYS'], ['ass', 'ASS'],
+] as const;
+export type ExportFormat = typeof exportFormats[number][0];
+export type ValidationFilter = ExportFormat | 'all' | 'nicokara';
 const parseTimed = { elrc: parseLrc, lrc: parseLrc, eslrc: parseEslrc, qrc: parseQrc, yrc: parseYrc, lys: parseLys };
 const maximumSize = 4_000_000;
 const milliseconds = (ms: number): number => {

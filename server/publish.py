@@ -7,7 +7,6 @@ import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
-from .projection import _plain
 from .time_units import milliseconds, clock, serialize_ttml
 
 TTML_NS = "http://www.w3.org/ns/ttml"
@@ -21,7 +20,7 @@ class PublishInvalid(ValueError):
 
 class MediaPublisher:
     """Single container-writing boundary, injectable in the persistent job runner."""
-    def publish(self, ttml: bytes | None, asset_path: Path, output: Path, lrc: str, target_track_id: int | None):
+    def publish(self, ttml: bytes | None, asset_path: Path, output: Path, lrc: str | None, target_track_id: int | None):
         from .packaging import package_media
         return package_media(asset_path, output, ttml, lrc, target_track_id)
 
@@ -45,8 +44,8 @@ def _time(value: str | None) -> float | None:
     return None
 
 
-def validate_publish_ttml(path: str | Path, max_duration: float | None = None, *, xml: bool = False) -> dict[str, Any]:
-    """Validate final-publish invariants; overlapping lines are intentional and allowed."""
+def validate_output_ttml(path: str | Path, *, xml: bool = False) -> dict[str, Any]:
+    """Validate ordinary TTML output, retaining optional body and Ruby endpoints."""
     try:
         from .documents import validate_ttml
         raw = str(path) if xml else Path(path).read_text(encoding="utf-8")
@@ -58,45 +57,23 @@ def validate_publish_ttml(path: str | Path, max_duration: float | None = None, *
         if agent.get("type") not in {"person", "character", "group", "organization", "other"}:
             raise PublishInvalid(f"歌手 {agent.get('{http://www.w3.org/XML/1998/namespace}id')}：缺失或非法 type")
     lines = root.findall(".//{%s}p" % TTML_NS)
-    if not lines:
-        raise PublishInvalid("lyrics must contain at least one line")
     # Translation drafts never borrow body timing or become plain text on publication.
     for translation in root.iter():
-        if translation.tag.rsplit('}', 1)[-1] != 'translation':
+        if translation.tag.rsplit('}', 1)[-1] not in {'translation', 'transliteration'}:
             continue
-        if translation.get('type', 'subtitle') not in {'subtitle', 'replacement'}:
+        if translation.tag.rsplit('}', 1)[-1] == 'translation' and translation.get('type', 'subtitle') not in {'subtitle', 'replacement'}:
             raise PublishInvalid('unsupported translation type')
         for content in translation.iter():
             if content.tag.rsplit('}', 1)[-1] not in {'text', 'span'}:
                 continue
             is_background = content.get('{http://www.w3.org/ns/ttml#metadata}role') == 'x-bg'
             if content.tag.rsplit('}', 1)[-1] == 'span' and not is_background:
+                if not list(content) and (content.text or '') and all(c in ' \t\r\n' for c in content.text) and content.get('begin') is None and content.get('end') is None:
+                    continue
                 if list(content) or content.get('begin') is None or content.get('end') is None or content.get(f'{{{STUDIO_NS}}}null'):
                     raise PublishInvalid('translation unit requires complete timing')
             if content.get(f'{{{STUDIO_NS}}}kind') == 'timed' and not list(content):
                 raise PublishInvalid('timed translation has no units')
-    parent_times: dict[int, tuple[float | None, float | None]] = {}
-    def collect(element, inherited=(None, None)):
-        local_begin = _time(element.get("begin")) if element.get("begin") is not None else None
-        local_end = _time(element.get("end")) if element.get("end") is not None else None
-        offset = 0
-        begin = offset + local_begin if local_begin is not None else inherited[0]
-        end = offset + local_end if local_end is not None else inherited[1]
-        parent_times[id(element)] = (begin, end)
-        for child in list(element):
-            collect(child, (begin, end))
-    collect(root)
-    for index, line in enumerate(lines):
-        text = _plain(line).strip()
-        if not text:
-            raise PublishInvalid(f"line {index + 1} is empty")
-        begin, end = parent_times[id(line)]
-        if begin is None or end is None:
-            raise PublishInvalid(f"line {index + 1} requires complete begin/end timing")
-        if end <= begin:
-            raise PublishInvalid(f"line {index + 1} has invalid timing")
-        if max_duration is not None and milliseconds(end) > milliseconds(max_duration):
-            raise PublishInvalid("lyrics exceed source audio duration")
     for element in root.iter():
         if element.attrib.get("timeContainer") not in (None, "par"):
             raise PublishInvalid("unsupported timeContainer")
@@ -108,19 +85,14 @@ def validate_publish_ttml(path: str | Path, max_duration: float | None = None, *
         unsupported_clock = {"frameRate", "frameRateMultiplier", "subFrameRate", "tickRate"}
         if any(key in {f"{{{TTP_NS}}}{name}" for name in unsupported_clock} for key in element.attrib):
             raise PublishInvalid("unsupported TTML clock parameter")
-        if f"{{{STUDIO_NS}}}null" in element.attrib:
-            if not (element.tag in (f"{{{TTML_NS}}}span", "{http://music.apple.com/lyric-ttml-internal}span")
-                    and not list(element) and (element.text or '').isspace()
-                    and set(element.get(f"{{{STUDIO_NS}}}null", '').split()) == {'begin', 'end'}
-                    and element.get('begin') is None and element.get('end') is None):
-                raise PublishInvalid("draft timing null is not publishable")
         begin, end = element.get("begin"), element.get("end")
-        if begin is not None or end is not None:
-            if begin is None or end is None:
-                raise PublishInvalid("timed elements require complete begin/end timing")
-            b, e = _time(begin), _time(end)
-            if b is None or e is None or not math.isfinite(b) or not math.isfinite(e) or b < 0 or e < 0 or e < b:
-                raise PublishInvalid("timing must be finite and non-negative")
+        for value in (begin, end):
+            if value is not None:
+                seconds = _time(value)
+                if seconds is None or not math.isfinite(seconds) or seconds < 0:
+                    raise PublishInvalid("timing must be finite and non-negative")
+        if begin is not None and end is not None and _time(end) < _time(begin):
+            raise PublishInvalid("end timing precedes begin")
     return {"passed": True, "line_count": len(lines)}
 
 
@@ -153,17 +125,16 @@ class PublishRunner:
         asset = Path(self.asset_path(project_id))
         from mutagen import File
         from mutagen.mp4 import MP4
-        from .publishing import media_duration_ms
         media = File(asset)
         ttml = None
         if isinstance(media, MP4):
-            validate_publish_ttml(source_xml, media_duration_ms(asset) / 1_000, xml=True)
+            validate_output_ttml(source_xml, xml=True)
             root = ET.fromstring(source_xml)
-            # Convert only validated, fully untimed whitespace spans to text in place.
+            # Project draft whitespace exactly as the ordinary TTML serializer does.
             for parent in root.iter():
                 previous = None
                 for child in list(parent):
-                    if child.get(f"{{{STUDIO_NS}}}null") is not None and (child.text or '').isspace() and not list(child):
+                    if child.tag.rsplit('}', 1)[-1] == 'span' and (child.text or '') and all(c in ' \t\r\n' for c in child.text) and child.get('begin') is None and child.get('end') is None and child.get('{http://www.w3.org/ns/ttml#metadata}agent') is None and not list(child):
                         text = (child.text or '') + (child.tail or '')
                         if previous is None: parent.text = (parent.text or '') + text
                         else: previous.tail = (previous.tail or '') + text

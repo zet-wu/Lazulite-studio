@@ -829,14 +829,11 @@ export interface components {
              * Lrc Kind
              * @enum {string}
              */
-            lrc_kind: "lrc" | "elrc";
+            lrc_kind: "none" | "lrc" | "elrc";
             /** Lrc Text */
-            lrc_text: string;
-            /**
-             * Target Track Id
-             * @default null
-             */
-            target_track_id: number | null;
+            lrc_text: string | null;
+            /** Target Track Id */
+            target_track_id?: number | null;
         };
         Export: {
             /** @enum {unknown} */
