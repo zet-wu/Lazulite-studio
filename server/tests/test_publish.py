@@ -302,3 +302,17 @@ def test_stpp_optional_timing_preserves_source_tags_without_lrc(tmp_path):
         assert 'untimedpartial字じ' == ''.join(lines[0].itertext())
         assert all(not key.startswith('{urn:lazulite:studio:draft}') for node in root.iter() for key in node.attrib)
         assert item['report']['audio_preserved'] and item['report']['metadata_preserved']
+
+
+def test_output_copy_keeps_semantic_whitespace_and_projects_unicode_separators():
+    from server.publish import serialize_output_ttml
+    import xml.etree.ElementTree as ET
+    xml = '''<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft" xmlns:amll="http://www.example.com/ns/amll" xmlns:tts="http://www.w3.org/ns/ttml#styling"><head><metadata><iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><transliterations><transliteration><text for="L1" studio:kind="timed"><span begin="0" end="1">a</span><span>　</span></text><text for="L1" studio:kind="timed"><span>　</span></text></transliteration></transliterations></iTunesMetadata></metadata></head><body><p xml:id="L1"><span>　</span><span studio:id="beat"> </span><span amll:obscene="true"> </span><span tts:ruby="base"> </span></p></body></tt>'''
+    snapshot = initial_project(xml, None)
+    snapshot['editing']['emptyBeats'] = {'beat': {'kind': 'word', 'count': 1}}
+    root = ET.fromstring(serialize_output_ttml(snapshot))
+    line = root.find('.//{http://www.w3.org/ns/ttml}p')
+    assert line.text == '　' and len(line) == 3
+    content = root.findall('.//{http://music.apple.com/lyric-ttml-internal}text')
+    assert len(content[0]) == 1 and content[0][0].tail == '　'
+    assert len(content[1]) == 1 and content[1][0].text == '　'

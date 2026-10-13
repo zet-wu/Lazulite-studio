@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 import shutil
 import uuid
+import unicodedata
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,12 @@ def _time(value: str | None) -> float | None:
     return None
 
 
+def _untimed_space(node, *, body=False):
+    text = node.text or ''
+    return bool(text) and not list(node) and node.get('begin') is None and node.get('end') is None and all(
+        unicodedata.category(char) == 'Zs' or body and char in '\t\r\n\u2028\u2029\ufeff' for char in text)
+
+
 def validate_output_ttml(path: str | Path, *, xml: bool = False) -> dict[str, Any]:
     """Validate ordinary TTML output, retaining optional body and Ruby endpoints."""
     try:
@@ -68,7 +75,7 @@ def validate_output_ttml(path: str | Path, *, xml: bool = False) -> dict[str, An
                 continue
             is_background = content.get('{http://www.w3.org/ns/ttml#metadata}role') == 'x-bg'
             if content.tag.rsplit('}', 1)[-1] == 'span' and not is_background:
-                if not list(content) and (content.text or '') and all(c in ' \t\r\n' for c in content.text) and content.get('begin') is None and content.get('end') is None:
+                if _untimed_space(content):
                     continue
                 if list(content) or content.get('begin') is None or content.get('end') is None or content.get(f'{{{STUDIO_NS}}}null'):
                     raise PublishInvalid('translation unit requires complete timing')
@@ -96,6 +103,44 @@ def validate_output_ttml(path: str | Path, *, xml: bool = False) -> dict[str, An
     return {"passed": True, "line_count": len(lines)}
 
 
+def serialize_output_ttml(snapshot: dict) -> bytes:
+    """Output copy with the same optional endpoints and whitespace as ordinary TTML."""
+    source_xml = snapshot['lyrics']['draftTtml']
+    validate_output_ttml(source_xml, xml=True)
+    root = ET.fromstring(source_xml)
+    ttm = '{http://www.w3.org/ns/ttml#metadata}'
+    tts = '{http://www.w3.org/ns/ttml#styling}'
+    sidecar_units = set()
+    for track in root.iter():
+        if track.tag.rsplit('}', 1)[-1] in {'translation', 'transliteration'}:
+            for content in track.iter():
+                units = [node for node in content if node.tag.rsplit('}', 1)[-1] == 'span' and node.get(ttm+'role') != 'x-bg']
+                if any(not _untimed_space(unit) for unit in units):
+                    sidecar_units.update(unit for unit in units if _untimed_space(unit))
+    for parent in root.iter():
+        previous = None
+        body = parent.tag == f'{{{TTML_NS}}}p' or parent.tag == f'{{{TTML_NS}}}span' and parent.get(ttm+'role') == 'x-bg'
+        for child in list(parent):
+            body_space = (body and child.tag == f'{{{TTML_NS}}}span' and _untimed_space(child, body=True)
+                          and child.get(ttm+'agent') is None and child.get(tts+'ruby') is None
+                          and child.get('{http://www.example.com/ns/amll}obscene') != 'true'
+                          and 'expletive' not in child.get(ttm+'role', '').split()
+                          and child.get(f'{{{STUDIO_NS}}}id') not in snapshot['editing']['emptyBeats'])
+            if body_space or child in sidecar_units:
+                text = (child.text or '') + (child.tail or '')
+                if previous is None: parent.text = (parent.text or '') + text
+                else: previous.tail = (previous.tail or '') + text
+                parent.remove(child)
+            else: previous = child
+    for element in root.iter():
+        for name in ('begin', 'end', 'dur'):
+            if element.get(name) is not None:
+                element.set(name, clock(milliseconds(_time(element.get(name)))))
+        for key in list(element.attrib):
+            if key.startswith('{'+STUDIO_NS+'}'): del element.attrib[key]
+    return serialize_ttml(root).encode('utf-8')
+
+
 class PublishRunner:
     capability = "publish.stpp"
 
@@ -120,33 +165,15 @@ class PublishRunner:
         with self.revisions.db.connect() as c:
             bound = c.execute('SELECT p.source_asset_id,p.name,a.filename FROM projects p JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?', (project_id,)).fetchone()
         if not bound or bound[0] != request['asset_id']: raise PublishInvalid('bound asset changed')
-        from .project_document import read_lyrics
-        source_xml = read_lyrics(self.revisions.db.paths.resolve(row[0]))
+        from .project_document import read_project
+        snapshot = read_project(self.revisions.db.paths.resolve(row[0]))
         asset = Path(self.asset_path(project_id))
         from mutagen import File
         from mutagen.mp4 import MP4
         media = File(asset)
         ttml = None
         if isinstance(media, MP4):
-            validate_output_ttml(source_xml, xml=True)
-            root = ET.fromstring(source_xml)
-            # Project draft whitespace exactly as the ordinary TTML serializer does.
-            for parent in root.iter():
-                previous = None
-                for child in list(parent):
-                    if child.tag.rsplit('}', 1)[-1] == 'span' and (child.text or '') and all(c in ' \t\r\n' for c in child.text) and child.get('begin') is None and child.get('end') is None and child.get('{http://www.w3.org/ns/ttml#metadata}agent') is None and not list(child):
-                        text = (child.text or '') + (child.tail or '')
-                        if previous is None: parent.text = (parent.text or '') + text
-                        else: previous.tail = (previous.tail or '') + text
-                        parent.remove(child)
-                    else: previous = child
-            for element in root.iter():
-                for name in ('begin', 'end', 'dur'):
-                    if element.get(name) is not None:
-                        element.set(name, clock(milliseconds(_time(element.get(name)))))
-                for key in list(element.attrib):
-                    if key.startswith('{'+STUDIO_NS+'}'): del element.attrib[key]
-            ttml = serialize_ttml(root).encode('utf-8')
+            ttml = serialize_output_ttml(snapshot)
         from .media_format import describe_media, download_filename
         format_info = describe_media(asset, media, bound[2])
         if format_info['extension'] is None: raise PublishInvalid('源文件格式不支持打包')
