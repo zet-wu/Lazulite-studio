@@ -9,7 +9,7 @@ const error = (status: number, code: string, message: string, retryable = false)
 let currentDocument: typeof document = JSON.parse(sessionStorage.getItem('studio-mock-document') ?? 'null') ?? document;
 let searchConditions={title:'',artist:'',album:''};
 
-const mockPreferences = {version:1,revision:0,library_id:'00000000000000000000000000000001',imported:true,values:{} as Record<string,string>};
+const mockPreferences = {version:1,revision:0,library_id:'00000000000000000000000000000001',values:{} as Record<string,string>};
 export const handlers = [
   http.get(`${root}/runtime`,()=>response({library_id:mockPreferences.library_id})),
   http.get(`${root}/settings`,()=>HttpResponse.json(mockPreferences,{headers:{ETag:`"${mockPreferences.revision}"`}})),

@@ -10,7 +10,6 @@ from server.db import Database
 from server.revisions import RevisionStore
 from server.runtime_settings import RuntimeSettings, SettingsConflict
 from server.storage_paths import StoragePaths
-from server.migrate_storage import migrate
 from server.tests.test_vocals import setup, wait
 
 HEADERS = {'origin': 'http://studio'}
@@ -53,31 +52,28 @@ def test_symlink_escape(tmp_path):
     with pytest.raises(ValueError): StoragePaths(tmp_path).resolve('link/outside')
 
 
-def test_old_database_requires_explicit_copy_conversion(tmp_path):
-    source = tmp_path / 'v4'
+@pytest.mark.parametrize('version', [4, 5])
+def test_old_database_is_rejected_without_modification(tmp_path, version):
+    source = tmp_path / 'old'
     with TestClient(create_app(source, Settings(None, True, 'http://studio'))) as client:
-        pid = client.post('/api/v1/projects', json={'name': '保存的项目'}, headers=HEADERS).json()['id']
-    with sqlite3.connect(source / 'studio.sqlite3') as conn:
-        conn.execute('UPDATE revisions SET project_path=? || project_path', (str(source) + '/',))
-        conn.execute('PRAGMA user_version=4')
+        client.post('/api/v1/projects', json={'name':'保存的项目'}, headers=HEADERS)
+    with sqlite3.connect(source / 'studio.sqlite3') as conn: conn.execute(f'PRAGMA user_version={version}')
     before = (source / 'studio.sqlite3').read_bytes()
-    with pytest.raises(RuntimeError, match='v5'): Database(source / 'studio.sqlite3')
-    assert migrate(source)['dry_run']
-    destination = tmp_path / 'v5'
-    assert not migrate(source, destination)['dry_run']
+    with pytest.raises(RuntimeError, match='v6'): Database(source / 'studio.sqlite3')
     assert (source / 'studio.sqlite3').read_bytes() == before
-    with TestClient(create_app(destination, Settings(None, True, 'http://studio'))) as client:
-        assert client.get(f'/api/v1/projects/{pid}/document').status_code == 200
 
 
-def test_preferences_conflicts_import_and_delete(tmp_path):
+def test_preferences_conflicts_identity_and_project_cleanup(tmp_path):
     store = RuntimeSettings(tmp_path / 'settings.json')
     store.patch({'lazulite-editor-theme': 'dark'}, 0)
     with pytest.raises(SettingsConflict): store.patch({'studio.playback-rate': '1.5'}, 0)
     store.patch({'studio.playback-rate': '1.5'}, 1)
-    store.patch({'lazulite-editor-theme': 'light'}, 2, import_legacy=True)
+    identity = store.read()['library_id']
+    assert 'imported' not in store.read()
     assert store.read()['values']['lazulite-editor-theme'] == 'dark'
-    store.patch({'studio:workspace-mode:project:p': 'sync', 'studio:workspace-mode:project:q': 'edit'}, 3)
+    store.patch({'studio:workspace-mode:project:p': 'sync', 'studio:workspace-mode:project:q': 'edit'}, 2)
     store.delete_project('p')
     assert 'studio:workspace-mode:project:p' not in store.read()['values']
     assert store.read()['values']['studio:workspace-mode:project:q'] == 'edit'
+
+    assert store.read()['library_id'] == identity

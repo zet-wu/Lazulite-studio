@@ -25,6 +25,6 @@
 `http/client.ts` 处理会话、CSRF 与错误；专用适配器管理读音、对齐、任务、来源和发布。`generated.ts` 从仓库 OpenAPI 生成，`validate.ts` 在使用边界校验所需响应。媒体打包以保存返回的确切 revision 为输入，归档与源音频由服务资源接口交付。
 
 
-`preferences.ts` 将长期偏好映射到服务端 settings 字段，以 ETag 和逐字段原值检查处理并发修改；旧 localStorage 白名单仅导入一次。`playback-speed.ts` 承担读取播放速度的副作用。恢复 IndexedDB 与 sessionStorage 应用意图按 library ID 隔离，偏好加载完成后才挂载依赖初始值的编辑器。
+`preferences.ts` 将长期偏好映射到服务端 settings 字段，以 ETag 和逐字段原值检查处理并发修改；值以当前资料库的服务端设置为准，独立模拟环境使用本地偏好。`playback-speed.ts` 承担读取播放速度的副作用。恢复 IndexedDB 与 sessionStorage 应用意图按 library ID 隔离，偏好加载完成后才挂载依赖初始值的编辑器。
 
 下载操作将一次生成的内容交给下载器。ASS 准备同时返回事件与问题，LRC 在统一格式边界检查后生成；NicoKara 检查按项目不可变引用、标题及实际校验页复用。

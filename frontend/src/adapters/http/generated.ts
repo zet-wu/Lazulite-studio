@@ -1233,7 +1233,6 @@ export interface components {
             version: 1;
             revision: number;
             library_id: string;
-            imported: boolean;
             values: {
                 [key: string]: string;
             };
@@ -1242,7 +1241,6 @@ export interface components {
             changes: {
                 [key: string]: string | null;
             };
-            import_legacy?: boolean;
         };
     };
     responses: {

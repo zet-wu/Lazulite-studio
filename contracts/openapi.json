@@ -3956,7 +3956,6 @@
           "version",
           "revision",
           "library_id",
-          "imported",
           "values"
         ],
         "properties": {
@@ -3968,9 +3967,6 @@
           },
           "library_id": {
             "type": "string"
-          },
-          "imported": {
-            "type": "boolean"
           },
           "values": {
             "type": "object",
@@ -3995,9 +3991,6 @@
                 "null"
               ]
             }
-          },
-          "import_legacy": {
-            "type": "boolean"
           }
         }
       }

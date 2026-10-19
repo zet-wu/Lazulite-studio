@@ -1,10 +1,8 @@
 import { requestHeaders } from './http/client';
 
-type Preferences = { version: number; revision: number; library_id: string; imported: boolean; values: Record<string, string> };
+type Preferences = { version: number; revision: number; library_id: string; values: Record<string, string> };
 let current: Preferences | null = null;
 let pending = Promise.resolve();
-const globals = new Set(['lazulite-editor-theme', 'lazulite-shortcuts', 'lazulite-sync-keys', 'lazulite-editor-columns', 'lazulite-kana-highlight', 'studio.playback-rate', 'studio:sync-mode', 'studio:sync-offset']);
-const allowed = (key: string) => globals.has(key) || /^(lazulite-romanization-mode|studio:sync-offset|studio:download|studio:packaging|studio:workspace-mode):project:[a-zA-Z0-9_-]+$/.test(key);
 export const libraryIdentity = () => current?.library_id ?? 'legacy';
 export const scopedSessionKey = (key: string) => `${libraryIdentity()}:${key}`;
 
@@ -15,23 +13,11 @@ async function read(): Promise<Preferences> {
   if (value.version !== 1 || !/^[a-f0-9]{32}$/.test(value.library_id) || !value.values || !Number.isInteger(value.revision)) throw new Error('偏好响应无效');
   return value;
 }
-async function patch(snapshot: Preferences, changes: Record<string, string | null>, importLegacy = false) {
-  return fetch('/api/v1/settings', { method: 'PATCH', headers: requestHeaders({ 'Content-Type': 'application/json', 'If-Match': `"${snapshot.revision}"` }), body: JSON.stringify({ changes, import_legacy: importLegacy }) });
+async function patch(snapshot: Preferences, changes: Record<string, string | null>) {
+  return fetch('/api/v1/settings', { method: 'PATCH', headers: requestHeaders({ 'Content-Type': 'application/json', 'If-Match': `"${snapshot.revision}"` }), body: JSON.stringify({ changes }) });
 }
 export async function loadPreferences() {
-  let value = await read();
-  if (!value.imported) {
-    const changes: Record<string, string> = {};
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && allowed(key) && localStorage.getItem(key) !== null) changes[key] = localStorage.getItem(key)!;
-      }
-    } catch { /* Browser preferences are optional; the service remains authoritative. */ }
-    const response = await patch(value, changes, true);
-    if (!response.ok && response.status !== 409) throw new Error('无法导入旧偏好');
-    value = await read();
-  }
+  const value = await read();
   current = value;
   return value;
 }

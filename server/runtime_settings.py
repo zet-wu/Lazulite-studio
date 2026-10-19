@@ -29,7 +29,7 @@ class RuntimeSettings:
         self.path = path
         self.lock = threading.RLock()
         if not path.exists():
-            self._write({'version': 1, 'library_id': uuid.uuid4().hex, 'revision': 0, 'imported': False, 'values': {}})
+            self._write({'version': 1, 'library_id': uuid.uuid4().hex, 'revision': 0, 'values': {}})
         self.read()
 
     def _write(self, value):
@@ -40,9 +40,9 @@ class RuntimeSettings:
             value = json.loads(self.path.read_text(encoding='utf-8'))
             if value.get('version') != 1 or not re.fullmatch('[0-9a-f]{32}', value.get('library_id', '')):
                 raise ValueError('偏好文件版本或资料库身份无效，请恢复 settings.json 备份')
-            return value
+            return {key: value[key] for key in ('version', 'library_id', 'revision', 'values')}
 
-    def patch(self, changes, revision, *, import_legacy=False):
+    def patch(self, changes, revision):
         with self.lock:
             current = self.read()
             if revision != current['revision']:
@@ -54,10 +54,6 @@ class RuntimeSettings:
                 if value is not None and (not isinstance(value, str) or len(value) > 16384): raise ValueError('偏好值无效')
                 if key.startswith('device.') and value not in {'auto', 'cpu'}: raise ValueError('设备只能选择自动或 CPU')
                 if key == 'port' and (not value or not value.isdecimal() or not 1024 <= int(value) <= 65535): raise ValueError('端口范围为 1024–65535')
-            if import_legacy:
-                if current['imported']: return current
-                changes = {k: v for k, v in changes.items() if k not in current['values'] and not k.startswith('device.') and k != 'port'}
-                current['imported'] = True
             for key, value in changes.items():
                 if value is None: current['values'].pop(key, None)
                 else: current['values'][key] = value
@@ -75,7 +71,6 @@ class RuntimeSettings:
 class PreferencePatch(BaseModel):
     model_config = ConfigDict(extra='forbid')
     changes: dict[str, str | None]
-    import_legacy: bool = False
 
 
 def settings_router(settings, *, auth, write):
@@ -92,7 +87,7 @@ def settings_router(settings, *, auth, write):
     def patch_settings(body: PreferencePatch, if_match: str = Header(), _=Depends(write)):
         try:
             if not re.fullmatch(r'"\d+"', if_match): raise ValueError('需要偏好版本 ETag')
-            return response(settings.patch(body.changes, int(if_match.strip('"')), import_legacy=body.import_legacy))
+            return response(settings.patch(body.changes, int(if_match.strip('"'))))
         except SettingsConflict:
             raise HTTPException(409, {'code': 'settings_conflict', 'message': '偏好已在另一页面修改，请刷新后重试', 'retryable': True})
         except ValueError as exc:

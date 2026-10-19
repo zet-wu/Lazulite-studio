@@ -46,14 +46,7 @@ TTML 草稿保存保留待修正时间与 Studio 身份，发布阶段检查实�
 
 便携包 `data/projects` 保存 SQLite 与项目树，`data/settings.json` 保存资料库身份及长期偏好；偏好 API 为 `GET/PATCH /api/v1/settings`，PATCH 需要 `If-Match` 并只修改提交字段。数据库为 v6，资源路径只记录相对数据根的 POSIX 路径；启动清理前验证归属、缺失修订及符号链接。项目 v9／歌词 v10／文档 v9／工程包 v1。
 
-已有 v4 库不能直接打开。停服并备份后，可用旧程序导出 `.lazp` 到新库（不含完整人声与历史修订），或显式执行：
-
-```sh
-python -m server.migrate_storage /path/to/v4-copy
-python -m server.migrate_storage /path/to/v4-copy --destination /path/to/new-v5
-```
-
-第一条只读检查，第二条只转换新副本。失败副本保留供排查，不在转换中清理资源；原库不删除、不自动升级。移动整个便携目录保留 library ID；复制为另一独立库时停服执行 `python -m server.portable --root <副本> --new-library-id`。
+服务只打开当前 v6 数据库；不支持的版本在写入前明确拒绝。移动整个便携目录保留 library ID；复制为另一独立库时停服执行 `python -m server.portable --root <副本> --new-library-id`。
 
 分离／对齐设备在任务开始时探测并固定进请求；GPU 不可用可在准备阶段选 CPU，GPU 计算失败不自动重跑。`POST /api/v1/jobs/{id}/retry-cpu` 仅接受可归因设备的失败及原 revision，创建新任务；长期偏好不变。`STUDIO_DEMUCS_REPO` 指向完整本地 htdemucs 仓库，本机包强制离线模型路径。分离复用身份不含安装路径或计算设备。
 
