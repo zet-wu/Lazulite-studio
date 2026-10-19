@@ -6,7 +6,7 @@ from server.alignment_projection import project_alignment
 
 def send(kind,**values):print(PREFIX+json.dumps({'kind':kind,**values}),flush=True)
 request=json.loads(sys.stdin.readline())
-send('event',values=['stage','acoustic',0,1,'fixture'])
+send('event',values=['stage','acoustic'])
 end=time.monotonic()+.4
 while time.monotonic()<end: pass
 send('boundary')

@@ -12,7 +12,7 @@ def project_storage(directory):
             for entry in entries:
                 info = entry.stat(follow_symlinks=False)
                 if stat.S_ISLNK(info.st_mode): raise OSError('项目目录包含符号链接，无法统计')
-                kind = category or {'source':'source', 'vocals':'vocals', 'cache':'cache', 'revisions':'snapshots', 'draft':'snapshots'}.get(entry.name, 'other')
+                kind = category or {'source':'source', 'vocals':'vocals', 'cache':'cache', 'revisions':'snapshots'}.get(entry.name, 'other')
                 if stat.S_ISDIR(info.st_mode): scan(entry.path, kind)
                 elif stat.S_ISREG(info.st_mode): totals[kind] += info.st_size
     scan(directory)

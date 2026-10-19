@@ -119,7 +119,7 @@ class JobService:
             if not record: return
             request=json.loads(record[4]); kind=record[2]
             if kind in {'vocal', 'alignment'}:
-                self.emit(jid, 'stage', 'preparing', None, None, '正在检查计算设备')
+                self.emit(jid, 'stage', 'preparing')
                 request['devices'] = self.devices.snapshot(kind, cpu_retry=request.get('cpu_retry', False))
                 if kind == 'vocal': request['device'] = request['devices']['vocal']['actual']
                 with self.db.transaction() as c:
@@ -178,7 +178,9 @@ class JobService:
             self._finish_error(jid, "engine_error", str(exc) if kind == "alignment" else "Lazulite engine failed; inspect server logs")
 
         finally:
-            if record and record[2] in {'vocal','alignment'}: self.vocal_runner.clean_unregistered(record[1], jid)
+            if record and record[2] in {'vocal','alignment'}:
+                try: self.vocal_runner.clean_unregistered(record[1], jid)
+                except OSError: logger.warning('未注册人声文件清理待重试：%s', jid)
             if not published and isinstance(result, dict) and result.get('output_path') and record[2] == 'publish':
                 try:
                     self.db.paths.resolve(result['output_path']).unlink(missing_ok=True)
@@ -198,7 +200,7 @@ class JobService:
                 return
             t=now(); c.execute("UPDATE jobs SET status='failed',error_json=?,updated_at=?,finished_at=? WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps({"code":code,"message":message, **extra}),t,t,jid))
 
-    def emit(self,jid,kind,stage,completed=None,total=None,message=None):
+    def emit(self,jid,kind,stage):
         if kind == 'stage':
             with self.db.transaction() as c:
                 c.execute("UPDATE jobs SET stage=?,updated_at=? WHERE id=? AND status IN ('running','cancel_requested')", (stage, now(), jid))

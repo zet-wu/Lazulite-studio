@@ -6,7 +6,7 @@
   "python_release": "20261009",
   "node": "22.22.2",
   "pnpm": "10.30.3",
-  "database_version": 5,
+  "database_version": 6,
   "targets": {
     "windows-x64-cpu": {
       "python": {

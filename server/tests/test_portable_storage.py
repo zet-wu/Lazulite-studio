@@ -65,7 +65,12 @@ def test_old_database_is_rejected_without_modification(tmp_path, version):
 
 def test_preferences_conflicts_identity_and_project_cleanup(tmp_path):
     store = RuntimeSettings(tmp_path / 'settings.json')
+    previous = store.read()
+    previous['imported'] = True
+    store.path.write_text(json.dumps(previous))
     store.patch({'lazulite-editor-theme': 'dark'}, 0)
+    assert 'imported' not in json.loads(store.path.read_text())
+    assert store.read()['library_id'] == previous['library_id']
     with pytest.raises(SettingsConflict): store.patch({'studio.playback-rate': '1.5'}, 0)
     store.patch({'studio.playback-rate': '1.5'}, 1)
     identity = store.read()['library_id']

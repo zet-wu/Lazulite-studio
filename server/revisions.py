@@ -118,7 +118,7 @@ class RevisionStore:
         """
         paths = []
         with self.db.transaction() as conn:
-            rows = conn.execute('SELECT id,project_path,created_at FROM revisions WHERE project_id=? ORDER BY created_at DESC,id DESC', (project_id,)).fetchall()
+            rows = conn.execute('SELECT id,project_path FROM revisions WHERE project_id=?', (project_id,)).fetchall()
             current = conn.execute('SELECT current_revision FROM projects WHERE id=?', (project_id,)).fetchone()
             if not current: return
             protected = {current[0]}

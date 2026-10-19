@@ -7,7 +7,7 @@ from server.vocals import VocalRunner, VocalCancelled
 
 def run(self, project_id, asset_path, params, job_id, emit, cancelled):
     if cancelled(): raise VocalCancelled()
-    emit('stage', 'separating', None, None, 'test worker entered')
+    emit('stage', 'separating')
     if os.getenv('STUDIO_TEST_VOCAL_CRASH'): os._exit(17)
     # Hold this interpreter's GIL for a measurable interval. API threads must stay live.
     sys.setswitchinterval(10)

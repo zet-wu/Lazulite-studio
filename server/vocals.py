@@ -79,7 +79,7 @@ class VocalRunner:
             with self.db.transaction() as c:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', self.db.paths.store(directory), json.dumps(metadata)))
         else:
-            emit('stage', 'separating', None, None, '正在分离人声；取消将在阶段结束后生效')
+            emit('stage', 'separating')
             try:
                 from lazulite.audio.separation import DemucsSeparator, DemucsConfig
                 separator = self.separator_factory() if self.separator_factory else DemucsSeparator(DemucsConfig(model_name=params['model_name'], device=params['device'], model_repo=os.getenv('STUDIO_DEMUCS_REPO')))
@@ -106,7 +106,7 @@ class VocalRunner:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', self.db.paths.store(directory), json.dumps(metadata)))
             del audio, vocals
         boundary()
-        emit('stage', 'analyzing', None, None, '正在分析持久人声的能量与核心片段')
+        emit('stage', 'analyzing')
         samples, rate = sf.read(str(vocal_path), dtype='float32', always_2d=True)
         audio = AudioBuffer(samples.T, rate, params['asset_id'])
         metadata.update(analysis_version='lazulite-vocal-core-v2-main-rms', runtime={'numpy': np.__version__, 'soundfile': sf.__version__, 'scipy': scipy.__version__})

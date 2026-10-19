@@ -101,7 +101,7 @@ def run_alignment(request, emit, cancelled):
     try:
         result = align_japanese(prepared, JapaneseAlignmentRequest.from_dict(projection['request']), backend=backend,
             config=JapaneseConfig(hint_mode='auto' if params['use_hints'] else 'off', **{k:params[k] for k in ('line_blank', 'rest_blank', 'rest_token')}),
-            cancel=cancelled, event_sink=lambda event: emit('stage', event.stage, event.completed,event.total,event.message))
+            cancel=cancelled, event_sink=lambda event: emit('stage', event.stage))
     except RuntimeError as exc:
         device = params.get('devices', {}).get('alignment', {}).get('actual', os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu'))
         if device_failure(exc, device): raise DeviceFailure('alignment', device) from exc
