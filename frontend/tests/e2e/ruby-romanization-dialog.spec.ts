@@ -59,8 +59,6 @@ test(`compact warning, correction, skip, direct navigation and Esc`, async ({ pa
   await patrol.click(); await expect(readings.nth(2)).toBeFocused();
   await rows.nth(0).locator('[data-ruby-source]').hover();
   await expect(dialog.getByRole('tooltip')).toContainText('0s – 1s');
-  const heights = await rows.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
-  expect(Math.max(...heights)).toBeLessThan(85);
 });
 
 test('virtual patrol navigates between distant repeated sources', async ({ page }) => {

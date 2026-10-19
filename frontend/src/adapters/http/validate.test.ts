@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isCapabilities, isDocumentShell, isProjectList, isSession } from './validate';
+import { isCapabilities, isProjectList, isSession } from './validate';
 
 describe('Studio HTTP DTO guards', () => {
   it('accepts the sample session and rejects missing schema version', () => {
@@ -14,11 +14,5 @@ describe('Studio HTTP DTO guards', () => {
     expect(isProjectList({ items: [{}], next_cursor: null })).toBe(false);
   });
 
-  it('accepts nullable document timing without accepting fractional milliseconds', () => {
-    const base = { schema_version: 'studio-document-shell-v1', project_id: 'p', revision: 'r', title: 'x', language: 'ja', lines: [], read_only_reasons: [] };
-    expect(isDocumentShell(base)).toBe(true);
-    expect(isDocumentShell({ ...base, lines: [{ id: 'l', text: 'x', begin_ms: 1.5, end_ms: null }] })).toBe(false);
-    expect(isDocumentShell({ ...base, read_only_reasons: [3] })).toBe(false);
-    expect(isDocumentShell({ ...base, lines: [{ id: 'l', text: 'x', begin_ms: 2, end_ms: 1 }] })).toBe(false);
-  });
+
 });

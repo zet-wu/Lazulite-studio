@@ -1,7 +1,7 @@
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
 import { describe, expect, it } from 'vitest';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
-import { replaceWords, shiftLineTimes, smoothWordTimes, syncLineTimes } from '../src/domain/batch-editing';
+import { replaceText, shiftLineTimes, smoothWordTimes, syncLineTimes } from '../src/domain/batch-editing';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
 
@@ -36,13 +36,13 @@ describe('E3 batch editing', () => {
   it('replaces selected text in one undo and preserves Ruby on a base change', () => {
     const document = createLyricDocument('hello hello');
     const line = document.lines[0], word = line.words[0];
-    const result = replaceWords(document, [word.id], 'hello', 'hi');
+    const result = replaceText(document, [word.id], 'words', 'hello', 'hi');
     expect(result.count).toBe(2);
     const state = executeLyricCommand(createLyricEditorState(document), result.command);
     expect(state.present.lines[0].words[0].text).toBe('hi hi');
     expect(undoLyricCommand(state).present).toBe(document);
     word.rubyUnits.push({ id: 'r', reading: 'ヘロー', beginMs: null, endMs: null });
-    expect(executeLyricCommand(createLyricEditorState(document), replaceWords(document, [word.id], 'hello', 'hi').command).present.lines[0].words[0].rubyUnits).toEqual(word.rubyUnits);
+    expect(executeLyricCommand(createLyricEditorState(document), replaceText(document, [word.id], 'words', 'hello', 'hi').command).present.lines[0].words[0].rubyUnits).toEqual(word.rubyUnits);
   });
 
   it('persists line end links in project snapshots, tracks target changes and retains the current end', () => {

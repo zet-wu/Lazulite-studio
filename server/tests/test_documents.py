@@ -77,31 +77,6 @@ def test_project_editing_survives_real_project_save(tmp_path):
 
     assert reopened.json()['document']['editing'] == snapshot['editing']
 
-def test_import_is_candidate_and_does_not_change_revision(tmp_path):
-    setup_project(tmp_path)
-    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
-    before = client.get("/api/v1/projects/p/document")
-    out = client.post("/api/v1/projects/p/imports?revision=" + before.json()["revision"], content="[00:01.25]hello\n", headers={"origin": "http://studio", "content-type": "text/lrc"})
-    assert out.status_code == 200 and out.json()["saved"] is False and out.json()["candidate"]["lines"][0]["begin_ms"] == 1250
-    assert client.get("/api/v1/projects/p/document").json()["revision"] == before.json()["revision"]
-
-
-def test_import_lrc_multiple_tags_metadata_offset_and_plain_text(tmp_path):
-    setup_project(tmp_path)
-    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
-    revision = client.get("/api/v1/projects/p/document").json()["revision"]
-    lrc = "[ti:Demo]\n[offset:1000]\n[00:01.00][00:02.00]hello\n[00:03.00]world\n"
-    out = client.post(f"/api/v1/projects/p/imports?revision={revision}", content=lrc, headers={"origin": "http://studio", "content-type": "text/lrc"})
-    assert out.status_code == 200
-    assert out.json()["input_revision"] == revision
-    assert [(x["begin_ms"], x["end_ms"], x["text"]) for x in out.json()["candidate"]["lines"]] == [(2000, 3000, "hello"), (3000, 4000, "hello"), (4000, None, "world")]
-    plain = client.post(f"/api/v1/projects/p/imports?revision={revision}", content="[00:01.00]literal\n", headers={"origin": "http://studio", "content-type": "text/plain"})
-    assert plain.json()["candidate"]["lines"][0]["text"] == "[00:01.00]literal"
-    missing = client.post("/api/v1/projects/p/imports?revision=missing", content="x", headers={"origin": "http://studio", "content-type": "text/plain"})
-    assert missing.status_code == 404
-
-
-
 def test_acoustic_edit_is_saved_atomically(tmp_path):
     from server.tests.media_fixture import add_media_project
     import subprocess

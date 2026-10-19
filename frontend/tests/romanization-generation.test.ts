@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { createLyricDocument, createLine, createWord } from '../src/domain/lyric-document';
 import { proposeRomanization, romanizationGenerationCommand } from '../src/domain/romanization-generation';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 const choices = { trackId: null, targets: {} };
 function source(parts: string[], ruby = false) {

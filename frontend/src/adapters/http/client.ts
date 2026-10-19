@@ -4,10 +4,7 @@ import {
   isApiError,
   isAsset,
   isCapabilities,
-  isDocumentShell,
   isDocumentEnvelope,
-  isImportCandidate,
-  isJobList,
   isProjectList,
   isProjectSummary,
   isSession,
@@ -19,7 +16,6 @@ export type Capabilities = components["schemas"]["Capabilities"];
 export type ProjectList = components["schemas"]["ProjectList"];
 export type ProjectSummary = components["schemas"]["ProjectSummary"];
 export type JobList = components["schemas"]["JobList"];
-export type DocumentShell = components["schemas"]["DocumentShell"];
 export type DocumentEnvelope = components["schemas"]["DocumentEnvelope"];
 export type RichDocumentEnvelope = DocumentEnvelope & { revision: string; etag?: string };
 export type Asset = components["schemas"]["Asset"];
@@ -242,13 +238,6 @@ export const studioApi = {
     ),
   getProject: (projectId: string) =>
     request(`/projects/${encodeURIComponent(projectId)}`, isProjectSummary),
-  listJobs: (projectId: string) =>
-    request(`/projects/${encodeURIComponent(projectId)}/jobs`, isJobList),
-  getDocument: (projectId: string) =>
-    request(
-      `/projects/${encodeURIComponent(projectId)}/document`,
-      isDocumentEnvelope,
-    ),
   getWaveform: (
     projectId: string,
     startMs = 0,
@@ -277,8 +266,6 @@ export const studioApi = {
 export type StudioPaths = paths;
 
 export type SaveDocumentResult = components["schemas"]["DocumentSaveResponse"];
-export type ImportLine = { id?: string; text: string; begin_ms?: number | null; end_ms?: number | null; changed?: boolean };
-export type ImportProposal = { schema_version: string; project_id: string; input_revision: string | null; candidate: { format: "ttml" | "lrc" | "text"; ttml?: string; text?: string; lines?: ImportLine[] }; diagnostics: Array<{ code?: string; message?: string }>; saved: false };
 export type JobResult = components["schemas"]["JobResult"];
 const s4 = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
   const response = await fetch(`${API_ROOT}${path}`, { credentials: 'include', ...init, headers: requestHeaders(init.headers) });
@@ -295,7 +282,6 @@ export const studioS4 = {
     return { ...body, revision: body.revision, etag: response.headers.get("ETag") ?? undefined };
   },
   saveRichDocument: async (projectId: string, document: ProjectSnapshot, baseRevision: string, operationId: string, seq: number, etag?: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/document`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag ?? `"${baseRevision}"`, "Idempotency-Key": operationId }, body: JSON.stringify({ schema_version: "studio-document-v9", project_id: projectId, revision: baseRevision, client_seq: seq, document }) }); if (!isDocumentEnvelope(result) || !result.revision) throw new ApiError(502, { code: "invalid_response", message: "保存响应无有效 revision", request_id: "", retryable: false }); return { revision: result.revision, etag: `"${result.revision}"` }; },
-  importLyrics: async (projectId: string, revision: string, filename: string, content: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/imports?revision=${encodeURIComponent(revision)}`, { method: 'POST', headers: { 'Content-Type': filename.endsWith("ttml") || filename.endsWith("xml") ? "application/ttml+xml" : filename.endsWith(".lrc") ? "text/lrc" : "text/plain", 'Idempotency-Key': crypto.randomUUID() }, body: content }); if (!isImportCandidate(result)) throw new ApiError(502, { code: "invalid_response", message: "导入响应格式无效", request_id: "", retryable: false }); return result; },
 };
 
 export type VocalResult = components['schemas']['VocalResult'];

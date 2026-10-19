@@ -1,10 +1,7 @@
 import type {
   Asset,
   Capabilities,
-  DocumentShell,
   DocumentEnvelope,
-  ImportProposal,
-  JobList,
   ProjectList,
   ProjectSummary,
   Session,
@@ -17,7 +14,6 @@ export const SCHEMA_VERSION = {
   project: "studio-project-v1",
   projectList: "studio-project-list-v1",
   jobList: "studio-job-list-v1",
-  document: "studio-document-shell-v1",
   asset: "studio-asset-v1",
   waveform: "studio-waveform-v1",
 } as const;
@@ -27,17 +23,9 @@ export function isDocumentEnvelope(value: unknown): value is DocumentEnvelope {
     string(value.revision) && object(value.document) && value.document.schemaVersion === "studio-project-v9" &&
     object(value.document.lyrics) && string(value.document.lyrics.draftTtml) && object(value.document.editing) && object(value.document.acoustics) && (value.document.acoustics.analysisId === null || string(value.document.acoustics.analysisId)) && Array.isArray(value.document.acoustics.segments);
 }
-export function isImportCandidate(value: unknown): value is ImportProposal {
-  return object(value) && value.schema_version === 'studio-import-v1' && string(value.project_id) && string(value.input_revision) && object(value.candidate) && Array.isArray(value.diagnostics) && value.saved === false;
-}
-
 const object = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 const string = (value: unknown): value is string => typeof value === "string";
-const nonNegativeIntegerOrNull = (value: unknown): value is number | null =>
-  value === null ||
-  (typeof value === "number" && Number.isSafeInteger(value) && value >= 0);
-
 export function isSession(value: unknown): value is Session {
   return (
     object(value) &&
@@ -83,57 +71,6 @@ export function isProjectList(value: unknown): value is ProjectList {
     Array.isArray(value.items) &&
     (value.next_cursor === null || string(value.next_cursor)) &&
     value.items.every(isProjectSummary)
-  );
-}
-
-export function isJobList(value: unknown): value is JobList {
-  return (
-    object(value) &&
-    value.schema_version === SCHEMA_VERSION.jobList &&
-    Array.isArray(value.items) &&
-    value.items.every(
-      (item) =>
-        object(item) &&
-        string(item.id) &&
-        string(item.project_id) &&
-        string(item.kind) &&
-        [
-          "queued",
-          "running",
-          "succeeded",
-          "failed",
-          "interrupted",
-          "cancelled",
-        ].includes(String(item.status)) &&
-        object(item.request) &&
-        typeof item.result_available === "boolean" &&
-        typeof item.state_version === "number" && Number.isSafeInteger(item.state_version) && item.state_version >= 0,
-    )
-  );
-}
-
-export function isDocumentShell(value: unknown): value is DocumentShell {
-  return (
-    object(value) &&
-    value.schema_version === SCHEMA_VERSION.document &&
-    string(value.project_id) &&
-    string(value.revision) &&
-    string(value.title) &&
-    string(value.language) &&
-    Array.isArray(value.lines) &&
-    Array.isArray(value.read_only_reasons) &&
-    value.read_only_reasons.every(string) &&
-    value.lines.every(
-      (line) =>
-        object(line) &&
-        string(line.id) &&
-        string(line.text) &&
-        nonNegativeIntegerOrNull(line.begin_ms) &&
-        nonNegativeIntegerOrNull(line.end_ms) &&
-        (line.begin_ms === null ||
-          line.end_ms === null ||
-          line.begin_ms <= line.end_ms),
-    )
   );
 }
 

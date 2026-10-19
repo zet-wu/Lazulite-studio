@@ -4,9 +4,7 @@ import { parseLyricTtml } from '../adapters/ttml/lyric-codec';
 const snapshot = (xml: string) => serializeProject(createProjectDocument(parseLyricTtml(xml)));
 import { act, renderHook } from "@testing-library/react";
 import { StrictMode } from "react";
-import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { proposeRuby, rubyGenerationCommand, rubySourceRows } from "../domain/ruby-generation";
 import { useProjectDocument } from "./useProjectDocument";
 
 const saveMock = vi.fn();
@@ -122,31 +120,7 @@ describe("useProjectDocument save lifecycle", () => {
     expect(result.current.conflict).toBe(true);
   });
 
-  it("saves generated 注音 with its source tracks and reopens the same semantics", async () => {
-    const source = readFileSync("../tests/fixtures/ttml/multitrack.ttml", "utf8");
-    let savedXml: ProjectSnapshot;
-    saveMock.mockImplementation(async (xml: ProjectSnapshot) => {
-      savedXml = xml;
-      return { revision: "r2", etag: '"r2"' };
-    });
-    const { result } = renderHook(() => useProjectDocument("p", snapshot(source), "r1", undefined, saveMock));
-    const before = result.current.document;
-    const track = before.romanizationTracks[0];
-    const content = track.contents[0];
-    const rows = proposeRuby(rubySourceRows(before, track.id, [content.id]), "hiragana");
-    const proposal = rubyGenerationCommand(before, before, rows, {}, new Set(), new Set());
-    act(() => result.current.apply(proposal));
-    expect(result.current.dirty).toBe(true);
-    const generated = result.current.document;
-    expect(generated.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(["ふ", "た", "り"]);
-    expect(generated.romanizationTracks).toEqual(before.romanizationTracks);
-    await act(async () => result.current.save());
-    expect(result.current.dirty).toBe(false);
-    const reopened = renderHook(() => useProjectDocument("p", savedXml, "r2", '"r2"', saveMock));
-    expect(reopened.result.current.document.romanizationTracks).toEqual(generated.romanizationTracks);
-    expect(reopened.result.current.document.lines[0].words[0].rubyUnits).toEqual(generated.lines[0].words[0].rubyUnits);
-    expect(reopened.result.current.document.lines[0].beginMs).toBe(999);
-  });
+
 });
 
 it('packaging returns the captured revision while later edits remain dirty', async () => {

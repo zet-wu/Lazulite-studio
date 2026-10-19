@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { moveTimeline, resizeTimeline, snapTime } from '../src/domain/timeline-editing';
 
 describe('E6 timeline editing', () => {

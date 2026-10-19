@@ -33,13 +33,6 @@ function* validationSteps(document: LyricDocument, editing?: ProjectEditing): Ge
   return [...result.values()];
 }
 
-/** Synchronous callers retain the identical full check. */
-export function validateLyrics(document: LyricDocument, editing?: ProjectEditing): OutputIssue[] {
-  const steps=validationSteps(document,editing);
-  let step=steps.next();
-  while(!step.done) step=steps.next();
-  return step.value;
-}
 /** Give input and paint a turn between actual serializers; abort superseded snapshots. */
 export async function validateLyricsIncrementally(document: LyricDocument, editing: ProjectEditing, signal: AbortSignal): Promise<OutputIssue[]> {
   const steps=validationSteps(document,editing);

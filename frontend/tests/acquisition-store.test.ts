@@ -27,11 +27,11 @@ test('deduplicates checks; tab selections and bounded preview cache are independ
    if(action==='fetch'){checks++;inChecks++;maxChecks=Math.max(maxChecks,inChecks);}
    await tick();
    inSource[source]--;if(action==='fetch')inChecks--;
-   return action==='search' ? {items:Array.from({length:8},(_,i)=>row(source,String(i)))} : {empty:false,format:'lrc',content:'[00:01]word',metadata:{}};
+   return action==='search' ? {items:Array.from({length:8},(_,i)=>row(source,String(7-i)))} : {empty:false,format:'lrc',content:'[00:01]word',metadata:{}};
  }) as any);
  store.search(query);
  for(let i=0;i<100;i++)await tick();
- expect(checks).toBe(32);expect(maxChecks).toBeLessThanOrEqual(2);expect(Object.values(maxSource).every(n=>n<=3)).toBe(true);
+ expect(store.getSnapshot().sources.netease.rows).toEqual(['0','1','2','3','4','5','6','7']);expect(checks).toBe(32);expect(maxChecks).toBeLessThanOrEqual(2);expect(Object.values(maxSource).every(n=>n<=3)).toBe(true);
  expect(store.cacheSize).toBeLessThanOrEqual(PREVIEW_CAPACITY);
  store.setTab('netease');store.select('netease','0');store.select('netease','0');await tick();
  store.setTab('qqmusic');store.select('qqmusic','1');for(let i=0;i<5;i++)await tick();

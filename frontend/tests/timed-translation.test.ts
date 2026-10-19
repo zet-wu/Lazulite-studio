@@ -2,7 +2,8 @@ import { translationsForLine } from '../src/domain/lyric-document';
 import { expect, it } from 'vitest';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { collectOutputIssues } from '../src/adapters/output-validation';
-import { applyLyricCommand, createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { applyLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { shiftLineTimes } from '../src/domain/batch-editing';
 import { copySelection, pasteRich } from '../src/features/editor/editing-actions';
 

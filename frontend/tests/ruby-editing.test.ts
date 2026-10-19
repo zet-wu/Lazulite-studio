@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { createLyricDocument, createWord } from '../src/domain/lyric-document';
 import { distributeRubyTime, makeRubyUnits, readingFromRomanization, splitReadingMora } from '../src/domain/ruby-editing';
 

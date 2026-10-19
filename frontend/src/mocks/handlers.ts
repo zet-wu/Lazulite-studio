@@ -77,12 +77,4 @@ export const handlers = [
     const next = currentDocument;
     return HttpResponse.json(next, { headers: { ETag: '"sample-r2"' } });
   }),
-  http.post(`${root}/projects/:projectId/imports`, async ({ params, request }) => {
-    if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
-    const content = await request.text();
-    const candidate = request.headers.get('content-type')?.includes('ttml')
-      ? { format: 'ttml', ttml: content }
-      : { format: 'text', text: content, lines: content.split(/\r?\n/).filter(Boolean).map((text, index) => ({ id: `import-${index}`, text, begin_ms: null, end_ms: null })) };
-    return response({ schema_version: 'studio-import-v1', project_id: 'sample-project', input_revision: currentDocument.revision, candidate, diagnostics: [], saved: false });
-  }),
 ];

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createLyricDocument } from '../src/domain/lyric-document';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { collectOutputIssues } from '../src/adapters/output-validation';
 const source = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><head><metadata><ttm:agent xml:id="role" type="character"><ttm:name>角色</ttm:name><ttm:actor agent="actor"/></ttm:agent><ttm:agent xml:id="actor" type="person"/></metadata></head><body><div><p begin="00:01.000" end="00:02.000" ttm:agent="role actor">歌</p></div></body></tt>`;

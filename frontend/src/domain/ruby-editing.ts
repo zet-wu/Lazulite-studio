@@ -5,10 +5,6 @@ const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme
 const smallKana = /^[ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ]$/u;
 const kana = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
 
-export function isKanaText(text: string): boolean {
-  return kana.test(text.trim());
-}
-
 export function readingFromRomanization(value: string): string {
   const source = value.replace(/\s+/gu, '');
   if (!source) throw new Error('逐词音译为空');

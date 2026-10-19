@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { createLine, lineText } from '../src/domain/lyric-document';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { copySelection, pasteRich } from '../src/features/editor/editing-actions';
 import { proposeRomanization, romanizationGenerationCommand } from '../src/domain/romanization-generation';
 import { rubySourceRows, proposeRuby, rubyGenerationCommand } from '../src/domain/ruby-generation';

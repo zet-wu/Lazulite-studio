@@ -8,8 +8,6 @@ import { splitAtGrapheme } from './text-boundaries';
 import { distributeRubyTime, splitReadingMora } from './ruby-editing';
 import { stampSync, type SyncAction, type SyncCursor, type SyncMode } from './sync-editing';
 
-const MAX_HISTORY = 256;
-
 type AtomicLyricCommand =
   | { type: 'shift-lines'; lineIds: string[]; deltaMs: number }
   | { type: 'insert-line'; afterLineId: string | null; line?: LyricLine; sourceGroupId?: string }
@@ -72,12 +70,6 @@ type AtomicLyricCommand =
 
 export type LyricCommand = AtomicLyricCommand | { type: 'batch'; commands: AtomicLyricCommand[] };
 type WordCommand = Extract<AtomicLyricCommand, { type: 'set-word-agents' | 'set-word-obscene' | 'split-word' | 'edit-word' | 'set-word-time' | 'add-ruby' | 'insert-ruby' | 'set-ruby-units' | 'redistribute-ruby-time' | 'set-word-empty-beat' | 'split-ruby' | 'edit-ruby' | 'delete-ruby' | 'set-ruby-time' }>;
-
-export type LyricEditorState = { present: LyricDocument; past: LyricDocument[]; future: LyricDocument[] };
-
-export function createLyricEditorState(document: LyricDocument): LyricEditorState {
-  return { present: document, past: [], future: [] };
-}
 
 function validTime(beginMs: TimeMs, endMs: TimeMs) {
   for (const value of [beginMs, endMs]) if (value !== null && (!Number.isSafeInteger(value) || value < 0)) throw new Error('Time must be a non-negative integer or null');
@@ -758,22 +750,6 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
       }
     }
   });
-}
-
-export function executeLyricCommand(state: LyricEditorState, command: LyricCommand): LyricEditorState {
-  const next = applyLyricCommand(state.present, command);
-  if (next === state.present) return state;
-  return { present: next, past: [...state.past.slice(-(MAX_HISTORY - 1)), state.present], future: [] };
-}
-
-export function undoLyricCommand(state: LyricEditorState): LyricEditorState {
-  if (!state.past.length) return state;
-  return { present: state.past.at(-1)!, past: state.past.slice(0, -1), future: [state.present, ...state.future] };
-}
-
-export function redoLyricCommand(state: LyricEditorState): LyricEditorState {
-  if (!state.future.length) return state;
-  return { present: state.future[0], past: [...state.past, state.present], future: state.future.slice(1) };
 }
 
 export function applyLyricTransaction(document: LyricDocument, command: LyricCommand, original: ProjectEditing) {

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { titleVariants, identityScore, compareCandidates } from '../src/domain/lyric-search';
+import { titleVariants, identityScore } from '../src/domain/lyric-search';
 import type { Candidate } from '../src/adapters/http/lyric-sources';
 const candidate = (patch: Partial<Candidate> = {}): Candidate => ({ source: 'netease', id: '1', title: '歌曲', artists: ['A'], album: 'B', duration_ms: null, ...patch });
 test('finite title transformations keep raw version, deduplicate and never include identity fields',()=>{
@@ -14,5 +14,4 @@ test('identity score follows weighted fuzzy matching and CJK views without chang
  expect(identityScore(query,missing)).toBeCloseTo(70);
  expect(identityScore({...query,artist:'',album:''},missing)).toBeCloseTo(100);
  expect(query.title).toBe('國々 (Live)'); expect(exact.title).toBe('国国');
- expect(compareCandidates({title:'歌曲',artist:'',album:''},candidate({id:'2'}),candidate({id:'1'}))).toBeGreaterThan(0);
 });

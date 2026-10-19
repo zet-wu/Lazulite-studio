@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createLyricDocument, createLine, plainTranslation } from '../src/domain/lyric-document';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand, redoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand, redoLyricCommand } from './helpers/project-history';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { validateLanguageTag } from '../src/domain/sublyrics';
 import { transferTranslations } from '../src/domain/translation-editing';

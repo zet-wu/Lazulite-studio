@@ -59,6 +59,3 @@ export function identityScore(query: SearchConditions, candidate: Candidate) {
   const artist = Math.max(0, ...candidate.artists.map(value=>similarity(query.artist,value,.2)));
   return (.7*title + albumWeight*album + artistWeight*artist)/(.7+albumWeight+artistWeight);
 }
-export function compareCandidates(query: SearchConditions, left: Candidate, right: Candidate) {
-  return identityScore(query,right)-identityScore(query,left) || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
-}

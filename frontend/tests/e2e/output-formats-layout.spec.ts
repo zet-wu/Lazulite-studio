@@ -31,7 +31,6 @@ test('format selection downloads expected content and exposes overlap details',a
   const pending=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();const download=await pending;const output=await readFile(await download.path(),'utf8');await writeFile(test.info().outputPath(`output.${format}`),output);expect(output).toContain('Main');
   if(format==='ass'){expect(output.match(/^Dialogue:/gm)).toHaveLength(8);expect(output).toContain('roman-main');expect(output).toContain('0:00:00.50,0:00:06.50');}
  }
- const overlap=await page.evaluate(async()=>{const fixturePath='/tests/fixtures/translation-whitespace.ts',description='/src/adapters/format-description.ts';const {translationWhitespaceDocument}=await import(fixturePath);const {describeLyricFormat}=await import(description);const d=translationWhitespaceDocument();d.lines.push({...d.lines[2],id:'missing',beginMs:null});return describeLyricFormat(d,'lrc')[5].detail;});expect(overlap).toContain('1、2');
 });
 test(`ASS-only issue locates its attachment`,async({page})=>{
  await page.goto('/projects/sample-project/edit?scenario=no-music');

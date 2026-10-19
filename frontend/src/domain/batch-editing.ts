@@ -72,9 +72,6 @@ export function syncLineTimes(document: LyricDocument, lineIds: string[]): Lyric
 
 export type BatchReplacement = { command: LyricCommand; count: number; changed: number; deletedWords: number; deletedRuby: number; deletedBeats: number };
 
-export function replaceWords(document: LyricDocument, wordIds: string[], search: string, replacement: string, ignoreCase = false, editing = createProjectEditing()): BatchReplacement {
-  return replaceText(document, wordIds, 'words', search, replacement, ignoreCase, editing);
-}
 export function replaceText(document: LyricDocument, ids: string[], kind: 'words' | 'ruby', search: string, replacement: string, ignoreCase = false, editing = createProjectEditing()): BatchReplacement {
   if (!search) throw new Error('查找内容不能为空');
   const selected = new Set(ids);

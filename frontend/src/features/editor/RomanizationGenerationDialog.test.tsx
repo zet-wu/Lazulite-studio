@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createLyricDocument } from '../../domain/lyric-document';
-import { executeLyricCommand, createLyricEditorState } from '../../domain/lyric-commands';
+import { executeLyricCommand, createLyricEditorState } from '../../../tests/helpers/project-history';
 import { RomanizationGenerationDialog } from './RomanizationGenerationDialog';
 import { proposeRomanization } from '../../domain/romanization-generation';
 vi.mock('../../domain/romanization-generation', async importOriginal => {

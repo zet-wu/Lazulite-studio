@@ -15,13 +15,13 @@ FastAPI 提供同源 `/api/v1` API，SQLite 管理项目、资源索引、修订
 | `reading.py`、`furigana.py` | 无状态日文读音快照与固定词典分段 |
 | `lyric_sources.py`、`embedded_lyrics.py` | 在线载荷与媒体内嵌歌词读取 |
 | `publish.py`、`publish_routes.py`、`packaging.py`、`publishing.py` | 快照绑定、歌词写入、媒体回读与下载 |
-| `time_units.py`、`projection.py`、`amll_compatibility.py`、`karaoke.py` | 时间、输出投影与项目配置边界 |
+| `time_units.py`、`amll_compatibility.py`、`karaoke.py` | 时间、输出投影与项目配置边界 |
 
 ## 持久化
 
 默认目录 `server/data-projects-v5` 可由 `STUDIO_DATA_DIR` 配置。每个项目独立持有 `source/original`、`cache`、`revisions`、`vocals` 和 `exports`。临时上传在接收时计算一次资源摘要，完成探测及代理后，在创建或首次接入事务中归属项目。资源摘要用于缓存身份，相同文件可分别属于多个项目。
 
-项目快照 v8 通过文档 envelope v9 传输，歌词为 draft TTML，资源数据库版本为 5。RevisionStore 原子写文件后比较并交换当前 revision；回收保护当前及任务引用，再保留其余最新 100 份和 7 天内修订。删除项目先检查任务并隔离目录，失败回移，启动按数据库状态恢复。归档 v1 在写入／解包流中计算摘要，导入验证后复用摘要并创建新项目、校验引用；空间接口按项目实际文件统计五类逻辑字节。
+项目快照 v9 通过文档 envelope v9 传输，歌词为 draft TTML，资源数据库版本为 5。RevisionStore 原子写文件后比较并交换当前 revision；回收保护当前及任务引用，再保留其余最新 100 份和 7 天内修订。删除项目先检查任务并隔离目录，失败回移，启动按数据库状态恢复。归档 v1 在写入／解包流中计算摘要，导入验证后复用摘要并创建新项目、校验引用；空间接口按项目实际文件统计五类逻辑字节。
 
 ## 模型与媒体
 

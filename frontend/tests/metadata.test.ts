@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createLyricDocument } from '../src/domain/lyric-document';
-import { createLyricEditorState, executeLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand } from './helpers/project-history';
 import { serializeLyricTtml, parseLyricTtml } from '../src/adapters/ttml/lyric-codec';
 
 it('keeps multiple artists, custom metadata and document language through a draft', () => {

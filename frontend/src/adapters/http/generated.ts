@@ -276,22 +276,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/projects/{projectId}/imports": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["importCandidate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/projects/{projectId}/audio": {
         parameters: {
             query?: never;
@@ -1034,40 +1018,6 @@ export interface components {
                 created_at: string;
                 client_seq?: number | null;
             };
-        };
-        ImportCandidate: {
-            /** @constant */
-            schema_version: "studio-import-v1";
-            project_id: string;
-            input_revision: string | null;
-            candidate: {
-                /** @enum {unknown} */
-                format: "ttml" | "lrc" | "text";
-                ttml?: string;
-                text?: string;
-                lines?: {
-                    begin_ms: number | null;
-                    text: string;
-                }[];
-            };
-            diagnostics: Record<string, never>[];
-            /** @constant */
-            saved: false;
-        };
-        DocumentShell: {
-            /** @constant */
-            schema_version: "studio-document-shell-v1";
-            project_id: string;
-            revision: string;
-            title: string;
-            language: string;
-            lines: {
-                id: string;
-                text: string;
-                begin_ms: number | null;
-                end_ms: number | null;
-            }[];
-            read_only_reasons: string[];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2087,36 +2037,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    importCandidate: {
-        parameters: {
-            query?: {
-                revision?: components["parameters"]["Revision"];
-            };
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "text/plain": unknown;
-                "application/ttml+xml": unknown;
-            };
-        };
-        responses: {
-            /** @description Candidate import; never saved */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ImportCandidate"];
-                };
             };
             default: components["responses"]["Error"];
         };

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { dragCommand } from '../src/features/editor/object-drag';
 
 it('uses explicit first/last slots for moves and copies, retaining backgrounds and one undo', () => {

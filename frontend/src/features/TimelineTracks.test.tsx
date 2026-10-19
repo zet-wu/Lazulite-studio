@@ -18,7 +18,7 @@ it('uses half-open independent intervals across line, word and 注音 at seek an
   const { rerender } = render(<SelectionProvider><InitialSelection id={props.selectedLineId}><TimelineTracks {...props} positionMs={0} /></InitialSelection></SelectionProvider>);
   for (const [positionMs, expected] of [[1000, [true, false, false]], [2000, [true, true, true]], [2001, [true, true, false]], [3000, [true, false, false]], [4000, [false, false, false]]] as const) {
     rerender(<SelectionProvider><InitialSelection id={props.selectedLineId}><TimelineTracks {...props} positionMs={positionMs} /></InitialSelection></SelectionProvider>);
-    for (const [index, kind] of ['行', '词', '注音'].entries()) expect(screen.getByRole('button', { name: new RegExp(`^时间轴${kind} `) }).className.includes('trackPlaying')).toBe(expected[index]);
+    for (const [index, kind] of ['行', '词', '注音'].entries()) expect(screen.getByRole('button', { name: new RegExp(`^时间轴${kind} `) }).getAttribute('aria-current') === 'time').toBe(expected[index]);
   }
   vi.unstubAllGlobals();
 });

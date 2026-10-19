@@ -107,13 +107,3 @@ def package(root, output, volume_size=1900 * 1024 * 1024):
         volumes[0].rename(archive)
         return [archive]
     return volumes
-
-
-def extract_package(first_volume, destination):
-    # Only for our newly built, verified archive, not arbitrary user input.
-    destination = Path(destination).resolve()
-    destination.mkdir(parents=True, exist_ok=True)
-    if any(destination.iterdir()):
-        raise ValueError('验证解包目录必须为空')
-    subprocess.run([seven_zip(), 'x', '-y', str(Path(first_volume).resolve()),
-                    '-o' + str(destination)], check=True)

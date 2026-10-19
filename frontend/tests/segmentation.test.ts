@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createLine, createLyricDocument, createWord, lineText } from '../src/domain/lyric-document';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from '../src/domain/lyric-commands';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, loadSyllableDivider, segmentText, segmentationPreview } from '../src/domain/segmentation';
 
 describe('E3 segmentation', () => {

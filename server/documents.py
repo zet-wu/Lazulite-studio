@@ -18,8 +18,6 @@ TTML_NS = "http://www.w3.org/ns/ttml"
 MAX_TTML_BYTES = 2 * 1024 * 1024
 _DOCTYPE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.I)
 _TIME = re.compile(r"^(?:\d+(?:\.\d+)?(?:ms|s)?|\d+:\d{2}(?::\d{2})?(?:\.\d+)?)$")
-_LRC = re.compile(r"\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\](.*)$")
-_LRC_TAGS = re.compile(r"\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]")
 
 
 from .project_document import ProjectSnapshot
@@ -131,10 +129,6 @@ class DocumentService:
             "document": snapshot,
         }
 
-    def resolve_revision(self, project_id: str, revision: str | None) -> str:
-        resolved, _ = self.revisions.read(project_id, revision)
-        return resolved
-
     def save(self, body: DocumentEnvelope, *, if_match: str | None,
              operation_id: str | None, subject: str = "local") -> dict:
         if body.schema_version != "studio-document-v9":
@@ -192,63 +186,5 @@ def build_router(service: DocumentService, *, auth: Callable, write: Callable,
         response.headers["ETag"] = out["etag"]
         out.pop("etag", None)
         return out
-
-    @router.post("/projects/{pid}/imports")
-    async def import_candidate(pid: str, request: Request, revision: str | None = None, _: object = Depends(write)):
-        """Parse an import as a candidate; never changes the current revision."""
-        project_exists(pid)
-        try:
-            input_revision = service.resolve_revision(pid, revision)
-        except KeyError as exc:
-            raise HTTPException(404, {"code": "revision_not_found", "message": "revision not found", "retryable": False}) from exc
-        content_type = request.headers.get("content-type", "").split(";", 1)[0].lower()
-        data = await request.body()
-        if len(data) > MAX_TTML_BYTES:
-            raise HTTPException(413, {"code": "import_too_large", "message": "import exceeds 2 MiB limit", "retryable": False})
-        try:
-            text = data.decode("utf-8-sig")
-            if content_type in ("application/ttml+xml", "application/xml", "text/xml"):
-                validate_ttml(text)
-                diagnostics = []
-                candidate = {"format": "ttml", "ttml": text}
-            elif content_type in ("text/plain", "text/lrc", "application/lrc"):
-                fmt = "text" if content_type == "text/plain" else "lrc"
-                lines = []
-                if fmt == "text":
-                    lines = [{"begin_ms": None, "end_ms": None, "text": raw_line} for raw_line in text.splitlines() if raw_line.strip()]
-                else:
-                    offsets = []
-                    for raw_line in text.splitlines():
-                        if raw_line.lower().startswith("[offset:"):
-                            try:
-                                offsets.append(int(raw_line[8:].split("]", 1)[0]))
-                            except ValueError:
-                                pass
-                    offset_ms = offsets[-1] if offsets else 0
-                    timed = []
-                    for raw_line in text.splitlines():
-                        if raw_line.lower().startswith("[offset:"):
-                            continue
-                        if re.match(r"^\[[A-Za-z]+:", raw_line):
-                            continue
-                        tags = list(_LRC_TAGS.finditer(raw_line))
-                        body = _LRC_TAGS.sub("", raw_line).strip()
-                        if not body:
-                            continue
-                        for tag in tags:
-                            fraction = (tag.group(3) or "").ljust(3, "0")
-                            begin = max(0, ((int(tag.group(1)) * 60 + int(tag.group(2))) * 1000 + int(fraction)) + offset_ms)
-                            timed.append((begin, body))
-                    timed.sort(key=lambda item: item[0])
-                    for index, (begin, body) in enumerate(timed):
-                        end = timed[index + 1][0] if index + 1 < len(timed) else None
-                        lines.append({"begin_ms": begin, "end_ms": end, "text": body})
-                candidate = {"format": fmt, "text": text, "lines": lines}
-                diagnostics = [{"code": "candidate_only", "message": "import is a candidate and was not saved"}]
-            else:
-                raise ValueError("unsupported import format")
-        except (UnicodeError, ValueError) as exc:
-            raise HTTPException(422, {"code": "import_invalid", "message": str(exc), "retryable": False}) from exc
-        return {"schema_version": "studio-import-v1", "project_id": pid, "input_revision": input_revision, "candidate": candidate, "diagnostics": diagnostics, "saved": False}
 
     return router
