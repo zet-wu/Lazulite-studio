@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Mapping, Protocol, Sequence
 from threading import Lock
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,23 +18,10 @@ class ReadingProposal:
     base_end: int
     base: str
     reading: str
-    source: str
-    needs_review: bool
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "line_id": self.line_id,
-            "base_start": self.base_start,
-            "base_end": self.base_end,
-            "base": self.base,
-            "reading": self.reading,
-            "source": self.source,
-            "needs_review": self.needs_review,
-        }
 
 
 class ReadingProposer(Protocol):
-    def propose(self, lines: Sequence[Mapping[str, str]]) -> Sequence[ReadingProposal | Mapping[str, Any]]:
+    def propose(self, lines: Sequence[Mapping[str, str]]) -> Sequence[ReadingProposal]:
         """Return whole-word proposals using code-point offsets in each line."""
 
 
@@ -76,7 +63,7 @@ class SudachiReadingProposer:
             raise ReadingUnavailable(self.unavailable_reason or "SudachiPy 不可用")
         output: list[ReadingProposal] = []
         for line in lines:
-            line_id, text = str(line["id"]), str(line.get("text", ""))
+            line_id, text = line["id"], line["text"]
             with self._tokenizer_lock:
                 # Keep token reads and split(A) inside the tokenizer lock too.
                 for token in self._tokenizer.tokenize(text, self._mode):
@@ -87,7 +74,6 @@ class SudachiReadingProposer:
                         output.append(ReadingProposal(
                             line_id=line_id,
                             base_start=start, base_end=end, base=base, reading=reading,
-                            source='sudachi', needs_review=True,
                         ))
         return output
 
@@ -96,31 +82,16 @@ class ReadingUnavailable(RuntimeError):
     pass
 
 
-def _coerce_proposal(value: ReadingProposal | Mapping[str, Any], lines: Mapping[str, str]) -> ReadingProposal:
-    data = value.as_dict() if isinstance(value, ReadingProposal) else dict(value)
-    line_id = str(data["line_id"])
-    if line_id not in lines:
-        raise ValueError("proposal line does not belong to revision")
-    text = lines[line_id]
-    start, end = int(data["base_start"]), int(data["base_end"])
-    base = str(data.get("base", text[start:end]))
-    reading = str(data["reading"])
-    if not reading or start < 0 or end <= start or end > len(text) or text[start:end] != base:
-        raise ValueError("proposal range does not match line text")
-    return ReadingProposal(
-        line_id=line_id,
-        base_start=start,
-        base_end=end,
-        base=base,
-        reading=reading,
-        source=str(data.get("source") or "sudachi"),
-        needs_review=bool(data.get("needs_review", True)),
-    )
-
-
-def propose_readings(lines: Sequence[Mapping[str, str]], proposer: ReadingProposer) -> list[ReadingProposal]:
-    texts = {str(line["id"]): str(line.get("text", "")) for line in lines}
-    return [_coerce_proposal(item, texts) for item in proposer.propose(lines)]
+def propose_readings(lines: Sequence[Mapping[str, str]], proposer: ReadingProposer) -> Sequence[ReadingProposal]:
+    texts = {line['id']: line['text'] for line in lines}
+    proposals = proposer.propose(lines)
+    for item in proposals:
+        if item.line_id not in texts:
+            raise ValueError('proposal line does not belong to snapshot')
+        text = texts[item.line_id]
+        if not item.reading or item.base_start < 0 or item.base_end <= item.base_start or item.base_end > len(text) or text[item.base_start:item.base_end] != item.base:
+            raise ValueError('proposal range does not match line text')
+    return proposals
 
 
 class ReadingLine(BaseModel):

@@ -35,8 +35,8 @@ it('handles non-BMP/combining clusters and ambiguous kana anchors conservatively
  const d=createLyricDocument('𝄞食べる');const l=d.lines[0];const rows=proposeJapaneseRuby(d,[l.id],[range('食べる','たべる',l.id,1)]);expect(rows[0].blocks.map(b=>[b.text,b.reading])).toEqual([['𝄞',''],['食','た'],['べる','']]);
  const a=createLyricDocument('漢あ漢');expect(proposeJapaneseRuby(a,[a.lines[0].id],[range('漢あ漢','かああか',a.lines[0].id)])[0].blocks.filter(b=>b.editable).map(b=>b.reading)).toEqual(['','']);
 });
-it('rejects stale or malformed proposals without modifying source',()=>{
- const d=createLyricDocument('今日');const l=d.lines[0];expect(()=>proposeJapaneseRuby(d,[l.id],[range('違','ちがう',l.id)])).toThrow();const rows=proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)]);expect(()=>japaneseRubyCommand({...d},d,rows)).toThrow('源文档');rows[0].blocks[0].text='別';expect(()=>japaneseRubyCommand(d,d,rows)).toThrow();expect(l.words[0].text).toBe('今日');
+it('rejects invalid service ranges and stale source without modifying source',()=>{
+ const d=createLyricDocument('今日');const l=d.lines[0];expect(()=>proposeJapaneseRuby(d,[l.id],[range('違','ちがう',l.id)])).toThrow();const rows=proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)]);expect(()=>japaneseRubyCommand({...d},d,rows)).toThrow('源文档');expect(l.words[0].text).toBe('今日');
 });
 it('roundtrips main/background ruby through draft and pure TTML',()=>{
  const d=createLyricDocument('今日');const l=d.lines[0];d.lines.push({...createLine('魂','bg'),backgroundOf:l.id});for(const l of d.lines){l.beginMs=0;l.endMs=1000;l.words[0].beginMs=0;l.words[0].endMs=1000;}

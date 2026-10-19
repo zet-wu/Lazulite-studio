@@ -1,17 +1,20 @@
-"""Fixed JmdictFurigana segments, keyed by exact surface AND selected reading."""
+"""Dictionary segments, keyed by exact surface AND selected reading."""
 from functools import lru_cache
 import gzip
-import hashlib
 import json
 from pathlib import Path
 
 RESOURCE = Path(__file__).parent / 'vendor/jmdict-furigana/JmdictFurigana.json.gz'
-SHA256 = '2a8e206f0b171fa5acdce89e5f5798621b227175e5bfa2db6bd92fef63dd962e'
 
 
 def build_index(entries):
+    if not isinstance(entries, list): raise ValueError('词典须为条目数组')
     variants = {}
     for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get('text'), str) or not isinstance(entry.get('reading'), str) or not isinstance(entry.get('furigana'), list):
+            raise ValueError('词典条目须包含 text、reading 字符串和 furigana 数组')
+        if any(not isinstance(part, dict) or not isinstance(part.get('ruby'), str) or ('rt' in part and not isinstance(part['rt'], str)) for part in entry['furigana']):
+            raise ValueError('词典分段须包含 ruby 字符串及可选 rt 字符串')
         surface, reading = entry['text'], entry['reading']
         parts = tuple((p['ruby'], p.get('rt', p['ruby'])) for p in entry['furigana'])
         if not parts or any(not base or not rt for base, rt in parts):
@@ -25,8 +28,6 @@ def build_index(entries):
 @lru_cache(maxsize=1)
 def load_index():
     raw = gzip.decompress(RESOURCE.read_bytes())
-    if hashlib.sha256(raw).hexdigest() != SHA256:
-        raise ValueError('JmdictFurigana 资源校验失败')
     return build_index(json.loads(raw.decode('utf-8-sig')))
 
 

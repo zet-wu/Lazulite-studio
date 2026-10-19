@@ -12,7 +12,7 @@ FastAPI 提供同源 `/api/v1` API，SQLite 管理项目、资源索引、修订
 | `jobs.py`、`job_routes.py` | 持久任务、幂等启动、当前阶段、取消与产物生命周期 |
 | `vocals.py`、`vocal_process.py`、`vocal_worker.py`、`vocal_routes.py` | 独立进程人声分离、分析、音频复用、窗口及下载 |
 | `alignment_projection.py`、`alignment.py`、`alignment_worker.py` | 全局歌词投影、资源准备、受监管日语对齐 |
-| `reading.py`、`furigana.py` | 无状态日文读音快照与固定词典分段 |
+| `reading.py`、`furigana.py` | 无状态日文读音快照与词典结构边界与分段 |
 | `lyric_sources.py`、`embedded_lyrics.py` | 在线载荷与媒体内嵌歌词读取 |
 | `publish.py`、`publish_routes.py`、`packaging.py`、`publishing.py` | 快照绑定、歌词写入、媒体回读与下载 |
 | `time_units.py`、`amll_compatibility.py`、`karaoke.py` | 时间、输出投影与项目配置边界 |
@@ -31,7 +31,7 @@ Lazulite 源码位于仓库根目录的固定 Git 子模块 `vendor/Lazulite`，
 
 原曲通过 48 kHz 双声道代理播放，人声播放／窗口／下载使用真实 WAV。波形与播放代理冷构建去重，能量通过 mmap 分桶读取；窗口接口复用已知媒体元数据。
 
-读音接口接收当前行文本并返回 code point 范围。Sudachi C、A 细分与 JmdictFurigana 精确分段共用整行读音；词典校验与索引按进程缓存。来源及许可见 [vendor](vendor/README.md)。
+读音接口接收当前行文本并返回 code point 范围。Sudachi C、A 细分与 JmdictFurigana 精确分段共用整行读音；词典按结构加载，同结构数据可替换，索引按进程缓存。来源及许可见 [vendor](vendor/README.md)。
 
 ## 输出与接口
 

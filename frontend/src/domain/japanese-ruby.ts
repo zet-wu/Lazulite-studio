@@ -8,9 +8,9 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 const han = /[\p{Script=Han}々〆]/u;
 const length = (text: string) => Array.from(text).length;
 const slice = (text: string, start: number, end: number) => Array.from(text).slice(start, end).join('');
-export type ReadingSpan = { wordId: string; start: number; end: number };
-export type ReadingBlock = { key: string; wordId: string; start: number; end: number; text: string; reading: string; editable: boolean; existing: boolean; spans?: ReadingSpan[] };
-export type ReadingRow = { lineId: string; background: boolean; blocks: ReadingBlock[] };
+export type ReadingSpan = Readonly<{ wordId: string; start: number; end: number }>;
+export type ReadingBlock = Readonly<{ key: string; wordId: string; start: number; end: number; text: string; editable: boolean; existing: boolean; spans?: readonly ReadingSpan[] }> & { reading: string };
+export type ReadingRow = Readonly<{ lineId: string; background: boolean; blocks: readonly ReadingBlock[] }>;
 
 function runs(text: string) {
   const result: Array<{ text: string; start: number; end: number; kanji: boolean }> = [];
@@ -104,8 +104,7 @@ export function proposeJapaneseRuby(source: LyricDocument, ids: string[], ranges
       for (const item of result) {
         const last = merged.at(-1);
         if (last && last.end === item.start && !last.editable && !item.editable) {
-          last.end = item.end; last.text += item.text; last.reading += item.reading;
-          last.key = `${word.id}:${last.start}:${last.end}`;
+          merged[merged.length-1] = {...last, end:item.end, text:last.text+item.text, reading:last.reading+item.reading, key:`${word.id}:${last.start}:${item.end}`};
         } else merged.push(item);
       }
       return merged;
@@ -131,35 +130,20 @@ export function japaneseRubyCommand(current: LyricDocument, source: LyricDocumen
   if (current !== source) throw new Error('源文档已变化，请重新打开生成');
   if (!hasJapaneseRubyChanges(rows, source)) throw new Error('没有可应用的注音修改');
   const rowMap = new Map(rows.map(row => [row.lineId, row]));
-  if (rowMap.size !== rows.length || rows.some(row => !source.lines.some(line => line.id === row.lineId))) throw new Error('提案行标识不符');
   const lines = source.lines.map(line => {
     const row = rowMap.get(line.id); if (!row) return line;
-    // Validate the preview as an exact, ordered coverage of the source before preparing any edits.
+    // Proposal construction and retry merging own coverage; only readings are editable.
     const groups = new Map<string, Array<{block: ReadingBlock; span: ReadingSpan}>>();
-    let wordIndex = 0, cursor = 0;
     for (const block of row.blocks) {
-      const spans = block.spans ?? [{wordId:block.wordId,start:block.start,end:block.end}];
-      if (!spans.length || block.spans && (spans.length < 2 || block.existing || !runs(block.text).every(part=>part.kanji))) throw new Error('合并提案范围无效');
-      let body = '';
-      for (const span of spans) {
-        const word = line.words[wordIndex];
-        const boundaries = new Set([0]); let at = 0;
-        if (word) for (const {segment} of segmenter.segment(word.text)) { at += length(segment); boundaries.add(at); }
-        if (!word || span.wordId !== word.id || span.start !== cursor || span.end <= span.start || !boundaries.has(span.start) || !boundaries.has(span.end)
-          || block.spans && word.rubyUnits.length) throw new Error('提案正文范围不符');
-        body += slice(word.text,span.start,span.end);
-        const group = groups.get(word.id) ?? []; group.push({block,span}); groups.set(word.id,group);
-        cursor = span.end;
-        if (cursor === length(word.text)) { wordIndex++; cursor=0; }
+      for (const span of block.spans ?? [{wordId:block.wordId,start:block.start,end:block.end}]) {
+        const group = groups.get(span.wordId) ?? [];
+        group.push({block,span}); groups.set(span.wordId,group);
       }
-      if (body !== block.text) throw new Error('提案正文结构不完整');
     }
-    if (wordIndex !== line.words.length || cursor) throw new Error('提案正文结构不完整');
     const parts = new Map<ReadingBlock, string[]>();
     let words = line.words.flatMap(word => {
       const blocks = groups.get(word.id)!;
       if (word.rubyUnits.length) {
-        if (blocks.length !== 1 || !blocks[0].block.existing) throw new Error('已有注音结构不符');
         const reading = blocks[0].block.reading;
         if (!reading.trim() || reading === rubyReading(word)) return [word];
         const starts = word.rubyUnits.flatMap(u => u.beginMs === null ? [] : [u.beginMs]), ends = word.rubyUnits.flatMap(u => u.endMs === null ? [] : [u.endMs]);

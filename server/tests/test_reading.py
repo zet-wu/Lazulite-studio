@@ -109,3 +109,32 @@ def test_missing_furigana_resource_is_explicit_failure(monkeypatch, tmp_path):
     with pytest.raises(ReadingUnavailable, match='读音资源不可用'):
         proposer.propose([{'id': 'l', 'text': '夜空'}])
     resource.load_index.cache_clear()
+
+
+def test_dictionary_load_accepts_replacement_content_and_rejects_bad_structure(tmp_path, monkeypatch):
+    import gzip, json, pytest
+    import server.furigana as resource
+    path = tmp_path / 'dictionary.gz'
+    monkeypatch.setattr(resource, 'RESOURCE', path)
+    try:
+        for surface, reading in [('今日','きょう'), ('明日','あした')]:
+            path.write_bytes(gzip.compress(json.dumps([{'text':surface, 'reading':reading, 'furigana':[{'ruby':surface,'rt':reading}]}]).encode()))
+            resource.load_index.cache_clear()
+            assert resource.load_index() == {(surface, reading): ((surface, reading),)}
+        for entries in [{}, [{'text':'字','reading':'じ','furigana':[{'ruby':'字','rt':1}]}]]:
+            path.write_bytes(gzip.compress(json.dumps(entries).encode()))
+            resource.load_index.cache_clear()
+            with pytest.raises(ValueError, match='词典'): resource.load_index()
+    finally: resource.load_index.cache_clear()
+
+
+def test_proposer_range_boundary_rejects_mismatches_and_overlap():
+    import pytest
+    from server.reading import ReadingProposal, ReadingSnapshot, analyze_snapshot
+    body = ReadingSnapshot(lines=[{'id':'l','text':'今日'}])
+    class Proposer:
+        def __init__(self, items): self.items = items
+        def propose(self, lines): return self.items
+    valid = ReadingProposal('l', 0, 2, '今日', 'きょう')
+    for items in [[ReadingProposal('l',0,2,'昨日','きのう')], [valid,valid]]:
+        with pytest.raises(ValueError): analyze_snapshot(body, Proposer(items))
