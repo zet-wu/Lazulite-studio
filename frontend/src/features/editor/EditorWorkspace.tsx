@@ -102,7 +102,7 @@ type Props = {
   onSave: () => void;
   onNew?: () => void;
   onImportName?: (name: string) => void;
-  onExportFormat?: (format: LyricFormat) => void;
+  onExportFormat?: (format: LyricFormat, content: string) => void;
   saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument; editing?: ProjectEditing } | undefined>;
   selectedLineId?: string | null;
   playheadLineId?: string | null;

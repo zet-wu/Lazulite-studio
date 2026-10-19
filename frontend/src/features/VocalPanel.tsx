@@ -1,3 +1,4 @@
+import { useProjectJobs } from './useProjectJobs';
 import { IconButton } from '../shared/Controls';
 import { MessageBar, useNotice } from '../shared/MessageBar';
 import { scopedSessionKey } from '../adapters/preferences';
@@ -28,12 +29,15 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   });
   useEffect(()=>{if(pending)sessionStorage.setItem(intentKey,JSON.stringify(pending));else sessionStorage.removeItem(intentKey);},[intentKey,pending]);
   const handled = useRef(new Set<string>());
-  const jobs = useQuery({ queryKey: ['vocal-jobs', projectId], queryFn: () => jobsApi.list(projectId), refetchInterval: 1000 });
-  const results = useQuery({ queryKey: ['vocals', projectId], queryFn: () => vocalApi.list(projectId), refetchInterval: 1000 });
+  const jobs = useProjectJobs(projectId,visible);
+  const hasActive=jobs.data?.items.some(job=>['queued','running','cancel_requested'].includes(job.status));
+  const results = useQuery({ queryKey: ['vocals', projectId], queryFn: () => vocalApi.list(projectId), refetchInterval: hasActive ? 1000 : 15000, refetchOnWindowFocus: 'always' });
+  useEffect(()=>{if(visible)void results.refetch();},[projectId,visible]);
   const tasks = jobs.data?.items.filter(j => j.kind === 'vocal') ?? [];
   const active = tasks.find(j => ['queued','running','cancel_requested'].includes(j.status));
   const latest = pending ? tasks.find(j=>j.id===pending.id) : tasks[0];
   const completed = useQuery({queryKey:['vocal-result',latest?.id], queryFn:()=>vocalApi.jobResult(latest!.id), enabled:latest?.status==='succeeded'});
+  useEffect(()=>{if(latest && ['succeeded','failed','cancelled','interrupted'].includes(latest.status))void results.refetch();},[latest?.id,latest?.status]);
   const result = results.data?.items.find(r=>r.id===(completed.data?.analysis_id ?? latest?.id));
   const sourceResults = results.data?.items.filter(r=>r.source_asset_id===sourceAssetId) ?? [];
   const currentAudio = sourceResults.find(r=>r.audio_state==='current') ?? sourceResults[0];

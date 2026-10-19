@@ -4,14 +4,12 @@ import { assertOutputDocument, visibleLineOrdinals } from './output-validation';
 import { lineText, type LyricDocument, type LyricLine } from '../domain/lyric-document';
 export type LrcKind = 'lrc' | 'elrc';
 const stamp = (v: number) => `${String(Math.floor(v / 60000)).padStart(2, '0')}:${String(Math.floor(v / 1000) % 60).padStart(2, '0')}.${String(v % 1000).padStart(3, '0')}`;
-function extended(line: LyricLine, ordinal: number, editing?: ProjectEditing): string {
+function extended(line: LyricLine, editing?: ProjectEditing): string {
   let boundary = line.beginMs!, result = '';
   const emit = (time: number) => { if (time !== boundary) result += `<${stamp(time)}>`; boundary = time; };
-  line.words.forEach((word, index) => {
+  line.words.forEach((word) => {
     if (isUntimedSeparator(word,editing)) { result += word.text; return; }
-    if (word.beginMs === null) throw new Error(`第 ${ordinal} 行第 ${index + 1} 单元缺少开始时间`);
-    const begin = word.beginMs, end = word.endMs === null ? null : word.endMs;
-    if (begin < boundary || (end !== null && end < begin)) throw new Error(`第 ${ordinal} 行第 ${index + 1} 单元时间倒序或重叠，无法输出扩展 LRC`);
+    const begin = word.beginMs!, end = word.endMs === null ? null : word.endMs;
     emit(begin); result += word.text; if (end !== null) emit(end);
   });
   return result;
@@ -21,10 +19,6 @@ export function renderLrc(document: LyricDocument, kind: LrcKind = 'lrc', editin
   assertOutputDocument(document,kind,editing);
   const ordinals=visibleLineOrdinals(document);
   const rows = document.lines.map((line) => ({ line, ordinal: ordinals.get(line.id)! })).filter(({ line }) => !line.backgroundOf);
-  for (const { line, ordinal } of rows) {
-    if (line.beginMs === null) throw new Error(`第 ${ordinal} 行缺少开始时间`);
-    if (line.endMs !== null && line.endMs < line.beginMs) throw new Error(`第 ${ordinal} 行结束早于开始`);
-  }
   rows.sort((a, b) => a.line.beginMs! - b.line.beginMs!);
   const output: string[] = [], overlap = new Set<number>();
   let groupEnd: number | null | undefined;
@@ -36,7 +30,7 @@ export function renderLrc(document: LyricDocument, kind: LrcKind = 'lrc', editin
       output.push(`[${stamp(groupEnd)}]`); groupRows = []; groupEnd = undefined;
     }
     for (const other of groupRows) if (other.line.beginMs! === begin || (other.line.endMs !== null && other.line.endMs > begin)) { overlap.add(other.ordinal); overlap.add(ordinal); }
-    output.push(`[${stamp(begin)}]${kind === 'elrc' ? extended(line, ordinal,editing) : lineText(line)}`);
+    output.push(`[${stamp(begin)}]${kind === 'elrc' ? extended(line,editing) : lineText(line)}`);
     groupEnd = groupEnd === null || end === null ? null : Math.max(groupEnd ?? end, end);
     groupRows.push(row);
   }

@@ -1,3 +1,4 @@
+import { useProjectJobs } from './useProjectJobs';
 import { IconButton } from '../shared/Controls';
 import { MessageBar, useNotice, type Notice } from '../shared/MessageBar';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -22,7 +23,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
 }) {
   const ui=useAudioReview();
   const caps=useQuery({queryKey:['capabilities'],queryFn:()=>jobsApi.capabilities()});
-  const jobs=useQuery({queryKey:['vocal-jobs',pid],queryFn:()=>jobsApi.list(pid),refetchInterval:1000});
+  const jobs=useProjectJobs(pid,visible);
   const [dialog,setDialog]=useState(false),[options,setOptions]=useState(defaultAlignmentOptions),[summary,setSummary]=useState<AlignmentSummary|null>(null);
   const [gapDraft,setGapDraft]=useState('500'),[gapError,setGapError]=useState('');
   const gapId=useId(),gapErrorId=useId();

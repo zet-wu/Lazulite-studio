@@ -218,15 +218,17 @@ def create_app(
 
     @api.get("/capabilities")
     def capabilities():
+        alignment_reason = alignment_unavailable()
+        publish_available = publish_runner.available()
         return {
             "schema_version": "studio-capabilities-v1",
             "items": [
                 {"id": "assets", "enabled": True, "reason": None},
                 {"id": "document.edit", "enabled": True, "reason": None},
                 {"id": "job.run", "enabled": True, "reason": None},
-                {"id": "job.alignment", "enabled": alignment_unavailable() is None, "reason": alignment_unavailable()},
-                {"id": "publish.stpp", "enabled": publish_runner.available(),
-                 "reason": None if publish_runner.available() else "未配置 STPP 发布器"},
+                {"id": "job.alignment", "enabled": alignment_reason is None, "reason": alignment_reason},
+                {"id": "publish.stpp", "enabled": publish_available,
+                 "reason": None if publish_available else "未配置 STPP 发布器"},
             ],
         }
 

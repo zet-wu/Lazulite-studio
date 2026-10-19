@@ -59,8 +59,8 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
     return () => window.removeEventListener('beforeunload', warn);
   }, [editor.dirty, editor.saving, editor.conflict]);
   if (editor.deleted) return <main><p role="alert">项目已删除，不能继续保存或恢复。</p><a href="/projects">返回项目列表</a></main>;
-  const exportFormat = (format: LyricFormat) => {
-    download(exportLyricFile(editor.document, format, editor.project.editing), `${title}.${format === 'elrc' ? 'extended.lrc' : format}`);
+  const exportFormat = (format: LyricFormat, content = exportLyricFile(editor.document, format, editor.project.editing)) => {
+    download(content, `${title}.${format === 'elrc' ? 'extended.lrc' : format}`);
   };
   return <KaraokeContext value={{project:editor.project,locked:editor.editingLocked,apply:command=>{if(editor.conflict)throw new Error('保存冲突，请先处理');editor.applyProject(command);}}}><ProjectEditingContext value={editor.project.editing}><div className={styles.editorShell} onKeyDown={event=>{
     if(event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || !(event.ctrlKey||event.metaKey) || (event.target as Element).closest('input,textarea,select,[role="dialog"]'))return;

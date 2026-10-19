@@ -12,6 +12,11 @@ test('production spectrum cache stays bounded until actual eviction', async ({ p
   }, { timeout: 15_000 }).toBe(true);
   const stats = async () => JSON.parse((await spectrum.getAttribute('data-spectrum-stats'))!) as { cacheSize: number; evictions: number; completed: number };
   await ready();
+  await expect(spectrum).not.toHaveAttribute('data-spectrum-stats');
+  await page.evaluate(() => { (window as Window & {studioSpectrumDiagnostics?:boolean}).studioSpectrumDiagnostics=true; });
+  await page.getByLabel('时间轴图层').getByRole('button', {name:'声谱图',exact:true}).click();
+  await page.getByLabel('时间轴图层').getByRole('button', {name:'声谱图',exact:true}).click();
+  await ready();
   const wave = page.getByRole('slider', { name: '波形进度' });
   // Stop once real fetch/compute has crossed capacity; full-song sampling is manual.
   for (let step = 0; step <= SPECTRUM_CACHE_LIMIT; step++) {

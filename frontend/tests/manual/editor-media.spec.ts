@@ -6,6 +6,7 @@ import { performanceTtml } from '../fixtures/large-document';
 const percentile = (values: number[], p: number) => [...values].sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(values.length * p))] ?? null;
 
 test('production media traverses a long document with bounded cache and eviction', async ({ page }) => {
+  await page.addInitScript(() => { (window as Window & { studioSpectrumDiagnostics?: boolean }).studioSpectrumDiagnostics = true; });
   await page.addInitScript(() => {
     const measures = { longTasks: [] as number[], frames: [] as number[] };
     (window as unknown as { perfMeasures: typeof measures }).perfMeasures = measures;

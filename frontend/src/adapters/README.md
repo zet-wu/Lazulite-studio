@@ -26,3 +26,5 @@
 
 
 `preferences.ts` 将长期偏好映射到服务端 settings 字段，以 ETag 和逐字段原值检查处理并发修改；旧 localStorage 白名单仅导入一次。`playback-speed.ts` 承担读取播放速度的副作用。恢复 IndexedDB 与 sessionStorage 应用意图按 library ID 隔离，偏好加载完成后才挂载依赖初始值的编辑器。
+
+下载操作将一次生成的内容交给下载器。ASS 准备同时返回事件与问题，LRC 在统一格式边界检查后生成；NicoKara 检查按项目不可变引用、标题及实际校验页复用。

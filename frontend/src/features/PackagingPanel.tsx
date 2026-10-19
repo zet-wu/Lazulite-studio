@@ -13,18 +13,19 @@ import { usePreference } from './editor/use-preference';
 import { OutputIssues } from './OutputIssues';
 import { uniqueOutputIssues, DocumentOutputError, outputIssueKey, type OutputIssue } from '../adapters/output-validation';
 import { MusicPackaging } from './MusicPackaging';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { exportLyricFile, exportFormats, type ValidationFilter, type LyricFormat } from '../adapters/lyric-formats';
 import type { LyricDocument } from '../domain/lyric-document';
 import styles from './acquisition.module.css';
-export function PackagingPanel(props: { validationFilter?:ValidationFilter; onValidationFilter?:(filter:ValidationFilter)=>void; resumeKaraoke?:()=>void; validationTab?: ValidationTab; onValidationTab?: (tab:ValidationTab)=>void; focusRule?: AmllRule; onRuleLocated?:()=>void; project?: ProjectDocument; applyProject?: (command:ProjectCommand)=>void; title?: string; document: LyricDocument; dirty?: boolean; onExportFormat?: (format: LyricFormat) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument; editing?: ProjectEditing } | undefined>; projectId?: string; sourceAssetId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
+export function PackagingPanel(props: { validationFilter?:ValidationFilter; onValidationFilter?:(filter:ValidationFilter)=>void; resumeKaraoke?:()=>void; validationTab?: ValidationTab; onValidationTab?: (tab:ValidationTab)=>void; focusRule?: AmllRule; onRuleLocated?:()=>void; project?: ProjectDocument; applyProject?: (command:ProjectCommand)=>void; title?: string; document: LyricDocument; dirty?: boolean; onExportFormat?: (format: LyricFormat, content: string) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument; editing?: ProjectEditing } | undefined>; projectId?: string; sourceAssetId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
  const [localFilter,setLocalFilter]=useState<ValidationFilter>('all');
  const filter=props.validationFilter??localFilter;
  const setFilter=(value:ValidationFilter)=>{setLocalFilter(value);props.onValidationFilter?.(value);};
- const nicokara=props.project?prepareNicokara(props.project,props.title??"歌词项目"):null;
  const editing = useProjectEditing();
  const [localTab,setLocalTab] = useState<ValidationTab>('lyrics');
  const tab=props.validationTab??localTab;
+ const needsNicokara=tab==='lyrics'&&(filter==='all'||filter==='nicokara');
+ const nicokara=useMemo(()=>needsNicokara&&props.project?prepareNicokara(props.project,props.title??'歌词项目'):null,[needsNicokara,props.project,props.title]);
  const validationPane=useRef<HTMLElement>(null);
  useEffect(()=>{if(validationPane.current)validationPane.current.scrollTop=0;},[tab]);
  const choose=(next:ValidationTab)=>{setLocalTab(next);props.onValidationTab?.(next);};
@@ -57,7 +58,7 @@ export function PackagingPanel(props: { validationFilter?:ValidationFilter; onVa
  </section><section className={styles.pane}><h2>歌词下载</h2><div className={styles.downloadRow}>
  <label>导出格式 <Select aria-label="导出格式" value={format} onChange={e => setFormat(e.target.value as LyricFormat)}>{exportFormats.map(([id,label]) => <option key={id} value={id}>{label}</option>)}</Select></label><button data-role="secondary" onClick={() => {
  setBlocking([]); setMessage('');
- try { exportLyricFile(props.document,format,editing); props.onExportFormat?.(format); }
+ try { const content=exportLyricFile(props.document,format,editing); props.onExportFormat?.(format,content); }
  catch(e) { setFilter(format as ValidationFilter); choose('lyrics'); if(e instanceof DocumentOutputError)setBlocking(uniqueOutputIssues(e.issues)); else setMessage(e instanceof Error ? e.message : '导出失败'); }
  }}>下载歌词</button></div><Disclosure title="导出对照">{() => <table className={styles.formatComparison} aria-label="所选格式导出对照"><thead><tr><th scope="col">要素</th><th scope="col">导出结果</th></tr></thead><tbody>{describeLyricFormat(props.document, format as Exclude<LyricFormat,'krc'>).map((row,index) => <tr key={row.element}><th scope="row">{row.element}</th><td><span className={styles.formatDetail} tabIndex={0} aria-describedby={`format-detail-${index}`}>{row.status === 'partial' ? <span>{row.result}</span> : <span role="img" aria-label={row.result}><Icon name={row.status === 'preserved' ? 'check' : 'close'}/></span>}<span role="tooltip" id={`format-detail-${index}`}>{row.detail}</span></span></td></tr>)}</tbody></table>}</Disclosure>{message && <p role="alert">{message}</p>}
  <OutputIssues document={props.document} issues={blocking} highlighted={blocking} locate={props.locateIssue}/><h2>音乐文件</h2><OutputIssues document={props.document} issues={musicBlocking} highlighted={musicBlocking} locate={props.locateIssue}/>{props.projectId && props.sourceAssetId && props.saveForPackaging ? <MusicPackaging dirty={props.dirty} key={props.projectId} onIssues={setMusicBlocking} projectId={props.projectId} document={props.document} saveForPackaging={props.saveForPackaging} /> : <p>上传音乐后可打包音乐文件；单独下载歌词无需音乐。</p>}</section></div>;

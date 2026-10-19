@@ -5,7 +5,6 @@ import { preferences } from '../../adapters/preferences';
 import { Icon } from '../../shared/Icon';
 import { Link } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
-import type { LyricFormat } from '../../adapters/lyric-formats';
 import { KanaHighlightDialog } from './KanaHighlightDialog';
 import { ShortcutDialog } from './ShortcutDialog';
 import { TopMenu, type MenuState } from './TopMenu';
@@ -27,7 +26,6 @@ type Props = MenuState & {
   inspectorVisible: boolean;
   onToggleOutline: () => void;
   onToggleInspector: () => void;
-  onExportFormat?: (format: LyricFormat) => void;
 };
 
 export function EditorMenu(props: Props) {

@@ -1,3 +1,4 @@
+import { spectrumDiagnosticsEnabled } from './spectrum-diagnostics';
 import { IconButton } from '../shared/Controls';
 import { TimelineIndicators } from './TimelineIndicators';
 import { useEffect, useRef, useState } from 'react';
@@ -9,8 +10,8 @@ import styles from './media.module.css';
 import { spectrumPalette } from './spectrum-palette';
 
 type Props = { pcmRate?: number; vocal?: string | null; projectId: string; assetIdentity: string; startMs: number; endMs: number; durationMs: number };
-type Request = { token: number; controller: AbortController; began: number; posted: boolean };
-type Result = { id: number; token: number; pixels: Uint8Array; computeMs: number; error?: string };
+type Request = { token: number; controller: AbortController; began?: number; posted: boolean };
+type Result = { id: number; token: number; pixels: Uint8Array; computeMs?: number; error?: string };
 
 export function SpectrogramCanvas(props: Props) {
   return <AssetSpectrum key={`${props.projectId}:${props.assetIdentity}:${props.durationMs}:${props.pcmRate ?? PROXY_SAMPLE_RATE}:fft512-${SPECTRUM_WIDTH}x${SPECTRUM_HEIGHT}`} {...props} />;
@@ -19,13 +20,14 @@ export function SpectrogramCanvas(props: Props) {
 function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs, endMs, durationMs }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const worker = useRef<Worker | null>(null);
-  const cache = useRef(new SpectrumCache());
+  const [diagnostics] = useState(spectrumDiagnosticsEnabled);
+  const cache = useRef(new SpectrumCache(diagnostics));
   const pending = useRef(new Map<number, Request>());
   const failed = useRef(new Map<number, string>());
   const wanted = useRef<number[]>([]);
   const nextToken = useRef(0);
   const pump = useRef<() => void>(() => {});
-  const stats = useRef({ completed: 0, computeMs: [] as number[], requestMs: [] as number[] });
+  const stats = useRef(diagnostics ? { completed: 0, computeMs: [] as number[], requestMs: [] as number[] } : null);
   const [revision, setRevision] = useState(0);
   const [retry, setRetry] = useState(0);
   const [error, setError] = useState('');
@@ -41,14 +43,14 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
     for (const first of wanted.current) {
       if (cache.current.get(first) || pending.current.has(first) || failed.current.has(first)) continue;
       if (pending.current.size >= 2) break;
-      const request: Request = { token: ++nextToken.current, controller: new AbortController(), began: performance.now(), posted: false };
+      const request: Request = { token: ++nextToken.current, controller: new AbortController(), began: diagnostics ? performance.now() : undefined, posted: false };
       const window = spectrumWindow(first, Math.min(first + SPECTRUM_WINDOW_MS, durationMs), durationMs, pcmRate);
       pending.current.set(first, request);
       void studioApi.getPcmWindow(projectId, window.requestStartMs, window.requestEndMs, request.controller.signal, vocal).then(({ pcm, rate, channels }) => {
         if (pending.current.get(first) !== request || !wanted.current.includes(first)) return;
-        stats.current.requestMs = [...stats.current.requestMs.slice(-127), performance.now() - request.began];
+        if (stats.current) stats.current.requestMs = [...stats.current.requestMs.slice(-127), performance.now() - request.began!];
         request.posted = true;
-        processor.postMessage({ id: first, token: request.token, pcm, rate, channels, window }, [pcm]);
+        processor.postMessage({ id: first, token: request.token, pcm, rate, channels, window, diagnostics }, [pcm]);
       }).catch(cause => {
         if (pending.current.get(first) !== request) return;
         pending.current.delete(first);
@@ -70,8 +72,10 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
       if (result.error) { failed.current.set(result.id, result.error); }
       else {
         cache.current.set({ startMs: result.id, endMs: Math.min(result.id + SPECTRUM_WINDOW_MS, durationMs), pixels: result.pixels });
-        stats.current.completed++;
-        stats.current.computeMs = [...stats.current.computeMs.slice(-127), result.computeMs];
+        if (stats.current) {
+          stats.current.completed++;
+          stats.current.computeMs = [...stats.current.computeMs.slice(-127), result.computeMs!];
+        }
       }
       changed(); pump.current();
     };
@@ -137,7 +141,7 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
   const displayError = error || wanted.current.map(first => failed.current.get(first)).find(Boolean);
   const ready = wanted.current.filter(first => cache.current.get(first)).length;
   return <div className={styles.spectrogram} data-spectrum-ready={ready} data-spectrum-wanted={wanted.current.length}
-    data-spectrum-stats={JSON.stringify({ ...stats.current, cacheSize: cache.current.size, evictions: cache.current.evictions, pending: pending.current.size })}>
+    data-spectrum-stats={stats.current ? JSON.stringify({ ...stats.current, cacheSize: cache.current.size, evictions: cache.current.evictions, pending: pending.current.size }) : undefined}>
     <div className={styles.spectrumPlot}><canvas ref={canvas} aria-label="声谱图" data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
     {ready < wanted.current.length && !displayError && <small role="status">声谱图加载中…</small>}
     {displayError && <small role="alert">{displayError} <IconButton icon="refresh" label="重试加载声谱图" data-role="secondary" onClick={() => { failed.current.clear(); setError(''); setRetry(value => value + 1); }}/></small>}
