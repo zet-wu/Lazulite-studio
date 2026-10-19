@@ -74,7 +74,7 @@ export const handlers = [
     const body = await request.json() as { revision?: string; document?: typeof currentDocument.document };
     currentDocument = { ...currentDocument, revision: 'sample-r2', document: body.document ?? currentDocument.document };
     sessionStorage.setItem('studio-mock-document', JSON.stringify(currentDocument));
-    const next = currentDocument;
+    const next = { revision: currentDocument.revision };
     return HttpResponse.json(next, { headers: { ETag: '"sample-r2"' } });
   }),
 ];

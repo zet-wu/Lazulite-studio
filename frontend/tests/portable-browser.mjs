@@ -26,7 +26,7 @@ try {
   await page.goto(origin+'/settings');await expect(page.getByRole('heading',{name:'计算设备'})).toBeVisible();
   const library=(await (await api.get(origin+'/api/v1/session')).json()).library_id;
   const databases=await page.evaluate(async()=> (await indexedDB.databases()).map(item=>item.name));
-  expect(databases).toContain(`lazulite-studio-recovery-project-v9:${library}`);
+  expect(databases).toContain(`lazulite-studio-recovery-v10:${library}`);
   expect(errors).toEqual([]);
   console.log(JSON.stringify({productionPage:true,noPassword:true,editorReload:true,preferencesAcrossContexts:true,conflict:true,deviceSettings:true,pageErrors:errors}));
   await fresh.close(); await context.close();

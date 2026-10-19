@@ -11,9 +11,7 @@ const saveMock = vi.fn();
 const recovery = {
   save: vi.fn().mockResolvedValue(undefined),
   readCheckpoint: vi.fn().mockResolvedValue(null),
-  load: vi.fn().mockResolvedValue(null),
   clear: vi.fn().mockResolvedValue(undefined),
-  discard: vi.fn().mockResolvedValue(undefined),
 };
 vi.mock("../adapters/recovery", () => ({
   createRecoveryAdapter: () => recovery,
@@ -71,8 +69,8 @@ describe("useProjectDocument save lifecycle", () => {
     await act(async () => resolve({ revision: "r2", etag: '"r2"' }));
     expect(result.current.dirty).toBe(true);
     const checkpoint = recovery.save.mock.calls.at(-1);
-    expect(checkpoint?.[2].present.lyrics.lines[0].words[0].text).toBe("A2");
-    expect(checkpoint?.[3]).toBe("r2");
+    expect(checkpoint?.[1].lyrics.lines[0].words[0].text).toBe("A2");
+    expect(checkpoint?.[2]).toBe("r2");
     await act(async () => result.current.save());
     expect(saveMock.mock.calls[1][1]).toBe("r2");
     expect(saveMock.mock.calls[1][2]).not.toBe(saveMock.mock.calls[0][2]);
@@ -105,19 +103,17 @@ describe("useProjectDocument save lifecycle", () => {
     const { result } = renderHook(hook, { wrapper: StrictMode });
     const checkpoint = result.current.state;
     recovery.readCheckpoint.mockResolvedValue({
-      version: 1,
+      version: 10,
       projectId: "p",
-      documentIdentity: "p",
-      savedAt: new Date().toISOString(),
       baseRevision: "old",
-      state: checkpoint,
+      project: checkpoint.present,
     });
-    recovery.load.mockResolvedValue(checkpoint);
     await act(async () => {
       await result.current.restore();
     });
     expect(result.current.dirty).toBe(true);
     expect(result.current.conflict).toBe(true);
+    expect(result.current.canUndo).toBe(false);
   });
 
 

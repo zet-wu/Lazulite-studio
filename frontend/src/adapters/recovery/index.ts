@@ -2,29 +2,25 @@ import { libraryIdentity } from '../preferences';
 import { validateKaraoke } from '../../domain/karaoke';
 import { assertAmll, validateAgents } from '../../domain/amll-compatibility';
 import { validateProjectEditing } from '../../domain/project-editing';
-import { createProjectEditorState, validateSegments, type ProjectEditorState, type ProjectDocument } from '../../domain/project-document';
+import { validateSegments, type ProjectDocument } from '../../domain/project-document';
 import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
-const DATABASE = 'lazulite-studio-recovery-project-v9';
+const DATABASE = 'lazulite-studio-recovery-v10';
 const STORE = 'projects';
-const RECORD_VERSION = 9;
+const RECORD_VERSION = 10;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {
   version: number;
   projectId: string;
-  documentIdentity: string;
-  savedAt: string;
-  state: ProjectEditorState;
-  baseRevision?: string;
+  project: ProjectDocument;
+  baseRevision: string;
 };
 
 export type RecoveryAdapter = {
-  save(slotKey: string, documentIdentity: string, state: ProjectEditorState, baseRevision?: string): Promise<void>;
+  save(projectId: string, project: ProjectDocument, baseRevision: string): Promise<void>;
   readCheckpoint(slotKey: string): Promise<RecoveryRecord | null>;
-  load(slotKey: string, documentIdentity: string): Promise<ProjectEditorState | null>;
   clear(slotKey: string): Promise<void>;
-  discard(slotKey: string): Promise<void>;
 };
 
 async function openDatabase(): Promise<IDBDatabase> {
@@ -50,10 +46,7 @@ const transaction = async <T>(mode: IDBTransactionMode, operation: (store: IDBOb
   });
 };
 
-const isState = (value: unknown): value is ProjectEditorState => {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as ProjectEditorState;
-  const validDocument = (document: unknown) => {
+const validDocument = (document: unknown): document is ProjectDocument => {
     if (!document || typeof document !== 'object') return false;
     const project = document as ProjectDocument;
     if (project.schemaVersion !== 'studio-project-v9' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
@@ -66,22 +59,17 @@ const isState = (value: unknown): value is ProjectEditorState => {
       && item.lines.every((line) => !!line && typeof line.id === 'string' && Array.isArray(line.words)
         && line.words.every((word) => !!word && typeof word.id === 'string' && typeof word.text === 'string' && typeof word.obscene === 'boolean' && Array.isArray(word.rubyUnits) ));
   };
-  return !!candidate.present && Array.isArray(candidate.past) && Array.isArray(candidate.future)
-    && candidate.past.length <= 256 && candidate.future.length <= 256
-    && [candidate.present, ...candidate.past, ...candidate.future].every(validDocument);
-};
 const isRecord = (value: unknown): value is RecoveryRecord => {
   if (!value || typeof value !== 'object') return false;
   const record = value as RecoveryRecord;
   return record.version === RECORD_VERSION && typeof record.projectId === 'string'
-    && typeof record.documentIdentity === 'string' && typeof record.savedAt === 'string' && isState(record.state);
+    && typeof record.baseRevision === 'string' && validDocument(record.project);
 };
 
 export function createRecoveryAdapter(): RecoveryAdapter {
   return {
-    async save(projectId, documentIdentity, state, baseRevision) {
-      if (!projectId || !documentIdentity || !isState(state)) throw new Error('Invalid recovery checkpoint');
-      const record: RecoveryRecord = { version: RECORD_VERSION, projectId, documentIdentity, savedAt: new Date().toISOString(), state: createProjectEditorState(state.present), baseRevision };
+    async save(projectId, project, baseRevision) {
+      const record: RecoveryRecord = { version: RECORD_VERSION, projectId, project, baseRevision };
       await transaction('readwrite', (store) => store.put(record, keyFor(projectId)));
     },
     async readCheckpoint(projectId) {
@@ -90,18 +78,7 @@ export function createRecoveryAdapter(): RecoveryAdapter {
       if (!isRecord(record) || record.projectId !== projectId) throw new Error('Local recovery checkpoint is incompatible');
       return record;
     },
-    async load(projectId, documentIdentity) {
-      const record = await this.readCheckpoint(projectId);
-      if (record === null) return null;
-      if (!isRecord(record) || record.projectId !== projectId || record.documentIdentity !== documentIdentity) {
-        throw new Error('Local recovery checkpoint is incompatible or belongs to another document');
-      }
-      return createProjectEditorState(record.state.present);
-    },
     async clear(projectId) {
-      await transaction('readwrite', (store) => store.delete(keyFor(projectId)));
-    },
-    async discard(projectId) {
       await transaction('readwrite', (store) => store.delete(keyFor(projectId)));
     },
   };

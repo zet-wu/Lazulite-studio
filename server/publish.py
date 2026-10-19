@@ -56,8 +56,7 @@ def validate_output_ttml(path: str | Path, *, xml: bool = False) -> dict[str, An
     try:
         from .documents import validate_ttml
         raw = str(path) if xml else Path(path).read_text(encoding="utf-8")
-        validate_ttml(raw)
-        root = ET.fromstring(raw)
+        root = validate_ttml(raw)
     except (ET.ParseError, OSError, UnicodeError, ValueError) as exc:
         raise PublishInvalid("revision is not readable TTML") from exc
     for agent in root.iter("{http://www.w3.org/ns/ttml#metadata}agent"):
@@ -157,16 +156,10 @@ class PublishRunner:
         if not self.available():
             raise RuntimeError("STPP publisher is not configured")
         revision = request["revision"]
-        _, _ = self.revisions.read(project_id, revision)
-        with self.revisions.db.connect() as c:
-            row = c.execute("SELECT project_path FROM revisions WHERE id=? AND project_id=?", (revision, project_id)).fetchone()
-        if not row:
-            raise PublishInvalid("revision not found")
         with self.revisions.db.connect() as c:
             bound = c.execute('SELECT p.source_asset_id,p.name,a.filename FROM projects p JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?', (project_id,)).fetchone()
         if not bound or bound[0] != request['asset_id']: raise PublishInvalid('bound asset changed')
-        from .project_document import read_project
-        snapshot = read_project(self.revisions.db.paths.resolve(row[0]))
+        _, snapshot = self.revisions.read(project_id, revision)
         asset = Path(self.asset_path(project_id))
         from mutagen import File
         from mutagen.mp4 import MP4

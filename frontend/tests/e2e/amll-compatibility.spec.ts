@@ -43,5 +43,5 @@ test('preserves older recovery databases while isolating the current project for
   for(const name of ['lazulite-studio-recovery','lazulite-studio-recovery-project-v3','lazulite-studio-recovery-project-v7:00000000000000000000000000000001','unrelated-app'])await new Promise<void>((resolve,reject)=>{const request=indexedDB.open(name,1);request.onupgradeneeded=()=>request.result.createObjectStore('sample');request.onsuccess=()=>{request.result.close();resolve();};request.onerror=()=>reject(request.error);});
  });
  await page.goto('/projects/sample-project/edit?scenario=no-music');await expect(page.getByRole('button',{name:'编辑',exact:true})).toBeVisible();
- await expect.poll(()=>page.evaluate(async()=>(await indexedDB.databases()).map(db=>db.name).sort())).toEqual(['lazulite-studio-recovery','lazulite-studio-recovery-project-v3','lazulite-studio-recovery-project-v7:00000000000000000000000000000001','lazulite-studio-recovery-project-v9:legacy','unrelated-app']);
+ await expect.poll(()=>page.evaluate(async()=>(await indexedDB.databases()).map(db=>db.name).sort())).toEqual(['lazulite-studio-recovery','lazulite-studio-recovery-project-v3','lazulite-studio-recovery-project-v7:00000000000000000000000000000001','lazulite-studio-recovery-v10:legacy','unrelated-app']);
 });

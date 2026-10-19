@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from .db import Database
-from .project_document import initial_project, validate_project, read_project, read_lyrics
+from .project_document import ProjectSnapshot, initial_project, validate_project, read_project, read_lyrics
 
 INITIAL_TTML = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>'
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class RevisionStore:
     def create(
         self,
         project_id: str,
-        snapshot: dict,
+        snapshot: dict | ProjectSnapshot,
         base: str | None,
         *,
         operation_id: str | None = None,
@@ -100,8 +100,6 @@ class RevisionStore:
                     "etag": f'"{revision}"',
                     "created_at": now,
                 }
-                if client_seq is not None:
-                    result["client_seq"] = client_seq
                 if operation_id:
                     conn.execute(
                         "INSERT INTO idempotency VALUES(?,?,?,?,?)",

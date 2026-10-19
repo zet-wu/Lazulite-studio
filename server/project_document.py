@@ -56,25 +56,16 @@ def initial_project(ttml: str, asset_id: str | None) -> dict:
             'editing': {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
 
 def read_project(path: str | Path) -> dict:
-    snapshot = ProjectSnapshot.model_validate_json(Path(path).read_text(encoding='utf-8')).model_dump()
-    validate_editing(snapshot)
-    from .amll_compatibility import validate_amll
-    validate_amll(snapshot)
+    snapshot = _validate_snapshot(ProjectSnapshot.model_validate_json(Path(path).read_text(encoding='utf-8')))
     return snapshot
 
 def read_lyrics(path: str | Path) -> str:
     return read_project(path)['lyrics']['draftTtml']
 
-def validate_project(value: dict, conn, project_id: str) -> dict:
-    from .documents import validate_ttml
-    from .time_units import normalize_ttml
-    snapshot = ProjectSnapshot.model_validate(value).model_dump()
+def validate_project(value: dict | ProjectSnapshot, conn, project_id: str) -> dict:
+    snapshot = _validate_snapshot(value if isinstance(value, ProjectSnapshot) else ProjectSnapshot.model_validate(value))
     row = conn.execute('SELECT p.source_asset_id,a.duration_ms FROM projects p LEFT JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?', (project_id,)).fetchone()
     if row is None: raise KeyError(project_id)
-    snapshot['lyrics']['draftTtml'] = normalize_ttml(validate_ttml(snapshot['lyrics']['draftTtml']))
-    validate_editing(snapshot)
-    from .amll_compatibility import validate_amll
-    validate_amll(snapshot)
     acoustic = snapshot['acoustics']
     if acoustic['analysisId'] is not None:
         result = conn.execute('SELECT source_asset_id FROM vocal_results WHERE id=? AND project_id=? AND status=?', (acoustic['analysisId'], project_id, 'ready')).fetchone()
@@ -87,11 +78,21 @@ def validate_project(value: dict, conn, project_id: str) -> dict:
     return snapshot
 
 
-def validate_editing(snapshot):
-    import xml.etree.ElementTree as ET
+def _validate_snapshot(model: ProjectSnapshot) -> dict:
+    from .documents import validate_ttml
+    from .time_units import normalize_ttml_tree, serialize_ttml
+    from .amll_compatibility import validate_amll
+    snapshot = model.model_dump()
+    root = validate_ttml(snapshot['lyrics']['draftTtml'])
+    normalize_ttml_tree(root)
+    snapshot['lyrics']['draftTtml'] = serialize_ttml(root)
+    validate_editing(snapshot, root)
+    validate_amll(snapshot, root)
+    return snapshot
+
+
+def validate_editing(snapshot, root):
     from decimal import Decimal
-    from .time_units import normalize_ttml
-    root = ET.fromstring(normalize_ttml(snapshot['lyrics']['draftTtml']))
     studio = '{urn:lazulite:studio:draft}'
     tt = '{http://www.w3.org/ns/ttml}'
     tts = '{http://www.w3.org/ns/ttml#styling}'

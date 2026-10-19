@@ -26,7 +26,8 @@ def test_document_save_retry_and_cas_preserves_unknown(tmp_path):
     ttml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:x="urn:example"><body><div><p begin="0s" end="1s">Hi<x:mark/></p></div></body></tt>'
     body = {"schema_version": "studio-document-v9", "project_id": "p", "revision": headers["if-match"].strip('"'), "client_seq": 3, "document": initial_project(ttml, None)}
     first = client.put("/api/v1/projects/p/document", json=body, headers=headers)
-    assert first.status_code == 200 and first.json()["saved"]["client_seq"] == 3
+    assert first.status_code == 200
+    assert set(first.json()) == {"revision"}
     assert client.put("/api/v1/projects/p/document", json=body, headers=headers).json()["revision"] == first.json()["revision"]
     assert client.get("/api/v1/projects/p/document").json()["document"]["lyrics"]["draftTtml"] == normalize_ttml(ttml)
     stale = {**headers, "idempotency-key": "save-2"}

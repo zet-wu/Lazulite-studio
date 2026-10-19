@@ -1010,14 +1010,8 @@ export interface components {
                 };
             };
         };
-        DocumentSaveResponse: components["schemas"]["DocumentEnvelope"] & {
-            saved: {
-                id: string;
-                etag: string;
-                sha256: string;
-                created_at: string;
-                client_seq?: number | null;
-            };
+        DocumentSaveResponse: {
+            revision: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {

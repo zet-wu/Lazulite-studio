@@ -32,7 +32,7 @@ class DocumentEnvelope(BaseModel):
     client_seq: int | None = Field(default=None, ge=0)
 
 
-def validate_ttml(ttml: str) -> str:
+def validate_ttml(ttml: str) -> ET.Element:
     raw = ttml.encode("utf-8")
     if len(raw) > MAX_TTML_BYTES:
         raise ValueError("TTML exceeds 2 MiB limit")
@@ -112,7 +112,7 @@ def validate_ttml(ttml: str) -> str:
     for element in root.iter("{http://www.w3.org/ns/ttml#metadata}actor"):
         if element.attrib.get("agent") not in agents:
             raise ValueError("unknown actor agent reference")
-    return ttml
+    return root
 
 
 class DocumentService:
@@ -144,7 +144,7 @@ class DocumentService:
         if body.revision is not None and body.revision != base:
             raise HTTPException(412, {"code": "revision_conflict", "message": "body revision does not match If-Match", "retryable": False})
         try:
-            result = self.revisions.create(body.project_id, body.document.model_dump(), base,
+            result = self.revisions.create(body.project_id, body.document, base,
                 operation_id=operation_id, subject=subject, client_seq=body.client_seq)
         except KeyError as exc:
             raise HTTPException(404, {"code": "project_not_found", "message": "project or revision not found", "retryable": False}) from exc
@@ -154,7 +154,7 @@ class DocumentService:
             raise HTTPException(412, {"code": "revision_conflict", "message": "document revision is stale", "retryable": False, "current_revision": exc.current}) from exc
         except IdempotencyConflict as exc:
             raise HTTPException(409, {"code": "idempotency_mismatch", "message": "operation id was used for another request", "retryable": False}) from exc
-        return {**self.get(body.project_id, result["id"]), "saved": result}
+        return {"revision": result["id"], "etag": result["etag"]}
 
 
 def build_router(service: DocumentService, *, auth: Callable, write: Callable,

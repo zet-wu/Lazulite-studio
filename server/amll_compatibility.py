@@ -1,5 +1,4 @@
 """Project constraints; read-only checks on the full persisted TTML."""
-import xml.etree.ElementTree as ET
 TT='{http://www.w3.org/ns/ttml}'
 TM='{http://www.w3.org/ns/ttml#metadata}'
 XML='{http://www.w3.org/XML/1998/namespace}'
@@ -7,11 +6,10 @@ ST='{urn:lazulite:studio:draft}'
 RUBY='{http://www.w3.org/ns/ttml#styling}ruby'
 DEFAULTS={'simplified':False,'noMultipleBackgrounds':True,'noChorus':False,'noWordAgents':True,'noIndependentBackground':False}
 
-def validate_amll(snapshot):
+def validate_amll(snapshot, root):
     flags=snapshot['amll']
     if flags['simplified'] and not all(flags[key] for key in ('noChorus','noWordAgents','noIndependentBackground')):
         raise ValueError('简化模型依赖限制必须开启')
-    root=ET.fromstring(snapshot['lyrics']['draftTtml'])
     issues=set()
     agents=list(root.iter(TM+'agent'))
     if any(a.get(XML+'id') not in ('v1','v2') or a.get('type')!='person' or len(a) for a in agents):issues.add('simplified')

@@ -3247,48 +3247,15 @@
         "additionalProperties": false
       },
       "DocumentSaveResponse": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/DocumentEnvelope"
-          },
-          {
-            "type": "object",
-            "required": [
-              "saved"
-            ],
-            "properties": {
-              "saved": {
-                "type": "object",
-                "required": [
-                  "id",
-                  "etag",
-                  "sha256",
-                  "created_at"
-                ],
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "etag": {
-                    "type": "string"
-                  },
-                  "sha256": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "client_seq": {
-                    "type": [
-                      "integer",
-                      "null"
-                    ]
-                  }
-                }
-              }
-            }
+        "type": "object",
+        "required": [
+          "revision"
+        ],
+        "properties": {
+          "revision": {
+            "type": "string"
           }
-        ]
+        }
       },
       "HTTPValidationError": {
         "properties": {

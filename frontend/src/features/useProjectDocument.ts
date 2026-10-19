@@ -22,7 +22,6 @@ export function useProjectDocument(
   initialEtag: string | undefined,
   saveDocument: Save,
 ) {
-  const identity = projectId;
   const editingLock = useRef<symbol | null>(null);
   const [editingLocked, setEditingLocked] = useState(false);
   const savedSequence = useRef(0);
@@ -61,9 +60,9 @@ export function useProjectDocument(
   const checkpoint = useCallback(
     async (next: ProjectEditorState) => {
       if (deletedRef.current) return;
-      await enqueueRecovery(async () => { if (!deletedRef.current) await createRecoveryAdapter().save(projectId, identity, next, revision); });
+      await enqueueRecovery(async () => { if (!deletedRef.current) await createRecoveryAdapter().save(projectId, next.present, revision); });
     },
-    [enqueueRecovery, identity, projectId, revision],
+    [enqueueRecovery, projectId, revision],
   );
   const commit = useCallback(
     (next: ProjectEditorState) => {
@@ -128,8 +127,7 @@ export function useProjectDocument(
       } else {
         await enqueueRecovery(() => createRecoveryAdapter().save(
           projectId,
-          identity,
-          stateRef.current,
+          stateRef.current.present,
           result.revision,
         ));
       }
@@ -145,7 +143,7 @@ export function useProjectDocument(
       inFlight.current = false;
       setSaving(false);
     }
-  }, [conflict, dirty, enqueueRecovery, etag, identity, projectId, revision, saveDocument]);
+  }, [conflict, dirty, enqueueRecovery, etag, projectId, revision, saveDocument]);
   useEffect(() => {
     if (!dirty || error || conflict || deleted) return;
     const timer = window.setTimeout(() => void save(), 700);
@@ -178,18 +176,18 @@ export function useProjectDocument(
     if (deletedRef.current) return false;
     const adapter = createRecoveryAdapter();
     const record = await adapter.readCheckpoint(projectId);
-    const recovered = await adapter.load(projectId, identity);
-    if (recovered) {
+    if (record) {
+      const recovered = createProjectEditorState(record.project);
       stateRef.current = recovered;
       setState(recovered);
       ++sequence.current;
       setDirty(true);
-      if (record?.baseRevision && record.baseRevision !== revision)
+      if (record.baseRevision !== revision)
         setConflict(true);
       return true;
     }
     return false;
-  }, [identity, projectId, revision]);
+  }, [projectId, revision]);
   useEffect(() => {
     let active = true;
     void createRecoveryAdapter()
@@ -209,7 +207,7 @@ export function useProjectDocument(
     };
   }, [projectId]);
   const discardRecovery = useCallback(async () => {
-    await enqueueRecovery(() => createRecoveryAdapter().discard(projectId));
+    await enqueueRecovery(() => createRecoveryAdapter().clear(projectId));
     setRecovery({ available: false });
   }, [enqueueRecovery, projectId]);
   const restore = useCallback(async () => {

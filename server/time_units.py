@@ -22,6 +22,12 @@ def normalize_ttml(ttml):
     import re
     import xml.etree.ElementTree as ET
     root = ET.fromstring(ttml)
+    normalize_ttml_tree(root)
+    return serialize_ttml(root)
+
+
+def normalize_ttml_tree(root):
+    import re
     absolute = any(f'{{{namespace}}}timing' in root.attrib for namespace in ('http://music.apple.com/lyric-ttml-internal', 'http://itunes.apple.com/lyric-ttml-extensions'))
     def seconds(raw):
         if raw is None:
@@ -57,7 +63,6 @@ def normalize_ttml(ttml):
                 if node.get('begin') is None: node.set('begin',clock(milliseconds(start)))
                 node.set('end',clock(milliseconds(end)))
     visit(root,Decimal(0))
-    return serialize_ttml(root)
 
 
 def time_fields(start, end, *, start_key='begin_ms'):
