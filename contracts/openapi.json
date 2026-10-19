@@ -742,39 +742,6 @@
         }
       }
     },
-    "/jobs/{jobId}/events": {
-      "get": {
-        "operationId": "streamJobEvents",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/JobId"
-          },
-          {
-            "name": "after_seq",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Server sent events",
-            "content": {
-              "text/event-stream": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      }
-    },
     "/projects/{projectId}/document": {
       "get": {
         "operationId": "getDocument",
@@ -844,27 +811,6 @@
           },
           "428": {
             "$ref": "#/components/responses/Error"
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      }
-    },
-    "/projects/{projectId}/lyrics": {
-      "get": {
-        "operationId": "getLyrics",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ProjectId"
-          },
-          {
-            "$ref": "#/components/parameters/Revision"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Committed TTML"
           },
           "default": {
             "$ref": "#/components/responses/Error"
@@ -2733,62 +2679,6 @@
         },
         "additionalProperties": false
       },
-      "JobEvent": {
-        "type": "object",
-        "required": [
-          "schema_version",
-          "job_id",
-          "seq",
-          "kind",
-          "state_version"
-        ],
-        "properties": {
-          "schema_version": {
-            "const": "studio-job-event-v1"
-          },
-          "job_id": {
-            "type": "string"
-          },
-          "seq": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "kind": {
-            "type": "string"
-          },
-          "stage": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "completed": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "total": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "message": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "state_version": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "created_at": {
-            "type": "string"
-          }
-        }
-      },
       "JobResult": {
         "type": "object",
         "required": [
@@ -2913,8 +2803,7 @@
           "kind",
           "status",
           "request",
-          "result_available",
-          "state_version"
+          "result_available"
         ],
         "properties": {
           "schema_version": {
@@ -2964,10 +2853,6 @@
           },
           "updated_at": {
             "type": "string"
-          },
-          "state_version": {
-            "type": "integer",
-            "minimum": 0
           }
         }
       },

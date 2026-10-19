@@ -37,7 +37,6 @@ def test_move_complete_library(tmp_path):
     with TestClient(create_app(destination, Settings(None, True, 'http://studio'))) as moved:
         assert moved.get('/api/v1/session').json()['library_id'] == identity
         assert moved.get('/api/v1/projects/p/document').json()['revision'] == second
-        assert moved.get(f'/api/v1/projects/p/lyrics?revision={first}').status_code == 200
         assert moved.get(f'/api/v1/projects/p/vocals/{job["id"]}/energy?start_ms=0&end_ms=1000').status_code == 200
         assert moved.get(f'/api/v1/projects/p/vocals/{job["id"]}/file', headers={'Range': 'bytes=0-9'}).status_code == 206
         assert moved.get('/api/v1/projects/p/exports/export/download').content == b'export fixture'

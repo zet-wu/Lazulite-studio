@@ -121,7 +121,6 @@ class VocalRunner:
         metadata.update({'segments': [{'id': s.id, 'beginMs': milliseconds(s.core_start), 'endMs': milliseconds(s.core_end)} for s in analysis.segments],
                          'diagnostics': list(analysis.diagnostics), 'analysis_config': asdict(config), 'energy_hop_ms': config.hop_length * 1000 / rate})
         boundary()
-        (directory / 'analysis.json').write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf-8')
         with self.db.transaction() as c:
             c.execute("UPDATE vocal_results SET status='ready',metadata_json=? WHERE id=?", (json.dumps(metadata, ensure_ascii=False), result_id))
         return self.result(project_id, metadata)

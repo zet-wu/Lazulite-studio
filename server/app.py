@@ -1,5 +1,5 @@
 from .project_resources import stream_file
-from .project_document import read_lyrics, initial_project
+from .project_document import initial_project
 import hashlib, json, os, secrets, tempfile, uuid, shutil, time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
@@ -51,7 +51,7 @@ def create_app(
             "set STUDIO_ORIGIN and STUDIO_PASSWORD, or enable STUDIO_TRUSTED_GATEWAY"
         )
     root = Path(
-        data_dir or os.getenv("STUDIO_DATA_DIR", Path(__file__).parent / "data-projects-v5")
+        data_dir or os.getenv("STUDIO_DATA_DIR", Path(__file__).parent / "data-projects-v6")
     )
     root = root.resolve()
     db = Database(root / "studio.sqlite3")
@@ -78,7 +78,6 @@ def create_app(
         if pid not in media_services: media_services[pid] = MediaService(root / 'projects' / pid)
         return media_services[pid]
     revisions = RevisionStore(db, root / "projects")
-    revisions.recover()
     from .vocals import VocalRunner
     from .vocal_routes import build_vocal_router, vocal_asset
     vocal_runner = VocalRunner(db, root / 'projects', separator_factory)
@@ -390,14 +389,6 @@ def create_app(
                 shutil.rmtree(root / 'projects' / pid, ignore_errors=True)
             raise
         if body.upload_id: shutil.rmtree(uploads / body.upload_id, ignore_errors=True)
-        try:
-            revisions.materialize_current(pid)
-        except OSError:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "failed to materialize draft for %s", pid, exc_info=True
-            )
         return result
 
     def project(pid):
@@ -492,20 +483,6 @@ def create_app(
         result = delete_project(db, root, pid)
         preferences.delete_project(pid)
         return result
-
-    @api.get("/projects/{pid}/lyrics")
-    def lyrics(pid: str, revision: str | None = None, _: object = Depends(auth)):
-        r = project(pid)
-        rev = revision or r[3]
-        with db.connect() as c:
-            x = c.execute(
-                "SELECT project_path FROM revisions WHERE id=? AND project_id=?",
-                (rev, pid),
-            ).fetchone()
-        if not x:
-            fail("revision_not_found", "revision not found", 404)
-        from .project_document import read_lyrics, initial_project
-        return Response(read_lyrics(db.paths.resolve(x[0])), media_type="application/ttml+xml", headers={"ETag": f'"{rev}"'})
 
     def asset_for(pid):
         r = project(pid)

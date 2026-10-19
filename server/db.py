@@ -37,15 +37,10 @@ CREATE TABLE IF NOT EXISTS jobs (
  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
  request_json TEXT NOT NULL, result_json TEXT, error_json TEXT, engine_json TEXT,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, finished_at TEXT,
- cancel_requested INTEGER NOT NULL DEFAULT 0, state_version INTEGER NOT NULL DEFAULT 0,
+ cancel_requested INTEGER NOT NULL DEFAULT 0, stage TEXT,
  FOREIGN KEY(project_id) REFERENCES projects(id)
 );
 CREATE INDEX IF NOT EXISTS jobs_project_created ON jobs(project_id, created_at DESC);
-CREATE TABLE IF NOT EXISTS job_events (
- job_id TEXT NOT NULL, seq INTEGER NOT NULL, kind TEXT NOT NULL, stage TEXT,
- completed INTEGER, total INTEGER, message TEXT, state_version INTEGER NOT NULL,
- created_at TEXT NOT NULL, PRIMARY KEY(job_id, seq), FOREIGN KEY(job_id) REFERENCES jobs(id)
-);
 CREATE TABLE IF NOT EXISTS job_idempotency (
  project_id TEXT NOT NULL, idem_key TEXT NOT NULL, request_hash TEXT NOT NULL, job_id TEXT NOT NULL,
  PRIMARY KEY(project_id, idem_key), FOREIGN KEY(job_id) REFERENCES jobs(id)
@@ -61,10 +56,10 @@ class Database:
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
             version = conn.execute('PRAGMA user_version').fetchone()[0]
-            if version != 5 and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
-                raise RuntimeError('旧项目存储不兼容（需要 v5）；请保留原库，用旧程序导出 .lazp 或显式运行迁移工具至新目录')
+            if version != 6 and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
+                raise RuntimeError('旧项目存储不兼容（需要 v6）；请使用当前格式的资料库')
             conn.executescript(SCHEMA)
-            conn.execute('PRAGMA user_version=5')
+            conn.execute('PRAGMA user_version=6')
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

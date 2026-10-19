@@ -9,7 +9,7 @@ FastAPI 提供同源 `/api/v1` API，SQLite 管理项目、资源索引、修订
 | `project_resources.py`、`project_deletion.py`、`project_storage.py` | 资源访问、删除事务、逻辑空间统计 |
 | `project_archive.py` | `.lazp` ZIP 校验、导入与导出 |
 | `studio/media.py` | FFmpeg／FFprobe、播放代理、波形与 PCM 窗口 |
-| `jobs.py`、`job_routes.py` | 持久任务、幂等启动、SSE、取消与产物生命周期 |
+| `jobs.py`、`job_routes.py` | 持久任务、幂等启动、当前阶段、取消与产物生命周期 |
 | `vocals.py`、`vocal_process.py`、`vocal_worker.py`、`vocal_routes.py` | 独立进程人声分离、分析、音频复用、窗口及下载 |
 | `alignment_projection.py`、`alignment.py`、`alignment_worker.py` | 全局歌词投影、资源准备、受监管日语对齐 |
 | `reading.py`、`furigana.py` | 无状态日文读音快照与固定词典分段 |
@@ -19,9 +19,9 @@ FastAPI 提供同源 `/api/v1` API，SQLite 管理项目、资源索引、修订
 
 ## 持久化
 
-默认目录 `server/data-projects-v5` 可由 `STUDIO_DATA_DIR` 配置。每个项目独立持有 `source/original`、`cache`、`revisions`、`vocals` 和 `exports`。临时上传在接收时计算一次资源摘要，完成探测及代理后，在创建或首次接入事务中归属项目。资源摘要用于缓存身份，相同文件可分别属于多个项目。
+默认目录 `server/data-projects-v6` 可由 `STUDIO_DATA_DIR` 配置。每个项目独立持有 `source/original`、`cache`、`revisions`、`vocals` 和 `exports`。临时上传在接收时计算一次资源摘要，完成探测及代理后，在创建或首次接入事务中归属项目。资源摘要用于缓存身份，相同文件可分别属于多个项目。
 
-项目快照 v9 通过文档 envelope v9 传输，歌词为 draft TTML，资源数据库版本为 5。RevisionStore 原子写文件后比较并交换当前 revision；幂等提交响应保存原修订身份，响应与发布均复用本次处理结果；回收保护当前及任务引用，再保留其余最新 100 份和 7 天内修订。删除项目先检查任务并隔离目录，失败回移，启动按数据库状态恢复。归档 v1 在写入／解包流中计算摘要，导入验证后复用摘要并创建新项目、校验引用；空间接口按项目实际文件统计五类逻辑字节。
+项目快照 v9 通过文档 envelope v9 传输，歌词为 draft TTML，资源数据库版本为 6。RevisionStore 原子写文件后比较并交换当前 revision；幂等提交响应保存原修订身份，响应与发布均复用本次处理结果；回收只保留当前版本与活动任务实际使用的输入；SQLite 事务保护选取至读完文件的过程，取消请求保持输入至工作进程退出。删除项目先检查任务并隔离目录，失败回移，启动按数据库状态恢复。归档 v1 在写入／解包流中计算摘要，导入验证后复用摘要并创建新项目、校验引用；空间接口按项目实际文件统计五类逻辑字节。
 
 ## 模型与媒体
 
@@ -44,7 +44,7 @@ TTML 草稿保存保留待修正时间与 Studio 身份，发布阶段检查实�
 
 `python -m server.portable --root <完整包目录>` 只绑定 `127.0.0.1`，默认端口 15173，提供生产前端与 API 同源入口。运行模式为 local，免口令，但所有请求必须匹配 Host，写入必须匹配 Origin。私人部署继续使用上述密码／网关入口；本机模式不继承宿主设备设置。启动器在初始化／清理前取得 OS 文件锁，重复启动通过 nonce、资料库 ID、目录和端口握手。仅在 readiness 成功后打开浏览器。
 
-便携包 `data/projects` 保存 SQLite 与项目树，`data/settings.json` 保存资料库身份及长期偏好；偏好 API 为 `GET/PATCH /api/v1/settings`，PATCH 需要 `If-Match` 并只修改提交字段。数据库为 v5，资源路径只记录相对数据根的 POSIX 路径；启动清理前验证归属、缺失修订及符号链接。项目 v9／歌词 v10／文档 v9／工程包 v1。
+便携包 `data/projects` 保存 SQLite 与项目树，`data/settings.json` 保存资料库身份及长期偏好；偏好 API 为 `GET/PATCH /api/v1/settings`，PATCH 需要 `If-Match` 并只修改提交字段。数据库为 v6，资源路径只记录相对数据根的 POSIX 路径；启动清理前验证归属、缺失修订及符号链接。项目 v9／歌词 v10／文档 v9／工程包 v1。
 
 已有 v4 库不能直接打开。停服并备份后，可用旧程序导出 `.lazp` 到新库（不含完整人声与历史修订），或显式执行：
 

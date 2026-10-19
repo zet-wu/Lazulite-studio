@@ -18,8 +18,6 @@ export type Job = {
   kind: string;
   status: JobStatus;
   stage?: string | null;
-  completed?: number | null;
-  total?: number | null;
   request?: JobRequest;
   result_available?: boolean;
   error?: { code?: string; message?: string; cpu_retry?: boolean; stage?: string } | null;

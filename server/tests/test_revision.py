@@ -24,8 +24,7 @@ def test_revision_cas_and_recovery(tmp_path: Path):
     (tmp_path / "projects" / "p" / "revisions" / "orphan.json").write_text("partial")
     store.recover()
     assert not (tmp_path / "projects" / "p" / "revisions" / "orphan.json").exists()
-    draft = tmp_path / "projects" / "p" / "revisions" / "current.draft.json"
-    before = draft.read_text()
+    before = store.read("p")
     with db.transaction() as conn:
         conn.execute(
             "CREATE TRIGGER reject_revision_update BEFORE UPDATE OF current_revision ON projects BEGIN SELECT RAISE(ABORT, 'blocked'); END"
@@ -41,10 +40,10 @@ def test_revision_cas_and_recovery(tmp_path: Path):
             ).fetchone()[0]
             == first["id"]
         )
-    assert draft.read_text() == before
+    assert store.read("p") == before
 
 
-def test_initial_revision_is_idempotent_and_recovery_replaces_stale_draft(
+def test_initial_revision_replays_identity_after_old_snapshot_is_collected(
     tmp_path: Path,
 ):
     db = Database(tmp_path / "db.sqlite")
@@ -70,24 +69,15 @@ def test_initial_revision_is_idempotent_and_recovery_replaces_stale_draft(
         raise AssertionError("same operation must reject different content")
     with db.connect() as conn:
         assert conn.execute("SELECT count(*) FROM revisions").fetchone()[0] == 1
-    draft = tmp_path / "projects" / "p" / "revisions" / "current.draft.json"
-    draft.write_text("stale")
-    store.recover()
-    assert (
-        read_lyrics(draft)
-        == normalize_ttml('<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>')
-    )
-    original_materialize = store.materialize_current
-    store.materialize_current = lambda _: (_ for _ in ()).throw(OSError("disk full"))
     second = store.create(
         "p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>two</p></tt>", None), first["id"], operation_id="op-2", subject="user"
     )
-    store.materialize_current = original_materialize
     store.recover()
     assert second["id"] != first["id"]
-    assert "two" in read_lyrics(draft)
+    assert "two" in store.read("p")[1]["lyrics"]["draftTtml"]
+    assert store.create_initial("p", operation_id="op-1", subject="user") == first
     with db.connect() as conn:
-        assert conn.execute("SELECT count(*) FROM revisions").fetchone()[0] == 2
+        assert conn.execute("SELECT count(*) FROM revisions").fetchone()[0] == 1
 
 
 def test_revision_without_idempotency_uses_revision_identity(tmp_path, monkeypatch):
@@ -106,3 +96,34 @@ def test_revision_without_idempotency_uses_revision_identity(tmp_path, monkeypat
     assert document['revision'] == result['id']
     assert document['etag'] == result['etag']
     assert 'sha256' not in document
+
+
+def test_read_transaction_protects_file_until_snapshot_is_loaded(tmp_path, monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    import server.revisions as module
+    db = Database(tmp_path / 'db.sqlite'); store = RevisionStore(db, tmp_path / 'projects')
+    with db.transaction() as c: c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)', ('p','p',None,None,'now','now'))
+    first = store.create_initial('p', operation_id='init')['id']
+    started, release, writing = threading.Event(), threading.Event(), threading.Event()
+    original = module.read_project
+    def read(path):
+        started.set()
+        assert release.wait(5)
+        return original(path)
+    monkeypatch.setattr(module, 'read_project', read)
+    def save():
+        writing.set()
+        return store.create('p', initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><p>new</p></body></tt>',None), first)
+    with ThreadPoolExecutor(2) as pool:
+        reader = pool.submit(store.read, 'p')
+        assert started.wait(2)
+        writer = pool.submit(save)
+        assert writing.wait(2)
+        try:
+            assert not writer.done()
+            assert (tmp_path/'projects/p/revisions'/f'{first}.json').exists()
+        finally: release.set()
+        assert reader.result()[0] == first
+        current = writer.result()['id']
+    assert {p.stem for p in (tmp_path/'projects/p/revisions').glob('*.json')} == {current}

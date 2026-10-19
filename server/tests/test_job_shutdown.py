@@ -18,7 +18,9 @@ def test_stop_cancels_queue_and_prevents_new_work(tmp_path):
     service = JobService(db, publish_runner=Runner())
     first = service.create('p','publish',{'revision':'r','asset_id':'a'})
     assert started.wait(1)
-    second = service.create('q','publish',{})
+    from server.revisions import RevisionStore
+    revision = RevisionStore(db, tmp_path/'projects').create_initial('q', operation_id='init-q')['id']
+    second = service.create('q','publish',{'revision':revision})
     service.begin_stop()
     with pytest.raises(ValueError, match='停止'): service.create('q','publish',{})
     assert service.get(second['id'])['status'] == 'cancelled'

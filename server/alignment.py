@@ -30,12 +30,12 @@ class AlignmentRunner:
     def close(self): self.worker.close()
 
     def snapshot(self, pid, revision):
-        with self.db.connect() as c:
+        with self.db.transaction() as c:
             current = c.execute('SELECT source_asset_id,current_revision FROM projects WHERE id=?', (pid,)).fetchone()
             if not current or current['current_revision'] != revision: raise ValueError('项目版本已改变，请重新运行')
             row = c.execute('SELECT project_path FROM revisions WHERE id=? AND project_id=?', (revision,pid)).fetchone()
             if not current['source_asset_id']: raise ValueError('请先上传源音频')
-        return read_project(self.db.paths.resolve(row[0])), current['source_asset_id']
+            return read_project(self.db.paths.resolve(row[0])), current['source_asset_id']
 
     def validate(self, pid, params):
         if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'merge_short_gaps', 'gap_threshold_ms'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'merge_short_gaps')):

@@ -228,22 +228,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/jobs/{jobId}/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["streamJobEvents"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/projects/{projectId}/document": {
         parameters: {
             query?: never;
@@ -253,22 +237,6 @@ export interface paths {
         };
         get: operations["getDocument"];
         put: operations["putDocument"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects/{projectId}/lyrics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getLyrics"];
-        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -880,19 +848,6 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        JobEvent: {
-            /** @constant */
-            schema_version: "studio-job-event-v1";
-            job_id: string;
-            seq: number;
-            kind: string;
-            stage?: string | null;
-            completed?: number | null;
-            total?: number | null;
-            message?: string | null;
-            state_version: number;
-            created_at?: string;
-        };
         JobResult: {
             /** @constant */
             schema_version: "studio-job-result-v1";
@@ -940,7 +895,6 @@ export interface components {
             engine?: Record<string, never> | null;
             created_at?: string;
             updated_at?: string;
-            state_version: number;
         };
         JobList: {
             /** @constant */
@@ -1930,31 +1884,6 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
-    streamJobEvents: {
-        parameters: {
-            query?: {
-                after_seq?: number;
-            };
-            header?: never;
-            path: {
-                jobId: components["parameters"]["JobId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Server sent events */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/event-stream": string;
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
     getDocument: {
         parameters: {
             query?: never;
@@ -2009,29 +1938,6 @@ export interface operations {
             409: components["responses"]["Error"];
             412: components["responses"]["Error"];
             428: components["responses"]["Error"];
-            default: components["responses"]["Error"];
-        };
-    };
-    getLyrics: {
-        parameters: {
-            query?: {
-                revision?: components["parameters"]["Revision"];
-            };
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Committed TTML */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
             default: components["responses"]["Error"];
         };
     };

@@ -1,4 +1,4 @@
-"""The v5 database stores only data-root-relative POSIX resource names."""
+"""The database stores only data-root-relative POSIX resource names."""
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 

@@ -33,11 +33,12 @@ def test_music_optional_upload_does_not_change_revision_lyrics_metadata_or_searc
         for endpoint in ('audio','waveform','pcm?start_ms=0&end_ms=100','packaging'):
             assert client.get(url+'/'+endpoint).status_code in (404,422)
         assert client.post(url+'/jobs/vocal', json={'params':{'asset_id':'missing'}}, headers=HEADERS).status_code == 422
+        saved_document = client.get(url+'/document').json()['document']
         token = upload(client)
         result = client.post(url+'/music', json={'upload_id':token}, headers=HEADERS)
         assert result.status_code == 200
         assert client.get(url+'/document').json()['revision'] == saved['revision']
-        assert client.get(url+'/document').json()['document'] == saved['document']
+        assert client.get(url+'/document').json()['document'] == saved_document
         assert client.get(url+'/search-conditions').json()['title'] == 'manual'
         assert client.get(url).json()['name'] == 'No music'
         assert client.post(url+'/music', json={'upload_id':token}, headers=HEADERS).status_code == 200
@@ -80,25 +81,22 @@ def test_deleted_target_and_invalid_upload_leave_no_owned_resources(tmp_path):
         assert client.post('/api/v1/uploads',files={'file':('bad.wav',b'bad')},headers=HEADERS).status_code == 415
         assert not list((tmp_path/'uploads').iterdir())
 
-def test_revision_collection_protects_references_recent_and_current(tmp_path):
-    db = Database(tmp_path/'studio.sqlite3');store = RevisionStore(db,tmp_path/'projects')
+def test_revision_collection_keeps_only_current_and_actual_active_inputs(tmp_path):
+    db = Database(tmp_path/'studio.sqlite3'); store = RevisionStore(db,tmp_path/'projects')
     with db.transaction() as c: c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)',('p','p',None,None,'now','now'))
-    ids=[];base=None
-    for i in range(108):
-        base=store.create('p',initial_project(f'<tt xmlns="http://www.w3.org/ns/ttml"><body><p>{i}</p></body></tt>',None),base)['id'];ids.append(base)
+    base = store.create_initial('p', operation_id='initial')['id']
     with db.transaction() as c:
-        c.execute("UPDATE revisions SET created_at='2000-01-01T00:00:00+00:00'")
-        # Make recency deterministic and preserve one old snapshot by age.
-        for i,rid in enumerate(ids):c.execute('UPDATE revisions SET created_at=? WHERE id=?',(f'2000-01-01T00:{i//60:02}:{i%60:02}+00:00',rid))
-        c.execute('UPDATE revisions SET created_at=? WHERE id=?',(datetime.now(timezone.utc).isoformat(),ids[0]))
-        c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,result_json,created_at,updated_at) VALUES('j','p','alignment','succeeded',?,?,'now','now')",(json.dumps({'revision':ids[1]}),json.dumps({'binding':{'revision':ids[2]}})))
+        c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at) VALUES('j','p','alignment','queued',?,'now','now')", (json.dumps({'revision':base}),))
+    for i in range(6):
+        current = store.create('p', initial_project(f'<tt xmlns="http://www.w3.org/ns/ttml"><body><p>{i}</p></body></tt>',None), store.read('p')[0])['id']
+    assert {p.stem for p in (tmp_path/'projects/p/revisions').glob('*.json')} == {base, current}
+    with db.transaction() as c: c.execute("UPDATE jobs SET status='cancel_requested' WHERE id='j'")
     store.collect('p')
-    with db.connect() as c: kept={row[0] for row in c.execute('SELECT id FROM revisions')}
-    assert set(ids[:3]+[ids[-1]]) <= kept
-    assert ids[4] not in kept and ids[5] not in kept
-    assert len(kept) == 103 # 100 unreferenced + two references + current (recent is among 100)
-    store.recover()
-    assert store.read('p')[0] == ids[-1]
+    assert store.read('p', base)[0] == base
+    with db.transaction() as c: c.execute("UPDATE jobs SET status='cancelled',result_json=? WHERE id='j'", (json.dumps({'binding': {'revision': base}}),))
+    store.collect('p')
+    assert {p.stem for p in (tmp_path/'projects/p/revisions').glob('*.json')} == {current}
+    assert store.create_initial('p', operation_id='initial')['id'] == base
 
 def test_create_failure_restores_upload_for_retry_and_attach_failure_cleans(tmp_path):
     import pytest

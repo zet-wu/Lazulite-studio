@@ -63,7 +63,7 @@ def test_restart_marks_running_interrupted(tmp_path):
         conn.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", ("j", "p", "publish", "running", "{}", "t", "t"))
     service = JobService(db, publish_runner=FakeEngine())
     assert service.get("j")["status"] == "interrupted"
-    assert service.events("j")[-1]["stage"] == "interrupted"
+    assert service.get("j")["stage"] is None
     service.close()
 
 def test_queued_job_can_be_cancelled_while_executor_is_blocked(tmp_path):
@@ -75,10 +75,40 @@ def test_queued_job_can_be_cancelled_while_executor_is_blocked(tmp_path):
     first = service.create("p", "publish", request)
     assert engine.started.wait(1)
     with db.transaction() as c: c.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)", ("p2","demo",None,None,"t","t"))
-    second = service.create("p2", "publish", request)
+    from server.revisions import RevisionStore
+    revision = RevisionStore(db, tmp_path / 'projects').create_initial('p2', operation_id='init-p2')['id']
+    second = service.create("p2", "publish", {**request, 'revision': revision})
     assert service.cancel(second["id"])["status"] == "cancelled"
     engine.release.set()
     assert wait_for(service, first["id"])["status"] == "succeeded"
     assert service.get(second["id"])["status"] == "cancelled"
     service.close()
 
+
+
+def test_active_cancelled_worker_keeps_input_until_exit(tmp_path):
+    from server.revisions import RevisionStore
+    db = Database(tmp_path / 'studio.sqlite3'); seed_project(db, tmp_path)
+    store = RevisionStore(db, tmp_path / 'projects')
+    started, release = threading.Event(), threading.Event()
+    class Reader(FakeEngine):
+        def run(self, pid, request):
+            started.set()
+            assert release.wait(5)
+            assert store.read(pid, request['revision'])[0] == 'r'
+            return super().run(pid, request)
+    service = JobService(db, publish_runner=Reader())
+    try:
+        job = service.create('p', 'publish', {'revision': 'r', 'asset_id': 'a'})
+        assert started.wait(2)
+        service.emit(job['id'], 'stage', 'writing')
+        assert service.get(job['id'])['stage'] == 'writing'
+        current = store.create('p', initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><p>new</p></body></tt>', 'a'), 'r')['id']
+        assert service.cancel(job['id'])['status'] == 'cancel_requested'
+        store.collect('p')
+        assert store.read('p', 'r')[0] == 'r'
+        release.set()
+        assert wait_for(service, job['id'])['status'] == 'cancelled'
+    finally:
+        release.set(); service.close()
+    assert {p.stem for p in (tmp_path/'projects/p/revisions').glob('*.json')} == {current}

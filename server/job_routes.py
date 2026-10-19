@@ -1,8 +1,6 @@
 """HTTP adapter for the durable JobService; app.py supplies auth and ownership."""
 from __future__ import annotations
-import asyncio, json
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 class JobRequest(BaseModel):
@@ -79,25 +77,4 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
         owned(jid); value=service.result(jid)
         if value is None: raise HTTPException(409,{"code":"result_not_ready","message":"result is not ready","retryable":True})
         return {"schema_version":"studio-job-result-v1","job_id":jid,**value}
-    @router.get("/jobs/{jid}/events", **read_auth)
-    async def events(jid, request: Request, after_seq: int=0):
-        owned(jid)
-        try:
-            cursor=max(after_seq, int(request.headers.get("last-event-id",0) or 0))
-        except (TypeError, ValueError):
-            raise HTTPException(400, {"code":"invalid_event_cursor","message":"Last-Event-ID must be an integer","retryable":False})
-        async def stream():
-            while True:
-                for event in service.events(jid,cursor_ref[0]):
-                    nonlocal_cursor=event["seq"]
-                    yield f"id: {event['seq']}\ndata: {json.dumps(event,ensure_ascii=False)}\n\n"
-                    # local cursor is advanced by refreshed snapshot below
-                    cursor_ref[0]=nonlocal_cursor
-                item=service.get(jid)
-                if item["status"] in {"succeeded","failed","cancelled","interrupted"}: return
-                if await request.is_disconnected(): return
-                yield ": heartbeat\n\n"
-                await asyncio.sleep(0.25)
-        cursor_ref=[cursor]
-        return StreamingResponse(stream(),media_type="text/event-stream",headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"})
     return router

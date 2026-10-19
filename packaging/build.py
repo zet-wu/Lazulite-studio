@@ -259,7 +259,7 @@ def build(target, output):
         shutil.copy2(ROOT / 'packaging/launchers/start.command', root / 'start.command')
         (root / 'start.command').chmod(0o755)
     manifest = {'schema':1, 'version':commit[:12], 'studio_commit':commit, 'lazulite_commit':library,
-                'target':target, 'database_version':5, 'python':runtime['python_version'],
+                'target':target, 'database_version':6, 'python':runtime['python_version'],
                 'build_python':platform.python_version(),
                 'validation':'preview; see the separate build diagnostics artifact for validation.json',
                 'unverified':['minimum Windows/macOS version', 'CUDA/MPS hardware', 'full-song quality',

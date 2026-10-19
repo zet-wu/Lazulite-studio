@@ -6,7 +6,7 @@ from server.project_storage import project_storage
 from server.tests.test_vocals import setup, wait
 
 
-def test_space_counts_real_files_history_and_changes(tmp_path):
+def test_space_counts_current_snapshot_and_media_changes(tmp_path):
     client,db=setup(tmp_path)
     with client:
         directory=tmp_path/'projects/p'
@@ -22,7 +22,7 @@ def test_space_counts_real_files_history_and_changes(tmp_path):
         envelope=client.get('/api/v1/projects/p/document').json()
         from server.revisions import RevisionStore
         RevisionStore(db,tmp_path/'projects').create('p',envelope['document'],envelope['revision'])
-        assert check()['snapshots']>before['snapshots']
+        assert check()['snapshots']==before['snapshots']
         client.get('/api/v1/projects/p/waveform?start_ms=0&end_ms=2000')
         assert check()['cache']>before['cache']
         job=client.post('/api/v1/projects/p/jobs/vocal',json={'params':{'asset_id':'p'}},headers={'origin':'http://studio'}).json()

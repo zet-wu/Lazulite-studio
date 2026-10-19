@@ -4,15 +4,13 @@ import hashlib
 import json
 import logging
 import os
-import shutil
 import tempfile
 import uuid
-import xml.etree.ElementTree as ET
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .db import Database
-from .project_document import ProjectSnapshot, initial_project, validate_project, read_project, read_lyrics
+from .project_document import ProjectSnapshot, initial_project, validate_project, read_project
 
 INITIAL_TTML = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>'
 logger = logging.getLogger(__name__)
@@ -108,62 +106,53 @@ class RevisionStore:
             except Exception:
                 path.unlink(missing_ok=True)
                 raise
-        try:
-            self.materialize_current(project_id)
-        except OSError:
-            logger.warning(
-                "revision committed but draft materialization failed",
-                extra={"project_id": project_id, "revision": result["id"]},
-            )
         try: self.collect(project_id)
         except OSError: logger.warning('修订回收待重试：%s', project_id, exc_info=True)
         return result
 
     def collect(self, project_id: str) -> None:
-        """Retain current/referenced snapshots, the newest 100, and the last 7 days.
+        """Keep current snapshots and inputs still used by active jobs.
 
-        Index removal precedes byte collection; startup recovers orphaned files.
-        Parent IDs are lineage, not live inputs. Idempotency responses remain valid.
+        Reads and enqueue use the same SQLite write transaction as collection,
+        including subprocess readers. Terminal results keep identity, not bytes.
         """
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
         paths = []
         with self.db.transaction() as conn:
             rows = conn.execute('SELECT id,project_path,created_at FROM revisions WHERE project_id=? ORDER BY created_at DESC,id DESC', (project_id,)).fetchall()
             current = conn.execute('SELECT current_revision FROM projects WHERE id=?', (project_id,)).fetchone()
             if not current: return
             protected = {current[0]}
-            for job in conn.execute('SELECT request_json,result_json FROM jobs WHERE project_id=?', (project_id,)):
-                request, result = json.loads(job[0]), json.loads(job[1] or '{}')
+            for job in conn.execute("SELECT request_json FROM jobs WHERE project_id=? AND kind IN ('alignment','publish') AND status IN ('queued','running','cancel_requested')", (project_id,)):
+                request = json.loads(job[0])
                 protected.add(request.get('revision'))
-                protected.add((result.get('binding') or {}).get('revision'))
-            unreferenced = [row for row in rows if row[0] not in protected]
-            protected.update(row[0] for row in unreferenced[:100])
             for row in rows:
-                if row[0] not in protected and row[2] < cutoff:
+                if row[0] not in protected:
                     conn.execute('UPDATE revisions SET parent_id=NULL WHERE parent_id=?', (row[0],))
                     conn.execute('DELETE FROM revisions WHERE id=?', (row[0],))
                     paths.append(self.db.paths.resolve(row[1]))
-        for path in paths: path.unlink(missing_ok=True)
+        for path in paths:
+            try: path.unlink(missing_ok=True)
+            except OSError: logger.warning('修订文件回收待重试：%s', path)
 
     def read(self, project_id: str, revision: str | None = None) -> tuple[str, dict]:
         """Read an immutable revision and return (revision id, project snapshot)."""
-        with self.db.connect() as conn:
+        with self.db.transaction() as conn:
             row = conn.execute(
                 "SELECT p.current_revision, r.id, r.project_path FROM projects p "
                 "JOIN revisions r ON r.project_id=p.id AND r.id=COALESCE(?, p.current_revision) "
                 "WHERE p.id=?",
                 (revision, project_id),
             ).fetchone()
-        if row is None:
-            raise KeyError(project_id if revision is None else revision)
-        path = self.db.paths.resolve(row[2])
-        root = self.root.resolve()
-        if root not in path.parents or path.suffix != ".json":
-            raise ValueError("revision path is outside revision store")
-        try:
-            return row[1], read_project(path)
-        except (OSError, UnicodeError) as exc:
-            raise ValueError("revision cannot be read") from exc
+            if row is None:
+                raise KeyError(project_id if revision is None else revision)
+            path = self.db.paths.resolve(row[2])
+            root = self.root.resolve()
+            if root not in path.parents or path.suffix != ".json":
+                raise ValueError("revision path is outside revision store")
+            try:
+                return row[1], read_project(path)
+            except (OSError, UnicodeError) as exc:
+                raise ValueError("revision cannot be read") from exc
 
     def _write_atomic(self, destination: Path, content: bytes) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -181,39 +170,13 @@ class RevisionStore:
         finally:
             temporary.unlink(missing_ok=True)
 
-    def _materialize(self, project_id: str, source: Path) -> None:
-        destination = self.root / project_id / "revisions" / "current.draft.json"
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        fd, name = tempfile.mkstemp(prefix=f".{project_id}.draft-", dir=destination.parent)
-        temporary = Path(name)
-        try:
-            with os.fdopen(fd, "wb") as handle, source.open("rb") as input_file:
-                shutil.copyfileobj(input_file, handle)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, destination)
-            self._fsync_dir(destination.parent)
-        finally:
-            temporary.unlink(missing_ok=True)
-
-    def materialize_current(self, project_id: str) -> None:
-        """Materialize the revision currently pointed to, under the DB write lock."""
-        with self.db.transaction() as conn:
-            row = conn.execute(
-                "SELECT r.project_path FROM projects p JOIN revisions r ON r.id=p.current_revision WHERE p.id=?",
-                (project_id,),
-            ).fetchone()
-            if row is None:
-                raise KeyError(project_id)
-            self._materialize(project_id, self.db.paths.resolve(row[0]))
-
     @staticmethod
     def _fsync_dir(path: Path) -> None:
         from .atomic_file import fsync_directory
         fsync_directory(path)
 
     def recover(self) -> None:
-        with self.db.connect() as conn:
+        with self.db.transaction() as conn:
             revisions = {
                 row[0]: row[1]
                 for row in conn.execute("SELECT id,project_path FROM revisions")
@@ -222,10 +185,14 @@ class RevisionStore:
                 "SELECT id,current_revision FROM projects WHERE current_revision IS NOT NULL"
             ).fetchall()
             for path in self.root.glob("*/revisions/*.json"):
-                if not path.name.endswith(".draft.json") and path.stem not in revisions:
-                    path.unlink(missing_ok=True)
+                if path.stem not in revisions:
+                    try: path.unlink(missing_ok=True)
+                    except OSError: logger.warning('孤立修订回收待重试：%s', path)
         for temporary in self.root.glob('*/revisions/.*'):
             if temporary.is_file(): temporary.unlink(missing_ok=True)
         for row in rows:
-            self.materialize_current(row[0])
             self.collect(row[0])
+
+        for path in self.root.glob('*/vocals/*/analysis.json'):
+            try: path.unlink(missing_ok=True)
+            except OSError: logger.warning('分析副本回收待重试：%s', path)

@@ -1,6 +1,6 @@
 # Contracts：前后端协议
 
-[openapi.json](openapi.json) 描述 `/api/v1` 会话、能力、项目、上传、文档、歌词、媒体窗口、任务／SSE、读音、对齐、人声、发布、工程归档与空间统计。生成类型位于 `frontend/src/adapters/http/generated.ts`，MSW 位于 `frontend/src/mocks`。
+[openapi.json](openapi.json) 描述 `/api/v1` 会话、能力、项目、上传、文档、媒体窗口、任务状态、读音、对齐、人声、发布、工程归档与空间统计。生成类型位于 `frontend/src/adapters/http/generated.ts`，MSW 位于 `frontend/src/mocks`。
 
 在仓库根目录运行 `pnpm --dir frontend contracts:generate` 更新类型。接口修改同步路由、契约与调用方；来源和打包等部分响应使用宽对象，运行时校验由相应 HTTP 适配器负责。
 

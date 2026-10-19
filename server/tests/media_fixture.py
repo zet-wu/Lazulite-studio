@@ -31,6 +31,5 @@ def add_real_vocal_fixture(root, db, store):
     directory = root/'projects'/'real-vocal'/'vocals'/'actual-demucs'
     shutil.copytree(source_db.paths.resolve(result['directory']), directory)
     metadata['source_asset_id'] = 'real-vocal'
-    (directory/'analysis.json').write_text(json.dumps(metadata))
     with db.transaction() as c:
         c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', ('actual-demucs','real-vocal','real-vocal','ready',db.paths.store(directory),json.dumps(metadata)))

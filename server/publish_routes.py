@@ -44,11 +44,6 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
             raise HTTPException(422, {'code':'audio_required','message':'上传音乐后才可打包音乐文件','retryable':False})
         if body.asset_id != row[2]:
             raise HTTPException(422, {"code": "publish_input_invalid", "message": "asset does not belong to project", "retryable": False})
-        with service.db.connect() as c:
-            found = c.execute("SELECT 1 FROM revisions WHERE id=? AND project_id=?", (body.revision, pid)).fetchone()
-        if not found:
-            raise HTTPException(422, {"code": "publish_input_invalid", "message": "revision does not belong to project", "retryable": False})
-
     @router.get("/projects/{pid}/embedded-lyrics")
     def embedded_lyrics(pid: str, _: object = Depends(auth)):
         import struct

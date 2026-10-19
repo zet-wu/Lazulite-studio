@@ -16,7 +16,7 @@ def test_final_strings_clear_reopen_and_old_project_no_backfill(tmp_path):
     assert client.get(url).json() == empty
     with db.transaction() as c: c.execute('DELETE FROM search_conditions WHERE project_id=?', (other,))
     assert client.get(f'/api/v1/projects/{other}/search-conditions').json() == empty
-    assert client.get(f'/api/v1/projects/{pid}/lyrics').text.find('custom') == -1
+    assert client.get(f'/api/v1/projects/{pid}/document').json()['document']['lyrics']['draftTtml'].find('custom') == -1
     assert client.put(url, json={'title': 'x'*2001, 'artist': '', 'album': ''}, headers=headers).status_code == 422
 
 

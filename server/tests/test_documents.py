@@ -32,6 +32,12 @@ def test_document_save_retry_and_cas_preserves_unknown(tmp_path):
     assert client.get("/api/v1/projects/p/document").json()["document"]["lyrics"]["draftTtml"] == normalize_ttml(ttml)
     stale = {**headers, "idempotency-key": "save-2"}
     assert client.put("/api/v1/projects/p/document", json=body, headers=stale).status_code == 412
+    next_body = {**body, "revision": first.json()["revision"]}
+    second = client.put("/api/v1/projects/p/document", json=next_body, headers={**headers, "if-match": first.headers["etag"], "idempotency-key": "next"})
+    assert second.status_code == 200
+    assert not (tmp_path / "projects/p/revisions" / (first.json()["revision"] + ".json")).exists()
+    assert client.put("/api/v1/projects/p/document", json=body, headers=headers).json() == first.json()
+    assert client.get("/api/v1/projects/p/document").json()["revision"] == second.json()["revision"]
 
 
 def test_semantic_editor_ttml_saves_and_reopens_with_clean_main_lyrics(tmp_path):
@@ -50,9 +56,6 @@ def test_semantic_editor_ttml_saves_and_reopens_with_clean_main_lyrics(tmp_path)
     assert reopened.json()["revision"] == saved.json()["revision"]
     assert reopened.json()["document"]["lyrics"]["draftTtml"] == normalize_ttml(ttml)
     assert "きよう" in reopened.json()["document"]["lyrics"]["draftTtml"]
-    lyrics = client.get("/api/v1/projects/p/lyrics")
-    assert lyrics.status_code == 200
-    assert lyrics.text == normalize_ttml(ttml)
 
 
 def test_project_editing_survives_real_project_save(tmp_path):
