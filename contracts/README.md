@@ -10,6 +10,8 @@
 | 上传与项目音乐 | 临时 upload_id 经创建或首次接入归属项目，项目 asset 是音源身份 |
 | audio／waveform／pcm | 整数毫秒窗口；可选 vocal 选择已注册人声，默认原曲 |
 | reading/analyze | 当前行 id／text 快照，返回原文 code point 范围及读音 |
+| reading/dictionaries | 列表、ZIP 导入检查／安装、显式替换和移除；来源及安装实例随响应提供 |
+| reading/dictionaries/{id}/analyze | 安装实例与行文本快照，返回 code point 范围、固定读音单元及缺词／歧义状态；过期实例返回 409 |
 | alignment-preview／jobs/alignment | 已保存 revision、提示及结果策略；scope 与目标映射用于完整性核对 |
 | 人声结果／能量／下载 | 分析 ID 与音频所有者 ID 分开，复用任务可返回已有 analysis_id |
 | 发布 | revision、asset_id、lrc_kind、lrc_text 和可选 target_track_id；MP4/M4A 的 none + null 保留已有歌词标签，lrc／elrc 提供非空文本；通过回读报告后下载 |

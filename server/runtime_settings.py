@@ -12,6 +12,7 @@ PREFERENCE_KEYS = {
     'lazulite-editor-theme', 'lazulite-shortcuts', 'lazulite-sync-keys',
     'lazulite-editor-columns', 'lazulite-kana-highlight', 'studio.playback-rate',
     'studio:sync-mode', 'studio:sync-offset',
+    'studio:reading-dictionary',
 }
 PROJECT_KEY = re.compile(r'^(?:lazulite-romanization-mode|studio:sync-offset|studio:download|studio:packaging|studio:workspace-mode):project:([a-zA-Z0-9_-]+)$')
 

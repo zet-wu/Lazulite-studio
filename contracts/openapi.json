@@ -1751,6 +1751,165 @@
         },
         "summary": "读取当前源音频搜索元数据"
       }
+    },
+    "/api/v1/reading/dictionaries": {
+      "get": {
+        "summary": "Listing",
+        "operationId": "listing_api_v1_reading_dictionaries_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reading/dictionaries/import": {
+      "post": {
+        "summary": "Install",
+        "operationId": "install_api_v1_reading_dictionaries_import_post",
+        "parameters": [
+          {
+            "name": "replace",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Replace"
+            }
+          },
+          {
+            "name": "inspect",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Inspect"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_install_api_v1_reading_dictionaries_import_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryInstall"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reading/dictionaries/{ident}": {
+      "delete": {
+        "summary": "Remove",
+        "operationId": "remove_api_v1_reading_dictionaries__ident__delete",
+        "parameters": [
+          {
+            "name": "ident",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ident"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reading/dictionaries/{ident}/analyze": {
+      "post": {
+        "summary": "Analyze",
+        "operationId": "analyze_api_v1_reading_dictionaries__ident__analyze_post",
+        "parameters": [
+          {
+            "name": "ident",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ident"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DictionarySnapshot"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3348,23 +3507,23 @@
       "ReadingLine": {
         "properties": {
           "id": {
+            "type": "string",
             "maxLength": 200,
             "minLength": 1,
-            "title": "Id",
-            "type": "string"
+            "title": "Id"
           },
           "text": {
+            "type": "string",
             "maxLength": 100000,
-            "title": "Text",
-            "type": "string"
+            "title": "Text"
           }
         },
+        "type": "object",
         "required": [
           "id",
           "text"
         ],
-        "title": "ReadingLine",
-        "type": "object"
+        "title": "ReadingLine"
       },
       "ReadingSnapshot": {
         "properties": {
@@ -3993,6 +4152,252 @@
             }
           }
         }
+      },
+      "Body_install_api_v1_reading_dictionaries_import_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_install_api_v1_reading_dictionaries_import_post"
+      },
+      "DictionaryAnalysis": {
+        "properties": {
+          "instance": {
+            "type": "string",
+            "title": "Instance"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "ranges": {
+            "items": {
+              "$ref": "#/components/schemas/DictionaryRange"
+            },
+            "type": "array",
+            "title": "Ranges"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instance",
+          "version",
+          "ranges"
+        ],
+        "title": "DictionaryAnalysis"
+      },
+      "DictionaryInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "instance": {
+            "type": "string",
+            "title": "Instance"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "instance",
+          "manifest",
+          "sources",
+          "error"
+        ],
+        "title": "DictionaryInfo"
+      },
+      "DictionaryInstall": {
+        "properties": {
+          "manifest": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Manifest"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              }
+            ],
+            "title": "Sources"
+          },
+          "entryCount": {
+            "type": "integer",
+            "title": "Entrycount"
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance"
+          },
+          "replaceRequired": {
+            "type": "boolean",
+            "title": "Replacerequired",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "manifest",
+          "sources",
+          "entryCount"
+        ],
+        "title": "DictionaryInstall"
+      },
+      "DictionaryList": {
+        "properties": {
+          "dictionaries": {
+            "items": {
+              "$ref": "#/components/schemas/DictionaryInfo"
+            },
+            "type": "array",
+            "title": "Dictionaries"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dictionaries",
+          "errors"
+        ],
+        "title": "DictionaryList"
+      },
+      "DictionaryRange": {
+        "properties": {
+          "line_id": {
+            "type": "string",
+            "title": "Line Id"
+          },
+          "base_start": {
+            "type": "integer",
+            "title": "Base Start"
+          },
+          "base_end": {
+            "type": "integer",
+            "title": "Base End"
+          },
+          "base": {
+            "type": "string",
+            "title": "Base"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "known",
+              "unknown",
+              "ambiguous",
+              "boundary",
+              "unannotated"
+            ],
+            "title": "Status"
+          },
+          "units": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Units"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line_id",
+          "base_start",
+          "base_end",
+          "base",
+          "status",
+          "units"
+        ],
+        "title": "DictionaryRange"
+      },
+      "DictionarySnapshot": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReadingLine"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Lines"
+          },
+          "instance": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Instance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lines",
+          "instance"
+        ],
+        "title": "DictionarySnapshot"
       }
     }
   }

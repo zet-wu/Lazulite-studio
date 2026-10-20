@@ -43,6 +43,7 @@ def configure_environment(root, manifest):
     os.environ['STUDIO_VOCAL_MODEL'] = 'htdemucs'
     os.environ['STUDIO_NEXTFIRE_PATH'] = str(root / 'models' / 'nextfire')
     os.environ['STUDIO_DEMUCS_REPO'] = str(root / 'models' / 'demucs')
+    os.environ['STUDIO_DICTIONARIES_DIR'] = str(root / 'resources' / 'dictionaries')
     os.environ['HF_HUB_OFFLINE'] = '1'
     os.environ['TRANSFORMERS_OFFLINE'] = '1'
     os.environ['HF_HOME'] = str(root / 'data/runtime/huggingface')

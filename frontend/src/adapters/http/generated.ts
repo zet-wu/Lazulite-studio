@@ -624,6 +624,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reading/dictionaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listing */
+        get: operations["listing_api_v1_reading_dictionaries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/dictionaries/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install */
+        post: operations["install_api_v1_reading_dictionaries_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/dictionaries/{ident}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove */
+        delete: operations["remove_api_v1_reading_dictionaries__ident__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/dictionaries/{ident}/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Analyze */
+        post: operations["analyze_api_v1_reading_dictionaries__ident__analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1241,6 +1309,92 @@ export interface components {
             changes: {
                 [key: string]: string | null;
             };
+        };
+        /** Body_install_api_v1_reading_dictionaries_import_post */
+        Body_install_api_v1_reading_dictionaries_import_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
+        };
+        /** DictionaryAnalysis */
+        DictionaryAnalysis: {
+            /** Instance */
+            instance: string;
+            /** Version */
+            version: string;
+            /** Ranges */
+            ranges: components["schemas"]["DictionaryRange"][];
+        };
+        /** DictionaryInfo */
+        DictionaryInfo: {
+            /** Id */
+            id: string;
+            /** Instance */
+            instance: string;
+            /** Manifest */
+            manifest: {
+                [key: string]: unknown;
+            } | null;
+            /** Sources */
+            sources: {
+                [key: string]: unknown;
+            } | unknown[] | null;
+            /** Error */
+            error: string | null;
+        };
+        /** DictionaryInstall */
+        DictionaryInstall: {
+            /** Manifest */
+            manifest: {
+                [key: string]: unknown;
+            };
+            /** Sources */
+            sources: {
+                [key: string]: unknown;
+            } | unknown[];
+            /** Entrycount */
+            entryCount: number;
+            /** Instance */
+            instance?: string | null;
+            /**
+             * Replacerequired
+             * @default false
+             */
+            replaceRequired: boolean;
+        };
+        /** DictionaryList */
+        DictionaryList: {
+            /** Dictionaries */
+            dictionaries: components["schemas"]["DictionaryInfo"][];
+            /** Errors */
+            errors: string[];
+        };
+        /** DictionaryRange */
+        DictionaryRange: {
+            /** Line Id */
+            line_id: string;
+            /** Base Start */
+            base_start: number;
+            /** Base End */
+            base_end: number;
+            /** Base */
+            base: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "known" | "unknown" | "ambiguous" | "boundary" | "unannotated";
+            /** Units */
+            units: string[];
+        };
+        /** DictionarySnapshot */
+        DictionarySnapshot: {
+            /** Lines */
+            lines: components["schemas"]["ReadingLine"][];
+            /** Instance */
+            instance: string;
         };
     };
     responses: {
@@ -2603,6 +2757,126 @@ export interface operations {
                 };
             };
             default: components["responses"]["Error"];
+        };
+    };
+    listing_api_v1_reading_dictionaries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DictionaryList"];
+                };
+            };
+        };
+    };
+    install_api_v1_reading_dictionaries_import_post: {
+        parameters: {
+            query?: {
+                replace?: boolean;
+                inspect?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_install_api_v1_reading_dictionaries_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DictionaryInstall"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_api_v1_reading_dictionaries__ident__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ident: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_api_v1_reading_dictionaries__ident__analyze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ident: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DictionarySnapshot"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DictionaryAnalysis"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
 }

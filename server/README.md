@@ -13,6 +13,8 @@ FastAPI 提供同源 `/api/v1` API，SQLite 管理项目、资源索引、修订
 | `vocals.py`、`vocal_process.py`、`vocal_worker.py`、`vocal_routes.py` | 独立进程人声分离、分析、音频复用、窗口及下载 |
 | `alignment_projection.py`、`alignment.py`、`alignment_worker.py` | 全局歌词投影、资源准备、受监管日语对齐 |
 | `reading.py`、`furigana.py` | 无状态日文读音快照与词典结构边界与分段 |
+| `dictionaries.py`、`dictionary_format.py` | 资料库词典安装、活动记录、实例租约及公开格式 v1 校验 |
+| `dictionary_engine.py`、`dictionary_routes.py` | 懒加载前缀索引、全局最优路径及可取消快照注音 |
 | `lyric_sources.py`、`embedded_lyrics.py` | 在线载荷与媒体内嵌歌词读取 |
 | `publish.py`、`publish_routes.py`、`packaging.py`、`publishing.py` | 快照绑定、歌词写入、媒体回读与下载 |
 | `time_units.py`、`amll_compatibility.py`、`karaoke.py` | 时间、输出投影与项目配置边界 |
@@ -32,6 +34,10 @@ Lazulite 源码位于仓库根目录的固定 Git 子模块 `vendor/Lazulite`，
 原曲通过 48 kHz 双声道代理播放，人声播放／窗口／下载使用真实 WAV。波形与播放代理冷构建去重，能量通过 mmap 分桶读取；窗口接口复用已知媒体元数据。
 
 读音接口接收当前行文本并返回 code point 范围。Sudachi C、A 细分与 JmdictFurigana 精确分段共用整行读音；词典按结构加载，同结构数据可替换，索引按进程缓存。来源及许可见 [vendor](vendor/README.md)。
+
+固定词典由 `/api/v1/reading/dictionaries` 管理。每次安装及服务启动分配新的实例身份；请求绑定实例，更新和移除保留进行中请求所需的旧目录，文件占用导致的清理延后会在管理界面报告。活动记录原子写入，默认包的首次安装和明确移除随资料库保存。索引采用压缩前缀树与紧凑候选数据，仅缓存当前词典；基础成本或包内整数成本参与整行动态规划，最佳路径中无法一致确定的最小正文范围返回歧义。API 用 code point 范围，字素边界与固定单元由格式契约约束。
+
+`STUDIO_DICTIONARIES_DIR` 指定默认 ZIP 目录；便携启动指向 `resources/dictionaries`。`packaging/dictionaries.json` 选择公开 Release，打包时下载所列资产并使用相同格式校验。词典来源与许可随 ZIP 保存，完整词典可在离线目标机首次安装。用户编辑后的合法内容按实际文件读取，项目只保存最终 Ruby 单元。
 
 ## 输出与接口
 
