@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { resolve } from 'node:path';
 import { importLyrics } from '../../fixtures/import-lyrics';
 
-test('custom ZIP installs through UI, fixed units edit and undo, save/reopen/export after uninstall',async({page})=>{
+test('custom ZIP installs through UI, fixed units edit and undo, save/reopen/archive/export after uninstall',async({page})=>{
   await page.goto('/projects/background-playback/edit');
   const xml='<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0" end="4"><span begin="0" end="2">重庆</span><span begin="2" end="4">𠮷</span></p></body></tt>';
   await importLyrics(page,{name:'dictionary.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
@@ -51,4 +51,16 @@ test('custom ZIP installs through UI, fixed units edit and undo, save/reopen/exp
     return again.lines[0].words.map((w:any)=>({text:w.text,units:w.rubyUnits.map((u:any)=>[u.reading,u.beginMs,u.endMs])}));
   },saved.document.lyrics.draftTtml);
   expect(exported).toEqual([{text:'重庆',units:[['chóng edited',0,1000],['qìng',1000,2000]]},{text:'𠮷',units:[['jí jí',2000,4000]]}]);
+  const archive=await page.request.get('/api/v1/projects/background-playback/archive');
+  expect(archive.status()).toBe(200);
+  const imported=await page.request.post('/api/v1/project-archives',{
+    headers:{origin:'http://127.0.0.1:5175'},
+    multipart:{file:{name:'dictionary-result.lazp',mimeType:'application/zip',buffer:await archive.body()}},
+  });
+  expect(imported.status()).toBe(200);
+  const project=(await imported.json()).id;
+  const reopened=await(await page.request.get(`/api/v1/projects/${project}/document`)).json();
+  expect(reopened.document.lyrics).toEqual(saved.document.lyrics);
+  await page.goto(`/projects/${project}/edit`);
+  await expect(page.locator('main [data-ruby-id]')).toHaveCount(3);
 });
