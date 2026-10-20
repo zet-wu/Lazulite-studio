@@ -1,7 +1,7 @@
 import { splitAtGrapheme } from './text-boundaries';
 import { consecutive, timeEnvelope, type LyricCommand } from './lyric-commands';
 import { createProjectEditing, emptyBeatCount, type ProjectEditing } from './project-editing';
-import { distributeRubyTime, splitReadingMora } from './ruby-editing';
+import { distributeRubyTime, isKanaReading, splitReadingMora } from './ruby-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, RomanizationContent } from './lyric-document';
 
 export type ObjectSelection =
@@ -77,6 +77,7 @@ export function planSelectionAction(document: LyricDocument, selection: ObjectSe
       return {type:'batch',commands:parents.map(({line,word})=>({type:'redistribute-ruby-time',lineId:line.id,wordId:word.id}))};
     }
     if(action==='mora'&&selection.kind==='ruby') {
+      if(selected.some(({unit})=>!isKanaReading(unit!.reading)))throw new Error('按音拍拆分仅适用于纯假名，所选读音包含非假名单元');
       if(selected.some(({unit})=>splitReadingMora(unit!.reading).length<2))throw new Error('所选读音中有无法继续按音拍拆分的对象');
       const parents=selected.filter((item,i)=>selected.findIndex(other=>other.word.id===item.word.id)===i);
       return {type:'batch',commands:parents.map(({line,word})=>({type:'set-ruby-units',lineId:line.id,wordId:word.id,overwrite:true,units:word.rubyUnits.flatMap(unit=>ids.includes(unit.id)?distributeRubyTime({...word,beginMs:unit.beginMs,endMs:unit.endMs},splitReadingMora(unit.reading).map((reading,i)=>({...unit,id:i?crypto.randomUUID():unit.id,reading}))):[unit])}))};

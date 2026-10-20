@@ -5,7 +5,7 @@ import { lineStructureIssues } from './line-structure';
 import { validateTranslationTracks } from './translation-editing';
 import { createLine, createWord, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type TranslationTrack, type TranslationContent, type TimeMs } from './lyric-document';
 import { splitAtGrapheme } from './text-boundaries';
-import { distributeRubyTime, splitReadingMora } from './ruby-editing';
+import { distributeRubyTime, isKanaReading, splitReadingMora } from './ruby-editing';
 import { stampSync, type SyncAction, type SyncCursor, type SyncMode } from './sync-editing';
 
 type AtomicLyricCommand =
@@ -728,7 +728,9 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
             const [left, right] = splitAtGrapheme(unit.reading, wordCommand.at);
           const id = wordCommand.newRubyId ?? crypto.randomUUID();
           if (word.rubyUnits.some((item) => item.id === id)) throw new Error('注音单元标识重复');
-          const middle = splitTime(unit.beginMs, unit.endMs, splitReadingMora(left).length, splitReadingMora(unit.reading).length);
+          const middle = isKanaReading(unit.reading)
+            ? splitTime(unit.beginMs, unit.endMs, splitReadingMora(left).length, splitReadingMora(unit.reading).length)
+            : splitTime(unit.beginMs, unit.endMs, 1, 2);
           return [{ ...unit, reading: left, endMs: middle }, { id, reading: right, beginMs: middle, endMs: unit.endMs }];
         })];
       case 'edit-ruby': {

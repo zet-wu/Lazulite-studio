@@ -1,0 +1,14 @@
+.toolbar, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.toolbar select { max-width: 420px; margin-left: 8px; }
+.rows { max-height: 55vh; overflow: auto; margin-top: 16px; }
+.rows section { padding: 8px 0 20px; }
+.blocks { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.block { display: flex; flex-direction: column; gap: 5px; max-width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+.block small { color: var(--muted); }
+.base { white-space: pre-wrap; overflow-wrap: anywhere; }
+.units { display: flex; flex-wrap: wrap; gap: 4px; }
+.units input { min-width: 5ch; max-width: 100%; }
+.skip { font-size: 12px; color: var(--muted); }
+.manager { display: grid; gap: 16px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.card pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; }

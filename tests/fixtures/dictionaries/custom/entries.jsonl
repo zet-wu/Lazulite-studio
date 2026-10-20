@@ -1,0 +1,2 @@
+{"surface": "重庆", "candidates": [{"id": "one", "priority": 0, "segments": [{"base": "重", "annotate": true, "units": ["chóng"]}, {"base": "庆", "annotate": true, "units": ["qìng"]}]}]}
+{"surface": "家己人", "candidates": [{"id": "one", "priority": 0, "segments": [{"base": "家己人", "annotate": true, "units": ["ka", "ki", "nâng"]}]}]}

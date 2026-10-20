@@ -40,6 +40,10 @@ Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML�
 ### 编辑与打轴
 简洁而功能强大的编辑与打轴界面，针对日语歌词提供多种自动化工具，涵盖假名注音和罗马字生成。打轴界面支持空拍、单行打轴、定位回听等功能。
 
+「词典注音」使用可独立安装的固定读音 ZIP，支持汉语拼音、粤拼和不同地区的潮州话。编辑工具栏或行菜单中选择词典并预览；每个读音单元可以独立改字，缺词与歧义可手工填写，跨正文词的整组读音由用户明确选择最小合并。应用后可继续拆分、合并、调整时间并一次撤销。日语自动处理入口为「智能日文注音」。
+
+「注音词典」负责导入、同 ID 替换及移除，接受符合 [公开格式 v1](https://github.com/zet-wu/Lazulite-studio-dict/blob/main/FORMAT.md) 的自定义包。官方包由[独立词典仓库](https://github.com/zet-wu/Lazulite-studio-dict)构建；便携构建携带汉语拼音和粤拼，潮州话按需导入。首次使用完整大词典需要加载索引，随后复用当前词典索引。已保存的注音可以在移除词典后继续编辑和导出。
+
 ### 文件打包
 支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，可配合 [zet-wu/MusicBox](https://github.com/zet-wu/MusicBox) 本地音乐播放器使用。也支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC ，兼容大部分播放器。
 
@@ -121,6 +125,8 @@ pnpm --dir frontend install --frozen-lockfile
 虚拟环境创建用的 Python 须满足上述版本。PowerShell 若限制激活脚本，可直接用 `./server/.venv/Scripts/python.exe` 替代 `python` 执行后续命令。
 
 基础依赖包含 API、歌词获取、日文读音及媒体处理所需的 Python 库，Lazulite 基础服务从固定的 `vendor/Lazulite` Git 子模块构建安装。JmdictFurigana 数据随仓库交付，服务读取固定资源。人声分离和自动对齐使用下文可选运行时。
+
+开发运行时通过「注音词典」导入所需 ZIP；`STUDIO_DICTIONARIES_DIR` 可指定首次安装的默认包目录。词典保存在资料库的 `dictionaries/`，停止服务后可以直接编辑其中的文本内容；重启后按实际内容重建索引。相同版本号的修改包也可显式重新导入。
 
 ### 开发运行
 

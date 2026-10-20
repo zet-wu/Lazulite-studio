@@ -66,7 +66,7 @@ export function JapaneseRubyDialog({ document, lineIds, apply, close }: { docume
  const shown=virtual?virtualizer.getVirtualItems().map(item=>({row:rows[item.index],item})):rows.map(row=>({row,item:null}));
  const stale=document!==source, changed=hasJapaneseRubyChanges(rows,source);
  const submit=()=>{if(composing||pending||stale)return;try{if(apply(japaneseRubyCommand(document,source,rows)))close();}catch(cause){setError((cause as Error).message);}};
- return <SettingsDialog title="生成日文注音" subtitle={`${rows.length} 行`} close={()=>{if(!composing)close();}}
+ return <SettingsDialog title="智能日文注音" subtitle={`${rows.length} 行`} close={()=>{if(!composing)close();}}
   actions={<><button data-role="secondary" onClick={close} disabled={composing}>取消</button><button data-role="primary" onClick={submit} disabled={composing||pending||stale||!changed}>应用</button></>}>
   <div className={styles.rubyGeneration}>
   <p>空白项跳过生成。</p>

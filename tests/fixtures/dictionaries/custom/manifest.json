@@ -1,0 +1,15 @@
+{
+  "formatVersion": 1,
+  "id": "custom-fixture",
+  "version": "1",
+  "name": "独立契约示例",
+  "language": "custom",
+  "region": "示例地区",
+  "notation": "固定读音",
+  "readingPolicy": "fixed",
+  "entries": "entries.jsonl",
+  "entryCount": 999,
+  "scoring": {
+    "mode": "uniform"
+  }
+}

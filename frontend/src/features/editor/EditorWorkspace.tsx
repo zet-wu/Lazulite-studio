@@ -23,6 +23,8 @@ import { documentTargets, selectionKind, targetId, targetSelection, selectionTar
 import { SelectionProvider, useEditorSelection } from './SelectionContext';
 import { flushSync } from 'react-dom';
 import { JapaneseRubyDialog } from './JapaneseRubyDialog';
+import { DictionaryRubyDialog } from './DictionaryRubyDialog';
+import { DictionaryManager } from './DictionaryManager';
 import { Select } from '../../shared/Select';
 import { useAudioReview } from '../AudioReviewContext';
 import { AlignmentPanel, type AlignmentControl } from '../AlignmentPanel';
@@ -204,12 +206,14 @@ function EditorWorkspaceContent(props: Props) {
   const [contentTransfer, setContentTransfer] = useState<{ trackId: string; contentId: string; ids: string[]; attachment?: 'translation'; targetLineId: string } | null>(null);
   const [romanizationGeneration, setRomanizationGeneration] = useState<string[] | null>(null);
   const [japaneseRuby, setJapaneseRuby] = useState<string[] | null>(null);
+  const [dictionaryRuby, setDictionaryRuby] = useState<string[] | null>(null);
+  const [dictionaryManager, setDictionaryManager] = useState(false);
   const canvasComposing = useRef(false), editRejected = useRef(false);
-  const openJapaneseRuby = (ids: string[]) => {
+  const openReadingDialog = (ids: string[], kind: 'japanese' | 'dictionary') => {
     if (canvasComposing.current) { setMessage('请先完成输入法组合'); return; }
     flushSync(() => { const active = window.document.activeElement; if (active instanceof HTMLElement) active.blur(); });
     if (editRejected.current || pageRef.current?.querySelector('[aria-invalid="true"]')) { setMessage('请先修正当前无效输入'); return; }
-    if (ids.length) setJapaneseRuby(ids);
+    if (ids.length) (kind === 'japanese' ? setJapaneseRuby : setDictionaryRuby)(ids);
   };
   const [rubyGeneration, setRubyGeneration] = useState<{ lineIds: string[]; trackId?: string; contentId?: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; title: string; actions: ContextAction[]; target: HTMLElement } | null>(null);
@@ -643,7 +647,8 @@ function EditorWorkspaceContent(props: Props) {
       actions.push(single('add-ruby','添加注音',()=>setRubyShortcut({wordId:word.id,serial:++rubyShortcutSerial.current})),selectionAction(effective,'redistribute','重分配读音时间'));
     } else if(effective.kind==='lines') {
       const parent=line.backgroundOf??line.id;
-      actions.push({id:'generate-ruby',label:'生成日文注音…',run:()=>openJapaneseRuby(effective.ids)},
+      actions.push({id:'dictionary-ruby',label:'词典注音…',run:()=>openReadingDialog(effective.ids, 'dictionary')},
+        {id:'generate-ruby',label:'智能日文注音…',run:()=>openReadingDialog(effective.ids, 'japanese')},
         {id:'insert-before',label:'前插行',run:()=>dispatch({type:'insert-line',afterLineId:mainLines[mainLines.findIndex(item=>item.id===parent)-1]?.id??null})},
         {id:'insert-after',label:'后插行',run:()=>dispatch({type:'insert-line',afterLineId:parent})},
         {id:'roman-to-ruby',label:'从音译生成 注音…',run:()=>setRubyGeneration({lineIds:effective.ids})},
@@ -890,7 +895,8 @@ function EditorWorkspaceContent(props: Props) {
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
-      canGenerateJapaneseRuby={selection?.kind === 'lines' && selection.ids.length > 0} openJapaneseRuby={() => openJapaneseRuby(selection?.kind === 'lines' ? selection.ids : [])}
+      canGenerateJapaneseRuby={selection?.kind === 'lines' && selection.ids.length > 0} openJapaneseRuby={() => openReadingDialog(selection?.kind === 'lines' ? selection.ids : [], 'japanese')}
+      openDictionaryRuby={() => openReadingDialog(selection?.kind === 'lines' ? selection.ids : [], 'dictionary')} openDictionaryManager={() => setDictionaryManager(true)}
       canGenerateRuby={propertyLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
       canGenerateRomanization={propertyLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(propertyLines.map(line => line.id))} openTranslationTracks={() => setSettingsDialog('translations')} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} singersDisabled={props.project?.amll.simplified} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: propertyLines.map((line) => line.id) })} />}
     {(mode === 'edit' || mode === 'sync' || mode === 'karaoke') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside onFocusCapture={() => { selectionArea.current = 'outline'; }} ref={outlineRef} className={styles.outline} onClick={event => {
@@ -1048,6 +1054,8 @@ function EditorWorkspaceContent(props: Props) {
     {batchToolsOpen && <BatchToolsPanel project={props.project} document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
     {romanizationGeneration && <RomanizationGenerationDialog document={document} lineIds={romanizationGeneration}
       preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} apply={dispatch} close={() => setRomanizationGeneration(null)} />}
+    {dictionaryManager && <DictionaryManager close={() => setDictionaryManager(false)} />}
+    {dictionaryRuby && <DictionaryRubyDialog document={document} lineIds={dictionaryRuby} apply={dispatch} close={() => setDictionaryRuby(null)} />}
     {japaneseRuby && <JapaneseRubyDialog document={document} lineIds={japaneseRuby} apply={dispatch} close={() => setJapaneseRuby(null)} />}
     {rubyGeneration && <RubyGenerationDialog document={document} lineIds={rubyGeneration.lineIds} initialTrackId={rubyGeneration.trackId} initialContentId={rubyGeneration.contentId}
       apply={dispatch} close={() => setRubyGeneration(null)} />}

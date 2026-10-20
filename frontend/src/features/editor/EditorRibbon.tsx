@@ -22,6 +22,8 @@ type Props = MenuState & {
   openBatchTools: () => void;
   canGenerateJapaneseRuby: boolean;
   openJapaneseRuby: () => void;
+  openDictionaryRuby: () => void;
+  openDictionaryManager: () => void;
   canGenerateRuby: boolean;
   openRubyGeneration: () => void;
   canGenerateRomanization: boolean;
@@ -52,7 +54,9 @@ export function EditorRibbon(props: Props) {
       <button data-role="inline" onClick={props.openSegmentation}>分词…</button>
       <button data-role="inline" onClick={props.openBatchTools}>批处理…</button>
       <button data-role="inline" disabled={!props.canGenerateRomanization} onClick={props.openRomanizationGeneration}>生成日文罗马字音译…</button>
-      <button data-role="inline" disabled={!props.canGenerateJapaneseRuby} onClick={props.openJapaneseRuby}>生成日文注音…</button>
+      <button data-role="inline" disabled={!props.canGenerateJapaneseRuby} onClick={props.openJapaneseRuby}>智能日文注音…</button>
+      <button data-role="inline" disabled={!props.canGenerateJapaneseRuby} onClick={props.openDictionaryRuby}>词典注音…</button>
+      <button data-role="inline" onClick={props.openDictionaryManager}>注音词典…</button>
       <button data-role="inline" disabled={!props.canGenerateRuby} onClick={props.openRubyGeneration}>从音译生成 注音…</button>
     </TopMenu>
     <TopMenu id="lyrics-settings" title="歌词设置" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>

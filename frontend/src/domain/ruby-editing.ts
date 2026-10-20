@@ -4,6 +4,8 @@ import type { LyricWord, RubyUnit, TimeMs } from './lyric-document';
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 const smallKana = /^[ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ]$/u;
 const kana = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
+export const isKanaReading = (reading: string) => kana.test(reading.normalize('NFC'));
+export const readingWeight = (reading: string) => isKanaReading(reading) ? Math.max(1, splitReadingMora(reading).length) : 1;
 
 export function readingFromRomanization(value: string): string {
   const source = value.replace(/\s+/gu, '');
@@ -32,7 +34,7 @@ function boundary(begin: TimeMs, end: TimeMs, position: number, total: number): 
 
 export function distributeRubyTime(word: LyricWord, units: RubyUnit[]): RubyUnit[] {
   if (!units.length || units.some((unit) => !unit.reading)) throw new Error('读音单元不能为空');
-  const weights = units.map((unit) => Math.max(1, splitReadingMora(unit.reading).length));
+  const weights = units.map((unit) => readingWeight(unit.reading));
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   let elapsed = 0;
   return units.map((unit, index) => {
