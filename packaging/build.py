@@ -251,6 +251,10 @@ def build(target, output):
     licenses(root, dependencies, pnpm)
     shutil.copy2(ROOT / 'packaging/models.json', root / 'licenses/models.json')
     shutil.copy2(ROOT / 'packaging/runtime-manifest.json', root / 'licenses/runtime-sources.json')
+    from dictionaries import assemble
+    assemble(root, python, ROOT / 'packaging/dictionaries.json')
+    result = subprocess.check_output([python, '-I', str(ROOT / 'packaging/dictionary_smoke.py'), str(root)], cwd=work, env=env, text=True)
+    (diagnostics / 'dictionaries.json').write_text(result, encoding='utf-8')
     shutil.copy2(dependencies / (target + '.txt'), root / 'licenses/dependencies.txt')
     if os.name == 'nt':
         from windows_launcher import compile_launcher

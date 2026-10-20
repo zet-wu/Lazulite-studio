@@ -30,7 +30,8 @@ def smoke(root, python=None, console_event=0):
     with log.open('w', encoding='utf-8') as output:
         process = subprocess.Popen(command, cwd=root / 'app', stdout=output, stderr=subprocess.STDOUT, **flags)
         try:
-            for _ in range(160):
+            # First launch validates and installs the complete offline dictionaries.
+            for _ in range(720):
                 if process.poll() is not None: raise RuntimeError(log.read_text(encoding='utf-8'))
                 try:
                     identity = json.loads((root / 'data/runtime/identity.json').read_text(encoding='utf-8'))

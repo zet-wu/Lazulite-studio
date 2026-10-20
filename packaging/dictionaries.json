@@ -1,0 +1,8 @@
+{
+  "repository": "zet-wu/Lazulite-studio-dict",
+  "release": "v0.1.0",
+  "assets": [
+    {"id": "zh-pinyin", "name": "zh-pinyin-0.1.0.zip"},
+    {"id": "yue-jyutping", "name": "yue-jyutping-0.1.0.zip"}
+  ]
+}
