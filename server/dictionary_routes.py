@@ -28,7 +28,7 @@ class DictionaryList(BaseModel):
 class DictionaryInstall(BaseModel):
     manifest: dict[str, Any]
     sources: dict[str, Any] | list[Any]
-    entryCount: int
+    entryCount: int | None
     instance: str | None = None
     replaceRequired: bool = False
 

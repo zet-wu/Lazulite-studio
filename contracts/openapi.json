@@ -4274,7 +4274,14 @@
             "title": "Sources"
           },
           "entryCount": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Entrycount"
           },
           "instance": {

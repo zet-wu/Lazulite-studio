@@ -1355,7 +1355,7 @@ export interface components {
                 [key: string]: unknown;
             } | unknown[];
             /** Entrycount */
-            entryCount: number;
+            entryCount: number | null;
             /** Instance */
             instance?: string | null;
             /**

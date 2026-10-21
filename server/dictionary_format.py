@@ -120,23 +120,41 @@ def read_directory(directory):
 def extract_package(archive, target):
     target = Path(target)
     with zipfile.ZipFile(archive) as z:
-        files = z.infolist()
-        if len(files) > 256 or sum(f.file_size for f in files) > MAX_BYTES:
-            raise ValueError("压缩包超过资源限制")
-        names = set()
-        for f in files:
-            if f.flag_bits & 1:
-                raise ValueError("词典压缩包不能加密")
-            name = f.filename
-            path = PurePosixPath(name)
-            if (not name or "\\" in name or ":" in name or "\x00" in name or path.is_absolute()
-                    or any(p in ("", ".", "..") for p in name.rstrip("/").split("/"))
-                    or stat.S_ISLNK(f.external_attr >> 16) or name.casefold() in names):
-                raise ValueError("压缩包路径无效或重复")
-            names.add(name.casefold())
-            if not (name in ("manifest.json", "entries.jsonl", "sources.json") or name.startswith("licenses/")):
-                raise ValueError("压缩包含格式外文件")
-        if not {"manifest.json", "entries.jsonl", "sources.json"}.issubset(names):
-            raise ValueError("压缩包缺少必需文件")
+        check_archive(z)
         z.extractall(target)
     return target
+
+
+def check_archive(z):
+    files = z.infolist()
+    if len(files) > 256 or sum(f.file_size for f in files) > MAX_BYTES:
+        raise ValueError("压缩包超过资源限制")
+    names = set()
+    for f in files:
+        if f.flag_bits & 1:
+            raise ValueError("词典压缩包不能加密")
+        name = f.filename
+        path = PurePosixPath(name)
+        if (not name or "\\" in name or ":" in name or "\x00" in name or path.is_absolute()
+                or any(p in ("", ".", "..") for p in name.rstrip("/").split("/"))
+                or stat.S_ISLNK(f.external_attr >> 16) or name.casefold() in names):
+            raise ValueError("压缩包路径无效或重复")
+        names.add(name.casefold())
+        if not (name in ("manifest.json", "entries.jsonl", "sources.json") or name.startswith("licenses/")):
+            raise ValueError("压缩包含格式外文件")
+    if not {"manifest.json", "entries.jsonl", "sources.json"}.issubset(names):
+        raise ValueError("压缩包缺少必需文件")
+
+def inspect_package(archive):
+    with zipfile.ZipFile(archive) as z:
+        check_archive(z)
+        for name in ("manifest.json", "sources.json"):
+            if z.getinfo(name).file_size > MAX_LINE:
+                raise ValueError("词典元数据过大")
+        manifest = validate_manifest(read_json(z.read("manifest.json").decode("utf-8")))
+        sources = read_json(z.read("sources.json").decode("utf-8"))
+        if not isinstance(sources, (list, dict)) or not any(
+            f.filename.startswith("licenses/") and not f.is_dir() for f in z.infolist()
+        ):
+            raise ValueError("来源或许可信息缺失")
+        return manifest, sources

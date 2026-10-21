@@ -175,6 +175,7 @@ def test_weighted_paths_and_priority_are_independent_of_file_order(tmp_path):
 def test_atomic_record_failure_and_corrupt_installed_content_are_explicit(tmp_path, monkeypatch):
     manager = Dictionaries(tmp_path)
     first = manager.install(package())
+    cached = manager.cache
     def fail(*_):
         raise OSError("disk write failed")
     with monkeypatch.context() as patch:
@@ -183,6 +184,7 @@ def test_atomic_record_failure_and_corrupt_installed_content_are_explicit(tmp_pa
             manager.install(package([entry("重庆", "new")]), replace=True)
     assert manager.instances["custom"] == first["instance"]
     assert len(list(tmp_path.iterdir())) == 2
+    assert manager.cache is cached
     path = tmp_path / manager.record["installed"]["custom"] / "entries.jsonl"
     path.write_text("{")
     restarted = Dictionaries(tmp_path)
@@ -218,3 +220,21 @@ def test_locked_retired_files_do_not_undo_publication_and_cleanup_retries(tmp_pa
         assert old.exists()
     assert not manager.list()["errors"]
     assert not old.exists()
+
+def test_inspect_reads_metadata_only_and_install_reuses_index(tmp_path, monkeypatch):
+    manager = Dictionaries(tmp_path)
+    original = zipfile.ZipFile.read
+    def metadata_only(z, name, *args, **kwargs):
+        assert name in ("manifest.json", "sources.json")
+        return original(z, name, *args, **kwargs)
+    with monkeypatch.context() as patch:
+        patch.setattr(zipfile.ZipFile, "read", metadata_only)
+        info = manager.install(package(extra={"entries.jsonl": "invalid"}), inspect=True)
+        assert info["entryCount"] is None and not manager.instances
+    first = manager.install(package())
+    cached = manager.cache[1]
+    def no_rebuild(*args, **kwargs):
+        raise AssertionError("installed index should be reused")
+    monkeypatch.setattr("server.dictionaries.DictionaryIndex", no_rebuild)
+    with manager.acquire("custom", first["instance"]) as index:
+        assert index is cached

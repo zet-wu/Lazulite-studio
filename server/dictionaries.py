@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .atomic_file import write_atomic
 from .dictionary_engine import DictionaryIndex
-from .dictionary_format import MAX_LINE, extract_package, read_directory, read_json, validate_manifest
+from .dictionary_format import MAX_LINE, extract_package, inspect_package, read_json, validate_manifest
 
 
 class DictionaryConflict(ValueError):
@@ -77,6 +77,11 @@ class Dictionaries:
             return {"dictionaries": result, "errors": self.default_errors + list(self.cleanup_errors.values())}
 
     def install(self, archive, replace=False, default=False, inspect=False):
+        if inspect:
+            manifest, sources = inspect_package(archive)
+            with self.lock:
+                return {"manifest": manifest, "sources": sources, "entryCount": None,
+                        "replaceRequired": manifest["id"] in self.record["installed"]}
         if default:
             with zipfile.ZipFile(archive) as z:
                 member = z.getinfo("manifest.json")
@@ -88,18 +93,12 @@ class Dictionaries:
                     return None
         with tempfile.TemporaryDirectory(prefix=".import-", dir=self.root) as tmp:
             extract_package(archive, tmp)
-            if inspect:
-                manifest, sources, entries = read_directory(tmp)
-                count = sum(1 for _ in entries)
-            else:
-                index = DictionaryIndex(tmp)
-                manifest, sources, count = index.manifest, index.sources, index.count
+            index = DictionaryIndex(tmp)
+            manifest, sources, count = index.manifest, index.sources, index.count
             ident = manifest["id"]
             info = {"manifest": manifest, "sources": sources, "entryCount": count}
             with self.lock:
                 exists = ident in self.record["installed"]
-                if inspect:
-                    return {**info, "replaceRequired": exists}
                 if default and ident in self.record["defaults"]:
                     return None
                 if exists and not replace and not default:
@@ -120,11 +119,8 @@ class Dictionaries:
                     shutil.rmtree(self.root / directory)
                     raise
                 instance = uuid.uuid4().hex
-                previous_instance = self.instances.get(ident)
                 self.instances[ident] = instance
-                # Validation index is released; only selected queries retain one.
-                if self.cache and self.cache[0] == previous_instance:
-                    self.cache = None
+                self.cache = (instance, index)
                 if old:
                     self._retire(old)
                 return {**info, "instance": instance}
