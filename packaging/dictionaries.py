@@ -1,12 +1,11 @@
 """Assemble editable dictionaries from one explicitly selected public Release."""
 import json
-import subprocess
 import urllib.request
 from pathlib import Path
 from urllib.parse import quote
 
 
-def assemble(root, python, specification):
+def assemble(root, specification):
     spec = json.loads(Path(specification).read_text("utf-8"))
     target = root / "resources/dictionaries"
     target.mkdir(parents=True)
@@ -22,11 +21,6 @@ def assemble(root, python, specification):
                 if size > 128 * 1024 * 1024:
                     raise ValueError("词典压缩包超过下载资源限制")
                 out.write(chunk)
-        subprocess.run([str(python), "-I", "-c",
-            "import sys,tempfile;sys.path.insert(0,sys.argv[1]);"
-            "from server.dictionary_format import extract_package,read_directory;"
-            "tmp=tempfile.TemporaryDirectory();extract_package(sys.argv[2],tmp.name);"
-            "manifest,sources,entries=read_directory(tmp.name);"
-            "assert manifest['id']==sys.argv[3];print(manifest['id'],sum(1 for _ in entries));tmp.cleanup()",
-            str(root / "app"), str(path), asset["id"]], check=True)
+        # The following runtime smoke installs through Studio's normal boundary
+        # validator. Do not scan every entry a second time in the downloader.
     (root / "licenses/dictionary-sources.json").write_text(json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
