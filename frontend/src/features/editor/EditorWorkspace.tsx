@@ -861,7 +861,7 @@ function EditorWorkspaceContent(props: Props) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
-    <EditorMenu {...props} editingLocked={props.alignment?.locked} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />
+    <EditorMenu {...props} onDictionaryManager={() => setDictionaryManager(true)} editingLocked={props.alignment?.locked} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />
     <div ref={audioReview?.setTaskHost} />
     <div ref={audioReview?.setMessageHost} />
     <MessageBar notice={message} />
@@ -896,7 +896,7 @@ function EditorWorkspaceContent(props: Props) {
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
       moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
       canGenerateJapaneseRuby={selection?.kind === 'lines' && selection.ids.length > 0} openJapaneseRuby={() => openReadingDialog(selection?.kind === 'lines' ? selection.ids : [], 'japanese')}
-      openDictionaryRuby={() => openReadingDialog(selection?.kind === 'lines' ? selection.ids : [], 'dictionary')} openDictionaryManager={() => setDictionaryManager(true)}
+      openDictionaryRuby={() => openReadingDialog(selection?.kind === 'lines' ? selection.ids : [], 'dictionary')}
       canGenerateRuby={propertyLines.some((line) => document.romanizationTracks.some((track) => track.contents.some((content) => content.lineId === line.id)))}
       canGenerateRomanization={propertyLines.length > 0} openRomanizationGeneration={() => setRomanizationGeneration(propertyLines.map(line => line.id))} openTranslationTracks={() => setSettingsDialog('translations')} openTracks={() => setSettingsDialog('tracks')} openMetadata={() => setSettingsDialog('metadata')} singersDisabled={props.project?.amll.simplified} openSingers={() => setSettingsDialog('singers')} openRubyGeneration={() => setRubyGeneration({ lineIds: propertyLines.map((line) => line.id) })} />}
     {(mode === 'edit' || mode === 'sync' || mode === 'karaoke') && <div ref={layoutRef} className={styles.layout} style={{ gridTemplateColumns: template(rendered) }}>{columns.outlineVisible && <aside onFocusCapture={() => { selectionArea.current = 'outline'; }} ref={outlineRef} className={styles.outline} onClick={event => {

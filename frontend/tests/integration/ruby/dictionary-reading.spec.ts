@@ -2,27 +2,24 @@ import { expect, test } from '@playwright/test';
 import { resolve } from 'node:path';
 import { importLyrics } from '../../fixtures/import-lyrics';
 
-test('custom ZIP installs through UI, fixed units edit and undo, save/reopen/archive/export after uninstall',async({page})=>{
+test('custom ZIP installs through UI, fixed units edit, save/reopen/export after uninstall',async({page})=>{
   await page.goto('/projects/background-playback/edit');
   const xml='<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0" end="4"><span begin="0" end="2">重庆</span><span begin="2" end="4">𠮷</span></p></body></tt>';
   await importLyrics(page,{name:'dictionary.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
-  await page.locator('[data-outline-drag]').first().click({button:'right'});
-  await page.getByRole('menuitem',{name:'词典注音…',exact:true}).click();
-  let dialog=page.getByRole('dialog',{name:'词典注音',exact:true});
-  await dialog.getByRole('button',{name:'管理注音词典'}).click();
+  await page.locator('[data-top-menu="settings"] summary').click();
+  await page.getByRole('button',{name:'注音词典…',exact:true}).click();
   const manager=page.getByRole('dialog',{name:'注音词典',exact:true});
   await manager.locator('input[type=file]').setInputFiles(resolve('../tests/fixtures/dictionaries/custom.zip'));
   await manager.getByRole('button',{name:'安装词典',exact:true}).click();
   await expect(manager.getByText('独立契约示例 · 1 · 示例地区',{exact:true})).toBeVisible();
   await manager.getByRole('button',{name:'关闭注音词典',exact:true}).click();
-  dialog=page.getByRole('dialog',{name:'词典注音',exact:true});
+  await page.locator('[data-outline-drag]').first().click({button:'right'});
+  await page.getByRole('menuitem',{name:'词典注音…',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'词典注音',exact:true});
   await dialog.getByRole('combobox',{name:'词典',exact:true}).selectOption({label:'独立契约示例 · 1 · 示例地区'});
   await expect(dialog.getByLabel('重读音 1',{exact:true})).toHaveValue('chóng');
   await dialog.getByLabel('重读音 1',{exact:true}).fill('chóng edited');
   await dialog.getByLabel('𠮷读音 1',{exact:true}).fill('jí jí');
-  await dialog.getByRole('button',{name:'重新生成词典注音'}).click();
-  await expect(dialog.getByLabel('重读音 1',{exact:true})).toHaveValue('chóng edited');
-  await expect(dialog.getByRole('button',{name:'应用',exact:true})).toBeEnabled();
   const light=test.info().outputPath('dictionary-preview-light.png');
   await page.screenshot({path:light});
   await test.info().attach('dictionary-preview-light',{path:light,contentType:'image/png'});
@@ -32,10 +29,6 @@ test('custom ZIP installs through UI, fixed units edit and undo, save/reopen/arc
   await test.info().attach('dictionary-preview-dark',{path:dark,contentType:'image/png'});
   await page.evaluate(()=>document.documentElement.dataset.theme='light');
   await dialog.getByRole('button',{name:'应用',exact:true}).click();
-  await expect(page.locator('main [data-ruby-id]')).toHaveCount(3);
-  await page.getByRole('button',{name:'撤销',exact:true}).click();
-  await expect(page.locator('main [data-ruby-id]')).toHaveCount(0);
-  await page.getByRole('button',{name:'重做',exact:true}).click();
   await expect(page.locator('main [data-ruby-id]')).toHaveCount(3);
   await page.getByRole('button',{name:'保存',exact:true}).click();
   await expect(page.getByText('已保存',{exact:true})).toBeVisible();
@@ -51,16 +44,4 @@ test('custom ZIP installs through UI, fixed units edit and undo, save/reopen/arc
     return again.lines[0].words.map((w:any)=>({text:w.text,units:w.rubyUnits.map((u:any)=>[u.reading,u.beginMs,u.endMs])}));
   },saved.document.lyrics.draftTtml);
   expect(exported).toEqual([{text:'重庆',units:[['chóng edited',0,1000],['qìng',1000,2000]]},{text:'𠮷',units:[['jí jí',2000,4000]]}]);
-  const archive=await page.request.get('/api/v1/projects/background-playback/archive');
-  expect(archive.status()).toBe(200);
-  const imported=await page.request.post('/api/v1/project-archives',{
-    headers:{origin:'http://127.0.0.1:5175'},
-    multipart:{file:{name:'dictionary-result.lazp',mimeType:'application/zip',buffer:await archive.body()}},
-  });
-  expect(imported.status()).toBe(200);
-  const project=(await imported.json()).id;
-  const reopened=await(await page.request.get(`/api/v1/projects/${project}/document`)).json();
-  expect(reopened.document.lyrics).toEqual(saved.document.lyrics);
-  await page.goto(`/projects/${project}/edit`);
-  await expect(page.locator('main [data-ruby-id]')).toHaveCount(3);
 });

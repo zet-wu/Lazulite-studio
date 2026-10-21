@@ -1,11 +1,14 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DictionaryRubyDialog } from './DictionaryRubyDialog';
 import { analyzeDictionary, listDictionaries } from '../../adapters/http/dictionaries';
 import { createLyricDocument } from '../../domain/lyric-document';
 
 vi.mock('../../adapters/http/dictionaries',()=>({listDictionaries:vi.fn(),analyzeDictionary:vi.fn()}));
+afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
 beforeEach(()=>{
+  vi.stubGlobal('ResizeObserver',class {observe(){} unobserve(){} disconnect(){}});
+  vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(null);
   localStorage.clear();
   vi.mocked(listDictionaries).mockResolvedValue({errors:[],dictionaries:['a','b'].map(id=>({id,instance:id,manifest:{name:id,version:'1',region:id},sources:{},error:null}))});
   vi.mocked(analyzeDictionary).mockReset();
@@ -23,7 +26,13 @@ it('aborts old selections, preserves fixed unit edits on retry, and blocks stale
   await screen.findByLabelText('重庆读音 1');
   expect(signal.aborted).toBe(true);
   await act(async()=>resolveA({instance:'a',version:'1',ranges:[]}));
-  fireEvent.change(screen.getByLabelText('重庆读音 1'),{target:{value:'several syllables'}});
+  const input=screen.getByLabelText('重庆读音 1');
+  fireEvent.focus(input);fireEvent.change(input,{target:{value:'temporary'}});fireEvent.keyDown(input,{key:'Escape'});
+  expect(input).toHaveValue('chóng');
+  fireEvent.compositionStart(input);fireEvent.change(input,{target:{value:'several syllables'}});
+  expect(screen.getByRole('button',{name:'应用'})).toBeDisabled();
+  fireEvent.keyDown(input,{key:'Escape',isComposing:true});expect(input).toHaveValue('several syllables');
+  fireEvent.compositionEnd(input);
   fireEvent.click(screen.getByRole('button',{name:'重新生成词典注音'}));
   await waitFor(()=>expect(screen.getByRole('button',{name:'应用'})).toBeEnabled());
   expect(screen.getByLabelText('重庆读音 1')).toHaveValue('several syllables');

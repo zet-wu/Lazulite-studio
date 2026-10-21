@@ -1,38 +1,13 @@
 import { IconButton } from '../../shared/Controls';
-import { measureTextWidth } from '../../shared/measure-text';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ReadingInput, ReadingPair } from './ReadingPreview';
+import { useEffect, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { analyzeReadings } from '../../adapters/http/reading';
 import { lineText, type LyricDocument } from '../../domain/lyric-document';
 import type { LyricCommand } from '../../domain/lyric-commands';
-import { hasJapaneseRubyChanges, japaneseRubyCommand, proposeJapaneseRuby, type ReadingBlock } from '../../domain/japanese-ruby';
+import { hasJapaneseRubyChanges, japaneseRubyCommand, proposeJapaneseRuby } from '../../domain/japanese-ruby';
 import { SettingsDialog } from './SettingsDialog';
 import styles from './semantic-editor.module.css';
-
-function ReadingInput({ block, change, focus, composition }: { block: ReadingBlock; change: (value: string) => void; focus: (active: boolean) => void; composition: (active: boolean) => void }) {
- const start = useRef(block.reading), composing = useRef(false);
- const input = useRef<HTMLInputElement>(null);
- useLayoutEffect(()=>{
-  const element=input.current!, container=element.parentElement!, row=container.parentElement!;
-  const resize=()=>{
-   const body=container.querySelector<HTMLElement>('[data-reading-body]')!;
-   const status=container.querySelector<HTMLElement>('[data-reading-status]');
-   // A whole block wraps; only truly oversized text scrolls within the single input.
-   container.style.width=`${Math.min(row.clientWidth, 640, Math.max(40, measureTextWidth(element,block.reading,true),measureTextWidth(body,block.text),status?measureTextWidth(status,status.textContent??''):0))}px`;
-  };
-  resize();
-  const observer=new ResizeObserver(resize);observer.observe(row);
-  let alive=true;void document.fonts?.ready.then(()=>{if(alive)resize();});
-  return()=>{alive=false;observer.disconnect();};
- },[block.reading,block.text,block.existing,block.spans]);
- const missing = !block.reading.trim();
- return <input ref={input} title={block.reading || undefined} aria-label={`${block.text}完整读音`} aria-description={missing ? block.existing ? '清空将保留原注音' : '缺少读音，留空将跳过' : undefined}
-  className={`${styles.romanPreviewInput} ${missing ? styles.japaneseRubyMissing : ''}`} value={block.reading}
-  style={{ width: '100%' }}
-  onChange={e=>change(e.target.value)} onFocus={()=>{start.current=block.reading;focus(true);}} onBlur={()=>focus(false)}
-  onCompositionStart={()=>{composing.current=true;composition(true);}} onCompositionEnd={()=>{composing.current=false;composition(false);}}
-  onKeyDown={e=>{if(composing.current||e.nativeEvent.isComposing){e.stopPropagation();return;}if(e.key==='Escape'){e.preventDefault();e.stopPropagation();change(start.current);}if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}/>;
-}
 
 export function JapaneseRubyDialog({ document, lineIds, apply, close }: { document: LyricDocument; lineIds: string[]; apply: (command: LyricCommand) => boolean; close: () => void }) {
  const [autoMerge,setAutoMerge] = useState(false);
@@ -81,13 +56,11 @@ export function JapaneseRubyDialog({ document, lineIds, apply, close }: { docume
     {shown.map(({row,item})=><section key={row.lineId} data-reading-row={row.lineId} data-index={item?.index} ref={item?virtualizer.measureElement:undefined}
      style={item?{position:'absolute',top:0,left:0,width:'100%',transform:`translateY(${item.start}px)`}:undefined}>
      <div className={styles.japaneseRubyLabel}>{row.background?'背景行':'主行'} · {source.lines.findIndex(l=>l.id===row.lineId)+1}</div>
-     <div className={styles.japaneseRubyBlocks}>{row.blocks.map(block=><div className={styles.japaneseRubyBlock} key={block.key}>
-      {(block.existing||block.spans)&&<small data-reading-status>{block.existing?'已有注音':'将合并'}</small>}
-      {block.editable&&<ReadingInput block={block} composition={setComposing} focus={value=>setActive(value?row.lineId:null)} change={reading=>{
+     <div className={styles.japaneseRubyBlocks}>{row.blocks.map(block=><ReadingPair text={block.text} status={block.existing?'已有注音':block.spans?'将合并':undefined} key={block.key}>
+      {block.editable&&<ReadingInput value={block.reading} label={`${block.text}完整读音`} hint={!block.reading.trim()?(block.existing?'清空将保留原注音':'缺少读音，留空将跳过'):undefined} composition={setComposing} focus={value=>setActive(value?row.lineId:null)} change={reading=>{
        edited.current.set(block.key,reading);setRows(previous=>previous.map(r=>r.lineId===row.lineId?{...r,blocks:r.blocks.map(b=>b.key===block.key?{...b,reading}:b)}:r));
       }}/>}
-      <div data-reading-body className={styles.japaneseRubyText}>{block.text}</div>
-     </div>)}</div>
+     </ReadingPair>)}</div>
     </section>)}
    </div>
   </div>

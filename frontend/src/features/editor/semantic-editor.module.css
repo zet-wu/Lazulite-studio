@@ -410,3 +410,6 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 
 .deviceSettingsMenu > div { width: max-content; min-width: 200px; max-width: calc(100vw - 32px); }
 .deviceSettingsMenu > div button { white-space: normal; }
+
+.readingHint { position: relative; }
+.readingHint:focus-within::after { content: attr(data-tooltip); position: absolute; z-index: 20; top: 100%; left: 0; width: max-content; max-width: 260px; padding: 5px 8px; color: var(--ink); background: var(--surface-high); border: 1px solid var(--line); border-radius: 4px; font: 12px system-ui; pointer-events: none; }

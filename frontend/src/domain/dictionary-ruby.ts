@@ -9,7 +9,7 @@ export type DictionaryBlock = Readonly<{
   key: string; start: number; end: number; base: string; existing: boolean;
   status: DictionaryRange['status']; spans: readonly { wordId: string; start: number; end: number }[];
   original: readonly string[]; merge: boolean;
-}> & { units: string[]; skip: boolean };
+}> & { units: string[] };
 export type DictionaryRow = { lineId: string; blocks: DictionaryBlock[] };
 
 export function proposeDictionaryRuby(source: LyricDocument, ids: string[], ranges: DictionaryRange[]): DictionaryRow[] {
@@ -43,14 +43,14 @@ export function proposeDictionaryRuby(source: LyricDocument, ids: string[], rang
     return {lineId:line.id, blocks:covered.map(r=>{
       const spans=words.filter(w=>w.start<r.end&&w.end>r.start).map(w=>({wordId:w.word.id,start:Math.max(r.start,w.start)-w.start,end:Math.min(r.end,w.end)-w.start}));
       const units=r.units.length?[...r.units]:[''];
-      return {...r,key:`${line.id}:${r.start}:${r.end}`,original:[...units],units,spans,merge:spans.length>1,skip:false};
+      return {...r,key:`${line.id}:${r.start}:${r.end}`,original:[...units],units,spans,merge:spans.length>1};
     })};
   });
 }
 
 export function dictionaryBlockApplies(block: DictionaryBlock, merge: boolean) {
-  return !block.skip && (!block.merge || merge) && block.status !== 'boundary' && block.status !== 'unannotated'
-    && block.units.every(u=>u.trim()) && (!block.existing || block.units.some((u,i)=>u!==block.original[i]));
+  return (!block.merge || merge) && block.status !== 'boundary' && block.status !== 'unannotated'
+    && block.units.some(u=>u.trim()) && (!block.existing || block.units.some((u,i)=>u!==block.original[i]));
 }
 
 const makeUnits = (word: LyricWord, readings: string[]): RubyUnit[] => {
@@ -71,7 +71,7 @@ export function dictionaryRubyCommand(current: LyricDocument, source: LyricDocum
       if(!blocks.length)return [word];
       if(word.rubyUnits.length) {
         const block=blocks[0];
-        return [{...word,rubyUnits:word.rubyUnits.map((u,i)=>({...u,reading:block.units[i]}))}];
+        return [{...word,rubyUnits:word.rubyUnits.flatMap((u,i)=>block.units[i].trim()?[{...u,reading:block.units[i]}]:[])}];
       }
       const ranges=blocks.map(b=>({block:b,span:b.spans.find(s=>s.wordId===word.id)!})).sort((a,b)=>a.span.start-b.span.start);
       // Consecutive fine segments inside an existing word retain that word.
@@ -90,13 +90,16 @@ export function dictionaryRubyCommand(current: LyricDocument, source: LyricDocum
         if(group.blocks[0].merge) {
           const block=group.blocks[0], ids=mergeParts.get(block)??[]; ids.push(part.id);mergeParts.set(block,ids);return part;
         }
-        return {...part,rubyUnits:makeUnits(part,group.blocks.flatMap(block=>block.units))};
+        return {...part,rubyUnits:group.blocks.flatMap(block=>{
+          const span=block.spans.find(s=>s.wordId===word.id)!;
+          return makeUnits({...part,beginMs:boundary(span.start),endMs:boundary(span.end)},block.units.filter(u=>u.trim()));
+        })};
       });
     });
     for(const [block,ids] of mergeParts) {
       const interim={...source,lines:source.lines.map(l=>l===line?{...line,words}:l)};
       const {merged}=planWordMerge(interim,ids);
-      const result={...merged,rubyUnits:makeUnits(merged,block.units)};
+      const result={...merged,rubyUnits:makeUnits(merged,block.units.filter(u=>u.trim()))};
       words=words.flatMap(w=>w.id===ids[0]?[result]:ids.includes(w.id)?[]:[w]);
     }
     return {...line,words};
