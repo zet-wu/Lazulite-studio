@@ -1,18 +1,14 @@
+import { karaokeOutputs, karaokeFilenames, zipFiles, type KaraokeOutput } from './karaoke-output';
+export { karaokeOutputs, safeFilename, zipFiles } from './karaoke-output';
+export type { KaraokeOutput } from './karaoke-output';
 import { isUntimedSeparator } from './export-separators';
 import { defaultSingerMarker, singerKey, singerSet, markerProblem, type SingerMarker } from '../domain/singer-markers';
 import transparentPng from '../assets/transparent-1x1.png?inline';
-import { cueProblem, cueWord, outputId, type KaraokeCue } from '../domain/karaoke';
+import { cueProblem, cueWord, type KaraokeCue } from '../domain/karaoke';
 import type { LyricLine, LyricWord, TimeMs } from '../domain/lyric-document';
 import type { ProjectDocument } from '../domain/project-document';
 import { DocumentOutputError, outputIssueKey, type OutputIssue } from './output-validation';
 
-export type KaraokeOutput = { id: string; groupId: string; kind: 'body' | 'translation' | 'romanization'; trackId: string; trackNumber: number; language: string; label: string };
-export function karaokeOutputs(project: ProjectDocument): KaraokeOutput[] {
-  return project.karaoke.groups.flatMap(group => [
-    { id: outputId(group.id), groupId: group.id, kind: 'body' as const, trackId: '', trackNumber: 0, language: '', label: `${group.name} · 正文` },
-    ...(['translation', 'romanization'] as const).flatMap(kind => project.lyrics[kind === 'translation' ? 'translationTracks' : 'romanizationTracks'].map((track,index) => ({ id: outputId(group.id, kind, track.id), groupId: group.id, kind, trackId: track.id, trackNumber: index + 1, language: track.language || 'und', label: `${group.name} · ${kind === 'translation' ? '翻译' : '音译'} ${index + 1} · ${track.language || 'und'}` }))),
-  ]);
-}
 export const quantize = (ms: number) => Math.floor(ms / 10) * 10;
 export function nicokaraTime(ms: number) {
   const cs = Math.floor(ms / 10);
@@ -20,10 +16,6 @@ export function nicokaraTime(ms: number) {
 }
 // Numeric references are decoded by the consumer after field/tag recognition.
 export const encodeKraText = (text: string, ruby = false) => text.replace(ruby ? /[&,\[\]【】]/g : /[&\[\]【】]/g, char => `&#${char.codePointAt(0)};`);
-export const safeFilename = (name: string) => {
-  const clean = name.normalize('NFC').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\.{2,}/g, '_').replace(/[. ]+$/g, '').slice(0, 100) || 'project';
-  return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(clean) ? `_${clean}` : clean;
-};
 const encodeEmojiField = (text: string) => text.replace(/[&,\[\]]/g, char => `&#${char.codePointAt(0)};`);
 function emojiDeclaration(marker: SingerMarker, index: number) {
   return `@Emoji${index}=` + [encodeEmojiField(marker.trigger), encodeEmojiField(marker.beforeImage), encodeEmojiField(marker.afterImage), marker.sizeMode==='Zoom'?`Zoom=${marker.zoom}`:'Fix', ...(marker.noDecor?['NoDecor']:marker.forceWipeDecor?['ForceWipeDecor']:[]), ...([['marginLeft','MarginLeft'],['marginRight','MarginRight'],['marginBottom','MarginBottom']] as const).flatMap(([key,name])=>marker[key]?[`${name}=${marker[key]}`]:[])].join(',');
@@ -62,17 +54,7 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
     const value = lyrics.metadata[key]?.join(' / ').replace(/[\r\n\u2028\u2029]+/g, ' ');
     return value ? [`@${tag}=${encodeKraText(value)}`] : [];
   });
-  const stems = new Map(outputs.map(output=>{
-    const same=outputs.filter(o=>o.groupId===output.groupId&&o.kind===output.kind&&o.language===output.language);
-    const suffix=output.kind==='body'?'':`.${output.kind}.${safeFilename(output.language)}${same.length>1?`.track${output.trackNumber}`:''}`;
-    return [output.id,`${safeFilename(title)}.${safeFilename(output.groupId)}${suffix}`.slice(0,220)];
-  }));
-  const names=new Map<string,string>(),usedNames=new Set<string>();
-  for(const output of [...outputs].sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0)){
-    const stem=stems.get(output.id)!;let name=`${stem}.kra`,index=1;
-    while(usedNames.has(name.toLowerCase()))name=`${stem}.${index++}.kra`;
-    usedNames.add(name.toLowerCase());names.set(output.id,name);
-  }
+  const names = karaokeFilenames(outputs, title, 'kra');
   for (const id of [...new Set(selected)]) {
     const output = outputs.find(output => output.id === id);
     if (!output) { add({ karaokeSettings: true }, '所选输出已失效，请重新选择文件', id); continue; }
@@ -192,25 +174,6 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
   const merged = new Map<string, OutputIssue>();
   for (const issue of issues) { const key = outputIssueKey(issue) + issue.message; const previous = merged.get(key); merged.set(key, previous ? { ...previous, outputIds: [...new Set([...previous.outputIds!, ...issue.outputIds!])] } : issue); }
   return { files, issues: [...merged.values()], omitted, summary: [...files.map(file => `${file.name} — ${file.output.label}`), ...omitted.map(label => `空输出已省略：${label}`), '时间向下量化为厘秒；源项目毫秒时间不变。', '翻译／音译按整句输出；请在 NKM3 中将扫色前后颜色设为相同以显示静态字幕。', '歌手标记写入输出副本；未指定歌手时沿用已输出声部。'].join('\r\n') + '\r\n' };
-}
-/** Uncompressed ZIP writer with UTF-8 names and CRC32. */
-export function zipFiles(files: ({ name: string; text: string } | { name: string; data: Uint8Array<ArrayBuffer> })[]): Uint8Array<ArrayBuffer> {
-  const enc = new TextEncoder(), local: Uint8Array<ArrayBuffer>[] = [], central: Uint8Array<ArrayBuffer>[] = []; let offset = 0;
-  for (const file of files) {
-    const name = enc.encode(file.name), data = 'data' in file ? file.data : enc.encode(file.text); let crc = 0xffffffff;
-    for (const byte of data) { crc ^= byte; for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0); } crc = (crc ^ 0xffffffff) >>> 0;
-    const header = new Uint8Array(30 + name.length), view = new DataView(header.buffer);
-    view.setUint32(0, 0x04034b50, true); view.setUint16(4, 20, true); view.setUint16(6, 0x800, true); view.setUint16(12, 33, true);
-    view.setUint32(14, crc, true); view.setUint32(18, data.length, true); view.setUint32(22, data.length, true); view.setUint16(26, name.length, true); header.set(name, 30);
-    const directory = new Uint8Array(46 + name.length), d = new DataView(directory.buffer);
-    d.setUint32(0, 0x02014b50, true); d.setUint16(4, 20, true); d.setUint16(6, 20, true); d.setUint16(8, 0x800, true); d.setUint16(14, 33, true);
-    d.setUint32(16, crc, true); d.setUint32(20, data.length, true); d.setUint32(24, data.length, true); d.setUint16(28, name.length, true); d.setUint32(42, offset, true); directory.set(name, 46);
-    local.push(header, data); central.push(directory); offset += header.length + data.length;
-  }
-  const size = central.reduce((n, part) => n + part.length, 0), end = new Uint8Array(22), e = new DataView(end.buffer);
-  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, size, true); e.setUint32(16, offset, true);
-  const result = new Uint8Array(offset + size + 22); let at = 0;
-  for (const part of [...local, ...central, end]) { result.set(part, at); at += part.length; } return result;
 }
 export function nicokaraZip(project: ProjectDocument, title: string) {
   const result = prepareNicokara(project, title);
