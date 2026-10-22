@@ -120,5 +120,6 @@ class IndexCache:
     def close(self):
         self.memory.clear()
         self.recent.clear()
-        self.owner.__exit__()
-        shutil.rmtree(self.directory)
+        with InstanceLock(self.directory.parent, blocking=True):
+            self.owner.__exit__()
+            shutil.rmtree(self.directory)

@@ -158,6 +158,8 @@ def test_http_contract_inspect_replace_auth_and_stale_request(tmp_path):
         assert events[-1]["result"] == analysis.json()
         client.post(endpoint+"/import?replace=true", headers=headers, files={"file": ("custom.zip", package())})
         assert client.post(endpoint+"/custom/analyze", headers=headers, json=body).status_code == 409
+        stale_stream = client.post(endpoint+"/custom/analyze?stream=true", headers=headers, json=body)
+        assert "安装实例已变化" in json.loads(stale_stream.text.splitlines()[-1])["error"]
         assert client.delete(endpoint+"/custom", headers=headers).status_code == 204
         assert client.post(endpoint+"/custom/analyze", headers=headers, json=body).status_code == 404
 

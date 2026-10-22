@@ -190,7 +190,7 @@ class Dictionaries:
             if restore:
                 try:
                     index = self.cache.restore(instance)
-                except (OSError, ValueError, EOFError, TypeError):
+                except (OSError, ValueError, EOFError, TypeError, AttributeError, KeyError):
                     logging.getLogger(__name__).warning("临时词典索引恢复失败，重新读取源词典", exc_info=True)
             if index is None:
                 index = DictionaryIndex(self.root / directory)
