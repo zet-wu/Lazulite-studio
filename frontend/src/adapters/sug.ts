@@ -4,7 +4,7 @@ import { cueProblem, cueWord, type KaraokeCue } from '../domain/karaoke';
 import { singerSet } from '../domain/singer-markers';
 import type { LyricLine, LyricWord } from '../domain/lyric-document';
 import type { ProjectDocument } from '../domain/project-document';
-import { DocumentOutputError, type OutputIssue } from './output-validation';
+import { DocumentOutputError, outputIssueKey, type OutputIssue } from './output-validation';
 
 export type SugCharacter = { id: string; char: string; timestamps: number[]; check_count: number; linked_to_next: boolean; is_sentence_end: boolean; sentence_end_ts: number | null; is_line_end: boolean; singer_id: string; is_guide: boolean; ruby?: { parts: { text: string; offset_ms: number }[] } };
 type Sentence = { id: string; singer_id: string; characters: SugCharacter[] };
@@ -71,7 +71,7 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
         chars.forEach((char,index)=>{
           const first=index===0,last=index===chars.length-1;
           const timestamps=first?(segment.reading?.map(p=>p.begin)??[segment.begin]):[];
-          characters.push({id:`char-${charIndex++}`,char,timestamps,check_count:timestamps.length,linked_to_next:!last,is_sentence_end:last,sentence_end_ts:last?segment.end:null,is_line_end:false,singer_id:segment.singer,is_guide:!!segment.guide,...(first&&segment.reading?{ruby:{parts:segment.reading.map((p,i,parts)=>({text:p.text,offset_ms:i?p.begin-parts[i-1].begin:0}))}}:{})});
+          characters.push({id:`char-${charIndex++}`,char,timestamps,check_count:timestamps.length,linked_to_next:!last,is_sentence_end:last,sentence_end_ts:last?segment.end:null,is_line_end:false,singer_id:segment.singer,is_guide:!!segment.guide,...(first&&segment.reading?{ruby:{parts:segment.reading.map((p,i,parts)=>({text:p.text,offset_ms:i?p.begin-parts[0].begin:0}))}}:{})});
         });
       }
       if(segments.at(-1)!.end<maxEnd)issue(target,'最后文本的结束不是整行最大结束，Lin-K 会缩短行包络','unsupported-order');
@@ -142,7 +142,9 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
     files.push({name:names.get(id)!,text:JSON.stringify(data,null,2)+'\n',output});
   }
   if(karaoke.outputs.length&&!files.length&&!issues.length)add({karaokeSettings:true},'请选择至少一个有实际内容的输出文件');
-  const summary=[...files.map(f=>`${f.name} — ${f.output.label}；输出偏移 ${karaoke.offsets[f.output.id]??0} ms`),...descriptions,...omitted.map(label=>`空输出已省略：${label}`),'行采用正文词包络（含带出的导唱）；Ruby 首尾填满所属词，中间停顿保留。','无时间横向分隔保留原文，投影为零时长边界；在 SUG 打轴中成为额外检查点。','词内字符时间由接收端推导；正文与 Ruby 共用检查点。组合角色保留显示名称，集合关系不往返。','其他元数据、段落、脏词、agent 类型／actorRef、背景父子关联、附属轨道用途和原始对象身份没有对等映射。','不携带歌手图片、NKM3 触发标记、媒体或样式；时长 0 表示未知，.lazp 用于 Studio 工程备份。','解压并保留全部 SUG 文件；在 Lin-K 字幕视频生成中加载主文件，再逐个添加背景／翻译／音译副字幕源。','另选媒体、设置各源位置和样式；首次装配请将软件补偿和样式额外偏移设为 0，再按需要调整。','SUG 也可在打轴模块打开；零时长分隔会参与检查点导航。'].join('\n')+'\n';
-  return {files,issues,omitted,summary};
+  const summary=[...files.map(f=>`${f.name} — ${f.output.label}；输出偏移 ${karaoke.offsets[f.output.id]??0} ms`),...descriptions,...omitted.map(label=>`空输出已省略：${label}`),'行采用正文词包络（含带出的导唱）；Ruby 首尾填满所属词，中间停顿保留。','无时间横向分隔保留原文，投影为零时长边界；在 SUG 打轴中成为额外检查点。','词内字符时间由接收端推导；正文与 Ruby 共用检查点。组合角色保留显示名称，集合关系不往返。','SUG 保留原始 Unicode 字符；Lin-K 可能将组合字符合并为显示字符（如 e＋组合重音变为 é）。','其他元数据、段落、脏词、agent 类型／actorRef、背景父子关联、附属轨道用途和原始对象身份没有对等映射。','不携带歌手图片、NKM3 触发标记、媒体或样式；时长 0 表示未知，.lazp 用于 Studio 工程备份。','解压并保留全部 SUG 文件；在 Lin-K 字幕视频生成中加载主文件，再逐个添加背景／翻译／音译副字幕源。','另选媒体、设置各源位置和样式；首次装配请将软件补偿和样式额外偏移设为 0，再按需要调整。','SUG 也可在打轴模块打开；零时长分隔会参与检查点导航。'].join('\n')+'\n';
+  const merged = new Map<string, OutputIssue>();
+  for(const issue of issues){const key=outputIssueKey(issue)+issue.message,previous=merged.get(key);merged.set(key,previous?{...previous,outputIds:[...new Set([...(previous.outputIds??[]),...(issue.outputIds??[])])]}:issue);}
+  return {files,issues:[...merged.values()],omitted,summary};
 }
 export function sugZip(project:ProjectDocument,title:string){const result=prepareSug(project,title);if(result.issues.length)throw new DocumentOutputError(result.issues);return zipFiles([...result.files,{name:'summary.txt',text:result.summary}]);}

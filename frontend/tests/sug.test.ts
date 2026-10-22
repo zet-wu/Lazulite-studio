@@ -9,7 +9,7 @@ const data=(p:ReturnType<typeof fixture>)=>JSON.parse(prepareSug(p,'曲').files[
 it('exports native Unicode, ruby boundaries, pauses, guides and shared offset without source mutations',()=>{
  const p=fixture();p.karaoke.defaults.rubyMs=100;p.karaoke=autoInsertCues(p.lyrics,p.karaoke);p.karaoke.offsets[outputId('main')]=50;
  const before=structuredClone(p),r=prepareSug(p,'曲');expect(r.issues).toEqual([]);expect(p).toEqual(before);
- const d=data(p),chars=d.sentences[0].characters;expect(d.global_offset_ms).toBe(50);expect(chars[0].timestamps[0]).toBe(1003);expect(chars.at(-1).sentence_end_ts).toBe(2009);expect(chars[0].ruby.parts.at(-1).text).toBe('した');
+ const d=data(p),chars=d.sentences[0].characters;expect(d.global_offset_ms).toBe(50);expect(chars[0].timestamps[0]).toBe(1003);expect(chars.at(-1).sentence_end_ts).toBe(2009);expect(chars[0].ruby.parts.at(-1).text).toBe('した');expect(chars[0].ruby.parts.map((p:{offset_ms:number})=>p.offset_ms)).toEqual(chars[0].timestamps.map((t:number)=>t-chars[0].timestamps[0]));
  if(process.env.SUG_CONTRACT_DIR){writeFileSync(`${process.env.SUG_CONTRACT_DIR}/actual.zip`,sugZip(p,'曲'));writeFileSync(`${process.env.SUG_CONTRACT_DIR}/actual.sug`,r.files[0].text);}
 });
 it('preserves independent zero-length separator checkpoints and blocks unhosted or invalid words',()=>{
@@ -30,4 +30,18 @@ it('selected timed auxiliary is independent of broken body ruby and preserves pe
 });
 it('canonicalizes chorus roles, disambiguates names and assigns unspecified explicitly',()=>{
  const p=fixture(),l=p.lyrics.lines[0];p.lyrics.agents=[{id:'a',name:'同名',type:'person'},{id:'b',name:'同名',type:'person'}];l.agentRefs=['a','b'];l.words.push({...createWord('次'),beginMs:2100,endMs:2200,agentRefs:['b','a']});const d=data(p);expect(d.singers).toHaveLength(2);expect(d.sentences[0].characters.every((c:{singer_id:string})=>c.singer_id==='singer-1')).toBe(true);
+});
+it('names full track numbers, omits empty outputs and blocks unknown or ungrouped references',()=>{
+ const p=fixture(),line=p.lyrics.lines[0];p.lyrics.translationTracks=[{id:'first',language:'zh-CN',purpose:'subtitle',contents:[]},{id:'second',language:'zh-CN',purpose:'subtitle',contents:[{id:'c',lineId:line.id,kind:'plain',text:'明天'}]}];p.karaoke.outputs=[outputId('main','translation','second'),outputId('main','translation','first')];
+ const r=prepareSug(p,'曲');expect(r.issues).toEqual([]);expect(r.files[0].name).toBe('曲.main.translation.zh-CN.track2.sug');expect(r.omitted).toHaveLength(1);
+ p.karaoke.outputs=[outputId('main','translation','first')];expect(prepareSug(p,'曲').issues).toHaveLength(1);
+ p.karaoke.lineGroups[line.id]='missing';expect(prepareSug(p,'曲').issues.some(i=>i.karaokeSettings&&i.lineId===line.id)).toBe(true);
+});
+it('blocks ruby conflicts, invalid ranges and controls only in selected dependencies',()=>{
+ const p=fixture(),word=p.lyrics.lines[0].words[0];word.rubyUnits[0].reading='あ^い';expect(prepareSug(p,'s').issues.some(i=>i.rubyId==='r1')).toBe(true);
+ word.rubyUnits[0].reading='あ';word.rubyUnits[1].beginMs=1200;expect(prepareSug(p,'s').issues.some(i=>i.rubyId==='r2')).toBe(true);
+ word.text='歌\t';expect(prepareSug(p,'s').issues.some(i=>i.code==='serialization')).toBe(true);
+});
+it('keeps supplementary and combining codepoints and independent words without ruby linking',()=>{
+ const p=fixture(),l=p.lyrics.lines[0];l.words[0].text='𠮷é';l.words[0].rubyUnits=[];l.words.push({...createWord('次'),beginMs:2100,endMs:2200});const c=data(p).sentences[0].characters;expect(c.map((c:{char:string})=>c.char)).toEqual(['𠮷','e','́','次']);expect(c[2].linked_to_next).toBe(false);expect(c[2].sentence_end_ts).toBe(2009);
 });

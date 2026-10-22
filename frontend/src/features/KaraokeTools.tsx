@@ -1,9 +1,11 @@
+import { prepareSug, sugZip } from '../adapters/sug';
+export type KaraokeExportFormat = 'nicokara' | 'sug';
 import { TopMenu } from './editor/TopMenu';
 import { SelectionSummary } from './editor/SelectionSummary';
 import editorStyles from './editor/semantic-editor.module.css';
 import { lineLabel } from '../domain/line-structure';
 import { SingerMarkersDialog } from './SingerMarkersDialog';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { anchorKey, anchorRange, cueProblem, type CueAnchor, type KaraokeCommand, type KaraokeCue } from '../domain/karaoke';
 import type { ProjectDocument, ProjectCommand } from '../domain/project-document';
 import { karaokeOutputs, nicokaraZip, prepareNicokara, safeFilename } from '../adapters/nicokara';
@@ -36,7 +38,7 @@ export function CueProperties({project,cue,apply}: {project:ProjectDocument;cue:
     <TimePair begin={cue.beginMs} end={cue.endMs} label="导唱" onCommit={(beginMs,endMs)=>{if(beginMs===null||endMs===null)throw new Error('导唱需要完整双端');apply({kind:'cue',id:cue.id,text:cue.text,beginMs,endMs});}}/>
     {problem&&<p role="alert">{problem}</p>}</>;
 }
-export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewIssues}: {project:ProjectDocument;apply:(command:ProjectCommand)=>void;title:string;exportOpen:boolean;setExportOpen:(open:boolean)=>void;viewIssues:(issues:OutputIssue[])=>void}) {
+export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewIssues,focusOutputId}: {project:ProjectDocument;apply:(command:ProjectCommand)=>void;title:string;focusOutputId?:string;exportOpen:KaraokeExportFormat|null;setExportOpen:(open:KaraokeExportFormat|null)=>void;viewIssues:(format:KaraokeExportFormat)=>void}) {
  const {selection,selectedCue}=useEditorSelection()!;
  const [dialog,setDialog]=useState<'groups'|'defaults'|'auto'|'singers'|null>(null), [error,setError]=useState('');
  const [activeMenuId,setActiveMenuId]=useState<string|null>(null);
@@ -45,13 +47,13 @@ export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewI
  return <><div className={editorStyles.ribbon} aria-label="卡拉 OK 操作">
  <SelectionSummary selection={selection} selectedCue={selectedCue} />
  <TopMenu id="cue-tools" title="导唱符" className={editorStyles.ribbonMenu} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId}><button data-role="inline" onClick={()=>(setError(''),setDialog('auto'))}>自动插入导唱符</button><button data-role="inline" onClick={()=>(setError(''),setDialog('defaults'))}>默认导唱符</button></TopMenu>
- <button data-role="secondary" onClick={()=>(setError(''),setDialog('groups'))}>分组管理</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('singers'))}>歌手标记管理</button><button data-role="primary" onClick={()=>setExportOpen(true)}>导出 NicoKara</button></div>
+ <button data-role="secondary" onClick={()=>(setError(''),setDialog('groups'))}>分组管理</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('singers'))}>歌手标记管理</button><button data-karaoke-export="nicokara" data-role="primary" onClick={()=>setExportOpen('nicokara')}>导出 NicoKara</button><button data-karaoke-export="sug" data-role="primary" onClick={()=>setExportOpen('sug')}>导出 SUG</button></div>
  {error&&!dialog&&<p role="alert">{error}</p>}
  {dialog==='singers'&&<SingerMarkersDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='auto'&&<AutoInsertDialog initialGroups={autoGroups} rememberGroups={setAutoGroups} error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='defaults'&&<DefaultsDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='groups'&&<GroupsDialog error={error} project={project} close={()=>setDialog(null)} apply={c=>{const ok=command(c);if(ok&&c.kind==='groups')setAutoGroups(ids=>ids?.flatMap(id=>c.renames[id]?[c.renames[id]]:[])??null);return ok;}}/>}
- {exportOpen&&<KaraokeExport project={project} title={title} apply={command} close={()=>setExportOpen(false)} viewIssues={issues=>{setExportOpen(false);viewIssues(issues);}}/>}</>;
+ {exportOpen&&<KaraokeExport focusOutputId={focusOutputId} format={exportOpen} project={project} title={title} apply={command} close={()=>setExportOpen(null)} viewIssues={()=>{setExportOpen(null);viewIssues(exportOpen);}}/>}</>;
 }
 function DefaultsDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
  const [value,setValue]=useState(project.karaoke.defaults);
@@ -91,10 +93,12 @@ function GroupsDialog({project,close,apply,error}:{error:string;project:ProjectD
  </SettingsDialog>;
 }
 
-export function KaraokeExport({project,title,apply,close,viewIssues}:{project:ProjectDocument;title:string;apply:(c:KaraokeCommand)=>boolean;close:()=>void;viewIssues:(issues:OutputIssue[])=>void}) {
- const result=useMemo(()=>prepareNicokara(project,title),[project,title]);const [error,setError]=useState('');
+export function KaraokeExport({project,title,apply,close,viewIssues,focusOutputId,format='nicokara'}:{focusOutputId?:string;format?:KaraokeExportFormat;project:ProjectDocument;title:string;apply:(c:KaraokeCommand)=>boolean;close:()=>void;viewIssues:(issues:OutputIssue[])=>void}) {
+ const prepare=format==='sug'?prepareSug:prepareNicokara;
+ const result=useMemo(()=>prepare(project,title),[project,title,prepare]);const [error,setError]=useState('');
  const [drafts,setDrafts]=useState<Record<string,string>>({}),[invalid,setInvalid]=useState<Set<string>>(new Set());
  const inputs=useRef(new Map<string,HTMLInputElement>());
+ useEffect(()=>{if(focusOutputId)inputs.current.get(focusOutputId)?.focus();},[focusOutputId]);
  const valid=(value:string)=>/^[+-]?\d+$/.test(value)&&Number.isSafeInteger(Number(value));
  const commit=(ids:string[])=>{
    const bad=ids.filter(id=>drafts[id]!==undefined&&!valid(drafts[id]));
@@ -108,17 +112,18 @@ export function KaraokeExport({project,title,apply,close,viewIssues}:{project:Pr
  const download=()=>{
    const submitted=commit(project.karaoke.outputs);if(!submitted)return;
    if(submitted.bad.length){inputs.current.get(submitted.bad[0])?.focus();return;}
-   try{downloadKaraoke(nicokaraZip(submitted.project,title),`${safeFilename(title)}-nicokara.zip`,'application/zip');setError('');}catch(e){setError((e as Error).message);}
+   try{downloadKaraoke((format==='sug'?sugZip:nicokaraZip)(submitted.project,title),`${safeFilename(title)}-${format}.zip`,'application/zip');setError('');}catch(e){setError((e as Error).message);}
  };
- return <SettingsDialog title="导出 Nicokara" close={close} actions={<><button data-role="secondary" onClick={()=>viewIssues(result.issues)}>查看校验</button><button data-role="primary" onClick={download}>下载 ZIP</button></>}>
- <p id="offset-help">单位：毫秒；正数延后，负数提前</p>
- <div className={styles.outputGrid}><span>输出文件</span><span>@Offset</span>{karaokeOutputs(project).map(output=>{
+ const check=()=>{const submitted=commit(project.karaoke.outputs);if(!submitted)return;if(submitted.bad.length){inputs.current.get(submitted.bad[0])?.focus();return;}viewIssues(prepare(submitted.project,title).issues);};
+ return <SettingsDialog returnFocus={()=>document.querySelector<HTMLElement>(`[data-karaoke-export="${format}"]`)} title={format==='sug'?'导出 SUG':'导出 Nicokara'} close={close} actions={<><button data-role="secondary" onClick={check}>查看校验</button><button data-role="primary" onClick={download}>下载 ZIP</button></>}>
+ <p id="offset-help">单位：毫秒；正数延后，负数提前。NicoKara 与 SUG 共用输出选择和偏移设置。</p>
+ <div className={styles.outputGrid}><span>输出文件</span><span>{format==='sug'?'输出偏移（毫秒）':'@Offset'}</span>{karaokeOutputs(project).map(output=>{
    const selected=project.karaoke.outputs.includes(output.id);
    return <div className={styles.outputRow} key={output.id}><label className={styles.output}><input type="checkbox" checked={selected} onChange={e=>apply({kind:'outputs',outputs:e.target.checked?[...project.karaoke.outputs,output.id]:project.karaoke.outputs.filter(id=>id!==output.id)})}/>{output.label}</label>
-   <input className={styles.offset} aria-label={`${output.label} @Offset`} aria-describedby="offset-help" aria-invalid={invalid.has(output.id)} disabled={!selected} value={drafts[output.id]??String(project.karaoke.offsets[output.id]??0)} ref={node=>{if(node)inputs.current.set(output.id,node);else inputs.current.delete(output.id);}}
+   <input className={styles.offset} aria-label={`${output.label} ${format==='sug'?'输出偏移（毫秒）':'@Offset'}`} aria-describedby="offset-help" aria-invalid={invalid.has(output.id)} disabled={!selected} value={drafts[output.id]??String(project.karaoke.offsets[output.id]??0)} ref={node=>{if(node)inputs.current.set(output.id,node);else inputs.current.delete(output.id);}}
    onChange={e=>{const value=e.target.value;setDrafts(previous=>({...previous,[output.id]:value}));if(valid(value))setInvalid(previous=>new Set([...previous].filter(id=>id!==output.id)));}}
    onBlur={()=>{if(selected)commit([output.id]);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();commit([output.id]);}}}/></div>;
  })}</div>
- <p role="status">所选文件：{result.files.length} 个有内容，{result.issues.length} 项阻塞</p>{result.issues.length>0&&<p>{result.issues[0].message}</p>}{result.omitted.length>0&&<p>省略 {result.omitted.length} 个空输出</p>}
+ <p role="status">所选文件：{result.files.length} 个有内容，{result.issues.length} 项阻塞</p>{result.issues.length>0&&<p>{result.issues[0].message}</p>}{result.omitted.length>0&&<p>省略 {result.omitted.length} 个空输出{format==='sug'?`：${result.omitted.join('、')}`:''}</p>}
  {error&&<p role="alert">{error}</p>}</SettingsDialog>;
 }
