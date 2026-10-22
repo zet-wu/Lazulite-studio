@@ -16,6 +16,7 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
   const [source]=useState(document),[ids]=useState(lineIds);
   const [items,setItems]=useState<DictionaryInfo[]>([]),[selected,setSelected]=useState('');
   const [rows,setRows]=useState<DictionaryRow[]>([]),[pending,setPending]=useState(false),[error,setError]=useState('');
+  const [phase,setPhase]=useState<'loading'|'analyzing'>('loading');
   const [attempt,setAttempt]=useState(0),[merge,setMerge]=useState(false);
   const [composing,setComposing]=useState(false),[active,setActive]=useState<string|null>(null);
   const edited=useRef(new Map<string,string[]>()), scroll=useRef<HTMLDivElement>(null);
@@ -36,8 +37,8 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
   useEffect(()=>{
     const item=items.find(i=>i.instance===selected);
     if(!item||stale)return;
-    const controller=new AbortController();abort.current=controller;setPending(true);setError('');
-    void analyzeDictionary(item.id,item.instance,source.lines.filter(l=>ids.includes(l.id)).map(l=>({id:l.id,text:lineText(l)})),controller.signal).then(result=>{
+    const controller=new AbortController();abort.current=controller;setPending(true);setPhase('loading');setError('');
+    void analyzeDictionary(item.id,item.instance,source.lines.filter(l=>ids.includes(l.id)).map(l=>({id:l.id,text:lineText(l)})),controller.signal,value=>{if(!controller.signal.aborted)setPhase(value);}).then(result=>{
       if(controller.signal.aborted)return;
       setRows(proposeDictionaryRuby(source,ids,result.ranges).map(row=>({...row,blocks:row.blocks.map(block=>{
         const values=edited.current.get(block.key);
@@ -68,7 +69,7 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
     </div>
     {!items.length&&<p>请在设置中的注音词典导入词典</p>}
     {rows.some(r=>r.blocks.some(b=>b.merge))&&<label><input type="checkbox" checked={merge} disabled={composing||stale} onChange={e=>setMerge(e.target.checked)}/>允许下方标出的最小正文合并</label>}
-    {pending&&<p role="status">正在生成词典注音…</p>}
+    {pending&&<p role="status">{phase==='loading'?'正在加载词典…':'正在分析正文…'}</p>}
     {error&&<p role="alert">{error}</p>}
     {stale&&<p role="alert">源文档已变化，请重新打开生成。</p>}
     <div ref={scroll} className={`${preview.rubyGenerationRows} ${virtual?preview.rubyGenerationRowsVirtual:''}`}>
@@ -79,7 +80,7 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
           <div className={preview.japaneseRubyBlocks}>{row.blocks.map(block=>{
             const editable=!['boundary','unannotated'].includes(block.status);
             const hint=editable?((block.merge&&!merge?'需开启最小正文合并才能应用此段；':'')+'留空不生成此单元；整段留空保留原注音'):undefined;
-            return <ReadingPair key={block.key} text={block.base} hint={hint} status={block.merge&&dictionaryBlockApplies(block,merge)?'将合并':undefined}>
+            return <ReadingPair key={block.key} text={block.base} hint={hint} status={block.existing?'已有注音':block.merge&&dictionaryBlockApplies(block,merge)?'将合并':undefined}>
               {editable&&<div className={styles.units}>{block.units.map((unit,i)=><ReadingInput key={i}
                 value={unit} label={`${block.base}读音 ${i+1}`} hint={hint}
                 disabled={stale||pending} change={value=>change(block.key,i,value)}

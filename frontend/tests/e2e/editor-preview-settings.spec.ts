@@ -11,7 +11,7 @@ test('device settings opens in the editor and returns keyboard focus',async({pag
  },target);
  await page.goto('/projects/sample-project/edit?scenario=no-music');
   const summary=page.locator('[data-top-menu="settings"] summary');await summary.click();
-  await page.getByRole('button',{name:'计算设备…',exact:true}).click();
+  await page.getByRole('button',{name:'计算设备',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'计算设备',exact:true});await expect(dialog).toBeVisible();
   await dialog.getByRole('button',{name:'关闭计算设备',exact:true}).click();await expect(dialog).toHaveCount(0);await expect(summary).toBeFocused();
   await expect(page).toHaveURL(/\/edit/);

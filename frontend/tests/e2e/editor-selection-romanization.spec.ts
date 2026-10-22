@@ -48,7 +48,7 @@ test('Ctrl and Cmd toggle timed units and content delete preserves native typing
 });
 async function generate(page: Page) {
   await page.locator('[data-outline-drag]').first().click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
+  await page.getByRole('menuitem', { name: '生成日文罗马字音译' }).click();
   return page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
 }
 test('active edits, Escape and IME stay within proposal', async ({ page }) => {
@@ -68,11 +68,11 @@ test('lyric settings menu dismisses and keyboard opens dialogs', async ({ page }
   await settings.focus(); await settings.press('Enter'); await expect(settings).toHaveAttribute('aria-expanded', 'true');
   await page.getByRole('button', { name: '歌词元数据', exact: true }).focus(); await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog', { name: '歌词元数据', exact: true })).toBeVisible(); await page.keyboard.press('Escape'); await expect(settings).toHaveAttribute('aria-expanded', 'false');
-  for (const [entry, title] of [['歌手管理', '歌手管理'], ['管理音译轨道…', '音译轨道管理']]) {
+  for (const [entry, title] of [['歌手管理', '歌手管理'], ['管理音译轨道', '音译轨道管理']]) {
     await settings.click(); await page.getByRole('button', { name: entry, exact: true }).click(); await expect(page.getByRole('dialog', { name: title, exact: true })).toBeVisible(); await page.keyboard.press('Escape');
   }
   await settings.click(); await page.locator('[data-top-menu="tools"] summary').click(); await expect(settings).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.getByRole('button', { name: '管理音译轨道…', exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: '管理音译轨道', exact: true })).toBeHidden();
   await page.getByRole('button', { name: '编辑', exact: true }).click(); await expect(settings).toHaveAttribute('aria-expanded', 'false');
 });
 test('line and content ranges delete fully and restore with one undo', async ({ page }) => {

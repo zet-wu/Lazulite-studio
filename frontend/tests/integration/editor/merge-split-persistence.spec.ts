@@ -15,7 +15,7 @@ test('merges, splits, drafts and atomic history survive real save, reopen and TT
   await ruby.first().click({ position: { x: 3, y: 3 } }); await ruby.last().click({ position: { x: 3, y: 3 }, modifiers: ['Shift'] });
   await ruby.first().click({ position: { x: 3, y: 3 }, button: 'right' }); await page.getByRole('menuitem', { name: '合并所选', exact: true }).click();
   await expect(line.getByLabel('读音 今日', { exact: true })).toHaveValue('きょう');
-  await page.locator('[data-outline-drag]').first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行…' }).click();
+  await page.locator('[data-outline-drag]').first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行' }).click();
   const dialog = page.getByRole('dialog', { name: '拆分歌词行', exact: true });
   await dialog.getByRole('button', { name: '在第 3 词前切分' }).click(); await dialog.getByRole('button', { name: '在第 2 词前切分' }).click();
   await dialog.getByLabel('翻译 1归属').selectOption({ label: '第 2 行' });

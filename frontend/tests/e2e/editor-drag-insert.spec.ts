@@ -119,7 +119,7 @@ test('UI word to empty line, 注音 and romanization drags use the same insertio
   await begin(page, contents.first(), contents.nth(1)); await page.mouse.up();
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
   await contents.first().getByText('音译 · ja-Latn').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
+  await page.getByRole('menuitem', { name: '从音译生成注音' }).click();
   await page.getByRole('button', { name: '生成 注音', exact: true }).click();
   const rubies = line.locator('[data-ruby-id]');
   const r = (await rubies.last().boundingBox())!, t = (await rubies.first().boundingBox())!;

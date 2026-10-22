@@ -9,7 +9,7 @@ test('main merge, song part and clear Ruby survive real save/reopen with one-ste
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();
  const before=await(await page.request.get('/api/v1/projects/background-playback/document')).json();await page.reload();await expect(line.locator('[data-word-id]')).toHaveCount(8);
  await page.locator('[data-outline-drag]').first().click();await expect(page.getByLabel('歌曲段落',{exact:true})).toHaveValue('Custom Part');
- await page.locator('[data-top-menu="tools"] summary').click();await page.getByRole('button',{name:'批处理…',exact:true}).click();await page.getByRole('button',{name:'清除注音',exact:true}).click();await page.getByRole('button',{name:'应用（一次撤销）'}).click();await expect(line.locator('[data-ruby-id]')).toHaveCount(0);
+ await page.locator('[data-top-menu="tools"] summary').click();await page.getByRole('button',{name:'批处理',exact:true}).click();await page.getByRole('button',{name:'清除注音',exact:true}).click();await page.getByRole('button',{name:'应用（一次撤销）'}).click();await expect(line.locator('[data-ruby-id]')).toHaveCount(0);
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(line.locator('[data-ruby-id]')).toHaveCount(4);
  await page.getByRole('button',{name:'重做',exact:true}).click();await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();await page.reload();await expect(line.locator('[data-ruby-id]')).toHaveCount(0);
  const saved=await(await page.request.get('/api/v1/projects/background-playback/document')).json();

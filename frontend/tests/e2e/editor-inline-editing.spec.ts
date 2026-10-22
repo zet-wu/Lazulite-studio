@@ -15,8 +15,8 @@ test('注音 main-row right click preserves multi-selection and updates content/
   const outline = page.locator('[data-outline-drag]');
   await outline.first().click(); await outline.last().click({ modifiers: ['Shift'] });
   await outline.first().click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
+  await page.getByRole('menuitem', { name: '从音译生成注音' }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成注音' });
   await expect(dialog).toContainText('生成 2 / 3 行');
   await expect(dialog.getByLabel('目标词')).toHaveCount(2);
   await expect(dialog.getByText('空单元', { exact: true })).toHaveCount(0);
@@ -28,11 +28,11 @@ test('注音 main-row right click preserves multi-selection and updates content/
   await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeDisabled();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await outline.nth(1).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
+  await page.getByRole('menuitem', { name: '从音译生成注音' }).click();
   await expect(dialog).toContainText('生成 2 / 3 行');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await outline.last().click(); await outline.first().click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
+  await page.getByRole('menuitem', { name: '从音译生成注音' }).click();
   await expect(dialog).toContainText('L1');
 });
 
@@ -75,7 +75,7 @@ test('translation languages, trash, clear, background and singer mixed editing p
   await load(page);
   const line = row(page);
   await page.locator('[data-top-menu=lyrics-settings] summary').click();
-  await page.getByRole('button', { name: '管理翻译轨道…' }).click();
+  await page.getByRole('button', { name: '管理翻译轨道' }).click();
   const manager = page.getByRole('dialog', { name: '翻译轨道管理' });
   await manager.getByLabel('翻译轨道 1语言').fill('en_MS'); await manager.getByRole('button', { name: '应用', exact: true }).click();
   await expect(page.getByRole('alert').filter({ hasText: '语言标签格式无效' })).toBeVisible();

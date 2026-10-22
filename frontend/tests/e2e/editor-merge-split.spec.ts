@@ -54,7 +54,7 @@ for (const entry of ['＋', '添加词', '前插词', '后插词']) test(`${entr
 });
 
 test('three-way split preview, keyboard boundary, invalidated background, cancel and atomic apply', async ({ page }) => {
-  const open = async () => { await page.locator('[data-outline-drag]').first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行…' }).click(); };
+  const open = async () => { await page.locator('[data-outline-drag]').first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '拆分行' }).click(); };
   await open();
   const dialog = page.getByRole('dialog', { name: '拆分歌词行', exact: true });
   await expect(dialog.getByRole('button', { name: '应用', exact: true })).toBeDisabled();

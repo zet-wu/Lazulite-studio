@@ -647,16 +647,16 @@ function EditorWorkspaceContent(props: Props) {
       actions.push(single('add-ruby','添加注音',()=>setRubyShortcut({wordId:word.id,serial:++rubyShortcutSerial.current})),selectionAction(effective,'redistribute','重分配读音时间'));
     } else if(effective.kind==='lines') {
       const parent=line.backgroundOf??line.id;
-      actions.push({id:'dictionary-ruby',label:'词典注音…',run:()=>openReadingDialog(effective.ids, 'dictionary')},
-        {id:'generate-ruby',label:'智能日文注音…',run:()=>openReadingDialog(effective.ids, 'japanese')},
+      actions.push({id:'dictionary-ruby',label:'词典注音',run:()=>openReadingDialog(effective.ids, 'dictionary')},
+        {id:'generate-ruby',label:'智能日文注音',run:()=>openReadingDialog(effective.ids, 'japanese')},
         {id:'insert-before',label:'前插行',run:()=>dispatch({type:'insert-line',afterLineId:mainLines[mainLines.findIndex(item=>item.id===parent)-1]?.id??null})},
         {id:'insert-after',label:'后插行',run:()=>dispatch({type:'insert-line',afterLineId:parent})},
-        {id:'roman-to-ruby',label:'从音译生成 注音…',run:()=>setRubyGeneration({lineIds:effective.ids})},
-        {id:'generate-roman',label:'生成日文罗马字音译…',run:()=>setRomanizationGeneration(effective.ids)},
+        {id:'roman-to-ruby',label:'从音译生成注音',run:()=>setRubyGeneration({lineIds:effective.ids})},
+        {id:'generate-roman',label:'生成日文罗马字音译',run:()=>setRomanizationGeneration(effective.ids)},
         single('insert-word','添加词',()=>startWordDraft(line.id,line.words.at(-1)?.id??null)),
         selectionAction(effective,'previous','行上移'),selectionAction(effective,'next','行下移'),
-        {...single('split-line','拆分行…',()=>setSplitLineId(line.id)),disabled:multiple||!!line.backgroundOf||line.words.length<2,reason:multiple?'拆行需单选':lineStructureIssues(document,line).join('；')},
-        selectionAction(effective,'merge','合并所选'),{id:'segment',label:'分词…',run:()=>setSegmentationOpen(true)});
+        {...single('split-line','拆分行',()=>setSplitLineId(line.id)),disabled:multiple||!!line.backgroundOf||line.words.length<2,reason:multiple?'拆行需单选':lineStructureIssues(document,line).join('；')},
+        selectionAction(effective,'merge','合并所选'),{id:'segment',label:'分词',run:()=>setSegmentationOpen(true)});
       if(mode==='karaoke'&&props.project) {
         const count=props.project.karaoke.cues.filter(cue=>effective.ids.includes(cue.anchor.lineId)).length;
         actions.push({id:'clear-cues',label:multiple?'清除所选行导唱':'清除本行导唱',disabled:!count,reason:count?`清除 ${count} 个导唱，仅所选行`:'所选行没有导唱',run:()=>applyKaraokeCommand({kind:'remove-lines',lineIds:effective.ids})});
@@ -670,13 +670,13 @@ function EditorWorkspaceContent(props: Props) {
         actions.push(selectionAction(effective,'tokenize','分词并定时'));
         let reason: string|undefined;
         try { attachmentSelection(document,effective); } catch(cause) {reason=(cause as Error).message;}
-        actions.push({id:'transfer',label:'转移到其他歌词行…',disabled:!!reason||document.lines.length<2,reason,run:()=>setContentTransfer({trackId:effective.trackId,contentId:effective.contentId,ids:effective.ids,attachment:effective.attachment,targetLineId:document.lines.find(item=>item.id!==line.id)?.id??''})});
-        if(!translated)actions.push(single('roman-to-ruby','从音译生成 注音…',()=>setRubyGeneration({lineIds:[line.id],trackId:effective.trackId,contentId:effective.contentId}),'多个内容的覆盖语义未定义，请先单选'));
+        actions.push({id:'transfer',label:'转移到其他歌词行',disabled:!!reason||document.lines.length<2,reason,run:()=>setContentTransfer({trackId:effective.trackId,contentId:effective.contentId,ids:effective.ids,attachment:effective.attachment,targetLineId:document.lines.find(item=>item.id!==line.id)?.id??''})});
+        if(!translated)actions.push(single('roman-to-ruby','从音译生成注音',()=>setRubyGeneration({lineIds:[line.id],trackId:effective.trackId,contentId:effective.contentId}),'多个内容的覆盖语义未定义，请先单选'));
       }
       const tracks=attachmentTracks(document,effective), index=tracks.findIndex(track=>track.id===effective.trackId);
       const resolved=tracks.flatMap(track=>track.contents.flatMap(content=>effective.kind==='romanization-content'?(effective.ids.includes(content.id)?[track.id]:[]):content.kind==='timed'?content.units.filter(unit=>effective.ids.includes(unit.id)).map(()=>track.id):[]));
       const sameTrack=resolved.length===effective.ids.length&&new Set(resolved).size===1;
-      actions.push({id:'manage-track',label:'管理轨道…',disabled:!sameTrack,reason:!sameTrack?'请选择同一轨道':undefined,run:()=>setSettingsDialog(translated?'translations':'tracks')});
+      actions.push({id:'manage-track',label:'管理轨道',disabled:!sameTrack,reason:!sameTrack?'请选择同一轨道':undefined,run:()=>setSettingsDialog(translated?'translations':'tracks')});
       for(const direction of [-1,1] as const) actions.push({id:direction<0?'track-previous':'track-next',label:direction<0?'轨道前移':'轨道后移',disabled:!sameTrack||index+direction<0||index+direction>=tracks.length,reason:!sameTrack?'请选择同一轨道':index+direction<0||index+direction>=tracks.length?'已到达轨道边界':undefined,run:()=>{
         if(!translated)dispatch({type:'move-romanization-track',trackId:effective.trackId,direction});
         else {const ordered=document.translationTracks.slice(); const [track]=ordered.splice(index,1);ordered.splice(index+direction,0,track);dispatch({type:'set-translation-tracks',source:document.translationTracks,tracks:ordered});}

@@ -8,7 +8,7 @@ test('romanization input and composition survive resize',async({page})=>{
  await page.setViewportSize({width:1440,height:1000});await page.goto('/projects/sample-project/edit?scenario=no-music');
  const xml='<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1" end="5"><span begin="1" end="2">が</span><span begin="2" end="3">も</span><span begin="3" end="3.5">わ</span><span begin="3.5" end="4">つ</span><span begin="4" end="5">ち</span></p></div></body></tt>';
  await importLyrics(page,{name:'short.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
- await page.locator('[data-outline-drag]').first().click({button:'right'});await page.getByRole('menuitem',{name:'生成日文罗马字音译…'}).click();
+ await page.locator('[data-outline-drag]').first().click({button:'right'});await page.getByRole('menuitem',{name:'生成日文罗马字音译'}).click();
  const dialog=page.getByRole('dialog',{name:'生成日文罗马字音译',exact:true});await dialog.getByLabel('输出',{exact:true}).selectOption('timed');
  await page.evaluate(zoom=>{document.documentElement.style.zoom=String(zoom);window.dispatchEvent(new Event('resize'));},zoom);
  const inputs=dialog.getByRole('textbox');expect(await inputs.evaluateAll(nodes=>nodes.map(n=>(n as HTMLInputElement).value.trim()))).toEqual(['ga','mo','wa','tsu','chi']);

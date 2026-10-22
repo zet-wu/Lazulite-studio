@@ -7,7 +7,7 @@ for (const kind of ['plain', 'timed']) test(`${kind} manual results persist and 
   await importLyrics(page, { name: 'generation-persistence.ttml', mimeType: 'application/xml', buffer: Buffer.from(japaneseReadingTtml) });
   const outline = page.locator('[data-outline-drag]'); await expect(outline).toHaveCount(3);
   await outline.first().click(); await outline.last().click({ modifiers: ['Shift'] }); await outline.first().click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
+  await page.getByRole('menuitem', { name: '生成日文罗马字音译' }).click();
   const dialog = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
   await dialog.getByLabel('输出', { exact: true }).selectOption(kind);
   const label = kind === 'timed' ? 'L1单元 1音译' : 'L1音译'; await dialog.getByLabel(label, { exact: true }).fill(' manual  ');
@@ -32,7 +32,7 @@ for (const kind of ['plain', 'timed']) test(`${kind} manual results persist and 
   expect(final).toEqual(draft); expect(finalXml).toContain('transliterations'); expect(finalXml).not.toContain('x-roman'); expect(finalXml).not.toContain('studio:');
   await importLyrics(page, { name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });
   await expect(page.getByLabel(kind === 'timed' ? '音译单元 1' : '音译 ja-Latn', { exact: true }).first()).toHaveValue(' manual  ');
-  await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
+  await outline.first().click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译' }).click();
   await expect(dialog.getByLabel('输出', { exact: true })).toHaveValue(kind);
   expect(await dialog.getByLabel('目标轨道').inputValue()).not.toBe('');
   await expect(dialog.getByLabel('L1生成内容')).toHaveValue('skip');
@@ -43,7 +43,7 @@ for (const kind of ['plain', 'timed']) test(`${kind} manual results persist and 
 test('Generation mode survives project reload and stays isolated across projects', async ({ page }) => {
   async function open(page: Page) {
     await page.locator('[data-outline-drag]').first().click({ button: 'right' });
-    await page.getByRole('menuitem', { name: '生成日文罗马字音译…' }).click();
+    await page.getByRole('menuitem', { name: '生成日文罗马字音译' }).click();
     return page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
   }
   await page.goto('/projects/background-playback/edit'); let dialog = await open(page);

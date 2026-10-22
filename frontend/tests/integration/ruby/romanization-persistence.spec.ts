@@ -21,8 +21,8 @@ test('filtering, warning and explicit overwrite apply atomically and survive rea
   });
   await importLyrics(page, { name: 'p11.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await page.locator('[data-top-menu="tools"] summary').click();
-  await page.getByRole('button', { name: '从音译生成 注音…', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 注音', exact: true });
+  await page.getByRole('button', { name: '从音译生成注音', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成注音', exact: true });
   await expect(dialog.locator('[data-ruby-row]')).toHaveCount(2);
   await dialog.getByRole('checkbox', { name: /覆盖/ }).check();
   await dialog.getByLabel('目标 注音').last().fill('じ');

@@ -48,7 +48,7 @@ test('no music: import, shared beat properties, translation, metadata, undo and 
 test('generated whitespace is omitted from saved timing and playback projection',async({page})=>{
   const id=await create(page);const text='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="1" end="3"><span studio:id="ka" begin="1" end="2">か</span><span studio:id="space"> </span><span studio:id="na" begin="2" end="3">な</span></p></body></tt>';
   await importLyrics(page,{name:'empty.ttml',mimeType:'application/xml',buffer:Buffer.from(text)});await page.locator('[data-outline-drag]').first().click();
-  await page.getByText('编辑工具',{exact:true}).click();await page.getByRole('button',{name:'生成日文罗马字音译…',exact:true}).click();
+  await page.getByText('编辑工具',{exact:true}).click();await page.getByRole('button',{name:'生成日文罗马字音译',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'生成日文罗马字音译'});await dialog.getByLabel('L1单元 2音译').fill('');await dialog.getByLabel('L1单元 2音译').press('Tab');await expect(dialog.getByLabel('L1单元 2音译')).toHaveValue('');
   await dialog.getByRole('button',{name:'生成音译',exact:true}).click();await save(page);
   const snapshot=(await envelope(page,id)).document;

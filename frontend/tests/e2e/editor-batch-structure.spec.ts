@@ -3,7 +3,7 @@ import { importMergeSplit } from '../fixtures/merge-split';
 import { importLyrics } from '../fixtures/import-lyrics';
 const line=(page:Page,id='merge-line-0')=>page.locator(`main section[data-line-id="${id}"]`);
 const edge=async(page:Page,index:number,options={})=>line(page).locator('[data-word-id]').nth(index).click({position:{x:3,y:3},...options});
-const batch=async(page:Page)=>{await page.locator('[data-top-menu="tools"] summary').click();await page.getByRole('button',{name:'批处理…',exact:true}).click();return page.getByRole('dialog',{name:'批处理',exact:true});};
+const batch=async(page:Page)=>{await page.locator('[data-top-menu="tools"] summary').click();await page.getByRole('button',{name:'批处理',exact:true}).click();return page.getByRole('dialog',{name:'批处理',exact:true});};
 test.beforeEach(async({page})=>{await page.setViewportSize({width:1440,height:1000});await page.goto('/projects/sample-project/edit?scenario=no-music');await importMergeSplit(page,3);});
 test('batch feedback, literal body and Ruby replacements, clear preview and undo',async({page})=>{
  await edge(page,0);let dialog=await batch(page);await expect(dialog.getByRole('button',{name:'替换',exact:true})).toHaveAttribute('aria-pressed','true');

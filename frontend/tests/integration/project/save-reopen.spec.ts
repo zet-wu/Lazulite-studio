@@ -7,8 +7,8 @@ test('generates 注音, saves through FastAPI and reopens the complete current d
   const content = line.locator('[data-romanization-content-id]').first();
   const source = await content.locator('input').evaluateAll((items) => items.map((item) => (item as HTMLInputElement).value));
   await content.getByText('音译 · ja-Latn').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 注音…' }).click();
-  const dialog = page.getByRole('dialog', { name: '从音译生成 注音' });
+  await page.getByRole('menuitem', { name: '从音译生成注音' }).click();
+  const dialog = page.getByRole('dialog', { name: '从音译生成注音' });
 
   await dialog.getByRole('button', { name: '生成 注音', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '读音 二人', exact: true })).toHaveCount(3);

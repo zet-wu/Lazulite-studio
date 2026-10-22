@@ -7,7 +7,7 @@ test('shared popup in a dialog dismisses with Escape at either screen edge and r
   await page.goto('/projects/sample-project/edit?scenario=no-music');
   await importLyrics(page,{name:'select.ttml',mimeType:'application/xml',buffer:Buffer.from(japaneseReadingTtml)});
   const row=page.locator('[data-outline-drag]').first();await row.click({button:'right'});
-  await page.getByRole('menuitem',{name:'生成日文罗马字音译…'}).click();
+  await page.getByRole('menuitem',{name:'生成日文罗马字音译'}).click();
   const dialog=page.getByRole('dialog',{name:'生成日文罗马字音译',exact:true});
   const source=dialog.getByRole('combobox',{name:'输出',exact:true});
   // Boundary placement exercises the same live shared control in the dialog portal.

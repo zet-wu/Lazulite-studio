@@ -50,18 +50,18 @@ export function EditorRibbon(props: Props) {
     <TopMenu id="tools" title="编辑工具" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
       <button data-role="inline" disabled={!props.canMoveUp} onClick={props.moveUp}>词移上行</button>
       <button data-role="inline" disabled={!props.canMoveDown} onClick={props.moveDown}>词移下行</button>
-      <button data-role="inline" onClick={props.openSegmentation}>分词…</button>
-      <button data-role="inline" onClick={props.openBatchTools}>批处理…</button>
-      <button data-role="inline" disabled={!props.canGenerateRomanization} onClick={props.openRomanizationGeneration}>生成日文罗马字音译…</button>
-      <button data-role="inline" disabled={!props.canGenerateJapaneseRuby} onClick={props.openJapaneseRuby}>智能日文注音…</button>
-      <button data-role="inline" disabled={!props.canGenerateJapaneseRuby} onClick={props.openDictionaryRuby}>词典注音…</button>
-      <button data-role="inline" disabled={!props.canGenerateRuby} onClick={props.openRubyGeneration}>从音译生成 注音…</button>
+      <button data-role="inline" onClick={props.openSegmentation}>分词</button>
+      <button data-role="inline" onClick={props.openBatchTools}>批处理</button>
+      <button data-role="inline" disabled={!props.canGenerateRomanization} onClick={props.openRomanizationGeneration}>生成日文罗马字音译</button>
+      <button data-role="inline" disabled={!props.canGenerateJapaneseRuby} onClick={props.openJapaneseRuby}>智能日文注音</button>
+      <button data-role="inline" disabled={!props.canGenerateJapaneseRuby} onClick={props.openDictionaryRuby}>词典注音</button>
+      <button data-role="inline" disabled={!props.canGenerateRuby} onClick={props.openRubyGeneration}>从音译生成注音</button>
     </TopMenu>
     <TopMenu id="lyrics-settings" title="歌词设置" className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
       <button data-role="inline" onClick={props.openMetadata}>歌词元数据</button>
       <button data-role="inline" disabled={props.singersDisabled} onClick={props.openSingers}>歌手管理</button>
-      <button data-role="inline" onClick={props.openTranslationTracks}>管理翻译轨道…</button>
-      <button data-role="inline" onClick={props.openTracks}>管理音译轨道…</button>
+      <button data-role="inline" onClick={props.openTranslationTracks}>管理翻译轨道</button>
+      <button data-role="inline" onClick={props.openTracks}>管理音译轨道</button>
     </TopMenu>
   </div>;
 }

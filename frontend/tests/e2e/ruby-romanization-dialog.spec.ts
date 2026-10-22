@@ -25,15 +25,15 @@ async function open(page: Page, count = 3, source = 'ka', body = 'は', setup: '
   if (setup === 'link') {
     await page.locator('[data-outline-drag]').first().click();
     await page.locator('[data-top-menu="tools"] summary').click();
-    await page.getByRole('button', { name: '批处理…', exact: true }).click();
+    await page.getByRole('button', { name: '批处理', exact: true }).click();
     const batch = page.getByRole('dialog', { name: '批处理', exact: true });
     await batch.getByRole('button', { name: '结束时间链接', exact: true }).click();
     await batch.getByRole('button', { name: '应用（一次撤销）', exact: true }).click();
     await batch.getByRole('button', { name: '关闭', exact: true }).click();
   }
   await page.locator('[data-top-menu="tools"] summary').click();
-  await page.getByRole('button', { name: '从音译生成 注音…', exact: true }).click();
-  return page.getByRole('dialog', { name: '从音译生成 注音', exact: true });
+  await page.getByRole('button', { name: '从音译生成注音', exact: true }).click();
+  return page.getByRole('dialog', { name: '从音译生成注音', exact: true });
 }
 
 test(`compact warning, correction, skip, direct navigation and Esc`, async ({ page }) => {

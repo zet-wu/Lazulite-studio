@@ -28,14 +28,14 @@ test('background editing, mixed singer selection, relation and generation use ex
   await expect(bg.getByRole('textbox', { name: '翻译 1', exact: true })).toHaveValue('修改后的背景翻译');
   await expect(bg.locator('[data-romanization-unit-id]')).toHaveCount(2);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
-  await bgOutline.click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译…', exact: true }).click();
+  await bgOutline.click({ button: 'right' }); await page.getByRole('menuitem', { name: '生成日文罗马字音译', exact: true }).click();
   const generation = page.getByRole('dialog', { name: '生成日文罗马字音译', exact: true });
   await generation.getByLabel('L1 · 背景生成内容').selectOption('append');
   await generation.getByRole('button', { name: '生成音译', exact: true }).click();
   await expect(bg.locator('[data-romanization-content-id]')).toHaveCount(2);
   await bg.locator('[data-romanization-content-id]').last().getByText('音译 · ja-Latn', { exact: true }).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '从音译生成 注音…', exact: true }).click();
-  const ruby = page.getByRole('dialog', { name: '从音译生成 注音', exact: true });
+  await page.getByRole('menuitem', { name: '从音译生成注音', exact: true }).click();
+  const ruby = page.getByRole('dialog', { name: '从音译生成注音', exact: true });
   await ruby.getByLabel('字符输出').selectOption('roman');
   await ruby.getByRole('button', { name: '生成 注音', exact: true }).click();
   await expect(ruby).toHaveCount(0);
@@ -46,7 +46,7 @@ test('background content transfer and clipboard deletion preserve its parent', a
   await load(page);
   const bg = page.locator('main section[data-line-id="L1-bg"]');
   await bg.locator('[data-romanization-content-id]').getByText('音译 · ja-Latn', { exact: true }).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '转移到其他歌词行…', exact: true }).click();
+  await page.getByRole('menuitem', { name: '转移到其他歌词行', exact: true }).click();
   const transfer = page.getByRole('dialog', { name: '转移附属内容' });
   await transfer.getByLabel('目标歌词行').selectOption('L2'); await transfer.getByRole('button', { name: '应用（一次撤销）' }).click();
   await expect(bg.locator('[data-romanization-content-id]')).toHaveCount(0);

@@ -117,7 +117,7 @@ test('a server cancellation keeps the row and editing lock until the terminal st
  await expect(page.getByRole('button',{name:'取消任务',exact:true})).toBeDisabled();
  await expect(page.locator('[data-message-bar]').filter({has:page.getByRole('button',{name:'取消任务',exact:true})})).toContainText('正在取消');
  await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeDisabled();
- await page.locator('[data-top-menu="settings"] summary').click();await page.getByRole('button',{name:'计算设备…'}).click();
+ await page.locator('[data-top-menu="settings"] summary').click();await page.getByRole('button',{name:'计算设备'}).click();
  await expect(page.getByRole('dialog',{name:'计算设备',exact:true})).toBeVisible();await page.getByRole('button',{name:'关闭计算设备'}).click();
  await expect(page.locator('[data-top-menu="settings"] summary')).toBeFocused();
  state.status='cancelled';await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeEnabled();

@@ -18,7 +18,7 @@ async function load(page: Page) {
 }
 async function manage(page: Page) {
   await page.locator('[data-top-menu=lyrics-settings] summary').click();
-  await page.getByRole('button', { name: '管理翻译轨道…', exact: true }).first().click();
+  await page.getByRole('button', { name: '管理翻译轨道', exact: true }).first().click();
   return page.getByRole('dialog', { name: '翻译轨道管理', exact: true });
 }
 test(`keyboard mixed selection and scoped transfer`, async ({ page }) => {

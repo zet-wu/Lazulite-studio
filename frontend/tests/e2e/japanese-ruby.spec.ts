@@ -11,7 +11,7 @@ async function mock(page: Page, fail=false){await page.addInitScript(fail=>{
   }return original(input,init);
  };
 },fail);}
-async function open(page:Page,index=0){await page.locator('[data-outline-drag]').nth(index).click({button:'right'});await page.getByRole('menuitem',{name:'智能日文注音…',exact:true}).click();const dialog=page.getByRole('dialog',{name:'智能日文注音',exact:true});await expect(dialog.getByText('正在分析日文正文…')).toHaveCount(0);return dialog;}
+async function open(page:Page,index=0){await page.locator('[data-outline-drag]').nth(index).click({button:'right'});await page.getByRole('menuitem',{name:'智能日文注音',exact:true}).click();const dialog=page.getByRole('dialog',{name:'智能日文注音',exact:true});await expect(dialog.getByText('正在分析日文正文…')).toHaveCount(0);return dialog;}
 test('mixed selection, exact background scope, mora apply and undo',async({page})=>{
  await mock(page);await load(page);const outline=page.locator('[data-outline-drag]');await outline.first().click();await outline.nth(1).click({modifiers:['Control']});const dialog=await open(page);
  await expect(dialog.locator('[data-reading-row]')).toHaveCount(2);await expect(dialog.getByLabel('食完整读音')).toHaveValue('た');await expect(dialog.getByLabel('魂完整读音')).toHaveValue('たましい');
@@ -39,8 +39,8 @@ test('long line wraps without replacing focused input node',async({page})=>{
 });
 test('current canvas unblurred edit enters snapshot and invalid/IME edits block opening',async({page})=>{
  await mock(page);await load(page);const word=page.getByLabel('词 今日',{exact:true});await word.fill('魂');const d=await open(page,2);await expect(d.getByLabel('魂完整读音')).toHaveValue('たましい');await d.getByRole('button',{name:'取消',exact:true}).click();await expect(page.getByLabel('词 魂',{exact:true})).toHaveCount(2);
- const last=page.getByLabel('词 魂',{exact:true}).last();await last.fill('');await page.locator('[data-outline-drag]').last().click({button:'right'});await page.getByRole('menuitem',{name:'智能日文注音…',exact:true}).click();await expect(page.getByRole('dialog',{name:'智能日文注音',exact:true})).toHaveCount(0);
- await last.fill('魂');await last.dispatchEvent('compositionstart');await page.locator('[data-outline-drag]').last().click({button:'right'});await page.getByRole('menuitem',{name:'智能日文注音…',exact:true}).click();await expect(page.getByRole('dialog',{name:'智能日文注音',exact:true})).toHaveCount(0);await last.dispatchEvent('compositionend');
+ const last=page.getByLabel('词 魂',{exact:true}).last();await last.fill('');await page.locator('[data-outline-drag]').last().click({button:'right'});await page.getByRole('menuitem',{name:'智能日文注音',exact:true}).click();await expect(page.getByRole('dialog',{name:'智能日文注音',exact:true})).toHaveCount(0);
+ await last.fill('魂');await last.dispatchEvent('compositionstart');await page.locator('[data-outline-drag]').last().click({button:'right'});await page.getByRole('menuitem',{name:'智能日文注音',exact:true}).click();await expect(page.getByRole('dialog',{name:'智能日文注音',exact:true})).toHaveCount(0);await last.dispatchEvent('compositionend');
 });
 
 test(`kana input preserves composition and text selection on resize`,async({page})=>{

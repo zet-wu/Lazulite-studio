@@ -18,7 +18,7 @@ test('document translation tracks survive actual save, reopen, reorder, partial 
   });
   await importLyrics(page, { name: 'tracks.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
   await page.locator('[data-top-menu=lyrics-settings] summary').click();
-  await page.getByRole('button', { name: '管理翻译轨道…', exact: true }).click();
+  await page.getByRole('button', { name: '管理翻译轨道', exact: true }).click();
   const manager = page.getByRole('dialog', { name: '翻译轨道管理' });
   await manager.getByRole('button', { name: '下移翻译轨道 1', exact: true }).click();
   await manager.getByRole('checkbox', { name: /^选择翻译轨道 / }).nth(2).check();

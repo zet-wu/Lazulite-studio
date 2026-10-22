@@ -53,8 +53,8 @@ export function EditorMenu(props: Props) {
         <button data-role="inline" onClick={() => setDark((value) => !value)}>{dark ? '日间模式' : '夜间模式'}</button>
       </TopMenu>
       <TopMenu id="settings" title="设置" className={`${styles.settingsMenu} ${styles.deviceSettingsMenu}`} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
-        <button data-role="inline" onClick={props.onDictionaryManager}>注音词典…</button>
-        <button data-role="inline" onClick={() => setDevicesOpen(true)}>计算设备…</button>
+        <button data-role="inline" onClick={props.onDictionaryManager}>注音词典</button>
+        <button data-role="inline" onClick={() => setDevicesOpen(true)}>计算设备</button>
         {props.onAmllSettings && <button data-role="inline" disabled={props.editingLocked} onClick={props.onAmllSettings}>AMLL 兼容设置</button>}
         <button data-role="inline" onClick={() => setShortcutsOpen(true)}>快捷键设置</button>
         <button data-role="inline" onClick={() => setKanaOpen(true)}>音译生成假名高亮</button>
