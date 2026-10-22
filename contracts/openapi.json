@@ -1875,6 +1875,17 @@
               "type": "string",
               "title": "Ident"
             }
+          },
+          {
+            "name": "stream",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Stream"
+            },
+            "description": "以 NDJSON 返回 loading/analyzing 阶段，随后 result 或 error；错误事件在流内报告。"
           }
         ],
         "requestBody": {
@@ -1894,6 +1905,12 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DictionaryAnalysis"
+                }
+              },
+              "application/x-ndjson": {
+                "schema": {
+                  "type": "string",
+                  "description": "每行 JSON：{phase: loading|analyzing}、{result: DictionaryAnalysis} 或 {error: string}。"
                 }
               }
             }

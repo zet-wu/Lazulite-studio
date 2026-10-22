@@ -8,9 +8,10 @@ class AlreadyRunning(RuntimeError):
 
 
 class InstanceLock:
-    def __init__(self, root):
+    def __init__(self, root, *, blocking=False):
         self.path = Path(root) / 'runtime' / 'instance.lock'
         self.handle = None
+        self.blocking = blocking
 
     def __enter__(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -21,10 +22,10 @@ class InstanceLock:
                 if self.path.stat().st_size == 0:
                     handle.write(b'\0'); handle.flush()
                 handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK if self.blocking else msvcrt.LK_NBLCK, 1)
             else:
                 import fcntl
-                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(handle, fcntl.LOCK_EX | (0 if self.blocking else fcntl.LOCK_NB))
         except OSError as exc:
             handle.close()
             raise AlreadyRunning('此数据目录已在运行') from exc

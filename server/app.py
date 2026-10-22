@@ -628,6 +628,7 @@ def create_app(
     @app.on_event("shutdown")
     async def shutdown_jobs():
         job_service.close()
+        dictionaries.close()
 
     @app.exception_handler(HTTPException)
     async def http_error(request: Request, exc: HTTPException):

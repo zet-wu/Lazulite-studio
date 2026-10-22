@@ -77,7 +77,7 @@ def test_invalid_import_preserves_installed_instance(tmp_path, extra):
     with pytest.raises((ValueError, zipfile.BadZipFile)):
         manager.install(package(extra=extra), replace=True)
     assert manager.instances["custom"] == first["instance"]
-    assert len(list(tmp_path.iterdir())) == 2
+    assert len(list(tmp_path.iterdir())) == 3
 
 
 def test_duplicate_zip_key_and_grapheme_boundary_rejected(tmp_path):
@@ -152,6 +152,10 @@ def test_http_contract_inspect_replace_auth_and_stale_request(tmp_path):
         analysis = client.post(endpoint+"/custom/analyze", headers=headers, json=body)
         assert analysis.status_code == 200
         assert analysis.json()["ranges"][1] == {"line_id": "line", "base_start": 1, "base_end": 3, "base": "重庆", "status": "known", "units": ["chóng", "qìng"]}
+        streamed = client.post(endpoint+"/custom/analyze?stream=true", headers=headers, json=body)
+        events = [json.loads(line) for line in streamed.text.splitlines()]
+        assert events[:2] == [{"phase": "loading"}, {"phase": "analyzing"}]
+        assert events[-1]["result"] == analysis.json()
         client.post(endpoint+"/import?replace=true", headers=headers, files={"file": ("custom.zip", package())})
         assert client.post(endpoint+"/custom/analyze", headers=headers, json=body).status_code == 409
         assert client.delete(endpoint+"/custom", headers=headers).status_code == 204
@@ -183,7 +187,7 @@ def test_atomic_record_failure_and_corrupt_installed_content_are_explicit(tmp_pa
         with pytest.raises(OSError, match="disk write"):
             manager.install(package([entry("重庆", "new")]), replace=True)
     assert manager.instances["custom"] == first["instance"]
-    assert len(list(tmp_path.iterdir())) == 2
+    assert len(list(tmp_path.iterdir())) == 3
     assert manager.cache is cached
     path = tmp_path / manager.record["installed"]["custom"] / "entries.jsonl"
     path.write_text("{")
@@ -232,9 +236,145 @@ def test_inspect_reads_metadata_only_and_install_reuses_index(tmp_path, monkeypa
         info = manager.install(package(extra={"entries.jsonl": "invalid"}), inspect=True)
         assert info["entryCount"] is None and not manager.instances
     first = manager.install(package())
-    cached = manager.cache[1]
+    cached = manager.cache.memory[first["instance"]]
     def no_rebuild(*args, **kwargs):
         raise AssertionError("installed index should be reused")
     monkeypatch.setattr("server.dictionaries.DictionaryIndex", no_rebuild)
     with manager.acquire("custom", first["instance"]) as index:
         assert index is cached
+
+
+def test_two_memory_indexes_disk_restore_expiry_and_corruption(tmp_path, monkeypatch):
+    from server.dictionary_engine import DictionaryIndex
+    manager = Dictionaries(tmp_path)
+    infos = [manager.install(package(ident=name)) for name in ("one", "two", "three")]
+    first = infos[0]["instance"]
+    assert list(manager.cache.memory) == [i["instance"] for i in infos[1:]]
+    with monkeypatch.context() as patch:
+        patch.setattr("server.dictionaries.DictionaryIndex", lambda *_: pytest.fail("must restore compiled index"))
+        with manager.acquire("one", first) as index:
+            assert index.analyze("重庆")[0]["units"] == ["chóng", "qìng"]
+    assert list(manager.cache.memory) == [infos[2]["instance"], first]
+    manager.cache.memory.clear()
+    manager.cache.path(first).write_bytes(b"broken cache")
+    with manager.acquire("one", first) as index:
+        assert index.count == 1
+    manager.cache.recent[first] -= manager.cache.ttl + 1
+    manager.list()
+    assert not manager.cache.path(first).exists()
+    with manager.acquire("one", first) as index:
+        assert index.count == 1  # expiry leaves the in-memory index usable
+    manager.cache.memory.clear()
+    calls = []
+    def build(*args):
+        calls.append(1)
+        return DictionaryIndex(*args)
+    monkeypatch.setattr("server.dictionaries.DictionaryIndex", build)
+    with manager.acquire("one", first):
+        pass
+    assert calls == [1]
+    directory = manager.cache.directory
+    manager.close()
+    assert not directory.exists()
+
+
+def test_shared_loading_cancel_and_replacement_do_not_block_manager(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from server.dictionary_engine import DictionaryIndex
+    manager = Dictionaries(tmp_path)
+    info = manager.install(package())
+    instance = info["instance"]
+    manager.cache.invalidate(instance)
+    started, resume, cancel = threading.Event(), threading.Event(), threading.Event()
+    calls = []
+    def build(*args):
+        calls.append(1)
+        started.set()
+        assert resume.wait(5)
+        return DictionaryIndex(*args)
+    def acquire(cancel=None):
+        with manager.acquire("custom", instance, cancel) as index:
+            return index.analyze("重庆")
+    with ThreadPoolExecutor(2) as pool:
+        with monkeypatch.context() as patch:
+            patch.setattr("server.dictionaries.DictionaryIndex", build)
+            first = pool.submit(acquire, cancel)
+            assert started.wait(5)
+            second = pool.submit(acquire)
+            # Listing remains available while construction is paused.
+            assert manager.list()["dictionaries"][0]["instance"] == instance
+            cancel.set()
+            with pytest.raises(AnalysisCancelled):
+                first.result(timeout=5)
+            old = tmp_path / manager.record["installed"]["custom"]
+            manager.remove("custom")
+            assert old.exists()
+            resume.set()
+            assert second.result(timeout=5)[0]["units"] == ["chóng", "qìng"]
+    assert calls == [1]
+    assert not old.exists()
+    assert instance not in manager.cache.memory
+    assert not manager.cache.path(instance).exists()
+    manager.close()
+
+
+def test_same_version_replacement_during_load_cannot_republish_old_index(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from server.dictionary_engine import DictionaryIndex
+    manager = Dictionaries(tmp_path)
+    old = manager.install(package())["instance"]
+    manager.cache.invalidate(old)
+    started, resume = threading.Event(), threading.Event()
+    def build(path):
+        if str(path).endswith(manager.record["installed"]["custom"]):
+            started.set()
+            assert resume.wait(5)
+        return DictionaryIndex(path)
+    def acquire():
+        with manager.acquire("custom", old) as index:
+            return index.analyze("重庆")
+    with ThreadPoolExecutor(1) as pool:
+        with monkeypatch.context() as patch:
+            patch.setattr("server.dictionaries.DictionaryIndex", build)
+            request = pool.submit(acquire)
+            assert started.wait(5)
+            new = manager.install(package([entry("重庆", "new")]), replace=True)["instance"]
+            resume.set()
+            assert request.result(timeout=5)[0]["units"] == ["chóng", "qìng"]
+    assert old not in manager.cache.memory and old not in manager.cache.recent
+    with manager.acquire("custom", new) as index:
+        assert index.analyze("重庆")[0]["units"] == ["new"]
+    manager.close()
+
+
+def test_cache_write_failure_is_diagnostic_and_install_stays_usable(tmp_path, monkeypatch, caplog):
+    from pathlib import Path
+    original = Path.replace
+    def fail(path, target):
+        if path.suffix == ".tmp":
+            raise OSError("cache unavailable")
+        return original(path, target)
+    manager = Dictionaries(tmp_path)
+    monkeypatch.setattr(Path, "replace", fail)
+    info = manager.install(package())
+    assert "临时词典索引写入失败" in caplog.text
+    with manager.acquire("custom", info["instance"]) as index:
+        assert index.count == 1
+    assert not manager.cache.recent
+    manager.close()
+
+
+def test_crash_cache_cleanup_preserves_live_runs(tmp_path):
+    import subprocess
+    import sys
+    from server.dictionary_cache import IndexCache
+    live = IndexCache(tmp_path)
+    script = "from server.dictionary_cache import IndexCache; import os,sys; c=IndexCache(sys.argv[1]); print(c.directory, flush=True); os._exit(0)"
+    result = subprocess.run([sys.executable, "-c", script, str(tmp_path)], check=True, capture_output=True, text=True)
+    from pathlib import Path
+    crashed = Path(result.stdout.strip())
+    assert crashed.exists()
+    new = IndexCache(tmp_path)
+    assert not crashed.exists() and live.directory.exists()
+    new.close()
+    live.close()

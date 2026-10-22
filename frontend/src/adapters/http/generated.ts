@@ -2846,7 +2846,10 @@ export interface operations {
     };
     analyze_api_v1_reading_dictionaries__ident__analyze_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 以 NDJSON 返回 loading/analyzing 阶段，随后 result 或 error；错误事件在流内报告。 */
+                stream?: boolean;
+            };
             header?: never;
             path: {
                 ident: string;
@@ -2866,6 +2869,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DictionaryAnalysis"];
+                    "application/x-ndjson": string;
                 };
             };
             /** @description Validation Error */

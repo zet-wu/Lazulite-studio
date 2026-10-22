@@ -1,10 +1,12 @@
 import asyncio
+import json
 import threading
 import zipfile
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
+from starlette.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from .dictionaries import DictionaryConflict
@@ -82,13 +84,38 @@ def dictionary_router(manager, *, auth, write):
             raise error(exc) from exc
 
     @router.post("/{ident}/analyze", response_model=DictionaryAnalysis)
-    async def analyze(ident: str, body: DictionarySnapshot, request: Request, _: object = Depends(write)):
+    async def analyze(ident: str, body: DictionarySnapshot, request: Request, stream: bool = Query(False), _: object = Depends(write)):
         cancelled = threading.Event()
+        ready = threading.Event()
         def run():
             with manager.acquire(ident, body.instance, cancelled) as index:
+                ready.set()
                 return {"instance": body.instance, "version": index.manifest["version"],
                         "ranges": index.snapshot([line.model_dump() for line in body.lines], cancelled)}
         task = asyncio.create_task(run_in_threadpool(run))
+        if stream:
+            async def events():
+                def encode(value):
+                    return json.dumps(value, ensure_ascii=False) + "\n"
+                try:
+                    yield encode({"phase": "loading"})
+                    while not ready.is_set() and not task.done():
+                        await asyncio.wait({task}, timeout=0.05)
+                    if ready.is_set():
+                        yield encode({"phase": "analyzing"})
+                    result = await asyncio.shield(task)
+                    yield encode({"result": result})
+                except (ValueError, KeyError, OSError) as exc:
+                    yield encode({"error": error(exc).detail["message"]})
+                finally:
+                    cancelled.set()
+                    # Disconnect cancels the stream, not the shared index load.
+                    if not task.done():
+                        try:
+                            await asyncio.shield(task)
+                        except AnalysisCancelled:
+                            pass
+            return StreamingResponse(events(), media_type="application/x-ndjson")
         try:
             while not task.done():
                 await asyncio.wait({task}, timeout=0.1)

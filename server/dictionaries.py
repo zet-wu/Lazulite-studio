@@ -1,16 +1,20 @@
 """Library-scoped dictionary instances; publish an activity record, never swap open directories."""
 import json
+import logging
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 import re
 import shutil
 import tempfile
 import threading
+import time
 import uuid
 import zipfile
 from contextlib import contextmanager
 from pathlib import Path
 
 from .atomic_file import write_atomic
-from .dictionary_engine import DictionaryIndex
+from .dictionary_engine import DictionaryIndex, check_cancel
+from .dictionary_cache import IndexCache
 from .dictionary_format import MAX_LINE, extract_package, inspect_package, read_json, validate_manifest
 
 
@@ -31,7 +35,10 @@ class Dictionaries:
             if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,79}", ident) or not isinstance(directory, str) or not re.fullmatch("[a-f0-9]{32}", directory):
                 raise ValueError("词典活动记录路径无效")
         self.instances = {ident: uuid.uuid4().hex for ident in self.record["installed"]}
-        self.cache = None
+        self.cache = IndexCache(self.root)
+        self.loading = {}
+        self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="dictionary-index")
+        self.closed = False
         self.leases = {}
         self.retired = set()
         self.cleanup_errors = {}
@@ -55,6 +62,7 @@ class Dictionaries:
 
     def list(self):
         with self.lock:
+            self.cache.expire()
             for directory in list(self.retired):
                 if not self.leases.get(directory, 0):
                     self._retire(directory)
@@ -97,6 +105,7 @@ class Dictionaries:
             manifest, sources, count = index.manifest, index.sources, index.count
             ident = manifest["id"]
             info = {"manifest": manifest, "sources": sources, "entryCount": count}
+            instance = uuid.uuid4().hex
             with self.lock:
                 exists = ident in self.record["installed"]
                 if default and ident in self.record["defaults"]:
@@ -118,12 +127,28 @@ class Dictionaries:
                 except BaseException:
                     shutil.rmtree(self.root / directory)
                     raise
-                instance = uuid.uuid4().hex
+                previous = self.instances.get(ident)
                 self.instances[ident] = instance
-                self.cache = (instance, index)
+                self.cache.expire()
+                if previous:
+                    self.cache.invalidate(previous)
+                self.cache.publish(instance, index, False)
+                # Queries can still share this built index if concurrent installs
+                # evict it while its first disk serialization is in progress.
+                installed = Future()
+                installed.set_result(index)
+                self.loading[instance] = installed
                 if old:
                     self._retire(old)
-                return {**info, "instance": instance}
+            disk = self.cache.write(instance, index)
+            with self.lock:
+                self.loading.pop(instance, None)
+                if self.instances.get(ident) == instance and not self.closed:
+                    if disk:
+                        self.cache.recent[instance] = time.monotonic()
+                else:
+                    self.cache.invalidate(instance)
+            return {**info, "instance": instance}
 
     def _retire(self, directory):
         self.retired.add(directory)
@@ -148,31 +173,84 @@ class Dictionaries:
             directory = record["installed"].pop(ident)
             self._write(record)
             instance = self.instances.pop(ident)
-            if self.cache and self.cache[0] == instance:
-                self.cache = None
+            self.cache.expire()
+            self.cache.invalidate(instance)
             self._retire(directory)
+
+    def _release(self, directory):
+        self.leases[directory] -= 1
+        if not self.leases[directory]:
+            del self.leases[directory]
+            if directory in self.retired:
+                self._retire(directory)
+
+    def _load(self, ident, instance, directory, restore):
+        try:
+            index = None
+            if restore:
+                try:
+                    index = self.cache.restore(instance)
+                except (OSError, ValueError, EOFError, TypeError):
+                    logging.getLogger(__name__).warning("临时词典索引恢复失败，重新读取源词典", exc_info=True)
+            if index is None:
+                index = DictionaryIndex(self.root / directory)
+                if index.manifest["id"] != ident:
+                    raise ValueError("已安装词典 ID 被修改，请重新导入")
+                disk = self.cache.write(instance, index)
+            else:
+                disk = True
+            with self.lock:
+                if not self.closed and self.instances.get(ident) == instance:
+                    self.cache.publish(instance, index, disk)
+                else:
+                    self.cache.invalidate(instance)
+            return index
+        finally:
+            with self.lock:
+                self.loading.pop(instance, None)
+                self._release(directory)
 
     @contextmanager
     def acquire(self, ident, instance, cancel=None):
+        check_cancel(cancel)
         with self.lock:
+            if self.closed:
+                raise RuntimeError("词典服务已关闭")
             if ident not in self.instances:
                 raise KeyError(ident)
             if self.instances[ident] != instance:
                 raise DictionaryConflict("词典安装实例已变化，请重新选择词典并生成")
+            self.cache.expire()
             directory = self.record["installed"][ident]
-            if self.cache is None or self.cache[0] != instance:
-                index = DictionaryIndex(self.root / directory, cancel)
-                if index.manifest["id"] != ident:
-                    raise ValueError("已安装词典 ID 被修改，请重新导入")
-                self.cache = (instance, index)
-            index = self.cache[1]
+            index = self.cache.get(instance)
+            future = None
+            if index is None:
+                future = self.loading.get(instance)
+                if future is None:
+                    self.leases[directory] = self.leases.get(directory, 0) + 1
+                    future = self.executor.submit(self._load, ident, instance, directory, instance in self.cache.recent)
+                    self.loading[instance] = future
             self.leases[directory] = self.leases.get(directory, 0) + 1
         try:
+            if future is not None:
+                while True:
+                    check_cancel(cancel)
+                    try:
+                        index = future.result(timeout=0.05)
+                        break
+                    except TimeoutError:
+                        if future.done():
+                            raise
+            check_cancel(cancel)
             yield index
         finally:
             with self.lock:
-                self.leases[directory] -= 1
-                if not self.leases[directory]:
-                    del self.leases[directory]
-                    if directory in self.retired:
-                        self._retire(directory)
+                self._release(directory)
+
+    def close(self):
+        with self.lock:
+            if self.closed:
+                return
+            self.closed = True
+        self.executor.shutdown(wait=True)
+        self.cache.close()

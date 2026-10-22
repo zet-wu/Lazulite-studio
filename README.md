@@ -42,7 +42,7 @@ Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML�
 
 「词典注音」使用可独立安装的固定读音 ZIP，支持汉语拼音、粤拼和不同地区的潮州话。编辑工具栏或行菜单中选择词典并预览；每个读音单元可以独立改字，缺词与歧义可手工填写，跨正文词的整组读音由用户明确选择最小合并。应用后可继续拆分、合并、调整时间并一次撤销。日语自动处理入口为「智能日文注音」。
 
-右上角「设置 → 注音词典…」负责导入、同 ID 替换及移除，接受符合 [公开格式 v1](https://github.com/zet-wu/Lazulite-studio-dict/blob/main/FORMAT.md) 的自定义包。官方包由[独立词典仓库](https://github.com/zet-wu/Lazulite-studio-dict)构建；便携构建携带汉语拼音和粤拼，潮州话按需导入。安装时构建并缓存索引；重启后首次选用按实际内容重建，随后复用单份活动索引。已保存的注音可以在移除词典后继续编辑和导出。
+右上角「设置 → 注音词典」负责导入、同 ID 替换及移除，接受符合 [公开格式 v1](https://github.com/zet-wu/Lazulite-studio-dict/blob/main/FORMAT.md) 的自定义包。官方包由[独立词典仓库](https://github.com/zet-wu/Lazulite-studio-dict)构建；便携构建携带汉语拼音和粤拼，潮州话按需导入。安装时构建并缓存索引；重启后首次选用按实际内容重建，随后复用最多两份活动内存索引与本次服务运行中闲置 30 分钟内的磁盘索引缓存。已保存的注音可以在移除词典后继续编辑和导出。
 
 ### 文件打包
 支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，可配合 [zet-wu/MusicBox](https://github.com/zet-wu/MusicBox) 本地音乐播放器使用。也支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC ，兼容大部分播放器。
