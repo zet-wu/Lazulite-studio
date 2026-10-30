@@ -29,7 +29,7 @@ def parse_output(raw, source, conflicts):
     ambiguity_count = 0
     for line in raw.splitlines():
         record = json.loads(line)
-        if ended or len(record)!=1: raise ValueError('转换程序输出格式错误')
+        if ended or not isinstance(record,dict) or len(record)!=1: raise ValueError('转换程序输出格式错误')
         if 'def' in record:
             if not isinstance(record['def'],str): raise ValueError('转换来源格式错误')
             definitions.append(record['def'])
@@ -45,8 +45,9 @@ def parse_output(raw, source, conflicts):
             text=record['lit']
         elif 'amb' in record:
             amb=record['amb']
+            if not isinstance(amb,dict) or set(amb)!={'t','s'} or not isinstance(amb['t'],str): raise ValueError('转换歧义格式错误')
             index=amb['s']
-            if not isinstance(index,int) or not 0<=index<len(definitions): raise ValueError('转换歧义来源无效')
+            if type(index) is not int or not 0<=index<len(definitions): raise ValueError('转换歧义来源无效')
             text=amb['t']; original=definitions[index]
             position=len(states)
             if source[position:position+len(original)]!=original or len(text)!=len(original):

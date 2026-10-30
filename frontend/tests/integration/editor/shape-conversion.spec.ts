@@ -1,0 +1,51 @@
+import { expect, test } from '@playwright/test';
+import { importLyrics } from '../../fixtures/import-lyrics';
+
+test('native whole-line conversion keeps word boundaries, background, undo and saved data',async({page})=>{
+  await page.goto('/projects/background-playback/edit');
+  const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><p xml:id="main" begin="0" end="4"><span begin="0" end="1">头</span><span begin="1" end="2">发</span><span begin="2" end="3">弁</span><span begin="3" end="4">猫</span><span ttm:role="x-bg" begin="0" end="4"><span begin="0" end="4">头发</span></span></p></body></tt>';
+  await importLyrics(page,{name:'shapes.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
+  await page.locator('[data-outline-drag]').first().click({button:'right'});
+  await page.getByRole('menuitem',{name:'简繁／中日汉字转换',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'简繁／中日汉字转换',exact:true});
+  await dialog.getByRole('combobox',{name:'转换目标'}).selectOption('taiwan');
+  await expect(dialog.getByLabel('头的目标字',{exact:true})).toHaveValue('頭');
+  await expect(dialog.getByLabel('发的目标字',{exact:true})).toHaveValue('髮');
+  await expect(dialog.getByLabel('弁的目标字',{exact:true})).toHaveValue('辨');
+  await expect(dialog.getByLabel('猫的目标字',{exact:true})).toHaveValue('');
+  await dialog.getByLabel('弁的目标字',{exact:true}).focus();
+  await page.keyboard.press('Tab');await expect(dialog.getByLabel('猫的目标字',{exact:true})).toBeFocused();
+  await page.screenshot({path:test.info().outputPath('shape-preview.png')});
+  await page.evaluate(()=>document.documentElement.dataset.theme='dark');
+  await page.screenshot({path:test.info().outputPath('shape-preview-dark.png')});
+  await page.evaluate(()=>delete document.documentElement.dataset.theme);
+  await dialog.getByRole('button',{name:'应用',exact:true}).click();
+  await expect(page.getByLabel('词 頭',{exact:true})).toHaveValue('頭');
+  await expect(page.getByLabel('词 髮',{exact:true})).toHaveValue('髮');
+  await expect(page.getByLabel('词 猫',{exact:true})).toHaveValue('猫');
+  await expect(page.getByLabel('词 头发',{exact:true})).toHaveValue('头发');
+  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.getByLabel('词 头',{exact:true})).toHaveValue('头');
+  await page.getByRole('button',{name:'重做',exact:true}).click();await expect(page.getByLabel('词 頭',{exact:true})).toHaveValue('頭');
+  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();
+  const saved=await(await page.request.get('/api/v1/projects/background-playback/document')).json();
+  const lyrics=await page.evaluate(async xml=>{const path='/src/adapters/ttml/lyric-codec.ts';return (await import(path)).parseLyricTtml(xml);},saved.document.lyrics.draftTtml);
+  expect(lyrics.lines[0].words.map((word:any)=>[word.text,word.beginMs,word.endMs])).toEqual([['頭',0,1000],['髮',1000,2000],['辨',2000,3000],['猫',3000,4000]]);
+  await page.reload();await expect(page.getByLabel('词 髮',{exact:true})).toHaveValue('髮');
+});
+
+test('virtualized preview retains the active manual edit across long scrolls',async({page})=>{
+  await page.goto('/projects/background-playback/edit');
+  const xml='<tt xmlns="http://www.w3.org/ns/ttml"><body>'+Array.from({length:100},(_,i)=>`<p xml:id="line${i}" begin="0" end="4"><span begin="0" end="4">发</span></p>`).join('')+'</body></tt>';
+  await importLyrics(page,{name:'long-shapes.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
+  await page.locator('[data-outline-drag]').first().click();
+  await page.locator('[data-top-menu="clipboard"] summary').click();await page.getByRole('button',{name:'全选',exact:true}).click();
+  await page.locator('[data-top-menu="tools"] summary').click();await page.getByRole('button',{name:'简繁／中日汉字转换',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'简繁／中日汉字转换',exact:true});
+  await dialog.getByRole('combobox',{name:'转换目标'}).selectOption('taiwan');
+  const first=dialog.getByLabel('发的目标字',{exact:true}).first();await expect(first).toHaveValue('發');await first.fill('髮');
+  const scroll=dialog.locator('[class*="rubyGenerationRowsVirtual"]');
+  await scroll.evaluate(element=>{element.scrollTop=element.scrollHeight;});
+  await expect(dialog.getByText('100 行',{exact:true})).toBeVisible();await expect(first).toBeFocused();await expect(first).toHaveValue('髮');
+  await scroll.evaluate(element=>{element.scrollTop=0;});await expect(dialog.getByText('1 行',{exact:true})).toBeVisible();await expect(first).toHaveValue('髮');
+  await dialog.getByRole('button',{name:'取消',exact:true}).click();
+});

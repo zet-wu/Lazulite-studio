@@ -90,7 +90,7 @@ def licenses(root, dependencies, pnpm):
     destination = root / 'licenses'
     destination.mkdir(exist_ok=True)
     shutil.copytree(ROOT / 'server/vendor', destination / 'server-vendor',
-                    ignore=shutil.ignore_patterns('*.py', '*.pyc', '__pycache__', '*.gz'))
+                    ignore=shutil.ignore_patterns('*.py', '*.pyc', '__pycache__', '*.gz', '*.ocd2'))
     for name in ('LICENSE', 'THIRD_PARTY_LICENSES'):
         shutil.copy2(ROOT / 'vendor/Lazulite' / name, destination / ('Lazulite-' + name))
     if (ROOT / 'LICENSE').exists():
