@@ -692,6 +692,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/shapes/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Analyze */
+        post: operations["analyze_shapes_analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1395,6 +1412,51 @@ export interface components {
             lines: components["schemas"]["ReadingLine"][];
             /** Instance */
             instance: string;
+        };
+        /** ShapeCell */
+        ShapeCell: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Original */
+            original: string;
+            /** Value */
+            value: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "known" | "ambiguous" | "failed";
+        };
+        /** ShapeLine */
+        ShapeLine: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+        };
+        /** ShapeRequest */
+        ShapeRequest: {
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "simplified" | "taiwan" | "hongkong" | "japanese";
+            /** Lines */
+            lines: components["schemas"]["ShapeLine"][];
+        };
+        /** ShapeResponse */
+        ShapeResponse: {
+            /** Rows */
+            rows: components["schemas"]["ShapeRow"][];
+        };
+        /** ShapeRow */
+        ShapeRow: {
+            /** Id */
+            id: string;
+            /** Cells */
+            cells: components["schemas"]["ShapeCell"][];
         };
     };
     responses: {
@@ -2881,6 +2943,31 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+        };
+    };
+    analyze_shapes_analyze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShapeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShapeResponse"];
+                };
+            };
+            422: components["responses"]["Error"];
         };
     };
 }

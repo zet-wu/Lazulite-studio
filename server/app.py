@@ -609,6 +609,8 @@ def create_app(
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
     api.include_router(build_vocal_router(vocal_runner, auth=auth, project_exists=project))
     api.include_router(build_analysis_router(configured_reading_proposer, write=write))
+    from .shape_routes import shape_router
+    api.include_router(shape_router(write=write))
     from .dictionaries import Dictionaries
     from .dictionary_routes import dictionary_router
     dictionaries = Dictionaries(root / "dictionaries", os.getenv("STUDIO_DICTIONARIES_DIR"))

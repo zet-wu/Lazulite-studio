@@ -33,6 +33,10 @@ def main():
         assert (tools[0].parent / 'msvcp140.dll').is_file()
         subprocess.run([str(tools[0]), '--version'], check=True)
     sys.path.insert(0, str(root / 'app'))
+    from server.shape_conversion import analyze_shapes
+    shapes = analyze_shapes([{'id':'smoke','text':'头发 發髮 洗浄 弁'}], 'taiwan')['rows'][0]['cells']
+    assert ''.join(cell['value'] for cell in shapes) == '頭髮 發髮 洗淨 辨'
+    assert shapes[-1]['status'] == 'ambiguous'
     from server import furigana
     assert furigana.load_index()
     if args.target == 'windows-x64-cpu':

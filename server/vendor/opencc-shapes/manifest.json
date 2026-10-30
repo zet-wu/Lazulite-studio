@@ -1,0 +1,61 @@
+{
+  "version": "1.4.2",
+  "conflicts": [
+    "么",
+    "侠",
+    "内",
+    "刹",
+    "匀",
+    "却",
+    "叙",
+    "唇",
+    "嘘",
+    "峰",
+    "巨著",
+    "庄",
+    "床",
+    "彦",
+    "悦",
+    "戯",
+    "才",
+    "掴",
+    "晋",
+    "核",
+    "没",
+    "沪",
+    "涛",
+    "湿",
+    "猫",
+    "痺",
+    "砺",
+    "税",
+    "稜",
+    "粧",
+    "粽",
+    "群",
+    "芸",
+    "莱",
+    "葱",
+    "蝉",
+    "这么",
+    "鋭",
+    "麺"
+  ],
+  "targets": {
+    "simplified": [
+      "TSPhrases",
+      "TSCharacters"
+    ],
+    "taiwan": [
+      "TWVariantsPhrases",
+      "TWVariants"
+    ],
+    "hongkong": [
+      "HKVariantsPhrases",
+      "HKVariants"
+    ],
+    "japanese": [
+      "JPShinjitaiCharactersRev"
+    ]
+  }
+}

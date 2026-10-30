@@ -6,5 +6,6 @@ SudachiPy==0.6.10
 sudachidict_core==20250129
 mutagen==1.48.1
 regex==2026.9.29
+OpenCC==1.4.2
 # Run installation from the repository root; bundled calculation library.
 ./vendor/Lazulite

@@ -1927,6 +1927,37 @@
           }
         }
       }
+    },
+    "/shapes/analyze": {
+      "post": {
+        "summary": "Analyze",
+        "operationId": "analyze_shapes_analyze_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShapeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShapeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4422,6 +4453,133 @@
           "instance"
         ],
         "title": "DictionarySnapshot"
+      },
+      "ShapeCell": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "original": {
+            "type": "string",
+            "title": "Original"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "known",
+              "ambiguous",
+              "failed"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "original",
+          "value",
+          "status"
+        ],
+        "title": "ShapeCell"
+      },
+      "ShapeLine": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100000,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "ShapeLine"
+      },
+      "ShapeRequest": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "simplified",
+              "taiwan",
+              "hongkong",
+              "japanese"
+            ],
+            "title": "Target"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ShapeLine"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target",
+          "lines"
+        ],
+        "title": "ShapeRequest"
+      },
+      "ShapeResponse": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ShapeRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "ShapeResponse"
+      },
+      "ShapeRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/ShapeCell"
+            },
+            "type": "array",
+            "title": "Cells"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "cells"
+        ],
+        "title": "ShapeRow"
       }
     }
   }

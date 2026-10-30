@@ -9,6 +9,7 @@
 | 文档 GET／PUT | GET 返回 `studio-document-v9` envelope 与项目 v9；PUT 使用 If-Match／幂等键，成功只返回 revision／ETag；歌词为 `lyrics.draftTtml` |
 | 上传与项目音乐 | 临时 upload_id 经创建或首次接入归属项目，项目 asset 是音源身份 |
 | audio／waveform／pcm | 整数毫秒窗口；可选 vocal 选择已注册人声，默认原曲 |
+| shapes/analyze | 四目标与显式行正文快照；逐字素结果、UTF-16 范围及确定／歧义／失败状态 |
 | reading/analyze | 当前行 id／text 快照，返回原文 code point 范围及读音 |
 | reading/dictionaries | 列表、ZIP 导入检查／安装、显式替换和移除；来源及安装实例随响应提供 |
 | reading/dictionaries/{id}/analyze | 安装实例与行文本快照，返回 code point 范围、固定读音单元及缺词／歧义状态；过期实例返回 409；`stream=true` 返回 NDJSON 阶段、结果或错误 |
