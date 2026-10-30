@@ -144,7 +144,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [snap, setSnap] = useState(true);
   const [bottomExpanded, setExpanded] = useState(true);
   const expanded = !!timelineHost || bottomExpanded;
-  const [visible, setVisible] = useState({ line: true, word: true, ruby: true, romanization: true, gap: true, spectrum: false, wave: true, energy:true, segments:true });
+  const [visible, setVisible] = useState({ karaoke: true, line: true, word: true, ruby: true, romanization: true, gap: true, spectrum: false, wave: true, energy:true, segments:true });
   const { width, ratio } = useCanvasMetrics(canvas, expanded, timelineHost);
   const [follow, setFollow] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
@@ -569,8 +569,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         <IconButton data-role="secondary" disabled={disabled} icon="minus" label="缩小波形" onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}/>
         <span className={styles.viewportRange}>视窗 {fmt(start)} – {fmt(end)}</span>
         <div className={styles.visibility} aria-label="时间轴图层">
-          {(['line', 'word', 'ruby', 'romanization', 'gap', 'wave', 'spectrum', ...(timelineHost?['energy','segments'] as const:[])] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
-            {({ line: '行', word: '词', ruby: '注音', romanization: '音译', gap: '空隙', wave: '波形', spectrum: '声谱图', energy:'能量',segments:'片段' })[key]}
+          {(['line', 'word', 'ruby', 'romanization', 'gap', 'karaoke', 'wave', 'spectrum', ...(timelineHost?['energy','segments'] as const:[])] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
+            {({ karaoke: '导唱', line: '行', word: '词', ruby: '注音', romanization: '音译', gap: '空隙', wave: '波形', spectrum: '声谱图', energy:'能量',segments:'片段' })[key]}
           </button>)}
         </div>
 </>);

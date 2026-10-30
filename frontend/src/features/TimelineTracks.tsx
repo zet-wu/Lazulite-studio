@@ -20,7 +20,7 @@ import { packIntervals } from '../domain/pack-intervals';
 import styles from './media.module.css';
 
 type Props = { locked?: boolean; document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
-  visible: { line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
+  visible: { karaoke: boolean; line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
   externalAnchors?: number[]; durationMs?: number | null;
   apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string) => void };
 type Drag = { started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string } };
@@ -256,7 +256,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       { label: '粘贴', disabled: !commands.current?.canPaste, run: () => commands.current?.paste() },
       { label: '删除所选对象', disabled: !selection?.ids.length, run: () => commands.current?.remove() },
     ]} />, window.document.body)}
-    <KaraokeTrack startMs={startMs} endMs={endMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const interval=targetInterval(document,target);return interval?[interval.beginMs,interval.endMs].filter((n):n is number=>n!==null):[];})]} onError={onError}/>
+    {visible.karaoke && <KaraokeTrack startMs={startMs} endMs={endMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const interval=targetInterval(document,target);return interval?[interval.beginMs,interval.endMs].filter((n):n is number=>n!==null):[];})]} onError={onError}/>}
     {visible.line && row('行', overview.filter(item => !editing || lineLayout.lanes.has(item.id)).map(item => bar({ kind: 'line', lineId: item.id }, `时间轴行 L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ' 背景' : ''}`, item.beginMs!, item.endMs!)), [], lineLayout.laneCount)}
     <div ref={scrollRef} className={styles.expandedTracks} style={!expandedLines.length ? { display: 'none' } : undefined}><div style={expandedLines.length > 20 ? { height: virtual.getTotalSize(), position: 'relative' } : undefined}>
     {(expandedLines.length > 20 ? virtual.getVirtualItems() : expandedLines.map((line, index) => ({ index, key: line.id, start: 0 }))).map(virtualRow => {

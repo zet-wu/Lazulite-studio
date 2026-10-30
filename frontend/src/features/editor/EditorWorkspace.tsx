@@ -632,20 +632,14 @@ function EditorWorkspaceContent(props: Props) {
     if(effective.kind==='ruby'&&word) {
       title='注音操作';
       actions.push(selectionAction(effective,'beat','添加空拍'),single('insert-ruby','添加读音',()=>setRubyShortcut({wordId:word.id,afterRubyId:rubyId,serial:++rubyShortcutSerial.current})),
-        selectionAction(effective,'merge','合并所选'),selectionAction(effective,'previous','向前移动'),selectionAction(effective,'next','向后移动'),selectionAction(effective,'mora','按音拍拆分'),selectionAction(effective,'redistribute','重分配读音时间'));
+        selectionAction(effective,'merge','合并所选'),selectionAction(effective,'mora','按音拍拆分'),selectionAction(effective,'redistribute','重分配读音时间'));
       const unit=word.rubyUnits.find(unit=>unit.id===rubyId)!;
       actions.push({...single('split-ruby','拆分读音',()=>dispatch({type:'split-ruby',lineId:line.id,wordId:word.id,rubyId:unit.id,at:Math.floor(Array.from(unit.reading).length/2)})),disabled:multiple||Array.from(unit.reading).length<2});
     } else if(effective.kind==='words'&&word) {
       title='词操作';
       const index=line.words.indexOf(word);
       actions.push(selectionAction(effective,'beat','添加空拍'),{id:'insert-before',label:'前插词',run:()=>startWordDraft(line.id,line.words[index-1]?.id??null)},{id:'insert-after',label:'后插词',run:()=>startWordDraft(line.id,word.id)},
-        single('split-word','拆分词',()=>{try{const parts=segmentText(word.text,DEFAULT_SEGMENT_OPTIONS);if(parts.length<2){setSegmentationOpen(true);return;}dispatch({type:'segment-words',changes:[{lineId:line.id,wordId:word.id,words:distributeSegmentTime(word,parts,DEFAULT_SEGMENT_OPTIONS.punctuationWeight,editing)}]});}catch(cause){setMessage((cause as Error).message);}}),selectionAction(effective,'merge','合并所选'),selectionAction(effective,'previous','词前移'),selectionAction(effective,'next','词后移'));
-      for(const direction of [-1,1] as const) {
-        const destination=document.lines[document.lines.indexOf(line)+direction];
-        const sources=document.lines.filter(line=>line.words.some(word=>effective.ids.includes(word.id)));
-        const reason=sources.length!==1?'跨来源行时需要明确目标':!destination?'已到达行边界':undefined;
-        actions.push({id:direction<0?'previous-line':'next-line',label:direction<0?'移到上一行':'移到下一行',disabled:!!reason,reason,run:()=>{if(destination)dispatch(moveWordsAcrossLine(document,effective,destination.id));}});
-      }
+        single('split-word','拆分词',()=>{try{const parts=segmentText(word.text,DEFAULT_SEGMENT_OPTIONS);if(parts.length<2){setSegmentationOpen(true);return;}dispatch({type:'segment-words',changes:[{lineId:line.id,wordId:word.id,words:distributeSegmentTime(word,parts,DEFAULT_SEGMENT_OPTIONS.punctuationWeight,editing)}]});}catch(cause){setMessage((cause as Error).message);}}),selectionAction(effective,'merge','合并所选'));
       actions.push(single('add-ruby','添加注音',()=>setRubyShortcut({wordId:word.id,serial:++rubyShortcutSerial.current})),selectionAction(effective,'redistribute','重分配读音时间'));
     } else if(effective.kind==='lines') {
       const parent=line.backgroundOf??line.id;
@@ -656,7 +650,6 @@ function EditorWorkspaceContent(props: Props) {
         {id:'roman-to-ruby',label:'从音译生成注音',run:()=>setRubyGeneration({lineIds:effective.ids})},
         {id:'generate-roman',label:'生成日文罗马字音译',run:()=>setRomanizationGeneration(effective.ids)},
         single('insert-word','添加词',()=>startWordDraft(line.id,line.words.at(-1)?.id??null)),
-        selectionAction(effective,'previous','行上移'),selectionAction(effective,'next','行下移'),
         {...single('split-line','拆分行',()=>setSplitLineId(line.id)),disabled:multiple||!!line.backgroundOf||line.words.length<2,reason:multiple?'拆行需单选':lineStructureIssues(document,line).join('；')},
         selectionAction(effective,'merge','合并所选'),{id:'segment',label:'分词',run:()=>setSegmentationOpen(true)});
       if(mode==='karaoke'&&props.project) {
