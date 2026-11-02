@@ -1,6 +1,6 @@
 .page { flex: 1; display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; background: var(--canvas); color: var(--ink); }
 .embeddedPage { height: 100%; }
-.header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.header { font-size: var(--body-size); display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .header > strong { min-width: 0; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brand { color: var(--blue); text-decoration: none; font-weight: 700; }
 .header > span { font-size: 12px; color: var(--muted); }
