@@ -888,7 +888,7 @@
     display: inline;
   }
 }
-.editorShell { display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 100dvh; overflow: hidden; }
+.editorShell { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; }
 
 .projectMainLink { display: flex; gap: 16px; align-items: center; flex: 1; min-width: 0; color: inherit; text-decoration: none; }
 

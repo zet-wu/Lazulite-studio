@@ -68,3 +68,25 @@ for(const [locale,warning,download] of [
  expect((await file).suggestedFilename()).toMatch(/\.ttml$/);
  await chooseLanguage(page,'zh-Hans');
 });
+
+test('both audio entries share busy state while changing modes during upload',async({page})=>{
+ const headers={origin:'http://127.0.0.1:5175'};
+ const pid=(await(await page.request.post('/api/v1/projects',{headers,data:{name:'shared upload'}})).json()).id;
+ let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);
+ await page.route('**/api/v1/uploads',async route=>{await gate;await route.continue();});
+ await page.goto(`/projects/${pid}/edit`);
+ await page.getByRole('button',{name:'音频处理',exact:true}).click();
+ const entries=page.getByRole('button',{name:'导入音频',exact:true});await expect(entries).toHaveCount(2);
+ const chooser=page.waitForEvent('filechooser');await entries.first().click();
+ await(await chooser).setFiles({name:'shared.wav',mimeType:'audio/wav',buffer:wav()});
+ await expect(entries.first()).toBeDisabled();await expect(entries.last()).toBeDisabled();
+ await page.getByRole('button',{name:'编辑',exact:true}).click();
+ await expect(page.getByRole('progressbar')).toBeVisible();
+ await page.getByRole('button',{name:'AMLL 预览',exact:true}).click();
+ await expect(page.getByRole('progressbar')).toBeVisible();
+ release();
+ await expect.poll(async()=>((await(await page.request.get(`/api/v1/projects/${pid}`)).json()).asset?.id)).toBeTruthy();
+ await page.getByRole('button',{name:'音频处理',exact:true}).click();
+ await expect(page.getByRole('button',{name:'替换音频',exact:true})).toBeEnabled();
+ await expect(page.getByRole('button',{name:'导入音频',exact:true})).toHaveCount(0);
+});

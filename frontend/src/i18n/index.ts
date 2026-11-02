@@ -2,7 +2,7 @@ import i18next from 'i18next';
 import {initReactI18next} from 'react-i18next';
 import {browserLanguage,languages,registeredLanguage} from './language';
 import {ensureLibraryPreference,writeLibraryPreference} from '../adapters/preferences';
-import type {Message} from '../domain/messages';
+import {message,type Message} from '../domain/messages';
 const resources=import.meta.glob<{default:Record<string,string>}>('./resources/*.json',{eager:true});
 export const i18n=i18next.createInstance();
 void i18n.use(initReactI18next).init({
@@ -23,7 +23,7 @@ export async function chooseLanguage(language:string) {
  const choice=registeredLanguage(language),current=++request;
  await i18n.changeLanguage(choice);
  try {await writeLibraryPreference('studio:ui-language',choice);confirmed=choice;}
- catch(error){if(current===request)await i18n.changeLanguage(confirmed);throw error;}
+ catch(error){if(current===request){await i18n.changeLanguage(confirmed);window.dispatchEvent(new CustomEvent('studio-preference-error',{detail:message('language.saveFailed')}));}throw error;}
 }
 export function formatMessage(value:Message):string { return value.parts ? value.parts.map(formatMessage).join(i18n.t('notice.separator')) : i18n.t(value.key,value.values??{}); }
 export const formatDate=(date:string|number|Date)=>new Intl.DateTimeFormat((languages.find(l=>l.id===i18n.language)??languages[0]).format,{dateStyle:'medium',timeStyle:'short'}).format(new Date(date));

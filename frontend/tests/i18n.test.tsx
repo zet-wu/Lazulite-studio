@@ -76,3 +76,23 @@ it('does not initialize a missing field after a failed preference read and falls
  await loadPreferences();await initializeLanguage();expect(i18n.language).toBe('zh-Hans');
  expect(i18n.t('menu.saved',{lng:'unregistered'})).toBe('已保存');
 });
+it('only reports failure for the current language request across dialog lifetimes',async()=>{
+ let saved={version:1,revision:0,library_id:'d'.repeat(32),values:{'studio:ui-language':'zh-Hans'}};
+ let release!:()=>void,started!:()=>void;
+ const gate=new Promise<void>(resolve=>release=resolve),entered=new Promise<void>(resolve=>started=resolve);
+ const report=vi.fn();window.addEventListener('studio-preference-error',report);
+ vi.stubGlobal('fetch',vi.fn(async(_url,options?:RequestInit)=>{
+  if(options?.method==='PATCH'){
+   const changes=JSON.parse(options.body as string).changes;
+   if(changes['studio:ui-language']==='en'){started();await gate;return new Response('{}',{status:503});}
+   saved={...saved,revision:saved.revision+1,values:changes};
+  }
+  return new Response(JSON.stringify(saved));
+ }));
+ try {
+  await loadPreferences();await initializeLanguage();
+  const first=chooseLanguage('en');const failed=expect(first).rejects.toThrow();await entered;
+  const next=chooseLanguage('zh-Hant');release();await failed;await next;
+  expect(report).not.toHaveBeenCalled();expect(i18n.language).toBe('zh-Hant');
+ } finally {window.removeEventListener('studio-preference-error',report);}
+});

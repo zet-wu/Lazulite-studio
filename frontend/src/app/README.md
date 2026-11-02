@@ -1,6 +1,6 @@
 # App：应用生命周期
 
-`App.tsx` 组合 Query provider、错误边界、路由、会话检查、登录和服务能力页。
+`App.tsx` 组合 Query provider、错误边界、路由、会话检查、登录和服务能力页。应用层在资料库偏好就绪后初始化语言及主题，共用常驻顶栏；项目通过 `ApplicationHeaderContext` 将编辑菜单挂载到顶栏宿主，列表和加载状态显示资料库作用域入口。语言设置使用即时保存的原生单选弹窗，失败反馈保留在全局消息区域。
 
 - `/projects`：项目列表、创建、音乐与工程包导入。
 - `/projects/:projectId/edit`：项目工作区。
