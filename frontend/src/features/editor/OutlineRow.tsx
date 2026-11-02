@@ -9,7 +9,7 @@ export const OutlineRow = memo(function OutlineRow({ line, ordinal, selected, pl
   useTranslation();
   return <div className={styles.outlineRow} data-line-id={line.id} data-active-context={context || undefined} data-drag-placeholder={placeholder ? '' : undefined}>
     <button data-role="secondary" data-outline-drag aria-pressed={selected} className={selected ? styles.selected : ''}>
-      <span className={styles.outlineNumber}>L{ordinal}</span><span className={styles.outlineText}>{line.backgroundOf && <small>{t('outline.background')}</small>}{lineText(line) || t('outline.emptyLine')}</span>
+      <span className={styles.outlineNumber}>L{ordinal}</span><span className={styles.outlineText}>{line.backgroundOf && <small>{t('outline.background')} </small>}{lineText(line) || t('outline.emptyLine')}</span>
     </button>
   </div>;
 });

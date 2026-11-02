@@ -8,15 +8,15 @@ export function projectErrorText(project: ProjectDocument, message: string): str
   identity.lastIndex = 0;
   const labels = new Map<string,string>();
   for (const [i,line] of project.lyrics.lines.entries()) {
-    const label = t('project.errorLine',{number:i+1,background:line.backgroundOf?' ('+t('editor.background')+')':''});
+    const label = t('project.errorLine',{number:i+1,background:line.backgroundOf?t('project.errorBackground'):''});
     labels.set(line.id,label);
     line.words.forEach((word,j)=>{
       labels.set(word.id,t('project.errorWord',{line:label,number:j+1,text:word.text}));
       word.rubyUnits.forEach((ruby,k)=>labels.set(ruby.id,t('project.errorRuby',{line:label,word:j+1,number:k+1,text:ruby.reading})));
     });
   }
-  for (const [kind,tracks] of [[t('selection.translation'),project.lyrics.translationTracks],[t('selection.romanization'),project.lyrics.romanizationTracks]] as const) tracks.forEach((track,i)=>{
-    const label=t('project.errorTrack',{kind,number:i+1,language:track.language||'und'});labels.set(track.id,label);
+  for (const [kind,tracks] of [['project.errorTranslationTrack',project.lyrics.translationTracks],['project.errorRomanizationTrack',project.lyrics.romanizationTracks]] as const) tracks.forEach((track,i)=>{
+    const label=t(kind,{number:i+1,language:track.language||'und'});labels.set(track.id,label);
     track.contents.forEach((content,j)=>{
       const owner=labels.get(content.lineId)??t('project.staleLine');
       labels.set(content.id,t('project.errorContent',{line:owner,track:label,number:j+1}));

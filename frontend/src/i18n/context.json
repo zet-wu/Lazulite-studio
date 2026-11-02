@@ -1945,7 +1945,7 @@
   },
   "editor.backgroundSuffix": {
     "context": "editor interface: editor.backgroundSuffix",
-    "source": "· 背景",
+    "source": " · 背景",
     "params": [],
     "parameterNotes": {}
   },
@@ -2951,7 +2951,7 @@
   },
   "alignment.gapThreshold": {
     "context": "alignment interface: alignment.gapThreshold",
-    "source": "行内空隙阈值必须为正的安全整数毫秒",
+    "source": "行内空隙阈值（毫秒）",
     "params": [],
     "parameterNotes": {}
   },
@@ -3641,7 +3641,7 @@
   },
   "packaging.keepTagsSuffix": {
     "context": "packaging interface: packaging.keepTagsSuffix",
-    "source": "· 保留已有歌词标签",
+    "source": " · 保留已有歌词标签",
     "params": [],
     "parameterNotes": {}
   },
@@ -5573,7 +5573,7 @@
   },
   "romanization.replace": {
     "context": "romanization interface: romanization.replace",
-    "source": "替换 ·",
+    "source": "替换 · ",
     "params": [],
     "parameterNotes": {}
   },
@@ -10975,20 +10975,6 @@
       "text": "Original lyric, reading, guide, or entered text; preserve it."
     }
   },
-  "project.errorTrack": {
-    "context": "project interface: project.errorTrack",
-    "source": "{{kind}}轨道 {{number}} · {{language}}",
-    "params": [
-      "kind",
-      "number",
-      "language"
-    ],
-    "parameterNotes": {
-      "kind": "Localized object kind.",
-      "number": "One-based displayed ordinal (line, track, unit, or group).",
-      "language": "Content language tag or localized unspecified-language label; not the UI locale."
-    }
-  },
   "project.errorContent": {
     "context": "project interface: project.errorContent",
     "source": "{{line}} · {{track}} · 内容 {{number}}",
@@ -11252,5 +11238,45 @@
     "source": "项目级问题",
     "params": [],
     "parameterNotes": {}
+  },
+  "project.errorBackground": {
+    "context": "Project error object label",
+    "source": "（背景）",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "project.errorTranslationTrack": {
+    "context": "Project error object label",
+    "source": "翻译轨道 {{number}} · {{language}}",
+    "params": [
+      "number",
+      "language"
+    ],
+    "parameterNotes": {
+      "number": "One-based track index",
+      "language": "Track language tag"
+    }
+  },
+  "project.errorRomanizationTrack": {
+    "context": "Project error object label",
+    "source": "音译轨道 {{number}} · {{language}}",
+    "params": [
+      "number",
+      "language"
+    ],
+    "parameterNotes": {
+      "number": "One-based track index",
+      "language": "Track language tag"
+    }
+  },
+  "validation.locationTrack": {
+    "context": "Disambiguates output issues on tracks sharing a language; number is the one-based track index",
+    "source": "轨道 {{number}}",
+    "params": [
+      "number"
+    ],
+    "parameterNotes": {
+      "number": "One-based track index"
+    }
   }
 }

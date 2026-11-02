@@ -98,8 +98,8 @@ export function SyncPanel({ progress, onProgress, document, cursor, targetVersio
     <small className={styles.syncTime}>{beginMs === null ? '—' : (beginMs / 1e3).toFixed(3)}–{endMs === null ? '—' : (endMs / 1e3).toFixed(3)} s</small>
     <Select aria-label={t('sync.mode')} disabled={Boolean(background)} value={effectiveMode} onChange={event => { setMode(event.target.value as SyncMode); onProgress({ completed: false, consumed: 0 }); }}><option value="continuous">{t('sync.continuous')}</option><option value="line">{t('sync.line')}</option></Select>
     {background && <span>{t('sync.backgroundLine')}</span>}
-    {offsetMs !== 0 && <small>{t('sync.offset')}{offsetMs} ms <button data-role="secondary" onClick={() => setOffsetMs(0)}>{t('sync.reset')}</button></small>}
-    {emptyBeats > 0 && <small>{t('sync.countdown')}{emptyBeats}/{beatCount}</small>}
+    {offsetMs !== 0 && <small>{t('sync.offset')} {offsetMs} ms <button data-role="secondary" onClick={() => setOffsetMs(0)}>{t('sync.reset')}</button></small>}
+    {emptyBeats > 0 && <small>{t('sync.countdown')} {emptyBeats}/{beatCount}</small>}
     <div className={styles.syncButtons}>
       <button data-role="secondary" disabled={index <= 0} onClick={() => moveTo(index - 1)}>{t('sync.previousUnit')}</button>
       <button data-role="secondary" disabled={!units.slice(0, index).some((unit) => unit.lineId !== active?.lineId)} onClick={previousLine}>{t('sync.previousLine')}</button>
@@ -115,7 +115,7 @@ export function SyncPanel({ progress, onProgress, document, cursor, targetVersio
       <button data-role="secondary" disabled={!transport || beginMs === null} onClick={() => { if (beginMs !== null) transport?.current?.seekMs(beginMs); }}>{t('sync.auditionPosition')}</button>
       <button data-role="secondary" disabled={!transport || beginMs === null} onClick={() => audition(true)}>{t('sync.before')}</button>
       <button data-role="secondary" disabled={!transport || endMs === null} onClick={() => audition(false)}>{t('sync.after')}</button>
-    {beatCount > 0 && <small>{t('sync.countdown')}{emptyBeats}/{beatCount}{t('sync.countdownHelp')}</small>}
+    {beatCount > 0 && <small>{t('sync.countdown')} {emptyBeats}/{beatCount}{t('sync.countdownHelp')}</small>}
     <label>{t('sync.offsetMs')}<input type="number" value={offsetMs} onChange={(event) => setOffsetMs(Math.round(Number(event.target.value)))} /></label>
     <button data-role="secondary" disabled={beginMs === null || !transport?.current} onClick={() => { if (beginMs !== null && transport?.current) setOffsetMs(Math.round((beginMs - transport.current.getPositionMs()) )); }}>{t('sync.calibrate')}</button>
     </div>}

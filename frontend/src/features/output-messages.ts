@@ -16,7 +16,10 @@ export function issueLocation(issue:OutputIssue,document?:LyricDocument):string 
   const tracks=issue.kind.startsWith('translation')?document!.translationTracks:document!.romanizationTracks;
   const track=tracks.find(t=>t.id===issue.trackId),content=track?.contents.find(c=>c.id===issue.contentId);
   parts.push(t(issue.kind.startsWith('translation')?'selection.translation':'selection.romanization'));
-  if(track)parts.push(track.language??t('editor.unspecifiedLanguage'));
+  if(track){
+   parts.push(track.language??t('editor.unspecifiedLanguage'));
+   if(tracks.filter(item=>item.language===track.language).length>1)parts.push(t('validation.locationTrack',{number:tracks.indexOf(track)+1}));
+  }
   if(content?.kind==='timed'&&issue.unitId)parts.push(t('validation.locationUnit',{number:content.units.findIndex(u=>u.id===issue.unitId)+1}));
  }
  return parts.join(' · ');

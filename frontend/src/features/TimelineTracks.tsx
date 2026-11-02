@@ -273,7 +273,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     <div ref={scrollRef} className={styles.expandedTracks} style={!expandedLines.length ? { display: 'none' } : undefined}><div style={expandedLines.length > 20 ? { height: virtual.getTotalSize(), position: 'relative' } : undefined}>
     {(expandedLines.length > 20 ? virtual.getVirtualItems() : expandedLines.map((line, index) => ({ index, key: line.id, start: 0 }))).map(virtualRow => {
       const item = displayed.lines.find(line => line.id === expandedLines[virtualRow.index].id)!;
-      const label = `L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? t('outline.background') : ''}`;
+      const label = `L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ` ${t('outline.background')}` : ''}`;
       const renderTargets = (name: string, targets: TimelineTarget[]) => {
         const intervals = targets.filter(target => { const value = targetInterval(projection, target); return value && intersects(value.beginMs, value.endMs); });
         const layout = packIntervals(intervals.map(target => { const value = targetInterval(projection, target)!; return { key: targetId(target), beginMs: value.beginMs!, endMs: value.endMs! }; }));
