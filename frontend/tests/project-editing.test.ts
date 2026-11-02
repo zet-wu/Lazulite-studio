@@ -89,7 +89,7 @@ it('timeline target start follows incoming links and rejects invalid endpoints a
   state = apply(state, { type: 'batch', commands: [{ type: 'set-line-time', lineId: 'b', beginMs: 1000, endMs: 2000 }, { type: 'link-line-end', lineId: 'a', targetLineId: 'b' }] });
   const moved = resizeTimeline(state.present.lyrics, { kind: 'line', lineId: 'b' }, 'beginMs', 1500, state.present.editing);
   expect(moved.lines[0].endMs).toBe(1500);
-  expect(() => resizeTimeline(state.present.lyrics, { kind: 'line', lineId: 'a' }, 'endMs', 900, state.present.editing)).toThrow(/链接/);
+  expect(() => resizeTimeline(state.present.lyrics, { kind: 'line', lineId: 'a' }, 'endMs', 900, state.present.editing)).toThrow('timeline.linkConflict');
   const next = apply(state, { type: 'replace-document', document: moved });
   expect(undoProjectCommand(next).present).toBe(state.present);
 });
@@ -109,7 +109,7 @@ it('retains configured whitespace export gates without leaking configuration int
 it('rejects generated Ruby replacement that would silently erase configured identity', () => {
  let state=apply(fixture(),{type:'add-ruby',lineId:'a',wordId:'a1',reading:'あ',rubyId:'r'});
  state=apply(state,{type:'set-empty-beat',id:'r',kind:'ruby',count:2});
- expect(()=>apply(state,{type:'set-ruby-units',lineId:'a',wordId:'a1',overwrite:true,units:[{id:'new-r',reading:'い',beginMs:null,endMs:null}]})).toThrow(/空拍/);
+ expect(()=>apply(state,{type:'set-ruby-units',lineId:'a',wordId:'a1',overwrite:true,units:[{id:'new-r',reading:'い',beginMs:null,endMs:null}]})).toThrow('editing.replaceRubyBeats');
  expect(state.present.editing.emptyBeats.r.count).toBe(2);
 });
 

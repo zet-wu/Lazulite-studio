@@ -1,3 +1,7 @@
+import { useMessageText } from '../shared/useMessageText';
+import { message as describeMessage, errorMessage, type Message } from '../domain/messages';
+import { i18n, formatMessage } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { spectrumDiagnosticsEnabled } from './spectrum-diagnostics';
 import { IconButton } from '../shared/Controls';
 import { TimelineIndicators } from './TimelineIndicators';
@@ -11,26 +15,28 @@ import { spectrumPalette } from './spectrum-palette';
 
 type Props = { pcmRate?: number; vocal?: string | null; projectId: string; assetIdentity: string; startMs: number; endMs: number; durationMs: number };
 type Request = { token: number; controller: AbortController; began?: number; posted: boolean };
-type Result = { id: number; token: number; pixels: Uint8Array; computeMs?: number; error?: string };
+type Result = { id: number; token: number; pixels: Uint8Array; computeMs?: number; error?: Message };
 
 export function SpectrogramCanvas(props: Props) {
+  useTranslation();
   return <AssetSpectrum key={`${props.projectId}:${props.assetIdentity}:${props.durationMs}:${props.pcmRate ?? PROXY_SAMPLE_RATE}:fft512-${SPECTRUM_WIDTH}x${SPECTRUM_HEIGHT}`} {...props} />;
 }
 
 function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs, endMs, durationMs }: Props) {
+  useTranslation();
   const canvas = useRef<HTMLCanvasElement>(null);
   const worker = useRef<Worker | null>(null);
   const [diagnostics] = useState(spectrumDiagnosticsEnabled);
   const cache = useRef(new SpectrumCache(diagnostics));
   const pending = useRef(new Map<number, Request>());
-  const failed = useRef(new Map<number, string>());
+  const failed = useRef(new Map<number, Message>());
   const wanted = useRef<number[]>([]);
   const nextToken = useRef(0);
   const pump = useRef<() => void>(() => {});
   const stats = useRef(diagnostics ? { completed: 0, computeMs: [] as number[], requestMs: [] as number[] } : null);
   const [revision, setRevision] = useState(0);
   const [retry, setRetry] = useState(0);
-  const [error, setError] = useState('');
+  const [error, setError] = useMessageText('');
   const visible = endMs > startMs && endMs - startMs <= 20_000;
   const firstTile = Math.floor(startMs / SPECTRUM_WINDOW_MS) * SPECTRUM_WINDOW_MS;
   const lastTile = Math.ceil(endMs / SPECTRUM_WINDOW_MS) * SPECTRUM_WINDOW_MS;
@@ -55,7 +61,7 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
         if (pending.current.get(first) !== request) return;
         pending.current.delete(first);
         if (!request.controller.signal.aborted) {
-          failed.current.set(first, cause instanceof Error ? cause.message : '声谱图片段加载失败');
+          failed.current.set(first, errorMessage(cause));
         }
         changed(); pump.current();
       });
@@ -80,9 +86,9 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
       changed(); pump.current();
     };
     processor.onerror = event => {
-      for (const [id, request] of pending.current) { request.controller.abort(); failed.current.set(id, event.message); }
+      for (const [id, request] of pending.current) { request.controller.abort(); failed.current.set(id, describeMessage('spectrum.computeFailed',{diagnostic:event.message})); }
       pending.current.clear(); worker.current = null; processor.terminate();
-      setError(`声谱图计算失败：${event.message}`); changed();
+      setError(describeMessage('spectrum.computeFailed',{diagnostic:event.message})); changed();
     };
     pump.current();
     return () => {
@@ -137,13 +143,15 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
     }
   }, [endMs, revision, startMs, visible, width, ratio]);
 
-  if (!visible) return <p className={styles.spectrumHint}>放大到 20 秒以内显示声谱图</p>;
-  const displayError = error || wanted.current.map(first => failed.current.get(first)).find(Boolean);
+  if (!visible) return <p className={styles.spectrumHint}>{t('spectrum.zoomHint')}</p>;
+  const displayError = error || wanted.current.map(first => failed.current.get(first)).filter(Boolean).map(value=>formatMessage(value!))[0];
   const ready = wanted.current.filter(first => cache.current.get(first)).length;
   return <div className={styles.spectrogram} data-spectrum-ready={ready} data-spectrum-wanted={wanted.current.length}
     data-spectrum-stats={stats.current ? JSON.stringify({ ...stats.current, cacheSize: cache.current.size, evictions: cache.current.evictions, pending: pending.current.size }) : undefined}>
-    <div className={styles.spectrumPlot}><canvas ref={canvas} aria-label="声谱图" data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
-    {ready < wanted.current.length && !displayError && <small role="status">声谱图加载中…</small>}
-    {displayError && <small role="alert">{displayError} <IconButton icon="refresh" label="重试加载声谱图" data-role="secondary" onClick={() => { failed.current.clear(); setError(''); setRetry(value => value + 1); }}/></small>}
+    <div className={styles.spectrumPlot}><canvas ref={canvas} aria-label={t('spectrum.title')} data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
+    {ready < wanted.current.length && !displayError && <small role="status">{t('spectrum.loading')}</small>}
+    {displayError && <small role="alert">{displayError} <IconButton icon="refresh" label={t('spectrum.retry')} data-role="secondary" onClick={() => { failed.current.clear(); setError(''); setRetry(value => value + 1); }}/></small>}
   </div>;
 }
+
+const t=i18n.t.bind(i18n);

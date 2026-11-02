@@ -4,8 +4,7 @@ import { i18n, formatMessage } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { EmbeddedLyrics } from './EmbeddedLyrics';
 import { createProjectEditing } from '../domain/project-editing';
-import { translationsForLine } from '../domain/lyric-document';
-import { translationText } from '../domain/lyric-document';
+import { translationsForLine, translationText, type LyricDocument } from '../domain/lyric-document';
 import { Select } from '../shared/Select';
 import { IconButton } from '../shared/Controls';
 import type { useSearchConditions } from './useSearchConditions';
@@ -15,7 +14,6 @@ import type { Source } from '../adapters/http/lyric-sources';
 import { decodeKrcFile } from '../adapters/source-codec';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { detectLyricFormat, importLyricFile, type LyricFormat } from '../adapters/lyric-formats';
-import { type LyricDocument } from '../domain/lyric-document';
 import type { LyricCommand } from '../domain/lyric-commands';
 import styles from './acquisition.module.css';
 
@@ -54,7 +52,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   useEffect(() => { if (tab === 'embedded') setIncoming(null); }, [sourceAssetId]);
   useEffect(() => setDismissed(false), [tab, selected?.candidate.id, selected?.error]);
   const parse = (content: string, kind: Exclude<LyricFormat, 'ass'>) => {
-    try { stage(importLyricFile(content, kind)); } catch (e) { setIncoming(null); setMessage(describeMessage('acquire.parseFailed',{diagnostic:e instanceof Error?e.message:String(e)})); }
+    try { stage(importLyricFile(content, kind)); } catch (e) { setIncoming(null); setMessage(errorMessage(e)); }
   };
   const open = async (file: File) => {
     const serial = ++request.current; setFilename(file.name); setIncoming(null); setMessage(describeMessage('common.reading'));
@@ -64,7 +62,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
       if (kind === 'ass') throw new MessageError(describeMessage('acquire.assExportOnly'));
       const content = kind === 'krc' ? await decodeKrcFile(file) : await file.text();
       if (serial === request.current) parse(content, kind);
-    } catch (e) { if (serial === request.current) setMessage(describeMessage('acquire.parseFailed',{diagnostic:e instanceof Error?e.message:String(e)})); }
+    } catch (e) { if (serial === request.current) setMessage(errorMessage(e)); }
   };
   const confirm = () => {
     if (!incoming) return;

@@ -11,7 +11,7 @@ it('keeps actual YRC/QRC/KRC word clocks and whitespace', () => {
 it('does not invent ordinary LRC ends', () => { const d=importLyricFile('[00:01.00]甲\n[00:02.00]乙','lrc'); expect(d.lines.map(l=>l.endMs)).toEqual([null,null]); });
 it('retains sidecar translation and real QRC romanization clocks', () => {
  const p=parsePayload({empty:false,format:'qrc',content:'[1000,500]甲(1000,500)',metadata:{qqMusicId:['mid']},translation:'[00:01]translation',romanization:'[1000,500]jia(1000,500)'});
- expect((p.document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === p.document.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))[0] as { text: string }).text).toBe('translation'); expect(p.document.romanizationTracks[0].contents[0].kind).toBe('timed'); expect(p.badges).toContain('音译');
+ expect((p.document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === p.document.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))[0] as { text: string }).text).toBe('translation'); expect(p.document.romanizationTracks[0].contents[0].kind).toBe('timed'); expect(p.badges).toContain('capability.romanization');
 });
 it('selects entire metadata lists and permits empty-side deletion', () => {
  const a={...createLyricDocument(), metadata:{artists:[' A ','B'],album:['old'],only:['x']}}, b={...createLyricDocument(),metadata:{artists:['C'],album:['new'],incoming:['y']}};
@@ -28,6 +28,6 @@ it('sidecar 750 ms matching is inclusive, monotonic, one to one and rejects same
 it('malformed optional blocks do not block body; malformed body and empty body still fail',()=>{
  const p=parsePayload({empty:false,format:'krc',content:'[language:broken]\n[1000,500]<0,500,0>甲',metadata:{},translation:'broken'});
  expect(p.document.lines).toHaveLength(1);expect(p.partial).toBe(true);expect(p.badges).toContain('KRC');
- expect(()=>parsePayload({empty:false,format:'qrc',content:'[1000,500]甲(1000,500)\nbroken body',metadata:{}})).toThrow('正文格式');
- expect(()=>parsePayload({empty:false,format:'lrc',content:'[00:01] ',metadata:{}})).toThrow('可用正文');
+ expect(()=>parsePayload({empty:false,format:'qrc',content:'[1000,500]甲(1000,500)\nbroken body',metadata:{}})).toThrow('parse.invalidLine');
+ expect(()=>parsePayload({empty:false,format:'lrc',content:'[00:01] ',metadata:{}})).toThrow('search.noUsableText');
 });

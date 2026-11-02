@@ -32,8 +32,8 @@ it.each(['main','background','custom',''])('syncs identity changes only for a co
 it('uses minimum readable number and validates edited IDs without rewriting legacy UUIDs',()=>{
  expect(nextGroupId([{id:'group1',name:'1'},{id:'GROUP3',name:'3'}])).toBe('group2');
  const old=[{id:'1234-uuid',name:'旧'}];expect(groupIdProblem(old,old,{'1234-uuid':'1234-uuid'})).toBeNull();
- expect(groupIdProblem(old,[{id:'1new',name:'新'}],{'1234-uuid':'1new'})).toContain('英文字母');
- expect(groupIdProblem([],[{id:'Main',name:'1'},{id:'main',name:'2'}],{})).toContain('重复');
+ expect((groupIdProblem(old,[{id:'1new',name:'新'}],{'1234-uuid':'1new'}))?.key).toBe('karaoke.groupInvalid');
+ expect((groupIdProblem([],[{id:'Main',name:'1'},{id:'main',name:'2'}],{}))?.key).toBe('karaoke.groupDuplicate');
 });
 
 it('copies explicit custom/unassigned group membership with each source line in one transaction',async()=>{

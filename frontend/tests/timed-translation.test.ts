@@ -33,7 +33,7 @@ it('keeps missing translation endpoints in drafts and locates final output error
   content.units[0].beginMs = null;
   expect(parseLyricTtml(serializeLyricTtml(d, { draft: true }))).toEqual(d);
   expect(collectOutputIssues(d, 'ttml')).toContainEqual(expect.objectContaining({ kind: 'translation-unit', lineId: 'L1', contentId: content.id, unitId: content.units[0].id, missing: ['begin'] }));
-  expect(() => serializeLyricTtml(d)).toThrow(/needs timing/);
+  expect(() => serializeLyricTtml(d)).toThrow('ttml.unitNeedsTime');
 });
 it('preserves translation structure through edits, relationships, grouped copy, explicit shifts and one undo', () => {
   const d = parseLyricTtml(xml);
@@ -51,8 +51,8 @@ it('preserves translation structure through edits, relationships, grouped copy, 
   expect(undoLyricCommand(state).present).toBe(d);
 });
 it('rejects unsupported translation types and nested data instead of flattening it', () => {
-  expect(() => parseLyricTtml(xml.replace('type="replacement"', 'type="unknown"'))).toThrow(/type/);
-  expect(() => parseLyricTtml(xml.replace(' 黃金 ', '<b>黃金</b>'))).toThrow(/structure/);
+  expect(() => parseLyricTtml(xml.replace('type="replacement"', 'type="unknown"'))).toThrow('ttml.translationType');
+  expect(() => parseLyricTtml(xml.replace(' 黃金 ', '<b>黃金</b>'))).toThrow('ttml.textStructure');
 });
 it('records installed AMLL consumer projection separately from Studio structured fidelity', async () => {
   const { parseTTML } = await import('@applemusic-like-lyrics/lyric');

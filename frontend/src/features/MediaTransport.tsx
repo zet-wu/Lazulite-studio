@@ -1,5 +1,5 @@
+import { errorMessage, message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
-import { message } from '../domain/messages';
 import { i18n } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { preferences } from '../adapters/preferences';
@@ -665,7 +665,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           onClick={() => {
             const aMs = Math.round(readPosition() * 1e3);
             try { setLoop(setLoopA(loop, aMs, durationMs)); setError(''); }
-            catch (cause) { setError(cause instanceof Error ? cause.message : message('media.setAFailed')); }
+            catch (cause) { setError(errorMessage(cause)); }
           }}
         >
           A {bandA == null ? "--:--.---" : fmt(bandA)}
@@ -675,7 +675,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           onClick={() => {
             const bMs = Math.round(readPosition() * 1e3);
             try { setLoop(setLoopB(loop, bMs, durationMs)); setError(''); }
-            catch (cause) { setError(cause instanceof Error ? cause.message : message('media.setBFailed')); }
+            catch (cause) { setError(errorMessage(cause)); }
           }}
         >
           B {bandB == null ? "--:--.---" : fmt(bandB)}
@@ -695,7 +695,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         >
           {t('media.loopLine')}</button>
         <button data-role="secondary"
-          title={loopRange ? undefined : lyricEnvelope.reason} disabled={disabled || !validUnit}
+          title={loopRange || !lyricEnvelope.reason ? undefined : t(lyricEnvelope.reason)} disabled={disabled || !validUnit}
           onClick={() => setLoop(captureLoop(loopRange!.begin_ms, loopRange!.end_ms, durationMs))}
         >
           {t('media.loopSelection')}</button>

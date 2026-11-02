@@ -1,5 +1,5 @@
+import { errorMessage, message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
-import { message } from '../domain/messages';
 import { i18n, formatDate } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { LanguageSelector } from './LanguageSelector';
@@ -29,7 +29,7 @@ export function ProjectList() {
       const file=event.target.files?.[0];event.target.value='';if(!file)return;
       setArchiveBusy('import');setArchiveError('');
       try { await studioApi.importProject(file);setExtra([]);setNextCursor(undefined);await query.refetch(); }
-      catch(error){setArchiveError(error instanceof Error?error.message:message('projects.importFailed'));}
+      catch(error){setArchiveError(errorMessage(error));}
       finally{setArchiveBusy(null);}
     }}/>
   </>;
@@ -38,7 +38,7 @@ export function ProjectList() {
     try {
       const blob=await studioApi.exportProject(id), url=URL.createObjectURL(blob), link=document.createElement('a');
       link.href=url;link.download=`${name.replace(/[<>:"/\\|?*]/g,'_') || 'project'}.lazp`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-    } catch(error){setArchiveError(error instanceof Error?error.message:message('projects.exportFailed'));}
+    } catch(error){setArchiveError(errorMessage(error));}
     finally{setArchiveBusy(null);}
   };
   const location = useLocation();
@@ -147,9 +147,9 @@ export function ProjectList() {
               <span className={styles.rowArrow}>›</span>
             </Link>
             <ProjectStorage id={project.id}/>
-            <button data-role="secondary" disabled={!!archiveBusy} onClick={()=>void exportProject(project.id,project.name)} aria-label={`导出项目 ${project.name}`}>{archiveBusy===project.id?t('projects.exporting'):t('projects.export')}</button>
-            <button data-role="danger" className={`icon-button ${styles.projectDelete}`} aria-label={`删除项目 ${project.name}`} title={`删除项目 ${project.name}`} disabled={deleting === project.id} onClick={async () => {
-                if (!window.confirm(`删除项目“${project.name}”？将删除歌词修订、任务和产物。原始上传文件和共享音频保留。`)) return;
+            <button data-role="secondary" disabled={!!archiveBusy} onClick={()=>void exportProject(project.id,project.name)} aria-label={t('projects.exportNamed',{name:project.name})}>{archiveBusy===project.id?t('projects.exporting'):t('projects.export')}</button>
+            <button data-role="danger" className={`icon-button ${styles.projectDelete}`} aria-label={t('projects.deleteNamed',{name:project.name})} title={t('projects.deleteNamed',{name:project.name})} disabled={deleting === project.id} onClick={async () => {
+                if (!window.confirm(t('projects.deleteConfirm',{name:project.name}))) return;
                 setDeleting(project.id); setDeleteError("");
                 try {
                   await studioApi.deleteProject(project.id);
@@ -157,7 +157,7 @@ export function ProjectList() {
                   try { await clearProjectLocalData(project.id); }
                   catch { setDeleteError(message('projects.deleteCleanupFailed')); }
                   setExtra([]); setNextCursor(undefined); await query.refetch();
-                } catch (error) { setDeleteError(error instanceof Error ? error.message : message('projects.deleteFailed')); }
+                } catch (error) { setDeleteError(errorMessage(error)); }
                 finally { setDeleting(null); }
               }}><Icon name="trash" /></button></div>
           ))}

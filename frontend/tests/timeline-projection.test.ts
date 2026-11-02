@@ -35,7 +35,7 @@ it('resizes only the requested side without filling unknown ancestors and reject
   expect(next.lines[0].words[0]).toMatchObject({ beginMs: null, endMs: null, rubyUnits: [{ beginMs: 100, endMs: 200 }] });
   expect(next.lines[0]).toMatchObject({ beginMs: null, endMs: null });
   line.beginMs = 0;
-  expect(() => moveTimeline(doc, [{ kind: 'line', lineId: line.id }], 10)).toThrow('完整时间');
+  expect(() => moveTimeline(doc, [{ kind: 'line', lineId: line.id }], 10)).toThrow('timeline.lineTimesRequired');
 });
 it('computes parents before children while using only real sibling endpoints and all descendant constraints', () => {
   const doc = createLyricDocument('');
@@ -67,7 +67,7 @@ it('resizing Ruby retains known parent sides when no Ruby supplies that side, an
   const next = resizeTimeline(doc, { kind: 'ruby', lineId: row.id, wordId: word.id, rubyId: 'r' }, 'endMs', 200);
   expect(next.lines[0]).toMatchObject({ beginMs: 0, endMs: null });
   expect(next.lines[0].words[0]).toMatchObject({ beginMs: 10, endMs: null });
-  expect(() => resizeTimeline(doc, { kind: 'line', lineId: row.id }, 'endMs', 50)).toThrow('不能排除');
+  expect(() => resizeTimeline(doc, { kind: 'line', lineId: row.id }, 'endMs', 50)).toThrow('timeline.lineExcludesWords');
 });
 
 it.each(['beginMs', 'endMs'] as const)('skips consecutive untimed whitespace for a background word missing %s without changing source data', side => {

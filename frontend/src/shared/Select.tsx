@@ -1,3 +1,5 @@
+import { i18n } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { useEffect, useLayoutEffect, useId, useRef, useState, type SelectHTMLAttributes } from 'react';
 import { createPortal } from 'react-dom';
 import './select.css';
@@ -5,9 +7,11 @@ import './select.css';
 type Quote = { prefix: string; text: string };
 type Props = SelectHTMLAttributes<HTMLSelectElement> & { quotes?: Record<string, Quote> };
 function QuotedOption({ quote }: { quote: Quote }) {
+  useTranslation();
   return <span className="studio-select-quote" title={`${quote.prefix}${quote.text}`}><span>{quote.prefix}</span><span className="studio-lyric-quote">{quote.text}</span></span>;
 }
 export function Select({ quotes, ...props }: Props) {
+  useTranslation();
   const ref=useRef<HTMLSelectElement>(null);
   const list=useRef<HTMLDivElement>(null);
   const id=useId();
@@ -77,5 +81,7 @@ export function Select({ quotes, ...props }: Props) {
         setActive(e.key==='Home'?enabled[0]:e.key==='End'?enabled.at(-1)!:enabled[Math.max(0,Math.min(enabled.length-1,index+(e.key==='ArrowDown'?1:-1)))]??active);
       } else if(open&&e.key.length===1){e.preventDefault();const index=options.findIndex(o=>!o.disabled&&o.text.toLocaleLowerCase().startsWith(e.key.toLocaleLowerCase()));if(index>=0)setActive(index);}
     }}/>;
-  return <>{quotes ? <span className="studio-select-trigger">{trigger}{selectedQuote && <span className="studio-select-value" aria-hidden="true"><QuotedOption quote={selectedQuote}/></span>}</span> : trigger}{open&&createPortal(<div ref={list} id={id} role="listbox" aria-label={props['aria-label']??ref.current?.labels?.[0]?.textContent??'选项'} className="studio-select-list" style={rect} onPointerDown={e=>{e.preventDefault();e.stopPropagation();}}>{options.map((o,i)=><div key={i} id={`${id}-${i}`} data-index={i} role="option" aria-selected={o.selected} aria-disabled={o.disabled} data-active={active===i} onPointerMove={()=>{if(!o.disabled)setActive(i);}} onClick={e=>{e.stopPropagation();choose(i);}} aria-label={o.text}>{quotes?.[o.value] ? <QuotedOption quote={quotes[o.value]}/> : o.text}</div>)}</div>,ref.current?.closest('[role="dialog"]')??document.body)}</>;
+  return <>{quotes ? <span className="studio-select-trigger">{trigger}{selectedQuote && <span className="studio-select-value" aria-hidden="true"><QuotedOption quote={selectedQuote}/></span>}</span> : trigger}{open&&createPortal(<div ref={list} id={id} role="listbox" aria-label={props['aria-label']??ref.current?.labels?.[0]?.textContent??t('select.options')} className="studio-select-list" style={rect} onPointerDown={e=>{e.preventDefault();e.stopPropagation();}}>{options.map((o,i)=><div key={i} id={`${id}-${i}`} data-index={i} role="option" aria-selected={o.selected} aria-disabled={o.disabled} data-active={active===i} onPointerMove={()=>{if(!o.disabled)setActive(i);}} onClick={e=>{e.stopPropagation();choose(i);}} aria-label={o.text}>{quotes?.[o.value] ? <QuotedOption quote={quotes[o.value]}/> : o.text}</div>)}</div>,ref.current?.closest('[role="dialog"]')??document.body)}</>;
 }
+
+const t=i18n.t.bind(i18n);

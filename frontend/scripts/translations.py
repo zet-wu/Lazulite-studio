@@ -23,6 +23,18 @@ def read(path):
 
 def resources(root):
     languages=read(REGISTRY)
+    seen=set()
+    for item in languages:
+        identity=item.get('id','')
+        if not re.fullmatch(r'[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*',identity) or identity in seen:
+            raise ValueError(f'invalid or duplicate language: {identity}')
+        seen.add(identity)
+        if not item.get('name') or item.get('direction') not in ('ltr','rtl') or not isinstance(item.get('complete'),bool):
+            raise ValueError(f'{identity}: invalid language metadata')
+        forms=item.get('plurals',[])
+        if not forms or len(forms)!=len(set(forms)) or any(form not in ('zero','one','two','few','many','other') for form in forms):
+            raise ValueError(f'{identity}: invalid plural forms')
+    if 'zh-Hans' not in seen:raise ValueError('the source language is required')
     return languages,{item['id']:read(root/'resources'/f"{item['id']}.json") for item in languages}
 
 

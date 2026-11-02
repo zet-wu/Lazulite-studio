@@ -1,3 +1,5 @@
+import { i18n } from '../../i18n';
+import { useTranslation } from 'react-i18next';
 import { focusObject } from './selection-recovery';
 import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { defaultRangeExtractor, useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
@@ -74,10 +76,12 @@ function useLocate(scrollRef: RefObject<HTMLDivElement | null>, { lines, locate,
 }
 
 function AppendLine({ append }: { append?: () => void }) {
-  return append ? <button data-role="secondary" className={styles.appendLine} aria-label="新增歌词行" onClick={append}><Icon name="add"/></button> : null;
+  useTranslation();
+  return append ? <button data-role="secondary" className={styles.appendLine} aria-label={t('editor.newLine')} onClick={append}><Icon name="add"/></button> : null;
 }
 
 function VirtualLyricList(props: ListProps) {
+  useTranslation();
   const { lines, renderLine } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { const node = scrollRef.current!; node.scrollTop = props.memory?.offset ?? 0; return () => { if (props.memory) props.memory.offset = node.scrollTop; }; }, []);
@@ -121,7 +125,7 @@ function VirtualLyricList(props: ListProps) {
     else if (scrollRef.current) virtualizer.scrollToOffset(scrollRef.current.scrollTop, { behavior: 'auto' });
   }).current;
   useLocate(scrollRef, props, mountTarget);
-  return <div ref={scrollRef} className={styles.lyricScroller} aria-label="歌词列表"
+  return <div ref={scrollRef} className={styles.lyricScroller} data-lyric-list aria-label={t('editor.lyricList')}
     onFocus={event => setFocusedLineId((event.target as Element).closest('[data-line-id]')?.getAttribute('data-line-id') ?? null)}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedLineId(null); }}>
     <div className={styles.virtualContent} style={{ height: virtualizer.getTotalSize() }}>
@@ -135,20 +139,25 @@ function VirtualLyricList(props: ListProps) {
 }
 
 function NormalLyricList(props: ListProps) {
+  useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { const node = scrollRef.current!; node.scrollTop = props.memory?.offset ?? 0; return () => { if (props.memory) props.memory.offset = node.scrollTop; }; }, []);
   useLocate(scrollRef, props);
-  return <div ref={scrollRef} className={styles.lyricScroller} aria-label="歌词列表">{props.lines.map(props.renderLine)}<AppendLine append={props.append} /></div>;
+  return <div ref={scrollRef} className={styles.lyricScroller} data-lyric-list aria-label={t('editor.lyricList')}>{props.lines.map(props.renderLine)}<AppendLine append={props.append} /></div>;
 }
 
 const CachedLine = memo(function CachedLine({ line, index, render }: { line: LyricLine; index: number; version: string; render: RefObject<Props['renderLine']> }) {
+  useTranslation();
   return render.current(line, index);
 });
 
 export function LyricList(props: Props) {
+  useTranslation();
   const render = useRef(props.renderLine); render.current = props.renderLine;
   const renderLine = (line: LyricLine, index: number) => <CachedLine key={line.id} line={line} index={index} version={props.lineVersion?.(line) ?? ''} render={render}/>;
   const handled = useRef<number | null>(props.memory?.handled ?? null);
   useEffect(() => () => { if (props.memory) props.memory.handled = handled.current; }, [props.memory]);
   return props.lines.length > 80 ? <VirtualLyricList {...props} renderLine={props.lineVersion ? renderLine : props.renderLine} handled={handled} /> : <NormalLyricList {...props} renderLine={props.lineVersion ? renderLine : props.renderLine} handled={handled} />;
 }
+
+const t=i18n.t.bind(i18n);

@@ -1,5 +1,5 @@
 import { message as describeMessage, errorMessage } from '../../domain/messages';
-import { i18n } from '../../i18n';
+import { i18n, formatMessage } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { ShapeConversionDialog } from './ShapeConversionDialog';
 import type { ValidationFilter } from '../../adapters/lyric-formats';
@@ -22,7 +22,7 @@ import { useSyncProgress } from './sync-progress';
 import { useProjectEditing } from './ProjectEditingContext';
 import { emptyBeatCount } from '../../domain/project-editing';
 import { Icon } from '../../shared/Icon';
-import { Fragment } from 'react';
+import { Fragment, lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
 import { documentTargets, selectionKind, targetId, targetSelection, selectionTargets, targetInterval } from './selection-targets';
 import { SelectionProvider, useEditorSelection } from './SelectionContext';
 import { flushSync } from 'react-dom';
@@ -45,9 +45,8 @@ import { PackagingPanel } from '../PackagingPanel';
 import { RomanizationGenerationDialog } from './RomanizationGenerationDialog';
 import { lineStructureIssues } from '../../domain/line-structure';
 import { useObjectDrag, type DragSource } from './object-drag';
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
-import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord } from '../../domain/lyric-document';
+import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, translationsForLine } from '../../domain/lyric-document';
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, segmentText } from '../../domain/segmentation';
 import { copySelection, cutSelection, deleteSelection, invertIds, moveWordsAcrossLine, pastePlain, pasteRich, selectIds, selectionLineId, type EditorClipboard, type EditorSelection } from './editing-actions';
@@ -65,7 +64,6 @@ import { SegmentationPanel } from './SegmentationPanel';
 import { BatchToolsPanel } from './BatchToolsPanel';
 import { RubyWordEditor } from './RubyWordEditor';
 import { TranslationTrackDialog } from './TranslationTrackDialog';
-import { translationsForLine } from '../../domain/lyric-document';
 import { TranslationEditor } from './TranslationEditor';
 import { RomanizationRow } from './RomanizationRow';
 import { LineSplitDialog } from './LineSplitDialog';
@@ -94,7 +92,7 @@ type Props = {
   audioDurationMs?: number;
   sourceAssetId?: string;
   onTimelineHost?: (host: HTMLDivElement | null) => void;
-  assignmentError?: { lineId: string; message: string; objectIds: string[] } | null;
+  assignmentError?: { lineId: string; message: string; detail: import('../../domain/messages').Message; objectIds: string[] } | null;
   title: string;
   projectId?: string;
   document: LyricDocument;
@@ -436,7 +434,7 @@ function EditorWorkspaceContent(props: Props) {
   };
   const assignmentIssues: OutputIssue[] = props.assignmentError ? props.assignmentError.objectIds.map(id=>{
     const line=document.lines.find(l=>l.id===props.assignmentError!.lineId);
-    const base={lineId:props.assignmentError!.lineId,missing:[],message:props.assignmentError!.message} satisfies Omit<OutputIssue,'kind'>;
+    const base={lineId:props.assignmentError!.lineId,missing:[],message:props.assignmentError!.message,detail:props.assignmentError!.detail} satisfies Omit<OutputIssue,'kind'>;
     const word=line?.words.find(w=>w.id===id||w.rubyUnits.some(u=>u.id===id));
     if(word){const ruby=word.rubyUnits.find(u=>u.id===id);return {...base,kind:ruby?'ruby':'word',wordId:word.id,...(ruby?{rubyId:ruby.id}:{})} as OutputIssue;}
     for(const track of document.romanizationTracks)for(const content of track.contents)if(content.lineId===line?.id&&content.kind==='timed'&&content.units.some(u=>u.id===id))return {...base,kind:'romanization-unit',trackId:track.id,contentId:content.id,unitId:id} as OutputIssue;
@@ -594,7 +592,7 @@ function EditorWorkspaceContent(props: Props) {
       const next = executeProjectCommand(createProjectEditorState(project), { type: 'lyrics', command }).present;
       return { command, next };
     };
-    try { plan(); } catch (cause) { return { id: action, label, disabled: true, reason: (cause as Error).message, run: () => {} }; }
+    try { plan(); } catch (cause) { return { id: action, label, disabled: true, reason: formatMessage(errorMessage(cause)), run: () => {} }; }
     return { id: action, label, reason: action === 'redistribute' ? t('editor.rubyScope') : undefined, run: () => {
       try {
         const {command,next} = plan();
@@ -676,7 +674,7 @@ function EditorWorkspaceContent(props: Props) {
         {id:'roman-to-ruby',label:t('editor.rubyFromRomanization'),run:()=>setRubyGeneration({lineIds:effective.ids})},
         {id:'generate-roman',label:t('editor.romanize'),run:()=>setRomanizationGeneration(effective.ids)},
         single('insert-word',t('editor.addWord'),()=>startWordDraft(line.id,line.words.at(-1)?.id??null)),
-        {...single('split-line',t('editor.splitLine'),()=>setSplitLineId(line.id)),disabled:multiple||!!line.backgroundOf||line.words.length<2,reason:multiple?t('editor.singleSplit'):lineStructureIssues(document,line).join('；')},
+        {...single('split-line',t('editor.splitLine'),()=>setSplitLineId(line.id)),disabled:multiple||!!line.backgroundOf||line.words.length<2,reason:multiple?t('editor.singleSplit'):lineStructureIssues(document,line).map(formatMessage).join(t('notice.separator'))},
         selectionAction(effective,'merge',t('editor.merge')),{id:'segment',label:t('editor.segment'),run:()=>setSegmentationOpen(true)});
       if(mode==='karaoke'&&props.project) {
         const count=props.project.karaoke.cues.filter(cue=>effective.ids.includes(cue.anchor.lineId)).length;
@@ -690,7 +688,7 @@ function EditorWorkspaceContent(props: Props) {
       if(effective.kind==='romanization-content') {
         actions.push(selectionAction(effective,'tokenize',t('editor.segmentAndTime')));
         let reason: string|undefined;
-        try { attachmentSelection(document,effective); } catch(cause) {reason=(cause as Error).message;}
+        try { attachmentSelection(document,effective); } catch(cause) {reason=formatMessage(errorMessage(cause));}
         actions.push({id:'transfer',label:t('editor.moveToLine'),disabled:!!reason||document.lines.length<2,reason,run:()=>setContentTransfer({trackId:effective.trackId,contentId:effective.contentId,ids:effective.ids,attachment:effective.attachment,targetLineId:document.lines.find(item=>item.id!==line.id)?.id??''})});
         if(!translated)actions.push(single('roman-to-ruby',t('editor.rubyFromRomanization'),()=>setRubyGeneration({lineIds:[line.id],trackId:effective.trackId,contentId:effective.contentId}),t('editor.singleOverwrite')));
       }
@@ -900,7 +898,7 @@ function EditorWorkspaceContent(props: Props) {
     {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.sourceAssetId ? <div ref={layoutRef} className={vocalStyles.audioLayout} style={{gridTemplateColumns:template(rendered)}}>
       {columns.outlineVisible && <aside onFocusCapture={() => { selectionArea.current = 'outline'; }} ref={outlineRef} className={styles.outline} aria-label={t('editor.audioOutline')}><h2>{t('editor.outline')}</h2><div className={styles.panelBody}>{displayOrder.map(line => <div key={line.id} draggable onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed="copy";const ghost=e.currentTarget.cloneNode(true) as HTMLElement;ghost.style.cssText="position:fixed;left:-10000px;opacity:.6;width:220px";window.document.body.appendChild(ghost);e.dataTransfer.setDragImage(ghost,20,16);setTimeout(()=>ghost.remove(),0);}}>
         <div onClick={event => selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey)}><OutlineRow line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} selected={selection?.kind === 'lines' && selection.ids.includes(line.id)}/></div>
-        {props.assignmentError?.lineId===line.id && <div role="alert" className={vocalStyles.error}>{props.assignmentError.message}{assignmentIssues.map((issue,i)=><button data-role="secondary" key={i} onClick={()=>locateIssue(issue)}>{t('editor.locate')}{issue.kind==='ruby'?t('selection.ruby'):issue.kind==='word'?t('selection.word'):issue.kind==='romanization-unit'?t('selection.romanizationUnit'):t('selection.line')}{i+1}</button>)}</div>}
+        {props.assignmentError?.lineId===line.id && <div role="alert" className={vocalStyles.error}>{formatMessage(props.assignmentError.detail)}{assignmentIssues.map((issue,i)=><button data-role="secondary" key={i} onClick={()=>locateIssue(issue)}>{t('editor.locate')}{issue.kind==='ruby'?t('selection.ruby'):issue.kind==='word'?t('selection.word'):issue.kind==='romanization-unit'?t('selection.romanizationUnit'):t('selection.line')}{i+1}</button>)}</div>}
       </div>)}</div></aside>}
       {columns.outlineVisible && separator('outline')}
       <main ref={mainRef} tabIndex={-1} className={vocalStyles.main}><div ref={audioReview.setStatusHost}/><div hidden={!audioReview.timelineReady} className={vocalStyles.host} ref={props.onTimelineHost}/></main>
@@ -1040,7 +1038,7 @@ function EditorWorkspaceContent(props: Props) {
     {amllOpen&&props.project&&props.applyProject&&<SettingsDialog title={t('editor.amllSettings')} subtitle={t('editor.settingsScope')} close={()=>setAmllOpen(false)}
       returnFocus={()=>amllNavigating.current?null:pageRef.current?.querySelector<HTMLElement>('[data-top-menu="settings"] > summary')??null}
       actions={<button data-role="secondary" onClick={()=>setAmllOpen(false)}>{t('common.close')}</button>}>
-      <AmllSettings project={props.project} apply={command=>{try{props.applyProject!(command);}catch(e){setMessage(e instanceof Error?e.message:String(e));}}}
+      <AmllSettings project={props.project} apply={command=>{try{props.applyProject!(command);}catch(e){setMessage(errorMessage(e));}}}
         locate={rule=>{amllNavigating.current=true;setAmllOpen(false);setValidationTab('amll');setFocusRule(rule);setMode('package');}}/>
     </SettingsDialog>}
     {settingsDialog === 'singers' && !props.project?.amll.simplified && <SingerDialog focusAgent={focusAgent} document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}

@@ -1,3 +1,4 @@
+import { message, MessageError } from './messages';
 import type { LyricDocument, TimeMs } from './lyric-document';
 import type { ProjectDocument, VocalSegment } from './project-document';
 
@@ -28,12 +29,12 @@ export function projectTimes(project: ProjectDocument): TimedObject[] {
 }
 /** Check only created or changed endpoints after all snapping and linked edits. */
 export function assertChangedTimes(before: TimedObject[], after: TimedObject[], durationMs: number | null) {
-  if (durationMs === null) throw new Error('源音频时长未知，无法拖动时间');
+  if (durationMs === null) throw new MessageError(message('time.sourceUnknown'));
   const old = new Map(before.map(item => [item.id, item]));
   for (const item of after) for (const side of ['beginMs', 'endMs'] as const) {
     const value = item[side];
     if (value !== null && value !== old.get(item.id)?.[side] && (!Number.isSafeInteger(value) || value < 0 || value > durationMs))
-      throw new Error(`对象 ${item.id} 的${side === 'beginMs' ? '开始' : '结束'}时间超出源音频范围（${durationMs} ms）`);
+      throw new MessageError(message(side==='beginMs'?'time.beginOutsideSource':'time.endOutsideSource',{id:item.id,duration:durationMs}));
   }
 }
 export function intersectSegments(segments: VocalSegment[], durationMs: number) {

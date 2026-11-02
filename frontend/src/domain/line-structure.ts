@@ -1,14 +1,15 @@
 import type { LyricDocument, LyricLine } from './lyric-document';
+import { message, type Message } from './messages';
 
-export function lineLabel(document: LyricDocument, line: LyricLine): string {
+export function lineLabel(document: LyricDocument, line: LyricLine): Message {
   const main = document.lines.filter(item => !item.backgroundOf);
-  return line.backgroundOf ? `L${main.findIndex(item => item.id === line.backgroundOf) + 1} 的背景歌词` : `L${main.findIndex(item => item.id === line.id) + 1}`;
+  const number=main.findIndex(item=>item.id===(line.backgroundOf??line.id))+1;
+  return line.backgroundOf ? message('split.backgroundLine',{number}) : message('editor.lineLabel',{number});
 }
 
-/** Shared by entry points and the atomic command; only actual conflicts are reported. */
-export function lineStructureIssues(document: LyricDocument, first: LyricLine): string[] {
-  const issues: string[] = [];
-  if (first.backgroundOf) issues.push(`${lineLabel(document, first)}不能直接拆分`);
-  if (first.words.length < 2) issues.push(`${lineLabel(document, first)}没有可拆分的词边界`);
+export function lineStructureIssues(_document: LyricDocument, first: LyricLine): Message[] {
+  const issues: Message[]=[];
+  if(first.backgroundOf)issues.push(message('split.backgroundCannotSplit'));
+  if(first.words.length<2)issues.push(message('split.noWordBoundary'));
   return issues;
 }

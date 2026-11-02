@@ -1,6 +1,9 @@
+import { message as describeMessage, MessageError, errorMessage, type Message } from '../domain/messages';
+import { i18n } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { assertChangedTimes, lyricTimes, projectTimes } from '../domain/time-boundaries';
 import { focusObject, selectionSelector, preserveSelectionOnFocus } from './editor/selection-recovery';
-import { selectionLineId } from './editor/editing-actions';
+import { selectionLineId, selectIds } from './editor/editing-actions';
 import { KaraokeContext } from './KaraokeContext';
 import { createProjectEditorState, executeProjectCommand } from '../domain/project-document';
 import { KaraokeTrack } from './KaraokeTrack';
@@ -11,7 +14,6 @@ import { EditorContextMenu } from './editor/EditorContextMenu';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useEditorSelection } from './editor/SelectionContext';
 import { documentTargets, targetId, targetSelection, selectionKind, selectionTargets, targetInterval } from './editor/selection-targets';
-import { selectIds } from './editor/editing-actions';
 import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { LyricCommand } from '../domain/lyric-commands';
@@ -23,11 +25,12 @@ import styles from './media.module.css';
 type Props = { locked?: boolean; document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
   visible: { karaoke: boolean; line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
   externalAnchors?: number[]; durationMs?: number | null;
-  apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string) => void };
-type Drag = { started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string } };
+  apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string | Message) => void };
+type Drag = { started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string | Message } };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
 
 export function TimelineTracks({ locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onPan, onError }: Props) {
+  useTranslation();
   const editing = useProjectEditing();
   const projectContext = useContext(KaraokeContext);
   const tracksRef = useRef<HTMLDivElement>(null);
@@ -137,11 +140,11 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     if (bpm > 0) for (let time = Math.ceil(startMs / (60000 / bpm)) * (60000 / bpm); time <= endMs && candidateAnchors.length < 20000; time += 60000 / bpm) candidateAnchors.push(Math.round(time));
     const timeMs = current.side === 'select' || current.side === 'pan' ? proposed
       : snapTimelineTime(proposed, candidateAnchors, spanMs, current.width, snap);
-    const candidate = { timeMs, document, error: '' };
+    const candidate: Drag['candidate'] = { timeMs, document, error: '' };
     if (current.target && Math.abs(event.clientX - current.x) >= 3) {
       const target = current.target;
       try {
-        if (durationMs === null) throw new Error('源音频时长未知，无法拖动歌词时间');
+        if (durationMs === null) throw new MessageError(describeMessage('timeline.sourceUnknown'));
         candidate.document = current.side === 'move'
           ? moveTimeline(document, moving, timeMs - current.originalMs, editing)
           : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs, editing);
@@ -152,7 +155,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
           const nextProject=executeProjectCommand(createProjectEditorState(projectContext.project),{type:'lyrics',command});
           assertChangedTimes(projectTimes(projectContext.project),projectTimes(nextProject.present),durationMs);
         } else assertChangedTimes(lyricTimes(document),lyricTimes(candidate.document),durationMs);
-      } catch (cause) { candidate.error = cause instanceof Error ? cause.message : '时间轴编辑失败'; }
+      } catch (cause) { candidate.error = errorMessage(cause); }
       onError(candidate.error);
     } else if (current.target) candidate.timeMs = current.originalMs;
     const next = { ...current, started: current.started || Math.abs(event.clientX - current.x) >= 3, current: event.clientX, candidate };
@@ -209,13 +212,13 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     return () => cancelAnimationFrame(frame);
   }, [focusRequest, selection]);
   const boxTargets = useRef<TimelineTarget[]>([]);
-  const bar = (target: TimelineTarget, label: string, beginMs: number, endMs: number, active = false, laneLayoutOverride?: ReturnType<typeof packIntervals>) => {
+  const bar = (target: TimelineTarget, label: string, beginMs: number, endMs: number, active = false, laneLayoutOverride?: ReturnType<typeof packIntervals>, caption = label) => {
     const key = target.kind === 'line' ? target.lineId : target.kind === 'word' ? target.wordId : target.kind === 'ruby' ? target.rubyId : target.unitId;
     const layout = laneLayoutOverride ?? lineLayout;
     const real = targetInterval(candidateDocument, target);
     const playing = real?.beginMs != null && real?.endMs != null && positionMs >= real.beginMs && positionMs < real.endMs;
     const ghostBegin = real?.beginMs === null, ghostEnd = real?.endMs === null;
-    const description = ghostBegin || ghostEnd ? `${ghostBegin ? '开始' : '结束'}未定，临时端点 ${ghostBegin ? beginMs : endMs} 毫秒，拖动该边界设置真实时间` : undefined;
+    const description = ghostBegin || ghostEnd ? t('timeline.temporary',{side:t(ghostBegin?'time.begin':'time.end'),time:ghostBegin?beginMs:endMs}) : undefined;
     active = selection?.kind === selectionKind(target) && selection.ids.includes(key) || false;
     const clippedBegin = Math.max(startMs, beginMs);
     const right = Math.min(endMs, propsEndMs);
@@ -231,13 +234,13 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
         if (!locked && (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10')) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); if(!commands.current?.openContext(event.currentTarget,box.left,box.bottom)){choose(target);setMenu({ x: box.left, y: box.bottom, target: event.currentTarget });} }
         if (event.key === 'Delete' && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); }
       }}>
-      {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanMs * plotWidth }} /><span className={styles.narrowMarker} title="窄区间，请用时间轴缩放后调整边界" /></>}
-      {(!narrow || ghostBegin) && beginMs >= startMs && <span className={`${styles.trackHandle} ${ghostBegin ? styles.temporaryHandle : ''}`} title={ghostBegin ? description : undefined} aria-label={`${label}开始边界`} onPointerDown={(event) => begin(event, target, 'beginMs', beginMs)} onPointerMove={move} onPointerUp={finish} />}
-      <span className={styles.trackBarText}>{label.replace(/^时间轴(?:行|词|注音) /, '')}</span>
-      {(!narrow || ghostEnd) && endMs <= propsEndMs && <span className={`${styles.trackHandle} ${ghostEnd ? styles.temporaryHandle : ''}`} title={ghostEnd ? description : undefined} aria-label={`${label}结束边界`} onPointerDown={(event) => begin(event, target, 'endMs', endMs)} onPointerMove={move} onPointerUp={finish} />}
+      {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanMs * plotWidth }} /><span className={styles.narrowMarker} title={t('timeline.narrow')} /></>}
+      {(!narrow || ghostBegin) && beginMs >= startMs && <span className={`${styles.trackHandle} ${ghostBegin ? styles.temporaryHandle : ''}`} title={ghostBegin ? description : undefined} aria-label={t('timeline.beginBoundary',{label})} onPointerDown={(event) => begin(event, target, 'beginMs', beginMs)} onPointerMove={move} onPointerUp={finish} />}
+      <span className={styles.trackBarText}>{caption}</span>
+      {(!narrow || ghostEnd) && endMs <= propsEndMs && <span className={`${styles.trackHandle} ${ghostEnd ? styles.temporaryHandle : ''}`} title={ghostEnd ? description : undefined} aria-label={t('timeline.endBoundary',{label})} onPointerDown={(event) => begin(event, target, 'endMs', endMs)} onPointerMove={move} onPointerUp={finish} />}
     </div>;
   };
-  const row = (name: string, content: React.ReactNode, selectable: TimelineTarget[] = [], laneCount = 1, caption = name) => <div className={styles.trackRow} key={name}><strong title={caption}>{caption}</strong><div data-track-lane className={styles.trackLane} style={{ height: `calc(${Math.max(1, laneCount)} * var(--timeline-lane-height))` }}
+  const row = (name: string, content: React.ReactNode, selectable: TimelineTarget[] = [], laneCount = 1, caption = name) => <div className={styles.trackRow} key={selectable.length?selectable.map(targetId).join(':'):name}><strong title={caption}>{caption}</strong><div data-track-lane className={styles.trackLane} style={{ height: `calc(${Math.max(1, laneCount)} * var(--timeline-lane-height))` }}
     onPointerDown={(event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); boxTargets.current = selectable; begin(event, null, selectable.length > 0 && event.shiftKey ? 'select' : 'pan', selectable.length > 0 && event.shiftKey ? startMs + Math.round((event.clientX - rect.left) / rect.width * spanMs) : startMs); } }}
     onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}>
     {content}<TimelineIndicators /></div></div>;
@@ -248,43 +251,45 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       let changed = resizeTimeline(document, { kind: 'word', lineId: line.id, wordId: left.id }, 'endMs', middle, editing);
       changed = resizeTimeline(changed, { kind: 'word', lineId: line.id, wordId: right.id }, 'beginMs', middle, editing);
       apply({ type: 'replace-document', document: changed }); onError('');
-    } catch (cause) { onError(cause instanceof Error ? cause.message : '无法闭合空隙'); }
+    } catch (cause) { onError(errorMessage(cause)); }
   };
-  return <div ref={tracksRef} className={styles.tracks} data-editable-timeline aria-label="可编辑时间轴" tabIndex={-1} onFocusCapture={() => { area.current = 'timeline'; }}
+  return <div ref={tracksRef} className={styles.tracks} data-editable-timeline aria-label={t('timeline.editable')} tabIndex={-1} onFocusCapture={() => { area.current = 'timeline'; }}
     onKeyDown={event => { if (event.key === 'Delete' && !locked && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); } }}
     onCopy={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.copy(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onCut={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.cut(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onPaste={event => { event.preventDefault(); commands.current?.paste(event.clipboardData.getData('application/x-lazulite-lyric') === commands.current.clipboardToken() ? undefined : event.clipboardData.getData('text/plain')); }}>
-    {menu && createPortal(<EditorContextMenu x={menu.x} y={menu.y} title="时间轴对象操作" close={closeMenu} actions={[
-      { label: '复制', disabled: !commands.current?.canCopy, run: () => { commands.current?.copy(); } },
-      { label: '剪切', disabled: !commands.current?.canCopy, run: () => { commands.current?.cut(); } },
-      { label: '粘贴', disabled: !commands.current?.canPaste, run: () => commands.current?.paste() },
-      { label: '删除所选对象', disabled: !selection?.ids.length, run: () => commands.current?.remove() },
+    {menu && createPortal(<EditorContextMenu x={menu.x} y={menu.y} title={t('timeline.menu')} close={closeMenu} actions={[
+      { label: t('common.copy'), disabled: !commands.current?.canCopy, run: () => { commands.current?.copy(); } },
+      { label: t('common.cut'), disabled: !commands.current?.canCopy, run: () => { commands.current?.cut(); } },
+      { label: t('common.paste'), disabled: !commands.current?.canPaste, run: () => commands.current?.paste() },
+      { label: t('timeline.deleteSelected'), disabled: !selection?.ids.length, run: () => commands.current?.remove() },
     ]} />, window.document.body)}
     {visible.karaoke && <KaraokeTrack durationMs={durationMs} startMs={startMs} endMs={endMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const interval=targetInterval(document,target);return interval?[interval.beginMs,interval.endMs].filter((n):n is number=>n!==null):[];})]} onError={onError}/>}
-    {visible.line && row('行', overview.filter(item => !editing || lineLayout.lanes.has(item.id)).map(item => bar({ kind: 'line', lineId: item.id }, `时间轴行 L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ' 背景' : ''}`, item.beginMs!, item.endMs!)), [], lineLayout.laneCount)}
+    {visible.line && row('lines', overview.filter(item => !editing || lineLayout.lanes.has(item.id)).map(item => bar({ kind: 'line', lineId: item.id }, t('timeline.lineLabel',{number:ordinalById.get(item.backgroundOf??item.id),background:item.backgroundOf?t('outline.background'):''}), item.beginMs!, item.endMs!)), [], lineLayout.laneCount,t('edit.lineUnit'))}
     <div ref={scrollRef} className={styles.expandedTracks} style={!expandedLines.length ? { display: 'none' } : undefined}><div style={expandedLines.length > 20 ? { height: virtual.getTotalSize(), position: 'relative' } : undefined}>
     {(expandedLines.length > 20 ? virtual.getVirtualItems() : expandedLines.map((line, index) => ({ index, key: line.id, start: 0 }))).map(virtualRow => {
       const item = displayed.lines.find(line => line.id === expandedLines[virtualRow.index].id)!;
-      const label = `L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ' 背景' : ''}`;
+      const label = `L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? t('outline.background') : ''}`;
       const renderTargets = (name: string, targets: TimelineTarget[]) => {
         const intervals = targets.filter(target => { const value = targetInterval(projection, target); return value && intersects(value.beginMs, value.endMs); });
         const layout = packIntervals(intervals.map(target => { const value = targetInterval(projection, target)!; return { key: targetId(target), beginMs: value.beginMs!, endMs: value.endMs! }; }));
-        return row(`${label} ${name}`, intervals.map(target => { const value = targetInterval(displayed, target)!; const text = 'text' in value ? value.text : 'reading' in value ? value.reading : ''; return bar(target, `时间轴${name} ${text}`, value.beginMs!, value.endMs!, false, layout); }), targets, layout.laneCount, name);
+        return row(`${label} ${name}`, intervals.map(target => { const value = targetInterval(displayed, target)!; const text = 'text' in value ? value.text : 'reading' in value ? value.reading : ''; return bar(target, t('timeline.itemLabel',{name,text}), value.beginMs!, value.endMs!, false, layout, text); }), targets, layout.laneCount, name);
       };
       const targets = allTargets.filter(target => target.lineId === item.id);
-      return <section key={item.id} data-index={virtualRow.index} ref={expandedLines.length > 20 ? virtual.measureElement : undefined} className={styles.expandedGroup} style={expandedLines.length > 20 ? { position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` } : undefined} aria-label={`${label} 子轨`}>
+      return <section key={item.id} data-index={virtualRow.index} ref={expandedLines.length > 20 ? virtual.measureElement : undefined} className={styles.expandedGroup} style={expandedLines.length > 20 ? { position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` } : undefined} aria-label={t('timeline.subtracks',{label})}>
         <strong className={styles.groupLabel}>{label}</strong>
-        {visible.word && renderTargets('词', targets.filter(target => target.kind === 'word'))}
-        {visible.ruby && targets.some(target => target.kind === 'ruby') && renderTargets('注音', targets.filter(target => target.kind === 'ruby'))}
-        {visible.romanization && document.translationTracks.map((track,index)=>track.contents.filter(content=>content.lineId===item.id).map(content=>content.kind==='timed'?<div key={content.id} style={{display:'contents'}}>{renderTargets(`翻译 ${track.language??'未指定'} ${index+1}`,targets.filter(target=>target.kind==='romanization'&&target.attachment==='translation'&&target.contentId===content.id))}</div>:row(`${label} 翻译 ${index+1} ${content.id}`,contentBar(track.id,content,'translation'),[],1,`${label} 翻译 ${index+1}`)))}
-        {visible.romanization && document.romanizationTracks.map((track, index) => track.contents.filter(content => content.lineId === item.id).map(content => content.kind === 'plain' ? row(`${label} 音译 ${index+1} ${content.id}`,contentBar(track.id,content),[],1,`${label} 音译 ${track.language ?? '未指定'} ${index+1}`) : <div key={content.id} style={{ display: 'contents' }}>
-          {renderTargets(`音译 ${track.language ?? '未指定'} ${index + 1}`, targets.filter(target => target.kind === 'romanization' && target.contentId === content.id))}
-          {content.units.some(unit => unit.beginMs === null || unit.endMs === null) && <button data-role="inline" onClick={() => setSelection({ kind: 'romanization-content', lineId: item.id, trackId: track.id, contentId: content.id, ids: [content.id], anchorId: content.id, activeId: content.id })}>未定时音译：在画布补充时间</button>}
+        {visible.word && renderTargets(t('selection.word'), targets.filter(target => target.kind === 'word'))}
+        {visible.ruby && targets.some(target => target.kind === 'ruby') && renderTargets(t('batch.reading'), targets.filter(target => target.kind === 'ruby'))}
+        {visible.romanization && document.translationTracks.map((track,index)=>track.contents.filter(content=>content.lineId===item.id).map(content=>content.kind==='timed'?<div key={content.id} style={{display:'contents'}}>{renderTargets(t('timeline.translationLabel',{language:track.language??t('common.unspecified'),number:index+1}),targets.filter(target=>target.kind==='romanization'&&target.attachment==='translation'&&target.contentId===content.id))}</div>:row(`${item.id}:translation:${track.id}:${content.id}`,contentBar(track.id,content,'translation'),[],1,`${label} ${t('timeline.translationLabel',{language:'',number:index+1})}`)))}
+        {visible.romanization && document.romanizationTracks.map((track, index) => track.contents.filter(content => content.lineId === item.id).map(content => content.kind === 'plain' ? row(`${item.id}:romanization:${track.id}:${content.id}`,contentBar(track.id,content),[],1,`${label} ${t('timeline.romanizationLabel',{language:track.language??t('common.unspecified'),number:index+1})}`) : <div key={content.id} style={{ display: 'contents' }}>
+          {renderTargets(t('timeline.romanizationLabel',{language:track.language??t('common.unspecified'),number:index+1}), targets.filter(target => target.kind === 'romanization' && target.contentId === content.id))}
+          {content.units.some(unit => unit.beginMs === null || unit.endMs === null) && <button data-role="inline" onClick={() => setSelection({ kind: 'romanization-content', lineId: item.id, trackId: track.id, contentId: content.id, ids: [content.id], anchorId: content.id, activeId: content.id })}>{t('timeline.untimedRomanization')}</button>}
         </div>))}
       </section>;
     })}
     </div></div>
-    {visible.gap && line && row('空隙', gaps.map(({ left, right, beginMs, endMs, overlap }) => <button data-role="secondary" disabled={locked} key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? '消除重叠' : '闭合空隙'} onClick={() => closeGap(left, right)}>{overlap ? '重叠' : '空隙'}</button>))}
+    {visible.gap && line && row('gaps', gaps.map(({ left, right, beginMs, endMs, overlap }) => <button data-role="secondary" disabled={locked} key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? t('timeline.removeOverlap') : t('timeline.closeGap')} onClick={() => closeGap(left, right)}>{overlap ? t('timeline.overlap') : t('timeline.gap')}</button>),[],1,t('timeline.gap'))}
   </div>;
 }
+
+const t=i18n.t.bind(i18n);

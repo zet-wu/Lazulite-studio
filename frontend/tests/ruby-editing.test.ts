@@ -11,7 +11,7 @@ describe('E4 注音 editing', () => {
     expect(splitReadingMora('がっこう')).toEqual(['が', 'っ', 'こ', 'う']);
     expect(splitReadingMora('スーパー')).toEqual(['ス', 'ー', 'パ', 'ー']);
     expect(splitReadingMora('きょ😊')).toEqual(['きょ', '😊']);
-    expect(() => readingFromRomanization('hello 😊')).toThrow(/假名/);
+    expect(() => readingFromRomanization('hello 😊')).toThrow('ruby.cannotConvert');
   });
 
   it('inserts, splits, merges and redistributes independently timed 注音 units with one-step undo', () => {
@@ -56,7 +56,7 @@ describe('E4 注音 editing', () => {
     const units = makeRubyUnits(word, splitReadingMora(readingFromRomanization('sora')));
     const state = executeLyricCommand(createLyricEditorState(document), { type: 'set-ruby-units', lineId: line.id, wordId: word.id, units });
     expect(state.present.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['そ', 'ら']);
-    expect(() => executeLyricCommand(state, { type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: makeRubyUnits(word, ['う']) })).toThrow(/手动 注音/);
+    expect(() => executeLyricCommand(state, { type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: makeRubyUnits(word, ['う']) })).toThrow('command.rubyOverwrite');
     for (const draft of [true, false]) {
       const reopened = parseLyricTtml(serializeLyricTtml(state.present, { draft }));
       expect(reopened.lines[0].words[0].rubyUnits.map((unit) => [unit.reading, unit.beginMs, unit.endMs])).toEqual([

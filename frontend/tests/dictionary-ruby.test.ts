@@ -50,7 +50,7 @@ it('keeps existing IDs and manual timing; missing and ambiguous manual text stay
   expect(cmd.document.lines[0].words[0].rubyUnits).toEqual([{id:'saved',reading:'edited',beginMs:10,endMs:20}]);
   expect(cmd.document.lines[0].words[1].rubyUnits.map(u=>u.reading)).toEqual(['qing qing']);
   expect(cmd.document.lines[0].words[2]).toBe(l.words[2]);
-  expect(()=>dictionaryRubyCommand({...d},d,rows,false)).toThrow('源文档');
+  expect(()=>dictionaryRubyCommand({...d},d,rows,false)).toThrow('reading.stale');
 });
 it('retimes non-kana equally, splits manually at graphemes, refuses mora and preserves merged units',()=>{
   const d=createLyricDocument('重庆');const l=d.lines[0],w=l.words[0];w.beginMs=0;w.endMs=1000;
@@ -59,7 +59,7 @@ it('retimes non-kana equally, splits manually at graphemes, refuses mora and pre
   const state=createLyricEditorState(d);
   const split=executeLyricCommand(state,{type:'split-ruby',lineId:l.id,wordId:w.id,rubyId:'r1',at:1});
   expect(split.present.lines[0].words[0].rubyUnits.slice(0,2).map(u=>[u.reading,u.beginMs,u.endMs])).toEqual([['c',0,250],['hóng',250,500]]);
-  expect(()=>planSelectionAction(d,{kind:'ruby',lineId:l.id,wordId:w.id,ids:['r1','r2'],anchorId:'r1',activeId:'r2'},'mora')).toThrow('纯假名');
+  expect(()=>planSelectionAction(d,{kind:'ruby',lineId:l.id,wordId:w.id,ids:['r1','r2'],anchorId:'r1',activeId:'r2'},'mora')).toThrow('selection.kanaOnly');
   const merged=executeLyricCommand(state,planSelectionAction(d,{kind:'ruby',lineId:l.id,wordId:w.id,ids:['r1','r2'],anchorId:'r1',activeId:'r2'},'merge'));
   expect(merged.present.lines[0].words[0].rubyUnits).toHaveLength(1);
   expect(undoLyricCommand(merged).present).toEqual(d);
@@ -78,9 +78,9 @@ it('retains surviving existing identities and manual gaps, skips all empty and r
   expect(undoLyricCommand(state).present).toBe(d);
   expect(redoLyricCommand(undoLyricCommand(state)).present).toEqual(state.present);
   rows[0].blocks[0].units=['','',' '];
-  expect(()=>dictionaryRubyCommand(d,d,rows,false)).toThrow('没有可应用');
+  expect(()=>dictionaryRubyCommand(d,d,rows,false)).toThrow('reading.noChanges');
   rows[0].blocks[0].units=['fu','ta','ri'];
-  expect(()=>dictionaryRubyCommand(d,d,rows,false)).toThrow('没有可应用');
+  expect(()=>dictionaryRubyCommand(d,d,rows,false)).toThrow('reading.noChanges');
 });
 
 it('allocates remaining units within each independent text range',()=>{

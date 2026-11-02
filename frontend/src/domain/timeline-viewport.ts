@@ -1,3 +1,4 @@
+import { message, MessageError } from './messages';
 export type TimelineViewport = { startMs: number; spanMs: number };
 
 export function clampViewport(view: TimelineViewport, durationMs: number): TimelineViewport {
@@ -7,7 +8,7 @@ export function clampViewport(view: TimelineViewport, durationMs: number): Timel
 }
 
 export function zoomViewport(view: TimelineViewport, durationMs: number, factor: number, anchorFraction: number): TimelineViewport {
-  if (!Number.isFinite(factor) || factor <= 0) throw new Error('缩放比例必须大于零');
+  if (!Number.isFinite(factor) || factor <= 0) throw new MessageError(message('timeline.zoomInvalid'));
   const u = Math.max(0, Math.min(1, anchorFraction));
   const next = clampViewport({ startMs: 0, spanMs: view.spanMs * factor }, durationMs);
   return clampViewport({ startMs: view.startMs + u * view.spanMs - u * next.spanMs, spanMs: next.spanMs }, durationMs);

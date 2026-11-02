@@ -34,5 +34,5 @@ it('isolates target changes and late responses, restores Escape state, preserves
 it('an overall service failure cannot apply the retained preview',async()=>{
   const source=createLyricDocument('发');vi.mocked(analyzeShapes).mockRejectedValue(new Error('资源缺失'));
   render(<ShapeConversionDialog document={source} lineIds={[source.lines[0].id]} apply={vi.fn()} close={()=>{}}/>);
-  await screen.findByText('资源缺失');expect(screen.getByRole('button',{name:'应用'})).toBeDisabled();expect(screen.getByRole('button',{name:'重新分析字形'})).toBeEnabled();
+  await screen.findByText(/资源缺失/);expect(screen.getByRole('button',{name:'应用'})).toBeDisabled();expect(screen.getByRole('button',{name:'重新分析字形'})).toBeEnabled();
 });

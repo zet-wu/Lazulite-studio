@@ -22,7 +22,7 @@ it('allows monotonic overlap, blocks reversed starts and truncated line envelope
  l.words[1].beginMs=900;expect(prepareSug(p,'s').issues.some(i=>i.code==='unsupported-order')).toBe(true);
 });
 it('blocks clipping and overflow, allows exactly zero; ignores marker image settings',()=>{
- const p=fixture();p.karaoke.offsets[outputId('main')]=-1003;expect(prepareSug(p,'s').issues).toEqual([]);p.karaoke.offsets[outputId('main')]=-1004;expect(prepareSug(p,'s').issues.some(i=>i.message.includes('输出偏移'))).toBe(true);p.karaoke.offsets[outputId('main')]=Number.MAX_SAFE_INTEGER;expect(()=>sugZip(p,'s')).toThrow();
+ const p=fixture();p.karaoke.offsets[outputId('main')]=-1003;expect(prepareSug(p,'s').issues).toEqual([]);p.karaoke.offsets[outputId('main')]=-1004;expect(prepareSug(p,'s').issues.some(i=>i.detail?.key==='output.offsetRange')).toBe(true);p.karaoke.offsets[outputId('main')]=Number.MAX_SAFE_INTEGER;expect(()=>sugZip(p,'s')).toThrow();
 });
 it('selected timed auxiliary is independent of broken body ruby and preserves per-unit times',()=>{
  const p=fixture(),l=p.lyrics.lines[0];l.words[0].beginMs=null;p.lyrics.translationTracks=[{id:'t',language:null,purpose:'subtitle',contents:[{id:'c',lineId:l.id,kind:'timed',units:[{id:'u',text:'明天',beginMs:1001,endMs:2011}]}]}];p.karaoke.outputs=[outputId('main','translation','t')];expect(prepareSug(p,'s').issues).toEqual([]);expect(data(p).metadata.language).toBe('');expect(data(p).sentences[0].characters.at(-1).sentence_end_ts).toBe(2011);

@@ -1,5 +1,5 @@
+import { errorMessage, message } from '../../domain/messages';
 import { useMessageText } from '../../shared/useMessageText';
-import { message } from '../../domain/messages';
 import { i18n } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { Fragment, useEffect, useRef, useState } from 'react';
@@ -52,7 +52,7 @@ export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, 
       if (draft !== unit.reading) commands.push({ type: 'edit-ruby', lineId, wordId: word.id, rubyId: unit.id, reading: draft });
       commands.push({ type: 'split-ruby', lineId, wordId: word.id, rubyId: unit.id, at, newRubyId: id });
       if (apply({ type: 'batch', commands })) pendingFocus.current = id;
-    } catch (cause) { setError(cause instanceof Error ? cause.message : message('ruby.splitFailed')); }
+    } catch (cause) { setError(errorMessage(cause)); }
   };
   const slot = newAfter !== undefined && <div className={styles.rubyTile} key="new-reading"><input ref={newInput} aria-label={t('ruby.newLabel',{text:word.text})} value={newReading}
     onChange={event => setNewReading(event.target.value)} onBlur={add}

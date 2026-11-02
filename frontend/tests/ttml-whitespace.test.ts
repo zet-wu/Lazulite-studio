@@ -32,6 +32,6 @@ it('pure transliteration emits only fully untimed whitespace as text, keeping in
  const text=xml.getElementsByTagNameNS('http://music.apple.com/lyric-ttml-internal','text')[0];
  expect(text.children).toHaveLength(2); expect(text.textContent).toBe('a   ');expect(pure).not.toContain('studio:');expect(JSON.stringify(d)).toBe(saved);
  const content=d.romanizationTracks[0].contents[0];if(content.kind!=='timed')throw new Error('fixture');
- content.units[1].endMs=1000; expect(()=>serializeLyricTtml(d)).toThrow('needs timing');
- content.units[1].endMs=null; content.units[1].text='word';expect(()=>serializeLyricTtml(d)).toThrow('needs timing');
+ content.units[1].endMs=1000; expect(()=>serializeLyricTtml(d)).toThrow('ttml.unitNeedsTime');
+ content.units[1].endMs=null; content.units[1].text='word';expect(()=>serializeLyricTtml(d)).toThrow('ttml.unitNeedsTime');
 });

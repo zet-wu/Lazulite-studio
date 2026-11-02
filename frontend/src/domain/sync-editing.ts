@@ -1,3 +1,4 @@
+import { message, MessageError } from './messages';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit } from './lyric-document';
 
@@ -22,7 +23,7 @@ function assign(word: LyricWord, rubyUnitId: string | null, side: 'beginMs' | 'e
     return { ...word, [side]: timeMs, [other]: word[other] !== null && (side === 'beginMs' ? word[other] < timeMs : word[other] > timeMs) ? null : word[other] };
   }
   const index = word.rubyUnits.findIndex((unit) => unit.id === rubyUnitId);
-  if (index < 0) throw new Error('打轴 注音 单元已不存在');
+  if (index < 0) throw new MessageError(message('sync.rubyMissing'));
   const rubyUnits = word.rubyUnits.slice();
   const unit = rubyUnits[index];
   const other = side === 'beginMs' ? 'endMs' : 'beginMs';
@@ -34,7 +35,7 @@ function assign(word: LyricWord, rubyUnitId: string | null, side: 'beginMs' | 'e
 
 function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endMs', timeMs: number, editing: ProjectEditing): LyricLine {
   const index = line.words.findIndex((word) => word.id === cursor.wordId);
-  if (index < 0) throw new Error('打轴词已不存在');
+  if (index < 0) throw new MessageError(message('sync.wordMissing'));
   const words = line.words.slice();
   words[index] = assign(words[index], cursor.rubyUnitId, side, timeMs);
   const starts = words.map((word) => word.beginMs).filter((value): value is number => value !== null);
@@ -46,11 +47,11 @@ function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endM
 }
 
 export function stampSync(document: LyricDocument, cursor: SyncCursor, action: SyncAction, timeMs: number, mode: SyncMode = 'continuous', editing = createProjectEditing()): LyricDocument {
-  if (!Number.isSafeInteger(timeMs) || timeMs < 0) throw new Error('打轴时间必须是非负整数毫秒');
+  if (!Number.isSafeInteger(timeMs) || timeMs < 0) throw new MessageError(message('sync.integerTime'));
   const background = document.lines.find(line => line.id === cursor.lineId)?.backgroundOf;
   const units = syncUnits(document, editing, background ? cursor.lineId : undefined);
   const index = syncIndex(units, cursor);
-  if (index < 0) throw new Error('打轴游标已失效');
+  if (index < 0) throw new MessageError(message('sync.cursorStale'));
   const current = units[index];
   const successor = units[index + 1];
   const next = action === 'next' && (mode === 'continuous' || successor?.lineId === current.lineId) ? successor : null;
@@ -60,8 +61,8 @@ export function stampSync(document: LyricDocument, cursor: SyncCursor, action: S
   else {
     const original = read(current.lineId).words.find((word) => word.id === current.wordId)!;
     const begin = current.rubyUnitId ? original.rubyUnits.find((unit) => unit.id === current.rubyUnitId)!.beginMs : original.beginMs;
-    if (begin === null) throw new Error('请先为当前单元打起始轴');
-    if (timeMs < begin) throw new Error('结束轴不能早于起始轴');
+    if (begin === null) throw new MessageError(message('sync.startFirst'));
+    if (timeMs < begin) throw new MessageError(message('sync.endBeforeStart'));
     changes.set(current.lineId, updateUnit(read(current.lineId), current, 'endMs', timeMs, editing));
     if (next) changes.set(next.lineId, updateUnit(read(next.lineId), next, 'beginMs', timeMs, editing));
   }
@@ -75,7 +76,7 @@ export function stampSync(document: LyricDocument, cursor: SyncCursor, action: S
     if (target.beginMs === original.beginMs) return line;
     const endMs = target.beginMs;
     if (endMs === null || line.beginMs !== null && line.beginMs > endMs || line.words.some(word => word.endMs !== null && word.endMs > endMs)) {
-      throw new Error('打轴会使关联行终点早于行起点或排除已有词，请先处理行尾链接');
+      throw new MessageError(message('sync.linkConflict'));
     }
     return { ...line, endMs };
   }) };

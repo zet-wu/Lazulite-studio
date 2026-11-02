@@ -1,3 +1,5 @@
+import { formatMessage } from '../../i18n';
+import { errorMessage, message, MessageError } from '../../domain/messages';
 import { createProjectEditing } from '../../domain/project-editing';
 import { useProjectEditing } from './ProjectEditingContext';
 import { useEffect, useRef, useState, type RefObject } from 'react';
@@ -52,7 +54,7 @@ export function dragCommand(document: LyricDocument, source: DragSource, slot: D
       return { command: { type: 'batch', commands }, selection: { ...selection, lineId: slot.lineId } as EditorSelection };
     }
     case 'ruby': {
-      if (slot.lineId !== source.lineId) throw new Error('读音不能跨歌词行移动');
+      if (slot.lineId !== source.lineId) throw new MessageError(message('editing.readingCrossLine'));
       const wordId = slot.wordId ?? source.wordId;
       return { command: { type: 'move-ruby', lineId: source.lineId, wordId: source.wordId, toWordId: wordId, rubyId: source.rubyId, rubyIds: source.rubyIds, afterRubyId: slot.afterId }, selection: { ...selection, wordId } as EditorSelection };
     }
@@ -107,7 +109,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     let lineId = line?.id ?? source.lineId;
     let wordId: string | undefined;
     if (source.kind === 'line') {
-      container = element.closest<HTMLElement>(`[aria-label="歌词列表"], .${styles.outline} .${styles.panelBody}`);
+      container = element.closest<HTMLElement>(`[data-lyric-list], .${styles.outline} .${styles.panelBody}`);
       if (!container) return null;
       ids = shown.lines.filter(line => !line.backgroundOf).map(line => line.id);
       const mainIds = new Set(ids);
@@ -119,7 +121,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
         const rect = lineNode.getBoundingClientRect();
         return { slot: { lineId: line.id, afterId: line.words.filter(word => current.copy || !dragSelection(source).ids.includes(word.id)).at(-1)?.id ?? null }, marker: { x: rect.left, y: rect.bottom, width: rect.width, height: 2 } };
       }
-      if (!lineNode.closest('[aria-label="歌词列表"]')) return null;
+      if (!lineNode.closest('[data-lyric-list]')) return null;
       container = lineNode.querySelector<HTMLElement>(`.${styles.words}, .${styles.syncWords}`);
       ids = line.words.map(word => word.id);
       nodes = [...container!.querySelectorAll<HTMLElement>('[data-word-id]')];
@@ -183,7 +185,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     // Captured pointers may be above/below the pane (including outside the viewport).
     // Match the pane's horizontal column, not elementFromPoint, so headers and the
     // bottom transport do not leave a tiny strip as the only scroll target.
-    const scroller = [...(root.current?.querySelectorAll<HTMLElement>(`[aria-label="歌词列表"], .${styles.outline} .${styles.panelBody}`) ?? [])].find(node => {
+    const scroller = [...(root.current?.querySelectorAll<HTMLElement>(`[data-lyric-list], .${styles.outline} .${styles.panelBody}`) ?? [])].find(node => {
       if (current.source.kind !== 'line' && current.source.kind !== 'word' && node.closest(`.${styles.outline}`)) return false;
       const rect = node.getBoundingClientRect();
       return rect.height > 0 && current.x >= rect.left && current.x <= rect.right;
@@ -216,7 +218,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
           current.preview = result;
           delete current.ghost!.dataset.dropError;
         } catch (cause) {
-          current.ghost!.dataset.dropError = cause instanceof Error ? cause.message : '此处无法放置';
+          current.ghost!.dataset.dropError = formatMessage(errorMessage(cause));
         }
       }
     }

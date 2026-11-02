@@ -11,10 +11,10 @@ describe('single A/B loop', () => {
   });
 
   it('requires valid boundaries and clears them for a new asset', () => {
-    expect(() => captureLoop(2, 2, 10)).toThrow(/A < B/);
+    expect(() => captureLoop(2, 2, 10)).toThrow('loop.rangeInvalid');
     const withA = setLoopA(emptyLoop(), 1000, 5000);
     expect(setLoopB(withA, 2000, 5000)).toMatchObject({ aMs: 1000, bMs: 2000 });
-    expect(() => setLoopB(withA, 500, 5000)).toThrow(/晚于 A/);
+    expect(() => setLoopB(withA, 500, 5000)).toThrow('loop.endInvalid');
     expect(loopRange(emptyLoop(), 5000)).toBeNull();
   });
 });

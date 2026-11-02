@@ -260,7 +260,7 @@ export const studioApi = {
     if (!response.ok) throw await readApiError(response);
     const rate = Number(response.headers.get('x-sample-rate'));
     const channels = Number(response.headers.get('x-channels'));
-    if (!Number.isSafeInteger(rate) || rate < 1000 || !Number.isSafeInteger(channels) || channels < 1 || channels > 8) throw new Error('Invalid PCM window headers');
+    if (!Number.isSafeInteger(rate) || rate < 1000 || !Number.isSafeInteger(channels) || channels < 1 || channels > 8) throw new MessageError(message('http.pcmHeaders'));
     return { pcm: await response.arrayBuffer(), rate, channels };
   },
 };

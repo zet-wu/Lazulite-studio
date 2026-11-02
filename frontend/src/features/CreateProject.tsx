@@ -1,6 +1,5 @@
-import { errorMessage } from '../domain/messages';
+import { errorMessage, message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
-import { message } from '../domain/messages';
 import { i18n } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../shared/Icon';
@@ -182,7 +181,7 @@ export function CreateProject({
               <span className={styles.hint}>
                 {progress >= 1
                   ? t('create.processing')
-                  : `正在上传 ${Math.round(progress * 100)}%`}
+                  : t('project.uploadProgress',{percent:Math.round(progress*100)})}
               </span>
             </>
           )}

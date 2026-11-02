@@ -90,7 +90,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     const baseline=JSON.stringify(project.acoustics);
     setBusy(true); setError(''); publish(null); setDismissed(null);
     try { const job=await jobsApi.createVocal(projectId, sourceAssetId, reuse); setPending({id:job.id,baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); }
-    catch(e) { setError(e instanceof Error ? e.message : describeMessage('vocal.createFailed')); }
+    catch(e) { setError(errorMessage(e)); }
     finally { submitting.current=false; setBusy(false); }
   };
   const retryCpu = async () => {

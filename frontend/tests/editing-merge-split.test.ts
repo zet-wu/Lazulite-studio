@@ -48,7 +48,7 @@ describe('word and Ruby merges', () => {
     expect(() => executeLyricCommand(state, { type: 'merge-words', wordIds: ['w0', 'w1'] })).toThrow();
     line.words[0].beginMs = 1000; line.words[1].endMs = 2000;
     line.words[1].rubyUnits = [{ id: 'r', reading: 'あ', beginMs: 500, endMs: 1200 }];
-    expect(() => executeLyricCommand(state, { type: 'merge-words', wordIds: ['w0', 'w1'] })).toThrow(/排除注音/);
+    expect(() => executeLyricCommand(state, { type: 'merge-words', wordIds: ['w0', 'w1'] })).toThrow('command.rubyOutsideWordAdjust');
     expect(state.past).toEqual([]);
   });
   it('merges three Ruby in order and rejects cross-word, gaps and stale selections', () => {
@@ -92,8 +92,8 @@ it('uses known endpoints despite unknown siblings, and rejects invalid intervals
   line.words[2].beginMs = 1500; line.words[3].beginMs = 1000;
   expect(executeLyricCommand(createLyricEditorState(document), command).present.lines[1].beginMs).toBe(1000);
   line.words[3].endMs = 500;
-  expect(() => executeLyricCommand(createLyricEditorState(document), command)).toThrow(/第 2 行/);
-  expect(() => executeLyricCommand(createLyricEditorState(document), { ...command, beforeWordIds: [] })).toThrow(/切点/);
+  expect(() => executeLyricCommand(createLyricEditorState(document), command)).toThrow('split.invalidSegment');
+  expect(() => executeLyricCommand(createLyricEditorState(document), { ...command, beforeWordIds: [] })).toThrow('command.splitPoint');
 });
 
 it('keeps plain and timed translation/romanization content intact across split assignments', () => {
@@ -110,8 +110,8 @@ it('keeps plain and timed translation/romanization content intact across split a
   const next = executeLyricCommand(state, command).present;
   expect(next.translationTracks[0].contents).toEqual([document.translationTracks[0].contents[0], { ...document.translationTracks[0].contents[1], lineId: 'c' }]);
   expect(next.romanizationTracks[0].contents).toEqual(document.romanizationTracks[0].contents.map((content, i) => ({ ...content, lineId: i ? 'c' : 'b' })));
-  expect(() => executeLyricCommand(state, { ...command, translationTargets: { plain: 0, timed: 3 } })).toThrow(/归属已失效/);
-  expect(() => executeLyricCommand(state, { ...command, contentTargets: { rp: 1 } })).toThrow(/归属已失效/);
+  expect(() => executeLyricCommand(state, { ...command, translationTargets: { plain: 0, timed: 3 } })).toThrow('split.assignmentStale');
+  expect(() => executeLyricCommand(state, { ...command, contentTargets: { rp: 1 } })).toThrow('split.assignmentStale');
 });
 
 it('merges inside a background line and preserves attached content, while excluding out-of-parent Ruby', () => {
@@ -123,7 +123,7 @@ it('merges inside a background line and preserves attached content, while exclud
   expect(merged.present.lines[0]).toBe(line);
   line.words[0].beginMs = 1000;
   line.words[0].rubyUnits = [{ id: 'a', reading: 'a', beginMs: 500, endMs: null }, { id: 'b', reading: 'b', beginMs: null, endMs: 1500 }];
-  expect(() => executeLyricCommand(createLyricEditorState(document), { type: 'merge-ruby', rubyIds: ['a', 'b'] })).toThrow(/排除注音/);
+  expect(() => executeLyricCommand(createLyricEditorState(document), { type: 'merge-ruby', rubyIds: ['a', 'b'] })).toThrow('command.rubyOutsideWordAdjust');
 });
 
 it('splits a 1ms reversed punctuation boundary by word envelope without changing words or Ruby', () => {

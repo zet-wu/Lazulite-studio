@@ -20,8 +20,8 @@ it('preserves forward actor references, order, draft and final output; renames/d
  expect(()=>executeLyricCommand(state,{type:'set-agents',agents:[doc.agents[0]]})).toThrow();
 });
 it('reports unsupported actor/name structures and dangling references explicitly', () => {
- for (const actor of ['<ttm:actor agent="missing"/>','<ttm:actor agent="actor" extra="x"/>','<ttm:actor agent="actor"><ttm:name>x</ttm:name></ttm:actor>','<ttm:actor agent="actor"/><ttm:actor agent="actor"/>']) expect(()=>parseLyricTtml(source.replace('<ttm:actor agent="actor"/>',actor))).toThrow(/歌手 role/);
- expect(()=>parseLyricTtml(source.replace('<ttm:name>角色</ttm:name>','<ttm:name type="full">角色</ttm:name>'))).toThrow(/歌手 role/);
+ for (const [actor,code] of [['<ttm:actor agent="missing"/>','ttml.actorMissing'],['<ttm:actor agent="actor" extra="x"/>','ttml.agentAttribute'],['<ttm:actor agent="actor"><ttm:name>x</ttm:name></ttm:actor>','ttml.agentActor'],['<ttm:actor agent="actor"/><ttm:actor agent="actor"/>','ttml.agentStructure']]) expect(()=>parseLyricTtml(source.replace('<ttm:actor agent="actor"/>',actor))).toThrow(code);
+ expect(()=>parseLyricTtml(source.replace('<ttm:name>角色</ttm:name>','<ttm:name type="full">角色</ttm:name>'))).toThrow('ttml.agentAttribute');
 });
 it('keeps invalid types in drafts and gates only TTML outputs', () => {
  const doc = parseLyricTtml(source.replace('type="person"','type="invalid"'));

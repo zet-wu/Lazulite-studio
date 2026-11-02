@@ -1,3 +1,4 @@
+import { message } from '../domain/messages';
 import type { ProjectEditing } from '../domain/project-editing';
 import type { LyricDocument, RomanizationContent } from '../domain/lyric-document';
 import type { OutputIssue } from './output-validation';
@@ -15,40 +16,30 @@ export function prepareAss(document: LyricDocument, editing?: ProjectEditing): {
     const label = `第 ${ordinals.get(line.backgroundOf ?? line.id)} 行${line.backgroundOf ? ' · 背景' : ''}`;
     const lineBase = { kind: 'line' as const, lineId: line.id };
     const problem = (base: Omit<OutputIssue,'missing'|'message'>, reason: string, missing: OutputIssue['missing'] = []) => {
-      let context = '';
-      if (base.wordId) context = `第 ${line.words.findIndex(word=>word.id===base.wordId)+1} 词`;
-      if (base.trackId) {
-        const translation = base.kind.startsWith('translation');
-        const tracks = translation ? document.translationTracks : document.romanizationTracks;
-        const index = tracks.findIndex(track=>track.id===base.trackId), track = tracks[index];
-        const contentIndex = track.contents.findIndex(content=>content.id===base.contentId), content = track.contents[contentIndex];
-        context = ` · ${translation ? '翻译' : '音译'} ${track.language ?? '未指定语言'} 轨道 ${index+1} 内容 ${contentIndex+1}`;
-        if (base.unitId && content.kind === 'timed') context += `第 ${content.units.findIndex(unit=>unit.id===base.unitId)+1} 单元`;
-      }
-      issues.push({ ...base, missing, message: `${label}${context}：${reason}` });
+      issues.push({ ...base, missing, message: reason, detail: message(reason) });
     };
     const range = (unit: ExportUnit, base: Omit<OutputIssue,'missing'|'message'>) => {
       const missing: OutputIssue['missing'] = [...(unit.beginMs === null ? ['begin' as const] : []), ...(unit.endMs === null ? ['end' as const] : [])];
-      if (missing.length) { problem({ ...base, code: 'missing-time' }, `缺少${missing.length === 2 ? '开始和结束' : missing[0] === 'begin' ? '开始' : '结束'}时间`, missing); return false; }
-      if (!Number.isFinite(unit.beginMs) || !Number.isFinite(unit.endMs) || unit.beginMs! < 0 || unit.endMs! < unit.beginMs!) { problem({ ...base, code: 'invalid-range' }, '时间区间无效'); return false; }
+      if (missing.length) { problem({ ...base, code: 'missing-time' }, missing.length===2?'validation.missingBoth':missing[0]==='begin'?'validation.missingStart':'validation.missingEnd', missing); return false; }
+      if (!Number.isFinite(unit.beginMs) || !Number.isFinite(unit.endMs) || unit.beginMs! < 0 || unit.endMs! < unit.beginMs!) { problem({ ...base, code: 'invalid-range' }, 'output.rangeInvalid'); return false; }
       return true;
     };
     const textCheck = (text: string, base: Omit<OutputIssue,'missing'|'message'>) => {
-      if (/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]/u.test(text)) problem({ ...base, code: 'serialization' }, 'ASS 不能忠实表达制表符或控制字符');
+      if (/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]/u.test(text)) problem({ ...base, code: 'serialization' }, 'output.assControl');
     };
     const lineValid = range({ ...line, text: '' }, lineBase);
-    if (lineValid && cs(line.endMs!) <= cs(line.beginMs!)) problem({ ...lineBase, code: 'invalid-range' }, 'ASS 行边界量化到厘秒后必须有正时长');
+    if (lineValid && cs(line.endMs!) <= cs(line.beginMs!)) problem({ ...lineBase, code: 'invalid-range' }, 'output.assLineDuration');
     const timed = (source: ExportUnit[], base: Omit<OutputIssue,'missing'|'message'>, unitBase: (unit: ExportUnit)=>Omit<OutputIssue,'missing'|'message'>, body: boolean) => {
       const projection = projectExportSeparators(source,body ? editing : undefined);
-      if (!projection.units.length) problem({ ...base, code: 'empty-content' }, body ? '该行没有可输出的定时正文' : '该定时内容没有可输出的定时单元');
-      for (const unit of projection.unhosted) problem({ ...unitBase(unit), code: 'missing-time' }, '分隔空白没有相邻的有效定时单元');
+      if (!projection.units.length) problem({ ...base, code: 'empty-content' }, body ? '该行没有可输出的定时正文' : 'output.noTimedUnits');
+      for (const unit of projection.unhosted) problem({ ...unitBase(unit), code: 'missing-time' }, 'output.separatorUnits');
       let previousEnd: number | null = null;
       for (const unit of source) {
         textCheck(unit.text, unitBase(unit));
         if (isUntimedSeparator(unit,body ? editing : undefined)) continue;
         if (!range(unit, unitBase(unit))) continue;
-        if (previousEnd !== null && unit.beginMs! < previousEnd) problem({ ...unitBase(unit), code: 'unsupported-order' }, 'ASS 无法表达同一事件内的单元重叠或倒序');
-        if (body && lineValid && (unit.beginMs! < line.beginMs! || unit.endMs! > line.endMs!)) problem({ ...unitBase(unit), code: 'invalid-range' }, 'ASS 正文单元超出所属行边界');
+        if (previousEnd !== null && unit.beginMs! < previousEnd) problem({ ...unitBase(unit), code: 'unsupported-order' }, 'output.assOrder');
+        if (body && lineValid && (unit.beginMs! < line.beginMs! || unit.endMs! > line.endMs!)) problem({ ...unitBase(unit), code: 'invalid-range' }, 'output.assOutsideLine');
         previousEnd = unit.endMs;
       }
       return projection.units;
@@ -65,7 +56,7 @@ export function prepareAss(document: LyricDocument, editing?: ProjectEditing): {
         const units = timed(content.units,base,unit=>({...base,kind:`${kind}-unit` as const,unitId:unit.id}),false);
         const endpoints = units.filter(u=>u.beginMs!==null&&u.endMs!==null);
         const begin = cs(Math.min(...endpoints.map(u=>u.beginMs!))), end = cs(Math.max(...endpoints.map(u=>u.endMs!)));
-        if (endpoints.length && end <= begin) problem({...base,code:'invalid-range'},'ASS 定时内容包络量化到厘秒后必须有正时长');
+        if (endpoints.length && end <= begin) problem({...base,code:'invalid-range'},'output.assContentDuration');
         events.push({begin,end,role,name,units,text:units.map(u=>u.text).join('')});
       }
     };

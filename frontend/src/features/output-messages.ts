@@ -23,3 +23,7 @@ export function issueLocation(issue:OutputIssue,document?:LyricDocument):string 
 export function issueText(issue:OutputIssue,document?:LyricDocument):string {
  return issue.detail?`${issueLocation(issue,document)}: ${formatMessage(issue.detail)}`:issue.message;
 }
+
+export function karaokeOutputLabel(output: import('../adapters/karaoke-output').KaraokeOutput, project: import('../domain/project-document').ProjectDocument):string {
+ return i18n.t(`output.${output.kind}Label`,{group:project.karaoke.groups.find(group=>group.id===output.groupId)?.name??output.groupId,number:output.trackNumber,language:output.language});
+}

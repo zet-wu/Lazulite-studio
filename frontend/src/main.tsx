@@ -1,4 +1,4 @@
-import "./i18n";
+import { i18n } from "./i18n";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./app/App";
@@ -15,8 +15,11 @@ if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCKS === "true") {
     .then(({ startMocks }) => startMocks())
     .then(render)
     .catch(() => {
-      root.innerHTML =
-        "<main style='display:grid;place-content:center;min-height:100vh;gap:12px;text-align:center'><p>开发模拟服务启动失败，请重试。</p><button data-role='secondary' id='reload'>重新加载</button></main>";
+      const main=document.createElement('main');
+      main.style.cssText='display:grid;place-content:center;min-height:100vh;gap:12px;text-align:center';
+      const text=document.createElement('p'),button=document.createElement('button');
+      text.textContent=i18n.t('startup.mockFailed');button.textContent=i18n.t('common.reload');
+      button.id='reload';button.dataset.role='secondary';main.append(text,button);root.replaceChildren(main);
       document
         .getElementById("reload")
         ?.addEventListener("click", () => window.location.reload());

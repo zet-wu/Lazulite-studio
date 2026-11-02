@@ -1,5 +1,5 @@
+import { message as describeMessage, MessageError, errorMessage, message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
-import { message } from '../domain/messages';
 import { i18n } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../shared/Controls';
@@ -13,7 +13,7 @@ export function DeviceSettings() {
   const session = useQuery({ queryKey: ['session'], queryFn: studioApi.getSession });
   const runtime = useQuery({ queryKey: ['runtime'], enabled: session.data?.mode === 'local', queryFn: async () => {
     const response = await fetch('/api/v1/runtime', { headers: requestHeaders() });
-    if (!response.ok) throw new Error(t('settings.modeFailed'));
+    if (!response.ok) throw new MessageError(describeMessage('settings.modeFailed'));
     return await response.json() as { target?: string };
   } });
   const [values, setValues] = useState(() => ({ vocal: preferences.getItem('device.vocal') ?? 'auto', alignment: preferences.getItem('device.alignment') ?? 'auto' }));
@@ -28,7 +28,7 @@ export function DeviceSettings() {
       <select aria-label={stage === 'vocal' ? t('settings.vocalDevice') : t('settings.alignmentDevice')} disabled={saving || cpuOnly} value={cpuOnly ? 'auto' : values[stage]} onChange={async event => {
         const value = event.target.value; setSaving(true); setError('');
         try { await savePreference(`device.${stage}`, value); setValues(old => ({ ...old, [stage]: value })); }
-        catch (cause) { setError((cause as Error).message); }
+        catch (cause) { setError(errorMessage(cause)); }
         finally { setSaving(false); }
       }}><option value="auto">{cpuOnly ? 'CPU' : t('settings.auto')}</option>{!cpuOnly && <option value="cpu">CPU</option>}</select>
     </label>)}

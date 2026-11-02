@@ -1,3 +1,4 @@
+import { message, MessageError, messageList } from './messages';
 import { cueProblem, createKaraoke, reconcileKaraoke, applyKaraoke, type Karaoke, type KaraokeCommand } from './karaoke';
 import { assertAmll, checkAmll, createAmllSettings, amllDependencies, displayLines, groupDisplayLines, lineAgents, type AmllRule, type AmllSettings } from './amll-compatibility';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
@@ -24,7 +25,7 @@ export function createProjectDocument(lyrics = createLyricDocument()): ProjectDo
 export function validateSegments(segments: VocalSegment[]) {
   const ids = new Set<string>();
   for (const segment of segments) {
-    if (!segment.id || ids.has(segment.id) || !Number.isSafeInteger(segment.beginMs) || !Number.isSafeInteger(segment.endMs) || segment.beginMs < 0 || segment.beginMs >= segment.endMs) throw new Error('人声片段必须具有唯一标识，时间为非负安全整数且结束晚于开始');
+    if (!segment.id || ids.has(segment.id) || !Number.isSafeInteger(segment.beginMs) || !Number.isSafeInteger(segment.endMs) || segment.beginMs < 0 || segment.beginMs >= segment.endMs) throw new MessageError(message('project.segmentInvalid'));
     ids.add(segment.id);
   }
 }
@@ -36,18 +37,18 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     if (karaoke === state.present.karaoke) return state;
     present = { ...state.present, karaoke };
   } else if (command.type === 'alignment') {
-    if (command.source !== state.present) throw new Error('项目已改变，请重新运行自动对齐');
+    if (command.source !== state.present) throw new MessageError(message('project.alignmentStale'));
     if (command.project === state.present) return state;
     present = command.project;
   } else if (command.type === 'amll-setting') {
     const amll = {...state.present.amll};
-    if (amll.simplified && amllDependencies.includes(command.rule)) throw new Error('简化模型已锁定此限制');
+    if (amll.simplified && amllDependencies.includes(command.rule)) throw new MessageError(message('project.simpleLocked'));
     amll[command.rule] = command.enabled;
     if (amll.simplified) for (const key of amllDependencies) amll[key] = true;
     if (JSON.stringify(amll) === JSON.stringify(state.present.amll)) return state;
     present = {...state.present, amll};
   } else if (command.type === 'background-position') {
-    if (!state.present.lyrics.lines.find(line=>line.id===command.lineId)?.backgroundOf) throw new Error('只能前置背景行');
+    if (!state.present.lyrics.lines.find(line=>line.id===command.lineId)?.backgroundOf) throw new MessageError(message('project.backgroundPrepend'));
     const line = state.present.lyrics.lines.find(line=>line.id===command.lineId)!;
     const shown=displayLines(state.present.lyrics,state.present.lineOrder);
     if((shown.indexOf(line)<shown.findIndex(item=>item.id===line.backgroundOf))===command.before)return state;
@@ -60,9 +61,9 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
   } else if (command.type === 'amll-batch' || command.type === 'duet') {
     const lyrics = structuredClone(state.present.lyrics);
     if(command.type==='duet') {
-      if(!state.present.amll.simplified) throw new Error('请先启用简化歌手模型');
+      if(!state.present.amll.simplified) throw new MessageError(message('project.simpleSingersRequired'));
       const line=lyrics.lines.find(line=>line.id===command.lineId);
-      if(!line || line.backgroundOf) throw new Error('请选择主行');
+      if(!line || line.backgroundOf) throw new MessageError(message('project.chooseLead'));
       const id=command.duet?'v2':'v1';
       if(!lyrics.agents.some(agent=>agent.id===id)) lyrics.agents.push({id,name:null,type:'person'});
       line.agentRefs=[id];
@@ -125,7 +126,7 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     }
     for (const cue of karaoke.cues) if (moved.has(cue.id)) {
       const problem = cueProblem(result.lyrics, karaoke, cue);
-      if (problem) throw new Error(`第 ${result.lyrics.lines.findIndex(line=>line.id===cue.anchor.lineId)+1} 行 · 导唱「${cue.text}」：${problem}`);
+      if (problem) throw new MessageError(messageList([message('project.cueLocation',{number:result.lyrics.lines.findIndex(line=>line.id===cue.anchor.lineId)+1,text:cue.text}),message(problem)]));
     }
     const previous=displayLines(state.present.lyrics,state.present.lineOrder);
     const before=previous.filter((line,i)=>line.backgroundOf&&i<previous.findIndex(item=>item.id===line.backgroundOf)).map(line=>line.id);

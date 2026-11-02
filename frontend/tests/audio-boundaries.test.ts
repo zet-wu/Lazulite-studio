@@ -27,11 +27,11 @@ it('checks the final linked candidate while retaining unchanged out-of-range end
   let next=structuredClone(project);next.lyrics.lines[0].beginMs=9000;
   expect(()=>assertChangedTimes(projectTimes(project),projectTimes(next),10000)).not.toThrow();
   next.lyrics.lines[0].endMs=13000;
-  expect(()=>assertChangedTimes(projectTimes(project),projectTimes(next),10000)).toThrow('结束');
+  expect(()=>assertChangedTimes(projectTimes(project),projectTimes(next),10000)).toThrow('time.endOutsideSource');
   line.endMs=9500;
   next=executeProjectCommand(createProjectEditorState(project),{type:'lyrics',command:{type:'shift-lines',lineIds:[line.id],deltaMs:1000}}).present;
-  expect(()=>assertChangedTimes(projectTimes(project),projectTimes(next),10000)).toThrow('结束');
-  expect(()=>assertChangedTimes(projectTimes(project),projectTimes(next),null)).toThrow('未知');
+  expect(()=>assertChangedTimes(projectTimes(project),projectTimes(next),10000)).toThrow('time.endOutsideSource');
+  expect(()=>assertChangedTimes(projectTimes(project),projectTimes(next),null)).toThrow('time.sourceUnknown');
 });
 it('intersects automatic intervals with source duration without touching media metadata',()=>{
   const segments=[{id:'a',beginMs:900,endMs:1022},{id:'b',beginMs:1021,endMs:1500},{id:'c',beginMs:0,endMs:100}];

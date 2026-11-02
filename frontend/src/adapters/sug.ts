@@ -1,3 +1,4 @@
+import { message as describeMessage } from '../domain/messages';
 import { karaokeOutputs, karaokeFilenames, zipFiles } from './karaoke-output';
 import { isUntimedSeparator, type ExportUnit } from './export-separators';
 import { cueProblem, cueWord, type KaraokeCue } from '../domain/karaoke';
@@ -18,27 +19,27 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
   const files: { name: string; text: string; output: typeof outputs[number] }[] = [];
   const descriptions: string[] = [];
   const { lyrics, karaoke } = project;
-  const add = (target: Target, message: string, outputIds: string[] = [], code: OutputIssue['code'] = 'serialization') => issues.push({kind:'line',lineId:'',missing:[],...target,message,code,severity:'error',formats:['SUG'],outputIds});
-  for (const line of lyrics.lines) if (!karaoke.groups.some(g => g.id === karaoke.lineGroups[line.id])) add({lineId:line.id,karaokeSettings:true},'该行未选择有效输出分组');
-  if (!karaoke.outputs.length) add({karaokeSettings:true},'请选择输出文件');
+  const add = (target: Target, message: string, outputIds: string[] = [], code: OutputIssue['code'] = 'serialization') => issues.push({kind:'line',lineId:'',missing:[],...target,message,detail:describeMessage(message),code,severity:'error',formats:['SUG'],outputIds});
+  for (const line of lyrics.lines) if (!karaoke.groups.some(g => g.id === karaoke.lineGroups[line.id])) add({lineId:line.id,karaokeSettings:true},'output.groupRequired');
+  if (!karaoke.outputs.length) add({karaokeSettings:true},'output.chooseFiles');
   for (const id of new Set(karaoke.outputs)) {
     const output = outputs.find(o => o.id === id);
-    if (!output) { add({karaokeSettings:true},'所选输出已失效，请重新选择文件',[id]); continue; }
+    if (!output) { add({karaokeSettings:true},'output.staleSelection',[id]); continue; }
     const issue = (target: Target, message: string, code?: OutputIssue['code']) => add(target,message,[id],code);
     const offset = karaoke.offsets[id] ?? 0;
-    if (!Number.isSafeInteger(offset)) issue({karaokeSettings:true},'输出偏移须为安全整数毫秒','invalid-range');
+    if (!Number.isSafeInteger(offset)) issue({karaokeSettings:true},'output.integerOffset','invalid-range');
     const valid = (unit: ExportUnit, target: Target): unit is ExportUnit & {beginMs:number;endMs:number} => {
       const {beginMs:b,endMs:e} = unit;
-      if (b === null || e === null) { issue({...target,missing:[...(b===null?['begin' as const]:[]),...(e===null?['end' as const]:[])]},'缺少完整双端时间','missing-time'); return false; }
-      if (!Number.isSafeInteger(b)||!Number.isSafeInteger(e)||b<0||e<=b) { issue(target,'时间须为非负安全整数且结束晚于开始','invalid-range'); return false; }
+      if (b === null || e === null) { issue({...target,missing:[...(b===null?['begin' as const]:[]),...(e===null?['end' as const]:[])]},'output.bothTimes','missing-time'); return false; }
+      if (!Number.isSafeInteger(b)||!Number.isSafeInteger(e)||b<0||e<=b) { issue(target,'output.positiveRange','invalid-range'); return false; }
       return true;
     };
-    const textOk = (text:string,target:Target) => { if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(text)) issue(target,'SUG 不支持此控制字符或换行'); };
+    const textOk = (text:string,target:Target) => { if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(text)) issue(target,'output.sugControl'); };
     const singers = [{id:'singer-0',name:'未指定',is_default:true,color:'#FF6B6B'}];
     const roles = new Map<string,string>([['[]','singer-0']]);
     const singerFor = (line:LyricLine, word:LyricWord, target:Target) => {
       const set = singerSet(lyrics,line,word);
-      if (set.missing) issue(target,'歌手引用已失效');
+      if (set.missing) issue(target,'output.singerStale');
       const existing = roles.get(set.key); if (existing) return existing;
       const label = set.ids.map(agentId=>{const a=lyrics.agents.find(a=>a.id===agentId)!;return a.name || `歌手 ${lyrics.agents.indexOf(a)+1}`;}).join('+');
       let name=label,n=2;while(singers.some(s=>s.name===name))name=`${label} (${n++})`;
@@ -52,7 +53,7 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
       const problem=cueProblem(lyrics,karaoke,cue);if(problem)issue(target,problem,'invalid-range');
       if(!valid({...cue,id:cue.id},target))return null;
       textOk(cue.text,target);
-      if(cue.anchor.kind==='ruby'&&/[\^＾]/.test(cue.text))issue(target,'Ruby 导唱与 SUG 保留停顿编码冲突');
+      if(cue.anchor.kind==='ruby'&&/[\^＾]/.test(cue.text))issue(target,'output.sugCuePause');
       const line=lyrics.lines.find(l=>l.id===cue.anchor.lineId)!,word=cueWord(lyrics,cue);
       return {text:cue.text,begin:cue.beginMs,end:cue.endMs,target,singer:word?singerFor(line,word,target):'singer-0',guide:true};
     };
@@ -64,9 +65,9 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
       const characters:SugCharacter[]=[];
       for(const segment of segments){
         textOk(segment.text,segment.target);
-        if(segment.begin<previous)issue(segment.target,'SUG 无法忠实消费此正文顺序；请调整输出分组或时间','unsupported-order');
+        if(segment.begin<previous)issue(segment.target,'output.sugOrder','unsupported-order');
         previous=segment.begin;maxEnd=Math.max(maxEnd,segment.end);
-        if([segment.begin,segment.end].some(t=>!Number.isSafeInteger(t+offset)||t+offset<0)){issue(segment.target,'此内容加上输出偏移后为负时间或超出安全整数','invalid-range');if(!issues.some(i=>i.karaokeSettings&&i.outputIds?.includes(id)))issue({karaokeSettings:true},'请调整输出偏移：内容移到零之前或超出安全整数','invalid-range');}
+        if([segment.begin,segment.end].some(t=>!Number.isSafeInteger(t+offset)||t+offset<0)){issue(segment.target,'output.offsetRange','invalid-range');if(!issues.some(i=>i.karaokeSettings&&i.outputIds?.includes(id)))issue({karaokeSettings:true},'output.adjustOffset','invalid-range');}
         const chars=Array.from(segment.text);
         chars.forEach((char,index)=>{
           const first=index===0,last=index===chars.length-1;
@@ -74,7 +75,7 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
           characters.push({id:`char-${charIndex++}`,char,timestamps,check_count:timestamps.length,linked_to_next:!last,is_sentence_end:last,sentence_end_ts:last?segment.end:null,is_line_end:false,singer_id:segment.singer,is_guide:!!segment.guide,...(first&&segment.reading?{ruby:{parts:segment.reading.map((p,i,parts)=>({text:p.text,offset_ms:i?p.begin-parts[0].begin:0}))}}:{})});
         });
       }
-      if(segments.at(-1)!.end<maxEnd)issue(target,'最后文本的结束不是整行最大结束，Lin-K 会缩短行包络','unsupported-order');
+      if(segments.at(-1)!.end<maxEnd)issue(target,'output.sugShortEnvelope','unsupported-order');
       if(characters.length){characters.at(-1)!.is_line_end=true;sentences.push({id:`sentence-${sentences.length}`,singer_id:'singer-0',characters});}
     };
     const mapUnits = (units:ExportUnit[], targetFor:(u:ExportUnit)=>Target, singer:(u:ExportUnit)=>string, body=false):Segment[] => {
@@ -86,7 +87,7 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
           while(before>=0&&isUntimedSeparator(units[before],body?project.editing:undefined))before--;
           while(after<units.length&&isUntimedSeparator(units[after],body?project.editing:undefined))after++;
           const host=before>=0?units[before]:units[after];
-          if(!host||host.beginMs===null||host.endMs===null||host.endMs<=host.beginMs){issue(target,'分隔空白没有相邻的有效定时正文','missing-time');continue;}
+          if(!host||host.beginMs===null||host.endMs===null||host.endMs<=host.beginMs){issue(target,'validation.unhostedSeparator','missing-time');continue;}
           const t=before>=0?host.endMs:host.beginMs;
           // Every separator is independent, including consecutive spaces.
           for(const text of Array.from(unit.text))result.push({text,begin:t,end:t,target,singer:singer(unit),separator:true});
@@ -99,9 +100,9 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
           const reading:{text:string;begin:number;end:number}[]=[];
           for(const [index,ruby] of word.rubyUnits.entries()){
             const rt={...target,kind:'ruby' as const,rubyId:ruby.id};textOk(ruby.reading,rt);
-            if(!ruby.reading.length||ruby.reading.includes('^pause^')||/[\^＾]/.test(ruby.reading))issue(rt,'读音为空或与 SUG 保留停顿编码冲突');
+            if(!ruby.reading.length||ruby.reading.includes('^pause^')||/[\^＾]/.test(ruby.reading))issue(rt,'output.sugReading');
             if(!valid({...ruby,text:ruby.reading},rt))continue;
-            if(ruby.beginMs!<unit.beginMs||ruby.endMs!>unit.endMs||index>0&&ruby.beginMs!<(word.rubyUnits[index-1].endMs??Infinity))issue(rt,'Ruby 重叠、倒序或超出正文范围','invalid-range');
+            if(ruby.beginMs!<unit.beginMs||ruby.endMs!>unit.endMs||index>0&&ruby.beginMs!<(word.rubyUnits[index-1].endMs??Infinity))issue(rt,'output.rubyRange','invalid-range');
             reading.push({text:ruby.reading,begin:index===0?unit.beginMs:ruby.beginMs!,end:index===word.rubyUnits.length-1?unit.endMs:ruby.endMs!});
             for(const cue of karaoke.cues.filter(c=>c.anchor.kind==='ruby'&&c.anchor.wordId===word.id&&c.anchor.leftId===ruby.id)){const s=cueSegment(cue);if(s)reading.push(s);}
           }
@@ -130,7 +131,7 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
           if(content.kind==='timed')emit(mapUnits(content.units,u=>({...ct,kind:`${output.kind}-unit` as OutputIssue['kind'],unitId:u.id}),()=>lineSinger(line,ct)),ct);
           else if(content.text.length){
             const words=line.words.filter(w=>w.text.length&&!isUntimedSeparator(w,project.editing));
-            if(!words.length||words.some(w=>!valid(w,{...target,kind:'word',wordId:w.id}))) {issue(target,'附属文本需要关联行的完整有效正文词包络','missing-time');continue;}
+            if(!words.length||words.some(w=>!valid(w,{...target,kind:'word',wordId:w.id}))) {issue(target,'output.attachmentEnvelope','missing-time');continue;}
             emit([{text:content.text,begin:Math.min(...words.map(w=>w.beginMs!)),end:Math.max(...words.map(w=>w.endMs!)),target:ct,singer:lineSinger(line,ct)}],ct);
           }
         }
@@ -141,7 +142,7 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
     const data={version:'0.3.0',id:'project-0',metadata:{title:lyrics.metadata.title?.join(' / ')||title,artist:lyrics.metadata.artist?.join(' / ')||'',album:lyrics.metadata.album?.join(' / ')||'',language:output.kind==='body'?(lyrics.language??''):(output.language==='und'?'':output.language),created_at:date,modified_at:date},audio_duration_ms:0,singers,sentences,global_offset_ms:offset};
     files.push({name:names.get(id)!,text:JSON.stringify(data,null,2)+'\n',output});
   }
-  if(karaoke.outputs.length&&!files.length&&!issues.length)add({karaokeSettings:true},'请选择至少一个有实际内容的输出文件');
+  if(karaoke.outputs.length&&!files.length&&!issues.length)add({karaokeSettings:true},'output.chooseNonempty');
   const summary=[...files.map(f=>`${f.name} — ${f.output.label}；输出偏移 ${karaoke.offsets[f.output.id]??0} ms`),...descriptions,...omitted.map(label=>`空输出已省略：${label}`),'行采用正文词包络（含带出的导唱）；Ruby 首尾填满所属词，中间停顿保留。','无时间横向分隔保留原文，投影为零时长边界；在 SUG 打轴中成为额外检查点。','词内字符时间由接收端推导；正文与 Ruby 共用检查点。组合角色保留显示名称，集合关系不往返。','SUG 保留原始 Unicode 字符；Lin-K 可能将组合字符合并为显示字符（如 e＋组合重音变为 é）。','其他元数据、段落、脏词、agent 类型／actorRef、背景父子关联、附属轨道用途和原始对象身份没有对等映射。','不携带歌手图片、NKM3 触发标记、媒体或样式；时长 0 表示未知，.lazp 用于 Studio 工程备份。','解压并保留全部 SUG 文件；在 Lin-K 字幕视频生成中加载主文件，再逐个添加背景／翻译／音译副字幕源。','另选媒体、设置各源位置和样式；首次装配请将软件补偿和样式额外偏移设为 0，再按需要调整。','SUG 也可在打轴模块打开；零时长分隔会参与检查点导航。'].join('\n')+'\n';
   const merged = new Map<string, OutputIssue>();
   for(const issue of issues){const key=outputIssueKey(issue)+issue.message,previous=merged.get(key);merged.set(key,previous?{...previous,outputIds:[...new Set([...(previous.outputIds??[]),...(issue.outputIds??[])])]}:issue);}

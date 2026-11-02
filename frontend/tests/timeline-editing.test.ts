@@ -49,7 +49,7 @@ describe('E6 timeline editing', () => {
     const changed = resizeTimeline(document, target, 'endMs', 3500);
     expect(changed.lines[0].words[0]).toMatchObject({ beginMs: 1000, endMs: 3500 });
     expect(changed.lines[0].words[1]).toBe(document.lines[0].words[1]);
-    expect(() => resizeTimeline(document, { kind: 'line', lineId: document.lines[0].id }, 'endMs', 2000)).toThrow(/不能排除词/);
+    expect(() => resizeTimeline(document, { kind: 'line', lineId: document.lines[0].id }, 'endMs', 2000)).toThrow('timeline.lineExcludesWords');
   });
 
   it('moves selected words together and rejects negative times while snapping near a beat', () => {
@@ -57,7 +57,7 @@ describe('E6 timeline editing', () => {
     const targets = document.lines[0].words.map((word) => ({ kind: 'word' as const, lineId: document.lines[0].id, wordId: word.id }));
     const moved = moveTimeline(document, targets, 250);
     expect(moved.lines[0].words.map((word) => word.beginMs)).toEqual([1250, 3250]);
-    expect(() => moveTimeline(document, targets, -2000)).toThrow(/有效范围/);
+    expect(() => moveTimeline(document, targets, -2000)).toThrow('timeline.rangeInvalid');
     expect(snapTime(1498, [1000, 1500, 2000], 10_000)).toBe(1500);
   });
 });

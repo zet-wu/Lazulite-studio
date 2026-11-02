@@ -22,7 +22,7 @@ it('strict thresholds preserve short manual slots; curve head never creates zero
  expect(autoInsertCues(p.lyrics,p.karaoke).cues).toHaveLength(0);
  const a={kind:'before' as const,lineId:p.lyrics.lines[0].id};
  for(let i=0;i<4;i++)p.karaoke=insertCue(p.lyrics,p.karaoke,a);
- expect(()=>insertCue(p.lyrics,p.karaoke,a)).toThrow('曲头');
+ expect(()=>insertCue(p.lyrics,p.karaoke,a)).toThrow('karaoke.noIntro');
  expect(p.karaoke.cues.map(c=>[c.beginMs,c.endMs])).toEqual([[3000,4000],[2000,3000],[1000,2000],[0,1000]]);
 });
 it('retiming preserves manually shortened cue and reports range; deletion and undo are atomic',()=>{
@@ -33,7 +33,7 @@ it('retiming preserves manually shortened cue and reports range; deletion and un
  const changed=structuredClone(state.present.lyrics);changed.lines[0].words[1].beginMs=5400;
  const next=executeProjectCommand(state,{type:'lyrics',command:{type:'replace-document',document:changed}});
  expect(next.present.karaoke.cues[0].endMs).toBe(5500);
- expect(cueProblem(changed,next.present.karaoke,next.present.karaoke.cues[0])).toContain('双端');
+ expect(cueProblem(changed,next.present.karaoke,next.present.karaoke.cues[0])).toBe('karaoke.interval');
  const deleted=structuredClone(changed);deleted.lines[0].words.pop();
  const result=executeProjectCommand(next,{type:'lyrics',command:{type:'replace-document',document:deleted}});
  expect(result.present.karaoke.cues).toHaveLength(0);expect(undoProjectCommand(result).present).toBe(next.present);
@@ -56,7 +56,7 @@ it('limits all scans to selected groups and undoes thresholds together with cues
  const state=createProjectEditorState(p), next=executeProjectCommand(state,{type:'karaoke',command:{kind:'auto',groupIds:['background'],thresholds:{beforeMs:0,wordMs:0,rubyMs:0}}});
  expect(next.present.karaoke.cues).toHaveLength(3);expect(next.present.karaoke.cues.every(c=>c.anchor.lineId==='other')).toBe(true);
  expect(undoProjectCommand(next).present).toBe(p);
- expect(()=>applyKaraoke(p.lyrics,p.karaoke,{kind:'auto',groupIds:[],thresholds:p.karaoke.defaults})).toThrow('分组');
+ expect(()=>applyKaraoke(p.lyrics,p.karaoke,{kind:'auto',groupIds:[],thresholds:p.karaoke.defaults})).toThrow('karaoke.chooseGroups');
 });
 it('uses the latest prior occupied endpoint across overlapping and reordered lines',()=>{
  const p=fixture();p.lyrics.lines=[['a',0,20000],['b',5000,6000],['c',10000,11000]].map(([id,begin,end])=>{const line=createLine(String(id));Object.assign(line.words[0],{beginMs:begin,endMs:end});return line;});
@@ -84,7 +84,7 @@ it.each([500,-500])('shifts three cue kinds with selected lines atomically (%i)'
 });
 it('rejects the whole shift when only a before cue would become negative',()=>{
  const p=fixture();p.karaoke=autoInsertCues(p.lyrics,p.karaoke);const state=createProjectEditorState(p),before=structuredClone(state);
- expect(()=>executeProjectCommand(state,{type:'lyrics',command:{type:'shift-lines',lineIds:[p.lyrics.lines[0].id],deltaMs:-3500}})).toThrow('导唱');expect(state).toEqual(before);
+ expect(()=>executeProjectCommand(state,{type:'lyrics',command:{type:'shift-lines',lineIds:[p.lyrics.lines[0].id],deltaMs:-3500}})).toThrow('project.cueLocation');expect(state).toEqual(before);
 });
 it('linked end propagation does not shift cues of an unselected line',()=>{
  const p=fixture(), selected=p.lyrics.lines[0];p.karaoke=autoInsertCues(p.lyrics,p.karaoke);

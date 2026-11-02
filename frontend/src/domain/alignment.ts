@@ -1,3 +1,4 @@
+import { message, MessageError } from './messages';
 import { intersectSegments } from './time-boundaries';
 import type { Acoustics, ProjectDocument } from './project-document';
 import { validateSegments } from './project-document';
@@ -17,21 +18,21 @@ export type AlignmentResult = {
 };
 type Pair = { beginMs: TimeMs; endMs: TimeMs };
 export function mergeAlignment(project: ProjectDocument, result: AlignmentResult, durationMs: number, clearUnmatched = false, gapThresholdMs: number | null = null) {
-  if (gapThresholdMs !== null && (!Number.isSafeInteger(gapThresholdMs) || gapThresholdMs <= 0)) throw new Error("行内空隙阈值必须为正的安全整数毫秒");
-  if (result.alignment.schema !== 'lazulite-japanese-result-v1') throw new Error('自动对齐结果版本无效');
+  if (gapThresholdMs !== null && (!Number.isSafeInteger(gapThresholdMs) || gapThresholdMs <= 0)) throw new MessageError(message('alignment.gapThreshold'));
+  if (result.alignment.schema !== 'lazulite-japanese-result-v1') throw new MessageError(message('alignment.resultVersion'));
   const next = structuredClone(project), skipped = new Set(project.editing.skippedAlignmentLineIds);
   const units = new Map(result.alignment.units.map(unit => [unit.unit_id, unit]));
-  if (units.size !== result.alignment.units.length) throw new Error('自动对齐结果包含重复标识');
+  if (units.size !== result.alignment.units.length) throw new MessageError(message('alignment.duplicateIds'));
   const groups = new Map<string, string[]>();
   const seen = new Set<string>();
   for (const item of result.mapping) {
     const line = project.lyrics.lines.find(line => line.id === item.line_id);
     const word = line?.words.find(word => word.id === item.word_id);
-    if (!line || !word || skipped.has(line.id) || (item.kind === 'word' ? item.object_id !== word.id : !word.rubyUnits.some(r => r.id === item.object_id)) || seen.has(item.unit_id) || units.get(item.unit_id)?.line_id !== line.id) throw new Error('对齐结果与启动歌词不匹配');
+    if (!line || !word || skipped.has(line.id) || (item.kind === 'word' ? item.object_id !== word.id : !word.rubyUnits.some(r => r.id === item.object_id)) || seen.has(item.unit_id) || units.get(item.unit_id)?.line_id !== line.id) throw new MessageError(message('alignment.sourceMismatch'));
     seen.add(item.unit_id);
     groups.set(item.object_id, [...(groups.get(item.object_id) ?? []), item.unit_id]);
   }
-  if (seen.size !== units.size) throw new Error('自动对齐结果映射不完整');
+  if (seen.size !== units.size) throw new MessageError(message('alignment.mappingIncomplete'));
   const leaves = project.lyrics.lines.filter(l => !skipped.has(l.id)).flatMap(l => l.words.flatMap(w =>
     w.rubyUnits.length ? w.rubyUnits.map(r => ({object_id:r.id,word_id:w.id,line_id:l.id,kind:'ruby'})) : [{object_id:w.id,word_id:w.id,line_id:l.id,kind:'word'}]));
   const scope = new Map(result.scope.map(item => [item.object_id,item]));
@@ -39,7 +40,7 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
     const item = scope.get(leaf.object_id);
     return !item || item.word_id !== leaf.word_id || item.line_id !== leaf.line_id || item.kind !== leaf.kind
       || JSON.stringify(item.target_ids) !== JSON.stringify(groups.get(leaf.object_id) ?? []);
-  })) throw new Error('对齐结果完整范围或目标映射不匹配');
+  })) throw new MessageError(message('alignment.rangeMismatch'));
   const retained: { id: string; reason: string }[] = [];
   const cleared: string[] = [];
   const adoptedComplete = new Set<string>();
@@ -58,23 +59,23 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
   const endpoint = (value: Endpoint): TimeMs => value === null ? null : Math.round(value.time * 1000);
   const legal = (pair: Pair, upper = Number.MAX_SAFE_INTEGER) => [pair.beginMs, pair.endMs].every(t => t === null || Number.isSafeInteger(t) && t >= 0 && t <= upper) && (pair.beginMs === null || pair.endMs === null || pair.beginMs < pair.endMs);
   function merge(id: string, old: Pair, proposed: Pair): Pair {
-    if (!legal(proposed, durationMs)) { retained.push({id, reason:'非法建议端点'}); return old; }
+    if (!legal(proposed, durationMs)) { retained.push({id, reason:'alignment.invalidEndpoint'}); return old; }
     if (proposed.beginMs !== null && proposed.endMs !== null) adoptedComplete.add(id);
     if (clearUnmatched) {
       if (old.beginMs !== null && proposed.beginMs === null || old.endMs !== null && proposed.endMs === null) cleared.push(id);
       return proposed;
     }
-    if (proposed.beginMs === null && proposed.endMs === null) { retained.push({id, reason: '没有连续建议端点'}); return old; }
+    if (proposed.beginMs === null && proposed.endMs === null) { retained.push({id, reason: 'alignment.noConsecutiveEndpoints'}); return old; }
     const candidate = { beginMs: proposed.beginMs ?? old.beginMs, endMs: proposed.endMs ?? old.endMs };
-    if (!legal(candidate)) { retained.push({id, reason: '量化后越界或无法合法合并旧端点'}); return old; }
-    if (proposed.beginMs === null || proposed.endMs === null) retained.push({id, reason:'部分端点保留'});
+    if (!legal(candidate)) { retained.push({id, reason: 'alignment.quantizedInvalid'}); return old; }
+    if (proposed.beginMs === null || proposed.endMs === null) retained.push({id, reason:'alignment.partialEndpoints'});
     return candidate;
   }
   function adopt(id: string, old: Pair): Pair {
     const ids = groups.get(id);
     if (!ids?.length) return clearUnmatched ? merge(id,old,{beginMs:null,endMs:null}) : old;
     if (ids.some(uid => {const timing=units.get(uid)!.proposed_timing;return !legal({beginMs:endpoint(timing.start),endMs:endpoint(timing.end)}, durationMs);})) {
-      retained.push({id,reason:'非法建议端点'}); return old;
+      retained.push({id,reason:'alignment.invalidEndpoint'}); return old;
     }
     // Missing leading/trailing units cannot be replaced by a lucky middle prediction.
     return merge(id, old, { beginMs: endpoint(units.get(ids[0])!.proposed_timing.start), endMs: endpoint(units.get(ids.at(-1)!)!.proposed_timing.end) });

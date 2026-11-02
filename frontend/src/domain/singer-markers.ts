@@ -1,3 +1,4 @@
+import { message, MessageError } from './messages';
 import { wordAgents } from './amll-compatibility';
 import type { LyricDocument, LyricLine, LyricWord } from './lyric-document';
 
@@ -32,17 +33,17 @@ export function initializeSingerMarkers(lyrics: LyricDocument, markers: SingerMa
 }
 export function markerProblem(marker: SingerMarker): string | null {
   if (marker.skip) return null;
-  if (!marker.trigger.length) return '触发标记不能为空';
-  if (!marker.beforeImage.trim()) return '扫色前图片不能为空';
-  if (marker.sizeMode==='Zoom' && (!/^(?:\d+(?:\.\d+)?|\.\d+)%?$/.test(marker.zoom) || Number(marker.zoom.replace('%',''))<=0 || !Number.isFinite(Number(marker.zoom.replace('%',''))))) return 'Zoom 须为正数，可带百分号';
-  if ([marker.marginLeft,marker.marginRight,marker.marginBottom].some(value=>!Number.isSafeInteger(value))) return '边距须为整数像素';
+  if (!marker.trigger.length) return 'markers.triggerRequired';
+  if (!marker.beforeImage.trim()) return 'markers.beforeRequired';
+  if (marker.sizeMode==='Zoom' && (!/^(?:\d+(?:\.\d+)?|\.\d+)%?$/.test(marker.zoom) || Number(marker.zoom.replace('%',''))<=0 || !Number.isFinite(Number(marker.zoom.replace('%',''))))) return 'markers.zoomInvalid';
+  if ([marker.marginLeft,marker.marginRight,marker.marginBottom].some(value=>!Number.isSafeInteger(value))) return 'markers.marginInvalid';
   return null;
 }
 export function validateSingerMarkers(markers: SingerMarker[]) {
-  if (!Array.isArray(markers)) throw new Error('歌手标记数据无效');
+  if (!Array.isArray(markers)) throw new MessageError(message('markers.dataInvalid'));
   const keys = new Set<string>();
   for (const marker of markers) {
-    if (!marker || typeof marker.skip !== 'boolean' || !Array.isArray(marker.agentIds) || !marker.agentIds.length || marker.agentIds.some(id=>typeof id!=='string'||!id) || new Set(marker.agentIds).size!==marker.agentIds.length || ['trigger','beforeImage','afterImage','zoom'].some(key=>typeof marker[key as keyof SingerMarker]!=='string') || !['Zoom','Fix'].includes(marker.sizeMode) || typeof marker.noDecor!=='boolean' || typeof marker.forceWipeDecor!=='boolean' || [marker.marginLeft,marker.marginRight,marker.marginBottom].some(value=>!Number.isSafeInteger(value))) throw new Error('歌手标记数据无效');
-    const key=singerKey(marker.agentIds);if(keys.has(key))throw new Error('歌手标记集合重复');keys.add(key);
+    if (!marker || typeof marker.skip !== 'boolean' || !Array.isArray(marker.agentIds) || !marker.agentIds.length || marker.agentIds.some(id=>typeof id!=='string'||!id) || new Set(marker.agentIds).size!==marker.agentIds.length || ['trigger','beforeImage','afterImage','zoom'].some(key=>typeof marker[key as keyof SingerMarker]!=='string') || !['Zoom','Fix'].includes(marker.sizeMode) || typeof marker.noDecor!=='boolean' || typeof marker.forceWipeDecor!=='boolean' || [marker.marginLeft,marker.marginRight,marker.marginBottom].some(value=>!Number.isSafeInteger(value))) throw new MessageError(message('markers.dataInvalid'));
+    const key=singerKey(marker.agentIds);if(keys.has(key))throw new MessageError(message('markers.duplicate'));keys.add(key);
   }
 }

@@ -1,3 +1,4 @@
+import { message, MessageError } from './messages';
 import { toKana } from 'wanakana';
 import type { LyricWord, RubyUnit, TimeMs } from './lyric-document';
 
@@ -9,9 +10,9 @@ export const readingWeight = (reading: string) => isKanaReading(reading) ? Math.
 
 export function readingFromRomanization(value: string): string {
   const source = value.replace(/\s+/gu, '');
-  if (!source) throw new Error('逐词音译为空');
+  if (!source) throw new MessageError(message('ruby.wordRomanizationEmpty'));
   const reading = toKana(source);
-  if (!kana.test(reading)) throw new Error(`无法把音译转换成假名：${value}`);
+  if (!kana.test(reading)) throw new MessageError(message('ruby.cannotConvert',{value}));
   return reading;
 }
 
@@ -33,7 +34,7 @@ function boundary(begin: TimeMs, end: TimeMs, position: number, total: number): 
 }
 
 export function distributeRubyTime(word: LyricWord, units: RubyUnit[]): RubyUnit[] {
-  if (!units.length || units.some((unit) => !unit.reading)) throw new Error('读音单元不能为空');
+  if (!units.length || units.some((unit) => !unit.reading)) throw new MessageError(message('ruby.unitEmpty'));
   const weights = units.map((unit) => readingWeight(unit.reading));
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   let elapsed = 0;
@@ -46,7 +47,7 @@ export function distributeRubyTime(word: LyricWord, units: RubyUnit[]): RubyUnit
 }
 
 export function makeRubyUnits(word: LyricWord, readings: string[]): RubyUnit[] {
-  if (!readings.length || readings.some((reading) => !reading)) throw new Error('读音单元不能为空');
+  if (!readings.length || readings.some((reading) => !reading)) throw new MessageError(message('ruby.unitEmpty'));
   const units = readings.map((reading) => ({ id: crypto.randomUUID(), reading, beginMs: null, endMs: null }));
   return distributeRubyTime(word, units);
 }

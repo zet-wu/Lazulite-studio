@@ -50,9 +50,9 @@ describe('E5 sync editing', () => {
   it('does not write an end before a start or alter the document after rejection', () => {
     const document = createLyricDocument('今日');
     const cursor = syncUnits(document)[0];
-    expect(() => stampSync(document, cursor, 'next', 1000)).toThrow(/先为当前单元打起始轴/);
+    expect(() => stampSync(document, cursor, 'next', 1000)).toThrow('sync.startFirst');
     const started = stampSync(document, cursor, 'start', 2000);
-    expect(() => stampSync(started, cursor, 'end', 1000)).toThrow(/早于起始轴/);
+    expect(() => stampSync(started, cursor, 'end', 1000)).toThrow('sync.endBeforeStart');
     expect(document.lines[0].words[0].beginMs).toBeNull();
   });
 
@@ -127,7 +127,7 @@ it('updates incoming line links and rejects an excluded word without changing do
   expect(accepted.present.lines[0]).toMatchObject({ endMs: 9000 });
   expect(accepted.present.lines[1].beginMs).toBe(9000);
   expect(undoLyricCommand(accepted).present).toBe(document);
-  expect(() => executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 7000 })).toThrow(/关联行/);
+  expect(() => executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 7000 })).toThrow('sync.linkConflict');
   expect(state.present).toBe(document); expect(state.past).toHaveLength(0);
   expect(source.endMs).toBe(10000); expect(target.beginMs).toBe(10000);
 });

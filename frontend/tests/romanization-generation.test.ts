@@ -49,7 +49,7 @@ it('keeps missing times and isolates line-final sokuon from the next line', () =
   const rows = proposeRomanization(doc, doc.lines.map(line => line.id), 'timed');
   expect(rows[0].groups[0]).toMatchObject({ text: ' ', beginMs: null, endMs: null });
   const result = executeLyricCommand(createLyricEditorState(doc), romanizationGenerationCommand(doc, doc, rows, choices));
-  expect(() => serializeLyricTtml(result.present)).toThrow('needs timing');
+  expect(() => serializeLyricTtml(result.present)).toThrow('ttml.unitNeedsTime');
   expect(parseLyricTtml(serializeLyricTtml(result.present, { draft: true })).romanizationTracks[0].contents).toHaveLength(1);
 });
 it('applies current ordinary text without converting again and preserves non-target contents', () => {

@@ -42,12 +42,12 @@ describe('background content and independent singers', () => {
     track.contents.push({ id: 'bg2', lineId: 'L1-bg', kind: 'timed', units: [{ id: 'u', text: '  ', beginMs: null, endMs: 5000 }] });
     d.romanizationTracks.push({ id: 'second', language: 'en', contents: [{ id: 'empty', lineId: 'L1', kind: 'plain', text: '' }, { id: 'empty-bg', lineId: 'L1-bg', kind: 'timed', units: [] }] });
     expect(parseLyricTtml(serializeLyricTtml(d, { draft: true }))).toEqual(d);
-    expect(() => serializeLyricTtml(d)).toThrow(/timing|no units/);
+    expect(() => serializeLyricTtml(d)).toThrow('ttml.unitNeedsTime');
   });
   it('does not inherit missing agents and rejects unknown explicit agents or background references', () => {
     expect(parseLyricTtml(xml('', bg.replace(' ttm:agent="v2 v1"', ''))).lines[1].agentRefs).toEqual([]);
-    expect(() => parseLyricTtml(xml('', bg.replace('v2 v1', 'missing')))).toThrow(/Unknown agent/);
-    expect(() => parseLyricTtml(xml('<iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><transliterations><transliteration><text for="absent"><span ttm:role="x-bg">(x)</span></text></transliteration></transliterations></iTunesMetadata>', bg))).toThrow(/unknown parent/);
+    expect(() => parseLyricTtml(xml('', bg.replace('v2 v1', 'missing')))).toThrow('ttml.unknownAgent');
+    expect(() => parseLyricTtml(xml('<iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><transliterations><transliteration><text for="absent"><span ttm:role="x-bg">(x)</span></text></transliteration></transliterations></iTunesMetadata>', bg))).toThrow('ttml.backgroundParent');
   });
   it('preserves background contents and singers through relationships, group copy/delete and undo', () => {
     const d = fixture(); d.lines.push({ ...createLine('next', 'next'), beginMs: 6000, endMs: 7000 });

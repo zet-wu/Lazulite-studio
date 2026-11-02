@@ -1,3 +1,4 @@
+import { message, MessageError, type Message } from './messages';
 import { initializeSingerMarkers, validateSingerMarkers, markerProblem, type SingerMarker } from './singer-markers';
 import type { LyricDocument, LyricLine, LyricWord } from './lyric-document';
 
@@ -37,26 +38,26 @@ export function gapAnchors(line: LyricLine): CueAnchor[] {
 }
 export function cueProblem(lyrics: LyricDocument, karaoke: Karaoke, cue: KaraokeCue): string | null {
   const range = anchorRange(lyrics, cue.anchor);
-  if (!range) return '导唱锚点已无合法正空隙，请调整源时间或删除导唱';
-  if (!cue.text.length) return '导唱文字不能为空';
-  if (!Number.isSafeInteger(cue.beginMs) || !Number.isSafeInteger(cue.endMs) || cue.beginMs < range.beginMs || cue.endMs > range.endMs || cue.endMs <= cue.beginMs) return '导唱双端必须位于原空隙内且具有正时长';
-  if (karaoke.cues.some(other => other.id !== cue.id && anchorKey(other.anchor) === anchorKey(cue.anchor) && (cue.anchor.kind !== 'before' || other.beginMs < cue.endMs && other.endMs > cue.beginMs))) return '同一位置的导唱不能重复或重叠';
+  if (!range) return 'karaoke.anchorGap';
+  if (!cue.text.length) return 'karaoke.emptyText';
+  if (!Number.isSafeInteger(cue.beginMs) || !Number.isSafeInteger(cue.endMs) || cue.beginMs < range.beginMs || cue.endMs > range.endMs || cue.endMs <= cue.beginMs) return 'karaoke.interval';
+  if (karaoke.cues.some(other => other.id !== cue.id && anchorKey(other.anchor) === anchorKey(cue.anchor) && (cue.anchor.kind !== 'before' || other.beginMs < cue.endMs && other.endMs > cue.beginMs))) return 'karaoke.overlap';
   return null;
 }
 export function insertCue(lyrics: LyricDocument, karaoke: Karaoke, anchor: CueAnchor): Karaoke {
   const range = anchorRange(lyrics, anchor);
-  if (!range) throw new Error('此处没有可插入导唱的正空隙');
+  if (!range) throw new MessageError(message('karaoke.noGap'));
   if (anchor.kind !== 'before' && karaoke.cues.some(cue => anchorKey(cue.anchor) === anchorKey(anchor))) return karaoke;
   let { beginMs, endMs } = range;
   if (anchor.kind === 'before') {
     endMs = Math.min(endMs, ...karaoke.cues.filter(cue => anchorKey(cue.anchor) === anchorKey(anchor)).map(cue => cue.beginMs));
     beginMs = Math.max(0, endMs - 1000);
-    if (endMs <= beginMs) throw new Error('曲头已无可用时长');
+    if (endMs <= beginMs) throw new MessageError(message('karaoke.noIntro'));
   }
   return { ...karaoke, cues: [...karaoke.cues, { id: crypto.randomUUID(), text: karaoke.defaults.text, anchor, beginMs, endMs }] };
 }
 export function autoInsertCues(lyrics: LyricDocument, karaoke: Karaoke, groupIds = karaoke.groups.map(group => group.id)): Karaoke {
-  if (!groupIds.length || groupIds.some(id => !karaoke.groups.some(group => group.id === id))) throw new Error('请选择有效的目标分组');
+  if (!groupIds.length || groupIds.some(id => !karaoke.groups.some(group => group.id === id))) throw new MessageError(message('karaoke.chooseGroups'));
   let next = karaoke;
   for (const line of lyrics.lines) {
     const group = karaoke.lineGroups[line.id], first = firstLyric(line);
@@ -111,13 +112,13 @@ export function nextGroupId(groups: Karaoke['groups']): string {
   let n = 1; while (used.has(`group${n}`)) n++;
   return `group${n}`;
 }
-export function groupIdProblem(original: Karaoke['groups'], groups: Karaoke['groups'], renames: Record<string, string>): string | null {
+export function groupIdProblem(original: Karaoke['groups'], groups: Karaoke['groups'], renames: Record<string, string>): Message | null {
   const used = new Set<string>();
   for (const [index, group] of groups.entries()) {
     const id = group.id.trim();
     const unchanged = original.some(old => old.id === id && renames[old.id] === id);
-    if (!id || !unchanged && !/^[A-Za-z][A-Za-z0-9_-]*$/.test(id)) return `第 ${index + 1} 组 ID 须以英文字母开头，后接字母、数字、下划线或连字符`;
-    if (used.has(id.toLowerCase())) return `第 ${index + 1} 组 ID 重复（不区分大小写）`;
+    if (!id || !unchanged && !/^[A-Za-z][A-Za-z0-9_-]*$/.test(id)) return message('karaoke.groupInvalid',{number:index+1});
+    if (used.has(id.toLowerCase())) return message('karaoke.groupDuplicate',{number:index+1});
     used.add(id.toLowerCase());
   }
   return null;
@@ -128,7 +129,7 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
   switch (command.kind) {
     case 'singer-markers': {
       validateSingerMarkers(command.markers);
-      for (const marker of command.markers) { const problem=markerProblem(marker); if(problem)throw new Error(problem); }
+      for (const marker of command.markers) { const problem=markerProblem(marker); if(problem)throw new MessageError(message(problem)); }
       next = { ...karaoke, singerMarkers: command.markers }; break;
     }
     case 'insert': next = insertCue(lyrics, karaoke, command.anchor); break;
@@ -138,19 +139,19 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
       next = autoInsertCues(lyrics, configured, command.groupIds); break;
     }
     case 'remove-lines':
-      if (command.lineIds.some(id => !lyrics.lines.some(line => line.id === id))) throw new Error('歌词行已失效');
+      if (command.lineIds.some(id => !lyrics.lines.some(line => line.id === id))) throw new MessageError(message('karaoke.lineStale'));
       next = { ...karaoke, cues: karaoke.cues.filter(cue => !command.lineIds.includes(cue.anchor.lineId)) }; break;
     case 'remove': next = { ...karaoke, cues: karaoke.cues.filter(cue => cue.id !== command.id) }; break;
     case 'cue': {
       const old = karaoke.cues.find(cue => cue.id === command.id);
-      if (!old) throw new Error('导唱已删除');
+      if (!old) throw new MessageError(message('karaoke.cueDeleted'));
       const cue = { ...old, text: command.text, beginMs: command.beginMs, endMs: command.endMs };
       const problem = cueProblem(lyrics, karaoke, cue);
-      if (problem) throw new Error(problem);
+      if (problem) throw new MessageError(message(problem));
       next = { ...karaoke, cues: karaoke.cues.map(item => item.id === cue.id ? cue : item) }; break;
     }
     case 'assign':
-      if (command.groupId !== '' && !karaoke.groups.some(group => group.id === command.groupId) || command.lineIds.some(id => !lyrics.lines.some(line => line.id === id))) throw new Error('分组或歌词行已失效');
+      if (command.groupId !== '' && !karaoke.groups.some(group => group.id === command.groupId) || command.lineIds.some(id => !lyrics.lines.some(line => line.id === id))) throw new MessageError(message('karaoke.groupOrLineStale'));
       next = { ...karaoke, lineGroups: { ...karaoke.lineGroups, ...Object.fromEntries(command.lineIds.map(id => [id, command.groupId])) } }; break;
     case 'settings': next = { ...karaoke, defaults: command.defaults }; break;
     case 'offsets': next = { ...karaoke, offsets: { ...karaoke.offsets, ...command.offsets } }; break;
@@ -158,7 +159,7 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
     case 'groups': {
       const groups = command.groups.map(group => ({ ...group, id: group.id.trim() }));
       const problem = groupIdProblem(karaoke.groups, groups, command.renames);
-      if (problem) throw new Error(problem);
+      if (problem) throw new MessageError(problem);
       const resolve = (id: string) => {
         const renamed = command.renames[id];
         return renamed !== undefined && groups.some(group => group.id === renamed) ? renamed : '';
@@ -180,19 +181,19 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
 }
 /** Shape validation at persistence boundaries; editable timing issues belong to output validation. */
 export function validateKaraoke(lyrics: LyricDocument, value: Karaoke) {
-  if (!value || !Array.isArray(value.groups) || !Array.isArray(value.cues) || !value.lineGroups || !value.defaults || !Array.isArray(value.outputs)) throw new Error('卡拉 OK 项目数据无效');
+  if (!value || !Array.isArray(value.groups) || !Array.isArray(value.cues) || !value.lineGroups || !value.defaults || !Array.isArray(value.outputs)) throw new MessageError(message('karaoke.dataInvalid'));
   validateSingerMarkers(value.singerMarkers);
   const ids = new Set<string>();
-  for (const group of value.groups) { if (typeof group.id !== 'string' || !group.id || ids.has(group.id) || typeof group.name !== 'string' || !group.name.trim()) throw new Error('分组名称或标识无效'); ids.add(group.id); }
-  if (typeof value.defaults.text !== 'string' || !value.defaults.text.length || [value.defaults.beforeMs, value.defaults.wordMs, value.defaults.rubyMs].some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('导唱默认文字或阈值无效');
-  if (Object.entries(value.lineGroups).some(([id, group]) => !lyrics.lines.some(line => line.id === id) || typeof group !== 'string')) throw new Error('歌词分组引用无效');
+  for (const group of value.groups) { if (typeof group.id !== 'string' || !group.id || ids.has(group.id) || typeof group.name !== 'string' || !group.name.trim()) throw new MessageError(message('karaoke.groupInvalidData')); ids.add(group.id); }
+  if (typeof value.defaults.text !== 'string' || !value.defaults.text.length || [value.defaults.beforeMs, value.defaults.wordMs, value.defaults.rubyMs].some(n => !Number.isSafeInteger(n) || n < 0)) throw new MessageError(message('karaoke.defaultsInvalid'));
+  if (Object.entries(value.lineGroups).some(([id, group]) => !lyrics.lines.some(line => line.id === id) || typeof group !== 'string')) throw new MessageError(message('karaoke.groupReference'));
   ids.clear();
   for (const cue of value.cues) {
-    if (typeof cue.id !== 'string' || !cue.id || ids.has(cue.id) || typeof cue.text !== 'string' || !Number.isSafeInteger(cue.beginMs) || !Number.isSafeInteger(cue.endMs) || !cue.anchor || !['before', 'word', 'ruby'].includes(cue.anchor.kind) || typeof cue.anchor.lineId !== 'string' || cue.anchor.kind !== 'before' && (typeof cue.anchor.leftId !== 'string' || typeof cue.anchor.rightId !== 'string') || cue.anchor.kind === 'ruby' && typeof cue.anchor.wordId !== 'string') throw new Error('导唱数据无效');
+    if (typeof cue.id !== 'string' || !cue.id || ids.has(cue.id) || typeof cue.text !== 'string' || !Number.isSafeInteger(cue.beginMs) || !Number.isSafeInteger(cue.endMs) || !cue.anchor || !['before', 'word', 'ruby'].includes(cue.anchor.kind) || typeof cue.anchor.lineId !== 'string' || cue.anchor.kind !== 'before' && (typeof cue.anchor.leftId !== 'string' || typeof cue.anchor.rightId !== 'string') || cue.anchor.kind === 'ruby' && typeof cue.anchor.wordId !== 'string') throw new MessageError(message('karaoke.cueData'));
     ids.add(cue.id);
   }
-  if (!value.offsets || typeof value.offsets!=='object' || Array.isArray(value.offsets) || Object.values(value.offsets).some(offset=>!Number.isSafeInteger(offset))) throw new Error('输出偏移无效');
-  if ([...value.outputs,...Object.keys(value.offsets)].some(id => { if (typeof id !== 'string') return true; try { const parts = JSON.parse(id); return !Array.isArray(parts) || parts.length !== 3 || parts.some(p => typeof p !== 'string') || !['body', 'translation', 'romanization'].includes(parts[1]); } catch { return true; } })) throw new Error('输出选择无效');
+  if (!value.offsets || typeof value.offsets!=='object' || Array.isArray(value.offsets) || Object.values(value.offsets).some(offset=>!Number.isSafeInteger(offset))) throw new MessageError(message('karaoke.offsetInvalid'));
+  if ([...value.outputs,...Object.keys(value.offsets)].some(id => { if (typeof id !== 'string') return true; try { const parts = JSON.parse(id); return !Array.isArray(parts) || parts.length !== 3 || parts.some(p => typeof p !== 'string') || !['body', 'translation', 'romanization'].includes(parts[1]); } catch { return true; } })) throw new MessageError(message('karaoke.outputsInvalid'));
 }
 export function cueWord(lyrics: LyricDocument, cue: KaraokeCue): LyricWord | undefined {
   const line = lyrics.lines.find(line => line.id === cue.anchor.lineId);

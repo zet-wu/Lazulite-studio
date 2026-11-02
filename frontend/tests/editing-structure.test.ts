@@ -94,9 +94,9 @@ it('merges timed translation units using known endpoints and rejects gaps or mix
   const units:ObjectSelection={...selection,kind:'romanization-unit',ids:['x2','x1']};
   const next=executeProjectCommand(createProjectEditorState(project),{type:'lyrics',command:planSelectionAction(project.lyrics,units,'merge')}).present;
   expect(next.lyrics.translationTracks[0].contents[0]).toMatchObject({units:[{id:'x1',text:'x  ',beginMs:1000,endMs:2000}]});
-  expect(()=>planSelectionAction(project.lyrics,{...selection,ids:['x','z']},'merge')).toThrow(/连续/);
+  expect(()=>planSelectionAction(project.lyrics,{...selection,ids:['x','z']},'merge')).toThrow('command.mergeContinuous');
   project.lyrics.translationTracks[0].contents[1]={id:'y',kind:'plain',lineId:'a',text:'Y'};
-  expect(()=>planSelectionAction(project.lyrics,selection,'merge')).toThrow(/混选/);
+  expect(()=>planSelectionAction(project.lyrics,selection,'merge')).toThrow('selection.mixedContent');
 });
 it('translation selection supports deletion, clipboard and timeline movement independently from body/romanization',()=>{
   const {project,selection}=attached();

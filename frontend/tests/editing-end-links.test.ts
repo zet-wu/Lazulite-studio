@@ -58,7 +58,7 @@ it('assigns translations independently with romanization and background in one s
   expect(result.present.romanizationTracks[0].contents[0].lineId).toBe('new');
   for (const draft of [true, false]) expect(parseLyricTtml(serializeLyricTtml(result.present, { draft })).translationTracks.flatMap(track => track.contents.filter(content => content.lineId === result.present.lines[1].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual(doc.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === doc.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose }))).slice(1).map(item => ({ ...item, id: expect.any(String) })));
   expect(undoLyricCommand(result).present).toBe(doc);
-  expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], contentTargets: { r: 0 }, translationTargets: { missing: 1 }, backgroundTargets: { bg: 0 } })).toThrow('翻译分配条目不存在');
+  expect(() => executeLyricCommand(state, { type: 'split-line', lineId: 'a', beforeWordIds: ['w1'], newLineIds: ['new'], contentTargets: { r: 0 }, translationTargets: { missing: 1 }, backgroundTargets: { bg: 0 } })).toThrow('split.assignmentMissing');
 });
 
 it('eliminates every internal end link when coincident boundaries merge', () => {

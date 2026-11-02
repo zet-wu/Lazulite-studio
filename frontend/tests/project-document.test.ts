@@ -32,5 +32,5 @@ it('reopens incomplete draft Ruby outside the line without changing times or rel
  word.rubyUnits=[{id:'ruby',reading:'そ',beginMs:330583,endMs:null}];
  const snapshot=serializeProject(document);
  expect(parseProject(snapshot)).toEqual(document);
- expect(()=>parseLyricTtml(snapshot.lyrics.draftTtml)).toThrow('TTML child time exceeds parent');
+ expect(()=>parseLyricTtml(snapshot.lyrics.draftTtml)).toThrow('ttml.childOutside');
 });

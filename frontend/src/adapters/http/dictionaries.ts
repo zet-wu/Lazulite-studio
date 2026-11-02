@@ -1,3 +1,4 @@
+import { message, MessageError } from '../../domain/messages';
 import type { components } from './generated';
 import type { DictionaryRange } from '../../domain/dictionary-ruby';
 import { requestHeaders, readApiError } from './client';
@@ -21,14 +22,14 @@ export const importDictionary=(file:File,inspect:boolean,replace=false)=>{
 };
 export async function analyzeDictionary(id:string,instance:string,lines:Array<{id:string;text:string}>,signal:AbortSignal,onPhase?:(phase:'loading'|'analyzing')=>void) {
   const result=onPhase?await streamAnalysis(id,instance,lines,signal,onPhase):await call<Analysis>(`/${encodeURIComponent(id)}/analyze`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instance,lines}),signal});
-  if(result.instance!==instance)throw new Error('词典实例与请求不一致，请重新生成');
+  if(result.instance!==instance)throw new MessageError(message('http.dictionaryInstance'));
   // Wire positions are Unicode code points; the editor uses UTF-16 offsets.
   const offsets=new Map(lines.map(line=>{
     let at=0;const values=[0];for(const c of line.text){at+=c.length;values.push(at);}return [line.id,values] as const;
   }));
   const ranges:DictionaryRange[]=result.ranges.map(r=>{
     const map=offsets.get(r.line_id);
-    if(!map||!Number.isInteger(r.base_start)||!Number.isInteger(r.base_end)||map[r.base_start]===undefined||map[r.base_end]===undefined)throw new Error('词典正文范围无效');
+    if(!map||!Number.isInteger(r.base_start)||!Number.isInteger(r.base_end)||map[r.base_start]===undefined||map[r.base_end]===undefined)throw new MessageError(message('http.dictionaryRange'));
     return {lineId:r.line_id,start:map[r.base_start],end:map[r.base_end],base:r.base,status:r.status,units:r.units};
   });
   return {...result,ranges};
@@ -39,7 +40,7 @@ async function streamAnalysis(id:string,instance:string,lines:Array<{id:string;t
     method:'POST',credentials:'include',headers:requestHeaders({'Content-Type':'application/json'}),body:JSON.stringify({instance,lines}),signal,
   });
   if (!response.ok) throw await readApiError(response);
-  if(!response.body)throw new Error('词典响应为空');
+  if(!response.body)throw new MessageError(message('http.dictionaryEmpty'));
   const reader=response.body.getReader(),decoder=new TextDecoder();
   let pending='',result:Analysis|undefined;
   try {
@@ -58,6 +59,6 @@ async function streamAnalysis(id:string,instance:string,lines:Array<{id:string;t
       if(done)break;
     }
   } finally { reader.releaseLock(); }
-  if(!result)throw new Error('词典分析响应不完整');
+  if(!result)throw new MessageError(message('http.dictionaryIncomplete'));
   return result;
 }

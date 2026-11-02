@@ -79,7 +79,7 @@ it('keeps rows separate and skipped rows and independent tracks protected',()=>{
 });
 it('does not treat a broken mapping as a transparent separator',()=>{
  const p=fixture(),r=result(p,[[1,2],[2.1,2.2],[2.3,3]]);r.mapping.splice(1,1);r.alignment.units.splice(1,1);
- expect(()=>mergeAlignment(p,r,10000,true,500)).toThrow(/范围|映射/);
+ expect(()=>mergeAlignment(p,r,10000,true,500)).toThrow('alignment.rangeMismatch');
 });
 
 it('aggregates internal beats without creating nodes or borrowing a missing first boundary',()=>{

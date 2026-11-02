@@ -1,3 +1,4 @@
+import { message, MessageError } from './messages';
 export const SPECTRUM_WIDTH = 384;
 export const SPECTRUM_HEIGHT = 96;
 export const FFT_SIZE = 512;
@@ -42,7 +43,7 @@ function fft(real: Float32Array, imaginary: Float32Array) {
 
 /** Returns logarithmic frequency bins, low frequencies at the bottom. */
 export function computeSpectrogram(pcm: Int16Array, rate: number, channels: number, window?: SpectrumWindow): Uint8Array {
-  if (!Number.isSafeInteger(rate) || rate < 1000 || !Number.isSafeInteger(channels) || channels < 1 || channels > 8) throw new Error('Invalid PCM format');
+  if (!Number.isSafeInteger(rate) || rate < 1000 || !Number.isSafeInteger(channels) || channels < 1 || channels > 8) throw new MessageError(message('spectrum.pcmInvalid'));
   const frames = Math.floor(pcm.length / channels);
   const output = new Uint8Array(SPECTRUM_WIDTH * SPECTRUM_HEIGHT);
   if (!frames) return output;
@@ -57,7 +58,7 @@ export function computeSpectrogram(pcm: Int16Array, rate: number, channels: numb
     for (let index = 0; index < SIZE; index++) {
       const frame = center + index - SIZE / 2;
       const absolute = frame + requestFirst;
-      if ((frame < 0 || frame >= frames) && absolute >= 0 && absolute < mediaLast) throw new Error('PCM窗口缺少FFT上下文');
+      if ((frame < 0 || frame >= frames) && absolute >= 0 && absolute < mediaLast) throw new MessageError(message('spectrum.contextMissing'));
       let sample = 0;
       if (frame >= 0 && frame < frames) for (let channel = 0; channel < channels; channel++) sample += pcm[frame * channels + channel] / 32768;
       real[index] = sample / channels * (0.5 - 0.5 * Math.cos(2 * Math.PI * index / (SIZE - 1)));

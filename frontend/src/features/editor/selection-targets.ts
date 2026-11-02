@@ -36,11 +36,11 @@ export function targetInterval(document: LyricDocument, target: TimelineTarget) 
 }
 export function selectionEnvelope(document: LyricDocument, selection: EditorSelection | null, duration: number) {
   const targets = selectionTargets(document, selection);
-  if (selection?.kind === 'romanization-content' && attachmentTracks(document,selection).flatMap(track => track.contents).filter(content => selection.ids.includes(content.id)).length !== selection.ids.length) return { reason: '选区包含已失效对象' };
+  if (selection?.kind === 'romanization-content' && attachmentTracks(document,selection).flatMap(track => track.contents).filter(content => selection.ids.includes(content.id)).length !== selection.ids.length) return { reason: 'selection.staleEnvelope' };
   const intervals = selection?.kind === 'romanization-content' ? attachmentTracks(document,selection).flatMap(track => track.contents.filter(content => selection.ids.includes(content.id)).flatMap(content => content.kind === 'timed' ? (content.units.length ? content.units : [{ id: content.id, text: '', beginMs: null, endMs: null }]) : [{ id: content.id, text: content.text, beginMs: null, endMs: null }])) : targets.map(target => targetInterval(document, target));
-  if (selection && selection.kind !== 'romanization-content' && targets.length !== selection.ids.length) return { reason: '选区包含已失效对象' };
-  if (!selection?.ids.length || !intervals.length) return { reason: '请选择有时间的对象' };
-  if (intervals.some(item => !item || item.beginMs === null || item.endMs === null || !Number.isSafeInteger(item.beginMs) || !Number.isSafeInteger(item.endMs) || item.beginMs < 0 || item.endMs < item.beginMs)) return { reason: '选区包含未定时或非法时间' };
+  if (selection && selection.kind !== 'romanization-content' && targets.length !== selection.ids.length) return { reason: 'selection.staleEnvelope' };
+  if (!selection?.ids.length || !intervals.length) return { reason: 'selection.chooseTimed' };
+  if (intervals.some(item => !item || item.beginMs === null || item.endMs === null || !Number.isSafeInteger(item.beginMs) || !Number.isSafeInteger(item.endMs) || item.beginMs < 0 || item.endMs < item.beginMs)) return { reason: 'selection.invalidTimes' };
   const begin_ms = Math.min(...intervals.map(item => item!.beginMs!)), end_ms = Math.max(...intervals.map(item => item!.endMs!));
-  return begin_ms < end_ms && end_ms <= duration ? { range: { begin_ms, end_ms }, reason: '' } : { reason: '选区为空或超出媒体范围' };
+  return begin_ms < end_ms && end_ms <= duration ? { range: { begin_ms, end_ms }, reason: '' } : { reason: 'selection.outsideMedia' };
 }

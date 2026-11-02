@@ -72,7 +72,7 @@ it('rejects a dragged block tail beyond the source and commits after moving back
   bar.setPointerCapture=vi.fn();bar.hasPointerCapture=vi.fn(()=>false);
   const pointer=(type:string,x:number)=>{const event=new MouseEvent(type,{bubbles:true,button:0,clientX:x});Object.defineProperty(event,'pointerId',{value:1});fireEvent(bar,event);};
   pointer('pointerdown',100);pointer('pointermove',200);pointer('pointerup',200);
-  expect(onError).toHaveBeenCalledWith(expect.stringContaining('结束'));
+  expect(onError).toHaveBeenCalledWith(expect.objectContaining({key:'time.endOutsideSource'}));
   expect(apply).not.toHaveBeenCalled();
   pointer('pointerdown',100);pointer('pointermove',200);pointer('pointermove',140);pointer('pointerup',140);
   expect(apply).toHaveBeenCalledWith({type:'shift-lines',lineIds:[document.lines[0].id],deltaMs:400});

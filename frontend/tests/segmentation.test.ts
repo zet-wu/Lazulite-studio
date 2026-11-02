@@ -10,7 +10,7 @@ describe('E3 segmentation', () => {
     const parts = segmentText(text, options);
     expect(parts).toEqual(['東京', '  ', 'hel', 'lo,', '世', '界', ' ', '𝄞', 'e\u0301']);
     expect(parts.join('')).toBe(text);
-    expect(() => segmentText('e\u0301', { ...options, rules: [{ source: 'e\u0301', parts: ['e', '\u0301'] }] })).toThrow(/字符/);
+    expect(() => segmentText('e\u0301', { ...options, rules: [{ source: 'e\u0301', parts: ['e', '\u0301'] }] })).toThrow('segment.ruleCharacter');
   });
 
   it('loads a real language pattern and keeps the western word intact across syllables', async () => {
@@ -53,7 +53,7 @@ describe('E3 segmentation', () => {
     const line = document.lines[0], word = line.words[0];
     word.rubyUnits.push({ id: 'r', reading: 'きょう', beginMs: null, endMs: null });
     expect(segmentationPreview(document, [word.id], DEFAULT_SEGMENT_OPTIONS)[0].blocked).toBe(true);
-    expect(() => distributeSegmentTime(word, ['今', '日も'], 0.2)).toThrow(/注音/);
+    expect(() => distributeSegmentTime(word, ['今', '日も'], 0.2)).toThrow('segment.wordAttributes');
     word.rubyUnits = [];
     const parts = distributeSegmentTime(word, ['今日', 'も'], 0.2);
     const split = executeLyricCommand(createLyricEditorState(document), { type: 'segment-word', lineId: line.id, wordId: word.id, words: parts });

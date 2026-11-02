@@ -52,7 +52,7 @@ it('maps singers by reference order, preserves stable sides and locks dependenci
  expect(state.present.lyrics.lines.slice(1).every(l=>!l.agentRefs.length&&l.words.every(w=>!w.agentRefs))).toBe(true);
  const before=state;state=executeProjectCommand(state,{type:'amll-setting',rule:'simplified',enabled:true});
  expect(state.present.amll).toMatchObject({simplified:true,noChorus:true,noWordAgents:true,noIndependentBackground:true,noMultipleBackgrounds:false});
- expect(()=>executeProjectCommand(state,{type:'amll-setting',rule:'noWordAgents',enabled:false})).toThrow(/锁定/);
+ expect(()=>executeProjectCommand(state,{type:'amll-setting',rule:'noWordAgents',enabled:false})).toThrow('project.simpleLocked');
  expect(undoProjectCommand(state).present).toBe(before.present);
  state=executeProjectCommand(state,{type:'amll-setting',rule:'simplified',enabled:false});expect(state.present.amll.noWordAgents).toBe(true);
 });
@@ -67,7 +67,7 @@ it('scope and no-op batches are atomic, singers are inherited on detached backgr
 it('rejects cross-line inheritance loss and unequal merge, preserves effective singer on movement',()=>{
  let doc=createLyricDocument('');doc.agents=[{id:'a',name:null,type:'person'},{id:'b',name:null,type:'person'}];const from=doc.lines[0],to=createLine('');from.agentRefs=['a'];to.agentRefs=['b'];from.words=[createWord('one','w')];doc.lines.push(to);
  doc=applyLyricCommand(doc,{type:'move-word',lineId:from.id,wordId:'w',toLineId:to.id,afterWordId:null});expect(doc.lines[1].words[0].agentRefs).toEqual(['a']);
- doc.lines[1].words.push(createWord('two','w2'));expect(()=>applyLyricCommand(doc,{type:'merge-words',wordIds:['w','w2']})).toThrow(/统一/);
+ doc.lines[1].words.push(createWord('two','w2'));expect(()=>applyLyricCommand(doc,{type:'merge-words',wordIds:['w','w2']})).toThrow('command.mergeSingers');
 });
 
 it('copies every background and attachment and remaps editing references',()=>{

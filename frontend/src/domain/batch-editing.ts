@@ -1,3 +1,4 @@
+import { message, MessageError } from './messages';
 import { createProjectEditing, emptyBeatCount, type ProjectEditing } from './project-editing';
 import type { LyricCommand } from './lyric-commands';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
@@ -7,12 +8,12 @@ const cjkSyllable = (text: string) => /^[\p{Script=Han}\p{Script=Hiragana}\p{Scr
 const shifted = (value: TimeMs, delta: number): TimeMs => {
   if (value === null) return null;
   const result = value + delta;
-  if (!safe(result)) throw new Error('时间偏移超出有效范围；请减小偏移量');
+  if (!safe(result)) throw new MessageError(message('batch.offsetOutOfRange'));
   return result;
 };
 
 export function shiftLineTimes(document: LyricDocument, lineIds: string[], deltaMs: number, editing = createProjectEditing()): LyricCommand {
-  if (!Number.isSafeInteger(deltaMs)) throw new Error('时间偏移必须是整数毫秒');
+  if (!Number.isSafeInteger(deltaMs)) throw new MessageError(message('batch.integerOffset'));
   const selected = new Set(lineIds);
   const shiftedLines = document.lines.map((line): LyricLine => {
     if (!selected.has(line.id)) return line;
@@ -25,7 +26,7 @@ export function shiftLineTimes(document: LyricDocument, lineIds: string[], delta
     if (!editing.endLinks[line.id]) return line;
     const target = shiftedLines.find((item) => item.id === editing.endLinks[line.id])!;
     const endMs = target.beginMs;
-    if (endMs === null || line.beginMs !== null && endMs < line.beginMs || line.words.some((word) => word.endMs !== null && word.endMs > endMs)) throw new Error('偏移后链接的行结束时间不能覆盖词块');
+    if (endMs === null || line.beginMs !== null && endMs < line.beginMs || line.words.some((word) => word.endMs !== null && word.endMs > endMs)) throw new MessageError(message('batch.linkExcludesWords'));
     return endMs === line.endMs ? line : { ...line, endMs };
   });
   const romanizationTracks = document.romanizationTracks.map((track) => ({ ...track, contents: track.contents.map((content) =>
@@ -37,7 +38,7 @@ export function shiftLineTimes(document: LyricDocument, lineIds: string[], delta
 }
 
 export function smoothWordTimes(document: LyricDocument, lineIds: string[], thresholdMs: number): { command: LyricCommand; count: number } {
-  if (!safe(thresholdMs)) throw new Error('平滑阈值必须是非负整数毫秒');
+  if (!safe(thresholdMs)) throw new MessageError(message('batch.integerThreshold'));
   const selected = new Set(lineIds);
   let count = 0;
   const lines = document.lines.map((line) => {
@@ -73,7 +74,7 @@ export function syncLineTimes(document: LyricDocument, lineIds: string[]): Lyric
 export type BatchReplacement = { command: LyricCommand; count: number; changed: number; deletedWords: number; deletedRuby: number; deletedBeats: number };
 
 export function replaceText(document: LyricDocument, ids: string[], kind: 'words' | 'ruby', search: string, replacement: string, ignoreCase = false, editing = createProjectEditing()): BatchReplacement {
-  if (!search) throw new Error('查找内容不能为空');
+  if (!search) throw new MessageError(message('batch.emptySearch'));
   const selected = new Set(ids);
   const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(escaped, ignoreCase ? 'giu' : 'gu');

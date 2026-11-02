@@ -14,7 +14,7 @@
     "measure:manual": "playwright test --config=playwright.manual.config.ts",
     "test:integration": "playwright test --config=playwright.integration.config.ts",
     "contracts:generate": "openapi-typescript ../contracts/openapi.json -o src/adapters/http/generated.ts",
-    "i18n:check": "python3 scripts/translations.py check",
+    "i18n:check": "python3 scripts/translations.py check && node scripts/check-i18n-source.mjs",
     "i18n:export": "python3 scripts/translations.py export",
     "i18n:import": "python3 scripts/translations.py import"
   },

@@ -1,3 +1,4 @@
+import { message, MessageError } from './messages';
 import { createProjectEditing, followChangedEndLinks, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
 import { shiftLineTimes } from './batch-editing';
@@ -11,12 +12,12 @@ export type TimelineTarget =
 const changed = (time: TimeMs, delta: number): TimeMs => {
   if (time === null) return null;
   const value = time + delta;
-  if (!Number.isSafeInteger(value) || value < 0) throw new Error('时间超出有效范围');
+  if (!Number.isSafeInteger(value) || value < 0) throw new MessageError(message('timeline.rangeInvalid'));
   return value;
 };
 const valid = (begin: TimeMs, end: TimeMs) => {
-  for (const time of [begin, end]) if (time !== null && (!Number.isSafeInteger(time) || time < 0)) throw new Error('时间必须是非负整数毫秒');
-  if (begin !== null && end !== null && begin > end) throw new Error('开始不能晚于结束');
+  for (const time of [begin, end]) if (time !== null && (!Number.isSafeInteger(time) || time < 0)) throw new MessageError(message('timeline.integerTime'));
+  if (begin !== null && end !== null && begin > end) throw new MessageError(message('timeline.reversed'));
 };
 const envelope = (values: TimeMs[], minimum: boolean): TimeMs => {
   const numbers = values.filter((value): value is number => value !== null);
@@ -25,7 +26,7 @@ const envelope = (values: TimeMs[], minimum: boolean): TimeMs => {
 const include = (line: LyricLine, word: LyricWord, editing: ProjectEditing): LyricLine => {
   const beginMs = line.beginMs === null ? null : envelope([line.beginMs, word.beginMs], true);
   const endMs = line.endMs === null ? null : envelope([line.endMs, word.endMs], false);
-  if (editing.endLinks[line.id] && endMs !== line.endMs) throw new Error('时间修改与行尾链接冲突');
+  if (editing.endLinks[line.id] && endMs !== line.endMs) throw new MessageError(message('timeline.linkConflict'));
   return { ...line, beginMs, endMs };
 };
 const moveWord = (word: LyricWord, deltaMs: number): LyricWord => ({ ...word,
@@ -35,47 +36,47 @@ const moveWord = (word: LyricWord, deltaMs: number): LyricWord => ({ ...word,
 
 function editTarget(document: LyricDocument, target: TimelineTarget, update: (line: LyricLine) => LyricLine): LyricDocument {
   const index = document.lines.findIndex((line) => line.id === target.lineId);
-  if (index < 0) throw new Error('时间轴行已不存在');
+  if (index < 0) throw new MessageError(message('timeline.lineMissing'));
   const lines = document.lines.slice();
   lines[index] = update(lines[index]);
   return { ...document, lines };
 }
 
 function moveTargets(document: LyricDocument, targets: TimelineTarget[], deltaMs: number, editing = createProjectEditing()): LyricDocument {
-  if (!Number.isSafeInteger(deltaMs)) throw new Error('移动量必须是整数毫秒');
+  if (!Number.isSafeInteger(deltaMs)) throw new MessageError(message('timeline.integerOffset'));
   if (!targets.length || !deltaMs) return document;
   if (targets.every((target) => target.kind === 'line')) {
     const ids = new Set(targets.map((target) => target.lineId));
-    if (document.lines.some(line => ids.has(line.id) && (line.beginMs === null || line.endMs === null))) throw new Error('请先为行设置完整时间');
+    if (document.lines.some(line => ids.has(line.id) && (line.beginMs === null || line.endMs === null))) throw new MessageError(message('timeline.lineTimesRequired'));
     return (shiftLineTimes(document, [...ids], deltaMs, editing) as Extract<ReturnType<typeof shiftLineTimes>, { type: 'replace-document' }>).document;
   }
-  if (new Set(targets.map(target => target.kind)).size > 1) throw new Error('只能同时移动同类对象');
+  if (new Set(targets.map(target => target.kind)).size > 1) throw new MessageError(message('timeline.sameKind'));
   if (targets.every(target => target.kind === 'romanization')) {
     let next = document;
     for (const target of targets) next = editRomanization(next,target,unit=>{
-      if(unit.beginMs===null||unit.endMs===null)throw new Error('请先为附属单元设置完整时间');
+      if(unit.beginMs===null||unit.endMs===null)throw new MessageError(message('timeline.unitTimesRequired'));
       return {...unit,beginMs:changed(unit.beginMs,deltaMs),endMs:changed(unit.endMs,deltaMs)};
     });
     return next;
   }
   let result = document;
   for (const target of targets) {
-    if (target.kind === 'romanization') throw new Error('只能同时移动同类对象');
-    if (target.kind === 'line') throw new Error('行与子轨道不能同时移动');
+    if (target.kind === 'romanization') throw new MessageError(message('timeline.sameKind'));
+    if (target.kind === 'line') throw new MessageError(message('timeline.mixedTracks'));
     result = editTarget(result, target, (line) => {
       const index = line.words.findIndex((word) => word.id === target.wordId);
-      if (index < 0) throw new Error('时间轴词已不存在');
+      if (index < 0) throw new MessageError(message('timeline.wordMissing'));
       const words = line.words.slice();
       const word = words[index];
       if (target.kind === 'word') {
-        if (word.beginMs === null || word.endMs === null) throw new Error('请先为词设置完整时间');
+        if (word.beginMs === null || word.endMs === null) throw new MessageError(message('timeline.wordTimesRequired'));
         words[index] = moveWord(word, deltaMs);
       } else {
         const rubyIndex = word.rubyUnits.findIndex((unit) => unit.id === target.rubyId);
-        if (rubyIndex < 0) throw new Error('时间轴 注音 已不存在');
+        if (rubyIndex < 0) throw new MessageError(message('timeline.rubyMissing'));
         const rubyUnits = word.rubyUnits.slice();
         const unit = rubyUnits[rubyIndex];
-        if (unit.beginMs === null || unit.endMs === null) throw new Error('请先为 注音 设置完整时间');
+        if (unit.beginMs === null || unit.endMs === null) throw new MessageError(message('timeline.rubyTimesRequired'));
         rubyUnits[rubyIndex] = { ...unit, beginMs: changed(unit.beginMs, deltaMs), endMs: changed(unit.endMs, deltaMs) };
         words[index] = { ...word, rubyUnits,
           beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true) ?? word.beginMs, endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false) ?? word.endMs, };
@@ -94,23 +95,23 @@ function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'be
       const beginMs = side === 'beginMs' ? timeMs : line.beginMs;
       const endMs = side === 'endMs' ? timeMs : line.endMs;
       valid(beginMs, endMs);
-      if (line.words.flatMap(word => [word, ...word.rubyUnits]).some((word) => beginMs !== null && word.beginMs !== null && word.beginMs < beginMs || endMs !== null && word.endMs !== null && word.endMs > endMs)) throw new Error('行边界不能排除词');
-      if (editing.endLinks[line.id] && endMs !== line.endMs) throw new Error('时间修改与行尾链接冲突');
+      if (line.words.flatMap(word => [word, ...word.rubyUnits]).some((word) => beginMs !== null && word.beginMs !== null && word.beginMs < beginMs || endMs !== null && word.endMs !== null && word.endMs > endMs)) throw new MessageError(message('timeline.lineExcludesWords'));
+      if (editing.endLinks[line.id] && endMs !== line.endMs) throw new MessageError(message('timeline.linkConflict'));
       return { ...line, beginMs, endMs };
     }
     const index = line.words.findIndex((word) => word.id === target.wordId);
-    if (index < 0) throw new Error('时间轴词已不存在');
+    if (index < 0) throw new MessageError(message('timeline.wordMissing'));
     const words = line.words.slice();
     const word = words[index];
     if (target.kind === 'word') {
       const beginMs = side === 'beginMs' ? timeMs : word.beginMs;
       const endMs = side === 'endMs' ? timeMs : word.endMs;
       valid(beginMs, endMs);
-      if (word.rubyUnits.some((unit) => beginMs !== null && unit.beginMs !== null && unit.beginMs < beginMs || endMs !== null && unit.endMs !== null && unit.endMs > endMs)) throw new Error('词边界不能排除 注音');
+      if (word.rubyUnits.some((unit) => beginMs !== null && unit.beginMs !== null && unit.beginMs < beginMs || endMs !== null && unit.endMs !== null && unit.endMs > endMs)) throw new MessageError(message('timeline.wordExcludesRuby'));
       words[index] = { ...word, beginMs, endMs };
     } else {
       const rubyIndex = word.rubyUnits.findIndex((unit) => unit.id === target.rubyId);
-      if (rubyIndex < 0) throw new Error('时间轴 注音 已不存在');
+      if (rubyIndex < 0) throw new MessageError(message('timeline.rubyMissing'));
       const rubyUnits = word.rubyUnits.slice();
       const unit: RubyUnit = { ...rubyUnits[rubyIndex], [side]: timeMs };
       valid(unit.beginMs, unit.endMs);
@@ -142,7 +143,7 @@ function editRomanization(document: LyricDocument, target: Extract<TimelineTarge
     if (content.id !== target.contentId || content.lineId !== target.lineId || content.kind !== 'timed') return content;
     return { ...content, units: content.units.map(unit => { if (unit.id !== target.unitId) return unit; found = true; return update(unit); }) };
   }) });
-  if (!found) throw new Error('定时音译单元已不存在');
+  if (!found) throw new MessageError(message('timeline.romanizationMissing'));
   return { ...document, [key]: tracks };
 }
 

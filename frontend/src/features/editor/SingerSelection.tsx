@@ -13,7 +13,7 @@ export function SingerSelection({ agents, lines, apply }: { agents: LyricAgent[]
     {agents.map(agent => {
       const count = lines.filter(line => line.agentRefs.includes(agent.id)).length;
       const partial = count > 0 && count < lines.length;
-      return <label key={agent.id}><input type="checkbox" aria-label={`歌手 ${agent.name ?? agent.id}`} aria-checked={partial ? 'mixed' : count === lines.length}
+      return <label key={agent.id}><input type="checkbox" aria-label={t('singer.named',{name:agent.name??agent.id})} aria-checked={partial ? 'mixed' : count === lines.length}
         ref={node => { if (node) node.indeterminate = partial; }} checked={count === lines.length}
         onChange={event => {
           const checked = event.target.checked;

@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { IconButton } from '../../shared/Controls';
 import styles from './semantic-editor.module.css';
 
 export function SettingsDialog({ title, subtitle, close, children, actions, returnFocus }: { title: string; returnFocus?: () => HTMLElement | null; subtitle?: string; actions?: ReactNode; close: () => void; children: ReactNode }) {
+  const {t}=useTranslation();
   const ref = useRef<HTMLElement>(null);
   const previous = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
   useEffect(() => {
@@ -20,7 +22,7 @@ export function SettingsDialog({ title, subtitle, close, children, actions, retu
       if (event.shiftKey && (document.activeElement === items[0] || document.activeElement === ref.current)) { event.preventDefault(); items.at(-1)?.focus(); }
       else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0].focus(); }
     }}>
-      <div className={styles.dialogHeader}><h2>{title}</h2>{subtitle && <span>{subtitle}</span>}<IconButton icon="close" data-role="secondary" label={`关闭${title}`} onClick={close}/></div>
+      <div className={styles.dialogHeader}><h2>{title}</h2>{subtitle && <span>{subtitle}</span>}<IconButton icon="close" data-role="secondary" label={t('settings.closeTitle',{title})} onClick={close}/></div>
       <div className={styles.dialogBody}>{children}</div>
       {actions && <div className={styles.dialogActions}>{actions}</div>}
     </section>

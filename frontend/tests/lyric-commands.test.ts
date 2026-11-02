@@ -32,7 +32,7 @@ describe('semantic lyric commands', () => {
     expect(state.present.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['きょ', 'う']);
     expect(state.present.lines[0].words[1]).toMatchObject({ text: 'も唄う', beginMs: 1000, endMs: 2000 });
     expect(undoLyricCommand(state).present.lines[0].words[1]).toMatchObject({ text: 'も歌う', beginMs: 1000 });
-    expect(() => executeLyricCommand(state, { type: 'split-word', lineId, wordId: firstId, at: 1 })).toThrow(/拆分带注音的正文/);
+    expect(() => executeLyricCommand(state, { type: 'split-word', lineId, wordId: firstId, at: 1 })).toThrow('command.splitReadingFirst');
   });
 
   it('reorders 注音 only within its word while preserving unit identity and timing', () => {
@@ -46,7 +46,7 @@ describe('semantic lyric commands', () => {
     const moved = executeLyricCommand(state, { type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId: 'two', afterRubyId: null });
     expect(moved.present.lines[0].words[0].rubyUnits[0]).toBe(word.rubyUnits[1]);
     expect(undoLyricCommand(moved).present).toBe(document);
-    expect(() => executeLyricCommand(state, { type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId: 'two', afterRubyId: 'elsewhere' })).toThrow(/目标位置/);
+    expect(() => executeLyricCommand(state, { type: 'move-ruby', lineId: line.id, wordId: word.id, rubyId: 'two', afterRubyId: 'elsewhere' })).toThrow('command.readingPositionMissing');
   });
 
   it('uses grapheme boundaries across UTF-16 and code points', () => {
@@ -138,7 +138,7 @@ describe('semantic lyric commands', () => {
     ] });
     const original = createLyricEditorState(document);
     const withBackground = executeLyricCommand(original, { type: 'set-background-of', lineId: bg.id, parentLineId: main.id });
-    expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordIds: ['back'], newLineIds: ['right'], translationTargets: {}, contentTargets: { first: 0, second: 1 }, backgroundTargets: {} })).toThrow(/背景歌词归属/);
+    expect(() => executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordIds: ['back'], newLineIds: ['right'], translationTargets: {}, contentTargets: { first: 0, second: 1 }, backgroundTargets: {} })).toThrow('command.backgroundReassign');
     const leftAssigned = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordIds: ['back'], newLineIds: ['right'], translationTargets: {}, contentTargets: { first: 0, second: 1 }, backgroundTargets: { bg: 0 } });
     expect(leftAssigned.present.lines.find(line => line.id === bg.id)).toMatchObject({ backgroundOf: main.id, beginMs: bg.beginMs, endMs: bg.endMs });
     const split = executeLyricCommand(withBackground, { type: 'split-line', lineId: main.id, beforeWordIds: ['back'], newLineIds: ['right'], translationTargets: {}, contentTargets: { first: 0, second: 1 }, backgroundTargets: { bg: 1 } });
@@ -178,7 +178,7 @@ describe('semantic lyric commands', () => {
     expect((state.present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === state.present.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))[0] as { text: string }).text).toBe('今天也');
     expect(undoLyricCommand(state).present.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === undoLyricCommand(state).present.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([]);
     expect(undoLyricCommand(undoLyricCommand(state)).present).toBe(document);
-    expect(() => executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: null, word: createWord('重', first.id) })).toThrow(/身份重复/);
+    expect(() => executeLyricCommand(state, { type: 'insert-word', lineId, afterWordId: null, word: createWord('重', first.id) })).toThrow('command.wordDuplicate');
   });
 
   it('moves a timed 注音 word across lines without changing its identity or timing', () => {
@@ -194,7 +194,7 @@ describe('semantic lyric commands', () => {
     state = executeLyricCommand(state, { type: 'move-word', lineId: first.id, wordId: first.words[0].id, toLineId: second.id, afterWordId: null });
     expect(state.present.lines[1].words[0]).toBe(beforeMove.lines[0].words[0]);
     expect(undoLyricCommand(state).present).toBe(beforeMove);
-    expect(() => executeLyricCommand(state, { type: 'set-ruby-time', lineId: second.id, wordId: first.words[0].id, rubyId: 'ruby', beginMs: 0, endMs: 800 })).toThrow(/超出正文词/);
+    expect(() => executeLyricCommand(state, { type: 'set-ruby-time', lineId: second.id, wordId: first.words[0].id, rubyId: 'ruby', beginMs: 0, endMs: 800 })).toThrow('command.rubyTimeOutside');
   });
 
   it('applies several edits as one undo step and rejects a failed batch atomically', () => {
@@ -213,7 +213,7 @@ describe('semantic lyric commands', () => {
     expect(() => executeLyricCommand(state, { type: 'batch', commands: [
       { type: 'split-word', lineId, wordId, at: 2, newWordId: 'rest' },
       { type: 'edit-word', lineId, wordId: 'missing', text: '失敗' },
-    ] })).toThrow(/歌词词已不存在/);
+    ] })).toThrow('command.wordMissing');
     expect(state.present).toBe(document);
   });
 });
@@ -266,8 +266,8 @@ it('moves ruby groups within a line atomically, preserving identity and out-of-p
  expect(undoLyricCommand(state).present).toBe(d);expect(redoLyricCommand(undoLyricCommand(state)).present).toBe(state.present);
  const empty=executeLyricCommand(state,{...command,rubyId:'b',rubyIds:['b'],afterRubyId:null});expect(empty.present.lines[0].words[0].rubyUnits).toEqual([]);
  const bg=createLine('背景','bg');bg.backgroundOf=l.id;d.lines.push(bg);
- expect(()=>executeLyricCommand(createLyricEditorState(d),{...command,toWordId:bg.words[0].id})).toThrow('同一歌词行');
- expect(()=>executeLyricCommand(createLyricEditorState(d),{...command,rubyIds:['missing']})).toThrow('不存在');
- expect(()=>executeLyricCommand(createLyricEditorState(d),{...command,afterRubyId:'missing'})).toThrow('目标位置');
+ expect(()=>executeLyricCommand(createLyricEditorState(d),{...command,toWordId:bg.words[0].id})).toThrow('command.readingSameLine');
+ expect(()=>executeLyricCommand(createLyricEditorState(d),{...command,rubyIds:['missing']})).toThrow('command.readingMissing');
+ expect(()=>executeLyricCommand(createLyricEditorState(d),{...command,afterRubyId:'missing'})).toThrow('command.readingPositionMissing');
  expect(executeLyricCommand(createLyricEditorState(d),{...command,toWordId:source.id,rubyId:'a',rubyIds:['a','b'],afterRubyId:null}).present).toBe(d);
 });

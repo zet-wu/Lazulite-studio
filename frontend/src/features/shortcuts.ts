@@ -1,13 +1,14 @@
+import { message } from '../domain/messages';
 import { preferences } from '../adapters/preferences';
 import { useEffect, useState } from 'react';
 
 export const shortcutActions = {
-  start: ['打轴', '起始轴', 'KeyS'], next: ['打轴', '连续轴', 'KeyD'], end: ['打轴', '结束轴', 'KeyF'],
-  previous: ['打轴', '上一单元', 'ArrowLeft'], following: ['打轴', '下一单元', 'ArrowRight'],
-  previousLine: ['打轴', '上一行', 'ArrowUp'], followingLine: ['打轴', '下一行', 'ArrowDown'],
-  play: ['播放', '播放 / 暂停', 'Space'],
-  seekBack: ['播放定位', '后退 1 秒', 'ArrowLeft'], seekForward: ['播放定位', '前进 1 秒', 'ArrowRight'],
-  seekStart: ['播放定位', '定位媒体起点', 'Home'], seekEnd: ['播放定位', '定位媒体终点', 'End'],
+  start: ['shortcuts.timing', 'sync.start', 'KeyS'], next: ['shortcuts.timing', 'sync.step', 'KeyD'], end: ['shortcuts.timing', 'sync.end', 'KeyF'],
+  previous: ['shortcuts.timing', 'sync.previousUnit', 'ArrowLeft'], following: ['shortcuts.timing', 'sync.nextUnit', 'ArrowRight'],
+  previousLine: ['shortcuts.timing', 'sync.previousLine', 'ArrowUp'], followingLine: ['shortcuts.timing', 'sync.nextLine', 'ArrowDown'],
+  play: ['shortcuts.playback', 'shortcuts.toggle', 'Space'],
+  seekBack: ['shortcuts.seek', 'shortcuts.back', 'ArrowLeft'], seekForward: ['shortcuts.seek', 'shortcuts.forward', 'ArrowRight'],
+  seekStart: ['shortcuts.seek', 'shortcuts.begin', 'Home'], seekEnd: ['shortcuts.seek', 'shortcuts.end', 'End'],
 } as const;
 export type ShortcutAction = keyof typeof shortcutActions;
 export type Binding = { code: string; ctrl: boolean; meta: boolean; alt: boolean; shift: boolean };
@@ -22,16 +23,16 @@ export function matchesBinding(event: Pick<KeyboardEvent, 'code' | 'ctrlKey' | '
   return event.code === binding.code && event.ctrlKey === binding.ctrl && event.metaKey === binding.meta && event.altKey === binding.alt && event.shiftKey === binding.shift;
 }
 const same = (a: Binding, b: Binding) => a.code === b.code && a.ctrl === b.ctrl && a.meta === b.meta && a.alt === b.alt && a.shift === b.shift;
-export function bindingError(action: ShortcutAction, binding: Binding, bindings: Bindings): string | null {
-  if (!/^(Key[A-Z]|Digit[0-9]|Arrow(Left|Right|Up|Down)|Home|End|Space|F[1-9][0-9]?|Numpad[0-9])$/.test(binding.code)) return '此按键保留给文本或控件操作';
+export function bindingError(action: ShortcutAction, binding: Binding, bindings: Bindings): import('../domain/messages').Message | null {
+  if (!/^(Key[A-Z]|Digit[0-9]|Arrow(Left|Right|Up|Down)|Home|End|Space|F[1-9][0-9]?|Numpad[0-9])$/.test(binding.code)) return message('shortcuts.reserved');
   if (/^F/.test(binding.code) || (binding.alt && (/^Arrow/.test(binding.code) || binding.code === 'Space')) ||
     ((binding.ctrl || binding.meta) && /^(Key[ACVXSZYWLNTRPQHJKOFDBEGUIM]|Digit[0-9]|Space|Arrow.*|Home|End)$/.test(binding.code)) ||
-    (binding.ctrl && binding.alt)) return '此组合键用于固定操作或系统/浏览器，不能可靠接管';
+    (binding.ctrl && binding.alt)) return message('shortcuts.system');
   const scope = shortcutActions[action][0];
   for (const other of Object.keys(shortcutActions) as ShortcutAction[]) {
     if (other === action) continue;
     const otherScope = shortcutActions[other][0];
-    if ((scope === otherScope || scope === '播放' || otherScope === '播放') && same(binding, bindings[other])) return `与“${shortcutActions[other][1]}”冲突`;
+    if ((scope === otherScope || scope === 'shortcuts.playback' || otherScope === 'shortcuts.playback') && same(binding, bindings[other])) return {key:'shortcuts.conflict',values:{actionKey:shortcutActions[other][1]}};
   }
   return null;
 }
@@ -52,7 +53,7 @@ export function readBindings(): Bindings {
     const old = JSON.parse(preferences.getItem('lazulite-sync-keys') ?? 'null') as Record<string, unknown> | null;
     if (old) {
       const candidate = { ...result };
-      for (const action of Object.keys(shortcutActions) as ShortcutAction[]) if (typeof old[action] === 'string' && shortcutActions[action][0] === '打轴') candidate[action] = plain(old[action]);
+      for (const action of Object.keys(shortcutActions) as ShortcutAction[]) if (typeof old[action] === 'string' && shortcutActions[action][0] === 'shortcuts.timing') candidate[action] = plain(old[action]);
       if ((Object.keys(shortcutActions) as ShortcutAction[]).every(action => !bindingError(action, candidate[action], candidate))) {
         preferences.setItem(storageKey, JSON.stringify(candidate));
         return candidate;

@@ -1,18 +1,19 @@
+import { message, MessageError } from './messages';
 import type { LyricDocument, TimeMs } from './lyric-document';
 import type { Acoustics, VocalSegment } from './project-document';
 import { validateSegments } from './project-document';
-export class AssignmentError extends Error {
-  constructor(message: string, readonly lineId: string, readonly objectIds: string[]) { super(message); }
+export class AssignmentError extends MessageError {
+  constructor(key: string, readonly lineId: string, readonly objectIds: string[]) { super(message(key)); }
 }
 export function assignVocalSegment(document: LyricDocument, lineId: string, segment: VocalSegment): LyricDocument {
   validateSegments([segment]);
   const line = document.lines.find(item => item.id === lineId);
-  if (!line) throw new Error('请选择一行歌词');
+  if (!line) throw new MessageError(message('vocal.chooseLine'));
   const internal = [...document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === lineId)).flatMap(item => item.kind === 'timed' ? item.units : []), ...line.words.flatMap(w => [w, ...w.rubyUnits]), ...document.romanizationTracks.flatMap(t => t.contents.flatMap(c => c.lineId === lineId && c.kind === 'timed' ? c.units : []))];
-  if (line.beginMs === null && line.endMs === null && internal.some(unit => unit.beginMs !== null || unit.endMs !== null)) throw new AssignmentError('行内已有时间，请先明确行起点或终点', lineId, [lineId]);
+  if (line.beginMs === null && line.endMs === null && internal.some(unit => unit.beginMs !== null || unit.endMs !== null)) throw new AssignmentError('vocal.defineLineTime', lineId, [lineId]);
   const delta = line.beginMs !== null ? segment.beginMs - line.beginMs : line.endMs !== null ? segment.endMs - line.endMs : 0;
   const invalid = [line, ...internal].filter(unit => [unit.beginMs, unit.endMs].some(t => t !== null && (!Number.isSafeInteger(t + delta) || t + delta < 0)));
-  if (invalid.length) throw new AssignmentError('分配后时间为负值或溢出，未修改歌词或链接', lineId, invalid.map(x => x.id));
+  if (invalid.length) throw new AssignmentError('vocal.assignmentRange', lineId, invalid.map(x => x.id));
   const shift = <T extends { beginMs: TimeMs; endMs: TimeMs }>(unit: T): T => ({ ...unit, beginMs: unit.beginMs === null ? null : unit.beginMs + delta, endMs: unit.endMs === null ? null : unit.endMs + delta });
   // Freeze all incoming ends before moving the selected row. No recursive following.
   const lines = document.lines.map(item => {
@@ -36,10 +37,10 @@ export function editSegments(acoustics: Acoustics, operation: { type: 'put'; seg
   } else {
     const sorted = [...acoustics.segments].sort((a,b) => a.beginMs-b.beginMs || a.endMs-b.endMs || a.id.localeCompare(b.id));
     const selected = sorted.filter(s => operation.ids.includes(s.id));
-    if (selected.length !== new Set(operation.ids).size || !selected.length) throw new Error('请选择有效人声片段');
+    if (selected.length !== new Set(operation.ids).size || !selected.length) throw new MessageError(message('vocal.chooseSegments'));
     segments = acoustics.segments.filter(s => !operation.ids.includes(s.id));
     if (operation.type === 'merge') {
-      if (selected.length < 2 || sorted.indexOf(selected.at(-1)!) - sorted.indexOf(selected[0]) + 1 !== selected.length) throw new Error('只能合并时间排序连续的多个片段');
+      if (selected.length < 2 || sorted.indexOf(selected.at(-1)!) - sorted.indexOf(selected[0]) + 1 !== selected.length) throw new MessageError(message('vocal.mergeConsecutive'));
       segments.push({ id: selected[0].id, beginMs: Math.min(...selected.map(s => s.beginMs)), endMs: Math.max(...selected.map(s => s.endMs)) });
     }
   }

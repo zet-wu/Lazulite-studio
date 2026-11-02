@@ -1,3 +1,4 @@
+import { message, MessageError } from '../../domain/messages';
 import type { Capabilities } from "./client";
 import { requestHeaders, readApiError } from "./client";
 import { isCapabilities } from "./validate";
@@ -47,7 +48,7 @@ function validate<T>(
   predicate: (value: unknown) => boolean,
   label: string,
 ): T {
-  if (!predicate(value)) throw new Error(`任务服务返回的${label}格式无效`);
+  if (!predicate(value)) throw new MessageError(message('http.taskPayload'));
   return value as T;
 }
 const isJob = (value: unknown): value is Job =>

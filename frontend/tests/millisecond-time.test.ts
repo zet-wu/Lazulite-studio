@@ -17,6 +17,6 @@ it('resolves relative ancestors once, preserves collapsed and null endpoints, re
  expect(document.lines[0]).toMatchObject({beginMs:1,endMs:1});
  expect(document.lines[0].words[0]).toMatchObject({beginMs:1,endMs:1});
  expect(parseLyricTtml(xml('<p>歌</p>')).lines[0].beginMs).toBeNull();
- expect(()=>parseLyricTtml(xml('<p begin="0.00049" end="0.00048">歌</p>'))).toThrow('precedes');
+ expect(()=>parseLyricTtml(xml('<p begin="0.00049" end="0.00048">歌</p>'))).toThrow('ttml.reversed');
  expect(()=>parseLyricTtml(xml('<p begin="-0.0001" end="1">歌</p>'))).toThrow();
 });

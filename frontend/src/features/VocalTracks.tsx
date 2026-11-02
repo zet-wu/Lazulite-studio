@@ -1,3 +1,7 @@
+import { MessageError, errorMessage, type Message, message as describeMessage } from '../domain/messages';
+import { useMessageText } from '../shared/useMessageText';
+import { i18n } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { assertChangedTimes } from '../domain/time-boundaries';
 import { IconButton } from '../shared/Controls';
 import { useEditorSelection } from './editor/SelectionContext';
@@ -16,9 +20,10 @@ import { editSegments } from '../domain/vocal-editing';
 import type { Acoustics, VocalSegment } from '../domain/project-document';
 import styles from './vocal.module.css';
 type Props = { sourceDurationMs: number | null; locked?: boolean; children: ReactNode; bpm: number; snap: boolean; anchors: number[]; showEnergy: boolean; showSegments: boolean; lineLabel: string; projectId: string; acoustics: Acoustics; startMs: number; endMs: number; durationMs: number; selectedLineId: string | null; apply: (acoustics: Acoustics) => void; assign: (lineId: string, segment: VocalSegment) => void; pause: () => void };
-type Drag = { error?: string; segment?: VocalSegment; side: 'move'|'beginMs'|'endMs'|'new'; x: number; now: number; width: number; left: number; document: Acoustics; ids: string[]; candidate: VocalSegment };
+type Drag = { error?: string | Message; segment?: VocalSegment; side: 'move'|'beginMs'|'endMs'|'new'; x: number; now: number; width: number; left: number; document: Acoustics; ids: string[]; candidate: VocalSegment };
 export const VOCAL_LINE_MIME = 'application/x-studio-vocal-line';
 export function VocalTracks(props: Props) {
+  useTranslation();
   const { acoustics, startMs, endMs, durationMs } = props;
   const { publish } = useContext(TimelineIndicatorContext);
   const capture = useRef<{ element: HTMLElement; id: number } | null>(null);
@@ -28,7 +33,7 @@ export function VocalTracks(props: Props) {
   const showEnergy=props.showEnergy||adding, showSegments=props.showSegments||adding;
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
-  const [error, setError] = useState('');
+  const [error, setError] = useMessageText('');
   const [menu, setMenu] = useState<{x:number;y:number} | null>(null);
   const [dropId,setDropId] = useState<string | null>(null);
   const span = Math.max(1,endMs-startMs);
@@ -67,7 +72,7 @@ export function VocalTracks(props: Props) {
   };
   const candidate = (d:Drag): VocalSegment => {
     const durationMs = props.sourceDurationMs;
-    if (durationMs === null) throw new Error("源音频时长未知，无法拖动声学片段");
+    if (durationMs === null) throw new MessageError(describeMessage('vocal.sourceUnknown'));
     const delta=timelineDelta(d.now-d.x,d.width,span);
     if(d.side==='new') {
       const a=Math.max(0,Math.min(durationMs,snapAt(startMs+(d.x-d.left)/d.width*span,d)));
@@ -82,7 +87,7 @@ export function VocalTracks(props: Props) {
   const begin = (e:PointerEvent<HTMLElement>,segment?:VocalSegment,side:Drag['side']='new')=>{
     if(props.locked || e.button!==0 || (!segment && !adding))return;
     e.preventDefault(); e.stopPropagation();
-    if (props.sourceDurationMs === null) { setError('源音频时长未知，无法拖动声学片段'); return; }
+    if (props.sourceDurationMs === null) { setError(describeMessage('vocal.sourceUnknown')); return; }
     if(segment && (e.ctrlKey||e.metaKey||e.shiftKey)) {
       const sorted=[...acoustics.segments].sort((a,b)=>a.beginMs-b.beginMs||a.endMs-b.endMs||a.id.localeCompare(b.id));
       if(e.shiftKey&&selected.length){const a=sorted.findIndex(s=>s.id===(sharedSelection.effective?.anchorId ?? selected[0])),b=sorted.findIndex(s=>s.id===segment.id);setSelected(sorted.slice(Math.min(a,b),Math.max(a,b)+1).map(s=>s.id));}
@@ -103,10 +108,10 @@ export function VocalTracks(props: Props) {
     : {...acoustics,segments:[...acoustics.segments.filter(s=>s.id!==next.id),next]};
   const times = (value: Acoustics) => value.segments.map(s => ({...s,kind:'acoustic' as const,lineId:''}));
   const move=(e:PointerEvent<HTMLElement>)=>{if(dragRef.current){
-    const next={...dragRef.current,now:e.clientX,error:''};next.candidate=candidate(next);
+    const next: Drag={...dragRef.current,now:e.clientX,error:''};next.candidate=candidate(next);
     try { assertChangedTimes(times(acoustics),times(changed(next,next.candidate)),props.sourceDurationMs); }
-    catch(cause) { next.error=(cause as Error).message; }
-    setError(next.error);dragRef.current=next;setDrag(next);
+    catch(cause) { next.error=errorMessage(cause); }
+    setError(next.error ?? '');dragRef.current=next;setDrag(next);
     if(next.side!=='new')publish({timeMs:next.side==='endMs'?next.candidate.endMs:next.candidate.beginMs,valid:!next.error});
   }};
   const finish=()=>{
@@ -117,32 +122,34 @@ export function VocalTracks(props: Props) {
     else if(next.beginMs===d.segment!.beginMs&&next.endMs===d.segment!.endMs)return;
     try{const updated = changed(d,next);
       assertChangedTimes(times(acoustics),times(updated),props.sourceDurationMs);
-      props.apply(updated);setSelected(d.side==='move'?d.ids:[next.id]);setError('');}catch(e){setError((e as Error).message);}
+      props.apply(updated);setSelected(d.side==='move'?d.ids:[next.id]);setError('');}catch(e){setError(errorMessage(e));}
   };
-  const operate=(type:'merge'|'delete')=>{try{const next=editSegments(acoustics,{type,ids:selected});props.apply(next);setSelected(type==='merge'?next.segments.filter(s=>selected.includes(s.id)).map(s=>s.id):[]);setError('');}catch(e){setError((e as Error).message);}setMenu(null);};
-  const assign=(lineId:string|null,segment:VocalSegment|undefined)=>{if(!lineId||!segment)return;try{props.assign(lineId,segment);setError('');}catch(e){setError((e as Error).message);}setMenu(null);};
+  const operate=(type:'merge'|'delete')=>{try{const next=editSegments(acoustics,{type,ids:selected});props.apply(next);setSelected(type==='merge'?next.segments.filter(s=>selected.includes(s.id)).map(s=>s.id):[]);setError('');}catch(e){setError(errorMessage(e));}setMenu(null);};
+  const assign=(lineId:string|null,segment:VocalSegment|undefined)=>{if(!lineId||!segment)return;try{props.assign(lineId,segment);setError('');}catch(e){setError(errorMessage(e));}setMenu(null);};
   const active=selected.length===1?acoustics.segments.find(s=>s.id===selected[0]):undefined;
   const preview=drag?.candidate??null;
   const pct=(time:number)=>(time-startMs)/span*100;
   const upper=energyView?.upper??null;
   return <div className={styles.tracks} data-vocal-tracks data-vocal-focus tabIndex={-1} onPointerDownCapture={e=>{if(adding&&e.currentTarget.contains(e.target as Node))begin(e);}} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={clearDrag}>
     <VocalFocus active={adding} cancel={cancel}/>
-    {toolsHost && createPortal(<><span data-vocal-hint>{adding?'拖动框选新建片段':[props.lineLabel,selected.length===1?labels.get(selected[0]):selected.length?`片段已选 ${selected.length}`:''].filter(Boolean).join(' → ')||'未选择'}</span><button data-role="primary" disabled={props.locked||adding||!active||!props.selectedLineId} onClick={()=>assign(props.selectedLineId,active)}>分配</button><button data-role="secondary" ref={addButton} disabled={props.locked||adding} onClick={()=>{props.pause();setAdding(true);setMenu(null);}}>新建人声片段</button></>,toolsHost)}
+    {toolsHost && createPortal(<><span data-vocal-hint>{adding?t('vocal.dragCreate'):[props.lineLabel,selected.length===1?labels.get(selected[0]):selected.length?t('vocal.selectedCount',{count:selected.length}):''].filter(Boolean).join(' → ')||t('vocal.noSelection')}</span><button data-role="primary" disabled={props.locked||adding||!active||!props.selectedLineId} onClick={()=>assign(props.selectedLineId,active)}>{t('vocal.assign')}</button><button data-role="secondary" ref={addButton} disabled={props.locked||adding} onClick={()=>{props.pause();setAdding(true);setMenu(null);}}>{t('vocal.newSegment')}</button></>,toolsHost)}
     {props.children}
     {error&&<p role="alert">{error}</p>}
-    {showEnergy && <div className={styles.segmentRow}><strong>能量</strong><div className={styles.energyFrame} data-wheel-zoom data-timeline-pan="seek" tabIndex={-1}>
-      <svg className={styles.energy} viewBox="0 0 1000 55" preserveAspectRatio="none" aria-label="人声能量"><polyline fill="none" stroke="currentColor" strokeWidth="1" points={upper?energyView!.values.map((v,i)=>`${pct(energyView!.start_ms+i*energyView!.step_ms)*10},${54-v/upper*52}`).join(' '):''}/></svg>
+    {showEnergy && <div className={styles.segmentRow}><strong>{t('vocal.energy')}</strong><div className={styles.energyFrame} data-wheel-zoom data-timeline-pan="seek" tabIndex={-1}>
+      <svg className={styles.energy} viewBox="0 0 1000 55" preserveAspectRatio="none" aria-label={t('vocal.energyLabel')}><polyline fill="none" stroke="currentColor" strokeWidth="1" points={upper?energyView!.values.map((v,i)=>`${pct(energyView!.start_ms+i*energyView!.step_ms)*10},${54-v/upper*52}`).join(' '):''}/></svg>
       {!energy.isError && <TimelineIndicators playback />}
       {upper!==null && <small className={styles.scale}>{upper}</small>}
-      {energy.isError && <span className={styles.energyError} role="alert">能量加载失败<IconButton icon="refresh" label="重试加载能量" onClick={()=>void energy.refetch()}/></span>}
+      {energy.isError && <span className={styles.energyError} role="alert">{t('vocal.energyFailed')}<IconButton icon="refresh" label={t('vocal.retryEnergy')} onClick={()=>void energy.refetch()}/></span>}
     </div></div>}
-    {showSegments && <div className={styles.segmentRow}><strong>片段</strong><div data-vocal-lane data-timeline-pan="pan" tabIndex={-1} className={styles.lane} style={{height:`calc(${Math.max(1,frozen.current.laneCount)} * var(--timeline-lane-height))`}} onPointerDown={e=>begin(e)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={clearDrag}>
-      {visible.map(s=>{const p=preview&&drag?.side==='move'&&drag.ids.includes(s.id)?{...s,beginMs:s.beginMs+preview.beginMs-drag.segment!.beginMs,endMs:s.endMs+preview.beginMs-drag.segment!.beginMs}:preview&&drag?.segment?.id===s.id?preview:s;return <button data-role="secondary" key={s.id} className={styles.segment} data-segment-id={s.id} title={`${labels.get(s.id)} · ${s.beginMs}–${s.endMs} 毫秒`} aria-label={`人声片段 ${labels.get(s.id)} ${s.beginMs}–${s.endMs} 毫秒`} aria-pressed={selected.includes(s.id)} style={{left:`${Math.max(0,pct(p.beginMs))}%`,width:`${Math.min(100,pct(p.endMs))-Math.max(0,pct(p.beginMs))}%`,top:`calc(${frozen.current.lanes.get(s.id)??0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`,outline:dropId===s.id?'3px solid var(--primary, #3367ab)':undefined}} onPointerDown={e=>{if(!adding)begin(e,s,'move');}} onClick={e=>{if(e.detail===0 && !selected.includes(s.id)){setSelected([s.id]);}}} onKeyDown={e=>{if(!props.locked&&(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')){e.preventDefault();if(!selected.includes(s.id))setSelected([s.id]);const r=e.currentTarget.getBoundingClientRect();setMenu({x:r.left,y:r.bottom});}}} onContextMenu={e=>{if(props.locked){e.preventDefault();return;}e.preventDefault();if(adding)return;if(!selected.includes(s.id))setSelected([s.id]);setMenu({x:e.clientX,y:e.clientY});}} onDragOver={e=>{if(props.locked)return;if(!adding&&e.dataTransfer.types.includes(VOCAL_LINE_MIME)){e.preventDefault();setDropId(s.id);}}} onDragLeave={()=>setDropId(null)} onDrop={e=>{if(props.locked)return;e.preventDefault();setDropId(null);if(adding)return;const id=e.dataTransfer.getData(VOCAL_LINE_MIME);if(id){setSelected([s.id]);assign(id,s);}}}>
+    {showSegments && <div className={styles.segmentRow}><strong>{t('vocal.segment')}</strong><div data-vocal-lane data-timeline-pan="pan" tabIndex={-1} className={styles.lane} style={{height:`calc(${Math.max(1,frozen.current.laneCount)} * var(--timeline-lane-height))`}} onPointerDown={e=>begin(e)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={clearDrag}>
+      {visible.map(s=>{const p=preview&&drag?.side==='move'&&drag.ids.includes(s.id)?{...s,beginMs:s.beginMs+preview.beginMs-drag.segment!.beginMs,endMs:s.endMs+preview.beginMs-drag.segment!.beginMs}:preview&&drag?.segment?.id===s.id?preview:s;return <button data-role="secondary" key={s.id} className={styles.segment} data-segment-id={s.id} title={t('vocal.interval',{label:labels.get(s.id),begin:s.beginMs,end:s.endMs})} aria-label={t('vocal.segmentLabel',{label:labels.get(s.id),begin:s.beginMs,end:s.endMs})} aria-pressed={selected.includes(s.id)} style={{left:`${Math.max(0,pct(p.beginMs))}%`,width:`${Math.min(100,pct(p.endMs))-Math.max(0,pct(p.beginMs))}%`,top:`calc(${frozen.current.lanes.get(s.id)??0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`,outline:dropId===s.id?'3px solid var(--primary, #3367ab)':undefined}} onPointerDown={e=>{if(!adding)begin(e,s,'move');}} onClick={e=>{if(e.detail===0 && !selected.includes(s.id)){setSelected([s.id]);}}} onKeyDown={e=>{if(!props.locked&&(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')){e.preventDefault();if(!selected.includes(s.id))setSelected([s.id]);const r=e.currentTarget.getBoundingClientRect();setMenu({x:r.left,y:r.bottom});}}} onContextMenu={e=>{if(props.locked){e.preventDefault();return;}e.preventDefault();if(adding)return;if(!selected.includes(s.id))setSelected([s.id]);setMenu({x:e.clientX,y:e.clientY});}} onDragOver={e=>{if(props.locked)return;if(!adding&&e.dataTransfer.types.includes(VOCAL_LINE_MIME)){e.preventDefault();setDropId(s.id);}}} onDragLeave={()=>setDropId(null)} onDrop={e=>{if(props.locked)return;e.preventDefault();setDropId(null);if(adding)return;const id=e.dataTransfer.getData(VOCAL_LINE_MIME);if(id){setSelected([s.id]);assign(id,s);}}}>
         <span>{labels.get(s.id)}</span><span className={`${styles.edge} ${styles.begin}`} onPointerDown={e=>{if(!adding)begin(e,s,'beginMs');}}/><span className={`${styles.edge} ${styles.end}`} onPointerDown={e=>{if(!adding)begin(e,s,'endMs');}}/>
       </button>;})}
       {preview&&drag?.side==='new'&&<span className={styles.newRange} style={{left:`${pct(preview.beginMs)}%`,width:`${pct(preview.endMs)-pct(preview.beginMs)}%`}}/>}
       <TimelineIndicators />
     </div></div>}
-    {menu&&createPortal(<div role="menu" className={styles.menu} style={{left:Math.min(menu.x,window.innerWidth-170),top:Math.min(menu.y,window.innerHeight-130)}} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))setMenu(null);}}><button autoFocus role="menuitem" data-role="inline" disabled={props.locked||adding||!active||!props.selectedLineId} onClick={()=>assign(props.selectedLineId,active)}>分配给选中行</button><button role="menuitem" data-role="inline" disabled={selected.length<2} onClick={()=>operate('merge')}>合并选中片段</button><button role="menuitem" data-role="danger" onClick={()=>operate('delete')}>删除选中片段</button></div>,document.body)}
+    {menu&&createPortal(<div role="menu" className={styles.menu} style={{left:Math.min(menu.x,window.innerWidth-170),top:Math.min(menu.y,window.innerHeight-130)}} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))setMenu(null);}}><button autoFocus role="menuitem" data-role="inline" disabled={props.locked||adding||!active||!props.selectedLineId} onClick={()=>assign(props.selectedLineId,active)}>{t('vocal.assignSelected')}</button><button role="menuitem" data-role="inline" disabled={selected.length<2} onClick={()=>operate('merge')}>{t('vocal.mergeSelected')}</button><button role="menuitem" data-role="danger" onClick={()=>operate('delete')}>{t('vocal.deleteSelected')}</button></div>,document.body)}
   </div>;
 }
+
+const t=i18n.t.bind(i18n);

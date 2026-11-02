@@ -6,7 +6,7 @@ import { parsePayload } from '../adapters/http/lyric-sources';
 import { LyricCandidate } from './LyricCandidate';
 import styles from './acquisition.module.css';
 import { useEffect, useState } from 'react';
-import { requestHeaders } from '../adapters/http/client';
+import { requestHeaders, readApiError } from '../adapters/http/client';
 import type { LyricFormat } from '../adapters/lyric-formats';
 type Candidate = { id: string; label: string; format?: Exclude<LyricFormat, 'ass'>; content?: string; error?: string|Message; error_code?:string; badges?: string[] };
 export function EmbeddedLyrics({ projectId, sourceAssetId, onPreview }: { projectId?: string; sourceAssetId?: string | null; onPreview: (content: string, format: Exclude<LyricFormat, 'ass'>) => void }) {
@@ -22,8 +22,8 @@ export function EmbeddedLyrics({ projectId, sourceAssetId, onPreview }: { projec
     void (async () => {
       try {
         const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/embedded-lyrics`, { credentials: 'include', headers: requestHeaders(), signal: controller.signal });
+        if (!response.ok) throw await readApiError(response);
         const data = await response.json();
-        if (!response.ok) throw new Error(data.detail?.message ?? data.message ?? t('embedded.failed'));
         if (data.asset_id !== sourceAssetId) throw new MessageError(describeMessage('embedded.sourceChanged'));
         if (controller.signal.aborted) return;
         setCandidates(data.candidates.map((candidate: Candidate) => {

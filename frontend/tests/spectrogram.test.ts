@@ -39,5 +39,5 @@ it('encloses frame positions in millisecond requests and rejects missing interna
     expect(Math.abs(sampleTimestamp(frame) * PROXY_SAMPLE_RATE / 1e3 - frame)).toBeLessThan(PROXY_SAMPLE_RATE / 1000);
   }
   const window = spectrumWindow(4000, 8000, 12000);
-  expect(() => computeSpectrogram(new Int16Array(100), PROXY_SAMPLE_RATE, 1, window)).toThrow('上下文');
+  expect(() => computeSpectrogram(new Int16Array(100), PROXY_SAMPLE_RATE, 1, window)).toThrow('spectrum.contextMissing');
 });

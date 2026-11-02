@@ -7945,5 +7945,1025 @@
     "context": "output interface: output.attachmentEnvelope",
     "source": "附属文本需要关联行的完整有效正文词包络",
     "params": []
+  },
+  "format.timing": {
+    "context": "format interface: format.timing",
+    "source": "时间（行／词）",
+    "params": []
+  },
+  "format.overlap": {
+    "context": "format interface: format.overlap",
+    "source": "重叠主行",
+    "params": []
+  },
+  "format.lrcResult": {
+    "context": "format interface: format.lrcResult",
+    "source": "行开始、部分段尾",
+    "params": []
+  },
+  "format.startLabels": {
+    "context": "format interface: format.startLabels",
+    "source": "开始标签；可能无法同显",
+    "params": []
+  },
+  "format.elrcResult": {
+    "context": "format interface: format.elrcResult",
+    "source": "行／词时间；词倒序或重叠受限",
+    "params": []
+  },
+  "format.eslrcResult": {
+    "context": "format interface: format.eslrcResult",
+    "source": "首词开始、各词结束",
+    "params": []
+  },
+  "format.flatLines": {
+    "context": "format interface: format.flatLines",
+    "source": "普通行；无关联",
+    "params": []
+  },
+  "format.wordEnvelope": {
+    "context": "format interface: format.wordEnvelope",
+    "source": "词包络；显示依播放器",
+    "params": []
+  },
+  "format.parentheses": {
+    "context": "format interface: format.parentheses",
+    "source": "括号；无关联",
+    "params": []
+  },
+  "format.independentLines": {
+    "context": "format interface: format.independentLines",
+    "source": "独立行时间；显示依播放器",
+    "params": []
+  },
+  "format.lysResult": {
+    "context": "format interface: format.lysResult",
+    "source": "词时间；行界由词推导",
+    "params": []
+  },
+  "format.backgroundFlag": {
+    "context": "format interface: format.backgroundFlag",
+    "source": "背景标志；无关联",
+    "params": []
+  },
+  "format.assResult": {
+    "context": "format interface: format.assResult",
+    "source": "厘秒；词重叠受限",
+    "params": []
+  },
+  "format.trackEvents": {
+    "context": "format interface: format.trackEvents",
+    "source": "分轨字幕",
+    "params": []
+  },
+  "format.independentSubtitles": {
+    "context": "format interface: format.independentSubtitles",
+    "source": "独立字幕；无关联",
+    "params": []
+  },
+  "format.layoutNeeded": {
+    "context": "format interface: format.layoutNeeded",
+    "source": "独立事件；需排版",
+    "params": []
+  },
+  "format.preservedDetail": {
+    "context": "format interface: format.preservedDetail",
+    "source": "相对当前 Studio TTML 导出保留此项内容与结构。",
+    "params": []
+  },
+  "format.omittedDetail": {
+    "context": "format interface: format.omittedDetail",
+    "source": "不输出此项。",
+    "params": []
+  },
+  "format.lrcDetail": {
+    "context": "format interface: format.lrcDetail",
+    "source": "输出主行开始标签和可表达的段尾空标签；不保留逐词时间或重叠行各自的结束时间。",
+    "params": []
+  },
+  "format.elrcDetail": {
+    "context": "format interface: format.elrcDetail",
+    "source": "输出行开始与逐词标签；同一行内倒序或重叠不可输出，重叠主行各自的结束边界不能完整保留。",
+    "params": []
+  },
+  "format.eslrcDetail": {
+    "context": "format interface: format.eslrcDetail",
+    "source": "只输出首词开始和每词结束，后词独立起点、间隙和重叠可能丢失；行边界由词包络推导。",
+    "params": []
+  },
+  "format.lysDetail": {
+    "context": "format interface: format.lysDetail",
+    "source": "保留逐词端点；独立行边界由词包络替代。",
+    "params": []
+  },
+  "format.assDetail": {
+    "context": "format interface: format.assDetail",
+    "source": "正文保留有效行边界；正文和定时翻译／音译的绝对端点统一量化到厘秒，再计算间隙与时长。短单元可能为零，文字保留但高亮精度降低；事件内单元重叠、倒序或正文越出行边界会阻塞。",
+    "params": []
+  },
+  "format.assAttachments": {
+    "context": "format interface: format.assAttachments",
+    "source": "每份内容分别形成事件，按样式、名称区分。普通内容使用所属行时间，定时内容使用独立包络；不保留原生轨道身份、关联或 replacement 语义，不代表容器内可选字幕流。",
+    "params": []
+  },
+  "format.backgroundDetail": {
+    "context": "format interface: format.backgroundDetail",
+    "source": "保留背景正文，不保留与主行的结构关联。",
+    "params": []
+  },
+  "format.assOverlap": {
+    "context": "format interface: format.assOverlap",
+    "source": "各主行输出独立事件，默认按时间分配纵向位置；复杂多声部、长行及消费者字体差异仍需检查排版。",
+    "params": []
+  },
+  "format.lrcOverlap": {
+    "context": "format interface: format.lrcOverlap",
+    "source": "保留各行开始标签，不能完整保留重叠行各自的结束时间；同时显示取决于播放器。",
+    "params": []
+  },
+  "format.knownOverlap": {
+    "context": "format interface: format.knownOverlap",
+    "source": "当前已知时间有重叠，涉及主行：{{lines}}。",
+    "params": [
+      "lines"
+    ]
+  },
+  "format.preserved": {
+    "context": "format interface: format.preserved",
+    "source": "保留",
+    "params": []
+  },
+  "format.omitted": {
+    "context": "format interface: format.omitted",
+    "source": "不输出",
+    "params": []
+  },
+  "projects.exportNamed": {
+    "context": "projects interface: projects.exportNamed",
+    "source": "导出项目 {{name}}",
+    "params": [
+      "name"
+    ]
+  },
+  "projects.deleteNamed": {
+    "context": "projects interface: projects.deleteNamed",
+    "source": "删除项目 {{name}}",
+    "params": [
+      "name"
+    ]
+  },
+  "projects.deleteConfirm": {
+    "context": "projects interface: projects.deleteConfirm",
+    "source": "删除项目“{{name}}”？将删除歌词修订、任务和产物。原始上传文件和共享音频保留。",
+    "params": [
+      "name"
+    ]
+  },
+  "project.uploadProgress": {
+    "context": "project interface: project.uploadProgress",
+    "source": "正在上传 {{percent}}%",
+    "params": [
+      "percent"
+    ]
+  },
+  "workspace.issueCount": {
+    "context": "workspace interface: workspace.issueCount",
+    "source": "有 {{count}} 项需要处理，请到文件打包查看定位列表。",
+    "params": [
+      "count"
+    ]
+  },
+  "editor.newLine": {
+    "context": "editor interface: editor.newLine",
+    "source": "新增歌词行",
+    "params": []
+  },
+  "editor.lyricList": {
+    "context": "editor interface: editor.lyricList",
+    "source": "歌词列表",
+    "params": []
+  },
+  "settings.closeTitle": {
+    "context": "settings interface: settings.closeTitle",
+    "source": "关闭{{title}}",
+    "params": [
+      "title"
+    ]
+  },
+  "singer.named": {
+    "context": "singer interface: singer.named",
+    "source": "歌手 {{name}}",
+    "params": [
+      "name"
+    ]
+  },
+  "select.options": {
+    "context": "select interface: select.options",
+    "source": "选项",
+    "params": []
+  },
+  "startup.mockFailed": {
+    "context": "startup interface: startup.mockFailed",
+    "source": "开发模拟服务启动失败，请重试。",
+    "params": []
+  },
+  "editing.chooseRomanizationUnit": {
+    "context": "editing interface: editing.chooseRomanizationUnit",
+    "source": "请选择音译单元",
+    "params": []
+  },
+  "editing.copySameContent": {
+    "context": "editing interface: editing.copySameContent",
+    "source": "跨内容音译复制暂不支持，请选择同一份内容",
+    "params": []
+  },
+  "editing.differentTargetLine": {
+    "context": "editing interface: editing.differentTargetLine",
+    "source": "目标行必须不同于所选词所在行",
+    "params": []
+  },
+  "editing.chooseWords": {
+    "context": "editing interface: editing.chooseWords",
+    "source": "请先选择词块",
+    "params": []
+  },
+  "editing.chooseReadingTarget": {
+    "context": "editing interface: editing.chooseReadingTarget",
+    "source": "请先选择目标读音单元",
+    "params": []
+  },
+  "editing.readingWordMissing": {
+    "context": "editing interface: editing.readingWordMissing",
+    "source": "读音所属词不存在",
+    "params": []
+  },
+  "editing.chooseLine": {
+    "context": "editing interface: editing.chooseLine",
+    "source": "请先选择歌词行",
+    "params": []
+  },
+  "editing.chooseTimedRomanization": {
+    "context": "editing interface: editing.chooseTimedRomanization",
+    "source": "请先选择定时音译内容",
+    "params": []
+  },
+  "editing.choosePasteLine": {
+    "context": "editing interface: editing.choosePasteLine",
+    "source": "请先选择粘贴目标行",
+    "params": []
+  },
+  "editing.singerLoss": {
+    "context": "editing interface: editing.singerLoss",
+    "source": "无歌手词无法在有歌手目标行中保真",
+    "params": []
+  },
+  "editing.readingCrossLine": {
+    "context": "editing interface: editing.readingCrossLine",
+    "source": "读音不能跨歌词行移动",
+    "params": []
+  },
+  "editing.dropInvalid": {
+    "context": "editing interface: editing.dropInvalid",
+    "source": "此处无法放置",
+    "params": []
+  },
+  "selection.staleEnvelope": {
+    "context": "selection interface: selection.staleEnvelope",
+    "source": "选区包含已失效对象",
+    "params": []
+  },
+  "selection.chooseTimed": {
+    "context": "selection interface: selection.chooseTimed",
+    "source": "请选择有时间的对象",
+    "params": []
+  },
+  "selection.invalidTimes": {
+    "context": "selection interface: selection.invalidTimes",
+    "source": "选区包含未定时或非法时间",
+    "params": []
+  },
+  "selection.outsideMedia": {
+    "context": "selection interface: selection.outsideMedia",
+    "source": "选区为空或超出媒体范围",
+    "params": []
+  },
+  "split.invalidSegment": {
+    "context": "split interface: split.invalidSegment",
+    "source": "第 {{number}} 行时间不合法或排除了段内词，请先调整原词时间",
+    "params": [
+      "number"
+    ]
+  },
+  "split.backgroundLine": {
+    "context": "split interface: split.backgroundLine",
+    "source": "L{{number}} 的背景歌词",
+    "params": [
+      "number"
+    ]
+  },
+  "split.backgroundCannotSplit": {
+    "context": "split interface: split.backgroundCannotSplit",
+    "source": "背景歌词不能直接拆分",
+    "params": []
+  },
+  "split.noWordBoundary": {
+    "context": "split interface: split.noWordBoundary",
+    "source": "没有可拆分的词边界",
+    "params": []
+  },
+  "split.assignmentMissing": {
+    "context": "split interface: split.assignmentMissing",
+    "source": "附属内容分配条目不存在",
+    "params": []
+  },
+  "split.assignmentStale": {
+    "context": "split interface: split.assignmentStale",
+    "source": "附属内容归属已失效，请重新选择",
+    "params": []
+  },
+  "command.timeInvalid": {
+    "context": "command interface: command.timeInvalid",
+    "source": "时间必须为非负整数或未定",
+    "params": []
+  },
+  "command.timeReversed": {
+    "context": "command interface: command.timeReversed",
+    "source": "开始时间不能晚于结束时间",
+    "params": []
+  },
+  "command.parentAnchor": {
+    "context": "command interface: command.parentAnchor",
+    "source": "请以主行作为插入位置",
+    "params": []
+  },
+  "command.wordOutsideLine": {
+    "context": "command interface: command.wordOutsideLine",
+    "source": "词时间超出所属行",
+    "params": []
+  },
+  "command.insertBackgroundParent": {
+    "context": "command interface: command.insertBackgroundParent",
+    "source": "请将背景歌词与其主行一起插入",
+    "params": []
+  },
+  "command.moveBackgroundParent": {
+    "context": "command interface: command.moveBackgroundParent",
+    "source": "请移动主行以一同移动背景歌词",
+    "params": []
+  },
+  "command.moveLineSelf": {
+    "context": "command interface: command.moveLineSelf",
+    "source": "不能把行移动到自身之后",
+    "params": []
+  },
+  "command.wordTextEmpty": {
+    "context": "command interface: command.wordTextEmpty",
+    "source": "词正文不能为空",
+    "params": []
+  },
+  "command.moveWordSelf": {
+    "context": "command interface: command.moveWordSelf",
+    "source": "不能把词移动到自身之后",
+    "params": []
+  },
+  "command.lineExcludesWord": {
+    "context": "command interface: command.lineExcludesWord",
+    "source": "行时间不能排除所属词",
+    "params": []
+  },
+  "command.linkBeforeWordsEnglish": {
+    "context": "command interface: command.linkBeforeWordsEnglish",
+    "source": "链接行的结束不能早于所属词",
+    "params": []
+  },
+  "command.unknownSinger": {
+    "context": "command interface: command.unknownSinger",
+    "source": "未知歌词歌手",
+    "params": []
+  },
+  "command.languageInvalid": {
+    "context": "command interface: command.languageInvalid",
+    "source": "语言标签无效",
+    "params": []
+  },
+  "command.agentInvalid": {
+    "context": "command interface: command.agentInvalid",
+    "source": "歌手 ID 无效或重复",
+    "params": []
+  },
+  "command.assignedSinger": {
+    "context": "command interface: command.assignedSinger",
+    "source": "不能移除已分配的歌手",
+    "params": []
+  },
+  "command.splitAttributes": {
+    "context": "command interface: command.splitAttributes",
+    "source": "拆词前需明确重新分配附属属性",
+    "params": []
+  },
+  "command.wordIdExists": {
+    "context": "command interface: command.wordIdExists",
+    "source": "词 ID 已存在",
+    "params": []
+  },
+  "command.wordBeforeLine": {
+    "context": "command interface: command.wordBeforeLine",
+    "source": "词开始时间早于所属行",
+    "params": []
+  },
+  "command.wordAfterLine": {
+    "context": "command interface: command.wordAfterLine",
+    "source": "词结束时间晚于所属行",
+    "params": []
+  },
+  "text.codePointOffset": {
+    "context": "text interface: text.codePointOffset",
+    "source": "码点偏移无效",
+    "params": []
+  },
+  "text.utf16Offset": {
+    "context": "text interface: text.utf16Offset",
+    "source": "UTF-16 偏移无效",
+    "params": []
+  },
+  "text.surrogateSplit": {
+    "context": "text interface: text.surrogateSplit",
+    "source": "偏移切开了代理对",
+    "params": []
+  },
+  "text.graphemeSplit": {
+    "context": "text interface: text.graphemeSplit",
+    "source": "切点必须位于文本内部的字素边界",
+    "params": []
+  },
+  "spectrum.pcmInvalid": {
+    "context": "spectrum interface: spectrum.pcmInvalid",
+    "source": "PCM 格式无效",
+    "params": []
+  },
+  "parse.projectVersion": {
+    "context": "parse interface: parse.projectVersion",
+    "source": "项目版本不兼容",
+    "params": []
+  },
+  "parse.acousticsInvalid": {
+    "context": "parse interface: parse.acousticsInvalid",
+    "source": "声学数据无效",
+    "params": []
+  },
+  "parse.backgroundReference": {
+    "context": "parse interface: parse.backgroundReference",
+    "source": "背景前置引用无效",
+    "params": []
+  },
+  "parse.timeInvalid": {
+    "context": "parse interface: parse.timeInvalid",
+    "source": "歌词时间无效",
+    "params": []
+  },
+  "parse.unsupportedFormat": {
+    "context": "parse interface: parse.unsupportedFormat",
+    "source": "不支持此文件格式",
+    "params": []
+  },
+  "parse.fileSize": {
+    "context": "parse interface: parse.fileSize",
+    "source": "歌词文件不能超过 4 MB",
+    "params": []
+  },
+  "parse.lineCount": {
+    "context": "parse interface: parse.lineCount",
+    "source": "歌词行数无效",
+    "params": []
+  },
+  "parse.noLines": {
+    "context": "parse interface: parse.noLines",
+    "source": "未解析出歌词行或行数过多",
+    "params": []
+  },
+  "parse.reversed": {
+    "context": "parse interface: parse.reversed",
+    "source": "歌词时间倒序",
+    "params": []
+  },
+  "parse.krcImportOnly": {
+    "context": "parse interface: parse.krcImportOnly",
+    "source": "KRC 目前仅支持导入",
+    "params": []
+  },
+  "parse.lineTimesRequired": {
+    "context": "parse interface: parse.lineTimesRequired",
+    "source": "导出前请补全每行时间",
+    "params": []
+  },
+  "parse.wordTimesRequired": {
+    "context": "parse interface: parse.wordTimesRequired",
+    "source": "导出前请补全逐词时间",
+    "params": []
+  },
+  "parse.qrcContent": {
+    "context": "parse interface: parse.qrcContent",
+    "source": "QRC XML 缺少 LyricContent",
+    "params": []
+  },
+  "parse.wordTagText": {
+    "context": "parse interface: parse.wordTagText",
+    "source": "逐词标签之间含无法解析的文字",
+    "params": []
+  },
+  "parse.wordTagsIncomplete": {
+    "context": "parse interface: parse.wordTagsIncomplete",
+    "source": "逐词歌词标签不完整",
+    "params": []
+  },
+  "parse.wordLineLimit": {
+    "context": "parse interface: parse.wordLineLimit",
+    "source": "未解析出逐词歌词或行数超过 20000",
+    "params": []
+  },
+  "parse.krcSidecar": {
+    "context": "parse interface: parse.krcSidecar",
+    "source": "KRC 附属块格式无效",
+    "params": []
+  },
+  "parse.krcHeader": {
+    "context": "parse interface: parse.krcHeader",
+    "source": "KRC 文件头无效",
+    "params": []
+  },
+  "parse.krcSize": {
+    "context": "parse interface: parse.krcSize",
+    "source": "KRC 解压超过 4 MB",
+    "params": []
+  },
+  "parse.elrcReversed": {
+    "context": "parse interface: parse.elrcReversed",
+    "source": "扩展 LRC 词时间倒序",
+    "params": []
+  },
+  "parse.lrcLineLimit": {
+    "context": "parse interface: parse.lrcLineLimit",
+    "source": "未解析出 LRC 歌词或行数超过 20000",
+    "params": []
+  },
+  "parse.invalidLine": {
+    "context": "parse interface: parse.invalidLine",
+    "source": "第 {{number}} 行正文格式无效",
+    "params": [
+      "number"
+    ]
+  },
+  "parse.metadataName": {
+    "context": "parse interface: parse.metadataName",
+    "source": "元数据名称无效：{{key}}",
+    "params": [
+      "key"
+    ]
+  },
+  "ttml.agentId": {
+    "context": "ttml interface: ttml.agentId",
+    "source": "歌手缺少 xml:id",
+    "params": []
+  },
+  "ttml.agentAttribute": {
+    "context": "ttml interface: ttml.agentAttribute",
+    "source": "歌手 {{id}} 的 {{element}} 包含不支持的属性 {{attribute}}",
+    "params": [
+      "id",
+      "element",
+      "attribute"
+    ]
+  },
+  "ttml.agentActor": {
+    "context": "ttml interface: ttml.agentActor",
+    "source": "歌手 {{id}} 的 actor 需要单个 agent 引用且不支持子结构",
+    "params": [
+      "id"
+    ]
+  },
+  "ttml.agentStructure": {
+    "context": "ttml interface: ttml.agentStructure",
+    "source": "歌手 {{id}} 包含不支持的结构或重复的 {{element}}",
+    "params": [
+      "id",
+      "element"
+    ]
+  },
+  "ttml.unsupportedTime": {
+    "context": "ttml interface: ttml.unsupportedTime",
+    "source": "不支持的 TTML 时间：{{value}}",
+    "params": [
+      "value"
+    ]
+  },
+  "ttml.timeOverflow": {
+    "context": "ttml interface: ttml.timeOverflow",
+    "source": "TTML 时间超出毫秒范围：{{value}}",
+    "params": [
+      "value"
+    ]
+  },
+  "ttml.timeInvalid": {
+    "context": "ttml interface: ttml.timeInvalid",
+    "source": "毫秒时间无效",
+    "params": []
+  },
+  "ttml.sequential": {
+    "context": "ttml interface: ttml.sequential",
+    "source": "不支持顺序 TTML 时间容器",
+    "params": []
+  },
+  "ttml.reversed": {
+    "context": "ttml interface: ttml.reversed",
+    "source": "TTML 结束早于开始",
+    "params": []
+  },
+  "ttml.childOutside": {
+    "context": "ttml interface: ttml.childOutside",
+    "source": "TTML 子元素时间超出父元素",
+    "params": []
+  },
+  "ttml.textStructure": {
+    "context": "ttml interface: ttml.textStructure",
+    "source": "{{label}} 含不支持的结构",
+    "params": [
+      "label"
+    ]
+  },
+  "ttml.obsceneBoolean": {
+    "context": "ttml interface: ttml.obsceneBoolean",
+    "source": "amll:obscene 必须为 true 或 false",
+    "params": []
+  },
+  "ttml.rubySinger": {
+    "context": "ttml interface: ttml.rubySinger",
+    "source": "Ruby 不支持独立歌手",
+    "params": []
+  },
+  "ttml.expletiveWord": {
+    "context": "ttml interface: ttml.expletiveWord",
+    "source": "expletive 需要一个词",
+    "params": []
+  },
+  "ttml.attribute": {
+    "context": "ttml interface: ttml.attribute",
+    "source": "{{element}} 上的 TTML 属性 {{attribute}} 不受支持",
+    "params": [
+      "element",
+      "attribute"
+    ]
+  },
+  "ttml.lineChild": {
+    "context": "ttml interface: ttml.lineChild",
+    "source": "不支持的 TTML 行子元素",
+    "params": []
+  },
+  "ttml.elementUnsupported": {
+    "context": "ttml interface: ttml.elementUnsupported",
+    "source": "不支持的 {{context}} 元素：{{element}}",
+    "params": [
+      "context",
+      "element"
+    ]
+  },
+  "ttml.roleUnsupported": {
+    "context": "ttml interface: ttml.roleUnsupported",
+    "source": "不支持的 {{context}} 角色：{{role}}",
+    "params": [
+      "context",
+      "role"
+    ]
+  },
+  "ttml.expletiveConflict": {
+    "context": "ttml interface: ttml.expletiveConflict",
+    "source": "expletive 与 amll:obscene=false 冲突",
+    "params": []
+  },
+  "ttml.rubyKind": {
+    "context": "ttml interface: ttml.rubyKind",
+    "source": "不支持的注音类型：{{kind}}",
+    "params": [
+      "kind"
+    ]
+  },
+  "ttml.rubyPair": {
+    "context": "ttml interface: ttml.rubyPair",
+    "source": "注音容器须包含一组正文和读音",
+    "params": []
+  },
+  "ttml.rubyMissing": {
+    "context": "ttml interface: ttml.rubyMissing",
+    "source": "注音容器缺少正文或读音",
+    "params": []
+  },
+  "ttml.rubyBaseEmpty": {
+    "context": "ttml interface: ttml.rubyBaseEmpty",
+    "source": "注音正文不能为空",
+    "params": []
+  },
+  "ttml.rubyReadingNode": {
+    "context": "ttml interface: ttml.rubyReadingNode",
+    "source": "不支持的注音读音节点",
+    "params": []
+  },
+  "ttml.rubyUnits": {
+    "context": "ttml interface: ttml.rubyUnits",
+    "source": "注音读音容器须包含读音单元",
+    "params": []
+  },
+  "ttml.rubyUnitEmpty": {
+    "context": "ttml interface: ttml.rubyUnitEmpty",
+    "source": "注音读音单元不能为空",
+    "params": []
+  },
+  "ttml.transliterationChild": {
+    "context": "ttml interface: ttml.transliterationChild",
+    "source": "不支持的音译子元素",
+    "params": []
+  },
+  "ttml.transliterationRole": {
+    "context": "ttml interface: ttml.transliterationRole",
+    "source": "不支持的音译角色",
+    "params": []
+  },
+  "ttml.size": {
+    "context": "ttml interface: ttml.size",
+    "source": "TTML 超过 2 MiB 限制",
+    "params": []
+  },
+  "ttml.entities": {
+    "context": "ttml interface: ttml.entities",
+    "source": "不接受 DTD 或外部实体",
+    "params": []
+  },
+  "ttml.xml": {
+    "context": "ttml interface: ttml.xml",
+    "source": "TTML XML 无效",
+    "params": []
+  },
+  "ttml.root": {
+    "context": "ttml interface: ttml.root",
+    "source": "根元素必须为 TTML tt",
+    "params": []
+  },
+  "ttml.translationType": {
+    "context": "ttml interface: ttml.translationType",
+    "source": "不支持的翻译类型",
+    "params": []
+  },
+  "ttml.sublyricReference": {
+    "context": "ttml interface: ttml.sublyricReference",
+    "source": "iTunes 附属歌词需要行引用",
+    "params": []
+  },
+  "ttml.backgroundNode": {
+    "context": "ttml interface: ttml.backgroundNode",
+    "source": "不支持的背景附属歌词节点",
+    "params": []
+  },
+  "ttml.metadataFields": {
+    "context": "ttml interface: ttml.metadataFields",
+    "source": "AMLL 元数据需要键和值",
+    "params": []
+  },
+  "ttml.body": {
+    "context": "ttml interface: ttml.body",
+    "source": "TTML 需要一个 body 和受支持的 head 内容",
+    "params": []
+  },
+  "ttml.depth": {
+    "context": "ttml interface: ttml.depth",
+    "source": "TTML 嵌套深度超过 128",
+    "params": []
+  },
+  "ttml.unknownAgent": {
+    "context": "ttml interface: ttml.unknownAgent",
+    "source": "行 {{id}} 引用了未知歌手",
+    "params": [
+      "id"
+    ]
+  },
+  "ttml.duplicateLine": {
+    "context": "ttml interface: ttml.duplicateLine",
+    "source": "行 ID 重复",
+    "params": []
+  },
+  "ttml.backgroundFor": {
+    "context": "ttml interface: ttml.backgroundFor",
+    "source": "多背景附属内容需要明确 for 引用",
+    "params": []
+  },
+  "ttml.backgroundParent": {
+    "context": "ttml interface: ttml.backgroundParent",
+    "source": "背景音译引用未知主行 {{id}}",
+    "params": [
+      "id"
+    ]
+  },
+  "ttml.unknownLine": {
+    "context": "ttml interface: ttml.unknownLine",
+    "source": "附属歌词引用未知行 {{id}}",
+    "params": [
+      "id"
+    ]
+  },
+  "ttml.actorMissing": {
+    "context": "ttml interface: ttml.actorMissing",
+    "source": "歌手 {{id}} 的 actor 引用不存在：{{reference}}",
+    "params": [
+      "id",
+      "reference"
+    ]
+  },
+  "ttml.schema": {
+    "context": "ttml interface: ttml.schema",
+    "source": "不支持的歌词文档版本",
+    "params": []
+  },
+  "ttml.contentEmpty": {
+    "context": "ttml interface: ttml.contentEmpty",
+    "source": "定时内容 {{id}} 没有单元",
+    "params": [
+      "id"
+    ]
+  },
+  "ttml.unitNeedsTime": {
+    "context": "ttml interface: ttml.unitNeedsTime",
+    "source": "附属单元 {{id}} 需要时间",
+    "params": [
+      "id"
+    ]
+  },
+  "ttml.backgroundNoParent": {
+    "context": "ttml interface: ttml.backgroundNoParent",
+    "source": "背景歌词没有主行：{{id}}",
+    "params": [
+      "id"
+    ]
+  },
+  "output.bodyLabel": {
+    "context": "output interface: output.bodyLabel",
+    "source": "{{group}} · 正文",
+    "params": [
+      "group"
+    ]
+  },
+  "output.translationLabel": {
+    "context": "output interface: output.translationLabel",
+    "source": "{{group}} · 翻译 {{number}} · {{language}}",
+    "params": [
+      "group",
+      "number",
+      "language"
+    ]
+  },
+  "output.romanizationLabel": {
+    "context": "output interface: output.romanizationLabel",
+    "source": "{{group}} · 音译 {{number}} · {{language}}",
+    "params": [
+      "group",
+      "number",
+      "language"
+    ]
+  },
+  "http.dictionaryInstance": {
+    "context": "http interface: http.dictionaryInstance",
+    "source": "词典实例与请求不一致，请重新生成",
+    "params": []
+  },
+  "http.dictionaryRange": {
+    "context": "http interface: http.dictionaryRange",
+    "source": "词典正文范围无效",
+    "params": []
+  },
+  "http.dictionaryEmpty": {
+    "context": "http interface: http.dictionaryEmpty",
+    "source": "词典响应为空",
+    "params": []
+  },
+  "http.dictionaryIncomplete": {
+    "context": "http interface: http.dictionaryIncomplete",
+    "source": "词典分析响应不完整",
+    "params": []
+  },
+  "http.taskPayload": {
+    "context": "http interface: http.taskPayload",
+    "source": "任务服务返回的数据格式无效",
+    "params": []
+  },
+  "http.pcmHeaders": {
+    "context": "http interface: http.pcmHeaders",
+    "source": "PCM 窗口响应头无效",
+    "params": []
+  },
+  "project.cueLocation": {
+    "context": "project interface: project.cueLocation",
+    "source": "第 {{number}} 行 · 导唱「{{text}}」",
+    "params": [
+      "number",
+      "text"
+    ]
+  },
+  "project.errorLine": {
+    "context": "project interface: project.errorLine",
+    "source": "第 {{number}} 行{{background}}",
+    "params": [
+      "number",
+      "background"
+    ]
+  },
+  "project.errorWord": {
+    "context": "project interface: project.errorWord",
+    "source": "{{line}}第 {{number}} 词「{{text}}」",
+    "params": [
+      "line",
+      "number",
+      "text"
+    ]
+  },
+  "project.errorRuby": {
+    "context": "project interface: project.errorRuby",
+    "source": "{{line}}第 {{word}} 词第 {{number}} 注音「{{text}}」",
+    "params": [
+      "line",
+      "word",
+      "number",
+      "text"
+    ]
+  },
+  "project.errorTrack": {
+    "context": "project interface: project.errorTrack",
+    "source": "{{kind}}轨道 {{number}} · {{language}}",
+    "params": [
+      "kind",
+      "number",
+      "language"
+    ]
+  },
+  "project.errorContent": {
+    "context": "project interface: project.errorContent",
+    "source": "{{line}} · {{track}} · 内容 {{number}}",
+    "params": [
+      "line",
+      "track",
+      "number"
+    ]
+  },
+  "project.errorUnit": {
+    "context": "project interface: project.errorUnit",
+    "source": "{{line}} · {{track}} · 内容 {{content}} 第 {{number}} 单元",
+    "params": [
+      "line",
+      "track",
+      "content",
+      "number"
+    ]
+  },
+  "project.staleLine": {
+    "context": "project interface: project.staleLine",
+    "source": "已失效行",
+    "params": []
+  },
+  "project.errorCue": {
+    "context": "project interface: project.errorCue",
+    "source": "{{line}} · 导唱「{{text}}」",
+    "params": [
+      "line",
+      "text"
+    ]
+  },
+  "project.errorSegment": {
+    "context": "project interface: project.errorSegment",
+    "source": "人声片段 {{number}}",
+    "params": [
+      "number"
+    ]
+  },
+  "segment.ruleSyntax": {
+    "context": "Invalid custom segmentation rule; rule is the user-authored line",
+    "source": "规则需写成 原文=部分|部分：{{rule}}",
+    "params": [
+      "rule"
+    ]
+  },
+  "format.txt": {
+    "context": "format interface: format.txt",
+    "source": "纯文本 TXT",
+    "params": []
+  },
+  "format.lrc": {
+    "context": "format interface: format.lrc",
+    "source": "普通 LRC",
+    "params": []
+  },
+  "format.elrc": {
+    "context": "format interface: format.elrc",
+    "source": "扩展 LRC（尖括号）",
+    "params": []
+  },
+  "format.eslrc": {
+    "context": "format interface: format.eslrc",
+    "source": "ESLRC（正文后方括号）",
+    "params": []
   }
 }

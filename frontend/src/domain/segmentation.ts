@@ -1,3 +1,4 @@
+import { message, MessageError } from './messages';
 import { createProjectEditing, emptyBeatCount, type ProjectEditing } from './project-editing';
 import { createWord, type LyricDocument, type LyricWord } from './lyric-document';
 import { isGraphemeBoundary } from './text-boundaries';
@@ -30,13 +31,13 @@ const isCjk = (text: string) => /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Ka
 const isWestern = (text: string) => /^[\p{L}\p{M}\p{N}]+$/u.test(text) && !isCjk(text);
 
 export function validateSegmentOptions(options: SegmentOptions): void {
-  if (!Number.isFinite(options.punctuationWeight) || options.punctuationWeight < 0) throw new Error('标点时间权重必须是非负数');
+  if (!Number.isFinite(options.punctuationWeight) || options.punctuationWeight < 0) throw new MessageError(message('segment.weightInvalid'));
   for (const rule of options.rules) {
-    if (!rule.source || rule.parts.length < 2 || rule.parts.some((part) => !part) || rule.parts.join('') !== rule.source) throw new Error(`自定义规则必须完整保留原文：${rule.source}`);
+    if (!rule.source || rule.parts.length < 2 || rule.parts.some((part) => !part) || rule.parts.join('') !== rule.source) throw new MessageError(message('segment.ruleText',{source:rule.source}));
     let offset = 0;
     for (const part of rule.parts.slice(0, -1)) {
       offset += Array.from(part).length;
-      if (!isGraphemeBoundary(rule.source, offset)) throw new Error(`自定义规则切开了字符：${rule.source}`);
+      if (!isGraphemeBoundary(rule.source, offset)) throw new MessageError(message('segment.ruleCharacter',{source:rule.source}));
     }
   }
 }
@@ -105,14 +106,14 @@ export function segmentText(text: string, options: SegmentOptions, divide?: (tex
     if (result.length) result[result.length - 1] += prefix;
     else result.push(prefix);
   }
-  if (result.join('') !== text) throw new Error('分词结果未保留原文');
+  if (result.join('') !== text) throw new MessageError(message('segment.textMismatch'));
   return result;
 }
 
 export function distributeSegmentTime(word: LyricWord, parts: string[], punctuationWeight: number, editing = createProjectEditing()): LyricWord[] {
-  if (!parts.length || parts.join('') !== word.text || parts.some((part) => !part)) throw new Error('分词结果未保留原文');
+  if (!parts.length || parts.join('') !== word.text || parts.some((part) => !part)) throw new MessageError(message('segment.textMismatch'));
   if (parts.length === 1) return [word];
-  if (word.rubyUnits.length || word.obscene || emptyBeatCount(editing, word.id)) throw new Error(`词“${word.text}”包含注音或附属属性，请先手动处理`);
+  if (word.rubyUnits.length || word.obscene || emptyBeatCount(editing, word.id)) throw new MessageError(message('segment.wordAttributes',{text:word.text}));
   const weights = parts.map((part) => graphemes(part).reduce((total, item) => total + (isSpace(item) ? 0 : isPunctuation(item) ? punctuationWeight : 1), 0));
   const sum = weights.reduce((a, b) => a + b, 0);
   const begin = word.beginMs, end = word.endMs;

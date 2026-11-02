@@ -99,7 +99,7 @@ describe('semantic TTML codec', () => {
   });
 
   it('rejects unknown inline structure instead of silently flattening it', () => {
-    expect(() => parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><p><x-translation>translation</x-translation></p></body></tt>')).toThrow(/Unsupported TTML line child/);
+    expect(() => parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml"><body><p><x-translation>translation</x-translation></p></body></tt>')).toThrow('ttml.elementUnsupported');
   });
 
   it('reads the reference tool 注音, translation, romanization and background sample', () => {
@@ -111,7 +111,7 @@ describe('semantic TTML codec', () => {
       ['きょ', 0, 500], ['う', 500, 1000],
     ]);
     const state = createLyricEditorState(document);
-    expect(() => executeLyricCommand(state, { type: 'set-word-time', lineId: document.lines[0].id, wordId: document.lines[0].words[0].id, beginMs: 600, endMs: 1000 })).toThrow(/注音单元/);
+    expect(() => executeLyricCommand(state, { type: 'set-word-time', lineId: document.lines[0].id, wordId: document.lines[0].words[0].id, beginMs: 600, endMs: 1000 })).toThrow('command.rubyOutsideWord');
     expect(document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === document.lines[0].id).map(({ lineId: _lineId, ...content }) => ({ ...content, language: track.language, purpose: track.purpose })))).toEqual([{ id: expect.any(String), purpose: 'subtitle' as const, kind: 'plain' as const,  language: 'zh', text: '今天也唱歌' }]);
     expect(document.romanizationTracks[0]).toMatchObject({ language: 'ja-Latn', contents: [{ lineId: document.lines[0].id, kind: 'plain', text: 'kyou mo utau' }] });
     expect(document.lines[1]).toMatchObject({ backgroundOf: document.lines[0].id, beginMs: 500, endMs: 1800 });
@@ -139,7 +139,7 @@ describe('semantic TTML codec', () => {
     const document = createLyricDocument('今日');
     document.romanizationTracks.push({ id: 'track', language: null, contents: [{ id: 'content', lineId: document.lines[0].id, kind: 'timed', units: [{ id: 'unit', text: 'kyou', beginMs: null, endMs: null }] }] });
     expect(parseLyricTtml(serializeLyricTtml(document, { draft: true })).romanizationTracks).toEqual(document.romanizationTracks);
-    expect(() => serializeLyricTtml(document)).toThrow(/needs timing/);
+    expect(() => serializeLyricTtml(document)).toThrow('ttml.unitNeedsTime');
   });
 
   it.each(['amll', 'apple'])('roundtrips reference %s metadata, song part and background timing', (style) => {

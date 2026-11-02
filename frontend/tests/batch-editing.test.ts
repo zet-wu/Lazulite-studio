@@ -17,7 +17,7 @@ describe('E3 batch editing', () => {
     expect(state.present.lines[0].words[0].rubyUnits[0].beginMs).toBe(800);
     expect(state.present.lines[1]).toBe(untouched);
     expect(undoLyricCommand(state).present).toBe(document);
-    expect(() => shiftLineTimes(document, [line.id], -600)).toThrow(/偏移/);
+    expect(() => shiftLineTimes(document, [line.id], -600)).toThrow('batch.offsetOutOfRange');
   });
 
   it('smooths only nearby plain word boundaries and synchronizes line envelope', () => {

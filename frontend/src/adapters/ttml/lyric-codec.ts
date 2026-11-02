@@ -1,3 +1,4 @@
+import { message, MessageError } from '../../domain/messages';
 import { validateAgents } from '../../domain/amll-compatibility';
 import type { ProjectEditing } from '../../domain/project-editing';
 import { isUntimedSeparator, isUntimedXmlWhitespace } from '../export-separators';
@@ -19,12 +20,12 @@ const is = (node: Element, ns: string, name: string) => (node.namespaceURI === n
 
 function readAgent(node: Element): LyricAgent {
   const id = attr(node, XML, 'id');
-  if (!id) throw new Error('歌手缺少 xml:id');
+  if (!id) throw new MessageError(message('ttml.agentId'));
   const strict = (element: Element, allowed: string[]) => {
     for (const a of Array.from(element.attributes)) {
       if (a.namespaceURI === 'http://www.w3.org/2000/xmlns/') continue;
       if (allowed.includes(a.namespaceURI ? `{${a.namespaceURI}}${a.localName}` : a.localName)) continue;
-      throw new Error(`歌手 ${id} 的 ${element.localName} 包含不支持的属性 ${a.name}`);
+      throw new MessageError(message('ttml.agentAttribute',{id,element:element.localName,attribute:a.name}));
     }
   };
   strict(node, ['type', `{${XML}}id`]);
@@ -34,8 +35,8 @@ function readAgent(node: Element): LyricAgent {
     else if (is(child, TTM, 'actor') && actorRef === undefined) {
       strict(child, ['agent']);
       actorRef = attr(child, null, 'agent') ?? '';
-      if (!/^[A-Za-z_][\w.-]*$/.test(actorRef) || child.children.length || child.textContent?.trim()) throw new Error(`歌手 ${id} 的 actor 需要单个 agent 引用且不支持子结构`);
-    } else throw new Error(`歌手 ${id} 包含不支持的结构或重复的 ${child.localName}`);
+      if (!/^[A-Za-z_][\w.-]*$/.test(actorRef) || child.children.length || child.textContent?.trim()) throw new MessageError(message('ttml.agentActor',{id}));
+    } else throw new MessageError(message('ttml.agentStructure',{id,element:child.localName}));
   }
   return { id, name, type: attr(node, null, 'type'), ...(actorRef === undefined ? {} : { actorRef }) };
 }
@@ -51,22 +52,22 @@ function parseTime(value: string): number {
   else if (/^\d+(?:\.\d+)?s?$/.test(raw)) ms = decimalMs(raw.replace(/s$/, ''));
   else {
     const match = /^(?:(\d+):)?(\d+):(\d{2}(?:\.\d+)?)$/.exec(raw);
-    if (!match || Number(match[3]) >= 60 || match[1] !== undefined && Number(match[2]) >= 60) throw new Error(`Unsupported TTML time: ${value}`);
+    if (!match || Number(match[3]) >= 60 || match[1] !== undefined && Number(match[2]) >= 60) throw new MessageError(message('ttml.unsupportedTime',{value}));
     ms = Number(match[1] ?? 0) * 3600000 + Number(match[2]) * 60000 + decimalMs(match[3]);
   }
-  if (!Number.isSafeInteger(Math.round(ms))) throw new Error(`TTML time exceeds millisecond range: ${value}`);
+  if (!Number.isSafeInteger(Math.round(ms))) throw new MessageError(message('ttml.timeOverflow',{value}));
   return ms;
 }
 
 function timeText(ms: number) {
-  if (!Number.isSafeInteger(ms) || ms < 0) throw new Error('Invalid millisecond time');
+  if (!Number.isSafeInteger(ms) || ms < 0) throw new MessageError(message('ttml.timeInvalid'));
   const seconds = Math.floor(ms / 1000);
   const tail = `${String(Math.floor(seconds / 60) % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}.${String(ms % 1000).padStart(3, '0')}`;
   return seconds >= 3600 ? `${String(Math.floor(seconds / 3600)).padStart(2, '0')}:${tail}` : tail;
 }
 
 function boundaries(node: Element, parentStart: number, parentEnd: TimeMs, absoluteTimes: boolean, draft = false): [TimeMs, TimeMs] {
-  if (attr(node, null, 'timeContainer') === 'seq') throw new Error('Sequential TTML timing is not supported');
+  if (attr(node, null, 'timeContainer') === 'seq') throw new MessageError(message('ttml.sequential'));
   const beginRaw = attr(node, null, 'begin');
   const endRaw = attr(node, null, 'end');
   const durRaw = attr(node, null, 'dur');
@@ -78,14 +79,14 @@ function boundaries(node: Element, parentStart: number, parentEnd: TimeMs, absol
   const endFromEnd = endRaw === null ? null : value(endRaw);
   const endFromDur = durRaw === null ? null : (begin ?? parentStart) + parseTime(durRaw);
   const end = nulls.includes('end') ? null : [endFromEnd, endFromDur].filter((value): value is number => value !== null).reduce<number | null>((left, value) => left === null ? value : Math.min(left, value), null);
-  if (begin !== null && end !== null && begin > end) throw new Error('TTML end precedes begin');
+  if (begin !== null && end !== null && begin > end) throw new MessageError(message('ttml.reversed'));
   // Saved editor drafts may contain timing issues; reopen them without changing endpoints.
-  if (!draft && parentEnd !== null && ((begin !== null && begin > parentEnd) || (end !== null && end > parentEnd))) throw new Error('TTML child time exceeds parent');
+  if (!draft && parentEnd !== null && ((begin !== null && begin > parentEnd) || (end !== null && end > parentEnd))) throw new MessageError(message('ttml.childOutside'));
   return [begin, end];
 }
 
 function textOnly(node: Element, label: string): string {
-  if (Array.from(node.childNodes).some((child) => child.nodeType !== Node.TEXT_NODE && child.nodeType !== Node.CDATA_SECTION_NODE)) throw new Error(`${label} contains unsupported structure`);
+  if (Array.from(node.childNodes).some((child) => child.nodeType !== Node.TEXT_NODE && child.nodeType !== Node.CDATA_SECTION_NODE)) throw new MessageError(message('ttml.textStructure',{label}));
   return node.textContent ?? '';
 }
 
@@ -95,21 +96,21 @@ function checkAttributes(node: Element, allowed: string[], word = false) {
     if (attribute.namespaceURI === null && allowed.includes(attribute.localName)) continue;
     if (attribute.namespaceURI === XML && ['id', 'lang', 'space'].includes(attribute.localName)) continue;
     if (word && attribute.namespaceURI === AMLL && attribute.localName === 'obscene') {
-      if (!['true', 'false'].includes(attribute.value)) throw new Error('amll:obscene must be true or false');
+      if (!['true', 'false'].includes(attribute.value)) throw new MessageError(message('ttml.obsceneBoolean'));
       continue;
     }
     if (attribute.namespaceURI === TTS && attribute.localName === 'ruby') continue;
     if (attribute.namespaceURI === TTM && attribute.localName === 'agent') {
-      if (['base','textContainer','text'].includes(attr(node,TTS,'ruby')??'')) throw new Error('Ruby 不支持独立歌手');
+      if (['base','textContainer','text'].includes(attr(node,TTS,'ruby')??'')) throw new MessageError(message('ttml.rubySinger'));
       continue;
     }
     if (attribute.namespaceURI === TTM && attribute.localName === 'role') {
-      if (!word && attribute.value.split(/\s+/).includes('expletive')) throw new Error('expletive requires a word');
+      if (!word && attribute.value.split(/\s+/).includes('expletive')) throw new MessageError(message('ttml.expletiveWord'));
       continue;
     }
     if ([ITUNES, ITUNES_EXT].includes(attribute.namespaceURI ?? '') && ['key', 'timing', 'songPart'].includes(attribute.localName)) continue;
     if (attribute.namespaceURI === STUDIO && ['id', 'kind', 'null'].includes(attribute.localName)) continue;
-    throw new Error(`Unsupported TTML attribute ${attribute.name} on <${node.localName}>`);
+    throw new MessageError(message('ttml.attribute',{attribute:attribute.name,element:node.localName}));
   }
 }
 
@@ -120,13 +121,13 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
     if (!text.trim() && /[\r\n]/.test(text) && (node.parentElement?.closest('[xml\\:space]')?.getAttributeNS(XML, 'space') !== 'preserve')) return null;
     return text ? createWord(text, id) : null;
   }
-  if (node.nodeType !== Node.ELEMENT_NODE) throw new Error('Unsupported TTML line child');
+  if (node.nodeType !== Node.ELEMENT_NODE) throw new MessageError(message('ttml.lineChild'));
   const element = node as Element;
-  if (!is(element, TTML, 'span')) throw new Error(`Unsupported TTML line child <${element.localName}>`);
+  if (!is(element, TTML, 'span')) throw new MessageError(message('ttml.elementUnsupported',{context:'TTML line child',element:element.localName}));
   checkAttributes(element, ['begin', 'end', 'dur'], true);
   const roles = (attr(element, TTM, 'role') ?? '').split(/\s+/).filter(Boolean);
-  if (roles.some(role => role !== 'expletive')) throw new Error(`Unsupported word role ${roles.join(' ')}`);
-  if (roles.includes('expletive') && attr(element, AMLL, 'obscene') === 'false') throw new Error('expletive conflicts with amll:obscene=false');
+  if (roles.some(role => role !== 'expletive')) throw new MessageError(message('ttml.roleUnsupported',{context:'word',role:roles.join(' ')}));
+  if (roles.includes('expletive') && attr(element, AMLL, 'obscene') === 'false') throw new MessageError(message('ttml.expletiveConflict'));
   const obscene = roles.includes('expletive') || attr(element, AMLL, 'obscene') === 'true';
   const agentRefs = (attr(element, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
   const identity = agentRefs.length ? { agentRefs } : {};
@@ -137,16 +138,16 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
     const text = textOnly(element, 'Word');
     return text ? { ...createWord(text, wordId), beginMs, endMs, obscene, ...identity } : null;
   }
-  if (rubyKind !== 'container') throw new Error(`不支持的注音类型： ${rubyKind}`);
+  if (rubyKind !== 'container') throw new MessageError(message('ttml.rubyKind',{kind:rubyKind??''}));
   const parts = Array.from(element.children);
-  if (parts.length !== 2 || parts.some((part) => !is(part, TTML, 'span'))) throw new Error('注音容器须包含一组正文和读音');
+  if (parts.length !== 2 || parts.some((part) => !is(part, TTML, 'span'))) throw new MessageError(message('ttml.rubyPair'));
   const base = parts.find((part) => attr(part, TTS, 'ruby') === 'base');
   const reading = parts.find((part) => ['text', 'textContainer'].includes(attr(part, TTS, 'ruby') ?? ''));
-  if (!base || !reading) throw new Error('注音容器缺少正文或读音');
+  if (!base || !reading) throw new MessageError(message('ttml.rubyMissing'));
   checkAttributes(base, []);
   checkAttributes(reading, []);
   const text = textOnly(base, '注音 base');
-  if (!text) throw new Error('注音正文不能为空');
+  if (!text) throw new MessageError(message('ttml.rubyBaseEmpty'));
   const rubyUnits: RubyUnit[] = [];
   let unitIndex = 0;
   for (const child of Array.from(reading.childNodes)) {
@@ -156,17 +157,17 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
       if (value) rubyUnits.push({ id: `${wordId}:ruby:${unitIndex++}`, reading: value, beginMs: null, endMs: null });
       continue;
     }
-    if (child.nodeType !== Node.ELEMENT_NODE || !is(child as Element, TTML, 'span')) throw new Error('不支持的注音读音节点');
+    if (child.nodeType !== Node.ELEMENT_NODE || !is(child as Element, TTML, 'span')) throw new MessageError(message('ttml.rubyReadingNode'));
     const part = child as Element;
     checkAttributes(part, ['begin', 'end', 'dur']);
-    if (attr(reading, TTS, 'ruby') === 'textContainer' && attr(part, TTS, 'ruby') !== 'text') throw new Error('注音读音容器须包含读音单元');
+    if (attr(reading, TTS, 'ruby') === 'textContainer' && attr(part, TTS, 'ruby') !== 'text') throw new MessageError(message('ttml.rubyUnits'));
     const value = textOnly(part, '注音 reading unit');
-    if (!value) throw new Error('注音读音单元不能为空');
+    if (!value) throw new MessageError(message('ttml.rubyUnitEmpty'));
     const [unitBegin, unitEnd] = boundaries(part, lineStart, lineEnd, absoluteTimes, draft);
     rubyUnits.push({ id: attr(part, STUDIO, 'id') ?? `${wordId}:ruby:${unitIndex}`, reading: value, beginMs: unitBegin, endMs: unitEnd });
     unitIndex++;
   }
-  if (!rubyUnits.length) throw new Error('注音读音不能为空');
+  if (!rubyUnits.length) throw new MessageError(message('command.rubyEmpty'));
   return {
     ...createWord(text, wordId), obscene, ...identity,
     beginMs: beginMs ?? (rubyUnits.every((unit) => unit.beginMs !== null) ? Math.min(...rubyUnits.map((unit) => unit.beginMs!)) : null),
@@ -200,10 +201,10 @@ function readRomanization(item: Element, lineId: string, absoluteTimes: boolean,
       }
       continue;
     }
-    if (node.nodeType !== Node.ELEMENT_NODE || !is(node as Element, namespace, 'span')) throw new Error('Unsupported transliteration child');
+    if (node.nodeType !== Node.ELEMENT_NODE || !is(node as Element, namespace, 'span')) throw new MessageError(message('ttml.transliterationChild'));
     const span = node as Element;
     checkAttributes(span, ['begin', 'end', 'dur']);
-    if (attr(span, TTM, 'role')) throw new Error('Unsupported transliteration role');
+    if (attr(span, TTM, 'role')) throw new MessageError(message('ttml.transliterationRole'));
     const [beginMs, endMs] = boundaries(span, 0, null, absoluteTimes);
     units.push({ id: attr(span, STUDIO, 'id') ?? crypto.randomUUID(), text: pending + textOnly(span, 'Word transliteration'), beginMs, endMs });
     pending = '';
@@ -212,12 +213,12 @@ function readRomanization(item: Element, lineId: string, absoluteTimes: boolean,
 }
 
 export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean } = {}): LyricDocument {
-  if (new TextEncoder().encode(xml).byteLength > MAX_BYTES) throw new Error('TTML exceeds 2 MiB limit');
-  if (/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml)) throw new Error('DTD and external entities are not accepted');
+  if (new TextEncoder().encode(xml).byteLength > MAX_BYTES) throw new MessageError(message('ttml.size'));
+  if (/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml)) throw new MessageError(message('ttml.entities'));
   const parsed = new DOMParser().parseFromString(xml, 'application/xml');
-  if (parsed.querySelector('parsererror')) throw new Error('Invalid TTML XML');
+  if (parsed.querySelector('parsererror')) throw new MessageError(message('ttml.xml'));
   const root = parsed.documentElement;
-  if (root.namespaceURI !== TTML || root.localName !== 'tt') throw new Error('Root must be TTML tt');
+  if (root.namespaceURI !== TTML || root.localName !== 'tt') throw new MessageError(message('ttml.root'));
   checkAttributes(root, ['begin', 'end']);
   const absoluteTimes = attr(root, ITUNES, 'timing') !== null;
   const agents: LyricAgent[] = [];
@@ -231,29 +232,29 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
   const readAppleMetadata = (node: Element) => {
     checkAttributes(node, []);
     for (const group of Array.from(node.children)) {
-      if (!is(group, ITUNES, 'songwriters') && !is(group, ITUNES, 'translations') && !is(group, ITUNES, 'transliterations')) throw new Error(`Unsupported iTunes metadata <${group.localName}>`);
+      if (!is(group, ITUNES, 'songwriters') && !is(group, ITUNES, 'translations') && !is(group, ITUNES, 'transliterations')) throw new MessageError(message('ttml.elementUnsupported',{context:'iTunes metadata',element:group.localName}));
       checkAttributes(group, []);
       for (const entry of Array.from(group.children)) {
         if (is(group, ITUNES, 'songwriters')) {
-          if (!is(entry, ITUNES, 'songwriter')) throw new Error(`Unsupported songwriter <${entry.localName}>`);
+          if (!is(entry, ITUNES, 'songwriter')) throw new MessageError(message('ttml.elementUnsupported',{context:'songwriter',element:entry.localName}));
           checkAttributes(entry, []);
           addMetadata('songwriter', textOnly(entry, 'Songwriter'));
           continue;
         }
         const translation = is(group, ITUNES, 'translations');
-        if (!is(entry, ITUNES, translation ? 'translation' : 'transliteration')) throw new Error(`Unsupported iTunes sublyric <${entry.localName}>`);
+        if (!is(entry, ITUNES, translation ? 'translation' : 'transliteration')) throw new MessageError(message('ttml.elementUnsupported',{context:'iTunes sublyric',element:entry.localName}));
         checkAttributes(entry, translation ? ['type'] : []);
         const purpose = attr(entry, null, 'type') ?? 'subtitle';
-        if (translation && purpose !== 'subtitle' && purpose !== 'replacement') throw new Error('Unsupported translation type');
+        if (translation && purpose !== 'subtitle' && purpose !== 'replacement') throw new MessageError(message('ttml.translationType'));
         const track = { ...(translation ? { purpose: purpose as TranslationTrack['purpose'] } : {}),
           id: attr(entry, STUDIO, 'id') ?? crypto.randomUUID(),
           language: attr(entry, XML, 'lang'), contents: [] as RomanizationContent[],
         };
         for (const item of Array.from(entry.children)) {
-          if (!is(item, ITUNES, 'text')) throw new Error(`Unsupported iTunes sublyric child <${item.localName}>`);
+          if (!is(item, ITUNES, 'text')) throw new MessageError(message('ttml.elementUnsupported',{context:'iTunes sublyric child',element:item.localName}));
           checkAttributes(item, ['for']);
           const lineId = attr(item, null, 'for');
-          if (!lineId) throw new Error('iTunes sublyric needs a line reference');
+          if (!lineId) throw new MessageError(message('ttml.sublyricReference'));
           const background = Array.from(item.children).filter(node => attr(node, TTM, 'role') === 'x-bg');
 
           const main = item.cloneNode(true) as Element;
@@ -261,7 +262,7 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
           const parts = [...((!background.length || main.children.length || Array.from(main.childNodes).some(node => node.nodeValue && (node.nodeValue.trim() || root.getAttributeNS(XML, 'space') === 'preserve' || !/[\r\n]/.test(node.nodeValue))) || attr(main, STUDIO, 'id') || attr(main, STUDIO, 'kind')) ? [{ node: main, background: false }] : []),
             ...background.map(node => ({ node, background: true }))];
           for (const part of parts) {
-            if (part.background && !is(part.node, ITUNES, 'span')) throw new Error('Unsupported background sublyric node');
+            if (part.background && !is(part.node, ITUNES, 'span')) throw new MessageError(message('ttml.backgroundNode'));
             checkAttributes(part.node, ['for']);
             const content = readRomanization(part.node, lineId, absoluteTimes, part.node.namespaceURI ?? ITUNES, part.background);
             if (part.background) { backgroundContents.push({ parentId: lineId, backgroundId: attr(part.node, null, 'for'), content }); }
@@ -289,22 +290,22 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
             checkAttributes(entry, ['key', 'value']);
             const key = attr(entry, null, 'key');
             const value = attr(entry, null, 'value');
-            if (!key || value === null) throw new Error('AMLL metadata needs key and value');
+            if (!key || value === null) throw new MessageError(message('ttml.metadataFields'));
             addMetadata(key === 'musicName' ? 'title' : key === 'artists' ? 'artist' : key, value);
             continue;
           }
           if (is(entry, ITUNES, 'iTunesMetadata')) { readAppleMetadata(entry); continue; }
-          if (entry.namespaceURI !== TTM) throw new Error(`Unsupported metadata <${entry.localName}>`);
+          if (entry.namespaceURI !== TTM) throw new MessageError(message('ttml.elementUnsupported',{context:'metadata',element:entry.localName}));
           checkAttributes(entry, []);
           addMetadata(entry.localName, textOnly(entry, 'Metadata'));
         }
-      } else throw new Error(`Unsupported TTML head child <${child.localName}>`);
+      } else throw new MessageError(message('ttml.elementUnsupported',{context:'TTML head child',element:child.localName}));
     }
   }
   const body = Array.from(root.children).find((child) => is(child, TTML, 'body'));
-  if (!body || Array.from(root.children).some((child) => child !== head && child !== body)) throw new Error('TTML requires one body and supported head content');
+  if (!body || Array.from(root.children).some((child) => child !== head && child !== body)) throw new MessageError(message('ttml.body'));
   const visit = (parent: Element, parentStart: number, parentEnd: TimeMs, depth: number, songPart: string | null) => {
-    if (depth > 128) throw new Error('TTML nesting exceeds depth 128');
+    if (depth > 128) throw new MessageError(message('ttml.depth'));
     checkAttributes(parent, ['begin', 'end', 'dur', 'timeContainer']);
     const [ownBegin, ownEnd] = boundaries(parent, parentStart, parentEnd, absoluteTimes, draft);
     const start = ownBegin ?? parentStart;
@@ -314,7 +315,7 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
         visit(child, start, ownEnd, depth + 1, part);
         continue;
       }
-      if (!is(child, TTML, 'p')) throw new Error(`Unsupported TTML body child <${child.localName}>`);
+      if (!is(child, TTML, 'p')) throw new MessageError(message('ttml.elementUnsupported',{context:'TTML body child',element:child.localName}));
       checkAttributes(child, ['begin', 'end', 'dur']);
       const [beginMs, endMs] = boundaries(child, start, ownEnd, absoluteTimes, draft);
       const id = attr(child, XML, 'id') ?? attr(child, ITUNES, 'key') ?? `line-${lines.length + 1}`;
@@ -336,13 +337,13 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
             backgrounds.push(node as Element);
             continue;
           }
-          if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new Error(`Unsupported TTML role ${role}`);
+          if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new MessageError(message('ttml.roleUnsupported',{context:'TTML',role:role}));
         }
         const word = makeWord(node, id, index, wordStart, endMs, absoluteTimes, draft);
         if (word) words.push(word);
       }
       const agentRefs = (attr(child, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
-      if (agentRefs.some((ref) => !agents.some((agent) => agent.id === ref))) throw new Error(`Unknown agent on line ${id}`);
+      if (agentRefs.some((ref) => !agents.some((agent) => agent.id === ref))) throw new MessageError(message('ttml.unknownAgent',{id}));
       lines.push({ id, words, beginMs, endMs, agentRefs, backgroundOf: null, songPart: part });
       const addInline = (values: typeof inlineRomanizations, lineId: string) => values.forEach((value, index) => {
         const key = `${value.language ?? ''}\u0000${index}`;
@@ -372,14 +373,14 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
               bgRomanizations.push({ language, content });
             }
           } else {
-            if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new Error(`Unsupported background role ${role}`);
+            if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new MessageError(message('ttml.roleUnsupported',{context:'background',role:role}));
             const word = makeWord(node, bgId, index, bgStart, bgEnd, absoluteTimes, draft);
             if (word) bgWords.push(word);
           }
         }
         addInline(bgRomanizations, bgId);
         const bgAgents = (attr(background, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
-        if (bgAgents.some(ref => !agents.some(agent => agent.id === ref))) throw new Error(`Unknown agent on line ${bgId}`);
+        if (bgAgents.some(ref => !agents.some(agent => agent.id === ref))) throw new MessageError(message('ttml.unknownAgent',{id:bgId}));
         if (bgWords[0]?.text.startsWith('(') && bgWords.at(-1)!.text.endsWith(')')) {
           bgWords[0] = { ...bgWords[0], text: bgWords[0].text.replace(/^\(/, '') };
           const last = bgWords.length - 1;
@@ -390,17 +391,17 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
     }
   };
   visit(body, rootStart, null, 1, null);
-  if (new Set(lines.map((line) => line.id)).size !== lines.length) throw new Error('Duplicate line id');
+  if (new Set(lines.map((line) => line.id)).size !== lines.length) throw new MessageError(message('ttml.duplicateLine'));
   for (const { parentId, backgroundId, content } of backgroundContents) {
     const candidates = lines.filter(line => line.backgroundOf === parentId);
-    if (!backgroundId && candidates.length > 1) throw new Error('多背景附属内容需要明确 for 引用');
+    if (!backgroundId && candidates.length > 1) throw new MessageError(message('ttml.backgroundFor'));
     const background = candidates.find(line => !backgroundId || line.id === backgroundId);
-    if (!background) throw new Error(`Background transliteration refers to unknown parent ${parentId}`);
+    if (!background) throw new MessageError(message('ttml.backgroundParent',{id:parentId}));
     content.lineId = background.id;
   }
   romanizationTracks.push(...inlineRomanizationTracks.values());
   for (const track of [...romanizationTracks, ...translationTracks]) for (const content of track.contents) {
-    if (!lines.some((line) => line.id === content.lineId)) throw new Error(`iTunes transliteration refers to unknown line ${content.lineId}`);
+    if (!lines.some((line) => line.id === content.lineId)) throw new MessageError(message('ttml.unknownLine',{id:content.lineId}));
   }
   // Resolve all relative endpoints before quantizing; never round each ancestor.
   const quantize = (item: { beginMs: TimeMs; endMs: TimeMs }) => {
@@ -412,7 +413,7 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
     for (const word of line.words) { quantize(word); word.rubyUnits.forEach(quantize); }
   }
   for (const track of [...romanizationTracks, ...translationTracks]) for (const content of track.contents) if (content.kind === 'timed') content.units.forEach(quantize);
-  for (const agent of agents) if (agent.actorRef && !agents.some(a => a.id === agent.actorRef)) throw new Error(`歌手 ${agent.id} 的 actor 引用不存在：${agent.actorRef}`);
+  for (const agent of agents) if (agent.actorRef && !agents.some(a => a.id === agent.actorRef)) throw new MessageError(message('ttml.actorMissing',{id:agent.id,reference:agent.actorRef}));
   validateTranslationTracks(translationTracks, new Set(lines.map(line => line.id)));
   const document = { schemaVersion: LYRIC_SCHEMA_VERSION, lines, romanizationTracks, translationTracks, agents, metadata, language: attr(root, XML, 'lang') };
   validateAgents(document);
@@ -429,7 +430,7 @@ function setTime(node: Element, begin: TimeMs, end: TimeMs, draft: boolean) {
 }
 
 export function serializeLyricTtml(document: LyricDocument, options: { draft?: boolean; editing?: ProjectEditing } = {}): string {
-  if (document.schemaVersion !== LYRIC_SCHEMA_VERSION) throw new Error('Unsupported lyric document schema');
+  if (document.schemaVersion !== LYRIC_SCHEMA_VERSION) throw new MessageError(message('ttml.schema'));
   validateTranslationTracks(document.translationTracks, new Set(document.lines.map(line => line.id)));
   const draft = options.draft === true;
   const xml = new DOMParser().parseFromString(`<tt xmlns="${TTML}" xmlns:tts="${TTS}" xmlns:ttm="${TTM}" xmlns:amll="${AMLL}"${draft ? ` xmlns:studio="${STUDIO}"` : ''}><body/></tt>`, 'application/xml');
@@ -441,7 +442,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     const metadataNode = xml.createElementNS(TTML, 'metadata');
     const songwriters = document.metadata.songwriter ?? [];
     for (const [key, values] of Object.entries(document.metadata)) for (const value of values) {
-      if (!/^[A-Za-z][\w.-]*$/.test(key)) throw new Error(`Invalid metadata name: ${key}`);
+      if (!/^[A-Za-z][\w.-]*$/.test(key)) throw new MessageError(message('parse.metadataName',{key}));
       if (key === 'songwriter') continue;
       const entry = xml.createElementNS(AMLL, 'amll:meta');
       entry.setAttribute('key', key === 'title' ? 'musicName' : key === 'artist' ? 'artists' : key);
@@ -479,7 +480,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
         let previousMain: { lineId: string; node: Element } | null = null;
         for (const content of track.contents) {
           const line = document.lines.find(line => line.id === content.lineId);
-          if (!line) throw new Error(`Transliteration refers to unknown line ${content.lineId}`);
+          if (!line) throw new MessageError(message('ttml.unknownLine',{id:content.lineId}));
           const parentId = line.backgroundOf ?? line.id;
           const parent: Element = line.backgroundOf && previousMain?.lineId === parentId ? previousMain.node : xml.createElementNS(ITUNES, 'text');
           parent.setAttribute('for', parentId);
@@ -493,14 +494,14 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
           }
           if (content.kind === 'plain') textNode.appendChild(xml.createTextNode(line.backgroundOf ? `(${content.text})` : content.text));
           else {
-            if (!draft && !content.units.length) throw new Error(`Timed transliteration ${content.id} has no units`);
+            if (!draft && !content.units.length) throw new MessageError(message('ttml.contentEmpty',{id:content.id}));
             if (line.backgroundOf && content.units.length) textNode.appendChild(xml.createTextNode('('));
             const hasTimedText = content.units.some(item => !isUntimedSeparator(item));
             for (const unit of content.units) {
               if (!draft && isUntimedSeparator(unit) && hasTimedText) {
                 textNode.appendChild(xml.createTextNode(unit.text)); continue;
               }
-              if (!draft && !isUntimedSeparator(unit) && (unit.beginMs === null || unit.endMs === null)) throw new Error(`Transliteration unit ${unit.id} needs timing`);
+              if (!draft && !isUntimedSeparator(unit) && (unit.beginMs === null || unit.endMs === null)) throw new MessageError(message('ttml.unitNeedsTime',{id:unit.id}));
               const span = xml.createElementNS(ITUNES, 'span');
               if (draft) span.setAttributeNS(STUDIO, 'studio:id', unit.id);
               setTime(span, unit.beginMs, unit.endMs, draft);
@@ -525,7 +526,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
         group.appendChild(entry);
         for (const item of track.contents) {
         const line = document.lines.find(line => line.id === item.lineId);
-        if (!line) throw new Error(`Translation refers to unknown line ${item.lineId}`);
+        if (!line) throw new MessageError(message('ttml.unknownLine',{id:item.lineId}));
         const parent = xml.createElementNS(ITUNES, 'text');
         parent.setAttribute('for', line.backgroundOf ?? line.id);
         const content = line.backgroundOf ? xml.createElementNS(ITUNES, 'span') : parent;
@@ -533,12 +534,12 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
         if (draft) { content.setAttributeNS(STUDIO, 'studio:id', item.id); content.setAttributeNS(STUDIO, 'studio:kind', item.kind); }
         if (item.kind === 'plain') content.textContent = line.backgroundOf ? `(${item.text})` : item.text;
         else {
-          if (!draft && !item.units.length) throw new Error(`Translation ${item.id} has no units`);
+          if (!draft && !item.units.length) throw new MessageError(message('ttml.contentEmpty',{id:item.id}));
           if (line.backgroundOf) content.appendChild(xml.createTextNode('('));
           const hasTimedText = item.units.some(unit => !isUntimedSeparator(unit));
           for (const unit of item.units) {
             if (!draft && isUntimedSeparator(unit) && hasTimedText) { content.appendChild(xml.createTextNode(unit.text)); continue; }
-            if (!draft && !isUntimedSeparator(unit) && (unit.beginMs === null || unit.endMs === null)) throw new Error(`Translation ${item.id} unit ${unit.id} needs timing`);
+            if (!draft && !isUntimedSeparator(unit) && (unit.beginMs === null || unit.endMs === null)) throw new MessageError(message('ttml.unitNeedsTime',{id:unit.id}));
             const node = xml.createElementNS(ITUNES, 'span');
             if (draft) node.setAttributeNS(STUDIO, 'studio:id', unit.id);
             setTime(node, unit.beginMs, unit.endMs, draft); node.textContent = unit.text; content.appendChild(node);
@@ -566,7 +567,7 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
   for (const line of document.lines) if (line.backgroundOf) {
     backgrounds.set(line.backgroundOf, [...(backgrounds.get(line.backgroundOf) ?? []), line]);
   }
-  for (const parentId of backgrounds.keys()) if (!document.lines.some((line) => line.id === parentId && !line.backgroundOf)) throw new Error(`Background vocal has no parent: ${parentId}`);
+  for (const parentId of backgrounds.keys()) if (!document.lines.some((line) => line.id === parentId && !line.backgroundOf)) throw new MessageError(message('ttml.backgroundNoParent',{id:parentId}));
   for (const line of document.lines) {
     if (line.backgroundOf) continue;
     if (!div || currentPart !== line.songPart) {

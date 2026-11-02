@@ -20,7 +20,7 @@ it('never merges original words or guesses cross-word readings',()=>{
 });
 it('skip cancels unrelated splitting and all skipped produces no history',()=>{
  const d=createLyricDocument('食べる魂');const l=d.lines[0];const rows=proposeJapaneseRuby(d,[l.id],[range('食べる','たべる',l.id),range('魂','たましい',l.id,3)]);
- rows[0].blocks[0].reading='';const c=japaneseRubyCommand(d,d,rows);if(c.type!=='replace-document')throw Error();expect(c.document.lines[0].words.map(w=>w.text)).toEqual(['食べる','魂']);rows[0].blocks.at(-1)!.reading=' ';expect(()=>japaneseRubyCommand(d,d,rows)).toThrow('没有可应用');
+ rows[0].blocks[0].reading='';const c=japaneseRubyCommand(d,d,rows);if(c.type!=='replace-document')throw Error();expect(c.document.lines[0].words.map(w=>w.text)).toEqual(['食べる','魂']);rows[0].blocks.at(-1)!.reading=' ';expect(()=>japaneseRubyCommand(d,d,rows)).toThrow('reading.noChanges');
 });
 it('preserves existing units on unchanged/restored/empty input and uses original envelope on edits',()=>{
  const d=createLyricDocument('今日');const l=d.lines[0],w=l.words[0];w.beginMs=0;w.endMs=1000;w.rubyUnits=[{id:'a',reading:'キョウ',beginMs:100,endMs:800}];
@@ -36,14 +36,14 @@ it('handles non-BMP/combining clusters and ambiguous kana anchors conservatively
  const a=createLyricDocument('漢あ漢');expect(proposeJapaneseRuby(a,[a.lines[0].id],[range('漢あ漢','かああか',a.lines[0].id)])[0].blocks.filter(b=>b.editable).map(b=>b.reading)).toEqual(['','']);
 });
 it('rejects invalid service ranges and stale source without modifying source',()=>{
- const d=createLyricDocument('今日');const l=d.lines[0];expect(()=>proposeJapaneseRuby(d,[l.id],[range('違','ちがう',l.id)])).toThrow();const rows=proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)]);expect(()=>japaneseRubyCommand({...d},d,rows)).toThrow('源文档');expect(l.words[0].text).toBe('今日');
+ const d=createLyricDocument('今日');const l=d.lines[0];expect(()=>proposeJapaneseRuby(d,[l.id],[range('違','ちがう',l.id)])).toThrow();const rows=proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)]);expect(()=>japaneseRubyCommand({...d},d,rows)).toThrow('reading.stale');expect(l.words[0].text).toBe('今日');
 });
 it('roundtrips main/background ruby through draft and pure TTML',()=>{
  const d=createLyricDocument('今日');const l=d.lines[0];d.lines.push({...createLine('魂','bg'),backgroundOf:l.id});for(const l of d.lines){l.beginMs=0;l.endMs=1000;l.words[0].beginMs=0;l.words[0].endMs=1000;}
  const rows=proposeJapaneseRuby(d,d.lines.map(l=>l.id),[range('今日','きょう',l.id),range('魂','たましい','bg')]);const c=japaneseRubyCommand(d,d,rows);if(c.type!=='replace-document')throw Error();for(const draft of [false,true]){const reopened=parseLyricTtml(serializeLyricTtml(c.document,{draft}));expect(reopened.lines.map(l=>l.words[0].rubyUnits.map(u=>u.reading))).toEqual([['きょ','う'],['た','ま','し','い']]);expect(reopened.lines[1].backgroundOf).toBe(reopened.lines[0].id);}
 });
 it('rejects an inverted existing envelope atomically',()=>{
- const d=createLyricDocument('今日');const l=d.lines[0];l.words[0].rubyUnits=[{id:'r1',reading:'きょ',beginMs:900,endMs:null},{id:'r2',reading:'う',beginMs:null,endMs:100}];const rows=proposeJapaneseRuby(d,[l.id],[]);rows[0].blocks[0].reading='こんにち';expect(()=>japaneseRubyCommand(d,d,rows)).toThrow('包络无效');expect(l.words[0].rubyUnits[0].reading).toBe('きょ');
+ const d=createLyricDocument('今日');const l=d.lines[0];l.words[0].rubyUnits=[{id:'r1',reading:'きょ',beginMs:900,endMs:null},{id:'r2',reading:'う',beginMs:null,endMs:100}];const rows=proposeJapaneseRuby(d,[l.id],[]);rows[0].blocks[0].reading='こんにち';expect(()=>japaneseRubyCommand(d,d,rows)).toThrow('reading.invalidEnvelope');expect(l.words[0].rubyUnits[0].reading).toBe('きょ');
 });
 it('applies all 2000 rows, including rows never mounted in the preview',()=>{
  const d=createLyricDocument();d.lines=Array.from({length:2000},(_,i)=>createLine('今日',`line${i}`));const rows=proposeJapaneseRuby(d,d.lines.map(l=>l.id),d.lines.map(l=>range('今日','きょう',l.id)));const command=japaneseRubyCommand(d,d,rows);if(command.type!=='replace-document')throw Error();expect(command.document.lines).toHaveLength(2000);expect(command.document.lines.every(l=>l.words[0].rubyUnits.map(u=>u.reading).join('|')==='きょ|う')).toBe(true);
@@ -123,10 +123,10 @@ it('merging reconciles invalid cue anchors and keeps external links in the same 
 it('rejects merged incompatible agents and existing ruby beat loss without modifying any source',()=>{
  const d=createLyricDocument(),l=d.lines[0];d.agents=[{id:'a',name:null,type:'person'},{id:'b',name:null,type:'person'}];
  l.words=[{...createWord('今'),agentRefs:['a']},{...createWord('日'),agentRefs:['b']}];const before=structuredClone(d);
- expect(()=>japaneseRubyCommand(d,d,proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)],true))).toThrow('统一有效歌手');expect(d).toEqual(before);
+ expect(()=>japaneseRubyCommand(d,d,proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)],true))).toThrow('command.mergeSingers');expect(d).toEqual(before);
  const source=createLyricDocument('今日'),word=source.lines[0].words[0];word.rubyUnits=[{id:'kept',reading:'きょう',beginMs:null,endMs:null}];
  const editing=createProjectEditing();setEmptyBeat(editing,'kept','ruby',2);const rows=proposeJapaneseRuby(source,[source.lines[0].id],[]);rows[0].blocks[0].reading='こんにち';
- const initial=createLyricEditorState(source,editing);expect(()=>executeLyricCommand(initial,japaneseRubyCommand(source,source,rows))).toThrow('空拍');expect(initial.present).toBe(source);expect(initial.past).toHaveLength(0);
+ const initial=createLyricEditorState(source,editing);expect(()=>executeLyricCommand(initial,japaneseRubyCommand(source,source,rows))).toThrow('editing.replaceRubyBeats');expect(initial.present).toBe(source);expect(initial.past).toHaveLength(0);
 });
 it.each([[2,3],[null,3],[2,null]])('splitting retains exact outer endpoints and never invents partial internal time (%s, %s)',(beginMs,endMs)=>{
  const d=createLyricDocument('坂道'),l=d.lines[0];Object.assign(l.words[0],{beginMs,endMs});

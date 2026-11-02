@@ -21,7 +21,7 @@ it('applies draft times and acoustics once, with undo/redo and save fidelity',()
  expect(state.past).toHaveLength(1);expect(state.present.lyrics.lines.map(l=>l.beginMs)).toEqual([1000,3000]);
  expect(undoProjectCommand(state).present).toBe(p);expect(redoProjectCommand(undoProjectCommand(state)).present).toEqual(adopted);
  expect(parseProject(serializeProject(adopted))).toEqual(adopted);
- expect(()=>executeProjectCommand(state,{type:'alignment',source:p,project:adopted})).toThrow(/改变/);
+ expect(()=>executeProjectCommand(state,{type:'alignment',source:p,project:adopted})).toThrow('project.alignmentStale');
 });
 it('preserves absent, inverted, out-of-range and quantized-zero suggestions locally',()=>{
  const p=fixture();p.lyrics.lines[0].words[0].beginMs=100;p.lyrics.lines[0].words[0].endMs=500;

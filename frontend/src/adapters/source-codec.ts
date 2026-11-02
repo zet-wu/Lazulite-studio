@@ -1,39 +1,39 @@
-import { plainTranslation } from '../domain/lyric-document';
-import { createLyricDocument, createLine, createWord, lineText, type LyricDocument, type LyricLine, type RomanizationTrack } from '../domain/lyric-document';
-const time = (ms: number) => { if (!Number.isFinite(ms) || ms < 0) throw new Error('歌词时间无效'); return Math.round(ms); };
+import { message, MessageError } from '../domain/messages';
+import { plainTranslation, createLyricDocument, createLine, createWord, lineText, type LyricDocument, type LyricLine, type RomanizationTrack } from '../domain/lyric-document';
+const time = (ms: number) => { if (!Number.isFinite(ms) || ms < 0) throw new MessageError(message('parse.timeInvalid')); return Math.round(ms); };
 export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc', onSidecarIssue: () => void = () => {}): LyricDocument {
   if (kind === 'qrc' && text.trim().startsWith('<')) {
     const xml = new DOMParser().parseFromString(text, 'application/xml');
     const content = xml.querySelector('[LyricContent]')?.getAttribute('LyricContent');
-    if (!content) throw new Error('QRC XML 缺少 LyricContent'); text = content;
+    if (!content) throw new MessageError(message('parse.qrcContent')); text = content;
   }
   const d = createLyricDocument(); d.lines = [];
   const offset = Number(text.match(/^\[offset:([+-]?\d+)\]/m)?.[1] ?? 0);
   for (const [index, raw] of text.split(/\r?\n/).entries()) {
     const row = raw.match(/^\[(\d+),(\d+)\](.*)$/);
     if (!row) {
-      if (raw.trim() && !/^\[[a-zA-Z]+:.*\]$/.test(raw.trim())) throw new Error(`第 ${index+1} 行正文格式无效`);
+      if (raw.trim() && !/^\[[a-zA-Z]+:.*\]$/.test(raw.trim())) throw new MessageError(message('parse.invalidLine',{number:index+1}));
       continue;
     }
     const start = Number(row[1]), line = createLine(''); line.beginMs = time(start + offset); line.endMs = time(start + Number(row[2]) + offset);
     const pattern = kind === 'krc' ? /<(\d+),(\d+),\d+>([\s\S]*?)(?=<\d+,\d+,\d+>|$)/g : kind === 'yrc' ? /\((\d+),(\d+),\d+\)([\s\S]*?)(?=\(\d+,\d+,\d+\)|$)/g : /([\s\S]*?)\((\d+),(\d+)\)/g;
     let consumed = 0;
     for (const m of row[3].matchAll(pattern)) {
-      if (m.index !== consumed) throw new Error('逐词标签之间含无法解析的文字');
+      if (m.index !== consumed) throw new MessageError(message('parse.wordTagText'));
       const wordText = kind === 'qrc' ? m[1] : m[3], begin = Number(kind === 'qrc' ? m[2] : m[1]) + (kind === 'krc' ? start : 0) + offset, duration = Number(kind === 'qrc' ? m[3] : m[2]);
       line.words.push({ ...createWord(wordText), beginMs: time(begin), endMs: time(begin + duration) }); consumed = m.index + m[0].length;
     }
-    if (consumed !== row[3].length || !line.words.length) throw new Error('逐词歌词标签不完整');
+    if (consumed !== row[3].length || !line.words.length) throw new MessageError(message('parse.wordTagsIncomplete'));
     d.lines.push(line);
   }
-  if (!d.lines.length || d.lines.length > 20000) throw new Error('未解析出逐词歌词或行数超过 20000');
+  if (!d.lines.length || d.lines.length > 20000) throw new MessageError(message('parse.wordLineLimit'));
   if (kind === 'krc') {
     const language = text.match(/^\[language:([^\]]+)\]/m)?.[1];
     if (language) {
       // Only this optional language block is recoverable; body parsing above is strict.
       try {
         const payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(language), c => c.charCodeAt(0))));
-        if (!Array.isArray(payload.content)) throw new Error('KRC 附属块格式无效');
+        if (!Array.isArray(payload.content)) throw new MessageError(message('parse.krcSidecar'));
         for (const part of payload.content) {
           if (part.type !== 0 && part.type !== 1) { onSidecarIssue(); continue; }
           if (!Array.isArray(part.lyricContent)) { onSidecarIssue(); continue; }
@@ -55,12 +55,12 @@ export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc', onSid
 }
 export async function decodeKrcFile(file: File): Promise<string> {
   const raw = new Uint8Array(await file.arrayBuffer());
-  if (new TextDecoder().decode(raw.slice(0, 4)) !== 'krc1') throw new Error('KRC 文件头无效');
+  if (new TextDecoder().decode(raw.slice(0, 4)) !== 'krc1') throw new MessageError(message('parse.krcHeader'));
   const key = [64,71,97,119,94,50,116,71,81,54,49,45,206,210,110,105];
   const bytes = raw.slice(4).map((v, i) => v ^ key[i % 16]);
   const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate')).getReader();
   let total = 0, result = ''; const decoder = new TextDecoder('utf-8', { fatal: true });
-  try { while (true) { const { value, done } = await reader.read(); if (done) break; total += value.length; if (total > 4_000_000) throw new Error('KRC 解压超过 4 MB'); result += decoder.decode(value, { stream: true }); } return result + decoder.decode(); }
+  try { while (true) { const { value, done } = await reader.read(); if (done) break; total += value.length; if (total > 4_000_000) throw new MessageError(message('parse.krcSize')); result += decoder.decode(value, { stream: true }); } return result + decoder.decode(); }
   finally { await reader.cancel(); }
 }
 export function parseLrcSource(text: string, lineTimedWords?: Set<string>): LyricDocument {
@@ -75,7 +75,7 @@ export function parseLrcSource(text: string, lineTimedWords?: Set<string>): Lyri
       const line = createLine(''); line.beginMs = clock(h[1], h[2]);
       let begin = line.beginMs, pos = 0;
       for (const marker of body.matchAll(/<(\d+):(\d+(?:\.\d+)?)>/g)) {
-        const end = clock(marker[1], marker[2]); if (end < begin) throw new Error('扩展 LRC 词时间倒序');
+        const end = clock(marker[1], marker[2]); if (end < begin) throw new MessageError(message('parse.elrcReversed'));
         const value = body.slice(pos, marker.index); if (value) line.words.push({ ...createWord(value), beginMs: begin, endMs: end });
         begin = end; pos = marker.index! + marker[0].length;
       }
@@ -87,7 +87,7 @@ export function parseLrcSource(text: string, lineTimedWords?: Set<string>): Lyri
       d.lines.push(line);
     }
   }
-  if (!d.lines.length || d.lines.length > 20000) throw new Error('未解析出 LRC 歌词或行数超过 20000');
+  if (!d.lines.length || d.lines.length > 20000) throw new MessageError(message('parse.lrcLineLimit'));
   return d;
 }
 export function attachSidecar(d: LyricDocument, text: string, kind: 'translation' | 'romanization'): string[] {

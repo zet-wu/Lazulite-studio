@@ -1,3 +1,4 @@
+import { message, MessageError } from '../../domain/messages';
 import { wordAgents, lineAgents, sameAgents } from '../../domain/amll-compatibility';
 import { createProjectEditing, remapEditing, type ProjectEditing } from '../../domain/project-editing';
 import { applyLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
@@ -46,14 +47,14 @@ function copyObjects(document: LyricDocument, selection: EditorSelection): Edito
   if (selection.kind === 'romanization-content' || selection.kind === 'romanization-unit') {
     const track = document.romanizationTracks.find((item) => item.id === selection.trackId);
     const content = track?.contents.find((item) => item.id === selection.contentId);
-    if (!content) throw new Error('音译内容不存在');
+    if (!content) throw new MessageError(message('command.romanizationContentMissing'));
     if (selection.kind === 'romanization-content') {
       const contents = track!.contents.filter((item) => item.lineId === selection.lineId && selection.ids.includes(item.id));
       return { kind: 'romanization-content', trackId: selection.trackId, contents, text: contents.map((item) => item.kind === 'plain' ? item.text : item.units.map((unit) => unit.text).join('')).join('\n') };
     }
-    if (content.kind !== 'timed') throw new Error('请选择音译单元');
+    if (content.kind !== 'timed') throw new MessageError(message('editing.chooseRomanizationUnit'));
     const selectedContents = document.romanizationTracks.flatMap(track => track.contents.filter(item => item.kind === 'timed' && item.units.some(unit => selection.ids.includes(unit.id))));
-    if (selectedContents.length !== 1) throw new Error('跨内容音译复制暂不支持，请选择同一份内容');
+    if (selectedContents.length !== 1) throw new MessageError(message('editing.copySameContent'));
     const units = content.units.filter((unit) => selection.ids.includes(unit.id));
     return { kind: 'romanization-unit', trackId: selection.trackId, contentId: content.id, units, text: units.map((unit) => unit.text).join('') };
   }
@@ -96,9 +97,9 @@ function expandedLineTime(target: LyricLine, words: LyricWord[]) {
 export function moveWordsAcrossLine(document: LyricDocument, selection: Extract<EditorSelection, { kind: 'words' }>, targetLineId: string, afterWordId?: string | null): LyricCommand {
   const target = document.lines.find((line) => line.id === targetLineId)!;
   const selected = document.lines.flatMap((line) => line.words.filter((word) => selection.ids.includes(word.id)).map((word) => ({ line, word })));
-  if (selected.some(({ line }) => line.id === target.id)) throw new Error('目标行必须不同于所选词所在行');
+  if (selected.some(({ line }) => line.id === target.id)) throw new MessageError(message('editing.differentTargetLine'));
   const words = selected.map(({ word }) => word);
-  if (!selected.length) throw new Error('请先选择词块');
+  if (!selected.length) throw new MessageError(message('editing.chooseWords'));
   const { beginMs, endMs } = expandedLineTime(target, words);
   const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'move-word' }>> = [];
   if (beginMs !== target.beginMs || endMs !== target.endMs) commands.push({ type: 'set-line-time', lineId: target.id, beginMs, endMs });
@@ -137,9 +138,9 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
   const selectedLineId = selectionLineId(selection);
   const currentLine = document.lines.find((line) => line.id === selectedLineId);
   if (clipboard.kind === 'ruby') {
-    if (selection?.kind !== 'ruby') throw new Error('请先选择目标读音单元');
+    if (selection?.kind !== 'ruby') throw new MessageError(message('editing.chooseReadingTarget'));
     const word = currentLine?.words.find((item) => item.id === selection.wordId);
-    if (!word) throw new Error('读音所属词不存在');
+    if (!word) throw new MessageError(message('editing.readingWordMissing'));
     const copied = clipboard.units.map((unit) => ({ ...unit, id: copyId(unit.id, idMap) }));
     const commands: Array<Extract<LyricCommand, { type: 'insert-ruby' | 'set-ruby-time' }>> = [];
     let afterRubyId = selection.activeId;
@@ -152,7 +153,7 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
       selection: { ...selection, ids: copied.map((unit) => unit.id), anchorId: copied[0].id, activeId: copied.at(-1)!.id } };
   }
   if (clipboard.kind === 'romanization-content') {
-    if (!currentLine) throw new Error('请先选择歌词行');
+    if (!currentLine) throw new MessageError(message('editing.chooseLine'));
     const contents = clipboard.contents.map((content) => content.kind === 'plain'
       ? { ...content, id: crypto.randomUUID(), lineId: currentLine.id }
       : { ...content, id: crypto.randomUUID(), lineId: currentLine.id, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) });
@@ -160,9 +161,9 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
       selection: { kind: 'romanization-content', lineId: currentLine.id, trackId: clipboard.trackId, contentId: contents.at(-1)!.id, ids: contents.map((content) => content.id), anchorId: contents[0].id, activeId: contents.at(-1)!.id } };
   }
   if (clipboard.kind === 'romanization-unit') {
-    if (selection?.kind !== 'romanization-unit' && selection?.kind !== 'romanization-content') throw new Error('请先选择定时音译内容');
+    if (selection?.kind !== 'romanization-unit' && selection?.kind !== 'romanization-content') throw new MessageError(message('editing.chooseTimedRomanization'));
     const content = document.romanizationTracks.find((track) => track.id === selection.trackId)?.contents.find((item) => item.id === selection.contentId);
-    if (!content || content.kind !== 'timed') throw new Error('请先选择定时音译内容');
+    if (!content || content.kind !== 'timed') throw new MessageError(message('editing.chooseTimedRomanization'));
     const units = content.units.slice();
     const after = selection.kind === 'romanization-unit' ? units.findIndex((unit) => unit.id === selection.activeId) : units.length - 1;
     const copied = clipboard.units.map((unit) => ({ ...unit, id: copyId(unit.id, idMap) }));
@@ -171,9 +172,9 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
       selection: { kind: 'romanization-unit', lineId: selection.lineId, trackId: selection.trackId, contentId: content.id, ids: copied.map((unit) => unit.id), anchorId: copied[0].id, activeId: copied.at(-1)!.id } };
   }
   if (clipboard.kind === 'words') {
-    if (!currentLine) throw new Error('请先选择粘贴目标行');
+    if (!currentLine) throw new MessageError(message('editing.choosePasteLine'));
     const afterWordId = selection?.kind === 'words' && currentLine.words.some((word) => word.id === selection.activeId) ? selection.activeId : currentLine.words.at(-1)?.id ?? null;
-    const words = clipboard.words.map(word => {const effective=clipboard.sources?.[word.id]; if(!word.agentRefs&&effective&&!sameAgents(effective,lineAgents(document,currentLine))) {if(!effective.length)throw new Error('无歌手词无法在有歌手目标行中保真');return cloneWord({...word,agentRefs:effective},idMap);}return cloneWord(word,idMap);});
+    const words = clipboard.words.map(word => {const effective=clipboard.sources?.[word.id]; if(!word.agentRefs&&effective&&!sameAgents(effective,lineAgents(document,currentLine))) {if(!effective.length)throw new MessageError(message('editing.singerLoss'));return cloneWord({...word,agentRefs:effective},idMap);}return cloneWord(word,idMap);});
     const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'insert-word' }>> = [];
     const { beginMs, endMs } = expandedLineTime(currentLine, words);
     if (beginMs !== currentLine.beginMs || endMs !== currentLine.endMs) commands.push({ type: 'set-line-time', lineId: currentLine.id, beginMs, endMs });
@@ -222,7 +223,7 @@ export function pastePlain(document: LyricDocument, text: string, selection: Edi
   }
   if (selection?.kind === 'romanization-unit') {
     const content = document.romanizationTracks.find((track) => track.id === selection.trackId)?.contents.find((item) => item.id === selection.contentId);
-    if (!content || content.kind !== 'timed') throw new Error('请选择定时音译内容');
+    if (!content || content.kind !== 'timed') throw new MessageError(message('command.timedRomanization'));
     const unit = { id: crypto.randomUUID(), text, beginMs: null, endMs: null };
     const units = content.units.slice();
     const after = units.findIndex((item) => item.id === selection.activeId);

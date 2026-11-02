@@ -41,7 +41,7 @@ it('rich copy remaps IDs, merge uses logical OR, and attached-property split gat
   const copied = executeProjectCommand(state, { type: 'lyrics', command: pasted.command });
   expect(copied.present.lyrics.lines[0].words[1]).toMatchObject({ obscene: true, text: 'Alpha' });
   expect(copied.present.lyrics.lines[0].words[1].id).not.toBe(line.words[0].id);
-  expect(() => executeProjectCommand(state, { type: 'lyrics', command: { type: 'split-word', lineId: line.id, wordId: line.words[0].id, at: 2 } })).toThrow(/attached/);
+  expect(() => executeProjectCommand(state, { type: 'lyrics', command: { type: 'split-word', lineId: line.id, wordId: line.words[0].id, at: 2 } })).toThrow('command.splitAttributes');
   state = executeProjectCommand(state, { type: 'lyrics', command: { type: 'merge-words', wordIds: line.words.map(w => w.id) } });
   expect(state.present.lyrics.lines[0].words[0]).toMatchObject({ text: 'Alpha今日', obscene: true });
   expect(undoProjectCommand(state).present.lyrics).toEqual(doc);
@@ -50,10 +50,10 @@ it('rejects invalid flag values and flags on individual Ruby/line nodes instead 
   const doc = fixture(); doc.lines[0].words[1].obscene = true;
   const xml = serializeLyricTtml(doc, { draft: true });
   expect(parseLyricTtml(xml.replace(' ttm:role="expletive"', '').replace('amll:obscene="true"', 'amll:obscene="false"')).lines[0].words[1].obscene).toBe(false);
-  expect(() => parseLyricTtml(xml.replace('amll:obscene="true"', 'amll:obscene="yes"'))).toThrow(/true or false/);
+  expect(() => parseLyricTtml(xml.replace('amll:obscene="true"', 'amll:obscene="yes"'))).toThrow('ttml.obsceneBoolean');
   for (const target of ['tts:ruby="text"', 'xml:id=']) {
     const invalid = target === 'xml:id=' ? xml.replace('<p ', '<p amll:obscene="true" ') : xml.replace(target, `${target} amll:obscene="true"`);
-    expect(() => parseLyricTtml(invalid)).toThrow(/Unsupported TTML attribute/);
+    expect(() => parseLyricTtml(invalid)).toThrow('ttml.attribute');
   }
 });
 
@@ -63,7 +63,7 @@ it('imports either obscene expression, tokenizes roles and rejects contradiction
   for (const input of [xml, xml.replaceAll(' amll:obscene="true"', ''), xml.replaceAll(' ttm:role="expletive"', ''), xml.replaceAll('ttm:role="expletive"', 'ttm:role=" expletive  expletive "')]) {
     expect(parseLyricTtml(input)).toEqual(doc);
   }
-  expect(() => parseLyricTtml(xml.replace('obscene="true"', 'obscene="false"'))).toThrow(/conflicts/);
+  expect(() => parseLyricTtml(xml.replace('obscene="true"', 'obscene="false"'))).toThrow('ttml.expletiveConflict');
   expect(() => parseLyricTtml(xml.replace('role="expletive"', 'role="expletive unknown"'))).toThrow(/role/);
   doc.lines.forEach(line => line.words.forEach(word => { word.obscene = false; }));
   const cleared = serializeLyricTtml(doc, { draft: false });
