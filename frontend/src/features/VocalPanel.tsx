@@ -12,7 +12,7 @@ import { useAudioReview } from './AudioReviewContext';
 import { TopMenu } from './editor/TopMenu';
 import editorStyles from './editor/semantic-editor.module.css';
 import styles from './vocal.module.css';
-export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, durationMs, visible }: { locked?: boolean; projectId: string; project: ProjectDocument; sourceAssetId: string; apply: (command: ProjectCommand) => void; durationMs: number; visible: boolean }) {
+export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, durationMs, visible }: { locked?: boolean; projectId: string; project: ProjectDocument; sourceAssetId: string; apply: (command: ProjectCommand) => void; durationMs: number | null; visible: boolean }) {
   const ui = useAudioReview();
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
@@ -65,6 +65,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const adopt = () => { if(locked)return;
     if(!pending || !result || result.status!=='ready') return;
     try {
+      if (durationMs === null) throw new Error('源音频时长未知，无法接入人声结果');
       if(result.source_asset_id!==sourceAssetId)throw new Error('音源已改变，请重新发起人声处理');
       apply({type:'acoustics', acoustics:{analysisId:result.id,segments:result.segments!.map(s=>({...s}))},durationMs});
       handled.current.add(pending.id); setPending(null); setError('');

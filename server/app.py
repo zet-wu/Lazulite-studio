@@ -137,6 +137,7 @@ def create_app(
             "content_type": row[3],
             "size_bytes": row[2],
             "duration_ms": metadata.get("proxy_duration_ms"),
+            "source_duration_ms": row[6],
             "status": "ready" if row[5] else "processing",
             "asset_hash": row[1],
             "source_start_ms": row[7] or 0,

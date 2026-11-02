@@ -99,6 +99,7 @@ export function isAsset(value: unknown): value is Asset {
     string(value.filename) &&
     string(value.content_type) &&
     Number.isSafeInteger(value.size_bytes) &&
+    (value.source_duration_ms === null || (Number.isSafeInteger(value.source_duration_ms) && Number(value.source_duration_ms) >= 0)) &&
     (value.duration_ms === null ||
       (Number.isSafeInteger(value.duration_ms) &&
         Number(value.duration_ms) >= 0)) &&

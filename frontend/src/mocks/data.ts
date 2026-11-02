@@ -37,6 +37,7 @@ export const sampleProject = {
     content_type: "audio/mp4",
     size_bytes: 1024,
     duration_ms: 120000,
+    source_duration_ms: 120000,
     status: "ready" as const,
     asset_hash: "demo-hash",
     source_start_ms: 0,

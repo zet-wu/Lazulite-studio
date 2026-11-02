@@ -14,7 +14,7 @@ import { packIntervals } from '../domain/pack-intervals';
 import { editSegments } from '../domain/vocal-editing';
 import type { Acoustics, VocalSegment } from '../domain/project-document';
 import styles from './vocal.module.css';
-type Props = { locked?: boolean; children: ReactNode; bpm: number; snap: boolean; anchors: number[]; showEnergy: boolean; showSegments: boolean; lineLabel: string; projectId: string; acoustics: Acoustics; startMs: number; endMs: number; durationMs: number; selectedLineId: string | null; apply: (acoustics: Acoustics) => void; assign: (lineId: string, segment: VocalSegment) => void; pause: () => void };
+type Props = { sourceDurationMs: number | null; locked?: boolean; children: ReactNode; bpm: number; snap: boolean; anchors: number[]; showEnergy: boolean; showSegments: boolean; lineLabel: string; projectId: string; acoustics: Acoustics; startMs: number; endMs: number; durationMs: number; selectedLineId: string | null; apply: (acoustics: Acoustics) => void; assign: (lineId: string, segment: VocalSegment) => void; pause: () => void };
 type Drag = { segment?: VocalSegment; side: 'move'|'beginMs'|'endMs'|'new'; x: number; now: number; width: number; left: number; document: Acoustics; ids: string[]; candidate: VocalSegment };
 export const VOCAL_LINE_MIME = 'application/x-studio-vocal-line';
 export function VocalTracks(props: Props) {
@@ -65,6 +65,8 @@ export function VocalTracks(props: Props) {
     return snapTimelineTime(time, anchors, span, d.width, props.snap);
   };
   const candidate = (d:Drag): VocalSegment => {
+    const durationMs = props.sourceDurationMs;
+    if (durationMs === null) throw new Error("源音频时长未知，无法拖动声学片段");
     const delta=timelineDelta(d.now-d.x,d.width,span);
     if(d.side==='new') {
       const a=Math.max(0,Math.min(durationMs,snapAt(startMs+(d.x-d.left)/d.width*span,d)));
@@ -79,6 +81,7 @@ export function VocalTracks(props: Props) {
   const begin = (e:PointerEvent<HTMLElement>,segment?:VocalSegment,side:Drag['side']='new')=>{
     if(props.locked || e.button!==0 || (!segment && !adding))return;
     e.preventDefault(); e.stopPropagation();
+    if (props.sourceDurationMs === null) { setError('源音频时长未知，无法拖动声学片段'); return; }
     if(segment && (e.ctrlKey||e.metaKey||e.shiftKey)) {
       const sorted=[...acoustics.segments].sort((a,b)=>a.beginMs-b.beginMs||a.endMs-b.endMs||a.id.localeCompare(b.id));
       if(e.shiftKey&&selected.length){const a=sorted.findIndex(s=>s.id===(sharedSelection.effective?.anchorId ?? selected[0])),b=sorted.findIndex(s=>s.id===segment.id);setSelected(sorted.slice(Math.min(a,b),Math.max(a,b)+1).map(s=>s.id));}

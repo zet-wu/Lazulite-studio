@@ -787,12 +787,15 @@ export interface components {
             filename: string;
             content_type: string;
             size_bytes: number;
+            /** @description Playback proxy duration; media reads and transport only. */
             duration_ms: number | null;
             /** @enum {string} */
             status: "ready";
             asset_hash: string;
             source_start_ms: number;
             proxy_offset_ms: number;
+            /** @description Probed duration of the bound source audio; null means unknown. */
+            source_duration_ms: number | null;
         };
         WaveformWindow: {
             /** @constant */

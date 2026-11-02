@@ -19,7 +19,7 @@ export type AlignmentControl = {
   save: () => Promise<{revision:string} | undefined>;
 };
 export function AlignmentPanel({pid, assetId, durationMs, project, control, visible, finishDraft}: {
-  pid:string; assetId?:string; durationMs:number; project:ProjectDocument; control:AlignmentControl; visible:boolean; finishDraft:()=>boolean;
+  pid:string; assetId?:string; durationMs:number|null; project:ProjectDocument; control:AlignmentControl; visible:boolean; finishDraft:()=>boolean;
 }) {
   const ui=useAudioReview();
   const caps=useQuery({queryKey:['capabilities'],queryFn:()=>jobsApi.capabilities()});
@@ -48,7 +48,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   },[pid]);
   const capability=caps.data?.items.find(c=>c.id==='job.alignment');
   const active=jobs.data?.items.some(j=>['vocal','alignment'].includes(j.kind)&&['queued','running','cancel_requested'].includes(j.status));
-  const reason=!assetId?'请先上传源音频':!project.lyrics.lines.some(l=>!project.editing.skippedAlignmentLineIds.includes(l.id))?'没有未跳过的歌词行':!capability?.enabled?(capability?.reason??'正在检查模型能力'):active?'已有音频处理运行':null;
+  const reason=!assetId?'请先上传源音频':durationMs===null?'源音频时长未知，无法自动对齐':!project.lyrics.lines.some(l=>!project.editing.skippedAlignmentLineIds.includes(l.id))?'没有未跳过的歌词行':!capability?.enabled?(capability?.reason??'正在检查模型能力'):active?'已有音频处理运行':null;
   const open=async()=>{
     if(!finishDraft())return;
     setOpening(true);setMessage('');setOptions(defaultAlignmentOptions());setGapDraft('500');setGapError('');
@@ -89,6 +89,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
           const current=await studioS4.getDocumentEnvelope(pid);
           if(!op.alive||op.cancel){if(op.alive)setMessage('已取消应用','status',4000);break;}
           if(current.revision!==saved.revision || result.binding.revision!==saved.revision || result.binding.project_id!==pid || result.binding.asset_id!==assetId)throw new Error('项目版本或音频已改变，请重新运行');
+          if (durationMs === null) throw new Error('源音频时长未知，无法接入自动对齐结果');
           const merged=mergeAlignment(op.lock.source,result,durationMs,selected.clear_unmatched,selected.merge_short_gaps?selected.gap_threshold_ms:null);op.lock.apply(merged.project);
           resultMessage([merged.project===op.lock.source?'未更新歌词时间':'已更新歌词时间', merged.mergedGaps?`合并 ${merged.mergedGaps} 处行内空隙`:'', merged.cleared.length?`清空 ${merged.cleared.length} 个词／注音的缺失端点`:'', merged.retained.length?`${merged.retained.length} 个词／注音部分时间保留原值`:''].filter(Boolean).join('；'), 'status', merged.retained.length||merged.cleared.length?8000:4000);break;
         }

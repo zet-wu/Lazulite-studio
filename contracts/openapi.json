@@ -2275,7 +2275,8 @@
           "status",
           "asset_hash",
           "source_start_ms",
-          "proxy_offset_ms"
+          "proxy_offset_ms",
+          "source_duration_ms"
         ],
         "properties": {
           "schema_version": {
@@ -2299,7 +2300,8 @@
               "integer",
               "null"
             ],
-            "minimum": 0
+            "minimum": 0,
+            "description": "Playback proxy duration; media reads and transport only."
           },
           "status": {
             "type": "string",
@@ -2315,6 +2317,14 @@
           },
           "proxy_offset_ms": {
             "type": "integer"
+          },
+          "source_duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Probed duration of the bound source audio; null means unknown."
           }
         }
       },

@@ -170,3 +170,30 @@ def test_trusted_gateway_still_requires_origin(tmp_path):
         ).status_code
         == 403
     )
+
+
+def test_asset_exposes_source_and_proxy_durations_separately(tmp_path, authenticated_client):
+    import json
+    from server.db import Database
+    client, _, headers = authenticated_client
+    uploaded = client.post('/api/v1/uploads', files={'file': ('tone.wav', wav_bytes(), 'audio/wav')}, headers=headers)
+    assert uploaded.status_code == 200, uploaded.text
+    asset = uploaded.json()
+    assert asset['source_duration_ms'] == 1000
+    created = client.post('/api/v1/projects', json={'name': 'Different durations', 'upload_id': asset['id']}, headers={**headers, 'idempotency-key': 'duration-project'})
+    assert created.status_code == 200, created.text
+    pid = created.json()['id']
+    db = Database(tmp_path / 'studio.sqlite3')
+    with db.transaction() as conn:
+        row = conn.execute('SELECT metadata FROM assets WHERE id=?', (asset['id'],)).fetchone()
+        metadata = json.loads(row[0])
+        metadata['proxy_duration_ms'] = 1022
+        conn.execute('UPDATE assets SET duration_ms=?,metadata=? WHERE id=?', (1021, json.dumps(metadata), asset['id']))
+    current = client.get(f'/api/v1/projects/{pid}').json()['asset']
+    assert current['source_duration_ms'] == 1021
+    assert current['duration_ms'] == 1022
+    with db.transaction() as conn:
+        conn.execute('UPDATE assets SET duration_ms=NULL WHERE id=?', (asset['id'],))
+    current = client.get(f'/api/v1/projects/{pid}').json()['asset']
+    assert current['source_duration_ms'] is None
+    assert current['duration_ms'] == 1022

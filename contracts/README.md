@@ -26,3 +26,5 @@
 会话与写请求使用精确来源匹配，密码模式结合会话 cookie、CSRF cookie 和 `X-CSRF-Token`。能力由实际配置和运行依赖决定。整体实现见[服务端架构](../server/README.md)。
 
 文档和任务以 revision 标识保存快照；发布报告返回实际回读结论。源资源 SHA-256 作为资产身份，工程 manifest 保留源音频摘要。
+
+`Asset.source_duration_ms` 是绑定源音频的探测时长，`Asset.duration_ms` 是播放代理时长。两个字段分别允许 `null`；源范围判断使用前者，播放、seek 和媒体读取使用对应媒体的实际范围。分析取样使用解码样本数。

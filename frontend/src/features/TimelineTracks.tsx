@@ -140,7 +140,8 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     if (current.target && Math.abs(event.clientX - current.x) >= 3) {
       const target = current.target;
       try {
-        if (durationMs !== null && timeMs > durationMs) throw new Error('时间超出歌曲范围');
+        if (durationMs === null) throw new Error('源音频时长未知，无法拖动歌词时间');
+        if (timeMs > durationMs) throw new Error('时间超出歌曲范围');
         candidate.document = current.side === 'move'
           ? moveTimeline(document, moving, timeMs - current.originalMs, editing)
           : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs, editing);
