@@ -170,8 +170,8 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
   }
   // Invalid assignments cannot silently drop lyrics from an otherwise selected output.
   for (const [index,line] of lyrics.lines.entries()) if (!karaoke.groups.some(group => group.id === karaoke.lineGroups[line.id])) add({ lineId: line.id, karaokeSettings: true }, 'output.groupRequired', null);
-  if (!selected.length) add({ karaokeSettings: true }, 'output.chooseFiles', null);
-  else if (!files.length && !issues.length) add({ karaokeSettings: true }, 'output.chooseNonempty', null);
+  if (!selected.length) add({ karaokeSettings: true }, 'output.chooseFiles', null, 'output-configuration');
+  else if (!files.length && !issues.length) add({ karaokeSettings: true }, 'output.chooseNonempty', null, 'output-configuration');
   const merged = new Map<string, OutputIssue>();
   for (const issue of issues) { const key = outputIssueKey(issue) + issue.message; const previous = merged.get(key); merged.set(key, previous ? { ...previous, outputIds: [...new Set([...previous.outputIds!, ...issue.outputIds!])] } : issue); }
   return { files, issues: [...merged.values()], omitted, summary: [...files.map(file => `${file.name} — ${file.output.label}`), ...omitted.map(label => `空输出已省略：${label}`), '时间向下量化为厘秒；源项目毫秒时间不变。', '翻译／音译按整句输出；请在 NKM3 中将扫色前后颜色设为相同以显示静态字幕。', '歌手标记写入输出副本；未指定歌手时沿用已输出声部。'].join('\r\n') + '\r\n' };

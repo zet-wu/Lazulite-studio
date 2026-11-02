@@ -4,9 +4,10 @@ import type {LyricDocument} from '../domain/lyric-document';
 export function issueLocation(issue:OutputIssue,document?:LyricDocument):string {
  const t=i18n.t.bind(i18n);
  if(issue.agentId)return t('singer.nameLabel',{id:issue.agentId});
+ if(issue.karaokeSettings)return t('validation.karaokeSettings');
  if(issue.segmentId)return t('validation.acoustics');
  const line=document?.lines.find(line=>line.id===issue.lineId);
- if(!line)return issue.lineId?t('editor.lineLabel',{number:issue.lineId}):t('validation.unlocated');
+ if(!line)return issue.lineId?t('editor.lineLabel',{number:issue.lineId}):t(issue.code==='serialization'?'validation.unlocated':'validation.project');
  const parts=[t('validation.locationLine',{number:document!.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(line.backgroundOf??line.id))+1,background:line.backgroundOf?' · '+t('outline.background'):''})];
  const word=line.words.find(w=>w.id===issue.wordId);
  if(word)parts.push(t('validation.locationWord',{number:line.words.indexOf(word)+1}));

@@ -1692,5 +1692,9 @@
   "search.cancelledCount_other": "已取消 {{count}}",
   "translation.deleteTrack_other": "刪除軌道及 {{count}} 份內容（軌道 {{number}}）",
   "music.replace": "替換音訊",
-  "preview.empty": "暫無歌詞可預覽"
+  "preview.empty": "暫無歌詞可預覽",
+  "validation.noLyrics": "暫無歌詞可檢查",
+  "validation.outputConfiguration": "輸出設定",
+  "validation.karaokeSettings": "卡拉 OK 輸出設定",
+  "validation.project": "專案層級問題"
 }

@@ -30,8 +30,8 @@ export function PackagingPanel(props: { audioDurationMs?: number; karaokeExportS
  const editing = useProjectEditing();
  const [localTab,setLocalTab] = useState<ValidationTab>('lyrics');
  const tab=props.validationTab??localTab;
- const needsNicokara=tab==='lyrics'&&(filter==='all'||filter==='nicokara');
- const needsSug=tab==='lyrics'&&(filter==='all'||filter==='sug');
+ const needsNicokara=props.document.lines.length > 0 && tab==='lyrics'&&(filter==='all'||filter==='nicokara');
+ const needsSug=props.document.lines.length > 0 && tab==='lyrics'&&(filter==='all'||filter==='sug');
  const sug=useMemo(()=>needsSug&&props.project?prepareSug(props.project,props.title??t('workspace.defaultName')):null,[needsSug,props.project,props.title]);
  const nicokara=useMemo(()=>needsNicokara&&props.project?prepareNicokara(props.project,props.title??t('workspace.defaultName')):null,[needsNicokara,props.project,props.title]);
  const validationPane=useRef<HTMLElement>(null);
@@ -60,7 +60,7 @@ export function PackagingPanel(props: { audioDurationMs?: number; karaokeExportS
  <div role="tabpanel" key={tab} id={`validation-panel-${tab}`} aria-labelledby={`validation-tab-${tab}`} aria-busy={!current}>
  {!current&&<p role="status">{t('validation.updating')}</p>}
  {current&&result?.error&&<p role="alert">{t('validation.failed')}{formatMessage(result.error)}</p>}
- {tab==='lyrics'?<><div className={styles.downloadRow}><label>{t('validation.formats')}<Select aria-label={t('validation.formatFilter')} value={filter} onChange={e=>setFilter(e.target.value as ValidationFilter)}><option value="all">{t('validation.allFormats')}</option>{exportFormats.map(([id,label])=><option key={id} value={id}>{t(label,{defaultValue:label})}</option>)}<option value="sug">{t('validation.sugSelection')}</option><option value="nicokara">{t('validation.nicokaraSelection')}</option></Select></label>{props.resumeKaraoke&&<button data-role="secondary" onClick={props.resumeKaraoke}>{t('packaging.returnExport',{format:props.karaokeExportSource==='sug'?'SUG':'NicoKara'})}</button>}</div><OutputIssues document={props.document} issues={current&&!result?.error?visibleIssues:[]} highlighted={[]} locate={props.locateIssue}/>{current&&!result?.error&&visibleIssues.length===0&&<p>{filter==='all'?t('validation.clean'):t('validation.noBlocking')}</p>}</>:
+ {tab==='lyrics'?<><div className={styles.downloadRow}><label>{t('validation.formats')}<Select aria-label={t('validation.formatFilter')} value={filter} onChange={e=>setFilter(e.target.value as ValidationFilter)}><option value="all">{t('validation.allFormats')}</option>{exportFormats.map(([id,label])=><option key={id} value={id}>{t(label,{defaultValue:label})}</option>)}<option value="sug">{t('validation.sugSelection')}</option><option value="nicokara">{t('validation.nicokaraSelection')}</option></Select></label>{props.resumeKaraoke&&<button data-role="secondary" onClick={props.resumeKaraoke}>{t('packaging.returnExport',{format:props.karaokeExportSource==='sug'?'SUG':'NicoKara'})}</button>}</div><OutputIssues document={props.document} issues={current&&!result?.error?visibleIssues:[]} highlighted={[]} locate={props.locateIssue}/>{current&&!result?.error&&(props.document.lines.length===0||visibleIssues.length===0)&&<p>{props.document.lines.length===0?t('validation.noLyrics'):filter==='all'?t('validation.clean'):t('validation.noBlocking')}</p>}</>:
  props.project&&props.applyProject&&result?.amll&&<AmllPanel project={props.project} results={result.amll} current={current} apply={props.applyProject} locate={props.locateIssue} focusRule={props.focusRule} onRuleLocated={props.onRuleLocated}/>}
  </div>
  </section><section className={styles.pane}><h2>{t('packaging.lyricsDownload')}</h2><div className={styles.downloadRow}>

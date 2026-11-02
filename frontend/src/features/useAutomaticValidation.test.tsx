@@ -8,7 +8,7 @@ import { useAutomaticValidation, type ValidationTab } from './useAutomaticValida
 afterEach(()=>vi.restoreAllMocks());
 it('checks only committed inputs, coalesces changes and cancels checks after switching or leaving', async()=>{
  const check=vi.spyOn(validation,'validateLyricsIncrementally').mockResolvedValue([]);
- const initial={doc:createLyricDocument(),editing:createProjectEditing(),amll:createAmllSettings(),tab:'lyrics' as ValidationTab};
+ const initial={doc:{...createLyricDocument(),lines:[createLine('initial')]},editing:createProjectEditing(),amll:createAmllSettings(),tab:'lyrics' as ValidationTab};
  const {result,rerender,unmount}=renderHook(p=>useAutomaticValidation(p.doc,p.editing,p.amll,'p',p.tab),{initialProps:initial});
  await waitFor(()=>expect(result.current.current).toBe(true));expect(check).toHaveBeenCalledTimes(1);
  rerender({...initial}); expect(check).toHaveBeenCalledTimes(1);
@@ -24,7 +24,7 @@ it('reports execution failures instead of a successful empty report',async()=>{
  const {result}=renderHook(()=>useAutomaticValidation(createDoc,editing,undefined,'p','lyrics'));
  await waitFor(()=>expect(result.current.current).toBe(true));expect(result.current.result?.error).toEqual({key:'error.unexpected',values:{diagnostic:'计算失败样例'}});expect(result.current.result?.issues).toBeUndefined();
 });
-const createDoc=createLyricDocument(),editing=createProjectEditing();
+const createDoc={...createLyricDocument(),lines:[createLine('test')]},editing=createProjectEditing();
 it('rejects delayed results from a previous project and tab even if a checker finishes after cancellation',async()=>{
  let finish!:(issues:[])=>void;
  const check=vi.spyOn(validation,'validateLyricsIncrementally').mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;})).mockResolvedValue([]);
@@ -33,4 +33,16 @@ it('rejects delayed results from a previous project and tab even if a checker fi
  await waitFor(()=>expect(check).toHaveBeenCalledTimes(1));
  rerender({id:'new',tab:'amll'});await waitFor(()=>expect(result.current.current).toBe(true));
  await act(async()=>finish([]));expect(result.current.result?.input.projectId).toBe('new');expect(result.current.result?.amll).toBeDefined();
+});
+
+it('clears a delayed lyric result after deleting the last line and retains independent audio range issues',async()=>{
+ let finish!:(issues:[])=>void;
+ const check=vi.spyOn(validation,'validateLyricsIncrementally').mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;})).mockResolvedValue([]);
+ const acoustics={analysisId:null,segments:[{id:'segment',beginMs:0,endMs:2000}]};
+ const {result,rerender}=renderHook(doc=>useAutomaticValidation(doc,editing,undefined,'p','lyrics',acoustics,'asset',1000),{initialProps:createDoc});
+ await waitFor(()=>expect(check).toHaveBeenCalledTimes(1));
+ rerender({...createLyricDocument(),lines:[]});await waitFor(()=>expect(result.current.current).toBe(true));
+ expect(check).toHaveBeenCalledTimes(1);expect(result.current.result?.issues).toEqual([expect.objectContaining({code:'audio-range',segmentId:'segment'})]);
+ await act(async()=>finish([]));expect(result.current.result?.input.document.lines).toHaveLength(0);
+ rerender({...createLyricDocument(),lines:[createLine('')]});await waitFor(()=>expect(check).toHaveBeenCalledTimes(2));
 });

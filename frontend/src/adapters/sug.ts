@@ -21,7 +21,7 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
   const { lyrics, karaoke } = project;
   const add = (target: Target, message: string, outputIds: string[] = [], code: OutputIssue['code'] = 'serialization') => issues.push({kind:'line',lineId:'',missing:[],...target,message,detail:describeMessage(message),code,severity:'error',formats:['SUG'],outputIds});
   for (const line of lyrics.lines) if (!karaoke.groups.some(g => g.id === karaoke.lineGroups[line.id])) add({lineId:line.id,karaokeSettings:true},'output.groupRequired');
-  if (!karaoke.outputs.length) add({karaokeSettings:true},'output.chooseFiles');
+  if (!karaoke.outputs.length) add({karaokeSettings:true},'output.chooseFiles', [], 'output-configuration');
   for (const id of new Set(karaoke.outputs)) {
     const output = outputs.find(o => o.id === id);
     if (!output) { add({karaokeSettings:true},'output.staleSelection',[id]); continue; }
@@ -142,7 +142,7 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
     const data={version:'0.3.0',id:'project-0',metadata:{title:lyrics.metadata.title?.join(' / ')||title,artist:lyrics.metadata.artist?.join(' / ')||'',album:lyrics.metadata.album?.join(' / ')||'',language:output.kind==='body'?(lyrics.language??''):(output.language==='und'?'':output.language),created_at:date,modified_at:date},audio_duration_ms:0,singers,sentences,global_offset_ms:offset};
     files.push({name:names.get(id)!,text:JSON.stringify(data,null,2)+'\n',output});
   }
-  if(karaoke.outputs.length&&!files.length&&!issues.length)add({karaokeSettings:true},'output.chooseNonempty');
+  if(karaoke.outputs.length&&!files.length&&!issues.length)add({karaokeSettings:true},'output.chooseNonempty', [], 'output-configuration');
   const summary=[...files.map(f=>`${f.name} — ${f.output.label}；输出偏移 ${karaoke.offsets[f.output.id]??0} ms`),...descriptions,...omitted.map(label=>`空输出已省略：${label}`),'行采用正文词包络（含带出的导唱）；Ruby 首尾填满所属词，中间停顿保留。','无时间横向分隔保留原文，投影为零时长边界；在 SUG 打轴中成为额外检查点。','词内字符时间由接收端推导；正文与 Ruby 共用检查点。组合角色保留显示名称，集合关系不往返。','SUG 保留原始 Unicode 字符；Lin-K 可能将组合字符合并为显示字符（如 e＋组合重音变为 é）。','其他元数据、段落、脏词、agent 类型／actorRef、背景父子关联、附属轨道用途和原始对象身份没有对等映射。','不携带歌手图片、NKM3 触发标记、媒体或样式；时长 0 表示未知，.lazp 用于 Studio 工程备份。','解压并保留全部 SUG 文件；在 Lin-K 字幕视频生成中加载主文件，再逐个添加背景／翻译／音译副字幕源。','另选媒体、设置各源位置和样式；首次装配请将软件补偿和样式额外偏移设为 0，再按需要调整。','SUG 也可在打轴模块打开；零时长分隔会参与检查点导航。'].join('\n')+'\n';
   const merged = new Map<string, OutputIssue>();
   for(const issue of issues){const key=outputIssueKey(issue)+issue.message,previous=merged.get(key);merged.set(key,previous?{...previous,outputIds:[...new Set([...(previous.outputIds??[]),...(issue.outputIds??[])])]}:issue);}

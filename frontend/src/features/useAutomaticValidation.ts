@@ -16,7 +16,7 @@ export function useAutomaticValidation(document: LyricDocument, editing: Project
     // Coalesce committed changes and let the pending status paint before computation.
     const timer = setTimeout(async () => {
       try {
-        const next = tab === 'lyrics' ? {issues: [...await validateLyricsIncrementally(document, editing, controller.signal), ...audioRangeIssues(document, acoustics, assetId, durationMs)]} : {amll: checkAmll(document)};
+        const next = tab === 'lyrics' ? {issues: [...(document.lines.length === 0 ? [] : await validateLyricsIncrementally(document, editing, controller.signal)), ...audioRangeIssues(document, acoustics, assetId, durationMs)]} : {amll: checkAmll(document)};
         if (!controller.signal.aborted) setResult({input, ...next});
       } catch (error) {
         if (!controller.signal.aborted) setResult({input, error: errorMessage(error)});

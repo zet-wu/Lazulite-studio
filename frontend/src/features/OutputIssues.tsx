@@ -8,6 +8,7 @@ import { outputIssueKey, type OutputIssue } from '../adapters/output-validation'
 import { lineText, type LyricDocument } from '../domain/lyric-document';
 import styles from './acquisition.module.css';
 const reasons: Record<NonNullable<OutputIssue['code']>, string> = {
+  'output-configuration': 'validation.outputConfiguration',
   'audio-range': 'validation.audioRange', 'invalid-agent-type': 'validation.agentType', 'missing-time': 'validation.missingTime', 'invalid-range': 'validation.range',
   'unsupported-order': 'validation.order', 'empty-content': 'validation.empty', 'punctuation-zero': 'validation.punctuation', 'serialization': 'validation.serialization',
 };
@@ -34,7 +35,7 @@ export function LineGroups({ issues, keys, locate, document, selection }: { issu
   const [limit, setLimit] = useState(50);
   const groups = new Map<string, OutputIssue[]>();
   for (const issue of issues) {
-    const key = issue.agentId ? `agent:${issue.agentId}` : issue.lineId || (issue.segmentId ? 'acoustics' : 'serialization');
+    const key = issue.agentId ? `agent:${issue.agentId}` : issue.lineId || (issue.segmentId ? 'acoustics' : issue.karaokeSettings ? 'karaoke-settings' : issue.code === 'serialization' ? 'serialization' : 'project');
     const group = groups.get(key) ?? []; group.push(issue); groups.set(key, group);
   }
   return <>{[...groups].slice(0, limit).map(([key, group]) => {

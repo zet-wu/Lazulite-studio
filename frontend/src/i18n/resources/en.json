@@ -1705,5 +1705,9 @@
   "translation.deleteTrack_other": "Delete track {{number}} and its content ({{count}} items)",
   "translation.deleteTrack_one": "Delete track {{number}} and its content ({{count}} item)",
   "music.replace": "Replace audio",
-  "preview.empty": "No lyrics to preview"
+  "preview.empty": "No lyrics to preview",
+  "validation.noLyrics": "No lyrics to validate",
+  "validation.outputConfiguration": "Output configuration",
+  "validation.karaokeSettings": "Karaoke output settings",
+  "validation.project": "Project issue"
 }

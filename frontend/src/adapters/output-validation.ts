@@ -11,7 +11,7 @@ export type OutputIssue = {
   severity?: 'warning' | 'error'; formats?: string[];
   kind: 'acoustic' | 'agent' | 'line' | 'word' | 'ruby' | 'romanization-content' | 'romanization-unit' | 'translation-content' | 'translation-unit';
   lineId: string; agentId?: string; wordId?: string; rubyId?: string; trackId?: string; contentId?: string; unitId?: string;
-  code?: 'audio-range' | 'invalid-agent-type' | 'missing-time' | 'invalid-range' | 'unsupported-order' | 'empty-content' | 'punctuation-zero' | 'serialization';
+  code?: 'audio-range' | 'invalid-agent-type' | 'missing-time' | 'invalid-range' | 'unsupported-order' | 'empty-content' | 'punctuation-zero' | 'serialization' | 'output-configuration';
   missing: ('begin' | 'end')[]; message: string; detail?: Message;
 };
 export class DocumentOutputError extends Error {
