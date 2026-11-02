@@ -265,7 +265,11 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       { label: t('timeline.deleteSelected'), disabled: !selection?.ids.length, run: () => commands.current?.remove() },
     ]} />, window.document.body)}
     {visible.karaoke && <KaraokeTrack durationMs={durationMs} startMs={startMs} endMs={endMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const interval=targetInterval(document,target);return interval?[interval.beginMs,interval.endMs].filter((n):n is number=>n!==null):[];})]} onError={onError}/>}
-    {visible.line && row('lines', overview.filter(item => !editing || lineLayout.lanes.has(item.id)).map(item => bar({ kind: 'line', lineId: item.id }, t('timeline.lineLabel',{number:ordinalById.get(item.backgroundOf??item.id),background:item.backgroundOf?t('outline.background'):''}), item.beginMs!, item.endMs!)), [], lineLayout.laneCount,t('edit.lineUnit'))}
+    {visible.line && row('lines', overview.filter(item => !editing || lineLayout.lanes.has(item.id)).map(item => {
+      const number = ordinalById.get(item.backgroundOf ?? item.id);
+      const background = item.backgroundOf ? ` ${t('outline.background')}` : '';
+      return bar({ kind: 'line', lineId: item.id }, t('timeline.lineLabel', { number, background }), item.beginMs!, item.endMs!, false, undefined, `L${number}${background}`);
+    }), [], lineLayout.laneCount,t('edit.lineUnit'))}
     <div ref={scrollRef} className={styles.expandedTracks} style={!expandedLines.length ? { display: 'none' } : undefined}><div style={expandedLines.length > 20 ? { height: virtual.getTotalSize(), position: 'relative' } : undefined}>
     {(expandedLines.length > 20 ? virtual.getVirtualItems() : expandedLines.map((line, index) => ({ index, key: line.id, start: 0 }))).map(virtualRow => {
       const item = displayed.lines.find(line => line.id === expandedLines[virtualRow.index].id)!;
