@@ -500,7 +500,6 @@
   "vocal.reanalyze": "重新进行声学分析",
   "vocal.download": "下载人声 WAV",
   "vocal.useExisting": "使用已有人声",
-  "vocal.recent": "查看最近处理结果",
   "vocal.acousticAnalysis": "声学分析",
   "vocal.retry": "重试人声处理",
   "vocal.retryRead": "重试读取人声任务和结果",

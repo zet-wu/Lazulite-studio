@@ -3171,12 +3171,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "vocal.recent": {
-    "context": "vocal interface: vocal.recent",
-    "source": "查看最近处理结果",
-    "params": [],
-    "parameterNotes": {}
-  },
   "vocal.acousticAnalysis": {
     "context": "vocal interface: vocal.acousticAnalysis",
     "source": "声学分析",

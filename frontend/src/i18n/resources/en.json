@@ -504,7 +504,6 @@
   "vocal.reanalyze": "Run acoustic analysis again",
   "vocal.download": "Download vocal WAV",
   "vocal.useExisting": "Use existing vocals",
-  "vocal.recent": "Show latest processing result",
   "vocal.acousticAnalysis": "Acoustic analysis",
   "vocal.retry": "Retry vocal processing",
   "vocal.retryRead": "Retry loading vocal tasks and results",

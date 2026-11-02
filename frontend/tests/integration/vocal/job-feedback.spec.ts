@@ -30,11 +30,13 @@ test('vocal running status remains reachable, failures close independently and o
  await expect(page.getByRole('alert').filter({hasText:'取消测试失败'})).toBeVisible();await expect(running).toBeVisible();
  state.readsFail=true;await expect(page.getByRole('alert').filter({hasText:'读取失败'})).toBeVisible();await expect(running).toBeVisible();state.readsFail=false;
  state.status='failed';await expect(page.getByRole('button',{name:'使用 CPU 重试'})).toBeVisible();
- const failure=page.locator('[data-message-bar]').filter({hasText:'GPU 人声测试失败'});await failure.getByRole('button',{name:'关闭提示'}).click();
+ const failure=page.locator('[data-message-bar]').filter({hasText:'GPU 人声测试失败'});
+ await failure.getByRole('button',{name:'使用 CPU 重试'}).click();await expect.poll(()=>state.retries).toBe(1);
+ await expect(failure).toHaveCount(0);await expect(running).toBeVisible();
+ state.status='failed';await expect(failure).toBeVisible();await failure.getByRole('button',{name:'关闭提示'}).click();
  await expect(page.getByRole('button',{name:'使用 CPU 重试'})).toHaveCount(0);
  await page.getByRole('button',{name:'音频处理',exact:true}).click();await expect(page.locator('[data-segment-id]').first()).toBeVisible();
- await page.getByRole('button',{name:'查看最近处理结果'}).click();await failure.getByRole('button',{name:'使用 CPU 重试'}).click();await expect.poll(()=>state.retries).toBe(1);
- await expect(failure).toHaveCount(0);await expect(running).toBeVisible();
+ await expect(failure).toHaveCount(0);
 });
 test('closing success leaves result replacement decisions intact',async({page})=>{
  const {state}=await setup(page);
@@ -42,8 +44,7 @@ test('closing success leaves result replacement decisions intact',async({page})=
  await expect(page.locator('[data-segment-id]')).toHaveCount(1);
  state.status='succeeded';await expect(page.getByRole('button',{name:'替换当前片段'})).toBeVisible();
  await page.locator('[data-message-bar]').filter({hasText:'人声处理完成'}).getByRole('button',{name:'关闭提示'}).click();
- await expect(page.getByRole('button',{name:'替换当前片段'})).toBeVisible();await page.getByRole('button',{name:'返回上次结果'}).click();
- await expect(page.locator('[data-segment-id="old2"]')).toBeVisible();await page.getByRole('button',{name:'查看最近处理结果'}).click();
+ await expect(page.getByRole('button',{name:'替换当前片段'})).toBeVisible();
  await page.getByRole('button',{name:'替换当前片段'}).click();await expect(page.locator('[data-segment-id="new15"]')).toBeVisible();
 });
 test('no-result state stays actionable and cancellation waits for the terminal status',async({page})=>{

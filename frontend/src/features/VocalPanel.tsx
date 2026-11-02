@@ -57,14 +57,13 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const ready = !!project.acoustics.analysisId || project.acoustics.segments.length>0;
   const conflictVisible = !!conflict && dismissed !== latest?.id;
   useEffect(()=>ui.setTimelineReady(ready && !conflictVisible),[ready,conflictVisible,ui.setTimelineReady]);
-  const showResult = () => {
+  useEffect(() => {
     if (!latest || !['failed','cancelled','interrupted','succeeded'].includes(latest.status)) return;
     const success = latest.status === 'succeeded' || latest.status === 'cancelled';
     const text=describeMessage(latest.status==='failed'?'vocal.failed':latest.status==='interrupted'?'vocal.interrupted':latest.status==='cancelled'?'vocal.cancelled':'vocal.completed');
     publish(latest.error ? taskError(latest.error) : text, success ? 'status' : 'alert', success ? 4000 : undefined, latest.id);
     setDismissed(null);
-  };
-  useEffect(showResult, [latest?.id, latest?.status]);
+  }, [latest?.id, latest?.status]);
   useEffect(()=>{publishIssue(error || null);},[error,publishIssue]);
   const readingFailed = jobs.isError || results.isError || completed.isError;
   useEffect(()=>{publishReadError(readingFailed ? describeMessage('vocal.readFailed') : null);},[readingFailed,publishReadError]);
@@ -122,7 +121,6 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
         <button data-role="inline" disabled={locked||busy||!!active||!adoptedAvailable} title={t('vocal.reuseHelp')} onClick={()=>void run(project.acoustics.analysisId!)}>{t('vocal.reanalyze')}</button>
         {adoptedAvailable && project.acoustics.analysisId && <a data-role="secondary" href={download(project.acoustics.analysisId)} download>{t('vocal.download')}</a>}
       </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run()}>{repair?t('vocal.regenerate'):update?t('vocal.updateSeparation'):currentAudio?t('vocal.useExisting'):t('vocal.separate')}</button>}
-      {latest && !active && <button data-role="inline" onClick={showResult}>{t('vocal.recent')}</button>}
     </>, ui.analysisHost)}
     {ui.taskHost && (active || busy) && createPortal(<MessageBar notice={{ text: t('task.vocalProgress',{progress:`${task ? cancelling ? t('task.cancelling') : status[task.status] : t('task.preparing')}${task?.stage ? ` · ${{separating:t('vocal.separate'),analyzing:t('vocal.acousticAnalysis')}[task.stage] ?? task.stage}` : ''}`,device:deviceText?' · '+deviceText:''}), role:'status', origin:null, dismissible:false }} actions={<button data-role="secondary" disabled={cancelling || active?.status==='cancel_requested'} onClick={()=>void cancel()}>{t('task.cancel')}</button>}/>,ui.taskHost)}
     {ui.messageHost && createPortal(<>
