@@ -1,4 +1,4 @@
-import registry from './languages.json';
+import registry from '../../../server/ui_languages.json';
 export const languages=registry.filter(language=>language.complete);
 export type Language = string;
 export function registeredLanguage(value: string | null | undefined): string {
