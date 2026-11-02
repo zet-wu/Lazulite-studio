@@ -92,7 +92,7 @@ def test_acoustic_edit_is_saved_atomically(tmp_path):
     client = TestClient(create_app(tmp_path, Settings(None, True, 'http://studio')))
     before = client.get('/api/v1/projects/p/document')
     envelope = before.json()
-    envelope['document']['acoustics']['segments'] = [{'id': 's', 'beginMs': 100, 'endMs': 1500}]
+    envelope['document']['acoustics']['segments'] = [{'id': 's', 'beginMs': 100, 'endMs': 2500}]
     body = {k: envelope[k] for k in ('schema_version', 'project_id', 'revision', 'document')}
     response = client.put('/api/v1/projects/p/document', json=body, headers={'origin': 'http://studio', 'if-match': before.headers['etag']})
     assert response.status_code == 200

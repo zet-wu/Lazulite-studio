@@ -8,6 +8,7 @@ from .runtime_devices import DeviceFailure, device_failure
 from .vocals import VocalCancelled
 from .vocal_process import VocalProcess
 from .project_document import read_project
+from .audio_boundaries import source_duration, intersect_segments
 from .alignment_projection import project_alignment
 
 
@@ -71,6 +72,7 @@ def run_alignment(request, emit, cancelled):
     runner = AlignmentRunner(db, root)
     snapshot, asset = runner.snapshot(pid, params['revision'])
     if asset != params['asset_id']: raise ValueError('源音频已改变，请重新运行')
+    duration_ms = source_duration(db, pid, asset)
     if cancelled(): raise VocalCancelled()
     projection = project_alignment(snapshot, params['use_hints'])
     vocal = VocalRunner(db, root, cleanup=False)
@@ -83,16 +85,17 @@ def run_alignment(request, emit, cancelled):
         if acoustics['segments']: raise ValueError('现有片段没有可匹配的人声资源')
         result = vocal.run_in_process(pid, Path(request['asset_path']), {'asset_id': asset, 'model_name': 'htdemucs', 'device': params.get('devices', {}).get('vocal', {}).get('actual', os.getenv('STUDIO_VOCAL_DEVICE','cpu'))}, request['job_id'], emit, cancelled)
         _, metadata = vocal.get(pid, result['analysis_id'])
-        new_acoustics = {'analysisId': metadata['id'], 'segments': metadata['segments']}
+        normalized, _ = intersect_segments(metadata['segments'], duration_ms)
+        new_acoustics = {'analysisId': metadata['id'], 'segments': normalized}
     if cancelled(): raise VocalCancelled()
     samples, rate = sf.read(vocal.audio_path(pid, metadata), dtype='float32', always_2d=True)
     audio = AudioBuffer(samples.T, rate, metadata['audio_result_id'])
     def segments(rows):
-        if any(s['beginMs'] < 0 or s['endMs']/1000 > audio.duration + .001 for s in rows):
-            raise ValueError('人声片段超出完整音频范围')
-        return tuple(VocalSegment(s['id'], None, s['beginMs']/1000, min(s['endMs']/1000,audio.duration), s['beginMs']/1000, min(s['endMs']/1000,audio.duration), None, None) for s in rows)
+        # Samples are read only inside the decoded PCM, independently of source metadata.
+        return tuple(VocalSegment(s['id'], None, max(0,s['beginMs']/1000), min(s['endMs']/1000,audio.duration), max(0,s['beginMs']/1000), min(s['endMs']/1000,audio.duration), None, None) for s in rows if max(0,s['beginMs']/1000) < min(s['endMs']/1000,audio.duration))
     selected = segments(acoustics['segments']) if acoustics['analysisId'] else None
-    automatic = VocalAnalysis(audio.source_id, segments(metadata['segments']))
+    automatic_segments, automatic_normalization = intersect_segments(metadata['segments'], duration_ms)
+    automatic = VocalAnalysis(audio.source_id, segments(automatic_segments))
     prepared = prepare_existing_vocals(audio, original_id=asset,
         analysis=automatic, analysis_description={'configuration': metadata['analysis_config'], 'reference':'full_scale'},
         segments=selected, separation=metadata['model'])
@@ -118,4 +121,4 @@ def run_alignment(request, emit, cancelled):
     result_data = asdict(result)
     backend_info = result_data.get('execution', {}).get('backend', {})
     backend_info.pop('model_path', None)
-    return {'kind':'alignment', 'alignment':result_data, 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'summary':projection['summary']}
+    return {'kind':'alignment', 'alignment':result_data, 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'normalization':automatic_normalization, 'summary':projection['summary']}

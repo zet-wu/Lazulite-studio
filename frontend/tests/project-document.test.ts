@@ -6,7 +6,7 @@ import { serializeProject, parseProject } from '../src/adapters/project-codec';
 it('uses one history for acoustic and lyric edits; lyric import retains acoustics', () => {
   const initial = createProjectEditorState(createProjectDocument(createLyricDocument('old')));
   const acoustics = { analysisId: 'analysis', segments: [{ id: 's', beginMs: 100, endMs: 400 }] };
-  const acoustic = executeProjectCommand(initial, { type: 'acoustics', acoustics, durationMs: 500 });
+  const acoustic = executeProjectCommand(initial, { type: 'acoustics', acoustics });
   expect(acoustic.present.lyrics).toBe(initial.present.lyrics);
   const imported = executeProjectCommand(acoustic, { type: 'lyrics', command: { type: 'replace-document', document: createLyricDocument('new') } });
   expect(imported.present.acoustics).toBe(acoustics);
@@ -15,7 +15,7 @@ it('uses one history for acoustic and lyric edits; lyric import retains acoustic
   expect(redoProjectCommand(undoProjectCommand(imported)).present).toBe(imported.present);
   expect(parseProject(serializeProject(imported.present)).acoustics).toEqual(acoustics);
   expect(serializeProject(imported.present).lyrics.draftTtml).not.toContain('analysis');
-  expect(() => executeProjectCommand(imported, { type: 'acoustics', acoustics: { ...acoustics, segments: [{ id: 's', beginMs: 400, endMs: 600 }] }, durationMs: 500 })).toThrow();
+  expect(() => executeProjectCommand(imported, { type: 'acoustics', acoustics: { ...acoustics, segments: [{ id: 's', beginMs: 400, endMs: 300 }] } })).toThrow();
   expect(imported.past).toHaveLength(2);
 });
 it('bounds the single history to 256 entries', () => {

@@ -1,3 +1,4 @@
+import { assertChangedTimes, lyricTimes, projectTimes } from '../domain/time-boundaries';
 import { focusObject, selectionSelector, preserveSelectionOnFocus } from './editor/selection-recovery';
 import { selectionLineId } from './editor/editing-actions';
 import { KaraokeContext } from './KaraokeContext';
@@ -141,13 +142,16 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       const target = current.target;
       try {
         if (durationMs === null) throw new Error('源音频时长未知，无法拖动歌词时间');
-        if (timeMs > durationMs) throw new Error('时间超出歌曲范围');
         candidate.document = current.side === 'move'
           ? moveTimeline(document, moving, timeMs - current.originalMs, editing)
           : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs, editing);
-        if (projectContext && current.side === 'move' && moving.every(item => item.kind === 'line')) {
-          executeProjectCommand(createProjectEditorState(projectContext.project), { type: 'lyrics', command: { type: 'shift-lines', lineIds: moving.map(item => item.lineId), deltaMs: timeMs - current.originalMs } });
-        }
+        if (projectContext) {
+          const command: LyricCommand = current.side === 'move' && moving.every(item => item.kind === 'line')
+            ? { type:'shift-lines',lineIds:moving.map(item=>item.lineId),deltaMs:timeMs-current.originalMs }
+            : { type:'replace-document',document:candidate.document };
+          const nextProject=executeProjectCommand(createProjectEditorState(projectContext.project),{type:'lyrics',command});
+          assertChangedTimes(projectTimes(projectContext.project),projectTimes(nextProject.present),durationMs);
+        } else assertChangedTimes(lyricTimes(document),lyricTimes(candidate.document),durationMs);
       } catch (cause) { candidate.error = cause instanceof Error ? cause.message : '时间轴编辑失败'; }
       onError(candidate.error);
     } else if (current.target) candidate.timeMs = current.originalMs;
@@ -257,7 +261,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       { label: '粘贴', disabled: !commands.current?.canPaste, run: () => commands.current?.paste() },
       { label: '删除所选对象', disabled: !selection?.ids.length, run: () => commands.current?.remove() },
     ]} />, window.document.body)}
-    {visible.karaoke && <KaraokeTrack startMs={startMs} endMs={endMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const interval=targetInterval(document,target);return interval?[interval.beginMs,interval.endMs].filter((n):n is number=>n!==null):[];})]} onError={onError}/>}
+    {visible.karaoke && <KaraokeTrack durationMs={durationMs} startMs={startMs} endMs={endMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const interval=targetInterval(document,target);return interval?[interval.beginMs,interval.endMs].filter((n):n is number=>n!==null):[];})]} onError={onError}/>}
     {visible.line && row('行', overview.filter(item => !editing || lineLayout.lanes.has(item.id)).map(item => bar({ kind: 'line', lineId: item.id }, `时间轴行 L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ' 背景' : ''}`, item.beginMs!, item.endMs!)), [], lineLayout.laneCount)}
     <div ref={scrollRef} className={styles.expandedTracks} style={!expandedLines.length ? { display: 'none' } : undefined}><div style={expandedLines.length > 20 ? { height: virtual.getTotalSize(), position: 'relative' } : undefined}>
     {(expandedLines.length > 20 ? virtual.getVirtualItems() : expandedLines.map((line, index) => ({ index, key: line.id, start: 0 }))).map(virtualRow => {

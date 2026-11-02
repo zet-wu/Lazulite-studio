@@ -1,3 +1,4 @@
+import { assertChangedTimes } from '../domain/time-boundaries';
 import { IconButton } from '../shared/Controls';
 import { useEditorSelection } from './editor/SelectionContext';
 import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
@@ -15,7 +16,7 @@ import { editSegments } from '../domain/vocal-editing';
 import type { Acoustics, VocalSegment } from '../domain/project-document';
 import styles from './vocal.module.css';
 type Props = { sourceDurationMs: number | null; locked?: boolean; children: ReactNode; bpm: number; snap: boolean; anchors: number[]; showEnergy: boolean; showSegments: boolean; lineLabel: string; projectId: string; acoustics: Acoustics; startMs: number; endMs: number; durationMs: number; selectedLineId: string | null; apply: (acoustics: Acoustics) => void; assign: (lineId: string, segment: VocalSegment) => void; pause: () => void };
-type Drag = { segment?: VocalSegment; side: 'move'|'beginMs'|'endMs'|'new'; x: number; now: number; width: number; left: number; document: Acoustics; ids: string[]; candidate: VocalSegment };
+type Drag = { error?: string; segment?: VocalSegment; side: 'move'|'beginMs'|'endMs'|'new'; x: number; now: number; width: number; left: number; document: Acoustics; ids: string[]; candidate: VocalSegment };
 export const VOCAL_LINE_MIME = 'application/x-studio-vocal-line';
 export function VocalTracks(props: Props) {
   const { acoustics, startMs, endMs, durationMs } = props;
@@ -55,7 +56,7 @@ export function VocalTracks(props: Props) {
     const key = (e:KeyboardEvent)=>{if(e.key==='Escape'&&(dragRef.current||menu||adding)){ e.preventDefault(); cancel(); }};
     window.addEventListener('keydown',key); return()=>window.removeEventListener('keydown',key);
   },[adding,menu]);
-  useEffect(() => { clearDrag(); }, [acoustics, startMs, endMs, props.showEnergy, props.showSegments, clearDrag]);
+  useEffect(() => { clearDrag(); }, [acoustics, startMs, endMs, props.showEnergy, props.showSegments, props.sourceDurationMs, clearDrag]);
   useEffect(()=>{setSelected(ids=>ids.filter(id=>acoustics.segments.some(s=>s.id===id)));},[acoustics,setSelected]);
   const sorted=useMemo(()=>[...acoustics.segments].sort((a,b)=>a.beginMs-b.beginMs||a.endMs-b.endMs||a.id.localeCompare(b.id)),[acoustics]);
   const labels=useMemo(()=>new Map(sorted.map((s,i)=>[s.id,`S${i+1}`])),[sorted]);
@@ -76,7 +77,7 @@ export function VocalTracks(props: Props) {
     const s=d.segment!;
     if(d.now===d.x)return s;
     if(d.side==='move'){const group=acoustics.segments.filter(s=>d.ids.includes(s.id));const a=snapAt(s.beginMs+delta,d)-(s.beginMs+delta),b=snapAt(s.endMs+delta,d)-(s.endMs+delta);const correction=a!==0 && (b===0||Math.abs(a)<=Math.abs(b))?a:b;const shift=Math.max(-Math.min(...group.map(s=>s.beginMs)),Math.min(durationMs-Math.max(...group.map(s=>s.endMs)),delta+correction));return {...s,beginMs:s.beginMs+shift,endMs:s.endMs+shift};}
-    return {...s,[d.side]:Math.max(d.side==='beginMs'?0:s.beginMs+1,Math.min(d.side==='beginMs'?s.endMs-1:durationMs,snapAt(s[d.side]+delta,d)))};
+    return {...s,[d.side]:Math.max(d.side==='beginMs'?0:s.beginMs+1,Math.min(d.side==='beginMs'?Math.min(s.endMs-1,durationMs):durationMs,snapAt(s[d.side]+delta,d)))};
   };
   const begin = (e:PointerEvent<HTMLElement>,segment?:VocalSegment,side:Drag['side']='new')=>{
     if(props.locked || e.button!==0 || (!segment && !adding))return;
@@ -97,16 +98,28 @@ export function VocalTracks(props: Props) {
     capture.current = { element: e.currentTarget, id: e.pointerId };
     if (side !== 'new') publish({ timeMs: side === 'endMs' ? next.candidate.endMs : next.candidate.beginMs, valid: true });
   };
-  const move=(e:PointerEvent<HTMLElement>)=>{if(dragRef.current){const next={...dragRef.current,now:e.clientX};next.candidate=candidate(next);dragRef.current=next;setDrag(next);if(next.side!=='new')publish({timeMs:next.side==='endMs'?next.candidate.endMs:next.candidate.beginMs,valid:true});}};
+  const changed = (d: Drag, next: VocalSegment): Acoustics => d.side==='move'
+    ? {...acoustics,segments:acoustics.segments.map(s=>d.ids.includes(s.id)?{...s,beginMs:s.beginMs+next.beginMs-d.segment!.beginMs,endMs:s.endMs+next.beginMs-d.segment!.beginMs}:s)}
+    : {...acoustics,segments:[...acoustics.segments.filter(s=>s.id!==next.id),next]};
+  const times = (value: Acoustics) => value.segments.map(s => ({...s,kind:'acoustic' as const,lineId:''}));
+  const move=(e:PointerEvent<HTMLElement>)=>{if(dragRef.current){
+    const next={...dragRef.current,now:e.clientX,error:''};next.candidate=candidate(next);
+    try { assertChangedTimes(times(acoustics),times(changed(next,next.candidate)),props.sourceDurationMs); }
+    catch(cause) { next.error=(cause as Error).message; }
+    setError(next.error);dragRef.current=next;setDrag(next);
+    if(next.side!=='new')publish({timeMs:next.side==='endMs'?next.candidate.endMs:next.candidate.beginMs,valid:!next.error});
+  }};
   const finish=()=>{
     const d=dragRef.current;clearDrag();if(!d)return;
-    if(d.document!==acoustics)return;
+    if(d.document!==acoustics || d.error)return;
     const next=d.candidate;
     if(d.side==='new'){setAdding(false);requestAnimationFrame(()=>addButton.current?.focus());if(next.beginMs===next.endMs)return;next.id=crypto.randomUUID();}
     else if(next.beginMs===d.segment!.beginMs&&next.endMs===d.segment!.endMs)return;
-    try{props.apply(d.side==='move'?{...acoustics,segments:acoustics.segments.map(s=>d.ids.includes(s.id)?{...s,beginMs:s.beginMs+next.beginMs-d.segment!.beginMs,endMs:s.endMs+next.beginMs-d.segment!.beginMs}:s)}:editSegments(acoustics,{type:'put',segment:next},durationMs));setSelected(d.side==='move'?d.ids:[next.id]);setError('');}catch(e){setError((e as Error).message);}
+    try{const updated = changed(d,next);
+      assertChangedTimes(times(acoustics),times(updated),props.sourceDurationMs);
+      props.apply(updated);setSelected(d.side==='move'?d.ids:[next.id]);setError('');}catch(e){setError((e as Error).message);}
   };
-  const operate=(type:'merge'|'delete')=>{try{const next=editSegments(acoustics,{type,ids:selected},durationMs);props.apply(next);setSelected(type==='merge'?next.segments.filter(s=>selected.includes(s.id)).map(s=>s.id):[]);setError('');}catch(e){setError((e as Error).message);}setMenu(null);};
+  const operate=(type:'merge'|'delete')=>{try{const next=editSegments(acoustics,{type,ids:selected});props.apply(next);setSelected(type==='merge'?next.segments.filter(s=>selected.includes(s.id)).map(s=>s.id):[]);setError('');}catch(e){setError((e as Error).message);}setMenu(null);};
   const assign=(lineId:string|null,segment:VocalSegment|undefined)=>{if(!lineId||!segment)return;try{props.assign(lineId,segment);setError('');}catch(e){setError((e as Error).message);}setMenu(null);};
   const active=selected.length===1?acoustics.segments.find(s=>s.id===selected[0]):undefined;
   const preview=drag?.candidate??null;

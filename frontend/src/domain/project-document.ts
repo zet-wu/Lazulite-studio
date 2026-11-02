@@ -17,14 +17,14 @@ export type ProjectDocument = {
 };
 export type ProjectSnapshot = Omit<ProjectDocument, 'lyrics'> & { lyrics: { draftTtml: string } };
 export type ProjectEditorState = { present: ProjectDocument; past: ProjectDocument[]; future: ProjectDocument[] };
-export type ProjectCommand = { type: 'karaoke'; command: KaraokeCommand } | { type: 'alignment'; source: ProjectDocument; project: ProjectDocument } | { type: 'amll-setting'; rule: AmllRule; enabled: boolean } | { type: 'background-position'; lineId: string; before: boolean } | { type: 'amll-batch'; rule: AmllRule; ids?: string[]; duetAgents?: string[] } | { type: 'duet'; lineId: string; duet: boolean } | { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics; durationMs: number };
+export type ProjectCommand = { type: 'karaoke'; command: KaraokeCommand } | { type: 'alignment'; source: ProjectDocument; project: ProjectDocument } | { type: 'amll-setting'; rule: AmllRule; enabled: boolean } | { type: 'background-position'; lineId: string; before: boolean } | { type: 'amll-batch'; rule: AmllRule; ids?: string[]; duetAgents?: string[] } | { type: 'duet'; lineId: string; duet: boolean } | { type: 'lyrics'; command: LyricCommand } | { type: 'acoustics'; acoustics: Acoustics };
 export function createProjectDocument(lyrics = createLyricDocument()): ProjectDocument {
   return { schemaVersion: 'studio-project-v9', lyrics, karaoke: createKaraoke(lyrics), amll: createAmllSettings(), lineOrder: [], editing: createProjectEditing(), acoustics: { analysisId: null, segments: [] } };
 }
-export function validateSegments(segments: VocalSegment[], durationMs: number) {
+export function validateSegments(segments: VocalSegment[]) {
   const ids = new Set<string>();
   for (const segment of segments) {
-    if (!segment.id || ids.has(segment.id) || !Number.isSafeInteger(segment.beginMs) || !Number.isSafeInteger(segment.endMs) || segment.beginMs < 0 || segment.beginMs >= segment.endMs || segment.endMs > durationMs) throw new Error('人声片段必须具有唯一标识，且位于歌曲范围内');
+    if (!segment.id || ids.has(segment.id) || !Number.isSafeInteger(segment.beginMs) || !Number.isSafeInteger(segment.endMs) || segment.beginMs < 0 || segment.beginMs >= segment.endMs) throw new Error('人声片段必须具有唯一标识，时间为非负安全整数且结束晚于开始');
     ids.add(segment.id);
   }
 }
@@ -132,7 +132,7 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     const changedOrder=result.lyrics.lines.map(line=>line.id).join(' ')!==state.present.lyrics.lines.map(line=>line.id).join(' ');
     present = { ...state.present, ...result, karaoke, lineOrder:changedOrder?groupDisplayLines(result.lyrics,before).map(line=>line.id):state.present.lineOrder };
   } else {
-    validateSegments(command.acoustics.segments, command.durationMs);
+    validateSegments(command.acoustics.segments);
     if (command.acoustics === state.present.acoustics) return state;
     present = { ...state.present, acoustics: command.acoustics };
   }

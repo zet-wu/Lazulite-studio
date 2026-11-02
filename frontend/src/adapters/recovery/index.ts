@@ -51,7 +51,7 @@ const validDocument = (document: unknown): document is ProjectDocument => {
     const project = document as ProjectDocument;
     if (project.schemaVersion !== 'studio-project-v9' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
     if (project.acoustics.analysisId !== null && typeof project.acoustics.analysisId !== 'string') return false;
-    try { validateKaraoke(project.lyrics, project.karaoke); assertAmll(project.lyrics,project.amll); validateAgents(project.lyrics); if(!Array.isArray(project.lineOrder)||project.lineOrder.some(id=>!project.lyrics.lines.some(line=>line.id===id)))return false; validateSegments(project.acoustics.segments, Number.MAX_SAFE_INTEGER); validateProjectEditing(project.lyrics, project.editing); } catch { return false; }
+    try { validateKaraoke(project.lyrics, project.karaoke); assertAmll(project.lyrics,project.amll); validateAgents(project.lyrics); if(!Array.isArray(project.lineOrder)||project.lineOrder.some(id=>!project.lyrics.lines.some(line=>line.id===id)))return false; validateSegments(project.acoustics.segments); validateProjectEditing(project.lyrics, project.editing); } catch { return false; }
     const item = project.lyrics as LyricDocument;
     if (!item || typeof item !== 'object') return false;
     return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.romanizationTracks) && Array.isArray(item.translationTracks) && Array.isArray(item.agents)

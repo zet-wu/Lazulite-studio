@@ -4,15 +4,15 @@ import { validateSegments } from './project-document';
 export class AssignmentError extends Error {
   constructor(message: string, readonly lineId: string, readonly objectIds: string[]) { super(message); }
 }
-export function assignVocalSegment(document: LyricDocument, lineId: string, segment: VocalSegment, durationMs: number): LyricDocument {
-  validateSegments([segment], durationMs);
+export function assignVocalSegment(document: LyricDocument, lineId: string, segment: VocalSegment): LyricDocument {
+  validateSegments([segment]);
   const line = document.lines.find(item => item.id === lineId);
   if (!line) throw new Error('请选择一行歌词');
   const internal = [...document.translationTracks.flatMap(track => track.contents.filter(content => content.lineId === lineId)).flatMap(item => item.kind === 'timed' ? item.units : []), ...line.words.flatMap(w => [w, ...w.rubyUnits]), ...document.romanizationTracks.flatMap(t => t.contents.flatMap(c => c.lineId === lineId && c.kind === 'timed' ? c.units : []))];
   if (line.beginMs === null && line.endMs === null && internal.some(unit => unit.beginMs !== null || unit.endMs !== null)) throw new AssignmentError('行内已有时间，请先明确行起点或终点', lineId, [lineId]);
   const delta = line.beginMs !== null ? segment.beginMs - line.beginMs : line.endMs !== null ? segment.endMs - line.endMs : 0;
-  const invalid = [line, ...internal].filter(unit => [unit.beginMs, unit.endMs].some(t => t !== null && (!Number.isSafeInteger(t + delta) || t + delta < 0 || t + delta > durationMs)));
-  if (invalid.length) throw new AssignmentError('分配后时间超出歌曲范围，未修改歌词或链接', lineId, invalid.map(x => x.id));
+  const invalid = [line, ...internal].filter(unit => [unit.beginMs, unit.endMs].some(t => t !== null && (!Number.isSafeInteger(t + delta) || t + delta < 0)));
+  if (invalid.length) throw new AssignmentError('分配后时间为负值或溢出，未修改歌词或链接', lineId, invalid.map(x => x.id));
   const shift = <T extends { beginMs: TimeMs; endMs: TimeMs }>(unit: T): T => ({ ...unit, beginMs: unit.beginMs === null ? null : unit.beginMs + delta, endMs: unit.endMs === null ? null : unit.endMs + delta });
   // Freeze all incoming ends before moving the selected row. No recursive following.
   const lines = document.lines.map(item => {
@@ -28,7 +28,7 @@ export function assignVocalSegment(document: LyricDocument, lineId: string, segm
   const translationTracks = document.translationTracks.map(track => ({ ...track, contents: track.contents.map(content => content.lineId === lineId && content.kind === 'timed' ? { ...content, units: content.units.map(shift) } : content) }));
   return { ...document, lines, romanizationTracks, translationTracks };
 }
-export function editSegments(acoustics: Acoustics, operation: { type: 'put'; segment: VocalSegment } | { type: 'delete' | 'merge'; ids: string[] }, durationMs: number): Acoustics {
+export function editSegments(acoustics: Acoustics, operation: { type: 'put'; segment: VocalSegment } | { type: 'delete' | 'merge'; ids: string[] }): Acoustics {
   let segments: VocalSegment[];
   if (operation.type === 'put') {
     const index = acoustics.segments.findIndex(s => s.id === operation.segment.id);
@@ -43,12 +43,12 @@ export function editSegments(acoustics: Acoustics, operation: { type: 'put'; seg
       segments.push({ id: selected[0].id, beginMs: Math.min(...selected.map(s => s.beginMs)), endMs: Math.max(...selected.map(s => s.endMs)) });
     }
   }
-  validateSegments(segments, durationMs);
+  validateSegments(segments);
   return { ...acoustics, segments };
 }
 
-export function assignVocalSegmentCommand(project: import('./project-document').ProjectDocument, lineId: string, segment: VocalSegment, durationMs: number): import('./lyric-commands').LyricCommand {
-  const document = assignVocalSegment(project.lyrics, lineId, segment, durationMs);
+export function assignVocalSegmentCommand(project: import('./project-document').ProjectDocument, lineId: string, segment: VocalSegment): import('./lyric-commands').LyricCommand {
+  const document = assignVocalSegment(project.lyrics, lineId, segment);
   const editing = structuredClone(project.editing);
   for (const [source, target] of Object.entries(editing.endLinks)) if (source === lineId || target === lineId) delete editing.endLinks[source];
   return { type: 'replace-document', document, editing };

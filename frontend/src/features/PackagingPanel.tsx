@@ -18,7 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { exportLyricFile, exportFormats, type ValidationFilter, type LyricFormat } from '../adapters/lyric-formats';
 import type { LyricDocument } from '../domain/lyric-document';
 import styles from './acquisition.module.css';
-export function PackagingPanel(props: { karaokeExportSource?:'nicokara'|'sug'; validationFilter?:ValidationFilter; onValidationFilter?:(filter:ValidationFilter)=>void; resumeKaraoke?:()=>void; validationTab?: ValidationTab; onValidationTab?: (tab:ValidationTab)=>void; focusRule?: AmllRule; onRuleLocated?:()=>void; project?: ProjectDocument; applyProject?: (command:ProjectCommand)=>void; title?: string; document: LyricDocument; dirty?: boolean; onExportFormat?: (format: LyricFormat, content: string) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument; editing?: ProjectEditing } | undefined>; projectId?: string; sourceAssetId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
+export function PackagingPanel(props: { audioDurationMs?: number; karaokeExportSource?:'nicokara'|'sug'; validationFilter?:ValidationFilter; onValidationFilter?:(filter:ValidationFilter)=>void; resumeKaraoke?:()=>void; validationTab?: ValidationTab; onValidationTab?: (tab:ValidationTab)=>void; focusRule?: AmllRule; onRuleLocated?:()=>void; project?: ProjectDocument; applyProject?: (command:ProjectCommand)=>void; title?: string; document: LyricDocument; dirty?: boolean; onExportFormat?: (format: LyricFormat, content: string) => void; saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument; editing?: ProjectEditing } | undefined>; projectId?: string; sourceAssetId?: string; locateIssue: (issue: OutputIssue) => void; externalIssues?: OutputIssue[] }) {
  const [localFilter,setLocalFilter]=useState<ValidationFilter>('all');
  const filter=props.validationFilter??localFilter;
  const setFilter=(value:ValidationFilter)=>{setLocalFilter(value);props.onValidationFilter?.(value);};
@@ -32,7 +32,7 @@ export function PackagingPanel(props: { karaokeExportSource?:'nicokara'|'sug'; v
  const validationPane=useRef<HTMLElement>(null);
  useEffect(()=>{if(validationPane.current)validationPane.current.scrollTop=0;},[tab]);
  const choose=(next:ValidationTab)=>{setLocalTab(next);props.onValidationTab?.(next);};
- const {result,current}=useAutomaticValidation(props.document,editing,props.project?.amll,props.projectId,tab);
+ const {result,current}=useAutomaticValidation(props.document,editing,props.project?.amll,props.projectId,tab,props.project?.acoustics,props.sourceAssetId,props.audioDurationMs);
  const combined=new Map<string,OutputIssue>();
  for(const issue of [...(result?.issues??[]),...(nicokara?.issues??[]),...(sug?.issues??[])]) {
    const key=outputIssueKey(issue)+issue.message, old=combined.get(key);
@@ -44,7 +44,7 @@ export function PackagingPanel(props: { karaokeExportSource?:'nicokara'|'sug'; v
  const [format, setFormat] = usePreference<LyricFormat>(`studio:download:${props.projectId ? `project:${props.projectId}` : `local:${props.title}`}`, 'ttml', (v): v is LyricFormat => exportFormats.some(([id])=>id===v));
  useEffect(()=>{setBlocking([]);setMessage('');},[editing,props.document,props.projectId,props.project?.karaoke,format]);
 
- const visibleIssues=filter==='sug'?sug?.issues??[]:filter==='nicokara'?nicokara?.issues??[]:[...combined.values()].filter(issue=>filter==='all'||issue.severity==='error'&&issue.formats?.includes(filter.toUpperCase()));
+ const visibleIssues=filter==='sug'?[...(sug?.issues??[]),...(result?.issues??[]).filter(i=>i.code==='audio-range')]:filter==='nicokara'?[...(nicokara?.issues??[]),...(result?.issues??[]).filter(i=>i.code==='audio-range')]:[...combined.values()].filter(issue=>filter==='all'||issue.code==='audio-range'||issue.severity==='error'&&issue.formats?.includes(filter.toUpperCase()));
  return <div className={`${styles.page} ${styles.packagingPage}`}><section ref={validationPane} className={styles.pane}>
  <div className={styles.validationTabs} role="tablist" aria-label="校验类型">{(['lyrics','amll'] as const).map((value,index)=><button key={value} id={`validation-tab-${value}`} data-role="secondary" role="tab" aria-selected={tab===value} aria-controls={`validation-panel-${value}`} tabIndex={tab===value?0:-1}
  onClick={()=>choose(value)} onKeyDown={event=>{

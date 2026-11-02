@@ -1,3 +1,4 @@
+import { intersectSegments } from '../domain/time-boundaries';
 import { useProjectJobs } from './useProjectJobs';
 import { IconButton } from '../shared/Controls';
 import { MessageBar, useNotice } from '../shared/MessageBar';
@@ -67,7 +68,9 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     try {
       if (durationMs === null) throw new Error('源音频时长未知，无法接入人声结果');
       if(result.source_asset_id!==sourceAssetId)throw new Error('音源已改变，请重新发起人声处理');
-      apply({type:'acoustics', acoustics:{analysisId:result.id,segments:result.segments!.map(s=>({...s}))},durationMs});
+      const normalized = intersectSegments(result.segments!, durationMs);
+      apply({type:'acoustics', acoustics:{analysisId:result.id,segments:normalized.segments}});
+      if(normalized.clipped || normalized.dropped) publish(`按源音频范围裁切 ${normalized.clipped} 个片段，丢弃 ${normalized.dropped} 个空片段`, 'status');
       handled.current.add(pending.id); setPending(null); setError('');
     } catch(e) {setError((e as Error).message);}
   };

@@ -392,6 +392,7 @@ function EditorWorkspaceContent(props: Props) {
   });
   const [focusAgent,setFocusAgent] = useState<string>();
   const locateIssue = (issue: OutputIssue) => {
+    if (issue.segmentId) { setMode('audio'); audioReview?.setSelected([issue.segmentId]); return; }
     if(issue.cueId && props.project) { const cue=props.project.karaoke.cues.find(c=>c.id===issue.cueId);if(cue){setMode('karaoke');selectCue(cue.id,cue.anchor.lineId);requestLocate(cue.anchor.lineId,`[data-cue-id="${CSS.escape(cue.id)}"]`);}return;}
     if(issue.karaokeSettings){setKaraokeFocusOutput(issue.outputIds?.[0]);setMode('karaoke');if(issue.lineId){const line=document.lines.find(l=>l.id===issue.lineId);if(line){selectLine(line);setColumns(value=>({...value,inspectorVisible:true}));requestAnimationFrame(()=>inspectorRef.current?.querySelector<HTMLElement>('[aria-label="输出分组"]')?.focus());}}else setKaraokeExportOpen(issue.formats?.includes('SUG')?'sug':'nicokara');return;}
     if(issue.kind === 'agent') { setMode('edit'); setFocusAgent(issue.agentId); setSettingsDialog('singers'); return; }

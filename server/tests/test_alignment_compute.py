@@ -60,11 +60,15 @@ def test_independent_run_manual_resource_reuse_and_no_alignment_storage(tmp_path
     assert AcousticBackend.calls==AcousticBackend.closes==2
     assert (stale/'invalid.json').read_text()=='not an acoustic result'
     assert list(stale.iterdir())==[stale/'invalid.json']
-    # Saved selection is checked against actual audio, not current model settings.
+    # The persisted manual interval can exceed the media. Sampling intersects PCM.
     snapshot['acoustics']['segments'][0]['endMs']=999999
-    # Bypass document validation to exercise the compute boundary explicitly.
-    monkeypatch.setattr(AlignmentRunner,'snapshot',lambda *args:(snapshot,asset))
-    with pytest.raises(ValueError,match='超出'): run_alignment(request,lambda *args:None,lambda:False)
+    params['revision']=RevisionStore(db,root).create('p',snapshot,revision)['id']
+    third=run_alignment({**request,'job_id':'third'},lambda *args:None,lambda:False)
+    assert third['acoustics'] is None
+    assert third['alignment']['execution']['segment_source']=='manual'
+    reopened,_=AlignmentRunner(db,root).snapshot('p',params['revision'])
+    assert reopened['acoustics']['segments'][0]['endMs']==999999
+
 
 
 def test_backend_is_released_on_decode_failure(tmp_path,monkeypatch):

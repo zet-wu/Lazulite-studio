@@ -1,3 +1,4 @@
+import { intersectSegments } from './time-boundaries';
 import type { Acoustics, ProjectDocument } from './project-document';
 import { validateSegments } from './project-document';
 import { validateProjectEditing } from './project-editing';
@@ -7,6 +8,7 @@ import type { TimeMs } from './lyric-document';
 type Endpoint = { time: number; source: string } | null;
 export type AlignmentResult = {
   kind: 'alignment';
+  normalization?: { clipped: number; dropped: number };
   binding: { project_id: string; revision: string; asset_id: string };
   alignment: { schema: 'lazulite-japanese-result-v1'; units: { unit_id: string; line_id: string; proposed_timing: { start: Endpoint; end: Endpoint } }[] };
   mapping: { unit_id: string; object_id: string; word_id: string; line_id: string; kind: 'word' | 'ruby' }[];
@@ -54,9 +56,9 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
     return false;
   }
   const endpoint = (value: Endpoint): TimeMs => value === null ? null : Math.round(value.time * 1000);
-  const legal = (pair: Pair) => [pair.beginMs, pair.endMs].every(t => t === null || Number.isSafeInteger(t) && t >= 0 && t <= durationMs) && (pair.beginMs === null || pair.endMs === null || pair.beginMs < pair.endMs);
+  const legal = (pair: Pair, upper = Number.MAX_SAFE_INTEGER) => [pair.beginMs, pair.endMs].every(t => t === null || Number.isSafeInteger(t) && t >= 0 && t <= upper) && (pair.beginMs === null || pair.endMs === null || pair.beginMs < pair.endMs);
   function merge(id: string, old: Pair, proposed: Pair): Pair {
-    if (!legal(proposed)) { retained.push({id, reason:'非法建议端点'}); return old; }
+    if (!legal(proposed, durationMs)) { retained.push({id, reason:'非法建议端点'}); return old; }
     if (proposed.beginMs !== null && proposed.endMs !== null) adoptedComplete.add(id);
     if (clearUnmatched) {
       if (old.beginMs !== null && proposed.beginMs === null || old.endMs !== null && proposed.endMs === null) cleared.push(id);
@@ -71,7 +73,7 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
   function adopt(id: string, old: Pair): Pair {
     const ids = groups.get(id);
     if (!ids?.length) return clearUnmatched ? merge(id,old,{beginMs:null,endMs:null}) : old;
-    if (ids.some(uid => {const timing=units.get(uid)!.proposed_timing;return !legal({beginMs:endpoint(timing.start),endMs:endpoint(timing.end)});})) {
+    if (ids.some(uid => {const timing=units.get(uid)!.proposed_timing;return !legal({beginMs:endpoint(timing.start),endMs:endpoint(timing.end)}, durationMs);})) {
       retained.push({id,reason:'非法建议端点'}); return old;
     }
     // Missing leading/trailing units cannot be replaced by a lucky middle prediction.
@@ -122,7 +124,7 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
     const line = next.lyrics.lines.find(l => l.id === id)!, destination = next.lyrics.lines.find(l => l.id === target)!;
     if (line.endMs !== destination.beginMs || destination.beginMs === null) delete next.editing.endLinks[id];
   }
-  if (result.acoustics) { validateSegments(result.acoustics.segments, durationMs); next.acoustics = result.acoustics; }
+  if (result.acoustics) { validateSegments(result.acoustics.segments); next.acoustics = {...result.acoustics, segments:intersectSegments(result.acoustics.segments,durationMs).segments}; }
   validateProjectEditing(next.lyrics, next.editing); assertAmll(next.lyrics, next.amll);
   return { project: JSON.stringify(next) === JSON.stringify(project) ? project : next, retained, cleared, mergedGaps };
 }

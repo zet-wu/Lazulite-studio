@@ -60,3 +60,21 @@ it('hiding the cue layer unmounts the lane and releases an uncommitted pointer d
   view.rerender(show(true));expect(screen.getByRole('button',{name:'时间轴导唱 唱'})).toHaveAttribute('aria-pressed','true');expect(project.karaoke.cues[0].beginMs).toBe(0);
   cleanup();vi.unstubAllGlobals();
 });
+
+it('rejects a dragged block tail beyond the source and commits after moving back', async () => {
+  const {cleanup,fireEvent}=await import('@testing-library/react');cleanup();
+  vi.stubGlobal('ResizeObserver',class {observe(){} unobserve(){} disconnect(){}});
+  const box=vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockReturnValue({left:0,top:0,width:1000,height:100,right:1000,bottom:100,x:0,y:0,toJSON(){}});
+  const document=createLyricDocument('歌');Object.assign(document.lines[0],{beginMs:8000,endMs:9500});
+  const apply=vi.fn(),onError=vi.fn();
+  render(<SelectionProvider><InitialSelection id={document.lines[0].id}><TimelineTracks document={document} selectedLineId={document.lines[0].id} startMs={0} endMs={10000} durationMs={10000} positionMs={0} bpm={120} snap={false} visible={{karaoke:false,line:true,word:false,ruby:false,gap:false,romanization:false}} apply={apply} onPan={()=>{}} onError={onError}/></InitialSelection></SelectionProvider>);
+  const bar=screen.getByRole('button',{name:'时间轴行 L1'});
+  bar.setPointerCapture=vi.fn();bar.hasPointerCapture=vi.fn(()=>false);
+  const pointer=(type:string,x:number)=>{const event=new MouseEvent(type,{bubbles:true,button:0,clientX:x});Object.defineProperty(event,'pointerId',{value:1});fireEvent(bar,event);};
+  pointer('pointerdown',100);pointer('pointermove',200);pointer('pointerup',200);
+  expect(onError).toHaveBeenCalledWith(expect.stringContaining('结束'));
+  expect(apply).not.toHaveBeenCalled();
+  pointer('pointerdown',100);pointer('pointermove',200);pointer('pointermove',140);pointer('pointerup',140);
+  expect(apply).toHaveBeenCalledWith({type:'shift-lines',lineIds:[document.lines[0].id],deltaMs:400});
+  cleanup();box.mockRestore();vi.unstubAllGlobals();
+});

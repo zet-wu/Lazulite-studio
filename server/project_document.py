@@ -65,7 +65,7 @@ def read_lyrics(path: str | Path) -> str:
 
 def validate_project(value: dict | ProjectSnapshot, conn, project_id: str) -> dict:
     snapshot = _validate_snapshot(value if isinstance(value, ProjectSnapshot) else ProjectSnapshot.model_validate(value))
-    row = conn.execute('SELECT p.source_asset_id,a.duration_ms FROM projects p LEFT JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?', (project_id,)).fetchone()
+    row = conn.execute('SELECT source_asset_id FROM projects WHERE id=?', (project_id,)).fetchone()
     if row is None: raise KeyError(project_id)
     acoustic = snapshot['acoustics']
     if acoustic['analysisId'] is not None:
@@ -77,8 +77,6 @@ def validate_project(value: dict | ProjectSnapshot, conn, project_id: str) -> di
             raise DocumentInvalid('segment_duplicate_id', f"人声片段 {segment['id']} 标识重复", object_id=segment['id'])
         if not 0 <= segment['beginMs'] < segment['endMs'] <= 9007199254740991:
             raise DocumentInvalid('segment_invalid_range', f"人声片段 {segment['id']} 时间须为非负安全整数且结束晚于开始", object_id=segment['id'], begin_ms=segment['beginMs'], end_ms=segment['endMs'])
-        if row[0] is not None and row[1] is not None and segment['endMs'] > row[1]:
-            raise DocumentInvalid('segment_exceeds_source', f"人声片段 {segment['id']} 超出源音频范围", object_id=segment['id'], source_duration_ms=row[1])
         ids.add(segment['id'])
     return snapshot
 
