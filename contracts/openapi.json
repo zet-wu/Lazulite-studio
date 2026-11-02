@@ -2547,6 +2547,13 @@
           },
           "experimental": {
             "type": "boolean"
+          },
+          "reason_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stable unavailable reason code; raw reason is diagnostic only."
           }
         }
       },

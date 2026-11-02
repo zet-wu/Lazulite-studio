@@ -16,10 +16,10 @@ def alignment_unavailable():
     from importlib.util import find_spec
     from lazulite.alignment.japanese.backend import inspect_model
     path = os.getenv('STUDIO_NEXTFIRE_PATH')
-    if not path: return '未配置日语声学模型目录（STUDIO_NEXTFIRE_PATH）'
+    if not path: return {'code':'model_path_missing','message':'STUDIO_NEXTFIRE_PATH is not configured'}
     try: inspect_model(path)
-    except (OSError, ValueError, KeyError, TypeError) as error: return f'日语声学模型配置不可用：{error}'
-    if any(find_spec(name) is None for name in ('torch', 'transformers', 'soundfile', 'demucs')): return '缺少自动对齐模型依赖'
+    except (OSError, ValueError, KeyError, TypeError) as error: return {'code':'model_invalid','message':str(error)}
+    if any(find_spec(name) is None for name in ('torch', 'transformers', 'soundfile', 'demucs')): return {'code':'dependencies_missing','message':'Alignment model dependencies are missing'}
     return None
 
 
@@ -50,7 +50,7 @@ class AlignmentRunner:
         if not projection['summary']['line_count']: raise ValueError('没有未跳过的歌词行')
         if not projection['summary']['emitting_count']: raise ValueError('没有可用读音，无法计算')
         reason = alignment_unavailable()
-        if reason: raise ValueError(reason)
+        if reason: raise ValueError(reason['message'])
         params['asset_id'] = asset
 
     def run(self, pid, asset_path, params, jid, emit, cancelled):

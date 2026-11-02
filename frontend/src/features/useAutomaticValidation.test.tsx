@@ -22,7 +22,7 @@ it('checks only committed inputs, coalesces changes and cancels checks after swi
 it('reports execution failures instead of a successful empty report',async()=>{
  vi.spyOn(validation,'validateLyricsIncrementally').mockImplementation(()=>{throw new Error('计算失败样例');});
  const {result}=renderHook(()=>useAutomaticValidation(createDoc,editing,undefined,'p','lyrics'));
- await waitFor(()=>expect(result.current.current).toBe(true));expect(result.current.result?.error).toBe('计算失败样例');expect(result.current.result?.issues).toBeUndefined();
+ await waitFor(()=>expect(result.current.current).toBe(true));expect(result.current.result?.error).toEqual({key:'error.unexpected',values:{diagnostic:'计算失败样例'}});expect(result.current.result?.issues).toBeUndefined();
 });
 const createDoc=createLyricDocument(),editing=createProjectEditing();
 it('rejects delayed results from a previous project and tab even if a checker finishes after cancellation',async()=>{

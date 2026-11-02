@@ -26,6 +26,6 @@ Workspace 持有项目连接、保存及资源，EditorWorkspace 组合获取、
 
 界面语言使用 i18next／react-i18next 和本地 JSON 资源。`src/i18n` 管理语言匹配、订阅和格式化；`server/ui_languages.json` 是前后端共用的语言注册表。资料库偏好 `studio:ui-language` 以 revision 更新。领域层的 Message 只保存语义键和参数；Notice 与持续错误在渲染时翻译，语言更新不重新发布事件。
 
-翻译资源以 `src/i18n/resources/*.json` 为唯一译文来源，`context.json` 记录用途、源文及参数。运行 `pnpm i18n:check` 校验资源；`pnpm i18n:export /tmp/translations.csv` 导出 UTF-8 对照表，编辑后使用 `pnpm i18n:import /tmp/translations.csv --language en` 更新指定语言，并审阅 JSON 差异。缺行保留原资源，重复键、未知键、空译文及参数不一致会拒绝导入。英文计数使用 `_one`／`_other`；新增语言按注册表声明自己的复数形式。源文变化时检查要求重新审阅译文，再更新 context 中记录的源文。
+翻译资源以 `src/i18n/resources/*.json` 为唯一译文来源，`context.json` 记录用途、源文及参数意义。运行 `pnpm i18n:check` 校验资源、代码中的固定消息引用，以及语言注册的 BCP 47 与复数规则；`pnpm i18n:export /tmp/translations.csv` 导出 UTF-8 对照表，编辑后使用 `pnpm i18n:import /tmp/translations.csv --language en` 更新指定语言，并审阅 JSON 差异。缺行保留原资源，重复键、未知键、空译文及参数不一致会拒绝导入。英文计数使用 `_one`／`_other`；新增语言按注册表声明自己的复数形式。源文变化时检查要求重新审阅译文，再更新 context 中记录的源文。
 
 新增语言先在注册表登记 BCP 47 标识、自称名称、HTML／日期区域、方向、复数形式和 `complete: false`，再添加资源文件。完成资源与布局审阅后才启用；RTL 语言需要单独审阅布局。注册表随服务分发，前端在构建时引用同一文件。

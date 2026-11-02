@@ -1,3 +1,4 @@
+import { capabilityReason } from './task-messages';
 import { message as describeMessage, messageList, MessageError, errorMessage, type Message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { deviceSummary, taskError } from './task-messages';
@@ -55,7 +56,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   },[pid]);
   const capability=caps.data?.items.find(c=>c.id==='job.alignment');
   const active=jobs.data?.items.some(j=>['vocal','alignment'].includes(j.kind)&&['queued','running','cancel_requested'].includes(j.status));
-  const reason=!assetId?t('alignment.uploadRequired'):durationMs===null?t('alignment.durationUnknown'):!project.lyrics.lines.some(l=>!project.editing.skippedAlignmentLineIds.includes(l.id))?t('alignment.noLines'):!capability?.enabled?(capability?.reason??t('alignment.checkingModels')):active?t('alignment.busy'):null;
+  const reason=!assetId?t('alignment.uploadRequired'):durationMs===null?t('alignment.durationUnknown'):!project.lyrics.lines.some(l=>!project.editing.skippedAlignmentLineIds.includes(l.id))?t('alignment.noLines'):!capability?.enabled?(capability?capabilityReason(capability):t('alignment.checkingModels')):active?t('alignment.busy'):null;
   const open=async()=>{
     if(!finishDraft())return;
     setOpening(true);setMessage('');setOptions(defaultAlignmentOptions());setGapDraft('500');setGapError('');

@@ -1,6 +1,6 @@
 import {expect,test} from '@playwright/test';
-function wav() {
- const data=Buffer.alloc(44+16000);data.write('RIFF');data.writeUInt32LE(data.length-8,4);data.write('WAVEfmt ',8);data.writeUInt32LE(16,16);data.writeUInt16LE(1,20);data.writeUInt16LE(1,22);data.writeUInt32LE(8000,24);data.writeUInt32LE(16000,28);data.writeUInt16LE(2,32);data.writeUInt16LE(16,34);data.write('data',36);data.writeUInt32LE(16000,40);return data;
+function wav(seconds=1) {
+ const data=Buffer.alloc(44+16000*seconds);data.write('RIFF');data.writeUInt32LE(data.length-8,4);data.write('WAVEfmt ',8);data.writeUInt32LE(16,16);data.writeUInt16LE(1,20);data.writeUInt16LE(1,22);data.writeUInt32LE(8000,24);data.writeUInt32LE(16000,28);data.writeUInt16LE(2,32);data.writeUInt16LE(16,34);data.write('data',36);data.writeUInt32LE(16000*seconds,40);return data;
 }
 test('settings imports and reimports the same audio while preserving lyrics and advancing the binding',async({page})=>{
  const headers={origin:'http://127.0.0.1:5175'};
@@ -40,4 +40,32 @@ test('finishes a draft edited while audio is uploading before switching the sour
  await expect.poll(async()=>((await(await page.request.get(`/api/v1/projects/${pid}`)).json()).asset?.id)).toBeTruthy();
  const after=await(await page.request.get(url)).json();expect(after.document.lyrics.draftTtml).toContain('保留正在输入的歌词');
  await expect(page.getByText('已保存',{exact:true})).toBeVisible();
+});
+
+for(const [locale,warning,download] of [
+ ['zh-Hans','超过参考音频时长','下载歌词'],
+ ['zh-Hant','超過參考音訊長度','下載歌詞'],
+ ['en','Beyond reference audio duration','Download lyrics'],
+]) test(`shorter source refreshes nonblocking warnings without clipping lyrics in ${locale}`,async({page})=>{
+ const headers={origin:'http://127.0.0.1:5175'};
+ const pid=(await(await page.request.post('/api/v1/projects',{headers,data:{name:'Shorter source'}})).json()).id;
+ const url=`/api/v1/projects/${pid}`,before=await(await page.request.get(url+'/document')).json();
+ const xml='<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="line" begin="0s" end="1.5s"><span begin="0s" end="1.5s">fixed lyrics</span></p></body></tt>';
+ expect((await page.request.put(url+'/document',{headers:{...headers,'if-match':before.revision},data:{...before,document:{...before.document,lyrics:{draftTtml:xml}}}})).ok()).toBeTruthy();
+ await page.goto(`/projects/${pid}/edit`);
+ await page.locator('[data-top-menu="settings"] summary').click();
+ await page.locator('[data-top-menu="settings"] select').selectOption(locale);
+ await page.locator('[data-top-menu="settings"] summary').click();
+ const input=page.locator('input[type="file"][accept^="audio/"]');
+ await input.setInputFiles({name:'long.wav',mimeType:'audio/wav',buffer:wav(2)});
+ await expect.poll(async()=>((await(await page.request.get(url)).json()).asset?.source_duration_ms)).toBe(2000);
+ const initial=await(await page.request.get(url+'/document')).json();
+ await input.setInputFiles({name:'short.wav',mimeType:'audio/wav',buffer:wav()});
+ await expect.poll(async()=>((await(await page.request.get(url)).json()).asset?.source_duration_ms)).toBe(1000);
+ const after=await(await page.request.get(url+'/document')).json();expect(after.document.lyrics).toEqual(initial.document.lyrics);
+ await page.locator('nav').filter({has:page.locator('button[aria-current="page"]')}).getByRole('button').nth(6).click();
+ await expect(page.getByRole('button',{name:new RegExp(warning)}).first()).toBeVisible();
+ const file=page.waitForEvent('download');await page.getByRole('button',{name:download,exact:true}).click();
+ expect((await file).suggestedFilename()).toMatch(/\.ttml$/);
+ await page.locator('[data-top-menu="settings"] summary').click();await page.locator('[data-top-menu="settings"] select').selectOption('zh-Hans');
 });

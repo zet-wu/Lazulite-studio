@@ -90,8 +90,8 @@ export function SyncPanel({ progress, onProgress, document, cursor, targetVersio
     transport?.current?.audition(start, before ? beginMs : endMs + 600);
   };
   return <section className={styles.syncPanel} aria-label={t('sync.title')}>
+    {!transport && <p className={styles.syncAudioHint}>{t('sync.noAudio')}</p>}
     <div className={styles.syncMain}>
-    {!transport && <small>{t('sync.noAudio')}</small>}
     <strong>{active ? t('sync.progress',{line:lineNumber,number:lineIndex+1,total:lineUnits.length}) : t('sync.excluded')}</strong>
     <span className={styles.syncQuote}><span>{word?.text}</span>{ruby && <b> → {ruby.reading}</b>}</span>
     <small className={styles.syncTime}>{beginMs === null ? '—' : (beginMs / 1e3).toFixed(3)}–{endMs === null ? '—' : (endMs / 1e3).toFixed(3)} s</small>

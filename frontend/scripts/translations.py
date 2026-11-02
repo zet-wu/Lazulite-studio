@@ -81,7 +81,7 @@ def export_table(root,path):
         for key in keys:
             base=VARIANT.sub('',key);meta=context.get(key,context.get(base+'_other',context.get(base,{})))
             writer.writerow({'key':key,'variant':VARIANT.search(key).group(1) if VARIANT.search(key) else '',
-                'context':meta.get('context',''),'parameters':','.join(meta.get('params',[])),**{lang['id']:values[lang['id']].get(key,'') for lang in languages}})
+                'context':meta.get('context',''),'parameters':'; '.join(f"{name}: {meta.get('parameterNotes',{}).get(name,name)}" for name in meta.get('params',[])),**{lang['id']:values[lang['id']].get(key,'') for lang in languages}})
 
 
 def import_table(root,path,language):

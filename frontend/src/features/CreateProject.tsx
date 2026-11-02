@@ -114,7 +114,7 @@ export function CreateProject({
         caught instanceof ApiError && caught.status === 401
           ? message('create.expired')
           : caught instanceof ApiError
-            ? caught.body.message
+            ? errorMessage(caught)
             : message('common.failed'),
       );
       setStatus("idle");

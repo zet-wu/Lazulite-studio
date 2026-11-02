@@ -853,6 +853,8 @@ export interface components {
             enabled: boolean;
             reason: string | null;
             experimental?: boolean;
+            /** @description Stable unavailable reason code; raw reason is diagnostic only. */
+            reason_code?: string | null;
         };
         Capabilities: {
             /** @constant */

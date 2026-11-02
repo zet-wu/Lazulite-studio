@@ -13,3 +13,8 @@ export function deviceSummary(devices:JobRequest['devices']):string {
   return `${i18n.t(stage==='vocal'?'settings.vocalSeparation':'settings.alignment')}: ${device.label}${reason?` (${reason})`:''}`;
  }).join(i18n.t('notice.separator'));
 }
+
+export function capabilityReason(capability: import('../adapters/http/client').Capabilities['items'][number]):string {
+ const keys:Record<string,string>={model_path_missing:'capability.modelPath',model_invalid:'capability.modelInvalid',dependencies_missing:'capability.dependencies',publisher_missing:'capability.publisher'};
+ return i18n.t(keys[capability.reason_code??'']??'task.capabilityUnavailable',{diagnostic:capability.reason??''});
+}

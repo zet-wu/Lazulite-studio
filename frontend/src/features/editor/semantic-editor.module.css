@@ -270,13 +270,14 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 /* Both modes share the compact default row; only explicit extras expand. */
 .ribbon, .syncPanel { min-height: 41px; box-sizing: border-box; padding: 7px 16px; gap: 6px; font-size: 12px; line-height: 16px; }
 .syncPanel { display: block; }
-.syncMain { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.syncMain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.syncAudioHint { margin: 0 0 6px; color: var(--muted); }
 .syncMain > button[aria-expanded][data-role] { width: auto; flex-shrink: 0; }
 .syncPanel button, .syncPanel select { font: inherit; padding: 4px 6px; white-space: nowrap; }
-.syncButtons { flex-wrap: nowrap; }
+.syncButtons { flex-wrap: wrap; min-width: 0; }
 .syncQuote { flex: 1; min-width: 40px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; background: var(--state-hover); border-radius: 4px; padding: 2px 6px; }
 .syncTime { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.syncMain > strong { white-space: nowrap; }
+.syncMain > strong { max-width: 100%; overflow-wrap: anywhere; }
 .syncExtras { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px; }
 .syncBindings > label { display: grid; grid-template-columns: minmax(180px, 1fr) 150px auto; gap: 8px; align-items: center; }
 

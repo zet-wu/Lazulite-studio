@@ -1,3 +1,4 @@
+import { errorMessage } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { message, type Message } from '../domain/messages';
 import { useTranslation } from 'react-i18next';
@@ -104,7 +105,7 @@ function Login() {
         navigate("/projects", { replace: true });
     } catch (caught) {
       setError(
-        caught instanceof ApiError ? caught.body.message : message('login.failed'),
+        caught instanceof ApiError ? errorMessage(caught) : message('login.failed'),
       );
     } finally {
       setBusy(false);

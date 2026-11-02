@@ -229,9 +229,9 @@ def create_app(
                 {"id": "assets", "enabled": True, "reason": None},
                 {"id": "document.edit", "enabled": True, "reason": None},
                 {"id": "job.run", "enabled": True, "reason": None},
-                {"id": "job.alignment", "enabled": alignment_reason is None, "reason": alignment_reason},
+                {"id": "job.alignment", "enabled": alignment_reason is None, "reason": alignment_reason["message"] if alignment_reason else None, "reason_code": alignment_reason["code"] if alignment_reason else None},
                 {"id": "publish.stpp", "enabled": publish_available,
-                 "reason": None if publish_available else "未配置 STPP 发布器"},
+                 "reason": None if publish_available else "STPP publisher is not configured", "reason_code": None if publish_available else "publisher_missing"},
             ],
         }
 
