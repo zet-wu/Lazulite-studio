@@ -1313,7 +1313,6 @@
     },
     "/projects/{projectId}/music": {
       "post": {
-        "operationId": "attachMusic",
         "parameters": [
           {
             "name": "projectId",
@@ -1331,10 +1330,25 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "upload_id"
+                  "upload_id",
+                  "revision",
+                  "expected_asset_id",
+                  "operation_id"
                 ],
                 "properties": {
                   "upload_id": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "string"
+                  },
+                  "expected_asset_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "operation_id": {
                     "type": "string"
                   }
                 }
@@ -1344,22 +1358,33 @@
         },
         "responses": {
           "200": {
-            "description": "已校验的项目音乐资源",
+            "description": "Atomic source binding and empty acoustic revision",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Asset"
+                  "type": "object",
+                  "required": [
+                    "asset",
+                    "revision",
+                    "cleanup_pending"
+                  ],
+                  "properties": {
+                    "asset": {
+                      "$ref": "#/components/schemas/Asset"
+                    },
+                    "revision": {
+                      "type": "string"
+                    },
+                    "cleanup_pending": {
+                      "type": "boolean"
+                    }
+                  }
                 }
               }
             }
-          },
-          "409": {
-            "description": "音乐已由其他请求接入；未采用本次上传"
-          },
-          "404": {
-            "description": "项目或临时上传不存在"
           }
-        }
+        },
+        "operationId": "attachMusic"
       }
     },
     "/projects/{projectId}/embedded-lyrics": {
@@ -1959,11 +1984,12 @@
         }
       }
     },
-    "/projects/{pid}/music": {
+    "/projects/{projectId}/music-cleanup": {
       "post": {
+        "operationId": "cleanupMusic",
         "parameters": [
           {
-            "name": "pid",
+            "name": "projectId",
             "in": "path",
             "required": true,
             "schema": {
@@ -1971,62 +1997,21 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "upload_id",
-                  "revision",
-                  "expected_asset_id",
-                  "operation_id"
-                ],
-                "properties": {
-                  "upload_id": {
-                    "type": "string"
-                  },
-                  "revision": {
-                    "type": "string"
-                  },
-                  "expected_asset_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "operation_id": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
-            "description": "Atomic source binding and empty acoustic revision",
+            "description": "Source replacement journal collected",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "asset",
-                    "revision",
-                    "cleanup_pending"
-                  ],
                   "properties": {
-                    "asset": {
-                      "$ref": "#/components/schemas/Asset"
-                    },
-                    "revision": {
-                      "type": "string"
-                    },
                     "cleanup_pending": {
                       "type": "boolean"
                     }
-                  }
+                  },
+                  "required": [
+                    "cleanup_pending"
+                  ]
                 }
               }
             }

@@ -31,8 +31,9 @@ it('saves before replacement, keeps lyrics and prevents a pending save from bein
 it('preserves unsaved lyrics as a conflict when another page replaces audio',async()=>{
  const project=createProjectDocument();project.acoustics={analysisId:'old',segments:[{id:'s',beginMs:0,endMs:100}]};
  const {result}=renderHook(()=>useProjectDocument('p',serializeProject(project),'base',undefined,vi.fn(),'old'));
+ const acceptBeforeEdit=result.current.acceptSource;
  await act(async()=>{result.current.apply({type:'set-metadata',key:'title',values:['unsaved']});});
- await act(async()=>{await result.current.acceptSource('new','replacement',serializeProject(createProjectDocument()));});
+ await act(async()=>{await acceptBeforeEdit('new','replacement',serializeProject(createProjectDocument()));});
  expect(result.current.conflict).toBe(true);expect(result.current.dirty).toBe(true);
  expect(result.current.document.metadata.title).toEqual(['unsaved']);
  expect(result.current.project.acoustics.segments).toEqual([]);

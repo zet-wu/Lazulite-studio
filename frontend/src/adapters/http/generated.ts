@@ -709,7 +709,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/projects/{pid}/music": {
+    "/projects/{projectId}/music-cleanup": {
         parameters: {
             query?: never;
             header?: never;
@@ -718,41 +718,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    pid: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        upload_id: string;
-                        revision: string;
-                        expected_asset_id: string | null;
-                        operation_id: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Atomic source binding and empty acoustic revision */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            asset: components["schemas"]["Asset"];
-                            revision: string;
-                            cleanup_pending: boolean;
-                        };
-                    };
-                };
-            };
-        };
+        post: operations["cleanupMusic"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2587,32 +2553,25 @@ export interface operations {
             content: {
                 "application/json": {
                     upload_id: string;
+                    revision: string;
+                    expected_asset_id: string | null;
+                    operation_id: string;
                 };
             };
         };
         responses: {
-            /** @description 已校验的项目音乐资源 */
+            /** @description Atomic source binding and empty acoustic revision */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Asset"];
+                    "application/json": {
+                        asset: components["schemas"]["Asset"];
+                        revision: string;
+                        cleanup_pending: boolean;
+                    };
                 };
-            };
-            /** @description 项目或临时上传不存在 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description 音乐已由其他请求接入；未采用本次上传 */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
@@ -3027,6 +2986,30 @@ export interface operations {
                 };
             };
             422: components["responses"]["Error"];
+        };
+    };
+    cleanupMusic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Source replacement journal collected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cleanup_pending: boolean;
+                    };
+                };
+            };
         };
     };
 }

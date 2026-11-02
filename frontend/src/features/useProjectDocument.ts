@@ -234,9 +234,10 @@ export function useProjectDocument(
       const changed = sourceIdentity.current !== assetId;
       sourceIdentity.current=assetId;
       if (!changed) return;
-      const next=remote && !dirty ? createProjectEditorState(parseProject(remote)) : clearAcousticHistory(stateRef.current);
+      const hasLocalChanges=sequence.current!==savedSequence.current || !!pending.current || !!inFlight.current;
+      const next=remote && !hasLocalChanges ? createProjectEditorState(parseProject(remote)) : clearAcousticHistory(stateRef.current);
       stateRef.current=next;setState(next);setHistoryVersion(v=>v+1);
-      if (remote && (dirty || pending.current)) {
+      if (remote && hasLocalChanges) {
         setConflict(true);setError('源音频已在其他页面改变，未保存歌词已保留，请处理版本冲突');
         await checkpoint(next);
       } else {

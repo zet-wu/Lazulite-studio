@@ -170,7 +170,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       studioApi.getWaveform(projectId, requestWindow.startMs, requestWindow.endMs, level, signal, graphicVocal),
     enabled: Boolean(asset) && expanded && span > 0 && end > start,
     staleTime: Infinity, gcTime: 0, retry: false,
-    placeholderData: (data, query) => query?.queryKey[1] === projectId && query.queryKey[2] === graphicVocal && query.queryKey[5] === level ? data : undefined,
+    placeholderData: (data, query) => query?.queryKey[1] === projectId && query.queryKey[2] === asset?.id && query.queryKey[3] === graphicVocal && query.queryKey[6] === level ? data : undefined,
   });
   const validLine =
     selectedLine?.begin_ms != null &&
