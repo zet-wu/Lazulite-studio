@@ -9,7 +9,7 @@ import { SyncPanel } from './SyncPanel';
 import { useSyncProgress } from './sync-progress';
 import { ProjectEditingContext } from './ProjectEditingContext';
 afterEach(() => { cleanup(); localStorage.clear(); });
-function setup(background = false) {
+function setup(background = false, audio = true) {
   const document = createLyricDocument(); document.lines = [createLine('', 'a'), createLine('', 'b')];
   document.lines[0].words = [createWord('A', 'A'), createWord('B', 'B')]; document.lines[1].words = [createWord('C', 'C')];
   if (background) document.lines[1].backgroundOf = 'a';
@@ -21,7 +21,7 @@ function setup(background = false) {
     const [project, setProject] = useState(state.present);
     const [cursor, setCursor] = useState<SyncCursor>(syncUnits(document)[0]), [version, setVersion] = useState(0);
     const [progress, setProgress] = useSyncProgress(project.lyrics, project.editing, cursor, version, 0);
-    return <ProjectEditingContext value={project.editing}><SyncPanel document={project.lyrics} cursor={cursor} transport={transport} onCursor={setCursor} progress={progress} onProgress={setProgress}
+    return <ProjectEditingContext value={project.editing}><SyncPanel document={project.lyrics} cursor={cursor} transport={audio ? transport : undefined} onCursor={setCursor} progress={progress} onProgress={setProgress}
       apply={command => { try { state = executeProjectCommand(state, { type: 'lyrics', command }); setProject(state.present); return true; } catch { return false; } }} />
       <output data-testid="progress">{JSON.stringify(progress)}</output>
       <button onClick={() => { setVersion(v => v + 1); setCursor(syncUnits(project.lyrics, project.editing, background ? 'b' : undefined).at(-1)!); }}>choose last</button>
@@ -61,4 +61,13 @@ it('background stays in its own line and preserves the main mode preference', ()
   stamp('起始轴'); run.time(1250); stamp('连续轴'); expect(run.progress().consumed).toBe(1);
   run.time(1500); stamp('连续轴'); expect(run.progress().completed).toBe(true);
   expect(run.state().present.lyrics.lines[0].words.every(word => word.beginMs === null)).toBe(true);
+});
+
+it('ignores no-audio stamping keys while keeping unit navigation available',()=>{
+ const run=setup(false,false);
+ for(const label of ['起始轴','连续轴','结束轴'])expect(screen.getByRole('button',{name:label})).toBeDisabled();
+ for(const code of ['KeyS','KeyD','KeyF'])fireEvent.keyDown(window,{code});
+ expect(run.state().past).toHaveLength(0);expect(screen.queryByRole('alert')).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'下一单元'}));
+ expect(run.state().past).toHaveLength(0);
 });

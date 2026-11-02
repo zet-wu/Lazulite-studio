@@ -1690,5 +1690,7 @@
   "amll.processAll_other": "处理全部 {{count}} 项",
   "search.runningCount_other": "搜索中 {{count}}",
   "search.cancelledCount_other": "已取消 {{count}}",
-  "translation.deleteTrack_other": "删除轨道及 {{count}} 份内容（轨道 {{number}}）"
+  "translation.deleteTrack_other": "删除轨道及 {{count}} 份内容（轨道 {{number}}）",
+  "music.replace": "替换音频",
+  "preview.empty": "暂无歌词可预览"
 }

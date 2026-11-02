@@ -131,9 +131,9 @@
 .rubyIssueList strong { font-weight: 600; overflow-wrap: anywhere; }
 
 .syncButtons { display: flex; flex-wrap: wrap; gap: 6px; }
-.previewMode { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; background: var(--canvas); }
-.previewMode { flex: 1; min-height: 0; overflow-y: auto; }
-.previewSettings { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; font-size: 12px; }
+.previewMode { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; background: var(--canvas); }
+.previewSettings { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 7px 16px; font-size: 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.previewBody { flex: 1; min-height: 0; overflow: auto; padding: 12px; display: flex; flex-direction: column; }
 .previewSettings label { display: inline-flex; align-items: center; gap: 5px; }
 .previewPlayer { height: min(62dvh, 620px); min-height: 300px; border-radius: 10px; overflow: hidden; color: #fff; background: radial-gradient(circle at 25% 15%, #243f6b, #111622 65%); }
 .previewPlayer > div { height: 100%; }

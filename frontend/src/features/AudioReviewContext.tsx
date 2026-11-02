@@ -5,13 +5,14 @@ function useAudioState() {
   const selected = shared.selectedSegments, setSelected = shared.setSelectedSegments;
   const segmentTarget = shared.effective?.kind === 'segments';
   const [adding, setAdding] = useState(false);
+  const [analysisHost, setAnalysisHost] = useState<HTMLDivElement | null>(null);
   const [toolsHost, setToolsHost] = useState<HTMLDivElement | null>(null);
   const [alignmentHost, setAlignmentHost] = useState<HTMLDivElement | null>(null);
   const [statusHost, setStatusHost] = useState<HTMLDivElement | null>(null);
   const [taskHost, setTaskHost] = useState<HTMLDivElement | null>(null);
   const [messageHost, setMessageHost] = useState<HTMLDivElement | null>(null);
   const [timelineReady, setTimelineReady] = useState(false);
-  return { taskHost, setTaskHost, messageHost, setMessageHost, selected, setSelected, segmentTarget, adding, setAdding, toolsHost, setToolsHost, alignmentHost, setAlignmentHost, statusHost, setStatusHost, timelineReady, setTimelineReady };
+  return { analysisHost, setAnalysisHost, taskHost, setTaskHost, messageHost, setMessageHost, selected, setSelected, segmentTarget, adding, setAdding, toolsHost, setToolsHost, alignmentHost, setAlignmentHost, statusHost, setStatusHost, timelineReady, setTimelineReady };
 }
 const Context = createContext<ReturnType<typeof useAudioState> | null>(null);
 export const useAudioReview = () => useContext(Context)!;

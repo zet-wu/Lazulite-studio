@@ -84,6 +84,7 @@ const PreviewMode = lazy(() => import('./PreviewMode').then((module) => ({ defau
 
 type Props = {
   onImportAudio?:()=>void;
+  audioImportDisabled?: boolean;
   prepareAudioImport?:RefObject<(()=>boolean)|null>;
   alignment?: AlignmentControl;
   historyVersion?: number;
@@ -886,6 +887,13 @@ function EditorWorkspaceContent(props: Props) {
     <MessageBar notice={message} />
     {props.notices?.map((notice, index) => <MessageBar key={index} notice={notice} />)}
     <nav className={styles.modeTabs} aria-label={t('editor.mode')}>{([['acquire',t('editor.acquire'),'cloud'],['audio',t('editor.audio'),'music'],['edit',t('editor.edit'),'pencil'],['sync',t('editor.sync'),'target'],['karaoke',t('editor.karaoke'),'karaoke'],['preview',t('editor.amllPreview'),'lyric-list'],['package',t('editor.package'),'folder']] as const).map(([id,label,icon]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { if (canvasComposing.current || !finishSyncDraft()) return; flushSync(() => { const input = window.document.activeElement; if (input instanceof HTMLInputElement) input.blur(); }); if (pageRef.current?.querySelector('[aria-invalid="true"]')) return; setLocate(null); setRubyShortcut(null); setMode(id); setActiveMenuId(null); }}><Icon name={icon} size={17}/>{label}</button>)}</nav>
+    {mode === 'audio' && <div className={styles.ribbon} aria-label={t('vocal.actions')}>
+      {props.onImportAudio && <button data-role="secondary" disabled={props.audioImportDisabled || props.alignment?.locked || props.saving} onClick={() => { if (finishForAudioImport()) props.onImportAudio?.(); }}>{t(props.sourceAssetId ? 'music.replace' : 'menu.importAudio')}</button>}
+      <div className={vocalStyles.segmentTools} ref={audioReview.setToolsHost}/>
+      <div ref={audioReview.setAnalysisHost}/>
+      {!props.sourceAssetId && <button data-role="primary" disabled>{t('vocal.separate')}</button>}
+      <div className={vocalStyles.alignmentTools} ref={audioReview.setAlignmentHost}/>
+    </div>}
     {props.projectId && props.project && props.alignment && <AlignmentPanel pid={props.projectId} project={props.project} control={props.alignment} assetId={props.sourceAssetId} durationMs={props.audioDurationMs??null} visible={mode==='audio'} finishDraft={()=>{
       if(canvasComposing.current || !finishSyncDraft())return false;
       flushSync(()=>{const active=window.document.activeElement;if(active instanceof HTMLElement)active.blur();});

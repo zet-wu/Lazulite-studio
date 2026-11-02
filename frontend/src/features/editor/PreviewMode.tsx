@@ -47,8 +47,9 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
       {document.romanizationTracks.length > 1 && <label>{t('preview.track')}<Select value={romanizationTrackId ?? ''} onChange={(event) => setRomanizationTrackId(event.target.value || null)}><option value="">{t('preview.first')}</option>{document.romanizationTracks.map((track, index) => <option key={track.id} value={track.id}>{index + 1} · {track.language ?? t('editor.unspecifiedLanguage')}</option>)}</Select></label>}
       <label><input type="checkbox" checked={hidePassed} onChange={(event) => setHidePassed(event.target.checked)} /> {t('preview.hidePlayed')}</label>
       <label>{t('preview.gradient')}<input type="range" min="0.05" max="1.5" step="0.05" value={fadeWidth} onChange={(event) => setFadeWidth(Number(event.target.value))} /></label>
-      {!transport && <label>{t('preview.position')}<input type="range" min="0" max={duration} value={localTime} onChange={(event) => setLocalTime(Number(event.target.value))} /></label>}
+      {!transport && <label>{t('preview.position')}<input type="range" min="0" max={duration} disabled={duration <= 0} value={Math.min(localTime,duration)} onChange={(event) => setLocalTime(Number(event.target.value))} /></label>}
     </div>
+    <div className={styles.previewBody}>
     {document.lines.some(line => !line.backgroundOf && document.lines.filter(bg => bg.backgroundOf === line.id).length > 1) && <p className={styles.toolHint}>{t('preview.backgroundLimit')}</p>}
     {document.lines.some(line => line.agentRefs.length > 1 || line.words.some(word => word.agentRefs?.length)) && <p className={styles.toolHint}>{t('preview.singerLimit')}</p>}
     {lines.length ? <div className={styles.previewPlayer}>
@@ -62,7 +63,8 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
           if (transport) transport.current?.seekMs(startTime);
           else setLocalTime(startTime);
         }} />
-    </div> : <p className={styles.toolHint}>{t('preview.noTimes')}</p>}
+    </div> : <p className={styles.toolHint}>{t(document.lines.length === 0 ? 'preview.empty' : 'preview.noTimes')}</p>}
+    </div>
   </section>;
 }
 

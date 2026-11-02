@@ -11222,5 +11222,17 @@
       "count": "Item count used for grammatical plural selection.",
       "number": "One-based displayed ordinal (line, track, unit, or group)."
     }
+  },
+  "music.replace": {
+    "context": "Audio toolbar action",
+    "source": "替换音频",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "preview.empty": {
+    "context": "Preview with zero lyric lines",
+    "source": "暂无歌词可预览",
+    "params": [],
+    "parameterNotes": {}
   }
 }

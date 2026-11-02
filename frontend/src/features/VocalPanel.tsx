@@ -115,8 +115,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const deviceText=deviceSummary(task?.request?.devices);
   const status = { queued: t('task.queued'), running: t('task.processing'), cancel_requested: t('task.waitingCancel'), cancelled: t('task.cancelled'), failed: t('task.failed'), interrupted: t('task.interrupted'), succeeded: t('task.applying') };
   return <>
-    {visible && <div className={editorStyles.ribbon} aria-label={t('vocal.actions')}>
-      <div className={styles.segmentTools} ref={ui.setToolsHost}/>
+    {visible && ui.analysisHost && createPortal(<>
       {ready ? <TopMenu id="audio-analysis" title={t('vocal.analysis')} className={editorStyles.ribbonMenu} activeMenuId={menu} onMenuChange={setMenu}>
         {(!currentAudio || repair || update) && <button data-role="inline" disabled={locked||busy||!!active} title={t('vocal.replaceHelp')} onClick={()=>void run()}>{repair?t('vocal.regenerate'):update?t('vocal.updateSeparation'):t('vocal.separate')}</button>}
         {(repair||update) && <span>{repair?t('vocal.fileUnavailable'): t('vocal.versionMismatch')}</span>}
@@ -124,8 +123,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
         {adoptedAvailable && project.acoustics.analysisId && <a data-role="secondary" href={download(project.acoustics.analysisId)} download>{t('vocal.download')}</a>}
       </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run()}>{repair?t('vocal.regenerate'):update?t('vocal.updateSeparation'):currentAudio?t('vocal.useExisting'):t('vocal.separate')}</button>}
       {latest && !active && <button data-role="inline" onClick={showResult}>{t('vocal.recent')}</button>}
-      <div className={styles.alignmentTools} ref={ui.setAlignmentHost}/>
-    </div>}
+    </>, ui.analysisHost)}
     {ui.taskHost && (active || busy) && createPortal(<MessageBar notice={{ text: t('task.vocalProgress',{progress:`${task ? cancelling ? t('task.cancelling') : status[task.status] : t('task.preparing')}${task?.stage ? ` · ${{separating:t('vocal.separate'),analyzing:t('vocal.acousticAnalysis')}[task.stage] ?? task.stage}` : ''}`,device:deviceText?' · '+deviceText:''}), role:'status', origin:null, dismissible:false }} actions={<button data-role="secondary" disabled={cancelling || active?.status==='cancel_requested'} onClick={()=>void cancel()}>{t('task.cancel')}</button>}/>,ui.taskHost)}
     {ui.messageHost && createPortal(<>
       <MessageBar notice={notice} actions={notice?.taskId===latest?.id && failure && latest.status!=='cancelled' ? <>

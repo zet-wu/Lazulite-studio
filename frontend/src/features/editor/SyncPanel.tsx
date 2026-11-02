@@ -51,10 +51,11 @@ export function SyncPanel({ progress, onProgress, document, cursor, targetVersio
   };
   const previousLine = () => { const before = units.slice(0, index).reverse().find((unit) => unit.lineId !== active?.lineId); if (before) moveTo(units.findIndex((unit) => unit.lineId === before.lineId)); };
   const followingLine = () => { const at = units.findIndex((unit, position) => position > index && unit.lineId !== active?.lineId); if (at >= 0) moveTo(at); };
+  const canStamp = (action: SyncAction) => !!transport && !!active && (action === 'start' || !completed);
   const stamp = (action: SyncAction) => {
-    if (!active || completed && action !== 'start') return;
+    if (!canStamp(action) || !active) return;
     const clock = transport?.current;
-    if (!clock) { setError(describeMessage('sync.connectAudio')); return; }
+    if (!clock) return;
     const timeMs = Math.max(0, clock.getPositionMs() + Math.round(offsetMs));
     if (action !== 'start' && (beginMs === null || !Number.isSafeInteger(beginMs) || beginMs < 0)) { setError(describeMessage('sync.startFirst')); return; }
     if (action === 'next' && emptyBeats < beatCount) { onProgress({ completed: false, consumed: emptyBeats + 1 }); setError(''); return; }
@@ -102,9 +103,9 @@ export function SyncPanel({ progress, onProgress, document, cursor, targetVersio
     <div className={styles.syncButtons}>
       <button data-role="secondary" disabled={index <= 0} onClick={() => moveTo(index - 1)}>{t('sync.previousUnit')}</button>
       <button data-role="secondary" disabled={!units.slice(0, index).some((unit) => unit.lineId !== active?.lineId)} onClick={previousLine}>{t('sync.previousLine')}</button>
-      <button data-role="secondary" disabled={!transport || !active} onClick={() => stamp('start')}>{t('sync.start')}</button>
-      <button data-role="secondary" disabled={!transport || !active || completed} onClick={() => stamp('next')}>{t('sync.step')}</button>
-      <button data-role="secondary" disabled={!transport || !active || completed} onClick={() => stamp('end')}>{t('sync.end')}</button>
+      <button data-role="secondary" disabled={!canStamp('start')} onClick={() => stamp('start')}>{t('sync.start')}</button>
+      <button data-role="secondary" disabled={!canStamp('next')} onClick={() => stamp('next')}>{t('sync.step')}</button>
+      <button data-role="secondary" disabled={!canStamp('end')} onClick={() => stamp('end')}>{t('sync.end')}</button>
       <button data-role="secondary" disabled={index < 0 || index >= units.length - 1} onClick={() => moveTo(index + 1)}>{t('sync.nextUnit')}</button>
       <button data-role="secondary" disabled={!units.some((unit, position) => position > index && unit.lineId !== active?.lineId)} onClick={followingLine}>{t('sync.nextLine')}</button>
     </div>

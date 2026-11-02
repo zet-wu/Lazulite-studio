@@ -1703,5 +1703,7 @@
   "search.cancelledCount_other": "Cancelled · {{count}} results",
   "search.cancelledCount_one": "Cancelled · {{count}} result",
   "translation.deleteTrack_other": "Delete track {{number}} and its content ({{count}} items)",
-  "translation.deleteTrack_one": "Delete track {{number}} and its content ({{count}} item)"
+  "translation.deleteTrack_one": "Delete track {{number}} and its content ({{count}} item)",
+  "music.replace": "Replace audio",
+  "preview.empty": "No lyrics to preview"
 }
