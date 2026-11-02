@@ -1,5 +1,5 @@
 import { useMessageText } from '../shared/useMessageText';
-import { message } from '../domain/messages';
+import { message, messageList, errorMessage } from '../domain/messages';
 import { i18n } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
@@ -12,6 +12,7 @@ type Props = { projectId:string; assetId:string|null; openRequest:number;
   accepted:(result:Binding)=>Promise<void>; stop:()=>void };
 export function MusicUpload({projectId,assetId,openRequest,prepare,accepted,stop}: Props) {
   useTranslation();
+  const handlers=useRef({prepare,accepted,stop});handlers.current={prepare,accepted,stop};
   const input=useRef<HTMLInputElement>(null), controller=useRef<AbortController|null>(null);
   const pending=useRef<{request:Parameters<typeof studioApi.attachMusic>[1];release:()=>void}|null>(null);
   const [progress,setProgress]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useMessageText('');
@@ -24,16 +25,20 @@ export function MusicUpload({projectId,assetId,openRequest,prepare,accepted,stop
     setBusy(true);setError('');
     try {
       const result=await studioApi.attachMusic(projectId,operation.request);
-      await accepted(result);
+      await handlers.current.accepted(result);
       setCleanup(result.cleanup_pending);
       if(result.cleanup_pending)setError(message('music.cleanupFailed'));
       else pending.current=null;
       setUncertain(false);operation.release();
     } catch(cause) {
       const rejected=cause instanceof ApiError && [404,409,412,422].includes(cause.status);
-      if(rejected){operation.release();pending.current=null;setUncertain(false);}
+      if(rejected){
+        operation.release();pending.current=null;setUncertain(false);
+        try{await studioApi.discardUpload(operation.request.upload_id);}
+        catch(cleanupCause){setError(messageList([errorMessage(cause),errorMessage(cleanupCause)]));return;}
+      }
       else setUncertain(true);
-      setError((cause as Error).message);
+      setError(errorMessage(cause));
     } finally {setBusy(false);}
   };
   const upload=async(file:File)=>{
@@ -42,11 +47,11 @@ export function MusicUpload({projectId,assetId,openRequest,prepare,accepted,stop
     try {
       staged=await uploadMusic(file,setProgress,active.signal);
       if(active.signal.aborted){await studioApi.discardUpload(staged.id);return;}
-      const lock=await prepare();stop();
+      const lock=await handlers.current.prepare();handlers.current.stop();
       pending.current={request:{upload_id:staged.id,revision:lock.revision,expected_asset_id:assetId,operation_id:crypto.randomUUID()},release:lock.release};
       await confirm();
     } catch(cause) {
-      setError((cause as Error).name==='AbortError'?message('music.cancelled'):(cause as Error).message);
+      setError((cause as Error).name==='AbortError'?message('music.cancelled'):errorMessage(cause));
       if(staged&&!pending.current)await studioApi.discardUpload(staged.id);
     } finally {setBusy(false);controller.current=null;}
   };

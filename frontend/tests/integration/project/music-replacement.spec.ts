@@ -23,3 +23,21 @@ test('settings imports and reimports the same audio while preserving lyrics and 
  expect(after.revision).not.toBe(before.revision);
  await page.reload();await expect(page.getByText('已保存',{exact:true})).toBeVisible();
 });
+
+test('finishes a draft edited while audio is uploading before switching the source',async({page})=>{
+ const headers={origin:'http://127.0.0.1:5175'};
+ const pid=(await(await page.request.post('/api/v1/projects',{headers,data:{name:'upload draft'}})).json()).id;
+ const url=`/api/v1/projects/${pid}/document`,before=await(await page.request.get(url)).json();
+ const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" studio:null="begin end"><span studio:id="w" studio:null="begin end">old</span></p></body></tt>';
+ const document={...before.document,lyrics:{draftTtml:xml}};
+ expect((await page.request.put(url,{headers:{...headers,'if-match':before.revision},data:{...before,document}})).ok()).toBeTruthy();
+ let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+ await page.route('**/api/v1/uploads',async route=>{await gate;await route.continue();});
+ await page.goto(`/projects/${pid}/edit`);
+ await page.getByLabel('导入音频文件').setInputFiles({name:'source.wav',mimeType:'audio/wav',buffer:wav()});
+ const input=page.getByRole('textbox',{name:'词 old',exact:true});await input.fill('保留正在输入的歌词');
+ release();
+ await expect.poll(async()=>((await(await page.request.get(`/api/v1/projects/${pid}`)).json()).asset?.id)).toBeTruthy();
+ const after=await(await page.request.get(url)).json();expect(after.document.lyrics.draftTtml).toContain('保留正在输入的歌词');
+ await expect(page.getByText('已保存',{exact:true})).toBeVisible();
+});

@@ -1,5 +1,5 @@
 import { useMessageText } from '../shared/useMessageText';
-import { message } from '../domain/messages';
+import { message as describeMessage, MessageError } from '../domain/messages';
 import { i18n } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { announceSourceChanged, listenSourceChanged } from '../adapters/project-lifecycle';
@@ -51,6 +51,7 @@ export function Workspace({ projectId }: { projectId: string }) {
 function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, asset }: { projectId: string; title: string; initialSnapshot: ProjectSnapshot; initialRevision: string; asset: Asset | null }) {
   useTranslation();
   const transport = useRef<TransportHandle>(null);
+  const prepareAudioImport=useRef<(()=>boolean)|null>(null);
   const [timelineHost, setTimelineHost] = useState<HTMLDivElement | null>(null);
   const [assignmentError, setAssignmentError] = useState<AssignmentError | null>(null);
   const [params, setParams] = useSearchParams();
@@ -59,6 +60,7 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
       const saved = await studioS4.saveRichDocument(projectId, xml, base, operationId, sequence, etag);
       return { revision: saved.revision, etag: saved.etag };
     }, asset?.id??null);
+  const latestEditor=useRef(editor);latestEditor.current=editor;
   const { selection, expanded, setSelectedSegments } = useEditorSelection()!;
   const selectedLineId = selectionLineId(selection) ?? expanded.at(-1) ?? params.get('line');
   const [message, setMessage] = useNotice();
@@ -99,7 +101,7 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
     if(event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || !(event.ctrlKey||event.metaKey) || (event.target as Element).closest('input,textarea,select,[role="dialog"]'))return;
     if(event.key.toLowerCase()==='z'&&!editor.editingLocked){event.preventDefault();if(event.shiftKey)editor.redo();else editor.undo();}
     if(event.key.toLowerCase()==='s'){event.preventDefault();void editor.save();}
-  }}><EditorWorkspace onImportAudio={()=>setImportRequest(v=>v+1)} alignment={{locked:editor.editingLocked,lock:editor.lockEditing,save:editor.saveForPackaging}} historyVersion={editor.historyVersion} project={editor.project} applyProject={command=>{if(editor.conflict)throw new Error(t('workspace.conflict'));editor.applyProject(command);}} sourceAssetId={asset?.id} audioDurationMs={asset?.source_duration_ms ?? undefined} onTimelineHost={setTimelineHost} assignmentError={assignmentError} embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error(t('workspace.conflict')); }} undo={editor.undo} redo={editor.redo}
+  }}><EditorWorkspace prepareAudioImport={prepareAudioImport} onImportAudio={()=>setImportRequest(v=>v+1)} alignment={{locked:editor.editingLocked,lock:editor.lockEditing,save:editor.saveForPackaging}} historyVersion={editor.historyVersion} project={editor.project} applyProject={command=>{if(editor.conflict)throw new Error(t('workspace.conflict'));editor.applyProject(command);}} sourceAssetId={asset?.id} audioDurationMs={asset?.source_duration_ms ?? undefined} onTimelineHost={setTimelineHost} assignmentError={assignmentError} embedded projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new Error(t('workspace.conflict')); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo&&!editor.editingLocked} canRedo={editor.canRedo&&!editor.editingLocked} dirty={editor.dirty} saving={editor.saving} outputIssues={outputIssues} notices={[message, editor.errorNotice]}
     onSave={() => void editor.save()} onExportFormat={exportFormat}
     saveForPackaging={editor.saveForPackaging}
@@ -115,7 +117,7 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
         const active = editor.document.lines.find((item) => !item.backgroundOf && item.beginMs !== null && item.endMs !== null && item.beginMs <= positionMs && positionMs < item.endMs)?.id ?? null;
         setPlayheadLineId((current) => current === active ? current : active);
       }} /> : null}<MusicUpload projectId={projectId} assetId={asset?.id??null} openRequest={importRequest}
-    prepare={editor.prepareSource} stop={()=>transport.current?.pause()} accepted={async result=>{
+    prepare={async()=>{if(!prepareAudioImport.current?.())throw new MessageError(describeMessage('editor.fixInput'));return latestEditor.current.prepareSource();}} stop={()=>transport.current?.pause()} accepted={async result=>{
       await editor.acceptSource(result.asset.id,result.revision);knownSource.current=result.asset.id;
       query.setQueryData(['project',projectId],(previous:object|undefined)=>({...previous,asset:result.asset}));
       await refreshMedia();announceSourceChanged(projectId);

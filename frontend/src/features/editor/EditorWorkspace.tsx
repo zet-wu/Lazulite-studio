@@ -1,4 +1,4 @@
-import { message as describeMessage } from '../../domain/messages';
+import { message as describeMessage, errorMessage } from '../../domain/messages';
 import { i18n } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { ShapeConversionDialog } from './ShapeConversionDialog';
@@ -86,6 +86,7 @@ const PreviewMode = lazy(() => import('./PreviewMode').then((module) => ({ defau
 
 type Props = {
   onImportAudio?:()=>void;
+  prepareAudioImport?:RefObject<(()=>boolean)|null>;
   alignment?: AlignmentControl;
   historyVersion?: number;
   project?: ProjectDocument;
@@ -219,6 +220,15 @@ function EditorWorkspaceContent(props: Props) {
   const [shapeConversion, setShapeConversion] = useState<string[] | null>(null);
   const [dictionaryManager, setDictionaryManager] = useState(false);
   const canvasComposing = useRef(false), editRejected = useRef(false);
+  const finishForAudioImport=useLiveCallback(()=>{
+    if(canvasComposing.current||!finishSyncDraft())return false;
+    flushSync(()=>{const active=window.document.activeElement;if(active instanceof HTMLElement)active.blur();});
+    return !editRejected.current&&!pageRef.current?.querySelector('[aria-invalid="true"]');
+  });
+  useLayoutEffect(()=>{
+    const target=props.prepareAudioImport;if(!target)return;
+    target.current=finishForAudioImport;return()=>{target.current=null;};
+  },[props.prepareAudioImport,finishForAudioImport]);
   const openReadingDialog = (ids: string[], kind: 'japanese' | 'dictionary') => {
     if (canvasComposing.current) { setMessage(describeMessage('editor.finishComposition')); return; }
     flushSync(() => { const active = window.document.activeElement; if (active instanceof HTMLElement) active.blur(); });
@@ -441,7 +451,7 @@ function EditorWorkspaceContent(props: Props) {
   const pendingCue=useRef(false);
   const applyKaraokeCommand = (command:KaraokeCommand) => {
     if(command.kind==='insert')pendingCue.current=true;
-    try { props.applyProject?.({type:'karaoke',command}); } catch(error) { setMessage((error as Error).message); throw error; }
+    try { props.applyProject?.({type:'karaoke',command}); } catch(error) { setMessage(errorMessage(error)); throw error; }
   };
   const insertKaraoke = (command:KaraokeCommand) => {
     if(command.kind==='insert')pendingCue.current=true;
@@ -451,7 +461,7 @@ function EditorWorkspaceContent(props: Props) {
   useEffect(()=>{const old=previousCues.current,next=props.project?.karaoke.cues??[];const removed=old.filter(c=>!next.some(n=>n.id===c.id));if(pendingCue.current){const inserted=next.find(c=>!old.some(o=>o.id===c.id));if(inserted)selectCue(inserted.id,inserted.anchor.lineId);pendingCue.current=false;}const removedActive = removed.find(item => item.id === selectedCue); if (removedActive && document.lines.some(line => line.id === removedActive.anchor.lineId)) { const id = removedActive.anchor.lineId; const next: EditorSelection = {kind:'lines',ids:[id],anchorId:id,activeId:id}; setSelection(next); requestFocus(next); } previousCues.current=next;},[props.project]);
   const dispatch = useLiveCallback((command: LyricCommand) => {
     try { apply(command); editRejected.current = false; setMessage(''); return true; }
-    catch (error) { editRejected.current = true; setMessage(error instanceof Error ? error.message : describeMessage('editor.failed')); return false; }
+    catch (error) { editRejected.current = true; setMessage(errorMessage(error)); return false; }
   });
   const drag = useObjectDrag(document, pageRef, dispatch, setSelection);
   const displayed = useMemo(() => ({ ...drag.document, lines: displayLines(drag.document, props.project?.lineOrder ?? []) }), [drag.document, props.project?.lineOrder]);
@@ -493,12 +503,12 @@ function EditorWorkspaceContent(props: Props) {
     try {
       const result = next ? pasteRich(document, next, target ?? currentSelection()) : pastePlain(document, plain!, target ?? currentSelection());
       if (dispatch(result.command)) setSelection(result.selection);
-    } catch (error) { setMessage(error instanceof Error ? error.message : describeMessage('editor.pasteFailed')); }
+    } catch (error) { setMessage(errorMessage(error)); }
   };
   const copyAllowed = (current: EditorSelection | null) => current?.kind !== 'romanization-unit' || attachmentTracks(document,current).flatMap(track => track.contents.filter(content => content.kind === 'timed' && content.units.some(unit => current.ids.includes(unit.id)))).length <= 1;
   const canCopySelection = copyAllowed(selection);
   useEffect(() => {
-    selectionCommands.current = { copy: () => { try { return copy(); } catch (cause) { setMessage((cause as Error).message); return null; } }, cut: () => { try { return cut(); } catch (cause) { setMessage((cause as Error).message); return null; } }, remove: target => removeSelection(target), paste: text => paste(text ? null : clipboard, text), canCopy: Boolean(selection?.ids.length) && canCopySelection, canPaste: Boolean(clipboard), clipboardToken: () => clipboardToken.current, openContext };
+    selectionCommands.current = { copy: () => { try { return copy(); } catch (cause) { setMessage(errorMessage(cause)); return null; } }, cut: () => { try { return cut(); } catch (cause) { setMessage(errorMessage(cause)); return null; } }, remove: target => removeSelection(target), paste: text => paste(text ? null : clipboard, text), canCopy: Boolean(selection?.ids.length) && canCopySelection, canPaste: Boolean(clipboard), clipboardToken: () => clipboardToken.current, openContext };
   });
   const selectAll = (invert: boolean) => {
     if (selection?.kind === 'ruby') {
@@ -534,7 +544,7 @@ function EditorWorkspaceContent(props: Props) {
         setSelection({ ...selection, lineId: target.id });
         props.onSelectLine?.(target.id);
       }
-    } catch (error) { setMessage(error instanceof Error ? error.message : describeMessage('editor.moveFailed')); }
+    } catch (error) { setMessage(errorMessage(error)); }
   };
   const pointerSource = (element: Element): DragSource | null => {
     const lineId = element.closest<HTMLElement>('[data-line-id]')?.dataset.lineId;
@@ -599,7 +609,7 @@ function EditorWorkspaceContent(props: Props) {
           const attr=current.kind==='lines'?'data-line-id':current.kind==='words'?'data-word-id':current.kind==='ruby'?'data-ruby-id':current.attachment==='translation'?current.kind==='romanization-content'?'data-translation-id':'data-translation-unit-id':current.kind==='romanization-content'?'data-romanization-content-id':'data-romanization-unit-id';
           requestLocate(lineId,`[${attr}="${CSS.escape(id)}"]${current.kind==='words'&&mode==='edit'?' input[data-editor-field="word"]':current.kind==='ruby'&&mode==='edit'?' input':''}`);
         }
-      } catch(cause) { setMessage((cause as Error).message); }
+      } catch(cause) { setMessage(errorMessage(cause)); }
     } };
   };
   const openContext = (target: HTMLElement, x: number, y: number) => {
@@ -655,7 +665,7 @@ function EditorWorkspaceContent(props: Props) {
       title=t('editor.wordActions');
       const index=line.words.indexOf(word);
       actions.push(selectionAction(effective,'beat',t('editor.addBeats')),{id:'insert-before',label:t('editor.insertWordBefore'),run:()=>startWordDraft(line.id,line.words[index-1]?.id??null)},{id:'insert-after',label:t('editor.insertWordAfter'),run:()=>startWordDraft(line.id,word.id)},
-        single('split-word',t('editor.splitWord'),()=>{try{const parts=segmentText(word.text,DEFAULT_SEGMENT_OPTIONS);if(parts.length<2){setSegmentationOpen(true);return;}dispatch({type:'segment-words',changes:[{lineId:line.id,wordId:word.id,words:distributeSegmentTime(word,parts,DEFAULT_SEGMENT_OPTIONS.punctuationWeight,editing)}]});}catch(cause){setMessage((cause as Error).message);}}),selectionAction(effective,'merge',t('editor.merge')));
+        single('split-word',t('editor.splitWord'),()=>{try{const parts=segmentText(word.text,DEFAULT_SEGMENT_OPTIONS);if(parts.length<2){setSegmentationOpen(true);return;}dispatch({type:'segment-words',changes:[{lineId:line.id,wordId:word.id,words:distributeSegmentTime(word,parts,DEFAULT_SEGMENT_OPTIONS.punctuationWeight,editing)}]});}catch(cause){setMessage(errorMessage(cause));}}),selectionAction(effective,'merge',t('editor.merge')));
       actions.push(single('add-ruby',t('editor.addRuby'),()=>setRubyShortcut({wordId:word.id,serial:++rubyShortcutSerial.current})),selectionAction(effective,'redistribute',t('editor.redistributeReading')));
     } else if(effective.kind==='lines') {
       const parent=line.backgroundOf??line.id;
@@ -848,7 +858,7 @@ function EditorWorkspaceContent(props: Props) {
         && !drag.active() && !window.document.querySelector('[role="dialog"], [role="menu"], details[data-top-menu][open]')
         && ownsSelection(event.target)) {
         event.preventDefault();
-        try { removeSelection(); } catch (error) { setMessage(error instanceof Error ? error.message : describeMessage('editor.deleteFailed')); }
+        try { removeSelection(); } catch (error) { setMessage(errorMessage(error)); }
       }
       return;
     }
@@ -873,9 +883,7 @@ function EditorWorkspaceContent(props: Props) {
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
     <EditorMenu {...props} onImportAudio={props.onImportAudio?()=>{
-      if(canvasComposing.current||!finishSyncDraft())return;
-      flushSync(()=>{const active=window.document.activeElement;if(active instanceof HTMLElement)active.blur();});
-      if(pageRef.current?.querySelector('[aria-invalid="true"]'))return;
+      if(!finishForAudioImport())return;
       setActiveMenuId(null);props.onImportAudio?.();
     }:undefined} onDictionaryManager={() => setDictionaryManager(true)} editingLocked={props.alignment?.locked} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />
     <div ref={audioReview?.setTaskHost} />
