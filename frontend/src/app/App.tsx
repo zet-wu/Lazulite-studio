@@ -1,3 +1,7 @@
+import { useMessageText } from '../shared/useMessageText';
+import { message } from '../domain/messages';
+import { useTranslation } from 'react-i18next';
+import { initializeLanguage, i18n } from '../i18n';
 import { DeviceSettings } from '../features/DeviceSettings';
 import { loadPreferences, preferences } from '../adapters/preferences';
 import { Component, useState, useEffect, type ErrorInfo, type ReactNode } from "react";
@@ -36,9 +40,9 @@ class ErrorBoundary extends Component<
   render() {
     return this.state.error ? (
       <div className={styles.errorPage}>
-        <h1>页面遇到问题</h1>
-        <p>工作区无法继续显示，请重新打开当前页面。</p>
-        <button data-role="secondary" onClick={() => location.reload()}>重新加载</button>
+        <h1>{t('app.failure')}</h1>
+        <p>{t('app.failureHelp')}</p>
+        <button data-role="secondary" onClick={() => location.reload()}>{t('common.reload')}</button>
       </div>
     ) : (
       this.props.children
@@ -47,6 +51,7 @@ class ErrorBoundary extends Component<
 }
 
 function DemoBanner() {
+  useTranslation();
   const [params] = useSearchParams();
   const scenario = params.get("scenario");
   const [open, setOpen] = useState(false);
@@ -60,15 +65,15 @@ function DemoBanner() {
   };
   return (
     <div className={`${styles.demoBanner} ${open ? styles.demoOpen : ""}`}>
-      <button data-role="secondary" onClick={() => setOpen(!open)}>演示模式 · 合成数据</button>
-      <span>当前：{scenario || "正常"}</span>
+      <button data-role="secondary" onClick={() => setOpen(!open)}>{t('app.demo')}</button>
+      <span>{t('app.current')}{scenario || t('app.normal')}</span>
       {open && (
         <>
-          <button data-role="secondary" onClick={() => pick("")}>正常</button>
-          <button data-role="secondary" onClick={() => pick("loading")}>加载中</button>
-          <button data-role="secondary" onClick={() => pick("empty")}>空项目</button>
-          <button data-role="secondary" onClick={() => pick("error")}>错误</button>
-          <button data-role="secondary" onClick={() => pick("expired")}>会话过期</button>
+          <button data-role="secondary" onClick={() => pick("")}>{t('app.normal')}</button>
+          <button data-role="secondary" onClick={() => pick("loading")}>{t('common.loading')}</button>
+          <button data-role="secondary" onClick={() => pick("empty")}>{t('app.empty')}</button>
+          <button data-role="secondary" onClick={() => pick("error")}>{t('app.error')}</button>
+          <button data-role="secondary" onClick={() => pick("expired")}>{t('app.expired')}</button>
         </>
       )}
     </div>
@@ -76,10 +81,11 @@ function DemoBanner() {
 }
 
 function Login() {
+  useTranslation();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useMessageText("");
   const [busy, setBusy] = useState(false);
   const returnToDemo = () => {
     const next = new URL(window.location.href);
@@ -98,7 +104,7 @@ function Login() {
         navigate("/projects", { replace: true });
     } catch (caught) {
       setError(
-        caught instanceof ApiError ? caught.body.message : "登录失败，请重试",
+        caught instanceof ApiError ? caught.body.message : message('login.failed'),
       );
     } finally {
       setBusy(false);
@@ -110,12 +116,11 @@ function Login() {
         <div className={styles.loginLogo}>
           Lazulite <span>Studio</span>
         </div>
-        <h1>登录 Lazulite Studio</h1>
-        <p>输入服务端密码以继续。</p>
+        <h1>{t('login.title')}</h1>
+        <p>{t('login.help')}</p>
         <form onSubmit={submit}>
           <label>
-            密码
-            <input
+            {t('login.password')}<input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -125,41 +130,41 @@ function Login() {
           </label>
           {error && <p className={styles.loginError}>{error}</p>}
           <button data-role="secondary" className={styles.loginButton} disabled={busy || !password}>
-            {busy ? "登录中…" : "登录"}
+            {busy ? t('login.busy') : t('login.submit')}
           </button>
         </form>
         {import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCKS === "true" ? (
           <button data-role="secondary" className={styles.loginButton} onClick={returnToDemo}>
-            返回模拟工作台
-          </button>
+            {t('app.demoBack')}</button>
         ) : null}
       </div>
     </main>
   );
 }
 function Settings() {
+  useTranslation();
   const query = useQuery({
     queryKey: ["capabilities"],
     queryFn: studioApi.getCapabilities,
   });
   return (
     <main className={styles.simplePage}>
-      <Link to="/projects">‹ 返回项目</Link>
-      <h1>设置</h1>
+      <Link to="/projects">{t('app.projectsBack')}</Link>
+      <h1>{t('menu.settings')}</h1>
       <DeviceSettings/>
       {query.isLoading ? (
-        <p>正在读取服务能力…</p>
+        <p>{t('app.capabilitiesLoading')}</p>
       ) : query.isError ? (
         <>
-          <p>服务能力暂时不可用。</p>
-          <button data-role="secondary" onClick={() => query.refetch()}>重试</button>
+          <p>{t('app.capabilitiesFailed')}</p>
+          <button data-role="secondary" onClick={() => query.refetch()}>{t('common.retry')}</button>
         </>
       ) : query.data ? (
         <section>
           {query.data.items.map((item) => (
             <p key={item.id}>
               <strong>{item.id}</strong>：
-              {item.enabled ? "已启用" : item.reason || "未启用"}
+              {item.enabled ? t('app.enabled') : item.reason || t('app.disabled')}
             </p>
           ))}
         </section>
@@ -169,6 +174,7 @@ function Settings() {
 }
 
 function AppRoutes() {
+  useTranslation();
   return (
     <div className={styles.appFrame}>
       <DemoBanner />
@@ -182,6 +188,7 @@ function AppRoutes() {
   );
 }
 function ProtectedRoutes() {
+  useTranslation();
   return (
     <SessionGate>
       <Routes>
@@ -195,21 +202,22 @@ function ProtectedRoutes() {
   );
 }
 function SessionGate({ children }: { children: ReactNode }) {
+  useTranslation();
   const query = useQuery({
     queryKey: ["session"],
     queryFn: studioApi.getSession,
     retry: false,
   });
   if (query.isLoading)
-    return <main className={styles.centerState}>正在检查会话…</main>;
+    return <main className={styles.centerState}>{t('app.sessionLoading')}</main>;
   if (query.error && (query.error as { status?: number }).status === 401)
     return <Login />;
   if (query.error)
     return (
       <main className={styles.centerState}>
-        <strong>服务暂时不可用</strong>
-        <p>会话服务没有响应。</p>
-        <button data-role="secondary" onClick={() => query.refetch()}>重试</button>
+        <strong>{t('app.unavailable')}</strong>
+        <p>{t('app.sessionFailed')}</p>
+        <button data-role="secondary" onClick={() => query.refetch()}>{t('common.retry')}</button>
       </main>
     );
   if (query.data && !query.data.authenticated) return <Login />;
@@ -217,24 +225,27 @@ function SessionGate({ children }: { children: ReactNode }) {
   return <PreferenceGate>{children}</PreferenceGate>;
 }
 function PreferenceGate({ children }: { children: ReactNode }) {
+  useTranslation();
   const mock = import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCKS === 'true';
-  const query = useQuery({ queryKey: ['preferences'], queryFn: loadPreferences, enabled: !mock, staleTime: Infinity, retry: false });
-  const [error, setError] = useState('');
+  const query = useQuery({ queryKey: ['preferences'], queryFn: async()=>{const value=await loadPreferences();try{await initializeLanguage();}catch{window.dispatchEvent(new CustomEvent('studio-preference-error',{detail:i18n.t('language.initFailed')}));}return value;}, enabled: !mock, staleTime: Infinity, retry: false });
+  const [error, setError] = useMessageText('');
   useEffect(() => {
     const report = (event: Event) => setError((event as CustomEvent<string>).detail);
     window.addEventListener('studio-preference-error', report);
     return () => window.removeEventListener('studio-preference-error', report);
   }, []);
-  if (!mock && query.isPending) return <main className={styles.centerState}>正在读取偏好…</main>;
-  if (!mock && query.isError) return <main className={styles.centerState}>无法读取偏好。<button data-role="secondary" onClick={() => query.refetch()}>重试</button></main>;
-  return <>{error && <div role="alert">{error}<button data-role="secondary" onClick={() => location.reload()}>刷新偏好</button></div>}{children}</>;
+  if (!mock && query.isPending) return <main className={styles.centerState}>{t('app.preferencesLoading')}</main>;
+  if (!mock && query.isError) return <main className={styles.centerState}>{t('app.preferencesFailed')}<button data-role="secondary" onClick={() => query.refetch()}>{t('common.retry')}</button></main>;
+  return <>{error && <div role="alert">{error}<button data-role="secondary" onClick={() => location.reload()}>{t('app.preferencesRefresh')}</button></div>}{children}</>;
 }
 function WorkspaceRoute() {
+  useTranslation();
   const { projectId = "sample-project" } = useParams();
   return <Workspace projectId={projectId} />;
 }
 
 export default function App() {
+  useTranslation();
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
@@ -245,3 +256,5 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+const t=i18n.t.bind(i18n);

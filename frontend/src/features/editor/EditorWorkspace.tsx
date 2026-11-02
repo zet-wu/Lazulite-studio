@@ -196,7 +196,7 @@ function EditorWorkspaceContent(props: Props) {
   };
   const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | 'translations' | null>(null);
   const [message, publishMessage] = useNotice();
-  const setMessage: typeof publishMessage = useLiveCallback((text,...options) => publishMessage(text && props.project ? projectErrorText(props.project,text) : text,...options));
+  const setMessage: typeof publishMessage = useLiveCallback((text,...options) => publishMessage(typeof text==='string' && props.project ? projectErrorText(props.project,text) : text,...options));
   const [segmentationOpen, setSegmentationOpen] = useState(false);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number; afterRubyId?: string | null } | null>(null);

@@ -1,0 +1,5 @@
+[
+  {"id":"zh-Hans","name":"简体中文","html":"zh-Hans","format":"zh-CN","direction":"ltr","plurals":["other"],"complete":true},
+  {"id":"zh-Hant","name":"繁體中文","html":"zh-Hant-TW","format":"zh-TW","direction":"ltr","plurals":["other"],"complete":true},
+  {"id":"en","name":"English","html":"en","format":"en","direction":"ltr","plurals":["one","other"],"complete":true}
+]

@@ -12,7 +12,7 @@ PREFERENCE_KEYS = {
     'lazulite-editor-theme', 'lazulite-shortcuts', 'lazulite-sync-keys',
     'lazulite-editor-columns', 'lazulite-kana-highlight', 'studio.playback-rate',
     'studio:sync-mode', 'studio:sync-offset',
-    'studio:reading-dictionary',
+    'studio:reading-dictionary', 'studio:ui-language',
 }
 PROJECT_KEY = re.compile(r'^(?:lazulite-romanization-mode|studio:sync-offset|studio:download|studio:packaging|studio:workspace-mode):project:([a-zA-Z0-9_-]+)$')
 
@@ -53,6 +53,7 @@ class RuntimeSettings:
             for key, value in changes.items():
                 if not allowed_key(key): raise ValueError('不支持的偏好字段')
                 if value is not None and (not isinstance(value, str) or len(value) > 16384): raise ValueError('偏好值无效')
+                if key == 'studio:ui-language' and value not in {'zh-Hans','zh-Hant','en'}: raise ValueError('界面语言未注册')
                 if key.startswith('device.') and value not in {'auto', 'cpu'}: raise ValueError('设备只能选择自动或 CPU')
                 if key == 'port' and (not value or not value.isdecimal() or not 1024 <= int(value) <= 65535): raise ValueError('端口范围为 1024–65535')
             for key, value in changes.items():

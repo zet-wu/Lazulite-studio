@@ -1,3 +1,7 @@
+import { useMessageText } from '../shared/useMessageText';
+import { message } from '../domain/messages';
+import { i18n } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../shared/Icon';
 import { useEffect, useRef, useState } from "react";
 import {
@@ -15,6 +19,7 @@ export function CreateProject({
 }: {
   onCreated: (id: string) => void;
 }) {
+  useTranslation();
   const dialog = useRef<HTMLDialogElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const controller = useRef<AbortController | null>(null);
@@ -25,7 +30,7 @@ export function CreateProject({
   const [asset, setAsset] = useState<Asset | null>(null);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<Status>("idle");
-  const [error, setError] = useState("");
+  const [error, setError] = useMessageText("");
   const [key, setKey] = useState("");
 
   useEffect(() => () => controller.current?.abort(), []);
@@ -49,7 +54,7 @@ export function CreateProject({
     controller.current = null;
     setStatus("idle");
     setProgress(0);
-    setError("已取消上传");
+    setError(message('create.cancelled'));
   };
   const close = () => {
     if (asset && status !== 'creating') void studioApi.discardUpload(asset.id).catch(error => setError(error.message));
@@ -61,7 +66,7 @@ export function CreateProject({
   const submit = async () => {
     if (status !== "idle") return;
     if (!name.trim()) {
-      setError("请填写项目名称");
+      setError(message('create.nameRequired'));
       return;
     }
     const current = ++token.current;
@@ -105,10 +110,10 @@ export function CreateProject({
         return;
       setError(
         caught instanceof ApiError && caught.status === 401
-          ? "登录已失效，请重新登录后重试"
+          ? message('create.expired')
           : caught instanceof ApiError
             ? caught.body.message
-            : "操作失败，请重试",
+            : message('common.failed'),
       );
       setStatus("idle");
     } finally {
@@ -119,7 +124,7 @@ export function CreateProject({
   return (
     <>
       <button data-role="primary" className={`${styles.primary} ${styles.createButton}`} onClick={open}>
-        <Icon name="add"/><span>新建项目</span>
+        <Icon name="add"/><span>{t('create.new')}</span>
       </button>
       <dialog
         ref={dialog}
@@ -136,10 +141,9 @@ export function CreateProject({
             void submit();
           }}
         >
-          <h2>新建项目</h2>
+          <h2>{t('create.new')}</h2>
           <label>
-            项目名称
-            <input
+            {t('create.name')}<input
               value={name}
               onChange={(event) => {
                 touchedName.current = true;
@@ -149,8 +153,7 @@ export function CreateProject({
             />
           </label>
           <label>
-            音频文件（可选）
-            <input
+            {t('create.audio')}<input
               ref={fileInput}
               type="file"
               accept="audio/*,video/mp4,.m4a"
@@ -175,21 +178,21 @@ export function CreateProject({
               <progress max="1" value={progress} />
               <span className={styles.hint}>
                 {progress >= 1
-                  ? "正在处理音频…"
+                  ? t('create.processing')
                   : `正在上传 ${Math.round(progress * 100)}%`}
               </span>
             </>
           )}
           {status === "creating" && (
-            <span className={styles.hint}>正在创建项目…</span>
+            <span className={styles.hint}>{t('create.creating')}</span>
           )}
           {error && (
             <p className={styles.error}>
               {error}
-              {error.includes("登录") && (
+              {error.includes(t('login.submit')) && (
                 <>
                   {" "}
-                  · <a href="/login">重新登录</a>
+                  · <a href="/login">{t('login.again')}</a>
                 </>
               )}
             </p>
@@ -201,8 +204,7 @@ export function CreateProject({
               onClick={close}
               disabled={status === "creating"}
             >
-              取消
-            </button>
+              {t('common.cancel')}</button>
             {status === "uploading" ? (
               <button data-role="secondary"
                 key="cancel-upload"
@@ -213,8 +215,7 @@ export function CreateProject({
                   cancelUpload();
                 }}
               >
-                取消上传
-              </button>
+                {t('create.cancelUpload')}</button>
             ) : (
               <button data-role="primary"
                 key="submit-project"
@@ -222,7 +223,7 @@ export function CreateProject({
                 className={styles.primary}
                 disabled={status === "creating"}
               >
-                {asset ? "重试创建" : file ? "上传并创建" : "创建项目"}
+                {asset ? t('create.retry') : file ? t('create.uploadCreate') : t('create.create')}
               </button>
             )}
           </div>
@@ -231,3 +232,5 @@ export function CreateProject({
     </>
   );
 }
+
+const t=i18n.t.bind(i18n);

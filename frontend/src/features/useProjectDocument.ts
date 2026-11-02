@@ -1,4 +1,5 @@
-import { isRejectedDocument } from '../adapters/http/client';
+import { ApiError, isRejectedDocument } from '../adapters/http/client';
+import { message } from '../domain/messages';
 import { projectErrorText } from './project-error';
 import { useNotice } from '../shared/MessageBar';
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -142,7 +143,11 @@ export function useProjectDocument(
       if ((caught as { status?: number }).status === 404) { deletedRef.current = true; setDeleted(true); }
       if ((caught as { status?: number }).status === 412) setConflict(true);
       setError(
-        caught instanceof Error ? projectErrorText(captured, caught.message) : "保存失败，修改已保留",
+        caught instanceof ApiError
+          ? (['segment_invalid_range','segment_duplicate_id','analysis_source_mismatch'].includes(caught.body.reason??'')
+            ? message(`error.document.${caught.body.reason}`,caught.body.params as Record<string,string|number>)
+            : message('error.http',{status:caught.status,requestId:caught.body.request_id,diagnostic:caught.body.message}))
+          : caught instanceof Error ? projectErrorText(captured, caught.message) : "保存失败，修改已保留",
       );
       if (forPackaging) throw caught;
     } finally {

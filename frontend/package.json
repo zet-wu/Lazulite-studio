@@ -23,9 +23,11 @@
     "@tanstack/react-virtual": "3.14.13",
     "fuzzball": "2.2.3",
     "hyphen": "1.14.1",
+    "i18next": "26.7.1",
     "opencc-js": "1.0.5",
     "react": "19.1.1",
     "react-dom": "19.1.1",
+    "react-i18next": "17.1.11",
     "react-router-dom": "7.8.2",
     "wanakana": "5.3.1"
   },

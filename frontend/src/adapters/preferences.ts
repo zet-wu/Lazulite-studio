@@ -59,3 +59,33 @@ export function savePreference(key: string, value: string | null): Promise<void>
   });
   return operation;
 }
+
+/** Uses the same library revision protocol; initialization never overwrites a winner. */
+export async function ensureLibraryPreference(key:string, detected:string):Promise<string> {
+  if(current?.values[key]!==undefined)return current.values[key];
+  for(let attempt=0;attempt<4;attempt++) {
+    const latest=await read();current=latest;
+    if(latest.values[key]!==undefined)return latest.values[key];
+    const response=await patch(latest,{[key]:detected});
+    if(response.status===409)continue;
+    if(!response.ok)throw new Error('偏好初始化尚未保存');
+    current=await response.json() as Preferences;return current.values[key];
+  }
+  throw new Error('偏好初始化发生并发冲突');
+}
+export function writeLibraryPreference(key:string,value:string):Promise<void> {
+  const operation=pending.then(async()=>{
+    for(let attempt=0;attempt<4;attempt++) {
+      const latest=await read();
+      const response=await patch(latest,{[key]:value});
+      if(response.status===409)continue;
+      if(!response.ok)throw new Error('偏好保存失败');
+      const saved=await response.json() as Preferences;
+      if(current){current.revision=saved.revision;current.values[key]=saved.values[key];}else current=saved;
+      return;
+    }
+    throw new Error('偏好保存发生并发冲突');
+  });
+  pending=operation.catch(()=>undefined);
+  return operation;
+}

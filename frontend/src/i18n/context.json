@@ -1,0 +1,677 @@
+{
+  "language.label": {
+    "context": "language interface message",
+    "source": "界面语言",
+    "params": []
+  },
+  "language.saveFailed": {
+    "context": "language interface message",
+    "source": "语言偏好保存失败，已恢复最后保存的选择。",
+    "params": []
+  },
+  "language.initFailed": {
+    "context": "language interface message",
+    "source": "界面语言尚未保存，请重试。",
+    "params": []
+  },
+  "common.retry": {
+    "context": "common interface message",
+    "source": "重试",
+    "params": []
+  },
+  "common.cancel": {
+    "context": "common interface message",
+    "source": "取消",
+    "params": []
+  },
+  "common.close": {
+    "context": "common interface message",
+    "source": "关闭",
+    "params": []
+  },
+  "menu.save": {
+    "context": "menu interface message",
+    "source": "保存",
+    "params": []
+  },
+  "menu.undo": {
+    "context": "menu interface message",
+    "source": "撤销",
+    "params": []
+  },
+  "menu.redo": {
+    "context": "menu interface message",
+    "source": "重做",
+    "params": []
+  },
+  "menu.saving": {
+    "context": "menu interface message",
+    "source": "保存中",
+    "params": []
+  },
+  "menu.unsaved": {
+    "context": "menu interface message",
+    "source": "未保存",
+    "params": []
+  },
+  "menu.saved": {
+    "context": "menu interface message",
+    "source": "已保存",
+    "params": []
+  },
+  "menu.view": {
+    "context": "menu interface message",
+    "source": "视图",
+    "params": []
+  },
+  "menu.outline": {
+    "context": "menu interface message",
+    "source": "显示大纲",
+    "params": []
+  },
+  "menu.inspector": {
+    "context": "menu interface message",
+    "source": "显示属性栏",
+    "params": []
+  },
+  "menu.light": {
+    "context": "menu interface message",
+    "source": "日间模式",
+    "params": []
+  },
+  "menu.dark": {
+    "context": "menu interface message",
+    "source": "夜间模式",
+    "params": []
+  },
+  "menu.settings": {
+    "context": "menu interface message",
+    "source": "设置",
+    "params": []
+  },
+  "menu.importAudio": {
+    "context": "menu interface message",
+    "source": "导入音频",
+    "params": []
+  },
+  "menu.dictionary": {
+    "context": "menu interface message",
+    "source": "注音词典",
+    "params": []
+  },
+  "menu.devices": {
+    "context": "menu interface message",
+    "source": "计算设备",
+    "params": []
+  },
+  "menu.amll": {
+    "context": "menu interface message",
+    "source": "AMLL 兼容设置",
+    "params": []
+  },
+  "menu.shortcuts": {
+    "context": "menu interface message",
+    "source": "快捷键设置",
+    "params": []
+  },
+  "menu.kana": {
+    "context": "menu interface message",
+    "source": "音译生成假名高亮",
+    "params": []
+  },
+  "notice.dismiss": {
+    "context": "notice interface message",
+    "source": "关闭提示",
+    "params": []
+  },
+  "error.document.segment_invalid_range": {
+    "context": "error interface message",
+    "source": "片段 {{object_id}} 的时间须为非负安全整数，且结束晚于开始。",
+    "params": [
+      "object_id"
+    ]
+  },
+  "error.document.segment_duplicate_id": {
+    "context": "error interface message",
+    "source": "片段 {{object_id}} 的标识重复。",
+    "params": [
+      "object_id"
+    ]
+  },
+  "error.document.analysis_source_mismatch": {
+    "context": "error interface message",
+    "source": "分析 {{analysis_id}} 不属于当前项目音源。",
+    "params": [
+      "analysis_id"
+    ]
+  },
+  "error.http": {
+    "context": "error interface message",
+    "source": "请求失败（HTTP {{status}}，请求 {{requestId}}）：{{diagnostic}}",
+    "params": [
+      "status",
+      "requestId",
+      "diagnostic"
+    ]
+  },
+  "app.failure": {
+    "context": "app interface message",
+    "source": "页面遇到问题",
+    "params": []
+  },
+  "app.failureHelp": {
+    "context": "app interface message",
+    "source": "工作区无法继续显示，请重新打开当前页面。",
+    "params": []
+  },
+  "common.reload": {
+    "context": "common interface message",
+    "source": "重新加载",
+    "params": []
+  },
+  "app.demo": {
+    "context": "app interface message",
+    "source": "演示模式 · 合成数据",
+    "params": []
+  },
+  "app.current": {
+    "context": "app interface message",
+    "source": "当前：",
+    "params": []
+  },
+  "app.normal": {
+    "context": "app interface message",
+    "source": "正常",
+    "params": []
+  },
+  "common.loading": {
+    "context": "common interface message",
+    "source": "加载中",
+    "params": []
+  },
+  "app.empty": {
+    "context": "app interface message",
+    "source": "空项目",
+    "params": []
+  },
+  "app.error": {
+    "context": "app interface message",
+    "source": "错误",
+    "params": []
+  },
+  "app.expired": {
+    "context": "app interface message",
+    "source": "会话过期",
+    "params": []
+  },
+  "login.failed": {
+    "context": "login interface message",
+    "source": "登录失败，请重试",
+    "params": []
+  },
+  "login.title": {
+    "context": "login interface message",
+    "source": "登录 Lazulite Studio",
+    "params": []
+  },
+  "login.help": {
+    "context": "login interface message",
+    "source": "输入服务端密码以继续。",
+    "params": []
+  },
+  "login.password": {
+    "context": "login interface message",
+    "source": "密码",
+    "params": []
+  },
+  "login.busy": {
+    "context": "login interface message",
+    "source": "登录中…",
+    "params": []
+  },
+  "login.submit": {
+    "context": "login interface message",
+    "source": "登录",
+    "params": []
+  },
+  "app.demoBack": {
+    "context": "app interface message",
+    "source": "返回模拟工作台",
+    "params": []
+  },
+  "app.projectsBack": {
+    "context": "app interface message",
+    "source": "‹ 返回项目",
+    "params": []
+  },
+  "app.capabilitiesLoading": {
+    "context": "app interface message",
+    "source": "正在读取服务能力…",
+    "params": []
+  },
+  "app.capabilitiesFailed": {
+    "context": "app interface message",
+    "source": "服务能力暂时不可用。",
+    "params": []
+  },
+  "app.enabled": {
+    "context": "app interface message",
+    "source": "已启用",
+    "params": []
+  },
+  "app.disabled": {
+    "context": "app interface message",
+    "source": "未启用",
+    "params": []
+  },
+  "app.sessionLoading": {
+    "context": "app interface message",
+    "source": "正在检查会话…",
+    "params": []
+  },
+  "app.unavailable": {
+    "context": "app interface message",
+    "source": "服务暂时不可用",
+    "params": []
+  },
+  "app.sessionFailed": {
+    "context": "app interface message",
+    "source": "会话服务没有响应。",
+    "params": []
+  },
+  "app.preferencesLoading": {
+    "context": "app interface message",
+    "source": "正在读取偏好…",
+    "params": []
+  },
+  "app.preferencesFailed": {
+    "context": "app interface message",
+    "source": "无法读取偏好。",
+    "params": []
+  },
+  "app.preferencesRefresh": {
+    "context": "app interface message",
+    "source": "刷新偏好",
+    "params": []
+  },
+  "create.cancelled": {
+    "context": "create interface message",
+    "source": "已取消上传",
+    "params": []
+  },
+  "create.nameRequired": {
+    "context": "create interface message",
+    "source": "请填写项目名称",
+    "params": []
+  },
+  "create.expired": {
+    "context": "create interface message",
+    "source": "登录已失效，请重新登录后重试",
+    "params": []
+  },
+  "common.failed": {
+    "context": "common interface message",
+    "source": "操作失败，请重试",
+    "params": []
+  },
+  "create.new": {
+    "context": "create interface message",
+    "source": "新建项目",
+    "params": []
+  },
+  "create.name": {
+    "context": "create interface message",
+    "source": "项目名称",
+    "params": []
+  },
+  "create.audio": {
+    "context": "create interface message",
+    "source": "音频文件（可选）",
+    "params": []
+  },
+  "create.processing": {
+    "context": "create interface message",
+    "source": "正在处理音频…",
+    "params": []
+  },
+  "create.creating": {
+    "context": "create interface message",
+    "source": "正在创建项目…",
+    "params": []
+  },
+  "login.again": {
+    "context": "login interface message",
+    "source": "重新登录",
+    "params": []
+  },
+  "create.cancelUpload": {
+    "context": "create interface message",
+    "source": "取消上传",
+    "params": []
+  },
+  "create.retry": {
+    "context": "create interface message",
+    "source": "重试创建",
+    "params": []
+  },
+  "create.uploadCreate": {
+    "context": "create interface message",
+    "source": "上传并创建",
+    "params": []
+  },
+  "create.create": {
+    "context": "create interface message",
+    "source": "创建项目",
+    "params": []
+  },
+  "projects.importing": {
+    "context": "projects interface message",
+    "source": "正在导入…",
+    "params": []
+  },
+  "projects.import": {
+    "context": "projects interface message",
+    "source": "导入项目",
+    "params": []
+  },
+  "projects.archive": {
+    "context": "projects interface message",
+    "source": "Lazulite Studio 工程（*.lazp）",
+    "params": []
+  },
+  "projects.importFailed": {
+    "context": "projects interface message",
+    "source": "导入失败",
+    "params": []
+  },
+  "projects.exportFailed": {
+    "context": "projects interface message",
+    "source": "导出失败",
+    "params": []
+  },
+  "projects.loading": {
+    "context": "projects interface message",
+    "source": "正在加载项目…",
+    "params": []
+  },
+  "projects.unavailable": {
+    "context": "projects interface message",
+    "source": "项目暂时不可用",
+    "params": []
+  },
+  "projects.failedHelp": {
+    "context": "projects interface message",
+    "source": "服务没有返回项目列表。",
+    "params": []
+  },
+  "projects.empty": {
+    "context": "projects interface message",
+    "source": "还没有项目",
+    "params": []
+  },
+  "projects.emptyHelp": {
+    "context": "projects interface message",
+    "source": "创建项目开始制作歌词，音乐可稍后上传。",
+    "params": []
+  },
+  "projects.workspace": {
+    "context": "projects interface message",
+    "source": "工作台",
+    "params": []
+  },
+  "projects.title": {
+    "context": "projects interface message",
+    "source": "项目",
+    "params": []
+  },
+  "projects.description": {
+    "context": "projects interface message",
+    "source": "管理歌曲与歌词项目",
+    "params": []
+  },
+  "projects.search": {
+    "context": "projects interface message",
+    "source": "搜索项目",
+    "params": []
+  },
+  "projects.sort": {
+    "context": "projects interface message",
+    "source": "排序",
+    "params": []
+  },
+  "projects.recent": {
+    "context": "projects interface message",
+    "source": "最近编辑",
+    "params": []
+  },
+  "projects.name": {
+    "context": "projects interface message",
+    "source": "名称",
+    "params": []
+  },
+  "projects.list": {
+    "context": "projects interface message",
+    "source": "项目列表",
+    "params": []
+  },
+  "projects.exporting": {
+    "context": "projects interface message",
+    "source": "正在导出…",
+    "params": []
+  },
+  "projects.export": {
+    "context": "projects interface message",
+    "source": "导出项目",
+    "params": []
+  },
+  "projects.deleteCleanupFailed": {
+    "context": "projects interface message",
+    "source": "项目已删除，本地恢复数据清理失败。重新打开也无法保存到已删除项目。",
+    "params": []
+  },
+  "projects.deleteFailed": {
+    "context": "projects interface message",
+    "source": "删除失败，请重试",
+    "params": []
+  },
+  "projects.noMatch": {
+    "context": "projects interface message",
+    "source": "没有匹配项目",
+    "params": []
+  },
+  "projects.noMatchHelp": {
+    "context": "projects interface message",
+    "source": "换一个名称或清空搜索条件。",
+    "params": []
+  },
+  "projects.loadRetry": {
+    "context": "projects interface message",
+    "source": "加载失败，重试",
+    "params": []
+  },
+  "projects.loadingMore": {
+    "context": "projects interface message",
+    "source": "正在加载…",
+    "params": []
+  },
+  "projects.loadMore": {
+    "context": "projects interface message",
+    "source": "加载更多",
+    "params": []
+  },
+  "storage.failed": {
+    "context": "storage interface message",
+    "source": "统计失败",
+    "params": []
+  },
+  "storage.loading": {
+    "context": "storage interface message",
+    "source": "正在统计…",
+    "params": []
+  },
+  "storage.source": {
+    "context": "storage interface message",
+    "source": "源音频",
+    "params": []
+  },
+  "storage.vocals": {
+    "context": "storage interface message",
+    "source": "人声结果",
+    "params": []
+  },
+  "storage.cache": {
+    "context": "storage interface message",
+    "source": "可重建缓存",
+    "params": []
+  },
+  "storage.snapshots": {
+    "context": "storage interface message",
+    "source": "项目快照",
+    "params": []
+  },
+  "storage.other": {
+    "context": "storage interface message",
+    "source": "其他文件",
+    "params": []
+  },
+  "storage.refresh": {
+    "context": "storage interface message",
+    "source": "刷新空间统计",
+    "params": []
+  },
+  "music.cleanupFailed": {
+    "context": "music interface message",
+    "source": "新音频已接入，旧文件尚未释放；停止播放或下载后重试清理",
+    "params": []
+  },
+  "music.cancelled": {
+    "context": "music interface message",
+    "source": "上传已取消",
+    "params": []
+  },
+  "music.project": {
+    "context": "music interface message",
+    "source": "项目音乐",
+    "params": []
+  },
+  "music.empty": {
+    "context": "music interface message",
+    "source": "未上传音乐；歌词可编辑、保存及下载。",
+    "params": []
+  },
+  "music.file": {
+    "context": "music interface message",
+    "source": "导入音频文件",
+    "params": []
+  },
+  "music.progress": {
+    "context": "music interface message",
+    "source": "音乐上传进度",
+    "params": []
+  },
+  "music.switching": {
+    "context": "music interface message",
+    "source": "正在切换音频…",
+    "params": []
+  },
+  "music.uploading": {
+    "context": "music interface message",
+    "source": "正在上传和探测音频…",
+    "params": []
+  },
+  "music.cleanupRetry": {
+    "context": "music interface message",
+    "source": "重试清理",
+    "params": []
+  },
+  "music.confirm": {
+    "context": "music interface message",
+    "source": "确认导入结果",
+    "params": []
+  },
+  "workspace.sourceChanging": {
+    "context": "workspace interface message",
+    "source": "音源正在改变，正在重新读取项目…",
+    "params": []
+  },
+  "workspace.loading": {
+    "context": "workspace interface message",
+    "source": "正在加载歌词…",
+    "params": []
+  },
+  "workspace.missing": {
+    "context": "workspace interface message",
+    "source": "项目不存在或已删除",
+    "params": []
+  },
+  "workspace.openFailed": {
+    "context": "workspace interface message",
+    "source": "无法打开项目文档",
+    "params": []
+  },
+  "workspace.cleanupPending": {
+    "context": "workspace interface message",
+    "source": "旧音频文件尚未清理。",
+    "params": []
+  },
+  "workspace.defaultName": {
+    "context": "workspace interface message",
+    "source": "歌词项目",
+    "params": []
+  },
+  "workspace.deleted": {
+    "context": "workspace interface message",
+    "source": "项目已删除，不能继续保存或恢复。",
+    "params": []
+  },
+  "workspace.back": {
+    "context": "workspace interface message",
+    "source": "返回项目列表",
+    "params": []
+  },
+  "workspace.conflict": {
+    "context": "workspace interface message",
+    "source": "保存冲突，请先处理",
+    "params": []
+  },
+  "workspace.recoveryFound": {
+    "context": "workspace interface message",
+    "source": "发现本地草稿",
+    "params": []
+  },
+  "workspace.restore": {
+    "context": "workspace interface message",
+    "source": "恢复",
+    "params": []
+  },
+  "workspace.discard": {
+    "context": "workspace interface message",
+    "source": "丢弃",
+    "params": []
+  },
+  "workspace.newRevision": {
+    "context": "workspace interface message",
+    "source": "服务器已有新版本，本地修改已保留。",
+    "params": []
+  },
+  "workspace.downloadFailed": {
+    "context": "workspace interface message",
+    "source": "下载失败",
+    "params": []
+  },
+  "workspace.localTtml": {
+    "context": "workspace interface message",
+    "source": "下载本地 TTML",
+    "params": []
+  },
+  "workspace.reloadConfirm": {
+    "context": "workspace interface message",
+    "source": "重新加载服务器版本并清除本地检查点？",
+    "params": []
+  },
+  "workspace.reloadServer": {
+    "context": "workspace interface message",
+    "source": "重新加载服务器",
+    "params": []
+  }
+}
