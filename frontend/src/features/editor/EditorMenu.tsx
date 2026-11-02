@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { ApplicationHeaderContext } from '../../shared/ApplicationHeaderContext';
 import { LanguageSelector } from '../LanguageSelector';
 import { DictionaryManager } from './DictionaryManager';
 import { createPortal } from 'react-dom';
@@ -8,7 +9,7 @@ import { SettingsDialog } from './SettingsDialog';
 import { preferences } from '../../adapters/preferences';
 import { Icon } from '../../shared/Icon';
 import { Link } from 'react-router-dom';
-import { useState, useRef } from 'react';
+import { useContext, useLayoutEffect, useState, useRef } from 'react';
 import { KanaHighlightDialog } from './KanaHighlightDialog';
 import { ShortcutDialog } from './ShortcutDialog';
 import { TopMenu, type MenuState } from './TopMenu';
@@ -35,6 +36,14 @@ type Props = MenuState & Partial<{
 
 export function EditorMenu(props: Props) {
   const {t}=useTranslation();
+  const chrome = useContext(ApplicationHeaderContext);
+  const setProjectHeader = chrome?.setProjectHeader;
+  const projectOpen = props.title !== undefined;
+  useLayoutEffect(() => {
+    if (!projectOpen || !setProjectHeader) return;
+    setProjectHeader(true);
+    return () => setProjectHeader(false);
+  }, [projectOpen, setProjectHeader]);
   const header = useRef<HTMLElement>(null);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [dictionaryOpen, setDictionaryOpen] = useState(false);
@@ -71,6 +80,6 @@ export function EditorMenu(props: Props) {
     {kanaOpen && <KanaHighlightDialog close={() => setKanaOpen(false)} />}
     {shortcutsOpen && <ShortcutDialog close={() => setShortcutsOpen(false)} />}
   </header>;
-  const host = window.document.getElementById("studio-project-header");
+  const host = chrome?.host;
   return props.title !== undefined && host ? createPortal(content, host) : content;
 }

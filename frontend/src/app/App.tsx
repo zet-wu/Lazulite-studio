@@ -3,6 +3,7 @@ import { useMessageText } from '../shared/useMessageText';
 import { message, type Message } from '../domain/messages';
 import { useTranslation } from 'react-i18next';
 import { initializeLanguage, i18n } from '../i18n';
+import { ApplicationHeaderContext } from '../shared/ApplicationHeaderContext';
 import headerStyles from '../features/editor/semantic-editor.module.css';
 import { EditorMenu } from '../features/editor/EditorMenu';
 import { DeviceSettings } from '../features/DeviceSettings';
@@ -240,12 +241,16 @@ function PreferenceGate({ children }: { children: ReactNode }) {
   useEffect(() => { if (mock || query.isSuccess) document.documentElement.dataset.theme = preferences.getItem('lazulite-editor-theme') === 'dark' ? 'dark' : 'light'; }, [mock, query.isSuccess]);
   if (!mock && query.isPending) return <><ApplicationHeader ready={false}/><main className={styles.centerState}>{t('app.preferencesLoading')}</main></>;
   if (!mock && query.isError) return <><ApplicationHeader ready={false}/><main className={styles.centerState}>{t('app.preferencesFailed')}<button data-role="secondary" onClick={() => query.refetch()}>{t('common.retry')}</button></main></>;
-  return <><ApplicationHeader />{error && <div role="alert">{error}<button data-role="secondary" onClick={() => location.reload()}>{t('app.preferencesRefresh')}</button></div>}{children}</>;
+  return <ApplicationFrame>{error && <div role="alert">{error}<button data-role="secondary" onClick={() => location.reload()}>{t('app.preferencesRefresh')}</button></div>}{children}</ApplicationFrame>;
 }
-function ApplicationHeader({ready = true}: {ready?: boolean}) {
+function ApplicationHeader({ready = false}: {ready?: boolean}) {
   const [activeMenuId, onMenuChange] = useState<string | null>(null);
-  if (!ready) return <header className={headerStyles.header}><span className={headerStyles.brand}>Lazulite Studio</span><button data-role="secondary" disabled>{t('menu.settings')}</button></header>;
-  return <div className={styles.applicationHeader}><div id="studio-project-header"/><div className={styles.defaultHeader}><EditorMenu activeMenuId={activeMenuId} onMenuChange={onMenuChange}/></div></div>;
+  return ready ? <EditorMenu activeMenuId={activeMenuId} onMenuChange={onMenuChange}/> : <header className={headerStyles.header}><span className={headerStyles.brand}>Lazulite Studio</span><button data-role="secondary" disabled>{t('menu.settings')}</button></header>;
+}
+function ApplicationFrame({children}: {children: ReactNode}) {
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
+  const [projectHeader, setProjectHeader] = useState(false);
+  return <ApplicationHeaderContext value={{host, setProjectHeader}}><div className={styles.applicationHeader}><div ref={setHost}/>{!projectHeader && <ApplicationHeader ready/>}</div>{children}</ApplicationHeaderContext>;
 }
 function WorkspaceRoute() {
   useTranslation();

@@ -17,7 +17,12 @@ export function SettingsDialog({ title, subtitle, close, children, actions, retu
     <section ref={ref} tabIndex={-1} className={styles.dialog} role="dialog" aria-modal="true" aria-label={title} onKeyDown={(event) => {
       if (event.key === 'Escape') { event.stopPropagation(); close(); return; }
       if (event.key !== 'Tab') return;
-      const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('summary, button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])') ?? []).filter(item => item.getClientRects().length > 0);
+      const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('summary, button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])') ?? []).filter(item => {
+        if (!item.getClientRects().length) return false;
+        if (!(item instanceof HTMLInputElement) || item.type !== 'radio' || !item.name) return true;
+        const group = Array.from(ref.current?.querySelectorAll<HTMLInputElement>('input[type="radio"]') ?? []).filter(radio => radio.name === item.name && !radio.disabled);
+        return item === (group.find(radio => radio.checked) ?? group[0]);
+      });
       if (!items.length) { event.preventDefault(); return; }
       if (event.shiftKey && (document.activeElement === items[0] || document.activeElement === ref.current)) { event.preventDefault(); items.at(-1)?.focus(); }
       else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0].focus(); }
