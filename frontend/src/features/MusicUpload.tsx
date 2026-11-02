@@ -58,7 +58,7 @@ export function MusicUpload({projectId,assetId,openRequest,prepare,accepted,stop
       if(staged&&!pending.current)await studioApi.discardUpload(staged.id);
     } finally {setBusy(false);controller.current=null;}
   };
-  return <footer className={styles.musicUpload} aria-label={t('music.project')}>
+  return <footer hidden={!!assetId && !busy && !error && !uncertain && !cleanup} className={styles.musicUpload} aria-label={t('music.project')}>
     {!assetId&&<><span>{t('music.empty')}</span><button data-role="secondary" disabled={unavailable} onClick={()=>input.current?.click()}>{t('menu.importAudio')}</button></>}
     <input hidden ref={input} aria-label={t('music.file')} type="file" accept="audio/*,video/mp4,.m4a" disabled={unavailable} onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)void upload(file);}}/>
     {busy&&<><progress aria-label={t('music.progress')} value={progress} max={1}/><span>{pending.current?t('music.switching'):t('music.uploading')}</span><button data-role="secondary" disabled={!!pending.current} onClick={()=>controller.current?.abort()}>{t('common.cancel')}</button></>}

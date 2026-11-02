@@ -897,6 +897,7 @@
 .projectDelete:disabled { opacity: .5; cursor: wait; }
 
 .musicUpload { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 13px; }
+.musicUpload[hidden] { display: none; }
 .musicUpload > span:first-child { color: var(--muted); }
 .musicUpload progress { width: 140px; accent-color: var(--blue); }
 
