@@ -148,3 +148,18 @@ export function undoProjectCommand(state: ProjectEditorState): ProjectEditorStat
 export function redoProjectCommand(state: ProjectEditorState): ProjectEditorState {
   return !state.future.length ? state : { present: state.future[0], past: [...state.past, state.present], future: state.future.slice(1) };
 }
+
+/** A source replacement keeps lyric history but removes every old acoustic state. */
+export function clearAcousticHistory(state: ProjectEditorState): ProjectEditorState {
+  const clean = (project: ProjectDocument): ProjectDocument => ({...project, acoustics:{analysisId:null,segments:[]}});
+  const present = clean(state.present);
+  const compact = (items: ProjectDocument[], anchor: ProjectDocument, reverse: boolean) => {
+    const result: ProjectDocument[] = []; let previous=JSON.stringify(anchor);
+    for(const item of reverse?[...items].reverse():items) {
+      const next=clean(item), identity=JSON.stringify(next);
+      if(identity!==previous){result.push(next);previous=identity;}
+    }
+    return reverse?result.reverse():result;
+  };
+  return {present,past:compact(state.past,present,true),future:compact(state.future,present,false)};
+}

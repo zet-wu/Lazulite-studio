@@ -17,7 +17,7 @@ export type ProjectList = components["schemas"]["ProjectList"];
 export type ProjectSummary = components["schemas"]["ProjectSummary"];
 export type JobList = components["schemas"]["JobList"];
 export type DocumentEnvelope = components["schemas"]["DocumentEnvelope"];
-export type RichDocumentEnvelope = DocumentEnvelope & { revision: string; etag?: string };
+export type RichDocumentEnvelope = DocumentEnvelope & { source_asset_id: string | null; revision: string; etag?: string };
 export type Asset = components["schemas"]["Asset"];
 export type WaveformWindow = components["schemas"]["WaveformWindow"];
 
@@ -37,6 +37,7 @@ async function request<T>(
 ): Promise<T> {
   const response = await fetch(`${API_ROOT}${path}`, {
     credentials: "include",
+    cache: "no-store",
     signal,
     headers: requestHeaders(),
   });
@@ -204,7 +205,8 @@ export const studioApi = {
       isSession,
     ),
   discardUpload: (id: string) => s4<{cancelled:string}>(`/uploads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  attachMusic: (projectId: string, uploadId: string) => s4<Asset>(`/projects/${encodeURIComponent(projectId)}/music`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ upload_id: uploadId }) }),
+  cleanupMusic: (projectId:string) => s4<{cleanup_pending:boolean}>(`/projects/${encodeURIComponent(projectId)}/music-cleanup`,{method:'POST'}),
+  attachMusic: (projectId: string, request: {upload_id:string;revision:string;expected_asset_id:string|null;operation_id:string}) => s4<{asset:Asset;revision:string;cleanup_pending:boolean}>(`/projects/${encodeURIComponent(projectId)}/music`, { method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request) }),
   createProject: (
     name: string,
     uploadId: string | null,
@@ -247,10 +249,10 @@ export const studioApi = {
       isWaveformWindow,
       signal,
     ),
-  audioUrl: (projectId: string, vocal?: string | null) =>
-    `${API_ROOT}/projects/${encodeURIComponent(projectId)}/audio${vocal ? `?vocal=${encodeURIComponent(vocal)}` : ""}`,
+  audioUrl: (projectId: string, vocal?: string | null, source?: string) =>
+    `${API_ROOT}/projects/${encodeURIComponent(projectId)}/audio?source=${encodeURIComponent(source??'')}${vocal ? `&vocal=${encodeURIComponent(vocal)}` : ""}`,
   getPcmWindow: async (projectId: string, startMs: number, endMs: number, signal?: AbortSignal, vocal?: string | null) => {
-    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/pcm?start_ms=${startMs}&end_ms=${endMs}${vocal ? `&vocal=${encodeURIComponent(vocal)}` : ""}`, { credentials: 'include', signal });
+    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/pcm?start_ms=${startMs}&end_ms=${endMs}${vocal ? `&vocal=${encodeURIComponent(vocal)}` : ""}`, { credentials: 'include', cache:'no-store', signal });
     if (!response.ok) throw await readApiError(response);
     const rate = Number(response.headers.get('x-sample-rate'));
     const channels = Number(response.headers.get('x-channels'));
@@ -275,7 +277,7 @@ export const studioS4 = {
     if (!response.ok) throw await readApiError(response);
     const body: unknown = await response.json();
     if (!isDocumentEnvelope(body) || !body.revision) throw new ApiError(502, { code: "invalid_response", message: "文档响应无有效 revision", request_id: "", retryable: false });
-    return { ...body, revision: body.revision, etag: response.headers.get("ETag") ?? undefined };
+    return { ...body, source_asset_id: body.source_asset_id, revision: body.revision, etag: response.headers.get("ETag") ?? undefined };
   },
   saveRichDocument: async (projectId: string, document: ProjectSnapshot, baseRevision: string, operationId: string, seq: number, etag?: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/document`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag ?? `"${baseRevision}"`, "Idempotency-Key": operationId }, body: JSON.stringify({ schema_version: "studio-document-v9", project_id: projectId, revision: baseRevision, client_seq: seq, document }) }); if (!result || typeof result !== 'object' || !('revision' in result) || typeof result.revision !== 'string' || !result.revision) throw new ApiError(502, { code: "invalid_response", message: "保存响应无有效 revision", request_id: "", retryable: false }); return { revision: result.revision, etag: `"${result.revision}"` }; },
 };

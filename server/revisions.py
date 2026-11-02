@@ -135,10 +135,14 @@ class RevisionStore:
             except OSError: logger.warning('修订文件回收待重试：%s', path)
 
     def read(self, project_id: str, revision: str | None = None) -> tuple[str, dict]:
+        revision_id, snapshot, _ = self.read_bound(project_id, revision)
+        return revision_id, snapshot
+
+    def read_bound(self, project_id: str, revision: str | None = None) -> tuple[str, dict, str | None]:
         """Read an immutable revision and return (revision id, project snapshot)."""
         with self.db.transaction() as conn:
             row = conn.execute(
-                "SELECT p.current_revision, r.id, r.project_path FROM projects p "
+                "SELECT p.current_revision, r.id, r.project_path, p.source_asset_id FROM projects p "
                 "JOIN revisions r ON r.project_id=p.id AND r.id=COALESCE(?, p.current_revision) "
                 "WHERE p.id=?",
                 (revision, project_id),
@@ -150,7 +154,7 @@ class RevisionStore:
             if root not in path.parents or path.suffix != ".json":
                 raise ValueError("revision path is outside revision store")
             try:
-                return row[1], read_project(path)
+                return row[1], read_project(path), row[3]
             except (OSError, UnicodeError) as exc:
                 raise ValueError("revision cannot be read") from exc
 

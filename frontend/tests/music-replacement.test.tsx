@@ -1,0 +1,40 @@
+import {act,cleanup,renderHook} from '@testing-library/react';
+import {afterEach,expect,it,vi} from 'vitest';
+import {clearAcousticHistory,createProjectDocument,createProjectEditorState,executeProjectCommand,redoProjectCommand,undoProjectCommand} from '../src/domain/project-document';
+import {serializeProject} from '../src/adapters/project-codec';
+import {useProjectDocument} from '../src/features/useProjectDocument';
+const recovery=vi.hoisted(()=>({save:vi.fn(async()=>{}),clear:vi.fn(async()=>{}),readCheckpoint:vi.fn(async()=>null)}));
+vi.mock('../src/adapters/recovery',()=>({createRecoveryAdapter:()=>recovery}));
+vi.mock('../src/adapters/project-lifecycle',()=>({listenProjectDeletion:()=>()=>{},clearProjectLocalData:vi.fn()}));
+afterEach(()=>{cleanup();vi.clearAllMocks();});
+it('strips acoustics in past/present/future and collapses purely acoustic steps',()=>{
+ let state=createProjectEditorState(createProjectDocument());
+ state=executeProjectCommand(state,{type:'acoustics',acoustics:{analysisId:'old',segments:[{id:'s',beginMs:0,endMs:100}]}});
+ state=executeProjectCommand(state,{type:'lyrics',command:{type:'set-metadata',key:'title',values:['new']}});
+ state=undoProjectCommand(state);
+ const clean=clearAcousticHistory(state);
+ expect(clean.past).toHaveLength(0);expect(clean.future).toHaveLength(1);
+ expect(redoProjectCommand(clean).present.lyrics.metadata.title).toEqual(['new']);
+ expect(redoProjectCommand(clean).present.acoustics).toEqual({analysisId:null,segments:[]});
+});
+it('saves before replacement, keeps lyrics and prevents a pending save from being replaced',async()=>{
+ const save=vi.fn(async()=>({revision:'saved'}));
+ const {result}=renderHook(()=>useProjectDocument('p',serializeProject(createProjectDocument()),'base',undefined,save,'old'));
+ await act(async()=>{result.current.apply({type:'set-metadata',key:'title',values:['lyrics']});});
+ let lock!:Awaited<ReturnType<typeof result.current.prepareSource>>;
+ await act(async()=>{lock=await result.current.prepareSource();});
+ expect(lock.revision).toBe('saved');expect(result.current.editingLocked).toBe(true);
+ await act(async()=>{await result.current.acceptSource('new','replaced');lock.release();});
+ expect(result.current.revision).toBe('replaced');expect(result.current.document.metadata.title).toEqual(['lyrics']);
+ expect(result.current.dirty).toBe(false);expect(result.current.canUndo).toBe(true);
+});
+it('preserves unsaved lyrics as a conflict when another page replaces audio',async()=>{
+ const project=createProjectDocument();project.acoustics={analysisId:'old',segments:[{id:'s',beginMs:0,endMs:100}]};
+ const {result}=renderHook(()=>useProjectDocument('p',serializeProject(project),'base',undefined,vi.fn(),'old'));
+ await act(async()=>{result.current.apply({type:'set-metadata',key:'title',values:['unsaved']});});
+ await act(async()=>{await result.current.acceptSource('new','replacement',serializeProject(createProjectDocument()));});
+ expect(result.current.conflict).toBe(true);expect(result.current.dirty).toBe(true);
+ expect(result.current.document.metadata.title).toEqual(['unsaved']);
+ expect(result.current.project.acoustics.segments).toEqual([]);
+ expect(recovery.save).toHaveBeenLastCalledWith('p',expect.objectContaining({acoustics:{analysisId:null,segments:[]}}),'base','new');
+});

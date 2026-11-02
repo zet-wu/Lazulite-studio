@@ -30,6 +30,7 @@ class DocumentEnvelope(BaseModel):
     project_id: str = Field(min_length=1, max_length=200)
     revision: str | None = None
     document: ProjectSnapshot
+    source_asset_id: str | None = None
     client_seq: int | None = Field(default=None, ge=0)
 
 
@@ -121,13 +122,14 @@ class DocumentService:
         self.revisions = revisions
 
     def get(self, project_id: str, revision: str | None = None) -> dict:
-        rev, snapshot = self.revisions.read(project_id, revision)
+        rev, snapshot, source_asset_id = self.revisions.read_bound(project_id, revision)
         return {
             "schema_version": "studio-document-v9",
             "project_id": project_id,
             "revision": rev,
             "etag": f'"{rev}"',
             "document": snapshot,
+            "source_asset_id": source_asset_id,
         }
 
     def save(self, body: DocumentEnvelope, *, if_match: str | None,

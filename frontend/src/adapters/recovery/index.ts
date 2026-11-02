@@ -5,9 +5,9 @@ import { validateProjectEditing } from '../../domain/project-editing';
 import { validateSegments, type ProjectDocument } from '../../domain/project-document';
 import { LYRIC_SCHEMA_VERSION, type LyricDocument } from '../../domain/lyric-document';
 
-const DATABASE = 'lazulite-studio-recovery-v10';
+const DATABASE = 'lazulite-studio-recovery-v11';
 const STORE = 'projects';
-const RECORD_VERSION = 10;
+const RECORD_VERSION = 11;
 const keyFor = (projectId: string) => `project:${projectId}`;
 
 export type RecoveryRecord = {
@@ -15,10 +15,11 @@ export type RecoveryRecord = {
   projectId: string;
   project: ProjectDocument;
   baseRevision: string;
+  sourceAssetId: string | null;
 };
 
 export type RecoveryAdapter = {
-  save(projectId: string, project: ProjectDocument, baseRevision: string): Promise<void>;
+  save(projectId: string, project: ProjectDocument, baseRevision: string, sourceAssetId?: string | null): Promise<void>;
   readCheckpoint(slotKey: string): Promise<RecoveryRecord | null>;
   clear(slotKey: string): Promise<void>;
 };
@@ -62,14 +63,14 @@ const validDocument = (document: unknown): document is ProjectDocument => {
 const isRecord = (value: unknown): value is RecoveryRecord => {
   if (!value || typeof value !== 'object') return false;
   const record = value as RecoveryRecord;
-  return record.version === RECORD_VERSION && typeof record.projectId === 'string'
+  return (record.sourceAssetId===null || typeof record.sourceAssetId==='string') && record.version === RECORD_VERSION && typeof record.projectId === 'string'
     && typeof record.baseRevision === 'string' && validDocument(record.project);
 };
 
 export function createRecoveryAdapter(): RecoveryAdapter {
   return {
-    async save(projectId, project, baseRevision) {
-      const record: RecoveryRecord = { version: RECORD_VERSION, projectId, project, baseRevision };
+    async save(projectId, project, baseRevision, sourceAssetId = null) {
+      const record: RecoveryRecord = { version: RECORD_VERSION, projectId, project, baseRevision, sourceAssetId };
       await transaction('readwrite', (store) => store.put(record, keyFor(projectId)));
     },
     async readCheckpoint(projectId) {

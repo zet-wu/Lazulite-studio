@@ -1958,6 +1958,81 @@
           }
         }
       }
+    },
+    "/projects/{pid}/music": {
+      "post": {
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "upload_id",
+                  "revision",
+                  "expected_asset_id",
+                  "operation_id"
+                ],
+                "properties": {
+                  "upload_id": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "string"
+                  },
+                  "expected_asset_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "operation_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Atomic source binding and empty acoustic revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "asset",
+                    "revision",
+                    "cleanup_pending"
+                  ],
+                  "properties": {
+                    "asset": {
+                      "$ref": "#/components/schemas/Asset"
+                    },
+                    "revision": {
+                      "type": "string"
+                    },
+                    "cleanup_pending": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2539,6 +2614,9 @@
                 "type": "null"
               }
             ]
+          },
+          "music_cleanup_pending": {
+            "type": "boolean"
           }
         }
       },
@@ -3104,7 +3182,8 @@
           "schema_version",
           "project_id",
           "revision",
-          "document"
+          "document",
+          "source_asset_id"
         ],
         "properties": {
           "schema_version": {
@@ -3351,6 +3430,12 @@
               }
             },
             "additionalProperties": false
+          },
+          "source_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "additionalProperties": false

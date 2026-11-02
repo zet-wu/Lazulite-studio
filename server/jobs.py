@@ -80,6 +80,9 @@ class JobService:
                 if old:
                     if old[0]!=digest: raise ValueError("idempotency key was used for another request")
                     return self.get(old[1])
+            if kind in {'vocal', 'alignment'}:
+                source = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (project_id,)).fetchone()
+                if not source or source[0] != request.get('asset_id'): raise ValueError('源音频已改变，请重新发起任务')
             if kind in {'alignment', 'publish'}:
                 revision = request.get('revision')
                 if not c.execute('SELECT 1 FROM revisions WHERE id=? AND project_id=?', (revision, project_id)).fetchone():

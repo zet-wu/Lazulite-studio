@@ -709,6 +709,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{pid}/music": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    pid: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        upload_id: string;
+                        revision: string;
+                        expected_asset_id: string | null;
+                        operation_id: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Atomic source binding and empty acoustic revision */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            asset: components["schemas"]["Asset"];
+                            revision: string;
+                            cleanup_pending: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -851,6 +901,7 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             asset?: components["schemas"]["Asset"] | null;
+            music_cleanup_pending?: boolean;
         };
         ProjectList: {
             /** @constant */
@@ -1055,6 +1106,7 @@ export interface components {
                     };
                 };
             };
+            source_asset_id: string | null;
         };
         DocumentSaveResponse: {
             revision: string;

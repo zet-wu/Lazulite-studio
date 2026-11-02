@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { listenProjectDeletion, clearProjectLocalData } from "../adapters/project-lifecycle";
 import { createRecoveryAdapter } from "../adapters/recovery";
 import { parseProject, serializeProject } from '../adapters/project-codec';
-import { createProjectEditorState, executeProjectCommand, redoProjectCommand, undoProjectCommand, type ProjectEditorState, type ProjectSnapshot, type ProjectCommand } from '../domain/project-document';
+import { clearAcousticHistory, createProjectEditorState, executeProjectCommand, redoProjectCommand, undoProjectCommand, type ProjectEditorState, type ProjectSnapshot, type ProjectCommand } from '../domain/project-document';
 import type { ProjectDocument } from '../domain/project-document';
 import type { LyricCommand } from '../domain/lyric-commands';
 
@@ -22,7 +22,9 @@ export function useProjectDocument(
   initialRevision: string,
   initialEtag: string | undefined,
   saveDocument: Save,
+  sourceAssetId: string | null = null,
 ) {
+  const sourceIdentity = useRef(sourceAssetId);
   const editingLock = useRef<symbol | null>(null);
   const [editingLocked, setEditingLocked] = useState(false);
   const savedSequence = useRef(0);
@@ -61,7 +63,7 @@ export function useProjectDocument(
   const checkpoint = useCallback(
     async (next: ProjectEditorState) => {
       if (deletedRef.current) return;
-      await enqueueRecovery(async () => { if (!deletedRef.current) await createRecoveryAdapter().save(projectId, next.present, revision); });
+      await enqueueRecovery(async () => { if (!deletedRef.current) await createRecoveryAdapter().save(projectId, next.present, revision, sourceIdentity.current); });
     },
     [enqueueRecovery, projectId, revision],
   );
@@ -96,6 +98,7 @@ export function useProjectDocument(
     }
     if (forPackaging && pending.current) throw new Error('上次保存尚未确认，请先重试保存再打包');
     const captured = stateRef.current.present;
+    const saveSource = sourceIdentity.current;
     if (sequence.current === savedSequence.current) return { revision, document: captured.lyrics, editing: captured.editing };
     inFlight.current = true;
     setSaving(true);
@@ -115,7 +118,7 @@ export function useProjectDocument(
         request.seq,
         etag,
       );
-      if (deletedRef.current) return;
+      if (deletedRef.current || saveSource !== sourceIdentity.current) return;
       setRevision(result.revision);
       setEtag(result.etag);
       setError(null);
@@ -130,6 +133,7 @@ export function useProjectDocument(
           projectId,
           stateRef.current.present,
           result.revision,
+          sourceIdentity.current,
         ));
       }
       return { revision: result.revision, document: captured.lyrics, editing: captured.editing };
@@ -179,7 +183,7 @@ export function useProjectDocument(
     const adapter = createRecoveryAdapter();
     const record = await adapter.readCheckpoint(projectId);
     if (record) {
-      const recovered = createProjectEditorState(record.project);
+      const recovered = record.sourceAssetId===sourceIdentity.current ? createProjectEditorState(record.project) : clearAcousticHistory(createProjectEditorState(record.project));
       stateRef.current = recovered;
       setState(recovered);
       ++sequence.current;
@@ -226,6 +230,28 @@ export function useProjectDocument(
   }, [deleted, enqueueRecovery, projectId]);
   return {
     deleted, historyVersion, editingLocked,
+    acceptSource: async (assetId: string | null, nextRevision: string, remote?: ProjectSnapshot) => {
+      const changed = sourceIdentity.current !== assetId;
+      sourceIdentity.current=assetId;
+      if (!changed) return;
+      const next=remote && !dirty ? createProjectEditorState(parseProject(remote)) : clearAcousticHistory(stateRef.current);
+      stateRef.current=next;setState(next);setHistoryVersion(v=>v+1);
+      if (remote && (dirty || pending.current)) {
+        setConflict(true);setError('源音频已在其他页面改变，未保存歌词已保留，请处理版本冲突');
+        await checkpoint(next);
+      } else {
+        pending.current=null;setRevision(nextRevision);setEtag(`"${nextRevision}"`);
+        savedSequence.current=sequence.current;setDirty(false);
+        await enqueueRecovery(()=>createRecoveryAdapter().clear(projectId));setRecovery({available:false});
+      }
+    },
+    prepareSource: async () => {
+      if(editingLock.current || conflict || deletedRef.current || inFlight.current || pending.current) throw new Error('请先完成或重试保存并处理冲突');
+      const token=Symbol('music');editingLock.current=token;setEditingLocked(true);
+      const release=()=>{if(editingLock.current===token){editingLock.current=null;setEditingLocked(false);}};
+      try { const saved=await save(true);if(!saved)throw new Error('请先完成保存');return {revision:saved.revision,release}; }
+      catch(error){release();throw error;}
+    },
     lockEditing: () => {
       if (editingLock.current || conflict || deletedRef.current) throw new Error('项目当前不能开始对齐');
       const token = Symbol('alignment'); editingLock.current = token; setEditingLocked(true);

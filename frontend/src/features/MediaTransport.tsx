@@ -165,7 +165,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     ),
   );
   const waveform = useQuery({
-    queryKey: ["waveform", projectId, graphicVocal, requestWindow.startMs, requestWindow.endMs, level],
+    queryKey: ["waveform", projectId, asset?.id, graphicVocal, requestWindow.startMs, requestWindow.endMs, level],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       studioApi.getWaveform(projectId, requestWindow.startMs, requestWindow.endMs, level, signal, graphicVocal),
     enabled: Boolean(asset) && expanded && span > 0 && end > start,
@@ -640,7 +640,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         ref={audio}
         onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; const captured=switching.current; if(captured){audio.current.currentTime=captured.position; switching.current=null;setLoadingSource(false);if(captured.playing)void audio.current.play().catch(e=>{if(e.name!=='AbortError')setError('所选音源无法播放，请重试');});} } }}
         preload="metadata"
-        src={asset ? studioApi.audioUrl(projectId, playbackVocal) : undefined}
+        src={asset ? studioApi.audioUrl(projectId, playbackVocal, asset.id) : undefined}
       />
       <div className={styles.header}>
         <IconButton data-role="secondary" className={styles.play} disabled={disabled} icon={playing ? 'pause' : 'play'} label={playing ? '暂停' : '播放'} onClick={play}/>

@@ -82,6 +82,7 @@ const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
 const PreviewMode = lazy(() => import('./PreviewMode').then((module) => ({ default: module.PreviewMode })));
 
 type Props = {
+  onImportAudio?:()=>void;
   alignment?: AlignmentControl;
   historyVersion?: number;
   project?: ProjectDocument;
@@ -866,7 +867,12 @@ function EditorWorkspaceContent(props: Props) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
-    <EditorMenu {...props} onDictionaryManager={() => setDictionaryManager(true)} editingLocked={props.alignment?.locked} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />
+    <EditorMenu {...props} onImportAudio={props.onImportAudio?()=>{
+      if(canvasComposing.current||!finishSyncDraft())return;
+      flushSync(()=>{const active=window.document.activeElement;if(active instanceof HTMLElement)active.blur();});
+      if(pageRef.current?.querySelector('[aria-invalid="true"]'))return;
+      setActiveMenuId(null);props.onImportAudio?.();
+    }:undefined} onDictionaryManager={() => setDictionaryManager(true)} editingLocked={props.alignment?.locked} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />
     <div ref={audioReview?.setTaskHost} />
     <div ref={audioReview?.setMessageHost} />
     <MessageBar notice={message} />
@@ -877,7 +883,7 @@ function EditorWorkspaceContent(props: Props) {
       flushSync(()=>{const active=window.document.activeElement;if(active instanceof HTMLElement)active.blur();});
       return !editRejected.current && !pageRef.current?.querySelector('[aria-invalid="true"]');
     }}/>}
-    {props.projectId && props.project && props.applyProject && props.sourceAssetId && <VocalPanel locked={props.alignment?.locked} visible={mode==='audio'} projectId={props.projectId} project={props.project} sourceAssetId={props.sourceAssetId} apply={props.applyProject} durationMs={props.audioDurationMs??null}/>}
+    {props.projectId && props.project && props.applyProject && props.sourceAssetId && <VocalPanel key={props.sourceAssetId} locked={props.alignment?.locked} visible={mode==='audio'} projectId={props.projectId} project={props.project} sourceAssetId={props.sourceAssetId} apply={props.applyProject} durationMs={props.audioDurationMs??null}/>}
     {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.sourceAssetId ? <div ref={layoutRef} className={vocalStyles.audioLayout} style={{gridTemplateColumns:template(rendered)}}>
       {columns.outlineVisible && <aside onFocusCapture={() => { selectionArea.current = 'outline'; }} ref={outlineRef} className={styles.outline} aria-label="音频处理大纲"><h2>大纲</h2><div className={styles.panelBody}>{displayOrder.map(line => <div key={line.id} draggable onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed="copy";const ghost=e.currentTarget.cloneNode(true) as HTMLElement;ghost.style.cssText="position:fixed;left:-10000px;opacity:.6;width:220px";window.document.body.appendChild(ghost);e.dataTransfer.setDragImage(ghost,20,16);setTimeout(()=>ghost.remove(),0);}}>
         <div onClick={event => selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey)}><OutlineRow line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} selected={selection?.kind === 'lines' && selection.ids.includes(line.id)}/></div>

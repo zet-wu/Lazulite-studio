@@ -73,6 +73,7 @@ export const jobs: JobList = {
 };
 export const document: DocumentEnvelope = {
   schema_version: "studio-document-v9",
+  source_asset_id: "sample-asset",
   project_id: "sample-project",
   revision: "sample-r1",
   document: {

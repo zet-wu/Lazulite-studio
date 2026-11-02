@@ -56,6 +56,8 @@ def create_app(
     root = root.resolve()
     db = Database(root / "studio.sqlite3")
     from .storage_paths import validate_database_paths
+    from .music_replacement import recover_music_replacements, replace_music
+    recover_music_replacements(db, root)
     validate_database_paths(db)
     from .runtime_settings import RuntimeSettings, settings_router
     preferences = runtime_settings or RuntimeSettings(root / "settings.json")
@@ -296,36 +298,28 @@ def create_app(
         return {'cancelled': token}
 
     class MusicUpload(BaseModel):
-        upload_id: str
+        model_config = ConfigDict(extra='forbid')
+        upload_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+        revision: str = Field(min_length=1, max_length=200)
+        expected_asset_id: str | None
+        operation_id: str = Field(min_length=1, max_length=200)
 
     @api.post('/projects/{pid}/music')
-    def attach_music(pid: str, body: MusicUpload, _: object = Depends(write)):
+    def attach_music(pid: str, body: MusicUpload, subject: str = Depends(write)):
+        result = replace_music(db, root, pid, body.upload_id, body.revision,
+            body.expected_asset_id, body.operation_id, subject, staged_upload, asset_dto)
+        media_services.pop(pid, None)
+        return result
+
+    @api.post('/projects/{pid}/music-cleanup')
+    def cleanup_music(pid: str, _: object = Depends(write)):
+        project(pid)
+        from .music_replacement import _recover
+        journal = root / '.replacing' / pid
         try:
-            with db.transaction() as c:
-                row = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (pid,)).fetchone()
-                if not row: fail('project_not_found', '项目已删除', 404)
-                if row[0] == body.upload_id:
-                    return asset_dto(c.execute('SELECT * FROM assets WHERE id=?', (row[0],)).fetchone())
-                if row[0]: fail('project_changed', '项目音乐已改变，请刷新；未采用本次上传', 409)
-                directory, _ = staged_upload(body.upload_id)
-                try:
-                    asset = adopt_upload(c, body.upload_id, pid)
-                    c.execute('UPDATE projects SET source_asset_id=?,updated_at=? WHERE id=?', (asset[0], stamp(), pid))
-                except Exception:
-                    for name in ('source','cache'):
-                        shutil.rmtree(root / 'projects' / pid / name, ignore_errors=True)
-                    raise
-            return asset_dto(asset)
-        except Exception:
-            with db.transaction() as c:
-                current = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (pid,)).fetchone()
-                if current and not current[0]:
-                    for name in ('source','cache'): shutil.rmtree(root / 'projects' / pid / name, ignore_errors=True)
-            raise
-        finally:
-            # Committed and rejected uploads both cease to be pending assets.
-            if len(body.upload_id) == 32 and all(ch in '0123456789abcdef' for ch in body.upload_id):
-                shutil.rmtree(uploads / body.upload_id, ignore_errors=True)
+            if journal.exists(): _recover(db, root, journal)
+        except OSError: fail('music_cleanup_pending', '旧音频文件尚未释放，请停止播放／下载后重试', 409)
+        return {'cleanup_pending': False}
 
     @api.post("/projects")
     def create_project(
@@ -453,6 +447,7 @@ def create_app(
             "name": r[1],
             "updated_at": r[5],
             "asset": asset_dto(a) if a else None,
+            "music_cleanup_pending": (root / ".replacing" / pid).exists(),
         }
 
     @api.get("/projects/{pid}/search-conditions")
@@ -503,11 +498,12 @@ def create_app(
         )
 
     @api.get("/projects/{pid}/audio")
-    def audio(pid: str, request: Request, vocal: str | None = None, _: object = Depends(auth)):
+    def audio(pid: str, request: Request, vocal: str | None = None, source: str | None = None, _: object = Depends(auth)):
         with db.transaction():
             r, a = asset_for(pid)
             if not a:
                 fail("audio_not_found", "audio not found", 404)
+            if source and source != a[0]: fail('source_conflict', '源音频已改变，请重新加载播放', 409)
             asset = vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(a, pid)
             proxy = media_for(pid).playback_proxy(asset)
             return stream_file(proxy.path, proxy.mime_type, request.headers.get('range'), request.headers.get('if-range'))

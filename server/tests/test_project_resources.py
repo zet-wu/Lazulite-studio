@@ -20,7 +20,11 @@ def upload(client):
     assert response.status_code == 200, response.text
     return response.json()['id']
 
-def test_music_optional_upload_does_not_change_revision_lyrics_metadata_or_search(tmp_path):
+def binding(client, pid, token):
+    return {'upload_id':token,'revision':client.get(f'/api/v1/projects/{pid}/document').json()['revision'],
+            'expected_asset_id':(client.get(f'/api/v1/projects/{pid}').json()['asset'] or {}).get('id'),'operation_id':token}
+
+def test_music_import_advances_revision_and_preserves_lyrics_metadata_and_search(tmp_path):
     with client_for(tmp_path) as client:
         created = client.post('/api/v1/projects', json={'name':'No music'}, headers=HEADERS).json()
         pid = created['id']; assert created['asset'] is None
@@ -35,17 +39,18 @@ def test_music_optional_upload_does_not_change_revision_lyrics_metadata_or_searc
         assert client.post(url+'/jobs/vocal', json={'params':{'asset_id':'missing'}}, headers=HEADERS).status_code == 422
         saved_document = client.get(url+'/document').json()['document']
         token = upload(client)
-        result = client.post(url+'/music', json={'upload_id':token}, headers=HEADERS)
+        request = binding(client,pid,token)
+        result = client.post(url+'/music', json=request, headers=HEADERS)
         assert result.status_code == 200
-        assert client.get(url+'/document').json()['revision'] == saved['revision']
+        assert client.get(url+'/document').json()['revision'] != saved['revision']
         assert client.get(url+'/document').json()['document'] == saved_document
         assert client.get(url+'/search-conditions').json()['title'] == 'manual'
         assert client.get(url).json()['name'] == 'No music'
-        assert client.post(url+'/music', json={'upload_id':token}, headers=HEADERS).status_code == 200
-        # A stale lyric snapshot from before upload remains saveable and cannot detach music.
+        assert client.post(url+'/music', json=request, headers=HEADERS).status_code == 200
+        # A stale pre-import snapshot cannot restore old acoustic content.
         before['revision'] = saved['revision']; before['document'] = snapshot
         response = client.put(url+'/document', json={k:before[k] for k in ('schema_version','project_id','revision','document')}, headers={**HEADERS,'if-match':saved['revision']})
-        assert response.status_code == 200
+        assert response.status_code == 412
         assert client.get(url).json()['asset']['id'] == token
         assert not list((tmp_path/'uploads').iterdir())
 
@@ -58,9 +63,12 @@ def test_independent_music_competing_uploads_cancel_delete_and_restart(tmp_path)
         assert all(p.is_file() for p in files) and files[0].stat().st_ino != files[1].stat().st_ino
         empty = client.post('/api/v1/projects',json={'name':'race'},headers=HEADERS).json()['id']
         competing = [upload(client),upload(client)]
+        requests=[binding(client,empty,token) for token in competing]
         with ThreadPoolExecutor(2) as pool:
-            results = list(pool.map(lambda token: client.post(f'/api/v1/projects/{empty}/music',json={'upload_id':token},headers=HEADERS).status_code,competing))
-        assert sorted(results) == [200,409]
+            results = list(pool.map(lambda request: client.post(f'/api/v1/projects/{empty}/music',json=request,headers=HEADERS).status_code,requests))
+        assert sorted(results) == [200,412]
+        for token in competing:
+            if (tmp_path/'uploads'/token).exists():client.delete('/api/v1/uploads/'+token,headers=HEADERS)
         cancelled = upload(client)
         assert client.delete('/api/v1/uploads/'+cancelled,headers=HEADERS).status_code == 200
         assert not list((tmp_path/'uploads').iterdir())
@@ -75,8 +83,10 @@ def test_deleted_target_and_invalid_upload_leave_no_owned_resources(tmp_path):
     with client_for(tmp_path) as client:
         pid = client.post('/api/v1/projects',json={'name':'delete'},headers=HEADERS).json()['id']
         token = upload(client)
+        request=binding(client,pid,token)
         client.delete(f'/api/v1/projects/{pid}',headers=HEADERS)
-        assert client.post(f'/api/v1/projects/{pid}/music',json={'upload_id':token},headers=HEADERS).status_code == 404
+        assert client.post(f'/api/v1/projects/{pid}/music',json=request,headers=HEADERS).status_code == 404
+        client.delete('/api/v1/uploads/'+token,headers=HEADERS)
         assert not (tmp_path/'projects'/pid).exists() and not list((tmp_path/'uploads').iterdir())
         assert client.post('/api/v1/uploads',files={'file':('bad.wav',b'bad')},headers=HEADERS).status_code == 415
         assert not list((tmp_path/'uploads').iterdir())
@@ -114,9 +124,9 @@ def test_create_failure_restores_upload_for_retry_and_attach_failure_cleans(tmp_
         empty=client.post('/api/v1/projects',json={'name':'empty'},headers=HEADERS).json()['id'];token=upload(client)
         with db.transaction() as c:c.execute("CREATE TRIGGER reject_music BEFORE UPDATE OF source_asset_id ON projects BEGIN SELECT RAISE(ABORT,'music fail'); END")
         with pytest.raises(Exception,match='music fail'):
-            client.post(f'/api/v1/projects/{empty}/music',json={'upload_id':token},headers=HEADERS)
+            client.post(f'/api/v1/projects/{empty}/music',json=binding(client,empty,token),headers=HEADERS)
         assert not (tmp_path/'projects'/empty/'source').exists()
-        assert not (tmp_path/'uploads'/token).exists()
+        assert (tmp_path/'uploads'/token/'source'/'original').is_file()
         assert client.get(f'/api/v1/projects/{empty}').json()['asset'] is None
 
 def test_restart_restores_uncommitted_delete_and_collects_committed_quarantine(tmp_path):

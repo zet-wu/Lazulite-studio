@@ -20,7 +20,7 @@ export const SCHEMA_VERSION = {
 
 export function isDocumentEnvelope(value: unknown): value is DocumentEnvelope {
   return object(value) && value.schema_version === "studio-document-v9" && string(value.project_id) &&
-    string(value.revision) && object(value.document) && value.document.schemaVersion === "studio-project-v9" &&
+    string(value.revision) && (value.source_asset_id === null || string(value.source_asset_id)) && object(value.document) && value.document.schemaVersion === "studio-project-v9" &&
     object(value.document.lyrics) && string(value.document.lyrics.draftTtml) && object(value.document.editing) && object(value.document.acoustics) && (value.document.acoustics.analysisId === null || string(value.document.acoustics.analysisId)) && Array.isArray(value.document.acoustics.segments);
 }
 const object = (value: unknown): value is Record<string, unknown> =>

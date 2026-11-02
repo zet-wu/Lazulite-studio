@@ -15,7 +15,7 @@ Studio 是浏览器前端与本地／同源 API 组成的单工作台，登录�
 | `contracts` | OpenAPI 与前端生成类型的来源 |
 | `tests/fixtures` | 仓库内的可执行测试输入 |
 
-入口为 `/projects`、`/projects/:projectId/edit`、`/login`、`/settings`；`/editor` 重定向项目列表。Workspace 组合 EditorWorkspace、保存状态、恢复与媒体生命周期，各模式共享项目草稿及播放状态。音乐可选，首次接入通过项目资源接口完成。
+入口为 `/projects`、`/projects/:projectId/edit`、`/login`、`/settings`；`/editor` 重定向项目列表。Workspace 组合 EditorWorkspace、保存状态、恢复与媒体生命周期，各模式共享项目草稿及播放状态。音乐可选，首次导入和替换共用项目资源接口，按源身份与修订原子提交。
 
 ## 测试边界与组织
 
@@ -34,7 +34,7 @@ Studio 是浏览器前端与本地／同源 API 组成的单工作台，登录�
 | 项目 JSON | `studio-project-v9` |
 | 运行时歌词 | `studio-lyric-v10` |
 | HTTP 文档 envelope | `studio-document-v9` |
-| 浏览器恢复 | recovery-v10／record 10（项目 v9） |
+| 浏览器恢复 | recovery-v11／record 11，含源绑定身份（项目 v9） |
 | SQLite 资源结构 | 6 |
 | `.lazp` manifest | 1 |
 
@@ -82,7 +82,7 @@ AMLL core/react 0.5.2 按需加载，读取当前草稿的播放投影。Studio 
 
 `useProjectDocument` 管理本地副本、dirty、revision／ETag、保存序号和冲突。IndexedDB 按稳定 library ID 分库保存当前项目及基础修订；读盘校验后创建空撤销历史。HTTP 文档中的 `lyrics.draftTtml` 承载草稿歌词；服务边界统一建模、共用一次规范化 TTML 树，校验后写不可变 JSON 修订，通过 SQLite compare-and-swap 更新当前指针。PUT 成功只返回 revision 与 ETag。草稿读取保留待修正时间，正式输出执行目标格式校验。
 
-数据目录默认 `server/data-projects-v6`，`STUDIO_DATA_DIR` 可指定其他位置。SQLite 保存资源索引、修订指针、会话、幂等记录及任务。每个 `projects/<id>` 目录含 `source/original`、`cache`、`revisions`、`vocals`、`exports`；相同源文件在不同项目分别存储。上传在临时区校验、探测和建代理，再由创建项目／首次接入事务确认归属。
+数据目录默认 `server/data-projects-v6`，`STUDIO_DATA_DIR` 可指定其他位置。SQLite 保存资源索引、修订指针、会话、幂等记录及任务。每个 `projects/<id>` 目录含 `source/original`、`cache`、`revisions`、`vocals`、`exports`；相同源文件在不同项目分别存储。上传在临时区校验、探测和建代理，再由创建项目／音源替换事务确认归属。
 
 修订仅保留当前版本和排队／执行／取消未结束任务实际使用的输入；读取与入队使用同一 SQLite 事务排除回收竞争。终态结果与幂等响应保留修订身份，文件由提交、任务结束和启动恢复回收。项目删除检查活动任务，隔离目录后清理索引，失败回移；启动按数据库状态恢复。空间接口按需统计项目目录逻辑字节，分类为源音频、人声结果、缓存、快照及其他文件。
 
