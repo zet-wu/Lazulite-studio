@@ -1,3 +1,4 @@
+import { MessageError, message } from '../../domain/messages';
 import type { ProjectSnapshot } from '../../domain/project-document';
 import type { components, paths } from "./generated";
 import {
@@ -117,14 +118,7 @@ export function uploadMusic(
         reject(
           new ApiError(
             xhr.status,
-            isApiError(body)
-              ? body
-              : {
-                  code: "upload_failed",
-                  message: "上传失败，请重试",
-                  request_id: "",
-                  retryable: xhr.status >= 500,
-                },
+            apiErrorBody(body,xhr.status,xhr.getResponseHeader('X-Request-ID')??''),
           ),
         );
         return;
@@ -149,27 +143,37 @@ export function uploadMusic(
   });
 }
 
-export class ApiError extends Error {
+export class ApiError extends MessageError {
   constructor(
     readonly status: number,
     readonly body: ApiErrorBody,
   ) {
-    super(body.message);
+    super(['segment_invalid_range','segment_duplicate_id','analysis_source_mismatch'].includes(body.reason??'')
+      ? message(`error.document.${body.reason}`,body.params as Record<string,string|number>)
+      : message(body.request_id?'error.http':'error.httpNoRequest',{status,requestId:body.request_id,diagnostic:body.message}));
+    this.message=body.message;
   }
 }
 
 export type ApiErrorBody = components["schemas"]["Error"];
 
-/** Preserve structured diagnostics even when a write's result is uncertain. */
+/** Read valid fields independently, including proxy and framework error envelopes. */
+export function apiErrorBody(value: unknown, status: number, requestId=''): ApiErrorBody {
+  const envelope=value&&typeof value==='object'?value as Record<string,unknown>:{};
+  const data=envelope.detail&&typeof envelope.detail==='object'?envelope.detail as Record<string,unknown>:envelope;
+  return {
+    code:typeof data.code==='string'?data.code:'http_error',
+    message:typeof data.message==='string'?data.message:typeof envelope.detail==='string'?envelope.detail:`HTTP ${status}`,
+    request_id:typeof data.request_id==='string'?data.request_id:requestId,
+    retryable:typeof data.retryable==='boolean'?data.retryable:status>=500,
+    ...(typeof data.reason==='string'?{reason:data.reason}:{}),
+    ...(data.params&&typeof data.params==='object'&&!Array.isArray(data.params)?{params:data.params as Record<string,unknown>}:{}),
+  };
+}
 export async function readApiError(response: Response): Promise<ApiError> {
   let body: unknown;
   try { body = await response.json(); } catch { /* HTTP errors may have no JSON body. */ }
-  return new ApiError(response.status, isApiError(body) ? body : {
-    code: 'http_error',
-    message: `请求失败（HTTP ${response.status}）`,
-    request_id: response.headers.get('X-Request-ID') ?? '',
-    retryable: response.status >= 500,
-  });
+  return new ApiError(response.status, apiErrorBody(body,response.status,response.headers.get('X-Request-ID')??''));
 }
 
 /** Only explicit document rejections prove that this snapshot was not committed. */

@@ -1,5 +1,5 @@
 import { useMessageText } from '../shared/useMessageText';
-import { message } from '../domain/messages';
+import { message, type Message } from '../domain/messages';
 import { useTranslation } from 'react-i18next';
 import { initializeLanguage, i18n } from '../i18n';
 import { DeviceSettings } from '../features/DeviceSettings';
@@ -227,10 +227,10 @@ function SessionGate({ children }: { children: ReactNode }) {
 function PreferenceGate({ children }: { children: ReactNode }) {
   useTranslation();
   const mock = import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCKS === 'true';
-  const query = useQuery({ queryKey: ['preferences'], queryFn: async()=>{const value=await loadPreferences();try{await initializeLanguage();}catch{window.dispatchEvent(new CustomEvent('studio-preference-error',{detail:i18n.t('language.initFailed')}));}return value;}, enabled: !mock, staleTime: Infinity, retry: false });
+  const query = useQuery({ queryKey: ['preferences'], queryFn: async()=>{const value=await loadPreferences();try{await initializeLanguage();}catch{window.dispatchEvent(new CustomEvent('studio-preference-error',{detail:message('language.initFailed')}));}return value;}, enabled: !mock, staleTime: Infinity, retry: false });
   const [error, setError] = useMessageText('');
   useEffect(() => {
-    const report = (event: Event) => setError((event as CustomEvent<string>).detail);
+    const report = (event: Event) => setError((event as CustomEvent<string|Message>).detail);
     window.addEventListener('studio-preference-error', report);
     return () => window.removeEventListener('studio-preference-error', report);
   }, []);

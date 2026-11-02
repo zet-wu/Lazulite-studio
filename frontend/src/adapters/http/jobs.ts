@@ -2,7 +2,7 @@ import type { Capabilities } from "./client";
 import { requestHeaders } from "./client";
 import { isCapabilities } from "./validate";
 
-export type JobRequest = {retry_analysis_id?:string; revision?:string; bound_revision?:string; devices?: Record<string, { preferred: string; actual: string; label: string; reason?: string | null }>; asset_id:string};
+export type JobRequest = {retry_analysis_id?:string; revision?:string; bound_revision?:string; devices?: Record<string, { preferred: string; actual: string; label: string; reason?: string | null; reason_code?: string | null }>; asset_id:string};
 export type JobStatus =
   | "queued"
   | "running"

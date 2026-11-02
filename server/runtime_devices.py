@@ -26,7 +26,7 @@ def probe(preferred):
         if result.returncode: raise ValueError()
         return json.loads(result.stdout)
     except (OSError, ValueError, subprocess.TimeoutExpired):
-        return {'actual': 'cpu', 'reason': '设备探测未完成，将尝试 CPU；若运行时无法加载，请使用完整 CPU 包', 'runtime_ok': False}
+        return {'actual': 'cpu', 'reason_code': 'probe_incomplete', 'reason': '设备探测未完成，将尝试 CPU；若运行时无法加载，请使用完整 CPU 包', 'runtime_ok': False}
 
 
 class RuntimeDevices:
@@ -55,7 +55,7 @@ def main(device):
     try:
         import torch
     except (ImportError, OSError):
-        print(json.dumps({'actual':'cpu', 'reason':'Torch 运行时加载失败，请恢复运行时或使用 CPU 包', 'runtime_ok':False})); return
+        print(json.dumps({'actual':'cpu', 'reason_code':'runtime_failed', 'reason':'Torch 运行时加载失败，请恢复运行时或使用 CPU 包', 'runtime_ok':False})); return
     reason = None
     actual = device
     try:
@@ -69,8 +69,8 @@ def main(device):
             value = torch.ones((4, 4), device='cpu')
             assert torch.isfinite(value @ value).all().item()
         except (RuntimeError, AssertionError):
-            print(json.dumps({'actual':'cpu', 'reason':'CPU 计算检查也失败，请恢复完整运行时', 'runtime_ok':False})); return
-    print(json.dumps({'actual':actual, 'reason':reason, 'runtime_ok':True}))
+            print(json.dumps({'actual':'cpu', 'reason_code':'cpu_failed', 'reason':'CPU 计算检查也失败，请恢复完整运行时', 'runtime_ok':False})); return
+    print(json.dumps({'actual':actual, 'reason':reason, 'reason_code':'unavailable' if reason else None, 'runtime_ok':True}))
 
 
 if __name__ == '__main__': main(sys.argv[1])

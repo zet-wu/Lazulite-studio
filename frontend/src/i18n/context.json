@@ -2235,5 +2235,1589 @@
     "params": [
       "count"
     ]
+  },
+  "alignment.uploadRequired": {
+    "context": "alignment interface: alignment.uploadRequired",
+    "source": "请先上传源音频",
+    "params": []
+  },
+  "alignment.durationUnknown": {
+    "context": "alignment interface: alignment.durationUnknown",
+    "source": "源音频时长未知，无法自动对齐",
+    "params": []
+  },
+  "alignment.noLines": {
+    "context": "alignment interface: alignment.noLines",
+    "source": "没有未跳过的歌词行",
+    "params": []
+  },
+  "alignment.checkingModels": {
+    "context": "alignment interface: alignment.checkingModels",
+    "source": "正在检查模型能力",
+    "params": []
+  },
+  "alignment.busy": {
+    "context": "alignment interface: alignment.busy",
+    "source": "已有音频处理运行",
+    "params": []
+  },
+  "alignment.saveRequired": {
+    "context": "alignment interface: alignment.saveRequired",
+    "source": "请先完成保存",
+    "params": []
+  },
+  "alignment.gapRange": {
+    "context": "alignment interface: alignment.gapRange",
+    "source": "行内空隙阈值必须为正的安全整数毫秒",
+    "params": []
+  },
+  "alignment.intentChanged": {
+    "context": "alignment interface: alignment.intentChanged",
+    "source": "歌词、声学内容或应用意图已改变，请重新发起对齐",
+    "params": []
+  },
+  "task.preparing": {
+    "context": "task interface: task.preparing",
+    "source": "正在准备",
+    "params": []
+  },
+  "alignment.revisionUnknown": {
+    "context": "alignment interface: alignment.revisionUnknown",
+    "source": "无法确认保存版本",
+    "params": []
+  },
+  "alignment.cancelled": {
+    "context": "alignment interface: alignment.cancelled",
+    "source": "已取消对齐",
+    "params": []
+  },
+  "alignment.revisionChanged": {
+    "context": "alignment interface: alignment.revisionChanged",
+    "source": "项目版本已改变，请重新发起对齐",
+    "params": []
+  },
+  "alignment.applyCancelled": {
+    "context": "alignment interface: alignment.applyCancelled",
+    "source": "已取消应用",
+    "params": []
+  },
+  "alignment.sourceChanged": {
+    "context": "alignment interface: alignment.sourceChanged",
+    "source": "项目版本或音频已改变，请重新运行",
+    "params": []
+  },
+  "alignment.resultDurationUnknown": {
+    "context": "alignment interface: alignment.resultDurationUnknown",
+    "source": "源音频时长未知，无法接入自动对齐结果",
+    "params": []
+  },
+  "alignment.noChanges": {
+    "context": "alignment interface: alignment.noChanges",
+    "source": "未更新歌词时间",
+    "params": []
+  },
+  "alignment.updated": {
+    "context": "alignment interface: alignment.updated",
+    "source": "已更新歌词时间",
+    "params": []
+  },
+  "task.interruptedRetry": {
+    "context": "task interface: task.interruptedRetry",
+    "source": "服务中断，请重新运行",
+    "params": []
+  },
+  "task.cancelling": {
+    "context": "task interface: task.cancelling",
+    "source": "正在取消",
+    "params": []
+  },
+  "task.queued": {
+    "context": "task interface: task.queued",
+    "source": "排队中",
+    "params": []
+  },
+  "task.separating": {
+    "context": "task interface: task.separating",
+    "source": "正在分离人声",
+    "params": []
+  },
+  "task.analyzingRegions": {
+    "context": "task interface: task.analyzingRegions",
+    "source": "正在分析声区",
+    "params": []
+  },
+  "task.probabilities": {
+    "context": "task interface: task.probabilities",
+    "source": "正在计算声学概率",
+    "params": []
+  },
+  "task.globalAlignment": {
+    "context": "task interface: task.globalAlignment",
+    "source": "正在全局对齐",
+    "params": []
+  },
+  "task.aligning": {
+    "context": "task interface: task.aligning",
+    "source": "正在对齐",
+    "params": []
+  },
+  "alignment.recent": {
+    "context": "alignment interface: alignment.recent",
+    "source": "查看最近对齐结果",
+    "params": []
+  },
+  "task.cancel": {
+    "context": "task interface: task.cancel",
+    "source": "取消任务",
+    "params": []
+  },
+  "task.retryCpu": {
+    "context": "task interface: task.retryCpu",
+    "source": "使用 CPU 重试",
+    "params": []
+  },
+  "alignment.retry": {
+    "context": "alignment interface: alignment.retry",
+    "source": "重试自动对齐",
+    "params": []
+  },
+  "alignment.start": {
+    "context": "alignment interface: alignment.start",
+    "source": "开始对齐",
+    "params": []
+  },
+  "alignment.help": {
+    "context": "alignment interface: alignment.help",
+    "source": "请确认假名注音完整且与实际唱法一致。自动对齐使用正文和假名注音，处理期间无法编辑，完成后一次应用未跳过行的时间，可一次撤销。",
+    "params": []
+  },
+  "alignment.useStarts": {
+    "context": "alignment interface: alignment.useStarts",
+    "source": "使用已有行起始时间辅助对齐",
+    "params": []
+  },
+  "alignment.startsHelp": {
+    "context": "alignment interface: alignment.startsHelp",
+    "source": "适合已有大致准确行首的歌词",
+    "params": []
+  },
+  "alignment.noStarts": {
+    "context": "alignment interface: alignment.noStarts",
+    "source": "参与行没有已有行首",
+    "params": []
+  },
+  "alignment.clearUnmatched": {
+    "context": "alignment interface: alignment.clearUnmatched",
+    "source": "清空未匹配单元时间",
+    "params": []
+  },
+  "alignment.clearHelp": {
+    "context": "alignment interface: alignment.clearHelp",
+    "source": "清空本次对齐范围内没有新时间建议的词／注音端点，包括未送入对齐的符号、标点和空白；可一次撤销。",
+    "params": []
+  },
+  "alignment.gapThreshold": {
+    "context": "alignment interface: alignment.gapThreshold",
+    "source": "行内空隙阈值（毫秒）",
+    "params": []
+  },
+  "alignment.experimental": {
+    "context": "alignment interface: alignment.experimental",
+    "source": "实验性对齐选项",
+    "params": []
+  },
+  "alignment.blankCost": {
+    "context": "alignment interface: alignment.blankCost",
+    "source": "行内 blank 代价",
+    "params": []
+  },
+  "alignment.blankHelp": {
+    "context": "alignment interface: alignment.blankHelp",
+    "source": "抑制同一行内部过长的 blank 停留",
+    "params": []
+  },
+  "alignment.restBlankCost": {
+    "context": "alignment interface: alignment.restBlankCost",
+    "source": "人声休止 blank 代价",
+    "params": []
+  },
+  "alignment.restBlankHelp": {
+    "context": "alignment interface: alignment.restBlankHelp",
+    "source": "在低人声活动处增加行内 blank 代价",
+    "params": []
+  },
+  "alignment.restTokenCost": {
+    "context": "alignment interface: alignment.restTokenCost",
+    "source": "人声休止 token 代价",
+    "params": []
+  },
+  "alignment.restTokenHelp": {
+    "context": "alignment interface: alignment.restTokenHelp",
+    "source": "抑制发音目标落入低人声活动区",
+    "params": []
+  },
+  "alignment.noReadings": {
+    "context": "alignment interface: alignment.noReadings",
+    "source": "没有可用读音，无法计算",
+    "params": []
+  },
+  "vocal.failed": {
+    "context": "vocal interface: vocal.failed",
+    "source": "人声处理失败",
+    "params": []
+  },
+  "vocal.interrupted": {
+    "context": "vocal interface: vocal.interrupted",
+    "source": "服务重启，人声任务已中断",
+    "params": []
+  },
+  "vocal.cancelled": {
+    "context": "vocal interface: vocal.cancelled",
+    "source": "人声处理已取消",
+    "params": []
+  },
+  "vocal.completed": {
+    "context": "vocal interface: vocal.completed",
+    "source": "人声处理完成",
+    "params": []
+  },
+  "vocal.readFailed": {
+    "context": "vocal interface: vocal.readFailed",
+    "source": "任务或结果读取失败，保留已知任务状态",
+    "params": []
+  },
+  "vocal.durationUnknown": {
+    "context": "vocal interface: vocal.durationUnknown",
+    "source": "源音频时长未知，无法接入人声结果",
+    "params": []
+  },
+  "vocal.sourceChanged": {
+    "context": "vocal interface: vocal.sourceChanged",
+    "source": "音源已改变，请重新发起人声处理",
+    "params": []
+  },
+  "vocal.createFailed": {
+    "context": "vocal interface: vocal.createFailed",
+    "source": "无法创建人声任务",
+    "params": []
+  },
+  "vocal.intentChanged": {
+    "context": "vocal interface: vocal.intentChanged",
+    "source": "声学内容或本页应用意图已改变，请重新发起任务",
+    "params": []
+  },
+  "vocal.noRetryRevision": {
+    "context": "vocal interface: vocal.noRetryRevision",
+    "source": "任务缺少可重试的项目版本",
+    "params": []
+  },
+  "task.processing": {
+    "context": "task interface: task.processing",
+    "source": "处理中",
+    "params": []
+  },
+  "task.waitingCancel": {
+    "context": "task interface: task.waitingCancel",
+    "source": "正在取消，等待当前阶段结束",
+    "params": []
+  },
+  "task.cancelled": {
+    "context": "task interface: task.cancelled",
+    "source": "已取消",
+    "params": []
+  },
+  "task.failed": {
+    "context": "task interface: task.failed",
+    "source": "失败",
+    "params": []
+  },
+  "task.interrupted": {
+    "context": "task interface: task.interrupted",
+    "source": "服务重启，任务已中断",
+    "params": []
+  },
+  "task.applying": {
+    "context": "task interface: task.applying",
+    "source": "正在接入结果",
+    "params": []
+  },
+  "vocal.actions": {
+    "context": "vocal interface: vocal.actions",
+    "source": "音频操作",
+    "params": []
+  },
+  "vocal.analysis": {
+    "context": "vocal interface: vocal.analysis",
+    "source": "音频分析",
+    "params": []
+  },
+  "vocal.replaceHelp": {
+    "context": "vocal interface: vocal.replaceHelp",
+    "source": "生成可用人声并分析，替换全部片段及人工修正",
+    "params": []
+  },
+  "vocal.regenerate": {
+    "context": "vocal interface: vocal.regenerate",
+    "source": "重新生成人声",
+    "params": []
+  },
+  "vocal.updateSeparation": {
+    "context": "vocal interface: vocal.updateSeparation",
+    "source": "更新人声分离结果",
+    "params": []
+  },
+  "vocal.separate": {
+    "context": "vocal interface: vocal.separate",
+    "source": "分离人声",
+    "params": []
+  },
+  "vocal.fileUnavailable": {
+    "context": "vocal interface: vocal.fileUnavailable",
+    "source": "人声文件缺失、损坏或存储版本不支持",
+    "params": []
+  },
+  "vocal.versionMismatch": {
+    "context": "vocal interface: vocal.versionMismatch",
+    "source": "现有人声未匹配当前分离版本",
+    "params": []
+  },
+  "vocal.reuseHelp": {
+    "context": "vocal interface: vocal.reuseHelp",
+    "source": "复用现有人声，替换全部片段及人工修正",
+    "params": []
+  },
+  "vocal.reanalyze": {
+    "context": "vocal interface: vocal.reanalyze",
+    "source": "重新进行声学分析",
+    "params": []
+  },
+  "vocal.download": {
+    "context": "vocal interface: vocal.download",
+    "source": "下载人声 WAV",
+    "params": []
+  },
+  "vocal.useExisting": {
+    "context": "vocal interface: vocal.useExisting",
+    "source": "使用已有人声",
+    "params": []
+  },
+  "vocal.recent": {
+    "context": "vocal interface: vocal.recent",
+    "source": "查看最近处理结果",
+    "params": []
+  },
+  "vocal.acousticAnalysis": {
+    "context": "vocal interface: vocal.acousticAnalysis",
+    "source": "声学分析",
+    "params": []
+  },
+  "vocal.retry": {
+    "context": "vocal interface: vocal.retry",
+    "source": "重试人声处理",
+    "params": []
+  },
+  "vocal.retryRead": {
+    "context": "vocal interface: vocal.retryRead",
+    "source": "重试读取人声任务和结果",
+    "params": []
+  },
+  "vocal.results": {
+    "context": "vocal interface: vocal.results",
+    "source": "音频处理结果",
+    "params": []
+  },
+  "vocal.changed": {
+    "context": "vocal interface: vocal.changed",
+    "source": "声学内容已改变，本次结果已保留。",
+    "params": []
+  },
+  "vocal.replaceSegments": {
+    "context": "vocal interface: vocal.replaceSegments",
+    "source": "替换当前片段",
+    "params": []
+  },
+  "vocal.previous": {
+    "context": "vocal interface: vocal.previous",
+    "source": "返回上次结果",
+    "params": []
+  },
+  "vocal.runningHelp": {
+    "context": "vocal interface: vocal.runningHelp",
+    "source": "正在处理音频，可在上方查看任务状态。",
+    "params": []
+  },
+  "vocal.empty": {
+    "context": "vocal interface: vocal.empty",
+    "source": "尚无可用片段，请通过音频工具分离人声。",
+    "params": []
+  },
+  "notice.separator": {
+    "context": "notice interface: notice.separator",
+    "source": "；",
+    "params": []
+  },
+  "notice.list": {
+    "context": "notice interface: notice.list",
+    "source": "{{text}}",
+    "params": [
+      "text"
+    ]
+  },
+  "task.cancelFailed": {
+    "context": "task interface: task.cancelFailed",
+    "source": "取消请求失败：{{diagnostic}}",
+    "params": [
+      "diagnostic"
+    ]
+  },
+  "task.reconnecting": {
+    "context": "task interface: task.reconnecting",
+    "source": "连接中断，正在重新确认运行状态：{{diagnostic}}",
+    "params": [
+      "diagnostic"
+    ]
+  },
+  "task.normalized": {
+    "context": "task interface: task.normalized",
+    "source": "按源音频范围裁切 {{clipped}} 个片段，丢弃 {{dropped}} 个空片段",
+    "params": [
+      "clipped",
+      "dropped"
+    ]
+  },
+  "alignment.mergedGaps": {
+    "context": "alignment interface: alignment.mergedGaps",
+    "source": "合并 {{count}} 处行内空隙",
+    "params": [
+      "count"
+    ]
+  },
+  "alignment.cleared": {
+    "context": "alignment interface: alignment.cleared",
+    "source": "清空 {{count}} 个词／注音的缺失端点",
+    "params": [
+      "count"
+    ]
+  },
+  "alignment.retained": {
+    "context": "alignment interface: alignment.retained",
+    "source": "{{count}} 个词／注音部分时间保留原值",
+    "params": [
+      "count"
+    ]
+  },
+  "alignment.scope": {
+    "context": "alignment interface: alignment.scope",
+    "source": "将对齐 {{included}} 行，跳过 {{skipped}} 行",
+    "params": [
+      "included",
+      "skipped"
+    ]
+  },
+  "alignment.unknownReadings": {
+    "context": "alignment interface: alignment.unknownReadings",
+    "source": "有 {{count}} 处缺少可用读音，相关时间可能保留原值",
+    "params": [
+      "count"
+    ]
+  },
+  "alignment.mergeGapsLabel": {
+    "context": "alignment interface: alignment.mergeGapsLabel",
+    "source": "将短于阈值的行内空隙并入前词",
+    "params": []
+  },
+  "task.vocalProgress": {
+    "context": "task interface: task.vocalProgress",
+    "source": "人声处理 · {{progress}}{{device}}",
+    "params": [
+      "progress",
+      "device"
+    ]
+  },
+  "task.alignmentProgress": {
+    "context": "task interface: task.alignmentProgress",
+    "source": "自动对齐 · {{progress}}{{device}}",
+    "params": [
+      "progress",
+      "device"
+    ]
+  },
+  "device.probeIncomplete": {
+    "context": "device interface: device.probeIncomplete",
+    "source": "设备探测未完成，将尝试 CPU；若运行时无法加载，请使用完整 CPU 包",
+    "params": []
+  },
+  "device.runtimeFailed": {
+    "context": "device interface: device.runtimeFailed",
+    "source": "Torch 运行时加载失败，请恢复运行时或使用 CPU 包",
+    "params": []
+  },
+  "device.cpuFailed": {
+    "context": "device interface: device.cpuFailed",
+    "source": "CPU 计算检查也失败，请恢复完整运行时",
+    "params": []
+  },
+  "device.unavailable": {
+    "context": "device interface: device.unavailable",
+    "source": "{{device}} 不可用，准备阶段选择 CPU",
+    "params": [
+      "device"
+    ]
+  },
+  "task.deviceFailed": {
+    "context": "task interface: task.deviceFailed",
+    "source": "计算设备运行失败，可使用 CPU 重试。诊断：{{diagnostic}}",
+    "params": [
+      "diagnostic"
+    ]
+  },
+  "task.capabilityUnavailable": {
+    "context": "task interface: task.capabilityUnavailable",
+    "source": "所需模型能力不可用：{{diagnostic}}",
+    "params": [
+      "diagnostic"
+    ]
+  },
+  "task.publishFailed": {
+    "context": "task interface: task.publishFailed",
+    "source": "打包任务失败：{{diagnostic}}",
+    "params": [
+      "diagnostic"
+    ]
+  },
+  "task.engineFailed": {
+    "context": "task interface: task.engineFailed",
+    "source": "模型处理失败：{{diagnostic}}",
+    "params": [
+      "diagnostic"
+    ]
+  },
+  "packaging.readSourceFailed": {
+    "context": "packaging interface: packaging.readSourceFailed",
+    "source": "无法读取源文件打包信息",
+    "params": []
+  },
+  "packaging.serializeFailed": {
+    "context": "packaging interface: packaging.serializeFailed",
+    "source": "序列化失败",
+    "params": []
+  },
+  "packaging.lrcRequired": {
+    "context": "packaging interface: packaging.lrcRequired",
+    "source": "此容器需要写入 LRC",
+    "params": []
+  },
+  "packaging.snapshotChanged": {
+    "context": "packaging interface: packaging.snapshotChanged",
+    "source": "保存快照已变化，请重新发起打包",
+    "params": []
+  },
+  "packaging.failed": {
+    "context": "packaging interface: packaging.failed",
+    "source": "打包失败",
+    "params": []
+  },
+  "packaging.source": {
+    "context": "packaging interface: packaging.source",
+    "source": "源文件：",
+    "params": []
+  },
+  "packaging.keepTags": {
+    "context": "packaging interface: packaging.keepTags",
+    "source": "保留源文件已有歌词标签",
+    "params": []
+  },
+  "packaging.extended": {
+    "context": "packaging interface: packaging.extended",
+    "source": "扩展",
+    "params": []
+  },
+  "packaging.plain": {
+    "context": "packaging interface: packaging.plain",
+    "source": "普通",
+    "params": []
+  },
+  "packaging.chooseOverwrite": {
+    "context": "packaging interface: packaging.chooseOverwrite",
+    "source": "请选择覆盖轨道",
+    "params": []
+  },
+  "packaging.addStpp": {
+    "context": "packaging interface: packaging.addStpp",
+    "source": "新增 STPP 轨道",
+    "params": []
+  },
+  "packaging.id3": {
+    "context": "packaging interface: packaging.id3",
+    "source": "LRC → ID3 USLT 歌词标签",
+    "params": []
+  },
+  "packaging.flac": {
+    "context": "packaging interface: packaging.flac",
+    "source": "LRC → FLAC LYRICS 歌词标签",
+    "params": []
+  },
+  "packaging.unsupported": {
+    "context": "packaging interface: packaging.unsupported",
+    "source": "此格式不支持打包",
+    "params": []
+  },
+  "packaging.copyHelp": {
+    "context": "packaging interface: packaging.copyHelp",
+    "source": "生成副本，不转码。",
+    "params": []
+  },
+  "packaging.embedded": {
+    "context": "packaging interface: packaging.embedded",
+    "source": "内嵌歌词",
+    "params": []
+  },
+  "packaging.none": {
+    "context": "packaging interface: packaging.none",
+    "source": "不写入",
+    "params": []
+  },
+  "packaging.lrc": {
+    "context": "packaging interface: packaging.lrc",
+    "source": "普通 LRC",
+    "params": []
+  },
+  "packaging.elrcAngles": {
+    "context": "packaging interface: packaging.elrcAngles",
+    "source": "扩展 LRC（尖括号）",
+    "params": []
+  },
+  "packaging.usltHelp": {
+    "context": "packaging interface: packaging.usltHelp",
+    "source": "目标：USLT，语言 eng，空描述；其他语言／描述保留。",
+    "params": []
+  },
+  "packaging.overwriteStpp": {
+    "context": "packaging interface: packaging.overwriteStpp",
+    "source": "覆盖 STPP 轨道",
+    "params": []
+  },
+  "packaging.chooseTrack": {
+    "context": "packaging interface: packaging.chooseTrack",
+    "source": "请选择目标轨道",
+    "params": []
+  },
+  "packaging.unnamed": {
+    "context": "packaging interface: packaging.unnamed",
+    "source": "未命名",
+    "params": []
+  },
+  "packaging.noStpp": {
+    "context": "packaging interface: packaging.noStpp",
+    "source": "源文件没有 STPP，将新增歌词轨道。",
+    "params": []
+  },
+  "common.readFailed": {
+    "context": "common interface: common.readFailed",
+    "source": "读取失败",
+    "params": []
+  },
+  "packaging.retrySource": {
+    "context": "packaging interface: packaging.retrySource",
+    "source": "重试读取音乐打包信息",
+    "params": []
+  },
+  "packaging.unsupportedHelp": {
+    "context": "packaging interface: packaging.unsupportedHelp",
+    "source": "源音频格式不支持打包；可下载歌词文件。",
+    "params": []
+  },
+  "packaging.submitting": {
+    "context": "packaging interface: packaging.submitting",
+    "source": "保存并提交中…",
+    "params": []
+  },
+  "packaging.submit": {
+    "context": "packaging interface: packaging.submit",
+    "source": "打包文件",
+    "params": []
+  },
+  "packaging.download": {
+    "context": "packaging interface: packaging.download",
+    "source": "下载产物",
+    "params": []
+  },
+  "packaging.newerEdits": {
+    "context": "packaging interface: packaging.newerEdits",
+    "source": "当前歌词有较新修改，已提交任务使用之前捕获的修订。",
+    "params": []
+  },
+  "packaging.history": {
+    "context": "packaging interface: packaging.history",
+    "source": "打包任务与最近产物",
+    "params": []
+  },
+  "packaging.historyFailed": {
+    "context": "packaging interface: packaging.historyFailed",
+    "source": "记录读取失败",
+    "params": []
+  },
+  "packaging.retryHistory": {
+    "context": "packaging interface: packaging.retryHistory",
+    "source": "重试读取打包任务记录",
+    "params": []
+  },
+  "packaging.elrc": {
+    "context": "packaging interface: packaging.elrc",
+    "source": "扩展 LRC",
+    "params": []
+  },
+  "packaging.running": {
+    "context": "packaging interface: packaging.running",
+    "source": "正在打包",
+    "params": []
+  },
+  "packaging.keepTagsSuffix": {
+    "context": "packaging interface: packaging.keepTagsSuffix",
+    "source": "· 保留已有歌词标签",
+    "params": []
+  },
+  "packaging.unavailable": {
+    "context": "packaging interface: packaging.unavailable",
+    "source": "产物不可用",
+    "params": []
+  },
+  "packaging.interrupted": {
+    "context": "packaging interface: packaging.interrupted",
+    "source": "打包中断",
+    "params": []
+  },
+  "packaging.recent": {
+    "context": "packaging interface: packaging.recent",
+    "source": "最近产物",
+    "params": []
+  },
+  "packaging.currentTask": {
+    "context": "packaging interface: packaging.currentTask",
+    "source": "当前任务",
+    "params": []
+  },
+  "packaging.unsaved": {
+    "context": "packaging interface: packaging.unsaved",
+    "source": "当前歌词有未保存修改，此产物不包含这些修改。",
+    "params": []
+  },
+  "packaging.noSourceName": {
+    "context": "packaging interface: packaging.noSourceName",
+    "source": "未记录源文件名",
+    "params": []
+  },
+  "packaging.unknownFormat": {
+    "context": "packaging interface: packaging.unknownFormat",
+    "source": "格式待确认",
+    "params": []
+  },
+  "packaging.revision": {
+    "context": "packaging interface: packaging.revision",
+    "source": "修订",
+    "params": []
+  },
+  "packaging.oldRevision": {
+    "context": "packaging interface: packaging.oldRevision",
+    "source": "· 旧修订",
+    "params": []
+  },
+  "packaging.report": {
+    "context": "packaging interface: packaging.report",
+    "source": "回读报告",
+    "params": []
+  },
+  "packaging.empty": {
+    "context": "packaging interface: packaging.empty",
+    "source": "还没有打包产物。",
+    "params": []
+  },
+  "validation.type": {
+    "context": "validation interface: validation.type",
+    "source": "校验类型",
+    "params": []
+  },
+  "validation.lyrics": {
+    "context": "validation interface: validation.lyrics",
+    "source": "歌词校验",
+    "params": []
+  },
+  "validation.amll": {
+    "context": "validation interface: validation.amll",
+    "source": "AMLL 兼容校验",
+    "params": []
+  },
+  "validation.updating": {
+    "context": "validation interface: validation.updating",
+    "source": "正在更新校验",
+    "params": []
+  },
+  "validation.failed": {
+    "context": "validation interface: validation.failed",
+    "source": "校验失败：",
+    "params": []
+  },
+  "validation.formats": {
+    "context": "validation interface: validation.formats",
+    "source": "适用格式",
+    "params": []
+  },
+  "validation.formatFilter": {
+    "context": "validation interface: validation.formatFilter",
+    "source": "校验格式筛选",
+    "params": []
+  },
+  "validation.allFormats": {
+    "context": "validation interface: validation.allFormats",
+    "source": "全部歌词格式",
+    "params": []
+  },
+  "validation.sugSelection": {
+    "context": "validation interface: validation.sugSelection",
+    "source": "SUG · 当前所选文件",
+    "params": []
+  },
+  "validation.nicokaraSelection": {
+    "context": "validation interface: validation.nicokaraSelection",
+    "source": "NicoKara · 当前所选文件",
+    "params": []
+  },
+  "common.back": {
+    "context": "common interface: common.back",
+    "source": "返回",
+    "params": []
+  },
+  "common.export": {
+    "context": "common interface: common.export",
+    "source": "导出",
+    "params": []
+  },
+  "validation.clean": {
+    "context": "validation interface: validation.clean",
+    "source": "当前检查未发现问题",
+    "params": []
+  },
+  "validation.noBlocking": {
+    "context": "validation interface: validation.noBlocking",
+    "source": "当前检查未发现阻塞此格式的问题",
+    "params": []
+  },
+  "packaging.lyricsDownload": {
+    "context": "packaging interface: packaging.lyricsDownload",
+    "source": "歌词下载",
+    "params": []
+  },
+  "packaging.exportFormat": {
+    "context": "packaging interface: packaging.exportFormat",
+    "source": "导出格式",
+    "params": []
+  },
+  "packaging.exportFailed": {
+    "context": "packaging interface: packaging.exportFailed",
+    "source": "导出失败",
+    "params": []
+  },
+  "packaging.downloadLyrics": {
+    "context": "packaging interface: packaging.downloadLyrics",
+    "source": "下载歌词",
+    "params": []
+  },
+  "packaging.comparison": {
+    "context": "packaging interface: packaging.comparison",
+    "source": "导出对照",
+    "params": []
+  },
+  "packaging.selectedComparison": {
+    "context": "packaging interface: packaging.selectedComparison",
+    "source": "所选格式导出对照",
+    "params": []
+  },
+  "packaging.element": {
+    "context": "packaging interface: packaging.element",
+    "source": "要素",
+    "params": []
+  },
+  "packaging.result": {
+    "context": "packaging interface: packaging.result",
+    "source": "导出结果",
+    "params": []
+  },
+  "packaging.musicFile": {
+    "context": "packaging interface: packaging.musicFile",
+    "source": "音乐文件",
+    "params": []
+  },
+  "packaging.uploadHelp": {
+    "context": "packaging interface: packaging.uploadHelp",
+    "source": "上传音乐后可打包音乐文件；单独下载歌词无需音乐。",
+    "params": []
+  },
+  "packaging.submitted": {
+    "context": "packaging interface: packaging.submitted",
+    "source": "已提交打包，修订 {{revision}}",
+    "params": [
+      "revision"
+    ]
+  },
+  "packaging.mp4Target": {
+    "context": "packaging interface: packaging.mp4Target",
+    "source": "TTML → STPP 歌词轨道；{{tags}}。{{track}}",
+    "params": [
+      "tags",
+      "track"
+    ]
+  },
+  "packaging.tagTarget": {
+    "context": "packaging interface: packaging.tagTarget",
+    "source": "{{kind}} LRC → 歌词标签",
+    "params": [
+      "kind"
+    ]
+  },
+  "packaging.overwriteTrack": {
+    "context": "packaging interface: packaging.overwriteTrack",
+    "source": "覆盖轨道 {{track}}",
+    "params": [
+      "track"
+    ]
+  },
+  "packaging.wroteStpp": {
+    "context": "packaging interface: packaging.wroteStpp",
+    "source": "已写入 STPP{{tags}}",
+    "params": [
+      "tags"
+    ]
+  },
+  "packaging.wroteLyrics": {
+    "context": "packaging interface: packaging.wroteLyrics",
+    "source": "已写入 {{format}}",
+    "params": [
+      "format"
+    ]
+  },
+  "packaging.stppTrack": {
+    "context": "packaging interface: packaging.stppTrack",
+    "source": "STPP 轨道 {{track}}",
+    "params": [
+      "track"
+    ]
+  },
+  "preferences.changed": {
+    "context": "preferences interface: preferences.changed",
+    "source": "此偏好已在另一页面修改，请刷新后重试",
+    "params": []
+  },
+  "preferences.conflict": {
+    "context": "preferences interface: preferences.conflict",
+    "source": "偏好发生冲突，请刷新后重试",
+    "params": []
+  },
+  "preferences.saveFailed": {
+    "context": "preferences interface: preferences.saveFailed",
+    "source": "偏好保存失败，请重试",
+    "params": []
+  },
+  "preferences.initUnsaved": {
+    "context": "preferences interface: preferences.initUnsaved",
+    "source": "偏好初始化尚未保存",
+    "params": []
+  },
+  "preferences.initConflict": {
+    "context": "preferences interface: preferences.initConflict",
+    "source": "偏好初始化发生并发冲突",
+    "params": []
+  },
+  "preferences.readFailed": {
+    "context": "preferences interface: preferences.readFailed",
+    "source": "偏好读取失败",
+    "params": []
+  },
+  "preferences.saveConflict": {
+    "context": "preferences interface: preferences.saveConflict",
+    "source": "偏好保存发生并发冲突",
+    "params": []
+  },
+  "save.checkpointFailed": {
+    "context": "save interface: save.checkpointFailed",
+    "source": "本地检查点保存失败，当前修改仍保留",
+    "params": []
+  },
+  "save.failed": {
+    "context": "save interface: save.failed",
+    "source": "保存失败，修改已保留",
+    "params": []
+  },
+  "save.recoveryReadFailed": {
+    "context": "save interface: save.recoveryReadFailed",
+    "source": "本地恢复记录读取失败",
+    "params": []
+  },
+  "save.deletedCleanupFailed": {
+    "context": "save interface: save.deletedCleanupFailed",
+    "source": "项目已删除，本地数据清理失败",
+    "params": []
+  },
+  "save.sourceConflict": {
+    "context": "save interface: save.sourceConflict",
+    "source": "源音频已在其他页面改变，未保存歌词已保留，请处理版本冲突",
+    "params": []
+  },
+  "save.editingLocked": {
+    "context": "save interface: save.editingLocked",
+    "source": "自动对齐期间无法编辑",
+    "params": []
+  },
+  "save.deleted": {
+    "context": "save interface: save.deleted",
+    "source": "项目已删除",
+    "params": []
+  },
+  "save.conflict": {
+    "context": "save interface: save.conflict",
+    "source": "保存冲突，请先处理",
+    "params": []
+  },
+  "save.waitForPackaging": {
+    "context": "save interface: save.waitForPackaging",
+    "source": "正在保存，请完成后重试打包",
+    "params": []
+  },
+  "save.uncertainPackaging": {
+    "context": "save interface: save.uncertainPackaging",
+    "source": "上次保存尚未确认，请先重试保存再打包",
+    "params": []
+  },
+  "save.recoveryLocked": {
+    "context": "save interface: save.recoveryLocked",
+    "source": "自动对齐期间无法恢复",
+    "params": []
+  },
+  "save.finishBeforeImport": {
+    "context": "save interface: save.finishBeforeImport",
+    "source": "请先完成或重试保存并处理冲突",
+    "params": []
+  },
+  "save.alignmentUnavailable": {
+    "context": "save interface: save.alignmentUnavailable",
+    "source": "项目当前不能开始对齐",
+    "params": []
+  },
+  "save.alignmentExpired": {
+    "context": "save interface: save.alignmentExpired",
+    "source": "本次对齐已失效",
+    "params": []
+  },
+  "preferences.portableReadFailed": {
+    "context": "preferences interface: preferences.portableReadFailed",
+    "source": "无法读取便携偏好，请重试",
+    "params": []
+  },
+  "preferences.invalidResponse": {
+    "context": "preferences interface: preferences.invalidResponse",
+    "source": "偏好响应无效",
+    "params": []
+  },
+  "validation.audioStart": {
+    "context": "validation interface: validation.audioStart",
+    "source": "开始时间 {{time}} ms 超过当前参考音频 {{duration}} ms，超出 {{excess}} ms",
+    "params": [
+      "time",
+      "duration",
+      "excess"
+    ]
+  },
+  "validation.audioEnd": {
+    "context": "validation interface: validation.audioEnd",
+    "source": "结束时间 {{time}} ms 超过当前参考音频 {{duration}} ms，超出 {{excess}} ms",
+    "params": [
+      "time",
+      "duration",
+      "excess"
+    ]
+  },
+  "validation.audioRange": {
+    "context": "validation interface: validation.audioRange",
+    "source": "超过参考音频时长",
+    "params": []
+  },
+  "validation.agentType": {
+    "context": "validation interface: validation.agentType",
+    "source": "歌手类型",
+    "params": []
+  },
+  "validation.missingTime": {
+    "context": "validation interface: validation.missingTime",
+    "source": "缺少时间",
+    "params": []
+  },
+  "validation.range": {
+    "context": "validation interface: validation.range",
+    "source": "时间范围",
+    "params": []
+  },
+  "validation.order": {
+    "context": "validation interface: validation.order",
+    "source": "时间顺序",
+    "params": []
+  },
+  "validation.empty": {
+    "context": "validation interface: validation.empty",
+    "source": "空内容",
+    "params": []
+  },
+  "validation.punctuation": {
+    "context": "validation interface: validation.punctuation",
+    "source": "标点零时长",
+    "params": []
+  },
+  "validation.serialization": {
+    "context": "validation interface: validation.serialization",
+    "source": "序列化",
+    "params": []
+  },
+  "validation.invalidAgent": {
+    "context": "validation interface: validation.invalidAgent",
+    "source": "歌手 type 无效：{{type}}",
+    "params": [
+      "type"
+    ]
+  },
+  "validation.missingAgentType": {
+    "context": "validation interface: validation.missingAgentType",
+    "source": "歌手缺少 type",
+    "params": []
+  },
+  "validation.missingStart": {
+    "context": "validation interface: validation.missingStart",
+    "source": "缺少开始时间",
+    "params": []
+  },
+  "validation.missingEnd": {
+    "context": "validation interface: validation.missingEnd",
+    "source": "缺少结束时间",
+    "params": []
+  },
+  "validation.missingBoth": {
+    "context": "validation interface: validation.missingBoth",
+    "source": "缺少开始和结束时间",
+    "params": []
+  },
+  "validation.elrcOrder": {
+    "context": "validation interface: validation.elrcOrder",
+    "source": "时间倒序或重叠，无法输出扩展 LRC",
+    "params": []
+  },
+  "validation.endAfterStart": {
+    "context": "validation interface: validation.endAfterStart",
+    "source": "结束时间必须晚于开始",
+    "params": []
+  },
+  "validation.emptyTimed": {
+    "context": "validation interface: validation.emptyTimed",
+    "source": "没有可输出的定时单元",
+    "params": []
+  },
+  "validation.unhostedSeparator": {
+    "context": "validation interface: validation.unhostedSeparator",
+    "source": "分隔空白没有相邻的有效定时正文",
+    "params": []
+  },
+  "validation.controlCharacters": {
+    "context": "validation interface: validation.controlCharacters",
+    "source": "此格式不能忠实表达正文中的制表符或换行",
+    "params": []
+  },
+  "validation.punctuationZero": {
+    "context": "validation interface: validation.punctuationZero",
+    "source": "标点起止时间相同",
+    "params": []
+  },
+  "validation.blockingHelp": {
+    "context": "validation interface: validation.blockingHelp",
+    "source": "本次操作受阻，需要处理",
+    "params": []
+  },
+  "validation.blocking": {
+    "context": "validation interface: validation.blocking",
+    "source": "阻塞",
+    "params": []
+  },
+  "validation.review": {
+    "context": "validation interface: validation.review",
+    "source": "核对提示",
+    "params": []
+  },
+  "validation.moreItems": {
+    "context": "validation interface: validation.moreItems",
+    "source": "再显示 50 项（剩余 {{count}} 项）",
+    "params": [
+      "count"
+    ]
+  },
+  "validation.moreGroups": {
+    "context": "validation interface: validation.moreGroups",
+    "source": "再显示 50 组（剩余 {{count}} 组）",
+    "params": [
+      "count"
+    ]
+  },
+  "validation.acoustics": {
+    "context": "validation interface: validation.acoustics",
+    "source": "人声片段",
+    "params": []
+  },
+  "validation.unlocated": {
+    "context": "validation interface: validation.unlocated",
+    "source": "无法定位的序列化问题",
+    "params": []
+  },
+  "validation.selectIssue": {
+    "context": "validation interface: validation.selectIssue",
+    "source": "选择 {{message}}",
+    "params": [
+      "message"
+    ]
+  },
+  "validation.operationCount": {
+    "context": "validation interface: validation.operationCount",
+    "source": "本次操作有 {{count}} 项需要处理",
+    "params": [
+      "count"
+    ]
+  },
+  "validation.issueCount": {
+    "context": "validation interface: validation.issueCount",
+    "source": "有 {{count}} 项需要处理：",
+    "params": [
+      "count"
+    ]
+  },
+  "validation.groupSummary": {
+    "context": "validation interface: validation.groupSummary",
+    "source": "{{reason}} · {{count}} 项，涉及 {{lines}} 行",
+    "params": [
+      "reason",
+      "count",
+      "lines"
+    ]
+  },
+  "validation.locationLine": {
+    "context": "validation interface: validation.locationLine",
+    "source": "第 {{number}} 行{{background}}",
+    "params": [
+      "number",
+      "background"
+    ]
+  },
+  "validation.locationWord": {
+    "context": "validation interface: validation.locationWord",
+    "source": "第 {{number}} 词",
+    "params": [
+      "number"
+    ]
+  },
+  "validation.locationRuby": {
+    "context": "validation interface: validation.locationRuby",
+    "source": "第 {{number}} 注音",
+    "params": [
+      "number"
+    ]
+  },
+  "validation.locationUnit": {
+    "context": "validation interface: validation.locationUnit",
+    "source": "第 {{number}} 单元",
+    "params": [
+      "number"
+    ]
+  },
+  "error.httpNoRequest": {
+    "context": "error interface: error.httpNoRequest",
+    "source": "请求失败（HTTP {{status}}）：{{diagnostic}}",
+    "params": [
+      "status",
+      "diagnostic"
+    ]
+  },
+  "amll.simplified": {
+    "context": "amll interface: amll.simplified",
+    "source": "使用 AMLL 简化歌手模型",
+    "params": []
+  },
+  "amll.noMultipleBackgrounds": {
+    "context": "amll interface: amll.noMultipleBackgrounds",
+    "source": "禁用多行背景",
+    "params": []
+  },
+  "amll.noChorus": {
+    "context": "amll interface: amll.noChorus",
+    "source": "禁用多歌手合唱",
+    "params": []
+  },
+  "amll.noWordAgents": {
+    "context": "amll interface: amll.noWordAgents",
+    "source": "禁用词级歌手",
+    "params": []
+  },
+  "amll.noIndependentBackground": {
+    "context": "amll interface: amll.noIndependentBackground",
+    "source": "禁用背景独立歌手",
+    "params": []
+  },
+  "amll.settings": {
+    "context": "amll interface: amll.settings",
+    "source": "AMLL 项目设置",
+    "params": []
+  },
+  "amll.locked": {
+    "context": "amll interface: amll.locked",
+    "source": "由简化歌手模型锁定",
+    "params": []
+  },
+  "amll.conflict": {
+    "context": "amll interface: amll.conflict",
+    "source": "当前内容不满足此限制",
+    "params": []
+  },
+  "amll.locate": {
+    "context": "amll interface: amll.locate",
+    "source": "定位兼容问题",
+    "params": []
+  },
+  "amll.simplify": {
+    "context": "amll interface: amll.simplify",
+    "source": "转换为简化歌手模型",
+    "params": []
+  },
+  "common.convert": {
+    "context": "common interface: common.convert",
+    "source": "转换",
+    "params": []
+  },
+  "amll.simplifyHelp": {
+    "context": "amll interface: amll.simplifyHelp",
+    "source": "选中歌手归对唱侧，其余归默认侧。全项目清除自定义身份、词级及背景独立歌手；主行按引用首项映射。",
+    "params": []
+  },
+  "amll.duetSingers": {
+    "context": "amll interface: amll.duetSingers",
+    "source": "对唱侧歌手",
+    "params": []
+  },
+  "amll.keepFirstBackground": {
+    "context": "amll interface: amll.keepFirstBackground",
+    "source": "保留首条背景，其余转主行",
+    "params": []
+  },
+  "amll.keepFirstSinger": {
+    "context": "amll interface: amll.keepFirstSinger",
+    "source": "保留引用首位歌手",
+    "params": []
+  },
+  "amll.clearWordSingers": {
+    "context": "amll interface: amll.clearWordSingers",
+    "source": "清除词级歌手",
+    "params": []
+  },
+  "amll.clearBackgroundSingers": {
+    "context": "amll interface: amll.clearBackgroundSingers",
+    "source": "清除背景行及其词的歌手",
+    "params": []
+  },
+  "amll.failed": {
+    "context": "amll interface: amll.failed",
+    "source": "处理失败",
+    "params": []
+  },
+  "amll.unmet": {
+    "context": "amll interface: amll.unmet",
+    "source": "不满足",
+    "params": []
+  },
+  "amll.met": {
+    "context": "amll interface: amll.met",
+    "source": "满足",
+    "params": []
+  },
+  "amll.rules": {
+    "context": "amll interface: amll.rules",
+    "source": "查看规则组",
+    "params": []
+  },
+  "amll.projectScope": {
+    "context": "amll interface: amll.projectScope",
+    "source": "全项目",
+    "params": []
+  },
+  "amll.selectionGone": {
+    "context": "amll interface: amll.selectionGone",
+    "source": "原选中问题已消失",
+    "params": []
+  },
+  "amll.allRuleObjects": {
+    "context": "amll interface: amll.allRuleObjects",
+    "source": "该规则全部问题对象",
+    "params": []
+  },
+  "amll.ruleStatus": {
+    "context": "amll interface: amll.ruleStatus",
+    "source": "{{rule}}：{{status}}",
+    "params": [
+      "rule",
+      "status"
+    ]
+  },
+  "amll.singerCount": {
+    "context": "amll interface: amll.singerCount",
+    "source": "当前有 {{count}} 位自定义歌手。",
+    "params": [
+      "count"
+    ]
+  },
+  "amll.mainGroupCount": {
+    "context": "amll interface: amll.mainGroupCount",
+    "source": "{{count}} 个主行组",
+    "params": [
+      "count"
+    ]
+  },
+  "amll.wordCount": {
+    "context": "amll interface: amll.wordCount",
+    "source": "{{count}} 个词，涉及 {{lines}} 行",
+    "params": [
+      "count",
+      "lines"
+    ]
+  },
+  "amll.backgroundCount": {
+    "context": "amll interface: amll.backgroundCount",
+    "source": "{{count}} 条背景行",
+    "params": [
+      "count"
+    ]
+  },
+  "amll.objectCount": {
+    "context": "amll interface: amll.objectCount",
+    "source": "{{count}} 个对象",
+    "params": [
+      "count"
+    ]
+  },
+  "amll.dependency": {
+    "context": "amll interface: amll.dependency",
+    "source": "依赖 {{rule}}：{{count}} 个对象",
+    "params": [
+      "rule",
+      "count"
+    ]
+  },
+  "amll.scope": {
+    "context": "amll interface: amll.scope",
+    "source": "范围：{{scope}}",
+    "params": [
+      "scope"
+    ]
+  },
+  "amll.selectedCount": {
+    "context": "amll interface: amll.selectedCount",
+    "source": "选中 {{count}} 项",
+    "params": [
+      "count"
+    ]
+  },
+  "amll.applySelected": {
+    "context": "amll interface: amll.applySelected",
+    "source": "{{action}}（处理选中 {{count}} 项）",
+    "params": [
+      "action",
+      "count"
+    ]
+  },
+  "amll.applyAll": {
+    "context": "amll interface: amll.applyAll",
+    "source": "{{action}}（处理全部 {{count}} 项）",
+    "params": [
+      "action",
+      "count"
+    ]
+  },
+  "amll.processAll": {
+    "context": "amll interface: amll.processAll",
+    "source": "处理全部 {{count}} 项",
+    "params": [
+      "count"
+    ]
+  },
+  "amll.customSinger": {
+    "context": "amll interface: amll.customSinger",
+    "source": "自定义歌手不符合简化歌手模型",
+    "params": []
+  },
+  "amll.extraBackgrounds": {
+    "context": "amll interface: amll.extraBackgrounds",
+    "source": "{{count}} 条背景，{{extra}} 条多余背景",
+    "params": [
+      "count",
+      "extra"
+    ]
+  },
+  "amll.invalidSettings": {
+    "context": "amll interface: amll.invalidSettings",
+    "source": "AMLL 项目设置无效",
+    "params": []
+  },
+  "amll.dependenciesRequired": {
+    "context": "amll interface: amll.dependenciesRequired",
+    "source": "简化模型依赖限制必须开启",
+    "params": []
+  },
+  "amll.ruleConflict": {
+    "context": "amll interface: amll.ruleConflict",
+    "source": "当前内容不满足 AMLL 限制，请到兼容校验定位处理",
+    "params": []
+  },
+  "amll.duplicateSinger": {
+    "context": "amll interface: amll.duplicateSinger",
+    "source": "歌手标识重复",
+    "params": []
+  },
+  "amll.invalidSingerReference": {
+    "context": "amll interface: amll.invalidSingerReference",
+    "source": "歌手引用无效或重复",
+    "params": []
+  },
+  "amll.clearSingerField": {
+    "context": "amll interface: amll.clearSingerField",
+    "source": "词级歌手清除时必须移除字段",
+    "params": []
+  },
+  "amll.unassignedWord": {
+    "context": "amll interface: amll.unassignedWord",
+    "source": "无歌手词无法在有歌手目标行中保真，请先统一歌手",
+    "params": []
+  },
+  "amll.conflict.simplified": {
+    "context": "amll interface: amll.conflict.simplified",
+    "source": "当前内容不符合简化歌手模型，请到 AMLL 兼容校验处理",
+    "params": []
+  },
+  "amll.conflict.noMultipleBackgrounds": {
+    "context": "amll interface: amll.conflict.noMultipleBackgrounds",
+    "source": "当前内容有多行背景，请到 AMLL 兼容校验处理",
+    "params": []
+  },
+  "amll.conflict.noChorus": {
+    "context": "amll interface: amll.conflict.noChorus",
+    "source": "当前内容有多歌手合唱，请到 AMLL 兼容校验处理",
+    "params": []
+  },
+  "amll.conflict.noWordAgents": {
+    "context": "amll interface: amll.conflict.noWordAgents",
+    "source": "当前内容有词级歌手，请到 AMLL 兼容校验处理",
+    "params": []
+  },
+  "amll.conflict.noIndependentBackground": {
+    "context": "amll interface: amll.conflict.noIndependentBackground",
+    "source": "当前内容有背景独立歌手，请到 AMLL 兼容校验处理",
+    "params": []
   }
 }

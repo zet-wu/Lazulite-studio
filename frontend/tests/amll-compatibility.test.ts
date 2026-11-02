@@ -104,7 +104,7 @@ import {moveTimeline} from '../src/domain/timeline-editing';
 it('final constraints reject indirect word assignment and no-op background cleanup keeps history',()=>{
  const doc=createLyricDocument('first');const other=createLine('second','other');doc.agents=[{id:'a',name:null,type:'person'},{id:'b',name:null,type:'person'}];doc.lines[0].agentRefs=['a'];other.agentRefs=['b'];doc.lines.push(other);
  const state=createProjectEditorState(createProjectDocument(doc));
- expect(()=>executeProjectCommand(state,{type:'lyrics',command:{type:'move-word',lineId:doc.lines[0].id,wordId:doc.lines[0].words[0].id,toLineId:other.id,afterWordId:null}})).toThrow(/禁用词级歌手/);
+ expect(()=>executeProjectCommand(state,{type:'lyrics',command:{type:'move-word',lineId:doc.lines[0].id,wordId:doc.lines[0].words[0].id,toLineId:other.id,afterWordId:null}})).toThrow(/amll.conflict.noWordAgents/);
  expect(state.present.lyrics).toBe(doc);expect(state.past).toHaveLength(0);
  const one=rich();one.lines.splice(2);one.translationTracks[0].contents.splice(2);one.romanizationTracks[0].contents.splice(2);
  let positioned=createProjectEditorState({...createProjectDocument(one),amll:{simplified:false,noMultipleBackgrounds:false,noChorus:false,noWordAgents:false,noIndependentBackground:false}});

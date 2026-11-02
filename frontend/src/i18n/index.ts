@@ -25,5 +25,5 @@ export async function chooseLanguage(language:string) {
  try {await writeLibraryPreference('studio:ui-language',choice);confirmed=choice;}
  catch(error){if(current===request)await i18n.changeLanguage(confirmed);throw error;}
 }
-export const formatMessage=(value:Message)=>i18n.t(value.key,value.values??{});
+export function formatMessage(value:Message):string { return value.parts ? value.parts.map(formatMessage).join(i18n.t('notice.separator')) : i18n.t(value.key,value.values??{}); }
 export const formatDate=(date:string|number|Date)=>new Intl.DateTimeFormat((languages.find(l=>l.id===i18n.language)??languages[0]).format,{dateStyle:'medium',timeStyle:'short'}).format(new Date(date));

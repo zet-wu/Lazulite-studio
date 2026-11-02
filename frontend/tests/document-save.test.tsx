@@ -49,3 +49,8 @@ it.each(['rejected', 'uncertain'] as const)('%s save retries use the correct sna
     expect(result.current.dirty).toBe(false);
   }
 });
+
+it('keeps valid partial framework diagnostics and request IDs without treating them as confirmed document rejection',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({detail:{message:'save failed',reason:'storage_unavailable'}}),{status:503,headers:{'X-Request-ID':'partial'}})));
+ await expect(studioS4.saveRichDocument('p',snapshot(),'r0','op',1)).rejects.toMatchObject({status:503,body:{message:'save failed',reason:'storage_unavailable',request_id:'partial',code:'http_error',retryable:true}});
+});

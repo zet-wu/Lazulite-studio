@@ -1,3 +1,4 @@
+import {createLyricDocument} from '../domain/lyric-document';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { OutputIssues } from './OutputIssues';
@@ -5,7 +6,8 @@ import type { OutputIssue } from '../adapters/output-validation';
 it('lazily expands rule and line groups, pages details and locates the selected object', () => {
   const issues: OutputIssue[] = Array.from({length: 120}, (_,i) => ({kind:'word',lineId:'line',wordId:`w${i}`,code:'missing-time',missing:['begin'],message:`第 1 行第 ${i+1} 词：缺少开始时间`,formats:['TTML','ASS'],severity:'error'}));
   const locate = vi.fn();
-  const {container} = render(<OutputIssues issues={issues} locate={locate}/>);
+  const document=createLyricDocument('歌');document.lines[0].id='line';
+  const {container} = render(<OutputIssues issues={issues} locate={locate} document={document}/>);
   expect(container.querySelectorAll('li')).toHaveLength(0);
   fireEvent.click(screen.getByRole('button',{name:/^缺少时间/}));
   expect(container.querySelectorAll('li')).toHaveLength(0);

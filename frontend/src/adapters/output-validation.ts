@@ -1,3 +1,4 @@
+import { message, type Message } from '../domain/messages';
 import type { ProjectEditing } from '../domain/project-editing';
 import { prepareAss } from './ass';
 import { isUntimedSeparator, projectExportSeparators } from './export-separators';
@@ -11,7 +12,7 @@ export type OutputIssue = {
   kind: 'acoustic' | 'agent' | 'line' | 'word' | 'ruby' | 'romanization-content' | 'romanization-unit' | 'translation-content' | 'translation-unit';
   lineId: string; agentId?: string; wordId?: string; rubyId?: string; trackId?: string; contentId?: string; unitId?: string;
   code?: 'audio-range' | 'invalid-agent-type' | 'missing-time' | 'invalid-range' | 'unsupported-order' | 'empty-content' | 'punctuation-zero' | 'serialization';
-  missing: ('begin' | 'end')[]; message: string;
+  missing: ('begin' | 'end')[]; message: string; detail?: Message;
 };
 export class DocumentOutputError extends Error {
   constructor(readonly issues: OutputIssue[]) { super(issues[0].message); }
@@ -20,12 +21,12 @@ export function visibleLineOrdinals(document: LyricDocument) { return new Map(do
 export function collectOutputIssues(document: LyricDocument, target: LyricFormat, editing?: ProjectEditing): OutputIssue[] {
  if (target === 'ass') return prepareAss(document,editing).issues;
  const issues: OutputIssue[] = [], ordinals=visibleLineOrdinals(document);
- if (target === 'ttml') for (const agent of document.agents) if (!AGENT_TYPES.some(type => type === agent.type)) issues.push({ kind: 'agent', lineId: '', agentId: agent.id, code: 'invalid-agent-type', missing: [], message: `歌手 ${agent.id}：${agent.type ? `非法 type ${agent.type}` : '缺少 type'}` });
+ if (target === 'ttml') for (const agent of document.agents) if (!AGENT_TYPES.some(type => type === agent.type)) issues.push({ kind: 'agent', lineId: '', agentId: agent.id, code: 'invalid-agent-type', missing: [], detail:message(agent.type?'validation.invalidAgent':'validation.missingAgentType',{type:agent.type??''}), message: `歌手 ${agent.id}：${agent.type ? `非法 type ${agent.type}` : '缺少 type'}` });
  const label=(line: LyricLine)=>`第 ${ordinals.get(line.backgroundOf ?? line.id)} 行${line.backgroundOf ? ' · 背景' : ''}`;
  const add=(base: Omit<OutputIssue,'missing'|'message'>, prefix: string, begin: TimeMs, end: TimeMs, requireEnd: boolean, extra?: string)=>{
    const missing: OutputIssue['missing'] = [...(begin === null ? ['begin' as const] : []), ...(requireEnd && end === null ? ['end' as const] : [])];
    const reason=missing.length ? `缺少${missing.length===2 ? '开始和结束' : missing[0]==='begin' ? '开始' : '结束'}时间` : extra;
-   if(reason)issues.push({...base,code: missing.length ? 'missing-time' : target === 'elrc' ? 'unsupported-order' : 'invalid-range',missing,message:`${prefix}：${reason}`});
+   if(reason)issues.push({...base,code: missing.length ? 'missing-time' : target === 'elrc' ? 'unsupported-order' : 'invalid-range',missing,detail:message(missing.length ? missing.length===2?'validation.missingBoth':missing[0]==='begin'?'validation.missingStart':'validation.missingEnd' : target==='elrc'?'validation.elrcOrder':'validation.endAfterStart'),message:`${prefix}：${reason}`});
  };
  const fullBody=!['ttml','lrc','elrc','txt'].includes(target);
  const lrc=target==='lrc' || target==='elrc';
@@ -35,9 +36,9 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
    if(fullBody || lrc) add(base,prefix,line.beginMs,line.endMs,fullBody,line.beginMs!==null && line.endMs!==null && (fullBody ? line.endMs<=line.beginMs : line.endMs<line.beginMs) ? '结束时间必须晚于开始' : undefined);
    if (fullBody) {
      const projection = projectExportSeparators(line.words,editing);
-     if (!projection.units.length) issues.push({ ...base, code: 'empty-content', missing: [], message: `${prefix}：该行没有可输出的定时正文` });
-     else for (const word of projection.unhosted) issues.push({ kind: 'word', lineId: line.id, wordId: word.id, code: 'missing-time', missing: [], message: `${prefix}：分隔空白没有相邻的有效定时正文` });
-     for (const word of line.words) if (/[\t\r\n\u2028\u2029]/u.test(word.text)) issues.push({ kind: 'word', lineId: line.id, wordId: word.id, code: 'serialization', missing: [], message: `${prefix}：此格式不能忠实表达正文中的制表符或换行` });
+     if (!projection.units.length) issues.push({ ...base, code: 'empty-content', missing: [], detail:message('validation.emptyTimed'), message: `${prefix}：该行没有可输出的定时正文` });
+     else for (const word of projection.unhosted) issues.push({ kind: 'word', lineId: line.id, wordId: word.id, code: 'missing-time', missing: [], detail:message('validation.unhostedSeparator'), message: `${prefix}：分隔空白没有相邻的有效定时正文` });
+     for (const word of line.words) if (/[\t\r\n\u2028\u2029]/u.test(word.text)) issues.push({ kind: 'word', lineId: line.id, wordId: word.id, code: 'serialization', missing: [], detail:message('validation.controlCharacters'), message: `${prefix}：此格式不能忠实表达正文中的制表符或换行` });
    }
    let boundary=line.beginMs === null ? null : line.beginMs;
    for(const [i,word] of line.words.entries()) {
@@ -62,7 +63,7 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
      if(!line)continue; // Internal document validation owns unknown references.
      const prefix=`${label(line)} · ${track.language ?? '未指定语言'}${duplicate ? ` 轨道 ${index+1}` : ''} 音译`;
      if(content.kind==='timed') {
-       if(!content.units.length)issues.push({kind:'romanization-content',lineId:line.id,trackId:track.id,contentId:content.id,code:'empty-content',missing:[],message:`${prefix}：定时内容没有单元`});
+       if(!content.units.length)issues.push({kind:'romanization-content',lineId:line.id,trackId:track.id,contentId:content.id,code:'empty-content',missing:[],detail:message('validation.emptyTimed'),message:`${prefix}：定时内容没有单元`});
        for(const [i,unit] of content.units.entries()) {
          if(isUntimedSeparator(unit))continue;
          add({kind:'romanization-unit',lineId:line.id,trackId:track.id,contentId:content.id,unitId:unit.id},`${prefix}第 ${i+1} 单元`,unit.beginMs,unit.endMs,true);
@@ -72,7 +73,7 @@ export function collectOutputIssues(document: LyricDocument, target: LyricFormat
  }
  if (target === 'ttml') for (const track of document.translationTracks) for (const content of track.contents) if (content.kind === 'timed') {
    const line = document.lines.find(line => line.id === content.lineId)!;
-   if (!content.units.length) issues.push({ kind: 'translation-content', lineId: line.id, trackId: track.id, contentId: content.id, code: 'empty-content', missing: [], message: `${label(line)}翻译没有单元` });
+   if (!content.units.length) issues.push({ kind: 'translation-content', lineId: line.id, trackId: track.id, contentId: content.id, code: 'empty-content', missing: [], detail:message('validation.emptyTimed'), message: `${label(line)}翻译没有单元` });
    for (const [index, unit] of content.units.entries()) { if (isUntimedSeparator(unit)) continue; add({ kind: 'translation-unit', lineId: line.id, trackId: track.id, contentId: content.id, unitId: unit.id }, `${label(line)}翻译第 ${index + 1} 单元`, unit.beginMs, unit.endMs, true, unit.beginMs !== null && unit.endMs !== null && unit.beginMs > unit.endMs ? '时间倒序' : undefined); }
  }
  return issues;

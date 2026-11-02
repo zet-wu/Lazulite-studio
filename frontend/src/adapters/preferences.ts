@@ -1,3 +1,4 @@
+import {message, MessageError, errorMessage} from '../domain/messages';
 import { requestHeaders } from './http/client';
 
 type Preferences = { version: number; revision: number; library_id: string; values: Record<string, string> };
@@ -8,9 +9,9 @@ export const scopedSessionKey = (key: string) => `${libraryIdentity()}:${key}`;
 
 async function read(): Promise<Preferences> {
   const response = await fetch('/api/v1/settings', { headers: requestHeaders(), cache: 'no-store' });
-  if (!response.ok) throw new Error('无法读取便携偏好，请重试');
+  if (!response.ok) throw new MessageError(message('preferences.portableReadFailed'));
   const value = await response.json() as Preferences;
-  if (value.version !== 1 || !/^[a-f0-9]{32}$/.test(value.library_id) || !value.values || !Number.isInteger(value.revision)) throw new Error('偏好响应无效');
+  if (value.version !== 1 || !/^[a-f0-9]{32}$/.test(value.library_id) || !value.values || !Number.isInteger(value.revision)) throw new MessageError(message('preferences.invalidResponse'));
   return value;
 }
 async function patch(snapshot: Preferences, changes: Record<string, string | null>) {
@@ -43,9 +44,9 @@ export function savePreference(key: string, value: string | null): Promise<void>
   const operation = pending.then(async () => {
     // Read a fresh version so disjoint changes in other tabs are preserved.
     const latest = await read();
-    if (latest.values[key] !== before && latest.values[key] !== (value ?? undefined)) throw new Error('此偏好已在另一页面修改，请刷新后重试');
+    if (latest.values[key] !== before && latest.values[key] !== (value ?? undefined)) throw new MessageError(message('preferences.changed'));
     const response = await patch(latest, { [key]: value });
-    if (!response.ok) throw new Error(response.status === 409 ? '偏好发生冲突，请刷新后重试' : '偏好保存失败，请重试');
+    if (!response.ok) throw new MessageError(message(response.status===409?'preferences.conflict':'preferences.saveFailed'));
     const saved = await response.json() as Preferences;
     if (current) current.revision = saved.revision;
   }).catch(error => {
@@ -55,7 +56,7 @@ export function savePreference(key: string, value: string | null): Promise<void>
     throw error;
   });
   pending = operation.catch((error: unknown) => {
-    window.dispatchEvent(new CustomEvent('studio-preference-error', { detail: error instanceof Error ? error.message : '偏好保存失败' }));
+    window.dispatchEvent(new CustomEvent('studio-preference-error', { detail: errorMessage(error) }));
   });
   return operation;
 }
@@ -68,10 +69,10 @@ export async function ensureLibraryPreference(key:string, detected:string):Promi
     if(latest.values[key]!==undefined)return latest.values[key];
     const response=await patch(latest,{[key]:detected});
     if(response.status===409)continue;
-    if(!response.ok)throw new Error('偏好初始化尚未保存');
+    if(!response.ok)throw new MessageError(message('preferences.initUnsaved'));
     current=await response.json() as Preferences;return current.values[key];
   }
-  throw new Error('偏好初始化发生并发冲突');
+  throw new MessageError(message('preferences.initConflict'));
 }
 export function writeLibraryPreference(key:string,value:string):Promise<void> {
   const operation=pending.then(async()=>{
@@ -79,12 +80,12 @@ export function writeLibraryPreference(key:string,value:string):Promise<void> {
       const latest=await read();
       const response=await patch(latest,{[key]:value});
       if(response.status===409)continue;
-      if(!response.ok)throw new Error('偏好保存失败');
+      if(!response.ok)throw new MessageError(message('preferences.saveFailed'));
       const saved=await response.json() as Preferences;
       if(current){current.revision=saved.revision;current.values[key]=saved.values[key];}else current=saved;
       return;
     }
-    throw new Error('偏好保存发生并发冲突');
+    throw new MessageError(message('preferences.saveConflict'));
   });
   pending=operation.catch(()=>undefined);
   return operation;

@@ -1,3 +1,4 @@
+import { message } from '../domain/messages';
 import { lyricTimes } from '../domain/time-boundaries';
 import type { Acoustics } from '../domain/project-document';
 import type { LyricDocument } from '../domain/lyric-document';
@@ -15,7 +16,8 @@ export function audioRangeIssues(document: LyricDocument, acoustics: Acoustics |
     const names={line:'',word:'词',ruby:'注音', 'romanization-unit':'音译单元','translation-unit':'翻译单元',acoustic:'人声片段',cue:'导唱'};
     const label=kind==='acoustic'?`人声片段 ${(acoustics?.segments.findIndex(s=>s.id===id)??-1)+1}`:`${lineLabel}${names[kind]?` · ${names[kind]}`:''}`;
     if(kind === 'cue') return [];
-    return [{...references,kind,segmentId:kind==='acoustic'?id:undefined,objectId:id,code:'audio-range' as const,severity:'warning' as const,formats:['音频范围'],missing:[],endpoint,sourceAssetId:assetId,sourceDurationMs:durationMs,excessMs:value-durationMs,
+    return [{...references,kind,segmentId:kind==='acoustic'?id:undefined,objectId:id,code:'audio-range' as const,severity:'warning' as const,formats:['audio-range'],missing:[],endpoint,sourceAssetId:assetId,sourceDurationMs:durationMs,excessMs:value-durationMs,
+      detail:message(endpoint==='beginMs'?'validation.audioStart':'validation.audioEnd',{time:value,duration:durationMs,excess:value-durationMs}),
       message:`${label}的${endpoint==='beginMs'?'开始':'结束'}时间 ${value} ms 超过当前参考音频 ${durationMs} ms，超出 ${value-durationMs} ms`}];
   }));
 }

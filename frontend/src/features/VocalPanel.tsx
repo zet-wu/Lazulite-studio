@@ -1,3 +1,8 @@
+import { message as describeMessage, messageList, MessageError, errorMessage, type Message } from '../domain/messages';
+import { useMessageText } from '../shared/useMessageText';
+import { deviceSummary, taskError } from './task-messages';
+import { i18n } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { intersectSegments } from '../domain/time-boundaries';
 import { useProjectJobs } from './useProjectJobs';
 import { IconButton } from '../shared/Controls';
@@ -14,9 +19,10 @@ import { TopMenu } from './editor/TopMenu';
 import editorStyles from './editor/semantic-editor.module.css';
 import styles from './vocal.module.css';
 export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, durationMs, visible }: { locked?: boolean; projectId: string; project: ProjectDocument; sourceAssetId: string; apply: (command: ProjectCommand) => void; durationMs: number | null; visible: boolean }) {
+  useTranslation();
   const ui = useAudioReview();
   const queryClient = useQueryClient();
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string|Message>('');
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState<string|null>(null);
   const [notice, publish] = useNotice(), [issue, publishIssue] = useNotice(), [readError, publishReadError] = useNotice();
@@ -54,25 +60,25 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const showResult = () => {
     if (!latest || !['failed','cancelled','interrupted','succeeded'].includes(latest.status)) return;
     const success = latest.status === 'succeeded' || latest.status === 'cancelled';
-    const text = latest.status === 'failed' ? '人声处理失败' : latest.status === 'interrupted' ? '服务重启，人声任务已中断' : latest.status === 'cancelled' ? '人声处理已取消' : '人声处理完成';
-    publish(latest.error?.message ?? text, success ? 'status' : 'alert', success ? 4000 : undefined, latest.id);
+    const text=describeMessage(latest.status==='failed'?'vocal.failed':latest.status==='interrupted'?'vocal.interrupted':latest.status==='cancelled'?'vocal.cancelled':'vocal.completed');
+    publish(latest.error ? taskError(latest.error) : text, success ? 'status' : 'alert', success ? 4000 : undefined, latest.id);
     setDismissed(null);
   };
   useEffect(showResult, [latest?.id, latest?.status]);
   useEffect(()=>{publishIssue(error || null);},[error,publishIssue]);
   const readingFailed = jobs.isError || results.isError || completed.isError;
-  useEffect(()=>{publishReadError(readingFailed ? '任务或结果读取失败，保留已知任务状态' : null);},[readingFailed,publishReadError]);
+  useEffect(()=>{publishReadError(readingFailed ? describeMessage('vocal.readFailed') : null);},[readingFailed,publishReadError]);
   useEffect(()=>{if(!active)setCancelling(false);},[active?.id]);
   const adopt = () => { if(locked)return;
     if(!pending || !result || result.status!=='ready') return;
     try {
-      if (durationMs === null) throw new Error('源音频时长未知，无法接入人声结果');
-      if(result.source_asset_id!==sourceAssetId)throw new Error('音源已改变，请重新发起人声处理');
+      if (durationMs === null) throw new MessageError(describeMessage('vocal.durationUnknown'));
+      if(result.source_asset_id!==sourceAssetId)throw new MessageError(describeMessage('vocal.sourceChanged'));
       const normalized = intersectSegments(result.segments!, durationMs);
       apply({type:'acoustics', acoustics:{analysisId:result.id,segments:normalized.segments}});
-      if(normalized.clipped || normalized.dropped) publish(`按源音频范围裁切 ${normalized.clipped} 个片段，丢弃 ${normalized.dropped} 个空片段`, 'status');
+      if(normalized.clipped || normalized.dropped) publish(describeMessage('task.normalized',{clipped:normalized.clipped,dropped:normalized.dropped}), 'status');
       handled.current.add(pending.id); setPending(null); setError('');
-    } catch(e) {setError((e as Error).message);}
+    } catch(e) {setError(errorMessage(e));}
   };
   useEffect(()=>{
     if(pending && latest?.status==='succeeded' && result?.status==='ready' && !conflict && !handled.current.has(pending.id) && !error) adopt();
@@ -84,16 +90,16 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     const baseline=JSON.stringify(project.acoustics);
     setBusy(true); setError(''); publish(null); setDismissed(null);
     try { const job=await jobsApi.createVocal(projectId, sourceAssetId, reuse); setPending({id:job.id,baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); }
-    catch(e) { setError(e instanceof Error ? e.message : '无法创建人声任务'); }
+    catch(e) { setError(e instanceof Error ? e.message : describeMessage('vocal.createFailed')); }
     finally { submitting.current=false; setBusy(false); }
   };
   const retryCpu = async () => {
     if(locked || submitting.current || active)return;
-    if (!latest || !pending || pending.id !== latest.id || pending.baseline !== JSON.stringify(project.acoustics) || latest.request?.asset_id !== sourceAssetId) { setError('声学内容或本页应用意图已改变，请重新发起任务'); return; }
-    if (!latest.request?.bound_revision) { setError('任务缺少可重试的项目版本'); return; }
+    if (!latest || !pending || pending.id !== latest.id || pending.baseline !== JSON.stringify(project.acoustics) || latest.request?.asset_id !== sourceAssetId) { setError(describeMessage('vocal.intentChanged')); return; }
+    if (!latest.request?.bound_revision) { setError(describeMessage('vocal.noRetryRevision')); return; }
     submitting.current=true; cancelRequested.current=false; setCancelling(false); setBusy(true); setError(''); publish(null);
     try { const job = await jobsApi.retryCpu(latest.id, latest.request.bound_revision); setPending({id:job.id, baseline:pending.baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await jobs.refetch(); }
-    catch(e) { setError((e as Error).message); }
+    catch(e) { setError(errorMessage(e)); }
     finally { submitting.current=false; setBusy(false); }
   };
   const retry=()=>void run(result?.id ?? latest?.request?.retry_analysis_id);
@@ -103,34 +109,36 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     if(!active){cancelRequested.current=true;setCancelling(true);return;}
     setCancelling(true);setError('');
     try { await jobsApi.cancel(active.id); await jobs.refetch(); }
-    catch(e) { setError(`取消请求失败：${(e as Error).message}`);setCancelling(false); }
+    catch(e) { setError(describeMessage('task.cancelFailed',{diagnostic:(e as Error).message}));setCancelling(false); }
   };
   const task = active;
-  const deviceText = task?.request?.devices ? Object.entries(task.request.devices).map(([stage,device])=>`${stage==='vocal'?'人声分离':'自动对齐'}：${device.label}${device.reason ? `（${device.reason}）` : ''}`).join('；') : '';
-  const status = { queued: '排队中', running: '处理中', cancel_requested: '正在取消，等待当前阶段结束', cancelled: '已取消', failed: '失败', interrupted: '服务重启，任务已中断', succeeded: '正在接入结果' };
+  const deviceText=deviceSummary(task?.request?.devices);
+  const status = { queued: t('task.queued'), running: t('task.processing'), cancel_requested: t('task.waitingCancel'), cancelled: t('task.cancelled'), failed: t('task.failed'), interrupted: t('task.interrupted'), succeeded: t('task.applying') };
   return <>
-    {visible && <div className={editorStyles.ribbon} aria-label="音频操作">
+    {visible && <div className={editorStyles.ribbon} aria-label={t('vocal.actions')}>
       <div className={styles.segmentTools} ref={ui.setToolsHost}/>
-      {ready ? <TopMenu id="audio-analysis" title="音频分析" className={editorStyles.ribbonMenu} activeMenuId={menu} onMenuChange={setMenu}>
-        {(!currentAudio || repair || update) && <button data-role="inline" disabled={locked||busy||!!active} title="生成可用人声并分析，替换全部片段及人工修正" onClick={()=>void run()}>{repair?'重新生成人声':update?'更新人声分离结果':'分离人声'}</button>}
-        {(repair||update) && <span>{repair?'人声文件缺失、损坏或存储版本不支持': '现有人声未匹配当前分离版本'}</span>}
-        <button data-role="inline" disabled={locked||busy||!!active||!adoptedAvailable} title="复用现有人声，替换全部片段及人工修正" onClick={()=>void run(project.acoustics.analysisId!)}>重新进行声学分析</button>
-        {adoptedAvailable && project.acoustics.analysisId && <a data-role="secondary" href={download(project.acoustics.analysisId)} download>下载人声 WAV</a>}
-      </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run()}>{repair?'重新生成人声':update?'更新人声分离结果':currentAudio?'使用已有人声':'分离人声'}</button>}
-      {latest && !active && <button data-role="inline" onClick={showResult}>查看最近处理结果</button>}
+      {ready ? <TopMenu id="audio-analysis" title={t('vocal.analysis')} className={editorStyles.ribbonMenu} activeMenuId={menu} onMenuChange={setMenu}>
+        {(!currentAudio || repair || update) && <button data-role="inline" disabled={locked||busy||!!active} title={t('vocal.replaceHelp')} onClick={()=>void run()}>{repair?t('vocal.regenerate'):update?t('vocal.updateSeparation'):t('vocal.separate')}</button>}
+        {(repair||update) && <span>{repair?t('vocal.fileUnavailable'): t('vocal.versionMismatch')}</span>}
+        <button data-role="inline" disabled={locked||busy||!!active||!adoptedAvailable} title={t('vocal.reuseHelp')} onClick={()=>void run(project.acoustics.analysisId!)}>{t('vocal.reanalyze')}</button>
+        {adoptedAvailable && project.acoustics.analysisId && <a data-role="secondary" href={download(project.acoustics.analysisId)} download>{t('vocal.download')}</a>}
+      </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run()}>{repair?t('vocal.regenerate'):update?t('vocal.updateSeparation'):currentAudio?t('vocal.useExisting'):t('vocal.separate')}</button>}
+      {latest && !active && <button data-role="inline" onClick={showResult}>{t('vocal.recent')}</button>}
       <div className={styles.alignmentTools} ref={ui.setAlignmentHost}/>
     </div>}
-    {ui.taskHost && (active || busy) && createPortal(<MessageBar notice={{ text: `人声处理 · ${task ? cancelling ? '正在取消' : status[task.status] : '正在准备'}${task?.stage ? ` · ${{separating:'分离人声',analyzing:'声学分析'}[task.stage] ?? task.stage}` : ''}${deviceText ? ` · ${deviceText}` : ''}`, role:'status', origin:null, dismissible:false }} actions={<button data-role="secondary" disabled={cancelling || active?.status==='cancel_requested'} onClick={()=>void cancel()}>取消任务</button>}/>,ui.taskHost)}
+    {ui.taskHost && (active || busy) && createPortal(<MessageBar notice={{ text: t('task.vocalProgress',{progress:`${task ? cancelling ? t('task.cancelling') : status[task.status] : t('task.preparing')}${task?.stage ? ` · ${{separating:t('vocal.separate'),analyzing:t('vocal.acousticAnalysis')}[task.stage] ?? task.stage}` : ''}`,device:deviceText?' · '+deviceText:''}), role:'status', origin:null, dismissible:false }} actions={<button data-role="secondary" disabled={cancelling || active?.status==='cancel_requested'} onClick={()=>void cancel()}>{t('task.cancel')}</button>}/>,ui.taskHost)}
     {ui.messageHost && createPortal(<>
       <MessageBar notice={notice} actions={notice?.taskId===latest?.id && failure && latest.status!=='cancelled' ? <>
-        <IconButton icon="refresh" label="重试人声处理" data-role="secondary" disabled={locked||busy||!!active} onClick={retry}/>
-        {latest.error?.cpu_retry && <button data-role="secondary" disabled={locked||busy||!!active} onClick={()=>void retryCpu()}>使用 CPU 重试</button>}
+        <IconButton icon="refresh" label={t('vocal.retry')} data-role="secondary" disabled={locked||busy||!!active} onClick={retry}/>
+        {latest.error?.cpu_retry && <button data-role="secondary" disabled={locked||busy||!!active} onClick={()=>void retryCpu()}>{t('task.retryCpu')}</button>}
       </> : undefined}/>
-      <MessageBar notice={issue} actions={!active && !busy ? <IconButton icon="refresh" label="重试人声处理" data-role="secondary" disabled={locked} onClick={()=>{if(pending && result?.status==='ready' && latest?.status==='succeeded')setError('');else retry();}}/> : undefined}/>
-      <MessageBar notice={readError} actions={<IconButton icon="refresh" label="重试读取人声任务和结果" data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();if(completed.isError)void completed.refetch();}}/>}/>
+      <MessageBar notice={issue} actions={!active && !busy ? <IconButton icon="refresh" label={t('vocal.retry')} data-role="secondary" disabled={locked} onClick={()=>{if(pending && result?.status==='ready' && latest?.status==='succeeded')setError('');else retry();}}/> : undefined}/>
+      <MessageBar notice={readError} actions={<IconButton icon="refresh" label={t('vocal.retryRead')} data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();if(completed.isError)void completed.refetch();}}/>}/>
     </>,ui.messageHost)}
-    {ui.statusHost && (conflictVisible || !ready) && createPortal(<section className={styles.panel} aria-label="音频处理结果">
-      {conflictVisible ? <><p>声学内容已改变，本次结果已保留。</p><button data-role="primary" disabled={locked} onClick={adopt}>替换当前片段</button>{ready && <button data-role="secondary" onClick={()=>setDismissed(latest!.id)}>返回上次结果</button>}</> : <p>{active||busy?'正在处理音频，可在上方查看任务状态。':'尚无可用片段，请通过音频工具分离人声。'}</p>}
+    {ui.statusHost && (conflictVisible || !ready) && createPortal(<section className={styles.panel} aria-label={t('vocal.results')}>
+      {conflictVisible ? <><p>{t('vocal.changed')}</p><button data-role="primary" disabled={locked} onClick={adopt}>{t('vocal.replaceSegments')}</button>{ready && <button data-role="secondary" onClick={()=>setDismissed(latest!.id)}>{t('vocal.previous')}</button>}</> : <p>{active||busy?t('vocal.runningHelp'):t('vocal.empty')}</p>}
     </section>,ui.statusHost)}
   </>;
 }
+
+const t=i18n.t.bind(i18n);

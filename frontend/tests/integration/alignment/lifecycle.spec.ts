@@ -25,7 +25,7 @@ test('short disconnect reconnects the original run and a failed save retains loc
  let fail=true;
  await page.route(`**${url}`,async route=>{if(route.request().method()==='PUT'&&fail)return route.fulfill({status:500,json:{message:'保存测试失败'}});return route.continue();});
  state.status='succeeded';await expect(page.getByRole('status').filter({hasText:'已更新歌词时间'})).toBeVisible();
- const saveError=page.getByRole('alert').filter({hasText:'请求失败，请重试'});await expect(saveError).toBeVisible();
+ const saveError=page.getByRole('alert').filter({hasText:'保存测试失败'});await expect(saveError).toBeVisible();
  await saveError.locator('..').getByRole('button',{name:'关闭提示'}).click();await expect(saveError).toHaveCount(0);await expect(page.getByText('未保存',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(saveError).toBeVisible();
  await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('button',{name:'撤销',exact:true})).toBeEnabled();
@@ -121,4 +121,19 @@ test('a server cancellation keeps the row and editing lock until the terminal st
  await expect(page.getByRole('dialog',{name:'计算设备',exact:true})).toBeVisible();await page.getByRole('button',{name:'关闭计算设备'}).click();
  await expect(page.locator('[data-top-menu="settings"] summary')).toBeFocused();
  state.status='cancelled';await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeEnabled();
+});
+
+test('language changes preserve a running operation and translate its existing result without reapplying',async({page})=>{
+ const state=await setup(page);
+ await page.locator('[data-top-menu="settings"] summary').click();
+ const language=page.locator('[data-top-menu="settings"] select');await language.selectOption('en');
+ await expect(page.getByRole('button',{name:'Aligning',exact:true})).toBeDisabled();
+ expect(state.starts).toBe(1);expect(state.cancels).toBe(0);
+ state.status='succeeded';await expect(page.getByRole('status').filter({hasText:'Lyric times updated.'})).toBeVisible();
+ expect(state.results).toBe(1);
+ await language.selectOption('zh-Hant');
+ await expect(page.getByRole('status').filter({hasText:'已更新歌詞時間'})).toBeVisible();
+ expect(state.results).toBe(1);expect(state.starts).toBe(1);
+ await language.selectOption('zh-Hans');
+ await expect.poll(async()=>((await(await page.request.get('/api/v1/settings')).json()).values['studio:ui-language'])).toBe('zh-Hans');
 });

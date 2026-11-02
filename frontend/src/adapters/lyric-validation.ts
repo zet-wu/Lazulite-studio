@@ -1,3 +1,4 @@
+import { message, errorMessage } from '../domain/messages';
 import type { ProjectEditing } from '../domain/project-editing';
 import type { LyricDocument } from '../domain/lyric-document';
 import { isPunctuation } from '../domain/preview-adapter';
@@ -16,7 +17,7 @@ function* validationSteps(document: LyricDocument, editing?: ProjectEditing): Ge
   for (const format of checkedFormats) {
     try { exportLyricFile(document, format,editing); }
     catch (cause) {
-      const issues = cause instanceof DocumentOutputError ? cause.issues : [{ kind: 'line' as const, lineId: '', missing: [], code: 'serialization' as const, message: cause instanceof Error ? cause.message : '序列化失败' }];
+      const issues = cause instanceof DocumentOutputError ? cause.issues : [{ kind: 'line' as const, lineId: '', missing: [], code: 'serialization' as const, detail:errorMessage(cause), message: cause instanceof Error ? cause.message : '序列化失败' }];
       issues.forEach(issue => add(issue, format.toUpperCase(), 'error'));
     }
     yield;
@@ -25,8 +26,8 @@ function* validationSteps(document: LyricDocument, editing?: ProjectEditing): Ge
     for (const word of line.words) {
       if (isPunctuation(word.text)) {
         const missing: OutputIssue['missing'] = [...(word.beginMs === null ? ['begin' as const] : []), ...(word.endMs === null ? ['end' as const] : [])];
-        if (missing.length || word.beginMs === word.endMs) add({ kind: 'word', lineId: line.id, wordId: word.id, code: missing.length ? 'missing-time' : 'punctuation-zero', missing,
-          message: missing.length ? `标点「${word.text}」缺少${missing.length === 2 ? '开始和结束' : missing[0] === 'begin' ? '开始' : '结束'}时间` : `标点「${word.text}」起止时间相同` }, '时间核对', 'warning');
+        if (missing.length || word.beginMs === word.endMs) add({ kind: 'word', lineId: line.id, wordId: word.id, code: missing.length ? 'missing-time' : 'punctuation-zero', missing, detail:message(missing.length?missing.length===2?'validation.missingBoth':missing[0]==='begin'?'validation.missingStart':'validation.missingEnd':'validation.punctuationZero'),
+          message: missing.length ? `标点「${word.text}」缺少${missing.length === 2 ? '开始和结束' : missing[0] === 'begin' ? '开始' : '结束'}时间` : `标点「${word.text}」起止时间相同` }, 'timing-review', 'warning');
       }
     }
   }

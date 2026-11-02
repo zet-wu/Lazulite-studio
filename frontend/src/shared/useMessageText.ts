@@ -1,3 +1,4 @@
+import { formatMessage } from '../i18n';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isMessage, type Message } from '../domain/messages';
@@ -6,5 +7,5 @@ import { isMessage, type Message } from '../domain/messages';
 export function useMessageText(initial: string | Message = '') {
   const [value, setValue] = useState<string | Message>(initial);
   const { t } = useTranslation();
-  return [isMessage(value) ? t(value.key, value.values ?? {}) : value, setValue] as const;
+  return [isMessage(value) ? formatMessage(value) : value, setValue] as const;
 }

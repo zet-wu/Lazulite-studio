@@ -1,5 +1,5 @@
 import { ApiError, isRejectedDocument } from '../adapters/http/client';
-import { message } from '../domain/messages';
+import { message, MessageError, errorMessage } from '../domain/messages';
 import { projectErrorText } from './project-error';
 import { useNotice } from '../shared/MessageBar';
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -74,14 +74,14 @@ export function useProjectDocument(
       setDirty(true);
       setError(null);
       void checkpoint(next).catch(() =>
-        setError("本地检查点保存失败，当前修改仍保留"),
+        setError(message('save.checkpointFailed')),
       );
     },
     [checkpoint],
   );
   const dispatch = useCallback(
     (command: LyricCommand) => {
-      if (editingLock.current) throw new Error('自动对齐期间无法编辑');
+      if (editingLock.current) throw new MessageError(message('save.editingLocked'));
       const next = executeProjectCommand(stateRef.current, { type: 'lyrics', command });
       if (next !== stateRef.current) {
         stateRef.current = next;
@@ -92,12 +92,12 @@ export function useProjectDocument(
     [commit],
   );
   const save = useCallback(async (forPackaging = false) => {
-    if (deletedRef.current) { if (forPackaging) throw new Error("项目已删除"); return; }
+    if (deletedRef.current) { if (forPackaging) throw new MessageError(message('save.deleted')); return; }
     if (inFlight.current || conflict) {
-      if (forPackaging) throw new Error(conflict ? '保存冲突，请先处理' : '正在保存，请完成后重试打包');
+      if (forPackaging) throw new MessageError(message(conflict?'save.conflict':'save.waitForPackaging'));
       return;
     }
-    if (forPackaging && pending.current) throw new Error('上次保存尚未确认，请先重试保存再打包');
+    if (forPackaging && pending.current) throw new MessageError(message('save.uncertainPackaging'));
     const captured = stateRef.current.present;
     const saveSource = sourceIdentity.current;
     if (sequence.current === savedSequence.current) return { revision, document: captured.lyrics, editing: captured.editing };
@@ -143,11 +143,7 @@ export function useProjectDocument(
       if ((caught as { status?: number }).status === 404) { deletedRef.current = true; setDeleted(true); }
       if ((caught as { status?: number }).status === 412) setConflict(true);
       setError(
-        caught instanceof ApiError
-          ? (['segment_invalid_range','segment_duplicate_id','analysis_source_mismatch'].includes(caught.body.reason??'')
-            ? message(`error.document.${caught.body.reason}`,caught.body.params as Record<string,string|number>)
-            : message('error.http',{status:caught.status,requestId:caught.body.request_id,diagnostic:caught.body.message}))
-          : caught instanceof Error ? projectErrorText(captured, caught.message) : "保存失败，修改已保留",
+        errorMessage(caught),
       );
       if (forPackaging) throw caught;
     } finally {
@@ -163,7 +159,7 @@ export function useProjectDocument(
   const [historyVersion, setHistoryVersion] = useState(0);
   const history = useCallback(
     (change: (s: ProjectEditorState) => ProjectEditorState) => {
-      if (editingLock.current) throw new Error('自动对齐期间无法编辑');
+      if (editingLock.current) throw new MessageError(message('save.editingLocked'));
       if (conflict || deletedRef.current) return;
       const next = change(stateRef.current);
       if (next !== stateRef.current) {
@@ -183,7 +179,7 @@ export function useProjectDocument(
     [conflict, dispatch],
   );
   const recover = useCallback(async () => {
-    if (editingLock.current) throw new Error('自动对齐期间无法恢复');
+    if (editingLock.current) throw new MessageError(message('save.recoveryLocked'));
     if (deletedRef.current) return false;
     const adapter = createRecoveryAdapter();
     const record = await adapter.readCheckpoint(projectId);
@@ -210,7 +206,7 @@ export function useProjectDocument(
       .catch((caught) => {
         if (active)
           setError(
-            caught instanceof Error ? caught.message : "本地恢复记录读取失败",
+            errorMessage(caught),
           );
       });
     return () => {
@@ -228,10 +224,10 @@ export function useProjectDocument(
   }, [recover]);
   useEffect(() => listenProjectDeletion(projectId, () => {
     deletedRef.current = true; setDeleted(true);
-    void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError("项目已删除，本地数据清理失败"));
+    void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError(message('save.deletedCleanupFailed')));
   }), [enqueueRecovery, projectId]);
   useEffect(() => {
-    if (deleted) void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError("项目已删除，本地数据清理失败"));
+    if (deleted) void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError(message('save.deletedCleanupFailed')));
   }, [deleted, enqueueRecovery, projectId]);
   return {
     deleted, historyVersion, editingLocked,
@@ -243,7 +239,7 @@ export function useProjectDocument(
       const next=remote && !hasLocalChanges ? createProjectEditorState(parseProject(remote)) : clearAcousticHistory(stateRef.current);
       stateRef.current=next;setState(next);setHistoryVersion(v=>v+1);
       if (remote && hasLocalChanges) {
-        setConflict(true);setError('源音频已在其他页面改变，未保存歌词已保留，请处理版本冲突');
+        setConflict(true);setError(message('save.sourceConflict'));
         await checkpoint(next);
       } else {
         pending.current=null;setRevision(nextRevision);setEtag(`"${nextRevision}"`);
@@ -252,20 +248,20 @@ export function useProjectDocument(
       }
     },
     prepareSource: async () => {
-      if(editingLock.current || conflict || deletedRef.current || inFlight.current || pending.current) throw new Error('请先完成或重试保存并处理冲突');
+      if(editingLock.current || conflict || deletedRef.current || inFlight.current || pending.current) throw new MessageError(message('save.finishBeforeImport'));
       const token=Symbol('music');editingLock.current=token;setEditingLocked(true);
       const release=()=>{if(editingLock.current===token){editingLock.current=null;setEditingLocked(false);}};
-      try { const saved=await save(true);if(!saved)throw new Error('请先完成保存');return {revision:saved.revision,release}; }
+      try { const saved=await save(true);if(!saved)throw new MessageError(message('alignment.saveRequired'));return {revision:saved.revision,release}; }
       catch(error){release();throw error;}
     },
     lockEditing: () => {
-      if (editingLock.current || conflict || deletedRef.current) throw new Error('项目当前不能开始对齐');
+      if (editingLock.current || conflict || deletedRef.current) throw new MessageError(message('save.alignmentUnavailable'));
       const token = Symbol('alignment'); editingLock.current = token; setEditingLocked(true);
       const source = stateRef.current.present;
       return { source,
         release: () => { if (editingLock.current === token) { editingLock.current = null; setEditingLocked(false); } },
         apply: (project: ProjectDocument) => {
-          if (editingLock.current !== token || deletedRef.current) throw new Error('本次对齐已失效');
+          if (editingLock.current !== token || deletedRef.current) throw new MessageError(message('save.alignmentExpired'));
           const next = executeProjectCommand(stateRef.current, {type:'alignment', source, project});
           if (next !== stateRef.current) {stateRef.current=next;setState(next);commit(next);}
         },
