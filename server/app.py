@@ -679,7 +679,9 @@ def create_app(
         return JSONResponse(
             {
                 "code": "validation_error",
-                "message": "invalid request",
+                "message": "请求字段不合法：" + "；".join(".".join(map(str, item["loc"])) + "（" + item["type"] + "）" for item in exc.errors()),
+                "reason": "invalid_fields",
+                "params": {"fields": [{"path": list(item["loc"]), "reason": item["type"]} for item in exc.errors()]},
                 "retryable": False,
                 "request_id": request.headers.get("x-request-id", uuid.uuid4().hex),
             },

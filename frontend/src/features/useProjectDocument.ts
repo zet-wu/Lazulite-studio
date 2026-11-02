@@ -1,3 +1,4 @@
+import { isRejectedDocument } from '../adapters/http/client';
 import { projectErrorText } from './project-error';
 import { useNotice } from '../shared/MessageBar';
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -133,6 +134,7 @@ export function useProjectDocument(
       }
       return { revision: result.revision, document: captured.lyrics, editing: captured.editing };
     } catch (caught) {
+      if (isRejectedDocument(caught)) pending.current = null;
       if ((caught as { status?: number }).status === 404) { deletedRef.current = true; setDeleted(true); }
       if ((caught as { status?: number }).status === 412) setConflict(true);
       setError(

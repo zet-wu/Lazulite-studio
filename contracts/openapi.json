@@ -2400,6 +2400,13 @@
           },
           "retryable": {
             "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
           }
         }
       },

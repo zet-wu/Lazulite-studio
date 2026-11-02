@@ -12,6 +12,7 @@ from typing import Callable
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
+from .document_errors import DocumentInvalid
 from .revisions import IdempotencyConflict, RevisionConflict, RevisionStore
 
 TTML_NS = "http://www.w3.org/ns/ttml"
@@ -148,8 +149,10 @@ class DocumentService:
                 operation_id=operation_id, subject=subject, client_seq=body.client_seq)
         except KeyError as exc:
             raise HTTPException(404, {"code": "project_not_found", "message": "project or revision not found", "retryable": False}) from exc
+        except DocumentInvalid as exc:
+            raise HTTPException(422, {"code": "document_invalid", "reason": exc.reason, "params": exc.params, "message": str(exc), "retryable": False}) from exc
         except ValueError as exc:
-            raise HTTPException(422, {"code": "document_invalid", "message": str(exc), "retryable": False}) from exc
+            raise HTTPException(422, {"code": "document_invalid", "reason": "invalid_snapshot", "message": str(exc), "retryable": False}) from exc
         except RevisionConflict as exc:
             raise HTTPException(412, {"code": "revision_conflict", "message": "document revision is stale", "retryable": False, "current_revision": exc.current}) from exc
         except IdempotencyConflict as exc:

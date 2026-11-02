@@ -41,19 +41,7 @@ async function request<T>(
     headers: requestHeaders(),
   });
   if (!response.ok) {
-    let error: ApiErrorBody = {
-      code: "http_error",
-      message: `API request failed (${response.status})`,
-      request_id: "",
-      retryable: response.status >= 500,
-    };
-    try {
-      const body: unknown = await response.json();
-      if (isApiError(body)) error = body;
-    } catch {
-      /* empty error body */
-    }
-    throw new ApiError(response.status, error);
+    throw await readApiError(response);
   }
   const value: unknown = await response.json();
   if (!validate(value))
@@ -77,19 +65,7 @@ async function mutate<T>(
     headers: requestHeaders(init.headers),
   });
   if (!response.ok) {
-    let error: ApiErrorBody = {
-      code: "http_error",
-      message: `API request failed (${response.status})`,
-      request_id: "",
-      retryable: response.status >= 500,
-    };
-    try {
-      const body: unknown = await response.json();
-      if (isApiError(body)) error = body;
-    } catch {
-      /* empty error body */
-    }
-    throw new ApiError(response.status, error);
+    throw await readApiError(response);
   }
   const value: unknown = await response.json();
   if (!validate(value))
@@ -182,6 +158,26 @@ export class ApiError extends Error {
 }
 
 export type ApiErrorBody = components["schemas"]["Error"];
+
+/** Preserve structured diagnostics even when a write's result is uncertain. */
+export async function readApiError(response: Response): Promise<ApiError> {
+  let body: unknown;
+  try { body = await response.json(); } catch { /* HTTP errors may have no JSON body. */ }
+  return new ApiError(response.status, isApiError(body) ? body : {
+    code: 'http_error',
+    message: `请求失败（HTTP ${response.status}）`,
+    request_id: response.headers.get('X-Request-ID') ?? '',
+    retryable: response.status >= 500,
+  });
+}
+
+/** Only explicit document rejections prove that this snapshot was not committed. */
+export function isRejectedDocument(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 422 && [
+    'document_invalid', 'validation_error', 'document_schema_unsupported', 'project_mismatch',
+  ].includes(error.body.code);
+}
+
 export const studioApi = {
   projectStorage: (id:string) => request(`/projects/${encodeURIComponent(id)}/storage`, (value:unknown): value is components['schemas']['ProjectStorage'] => {
     const v=value as components['schemas']['ProjectStorage'];
@@ -193,7 +189,7 @@ export const studioApi = {
   },
   exportProject: async (id: string) => {
     const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(id)}/archive`, { credentials:'include', headers:requestHeaders() });
-    if (!response.ok) { const error = await response.json(); throw new Error(error.message || '导出项目失败'); }
+    if (!response.ok) throw await readApiError(response);
     return response.blob();
   },
   getSession: () => request("/session", isSession),
@@ -255,7 +251,7 @@ export const studioApi = {
     `${API_ROOT}/projects/${encodeURIComponent(projectId)}/audio${vocal ? `?vocal=${encodeURIComponent(vocal)}` : ""}`,
   getPcmWindow: async (projectId: string, startMs: number, endMs: number, signal?: AbortSignal, vocal?: string | null) => {
     const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/pcm?start_ms=${startMs}&end_ms=${endMs}${vocal ? `&vocal=${encodeURIComponent(vocal)}` : ""}`, { credentials: 'include', signal });
-    if (!response.ok) throw new Error(`PCM window request failed: ${response.status}`);
+    if (!response.ok) throw await readApiError(response);
     const rate = Number(response.headers.get('x-sample-rate'));
     const channels = Number(response.headers.get('x-channels'));
     if (!Number.isSafeInteger(rate) || rate < 1000 || !Number.isSafeInteger(channels) || channels < 1 || channels > 8) throw new Error('Invalid PCM window headers');
@@ -269,14 +265,14 @@ export type SaveDocumentResult = components["schemas"]["DocumentSaveResponse"];
 export type JobResult = components["schemas"]["JobResult"];
 const s4 = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
   const response = await fetch(`${API_ROOT}${path}`, { credentials: 'include', ...init, headers: requestHeaders(init.headers) });
-  if (!response.ok) throw new ApiError(response.status, { code: response.status === 412 ? 'revision_conflict' : 's4_request_failed', message: response.status === 412 ? '文档已在其他标签页更新' : '请求失败，请重试', request_id: '', retryable: response.status >= 500 });
+  if (!response.ok) throw await readApiError(response);
   return (await response.json()) as T;
 };
 
 export const studioS4 = {
   getDocumentEnvelope: async (projectId: string): Promise<RichDocumentEnvelope> => {
     const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/document`, { credentials: "include", headers: requestHeaders() });
-    if (!response.ok) throw new ApiError(response.status, { code: "document_failed", message: "文档加载失败", request_id: "", retryable: response.status >= 500 });
+    if (!response.ok) throw await readApiError(response);
     const body: unknown = await response.json();
     if (!isDocumentEnvelope(body) || !body.revision) throw new ApiError(502, { code: "invalid_response", message: "文档响应无有效 revision", request_id: "", retryable: false });
     return { ...body, revision: body.revision, etag: response.headers.get("ETag") ?? undefined };

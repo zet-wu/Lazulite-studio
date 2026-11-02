@@ -181,3 +181,23 @@ def test_karaoke_project_save_reopen_keeps_cues_outside_ttml(tmp_path):
     body.update(revision=current.json()['revision'], document=snapshot)
     headers['if-match'] = current.headers['etag']
     assert client.put('/api/v1/projects/p/document', json=body, headers=headers).status_code == 200
+
+
+def test_rejected_document_reports_object_and_allows_corrected_save(tmp_path):
+    setup_project(tmp_path)
+    client = TestClient(create_app(tmp_path, Settings(None, True, 'http://studio')), base_url='https://studio')
+    before = client.get('/api/v1/projects/p/document')
+    body = before.json()
+    body['document']['acoustics']['segments'] = [{'id': 'segment-1', 'beginMs': -1, 'endMs': 10}]
+    headers = {'origin': 'http://studio', 'if-match': before.headers['etag'], 'idempotency-key': 'rejected'}
+    rejected = client.put('/api/v1/projects/p/document', json=body, headers=headers)
+    assert rejected.status_code == 422
+    assert rejected.json()['reason'] == 'segment_invalid_range'
+    assert rejected.json()['params']['object_id'] == 'segment-1'
+    assert client.get('/api/v1/projects/p/document').json()['revision'] == body['revision']
+    body['document']['acoustics']['segments'][0]['beginMs'] = 0
+    headers['idempotency-key'] = 'corrected'
+    saved = client.put('/api/v1/projects/p/document', json=body, headers=headers)
+    assert saved.status_code == 200, saved.text
+    retried = client.put('/api/v1/projects/p/document', json=body, headers=headers)
+    assert retried.json() == saved.json()

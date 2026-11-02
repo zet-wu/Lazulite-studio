@@ -4,6 +4,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictBool
 from typing import Literal
 from .karaoke import Karaoke, initial_karaoke
+from .document_errors import DocumentInvalid
 
 class Segment(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -69,11 +70,15 @@ def validate_project(value: dict | ProjectSnapshot, conn, project_id: str) -> di
     acoustic = snapshot['acoustics']
     if acoustic['analysisId'] is not None:
         result = conn.execute('SELECT source_asset_id FROM vocal_results WHERE id=? AND project_id=? AND status=?', (acoustic['analysisId'], project_id, 'ready')).fetchone()
-        if result is None or result[0] != row[0]: raise ValueError('声学分析不属于当前项目源音频')
+        if result is None or result[0] != row[0]: raise DocumentInvalid('analysis_source_mismatch', '声学分析不属于当前项目源音频', analysis_id=acoustic['analysisId'])
     ids = set()
     for segment in acoustic['segments']:
-        if segment['id'] in ids or not 0 <= segment['beginMs'] < segment['endMs'] <= (row[1] if row[0] is not None and row[1] is not None else 9007199254740991):
-            raise ValueError('人声片段标识重复或时间超出歌曲范围')
+        if segment['id'] in ids:
+            raise DocumentInvalid('segment_duplicate_id', f"人声片段 {segment['id']} 标识重复", object_id=segment['id'])
+        if not 0 <= segment['beginMs'] < segment['endMs'] <= 9007199254740991:
+            raise DocumentInvalid('segment_invalid_range', f"人声片段 {segment['id']} 时间须为非负安全整数且结束晚于开始", object_id=segment['id'], begin_ms=segment['beginMs'], end_ms=segment['endMs'])
+        if row[0] is not None and row[1] is not None and segment['endMs'] > row[1]:
+            raise DocumentInvalid('segment_exceeds_source', f"人声片段 {segment['id']} 超出源音频范围", object_id=segment['id'], source_duration_ms=row[1])
         ids.add(segment['id'])
     return snapshot
 
@@ -102,7 +107,7 @@ def validate_editing(snapshot, root):
     def identity(node, kind):
         key = node.get(studio+'id') or node.get(xml+'id')
         if key:
-            if key in objects: raise ValueError('duplicate editing object ID')
+            if key in objects: raise DocumentInvalid('editing_duplicate_id', f'编辑对象 {key} 标识重复', object_id=key)
             objects[key] = kind
         return key
     def words(node):
@@ -112,7 +117,7 @@ def validate_editing(snapshot, root):
             for unit in child.iter():
                 if unit.get(tts+'ruby') == 'text': identity(unit, 'ruby')
     for node in root.iter():
-        if any(studio+field in node.attrib for field in ['emptyBeat','ignoreSync','endLink','order','members']): raise ValueError('obsolete lyric editing attributes')
+        if any(studio+field in node.attrib for field in ['emptyBeat','ignoreSync','endLink','order','members']): raise DocumentInvalid('editing_obsolete_attributes', '歌词包含不支持的编辑属性')
         if node.tag == tt+'p':
             key = identity(node, 'line')
             if key: lines[key] = node
@@ -124,11 +129,11 @@ def validate_editing(snapshot, root):
                     words(child)
     editing = snapshot['editing']
     for key, beat in editing['emptyBeats'].items():
-        if objects.get(key) != beat['kind']: raise ValueError('empty beat object or category is invalid')
+        if objects.get(key) != beat['kind']: raise DocumentInvalid('empty_beat_invalid_reference', f'空拍对象 {key} 或类别不合法', object_id=key, kind=beat['kind'])
     skipped = editing['skippedAlignmentLineIds']
-    if len(set(skipped)) != len(skipped) or any(key not in lines for key in skipped): raise ValueError('skipped alignment line is invalid')
+    if len(set(skipped)) != len(skipped) or any(key not in lines for key in skipped): raise DocumentInvalid('skipped_alignment_invalid_reference', '跳过对齐的行引用无效或重复', object_ids=skipped)
     ignored = editing['ignoredSyncLineIds']
-    if len(set(ignored)) != len(ignored) or any(key not in lines for key in ignored): raise ValueError('ignored sync line is invalid')
+    if len(set(ignored)) != len(ignored) or any(key not in lines for key in ignored): raise DocumentInvalid('ignored_sync_invalid_reference', '忽略打轴的行引用无效或重复', object_ids=ignored)
     def time(node, side):
         if side in node.get(studio+'null', '').split(): return None
         raw = node.get(side)
@@ -137,9 +142,9 @@ def validate_editing(snapshot, root):
         for part in raw.split(':'): value = value * 60 + Decimal(part)
         return int(value * 1000)
     for source, target in editing['endLinks'].items():
-        if source not in lines or target not in lines or source == target or source in backgrounds or target in backgrounds: raise ValueError('invalid end link relationship')
+        if source not in lines or target not in lines or source == target or source in backgrounds or target in backgrounds: raise DocumentInvalid('end_link_invalid_reference', f'行尾链接 {source} → {target} 不合法', object_id=source, target_id=target)
         line, destination = lines[source], lines[target]
         end, begin = time(line, 'end'), time(destination, 'begin')
-        if begin is None or end != begin or time(line, 'begin') is not None and time(line, 'begin') > end: raise ValueError('invalid evaluated end link')
+        if begin is None or end != begin or time(line, 'begin') is not None and time(line, 'begin') > end: raise DocumentInvalid('end_link_invalid_time', f'行尾链接 {source} 的时间与目标行不一致', object_id=source, target_id=target)
         for child in line:
-            if child.tag == tt+'span' and all(role == 'expletive' for role in child.get(ttm+'role', '').split()) and time(child, 'end') is not None and time(child, 'end') > end: raise ValueError('linked end excludes word')
+            if child.tag == tt+'span' and all(role == 'expletive' for role in child.get(ttm+'role', '').split()) and time(child, 'end') is not None and time(child, 'end') > end: raise DocumentInvalid('end_link_excludes_word', f'行 {source} 的链接结束时间未包含正文词', object_id=source, target_id=target)

@@ -812,6 +812,10 @@ export interface components {
             message: string;
             request_id: string;
             retryable: boolean;
+            reason?: string;
+            params?: {
+                [key: string]: unknown;
+            };
         };
         Session: {
             /** @constant */

@@ -72,3 +72,5 @@ TTML 草稿保存保留待修正时间与 Studio 身份，发布阶段检查实�
 分析接口的 `stream=true` 以 NDJSON 发送 `loading`、`analyzing` 阶段及最终结果或错误，界面据此显示等待状态；原 JSON 调用继续返回完整分析结果。日文资源保持独立的进程缓存。
 
 `shape_conversion.py` 通过原生 OpenCC 1.4.2 的歧义输出分析四目标字形转换。`shape_routes.py` 接收显式行快照、限制并行请求并取消断开请求；整批使用唯一非汉字边界隔离行，返回完整字素及 UTF-16 范围。`python -m server.generate_shapes` 从固定 wheel 生成 `vendor/opencc-shapes` 资源和日文筛选明细。混合来源按实际词条键合并；来源默认冲突留空，中间歧义贯穿目标转换。资源随代码和便携包分发。
+
+文档校验在修订写入前执行，422 拒绝不会推进修订。可定位的编辑引用与声学校验错误提供 `reason`、`params`，参数包含对象身份；请求字段错误提供字段路径与校验原因。
