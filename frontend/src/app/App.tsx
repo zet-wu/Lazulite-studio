@@ -3,6 +3,8 @@ import { useMessageText } from '../shared/useMessageText';
 import { message, type Message } from '../domain/messages';
 import { useTranslation } from 'react-i18next';
 import { initializeLanguage, i18n } from '../i18n';
+import headerStyles from '../features/editor/semantic-editor.module.css';
+import { EditorMenu } from '../features/editor/EditorMenu';
 import { DeviceSettings } from '../features/DeviceSettings';
 import { loadPreferences, preferences } from '../adapters/preferences';
 import { Component, useState, useEffect, type ErrorInfo, type ReactNode } from "react";
@@ -210,16 +212,16 @@ function SessionGate({ children }: { children: ReactNode }) {
     retry: false,
   });
   if (query.isLoading)
-    return <main className={styles.centerState}>{t('app.sessionLoading')}</main>;
+    return <><ApplicationHeader ready={false}/><main className={styles.centerState}>{t('app.sessionLoading')}</main></>;
   if (query.error && (query.error as { status?: number }).status === 401)
     return <Login />;
   if (query.error)
     return (
-      <main className={styles.centerState}>
+      <><ApplicationHeader ready={false}/><main className={styles.centerState}>
         <strong>{t('app.unavailable')}</strong>
         <p>{t('app.sessionFailed')}</p>
         <button data-role="secondary" onClick={() => query.refetch()}>{t('common.retry')}</button>
-      </main>
+      </main></>
     );
   if (query.data && !query.data.authenticated) return <Login />;
   if (query.data?.mode === "local" && window.location.pathname === "/login") return <Navigate to="/projects" replace />;
@@ -235,9 +237,15 @@ function PreferenceGate({ children }: { children: ReactNode }) {
     window.addEventListener('studio-preference-error', report);
     return () => window.removeEventListener('studio-preference-error', report);
   }, []);
-  if (!mock && query.isPending) return <main className={styles.centerState}>{t('app.preferencesLoading')}</main>;
-  if (!mock && query.isError) return <main className={styles.centerState}>{t('app.preferencesFailed')}<button data-role="secondary" onClick={() => query.refetch()}>{t('common.retry')}</button></main>;
-  return <>{error && <div role="alert">{error}<button data-role="secondary" onClick={() => location.reload()}>{t('app.preferencesRefresh')}</button></div>}{children}</>;
+  useEffect(() => { if (mock || query.isSuccess) document.documentElement.dataset.theme = preferences.getItem('lazulite-editor-theme') === 'dark' ? 'dark' : 'light'; }, [mock, query.isSuccess]);
+  if (!mock && query.isPending) return <><ApplicationHeader ready={false}/><main className={styles.centerState}>{t('app.preferencesLoading')}</main></>;
+  if (!mock && query.isError) return <><ApplicationHeader ready={false}/><main className={styles.centerState}>{t('app.preferencesFailed')}<button data-role="secondary" onClick={() => query.refetch()}>{t('common.retry')}</button></main></>;
+  return <><ApplicationHeader />{error && <div role="alert">{error}<button data-role="secondary" onClick={() => location.reload()}>{t('app.preferencesRefresh')}</button></div>}{children}</>;
+}
+function ApplicationHeader({ready = true}: {ready?: boolean}) {
+  const [activeMenuId, onMenuChange] = useState<string | null>(null);
+  if (!ready) return <header className={headerStyles.header}><span className={headerStyles.brand}>Lazulite Studio</span><button data-role="secondary" disabled>{t('menu.settings')}</button></header>;
+  return <div className={styles.applicationHeader}><div id="studio-project-header"/><div className={styles.defaultHeader}><EditorMenu activeMenuId={activeMenuId} onMenuChange={onMenuChange}/></div></div>;
 }
 function WorkspaceRoute() {
   useTranslation();

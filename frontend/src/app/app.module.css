@@ -126,3 +126,6 @@
 .simplePage h1 {
   margin: 36px 0 4px;
 }
+
+.applicationHeader { position: sticky; top: 0; z-index: 30; flex-shrink: 0; }
+.applicationHeader:has(:global(#studio-project-header) > header) > .defaultHeader { display: none; }

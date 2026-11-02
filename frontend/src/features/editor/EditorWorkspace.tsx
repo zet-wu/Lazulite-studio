@@ -880,10 +880,7 @@ function EditorWorkspaceContent(props: Props) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
-    <EditorMenu {...props} onImportAudio={props.onImportAudio?()=>{
-      if(!finishForAudioImport())return;
-      setActiveMenuId(null);props.onImportAudio?.();
-    }:undefined} onDictionaryManager={() => setDictionaryManager(true)} editingLocked={props.alignment?.locked} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />
+    <EditorMenu {...props} onDictionaryManager={() => setDictionaryManager(true)} editingLocked={props.alignment?.locked} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />
     <div ref={audioReview?.setTaskHost} />
     <div ref={audioReview?.setMessageHost} />
     <MessageBar notice={message} />
