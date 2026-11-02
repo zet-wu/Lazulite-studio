@@ -1,3 +1,7 @@
+import { useMessageText } from '../shared/useMessageText';
+import { message } from '../domain/messages';
+import { i18n } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { preferences } from '../adapters/preferences';
 import { useEditorSelection } from './editor/SelectionContext';
 import { selectionEnvelope, documentTargets, targetInterval } from './editor/selection-targets';
@@ -82,6 +86,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   selectedLineId,
   onTimelineCommand,
 }: Props, ref) {
+  useTranslation();
   const ui=useAudioReview();
   const sharedSelection = useEditorSelection();
   useEffect(() => {
@@ -112,7 +117,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     el?.pause();setLoadingSource(true);setPlaybackVocal(next);
   },[playbackChoice,vocalId,playbackVocal]);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [timelineError, setTimelineError] = useState('');
+  const [timelineError, setTimelineError] = useMessageText('');
   const [timelinePreview, publishTimelinePreview] = useState<TimelinePreview>(null);
   const clock = useRef<HTMLSpanElement>(null);
   const slider = useRef<HTMLDivElement>(null);
@@ -139,7 +144,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [span, setSpan] = useState(0);
 
   const [loop, setLoop] = useState<LoopState>(emptyLoop);
-  const [error, setError] = useState("");
+  const [error, setError] = useMessageText("");
   const [bpm, setBpm] = useState(120);
   const [snap, setSnap] = useState(true);
   const [bottomExpanded, setExpanded] = useState(true);
@@ -149,7 +154,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [follow, setFollow] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
   viewportRef.current = { start, span, duration, follow };
-  const [bpmStatus, setBpmStatus] = useState('');
+  const [bpmStatus, setBpmStatus] = useMessageText('');
   useEffect(() => () => { if (moveAnimation.current !== null) cancelAnimationFrame(moveAnimation.current); }, []);
   const tapTimes = useRef<number[]>([]);
   const startMs = Math.round(start * 1e3);
@@ -231,7 +236,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     if (!audio.current || !asset) return;
     setError("");
     if (audio.current.paused)
-      void audio.current.play().catch(() => setError("媒体无法播放，请重试"));
+      void audio.current.play().catch(() => setError(message('media.playFailed')));
     else audio.current.pause();
   }, [asset]);
   useImperativeHandle(ref, () => ({
@@ -276,9 +281,9 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       if (!range) return;
       el.currentTime = Math.max(0, range[0] - offset(asset));
       updateDom(range[0]);
-      void el.play().catch(() => setError("媒体无法播放，请重试"));
+      void el.play().catch(() => setError(message('media.playFailed')));
     };
-    const onError = () => { setLoadingSource(false); setError("所选音源无法播放，请重试"); };
+    const onError = () => { setLoadingSource(false); setError(message('media.sourceFailed')); };
     const onPlay = () => {
       setPlaying(true);
       sync();
@@ -540,14 +545,14 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   };
   const autoBpm = async () => {
     try {
-      setBpmStatus('分析中…');
+      setBpmStatus(message('media.analyzing'));
       const window = await studioApi.getWaveform(projectId, 0, Math.min(Math.round(duration * 1e3), 20_000), 0);
       const result = estimateBpm(window.minimum, window.maximum, window.bucket_ms);
-      if (result === null) { setBpmStatus('未检测到稳定节拍'); return; }
+      if (result === null) { setBpmStatus(message('media.noBeat')); return; }
       setBpm(result);
-      setBpmStatus(`检测到 ${result} BPM`);
+      setBpmStatus(message('media.bpmDetected',{bpm:result}));
     } catch {
-      setBpmStatus('BPM 分析失败');
+      setBpmStatus(message('media.bpmFailed'));
     }
   };
   const beatMs = 60_000 / bpm;
@@ -561,23 +566,22 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           disabled={disabled}
           onClick={() => { setFollow(false); setStart(0); setSpan(duration); }}
         >
-          全曲
-        </button>
-        <IconButton data-role="secondary" disabled={disabled} icon="back" label="前移窗口" onClick={() => move(-1)}/>
-        <IconButton data-role="secondary" disabled={disabled} icon="chevron" label="后移窗口" onClick={() => move(1)}/>
-        <IconButton data-role="secondary" disabled={disabled} icon="add" label="放大波形" onClick={() => zoomAt(0.5, span ? (positionRef.current - start) / span : 0.5)}/>
-        <IconButton data-role="secondary" disabled={disabled} icon="minus" label="缩小波形" onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}/>
-        <span className={styles.viewportRange}>视窗 {fmt(start)} – {fmt(end)}</span>
-        <div className={styles.visibility} aria-label="时间轴图层">
+          {t('media.fullTrack')}</button>
+        <IconButton data-role="secondary" disabled={disabled} icon="back" label={t('media.previousWindow')} onClick={() => move(-1)}/>
+        <IconButton data-role="secondary" disabled={disabled} icon="chevron" label={t('media.nextWindow')} onClick={() => move(1)}/>
+        <IconButton data-role="secondary" disabled={disabled} icon="add" label={t('media.zoomIn')} onClick={() => zoomAt(0.5, span ? (positionRef.current - start) / span : 0.5)}/>
+        <IconButton data-role="secondary" disabled={disabled} icon="minus" label={t('media.zoomOut')} onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}/>
+        <span className={styles.viewportRange}>{t('media.viewport')}{fmt(start)} – {fmt(end)}</span>
+        <div className={styles.visibility} aria-label={t('media.layers')}>
           {(['line', 'word', 'ruby', 'romanization', 'gap', 'karaoke', 'wave', 'spectrum', ...(timelineHost?['energy','segments'] as const:[])] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
-            {({ karaoke: '导唱', line: '行', word: '词', ruby: '注音', romanization: '音译', gap: '空隙', wave: '波形', spectrum: '声谱图', energy:'能量',segments:'片段' })[key]}
+            {({ karaoke: t('media.countIn'), line: t('selection.line'), word: t('selection.word'), ruby: t('selection.ruby'), romanization: t('media.romanization'), gap: t('media.gaps'), wave: t('media.waveform'), spectrum: t('media.spectrogram'), energy:t('media.energy'),segments:t('media.segments') })[key]}
           </button>)}
         </div>
 </>);
   const acousticPlots=(<div>
-      <div className={styles.ruler} aria-label="时间标尺" data-timeline-pan="seek" tabIndex={-1}><TimelineIndicators />{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
+      <div className={styles.ruler} aria-label={t('media.ruler')} data-timeline-pan="seek" tabIndex={-1}><TimelineIndicators />{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
       <div className={styles.waveRow}>
-        <div className={styles.sourceLabel}><Select aria-label="波形／声谱图音源" title="波形／声谱图音源" value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">原曲</option>{vocalId && <option value="vocal">人声</option>}</Select></div>
+        <div className={styles.sourceLabel}><Select aria-label={t('media.graphicSource')} title={t('media.graphicSource')} value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">{t('media.original')}</option>{vocalId && <option value="vocal">{t('media.vocals')}</option>}</Select></div>
       <div
         data-wheel-zoom ref={slider}
         className={styles.waveWrap}
@@ -585,7 +589,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         data-timeline-pan="seek"
         role="slider"
         tabIndex={disabled ? -1 : 0}
-        aria-label="波形进度"
+        aria-label={t('media.waveformProgress')}
         aria-valuemin={0}
         aria-valuemax={duration}
         aria-valuenow={position}
@@ -605,9 +609,9 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
             }}
           />
         )}
-        {bandA != null && bandB != null && (bandA >= start && bandA <= end || loopDrag.current?.side === 'a') && <span data-loop-handle="a" className={styles.loopHandle} role="slider" tabIndex={0} aria-label="循环 A 边界" aria-valuemin={0} aria-valuemax={bandB} aria-valuenow={bandA}
+        {bandA != null && bandB != null && (bandA >= start && bandA <= end || loopDrag.current?.side === 'a') && <span data-loop-handle="a" className={styles.loopHandle} role="slider" tabIndex={0} aria-label={t('media.loopA')} aria-valuemin={0} aria-valuemax={bandB} aria-valuenow={bandA}
           style={{ left: `${Math.max(0, Math.min(100, ((bandA - start) / span) * 100))}%` }} onPointerDown={(event) => beginLoopDrag(event, 'a')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={(event) => endLoopDrag(event, true)} />}
-        {bandA != null && bandB != null && (bandB >= start && bandB <= end || loopDrag.current?.side === 'b') && <span data-loop-handle="b" className={styles.loopHandle} role="slider" tabIndex={0} aria-label="循环 B 边界" aria-valuemin={bandA} aria-valuemax={duration} aria-valuenow={bandB}
+        {bandA != null && bandB != null && (bandB >= start && bandB <= end || loopDrag.current?.side === 'b') && <span data-loop-handle="b" className={styles.loopHandle} role="slider" tabIndex={0} aria-label={t('media.loopB')} aria-valuemin={bandA} aria-valuemax={duration} aria-valuenow={bandB}
           style={{ left: `${Math.max(0, Math.min(100, ((bandB - start) / span) * 100))}%` }} onPointerDown={(event) => beginLoopDrag(event, 'b')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={(event) => endLoopDrag(event, true)} />}
       </div></div>
   </div>);
@@ -618,12 +622,12 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           const plot = (event.target as Element).closest<HTMLElement>('[data-timeline-pan]');
           if (plot) beginPan(event, plot, plot.dataset.timelinePan === 'seek');
         }} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={cancelPan} onLostPointerCapture={cancelPan}>
-        <div className={styles.timelineTools}><strong>时间轴</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
-          <button data-role="secondary" onClick={tapBpm}>Tap</button><button data-role="secondary" disabled={!asset} onClick={() => void autoBpm()}>自动 BPM</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> 吸附</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> 播放跟随</label>{bpmStatus && <small role="status">{bpmStatus}</small>}</div>
+        <div className={styles.timelineTools}><strong>{t('media.timeline')}</strong><label>BPM <input type="number" min="30" max="300" value={bpm} onChange={(event) => { const value = Number(event.target.value); if (value >= 30 && value <= 300) setBpm(value); }} /></label>
+          <button data-role="secondary" onClick={tapBpm}>Tap</button><button data-role="secondary" disabled={!asset} onClick={() => void autoBpm()}>{t('media.autoBpm')}</button><label><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> {t('media.snap')}</label><label><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> {t('media.follow')}</label>{bpmStatus && <small role="status">{bpmStatus}</small>}</div>
       {timelineError && <p role="alert" className={styles.error}>{timelineError}</p>}
       {timelineHost && <div className={styles.header}>{viewportTools}</div>}
 
-      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks sourceDurationMs={asset?.source_duration_ms ?? null} locked={editingLocked} projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?' 背景':''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document ? documentTargets(document).flatMap(target => { const value = targetInterval(document, target); return value ? [value.beginMs, value.endMs].filter((time): time is number => time !== null) : []; }) : []} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
+      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks sourceDurationMs={asset?.source_duration_ms ?? null} locked={editingLocked} projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?t('outline.background'):''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document ? documentTargets(document).flatMap(target => { const value = targetInterval(document, target); return value ? [value.beginMs, value.endMs].filter((time): time is number => time !== null) : []; }) : []} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
       {document && onTimelineCommand && <>
 
         <TimelineTracks locked={editingLocked} durationMs={asset?.source_duration_ms ?? null} document={document} selectedLineId={selectedLineId ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
@@ -638,17 +642,17 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     <footer data-transport className={`${styles.footer} ${expanded && !timelineHost ? styles.expanded : styles.collapsed}`} onKeyDown={keyDown}>
       <audio
         ref={audio}
-        onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; const captured=switching.current; if(captured){audio.current.currentTime=captured.position; switching.current=null;setLoadingSource(false);if(captured.playing)void audio.current.play().catch(e=>{if(e.name!=='AbortError')setError('所选音源无法播放，请重试');});} } }}
+        onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; const captured=switching.current; if(captured){audio.current.currentTime=captured.position; switching.current=null;setLoadingSource(false);if(captured.playing)void audio.current.play().catch(e=>{if(e.name!=='AbortError')setError(message('media.sourceFailed'));});} } }}
         preload="metadata"
         src={asset ? studioApi.audioUrl(projectId, playbackVocal, asset.id) : undefined}
       />
       <div className={styles.header}>
-        <IconButton data-role="secondary" className={styles.play} disabled={disabled} icon={playing ? 'pause' : 'play'} label={playing ? '暂停' : '播放'} onClick={play}/>
+        <IconButton data-role="secondary" className={styles.play} disabled={disabled} icon={playing ? 'pause' : 'play'} label={playing ? t('media.pause') : t('media.play')} onClick={play}/>
         <span ref={clock}>{fmt(position)} / {fmt(duration)}</span>
-        <label>播放音源 <Select aria-label="播放音源" value={playbackVocal?'vocal':''} onChange={e=>setPlaybackChoice(e.target.value==='vocal')}><option value="">原曲</option>{vocalId && <option value="vocal">人声</option>}</Select></label>
-        {loadingSource&&<span role="status">正在加载音源…</span>}
+        <label>{t('media.playbackSource')}<Select aria-label={t('media.playbackSource')} value={playbackVocal?'vocal':''} onChange={e=>setPlaybackChoice(e.target.value==='vocal')}><option value="">{t('media.original')}</option>{vocalId && <option value="vocal">{t('media.vocals')}</option>}</Select></label>
+        {loadingSource&&<span role="status">{t('media.loadingSource')}</span>}
         {expanded && !timelineHost && viewportTools}
-        {!timelineHost && <button data-role="secondary" className={`icon-button ${styles.timelineToggle}`} aria-label={expanded ? "收起时间轴" : "展开时间轴"} title={expanded ? "收起时间轴" : "展开时间轴"} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>
+        {!timelineHost && <button data-role="secondary" className={`icon-button ${styles.timelineToggle}`} aria-label={expanded ? t('media.collapseTimeline') : t('media.expandTimeline')} title={expanded ? t('media.collapseTimeline') : t('media.expandTimeline')} aria-expanded={expanded} aria-controls="timeline-plots" onClick={() => setExpanded(value => !value)}>
           <svg width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d={expanded ? "M1 1h10L6 7z" : "M1 7h10L6 1z"} fill="currentColor" /></svg>
         </button>}
       </div>
@@ -661,7 +665,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           onClick={() => {
             const aMs = Math.round(readPosition() * 1e3);
             try { setLoop(setLoopA(loop, aMs, durationMs)); setError(''); }
-            catch (cause) { setError(cause instanceof Error ? cause.message : '设置 A 失败'); }
+            catch (cause) { setError(cause instanceof Error ? cause.message : message('media.setAFailed')); }
           }}
         >
           A {bandA == null ? "--:--.---" : fmt(bandA)}
@@ -671,7 +675,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           onClick={() => {
             const bMs = Math.round(readPosition() * 1e3);
             try { setLoop(setLoopB(loop, bMs, durationMs)); setError(''); }
-            catch (cause) { setError(cause instanceof Error ? cause.message : '设置 B 失败'); }
+            catch (cause) { setError(cause instanceof Error ? cause.message : message('media.setBFailed')); }
           }}
         >
           B {bandB == null ? "--:--.---" : fmt(bandB)}
@@ -683,30 +687,29 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           className={loop.enabled ? styles.active : ""}
           onClick={() => setLoop((current) => ({ ...current, enabled: !current.enabled }))}
         >
-          循环 A/B
-        </button>
-        <button data-role="secondary" disabled={disabled || loop.aMs === null || loop.bMs === null} onClick={() => { if (loop.aMs !== null && loop.bMs !== null) { setFollow(false); setStart(Math.max(0, Math.min(duration - span, loop.aMs / 1e3))); } }}>定位 A/B</button>
+          {t('media.loopAB')}</button>
+        <button data-role="secondary" disabled={disabled || loop.aMs === null || loop.bMs === null} onClick={() => { if (loop.aMs !== null && loop.bMs !== null) { setFollow(false); setStart(Math.max(0, Math.min(duration - span, loop.aMs / 1e3))); } }}>{t('media.locateAB')}</button>
         <button data-role="secondary"
           disabled={disabled || !validLine}
           onClick={() => setLoop(captureLoop(selectedLine!.begin_ms!, selectedLine!.end_ms!, durationMs))}
         >
-          循环当前行
-        </button>
+          {t('media.loopLine')}</button>
         <button data-role="secondary"
           title={loopRange ? undefined : lyricEnvelope.reason} disabled={disabled || !validUnit}
           onClick={() => setLoop(captureLoop(loopRange!.begin_ms, loopRange!.end_ms, durationMs))}
         >
-          循环选区
-        </button>
+          {t('media.loopSelection')}</button>
         {error ? (
-          <span className={styles.error} role="alert">{error}<IconButton icon="refresh" label="重试加载音频" onClick={retryMedia}/></span>
+          <span className={styles.error} role="alert">{error}<IconButton icon="refresh" label={t('media.retryAudio')} onClick={retryMedia}/></span>
         ) : !asset ? (
-          <span className={styles.note}>未连接媒体</span>
+          <span className={styles.note}>{t('media.disconnected')}</span>
         ) : waveform.isError ? (
-          <span className={styles.error} role="alert">波形加载失败<IconButton icon="refresh" label="重试加载波形" onClick={() => void waveform.refetch()}/></span>
+          <span className={styles.error} role="alert">{t('media.waveformFailed')}<IconButton icon="refresh" label={t('media.retryWaveform')} onClick={() => void waveform.refetch()}/></span>
         ) : null}
       </div>
       </>}
     </footer>
   );
 });
+
+const t=i18n.t.bind(i18n);

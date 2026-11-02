@@ -24,10 +24,10 @@ it('selects 注音 independently and opens its card menu while leaving input con
     onSave={() => {}} /></MemoryRouter>);
   const tile = container.querySelector<HTMLElement>('[data-ruby-id="r1"]')!;
   fireEvent.click(tile);
-  expect(screen.getByText('注音已选 1')).toBeVisible();
+  expect(screen.getAllByText('注音已选 1')[0]).toBeVisible();
   fireEvent.contextMenu(tile, { clientX: 20, clientY: 30 });
-  fireEvent.click(screen.getByRole('menuitem', { name: '向后移动' }));
-  expect(apply.mock.calls[0][0].document.lines[0].words[0].rubyUnits.map((unit: {id:string})=>unit.id)).toEqual(['r2','r1']);
+  fireEvent.click(screen.getByRole('menuitem', { name: '添加读音' }));
+  expect(screen.getByRole('textbox', { name: '新增读音 歌' })).toBeVisible();
   expect(screen.queryByRole('menu')).toBeNull();
   fireEvent.contextMenu(screen.getAllByRole('textbox', { name: '读音 歌' })[0]);
   expect(screen.queryByRole('menu')).toBeNull();

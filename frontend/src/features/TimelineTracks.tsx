@@ -250,7 +250,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       apply({ type: 'replace-document', document: changed }); onError('');
     } catch (cause) { onError(cause instanceof Error ? cause.message : '无法闭合空隙'); }
   };
-  return <div ref={tracksRef} className={styles.tracks} aria-label="可编辑时间轴" tabIndex={-1} onFocusCapture={() => { area.current = 'timeline'; }}
+  return <div ref={tracksRef} className={styles.tracks} data-editable-timeline aria-label="可编辑时间轴" tabIndex={-1} onFocusCapture={() => { area.current = 'timeline'; }}
     onKeyDown={event => { if (event.key === 'Delete' && !locked && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); } }}
     onCopy={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.copy(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onCut={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.cut(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}

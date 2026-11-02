@@ -1,12 +1,15 @@
+import { i18n } from '../../i18n';
+import { useTranslation } from 'react-i18next';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import type { LyricAgent, LyricLine } from '../../domain/lyric-document';
 import styles from './semantic-editor.module.css';
 
 export function SingerSelection({ agents, lines, apply }: { agents: LyricAgent[]; lines: LyricLine[]; apply: (command: LyricCommand) => boolean }) {
+  useTranslation();
   const mixed = lines.some(line => line.agentRefs.join(' ') !== lines[0].agentRefs.join(' '));
-  return <fieldset className={styles.singerSelection}><legend>歌手</legend>
-    {mixed && <small>混合值</small>}
-    {!lines.some(line => line.agentRefs.length) && <small>未指定</small>}
+  return <fieldset className={styles.singerSelection}><legend>{t('singer.label')}</legend>
+    {mixed && <small>{t('common.mixed')}</small>}
+    {!lines.some(line => line.agentRefs.length) && <small>{t('common.unspecified')}</small>}
     {agents.map(agent => {
       const count = lines.filter(line => line.agentRefs.includes(agent.id)).length;
       const partial = count > 0 && count < lines.length;
@@ -21,3 +24,5 @@ export function SingerSelection({ agents, lines, apply }: { agents: LyricAgent[]
     })}
   </fieldset>;
 }
+
+const t=i18n.t.bind(i18n);

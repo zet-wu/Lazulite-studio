@@ -1,11 +1,16 @@
+import { useMessageText } from '../../shared/useMessageText';
+import { message } from '../../domain/messages';
+import { i18n } from '../../i18n';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../../shared/Icon';
 import { useRef, useState } from 'react';
 import styles from './semantic-editor.module.css';
 
 /** The draft does not enter document history until a successful nonempty commit. */
 export function InlineDraft({ label, commit, close }: { label: string; commit: (text: string) => boolean; close: () => void }) {
+  useTranslation();
   const [draft, setDraft] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useMessageText('');
   const input = useRef<HTMLInputElement>(null);
   const composing = useRef(false), finished = useRef(false);
   const submit = () => {
@@ -13,7 +18,7 @@ export function InlineDraft({ label, commit, close }: { label: string; commit: (
     finished.current = true;
     const text = input.current!.value;
     if (!text.length || commit(text)) close();
-    else { finished.current = false; setError('添加失败，请检查错误说明后重试，输入已保留'); }
+    else { finished.current = false; setError(message('inlineAdd.failed')); }
   };
   return <span className={styles.inlineAdd} onClick={event => event.stopPropagation()}>
     <input ref={input} autoFocus aria-label={label} aria-invalid={Boolean(error)} value={draft} onChange={event => { setDraft(event.target.value); setError(''); }}
@@ -30,7 +35,10 @@ export function InlineDraft({ label, commit, close }: { label: string; commit: (
 }
 
 export function InlineAdd({ label, commit }: { label: string; commit: (text: string) => boolean }) {
+  useTranslation();
   const [active, setActive] = useState(false);
   return active ? <InlineDraft label={label} commit={commit} close={() => setActive(false)} />
     : <span className={styles.inlineAdd} onClick={event => event.stopPropagation()}><button data-role="inline" className="icon-button" title={label} data-tooltip={label} aria-label={label} onClick={() => setActive(true)}><Icon name="add"/></button></span>;
 }
+
+const t=i18n.t.bind(i18n);

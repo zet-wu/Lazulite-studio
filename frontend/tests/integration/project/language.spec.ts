@@ -1,0 +1,23 @@
+import {expect,test} from '@playwright/test';
+test('persists the library language and keeps project content unchanged through three languages',async({page})=>{
+ const headers={origin:'http://127.0.0.1:5175'};
+ const result=await page.request.post('/api/v1/projects',{headers,data:{name:'不翻译の project'}});const pid=(await result.json()).id;
+ const documentUrl=`/api/v1/projects/${pid}/document`;
+ const before=await(await page.request.get(documentUrl)).json();
+ await page.goto(`/projects/${pid}/edit`);
+ await page.locator('[data-top-menu="settings"] summary').click();
+ const selector=page.locator('[data-top-menu="settings"] select');
+ await selector.selectOption('en');
+ await expect(page.getByRole('button',{name:'Save',exact:true})).toBeVisible();
+ await expect(page.locator('html')).toHaveAttribute('lang','en');
+ await expect.poll(async()=>((await(await page.request.get('/api/v1/settings')).json()).values['studio:ui-language'])).toBe('en');
+ await page.reload();
+ await expect(page.getByRole('button',{name:'Save',exact:true})).toBeVisible();
+ await page.locator('[data-top-menu="settings"] summary').click();
+ await selector.selectOption('zh-Hant');
+ await expect(page.getByRole('button',{name:'儲存',exact:true})).toBeVisible();
+ await expect(page.locator('html')).toHaveAttribute('lang','zh-Hant-TW');
+ const after=await(await page.request.get(documentUrl)).json();expect(after).toEqual(before);
+ await selector.selectOption('zh-Hans');
+ await expect.poll(async()=>((await(await page.request.get('/api/v1/settings')).json()).values['studio:ui-language'])).toBe('zh-Hans');
+});

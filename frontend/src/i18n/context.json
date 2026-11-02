@@ -673,5 +673,1567 @@
     "context": "workspace interface message",
     "source": "重新加载服务器",
     "params": []
+  },
+  "editor.actions": {
+    "context": "editor interface: editor.actions",
+    "source": "编辑操作",
+    "params": []
+  },
+  "editor.clipboard": {
+    "context": "editor interface: editor.clipboard",
+    "source": "选择与剪贴",
+    "params": []
+  },
+  "common.copy": {
+    "context": "common interface: common.copy",
+    "source": "复制",
+    "params": []
+  },
+  "common.cut": {
+    "context": "common interface: common.cut",
+    "source": "剪切",
+    "params": []
+  },
+  "common.paste": {
+    "context": "common interface: common.paste",
+    "source": "粘贴",
+    "params": []
+  },
+  "common.selectAll": {
+    "context": "common interface: common.selectAll",
+    "source": "全选",
+    "params": []
+  },
+  "common.invertSelection": {
+    "context": "common interface: common.invertSelection",
+    "source": "反选",
+    "params": []
+  },
+  "common.clearSelection": {
+    "context": "common interface: common.clearSelection",
+    "source": "清空选择",
+    "params": []
+  },
+  "editor.tools": {
+    "context": "editor interface: editor.tools",
+    "source": "编辑工具",
+    "params": []
+  },
+  "editor.wordsUp": {
+    "context": "editor interface: editor.wordsUp",
+    "source": "词移上行",
+    "params": []
+  },
+  "editor.wordsDown": {
+    "context": "editor interface: editor.wordsDown",
+    "source": "词移下行",
+    "params": []
+  },
+  "editor.segment": {
+    "context": "editor interface: editor.segment",
+    "source": "分词",
+    "params": []
+  },
+  "editor.batch": {
+    "context": "editor interface: editor.batch",
+    "source": "批处理",
+    "params": []
+  },
+  "editor.romanize": {
+    "context": "editor interface: editor.romanize",
+    "source": "生成日文罗马字音译",
+    "params": []
+  },
+  "editor.japaneseRuby": {
+    "context": "editor interface: editor.japaneseRuby",
+    "source": "智能日文注音",
+    "params": []
+  },
+  "editor.dictionaryRuby": {
+    "context": "editor interface: editor.dictionaryRuby",
+    "source": "词典注音",
+    "params": []
+  },
+  "editor.shape": {
+    "context": "editor interface: editor.shape",
+    "source": "简繁／中日汉字转换",
+    "params": []
+  },
+  "editor.rubyFromRomanization": {
+    "context": "editor interface: editor.rubyFromRomanization",
+    "source": "从音译生成注音",
+    "params": []
+  },
+  "editor.lyricsSettings": {
+    "context": "editor interface: editor.lyricsSettings",
+    "source": "歌词设置",
+    "params": []
+  },
+  "editor.metadata": {
+    "context": "editor interface: editor.metadata",
+    "source": "歌词元数据",
+    "params": []
+  },
+  "editor.singers": {
+    "context": "editor interface: editor.singers",
+    "source": "歌手管理",
+    "params": []
+  },
+  "editor.translationTracks": {
+    "context": "editor interface: editor.translationTracks",
+    "source": "管理翻译轨道",
+    "params": []
+  },
+  "editor.romanizationTracks": {
+    "context": "editor interface: editor.romanizationTracks",
+    "source": "管理音译轨道",
+    "params": []
+  },
+  "selection.cue": {
+    "context": "selection interface: selection.cue",
+    "source": "导唱已选 1",
+    "params": []
+  },
+  "selection.word": {
+    "context": "selection interface: selection.word",
+    "source": "词",
+    "params": []
+  },
+  "selection.line": {
+    "context": "selection interface: selection.line",
+    "source": "行",
+    "params": []
+  },
+  "selection.ruby": {
+    "context": "selection interface: selection.ruby",
+    "source": "注音",
+    "params": []
+  },
+  "selection.translationUnit": {
+    "context": "selection interface: selection.translationUnit",
+    "source": "翻译单元",
+    "params": []
+  },
+  "selection.romanizationUnit": {
+    "context": "selection interface: selection.romanizationUnit",
+    "source": "音译单元",
+    "params": []
+  },
+  "selection.translation": {
+    "context": "selection interface: selection.translation",
+    "source": "翻译内容",
+    "params": []
+  },
+  "selection.romanization": {
+    "context": "selection interface: selection.romanization",
+    "source": "音译内容",
+    "params": []
+  },
+  "selection.currentLine": {
+    "context": "selection interface: selection.currentLine",
+    "source": "当前行",
+    "params": []
+  },
+  "selection.summary": {
+    "context": "selection interface: selection.summary",
+    "source": "{{kind}}已选 {{count}}",
+    "params": [
+      "kind",
+      "count"
+    ]
+  },
+  "inlineAdd.failed": {
+    "context": "inlineAdd interface: inlineAdd.failed",
+    "source": "添加失败，请检查错误说明后重试，输入已保留",
+    "params": []
+  },
+  "kana.title": {
+    "context": "kana interface: kana.title",
+    "source": "音译生成假名高亮",
+    "params": []
+  },
+  "kana.characters": {
+    "context": "kana interface: kana.characters",
+    "source": "假名集合",
+    "params": []
+  },
+  "kana.clear": {
+    "context": "kana interface: kana.clear",
+    "source": "清空假名高亮规则",
+    "params": []
+  },
+  "common.reset": {
+    "context": "common interface: common.reset",
+    "source": "恢复默认",
+    "params": []
+  },
+  "common.moveUp": {
+    "context": "common interface: common.moveUp",
+    "source": "上移",
+    "params": []
+  },
+  "common.moveDown": {
+    "context": "common interface: common.moveDown",
+    "source": "下移",
+    "params": []
+  },
+  "common.name": {
+    "context": "common interface: common.name",
+    "source": "名称",
+    "params": []
+  },
+  "common.actions": {
+    "context": "common interface: common.actions",
+    "source": "操作",
+    "params": []
+  },
+  "common.apply": {
+    "context": "common interface: common.apply",
+    "source": "应用",
+    "params": []
+  },
+  "common.language": {
+    "context": "common interface: common.language",
+    "source": "语言",
+    "params": []
+  },
+  "common.type": {
+    "context": "common interface: common.type",
+    "source": "类型",
+    "params": []
+  },
+  "common.unset": {
+    "context": "common interface: common.unset",
+    "source": "未设置",
+    "params": []
+  },
+  "common.unspecified": {
+    "context": "common interface: common.unspecified",
+    "source": "未指定",
+    "params": []
+  },
+  "common.mixed": {
+    "context": "common interface: common.mixed",
+    "source": "混合值",
+    "params": []
+  },
+  "metadata.language": {
+    "context": "metadata interface: metadata.language",
+    "source": "歌词语言",
+    "params": []
+  },
+  "metadata.author": {
+    "context": "metadata interface: metadata.author",
+    "source": "歌曲作者（iTunes）",
+    "params": []
+  },
+  "metadata.amll": {
+    "context": "metadata interface: metadata.amll",
+    "source": "AMLL 元数据编辑",
+    "params": []
+  },
+  "metadata.key": {
+    "context": "metadata interface: metadata.key",
+    "source": "键",
+    "params": []
+  },
+  "metadata.value": {
+    "context": "metadata interface: metadata.value",
+    "source": "值",
+    "params": []
+  },
+  "metadata.add": {
+    "context": "metadata interface: metadata.add",
+    "source": "新增元数据键",
+    "params": []
+  },
+  "metadata.emptyHelp": {
+    "context": "metadata interface: metadata.emptyHelp",
+    "source": "清空值后提交将删除该值；末值清空会删除整键。",
+    "params": []
+  },
+  "metadata.authorLabel": {
+    "context": "metadata interface: metadata.authorLabel",
+    "source": "作者",
+    "params": []
+  },
+  "metadata.authorHelp": {
+    "context": "metadata interface: metadata.authorHelp",
+    "source": "请在歌曲作者（iTunes）区域编辑",
+    "params": []
+  },
+  "metadata.invalidKey": {
+    "context": "metadata interface: metadata.invalidKey",
+    "source": "键名非法或已存在",
+    "params": []
+  },
+  "metadata.renameFailed": {
+    "context": "metadata interface: metadata.renameFailed",
+    "source": "改名失败",
+    "params": []
+  },
+  "metadata.valueRequired": {
+    "context": "metadata interface: metadata.valueRequired",
+    "source": "请填写至少一个值",
+    "params": []
+  },
+  "metadata.newKey": {
+    "context": "metadata interface: metadata.newKey",
+    "source": "新元数据键",
+    "params": []
+  },
+  "metadata.newValue": {
+    "context": "metadata interface: metadata.newValue",
+    "source": "新元数据值",
+    "params": []
+  },
+  "metadata.cancelAdd": {
+    "context": "metadata interface: metadata.cancelAdd",
+    "source": "取消新增元数据",
+    "params": []
+  },
+  "singer.invalidId": {
+    "context": "singer interface: singer.invalidId",
+    "source": "歌手 ID 非法或已存在",
+    "params": []
+  },
+  "singer.missingType": {
+    "context": "singer interface: singer.missingType",
+    "source": "缺少 type",
+    "params": []
+  },
+  "singer.needsRepair": {
+    "context": "singer interface: singer.needsRepair",
+    "source": "（待修）",
+    "params": []
+  },
+  "singer.selectType": {
+    "context": "singer interface: singer.selectType",
+    "source": "请选择有效 type",
+    "params": []
+  },
+  "singer.add": {
+    "context": "singer interface: singer.add",
+    "source": "添加歌手",
+    "params": []
+  },
+  "singer.orderHelp": {
+    "context": "singer interface: singer.orderHelp",
+    "source": "声明顺序影响 Studio 预览的基准侧。",
+    "params": []
+  },
+  "singer.deleteHelp": {
+    "context": "singer interface: singer.deleteHelp",
+    "source": "移除此歌手定义及上述引用，保留歌词与其他歌手；引用清空后变为未指定。",
+    "params": []
+  },
+  "singer.id": {
+    "context": "singer interface: singer.id",
+    "source": "歌手 ID",
+    "params": []
+  },
+  "singer.newType": {
+    "context": "singer interface: singer.newType",
+    "source": "新歌手 type",
+    "params": []
+  },
+  "singer.name": {
+    "context": "singer interface: singer.name",
+    "source": "歌手名称",
+    "params": []
+  },
+  "singer.cancelAdd": {
+    "context": "singer interface: singer.cancelAdd",
+    "source": "取消新增歌手",
+    "params": []
+  },
+  "singer.label": {
+    "context": "singer interface: singer.label",
+    "source": "歌手",
+    "params": []
+  },
+  "songPart.failed": {
+    "context": "songPart interface: songPart.failed",
+    "source": "段落提交失败，草稿已保留",
+    "params": []
+  },
+  "songPart.label": {
+    "context": "songPart interface: songPart.label",
+    "source": "歌曲段落",
+    "params": []
+  },
+  "songPart.inherited": {
+    "context": "songPart interface: songPart.inherited",
+    "source": "背景继承所属主行段落，只读",
+    "params": []
+  },
+  "common.multipleValues": {
+    "context": "common interface: common.multipleValues",
+    "source": "多个值",
+    "params": []
+  },
+  "songPart.clear": {
+    "context": "songPart interface: songPart.clear",
+    "source": "清除所选主行歌曲段落",
+    "params": []
+  },
+  "ruby.addFailed": {
+    "context": "ruby interface: ruby.addFailed",
+    "source": "添加失败，请检查读音后重试",
+    "params": []
+  },
+  "ruby.splitFailed": {
+    "context": "ruby interface: ruby.splitFailed",
+    "source": "拆分失败",
+    "params": []
+  },
+  "outline.background": {
+    "context": "outline interface: outline.background",
+    "source": "背景",
+    "params": []
+  },
+  "outline.emptyLine": {
+    "context": "outline interface: outline.emptyLine",
+    "source": "空行",
+    "params": []
+  },
+  "layout.outlineWidth": {
+    "context": "layout interface: layout.outlineWidth",
+    "source": "大纲宽度",
+    "params": []
+  },
+  "layout.inspectorWidth": {
+    "context": "layout interface: layout.inspectorWidth",
+    "source": "属性栏宽度",
+    "params": []
+  },
+  "ruby.newLabel": {
+    "context": "ruby interface: ruby.newLabel",
+    "source": "新增读音 {{text}}",
+    "params": [
+      "text"
+    ]
+  },
+  "ruby.label": {
+    "context": "ruby interface: ruby.label",
+    "source": "注音 {{text}}",
+    "params": [
+      "text"
+    ]
+  },
+  "ruby.readingLabel": {
+    "context": "ruby interface: ruby.readingLabel",
+    "source": "读音 {{text}}",
+    "params": [
+      "text"
+    ]
+  },
+  "metadata.keyLabel": {
+    "context": "metadata interface: metadata.keyLabel",
+    "source": "元数据键 {{name}}",
+    "params": [
+      "name"
+    ]
+  },
+  "metadata.valueLabel": {
+    "context": "metadata interface: metadata.valueLabel",
+    "source": "元数据 {{name}} 值 {{index}}",
+    "params": [
+      "name",
+      "index"
+    ]
+  },
+  "metadata.newValueLabel": {
+    "context": "metadata interface: metadata.newValueLabel",
+    "source": "元数据 {{name}} 新值",
+    "params": [
+      "name"
+    ]
+  },
+  "metadata.addValue": {
+    "context": "metadata interface: metadata.addValue",
+    "source": "为 {{name}} 添加值",
+    "params": [
+      "name"
+    ]
+  },
+  "metadata.deleteKey": {
+    "context": "metadata interface: metadata.deleteKey",
+    "source": "删除元数据 {{name}} 及全部值",
+    "params": [
+      "name"
+    ]
+  },
+  "singer.idLabel": {
+    "context": "singer interface: singer.idLabel",
+    "source": "歌手 ID {{id}}",
+    "params": [
+      "id"
+    ]
+  },
+  "singer.typeLabel": {
+    "context": "singer interface: singer.typeLabel",
+    "source": "歌手 {{id}} type",
+    "params": [
+      "id"
+    ]
+  },
+  "singer.nameLabel": {
+    "context": "singer interface: singer.nameLabel",
+    "source": "歌手 {{id}}",
+    "params": [
+      "id"
+    ]
+  },
+  "singer.up": {
+    "context": "singer interface: singer.up",
+    "source": "上移歌手 {{id}}",
+    "params": [
+      "id"
+    ]
+  },
+  "singer.down": {
+    "context": "singer interface: singer.down",
+    "source": "下移歌手 {{id}}",
+    "params": [
+      "id"
+    ]
+  },
+  "singer.delete": {
+    "context": "singer interface: singer.delete",
+    "source": "删除歌手 {{id}}",
+    "params": [
+      "id"
+    ]
+  },
+  "singer.confirmDelete": {
+    "context": "singer interface: singer.confirmDelete",
+    "source": "删除 {{id}}{{name}}？",
+    "params": [
+      "id",
+      "name"
+    ]
+  },
+  "singer.references": {
+    "context": "singer interface: singer.references",
+    "source": "直接歌词引用：{{lines}} 行；actor 引用：{{actors}} 个。",
+    "params": [
+      "lines",
+      "actors"
+    ]
+  },
+  "songPart.selected": {
+    "context": "songPart interface: songPart.selected",
+    "source": "编辑明确选中的 {{count}} 条主行",
+    "params": [
+      "count"
+    ]
+  },
+  "songPart.selectedWithBackground": {
+    "context": "songPart interface: songPart.selectedWithBackground",
+    "source": "编辑明确选中的 {{count}} 条主行，背景不单独设置",
+    "params": [
+      "count"
+    ]
+  },
+  "common.confirmDelete": {
+    "context": "common interface: common.confirmDelete",
+    "source": "确认删除",
+    "params": []
+  },
+  "editor.finishComposition": {
+    "context": "editor interface: editor.finishComposition",
+    "source": "请先完成输入法组合",
+    "params": []
+  },
+  "editor.fixInput": {
+    "context": "editor interface: editor.fixInput",
+    "source": "请先修正当前无效输入",
+    "params": []
+  },
+  "editor.failed": {
+    "context": "editor interface: editor.failed",
+    "source": "编辑失败",
+    "params": []
+  },
+  "editor.crossContentCopy": {
+    "context": "editor interface: editor.crossContentCopy",
+    "source": "跨内容音译复制暂不支持，请选择同一份内容",
+    "params": []
+  },
+  "editor.copied": {
+    "context": "editor interface: editor.copied",
+    "source": "已复制到编辑器剪贴板",
+    "params": []
+  },
+  "editor.pasteFailed": {
+    "context": "editor interface: editor.pasteFailed",
+    "source": "粘贴失败",
+    "params": []
+  },
+  "editor.moveTargetRequired": {
+    "context": "editor interface: editor.moveTargetRequired",
+    "source": "跨来源行移动需要明确目标",
+    "params": []
+  },
+  "editor.moveFailed": {
+    "context": "editor interface: editor.moveFailed",
+    "source": "跨行移动失败",
+    "params": []
+  },
+  "editor.addWord": {
+    "context": "editor interface: editor.addWord",
+    "source": "添加词",
+    "params": []
+  },
+  "editor.rubyScope": {
+    "context": "editor interface: editor.rubyScope",
+    "source": "作用于所涉父词的全部 Ruby，每词一次",
+    "params": []
+  },
+  "editor.cueActions": {
+    "context": "editor interface: editor.cueActions",
+    "source": "导唱操作",
+    "params": []
+  },
+  "editor.editCue": {
+    "context": "editor interface: editor.editCue",
+    "source": "编辑导唱",
+    "params": []
+  },
+  "editor.deleteCue": {
+    "context": "editor interface: editor.deleteCue",
+    "source": "删除导唱",
+    "params": []
+  },
+  "editor.emptyBeats": {
+    "context": "editor interface: editor.emptyBeats",
+    "source": "后置空拍",
+    "params": []
+  },
+  "editor.increaseBeats": {
+    "context": "editor interface: editor.increaseBeats",
+    "source": "增加空拍",
+    "params": []
+  },
+  "editor.decreaseBeats": {
+    "context": "editor interface: editor.decreaseBeats",
+    "source": "减少空拍",
+    "params": []
+  },
+  "editor.clearBeats": {
+    "context": "editor interface: editor.clearBeats",
+    "source": "清空空拍",
+    "params": []
+  },
+  "editor.singleRequired": {
+    "context": "editor interface: editor.singleRequired",
+    "source": "需要逐对象编辑，请先单选",
+    "params": []
+  },
+  "editor.lineActions": {
+    "context": "editor interface: editor.lineActions",
+    "source": "歌词行操作",
+    "params": []
+  },
+  "editor.rubyActions": {
+    "context": "editor interface: editor.rubyActions",
+    "source": "注音操作",
+    "params": []
+  },
+  "editor.addBeats": {
+    "context": "editor interface: editor.addBeats",
+    "source": "添加空拍",
+    "params": []
+  },
+  "editor.addReading": {
+    "context": "editor interface: editor.addReading",
+    "source": "添加读音",
+    "params": []
+  },
+  "editor.merge": {
+    "context": "editor interface: editor.merge",
+    "source": "合并所选",
+    "params": []
+  },
+  "editor.splitBeats": {
+    "context": "editor interface: editor.splitBeats",
+    "source": "按音拍拆分",
+    "params": []
+  },
+  "editor.redistributeReading": {
+    "context": "editor interface: editor.redistributeReading",
+    "source": "重分配读音时间",
+    "params": []
+  },
+  "editor.splitReading": {
+    "context": "editor interface: editor.splitReading",
+    "source": "拆分读音",
+    "params": []
+  },
+  "editor.wordActions": {
+    "context": "editor interface: editor.wordActions",
+    "source": "词操作",
+    "params": []
+  },
+  "editor.insertWordBefore": {
+    "context": "editor interface: editor.insertWordBefore",
+    "source": "前插词",
+    "params": []
+  },
+  "editor.insertWordAfter": {
+    "context": "editor interface: editor.insertWordAfter",
+    "source": "后插词",
+    "params": []
+  },
+  "editor.splitWord": {
+    "context": "editor interface: editor.splitWord",
+    "source": "拆分词",
+    "params": []
+  },
+  "editor.addRuby": {
+    "context": "editor interface: editor.addRuby",
+    "source": "添加注音",
+    "params": []
+  },
+  "editor.insertLineBefore": {
+    "context": "editor interface: editor.insertLineBefore",
+    "source": "前插行",
+    "params": []
+  },
+  "editor.insertLineAfter": {
+    "context": "editor interface: editor.insertLineAfter",
+    "source": "后插行",
+    "params": []
+  },
+  "editor.splitLine": {
+    "context": "editor interface: editor.splitLine",
+    "source": "拆分行",
+    "params": []
+  },
+  "editor.singleSplit": {
+    "context": "editor interface: editor.singleSplit",
+    "source": "拆行需单选",
+    "params": []
+  },
+  "editor.clearSelectedCues": {
+    "context": "editor interface: editor.clearSelectedCues",
+    "source": "清除所选行导唱",
+    "params": []
+  },
+  "editor.clearLineCue": {
+    "context": "editor interface: editor.clearLineCue",
+    "source": "清除本行导唱",
+    "params": []
+  },
+  "editor.noSelectedCues": {
+    "context": "editor interface: editor.noSelectedCues",
+    "source": "所选行没有导唱",
+    "params": []
+  },
+  "editor.translationActions": {
+    "context": "editor interface: editor.translationActions",
+    "source": "翻译操作",
+    "params": []
+  },
+  "editor.romanizationActions": {
+    "context": "editor interface: editor.romanizationActions",
+    "source": "音译操作",
+    "params": []
+  },
+  "editor.moveEarlier": {
+    "context": "editor interface: editor.moveEarlier",
+    "source": "向前移动",
+    "params": []
+  },
+  "editor.moveLater": {
+    "context": "editor interface: editor.moveLater",
+    "source": "向后移动",
+    "params": []
+  },
+  "editor.splitUnit": {
+    "context": "editor interface: editor.splitUnit",
+    "source": "拆分单元",
+    "params": []
+  },
+  "editor.segmentAndTime": {
+    "context": "editor interface: editor.segmentAndTime",
+    "source": "分词并定时",
+    "params": []
+  },
+  "editor.moveToLine": {
+    "context": "editor interface: editor.moveToLine",
+    "source": "转移到其他歌词行",
+    "params": []
+  },
+  "editor.singleOverwrite": {
+    "context": "editor interface: editor.singleOverwrite",
+    "source": "多个内容的覆盖语义未定义，请先单选",
+    "params": []
+  },
+  "editor.manageTracks": {
+    "context": "editor interface: editor.manageTracks",
+    "source": "管理轨道",
+    "params": []
+  },
+  "editor.sameTrack": {
+    "context": "editor interface: editor.sameTrack",
+    "source": "请选择同一轨道",
+    "params": []
+  },
+  "editor.trackEarlier": {
+    "context": "editor interface: editor.trackEarlier",
+    "source": "轨道前移",
+    "params": []
+  },
+  "editor.trackLater": {
+    "context": "editor interface: editor.trackLater",
+    "source": "轨道后移",
+    "params": []
+  },
+  "editor.trackBoundary": {
+    "context": "editor interface: editor.trackBoundary",
+    "source": "已到达轨道边界",
+    "params": []
+  },
+  "editor.reading": {
+    "context": "editor interface: editor.reading",
+    "source": "读音",
+    "params": []
+  },
+  "editor.content": {
+    "context": "editor interface: editor.content",
+    "source": "内容",
+    "params": []
+  },
+  "editor.unit": {
+    "context": "editor interface: editor.unit",
+    "source": "单元",
+    "params": []
+  },
+  "editor.textRequired": {
+    "context": "editor interface: editor.textRequired",
+    "source": "正文不能为空",
+    "params": []
+  },
+  "editor.deleteFailed": {
+    "context": "editor interface: editor.deleteFailed",
+    "source": "删除失败",
+    "params": []
+  },
+  "editor.mode": {
+    "context": "editor interface: editor.mode",
+    "source": "工作模式",
+    "params": []
+  },
+  "editor.acquire": {
+    "context": "editor interface: editor.acquire",
+    "source": "歌词获取",
+    "params": []
+  },
+  "editor.audio": {
+    "context": "editor interface: editor.audio",
+    "source": "音频处理",
+    "params": []
+  },
+  "editor.edit": {
+    "context": "editor interface: editor.edit",
+    "source": "编辑",
+    "params": []
+  },
+  "editor.sync": {
+    "context": "editor interface: editor.sync",
+    "source": "打轴",
+    "params": []
+  },
+  "editor.karaoke": {
+    "context": "editor interface: editor.karaoke",
+    "source": "卡拉 OK",
+    "params": []
+  },
+  "editor.amllPreview": {
+    "context": "editor interface: editor.amllPreview",
+    "source": "AMLL 预览",
+    "params": []
+  },
+  "editor.package": {
+    "context": "editor interface: editor.package",
+    "source": "文件打包",
+    "params": []
+  },
+  "editor.audioOutline": {
+    "context": "editor interface: editor.audioOutline",
+    "source": "音频处理大纲",
+    "params": []
+  },
+  "editor.outline": {
+    "context": "editor interface: editor.outline",
+    "source": "大纲",
+    "params": []
+  },
+  "editor.locate": {
+    "context": "editor interface: editor.locate",
+    "source": "定位",
+    "params": []
+  },
+  "editor.vocalAnalysis": {
+    "context": "editor interface: editor.vocalAnalysis",
+    "source": "人声分离与声学分析",
+    "params": []
+  },
+  "editor.audioRequired": {
+    "context": "editor interface: editor.audioRequired",
+    "source": "请从底部上传音乐文件，再进行人声处理。歌词可继续编辑、保存和下载。",
+    "params": []
+  },
+  "editor.previewLoading": {
+    "context": "editor interface: editor.previewLoading",
+    "source": "正在载入预览…",
+    "params": []
+  },
+  "editor.addCountIn": {
+    "context": "editor interface: editor.addCountIn",
+    "source": "添加行前导唱",
+    "params": []
+  },
+  "editor.mainVocal": {
+    "context": "editor interface: editor.mainVocal",
+    "source": "主唱",
+    "params": []
+  },
+  "editor.backgroundSuffix": {
+    "context": "editor interface: editor.backgroundSuffix",
+    "source": "· 背景",
+    "params": []
+  },
+  "editor.romanizationTrackSuffix": {
+    "context": "editor interface: editor.romanizationTrackSuffix",
+    "source": "· 音译轨道",
+    "params": []
+  },
+  "editor.unspecifiedLanguage": {
+    "context": "editor interface: editor.unspecifiedLanguage",
+    "source": "未指定语言",
+    "params": []
+  },
+  "editor.addRomanization": {
+    "context": "editor interface: editor.addRomanization",
+    "source": "添加音译",
+    "params": []
+  },
+  "editor.inspector": {
+    "context": "editor interface: editor.inspector",
+    "source": "属性",
+    "params": []
+  },
+  "editor.selectedLine": {
+    "context": "editor interface: editor.selectedLine",
+    "source": "已选行",
+    "params": []
+  },
+  "editor.parentLine": {
+    "context": "editor interface: editor.parentLine",
+    "source": "所在行",
+    "params": []
+  },
+  "editor.selectedObject": {
+    "context": "editor interface: editor.selectedObject",
+    "source": "选中对象",
+    "params": []
+  },
+  "editor.multiTimeHelp": {
+    "context": "editor interface: editor.multiTimeHelp",
+    "source": "多对象时间可在时间轴整体平移；端点请单独调整。",
+    "params": []
+  },
+  "editor.explicit": {
+    "context": "editor interface: editor.explicit",
+    "source": "不雅用语",
+    "params": []
+  },
+  "editor.wordSinger": {
+    "context": "editor interface: editor.wordSinger",
+    "source": "词级歌手",
+    "params": []
+  },
+  "editor.group": {
+    "context": "editor interface: editor.group",
+    "source": "输出分组",
+    "params": []
+  },
+  "editor.noGroup": {
+    "context": "editor interface: editor.noGroup",
+    "source": "未选择分组",
+    "params": []
+  },
+  "editor.multiLineTimeHelp": {
+    "context": "editor interface: editor.multiLineTimeHelp",
+    "source": "多行时间请使用整体偏移或时间轴平移。",
+    "params": []
+  },
+  "editor.skipAlignment": {
+    "context": "editor interface: editor.skipAlignment",
+    "source": "跳过对齐",
+    "params": []
+  },
+  "editor.skipSync": {
+    "context": "editor interface: editor.skipSync",
+    "source": "跳过打轴",
+    "params": []
+  },
+  "editor.duet": {
+    "context": "editor interface: editor.duet",
+    "source": "对唱歌词",
+    "params": []
+  },
+  "editor.backgroundBefore": {
+    "context": "editor interface: editor.backgroundBefore",
+    "source": "背景置于主行之前",
+    "params": []
+  },
+  "editor.backgroundLyrics": {
+    "context": "editor interface: editor.backgroundLyrics",
+    "source": "背景歌词",
+    "params": []
+  },
+  "editor.noPreviousMain": {
+    "context": "editor interface: editor.noPreviousMain",
+    "source": "此行之前没有主行，不能设为背景歌词",
+    "params": []
+  },
+  "editor.previousHasBackground": {
+    "context": "editor interface: editor.previousHasBackground",
+    "source": "前一主行已有背景歌词，请先处理所属关系",
+    "params": []
+  },
+  "editor.mainLine": {
+    "context": "editor interface: editor.mainLine",
+    "source": "所属主行",
+    "params": []
+  },
+  "common.choose": {
+    "context": "common interface: common.choose",
+    "source": "请选择",
+    "params": []
+  },
+  "editor.amllSettings": {
+    "context": "editor interface: editor.amllSettings",
+    "source": "AMLL 兼容设置",
+    "params": []
+  },
+  "editor.settingsScope": {
+    "context": "editor interface: editor.settingsScope",
+    "source": "当前项目 · 修改立即生效并自动保存，可撤销",
+    "params": []
+  },
+  "editor.romanizationTrackManagement": {
+    "context": "editor interface: editor.romanizationTrackManagement",
+    "source": "音译轨道管理",
+    "params": []
+  },
+  "editor.track": {
+    "context": "editor interface: editor.track",
+    "source": "轨道",
+    "params": []
+  },
+  "editor.romanizationTrackUp": {
+    "context": "editor interface: editor.romanizationTrackUp",
+    "source": "上移音译轨道",
+    "params": []
+  },
+  "editor.romanizationTrackDown": {
+    "context": "editor interface: editor.romanizationTrackDown",
+    "source": "下移音译轨道",
+    "params": []
+  },
+  "editor.deleteRomanizationTrack": {
+    "context": "editor interface: editor.deleteRomanizationTrack",
+    "source": "删除音译轨道",
+    "params": []
+  },
+  "editor.addRomanizationTrack": {
+    "context": "editor interface: editor.addRomanizationTrack",
+    "source": "新增轨道音译轨道",
+    "params": []
+  },
+  "editor.moveAttachment": {
+    "context": "editor interface: editor.moveAttachment",
+    "source": "转移附属内容",
+    "params": []
+  },
+  "editor.targetLineGone": {
+    "context": "editor interface: editor.targetLineGone",
+    "source": "目标行已失效",
+    "params": []
+  },
+  "editor.contentGone": {
+    "context": "editor interface: editor.contentGone",
+    "source": "选中内容已失效",
+    "params": []
+  },
+  "editor.applyOneUndo": {
+    "context": "editor interface: editor.applyOneUndo",
+    "source": "应用（一次撤销）",
+    "params": []
+  },
+  "editor.targetLine": {
+    "context": "editor interface: editor.targetLine",
+    "source": "目标歌词行",
+    "params": []
+  },
+  "editor.moveAttachmentHelp": {
+    "context": "editor interface: editor.moveAttachmentHelp",
+    "source": "文字与独立时间保持原值，所属行会改变。",
+    "params": []
+  },
+  "error.unexpected": {
+    "context": "error interface: error.unexpected",
+    "source": "操作失败：{{diagnostic}}",
+    "params": [
+      "diagnostic"
+    ]
+  },
+  "field.nonnegativeSeconds": {
+    "context": "field interface: field.nonnegativeSeconds",
+    "source": "时间必须是非负秒数",
+    "params": []
+  },
+  "field.precision": {
+    "context": "field interface: field.precision",
+    "source": "时间超出毫秒精度范围",
+    "params": []
+  },
+  "field.invalidTime": {
+    "context": "field interface: field.invalidTime",
+    "source": "时间格式错误",
+    "params": []
+  },
+  "field.emptyBeatRange": {
+    "context": "field interface: field.emptyBeatRange",
+    "source": "请输入 0–32 的整数",
+    "params": []
+  },
+  "field.whitespaceBeats": {
+    "context": "field interface: field.whitespaceBeats",
+    "source": "纯空白不参与打轴，也不显示或消费空拍；0 可清除配置。",
+    "params": []
+  },
+  "field.startSeconds": {
+    "context": "field interface: field.startSeconds",
+    "source": "{{label}}开始秒数",
+    "params": [
+      "label"
+    ]
+  },
+  "field.endSeconds": {
+    "context": "field interface: field.endSeconds",
+    "source": "{{label}}结束秒数",
+    "params": [
+      "label"
+    ]
+  },
+  "editor.wordLabel": {
+    "context": "editor interface: editor.wordLabel",
+    "source": "词 {{text}}",
+    "params": [
+      "text"
+    ]
+  },
+  "editor.lineLabel": {
+    "context": "editor interface: editor.lineLabel",
+    "source": "行 {{number}}",
+    "params": [
+      "number"
+    ]
+  },
+  "editor.backgroundLineLabel": {
+    "context": "editor interface: editor.backgroundLineLabel",
+    "source": "行 {{number}}背景",
+    "params": [
+      "number"
+    ]
+  },
+  "editor.currentLine": {
+    "context": "editor interface: editor.currentLine",
+    "source": "当前行 L{{number}}",
+    "params": [
+      "number"
+    ]
+  },
+  "editor.deleteSelected": {
+    "context": "editor interface: editor.deleteSelected",
+    "source": "删除所选{{kind}}（{{count}}）",
+    "params": [
+      "kind",
+      "count"
+    ]
+  },
+  "editor.deleteObject": {
+    "context": "editor interface: editor.deleteObject",
+    "source": "删除{{kind}}",
+    "params": [
+      "kind"
+    ]
+  },
+  "editor.wordSingerLabel": {
+    "context": "editor interface: editor.wordSingerLabel",
+    "source": "词级歌手 {{name}}",
+    "params": [
+      "name"
+    ]
+  },
+  "editor.trackLanguage": {
+    "context": "editor interface: editor.trackLanguage",
+    "source": "音译轨道 {{number}} 语言",
+    "params": [
+      "number"
+    ]
+  },
+  "media.playFailed": {
+    "context": "media interface: media.playFailed",
+    "source": "媒体无法播放，请重试",
+    "params": []
+  },
+  "media.sourceFailed": {
+    "context": "media interface: media.sourceFailed",
+    "source": "所选音源无法播放，请重试",
+    "params": []
+  },
+  "media.analyzing": {
+    "context": "media interface: media.analyzing",
+    "source": "分析中…",
+    "params": []
+  },
+  "media.noBeat": {
+    "context": "media interface: media.noBeat",
+    "source": "未检测到稳定节拍",
+    "params": []
+  },
+  "media.bpmFailed": {
+    "context": "media interface: media.bpmFailed",
+    "source": "BPM 分析失败",
+    "params": []
+  },
+  "media.fullTrack": {
+    "context": "media interface: media.fullTrack",
+    "source": "全曲",
+    "params": []
+  },
+  "media.previousWindow": {
+    "context": "media interface: media.previousWindow",
+    "source": "前移窗口",
+    "params": []
+  },
+  "media.nextWindow": {
+    "context": "media interface: media.nextWindow",
+    "source": "后移窗口",
+    "params": []
+  },
+  "media.zoomIn": {
+    "context": "media interface: media.zoomIn",
+    "source": "放大波形",
+    "params": []
+  },
+  "media.zoomOut": {
+    "context": "media interface: media.zoomOut",
+    "source": "缩小波形",
+    "params": []
+  },
+  "media.viewport": {
+    "context": "media interface: media.viewport",
+    "source": "视窗",
+    "params": []
+  },
+  "media.layers": {
+    "context": "media interface: media.layers",
+    "source": "时间轴图层",
+    "params": []
+  },
+  "media.countIn": {
+    "context": "media interface: media.countIn",
+    "source": "导唱",
+    "params": []
+  },
+  "media.romanization": {
+    "context": "media interface: media.romanization",
+    "source": "音译",
+    "params": []
+  },
+  "media.gaps": {
+    "context": "media interface: media.gaps",
+    "source": "空隙",
+    "params": []
+  },
+  "media.waveform": {
+    "context": "media interface: media.waveform",
+    "source": "波形",
+    "params": []
+  },
+  "media.spectrogram": {
+    "context": "media interface: media.spectrogram",
+    "source": "声谱图",
+    "params": []
+  },
+  "media.energy": {
+    "context": "media interface: media.energy",
+    "source": "能量",
+    "params": []
+  },
+  "media.segments": {
+    "context": "media interface: media.segments",
+    "source": "片段",
+    "params": []
+  },
+  "media.ruler": {
+    "context": "media interface: media.ruler",
+    "source": "时间标尺",
+    "params": []
+  },
+  "media.graphicSource": {
+    "context": "media interface: media.graphicSource",
+    "source": "波形／声谱图音源",
+    "params": []
+  },
+  "media.original": {
+    "context": "media interface: media.original",
+    "source": "原曲",
+    "params": []
+  },
+  "media.vocals": {
+    "context": "media interface: media.vocals",
+    "source": "人声",
+    "params": []
+  },
+  "media.waveformProgress": {
+    "context": "media interface: media.waveformProgress",
+    "source": "波形进度",
+    "params": []
+  },
+  "media.loopA": {
+    "context": "media interface: media.loopA",
+    "source": "循环 A 边界",
+    "params": []
+  },
+  "media.loopB": {
+    "context": "media interface: media.loopB",
+    "source": "循环 B 边界",
+    "params": []
+  },
+  "media.timeline": {
+    "context": "media interface: media.timeline",
+    "source": "时间轴",
+    "params": []
+  },
+  "media.autoBpm": {
+    "context": "media interface: media.autoBpm",
+    "source": "自动 BPM",
+    "params": []
+  },
+  "media.snap": {
+    "context": "media interface: media.snap",
+    "source": "吸附",
+    "params": []
+  },
+  "media.follow": {
+    "context": "media interface: media.follow",
+    "source": "播放跟随",
+    "params": []
+  },
+  "media.pause": {
+    "context": "media interface: media.pause",
+    "source": "暂停",
+    "params": []
+  },
+  "media.play": {
+    "context": "media interface: media.play",
+    "source": "播放",
+    "params": []
+  },
+  "media.playbackSource": {
+    "context": "media interface: media.playbackSource",
+    "source": "播放音源",
+    "params": []
+  },
+  "media.loadingSource": {
+    "context": "media interface: media.loadingSource",
+    "source": "正在加载音源…",
+    "params": []
+  },
+  "media.collapseTimeline": {
+    "context": "media interface: media.collapseTimeline",
+    "source": "收起时间轴",
+    "params": []
+  },
+  "media.expandTimeline": {
+    "context": "media interface: media.expandTimeline",
+    "source": "展开时间轴",
+    "params": []
+  },
+  "media.setAFailed": {
+    "context": "media interface: media.setAFailed",
+    "source": "设置 A 失败",
+    "params": []
+  },
+  "media.setBFailed": {
+    "context": "media interface: media.setBFailed",
+    "source": "设置 B 失败",
+    "params": []
+  },
+  "media.loopAB": {
+    "context": "media interface: media.loopAB",
+    "source": "循环 A/B",
+    "params": []
+  },
+  "media.locateAB": {
+    "context": "media interface: media.locateAB",
+    "source": "定位 A/B",
+    "params": []
+  },
+  "media.loopLine": {
+    "context": "media interface: media.loopLine",
+    "source": "循环当前行",
+    "params": []
+  },
+  "media.loopSelection": {
+    "context": "media interface: media.loopSelection",
+    "source": "循环选区",
+    "params": []
+  },
+  "media.retryAudio": {
+    "context": "media interface: media.retryAudio",
+    "source": "重试加载音频",
+    "params": []
+  },
+  "media.disconnected": {
+    "context": "media interface: media.disconnected",
+    "source": "未连接媒体",
+    "params": []
+  },
+  "media.waveformFailed": {
+    "context": "media interface: media.waveformFailed",
+    "source": "波形加载失败",
+    "params": []
+  },
+  "media.retryWaveform": {
+    "context": "media interface: media.retryWaveform",
+    "source": "重试加载波形",
+    "params": []
+  },
+  "media.speedControls": {
+    "context": "media interface: media.speedControls",
+    "source": "速度控件",
+    "params": []
+  },
+  "media.speed": {
+    "context": "media interface: media.speed",
+    "source": "速度",
+    "params": []
+  },
+  "media.playbackSpeed": {
+    "context": "media interface: media.playbackSpeed",
+    "source": "播放速度",
+    "params": []
+  },
+  "media.resetSpeed": {
+    "context": "media interface: media.resetSpeed",
+    "source": "恢复 1 倍速度",
+    "params": []
+  },
+  "settings.modeFailed": {
+    "context": "settings interface: settings.modeFailed",
+    "source": "无法读取运行方式",
+    "params": []
+  },
+  "settings.devicesFailed": {
+    "context": "settings interface: settings.devicesFailed",
+    "source": "无法读取计算设备设置。",
+    "params": []
+  },
+  "settings.retryDevices": {
+    "context": "settings interface: settings.retryDevices",
+    "source": "重试读取计算设备设置",
+    "params": []
+  },
+  "settings.loadingDevices": {
+    "context": "settings interface: settings.loadingDevices",
+    "source": "正在读取计算设备设置…",
+    "params": []
+  },
+  "settings.serviceDevices": {
+    "context": "settings interface: settings.serviceDevices",
+    "source": "计算设备由服务配置。",
+    "params": []
+  },
+  "settings.vocalSeparation": {
+    "context": "settings interface: settings.vocalSeparation",
+    "source": "人声分离",
+    "params": []
+  },
+  "settings.alignment": {
+    "context": "settings interface: settings.alignment",
+    "source": "自动对齐",
+    "params": []
+  },
+  "settings.vocalDevice": {
+    "context": "settings interface: settings.vocalDevice",
+    "source": "人声分离计算设备",
+    "params": []
+  },
+  "settings.alignmentDevice": {
+    "context": "settings interface: settings.alignmentDevice",
+    "source": "自动对齐计算设备",
+    "params": []
+  },
+  "settings.auto": {
+    "context": "settings interface: settings.auto",
+    "source": "自动",
+    "params": []
+  },
+  "settings.deviceHelp": {
+    "context": "settings interface: settings.deviceHelp",
+    "source": "修改仅影响后续任务；自动按服务配置选择设备。",
+    "params": []
+  },
+  "media.bpmDetected": {
+    "context": "media interface: media.bpmDetected",
+    "source": "检测到 {{bpm}} BPM",
+    "params": [
+      "bpm"
+    ]
+  },
+  "media.speedValue": {
+    "context": "media interface: media.speedValue",
+    "source": "{{rate}}倍",
+    "params": [
+      "rate"
+    ]
+  },
+  "editor.lineCount_other": {
+    "context": "editor interface: editor.lineCount",
+    "source": "{{count}} 行",
+    "params": [
+      "count"
+    ]
+  },
+  "editor.contentCount_other": {
+    "context": "editor interface: editor.contentCount",
+    "source": "已选 {{count}} 份内容",
+    "params": [
+      "count"
+    ]
+  },
+  "editor.itemCount_other": {
+    "context": "editor interface: editor.itemCount",
+    "source": "{{count}} 项",
+    "params": [
+      "count"
+    ]
+  },
+  "editor.clearCueCount_other": {
+    "context": "editor interface: editor.clearCueCount",
+    "source": "清除 {{count}} 个导唱，仅所选行",
+    "params": [
+      "count"
+    ]
   }
 }

@@ -1,16 +1,19 @@
+import { i18n } from '../../i18n';
+import { useTranslation } from 'react-i18next';
 import { useRef, useState } from 'react';
 import { COLUMN_LIMITS, type ColumnSide } from './column-preferences';
 import styles from './semantic-editor.module.css';
 
 type Props = { side: ColumnSide; width: number; preferredWidth: number; maximum: number; onChange: (width: number) => number; onCommit: (width: number) => void };
 export function ColumnSeparator({ side, width, preferredWidth, maximum, onChange, onCommit }: Props) {
+  useTranslation();
   const [preview, setPreview] = useState<number | null>(null);
   const drag = useRef<{ original: number; x: number; start: number; current: number } | null>(null);
   const limits = COLUMN_LIMITS[side], direction = side === 'outline' ? 1 : -1;
   const clamp = (value: number) => Math.max(limits.min, Math.min(maximum, value));
   const cancel = () => { if (drag.current) { onChange(drag.current.original); drag.current = null; setPreview(null); } };
   return <div className={styles.columnSeparator} role="separator" tabIndex={0} aria-orientation="vertical"
-    aria-label={side === 'outline' ? '大纲宽度' : '属性栏宽度'} aria-valuemin={limits.min} aria-valuemax={maximum} aria-valuenow={Math.round(preview ?? width)}
+    aria-label={side === 'outline' ? t('layout.outlineWidth') : t('layout.inspectorWidth')} aria-valuemin={limits.min} aria-valuemax={maximum} aria-valuenow={Math.round(preview ?? width)}
     onPointerDown={event => {
       if (event.button !== 0) return;
       event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId);
@@ -36,3 +39,5 @@ export function ColumnSeparator({ side, width, preferredWidth, maximum, onChange
       }
     }} />;
 }
+
+const t=i18n.t.bind(i18n);
