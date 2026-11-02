@@ -1,5 +1,5 @@
 import type { Capabilities } from "./client";
-import { requestHeaders } from "./client";
+import { requestHeaders, readApiError } from "./client";
 import { isCapabilities } from "./validate";
 
 export type JobRequest = {retry_analysis_id?:string; revision?:string; bound_revision?:string; devices?: Record<string, { preferred: string; actual: string; label: string; reason?: string | null; reason_code?: string | null }>; asset_id:string};
@@ -36,19 +36,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers ?? {}),
     }),
   });
-  if (!response.ok) {
-    let message = `任务请求失败（${response.status}）`;
-    try {
-      const body = (await response.json()) as {
-        message?: string;
-        detail?: { message?: string };
-      };
-      message = body.message ?? body.detail?.message ?? message;
-    } catch {
-      /* preserve status message */
-    }
-    throw new Error(message);
-  }
+  if (!response.ok) throw await readApiError(response);
   return (await response.json()) as T;
 }
 function isRecord(value: unknown): value is Record<string, unknown> {

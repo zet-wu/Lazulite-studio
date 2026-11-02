@@ -1,3 +1,4 @@
+import {message,MessageError,type Message} from './messages';
 import { lineText, type LyricDocument, type LyricWord, type RubyUnit } from './lyric-document';
 import { planWordMerge, type LyricCommand } from './lyric-commands';
 
@@ -20,10 +21,10 @@ export function proposeDictionaryRuby(source: LyricDocument, ids: string[], rang
     const entries = ranges.filter(r => r.lineId === line.id);
     let end = 0;
     for (const r of entries) {
-      if (r.start !== end || r.end <= r.start || r.end > text.length || text.slice(r.start,r.end) !== r.base) throw new Error('词典范围与正文快照不符');
+      if (r.start !== end || r.end <= r.start || r.end > text.length || text.slice(r.start,r.end) !== r.base) throw new MessageError(message('dictionary.rangeMismatch'));
       end = r.end;
     }
-    if (end !== text.length) throw new Error('词典结果未覆盖整行正文');
+    if (end !== text.length) throw new MessageError(message('dictionary.incomplete'));
     const selected: Array<DictionaryRange & { existing: boolean }> = [];
     for (const r of entries) {
       if (words.some(w => w.word.rubyUnits.length && w.start < r.end && w.end > r.start)) continue;
@@ -59,8 +60,8 @@ const makeUnits = (word: LyricWord, readings: string[]): RubyUnit[] => {
 };
 
 export function dictionaryRubyCommand(current: LyricDocument, source: LyricDocument, rows: DictionaryRow[], merge: boolean): LyricCommand {
-  if(current!==source)throw new Error('源文档已变化，请重新打开生成');
-  if(!rows.some(row=>row.blocks.some(b=>dictionaryBlockApplies(b,merge))))throw new Error('没有可应用的注音修改');
+  if(current!==source)throw new MessageError(message('reading.stale'));
+  if(!rows.some(row=>row.blocks.some(b=>dictionaryBlockApplies(b,merge))))throw new MessageError(message('reading.noChanges'));
   const mapped=new Map(rows.map(row=>[row.lineId,row]));
   const lines=source.lines.map(line=>{
     const row=mapped.get(line.id); if(!row)return line;

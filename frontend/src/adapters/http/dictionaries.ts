@@ -1,6 +1,6 @@
 import type { components } from './generated';
 import type { DictionaryRange } from '../../domain/dictionary-ruby';
-import { requestHeaders } from './client';
+import { requestHeaders, readApiError } from './client';
 
 export type DictionaryInfo = components['schemas']['DictionaryInfo'];
 export type DictionaryList = components['schemas']['DictionaryList'];
@@ -10,11 +10,7 @@ const root='/api/v1/reading/dictionaries';
 
 async function call<T>(path:string,init?:RequestInit):Promise<T> {
   const response=await fetch(root+path,{credentials:'include',...init,headers:requestHeaders(init?.headers)});
-  if(!response.ok){
-    let message=`词典请求失败（${response.status}）`;
-    try { const body=await response.json() as {message?:string};message=body.message??message; } catch { /* retain HTTP status */ }
-    throw new Error(message);
-  }
+  if (!response.ok) throw await readApiError(response);
   return response.status===204?undefined as T:await response.json() as T;
 }
 export const listDictionaries=(signal?:AbortSignal)=>call<DictionaryList>('',{signal});
@@ -42,7 +38,7 @@ async function streamAnalysis(id:string,instance:string,lines:Array<{id:string;t
   const response=await fetch(root+`/${encodeURIComponent(id)}/analyze?stream=true`,{
     method:'POST',credentials:'include',headers:requestHeaders({'Content-Type':'application/json'}),body:JSON.stringify({instance,lines}),signal,
   });
-  if(!response.ok)throw new Error(`词典请求失败（${response.status}）`);
+  if (!response.ok) throw await readApiError(response);
   if(!response.body)throw new Error('词典响应为空');
   const reader=response.body.getReader(),decoder=new TextDecoder();
   let pending='',result:Analysis|undefined;

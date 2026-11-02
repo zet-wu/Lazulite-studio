@@ -46,11 +46,11 @@ def test_project_endpoint_reads_owned_original_without_changing_document(tmp_pat
         before=client.get(url+'/document').json()
         assert client.get(url+'/embedded-lyrics').status_code==422
         token=client.post('/api/v1/uploads',files={'file':('source.flac',path.read_bytes(),'audio/flac')},headers=HEADERS).json()['id']
-        assert client.post(url+'/music',json={'upload_id':token},headers=HEADERS).status_code==200
+        assert client.post(url+'/music',json={'upload_id':token,'revision':before['revision'],'expected_asset_id':None,'operation_id':token},headers=HEADERS).status_code==200
         result=client.get(url+'/embedded-lyrics')
         assert result.status_code==200,result.text
         assert result.json()['candidates'][0]['content']=='[00:00.000]original'
-        assert client.get(url+'/document').json()==before
+        assert client.get(url+'/document').json()['document']==before['document']
         assert client.get('/api/v1/projects/absent/embedded-lyrics').status_code==404
 
 def test_multi_sample_stpp_is_listed_as_unsupported_instead_of_first_sample(tmp_path):

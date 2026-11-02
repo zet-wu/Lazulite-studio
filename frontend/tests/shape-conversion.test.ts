@@ -18,8 +18,8 @@ it('maps a whole-line phrase back to original words and keeps the entire project
   expect(executeProjectCommand(state,{type:'lyrics',command:shapeCommand(lyrics,lyrics,rows)})).toBe(state);
   rows[0].cells[0].value='頭';
   expect(shapeCommand(lyrics,lyrics,rows)).toMatchObject({commands:[{text:'頭'}]});
-  rows[0].cells[0].value='多字';expect(()=>shapeCommand(lyrics,lyrics,rows)).toThrow('每格');
-  expect(()=>shapeCommand({...lyrics},lyrics,rows)).toThrow('源文档');
+  rows[0].cells[0].value='多字';expect(()=>shapeCommand(lyrics,lyrics,rows)).toThrow('shape.invalidCell');
+  expect(()=>shapeCommand({...lyrics},lyrics,rows)).toThrow('shape.stale');
 });
 
 it('keeps UTF-16 grapheme positions, rejects malformed results, and cannot split a cross-word grapheme',()=>{
@@ -30,5 +30,5 @@ it('keeps UTF-16 grapheme positions, rejects malformed results, and cannot split
   const data={rows:[{id:line.id,cells:[{start:0,end:3,original:'葛\u{E0100}',value:'葛\u{E0100}',status:'known'}]}]};
   const rows=shapeRows(source,[line.id],data);
   expect(rows[0].cells[0]).toMatchObject({editable:false,status:'failed',value:''});
-  data.rows[0].cells[0].end=2;expect(()=>shapeRows(source,[line.id],data)).toThrow('原文字位');
+  data.rows[0].cells[0].end=2;expect(()=>shapeRows(source,[line.id],data)).toThrow('shape.characterMismatch');
 });

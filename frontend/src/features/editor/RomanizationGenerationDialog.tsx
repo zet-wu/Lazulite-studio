@@ -1,3 +1,7 @@
+import { useMessageText } from '../../shared/useMessageText';
+import { message as describeMessage, errorMessage } from '../../domain/messages';
+import { i18n, formatMessage } from '../../i18n';
+import { useTranslation } from 'react-i18next';
 import { preferences } from '../../adapters/preferences';
 import { measureTextWidth } from '../../shared/measure-text';
 import { kanaHighlightHint, readKanaHighlight } from './kana-highlight';
@@ -13,6 +17,7 @@ import styles from './semantic-editor.module.css';
 function ProposalText({ text, hint, label, multiline, change, focus }: {
   text: string; hint: string; label: string; multiline?: boolean; change: (text: string) => void; focus: (active: boolean) => void;
 }) {
+  useTranslation();
   const start = useRef(text), composing = useRef(false);
   const area = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -20,8 +25,8 @@ function ProposalText({ text, hint, label, multiline, change, focus }: {
     resize(); window.addEventListener('resize', resize); return () => window.removeEventListener('resize', resize);
   }, [text]);
   const common = {
-    'aria-label': label, 'aria-description': hint || undefined, title: [text, hint].filter(Boolean).join('；'),
-    value: text, placeholder: '留空则不生成', className: `${styles.romanPreviewInput} ${hint ? styles.romanPreviewHint : ''}`,
+    'aria-label': label, 'aria-description': hint || undefined, title: [text, hint].filter(Boolean).join(t('notice.separator')),
+    value: text, placeholder: t('romanization.emptySkip'), className: `${styles.romanPreviewInput} ${hint ? styles.romanPreviewHint : ''}`,
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => change(event.target.value),
     onFocus: () => { start.current = text; focus(true); },
     onBlur: () => { focus(false); },
@@ -39,6 +44,7 @@ function TimedWordPreview({ word, units, lineLabel, change, focus, highlight }: 
   highlight: string; word: LyricWord; units: Array<{ unit: GeneratedUnit; index: number }>; lineLabel: string;
   change: (text: string, key: string) => void; focus: (active: boolean) => void;
 }) {
+  useTranslation();
   const root = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = root.current!, text = body.current!;
@@ -74,7 +80,7 @@ function TimedWordPreview({ word, units, lineLabel, change, focus, highlight }: 
       const kanaHint = kanaHighlightHint(reading, highlight);
       return <div key={unit.key} className={styles.romanPreviewSlot} data-preview-unit={unit.key}>
         <div data-source-unit={unit.key}><div tabIndex={kanaHint ? 0 : undefined} title={kanaHint || undefined} aria-description={kanaHint || undefined} className={`${styles.romanPreviewReading} ${kanaHint ? styles.romanPreviewHint : ''}`}>{reading}</div></div>
-        <div data-generated-unit={unit.key}><ProposalText text={unit.text} hint={[unit.hint, kanaHint].filter(Boolean).join('；')} label={`${lineLabel}单元 ${index + 1}音译`}
+        <div data-generated-unit={unit.key}><ProposalText text={unit.text} hint={[unit.hint.split(';').filter(Boolean).map(key=>t(key)).join(t('notice.separator')), kanaHint].filter(Boolean).join(t('notice.separator'))} label={t('reading.unitRomanization',{line:lineLabel,number:index+1})}
           change={text => change(text, unit.key)} focus={focus} /></div>
       </div>;
     })}
@@ -83,6 +89,7 @@ function TimedWordPreview({ word, units, lineLabel, change, focus, highlight }: 
 export function RomanizationGenerationDialog({ document, lineIds, preferenceScope, apply, close }: {
   document: LyricDocument; lineIds: string[]; preferenceScope: string; apply: (command: LyricCommand) => boolean; close: () => void;
 }) {
+  useTranslation();
   const [source] = useState(document);
   const [highlight] = useState(readKanaHighlight);
   const [sourceIds] = useState(lineIds);
@@ -91,7 +98,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   const [rows, setRows] = useState<RomanizationProposal[]>(() => proposeRomanization(source, sourceIds, kind));
   const [trackId, setTrackId] = useState(() => source.romanizationTracks.find(track => track.language === 'ja-Latn')?.id ?? '');
   const [targets, setTargets] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useMessageText('');
   const [focusedRow, setFocusedRow] = useState<string | null>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const virtualized = rows.length > 80;
@@ -105,31 +112,31 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   const track = source.romanizationTracks.find(item => item.id === trackId);
   const lines = useMemo(() => new Map(source.lines.map(line => [line.id, line])), [source]);
   const ordinals = useMemo(() => new Map(source.lines.filter(line => !line.backgroundOf).map((line, index) => [line.id, index + 1])), [source]);
-  const lineLabel = (id: string) => { const line = source.lines.find(line => line.id === id)!; return `L${ordinals.get(line.backgroundOf ?? id)}${line.backgroundOf ? ' · 背景' : ''}`; };
+  const lineLabel = (id: string) => { const line = source.lines.find(line => line.id === id)!; return `L${ordinals.get(line.backgroundOf ?? id)}${line.backgroundOf ? t('editor.backgroundSuffix') : ''}`; };
   const targetFor = (lineId: string) => targets[lineId] ?? (track?.contents.some(content => content.lineId === lineId) ? 'skip' : 'append');
   let issue = '';
   try { prepareRomanization(document, source, rows, { trackId: trackId || null, targets }); }
-  catch (cause) { issue = (cause as Error).message; }
+  catch (cause) { issue = formatMessage(errorMessage(cause)); }
   const changeText = (lineId: string, text: string, key?: string) => setRows(current => current.map(row => row.lineId !== lineId ? row : row.kind === 'timed'
-    ? { ...row, groups: row.groups.map(unit => unit.key === key ? { ...unit, text, hint: unit.hint.includes('分片') ? unit.hint : text.trim() ? '' : '留空则不生成' } : unit) }
-    : { ...row, text, hint: row.hint.includes('分片') ? row.hint : text.trim() ? '' : '留空则不生成' }));
+    ? { ...row, groups: row.groups.map(unit => unit.key === key ? { ...unit, text, hint: hasSplitHint(unit.hint) ? unit.hint : text.trim() ? '' : 'romanization.emptySkip' } : unit) }
+    : { ...row, text, hint: hasSplitHint(row.hint) ? row.hint : text.trim() ? '' : 'romanization.emptySkip' }));
   const submit = () => {
     try { if (apply(romanizationGenerationCommand(document, source, rows, { trackId: trackId || null, targets }))) close(); }
-    catch (cause) { setMessage((cause as Error).message); }
+    catch (cause) { setMessage(errorMessage(cause)); }
   };
-  return <SettingsDialog title="生成日文罗马字音译" subtitle={`生成 ${rows.filter(row => targetFor(row.lineId) !== 'skip' && hasGeneratedContent(row)).length} / ${sourceIds.length} 行`} close={close}
-    actions={<><button data-role="secondary" onClick={close}>取消</button><button data-role="primary" disabled={Boolean(issue)} onClick={submit}>生成音译</button></>}>
+  return <SettingsDialog title={t('editor.romanize')} subtitle={t('reading.generatedLines',{generated:rows.filter(row=>targetFor(row.lineId)!=='skip'&&hasGeneratedContent(row)).length,total:sourceIds.length})} close={close}
+    actions={<><button data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={Boolean(issue)} onClick={submit}>{t('romanization.generate')}</button></>}>
     <div className={styles.rubyGeneration}>
       <div className={`${styles.rubyGenerationOptions} ${styles.romanGenerationOptions}`}>
-        <label>目标轨道 <Select aria-label="目标轨道" value={trackId} onChange={event => { setTrackId(event.target.value); setTargets({}); setMessage(''); }}><option value="">新建 · ja-Latn</option>
-          {source.romanizationTracks.filter(track => track.language === 'ja-Latn').map(track => <option key={track.id} value={track.id}>轨道 {source.romanizationTracks.indexOf(track) + 1} · ja-Latn</option>)}
+        <label>{t('romanization.targetTrack')}<Select aria-label={t('romanization.targetTrack')} value={trackId} onChange={event => { setTrackId(event.target.value); setTargets({}); setMessage(''); }}><option value="">{t('romanization.newLatin')}</option>
+          {source.romanizationTracks.filter(track => track.language === 'ja-Latn').map(track => <option key={track.id} value={track.id}>{t('editor.track')}{source.romanizationTracks.indexOf(track) + 1} · ja-Latn</option>)}
         </Select></label>
-        <label>输出 <Select aria-label="输出" aria-describedby="romanization-mode-help" value={kind} onChange={event => {
+        <label>{t('romanization.output')}<Select aria-label={t('romanization.output')} aria-describedby="romanization-mode-help" value={kind} onChange={event => {
           const next = event.target.value as RomanizationKind;
           setKind(next); setRows(proposeRomanization(source, sourceIds, next)); setMessage(''); setFocusedRow(null);
           preferences.setItem(modeStorage, next);
-        }}><option value="plain">普通文本</option><option value="timed">定时音译</option></Select></label>
-        <small id="romanization-mode-help">切换输出将清除修改</small>
+        }}><option value="plain">{t('romanization.plain')}</option><option value="timed">{t('romanization.timed')}</option></Select></label>
+        <small id="romanization-mode-help">{t('romanization.switchClears')}</small>
       </div>
       <div ref={scroll} data-proposal-count={rows.length} className={`${styles.rubyGenerationRows} ${virtualized ? styles.rubyGenerationRowsVirtual : ''}`}>
         <div style={virtualized ? { position: 'relative', height: virtualizer.getTotalSize() } : { display: 'grid', gap: 8 }}>
@@ -138,11 +145,11 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
             if (row.kind === 'timed') row.groups.forEach((unit, index) => { const list = byWord.get(unit.wordId) ?? []; list.push({ unit, index }); byWord.set(unit.wordId, list); });
             return <div key={row.lineId} ref={item ? virtualizer.measureElement : undefined} data-index={item?.index} data-roman-proposal={row.lineId}
             style={item ? { position: 'absolute', width: '100%', transform: `translateY(${item.start}px)` } : undefined} className={`${styles.rubyGenerationRow} ${styles.romanGenerationRow}`}>
-            <label className={styles.romanTarget}>{lineLabel(row.lineId)} <Select quotes={Object.fromEntries((track?.contents.filter(content => content.lineId === row.lineId) ?? []).map(content => [content.id, { prefix: '替换 · ', text: content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('') }]))} aria-label={`${lineLabel(row.lineId)}生成内容`} value={targetFor(row.lineId)} onChange={event => setTargets(current => ({ ...current, [row.lineId]: event.target.value }))}>
-              <option value="skip">跳过 · 保留已有</option><option value="append">添加新内容</option>
-              {track?.contents.filter(content => content.lineId === row.lineId).map(content => <option key={content.id} value={content.id}>替换 · {content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</option>)}
+            <label className={styles.romanTarget}>{lineLabel(row.lineId)} <Select quotes={Object.fromEntries((track?.contents.filter(content => content.lineId === row.lineId) ?? []).map(content => [content.id, { prefix: t('romanization.replace'), text: content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('') }]))} aria-label={t('reading.generatedContent',{line:lineLabel(row.lineId)})} value={targetFor(row.lineId)} onChange={event => setTargets(current => ({ ...current, [row.lineId]: event.target.value }))}>
+              <option value="skip">{t('romanization.skipExisting')}</option><option value="append">{t('romanization.addContent')}</option>
+              {track?.contents.filter(content => content.lineId === row.lineId).map(content => <option key={content.id} value={content.id}>{t('romanization.replace')}{content.kind === 'plain' ? content.text : content.units.map(unit => unit.text).join('')}</option>)}
             </Select></label>
-            {!hasGeneratedContent(row) && <small>结果为空，未替换；留空则不生成</small>}
+            {!hasGeneratedContent(row) && <small>{t('romanization.emptyPreserves')}</small>}
             <div className={styles.romanPreviewWords}>
               {lines.get(row.lineId)!.words.map(word => row.kind === 'timed'
                 ? <TimedWordPreview highlight={highlight} key={word.id} word={word} units={byWord.get(word.id) ?? []} lineLabel={`${lineLabel(row.lineId)}`}
@@ -152,13 +159,17 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
                   <div className={styles.romanPreviewBody}>{word.text}</div>
                 </div>)}
             </div>
-            {row.kind === 'plain' && <ProposalText multiline text={row.text} hint={row.hint} label={`${lineLabel(row.lineId)}音译`}
+            {row.kind === 'plain' && <ProposalText multiline text={row.text} hint={row.hint?t(row.hint):''} label={t('reading.lineRomanization',{line:lineLabel(row.lineId)})}
               change={text => changeText(row.lineId, text)} focus={active => setFocusedRow(active ? row.lineId : null)} />}
           </div>; })}
         </div>
       </div>
-      {kind === 'timed' && rows.some(row => row.kind === 'timed' && targetFor(row.lineId) !== 'skip' && row.groups.some(unit => unit.text.trim() && (unit.beginMs === null || unit.endMs === null))) && <small>源时间未定，生成后请在画布补全；最终定时导出要求完整时间。</small>}
+      {kind === 'timed' && rows.some(row => row.kind === 'timed' && targetFor(row.lineId) !== 'skip' && row.groups.some(unit => unit.text.trim() && (unit.beginMs === null || unit.endMs === null))) && <small>{t('romanization.untimedHelp')}</small>}
       {(message || issue) && <p role="alert" className={styles.romanGenerationError}>{message || issue}</p>}
     </div>
   </SettingsDialog>;
 }
+
+const t=i18n.t.bind(i18n);
+
+const hasSplitHint=(hint:string)=>hint.split(';').some(key=>['romanization.specialYoon','romanization.reviewSplit','romanization.reviewResult'].includes(key));

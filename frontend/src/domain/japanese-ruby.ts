@@ -1,3 +1,4 @@
+import {message,MessageError,type Message} from './messages';
 import { toHiragana } from 'wanakana';
 export type ReadingRange = { line_id: string; base_start: number; base_end: number; base: string; reading: string };
 import { lineText, rubyReading, type LyricDocument, type LyricWord } from './lyric-document';
@@ -60,7 +61,7 @@ export function proposeJapaneseRuby(source: LyricDocument, ids: string[], ranges
     const text = lineText(line), entries = byLine.get(line.id) ?? [];
     let previous = 0;
     for (const range of entries) {
-      if (!Number.isInteger(range.base_start) || !Number.isInteger(range.base_end) || range.base_start < previous || range.base_end <= range.base_start || range.base_end > length(text) || slice(text, range.base_start, range.base_end) !== range.base) throw new Error('读音分析范围与原文不符');
+      if (!Number.isInteger(range.base_start) || !Number.isInteger(range.base_end) || range.base_start < previous || range.base_end <= range.base_start || range.base_end > length(text) || slice(text, range.base_start, range.base_end) !== range.base) throw new MessageError(message('reading.rangeMismatch'));
       previous = range.base_end;
     }
     // Anchor before projection: a token crossing user word boundaries is still useful.
@@ -127,8 +128,8 @@ export function hasJapaneseRubyChanges(rows: ReadingRow[], source: LyricDocument
 }
 
 export function japaneseRubyCommand(current: LyricDocument, source: LyricDocument, rows: ReadingRow[]): LyricCommand {
-  if (current !== source) throw new Error('源文档已变化，请重新打开生成');
-  if (!hasJapaneseRubyChanges(rows, source)) throw new Error('没有可应用的注音修改');
+  if (current !== source) throw new MessageError(message('reading.stale'));
+  if (!hasJapaneseRubyChanges(rows, source)) throw new MessageError(message('reading.noChanges'));
   const rowMap = new Map(rows.map(row => [row.lineId, row]));
   const lines = source.lines.map(line => {
     const row = rowMap.get(line.id); if (!row) return line;
@@ -147,7 +148,7 @@ export function japaneseRubyCommand(current: LyricDocument, source: LyricDocumen
         const reading = blocks[0].block.reading;
         if (!reading.trim() || reading === rubyReading(word)) return [word];
         const starts = word.rubyUnits.flatMap(u => u.beginMs === null ? [] : [u.beginMs]), ends = word.rubyUnits.flatMap(u => u.endMs === null ? [] : [u.endMs]);
-        if (starts.length && ends.length && Math.min(...starts) > Math.max(...ends)) throw new Error('已有注音时间包络无效');
+        if (starts.length && ends.length && Math.min(...starts) > Math.max(...ends)) throw new MessageError(message('reading.invalidEnvelope'));
         return [{ ...word, rubyUnits: makeRubyUnits({ ...word, beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null }, splitReadingMora(reading)) }];
       }
       const accepted = blocks.filter(({block}) => block.editable && block.reading.trim());

@@ -1,13 +1,15 @@
+import {message,MessageError,errorMessage} from '../domain/messages';
+import {useMessageText} from '../shared/useMessageText';
 import { useEffect, useRef, useState } from 'react';
 import { requestHeaders } from '../adapters/http/client';
 export type SearchConditions = { title: string; artist: string; album: string };
 export const EMPTY_CONDITIONS: SearchConditions = { title: '', artist: '', album: '' };
 export function useSearchConditions(projectId?: string, sourceAssetId?: string) {
   const [values, setValues] = useState<SearchConditions>(EMPTY_CONDITIONS);
-  const [ready, setReady] = useState(!projectId), [error, setError] = useState('');
+  const [ready, setReady] = useState(!projectId), [error, setError] = useMessageText('');
   const latest = useRef(values), pending = useRef<SearchConditions | null>(null), saving = useRef(false);
   const alive = useRef(true);
-  const [readingMetadata, setReadingMetadata] = useState(false), [metadataError, setMetadataError] = useState('');
+  const [readingMetadata, setReadingMetadata] = useState(false), [metadataError, setMetadataError] = useMessageText('');
   const metadataRequest = useRef<AbortController | null>(null), editVersion = useRef(0);
   const identity = `${projectId ?? ''}:${sourceAssetId ?? ''}`;
   const currentIdentity = useRef(identity); currentIdentity.current = identity;
@@ -19,11 +21,11 @@ export function useSearchConditions(projectId?: string, sourceAssetId?: string) 
   const load = async (signal?: AbortSignal) => {
     try {
       const r = await fetch(url, { credentials: 'include', headers: requestHeaders(), signal });
-      if (!r.ok) throw new Error('获取条件读取失败，请重试');
+      if (!r.ok) throw new MessageError(message('search.conditionsReadFailed'));
       const next: SearchConditions = await r.json();
-      if (typeof next.title !== 'string' || typeof next.artist !== 'string' || typeof next.album !== 'string') throw new Error('获取条件响应无效');
+      if (typeof next.title !== 'string' || typeof next.artist !== 'string' || typeof next.album !== 'string') throw new MessageError(message('search.conditionsInvalid'));
       if (alive.current) { latest.current = next; setValues(next); setReady(true); setError(''); }
-    } catch (e) { if (alive.current && !signal?.aborted) setError(e instanceof Error ? e.message : '获取条件读取失败'); }
+    } catch (e) { if (alive.current && !signal?.aborted) setError(errorMessage(e)); }
   };
   useEffect(() => {
     alive.current = true; const controller = new AbortController();
@@ -38,11 +40,11 @@ export function useSearchConditions(projectId?: string, sourceAssetId?: string) 
         const captured = pending.current; pending.current = null;
         try {
           const r = await fetch(url, { method: 'PUT', credentials: 'include', keepalive: true, headers: requestHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(captured) });
-          if (!r.ok) throw new Error(r.status === 404 ? '项目已删除' : '获取条件保存失败，请重试');
+          if (!r.ok) throw new MessageError(message(r.status===404?'save.deleted':'search.conditionsSaveFailed'));
           if (alive.current) setError('');
         } catch (e) {
           pending.current ??= captured;
-          if (alive.current) setError(e instanceof Error ? e.message : '获取条件保存失败');
+          if (alive.current) setError(errorMessage(e));
           break;
         }
       }
@@ -64,13 +66,13 @@ export function useSearchConditions(projectId?: string, sourceAssetId?: string) 
     setReadingMetadata(true); setMetadataError('');
     try {
       const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/source-metadata`, {credentials:'include',headers:requestHeaders(),signal:controller.signal});
-      if (!response.ok) throw new Error('源音频标签读取失败，请重试');
+      if (!response.ok) throw new MessageError(message('search.tagsReadFailed'));
       const result = await response.json();
       if (!current()) return;
-      if (result.asset_id !== sourceAssetId) throw new Error('源音频已变化，请重新填入');
-      if (!result.conditions || ['title','artist','album'].some(key => typeof result.conditions[key] !== 'string')) throw new Error('源音频标签响应无效');
+      if (result.asset_id !== sourceAssetId) throw new MessageError(message('search.tagsSourceChanged'));
+      if (!result.conditions || ['title','artist','album'].some(key => typeof result.conditions[key] !== 'string')) throw new MessageError(message('search.tagsInvalid'));
       replace(result.conditions);
-    } catch (cause) { if (current()) setMetadataError(cause instanceof Error ? cause.message : '源音频标签读取失败'); }
+    } catch (cause) { if (current()) setMetadataError(errorMessage(cause)); }
     finally { if (metadataRequest.current === controller) setReadingMetadata(false); }
   };
   return { values, ready, error, change, retry: () => ready ? flush() : load(), fillMetadata, readingMetadata, metadataError, hasSource: !!sourceAssetId };

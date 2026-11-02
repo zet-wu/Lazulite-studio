@@ -1,10 +1,11 @@
+import {message,MessageError,errorMessage,type Message} from './domain/messages';
 import { SourceError, sourceRequest, type Candidate, type Source, parsePayload, type Payload } from './adapters/http/lyric-sources';
 import { identityScore, titleVariants } from './domain/lyric-search';
 import type { LyricDocument } from './domain/lyric-document';
 import type { SearchConditions } from './features/useSearchConditions';
 export const SOURCES: Source[] = ['netease','qqmusic','kugou','amll'];
 export type CheckStatus = 'pending' | 'fetching' | 'parsing' | 'ready' | 'partial' | 'fetch-failed' | 'decode-failed' | 'parse-failed' | 'empty';
-export type CandidateRecord = { candidate: Candidate; score: number; badges: string[]; status: CheckStatus; error?: string };
+export type CandidateRecord = { candidate: Candidate; score: number; badges: string[]; status: CheckStatus; error?: string|Message };
 export type SourceState = { rows: string[]; records: Record<string,CandidateRecord>; selected: string | null; pending: number; succeeded: number; failed: string[]; cancelled: boolean };
 export type AcquisitionState = { round: number; query: SearchConditions | null; tab: Source | 'file' | 'text' | 'embedded'; sources: Record<Source,SourceState>; version: number };
 type Task = { source: Source; kind: 'search' | 'check'; id?: string; round: number; controller: AbortController; run: () => Promise<void> };
@@ -55,7 +56,7 @@ export class AcquisitionStore {
           const result = await this.request<{items: Candidate[]}>('search',{ source, query },controller.signal);
           if (!this.valid(task)) return;
           for (const candidate of result.items) {
-            if (candidate.source !== source) throw new Error('来源响应不一致');
+            if (candidate.source !== source) throw new MessageError(message('search.sourceMismatch'));
             const existing = state.records[candidate.id];
             if (existing) {
               existing.candidate = { ...existing.candidate, ...candidate, songmid: candidate.songmid ?? existing.candidate.songmid };
@@ -110,18 +111,18 @@ export class AcquisitionStore {
             record.candidate = candidate;
           } catch (e) {
             if (!this.valid(task)) return;
-            record.error = '歌曲 ID 补查失败，可继续取词或重试';
+            record.error = message('search.resolveFailed');
           }
         }
         const payload = await this.request<Payload>('fetch',candidate,controller.signal);
         if (!this.valid(task)) return;
-        if (payload.empty) { record.status = 'empty'; record.error = '此候选没有可用歌词，仍可关联已确认的歌曲 ID'; return; }
+        if (payload.empty) { record.status = 'empty'; record.error = message('search.emptyCandidate'); return; }
         parsing = true; record.status = 'parsing'; this.emit();
         const parsed = parsePayload(payload);
         record.badges = parsed.badges; record.status = parsed.partial ? 'partial' : 'ready';
         this.cacheDocument(source,id,parsed.document);
       } catch (e) {
-        if (this.valid(task)) { record.status = parsing ? 'parse-failed' : e instanceof SourceError && e.code === 'source_decode' ? 'decode-failed' : 'fetch-failed'; record.error = e instanceof Error ? e.message : '请求失败'; }
+        if (this.valid(task)) { record.status = parsing ? 'parse-failed' : e instanceof SourceError && e.code === 'source_decode' ? 'decode-failed' : 'fetch-failed'; record.error = errorMessage(e); }
       } finally { if (this.valid(task)) this.emit(); }
     }};
     this.tasks.push(task);

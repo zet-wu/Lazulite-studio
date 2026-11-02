@@ -1,3 +1,4 @@
+import {message,MessageError,type Message} from './messages';
 import { toHiragana, toRomaji } from 'wanakana';
 import type { LyricDocument, LyricLine, RomanizationContent, TimeMs } from './lyric-document';
 import type { LyricCommand } from './lyric-commands';
@@ -29,7 +30,7 @@ function generateLine(line: LyricLine): GeneratedUnit[] {
   });
   const put = (owner: number, text: string, hint = '') => {
     sources[owner].text += text;
-    if (hint) sources[owner].hint = [...new Set([sources[owner].hint, hint].filter(Boolean))].join('；');
+    if (hint) sources[owner].hint = [...new Set([sources[owner].hint, hint].filter(Boolean))].join(';');
   };
   const syllableAt = (index: number) => {
     let end = index + 1;
@@ -39,10 +40,10 @@ function generateLine(line: LyricLine): GeneratedUnit[] {
   let vowel = '';
   for (let i = 0; i < chars.length;) {
     const { char, owner } = chars[i];
-    if (char === '\0') { put(owner, ' ', '缺少日文假名读音'); vowel = ''; i++; continue; }
+    if (char === '\0') { put(owner, ' ', 'romanization.missingKana'); vowel = ''; i++; continue; }
     if (/\s/.test(char)) { put(owner, char); vowel = ''; i++; continue; }
     if (char === 'ー') {
-      put(owner, vowel || ' ', vowel ? '' : '长音缺少行内元音上下文'); i++; continue;
+      put(owner, vowel || ' ', vowel ? '' : 'romanization.longVowelContext'); i++; continue;
     }
     if (char === 'っ') {
       let next = i + 1;
@@ -50,7 +51,7 @@ function generateLine(line: LyricLine): GeneratedUnit[] {
       const following = next < chars.length ? syllableAt(next).reading : '';
       const normal = converted(following), geminated = normal ? converted(`っ${following}`) : '';
       const consonant = normal && geminated.endsWith(normal) ? geminated.slice(0, -normal.length) : '';
-      put(owner, consonant || ' ', consonant ? '' : '促音缺少行内辅音上下文');
+      put(owner, consonant || ' ', consonant ? '' : 'romanization.geminateContext');
       if (!consonant) vowel = '';
       i++; continue;
     }
@@ -64,12 +65,12 @@ function generateLine(line: LyricLine): GeneratedUnit[] {
     }
     const { end, reading } = syllableAt(i);
     const text = converted(reading);
-    if (!text) { put(owner, ' ', '读音未得到罗马字'); vowel = ''; i = end; continue; }
+    if (!text) { put(owner, ' ', 'romanization.noConversion'); vowel = ''; i = end; continue; }
     const owners = [...new Set(chars.slice(i, end).map(item => item.owner))];
     if (owners.length === 1) put(owner, text);
     else if (yoon.test(reading)) {
-      put(owner, text.slice(0, -1), '特殊拗音分片');
-      put(chars[end - 1].owner, converted(chars[end - 1].char), '特殊拗音分片');
+      put(owner, text.slice(0, -1), 'romanization.specialYoon');
+      put(chars[end - 1].owner, converted(chars[end - 1].char), 'romanization.specialYoon');
     } else {
       // Foreign small vowels use the regular spelling, never the yoon cue.
       const suffix = converted(chars[end - 1].char);
@@ -78,7 +79,7 @@ function generateLine(line: LyricLine): GeneratedUnit[] {
         put(chars[end - 1].owner, suffix);
       } else {
         put(owner, text);
-        for (const other of owners.slice(1)) put(other, ' ', '组合读音需核对分片');
+        for (const other of owners.slice(1)) put(other, ' ', 'romanization.reviewSplit');
       }
     }
     vowel = text.match(/[aeiou](?=[^aeiou]*$)/)?.[0] ?? vowel;
@@ -95,7 +96,7 @@ export function proposeRomanization(document: LyricDocument, lineIds: readonly s
   const selected = new Set(lineIds);
   return document.lines.filter(line => selected.has(line.id)).map(line => {
     const groups = generateLine(line);
-    return kind === 'timed' ? { lineId: line.id, kind, groups } : { lineId: line.id, kind, text: groups.map(unit => unit.text).join('') || ' ', hint: groups.some(unit => unit.hint) ? '自动结果有空转换或特殊分片，可修正或保留' : '' };
+    return kind === 'timed' ? { lineId: line.id, kind, groups } : { lineId: line.id, kind, text: groups.map(unit => unit.text).join('') || ' ', hint: groups.some(unit => unit.hint) ? 'romanization.reviewResult' : '' };
   });
 }
 /** Keep separators as text, never as independently timed objects. */
@@ -118,19 +119,19 @@ export function hasGeneratedContent(row: RomanizationProposal): boolean {
 }
 export type RomanizationChoices = { trackId: string | null; targets: Record<string, string> };
 export function prepareRomanization(document: LyricDocument, source: LyricDocument, rows: RomanizationProposal[], choices: RomanizationChoices) {
-  if (document !== source) throw new Error('文档已变化，请重新打开生成窗口');
+  if (document !== source) throw new MessageError(message('romanization.stale'));
   const track = choices.trackId === null ? null : document.romanizationTracks.find(item => item.id === choices.trackId);
-  if (choices.trackId !== null && (!track || track.language !== 'ja-Latn')) throw new Error('请选择 ja-Latn 音译轨道');
+  if (choices.trackId !== null && (!track || track.language !== 'ja-Latn')) throw new MessageError(message('romanization.latinTrackRequired'));
   const byLine = new Map<string, RomanizationContent[]>();
   for (const content of track?.contents ?? []) { const list = byLine.get(content.lineId) ?? []; list.push(content); byLine.set(content.lineId, list); }
   const prepared = rows.flatMap(row => {
     const existing = byLine.get(row.lineId) ?? [];
     const target = choices.targets[row.lineId] ?? (existing.length ? 'skip' : 'append');
     if (target === 'skip' || !hasGeneratedContent(row)) return [];
-    if (target !== 'append' && !existing.some(content => content.id === target)) throw new Error('替换的音译内容不存在');
+    if (target !== 'append' && !existing.some(content => content.id === target)) throw new MessageError(message('romanization.targetMissing'));
     return [{ row, target }];
   });
-  if (!prepared.length) throw new Error('没有可生成内容');
+  if (!prepared.length) throw new MessageError(message('romanization.noContent'));
   return { track, prepared };
 }
 export function romanizationGenerationCommand(document: LyricDocument, source: LyricDocument, rows: RomanizationProposal[], choices: RomanizationChoices): LyricCommand {

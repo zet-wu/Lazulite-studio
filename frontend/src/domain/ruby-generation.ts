@@ -1,3 +1,4 @@
+import {message,MessageError,type Message} from './messages';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
 import { toHiragana, toKatakana } from 'wanakana';
 import type { LyricCommand } from './lyric-commands';
@@ -9,7 +10,7 @@ export type RubySourceRow = {
   sourceText: string; beginMs: TimeMs; endMs: TimeMs;
   candidates: string[]; suggestedWordId: string | null; defaultWordId: string | null;
 };
-export type RubyProposalRow = RubySourceRow & { wordId: string | null; reading: string | null; conversionIssue: string | null };
+export type RubyProposalRow = RubySourceRow & { wordId: string | null; reading: string | null; conversionIssue: string | null; conversionValue?:string };
 
 export const RUBY_OVERLAP_TOLERANCE_MS = 50;
 
@@ -23,12 +24,12 @@ const overlap = (begin: number, end: number, word: LyricWord) => word.beginMs ==
 
 export function rubySourceRows(document: LyricDocument, trackId: string, contentIds: string[]): RubySourceRow[] {
   const track = document.romanizationTracks.find((item) => item.id === trackId);
-  if (!track) throw new Error('音译轨道不存在');
+  if (!track) throw new MessageError(message('ruby.trackMissing'));
   const requested = new Set(contentIds);
-  if (!requested.size || contentIds.some((id) => !track.contents.some((content) => content.id === id))) throw new Error('请选择当前轨道中的音译内容');
+  if (!requested.size || contentIds.some((id) => !track.contents.some((content) => content.id === id))) throw new MessageError(message('ruby.selectTrackContent'));
   return track.contents.filter((content) => requested.has(content.id)).flatMap((content: RomanizationContent) => {
     const line = document.lines.find((item) => item.id === content.lineId);
-    if (!line) throw new Error('音译所属行已不存在');
+    if (!line) throw new MessageError(message('ruby.lineMissing'));
     const units = content.kind === 'plain'
       ? [{ id: null, text: content.text, beginMs: null, endMs: null }]
       : content.units.map((unit) => ({ ...unit }));
@@ -61,7 +62,8 @@ export function proposeRuby(rows: RubySourceRow[], output: RubyOutput, assignmen
     const valid = source.every(Boolean) && pieces.join('') === joined && (output === 'roman' || pieces.every((part) => kana.test(part)));
     for (let index = 0; index < group.length; index++) {
       group[index].reading = valid ? pieces[index] : null;
-      group[index].conversionIssue = valid ? null : `整组转换：${joined || '空'}；请手动确认每个 注音 的拆分`;
+      group[index].conversionIssue = valid ? null : 'ruby.groupConversion';
+      group[index].conversionValue=joined||'∅';
     }
   }
   return proposed;
@@ -99,7 +101,7 @@ export type RubyIssueKind = 'target' | 'reading' | 'overwrite' | 'link' | 'kana-
 export type RubyIssue = {
   id: string; kind: RubyIssueKind; severity: 'error' | 'warning';
   lineId: string; rowKey: string; rowKeys: string[]; wordId: string | null;
-  position: number; order: number; message: string;
+  position: number; order: number; message: string; detail: Message;
 };
 const issueOrder: Record<RubyIssueKind, number> = { target: 0, reading: 1, overwrite: 2, link: 3, 'kana-difference': 4 };
 const effectiveReading = (row: RubyProposalRow, readings: Record<string, string>) => (readings[row.key] ?? row.reading ?? '').trim();
@@ -113,13 +115,13 @@ export function rubyGenerationIssues(document: LyricDocument, rows: RubyProposal
   skipped: Set<string>, overwrite: Set<string>, output: RubyOutput = 'roman', editing = createProjectEditing()): RubyIssue[] {
   const issues: RubyIssue[] = [];
   const positions = new Map(rows.map((row, index) => [row.key, index]));
-  const add = (kind: RubyIssueKind, group: RubyProposalRow[], message: string) => {
+  const add = (kind: RubyIssueKind, group: RubyProposalRow[], key: string, values?:Message['values']) => {
     const active = group.filter(row => !skipped.has(row.key));
     if (!active.length) return;
     const row = active[0];
     issues.push({ id: JSON.stringify([kind, row.lineId, kind === 'target' || kind === 'reading' ? row.key : row.wordId]),
       kind, severity: kind === 'kana-difference' ? 'warning' : 'error', lineId: row.lineId, rowKey: row.key,
-      rowKeys: active.map(item => item.key), wordId: row.wordId, position: positions.get(row.key)!, order: issueOrder[kind], message });
+      rowKeys: active.map(item => item.key), wordId: row.wordId, position: positions.get(row.key)!, order: issueOrder[kind], message:key, detail:message(key,values) });
   };
   const groups = new Map<string, RubyProposalRow[]>();
   for (const row of rows) {
@@ -130,19 +132,19 @@ export function rubyGenerationIssues(document: LyricDocument, rows: RubyProposal
     }
     if (skipped.has(row.key)) continue;
     const word = document.lines.find(line => line.id === row.lineId)?.words.find(word => word.id === row.wordId);
-    if (!word) add('target', [row], '尚未指定有效目标词');
-    if (!effectiveReading(row, readings)) add('reading', [row], row.conversionIssue ?? '尚未确认 注音 读音');
+    if (!word) add('target', [row], 'ruby.targetRequired');
+    if (!effectiveReading(row, readings)) add('reading', [row], row.conversionIssue ?? 'ruby.readingRequired',{conversion:row.conversionValue??'∅'});
   }
   for (const group of groups.values()) {
     const row = group[0];
     const word = document.lines.find(line => line.id === row.lineId)?.words.find(word => word.id === row.wordId);
     if (!word) continue;
-    if (word.rubyUnits.length && !overwrite.has(word.id)) add('overwrite', group, '已有 注音，请显式选择覆盖');
+    if (word.rubyUnits.length && !overwrite.has(word.id)) add('overwrite', group, 'ruby.overwriteRequired');
     const text = word.text.normalize('NFC');
     const values = group.map(row => effectiveReading(row, readings).normalize('NFC'));
     if (output !== 'roman' && kana.test(text) && values.every(value => kana.test(value))
       && comparableKana(values.join('')) !== comparableKana(text)) {
-      add('kana-difference', group, '注音与假名正文读音不同，请核对');
+      add('kana-difference', group, 'ruby.kanaDifference');
     }
   }
   for (const line of document.lines) {
@@ -155,7 +157,7 @@ export function rubyGenerationIssues(document: LyricDocument, rows: RubyProposal
     const next = envelope(line, nextWords.map(word => word.beginMs), nextWords.map(word => word.endMs));
     if ((next.beginMs !== line.beginMs || next.endMs !== line.endMs)
       && (editing.endLinks[line.id] || Object.values(editing.endLinks).includes(line.id))) {
-      add('link', active, '行尾链接会受时间扩展影响，请先处理链接');
+      add('link', active, 'ruby.endLink');
     }
   }
   return issues.sort((a, b) => a.position - b.position || a.order - b.order);
@@ -171,9 +173,9 @@ export function nextRubyIssue(issues: RubyIssue[], current: RubyIssue | null): R
 }
 
 export function rubyGenerationCommand(document: LyricDocument, sourceDocument: LyricDocument, rows: RubyProposalRow[], readings: Record<string, string>, skipped: Set<string>, overwriteWordIds: Set<string>, editing = createProjectEditing()): LyricCommand {
-  if (document !== sourceDocument) throw new Error('文档已变化，请重新生成提案');
+  if (document !== sourceDocument) throw new MessageError(message('ruby.stale'));
   const blocking = rubyGenerationIssues(document, rows, readings, skipped, overwriteWordIds, 'roman', editing).find(issue => issue.severity === 'error');
-  if (blocking) throw new Error(blocking.message);
+  if (blocking) throw new MessageError(blocking.detail);
   const byWord = new Map<string, RubyProposalRow[]>();
   for (const row of rows) {
     if (skipped.has(row.key)) continue;
@@ -181,7 +183,7 @@ export function rubyGenerationCommand(document: LyricDocument, sourceDocument: L
     const key = `${row.lineId}:${row.wordId}`;
     byWord.set(key, [...(byWord.get(key) ?? []), { ...row, reading: reading!.trim() }]);
   }
-  if (!byWord.size) throw new Error('没有可应用的 注音');
+  if (!byWord.size) throw new MessageError(message('ruby.noChanges'));
   const commands: Extract<LyricCommand, { type: 'set-line-time' | 'set-word-time' | 'set-ruby-units' }>[] = [];
   for (const line of document.lines) {
     const groups = line.words.map((word) => ({ word, rows: byWord.get(`${line.id}:${word.id}`) ?? [] })).filter((group) => group.rows.length);

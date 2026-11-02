@@ -1,3 +1,4 @@
+import { errorMessage } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { message } from '../domain/messages';
 import { i18n } from '../i18n';
@@ -31,6 +32,7 @@ export function CreateProject({
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useMessageText("");
+  const [sessionExpired,setSessionExpired]=useState(false);
   const [key, setKey] = useState("");
 
   useEffect(() => () => controller.current?.abort(), []);
@@ -57,7 +59,7 @@ export function CreateProject({
     setError(message('create.cancelled'));
   };
   const close = () => {
-    if (asset && status !== 'creating') void studioApi.discardUpload(asset.id).catch(error => setError(error.message));
+    if (asset && status !== 'creating') void studioApi.discardUpload(asset.id).catch(error => setError(errorMessage(error)));
     if (status === "uploading") {
       cancelUpload();
       dialog.current?.close();
@@ -108,6 +110,7 @@ export function CreateProject({
         (caught as DOMException).name === "AbortError"
       )
         return;
+      setSessionExpired(caught instanceof ApiError&&caught.status===401);
       setError(
         caught instanceof ApiError && caught.status === 401
           ? message('create.expired')
@@ -131,7 +134,7 @@ export function CreateProject({
         className={styles.modal}
         onCancel={(event) => {
           if (status === "creating") event.preventDefault();
-          else { if (status === "uploading") cancelUpload(); if (asset) void studioApi.discardUpload(asset.id).catch(error => setError(error.message)); }
+          else { if (status === "uploading") cancelUpload(); if (asset) void studioApi.discardUpload(asset.id).catch(error => setError(errorMessage(error))); }
         }}
       >
         <form
@@ -189,7 +192,7 @@ export function CreateProject({
           {error && (
             <p className={styles.error}>
               {error}
-              {error.includes(t('login.submit')) && (
+              {sessionExpired && (
                 <>
                   {" "}
                   · <a href="/login">{t('login.again')}</a>

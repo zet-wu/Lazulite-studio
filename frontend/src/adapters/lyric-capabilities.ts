@@ -11,10 +11,10 @@ export function lyricCapabilities(document: LyricDocument, lineTimedWords: Reado
     if (word.rubyUnits.length) return word.rubyUnits.some(unit => !timed(unit));
     return lineTimedWords.has(word.id) || !timed(word);
   }) : hasTime && lines.some(line => !timed(line));
-  const badges = [fine ? '逐词' : hasTime ? '逐行' : '无时间'];
-  if (partial) badges.push('部分定时');
-  if (document.translationTracks.some(track => track.contents.length)) badges.push('翻译');
-  if (document.romanizationTracks.some(track => track.contents.length)) badges.push('音译');
-  if (words.some(word => word.rubyUnits.length)) badges.push('注音');
+  const badges = [fine ? 'capability.wordTimed' : hasTime ? 'capability.lineTimed' : 'capability.untimed'];
+  if (partial) badges.push('capability.partialTiming');
+  if (document.translationTracks.some(track => track.contents.length)) badges.push('capability.translation');
+  if (document.romanizationTracks.some(track => track.contents.length)) badges.push('capability.romanization');
+  if (words.some(word => word.rubyUnits.length)) badges.push('capability.ruby');
   return badges;
 }

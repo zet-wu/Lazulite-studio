@@ -1,3 +1,7 @@
+import { useMessageText } from '../shared/useMessageText';
+import { message as describeMessage, MessageError, errorMessage, isMessage, type Message } from '../domain/messages';
+import { i18n, formatMessage } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { EmbeddedLyrics } from './EmbeddedLyrics';
 import { createProjectEditing } from '../domain/project-editing';
 import { translationsForLine } from '../domain/lyric-document';
@@ -26,6 +30,7 @@ export function selectedMetadata(current: LyricDocument, incoming: LyricDocument
   }));
 }
 export function LyricAcquisition({ store, searchConditions, document, apply, onImported, onNew, onImportName, projectId, sourceAssetId }: { projectId?: string; sourceAssetId?: string | null; store: AcquisitionStore; searchConditions: ReturnType<typeof useSearchConditions>; document: LyricDocument; apply: (command: LyricCommand) => void; onImported: () => void; onNew?: () => void; onImportName?: (name: string) => void }) {
+  useTranslation();
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const tab = snapshot.tab;
   const network = tab !== 'file' && tab !== 'text' && tab !== 'embedded';
@@ -39,7 +44,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   const [choices, setChoices] = useState<MetadataChoices>({});
   const [previewPage, setPreviewPage] = useState(0);
   const [filename, setFilename] = useState<string | null>(null);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useMessageText('');
   const fileInput = useRef<HTMLInputElement>(null);
   const request = useRef(0);
   const stage = (next: LyricDocument) => { setIncoming(next); setPreviewPage(0); setBase(document); setChoices(defaultChoices(document, next)); setMessage(''); };
@@ -49,44 +54,46 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   useEffect(() => { if (tab === 'embedded') setIncoming(null); }, [sourceAssetId]);
   useEffect(() => setDismissed(false), [tab, selected?.candidate.id, selected?.error]);
   const parse = (content: string, kind: Exclude<LyricFormat, 'ass'>) => {
-    try { stage(importLyricFile(content, kind)); } catch (e) { setIncoming(null); setMessage(`解析失败：${e instanceof Error ? e.message : e}`); }
+    try { stage(importLyricFile(content, kind)); } catch (e) { setIncoming(null); setMessage(describeMessage('acquire.parseFailed',{diagnostic:e instanceof Error?e.message:String(e)})); }
   };
   const open = async (file: File) => {
-    const serial = ++request.current; setFilename(file.name); setIncoming(null); setMessage('正在读取…');
+    const serial = ++request.current; setFilename(file.name); setIncoming(null); setMessage(describeMessage('common.reading'));
     try {
-      if (file.size > 4_000_000) throw new Error('歌词文件不能超过 4 MB');
+      if (file.size > 4_000_000) throw new MessageError(describeMessage('acquire.fileLimit'));
       const kind = detectLyricFormat(file.name);
-      if (kind === 'ass') throw new Error('ASS 目前仅支持导出');
+      if (kind === 'ass') throw new MessageError(describeMessage('acquire.assExportOnly'));
       const content = kind === 'krc' ? await decodeKrcFile(file) : await file.text();
       if (serial === request.current) parse(content, kind);
-    } catch (e) { if (serial === request.current) setMessage(`解析失败：${e instanceof Error ? e.message : e}`); }
+    } catch (e) { if (serial === request.current) setMessage(describeMessage('acquire.parseFailed',{diagnostic:e instanceof Error?e.message:String(e)})); }
   };
   const confirm = () => {
     if (!incoming) return;
-    if (base !== document) { setBase(document); setChoices(defaultChoices(document, incoming)); setMessage('当前歌词已变化，已重新对照元数据，请检查后再次导入。'); return; }
+    if (base !== document) { setBase(document); setChoices(defaultChoices(document, incoming)); setMessage(describeMessage('acquire.changed')); return; }
     try { apply({ type: 'replace-document', editing: createProjectEditing(), document: { ...incoming, metadata: selectedMetadata(base, incoming, choices) } }); setIncoming(null); store.cancelAll(); if (filename) onImportName?.(filename); onImported(); }
-    catch (e) { setMessage(e instanceof Error ? e.message : '导入失败'); }
+    catch (e) { setMessage(errorMessage(e)); }
   };
   return <div className={styles.page}>
-    <section className={styles.pane}><h2>歌词获取</h2><div className={styles.tabs} role="tablist" aria-label="歌词来源">
-      {[['netease','网易云音乐'],['qqmusic','QQ 音乐'],['kugou','酷狗'],['amll','AMLL DB'],['embedded', '内嵌'], ['file', '文件'], ['text', '文本']].map(([id, label]) => <button data-role="secondary" key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; store.setTab(id as typeof tab); setFilename(null); setIncoming(null); setMessage(''); }}>{label}</button>)}
+    <section className={styles.pane}><h2>{t('editor.acquire')}</h2><div className={styles.tabs} role="tablist" aria-label={t('acquire.source')}>
+      {[['netease',t('source.netease')],['qqmusic',t('source.qq')],['kugou',t('source.kugou')],['amll','AMLL DB'],['embedded', t('source.embedded')], ['file', t('source.file')], ['text', t('source.text')]].map(([id, label]) => <button data-role="secondary" key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; store.setTab(id as typeof tab); setFilename(null); setIncoming(null); setMessage(''); }}>{label}</button>)}
     </div>
       {network && <NetworkLyrics store={store} searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} />}
       {tab === 'embedded' && <EmbeddedLyrics projectId={projectId} sourceAssetId={sourceAssetId} onPreview={parse} />}
-      {tab === 'file' && <><button data-role="secondary" onClick={() => fileInput.current?.click()}>选择歌词文件</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
-      {tab === 'text' && <><label>文本格式 <Select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</Select></label><textarea aria-label="待导入歌词文本" value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button data-role="secondary" onClick={() => parse(text, format)}>预览文本</button></>}
-      {onNew && <button data-role="secondary" onClick={onNew}>新建空白歌词</button>}
+      {tab === 'file' && <><button data-role="secondary" onClick={() => fileInput.current?.click()}>{t('acquire.chooseFile')}</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
+      {tab === 'text' && <><label>{t('acquire.textFormat')}<Select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</Select></label><textarea aria-label={t('acquire.textInput')} value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button data-role="secondary" onClick={() => parse(text, format)}>{t('acquire.previewText')}</button></>}
+      {onNew && <button data-role="secondary" onClick={onNew}>{t('acquire.emptyLyrics')}</button>}
       {message && <p role="status">{message}</p>}
     </section>
-    <section className={styles.pane}><h2>预览与导入</h2>
-      {selected && selected.error && !dismissed && <div className={styles.previewError} role="status"><span>{checkLabels[selected.status]}：{selected.error.slice(0,160)}</span><IconButton icon="close" data-role="secondary" label="关闭候选提示" onClick={()=>setDismissed(true)}/></div>}
-      {selected && ['pending','fetching','parsing'].includes(selected.status) && <p role="status">{checkLabels[selected.status]}…</p>}
+    <section className={styles.pane}><h2>{t('acquire.previewImport')}</h2>
+      {selected && selected.error && !dismissed && <div className={styles.previewError} role="status"><span>{t(checkLabels[selected.status])}：{(isMessage(selected.error)?formatMessage(selected.error):selected.error).slice(0,160)}</span><IconButton icon="close" data-role="secondary" label={t('acquire.dismissCandidate')} onClick={()=>setDismissed(true)}/></div>}
+      {selected && ['pending','fetching','parsing'].includes(selected.status) && <p role="status">{t(checkLabels[selected.status])}…</p>}
       {incoming ? <>
       <div className={styles.preview}>{incoming.lines.slice(previewPage * 100, (previewPage + 1) * 100).map(line => <p key={line.id}>{line.words.map(word => word.rubyUnits.length ? <ruby key={word.id}>{word.text}<rt>{word.rubyUnits.map(u => u.reading).join('')}</rt></ruby> : word.text)}{translationsForLine(incoming, line.id).map((t, i) => <small key={i}>{translationText(t)}</small>)}{incoming.romanizationTracks.flatMap(track => track.contents.filter(c => c.lineId === line.id).map(c => <small key={c.id}>{c.kind === 'plain' ? c.text : c.units.map(u => u.text).join('')}</small>))}</p>)}</div>
-      {incoming.lines.length > 100 && <div className={styles.actions}><IconButton icon="back" label="上一页" data-role="secondary" disabled={previewPage === 0} onClick={() => setPreviewPage(p => p - 1)}/><span>第 {previewPage + 1} / {Math.ceil(incoming.lines.length / 100)} 页</span><IconButton icon="chevron" label="下一页" data-role="secondary" disabled={(previewPage + 1) * 100 >= incoming.lines.length} onClick={() => setPreviewPage(p => p + 1)}/></div>}
-      <p className={styles.hint}>每键选择一侧完整值列表。选择空白侧会删除该键；正文、歌手与音译轨道整体替换。</p>
-      <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>键名</th><th>原值</th><th>待导入值</th></tr></thead><tbody>{Object.keys(choices).map(key => <tr key={key}><td>{key}{JSON.stringify(base.metadata[key]) === JSON.stringify(incoming.metadata[key]) && <small className={styles.hint}> · 一致</small>}</td>{(['current','incoming'] as const).map(side => <td key={side}><button data-role="secondary" aria-label={`${key} ${side === 'current' ? '原值' : '待导入值'}`} aria-pressed={choices[key] === side} onClick={() => setChoices({ ...choices, [key]: side })}>{(side === 'current' ? base : incoming).metadata[key]?.map((value, i) => <span key={i}>{value}</span>)}</button></td>)}</tr>)}</tbody></table></div>
-      <div className={styles.actions}><button data-role="primary" onClick={confirm}>确认导入并替换歌词</button><button data-role="secondary" onClick={() => { setIncoming(null); setMessage(''); }}>取消</button></div>
+      {incoming.lines.length > 100 && <div className={styles.actions}><IconButton icon="back" label={t('common.previousPage')} data-role="secondary" disabled={previewPage === 0} onClick={() => setPreviewPage(p => p - 1)}/><span>{t('acquire.page',{page:previewPage+1,pages:Math.ceil(incoming.lines.length/100)})}</span><IconButton icon="chevron" label={t('common.nextPage')} data-role="secondary" disabled={(previewPage + 1) * 100 >= incoming.lines.length} onClick={() => setPreviewPage(p => p + 1)}/></div>}
+      <p className={styles.hint}>{t('acquire.metadataHelp')}</p>
+      <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>{t('acquire.key')}</th><th>{t('acquire.originalValue')}</th><th>{t('acquire.incomingValue')}</th></tr></thead><tbody>{Object.keys(choices).map(key => <tr key={key}><td>{key}{JSON.stringify(base.metadata[key]) === JSON.stringify(incoming.metadata[key]) && <small className={styles.hint}> {t('acquire.identical')}</small>}</td>{(['current','incoming'] as const).map(side => <td key={side}><button data-role="secondary" aria-label={`${key} ${side === 'current' ? t('acquire.originalValue') : t('acquire.incomingValue')}`} aria-pressed={choices[key] === side} onClick={() => setChoices({ ...choices, [key]: side })}>{(side === 'current' ? base : incoming).metadata[key]?.map((value, i) => <span key={i}>{value}</span>)}</button></td>)}</tr>)}</tbody></table></div>
+      <div className={styles.actions}><button data-role="primary" onClick={confirm}>{t('acquire.confirm')}</button><button data-role="secondary" onClick={() => { setIncoming(null); setMessage(''); }}>{t('common.cancel')}</button></div>
     </> : null}</section>
   </div>;
 }
+
+const t=i18n.t.bind(i18n);

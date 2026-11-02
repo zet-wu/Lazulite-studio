@@ -1,5 +1,5 @@
 import type { ReadingRange } from '../../domain/japanese-ruby';
-import { requestHeaders } from "./client";
+import { requestHeaders, readApiError } from "./client";
 
 const root = "/api/v1";
 
@@ -12,16 +12,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers ?? {}),
     }),
   });
-  if (!response.ok) {
-    let message = `读音请求失败（${response.status}）`;
-    try {
-      const body = (await response.json()) as { message?: string };
-      message = body.message ?? message;
-    } catch {
-      /* keep the status message */
-    }
-    throw new Error(message);
-  }
+  if (!response.ok) throw await readApiError(response);
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }

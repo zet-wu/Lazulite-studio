@@ -30,7 +30,7 @@ describe('explicit transliteration to 注音', () => {
     expect(state.present.romanizationTracks[0]).toBe(source);
     expect(undoLyricCommand(state).present).toBe(document);
     expect(redoLyricCommand(undoLyricCommand(state)).present).toEqual(state.present);
-    expect(() => rubyGenerationCommand(state.present, document, rows, {}, new Set(), new Set())).toThrow(/文档已变化/);
+    expect(() => rubyGenerationCommand(state.present, document, rows, {}, new Set(), new Set())).toThrow('ruby.stale');
   });
 
   it('requires manual assignment for cross-word, plain and untimed sources and explicit overwrite', () => {
@@ -53,7 +53,7 @@ describe('explicit transliteration to 注音', () => {
     expect(raw[0].candidates).toEqual(['two', 'people']);
     const assigned = proposeRuby(raw, 'katakana', { 'timed:fu': 'two', 'timed:ta': 'two', 'plain:plain': 'two' });
     expect(assigned.map((row) => row.reading)).toEqual(['フ', 'タ', 'リ']);
-    expect(() => rubyGenerationCommand(document, document, assigned, {}, new Set(), new Set())).toThrow(/显式选择覆盖/);
+    expect(() => rubyGenerationCommand(document, document, assigned, {}, new Set(), new Set())).toThrow('ruby.overwriteRequired');
     const preview = rubyGenerationCommand(document, document, assigned, {}, new Set(), new Set(['two']));
     const state = executeLyricCommand(createLyricEditorState(document), preview);
     expect(state.present.lines[0].words[0].rubyUnits.map((unit) => [unit.reading, unit.beginMs])).toEqual([['フ', 1400], ['タ', null], ['リ', null]]);
@@ -69,7 +69,7 @@ describe('explicit transliteration to 注音', () => {
     ] }] });
     const rows = proposeRuby(rubySourceRows(document, 'latin', ['c']), 'hiragana');
     expect(rows[0].reading).toBeNull();
-    expect(rows[0].conversionIssue).toMatch(/整组转换/);
+    expect(rows[0].conversionIssue).toBe('ruby.groupConversion');
     expect(proposeRuby(rubySourceRows(document, 'latin', ['c']), 'roman').map((row) => row.reading)).toEqual(['k', 'ko']);
   });
 });
@@ -155,11 +155,11 @@ it('automatic expansion retains link, assignment, reading and empty-generation g
   Object.assign(line.words[0], { beginMs: 1000, endMs: 2000 });
   document.romanizationTracks.push({ id: 'track', language: 'ja', contents: [{ id: 'content', lineId: line.id, kind: 'timed', units: [{ id: 'u', text: 'ko', beginMs: 999, endMs: 2000 }] }] });
   const rows = proposeRuby(rubySourceRows(document, 'track', ['content']), 'hiragana');
-  expect(() => rubyGenerationCommand(document, document, rows, {}, new Set([rows[0].key]), new Set())).toThrow('没有可应用');
-  expect(() => rubyGenerationCommand(document, document, [{ ...rows[0], wordId: null }], {}, new Set(), new Set())).toThrow('尚未指定');
-  expect(() => rubyGenerationCommand(document, document, [{ ...rows[0], reading: null }], {}, new Set(), new Set())).toThrow('尚未确认');
+  expect(() => rubyGenerationCommand(document, document, rows, {}, new Set([rows[0].key]), new Set())).toThrow('ruby.noChanges');
+  expect(() => rubyGenerationCommand(document, document, [{ ...rows[0], wordId: null }], {}, new Set(), new Set())).toThrow('ruby.targetRequired');
+  expect(() => rubyGenerationCommand(document, document, [{ ...rows[0], reading: null }], {}, new Set(), new Set())).toThrow('ruby.readingRequired');
   const editing = createProjectEditing(); editing.endLinks[line.id] = 'next';
-  expect(() => rubyGenerationCommand(document, document, rows, {}, new Set(), new Set(), editing)).toThrow('行尾链接');
+  expect(() => rubyGenerationCommand(document, document, rows, {}, new Set(), new Set(), editing)).toThrow('ruby.endLink');
   expect(line.beginMs).toBe(1000); expect(line.words[0].rubyUnits).toHaveLength(0);
 });
 
@@ -225,7 +225,7 @@ describe('structured reverse-ruby issues', () => {
   });
   it('collects target, reading, overwrite and link errors without stale conversion gates', () => {
     const { document, line, rows, issues, editing } = fixture();
-    rows[0].reading = null; rows[0].conversionIssue = '整组转换：请确认';
+    rows[0].reading = null; rows[0].conversionIssue = 'ruby.groupConversion';
     expect(issues().map(issue => issue.kind)).toEqual(['reading']);
     expect(issues({ 'c:a': 'か', 'c:b': 'な' })).toEqual([]);
     line.words[0].rubyUnits = [{ id: 'old', reading: 'か', beginMs: 0, endMs: 1000 }];
@@ -236,7 +236,7 @@ describe('structured reverse-ruby issues', () => {
     expect(issues({}, skipped)).toEqual([]);
     rows[0].wordId = null;
     expect(issues().map(issue => issue.kind)).toContain('target');
-    expect(() => rubyGenerationCommand(document, document, rows, {}, new Set(), new Set(), editing)).toThrow('目标词');
+    expect(() => rubyGenerationCommand(document, document, rows, {}, new Set(), new Set(), editing)).toThrow('ruby.targetRequired');
   });
   it('continues after a removed issue, cycles and shares direct-selection position', () => {
     const { rows, issues } = fixture();
