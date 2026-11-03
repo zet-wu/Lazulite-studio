@@ -105,7 +105,5 @@ jobs:
           path: |
             ${{ env.BUILD_OUTPUT }}/build.log
             ${{ env.BUILD_OUTPUT }}/diagnostics/**
-            ${{ env.BUILD_OUTPUT }}/work/dependencies/*.json
-            ${{ env.BUILD_OUTPUT }}/work/dependencies/*.txt
           if-no-files-found: warn
           retention-days: 14

@@ -87,7 +87,6 @@ def audit(root, target):
             if 'arm64' not in arch.split():
                 errors.append(f'非 arm64 Mach-O：{path}')
                 continue
-            dependencies = subprocess.check_output(['otool', '-arch', 'arm64', '-L', str(path)], text=True)
             commands = subprocess.check_output(['otool', '-arch', 'arm64', '-l', str(path)], text=True)
             # otool prefixes its output with the input filename, which is an
             # absolute build path. Only inspect actual load commands below it.
@@ -105,7 +104,7 @@ def audit(root, target):
                 # Debug strings are not included in otool load commands.
                 errors.append(f'构建机路径出现在 Mach-O load commands：{path}')
             report.append({'file':path.relative_to(root).as_posix(), 'arch':arch,
-                           'dependencies':dependencies, 'imports':imports, 'load_commands':commands})
+                           'imports':imports, 'load_commands':commands})
     if errors:
         raise ValueError('原生依赖审计失败：\n' + '\n'.join(errors))
     return {'target':target, 'binaries':report,

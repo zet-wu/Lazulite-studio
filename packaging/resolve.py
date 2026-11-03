@@ -26,9 +26,13 @@ def check_source():
     return actual
 
 
-def resolve(target, output):
+def check_build_host(target):
     if (platform.system(), platform.machine()) != TARGETS[target] or sys.version_info[:2] != (3, 12):
         raise RuntimeError(f'{target} 必须在对应原生架构 CPython 3.12 环境解析，当前为 {platform.system()}/{platform.machine()}/{platform.python_version()}')
+
+
+def resolve(target, output):
+    check_build_host(target)
     commit = check_source()
     output = Path(output).resolve()
     if output.exists() and any(output.iterdir()): raise RuntimeError('输出目录必须为空，避免混入旧轮子')

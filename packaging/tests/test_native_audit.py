@@ -24,8 +24,6 @@ def test_macos_records_declared_minimum_and_rejects_missing_dependency(tmp_path,
     def output(command, **kwargs):
         if command[0] == 'lipo':
             return 'arm64'
-        if '-L' in command:
-            return f'{executable}:\n\t{dependency} (compatibility version 1.0.0)\n'
         return ('Load command 0\n cmd LC_LOAD_DYLIB\n'
                 f' name {dependency} (offset 24)\n'
                 'Load command 1\n cmd LC_BUILD_VERSION\n minos 14.0\n sdk 15.0\n')
@@ -48,8 +46,6 @@ def test_macos_ignores_filename_header_but_rejects_host_load_commands(tmp_path, 
         if command[0] == 'lipo':
             return 'arm64'
         header = f'{host_path}/ffmpeg:\n'
-        if '-L' in command:
-            return header + '\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0)\n'
         return header + commands
     monkeypatch.setattr('native_audit.subprocess.check_output', output)
     assert len(audit(tmp_path, 'macos-arm64')['binaries']) == 1
@@ -86,8 +82,6 @@ def test_macos_self_id_is_not_an_import_but_all_dependency_kinds_are_checked(tmp
     def output(command, **kwargs):
         if command[0] == 'lipo':
             return 'arm64'
-        if '-L' in command:
-            return f'{executable}:\n\t@rpath/tokenizers.tokenizers.abi3.so (compatibility version 0.0.0)\n'
         return f'{executable}:\n' + commands
     monkeypatch.setattr('native_audit.subprocess.check_output', output)
     assert audit(tmp_path, 'macos-arm64')['binaries'][0]['imports'] == ['/usr/lib/libSystem.B.dylib']

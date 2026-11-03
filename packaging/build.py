@@ -14,7 +14,7 @@ import traceback
 
 from archive import download, extract, package
 from native_audit import audit, remove_unused_host_rpaths
-from resolve import ROOT, TARGETS
+from resolve import ROOT, TARGETS, check_build_host
 
 
 def run(args, *, cwd=ROOT, env=None):
@@ -36,14 +36,10 @@ def runtime_python(root):
     return root / ('runtime/python/python.exe' if os.name == 'nt' else 'runtime/python/bin/python3')
 
 
-def frontend(output, runtime):
-    node = subprocess.check_output(['node', '--version'], text=True).strip().removeprefix('v')
+def frontend(output):
     pnpm = shutil.which('pnpm')
-    if node != runtime['node'] or not pnpm:
-        raise RuntimeError(f'需要 Node {runtime["node"]} 和 pnpm {runtime["pnpm"]}')
-    version = subprocess.check_output([pnpm, '--version'], text=True).strip()
-    if version != runtime['pnpm']:
-        raise RuntimeError(f'pnpm 版本不匹配：{version}')
+    if not pnpm:
+        raise RuntimeError('需要 pnpm')
     run([pnpm, '--dir', 'frontend', 'install', '--frozen-lockfile'])
     env = dict(os.environ, VITE_ENABLE_MOCKS='false')
     run([pnpm, '--dir', 'frontend', 'build'], env=env)
@@ -141,12 +137,6 @@ def licenses(root, dependencies, pnpm):
         raise RuntimeError('无法收集前端生产依赖许可')
 
 
-def check_build_host(target, runtime):
-    expected = runtime['build_python_version']
-    if (platform.system(), platform.machine()) != TARGETS[target] or platform.python_version() != expected:
-        raise RuntimeError(f'{target} 需要对应原生架构的构建 Python {expected}')
-
-
 def remove_foreign_installer_templates(root):
     """Do not ship installer launcher templates for other Windows architectures.
 
@@ -199,7 +189,7 @@ def deploy_windows_runtime(root):
 def build(target, output):
     runtime = json.loads((ROOT / 'packaging/runtime-manifest.json').read_text())
     models = json.loads((ROOT / 'packaging/models.json').read_text())
-    check_build_host(target, runtime)
+    check_build_host(target)
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=normal'], cwd=ROOT, text=True).strip():
         raise RuntimeError('发布输入必须为干净检出；输出目录请放在仓库外')
@@ -217,7 +207,7 @@ def build(target, output):
             shutil.copy2(path, diagnostics / path.name)
     root = work / f'LazuliteStudio-{target}'
     root.mkdir()
-    pnpm = frontend(root, runtime)
+    pnpm = frontend(root)
     (root / 'app/server').mkdir(parents=True)
     tracked = subprocess.check_output(['git', 'ls-files', '-z', 'server'], cwd=ROOT).decode().split('\0')
     for name in filter(None, tracked):

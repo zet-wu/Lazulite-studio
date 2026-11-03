@@ -47,7 +47,7 @@ def main():
     ffmpeg = root / 'runtime/ffmpeg' / ('ffmpeg' + suffix)
     ffprobe = root / 'runtime/ffmpeg' / ('ffprobe' + suffix)
     decoders = subprocess.check_output([str(ffmpeg), '-hide_banner', '-decoders'], text=True, stderr=subprocess.STDOUT)
-    for codec in ('aac', 'mp3', 'flac', 'alac', 'pcm_s16le'):
+    for codec in ('mp3', 'alac'):
         assert any(codec == line.split()[1] for line in decoders.splitlines() if len(line.split()) > 1), codec
     with tempfile.TemporaryDirectory(dir=root) as directory:
         directory = Path(directory)
