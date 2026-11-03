@@ -58,7 +58,7 @@ TTML 草稿保存保留待修正时间与 Studio 身份，发布阶段检查实�
 
 停服先拒绝新任务、取消排队、请求运行任务停止，再在宽限后回收模型及 FFmpeg 进程树。POSIX 使用独立进程组；Windows 使用 kill-on-close Job Object。轮换日志为 5 MiB × 3 份备份，常规日志省略模型原始输出和 traceback，不自动上传。
 
-卡拉数据模型允许空分组列表；导唱默认值由文字和三个阈值组成，标准组角色由 ID 决定。歌手集合配置含必需 `skip`，与项目 v9 快照一同通过保存及归档往返。源音频标签接口 `GET /api/v1/projects/{pid}/source-metadata` 复用创建项目标签解析，返回当前 `asset_id` 与 `title`／`artist`／`album`，由调用方明确保存搜索条件。标签失败返回对象级错误说明。
+卡拉数据模型允许空分组列表；导唱默认值由文字和三个阈值组成，标准组角色由 ID 决定。歌手集合配置含必需 `skip`，与项目 v9 快照一同通过保存及归档往返。源音频标签接口 `GET /api/v1/projects/{pid}/source-metadata` 复用创建项目标签解析，返回当前 `asset_id` 与 `title`／`artist`／`album`，获取页由调用方明确保存搜索条件；歌词元数据窗口通过 `tags_only=true` 读取纯标签，空标题保持为空。标签失败返回对象级错误说明。
 
 
 ### 固定词典索引生命周期

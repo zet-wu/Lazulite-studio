@@ -66,7 +66,7 @@ export function useSearchConditions(projectId?: string, sourceAssetId?: string) 
     const current = () => alive.current && !controller.signal.aborted && editVersion.current === version && currentIdentity.current === capturedIdentity;
     setReadingMetadata(true); setMetadataError('');
     try {
-      const result = await readSourceMetadata(projectId, sourceAssetId, controller.signal);
+      const result = await readSourceMetadata(projectId, sourceAssetId, controller.signal, false);
       if (!current()) return;
       replace(result);
     } catch (cause) { if (current()) setMetadataError(errorMessage(cause)); }

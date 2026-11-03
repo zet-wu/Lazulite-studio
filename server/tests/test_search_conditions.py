@@ -41,6 +41,7 @@ def test_explicit_source_metadata_does_not_write_search_or_lyrics(tmp_path):
     assert result.status_code == 200
     assert result.json()['conditions'] == {'title': 'song', 'artist': '', 'album': ''}
     assert result.json()['asset_id']
+    assert client.get(source + '?tags_only=true').json()['conditions'] == {'title': '', 'artist': '', 'album': ''}
     assert client.get(search).json() == original
     assert client.get(f'/api/v1/projects/{pid}/document').json() == before
     (tmp_path / 'projects' / pid / 'source' / 'original').unlink()
@@ -48,3 +49,18 @@ def test_explicit_source_metadata_does_not_write_search_or_lyrics(tmp_path):
     assert client.get(search).json() == original
     empty = client.post('/api/v1/projects', json={'name':'empty'}, headers=headers).json()['id']
     assert client.get(f'/api/v1/projects/{empty}/source-metadata').status_code == 422
+
+
+def test_source_tags_only_reads_real_id3_without_splitting_artist(tmp_path):
+    from mutagen.wave import WAVE
+    from mutagen.id3 import TIT2, TPE1, TALB
+    client, headers, asset, (pid, _), db = setup_project(tmp_path)
+    path = tmp_path / 'projects' / pid / 'source' / 'original'
+    audio = WAVE(path); audio.add_tags()
+    audio.tags.add(TIT2(encoding=3, text=['标签标题']))
+    audio.tags.add(TPE1(encoding=3, text=['A / B, C & D']))
+    audio.tags.add(TALB(encoding=3, text=['专辑']))
+    audio.save()
+    result = client.get(f'/api/v1/projects/{pid}/source-metadata?tags_only=true')
+    assert result.status_code == 200
+    assert result.json()['conditions'] == {'title': '标签标题', 'artist': 'A / B, C & D', 'album': '专辑'}

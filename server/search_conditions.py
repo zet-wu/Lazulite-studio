@@ -2,7 +2,7 @@
 from pathlib import Path
 from mutagen import File
 from mutagen.mp4 import MP4
-from mutagen.mp3 import MP3
+from mutagen.id3 import ID3
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -13,17 +13,17 @@ class SearchConditions(BaseModel):
     album: str = Field(max_length=2000)
 
 
-def initial_conditions(path: Path, filename: str) -> dict:
+def initial_conditions(path: Path, filename: str | None) -> dict:
     audio = File(path)
     tags = getattr(audio, 'tags', None) or {}
-    keys = ('\xa9nam', '\xa9ART', '\xa9alb') if isinstance(audio, MP4) else ('TIT2', 'TPE1', 'TALB') if isinstance(audio, MP3) else ('title', 'artist', 'album')
+    keys = ('\xa9nam', '\xa9ART', '\xa9alb') if isinstance(audio, MP4) else ('TIT2', 'TPE1', 'TALB') if isinstance(tags, ID3) else ('title', 'artist', 'album')
     def joined(key):
         value = tags.get(key, [])
         if hasattr(value, 'text'): value = value.text
         if isinstance(value, str): value = [value]
         return ' '.join(str(part).strip() for part in value if str(part).strip())
     title, artist, album = map(joined, keys)
-    return {'title': title or Path(filename).stem, 'artist': artist, 'album': album}
+    return {'title': title or (Path(filename).stem if filename else ''), 'artist': artist, 'album': album}
 
 
 def read_conditions(c, pid):

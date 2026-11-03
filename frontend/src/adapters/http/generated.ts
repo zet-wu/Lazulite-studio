@@ -2806,7 +2806,10 @@ export interface operations {
     };
     getProjectSourceMetadata: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 仅返回音频标签；空标题不回退文件名 */
+                tags_only?: boolean;
+            };
             header?: never;
             path: {
                 projectId: components["parameters"]["ProjectId"];
@@ -2815,7 +2818,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 项目保存的最终搜索字符串 */
+            /** @description 当前源音频身份和歌曲元数据 */
             200: {
                 headers: {
                     [name: string]: unknown;

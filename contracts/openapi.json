@@ -1722,11 +1722,21 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "tags_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "仅返回音频标签；空标题不回退文件名"
           }
         ],
         "responses": {
           "200": {
-            "description": "项目保存的最终搜索字符串",
+            "description": "当前源音频身份和歌曲元数据",
             "content": {
               "application/json": {
                 "schema": {

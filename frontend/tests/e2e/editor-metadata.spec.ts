@@ -40,3 +40,13 @@ test('table fields protect IME and cancel drafts without changing the saved meta
  await page.getByRole('button',{name:'新增元数据键'}).click();await page.getByLabel('新元数据键').press('Escape');await expect(page.getByLabel('新元数据键')).toHaveCount(0);await expect(page.getByRole('dialog',{name:'歌词元数据'})).toBeVisible();
  await page.getByRole('button',{name:'关闭歌词元数据'}).click();await settings(page,'歌词元数据');await expect(page.getByLabel('元数据 artist 值 1')).toHaveValue('甲');
 });
+
+test('source tags fill only blank metadata after blur and leave acquisition conditions intact',async({page})=>{
+ await page.goto('/projects/sample-project/edit');await importLyrics(page,{name:'metadata.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
+ await settings(page,'歌词元数据');const fill=page.getByRole('button',{name:'使用歌曲元数据'});
+ await page.getByLabel('元数据 title 值 1').fill('手写标题');await fill.click();await expect(page.getByLabel('元数据 title 值 1')).toHaveValue('手写标题');await expect(page.getByRole('status').filter({hasText:'没有需要填入'})).toBeVisible();
+ await page.getByRole('button',{name:'删除元数据 title 及全部值'}).click();await fill.click();await expect(page.getByLabel('元数据 title 值 1')).toHaveValue('源音频标题');await expect(page.getByLabel('元数据 artist 值 1')).toHaveValue('甲');await expect(page.getByLabel('元数据 artist 值 2')).toHaveValue('乙');
+ await page.getByRole('button',{name:'关闭歌词元数据'}).click();await page.getByRole('button',{name:'撤销',exact:true}).click();await settings(page,'歌词元数据');await expect(page.getByLabel('元数据 title 值 1')).toHaveCount(0);
+ await page.getByRole('button',{name:'关闭歌词元数据'}).click();await page.getByRole('button',{name:'重做',exact:true}).click();await settings(page,'歌词元数据');await expect(page.getByLabel('元数据 title 值 1')).toHaveValue('源音频标题');
+ const conditions=await page.evaluate(async()=> (await fetch('/api/v1/projects/sample-project/search-conditions')).json());expect(conditions).toEqual({title:'',artist:'',album:''});
+});
