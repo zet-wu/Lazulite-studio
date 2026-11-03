@@ -11,7 +11,7 @@ from .atomic_file import write_atomic
 UI_LANGUAGES = {language['id'] for language in json.loads(Path(__file__).with_name('ui_languages.json').read_text(encoding='utf-8')) if language['complete']}
 
 PREFERENCE_KEYS = {
-    'lazulite-editor-theme', 'lazulite-shortcuts', 'lazulite-sync-keys',
+    'lazulite-editor-theme', 'lazulite-shortcuts',
     'lazulite-editor-columns', 'studio.playback-rate',
     'studio:sync-mode', 'studio:sync-offset',
     'studio:reading-dictionary', 'studio:ui-language',

@@ -1,5 +1,4 @@
 import { message, MessageError } from './messages';
-import { toKana } from 'wanakana';
 import type { LyricWord, RubyUnit, TimeMs } from './lyric-document';
 
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
@@ -7,14 +6,6 @@ const smallKana = /^[ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ]$/u;
 const kana = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
 export const isKanaReading = (reading: string) => kana.test(reading.normalize('NFC'));
 export const readingWeight = (reading: string) => isKanaReading(reading) ? Math.max(1, splitReadingMora(reading).length) : 1;
-
-export function readingFromRomanization(value: string): string {
-  const source = value.replace(/\s+/gu, '');
-  if (!source) throw new MessageError(message('ruby.wordRomanizationEmpty'));
-  const reading = toKana(source);
-  if (!kana.test(reading)) throw new MessageError(message('ruby.cannotConvert',{value}));
-  return reading;
-}
 
 export function splitReadingMora(reading: string): string[] {
   const parts: string[] = [];

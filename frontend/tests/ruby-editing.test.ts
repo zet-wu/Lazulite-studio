@@ -2,16 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { createLyricDocument, createWord } from '../src/domain/lyric-document';
-import { distributeRubyTime, makeRubyUnits, readingFromRomanization, splitReadingMora } from '../src/domain/ruby-editing';
+import { distributeRubyTime, makeRubyUnits, splitReadingMora } from '../src/domain/ruby-editing';
 
 describe('E4 注音 editing', () => {
-  it('converts romaji and separates mora without breaking yoon, sokuon, long vowels or emoji graphemes', () => {
-    expect(readingFromRomanization('kyou')).toBe('きょう');
+  it('separates mora without breaking yoon, sokuon, long vowels or emoji graphemes', () => {
     expect(splitReadingMora('きょう')).toEqual(['きょ', 'う']);
     expect(splitReadingMora('がっこう')).toEqual(['が', 'っ', 'こ', 'う']);
     expect(splitReadingMora('スーパー')).toEqual(['ス', 'ー', 'パ', 'ー']);
     expect(splitReadingMora('きょ😊')).toEqual(['きょ', '😊']);
-    expect(() => readingFromRomanization('hello 😊')).toThrow('ruby.cannotConvert');
   });
 
   it('inserts, splits, merges and redistributes independently timed 注音 units with one-step undo', () => {
@@ -53,7 +51,7 @@ describe('E4 注音 editing', () => {
     const line = document.lines[0], word = line.words[0];
     line.beginMs = 3000; line.endMs = 4000;
     word.beginMs = 3000; word.endMs = 4000;
-    const units = makeRubyUnits(word, splitReadingMora(readingFromRomanization('sora')));
+    const units = makeRubyUnits(word, splitReadingMora('そら'));
     const state = executeLyricCommand(createLyricEditorState(document), { type: 'set-ruby-units', lineId: line.id, wordId: word.id, units });
     expect(state.present.lines[0].words[0].rubyUnits.map((unit) => unit.reading)).toEqual(['そ', 'ら']);
     expect(() => executeLyricCommand(state, { type: 'set-ruby-units', lineId: line.id, wordId: word.id, units: makeRubyUnits(word, ['う']) })).toThrow('command.rubyOverwrite');

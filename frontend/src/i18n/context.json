@@ -9249,27 +9249,11 @@
     "params": [],
     "parameterNotes": {}
   },
-  "ruby.wordRomanizationEmpty": {
-    "context": "ruby interface: ruby.wordRomanizationEmpty",
-    "source": "逐词音译为空",
-    "params": [],
-    "parameterNotes": {}
-  },
   "ruby.unitEmpty": {
     "context": "ruby interface: ruby.unitEmpty",
     "source": "读音单元不能为空",
     "params": [],
     "parameterNotes": {}
-  },
-  "ruby.cannotConvert": {
-    "context": "ruby interface: ruby.cannotConvert",
-    "source": "无法把音译转换成假名：{{value}}",
-    "params": [
-      "value"
-    ],
-    "parameterNotes": {
-      "value": "Entered or parsed value; preserve it."
-    }
   },
   "segment.weightInvalid": {
     "context": "segment interface: segment.weightInvalid",

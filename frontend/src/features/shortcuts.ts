@@ -49,17 +49,6 @@ export function readBindings(): Bindings {
     if ((Object.keys(shortcutActions) as ShortcutAction[]).some(action => bindingError(action, candidate[action], candidate))) return result;
     return candidate;
   }
-  try {
-    const old = JSON.parse(preferences.getItem('lazulite-sync-keys') ?? 'null') as Record<string, unknown> | null;
-    if (old) {
-      const candidate = { ...result };
-      for (const action of Object.keys(shortcutActions) as ShortcutAction[]) if (typeof old[action] === 'string' && shortcutActions[action][0] === 'shortcuts.timing') candidate[action] = plain(old[action]);
-      if ((Object.keys(shortcutActions) as ShortcutAction[]).every(action => !bindingError(action, candidate[action], candidate))) {
-        preferences.setItem(storageKey, JSON.stringify(candidate));
-        return candidate;
-      }
-    }
-  } catch { /* Invalid persisted preferences are discarded at the storage boundary. */ }
   return result;
 }
 export function saveBindings(bindings: Bindings) {
