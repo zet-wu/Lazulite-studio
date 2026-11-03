@@ -1690,5 +1690,10 @@
   "project.errorBackground": "（背景）",
   "project.errorTranslationTrack": "翻译轨道 {{number}} · {{language}}",
   "project.errorRomanizationTrack": "音译轨道 {{number}} · {{language}}",
-  "validation.locationTrack": "轨道 {{number}}"
+  "validation.locationTrack": "轨道 {{number}}",
+  "metadata.useSong": "使用歌曲元数据",
+  "metadata.finishEditing": "请先完成当前元数据编辑，再使用歌曲元数据。",
+  "metadata.filled": "已填入空白元数据。",
+  "metadata.noEmpty": "没有需要填入的空项。",
+  "metadata.noTags": "未读到可用标签。"
 }

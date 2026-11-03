@@ -1703,5 +1703,10 @@
   "project.errorBackground": " (Background)",
   "project.errorTranslationTrack": "Translation track {{number}} · {{language}}",
   "project.errorRomanizationTrack": "Romanization track {{number}} · {{language}}",
-  "validation.locationTrack": "Track {{number}}"
+  "validation.locationTrack": "Track {{number}}",
+  "metadata.useSong": "Use song metadata",
+  "metadata.finishEditing": "Finish editing metadata before using song metadata.",
+  "metadata.filled": "Empty metadata fields filled.",
+  "metadata.noEmpty": "No empty fields to fill.",
+  "metadata.noTags": "No usable tags found."
 }

@@ -11230,5 +11230,35 @@
     "parameterNotes": {
       "number": "One-based track index"
     }
+  },
+  "metadata.useSong": {
+    "context": "Lyrics metadata dialog: metadata.useSong",
+    "source": "使用歌曲元数据",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "metadata.finishEditing": {
+    "context": "Lyrics metadata dialog: metadata.finishEditing",
+    "source": "请先完成当前元数据编辑，再使用歌曲元数据。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "metadata.filled": {
+    "context": "Lyrics metadata dialog: metadata.filled",
+    "source": "已填入空白元数据。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "metadata.noEmpty": {
+    "context": "Lyrics metadata dialog: metadata.noEmpty",
+    "source": "没有需要填入的空项。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "metadata.noTags": {
+    "context": "Lyrics metadata dialog: metadata.noTags",
+    "source": "未读到可用标签。",
+    "params": [],
+    "parameterNotes": {}
   }
 }

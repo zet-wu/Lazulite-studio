@@ -1,3 +1,4 @@
+import { readSourceMetadata } from '../adapters/http/source-metadata';
 import {message,MessageError,errorMessage} from '../domain/messages';
 import {useMessageText} from '../shared/useMessageText';
 import { useEffect, useRef, useState } from 'react';
@@ -65,13 +66,9 @@ export function useSearchConditions(projectId?: string, sourceAssetId?: string) 
     const current = () => alive.current && !controller.signal.aborted && editVersion.current === version && currentIdentity.current === capturedIdentity;
     setReadingMetadata(true); setMetadataError('');
     try {
-      const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/source-metadata`, {credentials:'include',headers:requestHeaders(),signal:controller.signal});
-      if (!response.ok) throw new MessageError(message('search.tagsReadFailed'));
-      const result = await response.json();
+      const result = await readSourceMetadata(projectId, sourceAssetId, controller.signal);
       if (!current()) return;
-      if (result.asset_id !== sourceAssetId) throw new MessageError(message('search.tagsSourceChanged'));
-      if (!result.conditions || ['title','artist','album'].some(key => typeof result.conditions[key] !== 'string')) throw new MessageError(message('search.tagsInvalid'));
-      replace(result.conditions);
+      replace(result);
     } catch (cause) { if (current()) setMetadataError(errorMessage(cause)); }
     finally { if (metadataRequest.current === controller) setReadingMetadata(false); }
   };

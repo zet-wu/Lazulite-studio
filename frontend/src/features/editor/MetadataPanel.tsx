@@ -1,27 +1,55 @@
+import { readSourceMetadata } from '../../adapters/http/source-metadata';
+import { DialogEditingLocked } from './SettingsDialog';
 import { useMessageText } from '../../shared/useMessageText';
-import { message } from '../../domain/messages';
+import { errorMessage, message } from '../../domain/messages';
 import { i18n } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../../shared/Icon';
-import { useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import type { LyricDocument } from '../../domain/lyric-document';
 import { DraftInput } from './EditorFields';
 import { TableField } from './ManagementTable';
 import { IconButton } from '../../shared/Controls';
 
-const preferred = ['title','artist','album','composer','lyricist','isrc'];
+const preferred = ['title','artist','album','composer','arranger','lyricist','year','isrc'];
 type Props = { document: LyricDocument; apply: (command: LyricCommand) => boolean };
-export function MetadataPanel({ document, apply }: Props) {
+export function MetadataPanel({ document, apply, projectId, sourceAssetId }: Props & { projectId?: string; sourceAssetId?: string }) {
   useTranslation();
+ const locked = useContext(DialogEditingLocked);
+ const root = useRef<HTMLDivElement>(null), request = useRef<AbortController | null>(null);
+ const latest = useRef({ document, apply, projectId, sourceAssetId, locked });
+ latest.current = { document, apply, projectId, sourceAssetId, locked };
+ const [reading, setReading] = useState(false), [notice, setNotice] = useMessageText('');
+ useEffect(() => {
+   setReading(false); setNotice('');
+   return () => { request.current?.abort(); request.current = null; };
+ }, [projectId, sourceAssetId]);
+ const hasDraft = () => !!root.current?.querySelector('[data-uncommitted="true"], [data-draft]');
+ const fill = async () => {
+   if (!projectId || !sourceAssetId || locked || request.current) return;
+   if (hasDraft()) { setNotice(message('metadata.finishEditing')); return; }
+   const controller = new AbortController(); request.current = controller;
+   setReading(true); setNotice('');
+   const current = () => !controller.signal.aborted && latest.current.projectId === projectId && latest.current.sourceAssetId === sourceAssetId && !latest.current.locked;
+   try {
+     const source = await readSourceMetadata(projectId, sourceAssetId, controller.signal);
+     if (!current()) return;
+     if (hasDraft()) { setNotice(message('metadata.finishEditing')); return; }
+     const commands = (['title','artist','album'] as const).filter(key => source[key].trim() && !latest.current.document.metadata[key]?.some(value => value.trim())).map(key => ({ type: 'set-metadata' as const, key, values: [source[key]] }));
+     if (commands.length) { if (latest.current.apply({type:'batch', commands})) setNotice(message('metadata.filled')); }
+     else setNotice(message(Object.values(source).some(value => value.trim()) ? 'metadata.noEmpty' : 'metadata.noTags'));
+   } catch (cause) { if (current()) setNotice(errorMessage(cause)); }
+   finally { if (request.current === controller) { request.current = null; setReading(false); } }
+ };
  const identities=useRef(new Map<string,string>()), table=useRef<HTMLTableElement>(null), add=useRef<HTMLButtonElement>(null);
  const [drafts,setDrafts]=useState<string[]>([]);
  const identity=(key:string)=>{ if(!identities.current.has(key))identities.current.set(key,crypto.randomUUID());return identities.current.get(key)!; };
  const focusNext=(row:number)=>requestAnimationFrame(()=>{ const rows=table.current?.querySelectorAll('tbody tr'); const next=rows?.[Math.min(row,(rows?.length ?? 1)-1)]; (next?.querySelector('input,textarea') as HTMLElement | null)?.focus(); if(!next)add.current?.focus(); });
- return <div><label className="management-language">{t('metadata.language')}<DraftInput value={document.language ?? ''} label={t('metadata.language')} placeholder="ja / zh-Hans" onCommit={language=>apply({type:'set-language',language:language || null})}/></label>
+ return <div ref={root}><label className="management-language">{t('metadata.language')}<DraftInput value={document.language ?? ''} label={t('metadata.language')} placeholder="ja / zh-Hans" onCommit={language=>apply({type:'set-language',language:language || null})}/></label>
  <section aria-label={t('metadata.author')}><h3>{t('metadata.author')}</h3>
  <table className="management-table"><tbody><MetadataRow name="songwriter" values={document.metadata.songwriter ?? []} document={document} apply={apply} renamed={()=>{}} deleted={()=>{}} dedicated/></tbody></table></section>
- <section aria-label={t('metadata.amll')}><h3>{t('metadata.amll')}</h3>
+ <section aria-label={t('metadata.amll')}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}><h3>{t('metadata.amll')}</h3><button type="button" data-role="inline" disabled={!sourceAssetId || !projectId || locked || reading} aria-busy={reading} onClick={()=>void fill()}>{t(reading ? 'common.reading' : 'metadata.useSong')}</button></div>{notice && <p role="status">{notice}</p>}
  <datalist id="metadata-key-suggestions">{preferred.map(k=><option key={k} value={k}/>)}</datalist>
  <table className="management-table" ref={table}><colgroup><col style={{width:'27%'}}/><col/><col style={{width:80}}/></colgroup><thead><tr><th>{t('metadata.key')}</th><th>{t('metadata.value')}</th><th aria-label={t('common.actions')}/></tr></thead><tbody>
  {Object.entries(document.metadata).filter(([key])=>key !== 'songwriter').map(([key,values],index)=><MetadataRow key={identity(key)} name={key} values={values} apply={apply} document={document} deleted={()=>focusNext(index)} renamed={next=>{ identities.current.set(next,identity(key)); identities.current.delete(key); }}/>) }
