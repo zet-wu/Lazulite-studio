@@ -1095,7 +1095,7 @@ function EditorWorkspaceContent(props: Props) {
       attached={document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === splitLineId).map((content) => ({ track, content })))}
       close={() => setSplitLineId(null)}
       submit={plan => dispatch({ type: 'split-line', ...plan })} />}
-    {contextMenu && <EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.title} actions={contextMenu.actions} close={closeContext} />}
+    {contextMenu && !props.alignment?.locked && <EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.title} actions={contextMenu.actions} close={closeContext} />}
     </DialogEditingLocked.Provider>
     {dictionaryManager && <DictionaryManager close={() => setDictionaryManager(false)} />}
   </div>;

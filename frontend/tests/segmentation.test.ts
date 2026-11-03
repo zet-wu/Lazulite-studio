@@ -93,3 +93,58 @@ it('defaults to independent whitespace words for western lyrics, including punct
   expect(segmentText('I still love you', DEFAULT_SEGMENT_OPTIONS)).toEqual(['I', ' ', 'still', ' ', 'love', ' ', 'you']);
   expect(segmentText('a  , b', DEFAULT_SEGMENT_OPTIONS)).toEqual(['a', '  ', ',', ' ', 'b']);
 });
+
+it('automatically previews current parameters, waits for IME, and applies the displayed split', async () => {
+  const {createElement} = await import('react');
+  const {render, screen, fireEvent, waitFor, cleanup} = await import('@testing-library/react');
+  const {SegmentationPanel} = await import('../src/features/editor/SegmentationPanel');
+  const document = createLyricDocument('hello');
+  const applied: unknown[] = [];
+  const view = render(createElement(SegmentationPanel, {document, selection:null, currentLineId:document.lines[0].id, apply:command=>{applied.push(command);return true;}, close:()=>{}}));
+  try {
+    fireEvent.click(screen.getByRole('button', {name:'高级'}));
+    const rules = screen.getByLabelText('自定义规则（每行 原文=部分|部分）');
+    const apply = screen.getByRole('button', {name:'应用（一次撤销）'});
+    fireEvent.change(rules, {target:{value:'hello=hel|lo'}});
+    await waitFor(()=>expect(apply).toBeEnabled());
+    fireEvent.compositionStart(rules);
+    fireEvent.change(rules,{target:{value:'hello=he|llo'}});
+    expect(apply).toBeDisabled();
+    fireEvent.compositionEnd(rules);
+    await waitFor(()=>expect(apply).toBeEnabled());
+    fireEvent.click(apply);
+    expect(applied).toMatchObject([{type:'segment-words',changes:[{words:[{text:'he'},{text:'llo'}]}]}]);
+    fireEvent.change(rules,{target:{value:'invalid'}});
+    expect(apply).toBeDisabled();
+    await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('invalid'));
+  } finally {view.unmount();cleanup();}
+});
+
+it('ignores late syllable previews after newer inputs and after closing', async () => {
+  const {createElement} = await import('react');
+  const {render, screen, fireEvent, waitFor, act, cleanup} = await import('@testing-library/react');
+  const {vi} = await import('vitest');
+  const segmentation = await import('../src/domain/segmentation');
+  const pending: Array<(divide:(text:string)=>string[])=>void> = [];
+  const loader = vi.spyOn(segmentation, 'loadSyllableDivider').mockImplementation(() => new Promise(resolve => pending.push(resolve)));
+  const {SegmentationPanel} = await import('../src/features/editor/SegmentationPanel');
+  const document = createLyricDocument('hello'), apply = vi.fn(()=>true);
+  const view = render(createElement(SegmentationPanel, {document, selection:null, currentLineId:document.lines[0].id, apply, close:()=>{}}));
+  try {
+    fireEvent.click(screen.getByRole('button',{name:'自动'}));
+    fireEvent.change(screen.getByLabelText('西文处理'),{target:{value:'syllable'}});
+    await waitFor(()=>expect(pending).toHaveLength(1));
+    fireEvent.change(screen.getByLabelText('音节语言'),{target:{value:'de'}});
+    expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();
+    await waitFor(()=>expect(pending).toHaveLength(2));
+    await act(async()=>pending[1](()=>['he','llo']));
+    await act(async()=>pending[0](()=>['hel','lo']));
+    fireEvent.click(screen.getByRole('button',{name:'应用（一次撤销）'}));
+    expect(apply).toHaveBeenCalledWith(expect.objectContaining({changes:[expect.objectContaining({words:[expect.objectContaining({text:'he'}),expect.objectContaining({text:'llo'})]})]}));
+    fireEvent.change(screen.getByLabelText('音节语言'),{target:{value:'fr'}});
+    await waitFor(()=>expect(pending).toHaveLength(3));
+    view.unmount();
+    await act(async()=>pending[2](()=>['h','ello']));
+    expect(apply).toHaveBeenCalledTimes(1);
+  } finally {view.unmount();loader.mockRestore();cleanup();}
+});

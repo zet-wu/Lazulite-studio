@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => { await page.goto('/projects/sample-project/
 test('reverse selection, mouse/keyboard menus, word and Ruby merge retain selection and focus', async ({ page }) => {
   await edge(page, 2); await edge(page, 0, { modifiers: ['Shift'] });
   await edge(page, 1, { button: 'right' });
-  await expect(page.getByText('词已选 3', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('编辑操作').getByText('词已选 3', { exact: true })).toBeVisible();
   await page.getByRole('menuitem', { name: '合并所选', exact: true }).click();
   await expect(row(page).getByLabel('词 今日は', { exact: true })).toBeFocused();
   await expect(row(page).locator('[data-ruby-id]')).toHaveCount(2);
@@ -15,7 +15,7 @@ test('reverse selection, mouse/keyboard menus, word and Ruby merge retain select
   await ruby.first().click({ position: { x: 3, y: 3 } });
   await ruby.last().click({ position: { x: 3, y: 3 }, modifiers: ['Shift'] });
   await ruby.last().press('Shift+F10');
-  await expect(page.getByText('注音已选 2', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('编辑操作').getByText('注音已选 2', { exact: true })).toBeVisible();
   await page.getByRole('menuitem', { name: '合并所选', exact: true }).click();
   await expect(row(page).getByLabel('读音 今日は', { exact: true })).toHaveValue('きょう');
   await expect(row(page).getByLabel('读音 今日は', { exact: true })).toBeFocused();

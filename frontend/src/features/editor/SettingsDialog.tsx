@@ -23,7 +23,7 @@ export function SettingsDialog({ title, subtitle, close, children, actions, retu
     const initial = ref.current?.querySelector<HTMLElement>('[data-initial-focus]');
     if (initial) initial.focus();
     else if (!ref.current?.contains(document.activeElement)) ref.current?.focus();
-    return () => { const target = returnFocus ? returnFocus() : previous.current; target?.focus(); };
+    return () => { if (returnFocus) { returnFocus()?.focus(); return; } const target = previous.current; if (target?.isConnected && !target.matches(':disabled')) target.focus(); else document.querySelector<HTMLElement>('[data-top-menu="settings"] summary')?.focus(); };
   }, []);
   return createPortal(<div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
     <section ref={ref} tabIndex={-1} className={styles.dialog} role="dialog" aria-modal="true" aria-label={title} onKeyDown={(event) => {

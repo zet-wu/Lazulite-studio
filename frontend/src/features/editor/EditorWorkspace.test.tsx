@@ -123,3 +123,18 @@ it('keeps the selected object and real focus when deletion is rejected', () => {
   expect(word).toHaveFocus();
   expect(word.className).toContain('selectedWord');
 });
+
+it('keeps project dialog writes locked while close remains available during alignment', () => {
+  const lyric = createLyricDocument('歌'), apply = vi.fn();
+  const props = {title:'锁定', document:lyric, project:createProjectDocument(lyric), apply, undo:vi.fn(), redo:vi.fn(), canUndo:false, canRedo:false, dirty:false, onSave:vi.fn()};
+  const view = render(<MemoryRouter><EditorWorkspace {...props}/></MemoryRouter>);
+  fireEvent.click(screen.getByText('歌词设置'));
+  fireEvent.click(screen.getByRole('button', {name:'歌词元数据'}));
+  const alignment = {locked:true} as import('../AlignmentPanel').AlignmentControl;
+  view.rerender(<MemoryRouter><EditorWorkspace {...props} alignment={alignment}/></MemoryRouter>);
+  const dialog = screen.getByRole('dialog', {name:'歌词元数据'});
+  expect(dialog.querySelector('input')).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', {name:'关闭歌词元数据'}));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(apply).not.toHaveBeenCalled();
+});

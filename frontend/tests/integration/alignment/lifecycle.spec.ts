@@ -137,3 +137,18 @@ test('language changes preserve a running operation and translate its existing r
  await language.selectOption('zh-Hans');
  await expect.poll(async()=>((await(await page.request.get('/api/v1/settings')).json()).values['studio:ui-language'])).toBe('zh-Hans');
 });
+
+test('dictionary dialog closes during alignment without cancelling or releasing the edit lock', async ({page}) => {
+ const state=await setup(page);
+ await page.locator('[data-top-menu="settings"] summary').click();
+ await page.getByRole('button',{name:'注音词典',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'注音词典',exact:true});
+ await expect(dialog).toBeVisible();
+ await dialog.getByRole('button',{name:'关闭注音词典'}).click();
+ await expect(dialog).toHaveCount(0);
+ expect(state.cancels).toBe(0);expect(state.status).toBe('running');
+ await page.getByRole('button',{name:'编辑',exact:true}).click();
+ await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeDisabled();
+ state.status='cancelled';
+ await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeEnabled();
+});
