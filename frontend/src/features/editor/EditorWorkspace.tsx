@@ -1045,7 +1045,7 @@ function EditorWorkspaceContent(props: Props) {
     {settingsDialog === 'translations' && <TranslationTrackDialog document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'metadata' && <SettingsDialog title={t('editor.metadata')} close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} projectId={props.projectId} sourceAssetId={props.sourceAssetId} /></SettingsDialog>}
     {amllOpen&&props.project&&props.applyProject&&<SettingsDialog title={t('editor.amllSettings')} subtitle={t('editor.settingsScope')} close={()=>setAmllOpen(false)}
-      returnFocus={()=>amllNavigating.current?null:pageRef.current?.querySelector<HTMLElement>('[data-top-menu="settings"] > summary')??null}
+      returnFocus={()=>amllNavigating.current?null:globalThis.document.querySelector<HTMLElement>('[data-top-menu="settings"] > summary')??null}
       actions={<button data-role="secondary" onClick={()=>setAmllOpen(false)}>{t('common.close')}</button>}>
       <AmllSettings project={props.project} apply={command=>{if(props.alignment?.locked)return;try{props.applyProject!(command);}catch(e){setMessage(errorMessage(e));}}}
         locate={rule=>{amllNavigating.current=true;setAmllOpen(false);setValidationTab('amll');setFocusRule(rule);setMode('package');}}/>
