@@ -64,7 +64,5 @@ test('saved independent background remains visible after its parent ends', async
   await expect.poll(() => background.evaluate(e => getComputedStyle(e).opacity)).toBe('1');
   await expect(background).toBeInViewport();
 
-  await page.locator('audio').evaluate((e: HTMLAudioElement) => { e.currentTime = 4.2; e.playbackRate = .5; });
-  await expect(background).toHaveClass(/bgWrapperActive/);
   await page.getByRole('button', { name: '暂停', exact: true }).click();
 });

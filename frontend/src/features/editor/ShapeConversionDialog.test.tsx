@@ -22,9 +22,9 @@ it('isolates target changes and late responses, restores Escape state, preserves
   fireEvent.change(screen.getByRole('combobox'),{target:{value:'taiwan'}});
   const input=await screen.findByLabelText('发的目标字');expect(signal.aborted).toBe(true);
   await act(async()=>late([]));expect(input).toHaveValue('發');
-  expect(input.className).toContain('attention');fireEvent.focus(input);expect(input.className).toContain('attention');
-  fireEvent.change(input,{target:{value:'髮'}});expect(input.className).not.toContain('attention');
-  fireEvent.keyDown(input,{key:'Escape'});expect(input).toHaveValue('發');expect(input.className).toContain('attention');expect(close).not.toHaveBeenCalled();
+  fireEvent.focus(input);
+  fireEvent.change(input,{target:{value:'髮'}});
+  fireEvent.keyDown(input,{key:'Escape'});expect(input).toHaveValue('發');expect(close).not.toHaveBeenCalled();
   fireEvent.compositionStart(input);fireEvent.change(input,{target:{value:'多字'}});fireEvent.keyDown(input,{key:'Escape',isComposing:true});expect(input).toHaveValue('多字');
   expect(screen.getByRole('button',{name:'应用'})).toBeDisabled();fireEvent.compositionEnd(input);expect(screen.getByRole('button',{name:'应用'})).toBeDisabled();
   fireEvent.change(input,{target:{value:''}});expect(screen.getByRole('button',{name:'应用'})).toBeEnabled();

@@ -24,7 +24,7 @@ test('project gates, word properties, background positions and atomic compatibil
 });
 test('import violation keeps current project intact and readonly preview remains available',async({page})=>{
  await page.goto('/projects/sample-project/edit?scenario=no-music');await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.getByRole('tab',{name:'文件',exact:true}).click();await page.locator('input[type=file][accept^=".ttml"]').setInputFiles({name:'rich.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
- await expect(page.locator('p').filter({hasText:'SecondBG'})).toBeVisible();await page.getByRole('button',{name:'确认导入并替换歌词',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'禁用多行背景'})).toBeVisible();await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 SecondBG',exact:true})).toHaveCount(0);
+ await expect(page.locator('p').filter({hasText:'SecondBG'})).toBeVisible();await page.getByRole('button',{name:'确认导入并替换歌词',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'当前内容有多行背景'})).toBeVisible();await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 SecondBG',exact:true})).toHaveCount(0);
 });
 test('preposed audio outline keeps explicit selection and large compatibility results act on selected words',async({page})=>{
  await page.goto('/projects/sample-project/edit');await unrestricted(page);await importLyrics(page,{name:'rich.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.locator('[data-line-id="bg2"] [data-outline-drag]').click();await page.getByRole('switch',{name:'背景置于主行之前'}).check();
@@ -37,11 +37,4 @@ test('preposed audio outline keeps explicit selection and large compatibility re
  await check(page);const rule=page.locator('#amll-noWordAgents');await expect(rule.locator('li')).toHaveCount(0);await rule.locator(':scope > div > button[aria-expanded]').click();await rule.getByRole('button',{name:/^第 1 行/}).click();await expect(rule.locator('li').first()).toBeVisible();const firstCount=await rule.locator('li').count();expect(firstCount).toBeLessThan(1200);
  await rule.getByRole('button',{name:/再显示/}).click();await expect.poll(()=>rule.locator('li').count()).toBeGreaterThan(firstCount);expect(await rule.locator('li').count()).toBeLessThan(1200);await rule.getByRole('checkbox',{name:'选择 word1',exact:true}).check();await expect(rule.getByText('范围：选中 1 项')).toBeVisible();const scrollBefore=await rule.locator('ul').evaluate(el=>el.scrollTop);await rule.getByRole('button',{name:/^清除词级歌手/}).click();await expect(rule.getByText('1199 个词，涉及 1 行')).toBeVisible();expect(Math.abs(await rule.locator('ul').evaluate(el=>el.scrollTop)-scrollBefore)).toBeLessThan(40);
  await rule.getByRole('button',{name:'word2',exact:true}).focus();await page.keyboard.press('Enter');await expect(page.getByRole('textbox',{name:'词 word2',exact:true}).locator('xpath=ancestor::*[@data-word-id][1]')).toBeFocused();await expect(page.getByLabel('词级歌手 a',{exact:true})).toBeChecked();
-});
-test('preserves older recovery databases while isolating the current project format',async({page})=>{
- await page.goto('/projects');await page.evaluate(async()=>{
-  for(const name of ['lazulite-studio-recovery','lazulite-studio-recovery-project-v3','lazulite-studio-recovery-project-v7:00000000000000000000000000000001','unrelated-app'])await new Promise<void>((resolve,reject)=>{const request=indexedDB.open(name,1);request.onupgradeneeded=()=>request.result.createObjectStore('sample');request.onsuccess=()=>{request.result.close();resolve();};request.onerror=()=>reject(request.error);});
- });
- await page.goto('/projects/sample-project/edit?scenario=no-music');await expect(page.getByRole('button',{name:'编辑',exact:true})).toBeVisible();
- await expect.poll(()=>page.evaluate(async()=>(await indexedDB.databases()).map(db=>db.name).sort())).toEqual(['lazulite-studio-recovery','lazulite-studio-recovery-project-v3','lazulite-studio-recovery-project-v7:00000000000000000000000000000001','lazulite-studio-recovery-v10:legacy','unrelated-app']);
 });

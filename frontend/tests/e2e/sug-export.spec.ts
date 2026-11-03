@@ -14,5 +14,5 @@ test('SUG shares committed offsets, validates drafts, returns from validation an
  if(process.env.SUG_CONTRACT_DIR)await writeFile(`${process.env.SUG_CONTRACT_DIR}/browser.zip`,bytes);
  await page.keyboard.press('Escape');await expect(open).toBeFocused();await page.getByRole('button',{name:'导出 NicoKara',exact:true}).click();await expect(page.getByRole('dialog').getByLabel('主歌词 · 正文 @Offset',{exact:true})).toHaveValue('200');
  await page.keyboard.press('Escape');await page.getByRole('button',{name:'撤销',exact:true}).click();await open.click();await expect(input).toHaveValue('0');
- await input.fill('-2000');await dialog.getByRole('button',{name:'查看校验'}).click();await page.getByText('时间范围 · 2 项，涉及 1 行',{exact:true}).click();await page.getByText('无法定位的序列化问题 · 1 项',{exact:true}).click();await page.getByRole('button',{name:'请调整输出偏移：内容移到零之前或超出安全整数',exact:true}).click();await expect(input).toBeFocused();await expect(input).toHaveValue('-2000');
+ await input.fill('-2000');await dialog.getByRole('button',{name:'查看校验'}).click();await page.getByRole('button',{name:/^时间范围 ·/}).click();await page.getByRole('button',{name:/^卡拉 OK 输出设置 ·/}).click();await page.getByRole('button',{name:/请调整输出偏移：内容移到零之前或超出安全整数/}).click();await expect(input).toBeFocused();await expect(input).toHaveValue('-2000');
 });

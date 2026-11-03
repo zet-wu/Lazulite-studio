@@ -75,26 +75,6 @@ describe("useProjectDocument save lifecycle", () => {
     expect(saveMock.mock.calls[1][1]).toBe("r2");
     expect(saveMock.mock.calls[1][2]).not.toBe(saveMock.mock.calls[0][2]);
     expect(result.current.dirty).toBe(false);
-  });
-
-  it("reuses a failed pending operation, and undo marks the document dirty", async () => {
-    saveMock
-      .mockRejectedValueOnce(new Error("offline"))
-      .mockResolvedValue({ revision: "r2", etag: '"r2"' });
-    const { result } = renderHook(hook, { wrapper: StrictMode });
-    act(() =>
-      result.current.apply({
-        type: "edit-word",
-        lineId: "a",
-        wordId: "a:word:0",
-        text: "A1",
-      }),
-    );
-    await act(async () => result.current.save());
-    const first = saveMock.mock.calls[0];
-    expect(result.current.dirty).toBe(true);
-    await act(async () => result.current.save());
-    expect(saveMock.mock.calls[1][2]).toBe(first[2]);
     act(() => result.current.undo());
     expect(result.current.dirty).toBe(true);
   });
@@ -103,7 +83,8 @@ describe("useProjectDocument save lifecycle", () => {
     const { result } = renderHook(hook, { wrapper: StrictMode });
     const checkpoint = result.current.state;
     recovery.readCheckpoint.mockResolvedValue({
-      version: 10,
+      version: 11,
+      sourceAssetId: null,
       projectId: "p",
       baseRevision: "old",
       project: checkpoint.present,

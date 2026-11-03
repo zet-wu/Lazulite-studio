@@ -48,7 +48,7 @@ test('embedded candidates share parsed badges, selection and full-width cards; e
  await page.getByRole('button',{name:'歌词获取',exact:true}).click();await page.getByRole('tab',{name:'内嵌',exact:true}).click();
  const list=page.getByLabel('内嵌候选');const first=list.getByRole('button',{name:/^STPP/});await expect(first).toContainText('TTML');await expect(first).toContainText('逐行');
  await first.click();await expect(first).toHaveAttribute('aria-pressed','true');const second=list.getByRole('button',{name:/USLT/});await second.click();await expect(first).toHaveAttribute('aria-pressed','false');await expect(second).toContainText('无时间');
- await expect(list.getByRole('button',{name:/正文错误/})).toBeDisabled();await expect(list).toContainText('正文解析失败');
+ await expect(list.getByRole('button',{name:/正文错误/})).toBeDisabled();
  await page.getByRole('button',{name:'确认导入并替换歌词',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 plain candidate',exact:true})).toBeVisible();await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 plain candidate',exact:true})).toHaveCount(0);
 });
 

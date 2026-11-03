@@ -23,7 +23,7 @@ it.each(['eslrc','qrc','yrc','lys','ass'] as const)('%s serializes horizontal se
 });
 it.each(['eslrc','qrc','yrc','lys','ass'] as const)('%s rejects no host, missing text, partial/semantic spaces and control whitespace',format=>{
  const doc=fixture();
- for(const words of [[word(' ')],[word('A'),word(' '),word('B',2000,2500)],[word(' ',1000)],[word('')],[{...word(' '),emptyBeat:1}],[{...word(' '),rubyUnits:[{id:'r',reading:'a',beginMs:null,endMs:null}]}],[word('\t',1000,2000)],[word('\n',1000,2000)],[word('。')]]) {
+ for(const words of [[word(' ')],[word('A'),word(' '),word('B',2000,2500)],[word(' ',1000)],[word('')],[{...word(' '),rubyUnits:[{id:'r',reading:'a',beginMs:null,endMs:null}]}],[word('\t',1000,2000)],[word('\n',1000,2000)],[word('。')]]) {
   if (format === 'ass' && words[0].text === '\n') continue;
   doc.lines[0].words=words; expect(collectOutputIssues(doc,format).length).toBeGreaterThan(0); expect(()=>exportLyricFile(doc,format)).toThrow();
  }

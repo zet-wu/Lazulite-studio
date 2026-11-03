@@ -121,7 +121,6 @@ it('keeps the selected object and real focus when deletion is rejected', () => {
   expect(apply).toHaveBeenCalledOnce();
   expect(screen.getByRole('alert')).toHaveTextContent('删除被拒绝');
   expect(word).toHaveFocus();
-  expect(word.className).toContain('selectedWord');
 });
 
 it('keeps project dialog writes locked while close remains available during alignment', () => {

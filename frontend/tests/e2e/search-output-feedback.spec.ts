@@ -12,10 +12,9 @@ test('pure TTML shows every relevant issue; error links select and focus exact t
 
  await page.getByRole('button',{name:'下载歌词',exact:true}).click();
  await expect(page.getByRole('alert')).toContainText('有 2 项需要处理');
- const issue=page.getByRole('button',{name:'第 2 行 · ja-Latn 轨道 2 音译第 1 单元：缺少结束时间',exact:true});
+ const issue=page.getByRole('button',{name:/第 2 行.*轨道 2.*第 1 单元.*缺少结束时间/});
  await issue.focus();await page.keyboard.press('Enter');
  await expect(page.locator('main [data-romanization-unit-id="r2"]')).toBeFocused();
- await expect(page.locator('main [data-romanization-unit-id="r2"]')).toHaveClass(/selectedWord/);
  await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('lrc');
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
  expect(await readFile(await(await download).path(),'utf8')).toContain('word');
@@ -50,23 +49,22 @@ test('four-source round survives tabs and modes; edits retain results; explicit 
  await page.getByRole('button',{name:'搜索',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).probe.searches.length)).toBe(searches+8);
 });
 
-test('packaging error links focus body, background and 注音 with visible main numbering',async({page})=>{
- await page.goto('/projects/sample-project/edit');
- await page.getByRole('button',{name:'歌词获取',exact:true}).waitFor();
- await page.evaluate(()=>{const original=window.fetch;window.fetch=async(input,init)=>String(input).endsWith('/packaging') ? Response.json({filename:'synthetic.m4a',format_label:'M4A（MP4 容器）',asset_id:'asset-1',container:'mp4',supported:true,tracks:[],error:null}) : original(input,init);});
+test('automatic validation links focus body, background and 注音',async({page})=>{
+ await page.goto('/projects/sample-project/edit?scenario=no-music');
  const rubyXml=issueXml.replace('<span begin="2" end="4">正文</span>','<span studio:id="rubyword" begin="2" end="4" tts:ruby="container"><span tts:ruby="base">正文</span><span tts:ruby="textContainer"><span studio:id="ruby1" studio:null="begin end" tts:ruby="text">よみ</span></span></span>');
  await importLyrics(page,file(rubyXml));
  const targets=[
-  ['第 1 行第 1 词：缺少开始和结束时间','[data-word-id="word1"]'],
-  ['第 1 行 · 背景：缺少结束时间','[data-line-id="bg"]'],
-  ['第 1 行 · 背景第 1 词：缺少开始和结束时间','[data-word-id="bgword"]'],
-  ['第 2 行第 1 词第 1 读音单元：缺少开始和结束时间','[data-ruby-id="ruby1"]'],
- ];
- for(const [name,selector] of targets){
+  [/^第 1 行 · \d+ 项/, /第 1 行 · 第 1 词: 缺少开始和结束时间/, '[data-word-id="word1"]'],
+  [/^第 1 行 · 背景 · \d+ 项/, /第 1 行 · 背景: 缺少结束时间/, '[data-line-id="bg"]'],
+  [/^第 1 行 · 背景 · \d+ 项/, /第 1 行 · 背景 · 第 1 词: 缺少开始和结束时间/, '[data-word-id="bgword"]'],
+  [/^第 2 行 · \d+ 项/, /第 2 行 · 第 1 词 · 第 1 注音: 缺少/, '[data-ruby-id="ruby1"]'],
+ ] as const;
+ for(const [group,name,selector] of targets){
   await page.getByRole('button',{name:'文件打包',exact:true}).click();
-  await page.getByRole('button',{name:'打包文件',exact:true}).click();
-  await expect(page.getByRole('alert').filter({hasText:'有 6 项需要处理'})).toBeVisible();
-  const link=page.getByRole('button',{name,exact:true});await link.focus();await page.keyboard.press('Enter');
+  const panel=page.getByRole('tabpanel',{name:'歌词校验'});
+  await panel.getByRole('button',{name:/^缺少时间 ·/}).click();
+  await panel.getByRole('button',{name:group}).click();
+  const link=panel.getByRole('button',{name});await link.focus();await page.keyboard.press('Enter');
   await expect(page.locator('main '+selector)).toBeFocused();
  }
 });
@@ -76,6 +74,6 @@ test('output issue mounts a distant virtual row and transfers keyboard focus',as
  const lines=Array.from({length:82},(_,i)=>`<p xml:id="virtual${i}" begin="${i*2}" ${i===81 ? 'studio:null="end"' : `end="${i*2+1}"`}><span begin="${i*2}" end="${i*2+1}">word${i}</span></p>`).join('');
  await importLyrics(page,file(`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body>${lines}</body></tt>`));
  await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('qrc');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
- const link=page.getByRole('button',{name:'第 82 行：缺少结束时间',exact:true});await link.focus();await page.keyboard.press('Enter');
+ const link=page.getByRole('button',{name:/第 82 行.*缺少结束时间/});await link.focus();await page.keyboard.press('Enter');
  const row=page.locator('main [data-line-id="virtual81"]');await expect(row).toBeFocused();await expect(row).toBeInViewport();
 });

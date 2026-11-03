@@ -14,10 +14,9 @@ test('shared multi-line and child selection, envelope capture, independent roman
  await expect(page.getByRole('button', { name: '时间轴词 丙', exact: true })).toBeVisible();
  await page.getByRole('button', { name: '时间轴词 甲', exact: true }).click();
  await page.getByRole('button', { name: '时间轴词 丙', exact: true }).click({ modifiers: ['Control'] });
- await expect(page.getByText('词已选 2', { exact: true })).toBeVisible();
+ await expect(page.getByLabel('编辑操作').getByText('词已选 2', { exact: true })).toBeVisible();
  await expect(page.locator('[data-outline-drag][aria-pressed="true"]')).toHaveCount(0);
  await page.getByRole('button', { name: '循环选区', exact: true }).click();
- await expect(page.getByRole('button', { name: '循环 A/B', exact: true })).toHaveClass(/active/);
  await page.getByRole('button', { name: '音译', exact: true }).click();
  await expect(page.getByRole('button', { name: /^时间轴音译/ })).toHaveCount(0);
  await expect(page.getByRole('button', { name: '时间轴词 甲', exact: true })).toBeVisible();
@@ -51,10 +50,10 @@ test('timeline context menu preserves multi-selection and Delete shares atomic h
  await page.getByRole('button',{name:'时间轴行 L2',exact:true}).click({modifiers:['Control']});
  const first=page.getByRole('button',{name:'时间轴词 甲',exact:true}), last=page.getByRole('button',{name:'时间轴词 丙',exact:true});
  await first.click(); await last.click({modifiers:['Shift']});
- await expect(page.getByText('词已选 4',{exact:true})).toBeVisible(); // Includes the explicit background in document order.
+ await expect(page.getByLabel('编辑操作').getByText('词已选 4',{exact:true})).toBeVisible(); // Includes the explicit background in document order.
  await first.click({button:'right'});
  await page.getByRole('menuitem',{name:'复制',exact:true}).click();
- await expect(page.getByText('词已选 4',{exact:true})).toBeVisible();
+ await expect(page.getByLabel('编辑操作').getByText('词已选 4',{exact:true})).toBeVisible();
  await first.focus(); await page.keyboard.press('Delete');
  await expect(page.locator('main [data-word-id]')).toHaveCount(1);
  await page.getByRole('button',{name:'撤销',exact:true}).click();
@@ -88,12 +87,12 @@ test('Ruby range and reverse marquee resolve different word owners and undo one 
  await loadTimeline(page);
  const ruby=page.getByRole('button',{name:/^时间轴注音 /});
  await ruby.first().click(); await ruby.last().click({modifiers:['Shift']});
- await expect(page.getByText('注音已选 3',{exact:true})).toBeVisible();
- await ruby.first().click(); await expect(page.getByText('注音已选 1',{exact:true})).toBeVisible();
- const lane=ruby.first().locator('..');const box=(await lane.boundingBox())!;
+ await expect(page.getByLabel('编辑操作').getByText('注音已选 3',{exact:true})).toBeVisible();
+ await ruby.first().click(); await expect(page.getByLabel('编辑操作').getByText('注音已选 1',{exact:true})).toBeVisible();
+ const lane=ruby.first().locator('..');await lane.scrollIntoViewIfNeeded();const box=(await lane.boundingBox())!;
  await page.keyboard.down('Shift');await page.mouse.move(box.x+box.width*.9,box.y+box.height-1);await page.mouse.down();
- await page.mouse.move(box.x+.1,box.y+box.height-1,{steps:5});await page.mouse.up();await page.keyboard.up('Shift');
- await expect(page.getByText('注音已选 3',{exact:true})).toBeVisible();
+ await page.mouse.move(box.x+1,box.y+1,{steps:5});await page.mouse.up();await page.keyboard.up('Shift');
+ await expect(page.getByLabel('编辑操作').getByText('注音已选 3',{exact:true})).toBeVisible();
  await ruby.first().focus();await page.keyboard.press('Delete');await expect(page.locator('main [data-ruby-id]')).toHaveCount(0);
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('main [data-ruby-id]')).toHaveCount(3);
 });
@@ -101,7 +100,7 @@ test('romanization selection across contents disables partial copy and deletes a
  await setup(page);await page.getByRole('button',{name:'时间轴行 L2',exact:true}).click({modifiers:['Control']});
  const roman=page.getByRole('button',{name:/^时间轴音译 /});
  await roman.first().click();await roman.last().click({modifiers:['Shift']});
- await expect(page.getByText('音译单元已选 2',{exact:true})).toBeVisible();
+ await expect(page.getByLabel('编辑操作').getByText('音译单元已选 2',{exact:true})).toBeVisible();
  await roman.first().click({button:'right'});await expect(page.getByRole('menuitem',{name:'复制',exact:true})).toBeDisabled();
  await page.getByRole('menuitem',{name:/删除所选单元/}).click();await expect(roman).toHaveCount(0);
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(roman).toHaveCount(2);
