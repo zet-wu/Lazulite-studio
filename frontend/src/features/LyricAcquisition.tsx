@@ -57,7 +57,6 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   const open = async (file: File) => {
     const serial = ++request.current; setFilename(file.name); setIncoming(null); setMessage(describeMessage('common.reading'));
     try {
-      if (file.size > 4_000_000) throw new MessageError(describeMessage('acquire.fileLimit'));
       const kind = detectLyricFormat(file.name);
       if (kind === 'ass') throw new MessageError(describeMessage('acquire.assExportOnly'));
       const content = kind === 'krc' ? await decodeKrcFile(file) : await file.text();

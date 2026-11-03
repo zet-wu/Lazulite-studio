@@ -19,7 +19,7 @@ class Acoustics(BaseModel):
 
 class Lyrics(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    draftTtml: str = Field(min_length=1, max_length=2 * 1024 * 1024)
+    draftTtml: str = Field(min_length=1)
 
 class EmptyBeat(BaseModel):
     model_config = ConfigDict(extra='forbid')

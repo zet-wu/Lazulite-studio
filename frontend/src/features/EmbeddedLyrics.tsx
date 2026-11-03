@@ -47,4 +47,4 @@ export function EmbeddedLyrics({ projectId, sourceAssetId, onPreview }: { projec
 
 const t=i18n.t.bind(i18n);
 
-const embeddedErrors:Record<string,string>={invalid_format:'embedded.invalidFormat',too_large:'acquire.fileLimit',unsupported_sylt:'embedded.unsupportedSylt',stpp_read_failed:'embedded.stppFailed'};
+const embeddedErrors:Record<string,string>={invalid_format:'embedded.invalidFormat',unsupported_sylt:'embedded.unsupportedSylt',stpp_read_failed:'embedded.stppFailed'};

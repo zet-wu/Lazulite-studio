@@ -2672,7 +2672,6 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 4000000,
                 "minLength": 1
               },
               {
@@ -3219,8 +3218,7 @@
                 ],
                 "properties": {
                   "draftTtml": {
-                    "type": "string",
-                    "maxLength": 2097152
+                    "type": "string"
                   }
                 },
                 "additionalProperties": false

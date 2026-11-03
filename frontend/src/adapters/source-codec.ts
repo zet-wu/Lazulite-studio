@@ -59,8 +59,8 @@ export async function decodeKrcFile(file: File): Promise<string> {
   const key = [64,71,97,119,94,50,116,71,81,54,49,45,206,210,110,105];
   const bytes = raw.slice(4).map((v, i) => v ^ key[i % 16]);
   const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate')).getReader();
-  let total = 0, result = ''; const decoder = new TextDecoder('utf-8', { fatal: true });
-  try { while (true) { const { value, done } = await reader.read(); if (done) break; total += value.length; if (total > 4_000_000) throw new MessageError(message('parse.krcSize')); result += decoder.decode(value, { stream: true }); } return result + decoder.decode(); }
+  let result = ''; const decoder = new TextDecoder('utf-8', { fatal: true });
+  try { while (true) { const { value, done } = await reader.read(); if (done) break; result += decoder.decode(value, { stream: true }); } return result + decoder.decode(); }
   finally { await reader.cancel(); }
 }
 export function parseLrcSource(text: string, lineTimedWords?: Set<string>): LyricDocument {

@@ -14,7 +14,7 @@ class PublishRequest(BaseModel):
     revision: str = Field(min_length=1)
     asset_id: str = Field(min_length=1)
     lrc_kind: Literal['none', 'lrc', 'elrc']
-    lrc_text: str | None = Field(min_length=1, max_length=4_000_000)
+    lrc_text: str | None = Field(min_length=1)
     target_track_id: int | None = Field(default=None, gt=0)
 
     @model_validator(mode='after')
@@ -89,8 +89,8 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
             from mutagen.mp4 import MP4
             if not isinstance(File(asset_path(pid)), MP4):
                 raise HTTPException(422, {'code':'invalid_lrc','message':'此容器需要写入 LRC','retryable':False})
-        elif len(body.lrc_text.encode('utf-8')) > 4_000_000 or not all(re.match(r'^\[\d+:\d{2}\.\d{3}\]', line) for line in body.lrc_text.splitlines()) or '\x00' in body.lrc_text:
-            raise HTTPException(422, {'code':'invalid_lrc','message':'兼容歌词格式或大小无效','retryable':False})
+        elif not all(re.match(r'^\[\d+:\d{2}\.\d{3}\]', line) for line in body.lrc_text.splitlines()) or '\x00' in body.lrc_text:
+            raise HTTPException(422, {'code':'invalid_lrc','message':'兼容歌词格式无效','retryable':False})
         if body.lrc_kind == 'lrc' and re.search(r'<\d+:\d{2}\.\d{3}>',body.lrc_text):
             raise HTTPException(422, {'code':'invalid_lrc','message':'普通 LRC 不能包含扩展时间标签','retryable':False})
         try:

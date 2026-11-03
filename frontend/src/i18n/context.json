@@ -4665,12 +4665,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "acquire.fileLimit": {
-    "context": "acquire interface: acquire.fileLimit",
-    "source": "歌词文件不能超过 4 MB",
-    "params": [],
-    "parameterNotes": {}
-  },
   "acquire.assExportOnly": {
     "context": "acquire interface: acquire.assExportOnly",
     "source": "ASS 目前仅支持导出",
@@ -10337,12 +10331,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "parse.fileSize": {
-    "context": "parse interface: parse.fileSize",
-    "source": "歌词文件不能超过 4 MB",
-    "params": [],
-    "parameterNotes": {}
-  },
   "parse.lineCount": {
     "context": "parse interface: parse.lineCount",
     "source": "歌词行数无效",
@@ -10412,12 +10400,6 @@
   "parse.krcHeader": {
     "context": "parse interface: parse.krcHeader",
     "source": "KRC 文件头无效",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "parse.krcSize": {
-    "context": "parse interface: parse.krcSize",
-    "source": "KRC 解压超过 4 MB",
     "params": [],
     "parameterNotes": {}
   },

@@ -17,7 +17,6 @@ export const exportFormats = [
 export type ExportFormat = typeof exportFormats[number][0];
 export type ValidationFilter = ExportFormat | 'all' | 'nicokara' | 'sug';
 const parseTimed = { elrc: parseLrc, lrc: parseLrc, eslrc: parseEslrc, qrc: parseQrc, yrc: parseYrc, lys: parseLys };
-const maximumSize = 4_000_000;
 const milliseconds = (ms: number): number => {
   if (!Number.isFinite(ms) || ms < 0) throw new MessageError(message('parse.timeInvalid'));
   return Math.round(ms);
@@ -31,7 +30,6 @@ export function detectLyricFormat(name: string): LyricFormat {
 }
 
 export function importLyricFile(content: string, format: Exclude<LyricFormat, 'ass'>, onSidecarIssue?: () => void, lineTimedWords?: Set<string>): LyricDocument {
-  if (new TextEncoder().encode(content).length > maximumSize) throw new MessageError(message('parse.fileSize'));
   if (format === 'ttml') return parseLyricTtml(content);
   if (format === 'txt') {
     const text = content.replace(/^\uFEFF/, '').split(/\r?\n/).filter((value) => value.trim());
