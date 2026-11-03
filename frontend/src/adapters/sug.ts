@@ -14,7 +14,7 @@ type Target = Partial<OutputIssue>;
 type Segment = { text: string; begin: number; end: number; target: Target; singer: string; separator?: boolean; guide?: boolean; reading?: { text: string; begin: number; end: number }[] };
 
 /** Project-format boundary: diagnostics and products always use the same snapshot. */
-export function prepareSug(project: ProjectDocument, title: string, now = new Date()) {
+export function prepareSug(project: Pick<ProjectDocument, 'lyrics' | 'karaoke' | 'editing'>, title: string, now = new Date()) {
   const outputs = karaokeOutputs(project), names = karaokeFilenames(outputs, title, 'sug');
   const issues: OutputIssue[] = [], omitted: string[] = [];
   const files: { name: string; text: string; output: typeof outputs[number] }[] = [];

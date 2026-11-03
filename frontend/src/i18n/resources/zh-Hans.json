@@ -1582,8 +1582,6 @@
   "parse.noLines": "未解析出歌词行或行数过多",
   "parse.reversed": "歌词时间倒序",
   "parse.krcImportOnly": "KRC 目前仅支持导入",
-  "parse.lineTimesRequired": "导出前请补全每行时间",
-  "parse.wordTimesRequired": "导出前请补全逐词时间",
   "parse.qrcContent": "QRC XML 缺少 LyricContent",
   "parse.wordTagText": "逐词标签之间含无法解析的文字",
   "parse.wordTagsIncomplete": "逐词歌词标签不完整",

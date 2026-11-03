@@ -1,7 +1,7 @@
 import { outputId } from '../domain/karaoke';
 import type { ProjectDocument } from '../domain/project-document';
 export type KaraokeOutput = { id: string; groupId: string; kind: 'body' | 'translation' | 'romanization'; trackId: string; trackNumber: number; language: string; label: string };
-export function karaokeOutputs(project: ProjectDocument): KaraokeOutput[] {
+export function karaokeOutputs(project: Pick<ProjectDocument, 'lyrics' | 'karaoke'>): KaraokeOutput[] {
   return project.karaoke.groups.flatMap(group => [
     { id: outputId(group.id), groupId: group.id, kind: 'body' as const, trackId: '', trackNumber: 0, language: '', label: `${group.name} · 正文` },
     ...(['translation', 'romanization'] as const).flatMap(kind => project.lyrics[kind === 'translation' ? 'translationTracks' : 'romanizationTracks'].map((track,index) => ({ id: outputId(group.id, kind, track.id), groupId: group.id, kind, trackId: track.id, trackNumber: index + 1, language: track.language || 'und', label: `${group.name} · ${kind === 'translation' ? '翻译' : '音译'} ${index + 1} · ${track.language || 'und'}` }))),

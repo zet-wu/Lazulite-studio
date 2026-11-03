@@ -38,7 +38,7 @@ function sequence(segments: Segment[], offset = 0, singer?: { key: string; emit:
   }
   return result;
 }
-export function prepareNicokara(project: ProjectDocument, title: string, selected = project.karaoke.outputs) {
+export function prepareNicokara(project: Pick<ProjectDocument, 'lyrics' | 'karaoke' | 'editing'>, title: string, selected = project.karaoke.outputs) {
   const issues: OutputIssue[] = [], files: { name: string; text: string; output: KaraokeOutput }[] = [], omitted: string[] = [];
   const emittedMarkers: (SegmentSinger & { outputId: string })[] = [];
   const outputs = karaokeOutputs(project), lyrics = project.lyrics, karaoke = project.karaoke;

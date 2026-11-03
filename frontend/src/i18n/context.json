@@ -10333,18 +10333,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "parse.lineTimesRequired": {
-    "context": "parse interface: parse.lineTimesRequired",
-    "source": "导出前请补全每行时间",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "parse.wordTimesRequired": {
-    "context": "parse interface: parse.wordTimesRequired",
-    "source": "导出前请补全逐词时间",
-    "params": [],
-    "parameterNotes": {}
-  },
   "parse.qrcContent": {
     "context": "parse interface: parse.qrcContent",
     "source": "QRC XML 缺少 LyricContent",

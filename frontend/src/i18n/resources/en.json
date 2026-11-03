@@ -1586,8 +1586,6 @@
   "parse.noLines": "No lyric lines were parsed, or there are too many lines",
   "parse.reversed": "Lyric times are reversed",
   "parse.krcImportOnly": "KRC currently supports import only",
-  "parse.lineTimesRequired": "Complete each line’s timing before exporting",
-  "parse.wordTimesRequired": "Complete word timing before exporting",
   "parse.qrcContent": "QRC XML is missing LyricContent",
   "parse.wordTagText": "Unparseable text between word tags",
   "parse.wordTagsIncomplete": "Incomplete word timing tags",

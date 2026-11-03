@@ -137,10 +137,11 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     if (command.acoustics === state.present.acoustics) return state;
     present = { ...state.present, acoustics: command.acoustics };
   }
-  if (present.lyrics !== state.present.lyrics) present = { ...present, karaoke: reconcileKaraoke(present.lyrics, present.karaoke, state.present.lyrics) };
-  const lineIds=new Set(present.lyrics.lines.map(line=>line.id));
-  present = { ...present, lineOrder: present.lineOrder.filter(id=>lineIds.has(id)) };
-  assertAmll(present.lyrics, present.amll);
+  if (present.lyrics !== state.present.lyrics) {
+    const lineIds = new Set(present.lyrics.lines.map(line => line.id));
+    present = { ...present, karaoke: reconcileKaraoke(present.lyrics, present.karaoke, state.present.lyrics), lineOrder: present.lineOrder.filter(id => lineIds.has(id)) };
+  }
+  if (present.lyrics !== state.present.lyrics || present.amll !== state.present.amll) assertAmll(present.lyrics, present.amll);
   return { present, past: [...state.past.slice(-255), state.present], future: [] };
 }
 export function undoProjectCommand(state: ProjectEditorState): ProjectEditorState {

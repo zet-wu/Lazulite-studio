@@ -33,12 +33,15 @@ export function PackagingPanel(props: { audioDurationMs?: number; karaokeExportS
  const tab=props.validationTab??localTab;
  const needsNicokara=props.document.lines.length > 0 && tab==='lyrics'&&(filter==='all'||filter==='nicokara');
  const needsSug=props.document.lines.length > 0 && tab==='lyrics'&&(filter==='all'||filter==='sug');
- const sug=useMemo(()=>needsSug&&props.project?prepareSug(props.project,props.title??t('workspace.defaultName')):null,[needsSug,props.project,props.title]);
- const nicokara=useMemo(()=>needsNicokara&&props.project?prepareNicokara(props.project,props.title??t('workspace.defaultName')):null,[needsNicokara,props.project,props.title]);
+ const lyrics=props.project?.lyrics, karaoke=props.project?.karaoke, projectEditing=props.project?.editing;
+ const exportProject=useMemo(()=>lyrics&&karaoke&&projectEditing?{lyrics,karaoke,editing:projectEditing}:null,[lyrics,karaoke,projectEditing]);
+ const title=props.title??t('workspace.defaultName');
+ const sug=useMemo(()=>needsSug&&exportProject?prepareSug(exportProject,title):null,[needsSug,exportProject,title]);
+ const nicokara=useMemo(()=>needsNicokara&&exportProject?prepareNicokara(exportProject,title):null,[needsNicokara,exportProject,title]);
  const validationPane=useRef<HTMLElement>(null);
  useEffect(()=>{if(validationPane.current)validationPane.current.scrollTop=0;},[tab]);
  const choose=(next:ValidationTab)=>{setLocalTab(next);props.onValidationTab?.(next);};
- const {result,current}=useAutomaticValidation(props.document,editing,props.project?.amll,props.projectId,tab,props.project?.acoustics,props.sourceAssetId,props.audioDurationMs);
+ const {result,current}=useAutomaticValidation(props.document,editing,props.projectId,tab,props.project?.acoustics,props.sourceAssetId,props.audioDurationMs);
  const combined=new Map<string,OutputIssue>();
  for(const issue of [...(result?.issues??[]),...(nicokara?.issues??[]),...(sug?.issues??[])]) {
    const key=outputIssueKey(issue)+issue.message, old=combined.get(key);

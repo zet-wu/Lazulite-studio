@@ -1,10 +1,9 @@
 import { message, MessageError } from '../domain/messages';
 import type { ProjectEditing } from '../domain/project-editing';
 import { prepareAss, renderAss } from './ass';
-import { projectExportSeparators } from './export-separators';
 import { plainTranslation, createLine, createLyricDocument, createWord, type LyricDocument, type RomanizationTrack, type TranslationTrack } from '../domain/lyric-document';
 import { parseWordFormat, parseLrcSource } from './source-codec';
-import { assertOutputDocument, DocumentOutputError } from './output-validation';
+import { prepareOutputDocument, DocumentOutputError } from './output-validation';
 import { renderLrc } from './lrc';
 import { parseEslrc, parseLrc, parseLys, parseQrc, parseYrc, stringifyEslrc, type LyricLine as FormatLine } from '@applemusic-like-lyrics/lyric';
 import { parseLyricTtml, serializeLyricTtml } from './ttml/lyric-codec';
@@ -71,19 +70,19 @@ export function exportLyricFile(document: LyricDocument, format: LyricFormat, ed
     return renderAss(prepared.events);
   }
   if (format === 'lrc' || format === 'elrc') return renderLrc(document,format,editing).text;
-  assertOutputDocument(document,format,editing);
+  const prepared = prepareOutputDocument(document,format,editing);
+  if (prepared.issues.length) throw new DocumentOutputError(prepared.issues);
   if (format === 'ttml') return serializeLyricTtml(document,{editing});
   if (format === 'txt') return document.lines.filter((line) => !line.backgroundOf).map((line) => line.words.map((word) => word.text).join('')).join('\n') + '\n';
   const leadAgent = document.agents.find(agent => document.lines.some(line => line.agentRefs.includes(agent.id)))?.id;
-  const lines: FormatLine[] = document.lines.map((line) => {
-    if (line.beginMs === null || line.endMs === null || line.endMs <= line.beginMs) throw new MessageError(message('parse.lineTimesRequired'));
-    const words = projectExportSeparators(line.words,editing).units.map(word => {
-      const begin = word.beginMs;
-      const end = word.endMs;
-      if (begin === null || end === null || end <= begin) throw new MessageError(message('parse.wordTimesRequired'));
+  const lines: FormatLine[] = prepared.lines.map((line) => {
+    // Preparation has established complete, increasing line and word times.
+    const words = line.words.map(word => {
+      const begin = word.beginMs!;
+      const end = word.endMs!;
       return { word: word.text, startTime: begin, endTime: end };
     });
-    return { words, startTime: line.beginMs, endTime: line.endMs,
+    return { words, startTime: line.beginMs!, endTime: line.endMs!,
       translatedLyric: '', romanLyric: '', isBG: Boolean(line.backgroundOf), isDuet: Boolean(leadAgent && line.agentRefs.length && !line.agentRefs.includes(leadAgent)) };
   });
   // The library drops timed whitespace-only QRC/YRC words, including a background closing bracket.
