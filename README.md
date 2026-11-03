@@ -38,17 +38,16 @@ Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML�
 以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) Python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs)）、声学分析分片、人声能量与频谱图、日语歌曲自动对齐（默认基于 [NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn) 模型，该模型使用 CC-BY-NC-SA-4.0 协议，需注意商用限制）等功能。
 
 ### 编辑与打轴
-简洁而功能强大的编辑与打轴界面，针对日语歌词提供多种自动化工具，涵盖假名注音和罗马字生成。打轴界面支持空拍、单行打轴、定位回听等功能。
-
-「词典注音」使用可独立安装的固定读音 ZIP，支持汉语拼音、粤拼和不同地区的潮州话。编辑工具栏或行菜单中选择词典并预览；每个读音单元可以独立改字，缺词与歧义可手工填写，跨正文词的整组读音由用户明确选择最小合并。应用后可继续拆分、合并、调整时间并一次撤销。日语自动处理入口为「智能日文注音」。
-
-右上角「设置 → 注音词典」负责导入、同 ID 替换及移除，接受符合 [公开格式 v1](https://github.com/zet-wu/Lazulite-studio-dict/blob/main/FORMAT.md) 的自定义包。官方包由[独立词典仓库](https://github.com/zet-wu/Lazulite-studio-dict)构建；便携构建携带汉语拼音和粤拼，潮州话按需导入。安装时构建并缓存索引；重启后首次选用按实际内容重建，随后复用最多两份活动内存索引与本次服务运行中闲置 30 分钟内的磁盘索引缓存。已保存的注音可以在移除词典后继续编辑和导出。
+简洁而功能强大的编辑与打轴界面，针对日语歌词提供多种自动化工具，涵盖智能假名注音（不依赖 Windows 系统日语语言包）和罗马字生成。对其他语言提供词典注音功能，本地包附带汉语拼音和粤拼词典，更多方言可在 [Lazulite Studio 注音词典仓库](https://github.com/zet-wu/Lazulite-studio-dict)获取或根据格式制作。打轴界面支持空拍、单行打轴、定位回听等功能。
 
 ### 文件打包
-支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，可配合 [zet-wu/MusicBox](https://github.com/zet-wu/MusicBox) 本地音乐播放器使用。也支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC ，兼容大部分播放器。
+支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，可配合 [Musicovite](https://github.com/zet-wu/Musicovite) 本地音乐播放器使用。也支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC ，兼容大部分播放器。
 
 ### NicoKaraMaker 3 兼容
 支持导出能够输入到 [NicoKaraMaker 3](https://github.com/shinta0806/NicoKaraMaker3) 中的歌词文件，支持写入演唱者标记（借鉴自 [StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame)），支持分组文件输出，支持输出独立的翻译和音译轨道文件。
+
+### StrangeUtaGame / Lin-K 兼容
+支持导出 SUG 项目文件，可导入到 [Lin-K](https://github.com/karaoke-studio/karaoke-studio) 中，同样支持分组文件输出和独立的翻译与音译轨道文件。
 
 ### [Apple Music Like Lyric](https://github.com/amll-dev/applemusic-like-lyrics) 生态兼容
 Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 AMLL 对 TTML 的歌词模型做了一定的简化，舍弃了一些本项目认为很有用的数据承载能力，因此 Lazulite Studio 不保证其产物能够完整无损地被 AMLL 生态系列工具和库导入，也不保证其格式完全符合 [AMLL TTML DB](https://github.com/amll-dev/amll-ttml-db) 投稿的要求，若有较高的对 AMLL 兼容的要求，可以调整设置中的“AMLL 兼容设置”项。
@@ -98,7 +97,7 @@ Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 
 
 仓库内包含 [Lazulite](https://github.com/wuchenyanmo/Lazulite) 子模块。
 ```sh
-git clone --recurse-submodules
+git clone --recurse-submodules https://github.com/zet-wu/Lazulite-studio.git
 ```
 后续命令从仓库根目录运行。
 
