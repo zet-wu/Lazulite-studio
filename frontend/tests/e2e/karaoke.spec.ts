@@ -1,4 +1,5 @@
 import { expect,test } from '@playwright/test';
+import {loadTimeline} from '../fixtures/timeline-setup';
 import { importLyrics } from '../fixtures/import-lyrics';
 const xml=`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="4" end="7"><span studio:id="w" tts:ruby="container" begin="4" end="5"><span tts:ruby="base">愛</span><span tts:ruby="textContainer"><span studio:id="r1" tts:ruby="text" begin="4.2" end="4.3">あ</span><span studio:id="r2" tts:ruby="text" begin="4.9" end="5">い</span></span></span><span studio:id="b" begin="5.6" end="7">●</span></p><p xml:id="c" begin="10" end="11"><span studio:id="cw" begin="10" end="11">C</span></p></body></tt>`;
 async function load(page:import('@playwright/test').Page){await page.setViewportSize({width:1440,height:1000});await page.goto('/projects/sample-project/edit');await importLyrics(page,{name:'karaoke.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();}
@@ -23,7 +24,7 @@ test('auto insertion is idempotent and export ZIP can return from focused valida
  await page.getByRole('button',{name:'导出 NicoKara',exact:true}).click();await expect(page.getByRole('dialog').getByRole('status')).toContainText('0 项阻塞');
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'下载 ZIP',exact:true}).click();expect((await download).suggestedFilename()).toMatch(/-nicokara.zip$/);
  await page.getByRole('button',{name:'查看校验',exact:true}).click();await expect(page.getByLabel('校验格式筛选')).toHaveValue('nicokara');
- await page.getByRole('button',{name:'返回 Nicokara 导出',exact:true}).click();await expect(page.getByRole('dialog',{name:'导出 Nicokara',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'返回 NicoKara 导出',exact:true}).click();await expect(page.getByRole('dialog',{name:'导出 Nicokara',exact:true})).toBeVisible();
 });
 test('timeline cue selects shared properties, resizes within range and rejects out of bounds',async({page})=>{
  await load(page);await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
@@ -40,7 +41,7 @@ test('fresh selected-output validation locates a retimed cue and returns after r
  await load(page);await page.getByRole('button',{name:'插入行内导唱',exact:true}).click();
  await page.locator('main [data-word-id="b"]').click();await page.getByLabel('选中对象开始秒数').fill('5.2');await page.getByLabel('选中对象开始秒数').press('Tab');
  await page.getByRole('button',{name:'导出 NicoKara',exact:true}).click();await expect(page.getByRole('dialog').getByRole('status')).not.toContainText('0 项阻塞');
- await page.getByRole('button',{name:'查看校验',exact:true}).click();await page.getByRole('button',{name:'导唱双端必须位于原空隙内且具有正时长',exact:true}).click();
+ await page.getByRole('button',{name:'查看校验',exact:true}).click();await page.getByRole('button',{name:/^时间范围 ·/}).click();await page.getByRole('button',{name:/^第 1 行 · 1 项/}).click();await page.getByRole('button',{name:/导唱双端必须位于原空隙内且具有正时长/}).click();
  await expect(page.getByLabel('导唱结束秒数')).toHaveValue('5.6');await page.getByLabel('导唱结束秒数').fill('5.1');await page.getByLabel('导唱结束秒数').press('Tab');
  await page.getByRole('button',{name:'导出 NicoKara',exact:true}).click();await expect(page.getByRole('dialog').getByRole('status')).toContainText('0 项阻塞');
 });
@@ -69,4 +70,27 @@ test('wrapped multiline canvas keeps multi-character Ruby and editing above timi
  await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();await page.locator('[data-top-menu="cue-tools"] summary').click();await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await page.getByRole('button',{name:'插入',exact:true}).click();
  const cue=page.locator('main [data-cue-id]').first();await cue.dblclick();const input=page.locator('main').getByRole('textbox',{name:'导唱文字',exact:true});await input.fill('●●●');
  await input.press('Enter');await page.getByRole('button',{name:'打轴',exact:true}).click();expect(await positions()).toEqual(original);
+});
+
+for(const mode of ['编辑','音频处理']) test(`cue context menu stays in ${mode}, deletes and undoes without switching mode`,async({page})=>{
+ await page.setViewportSize({width:1440,height:1000});await loadTimeline(page);
+ await importLyrics(page,{name:'karaoke.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
+ await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();
+ await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
+ const cue=page.getByRole('button',{name:'时间轴导唱 ●',exact:true});
+ await page.locator('main [data-word-id="w"]').click();
+ await page.getByRole('button',{name:mode,exact:true}).click();
+ await expect(cue).toHaveAttribute('aria-pressed','false');
+ await cue.click({button:'right'});
+ const menu=page.getByRole('menu',{name:'导唱操作'});
+ await expect(menu.getByRole('menuitem')).toHaveCount(1);
+ await expect(menu.getByRole('menuitem',{name:'删除导唱',exact:true})).toBeVisible();
+ await expect(cue).toHaveAttribute('aria-pressed','true');
+ await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
+ await page.keyboard.press('Escape');await expect(cue).toBeFocused();
+ await page.keyboard.press('Shift+F10');await expect(menu).toBeVisible();
+ await page.keyboard.press('Enter');await expect(cue).toHaveCount(0);
+ await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
+ await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(cue).toHaveCount(1);
+ await cue.click();await expect(page.getByLabel('导唱开始秒数')).toBeVisible();
 });

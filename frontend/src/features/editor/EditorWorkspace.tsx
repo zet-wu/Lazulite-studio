@@ -161,7 +161,7 @@ function EditorWorkspaceContent(props: Props) {
   const [karaokeExportSource,setKaraokeExportSource]=useState<'nicokara'|'sug'>('nicokara');
   const [karaokeFocusOutput,setKaraokeFocusOutput]=useState<string>();
   const [karaokeValidation,setKaraokeValidation]=useState<ValidationFilter>('all');
-  const {selectedCue,selectCue}=useEditorSelection()!;
+  const {selectedCue,cueNavigation,selectCue}=useEditorSelection()!;
   const cue=props.project?.karaoke.cues.find(c=>c.id===selectedCue);
   const [validationTab,setValidationTab]=useState<ValidationTab>('lyrics');
   const [focusRule,setFocusRule]=useState<AmllRule>();
@@ -247,7 +247,7 @@ function EditorWorkspaceContent(props: Props) {
   const locateSerial = useRef(0);
   const listMemory = useRef<Record<'edit' | 'sync' | 'karaoke', ListMemory>>({ karaoke: {offset:0,handled:null}, edit: { offset: 0, handled: null }, sync: { offset: 0, handled: null } });
   const requestLocate = (id: string, focus?: string) => setLocate({ id, focus, serial: ++locateSerial.current });
-  useEffect(()=>{if(cue){setMode('karaoke');requestLocate(cue.anchor.lineId,`[data-cue-id="${CSS.escape(cue.id)}"]`);}},[selectedCue]);
+  useEffect(()=>{if(cue && cueNavigation){setMode('karaoke');requestLocate(cue.anchor.lineId,`[data-cue-id="${CSS.escape(cue.id)}"]`);}},[selectedCue,cueNavigation]);
   const pendingFocus = useRef<string | null>(null);
   const previousDocument = useRef(document);
   const pendingRemoval = useRef<{ before: LyricDocument; selection: EditorSelection } | null>(null);
@@ -618,8 +618,8 @@ function EditorWorkspaceContent(props: Props) {
     if(cueNode) {
       const cue=props.project?.karaoke.cues.find(cue=>cue.id===cueNode.dataset.cueId);
       if(!cue)return false;
-      selectCue(cue.id,cue.anchor.lineId);
-      setContextMenu({x,y,target:cueNode,title:t('editor.cueActions'),actions:[{id:'edit-cue',label:t('editor.editCue'),run:()=>selectCue(cue.id,cue.anchor.lineId)},{id:'delete-cue',danger:true,label:t('editor.deleteCue'),run:()=>insertKaraoke({kind:'remove',id:cue.id})}]});return true;
+      selectCue(cue.id,cue.anchor.lineId,false);
+      setContextMenu({x,y,target:cueNode,title:t('editor.cueActions'),actions:[{id:'delete-cue',danger:true,label:t('editor.deleteCue'),run:()=>insertKaraoke({kind:'remove',id:cue.id})}]});return true;
     }
     const beat = target.closest<HTMLElement>('[data-beat-owner]');
     if (beat) {

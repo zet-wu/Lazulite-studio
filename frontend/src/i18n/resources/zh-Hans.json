@@ -243,7 +243,6 @@
   "editor.addWord": "添加词",
   "editor.rubyScope": "作用于所涉父词的全部 Ruby，每词一次",
   "editor.cueActions": "导唱操作",
-  "editor.editCue": "编辑导唱",
   "editor.deleteCue": "删除导唱",
   "editor.emptyBeats": "后置空拍",
   "editor.increaseBeats": "增加空拍",

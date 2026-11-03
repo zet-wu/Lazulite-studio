@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useRef, useCallback, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import type { EditorSelection, EditorClipboard } from './editing-actions';
 
-type Selection = { kind: 'cue'; id: string; lineId: string; anchorId: string } | EditorSelection | { kind: 'segments'; ids: string[]; anchorId: string; activeId: string };
+type Selection = { kind: 'cue'; id: string; lineId: string; anchorId: string; navigate: boolean } | EditorSelection | { kind: 'segments'; ids: string[]; anchorId: string; activeId: string };
 export type SelectionArea = 'canvas' | 'outline' | 'timeline';
 function useSelectionState() {
   const area = useRef<SelectionArea>('canvas');
@@ -32,8 +32,9 @@ function useSelectionState() {
     return { kind: 'segments', ids, anchorId: previous?.anchorId && ids.includes(previous.anchorId) ? previous.anchorId : ids[0] ?? '', activeId: ids.at(-1) ?? '' };
   }), []);
   const selectedCue = effective?.kind === 'cue' ? effective.id : null;
-  const selectCue = (id: string, lineId: string) => { setEffective({kind:'cue', id, lineId, anchorId:id}); setExpanded(ids=>ids.includes(lineId)?ids:[...ids,lineId]); };
-  return { area, focusRequest, requestFocus, selectedCue, selectCue, commands, effective, selection, setSelection, expanded, selectedSegments, setSelectedSegments };
+  const cueNavigation = effective?.kind === 'cue' && effective.navigate;
+  const selectCue = (id: string, lineId: string, navigate = true) => { setFocusRequest(null); setEffective({kind:'cue', id, lineId, anchorId:id, navigate}); setExpanded(ids=>ids.includes(lineId)?ids:[...ids,lineId]); };
+  return { area, focusRequest, requestFocus, selectedCue, cueNavigation, selectCue, commands, effective, selection, setSelection, expanded, selectedSegments, setSelectedSegments };
 }
 const Context = createContext<ReturnType<typeof useSelectionState> | null>(null);
 export const useEditorSelection = () => useContext(Context);

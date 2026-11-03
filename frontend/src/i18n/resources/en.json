@@ -243,7 +243,6 @@
   "editor.addWord": "Add word",
   "editor.rubyScope": "Applies once per parent word to all its Ruby readings.",
   "editor.cueActions": "Count-in actions",
-  "editor.editCue": "Edit count-in",
   "editor.deleteCue": "Delete count-in",
   "editor.emptyBeats": "Trailing empty beats",
   "editor.increaseBeats": "Add empty beat",

@@ -1559,12 +1559,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "editor.editCue": {
-    "context": "editor interface: editor.editCue",
-    "source": "编辑导唱",
-    "params": [],
-    "parameterNotes": {}
-  },
   "editor.deleteCue": {
     "context": "editor interface: editor.deleteCue",
     "source": "删除导唱",
