@@ -39,7 +39,7 @@ it('canonicalizes chorus and leaves unspecified passages in the last emitted voi
 });
 it('encodes field commas and references without stripping punctuation or variation selectors',()=>{
  expect(encodeKraText('a,b&[00:01:00]❤️',true)).toBe('a&#44;b&#38;&#91;00:01:00&#93;❤️');
- const p=fixture();p.lyrics.metadata={title:['a\nb','c'],songwriter:['Ignored'],isrc:['Ignored']};const text=prepareNicokara(p,'s').files[0].text;expect(text).toContain('@Title=a b / c\r\n');expect(text).not.toContain('Ignored');
+ const p=fixture();p.lyrics.metadata={title:['a\nb','c'],arranger:['A&[B]','C\nD'],year:['2026'],songwriter:['Ignored'],isrc:['Ignored']};const text=prepareNicokara(p,'s').files[0].text;expect(text).toContain('@Title=a b / c\r\n');expect(text).not.toContain('Ignored');expect(text).toContain('@Arrange=A&#38;&#91;B&#93; / C D\r\n');expect(text).toContain('@Year=2026\r\n');
 });
 it('creates an independently readable ZIP with UTF-8 BOM and unique safe names',()=>{
  const p=fixture();p.karaoke.groups.push({id:'MAIN',name:'collision'});const other=createLine('B');Object.assign(other.words[0],{beginMs:20000,endMs:21000});p.lyrics.lines.push(other);p.karaoke.lineGroups[other.id]='MAIN';p.karaoke.outputs.push(outputId('MAIN'));

@@ -1,3 +1,4 @@
+import { songInformation } from './song-information';
 import { message as describeMessage } from '../domain/messages';
 import { karaokeOutputs, karaokeFilenames, zipFiles } from './karaoke-output';
 import { isUntimedSeparator, type ExportUnit } from './export-separators';
@@ -139,7 +140,11 @@ export function prepareSug(project: ProjectDocument, title: string, now = new Da
     }
     if(!sentences.length){omitted.push(output.label);continue;}
     const date=now.toISOString();
-    const data={version:'0.3.0',id:'project-0',metadata:{title:lyrics.metadata.title?.join(' / ')||title,artist:lyrics.metadata.artist?.join(' / ')||'',album:lyrics.metadata.album?.join(' / ')||'',language:output.kind==='body'?(lyrics.language??''):(output.language==='und'?'':output.language),created_at:date,modified_at:date},audio_duration_ms:0,singers,sentences,global_offset_ms:offset};
+    const information = songInformation(lyrics.metadata);
+    const values = Object.fromEntries(information.map(item => [item.key, item.value]));
+    const standard = { title: values.title || title, artist: values.artist, album: values.album };
+    const nicokara_tags = { ...standard, custom: information.filter(item => !['title','artist','album'].includes(item.key) && item.value.trim()).map(item => `@${item.tag}=${item.value}`) };
+    const data={nicokara_tags,version:'0.3.0',id:'project-0',metadata:{...standard,language:output.kind==='body'?(lyrics.language??''):(output.language==='und'?'':output.language),created_at:date,updated_at:date},audio_duration_ms:0,singers,sentences,global_offset_ms:offset};
     files.push({name:names.get(id)!,text:JSON.stringify(data,null,2)+'\n',output});
   }
   if(karaoke.outputs.length&&!files.length&&!issues.length)add({karaokeSettings:true},'output.chooseNonempty', [], 'output-configuration');

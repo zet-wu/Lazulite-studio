@@ -1,3 +1,4 @@
+import { songInformation } from './song-information';
 import { message as describeMessage } from '../domain/messages';
 import { karaokeOutputs, karaokeFilenames, zipFiles, type KaraokeOutput } from './karaoke-output';
 export { karaokeOutputs, safeFilename, zipFiles } from './karaoke-output';
@@ -51,10 +52,7 @@ export function prepareNicokara(project: ProjectDocument, title: string, selecte
   const textOk = (text: string, target: Partial<OutputIssue>, output: string) => {
     if (/[\r\n\t\u0000-\u0008\u000b\u000c\u000e-\u001f\u2028\u2029]/u.test(text)) add(target, 'output.nicoControl', output);
   };
-  const metadata = Object.entries({ title: 'Title', artist: 'Artist', album: 'Album', composer: 'Compose', lyricist: 'Lyrics' }).flatMap(([key, tag]) => {
-    const value = lyrics.metadata[key]?.join(' / ').replace(/[\r\n\u2028\u2029]+/g, ' ');
-    return value ? [`@${tag}=${encodeKraText(value)}`] : [];
-  });
+  const metadata = songInformation(lyrics.metadata).filter(item => item.value.trim()).map(({ tag, value }) => `@${tag}=${encodeKraText(value)}`);
   const names = karaokeFilenames(outputs, title, 'kra');
   for (const id of [...new Set(selected)]) {
     const output = outputs.find(output => output.id === id);

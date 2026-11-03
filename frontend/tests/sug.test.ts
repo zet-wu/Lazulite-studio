@@ -45,3 +45,12 @@ it('blocks ruby conflicts, invalid ranges and controls only in selected dependen
 it('keeps supplementary and combining codepoints and independent words without ruby linking',()=>{
  const p=fixture(),l=p.lyrics.lines[0];l.words[0].text='𠮷é';l.words[0].rubyUnits=[];l.words.push({...createWord('次'),beginMs:2100,endMs:2200});const c=data(p).sentences[0].characters;expect(c.map((c:{char:string})=>c.char)).toEqual(['𠮷','e','́','次']);expect(c[2].linked_to_next).toBe(false);expect(c[2].sentence_end_ts).toBe(2009);
 });
+
+it('synchronizes song tags without KRA encoding and retains export time and offset semantics',()=>{
+ const p=fixture();p.lyrics.metadata={title:['曲"&[名]'],artist:['甲 / 乙, 丙 & 丁'],album:['专辑'],composer:['A','B'],lyricist:['词\n作者'],arranger:['编曲&[一]','二'],year:['2026'],isrc:['omitted']};p.karaoke.offsets[outputId('main')]=50;
+ const now=new Date('2026-11-03T00:00:00Z'),result=prepareSug(p,'fallback',now),d=JSON.parse(result.files[0].text);
+ expect(d.nicokara_tags).toEqual({title:d.metadata.title,artist:d.metadata.artist,album:d.metadata.album,custom:['@Compose=A / B','@Lyrics=词 作者','@Arrange=编曲&[一] / 二','@Year=2026']});
+ expect(d.metadata.updated_at).toBe(d.metadata.created_at);expect(d.metadata).not.toHaveProperty('modified_at');expect(d.global_offset_ms).toBe(50);
+ if(process.env.SUG_CONTRACT_DIR)writeFileSync(`${process.env.SUG_CONTRACT_DIR}/metadata.sug`,result.files[0].text);
+ p.lyrics.metadata={composer:['  ']};const empty=data(p);expect(empty.nicokara_tags).toEqual({title:'曲',artist:'',album:'',custom:[]});
+});
