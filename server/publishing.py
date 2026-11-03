@@ -86,8 +86,8 @@ def _stpp_track(sample_size: int, offset: int, track_id: int, duration_ms: int, 
     stts = _box(b"stts", _fullbox(0) + struct.pack(">I", 1) + struct.pack(">II", 1, duration_ms))
     stsc = _box(b"stsc", _fullbox(0) + struct.pack(">I", 1) + struct.pack(">III", 1, 1, 1))
     stsz = _box(b"stsz", _fullbox(0) + struct.pack(">II", 0, 1) + struct.pack(">I", sample_size))
-    stco = _box(b"stco", _fullbox(0) + struct.pack(">II", 1, offset))
-    stbl = _box(b"stbl", stsd + stts + stsc + stsz + stco)
+    co64 = _box(b"co64", _fullbox(0) + struct.pack(">IQ", 1, offset))
+    stbl = _box(b"stbl", stsd + stts + stsc + stsz + co64)
     nmhd = _box(b"nmhd", _fullbox(0))
     dref = _box(b"dref", _fullbox(0) + struct.pack(">I", 1) + _box(b"url ", _fullbox(0, 1)))
     dinf = _box(b"dinf", dref)
@@ -186,8 +186,6 @@ def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str 
     source, output = Path(source), Path(output)
     if not source.is_file():
         raise PublishingError("source media is missing")
-    if source.stat().st_size > 500 * 1024 * 1024:
-        raise PublishingError("media exceeds 500 MiB limit")
     sample = ttml.encode("utf-8") if isinstance(ttml, str) else bytes(ttml)
     if not sample.strip():
         raise PublishingError("TTML sample is empty")
@@ -306,8 +304,8 @@ def extract_stpp(path: Path, track_id: int | None = None) -> bytes:
             raise PublishingError("不支持的 STPP sample/chunk 映射")
         if stts is None or len(stts) != 16 or struct.unpack_from(">II", stts, 4) != (1, 1) or _find(stbl, b"ctts") is not None:
             raise PublishingError("不支持的 STPP sample 时间映射")
-        if not 0 < size <= 4_000_000 or not any(kind == b"mdat" and pos + header <= offset and offset + size <= pos + length for kind, pos, length, header in top):
-            raise PublishingError("STPP sample 超限或不在媒体数据范围内")
+        if size <= 0 or not any(kind == b"mdat" and pos + header <= offset and offset + size <= pos + length for kind, pos, length, header in top):
+            raise PublishingError("STPP sample 为空或不在媒体数据范围内")
         with path.open("rb") as source:
             source.seek(offset)
             sample = source.read(size)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import struct
 import subprocess
 from pathlib import Path
 import pytest
@@ -40,6 +41,18 @@ def test_publish_adds_one_stpp_sample_and_preserves_audio_metadata(tmp_path: Pat
     assert report.audio_streams == 1
     assert report.metadata_preserved
     assert extract_stpp(output) == TTML
+    from server.publishing import _scan_top, _read_payload, _boxes, _find
+    moov = next(box for box in _scan_top(output) if box[0] == b'moov')
+    for kind, trak, _, _ in _boxes(_read_payload(output, *moov[1:])):
+        if kind != b'trak': continue
+        stbl = _find(_find(_find(trak, b'mdia'), b'minf'), b'stbl')
+        if not any(kind == b'stpp' for kind, *_ in _boxes(_find(stbl, b'stsd')[8:])): continue
+        table = _find(stbl, b'co64')
+        count, offset = struct.unpack_from('>IQ', table, 4)
+        assert count == 1
+        with output.open('rb') as stream:
+            stream.seek(offset)
+            assert stream.read(len(TTML)) == TTML
     assert _pcm_hash(source) == _pcm_hash(output)
 
     probe = subprocess.run(
