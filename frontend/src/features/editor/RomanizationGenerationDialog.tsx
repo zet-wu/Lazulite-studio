@@ -4,7 +4,7 @@ import { i18n, formatMessage } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { preferences } from '../../adapters/preferences';
 import { measureTextWidth } from '../../shared/measure-text';
-import { kanaHighlightHint, readKanaHighlight } from './kana-highlight';
+import { kanaHighlightHint, defaultKanaHighlight, normalizeKanaHighlight } from './kana-highlight';
 import { Select } from '../../shared/Select';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
@@ -91,7 +91,15 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
 }) {
   useTranslation();
   const [source] = useState(document);
-  const [highlight] = useState(readKanaHighlight);
+  const [highlight, setHighlight] = useState(defaultKanaHighlight);
+  const [highlightInput, setHighlightInput] = useState(defaultKanaHighlight);
+  const [highlightError, setHighlightError] = useMessageText('');
+  const composing = useRef(false);
+  const [isComposing, setIsComposing] = useState(false);
+  const updateHighlight = (value: string) => {
+    try { setHighlight(normalizeKanaHighlight(value)); setHighlightError(''); }
+    catch (cause) { setHighlightError(errorMessage(cause)); }
+  };
   const [sourceIds] = useState(lineIds);
   const modeStorage = `lazulite-romanization-mode:${preferenceScope}`;
   const [kind, setKind] = useState<RomanizationKind>(() => preferences.getItem(modeStorage) === 'plain' ? 'plain' : 'timed');
@@ -125,18 +133,20 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
     catch (cause) { setMessage(errorMessage(cause)); }
   };
   return <SettingsDialog title={t('editor.romanize')} subtitle={t('reading.generatedLines',{generated:rows.filter(row=>targetFor(row.lineId)!=='skip'&&hasGeneratedContent(row)).length,total:sourceIds.length})} close={close}
-    actions={<><button data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={Boolean(issue)} onClick={submit}>{t('romanization.generate')}</button></>}>
-    <div className={styles.rubyGeneration}>
+    actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={Boolean(issue)} onClick={submit}>{t('romanization.generate')}</button></>}>
+    <div className={styles.rubyGeneration} onCompositionStart={() => { composing.current = true; setIsComposing(true); }} onCompositionEnd={() => { composing.current = false; setIsComposing(false); }}>
       <div className={`${styles.rubyGenerationOptions} ${styles.romanGenerationOptions}`}>
-        <label>{t('romanization.targetTrack')}<Select aria-label={t('romanization.targetTrack')} value={trackId} onChange={event => { setTrackId(event.target.value); setTargets({}); setMessage(''); }}><option value="">{t('romanization.newLatin')}</option>
+        <div className={styles.romanTrackOptions}><label>{t('romanization.targetTrack')}<Select aria-label={t('romanization.targetTrack')} value={trackId} onChange={event => { setTrackId(event.target.value); setTargets({}); setMessage(''); }}><option value="">{t('romanization.newLatin')}</option>
           {source.romanizationTracks.filter(track => track.language === 'ja-Latn').map(track => <option key={track.id} value={track.id}>{t('editor.track')}{source.romanizationTracks.indexOf(track) + 1} · ja-Latn</option>)}
         </Select></label>
-        <label>{t('romanization.output')}<Select aria-label={t('romanization.output')} aria-describedby="romanization-mode-help" value={kind} onChange={event => {
+        <label className={styles.kanaHighlight}>{t('kana.characters')}<input aria-label={t('kana.characters')} value={highlightInput} aria-invalid={Boolean(highlightError)} onChange={event => { setHighlightInput(event.target.value); if (!composing.current) updateHighlight(event.target.value); }} onCompositionEnd={event => updateHighlight(event.currentTarget.value)} /></label></div>
+        {highlightError && <span role="alert">{highlightError}</span>}
+        <label className={styles.romanOutput}>{t('romanization.output')}<Select aria-label={t('romanization.output')} aria-describedby="romanization-mode-help" disabled={isComposing} value={kind} onChange={event => {
+          if (composing.current) return;
           const next = event.target.value as RomanizationKind;
           setKind(next); setRows(proposeRomanization(source, sourceIds, next)); setMessage(''); setFocusedRow(null);
           preferences.setItem(modeStorage, next);
-        }}><option value="plain">{t('romanization.plain')}</option><option value="timed">{t('romanization.timed')}</option></Select></label>
-        <small id="romanization-mode-help">{t('romanization.switchClears')}</small>
+        }}><option value="plain">{t('romanization.plain')}</option><option value="timed">{t('romanization.timed')}</option></Select><span role="tooltip" className={styles.romanOutputHint} id="romanization-mode-help">{t('romanization.switchClears')}</span></label>
       </div>
       <div ref={scroll} data-proposal-count={rows.length} className={`${styles.rubyGenerationRows} ${virtualized ? styles.rubyGenerationRowsVirtual : ''}`}>
         <div style={virtualized ? { position: 'relative', height: virtualizer.getTotalSize() } : { display: 'grid', gap: 8 }}>

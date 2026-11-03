@@ -137,12 +137,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "menu.kana": {
-    "context": "menu interface message",
-    "source": "音译生成假名高亮",
-    "params": [],
-    "parameterNotes": {}
-  },
   "notice.dismiss": {
     "context": "notice interface message",
     "source": "关闭提示",
@@ -1027,21 +1021,9 @@
     "params": [],
     "parameterNotes": {}
   },
-  "kana.title": {
-    "context": "kana interface: kana.title",
-    "source": "音译生成假名高亮",
-    "params": [],
-    "parameterNotes": {}
-  },
   "kana.characters": {
-    "context": "kana interface: kana.characters",
-    "source": "假名集合",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "kana.clear": {
-    "context": "kana interface: kana.clear",
-    "source": "清空假名高亮规则",
+    "context": "日文罗马音生成窗口的本次选项／提示",
+    "source": "高亮假名",
     "params": [],
     "parameterNotes": {}
   },
@@ -5566,8 +5548,8 @@
     "parameterNotes": {}
   },
   "romanization.switchClears": {
-    "context": "romanization interface: romanization.switchClears",
-    "source": "切换输出将清除修改",
+    "context": "日文罗马音生成窗口的本次选项／提示",
+    "source": "切换输出形式将清除本窗口未应用的音译修改。",
     "params": [],
     "parameterNotes": {}
   },
@@ -5926,8 +5908,8 @@
     }
   },
   "shape.simplified": {
-    "context": "shape interface: shape.simplified",
-    "source": "简体中文",
+    "context": "转换目标（不是界面语言）",
+    "source": "大陆简体",
     "params": [],
     "parameterNotes": {}
   },
@@ -6212,12 +6194,6 @@
   "segment.title": {
     "context": "segment interface: segment.title",
     "source": "分词",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "segment.generate": {
-    "context": "segment interface: segment.generate",
-    "source": "生成预览",
     "params": [],
     "parameterNotes": {}
   },

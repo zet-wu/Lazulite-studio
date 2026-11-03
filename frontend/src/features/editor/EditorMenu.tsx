@@ -10,7 +10,6 @@ import { preferences } from '../../adapters/preferences';
 import { Icon } from '../../shared/Icon';
 import { Link } from 'react-router-dom';
 import { useContext, useLayoutEffect, useState, useRef } from 'react';
-import { KanaHighlightDialog } from './KanaHighlightDialog';
 import { ShortcutDialog } from './ShortcutDialog';
 import { TopMenu, type MenuState } from './TopMenu';
 import styles from './semantic-editor.module.css';
@@ -48,7 +47,6 @@ export function EditorMenu(props: Props) {
   const [languageOpen, setLanguageOpen] = useState(false);
   const [dictionaryOpen, setDictionaryOpen] = useState(false);
   const [devicesOpen, setDevicesOpen] = useState(false);
-  const [kanaOpen, setKanaOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [dark, setDark] = useState(() => preferences.getItem('lazulite-editor-theme') === 'dark');
   const content = <header ref={header} className={styles.header}>
@@ -71,13 +69,11 @@ export function EditorMenu(props: Props) {
         <button data-role="inline" onClick={() => setDevicesOpen(true)}>{t('menu.devices')}</button>
         {props.onAmllSettings && <button data-role="inline" disabled={props.editingLocked} onClick={props.onAmllSettings}>{t('menu.amll')}</button>}
         <button data-role="inline" onClick={() => setShortcutsOpen(true)}>{t('menu.shortcuts')}</button>
-        <button data-role="inline" onClick={() => setKanaOpen(true)}>{t('menu.kana')}</button>
       </TopMenu>
     </div>
     {languageOpen && <SettingsDialog title={t('language.label')} returnFocus={() => header.current?.querySelector<HTMLElement>('[data-top-menu="settings"] summary') ?? null} close={() => setLanguageOpen(false)}><LanguageSelector /></SettingsDialog>}
     {dictionaryOpen && <DictionaryManager close={() => setDictionaryOpen(false)} />}
     {devicesOpen && <SettingsDialog title={t('menu.devices')} returnFocus={() => header.current?.querySelector<HTMLElement>('[data-top-menu="settings"] summary') ?? null} close={() => setDevicesOpen(false)}><DeviceSettings /></SettingsDialog>}
-    {kanaOpen && <KanaHighlightDialog close={() => setKanaOpen(false)} />}
     {shortcutsOpen && <ShortcutDialog close={() => setShortcutsOpen(false)} />}
   </header>;
   const host = chrome?.host;

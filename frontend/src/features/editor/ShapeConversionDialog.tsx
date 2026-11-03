@@ -53,7 +53,7 @@ export function ShapeConversionDialog({document,lineIds,apply,close}:{document:L
     if(stale||pending||!ready||composing||invalid)return;
     try { if(apply(shapeCommand(document,source,rows)))close(); } catch(cause){setError(errorMessage(cause));}
   };
-  return <SettingsDialog title={t('editor.shape')} close={()=>{if(!composing)close();}} actions={<><button data-role="secondary" disabled={composing} onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={stale||pending||!ready||composing||invalid} onClick={submit}>{t('common.apply')}</button></>}>
+  return <SettingsDialog title={t('editor.shape')} close={()=>{if(!composing)close();}} actions={<><button data-dialog-close data-role="secondary" disabled={composing} onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={stale||pending||!ready||composing||invalid} onClick={submit}>{t('common.apply')}</button></>}>
     <div className={styles.rubyGeneration}>
       <div className={shapes.toolbar}><label>{t('shape.target')}<select data-initial-focus aria-label={t('shape.target')} value={target} disabled={stale||composing} onChange={event=>{abort.current?.abort();edited.current.clear();setRows([]);setReady(false);setPending(true);setTarget(event.target.value as ShapeTarget);}}>{Object.entries(shapeTargets).map(([key,label])=><option key={key} value={key}>{t(label)}</option>)}</select></label>
       <IconButton icon="refresh" label={t('shape.reanalyze')} data-role="secondary" disabled={stale||pending||composing} onClick={()=>{setReady(false);setPending(true);setAttempt(value=>value+1);}}/></div>

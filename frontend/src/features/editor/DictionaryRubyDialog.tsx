@@ -63,7 +63,7 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
   })})));
   const submit=()=>{if(stale||pending||composing)return;try{if(apply(dictionaryRubyCommand(document,source,rows,merge)))close();}catch(e){setError(errorMessage(e));}};
   return <SettingsDialog title={t('editor.dictionaryRuby')} subtitle={t('editor.lineCount',{count:ids.length})} close={()=>{if(!composing)close();}}
-    actions={<><button data-role="secondary" disabled={composing} onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={composing||pending||stale||!changed} onClick={submit}>{t('common.apply')}</button></>}>
+    actions={<><button data-dialog-close data-role="secondary" disabled={composing} onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={composing||pending||stale||!changed} onClick={submit}>{t('common.apply')}</button></>}>
     <div className={preview.rubyGeneration}>
     <div className={styles.toolbar}>
       <label>{t('dictionary.label')}<select aria-label={t('dictionary.label')} value={selected} disabled={composing||stale} onChange={e=>{

@@ -12,7 +12,7 @@ UI_LANGUAGES = {language['id'] for language in json.loads(Path(__file__).with_na
 
 PREFERENCE_KEYS = {
     'lazulite-editor-theme', 'lazulite-shortcuts', 'lazulite-sync-keys',
-    'lazulite-editor-columns', 'lazulite-kana-highlight', 'studio.playback-rate',
+    'lazulite-editor-columns', 'studio.playback-rate',
     'studio:sync-mode', 'studio:sync-offset',
     'studio:reading-dictionary', 'studio:ui-language',
 }

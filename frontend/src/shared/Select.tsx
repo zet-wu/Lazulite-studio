@@ -21,7 +21,7 @@ export function Select({ quotes, ...props }: Props) {
   const options=ref.current?Array.from(ref.current.options):[];
   const close=()=>{setOpen(false);ref.current?.focus();};
   const show=()=>{
-    if(props.disabled)return;
+    if(props.disabled || ref.current?.matches(':disabled'))return;
     setActive(Math.max(0,ref.current!.selectedIndex));setOpen(true);
   };
   useLayoutEffect(() => {
@@ -49,7 +49,7 @@ export function Select({ quotes, ...props }: Props) {
     return () => cancelAnimationFrame(frame);
   }, [open, props.children]);
   const choose=(index:number)=>{
-    const select=ref.current!;if(select.options[index]?.disabled)return;
+    const select=ref.current!;if(select.matches(':disabled'))return;if(select.options[index]?.disabled)return;
     select.selectedIndex=index;select.dispatchEvent(new Event('change',{bubbles:true}));close();
   };
   useEffect(()=>{

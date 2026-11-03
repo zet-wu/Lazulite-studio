@@ -414,3 +414,12 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 
 .readingHint { position: relative; }
 .readingHint:focus-within::after { content: attr(data-tooltip); position: absolute; z-index: 20; top: 100%; left: 0; width: max-content; max-width: 260px; padding: 5px 8px; color: var(--ink); background: var(--surface-high); border: 1px solid var(--line); border-radius: 4px; font: 12px system-ui; pointer-events: none; }
+
+.romanTrackOptions { display:flex; align-items:center; gap:16px; width:100%; min-width:0; }
+.romanTrackOptions > label:first-child { flex:1; min-width:0; }
+.romanTrackOptions select { min-width:0; max-width:100%; }
+.romanTrackOptions .kanaHighlight { flex:none; white-space:nowrap; }
+.kanaHighlight input { width:7em; }
+.romanOutput { position:relative; }
+.romanOutputHint { position:absolute; top:100%; left:0; z-index:10; width:max-content; max-width: min(420px, 70vw); padding:8px; background:var(--surface-high); color:var(--ink); border:1px solid var(--line); border-radius:6px; opacity:0; pointer-events:none; }
+.romanOutput:hover .romanOutputHint, .romanOutput:focus-within .romanOutputHint { opacity:1; }

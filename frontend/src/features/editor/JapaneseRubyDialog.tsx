@@ -47,7 +47,7 @@ export function JapaneseRubyDialog({ document, lineIds, apply, close }: { docume
  const stale=document!==source, changed=hasJapaneseRubyChanges(rows,source);
  const submit=()=>{if(composing||pending||stale)return;try{if(apply(japaneseRubyCommand(document,source,rows)))close();}catch(cause){setError(errorMessage(cause));}};
  return <SettingsDialog title={t('editor.japaneseRuby')} subtitle={t('editor.lineCount',{count:rows.length})} close={()=>{if(!composing)close();}}
-  actions={<><button data-role="secondary" onClick={close} disabled={composing}>{t('common.cancel')}</button><button data-role="primary" onClick={submit} disabled={composing||pending||stale||!changed}>{t('common.apply')}</button></>}>
+  actions={<><button data-dialog-close data-role="secondary" onClick={close} disabled={composing}>{t('common.cancel')}</button><button data-role="primary" onClick={submit} disabled={composing||pending||stale||!changed}>{t('common.apply')}</button></>}>
   <div className={styles.rubyGeneration}>
   <p>{t('reading.emptySkip')}</p>
   <label className={styles.japaneseRubyMerge}><input type="checkbox" checked={autoMerge} disabled={composing||stale} onChange={event=>{

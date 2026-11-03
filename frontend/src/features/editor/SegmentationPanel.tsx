@@ -7,7 +7,7 @@ import { useProjectEditing } from './ProjectEditingContext';
 import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { lineText, type LyricDocument, type LyricWord } from '../../domain/lyric-document';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, loadSyllableDivider, segmentText, segmentationPreview, SYLLABLE_LANGUAGES, type SegmentOptions } from '../../domain/segmentation';
@@ -51,7 +51,13 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
   const [ruleText, setRuleText] = useState('');
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState<string[]>([]);
-  const [preview, setPreview] = useState<PreviewItem[]>([]);
+  const [composing, setComposing] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const inputs = useMemo(() => ({}), [document, selection, currentLineId, scope, from, to, options, ignoreText, ruleText, mode, editing, composing, retry]);
+  const [result, setResult] = useState<{ inputs: object; items: PreviewItem[] } | null>(null);
+  const [manualPreview, setManualPreview] = useState<PreviewItem[]>([]);
+  const preview = mode === 'manual' ? manualPreview : result?.inputs === inputs ? result.items : [];
+  const setPreview = setManualPreview;
   const [error, setError] = useMessageText('');
   const [manualBoundaries, setManualBoundaries] = useState<number[]>([]);
   const activeWord = selection?.kind === 'words' ? document.lines.flatMap((line) => line.words).find((word) => word.id === selection.activeId) :
@@ -78,22 +84,23 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
       setError('');
     } catch (cause) { setTestOutput([]); setError(errorMessage(cause)); }
   };
-  const buildPreview = async () => {
-    try {
-      setError('');
-      if (mode === 'manual') {
-        if (!activeWord || !manualLine) throw new MessageError(describeMessage('segment.selectWord'));
-        const parts = manualParts(activeWord);
-        setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.obscene || emptyBeatCount(editing, activeWord.id)) }]);
-        return;
-      }
-      const ids = targetWordIds(document, selection, currentLineId, scope, from, to);
-      if (!ids.length) throw new MessageError(describeMessage('segment.noWords'));
-      const config = { ...options, ignore: ignoreText.split('\n').map((item) => item.trim()).filter(Boolean), rules: parseRules(ruleText) };
-      const divide = config.western === 'syllable' ? await loadSyllableDivider(config.language) : undefined;
-      setPreview(segmentationPreview(document, ids, config, divide, editing));
-    } catch (cause) { setPreview([]); setError(errorMessage(cause)); }
-  };
+  useEffect(() => {
+    if (mode === 'manual') return;
+    let active = true;
+    setError('');
+    if (composing) return;
+    const timer = setTimeout(() => { void (async () => {
+      try {
+        const ids = targetWordIds(document, selection, currentLineId, scope, from, to);
+        if (!ids.length) throw new MessageError(describeMessage('segment.noWords'));
+        const config = { ...options, ignore: ignoreText.split('\n').map(item => item.trim()).filter(Boolean), rules: parseRules(ruleText) };
+        const divide = config.western === 'syllable' ? await loadSyllableDivider(config.language) : undefined;
+        const items = segmentationPreview(document, ids, config, divide, editing);
+        if (active) setResult({ inputs, items });
+      } catch (cause) { if (active) { setResult(null); setError(errorMessage(cause)); } }
+    })(); }, mode === 'advanced' ? 200 : 0);
+    return () => { active = false; clearTimeout(timer); };
+  }, [inputs]);
   const commit = () => {
     try {
       const changed = preview.filter((item) => item.parts.length > 1 && !item.blocked);
@@ -103,7 +110,7 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
       if (apply({ type: 'segment-words', changes })) close();
     } catch (cause) { setError(errorMessage(cause)); }
   };
-  return <SettingsDialog title={t('segment.title')} close={close} actions={<><button data-role="secondary" onClick={() => void buildPreview()}>{t('segment.generate')}</button><button data-role="primary" disabled={!preview.some((item) => item.parts.length > 1 && !item.blocked)} onClick={commit}>{t('edit.applyUndo')}</button></>}>
+  return <SettingsDialog title={t('segment.title')} close={close} actions={<>{mode !== 'manual' && error && <button data-role="secondary" onClick={() => setRetry(value => value + 1)}>{t('common.retry')}</button>}<button data-role="primary" disabled={!preview.some((item) => item.parts.length > 1 && !item.blocked)} onClick={commit}>{t('edit.applyUndo')}</button></>}>
       <div className={styles.dialogTabs}>{(['manual', 'auto', 'advanced'] as const).map((item) => <button data-role="secondary" key={item} className={mode === item ? styles.activeTab : ''} onClick={() => { setMode(item); setPreview([]); }}>{item === 'manual' ? t('segment.manual') : item === 'auto' ? t('segment.auto') : t('segment.advanced')}</button>)}</div>
       {mode === 'manual' ? <div>
         <p>{t('segment.currentWord')}{activeWord?.text ?? t('segment.selectCanvas')}</p>
@@ -122,8 +129,8 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
         <label>{t('segment.whitespace')}<Select value={options.whitespace} onChange={(event) => updateOption('whitespace', event.target.value as SegmentOptions['whitespace'])}><option value="next">{t('segment.next')}</option><option value="previous">{t('segment.previous')}</option><option value="separate">{t('segment.keepSeparate')}</option></Select></label>
         {mode === 'advanced' && <>
           <label>{t('segment.weight')}<input type="number" min="0" step="0.1" value={options.punctuationWeight} onChange={(event) => updateOption('punctuationWeight', Number(event.target.value))} /></label>
-          <label>{t('segment.ignore')}<textarea value={ignoreText} onChange={(event) => { setIgnoreText(event.target.value); setPreview([]); }} /></label>
-          <label>{t('segment.rules')}<textarea value={ruleText} onChange={(event) => { setRuleText(event.target.value); setPreview([]); }} /></label>
+          <label>{t('segment.ignore')}<textarea onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} value={ignoreText} onChange={(event) => { setIgnoreText(event.target.value); setPreview([]); }} /></label>
+          <label>{t('segment.rules')}<textarea onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} value={ruleText} onChange={(event) => { setRuleText(event.target.value); setPreview([]); }} /></label>
           <label>{t('segment.testInput')}<input aria-label={t('segment.testInputLabel')} value={testInput} placeholder={t('segment.sample')} onChange={(event) => { setTestInput(event.target.value); setTestOutput([]); }} /></label>
           <button data-role="secondary" onClick={() => void testRule()}>{t('segment.testRules')}</button>
           {testOutput.length > 0 && <p>{t('segment.testResult')}<Parts parts={testOutput}/></p>}

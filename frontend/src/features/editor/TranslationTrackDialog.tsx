@@ -42,7 +42,7 @@ export function TranslationTrackDialog({ document, apply, close }: { document: L
   };
   const update = (track: TranslationTrack) => setTracks(items => items.map(item => item.id === track.id ? track : item));
   const addTrack = () => { const track: TranslationTrack = { id: crypto.randomUUID(), language: null, purpose: 'subtitle', contents: [] }; setTracks(items => [...items, track]); setTargetId(track.id); };
-  return <SettingsDialog title={t('translation.manage')} close={close} actions={<><button data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={stale} onClick={() => {
+  return <SettingsDialog title={t('translation.manage')} close={close} actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={stale} onClick={() => {
     try { if (apply({ type: 'set-translation-tracks', source: source.translationTracks, tracks })) close(); } catch (cause) { setError(errorMessage(cause)); }
   }}>{t('common.apply')}</button></>}>
     <BooleanField label={t('translation.selectAll')} {...selectionProps(allIds)} />

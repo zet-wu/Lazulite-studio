@@ -72,7 +72,7 @@ import { SyncPanel } from './SyncPanel';
 import { MetadataPanel } from './MetadataPanel';
 import { SingerSelection } from './SingerSelection';
 import { SingerDialog } from './SingerDialog';
-import { SettingsDialog } from './SettingsDialog';
+import { SettingsDialog, DialogEditingLocked } from './SettingsDialog';
 import { EditorContextMenu, type ContextAction } from './EditorContextMenu';
 import { RubyGenerationDialog } from './RubyGenerationDialog';
 import type { TransportHandle } from '../MediaTransport';
@@ -459,6 +459,7 @@ function EditorWorkspaceContent(props: Props) {
   const previousCues=useRef(props.project?.karaoke.cues??[]);
   useEffect(()=>{const old=previousCues.current,next=props.project?.karaoke.cues??[];const removed=old.filter(c=>!next.some(n=>n.id===c.id));if(pendingCue.current){const inserted=next.find(c=>!old.some(o=>o.id===c.id));if(inserted)selectCue(inserted.id,inserted.anchor.lineId);pendingCue.current=false;}const removedActive = removed.find(item => item.id === selectedCue); if (removedActive && document.lines.some(line => line.id === removedActive.anchor.lineId)) { const id = removedActive.anchor.lineId; const next: EditorSelection = {kind:'lines',ids:[id],anchorId:id,activeId:id}; setSelection(next); requestFocus(next); } previousCues.current=next;},[props.project]);
   const dispatch = useLiveCallback((command: LyricCommand) => {
+    if (props.alignment?.locked) return false;
     try { apply(command); editRejected.current = false; setMessage(''); return true; }
     catch (error) { editRejected.current = true; setMessage(errorMessage(error)); return false; }
   });
@@ -1038,12 +1039,14 @@ function EditorWorkspaceContent(props: Props) {
         </>}
       </>}
       </div></aside>}</div>}
+    </fieldset>
+    <DialogEditingLocked.Provider value={Boolean(props.alignment?.locked)}>
     {settingsDialog === 'translations' && <TranslationTrackDialog document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'metadata' && <SettingsDialog title={t('editor.metadata')} close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} /></SettingsDialog>}
     {amllOpen&&props.project&&props.applyProject&&<SettingsDialog title={t('editor.amllSettings')} subtitle={t('editor.settingsScope')} close={()=>setAmllOpen(false)}
       returnFocus={()=>amllNavigating.current?null:pageRef.current?.querySelector<HTMLElement>('[data-top-menu="settings"] > summary')??null}
       actions={<button data-role="secondary" onClick={()=>setAmllOpen(false)}>{t('common.close')}</button>}>
-      <AmllSettings project={props.project} apply={command=>{try{props.applyProject!(command);}catch(e){setMessage(errorMessage(e));}}}
+      <AmllSettings project={props.project} apply={command=>{if(props.alignment?.locked)return;try{props.applyProject!(command);}catch(e){setMessage(errorMessage(e));}}}
         locate={rule=>{amllNavigating.current=true;setAmllOpen(false);setValidationTab('amll');setFocusRule(rule);setMode('package');}}/>
     </SettingsDialog>}
     {settingsDialog === 'singers' && !props.project?.amll.simplified && <SingerDialog focusAgent={focusAgent} document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
@@ -1082,7 +1085,6 @@ function EditorWorkspaceContent(props: Props) {
     {batchToolsOpen && <BatchToolsPanel project={props.project} document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
     {romanizationGeneration && <RomanizationGenerationDialog document={document} lineIds={romanizationGeneration}
       preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} apply={dispatch} close={() => setRomanizationGeneration(null)} />}
-    {dictionaryManager && <DictionaryManager close={() => setDictionaryManager(false)} />}
     {shapeConversion && <ShapeConversionDialog document={document} lineIds={shapeConversion} apply={dispatch} close={() => setShapeConversion(null)} />}
     {dictionaryRuby && <DictionaryRubyDialog document={document} lineIds={dictionaryRuby} apply={dispatch} close={() => setDictionaryRuby(null)} />}
     {japaneseRuby && <JapaneseRubyDialog document={document} lineIds={japaneseRuby} apply={dispatch} close={() => setJapaneseRuby(null)} />}
@@ -1094,7 +1096,8 @@ function EditorWorkspaceContent(props: Props) {
       close={() => setSplitLineId(null)}
       submit={plan => dispatch({ type: 'split-line', ...plan })} />}
     {contextMenu && <EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.title} actions={contextMenu.actions} close={closeContext} />}
-    </fieldset>
+    </DialogEditingLocked.Provider>
+    {dictionaryManager && <DictionaryManager close={() => setDictionaryManager(false)} />}
   </div>;
 }
 

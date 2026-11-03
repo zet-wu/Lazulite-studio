@@ -27,7 +27,7 @@ export function LineSplitDialog({ line, translations, backgrounds, attached, clo
   const time = (value: number | null) => value === null ? t('ruby.untimed') : `${(value / 1000).toFixed(3)}s`;
   const options = <><option value="" disabled>{t('split.unassigned')}</option>{keys.map((key, i) => <option key={key} value={key}>{t('split.lineNumber',{number:i+1})}</option>)}</>;
   return <SettingsDialog title={t('split.title')} close={close} actions={<>
-    <button data-role="secondary" onClick={close}>{t('common.cancel')}</button>
+    <button data-dialog-close data-role="secondary" onClick={close}>{t('common.cancel')}</button>
     <button data-role="primary" disabled={!cuts.length || invalid || preview.some(item => item.issue)} onClick={() => {
       const plan: LineSplitPlan = { lineId: line.id, beforeWordIds: cuts, newLineIds: keys.slice(1).map(() => crypto.randomUUID()),
         translationTargets: Object.fromEntries(translations.map(item => [item.id, keys.indexOf(targets[item.id] ?? first)])),
