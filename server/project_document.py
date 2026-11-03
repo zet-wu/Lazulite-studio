@@ -51,7 +51,7 @@ class ProjectSnapshot(BaseModel):
     acoustics: Acoustics
     editing: Editing
 
-def initial_project(ttml: str, asset_id: str | None) -> dict:
+def initial_project(ttml: str) -> dict:
     from .amll_compatibility import DEFAULTS
     return {'schemaVersion': 'studio-project-v9', 'karaoke': initial_karaoke(ttml), 'amll': dict(DEFAULTS), 'lineOrder': [],
             'editing': {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
@@ -60,8 +60,6 @@ def read_project(path: str | Path) -> dict:
     snapshot = _validate_snapshot(ProjectSnapshot.model_validate_json(Path(path).read_text(encoding='utf-8')))
     return snapshot
 
-def read_lyrics(path: str | Path) -> str:
-    return read_project(path)['lyrics']['draftTtml']
 
 def validate_project(value: dict | ProjectSnapshot, conn, project_id: str) -> dict:
     snapshot = _validate_snapshot(value if isinstance(value, ProjectSnapshot) else ProjectSnapshot.model_validate(value))

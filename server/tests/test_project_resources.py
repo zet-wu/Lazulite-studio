@@ -98,7 +98,7 @@ def test_revision_collection_keeps_only_current_and_actual_active_inputs(tmp_pat
     with db.transaction() as c:
         c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at) VALUES('j','p','alignment','queued',?,'now','now')", (json.dumps({'revision':base}),))
     for i in range(6):
-        current = store.create('p', initial_project(f'<tt xmlns="http://www.w3.org/ns/ttml"><body><p>{i}</p></body></tt>',None), store.read('p')[0])['id']
+        current = store.create('p', initial_project(f'<tt xmlns="http://www.w3.org/ns/ttml"><body><p>{i}</p></body></tt>'), store.read('p')[0])['id']
     assert {p.stem for p in (tmp_path/'projects/p/revisions').glob('*.json')} == {base, current}
     with db.transaction() as c: c.execute("UPDATE jobs SET status='cancel_requested' WHERE id='j'")
     store.collect('p')

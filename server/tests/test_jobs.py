@@ -38,7 +38,7 @@ def seed_project(db, root=None):
         if root is not None:
             path = root / "projects/p/revisions/r.json"
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>', 'a')))
+            path.write_text(json.dumps(initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>')))
             conn.execute("INSERT INTO revisions VALUES(?,?,?,?,?)", ("r", "p", None, db.paths.store(path), "t"))
 
 
@@ -103,7 +103,7 @@ def test_active_cancelled_worker_keeps_input_until_exit(tmp_path):
         assert started.wait(2)
         service.emit(job['id'], 'stage', 'writing')
         assert service.get(job['id'])['stage'] == 'writing'
-        current = store.create('p', initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><p>new</p></body></tt>', 'a'), 'r')['id']
+        current = store.create('p', initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><p>new</p></body></tt>'), 'r')['id']
         assert service.cancel(job['id'])['status'] == 'cancel_requested'
         store.collect('p')
         assert store.read('p', 'r')[0] == 'r'

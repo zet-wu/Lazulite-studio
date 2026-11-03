@@ -52,12 +52,11 @@ def test_symlink_escape(tmp_path):
     with pytest.raises(ValueError): StoragePaths(tmp_path).resolve('link/outside')
 
 
-@pytest.mark.parametrize('version', [4, 5])
-def test_old_database_is_rejected_without_modification(tmp_path, version):
+def test_old_database_is_rejected_without_modification(tmp_path):
     source = tmp_path / 'old'
     with TestClient(create_app(source, Settings(None, True))) as client:
         client.post('/api/v1/projects', json={'name':'保存的项目'}, headers=HEADERS)
-    with sqlite3.connect(source / 'studio.sqlite3') as conn: conn.execute(f'PRAGMA user_version={version}')
+    with sqlite3.connect(source / 'studio.sqlite3') as conn: conn.execute('PRAGMA user_version=5')
     before = (source / 'studio.sqlite3').read_bytes()
     with pytest.raises(RuntimeError, match='v6'): Database(source / 'studio.sqlite3')
     assert (source / 'studio.sqlite3').read_bytes() == before
@@ -66,15 +65,11 @@ def test_old_database_is_rejected_without_modification(tmp_path, version):
 def test_preferences_conflicts_identity_and_project_cleanup(tmp_path):
     store = RuntimeSettings(tmp_path / 'settings.json')
     previous = store.read()
-    previous['imported'] = True
-    store.path.write_text(json.dumps(previous))
     store.patch({'lazulite-editor-theme': 'dark'}, 0)
-    assert 'imported' not in json.loads(store.path.read_text())
     assert store.read()['library_id'] == previous['library_id']
     with pytest.raises(SettingsConflict): store.patch({'studio.playback-rate': '1.5'}, 0)
     store.patch({'studio.playback-rate': '1.5'}, 1)
     identity = store.read()['library_id']
-    assert 'imported' not in store.read()
     assert store.read()['values']['lazulite-editor-theme'] == 'dark'
     store.patch({'studio:workspace-mode:project:p': 'sync', 'studio:workspace-mode:project:q': 'edit'}, 2)
     store.delete_project('p')

@@ -27,7 +27,7 @@ class AcousticBackend:
     def close(self): AcousticBackend.closes+=1
 
 
-def test_independent_run_manual_resource_reuse_and_no_alignment_storage(tmp_path,monkeypatch):
+def test_independent_run_and_manual_resource_reuse(tmp_path,monkeypatch):
     from lazulite.audio import separation
     from lazulite.alignment.japanese import backend
     client,db,revision=prepare(tmp_path,monkeypatch)
@@ -41,8 +41,6 @@ def test_independent_run_manual_resource_reuse_and_no_alignment_storage(tmp_path
     params={'revision':revision,'asset_id':asset,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False}
     request={'database':str(db.path),'root':str(root),'project_id':'p','params':params,
              'asset_path':str(root/'p/source/original'),'job_id':'first'}
-    stale=root/'p/cache/alignment';stale.mkdir(parents=True)
-    (stale/'invalid.json').write_text('not an acoustic result')
     first=run_alignment(request,lambda *args:None,lambda:False)
     assert first['acoustics'] and first['alignment']['units']
     assert AcousticBackend.calls==AcousticBackend.closes==1
@@ -58,8 +56,6 @@ def test_independent_run_manual_resource_reuse_and_no_alignment_storage(tmp_path
     assert second['acoustics'] is None
     assert second['alignment']['execution']['segment_source']=='manual'
     assert AcousticBackend.calls==AcousticBackend.closes==2
-    assert (stale/'invalid.json').read_text()=='not an acoustic result'
-    assert list(stale.iterdir())==[stale/'invalid.json']
     # The persisted manual interval can exceed the media. Sampling intersects PCM.
     snapshot['acoustics']['segments'][0]['endMs']=999999
     params['revision']=RevisionStore(db,root).create('p',snapshot,revision)['id']

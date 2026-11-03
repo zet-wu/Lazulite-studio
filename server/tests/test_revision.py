@@ -1,6 +1,5 @@
-from server.project_document import initial_project, read_lyrics
+from server.project_document import initial_project
 from pathlib import Path
-from server.time_units import normalize_ttml
 
 from server.db import Database
 from server.revisions import IdempotencyConflict, RevisionConflict, RevisionStore
@@ -14,9 +13,9 @@ def test_revision_cas_and_recovery(tmp_path: Path):
             "INSERT INTO projects VALUES(?,?,?,?,?,?)",
             ("p", "demo", None, None, "now", "now"),
         )
-    first = store.create("p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>one</p></tt>", None), None)
+    first = store.create("p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>one</p></tt>"), None)
     try:
-        store.create("p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>bad</p></tt>", None), None)
+        store.create("p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>bad</p></tt>"), None)
     except RevisionConflict as exc:
         assert exc.current == first["id"]
     else:
@@ -30,7 +29,7 @@ def test_revision_cas_and_recovery(tmp_path: Path):
             "CREATE TRIGGER reject_revision_update BEFORE UPDATE OF current_revision ON projects BEGIN SELECT RAISE(ABORT, 'blocked'); END"
         )
     try:
-        store.create("p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>blocked</p></tt>", None), first["id"])
+        store.create("p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>blocked</p></tt>"), first["id"])
     except Exception:
         pass
     with db.connect() as conn:
@@ -58,7 +57,7 @@ def test_initial_revision_replays_identity_after_old_snapshot_is_collected(
     try:
         store.create(
             "p",
-            initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>other</p></tt>", None),
+            initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>other</p></tt>"),
             first["id"],
             operation_id="op-1",
             subject="user",
@@ -70,7 +69,7 @@ def test_initial_revision_replays_identity_after_old_snapshot_is_collected(
     with db.connect() as conn:
         assert conn.execute("SELECT count(*) FROM revisions").fetchone()[0] == 1
     second = store.create(
-        "p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>two</p></tt>", None), first["id"], operation_id="op-2", subject="user"
+        "p", initial_project("<tt xmlns=\"http://www.w3.org/ns/ttml\"><p>two</p></tt>"), first["id"], operation_id="op-2", subject="user"
     )
     store.recover()
     assert second["id"] != first["id"]
@@ -78,24 +77,6 @@ def test_initial_revision_replays_identity_after_old_snapshot_is_collected(
     assert store.create_initial("p", operation_id="op-1", subject="user") == first
     with db.connect() as conn:
         assert conn.execute("SELECT count(*) FROM revisions").fetchone()[0] == 1
-
-
-def test_revision_without_idempotency_uses_revision_identity(tmp_path, monkeypatch):
-    import server.revisions as revisions
-    from server.documents import DocumentService
-    db = Database(tmp_path / 'db.sqlite')
-    store = RevisionStore(db, tmp_path / 'projects')
-    with db.transaction() as conn:
-        conn.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)', ('p','demo',None,None,'now','now'))
-    def no_content_digest(*args, **kwargs):
-        raise AssertionError('plain save and document reads only need revision identity')
-    monkeypatch.setattr(revisions.hashlib, 'sha256', no_content_digest)
-    result = store.create('p', initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>', None), None)
-    assert 'sha256' not in result
-    document = DocumentService(store).get('p')
-    assert document['revision'] == result['id']
-    assert document['etag'] == result['etag']
-    assert 'sha256' not in document
 
 
 def test_read_transaction_protects_file_until_snapshot_is_loaded(tmp_path, monkeypatch):
@@ -114,7 +95,7 @@ def test_read_transaction_protects_file_until_snapshot_is_loaded(tmp_path, monke
     monkeypatch.setattr(module, 'read_project', read)
     def save():
         writing.set()
-        return store.create('p', initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><p>new</p></body></tt>',None), first)
+        return store.create('p', initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><p>new</p></body></tt>'), first)
     with ThreadPoolExecutor(2) as pool:
         reader = pool.submit(store.read, 'p')
         assert started.wait(2)

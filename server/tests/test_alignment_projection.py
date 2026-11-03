@@ -3,7 +3,7 @@ from server.project_document import initial_project
 
 
 def fixture():
-    return initial_project('''<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><p xml:id="main" begin="0"><span studio:id="mixed">𠮷がlove12</span><span studio:id="word" tts:ruby="container"><span tts:ruby="base">love</span><span tts:ruby="textContainer"><span studio:id="r1" tts:ruby="text">ら</span><span studio:id="r2" tts:ruby="text">bad</span><span studio:id="r3" tts:ruby="text">ぶ</span></span></span><span studio:id="space"> ！</span><span ttm:role="x-bg" studio:id="bg"><span studio:id="bgword">(アー)</span></span></p></body></tt>''', None)
+    return initial_project('''<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><p xml:id="main" begin="0"><span studio:id="mixed">𠮷がlove12</span><span studio:id="word" tts:ruby="container"><span tts:ruby="base">love</span><span tts:ruby="textContainer"><span studio:id="r1" tts:ruby="text">ら</span><span studio:id="r2" tts:ruby="text">bad</span><span studio:id="r3" tts:ruby="text">ぶ</span></span></span><span studio:id="space"> ！</span><span ttm:role="x-bg" studio:id="bg"><span studio:id="bgword">(アー)</span></span></p></body></tt>''')
 
 
 def test_projection_preserves_unknown_ids_unicode_ruby_and_display_order():
@@ -50,7 +50,7 @@ def test_multiple_background_order_and_english_ruby_are_independent():
 
 
 def test_complete_scope_includes_omitted_symbols_empty_body_and_ruby():
- snapshot=initial_project('''<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="l"><span studio:id="sym">♪！</span><span studio:id="empty"></span><span studio:id="mixed">あ！</span><span studio:id="ruby" tts:ruby="container"><span tts:ruby="base">愛</span><span tts:ruby="textContainer"><span studio:id="r1" tts:ruby="text">あ</span><span studio:id="r2" tts:ruby="text">！</span></span></span></p></body></tt>''',None)
+ snapshot=initial_project('''<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft" xmlns:tts="http://www.w3.org/ns/ttml#styling"><body><p xml:id="l"><span studio:id="sym">♪！</span><span studio:id="empty"></span><span studio:id="mixed">あ！</span><span studio:id="ruby" tts:ruby="container"><span tts:ruby="base">愛</span><span tts:ruby="textContainer"><span studio:id="r1" tts:ruby="text">あ</span><span studio:id="r2" tts:ruby="text">！</span></span></span></p></body></tt>''')
  result=project_alignment(snapshot)
  scope={s['object_id']:s for s in result['scope']}
  assert set(scope)=={'sym','empty','mixed','r1','r2'}

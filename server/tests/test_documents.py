@@ -1,5 +1,5 @@
-from server.project_document import initial_project, read_lyrics
-from server.time_units import normalize_ttml
+from server.project_document import initial_project
+from server.tests.ttml_helpers import normalized_ttml
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -24,12 +24,12 @@ def test_document_save_retry_and_cas_preserves_unknown(tmp_path):
     client = TestClient(create_app(tmp_path, Settings(None, True)), base_url="https://studio")
     headers = {"origin": "http://studio", "idempotency-key": "save-1", "if-match": client.get("/api/v1/projects/p/document").headers["etag"]}
     ttml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:x="urn:example"><body><div><p begin="0s" end="1s">Hi<x:mark/></p></div></body></tt>'
-    body = {"schema_version": "studio-document-v9", "project_id": "p", "revision": headers["if-match"].strip('"'), "client_seq": 3, "document": initial_project(ttml, None)}
+    body = {"schema_version": "studio-document-v9", "project_id": "p", "revision": headers["if-match"].strip('"'), "client_seq": 3, "document": initial_project(ttml)}
     first = client.put("/api/v1/projects/p/document", json=body, headers=headers)
     assert first.status_code == 200
     assert set(first.json()) == {"revision"}
     assert client.put("/api/v1/projects/p/document", json=body, headers=headers).json()["revision"] == first.json()["revision"]
-    assert client.get("/api/v1/projects/p/document").json()["document"]["lyrics"]["draftTtml"] == normalize_ttml(ttml)
+    assert client.get("/api/v1/projects/p/document").json()["document"]["lyrics"]["draftTtml"] == normalized_ttml(ttml)
     stale = {**headers, "idempotency-key": "save-2"}
     assert client.put("/api/v1/projects/p/document", json=body, headers=stale).status_code == 412
     next_body = {**body, "revision": first.json()["revision"]}
@@ -48,13 +48,13 @@ def test_semantic_editor_ttml_saves_and_reopens_with_clean_main_lyrics(tmp_path)
     before = client.get("/api/v1/projects/p/document")
     revision = before.json()["revision"]
     body = {"schema_version": "studio-document-v9", "project_id": "p", "revision": revision,
-            "document": initial_project(ttml, None)}
+            "document": initial_project(ttml)}
     saved = client.put("/api/v1/projects/p/document", json=body, headers={
         "origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "semantic-edit"})
     assert saved.status_code == 200
     reopened = client.get("/api/v1/projects/p/document")
     assert reopened.json()["revision"] == saved.json()["revision"]
-    assert reopened.json()["document"]["lyrics"]["draftTtml"] == normalize_ttml(ttml)
+    assert reopened.json()["document"]["lyrics"]["draftTtml"] == normalized_ttml(ttml)
     assert "きよう" in reopened.json()["document"]["lyrics"]["draftTtml"]
 
 
@@ -67,7 +67,7 @@ def test_project_editing_survives_real_project_save(tmp_path):
             '<p xml:id="b" begin="3" end="4"><span begin="3" end="4">下一句</span></p>'
             '</div></body></tt>')
     before = client.get("/api/v1/projects/p/document")
-    snapshot = initial_project(ttml, None)
+    snapshot = initial_project(ttml)
     snapshot['editing']['endLinks'] = {'a': 'b'}
     snapshot['editing']['ignoredSyncLineIds'] = ['a']
     saved = client.put("/api/v1/projects/p/document", json={
@@ -76,7 +76,7 @@ def test_project_editing_survives_real_project_save(tmp_path):
         headers={"origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "e3-end-link"})
     assert saved.status_code == 200
     reopened = client.get("/api/v1/projects/p/document")
-    assert reopened.json()["document"]["lyrics"]["draftTtml"] == normalize_ttml(ttml)
+    assert reopened.json()["document"]["lyrics"]["draftTtml"] == normalized_ttml(ttml)
     assert reopened.json()["revision"] == saved.json()["revision"]
 
     assert reopened.json()['document']['editing'] == snapshot['editing']
@@ -116,7 +116,7 @@ def test_timed_translation_real_save_preserves_purpose_units_and_unknown_draft_t
     before = client.get("/api/v1/projects/p/document")
     saved = client.put("/api/v1/projects/p/document", json={
         "schema_version": "studio-document-v9", "project_id": "p", "revision": before.json()["revision"],
-        "document": initial_project(ttml, None)}, headers={
+        "document": initial_project(ttml)}, headers={
         "origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "timed-translation"})
     assert saved.status_code == 200
     reopened = client.get("/api/v1/projects/p/document").json()["document"]["lyrics"]["draftTtml"]
@@ -136,7 +136,7 @@ def test_invalid_project_editing_is_rejected_without_revision_change(tmp_path):
     setup_project(tmp_path)
     client = TestClient(create_app(tmp_path, Settings(None, True)), base_url="https://studio")
     before = client.get('/api/v1/projects/p/document')
-    snapshot = initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="0" end="1"><span studio:id="w" begin="0" end="1">A</span></p></body></tt>', None)
+    snapshot = initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="0" end="1"><span studio:id="w" begin="0" end="1">A</span></p></body></tt>')
     invalid = [
         {'emptyBeats': {'w': {'kind': 'word', 'count': 33}}},
         {'emptyBeats': {'w': {'kind': 'ruby', 'count': 1}}},
@@ -157,7 +157,7 @@ def test_karaoke_project_save_reopen_keeps_cues_outside_ttml(tmp_path):
     setup_project(tmp_path)
     client = TestClient(create_app(tmp_path, Settings(None, True)), base_url='https://studio')
     before = client.get('/api/v1/projects/p/document')
-    snapshot = initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="4" end="5"><span studio:id="w" begin="4" end="5">A</span></p></body></tt>', None)
+    snapshot = initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="4" end="5"><span studio:id="w" begin="4" end="5">A</span></p></body></tt>')
     cue = {'id': 'cue-1', 'text': '●●', 'anchor': {'kind': 'before', 'lineId': 'a'}, 'beginMs': 3000, 'endMs': 3900}
     snapshot['karaoke']['cues'] = [cue]
     snapshot['karaoke']['groups'][0]['name'] = 'Custom'

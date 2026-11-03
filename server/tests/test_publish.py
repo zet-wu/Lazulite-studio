@@ -1,5 +1,5 @@
-from server.project_document import initial_project, read_lyrics
-from server.time_units import normalize_ttml
+from server.project_document import initial_project
+from server.tests.ttml_helpers import normalized_ttml
 import subprocess
 import time
 
@@ -31,7 +31,7 @@ def _project(client, headers, tmp_path):
 
 def _save(client, headers, pid, revision, text):
     body = {"schema_version": "studio-document-v9", "project_id": pid, "revision": revision,
-            "document": initial_project(text, client.get(f"/api/v1/projects/{pid}").json()["asset"]["id"])}
+            "document": initial_project(text)}
     out = client.put(f"/api/v1/projects/{pid}/document", json=body, headers={**headers, "if-match": f'"{revision}"', "idempotency-key": revision + "-save"})
     assert out.status_code == 200
     return out.json()["revision"]
@@ -138,7 +138,7 @@ def test_publish_untimed_transliteration_whitespace_copy_and_missing_endpoint(tm
         job = client.post(f'/api/v1/projects/{pid}/publish', json=body, headers=headers).json()['id']
         assert _wait(client, job)['status'] == 'succeeded'
         source = client.get(f'/api/v1/projects/{pid}/document').json()['document']['lyrics']['draftTtml']
-        assert source == normalize_ttml(xml)
+        assert source == normalized_ttml(xml)
         from server.db import Database
         with Database(tmp_path / 'studio.sqlite3').connect() as c:
             import json
@@ -310,7 +310,7 @@ def test_output_copy_keeps_semantic_whitespace_and_projects_unicode_separators()
     from server.publish import serialize_output_ttml
     import xml.etree.ElementTree as ET
     xml = '''<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft" xmlns:amll="http://www.example.com/ns/amll" xmlns:tts="http://www.w3.org/ns/ttml#styling"><head><metadata><iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal"><transliterations><transliteration><text for="L1" studio:kind="timed"><span begin="0" end="1">a</span><span>　</span></text><text for="L1" studio:kind="timed"><span>　</span></text></transliteration></transliterations></iTunesMetadata></metadata></head><body><p xml:id="L1"><span>　</span><span studio:id="beat"> </span><span amll:obscene="true"> </span><span tts:ruby="base"> </span></p></body></tt>'''
-    snapshot = initial_project(xml, None)
+    snapshot = initial_project(xml)
     snapshot['editing']['emptyBeats'] = {'beat': {'kind': 'word', 'count': 1}}
     root = ET.fromstring(serialize_output_ttml(snapshot))
     line = root.find('.//{http://www.w3.org/ns/ttml}p')

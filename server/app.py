@@ -341,7 +341,7 @@ def create_app(
                 asset = adopt_upload(c, body.upload_id, pid) if body.upload_id else None
                 asset_id = asset[0] if asset else None
                 path = root / 'projects' / pid / 'revisions' / f'{rev}.json'
-                revisions._write_atomic(path, json.dumps(initial_project(INITIAL_TTML, None), ensure_ascii=False).encode())
+                revisions._write_atomic(path, json.dumps(initial_project(INITIAL_TTML), ensure_ascii=False).encode())
                 c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)', (pid, name, asset_id, rev, t, t))
                 conditions = initial_conditions(root / 'projects' / pid / 'source' / 'original', body.source_filename or asset[4]) if asset else {'title':'','artist':'','album':''}
                 c.execute('INSERT INTO search_conditions VALUES(?,?,?,?)', (pid, conditions['title'], conditions['artist'], conditions['album']))

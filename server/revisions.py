@@ -33,10 +33,7 @@ class RevisionStore:
     def create_initial(
         self, project_id: str, *, operation_id: str, subject: str = "local"
     ) -> dict:
-        with self.db.connect() as conn:
-            row = conn.execute('SELECT source_asset_id FROM projects WHERE id=?', (project_id,)).fetchone()
-        if row is None: raise KeyError(project_id)
-        return self.create(project_id, initial_project(INITIAL_TTML, row[0]), None,
+        return self.create(project_id, initial_project(INITIAL_TTML), None,
                            operation_id=operation_id, subject=subject)
 
     def create(
@@ -196,7 +193,3 @@ class RevisionStore:
             if temporary.is_file(): temporary.unlink(missing_ok=True)
         for row in rows:
             self.collect(row[0])
-
-        for path in self.root.glob('*/vocals/*/analysis.json'):
-            try: path.unlink(missing_ok=True)
-            except OSError: logger.warning('分析副本回收待重试：%s', path)

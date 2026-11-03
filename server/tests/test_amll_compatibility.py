@@ -11,7 +11,7 @@ from server.tests.test_documents import setup_project
 XML=(Path(__file__).parents[2]/'tests/fixtures/ttml/amll-rich.ttml').read_text()
 
 def project():
-    value=initial_project(XML,None)
+    value=initial_project(XML)
     value['amll'].update(noMultipleBackgrounds=False,noWordAgents=False)
     value['lineOrder']=['bg2','main','bg1','next']
     return value
@@ -40,6 +40,6 @@ def test_real_service_preserves_settings_order_words_and_both_background_attachm
 def test_order_and_stable_anonymous_sides_validate():
     value=project();value['lineOrder']=['missing']
     with pytest.raises(ValueError):validate_amll(value, ET.fromstring(value['lyrics']['draftTtml']))
-    value=initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><head><metadata><ttm:agent xml:id="v2" type="person"/></metadata></head><body><p xml:id="main" ttm:agent="v2">text</p></body></tt>',None)
+    value=initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><head><metadata><ttm:agent xml:id="v2" type="person"/></metadata></head><body><p xml:id="main" ttm:agent="v2">text</p></body></tt>')
     value['amll'].update(simplified=True,noChorus=True,noIndependentBackground=True)
     validate_amll(value, ET.fromstring(value['lyrics']['draftTtml']))

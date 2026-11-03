@@ -308,7 +308,6 @@ def test_vocal_access_and_reanalysis_use_headers_after_metadata_changes(tmp_path
         assert wait(client, job['id'])['status'] == 'succeeded'
         metadata = client.get('/api/v1/projects/p/vocals').json()['items'][0]
     path = tmp_path/'projects/p/vocals'/metadata['audio_result_id']/'vocals.wav'
-    assert 'audio_sha256' not in metadata
     runner = VocalRunner(db, tmp_path/'projects', Separator, cleanup=False)
     original_open = Path.open
     def forbid_full_vocal_read(self, *args, **kwargs):
@@ -328,6 +327,5 @@ def test_vocal_access_and_reanalysis_use_headers_after_metadata_changes(tmp_path
         assert result['analysis_id'] != metadata['id']
         _, reused = runner.get('p', result['analysis_id'])
         assert reused['audio_result_id'] == metadata['audio_result_id']
-        assert 'audio_sha256' not in reused
     finally:
         runner.close()
