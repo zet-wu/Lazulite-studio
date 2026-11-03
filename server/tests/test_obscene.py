@@ -11,7 +11,7 @@ SOURCE = '''<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/n
 
 def test_flags_survive_service_save_and_reopen(tmp_path):
     setup_project(tmp_path)
-    client = TestClient(create_app(tmp_path, Settings(None, True, 'http://studio')), base_url='https://studio')
+    client = TestClient(create_app(tmp_path, Settings(None, True)), base_url='https://studio')
     before = client.get('/api/v1/projects/p/document')
     saved = client.put('/api/v1/projects/p/document', json={'schema_version': 'studio-document-v9', 'project_id': 'p', 'revision': before.json()['revision'], 'document': initial_project(SOURCE, None)}, headers={'origin': 'http://studio', 'if-match': before.headers['etag']})
     assert saved.status_code == 200, saved.text

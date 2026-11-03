@@ -12,7 +12,6 @@ import httpx
 
 Source = Literal['netease', 'qqmusic', 'kugou', 'amll']
 AMLL_BASE = 'https://amlldb.bikonoo.com'
-MAX_BYTES = 4_000_000
 KRC_KEY = b'@Gaw^2tGQ61-\xce\xd2ni'
 QRC_KEY = b'!@#)(*$%123ZXC!@!@#)(NHL'
 
@@ -26,9 +25,9 @@ def decode_body(decoder, value):
 
 def inflate(data):
     decoder = zlib.decompressobj()
-    result = decoder.decompress(data, MAX_BYTES + 1)
-    if len(result) > MAX_BYTES or not decoder.eof:
-        raise ValueError('歌词解压超限或压缩内容不完整')
+    result = decoder.decompress(data)
+    if not decoder.eof:
+        raise ValueError('歌词压缩内容不完整')
     return result.decode('utf-8')
 
 
@@ -44,7 +43,7 @@ def decode_qq(value):
     if re.fullmatch(r'[0-9a-fA-F]+', value):
         from .vendor.qrc_des import DECRYPT, tripledes_key_setup, tripledes_crypt
         raw = bytes.fromhex(value)
-        if len(raw) % 8 or len(raw) > 500_000:
+        if len(raw) % 8:
             raise ValueError('QRC 载荷长度无效')
         schedule = tripledes_key_setup(QRC_KEY, DECRYPT)
         value = inflate(b''.join(tripledes_crypt(bytearray(raw[i:i+8]), schedule) for i in range(0, len(raw), 8)))
@@ -83,10 +82,8 @@ class Sources:
         with httpx.Client(timeout=18, transport=self.transport, follow_redirects=False, headers={'User-Agent': 'Mozilla/5.0', 'Referer': 'https://y.qq.com/' if 'qq.com' in url else 'https://music.163.com/' if '163.com' in url else 'https://www.kugou.com/'}) as client:
             with client.stream('POST' if body is not None else 'GET', url, params=params, json=body) as response:
                 response.raise_for_status()
-                chunks, size = [], 0
+                chunks = []
                 for chunk in response.iter_bytes():
-                    size += len(chunk)
-                    if size > MAX_BYTES: raise ValueError('来源响应超过 4 MB')
                     chunks.append(chunk)
                 raw = b''.join(chunks).decode('utf-8')
         return raw if text else json.loads(raw)

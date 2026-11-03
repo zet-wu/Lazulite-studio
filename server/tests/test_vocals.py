@@ -25,7 +25,7 @@ def setup(tmp_path, factory=Separator):
     sf.write(audio, np.zeros((88200, 2)), 44100)
     db = Database(tmp_path / 'studio.sqlite3')
     add_media_project(tmp_path, db, RevisionStore(db,tmp_path/'projects'), 'p', audio, '<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>')
-    return TestClient(create_app(tmp_path, Settings(None, True, 'http://studio'), separator_factory=factory)), db
+    return TestClient(create_app(tmp_path, Settings(None, True), separator_factory=factory)), db
 
 def wait(client, job):
     for _ in range(200):
@@ -262,7 +262,7 @@ def test_restart_keeps_shared_audio_and_project_deletion_releases_it(tmp_path):
         assert runner.audio_path('p',metadata) == tmp_path/'projects'/'p'/'vocals'/first/'vocals.wav'
         assert runner.audio_available('p', metadata)
     assert before == {str(p): p.read_bytes() for p in (tmp_path/'projects').rglob('*') if p.is_file()}
-    with TestClient(create_app(tmp_path, Settings(None, True, 'http://studio'), separator_factory=Separator)) as client:
+    with TestClient(create_app(tmp_path, Settings(None, True), separator_factory=Separator)) as client:
         assert client.get(f'/api/v1/projects/p/vocals/{second}/file').status_code == 200
         assert client.delete('/api/v1/projects/p',headers={'origin':'http://studio'}).status_code == 200
     assert not list((tmp_path/'projects').rglob('vocals.wav'))

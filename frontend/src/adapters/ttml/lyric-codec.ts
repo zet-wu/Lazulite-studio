@@ -13,7 +13,6 @@ const STUDIO = 'urn:lazulite:studio:draft';
 const ITUNES = 'http://music.apple.com/lyric-ttml-internal';
 const ITUNES_EXT = 'http://itunes.apple.com/lyric-ttml-extensions';
 const AMLL = 'http://www.example.com/ns/amll';
-const MAX_BYTES = 2 * 1024 * 1024;
 
 const attr = (node: Element, ns: string | null, name: string) => node.getAttributeNS(ns, name) ?? (ns === ITUNES ? node.getAttributeNS(ITUNES_EXT, name) : null);
 const is = (node: Element, ns: string, name: string) => (node.namespaceURI === ns || ns === TTML && node.namespaceURI === null || ns === ITUNES && (node.namespaceURI === TTML || node.namespaceURI === null)) && node.localName === name;
@@ -213,7 +212,6 @@ function readRomanization(item: Element, lineId: string, absoluteTimes: boolean,
 }
 
 export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean } = {}): LyricDocument {
-  if (new TextEncoder().encode(xml).byteLength > MAX_BYTES) throw new MessageError(message('ttml.size'));
   if (/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml)) throw new MessageError(message('ttml.entities'));
   const parsed = new DOMParser().parseFromString(xml, 'application/xml');
   if (parsed.querySelector('parsererror')) throw new MessageError(message('ttml.xml'));

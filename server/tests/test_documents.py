@@ -21,7 +21,7 @@ def setup_project(tmp_path: Path) -> str:
 
 def test_document_save_retry_and_cas_preserves_unknown(tmp_path):
     setup_project(tmp_path)
-    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
+    client = TestClient(create_app(tmp_path, Settings(None, True)), base_url="https://studio")
     headers = {"origin": "http://studio", "idempotency-key": "save-1", "if-match": client.get("/api/v1/projects/p/document").headers["etag"]}
     ttml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:x="urn:example"><body><div><p begin="0s" end="1s">Hi<x:mark/></p></div></body></tt>'
     body = {"schema_version": "studio-document-v9", "project_id": "p", "revision": headers["if-match"].strip('"'), "client_seq": 3, "document": initial_project(ttml, None)}
@@ -42,7 +42,7 @@ def test_document_save_retry_and_cas_preserves_unknown(tmp_path):
 
 def test_semantic_editor_ttml_saves_and_reopens_with_clean_main_lyrics(tmp_path):
     setup_project(tmp_path)
-    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
+    client = TestClient(create_app(tmp_path, Settings(None, True)), base_url="https://studio")
     source = Path(__file__).resolve().parents[2] / "tests/fixtures/ttml/studio-roundtrip.ttml"
     ttml = source.read_text(encoding="utf-8").replace("きょ</span>", "きよう</span>")
     before = client.get("/api/v1/projects/p/document")
@@ -60,7 +60,7 @@ def test_semantic_editor_ttml_saves_and_reopens_with_clean_main_lyrics(tmp_path)
 
 def test_project_editing_survives_real_project_save(tmp_path):
     setup_project(tmp_path)
-    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
+    client = TestClient(create_app(tmp_path, Settings(None, True)), base_url="https://studio")
     ttml = ('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft">'
             '<body><div><p xml:id="a" begin="1" end="3">'
             '<span begin="1" end="2">中文</span></p>'
@@ -89,7 +89,7 @@ def test_acoustic_edit_is_saved_atomically(tmp_path):
     audio = tmp_path / 'source.wav'
     subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-t', '2', str(audio)], check=True)
     add_media_project(tmp_path, db, store, 'p', audio, '<tt xmlns="http://www.w3.org/ns/ttml"><body><p xml:id="a" begin="0" end="1">A</p></body></tt>')
-    client = TestClient(create_app(tmp_path, Settings(None, True, 'http://studio')))
+    client = TestClient(create_app(tmp_path, Settings(None, True)))
     before = client.get('/api/v1/projects/p/document')
     envelope = before.json()
     envelope['document']['acoustics']['segments'] = [{'id': 's', 'beginMs': 100, 'endMs': 2500}]
@@ -108,7 +108,7 @@ def test_acoustic_edit_is_saved_atomically(tmp_path):
 def test_timed_translation_real_save_preserves_purpose_units_and_unknown_draft_time(tmp_path):
     import xml.etree.ElementTree as ET
     setup_project(tmp_path)
-    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
+    client = TestClient(create_app(tmp_path, Settings(None, True)), base_url="https://studio")
     source = Path(__file__).resolve().parents[2] / "tests/fixtures/ttml/timeline-translation-external.ttml"
     ttml = source.read_text(encoding="utf-8")
     ttml = ttml.replace('xmlns:ttm=', 'xmlns:studio="urn:lazulite:studio:draft" xmlns:ttm=', 1)
@@ -134,7 +134,7 @@ def test_timed_translation_real_save_preserves_purpose_units_and_unknown_draft_t
 def test_invalid_project_editing_is_rejected_without_revision_change(tmp_path):
     from copy import deepcopy
     setup_project(tmp_path)
-    client = TestClient(create_app(tmp_path, Settings(None, True, "http://studio")), base_url="https://studio")
+    client = TestClient(create_app(tmp_path, Settings(None, True)), base_url="https://studio")
     before = client.get('/api/v1/projects/p/document')
     snapshot = initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="0" end="1"><span studio:id="w" begin="0" end="1">A</span></p></body></tt>', None)
     invalid = [
@@ -155,7 +155,7 @@ def test_invalid_project_editing_is_rejected_without_revision_change(tmp_path):
 def test_karaoke_project_save_reopen_keeps_cues_outside_ttml(tmp_path):
     from copy import deepcopy
     setup_project(tmp_path)
-    client = TestClient(create_app(tmp_path, Settings(None, True, 'http://studio')), base_url='https://studio')
+    client = TestClient(create_app(tmp_path, Settings(None, True)), base_url='https://studio')
     before = client.get('/api/v1/projects/p/document')
     snapshot = initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="4" end="5"><span studio:id="w" begin="4" end="5">A</span></p></body></tt>', None)
     cue = {'id': 'cue-1', 'text': '●●', 'anchor': {'kind': 'before', 'lineId': 'a'}, 'beginMs': 3000, 'endMs': 3900}
@@ -185,7 +185,7 @@ def test_karaoke_project_save_reopen_keeps_cues_outside_ttml(tmp_path):
 
 def test_rejected_document_reports_object_and_allows_corrected_save(tmp_path):
     setup_project(tmp_path)
-    client = TestClient(create_app(tmp_path, Settings(None, True, 'http://studio')), base_url='https://studio')
+    client = TestClient(create_app(tmp_path, Settings(None, True)), base_url='https://studio')
     before = client.get('/api/v1/projects/p/document')
     body = before.json()
     body['document']['acoustics']['segments'] = [{'id': 'segment-1', 'beginMs': -1, 'endMs': 10}]

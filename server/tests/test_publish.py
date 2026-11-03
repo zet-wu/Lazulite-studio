@@ -10,9 +10,9 @@ from server.auth import Settings
 
 
 def _headers(client, settings):
-    login = client.post("/api/v1/session", json={"password": "pw"}, headers={"origin": settings.origin})
+    login = client.post("/api/v1/session", json={"password": "pw"}, headers={"origin": "http://studio"})
     assert login.status_code == 200
-    return {"origin": settings.origin, "x-csrf-token": login.cookies["studio_csrf"]}
+    return {"origin": "http://studio", "x-csrf-token": login.cookies["studio_csrf"]}
 
 
 def _m4a(path):
@@ -47,7 +47,7 @@ def _wait(client, job):
 
 
 def test_publish_real_http_old_revision_idempotency_and_missing_file(tmp_path):
-    settings = Settings("pw", False, "http://studio")
+    settings = Settings("pw", False)
     client = TestClient(create_app(tmp_path, settings), base_url="https://studio")
     headers = _headers(client, settings)
     pid, asset = _project(client, headers, tmp_path)
@@ -78,7 +78,7 @@ def test_publish_real_http_old_revision_idempotency_and_missing_file(tmp_path):
 
 
 def test_publish_http_validation_and_download_auth_gate(tmp_path):
-    settings = Settings("pw", False, "http://studio")
+    settings = Settings("pw", False)
     client = TestClient(create_app(tmp_path, settings), base_url="https://studio")
     headers = _headers(client, settings)
     pid, asset = _project(client, headers, tmp_path)
@@ -100,7 +100,7 @@ def test_publish_http_validation_and_download_auth_gate(tmp_path):
 def test_packaging_options_are_part_of_job_identity_and_output(tmp_path):
     from io import BytesIO
     from mutagen.mp4 import MP4
-    settings = Settings("pw", False, "http://studio")
+    settings = Settings("pw", False)
     with TestClient(create_app(tmp_path, settings), base_url="https://studio") as client:
         headers = _headers(client, settings)
         pid, asset = _project(client, headers, tmp_path)
@@ -128,7 +128,7 @@ def test_publish_untimed_transliteration_whitespace_copy_and_missing_endpoint(tm
     from pathlib import Path
     import xml.etree.ElementTree as ET
     from server.publishing import extract_stpp
-    settings = Settings('pw', False, 'http://studio')
+    settings = Settings('pw', False)
     with TestClient(create_app(tmp_path, settings), base_url='https://studio') as client:
         headers = _headers(client, settings); pid, asset = _project(client, headers, tmp_path)
         initial = client.get(f'/api/v1/projects/{pid}/document').json()['revision']
@@ -164,7 +164,7 @@ def test_running_publish_cancel_removes_output_blocks_delete_until_worker_finish
             self.started.set(); assert self.release.wait(5)
             return super().publish(*args)
     publisher = BlockingPublisher()
-    settings = Settings('pw', False, 'http://studio')
+    settings = Settings('pw', False)
     with TestClient(create_app(tmp_path, settings, publisher=publisher), base_url='https://studio') as client:
         headers = _headers(client, settings);pid, asset = _project(client, headers, tmp_path)
         initial = client.get(f'/api/v1/projects/{pid}/document').json()['revision']
@@ -185,7 +185,7 @@ def test_running_publish_cancel_removes_output_blocks_delete_until_worker_finish
 import pytest
 @pytest.mark.parametrize('kind,codec', [('mp3','libmp3lame'),('flac','flac'),('m4a','aac')])
 def test_actual_format_controls_output_suffix_and_bound_history(tmp_path, kind, codec):
-    settings = Settings('pw', False, 'http://studio')
+    settings = Settings('pw', False)
     audio = tmp_path / f'source.{kind}'
     subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','sine=frequency=440:duration=1','-c:a',codec,str(audio)],check=True)
     with TestClient(create_app(tmp_path / 'data', settings), base_url='https://studio') as client:
@@ -217,7 +217,7 @@ def test_cover_audio_preserves_suffix_and_project_download_history(tmp_path, suf
     cover = tmp_path / 'cover.png'
     subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=32x32', '-frames:v', '1', str(cover)], check=True)
     media = MP4(source); media['covr'] = [MP4Cover(cover.read_bytes(), imageformat=MP4Cover.FORMAT_PNG)]; media.save()
-    settings = Settings('pw', False, 'http://studio')
+    settings = Settings('pw', False)
     app = create_app(tmp_path / 'data', settings)
     with TestClient(app, base_url='https://studio') as client:
         headers = _headers(client, settings)
@@ -277,7 +277,7 @@ def test_stpp_optional_timing_preserves_source_tags_without_lrc(tmp_path):
     source = tmp_path / 'source.m4a'
     _m4a(source)
     tags = MP4(source); tags['\xa9lyr'] = ['original lyrics']; tags['\xa9nam'] = ['title']; tags.save()
-    settings = Settings('pw', False, 'http://studio')
+    settings = Settings('pw', False)
     with TestClient(create_app(tmp_path / 'data', settings), base_url='https://studio') as client:
         headers = _headers(client, settings)
         asset = client.post('/api/v1/uploads', files={'file': ('source.m4a', source.read_bytes(), 'audio/mp4')}, headers=headers).json()['id']

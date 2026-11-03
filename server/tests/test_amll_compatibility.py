@@ -23,7 +23,7 @@ def test_each_enabled_rule_rejects_current_conflicts(rule):
 
 def test_real_service_preserves_settings_order_words_and_both_background_attachments(tmp_path):
     setup_project(tmp_path)
-    with TestClient(create_app(tmp_path,Settings(None,True,'http://studio')),base_url='https://studio') as client:
+    with TestClient(create_app(tmp_path,Settings(None, True)),base_url='https://studio') as client:
         before=client.get('/api/v1/projects/p/document').json()
         body={**{key:before[key] for key in ('schema_version','project_id','revision')},'document':project()}
         response=client.put('/api/v1/projects/p/document',json=body,headers={'origin':'http://studio','if-match':before['revision']})

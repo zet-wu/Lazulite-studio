@@ -8,8 +8,6 @@ from pathlib import Path, PurePosixPath
 import regex
 
 HARD_BOUNDARIES = frozenset(',，、.。!！?？:：;；()（）[]［］{}｛｝「」『』【】〈〉《》“”"…⋯')
-MAX_BYTES = 512 * 1024 * 1024
-MAX_LINE = 1024 * 1024
 
 
 def hard_boundary(text):
@@ -93,8 +91,8 @@ def validate_entry(entry, mode):
 def read_directory(directory):
     directory = Path(directory)
     paths = list(directory.rglob("*"))
-    if any(p.is_symlink() for p in paths) or sum(p.stat().st_size for p in paths if p.is_file()) > MAX_BYTES:
-        raise ValueError("词典资源越界或过大")
+    if any(p.is_symlink() for p in paths):
+        raise ValueError("词典资源包含链接")
     manifest = validate_manifest(read_json((directory / "manifest.json").read_text("utf-8")))
     sources = read_json((directory / "sources.json").read_text("utf-8"))
     if not isinstance(sources, (list, dict)) or not any(p.is_file() for p in (directory / "licenses").rglob("*")):
@@ -102,15 +100,11 @@ def read_directory(directory):
     seen = set()
     def entries():
         with (directory / "entries.jsonl").open("rb") as stream:
-            while line := stream.readline(MAX_LINE + 1):
-                if len(line) > MAX_LINE:
-                    raise ValueError("词条记录过大")
+            for line in stream:
                 entry = validate_entry(read_json(line.decode("utf-8")), manifest["scoring"]["mode"])
                 if entry["surface"] in seen:
                     raise ValueError("正文重复，应在同一词条保留全部候选")
                 seen.add(entry["surface"])
-                if len(seen) > 2_000_000:
-                    raise ValueError("词条数量超过资源限制")
                 yield entry
         if not seen:
             raise ValueError("词典没有可用词条")
@@ -127,8 +121,6 @@ def extract_package(archive, target):
 
 def check_archive(z):
     files = z.infolist()
-    if len(files) > 256 or sum(f.file_size for f in files) > MAX_BYTES:
-        raise ValueError("压缩包超过资源限制")
     names = set()
     for f in files:
         if f.flag_bits & 1:
@@ -148,9 +140,6 @@ def check_archive(z):
 def inspect_package(archive):
     with zipfile.ZipFile(archive) as z:
         check_archive(z)
-        for name in ("manifest.json", "sources.json"):
-            if z.getinfo(name).file_size > MAX_LINE:
-                raise ValueError("词典元数据过大")
         manifest = validate_manifest(read_json(z.read("manifest.json").decode("utf-8")))
         sources = read_json(z.read("sources.json").decode("utf-8"))
         if not isinstance(sources, (list, dict)) or not any(

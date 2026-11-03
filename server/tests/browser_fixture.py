@@ -31,6 +31,6 @@ def create_browser_app():
     add_media_project(root, db, store, 'music-packaging', audio, ttml)
     from server.tests.test_vocals import Separator
     add_real_vocal_fixture(root, db, store)
-    app = create_app(root, Settings(None, True, "http://127.0.0.1:5175"), separator_factory=Separator)
+    app = create_app(root, Settings(None, True), separator_factory=Separator)
     app.add_event_handler("shutdown", temporary.cleanup)
     return app

@@ -2666,13 +2666,6 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectSummary"];
                 };
             };
-            /** @description 超出工程大小限制 */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
             /** @description 非法、不完整或不支持的工程包 */
             422: {
                 headers: {

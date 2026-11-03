@@ -43,12 +43,12 @@ Lazulite 源码位于仓库根目录的固定 Git 子模块 `vendor/Lazulite`，
 
 TTML 草稿保存保留待修正时间与 Studio 身份，发布阶段检查实际目标格式。MP4/M4A 的 STPP 与歌词标签、MP3 的 USLT、FLAC 的 LYRICS 写入独立副本，回读检查音频 packet hash、原有媒体数据、非目标轨道与标签。成功报告通过后开放下载；替换产物保留任务记录，文件占用时延后重试清理。
 
-服务接收稳定 ID、revision 与业务参数，资源路径与模型配置由服务构造。来源通过 `normalize_origin` 精确规范化匹配，密码模式结合会话 cookie 与 CSRF。接口字段见[契约](../contracts/README.md)，跨模块行为见[项目架构](../docs/architecture.md)。
+服务接收稳定 ID、revision 与业务参数，资源路径与模型配置由服务构造。密码模式结合 8 小时会话 cookie 与 CSRF；Cookie Secure 依据请求协议，代理协议头由 Uvicorn 显式信任地址配置处理。接口字段见[契约](../contracts/README.md)，跨模块行为见[项目架构](../docs/architecture.md)。
 
 
 ## 本机便携运行
 
-`python -m server.portable --root <完整包目录>` 只绑定 `127.0.0.1`，默认端口 15173，提供生产前端与 API 同源入口。运行模式为 local，免口令，但所有请求必须匹配 Host，写入必须匹配 Origin。私人部署继续使用上述密码／网关入口；本机模式不继承宿主设备设置。启动器在初始化／清理前取得 OS 文件锁，重复启动通过 nonce、资料库 ID、目录和端口握手。仅在 readiness 成功后打开浏览器。
+`python -m server.portable --root <完整包目录>` 只绑定 `127.0.0.1`，默认端口 15173，提供生产前端与 API 同源入口。运行模式为 local，免口令，监听回环作为本机入口边界；请求 Host 与 Origin 可随转发地址变化。该模式的可访问边界由监听和部署入口决定。私人部署继续使用上述密码／网关入口；本机模式不继承宿主设备设置。启动器在初始化／清理前取得 OS 文件锁，重复启动通过 nonce、资料库 ID、目录和端口握手。仅在 readiness 成功后打开浏览器。
 
 便携包 `data/projects` 保存 SQLite 与项目树，`data/settings.json` 保存资料库身份及长期偏好；偏好 API 为 `GET/PATCH /api/v1/settings`，PATCH 需要 `If-Match` 并只修改提交字段。数据库为 v6，资源路径只记录相对数据根的 POSIX 路径；启动清理前验证归属、缺失修订及符号链接。项目 v9／歌词 v10／文档 v9／工程包 v1。
 

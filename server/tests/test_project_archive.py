@@ -46,7 +46,7 @@ def test_source_archive_independent_service_round_trip(tmp_path):
         assert json.loads(contents['project.json'])['acoustics']=={'analysisId':None,'segments':snapshot['acoustics']['segments']}
         assert client.get('/api/v1/projects/p/document').json()['document']['acoustics']['analysisId']==job['id']
     destination=tmp_path/'to'
-    with TestClient(create_app(destination,Settings(None,True,'http://studio'))) as target:
+    with TestClient(create_app(destination,Settings(None, True))) as target:
         first=upload(target,archive.content); assert first.status_code==200,first.text
         pid=first.json()['id']; second=upload(target,archive.content)
         assert second.status_code==200 and second.json()['id']!=pid
@@ -69,7 +69,7 @@ def no_audio(client):
     return pid,client.get(f'/api/v1/projects/{pid}/archive').content
 
 def test_no_audio_manual_segments_save_and_export(tmp_path):
-    with TestClient(create_app(tmp_path,Settings(None,True,'http://studio'))) as client:
+    with TestClient(create_app(tmp_path,Settings(None, True))) as client:
         _,data=no_audio(client); files=entries(data)
         snapshot=json.loads(files['project.json'])
         snapshot['acoustics']={'analysisId':'foreign','segments':[{'id':'hand','beginMs':20,'endMs':4000}]}
@@ -85,7 +85,7 @@ def test_no_audio_manual_segments_save_and_export(tmp_path):
 
 @pytest.mark.parametrize('fault',['version','format','path','missing','hash','oversize','snapshot','duplicate','badzip','reference','group','cue'])
 def test_invalid_archives_leave_no_project_or_temp_files(tmp_path,fault):
-    with TestClient(create_app(tmp_path,Settings(None,True,'http://studio'))) as client:
+    with TestClient(create_app(tmp_path,Settings(None, True))) as client:
         _,data=no_audio(client); files=entries(data); manifest=json.loads(files['manifest.json'])
         if fault=='version': manifest['version']=99
         if fault=='format': manifest['format']='unknown'

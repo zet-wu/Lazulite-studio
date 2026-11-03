@@ -100,7 +100,7 @@ def launch(root, *, no_browser=False):
         from .app import create_app
         from .auth import Settings
         from .local_web import mount_frontend
-        app = create_app(data / 'projects', Settings(origin=origin, mode='local'), runtime_settings=preferences,
+        app = create_app(data / 'projects', Settings(mode='local'), runtime_settings=preferences,
                          runtime_identity=identity, runtime_manifest=manifest)
         mount_frontend(app, root / 'app/frontend/dist')
         write_atomic(data / 'runtime/identity.json', json.dumps(identity).encode())

@@ -130,33 +130,31 @@ pnpm --dir frontend install --frozen-lockfile
 
 ### 开发运行
 
-终端一在仓库根目录激活虚拟环境，配置浏览器来源与登录密码，启动服务端。
+终端一在仓库根目录激活虚拟环境，配置登录密码，启动服务端。
 
 macOS／Linux：
 
 ```sh
-export STUDIO_ORIGIN='http://127.0.0.1:5173'
 export STUDIO_PASSWORD='replace-with-your-password'
-python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --reload --reload-dir server
+python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --no-proxy-headers --reload --reload-dir server
 ```
 
 Windows PowerShell：
 
 ```powershell
-$env:STUDIO_ORIGIN='http://127.0.0.1:5173'
 $env:STUDIO_PASSWORD='replace-with-your-password'
-python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --reload --reload-dir server
+python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --no-proxy-headers --reload --reload-dir server
 ```
 
 终端二在仓库根目录启动前端：
 
 ```sh
-pnpm --dir frontend dev
+pnpm --dir frontend dev --host 127.0.0.1 --port 5173
 ```
 
-浏览器访问 `http://127.0.0.1:5173`，输入配置的密码。Vite 将 `/api` 代理至 `http://127.0.0.1:8000`。API 端口变化时，在启动前端的终端设置 `STUDIO_API_TARGET`，例如 `http://127.0.0.1:8100`。浏览器地址变化时，修改 API 终端的 `STUDIO_ORIGIN` 并重启服务。
+浏览器访问 `http://127.0.0.1:5173`，输入配置的密码。Vite 将 `/api` 代理至 `http://127.0.0.1:8000`。API 端口变化时，在启动前端的终端设置 `STUDIO_API_TARGET`，例如 `http://127.0.0.1:8100`。监听地址／端口可通过 Vite 的 `--host`／`--port` 和 Uvicorn 的同名参数配置；默认回环，端口占用时明确失败。
 
-`STUDIO_ORIGIN` 为一个完整 HTTP(S) 来源，由协议、主机和可选端口构成；例如 `http://127.0.0.1:15173`。SSH 转发时需要填写浏览器实际访问的来源。`localhost` 与 `127.0.0.1` 是不同来源。
+SSH 转发或自定义域名通过同一浏览器入口访问页面与相对 `/api` 路径。开发服务器允许自定义 Host。
 
 仅调试前端界面可运行 `pnpm --dir frontend dev:mock`，它在开发环境启动 MSW 模拟 API。
 
@@ -169,10 +167,10 @@ pnpm --dir frontend build
 产物位于 `frontend/dist`。配置 Web 服务器，以该目录为静态根目录，页面路由回退到 `index.html`，同源 `/api/` 请求转发至 API。API 在已激活虚拟环境的仓库根目录运行：
 
 ```sh
-python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --workers 1
+python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --workers 1 --no-proxy-headers
 ```
 
-服务继承进程环境中的 `STUDIO_PASSWORD`、`STUDIO_ORIGIN` 和可选 `STUDIO_DATA_DIR`。`STUDIO_ORIGIN` 填写最终浏览器访问来源。任务队列、文件切换及下载锁由 API 进程管理，因此单个数据目录使用一个 API worker，由操作系统服务管理器维持进程生命周期。
+服务继承进程环境中的 `STUDIO_PASSWORD` 和可选 `STUDIO_DATA_DIR`。密码模式使用密码登录、8 小时会话和写操作 CSRF token。受信网关模式设置 `STUDIO_TRUSTED_GATEWAY=true`，由部署者在前置网关实际配置认证，应用直接进入；普通反向代理本身不提供认证。任务队列、文件切换及下载锁由 API 进程管理，因此单个数据目录使用一个 API worker，由操作系统服务管理器维持进程生命周期。
 
 Web 服务器需要以下配置：
 
@@ -180,9 +178,11 @@ Web 服务器需要以下配置：
 | --- | --- |
 | 页面 | 静态文件及 SPA `index.html` 回退 |
 | API | 保留 `/api/` 前缀转发至 Uvicorn |
-| Cookie／请求头 | 透传 cookie、Origin、CSRF、Range 及条件请求头 |
-| 上传 | 代理请求上限与产品接口协调：音频上传 500 MiB；工程包可含至多 2 GiB 源音频及受限快照 |
+| Cookie／请求头 | 透传 cookie、CSRF、Range 及条件请求头 |
+| 上传 | 按实际部署配置代理请求体策略与磁盘空间；应用分块接收上传并执行格式校验 |
 | 超时 | 允许上传后的媒体探测／代理生成和较大工程包传输完成 |
+
+Cookie `Secure` 根据实际请求协议设置。HTTPS 在代理终止时，将 `--no-proxy-headers` 替换为 `--proxy-headers --forwarded-allow-ips <受信代理地址>`，并让代理覆盖 `X-Forwarded-Proto`；仅信任明确配置的代理，避免客户端伪造协议头。
 
 生产静态站点使用编译后的文件，`vite preview` 用于本机构建预览。前端 API 使用相对路径，同源代理是部署组成部分。
 

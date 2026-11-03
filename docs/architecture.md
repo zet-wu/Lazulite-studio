@@ -108,7 +108,7 @@ TTML codec 支持 Studio 的正文、Ruby、背景、歌手及翻译／音译表
 
 领域层依赖纯数据与规则，适配器处理文件和服务，功能组件组合用户操作。共享主题与控件统一明暗色、按钮角色、焦点、消息及展开行为。
 
-Vite 开发服务器通过 `/api` 代理访问 Uvicorn。生产前端为 `frontend/dist` 静态产物，由 Web 服务器提供 SPA 回退和同源 API 代理。服务精确校验 `STUDIO_ORIGIN`，密码模式使用会话 cookie 与 CSRF；受信任网关模式由部署显式启用。构建与启动命令见[README](../README.md)。
+Vite 开发服务器通过 `/api` 代理访问 Uvicorn。生产前端为 `frontend/dist` 静态产物，由 Web 服务器提供 SPA 回退和同源 API 代理。监听地址与认证分别配置：默认回环，密码模式使用 8 小时会话 cookie 与 CSRF；受信网关模式由部署者配置前置认证。Cookie Secure 使用请求协议，转发协议头仅由明确受信的代理提供。构建与启动命令见[README](../README.md)。
 
 
 ## 便携运行边界

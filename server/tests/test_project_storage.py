@@ -36,7 +36,7 @@ def test_space_counts_current_snapshot_and_media_changes(tmp_path):
 
 
 def test_space_uses_logical_bytes_and_reports_failure(tmp_path):
-    with TestClient(create_app(tmp_path,Settings(None,True,'http://studio'))) as client:
+    with TestClient(create_app(tmp_path,Settings(None, True))) as client:
         pid=client.post('/api/v1/projects',json={'name':'size'},headers={'origin':'http://studio'}).json()['id']
         root=tmp_path/'projects'/pid
         with (root/'sparse').open('wb') as f:f.truncate(1024**2)

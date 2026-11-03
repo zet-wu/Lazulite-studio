@@ -13,7 +13,7 @@ from server.tests.test_api import wav_bytes
 HEADERS = {'origin':'http://studio'}
 
 def client_for(root):
-    return TestClient(create_app(root, Settings(None, True, 'http://studio')))
+    return TestClient(create_app(root, Settings(None, True)))
 
 def upload(client):
     response = client.post('/api/v1/uploads', files={'file':('music.wav',wav_bytes(),'audio/wav')}, headers=HEADERS)

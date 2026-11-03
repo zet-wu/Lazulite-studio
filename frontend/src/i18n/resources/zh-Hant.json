@@ -1628,7 +1628,6 @@
   "ttml.rubyUnitEmpty": "注音讀音單元不能為空",
   "ttml.transliterationChild": "不支援的音譯子元素",
   "ttml.transliterationRole": "不支援的音譯角色",
-  "ttml.size": "TTML 超過 2 MiB 限制",
   "ttml.entities": "不接受 DTD 或外部實體",
   "ttml.xml": "TTML XML 無效",
   "ttml.root": "根元素必須為 TTML tt",

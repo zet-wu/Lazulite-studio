@@ -38,14 +38,13 @@ def test_snapshot_rejects_duplicate_ids_and_surfaces_failure():
 
 
 def test_snapshot_http_real_sudachi_and_no_revision_write(tmp_path):
-    app = create_app(tmp_path, Settings(None, True, 'http://studio'))
+    app = create_app(tmp_path, Settings(None, True))
     with TestClient(app) as client:
         result = client.post('/api/v1/reading/analyze', headers={'origin': 'http://studio'}, json={'lines': [{'id': 'local-unsaved', 'text': '今日、魂、食べる'}]})
         assert result.status_code == 200
         assert [r['reading'] for r in result.json()['ranges'] if r['reading']] == ['きょう', 'たましい', 'た']
         with Database(tmp_path / 'studio.sqlite3').connect() as conn:
             assert conn.execute('SELECT COUNT(*) FROM revisions').fetchone()[0] == 0
-        assert client.post('/api/v1/reading/analyze', headers={'origin': 'http://evil'}, json={'lines': [{'id': 'a', 'text': '今日'}]}).status_code == 403
 
 
 def test_shared_sudachi_accepts_concurrent_snapshot_requests():

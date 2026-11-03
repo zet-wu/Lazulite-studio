@@ -15,7 +15,7 @@ from pathlib import Path
 from .atomic_file import write_atomic
 from .dictionary_engine import DictionaryIndex, check_cancel
 from .dictionary_cache import IndexCache
-from .dictionary_format import MAX_LINE, extract_package, inspect_package, read_json, validate_manifest
+from .dictionary_format import extract_package, inspect_package, read_json, validate_manifest
 
 
 class DictionaryConflict(ValueError):
@@ -93,8 +93,6 @@ class Dictionaries:
         if default:
             with zipfile.ZipFile(archive) as z:
                 member = z.getinfo("manifest.json")
-                if member.file_size > MAX_LINE:
-                    raise ValueError("词典清单过大")
                 manifest = validate_manifest(read_json(z.read(member).decode("utf-8")))
             with self.lock:
                 if manifest["id"] in self.record["defaults"]:

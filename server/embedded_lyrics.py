@@ -31,8 +31,6 @@ def read_embedded(path: Path):
     def add(label, text, format=None):
         candidate = {'id': str(len(candidates)), 'label': label}
         try:
-            if len(text.encode('utf-8')) > 4_000_000:
-                raise EmbeddedError('too_large', '内嵌歌词超过 4 MB')
             candidate.update(content=text, format=format or lyric_format(text))
         except ValueError as exc:
             candidate['error'] = str(exc)

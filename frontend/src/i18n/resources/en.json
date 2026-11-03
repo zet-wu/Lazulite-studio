@@ -1632,7 +1632,6 @@
   "ttml.rubyUnitEmpty": "A Ruby reading unit cannot be empty",
   "ttml.transliterationChild": "Unsupported transliteration child",
   "ttml.transliterationRole": "Unsupported transliteration role",
-  "ttml.size": "TTML exceeds 2 MiB limit",
   "ttml.entities": "DTD and external entities are not accepted",
   "ttml.xml": "Invalid TTML XML",
   "ttml.root": "Root must be TTML tt",

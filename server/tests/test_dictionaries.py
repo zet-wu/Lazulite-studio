@@ -139,11 +139,10 @@ def test_optimal_paths_local_ambiguity_candidates_and_boundaries(tmp_path):
 
 
 def test_http_contract_inspect_replace_auth_and_stale_request(tmp_path):
-    app = create_app(tmp_path, Settings(None, True, "http://studio"))
+    app = create_app(tmp_path, Settings(None, True))
     with TestClient(app) as client:
         headers = {"origin": "http://studio"}
         endpoint = "/api/v1/reading/dictionaries"
-        assert client.post(endpoint+"/import", files={"file": ("custom.zip", package())}).status_code == 403
         inspected = client.post(endpoint+"/import?inspect=true", headers=headers, files={"file": ("custom.zip", package())})
         assert inspected.status_code == 200 and not inspected.json()["replaceRequired"]
         assert client.get(endpoint).json()["dictionaries"] == []
@@ -197,15 +196,6 @@ def test_atomic_record_failure_and_corrupt_installed_content_are_explicit(tmp_pa
     with pytest.raises(ValueError):
         with restarted.acquire("custom", restarted.instances["custom"]):
             pass
-
-
-def test_archive_resource_limit_rejects_before_publish(tmp_path, monkeypatch):
-    manager = Dictionaries(tmp_path)
-    first = manager.install(package())
-    monkeypatch.setattr("server.dictionary_format.MAX_BYTES", 16)
-    with pytest.raises(ValueError, match="资源限制"):
-        manager.install(package(), replace=True)
-    assert manager.instances["custom"] == first["instance"]
 
 
 def test_locked_retired_files_do_not_undo_publication_and_cleanup_retries(tmp_path, monkeypatch):

@@ -33,7 +33,7 @@ def test_move_complete_library(tmp_path):
             c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,result_json,created_at,updated_at) VALUES('export','p','publish','succeeded','{}',?,'0','0')", (json.dumps({'output_path': db.paths.store(output), 'report': {'passed': True}}),))
     destination = tmp_path / '中文 空格 (搬移) &'
     shutil.move(source, destination)
-    with TestClient(create_app(destination, Settings(None, True, 'http://studio'))) as moved:
+    with TestClient(create_app(destination, Settings(None, True))) as moved:
         assert moved.get('/api/v1/session').json()['library_id'] == identity
         assert moved.get('/api/v1/projects/p/document').json()['revision'] == second
         assert moved.get(f'/api/v1/projects/p/vocals/{job["id"]}/energy?start_ms=0&end_ms=1000').status_code == 200
@@ -55,7 +55,7 @@ def test_symlink_escape(tmp_path):
 @pytest.mark.parametrize('version', [4, 5])
 def test_old_database_is_rejected_without_modification(tmp_path, version):
     source = tmp_path / 'old'
-    with TestClient(create_app(source, Settings(None, True, 'http://studio'))) as client:
+    with TestClient(create_app(source, Settings(None, True))) as client:
         client.post('/api/v1/projects', json={'name':'保存的项目'}, headers=HEADERS)
     with sqlite3.connect(source / 'studio.sqlite3') as conn: conn.execute(f'PRAGMA user_version={version}')
     before = (source / 'studio.sqlite3').read_bytes()

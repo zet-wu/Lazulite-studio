@@ -10673,12 +10673,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "ttml.size": {
-    "context": "ttml interface: ttml.size",
-    "source": "TTML 超过 2 MiB 限制",
-    "params": [],
-    "parameterNotes": {}
-  },
   "ttml.entities": {
     "context": "ttml interface: ttml.entities",
     "source": "不接受 DTD 或外部实体",

@@ -33,9 +33,7 @@ from .publish_routes import build_publish_router
 from .reading import SudachiReadingProposer, build_analysis_router
 from .revisions import INITIAL_TTML, RevisionStore
 from .studio.media import Asset, MediaError, MediaProbe, MediaService
-from .upload import UploadLimitMiddleware
 
-MAX_UPLOAD = 500 * 1024 * 1024
 
 
 def stamp():
@@ -46,9 +44,9 @@ def create_app(
     reading_proposer=None, publisher=None, separator_factory=None, runtime_settings=None, runtime_identity=None, runtime_manifest=None,
 ) -> FastAPI:
     cfg = settings or Settings.from_env()
-    if not cfg.origin or (cfg.mode != "local" and not cfg.trusted_gateway and not cfg.password):
+    if cfg.mode != "local" and not cfg.trusted_gateway and not cfg.password:
         raise RuntimeError(
-            "set STUDIO_ORIGIN and STUDIO_PASSWORD, or enable STUDIO_TRUSTED_GATEWAY"
+            "set STUDIO_PASSWORD, or enable STUDIO_TRUSTED_GATEWAY"
         )
     root = Path(
         data_dir or os.getenv("STUDIO_DATA_DIR", Path(__file__).parent / "data-projects-v6")
@@ -109,11 +107,6 @@ def create_app(
         return "local"
 
     def write(request: Request, subject=Depends(auth)):
-        if (
-            not request.headers.get("origin")
-            or request.headers.get("origin") != cfg.origin
-        ):
-            fail("origin_forbidden", "访问地址与服务允许的来源不一致，请检查浏览器地址及 --origin／STUDIO_ORIGIN 配置", 403)
         csrf = request.cookies.get("studio_csrf")
         if cfg.mode != "local" and not cfg.trusted_gateway and (
             not csrf or csrf != request.headers.get("x-csrf-token")
@@ -162,11 +155,6 @@ def create_app(
 
     @api.post("/session")
     def login(body: Login, request: Request):
-        if (
-            not request.headers.get("origin")
-            or request.headers.get("origin") != cfg.origin
-        ):
-            fail("origin_forbidden", "访问地址与服务允许的来源不一致，请检查浏览器地址及 --origin／STUDIO_ORIGIN 配置", 403)
         if cfg.password and not secrets.compare_digest(
             body.password or "", cfg.password
         ):
@@ -187,7 +175,7 @@ def create_app(
                 "user": {"id": "local", "name": "Local user"},
             }
         )
-        secure = cfg.origin.startswith("https://")
+        secure = request.url.scheme == "https"
         out.set_cookie(
             "studio_session",
             token,
@@ -265,12 +253,9 @@ def create_app(
         temporary = directory / 'upload'
         successful = False
         try:
-            size = 0
             digest = hashlib.sha256()
             with temporary.open('wb') as out:
                 while chunk := await file.read(1024 * 1024):
-                    size += len(chunk)
-                    if size > MAX_UPLOAD: fail('upload_too_large', 'upload exceeds limit', 413)
                     out.write(chunk)
                     digest.update(chunk)
             media = MediaService(directory)
@@ -620,10 +605,6 @@ def create_app(
     api.include_router(settings_router(preferences, auth=auth, write=write))
     app.state.jobs = job_service
     app.include_router(api)
-    if cfg.mode == "local":
-        from .local_web import LocalBoundary
-        app.add_middleware(LocalBoundary, origin=cfg.origin)
-    app.add_middleware(UploadLimitMiddleware, limit=MAX_UPLOAD + 1024 * 1024)
     @app.on_event("shutdown")
     async def shutdown_jobs():
         job_service.close()

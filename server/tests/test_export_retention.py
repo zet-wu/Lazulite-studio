@@ -23,7 +23,7 @@ def test_recent_success_failure_cancel_and_single_active(tmp_path):
             if self.fail: raise ValueError('intentional publisher failure')
             return super().publish(*args)
     publisher = Publisher()
-    settings = Settings('pw',False,'http://studio')
+    settings = Settings('pw', False)
     with TestClient(create_app(tmp_path,settings,publisher=publisher),base_url='https://studio') as client:
         headers = _headers(client,settings); pid,asset = _project(client,headers,tmp_path)
         initial = client.get(f'/api/v1/projects/{pid}/document').json()['revision']

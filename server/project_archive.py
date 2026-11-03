@@ -20,16 +20,12 @@ from .project_document import read_project, validate_project
 from .studio.media import MediaService, MediaError
 from .media_format import download_filename
 
-MAX_AUDIO = 2 * 1024**3
-MAX_DOCUMENT = 16 * 1024**2
-MAX_MANIFEST = 16 * 1024
-MAX_ARCHIVE = MAX_AUDIO + MAX_DOCUMENT + 1024**2
 
 class SourceEntry(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     path: str = Field(pattern=r'^media/source\.[a-z0-9]{1,12}$')
     filename: str = Field(min_length=1, max_length=1000)
-    size: StrictInt = Field(gt=0, le=MAX_AUDIO)
+    size: StrictInt = Field(gt=0)
     sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
 
 class Manifest(BaseModel):
@@ -56,9 +52,6 @@ def read_package(path, stage):
         for item in entries:
             if item.flag_bits & 1 or item.is_dir() or stat.S_ISLNK(item.external_attr >> 16):
                 raise ValueError('工程包不能包含加密条目、目录或链接')
-            limit = MAX_MANIFEST if item.filename == 'manifest.json' else MAX_DOCUMENT if item.filename == 'project.json' else MAX_AUDIO
-            if item.file_size > limit or item.compress_size == 0 and item.file_size > 0:
-                raise ValueError('工程包解包规模超出限制')
             if item.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
                 raise ValueError('工程包压缩方式不支持')
         if 'manifest.json' not in names or 'project.json' not in names:
@@ -177,11 +170,8 @@ def build_archive_router(db, root, revisions, *, auth, write, project_exists):
             with tempfile.TemporaryDirectory(prefix='studio-import-', dir=root) as directory:
                 stage = Path(directory)
                 path = stage / 'upload.lazp'
-                size = 0
                 with path.open('wb') as out:
                     while chunk := await file.read(1024**2):
-                        size += len(chunk)
-                        if size > MAX_ARCHIVE: raise HTTPException(413, '工程包超过大小限制')
                         out.write(chunk)
                 try:
                     return await run_in_threadpool(install, path, stage)

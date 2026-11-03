@@ -16,7 +16,6 @@ from .document_errors import DocumentInvalid
 from .revisions import IdempotencyConflict, RevisionConflict, RevisionStore
 
 TTML_NS = "http://www.w3.org/ns/ttml"
-MAX_TTML_BYTES = 2 * 1024 * 1024
 _DOCTYPE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.I)
 _TIME = re.compile(r"^(?:\d+(?:\.\d+)?(?:ms|s)?|\d+:\d{2}(?::\d{2})?(?:\.\d+)?)$")
 
@@ -36,8 +35,6 @@ class DocumentEnvelope(BaseModel):
 
 def validate_ttml(ttml: str) -> ET.Element:
     raw = ttml.encode("utf-8")
-    if len(raw) > MAX_TTML_BYTES:
-        raise ValueError("TTML exceeds 2 MiB limit")
     if _DOCTYPE.search(ttml):
         raise ValueError("DTD and external entities are not accepted")
     try:

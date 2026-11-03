@@ -10,7 +10,7 @@ from server.tests.test_api import wav_bytes
 
 
 def setup_project(tmp_path):
-    client = TestClient(create_app(tmp_path, Settings('', True, 'http://studio')))
+    client = TestClient(create_app(tmp_path, Settings('', True)))
     headers = {'origin': 'http://studio'}
     asset = client.post('/api/v1/uploads', files={'file': ('song.wav', wav_bytes())}, headers=headers).json()
     projects = [client.post('/api/v1/projects', json={'name': 'first', 'upload_id': asset['id']}, headers=headers).json()['id']]
