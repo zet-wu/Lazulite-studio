@@ -1,0 +1,24 @@
+.row {
+  display: grid;
+  grid-template-columns: var(--timeline-label-width, 36px) minmax(0, 1fr);
+  gap: var(--timeline-gap, 5px);
+}
+.lane {
+  position: relative;
+  overflow: hidden;
+  background: var(--timeline-surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: 3px;
+  touch-action: none;
+}
+.bar {
+  position: absolute;
+  box-sizing: border-box;
+  height: var(--timeline-bar-height);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  --timeline-element-radius: 3px;
+  border-radius: var(--timeline-element-radius);
+  cursor: grab;
+}

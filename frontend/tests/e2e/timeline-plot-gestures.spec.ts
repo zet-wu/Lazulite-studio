@@ -11,7 +11,7 @@ async function gesture(page:Page,plot:Locator,delta:number,cancel=false,back=fal
 for(const region of ['energy','segments','spectrum']) test(`plot gesture ${region}: click, threshold, cancel and history`,async({page})=>{
   await load(page,true);
   const plot=region==='energy'?page.locator('[data-timeline-pan="seek"]').filter({has:page.getByLabel('人声能量')}):region==='segments'?page.locator('[data-vocal-lane]'):page.getByLabel('声谱图',{exact:true});
-  const wave=page.getByRole('slider',{name:'波形进度'}), range=page.locator('span').filter({hasText:/^视窗 \d/}).first();
+  const wave=page.getByRole('slider',{name:'波形进度'}), range=page.locator('span').filter({hasText:/^视窗\s*\d/}).first();
   const original=await range.textContent();
   await page.locator('audio').evaluate((a:HTMLAudioElement)=>{a.currentTime=1;});
   await expect(wave).toHaveAttribute('aria-valuenow','1');
@@ -35,7 +35,7 @@ for(const region of ['energy','segments','spectrum']) test(`plot gesture ${regio
 
 test('segment edits and add mode retain priority over plot panning',async({page})=>{
   await load(page,true);
-  const range=page.locator('span').filter({hasText:/^视窗 \d/}).first(),original=await range.textContent();
+  const range=page.locator('span').filter({hasText:/^视窗\s*\d/}).first(),original=await range.textContent();
   const segment=page.locator('[data-segment-id="s1"]');
   const before=await segment.getAttribute('aria-label');await gesture(page,segment,25);
   await expect(segment).not.toHaveAttribute('aria-label',before!);await expect(range).toHaveText(original!);
