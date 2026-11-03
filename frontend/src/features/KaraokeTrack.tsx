@@ -20,7 +20,7 @@ export function KaraokeTrack({startMs,endMs,snap,bpm,anchors,onError,durationMs=
  const {project,apply,locked}=context;
  const cues=project.karaoke.cues.filter(c=>c.endMs>=startMs&&c.beginMs<=endMs),layout=packIntervals(cues.map(c=>({...c,key:c.id}))),span=Math.max(1,endMs-startMs);
  const begin=(e:PointerEvent<HTMLElement>,cue:KaraokeCue,side:Drag['side'])=>{
-  if(e.button!==0||locked)return;e.preventDefault();e.stopPropagation();shared.selectCue(cue.id,cue.anchor.lineId);
+  if(e.button!==0||locked)return;e.preventDefault();e.stopPropagation();shared.selectCue(cue.id,cue.anchor.lineId,false);
   e.currentTarget.setPointerCapture(e.pointerId);
   current.current={cue,side,x:e.clientX,width:lane.current!.clientWidth,beginMs:cue.beginMs,endMs:cue.endMs,error:'',pointer:e.pointerId,element:e.currentTarget};setDrag(current.current);
  };
@@ -39,8 +39,8 @@ export function KaraokeTrack({startMs,endMs,snap,bpm,anchors,onError,durationMs=
  return <div className={styles.track} aria-label={t('karaoke.guideTrack')}><strong>{t('karaoke.cue')}</strong><div ref={lane} className={styles.lane} style={{height:`calc(${Math.max(1,layout.laneCount)} * var(--timeline-lane-height))`}}>
  {cues.map(cue=>{const value=drag?.cue.id===cue.id?drag:cue;return <div role="button" tabIndex={0} aria-label={t('karaoke.timelineCue',{text:cue.text})} aria-pressed={shared.selectedCue===cue.id} className={styles.bar} key={cue.id} data-cue-id={cue.id} data-invalid={drag?.cue.id===cue.id&&!!drag.error||undefined}
  style={{left:`${(value.beginMs-startMs)/span*100}%`,width:`${(value.endMs-value.beginMs)/span*100}%`,top:`calc(${layout.lanes.get(cue.id)??0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`}}
- onContextMenu={event=>{event.preventDefault();event.stopPropagation();shared.commands.current?.openContext(event.currentTarget,event.clientX,event.clientY);}} onClick={()=>shared.selectCue(cue.id,cue.anchor.lineId)} onPointerDown={e=>begin(e,cue,'move')} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
- onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();shared.selectCue(cue.id,cue.anchor.lineId);}if(e.key==='Delete'&&!locked){e.stopPropagation();apply({type:'karaoke',command:{kind:'remove',id:cue.id}});}}}>
+ onContextMenu={event=>{event.preventDefault();event.stopPropagation();shared.commands.current?.openContext(event.currentTarget,event.clientX,event.clientY);}} onClick={()=>shared.selectCue(cue.id,cue.anchor.lineId,false)} onPointerDown={e=>begin(e,cue,'move')} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
+ onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();shared.selectCue(cue.id,cue.anchor.lineId,false);}if(e.key==='Delete'&&!locked){e.stopPropagation();apply({type:'karaoke',command:{kind:'remove',id:cue.id}});}}}>
  <button className={styles.handle} aria-label={t('karaoke.guideBegin')} onPointerDown={e=>begin(e,cue,'beginMs')}/><span>{cue.text}</span><button className={styles.handle} aria-label={t('karaoke.guideEnd')} onPointerDown={e=>begin(e,cue,'endMs')}/></div>;})}</div></div>;
 }
 

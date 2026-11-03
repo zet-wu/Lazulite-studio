@@ -72,7 +72,7 @@ test('wrapped multiline canvas keeps multi-character Ruby and editing above timi
  await input.press('Enter');await page.getByRole('button',{name:'打轴',exact:true}).click();expect(await positions()).toEqual(original);
 });
 
-for(const mode of ['编辑','音频处理']) test(`cue context menu stays in ${mode}, deletes and undoes without switching mode`,async({page})=>{
+for(const mode of ['编辑','打轴','音频处理']) test(`timeline cue selection and context menu stay in ${mode}, with delete and undo`,async({page})=>{
  await page.setViewportSize({width:1440,height:1000});await loadTimeline(page);
  await importLyrics(page,{name:'karaoke.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
  await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();
@@ -92,5 +92,7 @@ for(const mode of ['编辑','音频处理']) test(`cue context menu stays in ${m
  await page.keyboard.press('Enter');await expect(cue).toHaveCount(0);
  await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(cue).toHaveCount(1);
- await cue.click();await expect(page.getByLabel('导唱开始秒数')).toBeVisible();
+ await cue.click();await expect(cue).toHaveAttribute('aria-pressed','true');
+ await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
+ for(const key of ['Enter','Space']) {await cue.focus();await cue.press(key);await expect(cue).toHaveAttribute('aria-pressed','true');await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');}
 });
