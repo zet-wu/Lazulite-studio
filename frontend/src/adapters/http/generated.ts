@@ -157,7 +157,7 @@ export interface paths {
         };
         get: operations["listJobs"];
         put?: never;
-        post: operations["createJob"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -932,32 +932,6 @@ export interface components {
             sample_count?: number;
             lyrics_preserved: boolean;
             track_id: number | null;
-        };
-        JobCreate: {
-            /** @enum {string} */
-            kind: "vocal" | "alignment";
-            /** @description 歌词任务必须带 revision；vocal 只绑定源资产，可用 retry_analysis_id 复用已有 separated/ready 人声重新分析；每次生成以任务 ID 标识的新结果，不覆盖旧结果。模型和设备取服务配置。 */
-            params: {
-                revision?: string;
-                asset_id: string;
-                line_ids?: string[];
-                line_id?: string;
-                /** @enum {string} */
-                input_granularity?: "word" | "mora" | "phoneme";
-                language?: string | null;
-                /** @enum {string} */
-                coordinate_space?: "text" | "ruby";
-                ruby_id?: string;
-                base_range?: number[];
-                /** @enum {string} */
-                granularity?: "word" | "mora" | "phoneme";
-                title?: string | null;
-                artist?: string | null;
-                album?: string | null;
-                retry_analysis_id?: string;
-            } & {
-                [key: string]: unknown;
-            };
         };
         JobResult: {
             /** @constant */
@@ -1993,36 +1967,6 @@ export interface operations {
                     "application/json": components["schemas"]["JobList"];
                 };
             };
-            default: components["responses"]["Error"];
-        };
-    };
-    createJob: {
-        parameters: {
-            query?: never;
-            header?: {
-                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["JobCreate"];
-            };
-        };
-        responses: {
-            /** @description Queued job */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Job"];
-                };
-            };
-            409: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };

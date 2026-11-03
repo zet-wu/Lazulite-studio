@@ -1,11 +1,7 @@
 """HTTP adapter for the durable JobService; app.py supplies auth and ownership."""
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
-
-class JobRequest(BaseModel):
-    kind: str = Field(min_length=1, max_length=40)
-    params: dict = {}
+from pydantic import BaseModel
 
 class JobParams(BaseModel):
     params: dict = {}
@@ -25,13 +21,6 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
     write_auth = {"dependencies": write_dependencies}
     def check_project(pid):
         if not project_exists(pid): raise HTTPException(404, {"code":"project_not_found","message":"project not found","retryable":False})
-    @router.post("/projects/{pid}/jobs", status_code=202, **write_auth)
-    def create(pid: str, body: JobRequest, request: Request, subject=Depends(write_dependency) if write_dependency else None):
-        check_project(pid)
-        if validate_request:
-            validate_request(pid, body.kind, body.params)
-        try: return service.create(pid, body.kind, body.params, idem_key=request.headers.get("idempotency-key"), subject=subject or "local")
-        except ValueError as exc: raise HTTPException(409, {"code":"idempotency_mismatch","message":str(exc),"retryable":False})
     @router.post("/projects/{pid}/jobs/{kind}", status_code=202, **write_auth)
     def create_kind(pid: str, kind: str, body: JobParams, request: Request, subject=Depends(write_dependency) if write_dependency else None):
         check_project(pid)
@@ -42,8 +31,7 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
     @router.get("/projects/{pid}/jobs", **read_auth)
     def list_jobs(pid: str, limit: int=50):
         check_project(pid)
-        with service.db.connect() as c: rows=c.execute("SELECT id FROM jobs WHERE project_id=? ORDER BY created_at DESC LIMIT ?",(pid,max(1,min(limit,100)))).fetchall()
-        return {"schema_version":"studio-job-list-v1","items":[service.get(r[0]) for r in rows]}
+        return {"schema_version":"studio-job-list-v1","items":service.list(pid, max(1,min(limit,100)))}
     def owned(jid):
         item=service.get(jid)
         if not item: raise HTTPException(404, {"code":"job_not_found","message":"job not found","retryable":False})

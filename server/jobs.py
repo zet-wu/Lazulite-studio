@@ -94,8 +94,6 @@ class JobService:
             if kind in {'vocal', 'alignment'}:
                 active = c.execute("SELECT id,kind FROM jobs WHERE project_id=? AND kind IN ('vocal','alignment') AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone()
                 if active and (kind != 'vocal' or active['kind'] != 'vocal'): raise ValueError('已有音频处理运行，请等待完成或取消')
-            if kind == 'vocal':
-                active = c.execute("SELECT id FROM jobs WHERE project_id=? AND kind='vocal' AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone()
                 if active: return self.get(active[0])
             if kind == 'publish' and c.execute("SELECT 1 FROM jobs WHERE project_id=? AND kind='publish' AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone():
                 raise ValueError('此项目已有活动打包任务，请等待完成或取消')
@@ -221,7 +219,15 @@ class JobService:
 
     def get(self,jid):
         with self.db.connect() as c: row=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
-        if not row: return None
+        return self._job(row) if row else None
+
+    def list(self, project_id, limit):
+        with self.db.connect() as c:
+            rows = c.execute("SELECT * FROM jobs WHERE project_id=? ORDER BY created_at DESC LIMIT ?", (project_id, limit)).fetchall()
+        return [self._job(row) for row in rows]
+
+    @staticmethod
+    def _job(row):
         return {"stage": row["stage"], "schema_version":"studio-job-v1","id":row[0],"project_id":row[1],"kind":row[2],"status":row[3],"request":json.loads(row[4]),"result_available":row[5] is not None,"error":json.loads(row[6]) if row[6] else None,"engine":json.loads(row[7]) if row[7] else None,"created_at":row[8],"updated_at":row[9]}
 
     def result(self,jid):
