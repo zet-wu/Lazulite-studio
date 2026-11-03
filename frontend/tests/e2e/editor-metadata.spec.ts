@@ -21,7 +21,7 @@ test('singer rename and reorder retain focus and nested deletion confirmation ca
  await page.getByRole('button',{name:'删除歌手 performer',exact:true}).click();await page.getByRole('button',{name:'确认删除'}).click();await expect(page.getByLabel('歌手 ID performer',{exact:true})).toHaveCount(0);
 });
 test('invalid singer types locate the field and do not block plain text',async({page})=>{
- await load(page,xml.replace('type="person"','type="invalid"'));await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByRole('button',{name:'下载歌词'}).click();await page.getByRole('button',{name:'歌手 actor：非法 type invalid',exact:true}).click();await expect(page.getByLabel('歌手 actor type')).toBeFocused();await page.getByLabel('歌手 actor type').selectOption('person');await page.getByRole('button',{name:'关闭歌手管理'}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByRole('button',{name:'歌手 actor：非法 type invalid'})).toHaveCount(0);
+ await load(page,xml.replace('type="person"','type="invalid"'));await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByRole('button',{name:'下载歌词'}).click();await page.getByRole('button',{name:'歌手 actor: 歌手 type 无效：invalid',exact:true}).click();await expect(page.getByLabel('歌手 actor type')).toBeFocused();await page.getByLabel('歌手 actor type').selectOption('person');await page.getByRole('button',{name:'关闭歌手管理'}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByRole('button',{name:'歌手 actor: 歌手 type 无效：invalid'})).toHaveCount(0);
 });
 test('output preference survives a panel switch', async ({ page }) => {
  await load(page);

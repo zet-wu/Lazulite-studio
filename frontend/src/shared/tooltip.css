@@ -1,0 +1,2 @@
+.studio-tooltip { position:fixed; z-index:150; width:max-content; max-width:min(300px, calc(100vw - 16px)); max-height:calc(100dvh - 16px); overflow:auto; box-sizing:border-box; overflow-wrap:anywhere; white-space:normal; padding:5px 8px; border:1px solid var(--line); border-radius:4px; background:var(--surface-high); color:var(--ink); font-size:12px; font-weight:400; line-height:1.45; }
+.studio-tooltip-description { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }

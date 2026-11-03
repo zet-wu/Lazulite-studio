@@ -9,8 +9,7 @@ import { createProjectEditorState, executeProjectCommand } from '../domain/proje
 import { KaraokeTrack } from './KaraokeTrack';
 import { useProjectEditing } from './editor/ProjectEditingContext';
 import { projectTimeline } from '../domain/timeline-projection';
-import { createPortal } from 'react-dom';
-import { EditorContextMenu } from './editor/EditorContextMenu';
+import { ContextMenu } from '../shared/ContextMenu';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useEditorSelection } from './editor/SelectionContext';
 import { documentTargets, targetId, targetSelection, selectionKind, selectionTargets, targetInterval } from './editor/selection-targets';
@@ -47,7 +46,8 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtual = useVirtualizer({ count: expandedLines.length, getScrollElement: () => scrollRef.current, estimateSize: () => 80, overscan: 3, getItemKey: index => expandedLines[index].id });
   const [menu, setMenu] = useState<{ x: number; y: number; target: HTMLElement } | null>(null);
-  const closeMenu = () => { const target = menu?.target; setMenu(null); if (target?.isConnected) target.focus({ preventScroll: true }); };
+  useEffect(() => { if (locked) setMenu(null); }, [locked]);
+  const closeMenu = () => setMenu(null);
   const allTargets = useMemo(() => documentTargets(document), [document]);
   const choose = (target: TimelineTarget, shift = false, toggle = false) => {
     const id = targetId(target), previous = selection?.kind === selectionKind(target) && (target.kind!=='romanization'||(selection.kind==='romanization-unit'&&selection.attachment===target.attachment)) ? selection : null;
@@ -258,12 +258,12 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     onCopy={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.copy(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onCut={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.cut(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onPaste={event => { event.preventDefault(); commands.current?.paste(event.clipboardData.getData('application/x-lazulite-lyric') === commands.current.clipboardToken() ? undefined : event.clipboardData.getData('text/plain')); }}>
-    {menu && createPortal(<EditorContextMenu x={menu.x} y={menu.y} title={t('timeline.menu')} close={closeMenu} actions={[
+    {menu && !locked && <ContextMenu target={menu.target} x={menu.x} y={menu.y} title={t('timeline.menu')} close={closeMenu} actions={[
       { label: t('common.copy'), disabled: !commands.current?.canCopy, run: () => { commands.current?.copy(); } },
       { label: t('common.cut'), disabled: !commands.current?.canCopy, run: () => { commands.current?.cut(); } },
       { label: t('common.paste'), disabled: !commands.current?.canPaste, run: () => commands.current?.paste() },
-      { label: t('timeline.deleteSelected'), disabled: !selection?.ids.length, run: () => commands.current?.remove() },
-    ]} />, window.document.body)}
+      { danger:true, label: t('timeline.deleteSelected'), disabled: !selection?.ids.length, run: () => commands.current?.remove() },
+    ]} />}
     {visible.karaoke && <KaraokeTrack durationMs={durationMs} startMs={startMs} endMs={endMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const interval=targetInterval(document,target);return interval?[interval.beginMs,interval.endMs].filter((n):n is number=>n!==null):[];})]} onError={onError}/>}
     {visible.line && row('lines', overview.filter(item => !editing || lineLayout.lanes.has(item.id)).map(item => {
       const number = ordinalById.get(item.backgroundOf ?? item.id);

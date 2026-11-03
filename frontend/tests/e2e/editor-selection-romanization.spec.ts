@@ -12,9 +12,9 @@ async function edge(page: Page, selector: string, index: number, options: { butt
 test('real 注音 range, passive right focus, batch delete and one undo', async ({ page }) => {
   await load(page);
   await edge(page, '[data-ruby-id]', 0); await edge(page, '[data-ruby-id]', 1, { modifiers: ['Shift'] });
-  await expect(page.getByText('注音已选 2', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('编辑操作').getByText('注音已选 2', { exact: true })).toBeVisible();
   await page.getByLabel('读音 学校', { exact: true }).nth(1).click({ button: 'right' });
-  await expect(page.getByText('注音已选 2', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('编辑操作').getByText('注音已选 2', { exact: true })).toBeVisible();
   await edge(page, '[data-ruby-id]', 0, { button: 'right' });
   await page.getByRole('menuitem', { name: '删除所选读音（2）' }).click();
   await expect(page.locator('[data-ruby-id]')).toHaveCount(2);
@@ -27,8 +27,8 @@ test('cross-line word range, right-click outside and clipboard remains after dir
   await words.nth(1).getByLabel('词 しん', { exact: true }).click();
   await page.locator('[data-top-menu="clipboard"] summary').click(); await page.getByRole('button', { name: '复制', exact: true }).click();
   await edge(page, 'main [data-word-id]', 0); await edge(page, 'main [data-word-id]', 1, { modifiers: ['Shift'] });
-  await expect(page.getByText('词已选 2', { exact: true })).toBeVisible();
-  await page.getByLabel('词 しん', { exact: true }).click({ button: 'right' }); await expect(page.getByText('词已选 2', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('编辑操作').getByText('词已选 2', { exact: true })).toBeVisible();
+  await page.getByLabel('词 しん', { exact: true }).click({ button: 'right' }); await expect(page.getByLabel('编辑操作').getByText('词已选 2', { exact: true })).toBeVisible();
   await edge(page, 'main [data-word-id]', 0, { button: 'right' });
   await page.getByRole('menuitem', { name: '删除所选词（2）' }).click(); await expect(words).toHaveCount(2);
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(words).toHaveCount(4);

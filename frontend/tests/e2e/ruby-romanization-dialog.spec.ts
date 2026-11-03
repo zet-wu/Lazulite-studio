@@ -45,9 +45,9 @@ test(`compact warning, correction, skip, direct navigation and Esc`, async ({ pa
   await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeEnabled();
   await expect(readings.first()).not.toHaveAttribute('aria-invalid');
   await patrol.click(); await expect(readings.nth(0)).toBeFocused();
-  await expect(dialog.getByRole('tooltip')).toContainText('读音不同');
+  await expect(page.getByRole('tooltip')).toContainText('读音不同');
   await readings.nth(0).press('Escape');
-  await expect(dialog).toBeVisible(); await expect(dialog.getByRole('tooltip')).toHaveCount(0);
+  await expect(dialog).toBeVisible(); await expect(page.getByRole('tooltip')).toHaveCount(0);
   await readings.nth(0).fill('は');
   await patrol.click(); await expect(readings.nth(1)).toBeFocused();
   await rows.nth(1).getByLabel('跳过生成').check();
@@ -58,7 +58,7 @@ test(`compact warning, correction, skip, direct navigation and Esc`, async ({ pa
   await expect(readings.nth(1)).toBeFocused();
   await patrol.click(); await expect(readings.nth(2)).toBeFocused();
   await rows.nth(0).locator('[data-ruby-source]').hover();
-  await expect(dialog.getByRole('tooltip')).toContainText('0s – 1s');
+  await expect(page.getByRole('tooltip')).toContainText('0s – 1s');
 });
 
 test('virtual patrol navigates between distant repeated sources', async ({ page }) => {
@@ -112,7 +112,7 @@ test('target and overwrite navigation focus real controls, links stay blocked', 
   dialog = await open(page, 2, 'ka', '字', 'link');
   await dialog.getByRole('button', { name: /阻塞.*行尾链接/ }).click();
   await expect(dialog.locator('[data-ruby-source]').first()).toBeFocused();
-  await expect(dialog.getByRole('tooltip')).toContainText('请先处理链接');
+  await expect(page.getByRole('tooltip')).toContainText('请先处理链接');
   await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeDisabled();
 });
 

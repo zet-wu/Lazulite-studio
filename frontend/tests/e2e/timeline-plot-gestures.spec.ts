@@ -45,3 +45,13 @@ test('segment edits and add mode retain priority over plot panning',async({page}
   await expect(page.locator('[data-segment-id]')).toHaveCount(2);await expect(range).toHaveText(original!);
   await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('[data-segment-id]')).toHaveCount(1);
 });
+
+test('segment menu navigates enabled items, preserves multi-selection and restores focus on Escape',async({page})=>{
+ await load(page,true,[{id:'s1',beginMs:1000,endMs:3000},{id:'s2',beginMs:3200,endMs:4500}]);
+ const first=page.locator('[data-segment-id="s1"]'),second=page.locator('[data-segment-id="s2"]');
+ await first.click();await second.click({modifiers:['ControlOrMeta']});await second.focus();await second.press('Shift+F10');
+ await expect(page.getByRole('menuitem',{name:'分配给选中行'})).toBeDisabled();await expect(page.getByRole('menuitem',{name:'合并选中片段'})).toBeFocused();
+ await page.keyboard.press('ArrowDown');await expect(page.getByRole('menuitem',{name:'删除选中片段'})).toBeFocused();await page.keyboard.press('Escape');await expect(second).toBeFocused();await expect(first).toHaveAttribute('aria-pressed','true');
+ await second.click({button:'right'});await page.getByRole('menuitem',{name:'合并选中片段'}).click();await expect(page.locator('[data-segment-id]')).toHaveCount(1);await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('[data-segment-id]')).toHaveCount(2);
+ await first.click({button:'right'});await page.getByRole('button',{name:'新建人声片段',exact:true}).click();await expect(page.getByRole('menu')).toHaveCount(0);await page.keyboard.press('Escape');
+});

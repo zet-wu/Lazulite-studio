@@ -1,3 +1,4 @@
+import { Tooltip } from '../../shared/Tooltip';
 import { useMessageText } from '../../shared/useMessageText';
 import { message as describeMessage, errorMessage } from '../../domain/messages';
 import { i18n, formatMessage } from '../../i18n';
@@ -96,22 +97,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
   const [message, setMessage] = useMessageText('');
   const [currentIssue, setCurrentIssue] = useState<RubyIssue | null>(null);
   const [navigation, setNavigation] = useState<Navigation | null>(null);
-  const [hint, setHint] = useState<{ key: string; text: string; anchor: HTMLElement } | null>(null);
-  const hintRef = useRef<HTMLDivElement>(null);
-  const [hintRect, setHintRect] = useState({ left: 0, top: 0 });
   const overwriteNodes = useRef(new Map<string, HTMLInputElement>());
-  useLayoutEffect(() => {
-    if (!hint) return;
-    const place = () => {
-      const rect = hint.anchor.getBoundingClientRect();
-      const height = hintRef.current?.offsetHeight ?? 60;
-      setHintRect({ left: Math.max(8, Math.min(rect.left, window.innerWidth - 330)),
-        top: rect.top >= height + 12 ? rect.top - height - 6 : Math.min(rect.bottom + 6, window.innerHeight - height - 8) });
-    };
-    place();
-    window.addEventListener('scroll', place, true); window.addEventListener('resize', place);
-    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); };
-  }, [hint, readings, assignments, skipOverrides, overwrite]);
   const stale = document !== sourceDocument;
   const contents = tracks.find((track) => track.id === trackId)?.contents.filter((content) => lineIds.includes(content.lineId)) ?? [];
   const sourceRows = useMemo(() => contentIds.length && trackId ? rubySourceRows(sourceDocument, trackId, contentIds) : [], [sourceDocument, trackId, contentIds]);
@@ -131,14 +117,14 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
   const canGenerate = !stale && rows.length > 0 && !allSkipped && !issues.some(issue => issue.severity === 'error');
   const navigate = (issue: RubyIssue | null) => {
     if (!issue || stale) return;
-    setCurrentIssue(issue); setHint(null);
+    setCurrentIssue(issue);
     setNavigation(previous => ({ issue, serial: (previous?.serial ?? 0) + 1 }));
     if (issue.kind === 'overwrite' && issue.wordId) {
       const node = overwriteNodes.current.get(issue.wordId);
       node?.scrollIntoView({ block: 'center' }); node?.focus({ preventScroll: true });
     }
   };
-  const resetPatrol = () => { setCurrentIssue(null); setNavigation(null); setHint(null); };
+  const resetPatrol = () => { setCurrentIssue(null); setNavigation(null); };
   const resetChoices = () => { setAssignments({}); setReadings({}); setSkipOverrides({}); setOverwrite(new Set()); setMessage(''); resetPatrol(); };
   const selectTrack = (id: string) => { setTrackId(id); setContentIds(firstContents(sourceDocument, id, lineIds)); resetChoices(); };
   const refresh = () => {
@@ -155,9 +141,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
   const ordinals = new Map(sourceDocument.lines.filter(line => !line.backgroundOf).map((line, index) => [line.id, index + 1]));
   const lineLabel = (id: string) => { const line = sourceDocument.lines.find(line => line.id === id)!; return `L${ordinals.get(line.backgroundOf ?? id)}${line.backgroundOf ? t('editor.backgroundSuffix') : ''}`; };
   const generatedLines = new Set(sourceRows.map(row => row.lineId)).size;
-  return <div onKeyDownCapture={event => {
-    if (event.key === 'Escape' && hint) { event.preventDefault(); event.stopPropagation(); setHint(null); }
-  }}><SettingsDialog title={t('editor.rubyFromRomanization')} subtitle={lineIds.length === 1 && generatedLines === 1 ? lineLabel(lineIds[0]) : t('reading.generatedLines',{generated:generatedLines,total:lineIds.length})} close={close} actions={<><button className={styles.rubyPatrol} data-role="secondary" disabled={stale || !issues.length} onClick={() => navigate(nextRubyIssue(issues, currentIssue))}>{t('ruby.nextIssue')}</button><button data-dialog-close data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={!canGenerate} onClick={submit}>{t('ruby.generate')}</button></>}>
+  return <SettingsDialog title={t('editor.rubyFromRomanization')} subtitle={lineIds.length === 1 && generatedLines === 1 ? lineLabel(lineIds[0]) : t('reading.generatedLines',{generated:generatedLines,total:lineIds.length})} close={close} actions={<><button className={styles.rubyPatrol} data-role="secondary" disabled={stale || !issues.length} onClick={() => navigate(nextRubyIssue(issues, currentIssue))}>{t('ruby.nextIssue')}</button><button data-dialog-close data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={!canGenerate} onClick={submit}>{t('ruby.generate')}</button></>}>
     <div className={styles.rubyGeneration}>
       {stale ? <p role="alert">{t('ruby.documentChanged')}<button data-role="secondary" onClick={refresh}>{t('ruby.regenerate')}</button></p> : <>
         <div className={styles.rubyGenerationOptions}><label>{t('ruby.sourceTrack')}<Select value={trackId} onChange={(event) => selectTrack(event.target.value)}>{tracks.map((track, index) => <option key={track.id} value={track.id}>{t('editor.track')}{index + 1} · {track.language ?? t('editor.unspecifiedLanguage')}</option>)}</Select></label>
@@ -176,15 +160,10 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
           const descriptionId = `ruby-description-${encodeURIComponent(row.key)}`;
           const attention = (kinds: RubyIssue['kind'][]) => rowIssues.some(issue => kinds.includes(issue.kind));
           const invalid = (kinds: RubyIssue['kind'][]) => rowIssues.some(issue => issue.severity === 'error' && kinds.includes(issue.kind)) || undefined;
-          const showHint = (anchor: HTMLElement) => setHint({ key: row.key, text: explanation, anchor });
-          return <div className={styles.rubyGenerationRow} data-ruby-row={row.key}
-            onFocusCapture={event => showHint(event.target as HTMLElement)}
-            onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setHint(null); }}>
-            <div className={styles.rubySource} data-ruby-source tabIndex={0} aria-describedby={descriptionId}
-              onMouseEnter={event => showHint(event.currentTarget)} onMouseLeave={() => setHint(null)}>
+          return <Tooltip as="div" content={explanation} id={descriptionId} className={styles.rubyGenerationRow} data-ruby-row={row.key}>
+            <div className={styles.rubySource} data-ruby-source tabIndex={0} aria-describedby={descriptionId}>
               <small>{lineLabel(line.id)}</small><strong>{row.sourceText}</strong>
             </div>
-            <span id={descriptionId} className={styles.rubyDescription}>{explanation}</span>
             <label>{t('ruby.targetWord')}<Select aria-label={t('ruby.targetWord')} value={selected} quotes={Object.fromEntries(line.words.map((word, index) => [word.id, { prefix: `${index + 1} · `, text: word.text }]))} data-attention={attention(['target', 'link', 'overwrite']) || undefined} aria-invalid={invalid(['target'])} aria-describedby={descriptionId} disabled={skipped.has(row.key)} onChange={(event) => { const nextWordId = event.target.value || null;
                 setSkipOverrides(current => Object.fromEntries(Object.entries(current).filter(([key]) => {
                   const affected = rows.find(item => item.key === key)!;
@@ -195,7 +174,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
             </Select></label>
             <label>{t('ruby.targetReading')}<input aria-describedby={descriptionId} aria-invalid={invalid(['reading'])} data-attention={attention(['reading', 'kana-difference', 'link', 'overwrite']) || undefined} value={readings[row.key] ?? row.reading ?? ''} disabled={skipped.has(row.key)} onChange={(event) => setReadings((current) => ({ ...current, [row.key]: event.target.value }))} /></label>
             <label><input type="checkbox" checked={skipped.has(row.key)} onChange={(event) => setSkipOverrides(current => ({ ...current, [row.key]: event.target.checked }))} /> {t('ruby.skip')}</label>
-          </div>;
+          </Tooltip>;
         }} />
         {existingWords.length > 0 && <fieldset className={styles.rubyGenerationChoices}><legend>{t('ruby.existing')}</legend>{existingWords.map(({ line, word }) => <label key={word.id}><input ref={node => { if (node) overwriteNodes.current.set(word.id, node); else overwriteNodes.current.delete(word.id); }}
           aria-invalid={!overwrite.has(word.id) || undefined} data-attention={!overwrite.has(word.id) || undefined}
@@ -210,10 +189,9 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
           </button>)}
         </div>
         {message && <p role="alert">{message}</p>}
-        {hint && <div ref={hintRef} role="tooltip" className={styles.rubyHint} style={hintRect}>{rows.some(row => row.key === hint.key) ? describeRow(rows.find(row => row.key === hint.key)!) : hint.text}</div>}
       </>}
     </div>
-  </SettingsDialog></div>;
+  </SettingsDialog>;
 }
 
 const t=i18n.t.bind(i18n);

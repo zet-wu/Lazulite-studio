@@ -124,8 +124,6 @@
 .rubyGenerationRow label:has([type="checkbox"]) { display: inline-flex; align-items: center; white-space: nowrap; min-height: 30px; }
 .rubyGeneration [data-attention] { outline: 1px dashed var(--danger); outline-offset: 2px; }
 .rubyPatrol { margin-right: auto; }
-.rubyDescription { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.rubyHint { position: fixed; z-index: 120; max-width: 310px; overflow-wrap: anywhere; padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-high); color: var(--ink); box-shadow: 0 3px 12px #0003; pointer-events: none; }
 .rubyIssueList { display: grid; gap: 4px; }
 .rubyIssueList button { display: flex; flex-wrap: wrap; gap: 4px 8px; text-align: left; }
 .rubyIssueList strong { font-weight: 600; overflow-wrap: anywhere; }
@@ -150,10 +148,6 @@
 .toolHint { font-size: 13px; color: var(--muted); line-height: 1.5; }
 .splitAssignment { display: flex; align-items: center; justify-content: space-between; gap: .8rem; min-width: 0; }
 .splitAssignment span { min-width: 0; overflow-wrap: anywhere; }
-.contextMenu { position: fixed; z-index: 30; display: grid; min-width: 200px; max-height: min(70dvh, 420px); overflow-y: auto; padding: 5px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); box-shadow: 0 10px 28px #0004; }
-.contextMenu button { width: 100%; border: 0; border-radius: 4px; padding: 6px 8px; text-align: left; background: transparent; color: var(--ink); cursor: pointer; }
-.contextMenu button:hover, .contextMenu button:focus-visible { background: var(--blue-soft); }
-.contextMenu button:disabled { opacity: .45; cursor: default; }
 
 .inspector > *, .inspector label { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .inspector input:not([type="checkbox"]), .inspector select { box-sizing: border-box; min-width: 0; max-width: 100%; width: 100%; }
@@ -180,7 +174,7 @@
 .dialogTabs .activeTab { background: var(--blue-soft); color: var(--blue); }
 .settingsMenu summary, .ribbonMenu summary { border: 0; background: transparent; color: var(--ink); border-radius: var(--control-radius); }
 .settingsMenu summary:hover, .ribbonMenu summary:hover, .settingsMenu[open] summary, .ribbonMenu[open] summary { background: var(--state-hover); }
-.settingsMenu > div, .ribbonMenu > div, .contextMenu { background: var(--surface-container); border-radius: var(--surface-radius); }
+.settingsMenu > div, .ribbonMenu > div { background: var(--surface-container); border-radius: var(--surface-radius); }
 .settingsMenu > div button, .settingsMenu > div label, .ribbonMenu > div button { width: 100%; min-height: 32px; border: 0; background: transparent; color: var(--ink); border-radius: 4px; text-align: left; padding: 6px 10px; }
 .settingsMenu > div label:hover { background: var(--state-hover); }
 /* Mode navigation is a centered group, distinct from ordinary option controls. */
@@ -420,6 +414,3 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .romanTrackOptions select { min-width:0; max-width:100%; }
 .romanTrackOptions .kanaHighlight { flex:none; white-space:nowrap; }
 .kanaHighlight input { width:7em; }
-.romanOutput { position:relative; }
-.romanOutputHint { position:absolute; top:100%; left:0; z-index:10; width:max-content; max-width: min(420px, 70vw); padding:8px; background:var(--surface-high); color:var(--ink); border:1px solid var(--line); border-radius:6px; opacity:0; pointer-events:none; }
-.romanOutput:hover .romanOutputHint, .romanOutput:focus-within .romanOutputHint { opacity:1; }

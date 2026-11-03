@@ -1,3 +1,4 @@
+import { ContextMenu } from '../shared/ContextMenu';
 import { MessageError, errorMessage, type Message, message as describeMessage } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { i18n } from '../i18n';
@@ -34,7 +35,8 @@ export function VocalTracks(props: Props) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const [error, setError] = useMessageText('');
-  const [menu, setMenu] = useState<{x:number;y:number} | null>(null);
+  const [menu, setMenu] = useState<{x:number;y:number;target:HTMLElement} | null>(null);
+  useEffect(() => { if (props.locked) setMenu(null); }, [props.locked]);
   const [dropId,setDropId] = useState<string | null>(null);
   const span = Math.max(1,endMs-startMs);
   const visible = acoustics.segments.filter(s=>s.endMs>startMs && s.beginMs<endMs);
@@ -58,7 +60,7 @@ export function VocalTracks(props: Props) {
   useEffect(() => clearDrag, [clearDrag]);
   const cancel = useCallback(() => { clearDrag(); setAdding(false); setMenu(null); if(adding)requestAnimationFrame(()=>addButton.current?.focus()); },[adding,setAdding,clearDrag]);
   useEffect(()=>{
-    const key = (e:KeyboardEvent)=>{if(e.key==='Escape'&&(dragRef.current||menu||adding)){ e.preventDefault(); cancel(); }};
+    const key = (e:KeyboardEvent)=>{if(e.key==='Escape'&&(dragRef.current||adding)){ e.preventDefault(); cancel(); }};
     window.addEventListener('keydown',key); return()=>window.removeEventListener('keydown',key);
   },[adding,menu]);
   useEffect(() => { clearDrag(); }, [acoustics, startMs, endMs, props.showEnergy, props.showSegments, props.sourceDurationMs, clearDrag]);
@@ -142,13 +144,18 @@ export function VocalTracks(props: Props) {
       {energy.isError && <span className={styles.energyError} role="alert">{t('vocal.energyFailed')}<IconButton icon="refresh" label={t('vocal.retryEnergy')} onClick={()=>void energy.refetch()}/></span>}
     </div></div>}
     {showSegments && <div className={styles.segmentRow}><strong>{t('vocal.segment')}</strong><div data-vocal-lane data-timeline-pan="pan" tabIndex={-1} className={styles.lane} style={{height:`calc(${Math.max(1,frozen.current.laneCount)} * var(--timeline-lane-height))`}} onPointerDown={e=>begin(e)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={clearDrag}>
-      {visible.map(s=>{const p=preview&&drag?.side==='move'&&drag.ids.includes(s.id)?{...s,beginMs:s.beginMs+preview.beginMs-drag.segment!.beginMs,endMs:s.endMs+preview.beginMs-drag.segment!.beginMs}:preview&&drag?.segment?.id===s.id?preview:s;return <button data-role="secondary" key={s.id} className={styles.segment} data-segment-id={s.id} title={t('vocal.interval',{label:labels.get(s.id),begin:s.beginMs,end:s.endMs})} aria-label={t('vocal.segmentLabel',{label:labels.get(s.id),begin:s.beginMs,end:s.endMs})} aria-pressed={selected.includes(s.id)} style={{left:`${Math.max(0,pct(p.beginMs))}%`,width:`${Math.min(100,pct(p.endMs))-Math.max(0,pct(p.beginMs))}%`,top:`calc(${frozen.current.lanes.get(s.id)??0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`,outline:dropId===s.id?'3px solid var(--primary, #3367ab)':undefined}} onPointerDown={e=>{if(!adding)begin(e,s,'move');}} onClick={e=>{if(e.detail===0 && !selected.includes(s.id)){setSelected([s.id]);}}} onKeyDown={e=>{if(!props.locked&&(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')){e.preventDefault();if(!selected.includes(s.id))setSelected([s.id]);const r=e.currentTarget.getBoundingClientRect();setMenu({x:r.left,y:r.bottom});}}} onContextMenu={e=>{if(props.locked){e.preventDefault();return;}e.preventDefault();if(adding)return;if(!selected.includes(s.id))setSelected([s.id]);setMenu({x:e.clientX,y:e.clientY});}} onDragOver={e=>{if(props.locked)return;if(!adding&&e.dataTransfer.types.includes(VOCAL_LINE_MIME)){e.preventDefault();setDropId(s.id);}}} onDragLeave={()=>setDropId(null)} onDrop={e=>{if(props.locked)return;e.preventDefault();setDropId(null);if(adding)return;const id=e.dataTransfer.getData(VOCAL_LINE_MIME);if(id){setSelected([s.id]);assign(id,s);}}}>
+      {visible.map(s=>{const p=preview&&drag?.side==='move'&&drag.ids.includes(s.id)?{...s,beginMs:s.beginMs+preview.beginMs-drag.segment!.beginMs,endMs:s.endMs+preview.beginMs-drag.segment!.beginMs}:preview&&drag?.segment?.id===s.id?preview:s;return <button data-role="secondary" key={s.id} className={styles.segment} data-segment-id={s.id} title={t('vocal.interval',{label:labels.get(s.id),begin:s.beginMs,end:s.endMs})} aria-label={t('vocal.segmentLabel',{label:labels.get(s.id),begin:s.beginMs,end:s.endMs})} aria-pressed={selected.includes(s.id)} style={{left:`${Math.max(0,pct(p.beginMs))}%`,width:`${Math.min(100,pct(p.endMs))-Math.max(0,pct(p.beginMs))}%`,top:`calc(${frozen.current.lanes.get(s.id)??0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`,outline:dropId===s.id?'3px solid var(--primary, #3367ab)':undefined}} onPointerDown={e=>{if(!adding)begin(e,s,'move');}} onClick={e=>{if(e.detail===0 && !selected.includes(s.id)){setSelected([s.id]);}}} onKeyDown={e=>{if(!props.locked&&(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')){e.preventDefault();if(!selected.includes(s.id))setSelected([s.id]);const r=e.currentTarget.getBoundingClientRect();setMenu({x:r.left,y:r.bottom,target:e.currentTarget});}}} onContextMenu={e=>{if(props.locked){e.preventDefault();return;}e.preventDefault();if(adding)return;if(!selected.includes(s.id))setSelected([s.id]);setMenu({x:e.clientX,y:e.clientY,target:e.currentTarget});}} onDragOver={e=>{if(props.locked)return;if(!adding&&e.dataTransfer.types.includes(VOCAL_LINE_MIME)){e.preventDefault();setDropId(s.id);}}} onDragLeave={()=>setDropId(null)} onDrop={e=>{if(props.locked)return;e.preventDefault();setDropId(null);if(adding)return;const id=e.dataTransfer.getData(VOCAL_LINE_MIME);if(id){setSelected([s.id]);assign(id,s);}}}>
         <span>{labels.get(s.id)}</span><span className={`${styles.edge} ${styles.begin}`} onPointerDown={e=>{if(!adding)begin(e,s,'beginMs');}}/><span className={`${styles.edge} ${styles.end}`} onPointerDown={e=>{if(!adding)begin(e,s,'endMs');}}/>
       </button>;})}
       {preview&&drag?.side==='new'&&<span className={styles.newRange} style={{left:`${pct(preview.beginMs)}%`,width:`${pct(preview.endMs)-pct(preview.beginMs)}%`}}/>}
       <TimelineIndicators />
     </div></div>}
-    {menu&&createPortal(<div role="menu" className={styles.menu} style={{left:Math.min(menu.x,window.innerWidth-170),top:Math.min(menu.y,window.innerHeight-130)}} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))setMenu(null);}}><button autoFocus role="menuitem" data-role="inline" disabled={props.locked||adding||!active||!props.selectedLineId} onClick={()=>assign(props.selectedLineId,active)}>{t('vocal.assignSelected')}</button><button role="menuitem" data-role="inline" disabled={selected.length<2} onClick={()=>operate('merge')}>{t('vocal.mergeSelected')}</button><button role="menuitem" data-role="danger" onClick={()=>operate('delete')}>{t('vocal.deleteSelected')}</button></div>,document.body)}
+    {menu && !props.locked && <ContextMenu {...menu} title={t('vocal.segment')} close={()=>setMenu(null)} actions={[
+      {label:t('vocal.assignSelected'),disabled:adding||!active||!props.selectedLineId,run:()=>assign(props.selectedLineId,active)},
+      {label:t('vocal.mergeSelected'),disabled:adding||selected.length<2,run:()=>operate('merge')},
+      {label:t('vocal.deleteSelected'),danger:true,disabled:adding||!selected.length,run:()=>operate('delete')},
+    ]}/>}
+
   </div>;
 }
 

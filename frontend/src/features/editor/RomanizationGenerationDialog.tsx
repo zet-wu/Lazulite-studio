@@ -1,3 +1,4 @@
+import { Tooltip } from '../../shared/Tooltip';
 import { useMessageText } from '../../shared/useMessageText';
 import { message as describeMessage, errorMessage } from '../../domain/messages';
 import { i18n, formatMessage } from '../../i18n';
@@ -141,12 +142,12 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
         </Select></label>
         <label className={styles.kanaHighlight}>{t('kana.characters')}<input aria-label={t('kana.characters')} value={highlightInput} aria-invalid={Boolean(highlightError)} onChange={event => { setHighlightInput(event.target.value); if (!composing.current) updateHighlight(event.target.value); }} onCompositionEnd={event => updateHighlight(event.currentTarget.value)} /></label></div>
         {highlightError && <span role="alert">{highlightError}</span>}
-        <label className={styles.romanOutput}>{t('romanization.output')}<Select aria-label={t('romanization.output')} aria-describedby="romanization-mode-help" disabled={isComposing} value={kind} onChange={event => {
+        <label>{t('romanization.output')}<Tooltip content={t('romanization.switchClears')} id="romanization-mode-help"><Select aria-label={t('romanization.output')} aria-describedby="romanization-mode-help" disabled={isComposing} value={kind} onChange={event => {
           if (composing.current) return;
           const next = event.target.value as RomanizationKind;
           setKind(next); setRows(proposeRomanization(source, sourceIds, next)); setMessage(''); setFocusedRow(null);
           preferences.setItem(modeStorage, next);
-        }}><option value="plain">{t('romanization.plain')}</option><option value="timed">{t('romanization.timed')}</option></Select><span role="tooltip" className={styles.romanOutputHint} id="romanization-mode-help">{t('romanization.switchClears')}</span></label>
+        }}><option value="plain">{t('romanization.plain')}</option><option value="timed">{t('romanization.timed')}</option></Select></Tooltip></label>
       </div>
       <div ref={scroll} data-proposal-count={rows.length} className={`${styles.rubyGenerationRows} ${virtualized ? styles.rubyGenerationRowsVirtual : ''}`}>
         <div style={virtualized ? { position: 'relative', height: virtualizer.getTotalSize() } : { display: 'grid', gap: 8 }}>

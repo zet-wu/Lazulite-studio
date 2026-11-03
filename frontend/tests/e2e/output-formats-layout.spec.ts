@@ -27,7 +27,7 @@ test('format selection downloads expected content and exposes overlap details',a
  await page.getByText('导出对照',{exact:true}).click();const table=page.getByRole('table',{name:'所选格式导出对照'});
  for(const format of ['ttml','ass']){
   await page.getByLabel('导出格式').selectOption(format);
-  if(format==='ass'){await expect(table.getByText('分轨字幕',{exact:true})).toHaveCount(2);const result=table.getByRole('row').last().locator('td > span');await result.focus();await expect(result.getByRole('tooltip')).toBeVisible();await expect(result).toContainText('1、2');}
+  if(format==='ass'){await expect(table.getByText('分轨字幕',{exact:true})).toHaveCount(2);const result=table.getByRole('row').last().locator('td [tabindex="0"]');await result.focus();await expect(page.getByRole('tooltip')).toBeVisible();await expect(page.getByRole('tooltip')).toContainText(/1[,、] ?2/);}
   const pending=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();const download=await pending;const output=await readFile(await download.path(),'utf8');await writeFile(test.info().outputPath(`output.${format}`),output);expect(output).toContain('Main');
   if(format==='ass'){expect(output.match(/^Dialogue:/gm)).toHaveLength(8);expect(output).toContain('roman-main');expect(output).toContain('0:00:00.50,0:00:06.50');}
  }

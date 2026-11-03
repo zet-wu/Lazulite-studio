@@ -73,7 +73,7 @@ import { MetadataPanel } from './MetadataPanel';
 import { SingerSelection } from './SingerSelection';
 import { SingerDialog } from './SingerDialog';
 import { SettingsDialog, DialogEditingLocked } from './SettingsDialog';
-import { EditorContextMenu, type ContextAction } from './EditorContextMenu';
+import { ContextMenu, type ContextAction } from '../../shared/ContextMenu';
 import { RubyGenerationDialog } from './RubyGenerationDialog';
 import type { TransportHandle } from '../MediaTransport';
 import type { LyricFormat } from '../../adapters/lyric-formats';
@@ -619,7 +619,7 @@ function EditorWorkspaceContent(props: Props) {
       const cue=props.project?.karaoke.cues.find(cue=>cue.id===cueNode.dataset.cueId);
       if(!cue)return false;
       selectCue(cue.id,cue.anchor.lineId);
-      setContextMenu({x,y,target:cueNode,title:t('editor.cueActions'),actions:[{id:'edit-cue',label:t('editor.editCue'),run:()=>selectCue(cue.id,cue.anchor.lineId)},{id:'delete-cue',label:t('editor.deleteCue'),run:()=>insertKaraoke({kind:'remove',id:cue.id})}]});return true;
+      setContextMenu({x,y,target:cueNode,title:t('editor.cueActions'),actions:[{id:'edit-cue',label:t('editor.editCue'),run:()=>selectCue(cue.id,cue.anchor.lineId)},{id:'delete-cue',danger:true,label:t('editor.deleteCue'),run:()=>insertKaraoke({kind:'remove',id:cue.id})}]});return true;
     }
     const beat = target.closest<HTMLElement>('[data-beat-owner]');
     if (beat) {
@@ -680,7 +680,7 @@ function EditorWorkspaceContent(props: Props) {
         selectionAction(effective,'merge',t('editor.merge')),{id:'segment',label:t('editor.segment'),run:()=>setSegmentationOpen(true)});
       if(mode==='karaoke'&&props.project) {
         const count=props.project.karaoke.cues.filter(cue=>effective.ids.includes(cue.anchor.lineId)).length;
-        actions.push({id:'clear-cues',label:multiple?t('editor.clearSelectedCues'):t('editor.clearLineCue'),disabled:!count,reason:count?t('editor.clearCueCount',{count}):t('editor.noSelectedCues'),run:()=>applyKaraokeCommand({kind:'remove-lines',lineIds:effective.ids})});
+        actions.push({id:'clear-cues',danger:true,label:multiple?t('editor.clearSelectedCues'):t('editor.clearLineCue'),disabled:!count,reason:count?t('editor.clearCueCount',{count}):t('editor.noSelectedCues'),run:()=>applyKaraokeCommand({kind:'remove-lines',lineIds:effective.ids})});
       }
     } else if(effective.kind==='romanization-content'||effective.kind==='romanization-unit') {
       const translated=effective.attachment==='translation';
@@ -704,7 +704,7 @@ function EditorWorkspaceContent(props: Props) {
       }});
     }
     const noun=effective.kind==='lines'?t('selection.line'):effective.kind==='words'?t('selection.word'):effective.kind==='ruby'?t('editor.reading'):effective.kind==='romanization-content'?t('editor.content'):t('editor.unit');
-    actions.push({id:'delete',label:multiple?t('editor.deleteSelected',{kind:noun,count:effective.ids.length}):t('editor.deleteObject',{kind:noun}),run:()=>removeSelection(effective)});
+    actions.push({id:'delete',danger:true,label:multiple?t('editor.deleteSelected',{kind:noun,count:effective.ids.length}):t('editor.deleteObject',{kind:noun}),run:()=>removeSelection(effective)});
     const shared: ContextAction[] = [
       { label: t('common.copy'), disabled: !copyAllowed(effective), run: () => { copy(effective); } },
       { label: t('common.cut'), disabled: !copyAllowed(effective), run: () => { cut(effective); } },
@@ -722,7 +722,8 @@ function EditorWorkspaceContent(props: Props) {
     return Boolean(outlineRef.current?.contains(target) || mainRef.current?.contains(target));
   };
   const ownsClipboard = (target: EventTarget) => ownsSelection(target) && !window.getSelection()?.toString();
-  const closeContext = () => { const target = contextMenu?.target; setContextMenu(null); if (target?.isConnected) focusObject(target); else mainRef.current?.focus({ preventScroll: true }); };
+  useEffect(() => { if (props.alignment?.locked) setContextMenu(null); }, [props.alignment?.locked]);
+  const closeContext = () => setContextMenu(null);
   const navigateWord = (wordId: string, direction: -1 | 1) => {
     const order = document.lines.flatMap((line) => line.words.map((word) => ({ lineId: line.id, wordId: word.id })));
     const target = order[order.findIndex((item) => item.wordId === wordId) + direction];
@@ -1095,7 +1096,7 @@ function EditorWorkspaceContent(props: Props) {
       attached={document.romanizationTracks.flatMap((track) => track.contents.filter((content) => content.lineId === splitLineId).map((content) => ({ track, content })))}
       close={() => setSplitLineId(null)}
       submit={plan => dispatch({ type: 'split-line', ...plan })} />}
-    {contextMenu && !props.alignment?.locked && <EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.title} actions={contextMenu.actions} close={closeContext} />}
+    {contextMenu && !props.alignment?.locked && <ContextMenu returnFocus={()=>focusObject(contextMenu.target.isConnected ? contextMenu.target : mainRef.current!)} target={contextMenu.target} x={contextMenu.x} y={contextMenu.y} title={contextMenu.title} actions={contextMenu.actions} close={closeContext} />}
     </DialogEditingLocked.Provider>
     {dictionaryManager && <DictionaryManager close={() => setDictionaryManager(false)} />}
   </div>;
