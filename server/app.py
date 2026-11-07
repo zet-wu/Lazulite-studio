@@ -551,14 +551,29 @@ def create_app(
 
     from .alignment import AlignmentRunner, alignment_unavailable
     from .alignment_projection import project_alignment
-    alignment_runner = AlignmentRunner(db, root / 'projects')
+    from .alignment_models import AlignmentModels
+    model_catalog = AlignmentModels(preferences, Path(runtime_identity['data_dir']).parent if runtime_identity is not None else None)
+    alignment_runner = AlignmentRunner(db, root / 'projects', model_catalog)
+
+    @api.get('/alignment-models')
+    def alignment_models(refresh: bool = False, _=Depends(auth)):
+        return model_catalog.scan(refresh)
+
+    @api.post('/alignment-models/directory')
+    def alignment_models_directory(body: dict, _=Depends(write)):
+        try:
+            if set(body) != {'path'}: raise ValueError('需要模型目录或默认目录')
+            return model_catalog.apply(body['path'])
+        except (ValueError, OSError) as exc: fail('alignment_directory_invalid', str(exc), 422)
 
     @api.get('/projects/{pid}/alignment-preview')
-    def alignment_preview(pid: str, revision: str, _=Depends(auth)):
+    def alignment_preview(pid: str, revision: str, model: str, latin_normalize: bool = True, strip_tone_digits: bool = False, _=Depends(auth)):
         project(pid)
         try:
             snapshot, _ = alignment_runner.snapshot(pid, revision)
-            return project_alignment(snapshot)['summary']
+            options = {'latin_normalize':latin_normalize, 'strip_tone_digits':strip_tone_digits}
+            key, selected = model_catalog.preview(model, {**options, 'revision':revision})
+            return {**project_alignment(snapshot, model=selected, **options)['summary'], 'model_preview':key}
         except ValueError as exc: fail('alignment_input_invalid', str(exc), 409)
 
     def validate_job_request(pid, kind, params):

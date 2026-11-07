@@ -32,13 +32,14 @@ def test_independent_run_and_manual_resource_reuse(tmp_path,monkeypatch):
     from lazulite.alignment.japanese import backend
     client,db,revision=prepare(tmp_path,monkeypatch)
     monkeypatch.setattr(separation,'DemucsSeparator',lambda config:Separator())
-    monkeypatch.setattr(backend,'NextFireBackend',AcousticBackend)
-    monkeypatch.setenv('STUDIO_NEXTFIRE_PATH','/selected/model')
+    monkeypatch.setattr(backend,'open_backend',lambda path,device:AcousticBackend(None))
+    from server.alignment_models import model_snapshot
+    selected=model_snapshot(tmp_path/'models/model')
     AcousticBackend.calls=AcousticBackend.closes=0
     with db.connect() as c:
         asset=c.execute("SELECT source_asset_id FROM projects WHERE id='p'").fetchone()[0]
     root=tmp_path/'projects'
-    params={'revision':revision,'asset_id':asset,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False}
+    params={'revision':revision,'asset_id':asset,'_model':selected,'latin_normalize':True,'strip_tone_digits':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False}
     request={'database':str(db.path),'root':str(root),'project_id':'p','params':params,
              'asset_path':str(root/'p/source/original'),'job_id':'first'}
     first=run_alignment(request,lambda *args:None,lambda:False)
@@ -72,13 +73,14 @@ def test_backend_is_released_on_decode_failure(tmp_path,monkeypatch):
     from lazulite.alignment.japanese import backend,run
     _,db,revision=prepare(tmp_path,monkeypatch)
     monkeypatch.setattr(separation,'DemucsSeparator',lambda config:Separator())
-    monkeypatch.setattr(backend,'NextFireBackend',AcousticBackend)
-    monkeypatch.setenv('STUDIO_NEXTFIRE_PATH','/selected/model')
+    monkeypatch.setattr(backend,'open_backend',lambda path,device:AcousticBackend(None))
+    from server.alignment_models import model_snapshot
+    selected=model_snapshot(tmp_path/'models/model')
     monkeypatch.setattr(run,'align_japanese',lambda *a,**kw:(_ for _ in ()).throw(RuntimeError('injected')))
     with db.connect() as c: asset=c.execute("SELECT source_asset_id FROM projects WHERE id='p'").fetchone()[0]
     before=AcousticBackend.closes
     with pytest.raises(RuntimeError,match='injected'):
         run_alignment({'database':str(db.path),'root':str(tmp_path/'projects'),'project_id':'p',
-            'params':{'revision':revision,'asset_id':asset,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False},
+            'params':{'revision':revision,'asset_id':asset,'_model':selected,'latin_normalize':True,'strip_tone_digits':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False},
             'asset_path':str(tmp_path/'projects/p/source/original'),'job_id':'failed'},lambda *a:None,lambda:False)
     assert AcousticBackend.closes==before+1

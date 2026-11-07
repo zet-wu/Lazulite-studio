@@ -483,6 +483,9 @@ export interface paths {
             parameters: {
                 query: {
                     revision: string;
+                    model: string;
+                    latin_normalize?: boolean;
+                    strip_tone_digits?: boolean;
                 };
                 header?: never;
                 path: {
@@ -719,6 +722,90 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["cleanupMusic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alignment-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scan alignment model directories without loading weights */
+        get: {
+            parameters: {
+                query?: {
+                    refresh?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Directory source and structural status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alignment-models/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a portable alignment model directory */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        path: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Directory source and structural status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -1146,6 +1233,12 @@ export interface components {
             unknown_count: number;
             hint_count: number;
             emitting_count: number;
+            model_preview: string;
+            input_version: string;
+            unknown_objects: string[];
+            inputs: {
+                [key: string]: unknown;
+            }[];
         };
         AlignmentStart: {
             revision: string;

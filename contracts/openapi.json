@@ -1443,6 +1443,30 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "latin_normalize",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "strip_tone_digits",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -1981,6 +2005,74 @@
                     "cleanup_pending"
                   ]
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alignment-models": {
+      "get": {
+        "summary": "Scan alignment model directories without loading weights",
+        "responses": {
+          "200": {
+            "description": "Directory source and structural status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ]
+      }
+    },
+    "/alignment-models/directory": {
+      "post": {
+        "summary": "Apply a portable alignment model directory",
+        "responses": {
+          "200": {
+            "description": "Directory source and structural status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "path"
+                ],
+                "properties": {
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -3604,7 +3696,11 @@
           "skipped_count",
           "unknown_count",
           "hint_count",
-          "emitting_count"
+          "emitting_count",
+          "model_preview",
+          "input_version",
+          "unknown_objects",
+          "inputs"
         ],
         "properties": {
           "line_count": {
@@ -3626,6 +3722,25 @@
           "emitting_count": {
             "type": "integer",
             "minimum": 0
+          },
+          "model_preview": {
+            "type": "string"
+          },
+          "input_version": {
+            "type": "string"
+          },
+          "unknown_objects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
           }
         }
       },

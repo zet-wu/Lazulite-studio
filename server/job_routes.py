@@ -19,6 +19,8 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
         write_dependencies.append(Depends(write_dependency))
     read_auth = {"dependencies": read_dependencies}
     write_auth = {"dependencies": write_dependencies}
+    def public_job(item):
+        return {**item, 'request':{k:v for k,v in item['request'].items() if not k.startswith('_')}}
     def check_project(pid):
         if not project_exists(pid): raise HTTPException(404, {"code":"project_not_found","message":"project not found","retryable":False})
     @router.post("/projects/{pid}/jobs/{kind}", status_code=202, **write_auth)
@@ -26,12 +28,12 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
         check_project(pid)
         if validate_request:
             validate_request(pid, kind, body.params)
-        try: return service.create(pid, kind, body.params, idem_key=request.headers.get("idempotency-key"), subject=subject or "local")
+        try: return public_job(service.create(pid, kind, body.params, idem_key=request.headers.get("idempotency-key"), subject=subject or "local"))
         except ValueError as exc: raise HTTPException(409, {"code":"idempotency_mismatch","message":str(exc),"retryable":False})
     @router.get("/projects/{pid}/jobs", **read_auth)
     def list_jobs(pid: str, limit: int=50):
         check_project(pid)
-        return {"schema_version":"studio-job-list-v1","items":service.list(pid, max(1,min(limit,100)))}
+        return {"schema_version":"studio-job-list-v1","items":[public_job(j) for j in service.list(pid, max(1,min(limit,100)))]}
     def owned(jid):
         item=service.get(jid)
         if not item: raise HTTPException(404, {"code":"job_not_found","message":"job not found","retryable":False})
@@ -49,17 +51,22 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
             raise HTTPException(409, '项目版本或源音频已改变，请重新发起任务')
         public = {'asset_id', 'retry_analysis_id'} if old['kind'] == 'vocal' else {'revision','use_hints','line_blank','rest_blank','rest_token','clear_unmatched','merge_short_gaps','gap_threshold_ms'}
         fresh = {k:v for k,v in params.items() if k in public}
-        if validate_request: validate_request(old['project_id'], old['kind'], fresh)
+        if old['kind'] == 'alignment':
+            from .alignment_models import check_snapshot
+            try: check_snapshot(params['_model'])
+            except ValueError as exc: raise HTTPException(409, str(exc))
+            fresh = {k:v for k,v in params.items() if k not in {'devices','cpu_retry','retry_of'}}
+        elif validate_request: validate_request(old['project_id'], old['kind'], fresh)
         fresh['cpu_retry'] = True
         fresh['retry_of'] = jid
         try:
-            return service.create(old['project_id'], old['kind'], fresh, idem_key=request.headers.get('idempotency-key'), subject=subject or 'local')
+            return public_job(service.create(old['project_id'], old['kind'], fresh, idem_key=request.headers.get('idempotency-key'), subject=subject or 'local'))
         except ValueError as exc:
             raise HTTPException(409, str(exc))
     @router.get("/jobs/{jid}", **read_auth)
-    def get(jid): return owned(jid)
+    def get(jid): return public_job(owned(jid))
     @router.post("/jobs/{jid}/cancel", **write_auth)
-    def cancel(jid): owned(jid); return service.cancel(jid)
+    def cancel(jid): owned(jid); return public_job(service.cancel(jid))
     @router.get("/jobs/{jid}/result", **read_auth)
     def result(jid):
         owned(jid); value=service.result(jid)

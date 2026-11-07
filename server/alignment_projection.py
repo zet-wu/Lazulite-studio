@@ -5,39 +5,12 @@ import json
 import unicodedata as ud
 import xml.etree.ElementTree as ET
 from lazulite.models.japanese import JapaneseAlignmentRequest, JapaneseLine, JapaneseUnit, StartHint
-from lazulite.alignment.japanese.kana import is_kana_text, split_morae
-from lazulite.alignment.japanese.profile import JaHepburnProfile, is_hold
+from lazulite.alignment.japanese.input import prepare_input, InputOptions
+from lazulite.alignment.japanese.backend import MMS_VOCAB
 from .amll_compatibility import TT, TM, XML, ST, RUBY
 
 
-def normalized(text):
-    return ud.normalize('NFKC', text.replace('～', 'ー').replace('〜', 'ー'))
-
-
-def category(text):
-    value = normalized(text)
-    if is_kana_text(value) or is_hold(value): return 'ja'
-    if any(c.isascii() and c.isalpha() for c in value) and all(c.isascii() and (c.isalpha() or c in "'’") for c in value): return 'en'
-    if all(c.isspace() or ud.category(c)[0] in {'P','S'} for c in text): return 'separator'
-    return 'unknown'
-
-
-def runs(text):
-    clusters = []
-    for i, char in enumerate(text):
-        if ud.category(char).startswith('M') and clusters:
-            clusters[-1][1] += char
-        else: clusters.append([i, char])
-    output = []
-    for start, value in clusters:
-        kind = category(value)
-        if output and output[-1][2] == kind:
-            output[-1][1] += value
-        else: output.append([start, value, kind])
-    return output
-
-
-def project_alignment(snapshot, use_hints=False):
+def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=True, strip_tone_digits=False):
     root = ET.fromstring(snapshot['lyrics']['draftTtml'])
     rows = []
     for parent in root.iter(TT+'p'):
@@ -53,7 +26,6 @@ def project_alignment(snapshot, use_hints=False):
     skipped = set(snapshot['editing']['skippedAlignmentLineIds'])
     mapping, lines, unknown, hinted, emitted = [], [], set(), 0, 0
     scope = []
-    unit_counts = {}
     for row in rows:
         line_id = identity(row)
         if line_id in skipped: continue
@@ -71,27 +43,13 @@ def project_alignment(snapshot, use_hints=False):
                 scope.append({'object_id':identity(leaf), 'word_id':identity(word), 'line_id':line_id,
                               'kind':'ruby' if rubies else 'word', 'target_ids':[]})
             if not value: continue
-            def add(object_id, reading, language, a, b, source):
-                nonlocal emitted
-                if language == 'separator': return
-                pieces = [m.text for m in split_morae(normalized(reading))] if language == 'ja' else [normalized(reading)]
-                reading_offset = 0
-                for piece in pieces:
-                    uid = json.dumps([object_id, unit_counts.get(object_id, 0)], ensure_ascii=False, separators=(',', ':'))
-                    unit_counts[object_id] = unit_counts.get(object_id, 0) + 1
-                    units.append(JapaneseUnit(uid, (a, b), piece, language, source, (reading_offset, reading_offset+len(piece)) if piece else None))
-                    mapping.append({'unit_id': uid, 'object_id': object_id, 'word_id': identity(word), 'line_id': line_id, 'kind': 'ruby' if rubies else 'word'})
-                    reading_offset += len(piece)
-                if language == 'unknown': unknown.add(object_id)
-            if rubies:
-                for ruby in rubies:
-                    reading = ''.join(ruby.itertext())
-                    # Invalid Ruby is one unknown object, never a fallback to body text.
-                    lang = category(reading) if category(reading) in {'ja','separator'} else 'unknown'
-                    add(identity(ruby), reading, lang, start, len(text), 'ruby')
-            else:
-                for offset, part, lang in runs(value):
-                    add(identity(word), part, lang, start+offset, start+offset+len(part), 'body')
+            for leaf in rubies or [word]:
+                reading = ''.join(leaf.itertext()) if rubies else value
+                if reading and all(c.isspace() or ud.category(c)[0] in {'P','S'} for c in reading) and not all(c in 'ー〜～~' for c in reading):
+                    continue
+                uid = identity(leaf)
+                units.append(JapaneseUnit(uid, (start,len(text)), reading, 'unknown', 'ruby' if rubies else 'body'))
+                mapping.append({'unit_id':uid,'object_id':uid,'word_id':identity(word),'line_id':line_id,'kind':'ruby' if rubies else 'word'})
         hint = None
         if 'begin' not in row.get(ST+'null', '').split() and row.get('begin') is not None:
             value = Decimal(0)
@@ -99,11 +57,19 @@ def project_alignment(snapshot, use_hints=False):
             hinted += 1
             if use_hints: hint = StartHint(float(value), 'unknown')
         lines.append(JapaneseLine(line_id, text, tuple(units), hint))
-        profile = JaHepburnProfile().unit_texts([u.reading if u.reading_language != 'unknown' else '' for u in units], [u.reading_language for u in units], [[] for _ in units])
-        emitted += sum(bool(v) for v in profile)
+    original_readings = {u.unit_id:u.reading for l in lines for u in l.units}
+    original_mapping = {m['unit_id']:m for m in mapping}
+    vocabulary = model['vocabulary'] if model else MMS_VOCAB
+    blank = model['blank'] if model else 0
+    special = tuple(k for k in vocabulary if len(k)!=1 or k=='|')
+    prepared = prepare_input(JapaneseAlignmentRequest(tuple(lines)), vocabulary, blank, special,
+                             InputOptions(latin_normalize, strip_tone_digits))
+    request = prepared['request']
+    mapping = [{**original_mapping[origin], 'unit_id':uid} for uid,origin in prepared['origins'].items()]
+    unknown = {original_mapping[prepared['origins'][uid]]['object_id'] for uid,reason in prepared['problems'].items() if reason != 'profile_hold'}
+    emitted = sum(b>a for a,b in prepared['ranges'].values())
     by_object = {item['object_id']:item for item in scope}
     for item in mapping:
         by_object[item['object_id']]['target_ids'].append(item['unit_id'])
-    request = JapaneseAlignmentRequest(tuple(lines))
     return {'request': {'schema': 'lazulite-japanese-request-v1', **asdict(request)}, 'mapping': mapping, 'scope': scope,
-            'summary': {'line_count': len(lines), 'skipped_count': len(skipped), 'unknown_count': len(unknown), 'hint_count': hinted, 'emitting_count': emitted}}
+            'summary': {'unknown_objects': sorted(unknown), 'input_version':prepared['version'], 'inputs':[{'unit_id':u.unit_id,'object_id':original_mapping[prepared['origins'][u.unit_id]]['object_id'],'reading':u.reading,'original_reading':original_readings[prepared['origins'][u.unit_id]],'reading_range':u.reading_range,'model_text':prepared['texts'][u.unit_id],'problem':prepared['problems'].get(u.unit_id),'unknown_characters':prepared['unknown_characters'].get(u.unit_id,[])} for l in request.lines for u in l.units], 'line_count': len(lines), 'skipped_count': len(skipped), 'unknown_count': len(unknown), 'hint_count': hinted, 'emitting_count': emitted}}

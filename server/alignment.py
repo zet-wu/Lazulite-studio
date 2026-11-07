@@ -14,18 +14,14 @@ from .alignment_projection import project_alignment
 
 def alignment_unavailable():
     from importlib.util import find_spec
-    from lazulite.alignment.japanese.backend import inspect_model
-    path = os.getenv('STUDIO_NEXTFIRE_PATH')
-    if not path: return {'code':'model_path_missing','message':'STUDIO_NEXTFIRE_PATH is not configured'}
-    try: inspect_model(path)
-    except (OSError, ValueError, KeyError, TypeError) as error: return {'code':'model_invalid','message':str(error)}
-    if any(find_spec(name) is None for name in ('torch', 'transformers', 'soundfile', 'demucs')): return {'code':'dependencies_missing','message':'Alignment model dependencies are missing'}
+    if any(find_spec(name) is None for name in ('torch', 'torchaudio', 'transformers', 'uroman', 'soundfile', 'demucs')): return {'code':'dependencies_missing','message':'Alignment model dependencies are missing'}
     return None
 
 
 class AlignmentRunner:
-    def __init__(self, db, root):
+    def __init__(self, db, root, models=None):
         self.db, self.root = db, Path(root)
+        self.models = models
         self.worker = VocalProcess(module='server.alignment_worker')
 
     def close(self): self.worker.close()
@@ -39,14 +35,17 @@ class AlignmentRunner:
             return read_project(self.db.paths.resolve(row[0])), current['source_asset_id']
 
     def validate(self, pid, params):
-        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'merge_short_gaps', 'gap_threshold_ms'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'merge_short_gaps')):
+        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'merge_short_gaps', 'gap_threshold_ms', 'latin_normalize', 'strip_tone_digits', 'model_preview'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'merge_short_gaps', 'latin_normalize', 'strip_tone_digits')):
             raise ValueError('自动对齐只接受项目版本、布尔选项及行内空隙阈值')
         if type(params['gap_threshold_ms']) is not int or not 0 < params['gap_threshold_ms'] <= 9007199254740991:
             raise ValueError('行内空隙阈值必须为正的安全整数毫秒')
         if not params['merge_short_gaps']:
             params['gap_threshold_ms'] = 500
         snapshot, asset = self.snapshot(pid, params['revision'])
-        projection = project_alignment(snapshot, params['use_hints'])
+        if not isinstance(params['model_preview'], str): raise ValueError('需要有效模型预览')
+        model = self.models.capture(params['model_preview'], {k:params[k] for k in ('latin_normalize','strip_tone_digits','revision')})
+        projection = project_alignment(snapshot, params['use_hints'], model=model, **{k:params[k] for k in ('latin_normalize','strip_tone_digits')})
+        params['_model'] = model
         if not projection['summary']['line_count']: raise ValueError('没有未跳过的歌词行')
         if not projection['summary']['emitting_count']: raise ValueError('没有可用读音，无法计算')
         reason = alignment_unavailable()
@@ -65,7 +64,8 @@ def run_alignment(request, emit, cancelled):
     from lazulite.models.japanese import JapaneseAlignmentRequest
     from lazulite.alignment.japanese.run import align_japanese
     from lazulite.alignment.japanese.run import JapaneseConfig
-    from lazulite.alignment.japanese.backend import NextFireBackend, NextFireConfig
+    from lazulite.alignment.japanese.backend import open_backend
+    from .alignment_models import check_snapshot
     from .db import Database
     from .vocals import VocalRunner
     db = Database(request['database']); root = Path(request['root']); pid = request['project_id']; params = request['params']
@@ -74,7 +74,8 @@ def run_alignment(request, emit, cancelled):
     if asset != params['asset_id']: raise ValueError('源音频已改变，请重新运行')
     duration_ms = source_duration(db, pid, asset)
     if cancelled(): raise VocalCancelled()
-    projection = project_alignment(snapshot, params['use_hints'])
+    check_snapshot(params['_model'])
+    projection = project_alignment(snapshot, params['use_hints'], model=params['_model'], **{k:params[k] for k in ('latin_normalize','strip_tone_digits')})
     vocal = VocalRunner(db, root, cleanup=False)
     acoustics = snapshot['acoustics']; new_acoustics = None
     if acoustics['analysisId']:
@@ -100,10 +101,11 @@ def run_alignment(request, emit, cancelled):
         analysis=automatic, analysis_description={'configuration': metadata['analysis_config'], 'reference':'full_scale'},
         segments=selected, separation=metadata['model'])
     if not prepared.segments: raise ValueError('没有可用人声片段')
-    backend = NextFireBackend(NextFireConfig(Path(os.environ['STUDIO_NEXTFIRE_PATH']), device=params.get('devices', {}).get('alignment', {}).get('actual', os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu'))))
+    check_snapshot(params['_model'])
+    backend = open_backend(params['_model']['path'], device=params.get('devices', {}).get('alignment', {}).get('actual', os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu')))
     try:
         result = align_japanese(prepared, JapaneseAlignmentRequest.from_dict(projection['request']), backend=backend,
-            config=JapaneseConfig(hint_mode='auto' if params['use_hints'] else 'off', **{k:params[k] for k in ('line_blank', 'rest_blank', 'rest_token')}),
+            config=JapaneseConfig(hint_mode='auto' if params['use_hints'] else 'off', **{k:params[k] for k in ('line_blank', 'rest_blank', 'rest_token', 'latin_normalize', 'strip_tone_digits')}),
             cancel=cancelled, event_sink=lambda event: emit('stage', event.stage))
     except RuntimeError as exc:
         device = params.get('devices', {}).get('alignment', {}).get('actual', os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu'))
@@ -121,4 +123,5 @@ def run_alignment(request, emit, cancelled):
     result_data = asdict(result)
     backend_info = result_data.get('execution', {}).get('backend', {})
     backend_info.pop('model_path', None)
+    backend_info['model_name'] = params['_model']['name']
     return {'kind':'alignment', 'alignment':result_data, 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'normalization':automatic_normalization, 'summary':projection['summary']}

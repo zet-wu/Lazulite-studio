@@ -20,7 +20,7 @@ PROJECT_KEY = re.compile(r'^(?:lazulite-romanization-mode|studio:sync-offset|stu
 
 
 def allowed_key(key):
-    return key in PREFERENCE_KEYS or PROJECT_KEY.fullmatch(key) is not None or key in {'device.vocal', 'device.alignment', 'port'}
+    return key in PREFERENCE_KEYS or PROJECT_KEY.fullmatch(key) is not None or key in {'device.vocal', 'device.alignment', 'port', 'alignment.models_dir'}
 
 
 class SettingsConflict(Exception):
@@ -57,6 +57,9 @@ class RuntimeSettings:
                 if value is not None and (not isinstance(value, str) or len(value) > 16384): raise ValueError('偏好值无效')
                 if key == 'studio:ui-language' and value not in UI_LANGUAGES: raise ValueError('界面语言未注册')
                 if key.startswith('device.') and value not in {'auto', 'cpu'}: raise ValueError('设备只能选择自动或 CPU')
+                if key == 'alignment.models_dir' and value is not None:
+                    if not Path(value).is_absolute(): raise ValueError('模型总目录必须为绝对路径')
+                    list(Path(value).iterdir())
                 if key == 'port' and (not value or not value.isdecimal() or not 1024 <= int(value) <= 65535): raise ValueError('端口范围为 1024–65535')
             for key, value in changes.items():
                 if value is None: current['values'].pop(key, None)

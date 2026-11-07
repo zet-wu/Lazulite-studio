@@ -13,13 +13,13 @@ def test_projection_preserves_unknown_ids_unicode_ruby_and_display_order():
     assert [bg['line_id'], main['line_id']] == ['bg', 'main']
     assert bg['text'] == 'アー'
     assert main['text'] == '𠮷がlove12love ！'
-    assert [u['reading_language'] for u in main['units']] == ['unknown', 'ja', 'en', 'unknown', 'ja', 'unknown', 'ja']
-    assert main['units'][1]['source_range'] == (1, 3)
+    assert [u['reading_language'] for u in main['units']] == ['unknown', 'ja', 'unknown', 'ja', 'unknown', 'ja']
+    assert main['units'][1]['reading_range'] == (1, 3)
     assert main['units'][1]['reading'] == 'が'
-    assert main['units'][2]['reading'] == 'love'
+    assert main['units'][2]['reading'] == 'love12'
     assert main['units'][-3]['source_range'] == main['units'][-1]['source_range'] == (9, 13)
     assert main['start_hint'] == {'time': 0.0, 'source': 'unknown', 'route': None}
-    assert result['summary']['unknown_count'] == 2
+    assert result['summary']['unknown_count'] == 1
     assert all(m['object_id'] != 'space' for m in result['mapping'])
     assert project_alignment(snapshot)['request']['lines'][1]['start_hint'] is None
 
@@ -39,7 +39,7 @@ def test_multiple_background_order_and_english_ruby_are_independent():
     snapshot['lineOrder'] = ['bg2', 'main', 'bg']
     result = project_alignment(snapshot, True)
     assert [line['line_id'] for line in result['request']['lines']] == ['bg2', 'main', 'bg']
-    assert result['request']['lines'][0]['units'][0]['reading_language'] == 'en'
+    assert result['request']['lines'][0]['units'][0]['reading_language'] == 'unknown'
     assert result['request']['lines'][0]['units'][0]['reading'] == 'R'
     rubies = [unit for line in result['request']['lines'] for unit in line['units'] if unit['reading_source'] == 'ruby']
     assert [unit['reading'] for unit in rubies] == ['ら', 'bad', 'ぶ']
@@ -55,6 +55,22 @@ def test_complete_scope_includes_omitted_symbols_empty_body_and_ruby():
  scope={s['object_id']:s for s in result['scope']}
  assert set(scope)=={'sym','empty','mixed','r1','r2'}
  assert all(scope[k]['target_ids']==[] for k in ('sym','empty','r2'))
- assert all(len(scope[k]['target_ids'])==1 for k in ('mixed','r1'))
+ assert len(scope['mixed']['target_ids'])==2 and len(scope['r1']['target_ids'])==1
  assert result['summary']['emitting_count']==2
  assert [m['unit_id'] for m in result['mapping']]==[u['unit_id'] for l in result['request']['lines'] for u in l['units']]
+
+
+def test_ruby_precedence_options_and_original_objects():
+ import copy
+ snapshot=fixture();before=copy.deepcopy(snapshot)
+ normal=project_alignment(snapshot)
+ toned=project_alignment(snapshot,strip_tone_digits=True)
+ assert snapshot==before
+ assert any(u['reading']=='love12' and u['model_text']=='love' for u in toned['summary']['inputs'])
+ assert any(u['reading']=='bad' and u['model_text']=='bad' for u in normal['summary']['inputs'])
+ raw=project_alignment(snapshot,latin_normalize=False)
+ assert raw['summary']['unknown_count']>normal['summary']['unknown_count']
+ snapshot['lyrics']['draftTtml']=snapshot['lyrics']['draftTtml'].replace('>bad<','>ñ<')
+ failed=project_alignment(snapshot,latin_normalize=False)
+ assert 'r2' in failed['summary']['unknown_objects']
+ assert not any(u['reading']=='love' for u in failed['summary']['inputs'])
