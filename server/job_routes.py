@@ -1,5 +1,6 @@
 """HTTP adapter for the durable JobService; app.py supplies auth and ownership."""
 from __future__ import annotations
+import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
@@ -26,6 +27,21 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
     @router.post("/projects/{pid}/jobs/{kind}", status_code=202, **write_auth)
     def create_kind(pid: str, kind: str, body: JobParams, request: Request, subject=Depends(write_dependency) if write_dependency else None):
         check_project(pid)
+        # Resolve a lost launch response from its durable request before consulting the current catalog.
+        if kind == 'alignment' and request.headers.get('idempotency-key'):
+            with service.db.connect() as c:
+                previous=c.execute('SELECT job_id FROM job_idempotency WHERE project_id=? AND idem_key=?', (pid,request.headers['idempotency-key'])).fetchone()
+            if previous:
+                frozen={k:v for k,v in service.get(previous[0])['request'].items() if k!='devices'}
+                incoming=dict(body.params)
+                if incoming.get('merge_short_gaps') is False: incoming['gap_threshold_ms']=500
+                public={k:v for k,v in frozen.items() if k not in {'_model','asset_id'}}
+                if json.dumps(incoming, sort_keys=True) != json.dumps(public, sort_keys=True): raise HTTPException(409, 'idempotency key was used for another request')
+                from .alignment_models import check_snapshot
+                try:
+                    check_snapshot(frozen['_model'])
+                    return public_job(service.create(pid, kind, frozen, idem_key=request.headers['idempotency-key'], subject=subject or 'local'))
+                except ValueError as exc: raise HTTPException(409, str(exc))
         if validate_request:
             validate_request(pid, kind, body.params)
         try: return public_job(service.create(pid, kind, body.params, idem_key=request.headers.get("idempotency-key"), subject=subject or "local"))

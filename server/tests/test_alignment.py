@@ -106,7 +106,7 @@ def test_cpu_retry_uses_original_snapshot_after_catalog_switch(tmp_path,monkeypa
  client,db,revision=prepare(tmp_path,monkeypatch)
  with client:
   params={'revision':revision,**input_options(client,revision),'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500}
-  headers={'origin':'http://studio'}
+  headers={'origin':'http://studio','idempotency-key':'initial'}
   response=client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers=headers)
   assert response.status_code==202,response.text
   assert '_model' not in response.json()['request']
@@ -117,6 +117,10 @@ def test_cpu_retry_uses_original_snapshot_after_catalog_switch(tmp_path,monkeypa
   alternate=tmp_path/'alternate';model(alternate)
   monkeypatch.setenv('STUDIO_ALIGNMENT_MODELS_DIR',str(alternate))
   client.get('/api/v1/alignment-models',params={'refresh':True})
+  from server.alignment_models import AlignmentModels
+  monkeypatch.setattr(AlignmentModels,'capture',lambda *a:(_ for _ in ()).throw(AssertionError('lost response must reuse the durable snapshot')))
+  again=client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers=headers)
+  assert again.status_code==202 and again.json()['id']==jid
   reply=client.post(f'/api/v1/jobs/{jid}/retry-cpu',json={'revision':revision},headers={**headers,'idempotency-key':'cpu'})
   assert reply.status_code==202,reply.text
   retry=reply.json()['id'];assert wait(client,retry)['status']=='succeeded'
@@ -125,4 +129,4 @@ def test_cpu_retry_uses_original_snapshot_after_catalog_switch(tmp_path,monkeypa
   assert actual['_model']==original['_model'] and actual['latin_normalize'] is True
   (tmp_path/'models/model/model.pt').write_bytes(b'changed')
   assert client.post(f'/api/v1/jobs/{jid}/retry-cpu',json={'revision':revision},headers=headers).status_code==409
-  assert client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers=headers).status_code==422
+  assert client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers=headers).status_code==409
