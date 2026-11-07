@@ -1,3 +1,4 @@
+import { chooseLanguage } from '../../fixtures/language';
 import {expect,test,type Page} from '@playwright/test';
 const pid='music-packaging',url=`/api/v1/projects/${pid}/document`;
 async function setup(page:Page){
@@ -12,7 +13,7 @@ async function setup(page:Page){
  await page.route(/\/api\/v1\/jobs\/life(?:-cpu)?$/,async route=>{state.polls++;if(state.disconnects>0){state.disconnects--;await route.abort('failed');}else await route.fulfill({json:{id:'life',kind:'alignment',status:state.status,error:state.error}});});
  await page.route('**/api/v1/jobs/life/cancel',async route=>{state.cancels++;state.status='cancelled';await route.fulfill({json:{id:'life',kind:'alignment',status:'cancelled'}});});
  await page.route(/\/api\/v1\/jobs\/life(?:-cpu)?\/result$/,async route=>{state.results++;await route.fulfill({json:{kind:'alignment',binding:{project_id:pid,asset_id:asset,revision:state.revision},acoustics:null,scope:[{object_id:'w',word_id:'w',line_id:'a',kind:'word',target_ids:['u']}],mapping:[{unit_id:'u',object_id:'w',word_id:'w',line_id:'a',kind:'word'}],alignment:{schema:'lazulite-japanese-result-v1',units:[{unit_id:'u',line_id:'a',proposed_timing:{start:{time:1,source:'test'},end:{time:2,source:'test'}}}]}}});});
- await page.goto(`/projects/${pid}/edit`);await page.getByRole('button',{name:'音频处理',exact:true}).click();await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('button',{name:'开始对齐',exact:true}).click();await expect(page.getByRole('button',{name:'正在对齐',exact:true})).toBeDisabled();
+ await page.goto(`/projects/${pid}/edit`);await page.getByRole('button',{name:'音频处理',exact:true}).click();await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});await page.getByRole('button',{name:'开始对齐',exact:true}).click();await expect(page.getByRole('button',{name:'正在对齐',exact:true})).toBeDisabled();
  await expect.poll(()=>state.polls).toBeGreaterThan(0);
  return state;
 }
@@ -54,9 +55,9 @@ test(`keyboard dismiss preserves result and allows repeated operation`,async({pa
  const close=success.locator('..').getByRole('button',{name:'关闭提示'});
  await close.focus();await close.press('Enter');await expect(success).toHaveCount(0);
  expect(await page.evaluate(()=>document.activeElement?.tagName)).toBe('BUTTON');
- await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('button',{name:'开始对齐',exact:true}).click();
+ await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});await page.getByRole('button',{name:'开始对齐',exact:true}).click();
  const unchanged=page.getByRole('status').filter({hasText:'未更新歌词时间'});await expect(unchanged).toBeVisible();await unchanged.locator('..').getByRole('button',{name:'关闭提示'}).click();
- await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('button',{name:'开始对齐',exact:true}).click();await expect(unchanged).toBeVisible();
+ await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});await page.getByRole('button',{name:'开始对齐',exact:true}).click();await expect(unchanged).toBeVisible();
  // New project context does not inherit the old result or its timer.
  await page.goto('/projects');await page.goto(`/projects/${pid}/edit`);await expect(unchanged).toHaveCount(0);
  expect(state.starts).toBe(3);
@@ -125,16 +126,15 @@ test('a server cancellation keeps the row and editing lock until the terminal st
 
 test('language changes preserve a running operation and translate its existing result without reapplying',async({page})=>{
  const state=await setup(page);
- await page.locator('[data-top-menu="settings"] summary').click();
- const language=page.locator('[data-top-menu="settings"] select');await language.selectOption('en');
+ await chooseLanguage(page,'en');
  await expect(page.getByRole('button',{name:'Aligning',exact:true})).toBeDisabled();
  expect(state.starts).toBe(1);expect(state.cancels).toBe(0);
  state.status='succeeded';await expect(page.getByRole('status').filter({hasText:'Lyric times updated.'})).toBeVisible();
  expect(state.results).toBe(1);
- await language.selectOption('zh-Hant');
+ await chooseLanguage(page,'zh-Hant');
  await expect(page.getByRole('status').filter({hasText:'已更新歌詞時間'})).toBeVisible();
  expect(state.results).toBe(1);expect(state.starts).toBe(1);
- await language.selectOption('zh-Hans');
+ await chooseLanguage(page,'zh-Hans');
  await expect.poll(async()=>((await(await page.request.get('/api/v1/settings')).json()).values['studio:ui-language'])).toBe('zh-Hans');
 });
 

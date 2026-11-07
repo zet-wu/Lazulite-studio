@@ -31,6 +31,10 @@ def create_browser_app():
     add_media_project(root, db, store, 'music-packaging', audio, ttml)
     from server.tests.test_vocals import Separator
     add_real_vocal_fixture(root, db, store)
+    import os
+    from server.tests.test_alignment_models import model
+    model(root/'models')
+    os.environ['STUDIO_ALIGNMENT_MODELS_DIR']=str(root/'models')
     app = create_app(root, Settings(None, True), separator_factory=Separator)
     app.add_event_handler("shutdown", temporary.cleanup)
     return app

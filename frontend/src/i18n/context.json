@@ -2890,8 +2890,8 @@
     "parameterNotes": {}
   },
   "alignment.help": {
-    "context": "alignment interface: alignment.help",
-    "source": "请确认假名注音完整且与实际唱法一致。自动对齐使用正文和假名注音，处理期间无法编辑，完成后一次应用未跳过行的时间，可一次撤销。",
+    "context": "Alignment model selection and input preparation",
+    "source": "使用 Ruby 读音，无 Ruby 时使用正文；输入选项仅影响本次对齐。",
     "params": [],
     "parameterNotes": {}
   },
@@ -10987,7 +10987,7 @@
   },
   "capability.modelPath": {
     "context": "capability interface: capability.modelPath",
-    "source": "未配置日语声学模型目录（STUDIO_NEXTFIRE_PATH）",
+    "source": "未配置对齐模型总目录（STUDIO_ALIGNMENT_MODELS_DIR）",
     "params": [],
     "parameterNotes": {}
   },
@@ -11224,6 +11224,108 @@
   "metadata.noTags": {
     "context": "Lyrics metadata dialog: metadata.noTags",
     "source": "未读到可用标签。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.models": {
+    "context": "Alignment model selection and input preparation",
+    "source": "对齐模型管理",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.model": {
+    "context": "Alignment model selection and input preparation",
+    "source": "对齐模型",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.selectModel": {
+    "context": "Alignment model selection and input preparation",
+    "source": "请选择模型",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.modelMissing": {
+    "context": "Alignment model selection and input preparation",
+    "source": "原选择已不可用，请重新选择",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.directoryPortable": {
+    "context": "Alignment model selection and input preparation",
+    "source": "模型原位读取。路径应用后用于新任务。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.directoryServer": {
+    "context": "Alignment model selection and input preparation",
+    "source": "模型总目录由服务端部署配置管理。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.directory": {
+    "context": "Alignment model selection and input preparation",
+    "source": "模型总目录",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.applyDirectory": {
+    "context": "Alignment model selection and input preparation",
+    "source": "应用目录",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.defaultDirectory": {
+    "context": "Alignment model selection and input preparation",
+    "source": "恢复默认目录",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.refreshModels": {
+    "context": "Alignment model selection and input preparation",
+    "source": "刷新模型列表",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.noModels": {
+    "context": "Alignment model selection and input preparation",
+    "source": "没有可用模型，请配置目录并刷新。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.structureReady": {
+    "context": "Alignment model selection and input preparation",
+    "source": "结构检查通过",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.modelQuality": {
+    "context": "Alignment model selection and input preparation",
+    "source": "结构检查不代表对齐质量验收。MMS_FA 在已测日语歌曲上存在尾点偏早问题。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.latinNormalize": {
+    "context": "Alignment model selection and input preparation",
+    "source": "拉丁归一化",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.stripTones": {
+    "context": "Alignment model selection and input preparation",
+    "source": "去除调号数字",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.inputPreview": {
+    "context": "Alignment model selection and input preparation",
+    "source": "实际模型输入",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.locateInput": {
+    "context": "Alignment model selection and input preparation",
+    "source": "定位无法编码的歌词",
     "params": [],
     "parameterNotes": {}
   }
