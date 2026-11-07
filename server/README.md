@@ -27,7 +27,7 @@ FastAPI 提供同源 `/api/v1` API，SQLite 管理项目、资源索引、修订
 
 ## 模型与媒体
 
-Lazulite 源码位于仓库根目录的固定 Git 子模块 `vendor/Lazulite`，基础安装从仓库根目录读取 requirements。`STUDIO_VOCAL_MODEL` 默认 `htdemucs`，`STUDIO_VOCAL_DEVICE` 默认 `cpu`；自动对齐首次分离使用 `htdemucs`。`STUDIO_NEXTFIRE_PATH` 提供本地 Wav2Vec2 CTC 模型目录，`STUDIO_ALIGNMENT_DEVICE` 默认 `cpu`。模型可用性检查读取配置，计算由任务子进程执行。
+Lazulite 源码位于仓库根目录的固定 Git 子模块 `vendor/Lazulite`，基础安装从仓库根目录读取 requirements。`STUDIO_VOCAL_MODEL` 默认 `htdemucs`，`STUDIO_VOCAL_DEVICE` 默认 `cpu`；自动对齐首次分离使用 `htdemucs`。`STUDIO_ALIGNMENT_MODELS_DIR` 提供对齐模型总目录，直接子目录支持 HF Wav2Vec2 CTC 和带 `alignment-model.json` 声明的 TorchAudio MMS_FA，`STUDIO_ALIGNMENT_DEVICE` 默认 `cpu`。模型可用性检查读取配置，计算由任务子进程执行。
 
 人声以 44.1 kHz 双声道 float32 输入 Demucs，按整曲峰值处理后保存一份 PCM_16 WAV；分析重读此文件，能量保存 `main_rms`，核心片段和配置保存于独立分析记录。每条记录以 `audio_result_id` 引用音频所有者，重分析复用 WAV。访问及复用通过 WAV 格式、位深、实际帧数、采样率与声道检查可用性，音频所有者 ID 管理持久资源身份；复用条件由源资产、公开配置及生成规则决定。已注册分析与音频保留至项目删除。
 
@@ -78,3 +78,8 @@ TTML 草稿保存保留待修正时间与 Studio 身份，发布阶段检查实�
 项目声学快照校验区间与分析归属，允许手工端点超过源音频时长。自动对齐读取新分析时按源范围求交，解码取样再与实际 PCM 范围求交；人工快照保留原时间。
 
 `music_replacement.py` 在任务启动共用的 SQLite 写事务中核对 revision、源身份和活动任务，切换暂存目录及声学为空的新修订。`.replacing` 日志支持启动回滚与提交后清理；清理失败由项目状态报告并提供重试入口。每次主动上传使用新资产身份，幂等重试复用原结果。旧声学、任务、历史修订及源文件随成功替换回收。
+
+
+模型管理窗口轻量扫描直接子目录，显示结构状态；对齐窗口明确选择模型并预览 Ruby 优先、正文回退的实际输入。拉丁归一化默认开启、末尾调号数字删除默认关闭，两项参数与模型文件大小/修改时间一起冻结到任务。CPU 重试沿用该快照，模型替换后需重新发起。MMS_FA 在既有日语样本中存在尾点偏早限制。
+
+便携包默认从包根 `models/` 读取对齐模型，`vocal-models/demucs/` 读取人声分离模型。模型管理窗口可应用绝对路径，保存于 `data/settings.json` 的 `alignment.models_dir`；恢复默认后随包移动动态解析。服务端通过环境变量分别配置对齐总目录和 `STUDIO_DEMUCS_REPO`。MMS_FA 子目录声明示例：`{"type":"torchaudio-mms-fa","weights":"model.pt"}`，权重使用原始 MMS_FA 检查点。包内 Python 安装 uroman 1.3.1.1 及其数据/许可，离线冒烟检查实际转写。

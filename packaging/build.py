@@ -232,7 +232,7 @@ def build(target, output):
     ffmpeg(root, spec['ffmpeg'], downloads, work)
     for family in ('demucs', 'nextfire'):
         for item in models[family]['files']:
-            destination = root / 'models' / family / item['name']
+            destination = root / ('vocal-models' if family == 'demucs' else 'models') / family / item['name']
             destination.parent.mkdir(parents=True, exist_ok=True)
             if item['name'] == 'htdemucs.yaml':
                 run([python, '-I', '-c', 'import demucs,pathlib,shutil,sys; shutil.copyfile(pathlib.Path(demucs.__file__).parent/"remote/htdemucs.yaml",sys.argv[1])', destination], cwd=work)

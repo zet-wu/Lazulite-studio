@@ -203,4 +203,4 @@ python -m pip install -r server/requirements-alignment.txt
 
 该文件包含人声依赖并引用 `constraints-alignment.txt` 的 Linux CUDA 设备栈约束。Windows/macOS 的 Torch／torchaudio 安装需选用相容的平台构建。
 
-准备本地 C2C 对齐模型目录，包含 `config.json`、`processor_config.json`、`vocab.json`、`model.safetensors` 等模型资源，然后设置环境变量 `STUDIO_NEXTFIRE_PATH` 为目录绝对路径。环境变量 `STUDIO_ALIGNMENT_DEVICE` 使用 `cpu` 或 `cuda`，默认 `cpu`；自动对齐首次准备人声使用 `htdemucs` 和 `STUDIO_VOCAL_DEVICE`。设置页显示当前能力和缺失原因。
+准备本地 C2C 对齐模型目录，包含 `config.json`、`processor_config.json`、`vocab.json`、`model.safetensors` 等模型资源，然后将模型放在总目录的直接子目录，并设置 `STUDIO_ALIGNMENT_MODELS_DIR` 为总目录绝对路径。环境变量 `STUDIO_ALIGNMENT_DEVICE` 使用 `cpu` 或 `cuda`，默认 `cpu`；自动对齐首次准备人声使用 `htdemucs` 和 `STUDIO_VOCAL_DEVICE`。设置页显示当前能力和缺失原因。

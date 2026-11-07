@@ -17,3 +17,9 @@ Mac 版未经开发者签名和公证；首次打开可能受系统安全策略�
 data 保存项目和设置，logs 保存日志。
 
 
+
+对齐模型：默认放在包根 models/ 的直接子目录；在“对齐模型管理”中刷新并选择。
+可在便携版管理窗口应用自定义绝对路径或恢复默认目录。默认目录随整包移动重新解析。
+人声模型：包内 vocal-models/demucs/，与对齐模型目录独立。
+MMS_FA：模型子目录包含 alignment-model.json（type 为 torchaudio-mms-fa，weights 为 model.pt）及原始权重。
+MMS_FA 在已测日语歌曲上有尾点偏早现象；模型结构检查通过不等于质量验收通过。

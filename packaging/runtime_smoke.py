@@ -20,7 +20,8 @@ def main():
         raise RuntimeError('冒烟必须使用包内解释器')
     manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
     assert platform.python_version() == manifest['python'], (platform.python_version(), manifest['python'])
-    import fastapi, uvicorn, torch, torchaudio, demucs, transformers, soundfile, lazulite
+    import fastapi, uvicorn, torch, torchaudio, demucs, transformers, soundfile, lazulite, uroman
+    assert uroman.Uroman().romanize_string("你好").replace(" ", "") == "nihao"
     from sudachipy import dictionary
     from opencc import OpenCC
     assert dictionary.Dictionary().create().tokenize('日本語')
