@@ -1,5 +1,4 @@
 import { AlignmentModelsDialog } from './AlignmentModelsDialog';
-import { useEditorSelection } from './editor/SelectionContext';
 import { capabilityReason } from './task-messages';
 import { message as describeMessage, messageList, MessageError, errorMessage, type Message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
@@ -26,12 +25,11 @@ export type AlignmentControl = {
   lock: () => { source: ProjectDocument; release: () => void; apply: (project: ProjectDocument) => void };
   save: () => Promise<{revision:string} | undefined>;
 };
-export function AlignmentPanel({pid, assetId, durationMs, project, control, visible, finishDraft}: {
-  pid:string; assetId?:string; durationMs:number|null; project:ProjectDocument; control:AlignmentControl; visible:boolean; finishDraft:()=>boolean;
+export function AlignmentPanel({pid, assetId, durationMs, project, control, visible, finishDraft, locateInput}: {
+  pid:string; assetId?:string; durationMs:number|null; project:ProjectDocument; control:AlignmentControl; visible:boolean; finishDraft:()=>boolean; locateInput:(id:string)=>void;
 }) {
   useTranslation();
   const ui=useAudioReview();
-  const selection=useEditorSelection();
   const [catalog,setCatalog]=useState<AlignmentCatalog|null>(null),[manage,setManage]=useState(false),[model,setModel]=useState('');
   const [previewRevision,setPreviewRevision]=useState(''),[previewError,setPreviewError]=useState('');
   const previewSerial=useRef(0);
@@ -84,15 +82,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
     }).catch(e=>{if(alive&&serial===previewSerial.current)setPreviewError((e as Error).message);});
     return()=>{alive=false;};
   },[dialog,pid,previewRevision,model,options.latin_normalize,options.strip_tone_digits,catalog]);
-  const locate=(id:string)=>{
-    for(const line of project.lyrics.lines)for(const word of line.words){
-      const ruby=word.rubyUnits.some(unit=>unit.id===id);
-      if(word.id===id||ruby){
-        const target=ruby?{kind:'ruby' as const,lineId:line.id,wordId:word.id,ids:[id],anchorId:id,activeId:id}:{kind:'words' as const,lineId:line.id,ids:[id],anchorId:id,activeId:id};
-        setDialog(false);selection?.setSelection(target);selection?.requestFocus(target,'canvas');return;
-      }
-    }
-  };
+  const locate=(id:string)=>{setDialog(false);locateInput(id);};
   const start=async(retryCpu = false)=>{
     if (operation.current) return;
     const threshold=options.merge_short_gaps?Number(gapDraft):500;

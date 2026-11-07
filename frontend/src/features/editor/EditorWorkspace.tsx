@@ -896,7 +896,12 @@ function EditorWorkspaceContent(props: Props) {
       {props.onImportAudio && <button data-role="secondary" disabled={props.audioImportDisabled || props.alignment?.locked || props.saving} onClick={() => { if (finishForAudioImport()) props.onImportAudio?.(); }}>{t(props.sourceAssetId ? 'music.replace' : 'menu.importAudio')}</button>}
       <div className={vocalStyles.alignmentTools} ref={audioReview.setAlignmentHost}/>
     </div>}
-    {props.projectId && props.project && props.alignment && <AlignmentPanel pid={props.projectId} project={props.project} control={props.alignment} assetId={props.sourceAssetId} durationMs={props.audioDurationMs??null} visible={mode==='audio'} finishDraft={()=>{
+    {props.projectId && props.project && props.alignment && <AlignmentPanel pid={props.projectId} project={props.project} control={props.alignment} assetId={props.sourceAssetId} durationMs={props.audioDurationMs??null} visible={mode==='audio'} locateInput={id=>{
+      for(const line of document.lines)for(const word of line.words){
+        const ruby=word.rubyUnits.some(unit=>unit.id===id);
+        if(word.id===id||ruby){setMode('edit');if(ruby)selectRuby(line,word,id);else selectWord(line,word);requestLocate(line.id,`[data-${ruby?'ruby':'word'}-id="${CSS.escape(id)}"]`);return;}
+      }
+    }} finishDraft={()=>{
       if(canvasComposing.current || !finishSyncDraft())return false;
       flushSync(()=>{const active=window.document.activeElement;if(active instanceof HTMLElement)active.blur();});
       return !editRejected.current && !pageRef.current?.querySelector('[aria-invalid="true"]');

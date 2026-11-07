@@ -49,3 +49,16 @@ def test_portable_default_and_applied_path(tmp_path):
     settings=RuntimeSettings(moved/'settings.json')
     assert AlignmentModels(settings,moved).directory()==moved/'models'
     with pytest.raises(ValueError):AlignmentModels().apply(str(custom))
+
+
+def test_inaccessible_refresh_drops_the_old_list(tmp_path,monkeypatch):
+ root=tmp_path/'models';model(root)
+ monkeypatch.setenv('STUDIO_ALIGNMENT_MODELS_DIR',str(root))
+ catalog=AlignmentModels();assert catalog.scan()['items']
+ original=Path.iterdir
+ def entries(path):
+  if path==root:raise PermissionError('access denied')
+  return original(path)
+ monkeypatch.setattr(Path,'iterdir',entries)
+ result=catalog.scan(True)
+ assert result['error']=='access denied' and result['items']==[]
