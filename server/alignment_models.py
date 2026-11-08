@@ -40,6 +40,13 @@ class AlignmentModels:
         value = os.getenv('STUDIO_ALIGNMENT_MODELS_DIR')
         return Path(value) if value else None
 
+    def scan_error(self, exc, root):
+        if self.package_root is not None:
+            return str(exc)
+        if isinstance(exc, OSError):
+            return exc.strerror or type(exc).__name__
+        return str(exc).replace(str(root), '[models]') if root is not None else str(exc)
+
     def scan(self, refresh=False):
         with self.lock:
             root = self.directory()
@@ -63,9 +70,9 @@ class AlignmentModels:
                     except UnsupportedModel:
                         continue
                     except (OSError, ValueError, KeyError, TypeError) as exc:
-                        items.append({'id':None,'name':child.name,'type':None,'status':'invalid','reason':str(exc)})
+                        items.append({'id':None,'name':child.name,'type':None,'status':'invalid','reason':self.scan_error(exc, root)})
             except (OSError, ValueError) as exc:
-                error = str(exc)
+                error = self.scan_error(exc, root)
             self.catalog = {'directory':str(root or ''),'source':'portable' if self.package_root else 'environment',
                             'editable':self.package_root is not None,'items':items,'error':error}
             return self.catalog

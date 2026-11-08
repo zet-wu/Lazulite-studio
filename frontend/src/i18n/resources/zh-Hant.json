@@ -453,7 +453,6 @@
   "task.retryCpu": "使用 CPU 重試",
   "alignment.retry": "重試自動對齊",
   "alignment.start": "開始對齊",
-  "alignment.help": "使用 Ruby 讀音，無 Ruby 時使用正文；輸入選項僅影響本次對齊。",
   "alignment.useStarts": "使用既有行起始時間輔助對齊",
   "alignment.startsHelp": "適合已有大致準確行首的歌詞",
   "alignment.noStarts": "參與行沒有既有行首",
@@ -514,7 +513,7 @@
   "alignment.cleared": "清除 {{count}} 個詞／注音的缺失端點",
   "alignment.retained": "{{count}} 個詞／注音的部分時間保留原值",
   "alignment.scope": "將對齊 {{included}} 行，略過 {{skipped}} 行",
-  "alignment.unknownReadings": "有 {{count}} 處缺少可用讀音，相關時間可能保留原值",
+  "alignment.unknownReadings": "有 {{count}} 處缺少可用讀音",
   "alignment.mergeGapsLabel": "將短於門檻的行內間隙併入前詞",
   "task.vocalProgress": "人聲處理 · {{progress}}{{device}}",
   "task.alignmentProgress": "自動對齊 · {{progress}}{{device}}",
@@ -1695,7 +1694,6 @@
   "alignment.model": "對齊模型",
   "alignment.selectModel": "請選擇模型",
   "alignment.modelMissing": "原選擇已不可用，請重新選擇",
-  "alignment.directoryPortable": "模型原位讀取。路徑套用後用於新工作。",
   "alignment.directoryServer": "模型總目錄由伺服器部署設定管理。",
   "alignment.directory": "模型總目錄",
   "alignment.applyDirectory": "套用目錄",
@@ -1703,9 +1701,9 @@
   "alignment.refreshModels": "重新整理模型清單",
   "alignment.noModels": "沒有可用模型，請設定目錄並重新整理。",
   "alignment.structureReady": "結構檢查通過",
-  "alignment.modelQuality": "結構檢查不代表對齊品質驗收。MMS_FA 在已測日語歌曲上存在尾點偏早問題。",
   "alignment.latinNormalize": "拉丁正規化",
   "alignment.stripTones": "移除聲調數字",
-  "alignment.inputPreview": "實際模型輸入",
-  "alignment.locateInput": "定位無法編碼的歌詞"
+  "alignment.preprocessing": "前處理選項",
+  "alignment.postprocessing": "後處理選項",
+  "alignment.preparingInput": "正在準備對齊輸入…"
 }

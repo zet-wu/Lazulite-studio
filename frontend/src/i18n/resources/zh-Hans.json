@@ -453,7 +453,6 @@
   "task.retryCpu": "使用 CPU 重试",
   "alignment.retry": "重试自动对齐",
   "alignment.start": "开始对齐",
-  "alignment.help": "使用 Ruby 读音，无 Ruby 时使用正文；输入选项仅影响本次对齐。",
   "alignment.useStarts": "使用已有行起始时间辅助对齐",
   "alignment.startsHelp": "适合已有大致准确行首的歌词",
   "alignment.noStarts": "参与行没有已有行首",
@@ -514,7 +513,7 @@
   "alignment.cleared": "清空 {{count}} 个词／注音的缺失端点",
   "alignment.retained": "{{count}} 个词／注音部分时间保留原值",
   "alignment.scope": "将对齐 {{included}} 行，跳过 {{skipped}} 行",
-  "alignment.unknownReadings": "有 {{count}} 处缺少可用读音，相关时间可能保留原值",
+  "alignment.unknownReadings": "有 {{count}} 处缺少可用读音",
   "alignment.mergeGapsLabel": "将短于阈值的行内空隙并入前词",
   "task.vocalProgress": "人声处理 · {{progress}}{{device}}",
   "task.alignmentProgress": "自动对齐 · {{progress}}{{device}}",
@@ -1695,7 +1694,6 @@
   "alignment.model": "对齐模型",
   "alignment.selectModel": "请选择模型",
   "alignment.modelMissing": "原选择已不可用，请重新选择",
-  "alignment.directoryPortable": "模型原位读取。路径应用后用于新任务。",
   "alignment.directoryServer": "模型总目录由服务端部署配置管理。",
   "alignment.directory": "模型总目录",
   "alignment.applyDirectory": "应用目录",
@@ -1703,9 +1701,9 @@
   "alignment.refreshModels": "刷新模型列表",
   "alignment.noModels": "没有可用模型，请配置目录并刷新。",
   "alignment.structureReady": "结构检查通过",
-  "alignment.modelQuality": "结构检查不代表对齐质量验收。MMS_FA 在已测日语歌曲上存在尾点偏早问题。",
   "alignment.latinNormalize": "拉丁归一化",
   "alignment.stripTones": "去除调号数字",
-  "alignment.inputPreview": "实际模型输入",
-  "alignment.locateInput": "定位无法编码的歌词"
+  "alignment.preprocessing": "前处理选项",
+  "alignment.postprocessing": "后处理选项",
+  "alignment.preparingInput": "正在准备对齐输入…"
 }

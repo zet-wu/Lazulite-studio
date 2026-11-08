@@ -1,25 +1,38 @@
-import { useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { alignmentApi, type AlignmentCatalog } from '../adapters/http/alignment';
 import { SettingsDialog } from './editor/SettingsDialog';
 import { IconButton } from '../shared/Controls';
+import styles from './alignment.module.css';
 
-export function AlignmentModelsDialog({catalog, update, close}: {catalog:AlignmentCatalog|null; update:(value:AlignmentCatalog)=>void; close:()=>void}) {
+export function AlignmentModelsDialog({close, returnFocus}: {close:()=>void; returnFocus:()=>HTMLElement|null}) {
   const {t}=useTranslation();
-  const [draft,setDraft]=useState(catalog?.directory??''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const directoryId=useId();
+  const [catalog,setCatalog]=useState<AlignmentCatalog|null>(null);
+  const [draft,setDraft]=useState(''),[busy,setBusy]=useState(true),[error,setError]=useState('');
+  useEffect(()=>{
+    let alive=true;
+    void alignmentApi.models().then(value=>{if(alive){setCatalog(value);setDraft(value.directory);}})
+      .catch(e=>{if(alive)setError((e as Error).message);}).finally(()=>{if(alive)setBusy(false);});
+    return()=>{alive=false;};
+  },[]);
   const run=async(path?:string|null)=>{
     setBusy(true);setError('');
-    try {const value=path===undefined?await alignmentApi.models(true):await alignmentApi.directory(path);update(value);if(path!==undefined)setDraft(value.directory);}
+    try {const value=path===undefined?await alignmentApi.models(true):await alignmentApi.directory(path);setCatalog(value);if(path!==undefined||!catalog)setDraft(value.directory);}
     catch(e){setError((e as Error).message);}finally{setBusy(false);}
   };
-  return <SettingsDialog title={t('alignment.models')} close={close} actions={<button data-role="secondary" onClick={close}>{t('common.close')}</button>}>
-    <p>{t(catalog?.editable?'alignment.directoryPortable':'alignment.directoryServer')}</p>
-    <p>{catalog?.directory}</p>
-    {catalog?.editable&&<><label>{t('alignment.directory')}<input value={draft} onChange={e=>setDraft(e.target.value)} disabled={busy}/></label><button data-role="primary" disabled={busy} onClick={()=>void run(draft)}>{t('alignment.applyDirectory')}</button><button data-role="secondary" disabled={busy} onClick={()=>void run(null)}>{t('alignment.defaultDirectory')}</button></>}
-    <IconButton icon="refresh" label={t('alignment.refreshModels')} data-role="secondary" disabled={busy} onClick={()=>void run()}/>
+  const refresh=<IconButton icon="refresh" label={t('alignment.refreshModels')} data-role="secondary" disabled={busy} onClick={()=>void run()}/>;
+  return <SettingsDialog title={t('alignment.models')} close={close} returnFocus={returnFocus} actions={<button data-role="secondary" onClick={close}>{t('common.close')}</button>}>
+    {catalog?.editable?<>
+      <label htmlFor={directoryId}>{t('alignment.directory')}</label>
+      <div className={styles.directoryRow}><input id={directoryId} value={draft} onChange={e=>setDraft(e.target.value)} disabled={busy}/>{refresh}</div>
+      <div className={styles.directoryActions}><button data-role="primary" disabled={busy} onClick={()=>void run(draft)}>{t('alignment.applyDirectory')}</button><button data-role="secondary" disabled={busy} onClick={()=>void run(null)}>{t('alignment.defaultDirectory')}</button></div>
+    </>:<div className={styles.directoryRow}><small className={styles.description}>{catalog?t('alignment.directoryServer'):t('alignment.checkingModels')}</small>{refresh}</div>}
     {(error||catalog?.error)&&<p role="alert">{error||catalog?.error}</p>}
-    {!catalog?.items.length&&<p>{t('alignment.noModels')}</p>}
-    <ul>{catalog?.items.map(item=><li key={item.name}><strong>{item.name}</strong> · {item.type} · {item.status==='ready'?t('alignment.structureReady'):item.reason}</li>)}</ul>
-    <p>{t('alignment.modelQuality')}</p>
+    {catalog&&!catalog.items.some(item=>item.status==='ready')&&<p>{t('alignment.noModels')}</p>}
+    <ul className={styles.modelCards}>{catalog?.items.map(item=><li key={item.name}>
+      <div><strong>{item.name}</strong>{item.type&&<> · {item.type}</>}</div>
+      <small className={item.status==='ready'?styles.description:styles.modelError}>{item.status==='ready'?t('alignment.structureReady'):item.reason}</small>
+    </li>)}</ul>
   </SettingsDialog>;
 }

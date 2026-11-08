@@ -16,7 +16,8 @@ test('models remain explicitly selected and stale input previews cannot enable s
   await page.getByRole('button',{name:'自动对齐',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'自动对齐',exact:true}),start=dialog.getByRole('button',{name:'开始对齐'});
   await expect(start).toBeDisabled();
-  await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption('one');
+  await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).press('Enter');
+  await dialog.getByRole('option',{name:'MMS_FA · torchaudio-mms-fa'}).click();
   await expect(start).toBeEnabled();
   await dialog.getByRole('checkbox',{name:'去除调号数字',exact:true}).check();
   await expect.poll(()=>delayed).toBe(true);await expect(start).toBeDisabled();
@@ -26,28 +27,37 @@ test('models remain explicitly selected and stale input previews cannot enable s
   const stale=page.waitForResponse(response=>response.url().includes('strip_tone_digits=true'));release();await stale;
   await page.waitForTimeout(100);
   await expect(start).toBeDisabled();
-  await dialog.getByRole('button',{name:'对齐模型管理',exact:true}).click();
+  await dialog.getByRole('button',{name:'取消',exact:true}).click();
+  await page.locator('[data-top-menu="settings"] summary').click();
+  await page.getByRole('button',{name:'对齐模型管理',exact:true}).click();
   items=[];
   await page.getByRole('button',{name:'刷新模型列表'}).click();
   await expect(page.getByText('没有可用模型，请配置目录并刷新。')).toBeVisible();
   await page.getByRole('button',{name:'关闭',exact:true}).click();
+  await expect(page.locator('[data-top-menu="settings"] summary')).toBeFocused();
+  await page.getByRole('button',{name:'自动对齐',exact:true}).click();
   await expect(dialog.getByRole('combobox',{name:'对齐模型',exact:true})).toHaveValue('one');
   await expect(start).toBeDisabled();
 });
 
-test('unencodable preview locates the original editing object',async({page})=>{
- const url='/api/v1/projects/media-offset/document';
- const before=await(await page.request.get(url)).json();
- const document={...before.document,karaoke:{...before.document.karaoke,lineGroups:{line:'main'},cues:[]},lineOrder:[],editing:{...before.document.editing,skippedAlignmentLineIds:[],endLinks:{},emptyBeats:{}},lyrics:{draftTtml:'<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="line"><span studio:id="unknownword">ñ</span></p></body></tt>'}};
- expect((await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{...before,document}})).ok()).toBeTruthy();
- await page.route('**/api/v1/capabilities',r=>r.fulfill({json:{schema_version:'studio-capabilities-v1',items:[{id:'job.alignment',enabled:true,reason:null}]}}));
- await page.goto('/projects/media-offset/edit');await page.getByRole('button',{name:'音频处理',exact:true}).click();await page.getByRole('button',{name:'自动对齐',exact:true}).click();
- const dialog=page.getByRole('dialog',{name:'自动对齐',exact:true});
- await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});
- await dialog.getByRole('checkbox',{name:'拉丁归一化',exact:true}).uncheck();
- await dialog.getByText('实际模型输入',{exact:true}).click();
- await dialog.getByRole('button',{name:'定位无法编码的歌词',exact:true}).click();
- await expect(dialog).toHaveCount(0);
- await expect(page.getByRole('button',{name:'编辑',exact:true})).toHaveAttribute('aria-current','page');
- await expect(page.locator('[data-word-id="unknownword"]')).toHaveClass(/selected/);
+test('settings manager is reachable without a project and refresh keeps the directory draft',async({page})=>{
+  let directory='/active';const applied:(string|null)[]=[];
+  const catalog=()=>({directory,editable:true,items:[{id:null,name:'broken',type:null,status:'invalid',reason:'Missing weights'}],error:null});
+  await page.route('**/api/v1/alignment-models?*',r=>r.fulfill({json:catalog()}));
+  await page.route('**/api/v1/alignment-models/directory',async r=>{
+    applied.push(r.request().postDataJSON().path);directory=applied.at(-1)??'/default';await r.fulfill({json:catalog()});
+  });
+  await page.goto('/projects');
+  await page.locator('[data-top-menu="settings"] summary').click();
+  await page.getByRole('button',{name:'对齐模型管理',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'对齐模型管理'}),input=dialog.getByRole('textbox');
+  await expect(input).toHaveValue('/active');await input.fill('/draft');
+  await dialog.getByRole('button',{name:'刷新模型列表'}).click();
+  await expect(dialog.getByRole('button',{name:'刷新模型列表'})).toBeEnabled();
+  await expect(input).toHaveValue('/draft');expect(applied).toEqual([]);
+  await expect(dialog.getByText('Missing weights')).toBeVisible();
+  await expect(dialog.getByText('没有可用模型，请配置目录并刷新。')).toBeVisible();
+  await dialog.getByRole('button',{name:'应用目录',exact:true}).click();
+  await expect(dialog.getByRole('button',{name:'应用目录',exact:true})).toBeEnabled();
+  expect(applied).toEqual(['/draft']);
 });

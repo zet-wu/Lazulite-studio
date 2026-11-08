@@ -4,7 +4,7 @@ import type { Job } from './jobs';
 export type AlignmentOptions = {latin_normalize:boolean; strip_tone_digits:boolean; model_preview:string; use_hints:boolean; line_blank:boolean; rest_blank:boolean; rest_token:boolean; clear_unmatched:boolean; merge_short_gaps:boolean; gap_threshold_ms:number};
 export const defaultAlignmentOptions = (): AlignmentOptions => ({latin_normalize:true, strip_tone_digits:false, model_preview:'', use_hints:false, line_blank:false, rest_blank:false, rest_token:false, clear_unmatched:false, merge_short_gaps:false, gap_threshold_ms:500});
 export type AlignmentCatalog = {directory:string;source:string;editable:boolean;error:string|null;items:{id:string|null;name:string;type:string|null;status:string;reason?:string}[]};
-export type AlignmentSummary = {model_preview:string; unknown_objects:string[]; inputs:{unit_id:string;object_id:string;reading:string;model_text:string;problem:string|null;unknown_characters:string[]}[];line_count:number; skipped_count:number; unknown_count:number; hint_count:number; emitting_count:number};
+export type AlignmentSummary = {model_preview:string; line_count:number; skipped_count:number; unknown_count:number; hint_count:number; emitting_count:number};
 export async function alignmentCall<T>(path: string, body?: unknown, key?: string, keepalive = false): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {method:body === undefined ? 'GET':'POST', credentials:'include', keepalive,
     headers:requestHeaders({'Content-Type':'application/json', ...(key ? {'Idempotency-Key':key}: {})}), body:body === undefined ? undefined:JSON.stringify(body)});

@@ -2889,12 +2889,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "alignment.help": {
-    "context": "Alignment model selection and input preparation",
-    "source": "使用 Ruby 读音，无 Ruby 时使用正文；输入选项仅影响本次对齐。",
-    "params": [],
-    "parameterNotes": {}
-  },
   "alignment.useStarts": {
     "context": "alignment interface: alignment.useStarts",
     "source": "使用已有行起始时间辅助对齐",
@@ -3293,7 +3287,7 @@
   },
   "alignment.unknownReadings": {
     "context": "alignment interface: alignment.unknownReadings",
-    "source": "有 {{count}} 处缺少可用读音，相关时间可能保留原值",
+    "source": "有 {{count}} 处缺少可用读音",
     "params": [
       "count"
     ],
@@ -11251,12 +11245,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "alignment.directoryPortable": {
-    "context": "Alignment model selection and input preparation",
-    "source": "模型原位读取。路径应用后用于新任务。",
-    "params": [],
-    "parameterNotes": {}
-  },
   "alignment.directoryServer": {
     "context": "Alignment model selection and input preparation",
     "source": "模型总目录由服务端部署配置管理。",
@@ -11299,12 +11287,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "alignment.modelQuality": {
-    "context": "Alignment model selection and input preparation",
-    "source": "结构检查不代表对齐质量验收。MMS_FA 在已测日语歌曲上存在尾点偏早问题。",
-    "params": [],
-    "parameterNotes": {}
-  },
   "alignment.latinNormalize": {
     "context": "Alignment model selection and input preparation",
     "source": "拉丁归一化",
@@ -11317,15 +11299,21 @@
     "params": [],
     "parameterNotes": {}
   },
-  "alignment.inputPreview": {
-    "context": "Alignment model selection and input preparation",
-    "source": "实际模型输入",
+  "alignment.preprocessing": {
+    "context": "alignment interface message",
+    "source": "前处理选项",
     "params": [],
     "parameterNotes": {}
   },
-  "alignment.locateInput": {
-    "context": "Alignment model selection and input preparation",
-    "source": "定位无法编码的歌词",
+  "alignment.postprocessing": {
+    "context": "alignment interface message",
+    "source": "后处理选项",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.preparingInput": {
+    "context": "alignment interface message",
+    "source": "正在准备对齐输入…",
     "params": [],
     "parameterNotes": {}
   }

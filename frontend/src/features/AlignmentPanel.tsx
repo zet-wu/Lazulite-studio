@@ -1,4 +1,4 @@
-import { AlignmentModelsDialog } from './AlignmentModelsDialog';
+import { Select } from '../shared/Select';
 import { capabilityReason } from './task-messages';
 import { message as describeMessage, messageList, MessageError, errorMessage, type Message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
@@ -25,16 +25,14 @@ export type AlignmentControl = {
   lock: () => { source: ProjectDocument; release: () => void; apply: (project: ProjectDocument) => void };
   save: () => Promise<{revision:string} | undefined>;
 };
-export function AlignmentPanel({pid, assetId, durationMs, project, control, visible, finishDraft, locateInput}: {
-  pid:string; assetId?:string; durationMs:number|null; project:ProjectDocument; control:AlignmentControl; visible:boolean; finishDraft:()=>boolean; locateInput:(id:string)=>void;
+export function AlignmentPanel({pid, assetId, durationMs, project, control, visible, finishDraft}: {
+  pid:string; assetId?:string; durationMs:number|null; project:ProjectDocument; control:AlignmentControl; visible:boolean; finishDraft:()=>boolean;
 }) {
   useTranslation();
   const ui=useAudioReview();
-  const [catalog,setCatalog]=useState<AlignmentCatalog|null>(null),[manage,setManage]=useState(false),[model,setModel]=useState('');
+  const [catalog,setCatalog]=useState<AlignmentCatalog|null>(null),[model,setModel]=useState('');
   const [previewRevision,setPreviewRevision]=useState(''),[previewError,setPreviewError]=useState('');
   const previewSerial=useRef(0);
-  const updateCatalog=(value:AlignmentCatalog)=>{setCatalog(value);setSummary(null);};
-  const openModels=async()=>{setManage(true);try{setCatalog(await alignmentApi.models());}catch(e){setMessage(errorMessage(e));}};
 
   const caps=useQuery({queryKey:['capabilities'],queryFn:()=>jobsApi.capabilities()});
   const jobs=useProjectJobs(pid,visible);
@@ -82,7 +80,6 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
     }).catch(e=>{if(alive&&serial===previewSerial.current)setPreviewError((e as Error).message);});
     return()=>{alive=false;};
   },[dialog,pid,previewRevision,model,options.latin_normalize,options.strip_tone_digits,catalog]);
-  const locate=(id:string)=>{setDialog(false);locateInput(id);};
   const start=async(retryCpu = false)=>{
     if (operation.current) return;
     const threshold=options.merge_short_gaps?Number(gapDraft):500;
@@ -146,7 +143,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
     finally{op.lock.release();if(operation.current===op)operation.current=null;if(mounted.current){setRunning(false);setConnection('');}void jobs.refetch();}
   };
   const cancel=()=>{const op=operation.current;if(!op)return;op.cancel=true;setCancelling(true);setProgress(describeMessage('task.cancelling'));if(op.id)void alignmentApi.cancel(op.id).catch(e=>{setCancelling(false);setConnection(describeMessage('task.cancelFailed',{diagnostic:e.message}));});};
-  const button=<span className={styles.entry}><IconButton icon="folder" label={t('alignment.models')} data-role="secondary" onClick={()=>void openModels()}/><button ref={launchButton} data-role="primary" disabled={!!reason||opening||running||control.locked} title={reason??undefined} onClick={()=>void open()}>{running?t('task.aligning'):t('settings.alignment')}</button>{reason&&!running&&<small>{reason}</small>}{!running&&recent.current&&<button data-role="inline" onClick={()=>{const notice=recent.current!;setMessage(notice.text,notice.role,notice.timeout,notice.taskId);}}>{t('alignment.recent')}</button>}</span>;
+  const button=<span className={styles.entry}><button ref={launchButton} data-role="primary" disabled={!!reason||opening||running||control.locked} title={reason??undefined} onClick={()=>void open()}>{running?t('task.aligning'):t('settings.alignment')}</button>{reason&&!running&&<small>{reason}</small>}{!running&&recent.current&&<button data-role="inline" onClick={()=>{const notice=recent.current!;setMessage(notice.text,notice.role,notice.timeout,notice.taskId);}}>{t('alignment.recent')}</button>}</span>;
   return <>
     {visible&&ui.alignmentHost&&createPortal(button,ui.alignmentHost)}
     {ui.taskHost && running && createPortal(<MessageBar notice={{ text: t('task.alignmentProgress',{progress,device:deviceText?' · '+deviceText:''}), role: 'status', origin: null, dismissible: false }} actions={<button data-role="secondary" disabled={cancelling} onClick={cancel}>{t('task.cancel')}</button>}/>, ui.taskHost)}
@@ -154,28 +151,21 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       <MessageBar notice={message} actions={message?.taskId && cpuFailure?.id === message.taskId ? <button data-role="secondary" disabled={running||control.locked||!!active} onClick={()=>void start(true)}>{t('task.retryCpu')}</button> : message?.taskId && message.role==='alert' ? <IconButton icon="refresh" label={t('alignment.retry')} data-role="secondary" disabled={running||control.locked||!!reason} onClick={()=>void open()}/> : undefined}/>
       <MessageBar notice={connection}/>
     </>, ui.messageHost)}
-    {manage&&<AlignmentModelsDialog catalog={catalog} update={updateCatalog} close={()=>setManage(false)}/>}
-    {dialog&&!manage&&<SettingsDialog title={t('settings.alignment')} close={()=>setDialog(false)} actions={<><button data-role="secondary" data-initial-focus onClick={()=>setDialog(false)}>{t('common.cancel')}</button><button data-role="primary" disabled={!summary?.emitting_count} onClick={()=>void start()}>{t('alignment.start')}</button></>}>
-      <p>{t('alignment.help')}</p>
-      <label>{t('alignment.model')}<select value={model} onChange={e=>{if(e.target.value!==model){setSummary(null);setModel(e.target.value);}}}>
+    {dialog&&<SettingsDialog title={t('settings.alignment')} close={()=>setDialog(false)} actions={<><button data-role="secondary" data-initial-focus onClick={()=>setDialog(false)}>{t('common.cancel')}</button><button data-role="primary" disabled={!summary?.emitting_count} onClick={()=>void start()}>{t('alignment.start')}</button></>}>
+      <label>{t('alignment.model')}<Select value={model} onChange={e=>{if(e.target.value!==model){setSummary(null);setModel(e.target.value);}}}>
         <option value="">{t('alignment.selectModel')}</option>
-        {model&&!catalog?.items.some(item=>item.id===model)&&<option value={model} disabled>{t('alignment.modelMissing')}</option>}
+        {model&&!catalog?.items.some(item=>item.id===model&&item.status==='ready')&&<option value={model} disabled>{t('alignment.modelMissing')}</option>}
         {catalog?.items.filter(item=>item.status==='ready').map(item=><option key={item.id} value={item.id!}>{item.name} · {item.type}</option>)}
-      </select></label>
-      <IconButton icon="folder" label={t('alignment.models')} data-role="secondary" onClick={()=>void openModels()}/>
+      </Select></label>
+
       {catalog?.error&&<p role="alert">{catalog.error}</p>}
       {previewError&&<p role="alert">{previewError}</p>}
-      <label><input type="checkbox" checked={options.latin_normalize} onChange={e=>{setSummary(null);setOptions({...options,latin_normalize:e.target.checked});}}/>{t('alignment.latinNormalize')}</label>
-      <label><input type="checkbox" checked={options.strip_tone_digits} onChange={e=>{setSummary(null);setOptions({...options,strip_tone_digits:e.target.checked});}}/>{t('alignment.stripTones')}</label>
-      <p>{t('alignment.modelQuality')}</p>
-      {!!summary?.inputs.length&&<details><summary>{t('alignment.inputPreview')}</summary><ul>{summary.inputs.map(input=><li key={input.unit_id}><strong>{input.reading}</strong> → {input.model_text || '∅'} {input.unknown_characters.join(' ')}{input.problem==='unresolved_reading'&&<IconButton icon="target" label={t('alignment.locateInput')} onClick={()=>locate(input.object_id)}/>}</li>)}</ul></details>}
-
-      <p>{t('alignment.scope',{included:summary?.line_count,skipped:summary?.skipped_count})}</p>
-      {!!summary?.unknown_count&&<p>{t('alignment.unknownReadings',{count:summary.unknown_count})}</p>}
-      <label><input type="checkbox" checked={options.use_hints} disabled={!summary?.hint_count} onChange={e=>setOptions({...options,use_hints:e.target.checked})}/>{t('alignment.useStarts')}</label>
-      <p className={styles.description}>{summary?.hint_count?t('alignment.startsHelp'):t('alignment.noStarts')}</p>
-      <label><input type="checkbox" checked={options.clear_unmatched} onChange={e=>setOptions({...options,clear_unmatched:e.target.checked})}/>{t('alignment.clearUnmatched')}</label>
-      <p className={styles.description}>{t('alignment.clearHelp')}</p>
+      <fieldset className={styles.options}><legend>{t('alignment.preprocessing')}</legend>
+        <label><input type="checkbox" checked={options.latin_normalize} onChange={e=>{setSummary(null);setOptions({...options,latin_normalize:e.target.checked});}}/><span>{t('alignment.latinNormalize')}</span></label>
+        <label><input type="checkbox" checked={options.strip_tone_digits} onChange={e=>{setSummary(null);setOptions({...options,strip_tone_digits:e.target.checked});}}/><span>{t('alignment.stripTones')}</span></label>
+      </fieldset>
+      <fieldset className={styles.options}><legend>{t('alignment.postprocessing')}</legend>
+        <label><input type="checkbox" aria-label={t('alignment.clearUnmatched')} checked={options.clear_unmatched} onChange={e=>setOptions({...options,clear_unmatched:e.target.checked})}/><span>{t('alignment.clearUnmatched')}<small className={styles.description}>{t('alignment.clearHelp')}</small></span></label>
       <div className={styles.gapOption}>
         <input id={gapId} type="checkbox" checked={options.merge_short_gaps} onChange={e=>{setOptions({...options,merge_short_gaps:e.target.checked});setGapError('');}}/>
         <label htmlFor={gapId}>{t('alignment.mergeGapsLabel')}</label>
@@ -183,14 +173,18 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
 
       </div>
       {gapError&&<p id={gapErrorId} role="alert">{gapError}</p>}
+      </fieldset>
       <fieldset className={styles.options}><legend>{t('alignment.experimental')}</legend>
+        <label><input type="checkbox" aria-label={t('alignment.useStarts')} checked={options.use_hints} disabled={!summary?.hint_count} onChange={e=>setOptions({...options,use_hints:e.target.checked})}/><span>{t('alignment.useStarts')}<small className={styles.description}>{summary ? (summary.hint_count?t('alignment.startsHelp'):t('alignment.noStarts')) : t('alignment.startsHelp')}</small></span></label>
         {([
           ['line_blank',t('alignment.blankCost'),t('alignment.blankHelp')],
           ['rest_blank',t('alignment.restBlankCost'),t('alignment.restBlankHelp')],
           ['rest_token',t('alignment.restTokenCost'),t('alignment.restTokenHelp')],
         ] as const).map(([key,label,description])=><label key={key}><input type="checkbox" checked={options[key]} onChange={e=>setOptions({...options,[key]:e.target.checked})}/><span>{label}<small className={styles.description}>{description}</small></span></label>)}
       </fieldset>
-      {!summary?.emitting_count&&<p>{t('alignment.noReadings')}</p>}
+      {!!summary?.unknown_count&&<p>{t('alignment.unknownReadings',{count:summary.unknown_count})}</p>}
+      {summary&&!summary.emitting_count&&<p>{t('alignment.noReadings')}</p>}
+      <p role="status">{summary?t('alignment.scope',{included:summary.line_count,skipped:summary.skipped_count}):previewError?'':catalog?.items.some(item=>item.id===model&&item.status==='ready')?t('alignment.preparingInput'):t('alignment.selectModel')}</p>
     </SettingsDialog>}
   </>;
 }

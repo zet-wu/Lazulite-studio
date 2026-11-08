@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ApplicationHeaderContext } from '../../shared/ApplicationHeaderContext';
 import { LanguageSelector } from '../LanguageSelector';
+import { AlignmentModelsDialog } from '../AlignmentModelsDialog';
 import { DictionaryManager } from './DictionaryManager';
 import { createPortal } from 'react-dom';
 import { IconButton } from '../../shared/Controls';
@@ -45,6 +46,7 @@ export function EditorMenu(props: Props) {
   }, [projectOpen, setProjectHeader]);
   const header = useRef<HTMLElement>(null);
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [modelsOpen, setModelsOpen] = useState(false);
   const [dictionaryOpen, setDictionaryOpen] = useState(false);
   const [devicesOpen, setDevicesOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -66,12 +68,14 @@ export function EditorMenu(props: Props) {
       <TopMenu id="settings" title={t('menu.settings')} className={`${styles.settingsMenu} ${styles.deviceSettingsMenu}`} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
         <button data-role="inline" onClick={() => setLanguageOpen(true)}>{t('language.label')}</button>
         <button data-role="inline" onClick={props.onDictionaryManager ?? (() => setDictionaryOpen(true))}>{t('menu.dictionary')}</button>
+        <button data-role="inline" onClick={() => setModelsOpen(true)}>{t('alignment.models')}</button>
         <button data-role="inline" onClick={() => setDevicesOpen(true)}>{t('menu.devices')}</button>
         {props.onAmllSettings && <button data-role="inline" disabled={props.editingLocked} onClick={props.onAmllSettings}>{t('menu.amll')}</button>}
         <button data-role="inline" onClick={() => setShortcutsOpen(true)}>{t('menu.shortcuts')}</button>
       </TopMenu>
     </div>
     {languageOpen && <SettingsDialog title={t('language.label')} returnFocus={() => header.current?.querySelector<HTMLElement>('[data-top-menu="settings"] summary') ?? null} close={() => setLanguageOpen(false)}><LanguageSelector /></SettingsDialog>}
+    {modelsOpen && <AlignmentModelsDialog close={() => setModelsOpen(false)} returnFocus={() => header.current?.querySelector<HTMLElement>('[data-top-menu="settings"] summary') ?? null}/>}
     {dictionaryOpen && <DictionaryManager close={() => setDictionaryOpen(false)} />}
     {devicesOpen && <SettingsDialog title={t('menu.devices')} returnFocus={() => header.current?.querySelector<HTMLElement>('[data-top-menu="settings"] summary') ?? null} close={() => setDevicesOpen(false)}><DeviceSettings /></SettingsDialog>}
     {shortcutsOpen && <ShortcutDialog close={() => setShortcutsOpen(false)} />}

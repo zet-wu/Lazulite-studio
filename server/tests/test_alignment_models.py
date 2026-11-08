@@ -20,6 +20,7 @@ def test_catalog_refresh_and_frozen_snapshot(tmp_path, monkeypatch):
     monkeypatch.setenv('STUDIO_ALIGNMENT_MODELS_DIR',str(root))
     catalog=AlignmentModels();items=catalog.scan()['items']
     assert len(items)==2 and items[0]['status']=='invalid'
+    assert str(root) not in items[0]['reason']
     identity=items[1]['id']; options={'latin_normalize':True,'strip_tone_digits':False}
     key,snapshot=catalog.preview(identity,options)
     assert catalog.scan(True)['items'][1]['id']==identity
@@ -34,6 +35,7 @@ def test_catalog_refresh_and_frozen_snapshot(tmp_path, monkeypatch):
     assert catalog.scan(True)['items'][0]['name']=='renamed'
     monkeypatch.setenv('STUDIO_ALIGNMENT_MODELS_DIR',str(tmp_path/'missing'))
     assert catalog.scan()['error'] and not catalog.scan()['items']
+    assert str(tmp_path) not in catalog.scan()['error']
 
 
 def test_portable_default_and_applied_path(tmp_path):
@@ -61,4 +63,4 @@ def test_inaccessible_refresh_drops_the_old_list(tmp_path,monkeypatch):
   return original(path)
  monkeypatch.setattr(Path,'iterdir',entries)
  result=catalog.scan(True)
- assert result['error']=='access denied' and result['items']==[]
+ assert result['error']=='PermissionError' and result['items']==[]
