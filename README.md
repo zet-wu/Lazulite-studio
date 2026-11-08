@@ -35,10 +35,16 @@ Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML�
 支持从网易、QQ、酷狗、AMLL TTML DB 四个在线源搜索和获取歌词，并能保留其提供的词级时间和音译/翻译行。
 
 ### 音频处理
-以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) Python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs)）、声学分析分片、人声能量与频谱图、日语歌曲自动对齐（默认基于 [NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn) 模型，该模型使用 CC-BY-NC-SA-4.0 协议，需注意商用限制）等功能。
+以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) Python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs)）、声学分析分片、人声能量与频谱图、自动对齐等功能。
+
+### 自动对齐
+本地包提供两个基于 [facebook/mms-300m](https://huggingface.co/facebook/mms-300m) 的 Wav2Vec CTC 对齐模型，用于对有注音的歌词进行自动化对轴，分别是：
+- [NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn)：使用日语歌唱音频后训练的专门模型，对日语歌曲有很好的对齐效果，该模型使用 CC-BY-NC-SA-4.0 协议，需注意商用限制；
+- [MMS_FA](https://docs.pytorch.org/audio/main/generated/torchaudio.pipelines.MMS_FA.html)：通用的跨语言的对齐模型，在长音、尾音延长等方面表现不如前者，该模型使用 CC-BY-NC-4.0 协议，同样需注意商用限制。
 
 ### 编辑与打轴
 简洁而功能强大的编辑与打轴界面，针对日语歌词提供多种自动化工具，涵盖智能假名注音（不依赖 Windows 系统日语语言包）和罗马字生成。对其他语言提供词典注音功能，本地包附带汉语拼音和粤拼词典，更多方言可在 [Lazulite Studio 注音词典仓库](https://github.com/zet-wu/Lazulite-studio-dict)获取或根据格式制作。打轴界面支持空拍、单行打轴、定位回听等功能。
+
 
 ### 文件打包
 支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，可配合 [Musicovite](https://github.com/zet-wu/Musicovite) 本地音乐播放器使用。也支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC ，兼容大部分播放器。
