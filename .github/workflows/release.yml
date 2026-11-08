@@ -71,6 +71,7 @@ jobs:
         with:
           pattern: "{LazuliteStudio-*.7z*,NextFire-karaoke-ja-Latn.zip,MMS_FA.zip}"
           merge-multiple: true
+          skip-decompress: true
           path: release-assets
       - name: Create or update draft and upload assets
         env:
