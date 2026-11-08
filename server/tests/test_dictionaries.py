@@ -121,10 +121,12 @@ def test_optimal_paths_local_ambiguity_candidates_and_boundaries(tmp_path):
     installed = manager.install(package([known, entry("甲乙", "A"), entry("乙丙", "B"), entry("甲", "a"), entry("丙", "c")]))
     with manager.acquire("custom", installed["instance"]) as index:
         values = index.analyze("重庆甲乙丙👩‍👩‍👧‍👦，重 庆")
-        assert [(r["base"], r["status"]) for r in values[:4]] == [
-            ("重", "known"), ("庆", "ambiguous"), ("甲乙丙", "ambiguous"), ("👩‍👩‍👧‍👦", "unknown")]
+        assert [(r["base"], r["status"]) for r in values[:5]] == [
+            ("重", "known"), ("庆", "ambiguous"), ("甲", "ambiguous"), ("乙丙", "ambiguous"), ("👩‍👩‍👧‍👦", "unknown")]
         assert "".join(r["base"] for r in values) == "重庆甲乙丙👩‍👩‍👧‍👦，重 庆"
         assert not any(r["base"] == "重庆" for r in values)
+        assert [r["units"] for r in values[:4]] == [["chóng"], ["Q"], ["a"], ["B"]]
+        assert index.analyze("重庆甲乙丙👩‍👩‍👧‍👦，重 庆") == values
         cancel = threading.Event()
         cancel.set()
         with pytest.raises(AnalysisCancelled):
@@ -370,3 +372,40 @@ def test_crash_cache_cleanup_preserves_live_runs(tmp_path):
     assert not crashed.exists() and live.directory.exists()
     new.close()
     live.close()
+
+
+def test_ambiguous_defaults_keep_one_candidate_and_unannotated_segments(tmp_path):
+    value = entry('甲乙', 'unused')
+    value['candidates'][0]['segments'] = [
+        {'base': '甲', 'annotate': True, 'units': ['A']},
+        {'base': '乙', 'annotate': True, 'units': ['z']},
+    ]
+    other = json.loads(json.dumps(value['candidates'][0]))
+    other['id'] = 'other'
+    other['segments'][0]['units'] = ['B']
+    other['segments'][1]['units'] = ['a']
+    value['candidates'].append(other)
+    plain = entry('丙丁', 'unused')
+    plain['candidates'][0]['segments'] = [
+        {'base': '丙', 'annotate': False, 'units': []},
+        {'base': '丁', 'annotate': True, 'units': ['d']},
+    ]
+    alternate = json.loads(json.dumps(plain['candidates'][0]))
+    alternate['id'] = 'other'
+    alternate['segments'][0].update(annotate=True, units=['c'])
+    plain['candidates'].append(alternate)
+    manager = Dictionaries(tmp_path)
+    previous = None
+    for reverse in [False, True]:
+        if reverse:
+            value['candidates'].reverse()
+            plain['candidates'].reverse()
+        info = manager.install(package([plain, value] if reverse else [value, plain]), replace=True)
+        with manager.acquire('custom', info['instance']) as index:
+            result = index.analyze('甲乙丙丁戊')
+            assert [(r['status'], r['units']) for r in result] == [
+                ('ambiguous', ['A']), ('ambiguous', ['z']), ('unannotated', []),
+                ('known', ['d']), ('unknown', [])]
+            if previous is not None:
+                assert result == previous
+            previous = result

@@ -146,7 +146,27 @@ class DictionaryIndex:
                         end = at + len(base)
                         segments[at].add((end, "known" if annotate else "unannotated", tuple(units)))
                         at = end
+        # Choose one complete optimal path: shorter next edge first, then the
+        # lexicographically first highest-priority candidate (Unicode order).
+        # Keep this path intact instead of combining local ambiguous options.
+        by_start = {}
+        for start, edge in chosen:
+            by_start.setdefault(start, []).append(edge)
+        defaults = []
+        at = 0
+        while at < n:
+            stop, _, entry, state = min(by_start[at], key=lambda edge: edge[0])
+            if entry is None:
+                defaults.append((at, stop, state, ()))
+            else:
+                cursor = at
+                for base, annotate, units in decoded[id(entry)][0]:
+                    end = cursor + len(base)
+                    defaults.append((cursor, end, "known" if annotate else "unannotated", tuple(units)))
+                    cursor = end
+            at = stop
         output = []
+        default_index = 0
         at = 0
         while at < n:
             options = [(at, *item) for item in segments[at]]
@@ -159,9 +179,13 @@ class DictionaryIndex:
                     options.append((cursor, *item))
                     end = max(end, item[0])
                 cursor += 1
-            state, units = ("ambiguous", ()) if len(options) > 1 else (options[0][2], options[0][3])
-            output.append({"base_start": at, "base_end": end, "base": text[at:end],
-                           "status": state, "units": list(units)})
+            ambiguous = len(options) > 1
+            while default_index < len(defaults) and defaults[default_index][0] < end:
+                start, stop, state, units = defaults[default_index]
+                default_index += 1
+                output.append({"base_start": start, "base_end": stop, "base": text[start:stop],
+                               "status": "ambiguous" if ambiguous and state == "known" else state,
+                               "units": list(units)})
             at = end
         return output
 

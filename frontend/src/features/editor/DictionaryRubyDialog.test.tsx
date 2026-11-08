@@ -1,11 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DictionaryRubyDialog } from './DictionaryRubyDialog';
 import { analyzeDictionary, listDictionaries } from '../../adapters/http/dictionaries';
 import { createLyricDocument } from '../../domain/lyric-document';
 
 vi.mock('../../adapters/http/dictionaries',()=>({listDictionaries:vi.fn(),analyzeDictionary:vi.fn()}));
-afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
+afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.restoreAllMocks();});
 beforeEach(()=>{
   vi.stubGlobal('ResizeObserver',class {observe(){} unobserve(){} disconnect(){}});
   vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(null);
@@ -40,4 +40,23 @@ it('aborts old selections, preserves fixed unit edits on retry, and blocks stale
   view.rerender(<DictionaryRubyDialog document={{...source}} lineIds={[lineId]} apply={apply} close={()=>{}}/>);
   expect(screen.getByRole('button',{name:'应用'})).toBeDisabled();
   expect(apply).not.toHaveBeenCalled();
+});
+
+it('keeps nonempty ambiguity highlighted until edited, preserves review on regeneration and applies defaults',async()=>{
+  const source=createLyricDocument('重庆'),lineId=source.lines[0].id,apply=vi.fn((_command:any)=>true);
+  vi.mocked(analyzeDictionary).mockResolvedValue({instance:'a',version:'1',ranges:[{lineId,start:0,end:2,base:'重庆',status:'ambiguous',units:['chóng','qìng']}]});
+  render(<DictionaryRubyDialog document={source} lineIds={[lineId]} apply={apply} close={()=>{}}/>);
+  await screen.findByRole('option',{name:'a · 1 · a'});
+  fireEvent.change(screen.getByRole('combobox'),{target:{value:'a'}});
+  const first=await screen.findByLabelText('重庆读音 1'),second=screen.getByLabelText('重庆读音 2');
+  expect(first).toHaveValue('chóng');expect(first.className).toMatch(/japaneseRubyMissing/);
+  fireEvent.focus(first);expect(first.className).toMatch(/japaneseRubyMissing/);
+  fireEvent.change(first,{target:{value:'zhòng'}});expect(first.className).not.toMatch(/japaneseRubyMissing/);
+  fireEvent.click(screen.getByRole('button',{name:'重新生成词典注音'}));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'应用'})).toBeEnabled());
+  expect(first).toHaveValue('zhòng');expect(first.className).not.toMatch(/japaneseRubyMissing/);
+  expect(second).toHaveValue('qìng');expect(second.className).toMatch(/japaneseRubyMissing/);
+  fireEvent.change(first,{target:{value:''}});expect(first.className).toMatch(/japaneseRubyMissing/);
+  fireEvent.click(screen.getByRole('button',{name:'应用'}));
+  expect(apply.mock.calls[0][0].document.lines[0].words.flatMap((w:any)=>w.rubyUnits.map((u:any)=>u.reading))).toEqual(['qìng']);
 });

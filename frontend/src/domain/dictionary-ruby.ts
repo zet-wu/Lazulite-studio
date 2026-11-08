@@ -10,7 +10,7 @@ export type DictionaryBlock = Readonly<{
   key: string; start: number; end: number; base: string; existing: boolean;
   status: DictionaryRange['status']; spans: readonly { wordId: string; start: number; end: number }[];
   original: readonly string[]; merge: boolean;
-}> & { units: string[] };
+}> & { units: string[]; reviewed: boolean[] };
 export type DictionaryRow = { lineId: string; blocks: DictionaryBlock[] };
 
 export function proposeDictionaryRuby(source: LyricDocument, ids: string[], ranges: DictionaryRange[]): DictionaryRow[] {
@@ -44,7 +44,7 @@ export function proposeDictionaryRuby(source: LyricDocument, ids: string[], rang
     return {lineId:line.id, blocks:covered.map(r=>{
       const spans=words.filter(w=>w.start<r.end&&w.end>r.start).map(w=>({wordId:w.word.id,start:Math.max(r.start,w.start)-w.start,end:Math.min(r.end,w.end)-w.start}));
       const units=r.units.length?[...r.units]:[''];
-      return {...r,key:`${line.id}:${r.start}:${r.end}`,original:[...units],units,spans,merge:spans.length>1};
+      return {...r,key:`${line.id}:${r.start}:${r.end}`,original:[...units],units,reviewed:units.map(()=>false),spans,merge:spans.length>1};
     })};
   });
 }

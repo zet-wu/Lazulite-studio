@@ -28,11 +28,11 @@ export function ReadingPair({text, status, hint, children}:{text:string;status?:
  </div>;
 }
 
-export function ReadingInput({value,label,hint,disabled,change,focus,composition}:{
- value:string;label:string;hint?:string;disabled?:boolean;change:(value:string)=>void;focus:(active:boolean)=>void;composition:(active:boolean)=>void;
+export function ReadingInput({value,label,hint,disabled,needsReview=false,change,focus,composition}:{
+ value:string;label:string;hint?:string;needsReview?:boolean;disabled?:boolean;change:(value:string)=>void;focus:(active:boolean)=>void;composition:(active:boolean)=>void;
 }) {
  const start=useRef(value),composing=useRef(false);
- const missing=!value.trim();
+ const missing=!value.trim()||needsReview;
  return <input title={hint||value||undefined} aria-label={label} aria-description={hint}
   className={`${styles.romanPreviewInput} ${missing?styles.japaneseRubyMissing:''}`} value={value} disabled={disabled}
   onChange={e=>change(e.target.value)} onFocus={()=>{start.current=value;focus(true);}} onBlur={()=>focus(false)}

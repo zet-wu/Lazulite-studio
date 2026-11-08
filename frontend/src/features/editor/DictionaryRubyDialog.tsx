@@ -24,7 +24,7 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
   const [phase,setPhase]=useState<'loading'|'analyzing'>('loading');
   const [attempt,setAttempt]=useState(0),[merge,setMerge]=useState(false);
   const [composing,setComposing]=useState(false),[active,setActive]=useState<string|null>(null);
-  const edited=useRef(new Map<string,string[]>()), scroll=useRef<HTMLDivElement>(null);
+  const edited=useRef(new Map<string,{units:string[];reviewed:boolean[]}>()), scroll=useRef<HTMLDivElement>(null);
   const abort=useRef<AbortController|null>(null), selection=useRef('');
   const stale=source!==document;
   useEffect(()=>{
@@ -47,7 +47,7 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
       if(controller.signal.aborted)return;
       setRows(proposeDictionaryRuby(source,ids,result.ranges).map(row=>({...row,blocks:row.blocks.map(block=>{
         const values=edited.current.get(block.key);
-        return {...block,units:values&&values.length===block.units.length?[...values]:block.units};
+        return values&&values.units.length===block.units.length?{...block,units:[...values.units],reviewed:[...values.reviewed]}:block;
       })})));
     }).catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e));}).finally(()=>{if(!controller.signal.aborted)setPending(false);});
     return()=>controller.abort();
@@ -59,7 +59,9 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
   const changed=rows.some(r=>r.blocks.some(b=>dictionaryBlockApplies(b,merge)));
   const change=(key:string,index:number,value:string)=>setRows(previous=>previous.map(row=>({...row,blocks:row.blocks.map(block=>{
     if(block.key!==key)return block;
-    const units=block.units.map((u,i)=>i===index?value:u);edited.current.set(key,units);return {...block,units};
+    const units=block.units.map((u,i)=>i===index?value:u);
+    const reviewed=block.reviewed.map((done,i)=>i===index&&value!==block.units[i]?!!value.trim():done);
+    edited.current.set(key,{units,reviewed});return {...block,units,reviewed};
   })})));
   const submit=()=>{if(stale||pending||composing)return;try{if(apply(dictionaryRubyCommand(document,source,rows,merge)))close();}catch(e){setError(errorMessage(e));}};
   return <SettingsDialog title={t('editor.dictionaryRuby')} subtitle={t('editor.lineCount',{count:ids.length})} close={()=>{if(!composing)close();}}
@@ -87,7 +89,7 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
             const hint=editable?((block.merge&&!merge?t('dictionary.mergeRequired'):'')+t('dictionary.emptyHelp')):undefined;
             return <ReadingPair key={block.key} text={block.base} hint={hint} status={block.existing?t('reading.existing'):block.merge&&dictionaryBlockApplies(block,merge)?t('reading.willMerge'):undefined}>
               {editable&&<div className={styles.units}>{block.units.map((unit,i)=><ReadingInput key={i}
-                value={unit} label={t('reading.unitReading',{text:block.base,number:i+1})} hint={hint}
+                value={unit} needsReview={block.status==='ambiguous'&&!block.reviewed[i]} label={t('reading.unitReading',{text:block.base,number:i+1})} hint={hint}
                 disabled={stale||pending} change={value=>change(block.key,i,value)}
                 focus={value=>setActive(value?row.lineId:null)} composition={setComposing}/>)}</div>}
             </ReadingPair>;
