@@ -165,6 +165,14 @@ SSH 转发或自定义域名通过同一浏览器入口访问页面与相对 `/a
 
 仅调试前端界面可运行 `pnpm --dir frontend dev:mock`，它在开发环境启动 MSW 模拟 API。
 
+### 便携包与模型资源构建
+
+`packaging/build.py` 在对应 Windows x64 或 macOS arm64 主机上装配主包，使用 `--target`、`--output` 和必填的 `--model-release-tag` 指定目标、仓库外输出目录及模型附件所属 Release。预览工作流要求该资源标签已发布并包含两份 ZIP；正式 Release 工作流将本次标签绑定到三个主包，并独立构建一次共享模型 ZIP，准备草稿后由维护者人工发布。
+
+`packaging/build_models.py --output <附件目录> --cache <下载缓存目录>` 按 `packaging/models.json` 生成 `NextFire-karaoke-ja-Latn.zip` 和 `MMS_FA.zip`。模型 ZIP 包含唯一顶层模型目录、原始权重、必要配置及来源／许可说明。
+
+主包默认检查为一次 `pip check`、关键依赖与小资源加载及 0.1 秒媒体往返、一次服务启动／静态页面／正常退出。`packaging.native_audit.audit(root, target)` 可在运行时或原生依赖变动时单独调用（Windows 需准备 `pefile`）；`packaging/model_smoke.py --root <已补装两个模型的程序目录>` 用于真实模型离线专项验证。
+
 ### 生产构建与运行
 
 ```sh

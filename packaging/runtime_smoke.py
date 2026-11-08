@@ -30,9 +30,9 @@ def main():
     assert (root / 'vocal-models/demucs/htdemucs.yaml').is_file()
     assert (root / 'vocal-models/demucs/955717e8-8726e21a.th').is_file()
     assert (root / 'models').is_dir()
-    if args.target == 'windows-x64-cpu':
+    if args.target != 'windows-x64-cuda':
         assert torch.version.cuda is None, torch.version.cuda
-    elif args.target == 'windows-x64-cuda':
+    else:
         assert torch.version.cuda and torch.version.cuda.startswith('12.6'), torch.version.cuda
     suffix = '.exe' if os.name == 'nt' else ''
     ffmpeg = root / 'runtime/ffmpeg' / ('ffmpeg' + suffix)
@@ -44,14 +44,13 @@ def main():
             stream.setnchannels(2); stream.setsampwidth(2); stream.setframerate(44100)
             stream.writeframes(b'\0' * 4410 * 4)
         # One short roundtrip checks encoding, probing and decoding.
-        for extension, codec in [('m4a', 'aac')]:
-            encoded = directory / ('encoded.' + extension)
-            subprocess.run([str(ffmpeg), '-v', 'error', '-i', str(source), '-c:a', codec, str(encoded)], check=True)
-            probe = subprocess.check_output([str(ffprobe), '-v', 'error', '-show_streams', '-show_packets',
-                                             '-show_data_hash', 'sha256', '-of', 'json', str(encoded)], text=True)
-            data = json.loads(probe)
-            assert data['streams'] and data['packets'][0]['data_hash'].startswith('SHA256:')
-            subprocess.run([str(ffmpeg), '-v', 'error', '-i', str(encoded), '-f', 'null', '-'], check=True)
+        encoded = directory / 'encoded.m4a'
+        subprocess.run([str(ffmpeg), '-v', 'error', '-i', str(source), '-c:a', 'aac', str(encoded)], check=True)
+        probe = subprocess.check_output([str(ffprobe), '-v', 'error', '-show_streams', '-show_packets',
+                                         '-show_data_hash', 'sha256', '-of', 'json', str(encoded)], text=True)
+        data = json.loads(probe)
+        assert data['streams'] and data['packets'][0]['data_hash'].startswith('SHA256:')
+        subprocess.run([str(ffmpeg), '-v', 'error', '-i', str(encoded), '-f', 'null', '-'], check=True)
     print(json.dumps({'python':sys.version, 'torch':torch.__version__, 'cuda_runtime':torch.version.cuda,
                       'torchaudio':torchaudio.__version__, 'small_resources':True, 'media_roundtrip':'0.1s AAC'}))
 

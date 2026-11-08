@@ -24,7 +24,7 @@ def build(output, cache):
                 model = Path(work) / name
                 model.mkdir()
                 for item in spec['files']:
-                    source = download(item.get('url', spec['source']), cache / name / item['name'], item['sha256'], item['size'])
+                    download(item.get('url', spec['source']), cache / name / item['name'], item['sha256'], item['size'])
                     # ZIP reads directly from cache: no second copy of the large weights.
                     if item['name'] == 'model.pt':
                         (model / 'alignment-model.json').write_text('{"type":"torchaudio-mms-fa","weights":"model.pt"}\n', encoding='utf-8')

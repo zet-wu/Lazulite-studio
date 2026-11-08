@@ -69,3 +69,19 @@ def test_menu_all_retains_success_and_retries_failed_item(tmp_path, monkeypatch)
     answers = iter(['2','0'])
     downloader.menu(tmp_path, config)
     assert (tmp_path / 'models/MMS_FA/model.pt').exists()
+
+
+def test_crc_failure_and_symlinks_are_not_installed(tmp_path):
+    path = tmp_path / 'source.zip'
+    archive(path)
+    path.write_bytes(path.read_bytes().replace(b'weights', b'corrupt'))
+    with pytest.raises(zipfile.BadZipFile):
+        downloader.install(tmp_path, 'MMS_FA', path.as_uri())
+    with zipfile.ZipFile(path, 'w') as stream:
+        item = zipfile.ZipInfo('MMS_FA/link')
+        item.external_attr = (0o120777 << 16)
+        stream.writestr(item, '/outside')
+    with pytest.raises(ValueError, match='路径非法'):
+        downloader.install(tmp_path, 'MMS_FA', path.as_uri())
+    assert not (tmp_path / 'models/MMS_FA').exists()
+    assert list((tmp_path / 'tmp').iterdir()) == []
