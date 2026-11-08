@@ -8,13 +8,20 @@ import subprocess
 import tempfile
 from urllib.parse import quote
 
+MODEL_ASSETS = {'NextFire-karaoke-ja-Latn.zip', 'MMS_FA.zip'}
+
 TARGETS = ('windows-x64-cpu', 'windows-x64-cuda', 'macos-arm64')
 
 
 def assets_in(directory):
     files = sorted(Path(directory).iterdir())
     groups = {target: [] for target in TARGETS}
+    missing_models = MODEL_ASSETS - {p.name for p in files}
+    if missing_models:
+        raise ValueError(f'模型附件缺失：{sorted(missing_models)}')
     for path in files:
+        if path.name in MODEL_ASSETS and path.is_file() and 0 < path.stat().st_size < 2 * 1024**3:
+            continue
         match = re.fullmatch(r'LazuliteStudio-(windows-x64-cpu|windows-x64-cuda|macos-arm64)\.7z(?:\.(\d{3,}))?', path.name)
         if not match or not path.is_file() or not 0 < path.stat().st_size < 2 * 1024**3:
             raise ValueError(f'无效 Release 附件或超过单附件限制：{path}')
@@ -42,14 +49,14 @@ def prepare_draft(directory):
     existing = next((item for page in pages for item in page if item['tag_name'] == tag), None)
     if existing and not existing['draft']:
         raise ValueError('该版本已经发布，请使用新版本号；不会覆盖已发布附件')
-    notes = f'''Lazulite Studio {tag} 预发布\n\n源码提交：{commit}\n\n下载适合系统的完整 .7z 包。CUDA 若有分卷，下载全部 .7z.001、.7z.002 等文件，放在同一目录，从 .001 解压。\n\nWindows：双击 start.exe；macOS：双击 start.command。详细说明见包内 USAGE.txt。\n\nmacOS 未经开发者签名或公证；此版本标记为预发布，供试用反馈。\n'''
+    notes = f'''Lazulite Studio {tag} 预发布\n\n源码提交：{commit}\n\n下载适合系统的完整 .7z 包。CUDA 若有分卷，下载全部 .7z.001、.7z.002 等文件，放在同一目录，从 .001 解压。\n\nWindows：双击 start.exe；macOS：双击 start.command。主包包含运行时、词典和人声分离模型，对齐权重单独提供。双击 download-models.cmd（Windows）或 download-models.command（macOS）选择下载。也可手动下载本 Release 的 NextFire-karaoke-ja-Latn.zip 和 MMS_FA.zip，解压到程序根 models/，保留 ZIP 内的模型目录，然后在设置的模型管理中刷新。自定义总目录用户可恢复默认或自行移入所选目录。详细说明见包内 USAGE.txt。\n\nmacOS 未经开发者签名或公证；此版本标记为预发布，供试用反馈。\n'''
     if existing:
         # Preserve the user's title and release notes. Pin a new tag to the built SHA.
         subprocess.run(['gh', 'release', 'edit', tag, '--draft', '--prerelease',
                         '--target', commit], check=True)
         # Clear old managed archives so a failed rerun cannot mix build versions.
         for asset in existing['assets']:
-            if re.fullmatch(r'LazuliteStudio-(windows-x64-cpu|windows-x64-cuda|macos-arm64)\.7z(?:\.\d{3,})?', asset['name']):
+            if asset['name'] in MODEL_ASSETS or re.fullmatch(r'LazuliteStudio-(windows-x64-cpu|windows-x64-cuda|macos-arm64)\.7z(?:\.\d{3,})?', asset['name']):
                 subprocess.run(['gh', 'release', 'delete-asset', tag, asset['name'], '--yes'], check=True)
     else:
         with tempfile.TemporaryDirectory() as temp:

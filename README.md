@@ -38,7 +38,7 @@ Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML�
 以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) Python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs)）、声学分析分片、人声能量与频谱图、自动对齐等功能。
 
 ### 自动对齐
-本地包提供两个基于 [facebook/mms-300m](https://huggingface.co/facebook/mms-300m) 的 Wav2Vec CTC 对齐模型，用于对有注音的歌词进行自动化对轴，分别是：
+Release 单独提供两个基于 [facebook/mms-300m](https://huggingface.co/facebook/mms-300m) 的 Wav2Vec CTC 对齐模型，用于对有注音的歌词进行自动化对轴，分别是：
 - [NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn)：使用日语歌唱音频后训练的专门模型，对日语歌曲有很好的对齐效果，该模型使用 CC-BY-NC-SA-4.0 协议，需注意商用限制；
 - [MMS_FA](https://docs.pytorch.org/audio/main/generated/torchaudio.pipelines.MMS_FA.html)：通用的跨语言的对齐模型，在长音、尾音延长等方面表现不如前者，该模型使用 CC-BY-NC-4.0 协议，同样需注意商用限制。
 
@@ -65,6 +65,8 @@ Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 
 - Windows CPU 版：`LazuliteStudio-windows-x64-cpu.7z`
 - Windows cuda 版：`LazuliteStudio-windows-x64-cuda.7z.001` 与 `LazuliteStudio-windows-x64-cuda.7z.002`（需要 Nvidia 显卡及驱动）
 - Mac 版：`LazuliteStudio-macos-arm64.7z`
+
+主包包含完整运行时、词典和 Demucs 人声分离模型。对齐模型从同一 Release 单独下载：双击包内 `download-models.cmd`（Windows）或 `download-models.command`（macOS），选择 NextFire、MMS_FA 或全部下载。也可手动把 `NextFire-karaoke-ja-Latn.zip`、`MMS_FA.zip` 解压到程序根 `models/`，形成 `models/NextFire-karaoke-ja-Latn/` 和 `models/MMS_FA/`，然后在设置的模型管理中刷新。若配置了自定义总目录，请恢复默认或自行将模型移入该目录。下载脚本跳过已存在的同名目录，不代表该目录已通过模型校验。
 
 使用支持 7z 的解压工具完整解压后打开其中的文件夹，双击启动入口运行。不要直接在压缩包内运行。
 分卷包需下载全部 `.7z.001`、`.7z.002` 等文件，放在同一目录，从 `.7z.001` 开始解压；不要逐卷解压。

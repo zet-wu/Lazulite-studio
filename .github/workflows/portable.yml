@@ -5,11 +5,18 @@ on:
       target:
         type: string
         default: all
+      model_release_tag:
+        type: string
+        required: true
       source_ref:
         type: string
         required: true
   workflow_dispatch:
     inputs:
+      model_release_tag:
+        description: 'Published release tag containing the two model ZIPs'
+        type: string
+        required: true
       target:
         description: 'target'
         type: choice
@@ -88,9 +95,26 @@ jobs:
       - name: Install pinned 7-Zip build tool
         shell: bash
         run: python packaging/setup_7zip.py "$RUNNER_TEMP/studio-7zip"
+      - name: Verify preview model release assets
+        if: github.event_name == 'workflow_dispatch' && github.workflow == 'Build portable previews'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODEL_TAG: ${{ inputs.model_release_tag }}
+        run: |
+          gh release view "$MODEL_TAG" --json isDraft,assets > "$RUNNER_TEMP/model-release.json"
+          python - "$RUNNER_TEMP/model-release.json" <<'PY'
+          import json, sys
+          release = json.load(open(sys.argv[1]))
+          assert not release['isDraft'], 'Preview models must be published'
+          assert {'NextFire-karaoke-ja-Latn.zip', 'MMS_FA.zip'} <= {a['name'] for a in release['assets']}, 'Missing model ZIPs'
+          PY
       - name: Assemble, smoke and package distribution
         shell: bash
-        run: python packaging/build.py --target '${{ matrix.target }}' --output "$BUILD_OUTPUT"
+        env:
+          MODEL_TAG: ${{ inputs.model_release_tag }}
+          MODEL_REPOSITORY: ${{ github.repository }}
+        run: python packaging/build.py --model-release-tag "$MODEL_TAG" --model-repository "$MODEL_REPOSITORY" --target '${{ matrix.target }}' --output "$BUILD_OUTPUT"
       - name: Install archive upload client
         run: npm ci --prefix .github/actions/upload-packages --ignore-scripts --no-audit --no-fund
       - name: Upload verified portable archives

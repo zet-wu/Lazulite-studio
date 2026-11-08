@@ -1,5 +1,5 @@
-name: Upload portable archives
-description: Upload each verified 7z volume without an outer archive
+name: Upload distribution assets
+description: Upload each main archive, volume or model ZIP without an outer archive
 inputs:
   path:
     description: Directory containing verified archives

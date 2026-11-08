@@ -39,9 +39,27 @@ jobs:
     uses: ./.github/workflows/portable.yml
     with:
       target: all
+      model_release_tag: ${{ inputs.tag }}
       source_ref: ${{ needs.source.outputs.commit }}
+  models:
+    needs: source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+      - name: Build shared model ZIPs
+        run: python packaging/build_models.py --output "$RUNNER_TEMP/model-assets" --cache "$RUNNER_TEMP/model-cache"
+      - run: npm ci --prefix .github/actions/upload-packages --ignore-scripts --no-audit --no-fund
+      - uses: ./.github/actions/upload-packages
+        with:
+          path: ${{ runner.temp }}/model-assets
   draft:
-    needs: [source, build]
+    needs: [source, build, models]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -51,7 +69,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
-          pattern: LazuliteStudio-*.7z*
+          pattern: "{LazuliteStudio-*.7z*,NextFire-karaoke-ja-Latn.zip,MMS_FA.zip}"
           merge-multiple: true
           path: release-assets
       - name: Create or update draft and upload assets

@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import traceback
+from urllib.parse import quote
 
 from archive import download, extract, package
 from native_audit import audit, remove_unused_host_rpaths
@@ -186,7 +187,23 @@ def deploy_windows_runtime(root):
     return copied
 
 
-def build(target, output):
+def model_downloads(root, tag, repository):
+    if not tag.strip() or tag == 'latest' or not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
+        raise ValueError('需要明确的模型资源 Release 标签和 owner/repository')
+    base = f'https://github.com/{repository}/releases/download/{quote(tag, safe="")}'
+    names = ('NextFire-karaoke-ja-Latn', 'MMS_FA')
+    write_json(root / 'model-downloads.json', {
+        'release_tag': tag, 'repository': repository,
+        'models': {name: f'{base}/{name}.zip' for name in names}})
+    shutil.copy2(ROOT / 'packaging/download_models.py', root / 'download_models.py')
+    entry = 'download-models.cmd' if os.name == 'nt' else 'download-models.command'
+    shutil.copy2(ROOT / 'packaging/launchers' / entry, root / entry)
+    if os.name != 'nt':
+        (root / entry).chmod(0o755)
+    (root / 'models').mkdir()
+
+
+def build(target, output, model_release_tag, model_repository):
     runtime = json.loads((ROOT / 'packaging/runtime-manifest.json').read_text())
     models = json.loads((ROOT / 'packaging/models.json').read_text())
     check_build_host(target)
@@ -230,9 +247,10 @@ def build(target, output):
         write_json(diagnostics / 'removed-installer-templates.json', remove_foreign_installer_templates(root))
         write_json(diagnostics / 'app-local-vc-runtime.json', deploy_windows_runtime(root))
     ffmpeg(root, spec['ffmpeg'], downloads, work)
-    for family in ('demucs', 'nextfire'):
+    model_downloads(root, model_release_tag, model_repository)
+    for family in ('demucs',):
         for item in models[family]['files']:
-            destination = root / ('vocal-models' if family == 'demucs' else 'models') / family / item['name']
+            destination = root / 'vocal-models' / family / item['name']
             destination.parent.mkdir(parents=True, exist_ok=True)
             if item['name'] == 'htdemucs.yaml':
                 run([python, '-I', '-c', 'import demucs,pathlib,shutil,sys; shutil.copyfile(pathlib.Path(demucs.__file__).parent/"remote/htdemucs.yaml",sys.argv[1])', destination], cwd=work)
@@ -304,6 +322,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--target', required=True, choices=TARGETS)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--model-release-tag', required=True)
+    parser.add_argument('--model-repository', default='zet-wu/Lazulite-studio')
     args = parser.parse_args()
     output = args.output.resolve()
     if output.is_relative_to(ROOT) or output.exists() and any(output.iterdir()):
@@ -312,7 +332,7 @@ def main():
     with (output / 'build.log').open('w', encoding='utf-8') as log:
         with redirect_stdout(Tee(sys.stdout, log)), redirect_stderr(Tee(sys.stderr, log)):
             try:
-                build(args.target, output)
+                build(args.target, output, args.model_release_tag, args.model_repository)
             except Exception:
                 traceback.print_exc()
                 # Do not leave partial archives after a failed build.
