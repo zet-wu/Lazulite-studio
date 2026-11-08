@@ -78,7 +78,7 @@
   },
   "mms_fa": {
     "directory": "MMS_FA",
-    "source": "https://download.pytorch.org/torchaudio/models/ctc_alignment_mling_uroman.pth",
+    "source": "https://dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt",
     "documentation": "https://docs.pytorch.org/audio/2.8/generated/torchaudio.pipelines.MMS_FA.html",
     "license": "CC-BY-NC-4.0",
     "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
