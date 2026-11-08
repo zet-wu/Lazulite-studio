@@ -17,7 +17,7 @@ test('models remain explicitly selected and stale input previews cannot enable s
   const dialog=page.getByRole('dialog',{name:'自动对齐',exact:true}),start=dialog.getByRole('button',{name:'开始对齐'});
   await expect(start).toBeDisabled();
   await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).press('Enter');
-  await dialog.getByRole('option',{name:'MMS_FA · torchaudio-mms-fa'}).click();
+  await dialog.getByRole('listbox').getByRole('option',{name:'MMS_FA · torchaudio-mms-fa'}).click();
   await expect(start).toBeEnabled();
   await dialog.getByRole('checkbox',{name:'去除调号数字',exact:true}).check();
   await expect.poll(()=>delayed).toBe(true);await expect(start).toBeDisabled();
