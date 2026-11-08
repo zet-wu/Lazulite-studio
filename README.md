@@ -63,13 +63,12 @@ Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 
 
 下载适合系统的 7z 包：
 - Windows CPU 版：`LazuliteStudio-windows-x64-cpu.7z`
-- Windows cuda 版：`LazuliteStudio-windows-x64-cuda.7z.001` 与 `LazuliteStudio-windows-x64-cuda.7z.002`（需要 Nvidia 显卡及驱动）
+- Windows cuda 版：`LazuliteStudio-windows-x64-cuda.7z`（需要 Nvidia 显卡及驱动）
 - Mac 版：`LazuliteStudio-macos-arm64.7z`
 
-主包包含完整运行时、词典和 Demucs 人声分离模型。对齐模型从同一 Release 单独下载：双击包内 `download-models.cmd`（Windows）或 `download-models.command`（macOS），选择 NextFire、MMS_FA 或全部下载。也可手动把 `NextFire-karaoke-ja-Latn.zip`、`MMS_FA.zip` 解压到程序根 `models/`，形成 `models/NextFire-karaoke-ja-Latn/` 和 `models/MMS_FA/`，然后在设置的模型管理中刷新。若配置了自定义总目录，请恢复默认或自行将模型移入该目录。下载脚本跳过已存在的同名目录，不代表该目录已通过模型校验。
+主包包含完整运行时、词典和 Demucs 人声分离模型。对齐模型可通过自动脚本下载：双击包内 `download-models.cmd`（Windows）或 `download-models.command`（macOS），选择 NextFire、MMS_FA 或全部下载。也可手动把 `NextFire-karaoke-ja-Latn.zip`、`MMS_FA.zip` 解压到程序根 `models/`，形成 `models/NextFire-karaoke-ja-Latn/` 和 `models/MMS_FA/`，然后在设置的模型管理中刷新。若配置了自定义总目录，请恢复默认或自行将模型移入该目录。下载脚本会跳过已存在的同名目录。
 
 使用支持 7z 的解压工具完整解压后打开其中的文件夹，双击启动入口运行。不要直接在压缩包内运行。
-分卷包需下载全部 `.7z.001`、`.7z.002` 等文件，放在同一目录，从 `.7z.001` 开始解压；不要逐卷解压。
 - Windows 启动入口：`start.exe`。
 - macOS 启动脚本：`start.command`。
 
@@ -170,8 +169,6 @@ SSH 转发或自定义域名通过同一浏览器入口访问页面与相对 `/a
 `packaging/build.py` 在对应 Windows x64 或 macOS arm64 主机上装配主包，使用 `--target`、`--output` 和必填的 `--model-release-tag` 指定目标、仓库外输出目录及模型附件所属 Release。预览工作流要求该资源标签已发布并包含两份 ZIP；正式 Release 工作流将本次标签绑定到三个主包，并独立构建一次共享模型 ZIP，准备草稿后由维护者人工发布。
 
 `packaging/build_models.py --output <附件目录> --cache <下载缓存目录>` 按 `packaging/models.json` 生成 `NextFire-karaoke-ja-Latn.zip` 和 `MMS_FA.zip`。模型 ZIP 包含唯一顶层模型目录、原始权重、必要配置及来源／许可说明。
-
-主包默认检查为一次 `pip check`、关键依赖与小资源加载及 0.1 秒媒体往返、一次服务启动／静态页面／正常退出。`packaging.native_audit.audit(root, target)` 可在运行时或原生依赖变动时单独调用（Windows 需准备 `pefile`）；`packaging/model_smoke.py --root <已补装两个模型的程序目录>` 用于真实模型离线专项验证。
 
 ### 生产构建与运行
 
