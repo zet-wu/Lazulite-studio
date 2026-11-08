@@ -39,7 +39,7 @@ jobs:
           values = [
               {'runner': 'windows-2022', 'target': 'windows-x64-cpu'},
               {'runner': 'windows-2022', 'target': 'windows-x64-cuda'},
-              {'runner': 'macos-14', 'target': 'macos-arm64'},
+              {'runner': 'macos-15', 'target': 'macos-arm64'},
           ]
           values = [v for v in values if os.environ['TARGET'] in ('all', v['target'])]
           if not values:
