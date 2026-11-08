@@ -54,7 +54,9 @@
         "identity_status": "verified-against-fixed-upstream-revision",
         "url": "https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn/resolve/2ab2b5f46539ee284703c281f286b01d2410ee12/README.md"
       }
-    ]
+    ],
+    "directory": "NextFire-karaoke-ja-Latn",
+    "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
   },
   "demucs": {
     "signature": "955717e8",
@@ -71,6 +73,20 @@
         "size": 21,
         "sha256": "239c445d0b14454d541ad8bd9bb271c9e536d267e8a4625208744cbb2e7bb66c",
         "source": "demucs==4.0.1/demucs/remote/htdemucs.yaml"
+      }
+    ]
+  },
+  "mms_fa": {
+    "directory": "MMS_FA",
+    "source": "https://download.pytorch.org/torchaudio/models/ctc_alignment_mling_uroman.pth",
+    "documentation": "https://docs.pytorch.org/audio/2.8/generated/torchaudio.pipelines.MMS_FA.html",
+    "license": "CC-BY-NC-4.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
+    "files": [
+      {
+        "name": "model.pt",
+        "size": 1262047414,
+        "sha256": "20ef12963ab4924bef49ac4fc7f58ad5da2ee43b2c11bc8c853c9b90ecdbc680"
       }
     ]
   }
