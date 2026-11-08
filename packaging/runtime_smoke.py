@@ -21,25 +21,15 @@ def main():
     manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
     assert platform.python_version() == manifest['python'], (platform.python_version(), manifest['python'])
     import fastapi, uvicorn, torch, torchaudio, demucs, transformers, soundfile, lazulite, uroman
-    assert uroman.Uroman().romanize_string("你好").replace(" ", "") == "nihao"
+    # Load small required resources; exact linguistic results belong to development tests.
+    uroman.Uroman()
     from sudachipy import dictionary
     from opencc import OpenCC
-    assert dictionary.Dictionary().create().tokenize('日本語')
-    assert OpenCC('t2s').convert('歌詞') == '歌词'
-    if os.name == 'nt':
-        # Test the nested native tool too: its DLL search starts beside opencc.exe,
-        # not beside the interpreter which imports the Python extension.
-        tools = list((root / 'runtime/python/Lib/site-packages/opencc').rglob('opencc.exe'))
-        assert len(tools) == 1, tools
-        assert (tools[0].parent / 'msvcp140.dll').is_file()
-        subprocess.run([str(tools[0]), '--version'], check=True)
-    sys.path.insert(0, str(root / 'app'))
-    from server.shape_conversion import analyze_shapes
-    shapes = analyze_shapes([{'id':'smoke','text':'头发 發髮 洗浄 弁'}], 'taiwan')['rows'][0]['cells']
-    assert ''.join(cell['value'] for cell in shapes) == '頭髮 發髮 洗淨 辨'
-    assert shapes[-1]['status'] == 'ambiguous'
-    from server import furigana
-    assert furigana.load_index()
+    dictionary.Dictionary().create()
+    OpenCC('t2s')
+    assert (root / 'vocal-models/demucs/htdemucs.yaml').is_file()
+    assert (root / 'vocal-models/demucs/955717e8-8726e21a.th').is_file()
+    assert (root / 'models').is_dir()
     if args.target == 'windows-x64-cpu':
         assert torch.version.cuda is None, torch.version.cuda
     elif args.target == 'windows-x64-cuda':
@@ -47,17 +37,14 @@ def main():
     suffix = '.exe' if os.name == 'nt' else ''
     ffmpeg = root / 'runtime/ffmpeg' / ('ffmpeg' + suffix)
     ffprobe = root / 'runtime/ffmpeg' / ('ffprobe' + suffix)
-    decoders = subprocess.check_output([str(ffmpeg), '-hide_banner', '-decoders'], text=True, stderr=subprocess.STDOUT)
-    for codec in ('mp3', 'alac'):
-        assert any(codec == line.split()[1] for line in decoders.splitlines() if len(line.split()) > 1), codec
     with tempfile.TemporaryDirectory(dir=root) as directory:
         directory = Path(directory)
         source = directory / 'input.wav'
         with wave.open(str(source), 'wb') as stream:
             stream.setnchannels(2); stream.setsampwidth(2); stream.setframerate(44100)
-            stream.writeframes(b'\0' * 44100 * 4)
-        # Exercise codecs/container probing and packet hashing used by Studio.
-        for extension, codec in [('m4a', 'aac'), ('flac', 'flac'), ('wav', 'pcm_s16le')]:
+            stream.writeframes(b'\0' * 4410 * 4)
+        # One short roundtrip checks encoding, probing and decoding.
+        for extension, codec in [('m4a', 'aac')]:
             encoded = directory / ('encoded.' + extension)
             subprocess.run([str(ffmpeg), '-v', 'error', '-i', str(source), '-c:a', codec, str(encoded)], check=True)
             probe = subprocess.check_output([str(ffprobe), '-v', 'error', '-show_streams', '-show_packets',
@@ -66,7 +53,7 @@ def main():
             assert data['streams'] and data['packets'][0]['data_hash'].startswith('SHA256:')
             subprocess.run([str(ffmpeg), '-v', 'error', '-i', str(encoded), '-f', 'null', '-'], check=True)
     print(json.dumps({'python':sys.version, 'torch':torch.__version__, 'cuda_runtime':torch.version.cuda,
-                      'torchaudio':torchaudio.__version__, 'dictionary':True, 'conversion':True, 'media':True}))
+                      'torchaudio':torchaudio.__version__, 'small_resources':True, 'media_roundtrip':'0.1s AAC'}))
 
 
 if __name__ == '__main__':

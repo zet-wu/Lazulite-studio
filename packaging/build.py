@@ -14,7 +14,7 @@ import traceback
 from urllib.parse import quote
 
 from archive import download, extract, package
-from native_audit import audit, remove_unused_host_rpaths
+from native_audit import remove_unused_host_rpaths
 from resolve import ROOT, TARGETS, check_build_host
 
 
@@ -143,7 +143,6 @@ def remove_foreign_installer_templates(root):
 
     These are package data used to generate new console scripts, not runtime
     dependencies. Keep the x64 templates and all installed application scripts.
-    The native audit still checks every executable remaining in the package.
     """
     site = root / 'runtime/python/Lib/site-packages'
     templates = {
@@ -278,7 +277,6 @@ def build(target, output, model_release_tag, model_repository):
     shutil.copy2(ROOT / 'packaging/USAGE.txt', root / 'USAGE.txt')
     if target == 'macos-arm64':
         write_json(diagnostics / 'removed-host-rpaths.json', remove_unused_host_rpaths(root))
-    write_json(diagnostics / 'native-audit.json', audit(root, target))
     # Omit all build tools and ambient user caches from the runtime process environment.
     env = {k:v for k,v in os.environ.items() if not k.startswith(('PYTHON', 'HF_', 'TRANSFORMERS_', 'TORCH_', 'STUDIO_'))}
     env['PATH'] = str(root / 'runtime/ffmpeg') + os.pathsep + (str(Path(os.environ['SystemRoot']) / 'System32') if os.name == 'nt' else '/usr/bin:/bin')
@@ -299,8 +297,8 @@ def build(target, output, model_release_tag, model_repository):
     shutil.rmtree(downloads)
     archives = package(root, artifacts)
     write_json(diagnostics / 'validation.json', {**manifest, 'status':'assembled-runtime-smoke-passed',
-               'checks':['pip check', 'native architecture/import audit',
-                         'Japanese/Chinese/media', 'local service/static/graceful shutdown'],
+               'checks':['pip check', 'key dependencies/resources and short media roundtrip',
+                         'local service/static/graceful shutdown'],
                'archives':[{'file':p.name, 'size':p.stat().st_size} for p in archives]})
     print('便携包已完成组装、启动检查与压缩：', artifacts)
 

@@ -27,7 +27,7 @@ from lazulite.audio.separation import DemucsConfig,DemucsSeparator
 from lazulite.audio.preparation import prepare_existing_vocals
 from lazulite.models.japanese import JapaneseAlignmentRequest
 from lazulite.alignment.japanese.run import align_japanese,JapaneseConfig
-from lazulite.alignment.japanese.backend import NextFireBackend,NextFireConfig
+from lazulite.alignment.japanese.backend import open_backend
 from lazulite.alignment.japanese.input import model_texts
 assert model_texts(['你好']) == ['nihao']
 import torch
@@ -42,8 +42,12 @@ vocals=separator.separate(audio);separator.close()
 assert vocals.samples.shape==(2,rate*3) and np.isfinite(vocals.samples).all()
 segment=VocalSegment('s',None,0,3,0,3,None,None)
 prepared=prepare_existing_vocals(vocals,original_id='synthetic',analysis=VocalAnalysis('synthetic',(segment,)),analysis_description={'configuration':{},'reference':'full_scale'},segments=(segment,),separation={'model':'htdemucs'})
-backend=NextFireBackend(NextFireConfig(args.root/'models'/'nextfire',device='cpu'))
+
 request=JapaneseAlignmentRequest.from_dict({'schema':'lazulite-japanese-request-v1','lines':[{'line_id':'l','text':'あ','units':[{'unit_id':'u','source_range':[0,1],'reading':'あ','reading_language':'ja','reading_source':'edited','reading_range':None}],'start_hint':None}]})
-result=align_japanese(prepared,request,backend=backend,config=JapaneseConfig());backend.close()
-assert result.status == 'complete' and len(result.units) == 1, result
-print(json.dumps({'network':'OS isolation with rejected connectivity probe and Python socket hook' if args.os_isolated else 'Python socket audit hook only; not OS firewall isolation','torch':torch.__version__,'separation_frames':vocals.samples.shape[1],'alignment_status':result.status,'units':len(result.units),'seconds':time.monotonic()-start,'scope':'synthetic 3 seconds, CPU; not song quality or target-platform validation'}))
+results=[]
+for name in ('NextFire-karaoke-ja-Latn', 'MMS_FA'):
+    backend=open_backend(args.root/'models'/name, device='cpu')
+    result=align_japanese(prepared,request,backend=backend,config=JapaneseConfig());backend.close()
+    assert result.status == 'complete' and len(result.units) == 1, result
+    results.append({'model':name, 'status':result.status, 'units':len(result.units)})
+print(json.dumps({'network':'OS isolation with rejected connectivity probe and Python socket hook' if args.os_isolated else 'Python socket audit hook only; not OS firewall isolation','torch':torch.__version__,'separation_frames':vocals.samples.shape[1],'models':results,'seconds':time.monotonic()-start,'scope':'synthetic 3 seconds, CPU after model installation; not song quality or target-platform validation'}))

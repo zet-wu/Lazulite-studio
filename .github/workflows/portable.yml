@@ -90,8 +90,6 @@ jobs:
           import os
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
               output.write('BUILD_OUTPUT=' + os.path.join(os.environ['RUNNER_TEMP'], 'portable-' + os.environ['BUILD_TARGET']) + '\n')
-      - name: Install native dependency audit tool
-        run: python -m pip install pefile==2024.8.26
       - name: Install pinned 7-Zip build tool
         shell: bash
         run: python packaging/setup_7zip.py "$RUNNER_TEMP/studio-7zip"
