@@ -42,9 +42,10 @@ Release 单独提供两个基于 [facebook/mms-300m](https://huggingface.co/face
 - [NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn)：使用日语歌唱音频后训练的专门模型，对日语歌曲有很好的对齐效果，该模型使用 CC-BY-NC-SA-4.0 协议，需注意商用限制；
 - [MMS_FA](https://docs.pytorch.org/audio/main/generated/torchaudio.pipelines.MMS_FA.html)：通用的跨语言的对齐模型，在长音、尾音延长等方面表现不如前者，该模型使用 CC-BY-NC-4.0 协议，同样需注意商用限制。
 
+关于 Lazulite Studio 所使用的自动对齐路线的技术报告与比较，参见[歌词自动对齐管线探索](https://github.com/zet-wu/lyric-auto-report)
+
 ### 编辑与打轴
 简洁而功能强大的编辑与打轴界面，针对日语歌词提供多种自动化工具，涵盖智能假名注音（不依赖 Windows 系统日语语言包）和罗马字生成。对其他语言提供词典注音功能，本地包附带汉语拼音和粤拼词典，更多方言可在 [Lazulite Studio 注音词典仓库](https://github.com/zet-wu/Lazulite-studio-dict)获取或根据格式制作。打轴界面支持空拍、单行打轴、定位回听等功能。
-
 
 ### 文件打包
 支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，可配合 [Musicovite](https://github.com/zet-wu/Musicovite) 本地音乐播放器使用。也支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC ，兼容大部分播放器。
@@ -57,7 +58,6 @@ Release 单独提供两个基于 [facebook/mms-300m](https://huggingface.co/face
 
 ### [Apple Music Like Lyric](https://github.com/amll-dev/applemusic-like-lyrics) 生态兼容
 Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 AMLL 对 TTML 的歌词模型做了一定的简化，舍弃了一些本项目认为很有用的数据承载能力，因此 Lazulite Studio 不保证其产物能够完整无损地被 AMLL 生态系列工具和库导入，也不保证其格式完全符合 [AMLL TTML DB](https://github.com/amll-dev/amll-ttml-db) 投稿的要求，若有较高的对 AMLL 兼容的要求，可以调整设置中的“AMLL 兼容设置”项。
-
 
 ## 本地包安装与使用
 
