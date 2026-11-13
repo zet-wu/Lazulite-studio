@@ -148,7 +148,7 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
   const ready = wanted.current.filter(first => cache.current.get(first)).length;
   return <div className={styles.spectrogram} data-spectrum-ready={ready} data-spectrum-wanted={wanted.current.length}
     data-spectrum-stats={stats.current ? JSON.stringify({ ...stats.current, cacheSize: cache.current.size, evictions: cache.current.evictions, pending: pending.current.size }) : undefined}>
-    <div className={styles.spectrumPlot}><canvas ref={canvas} aria-label={t('spectrum.title')} data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
+    <div data-wheel-zoom className={styles.spectrumPlot}><canvas ref={canvas} aria-label={t('spectrum.title')} data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
     {ready < wanted.current.length && !displayError && <small role="status">{t('spectrum.loading')}</small>}
     {displayError && <small role="alert">{displayError} <IconButton icon="refresh" label={t('spectrum.retry')} data-role="secondary" onClick={() => { failed.current.clear(); setError(''); setRetry(value => value + 1); }}/></small>}
   </div>;

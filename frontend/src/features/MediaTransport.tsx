@@ -153,7 +153,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [bottomExpanded, setExpanded] = useState(true);
   const expanded = !!timelineHost || bottomExpanded;
   const [visible, setVisible] = useState({ karaoke: true, line: true, word: true, ruby: true, romanization: true, gap: true, spectrum: false, wave: true, energy:true, segments:true });
-  const { width, ratio } = useCanvasMetrics(canvas, expanded, timelineHost);
+  const { width, height, ratio, node: measuredCanvas } = useCanvasMetrics(canvas, expanded, timelineHost);
   const [follow, setFollow] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
   viewportRef.current = { start, span, duration, follow };
@@ -369,7 +369,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   }, [rate, asset?.id, projectId]);
   useEffect(() => {
     const c = canvas.current;
-    if (!c) return;
+    if (!c || !expanded || !(visible.wave || ui?.adding) || width <= 0 || height <= 0) return;
     const draw = () => {
       const r = c.getBoundingClientRect();
       const scale = ratio;
@@ -398,7 +398,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       ctx.stroke();
     };
     draw();
-  }, [endMs, startMs, waveform.data, width, ratio, timelineHost]);
+  }, [endMs, startMs, waveform.data, width, height, ratio, measuredCanvas, expanded, visible.wave, ui?.adding, timelineHost]);
   const zoomAt = (factor: number, fraction: number) => {
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }
     const next = zoomViewport({ startMs, spanMs: Math.round(span * 1e3) }, durationMs, factor, fraction);
@@ -427,10 +427,13 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     const wheel=(event:globalThis.WheelEvent)=>{
       if(!asset||event.ctrlKey||event.metaKey||ui?.adding)return;
       const target=event.target as Element;
-      if(!target.closest('[data-wheel-zoom]')||target.closest('input,select,button,[role="combobox"]'))return;
+      const plot=target.closest<HTMLElement>('[data-wheel-zoom]');
+      if(!plot||target.closest('input,select,textarea,[role="combobox"],[role="menu"],[role="listbox"]'))return;
+      const rect=plot.getBoundingClientRect();
+      if(rect.width<=0||rect.height<=0)return;
       event.preventDefault();
-      const rect=slider.current!.getBoundingClientRect();
-      const delta=(event.deltaY||event.deltaX)*(event.deltaMode===1?16:event.deltaMode===2?rect.height:1);
+      const lineHeight=parseFloat(getComputedStyle(plot).lineHeight)||16;
+      const delta=(event.deltaY||event.deltaX)*(event.deltaMode===1?lineHeight:event.deltaMode===2?node.clientHeight:1);
       zoomAt(Math.exp(delta*.001),(event.clientX-rect.left)/rect.width);
     };
     node.addEventListener('wheel',wheel,{passive:false});
@@ -590,7 +593,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         </div>
 </>);
   const acousticPlots=(<div>
-      <div className={styles.ruler} aria-label={t('media.ruler')} data-timeline-pan="seek" tabIndex={-1}><TimelineIndicators />{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
+      <div data-wheel-zoom className={styles.ruler} aria-label={t('media.ruler')} data-timeline-pan="seek" tabIndex={-1}><TimelineIndicators />{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
       <div className={styles.waveRow}>
         <div className={styles.sourceLabel}><Select aria-label={t('media.graphicSource')} title={t('media.graphicSource')} value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">{t('media.original')}</option>{vocalId && <option value="vocal">{t('media.vocals')}</option>}</Select></div>
       <div

@@ -2,12 +2,15 @@ import { useEffect, useState, type RefObject } from 'react';
 
 /** Resize and monitor moves between desktop displays with different DPR. */
 export function useCanvasMetrics(ref: RefObject<HTMLCanvasElement | null>, enabled = true, mountIdentity?: unknown) {
-  const [metrics, setMetrics] = useState({ width: 640, ratio: window.devicePixelRatio || 1 });
+  const [metrics, setMetrics] = useState({ width: 640, height: 0, node: null as HTMLCanvasElement | null, ratio: window.devicePixelRatio || 1 });
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas || !enabled) return;
     let resolution: MediaQueryList;
-    const measure = () => setMetrics({ width: canvas.getBoundingClientRect().width, ratio: window.devicePixelRatio || 1 });
+    const measure = () => {
+      const { width, height } = canvas.getBoundingClientRect();
+      setMetrics({ width, height, node: canvas, ratio: window.devicePixelRatio || 1 });
+    };
     const changed = () => {
       resolution.removeEventListener('change', changed);
       measure(); watch();
