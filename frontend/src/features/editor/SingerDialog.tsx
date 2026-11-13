@@ -37,9 +37,9 @@ export function SingerDialog({ document, apply, close, focusAgent }:Props) {
 }
 function NewSinger({document,apply,done}:{document:LyricDocument;apply:Props['apply'];done:(id?:string)=>void}) {
   useTranslation();
- const [id,setId]=useState(''),[type,setType]=useState('person'),[name,setName]=useState(''),[error,setError]=useMessageText('');
+ const [id,setId]=useState(()=>{let n=1;while(document.agents.some(a=>a.id===`v${n}`))n++;return `v${n}`;}),[type,setType]=useState('person'),[name,setName]=useState(''),[error,setError]=useMessageText('');
  const save=(next:string)=>{setId(next);if(!/^[A-Za-z_][\w.-]*$/.test(next)||document.agents.some(a=>a.id===next)){setError(message('singer.invalidId'));return false;}if(apply({type:'set-agents',agents:[...document.agents,{id:next,type,name:name||null}]})){done(next);return true;}return false;};
- return <tr data-draft><td><TableField autoFocus value={id} label={t('singer.id')} cancel={()=>done()} commit={save}/>{error&&<p role="alert">{error}</p>}</td><td><Select aria-label={t('singer.newType')} value={type} onChange={e=>setType(e.target.value)}>{AGENT_TYPES.map(t=><option key={t}>{t}</option>)}</Select></td><td><TableField value={name} label={t('singer.name')} cancel={()=>done()} commit={v=>{setName(v);return true;}}/></td><td><div className="row-actions"><IconButton icon="trash" label={t('singer.cancelAdd')} onClick={()=>done()}/></div></td></tr>;
+ return <tr data-draft><td><TableField autoFocus commitInitial value={id} label={t('singer.id')} cancel={()=>done()} commit={save}/>{error&&<p role="alert">{error}</p>}</td><td><Select aria-label={t('singer.newType')} value={type} onChange={e=>setType(e.target.value)}>{AGENT_TYPES.map(t=><option key={t}>{t}</option>)}</Select></td><td><TableField value={name} label={t('singer.name')} cancel={()=>done()} commit={v=>{setName(v);return true;}}/></td><td><div className="row-actions"><IconButton icon="trash" label={t('singer.cancelAdd')} onPointerDown={e=>e.preventDefault()} onClick={()=>done()}/></div></td></tr>;
 }
 
 const t=i18n.t.bind(i18n);
