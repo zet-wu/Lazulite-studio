@@ -170,15 +170,17 @@
 .trackBar[data-temporary-end] { border-right: 2px dashed currentColor; }
 .trackBar .temporaryHandle { border: 1px dashed currentColor; background: repeating-linear-gradient(135deg, transparent, transparent 2px, currentColor 3px, transparent 4px); min-width: 6px; }
 
-.staging { border-top: 1px solid var(--line); padding-block: 4px; }
+.staging { border: 1px dashed var(--muted); border-radius: 6px; padding-block: 4px; }
 .stagingLane { display: flex; justify-content: center; min-width: 0; height: var(--timeline-lane-height); }
-.stagingBlock { white-space: nowrap; box-sizing: border-box; flex: 1; min-width: 0; overflow: hidden; cursor: grab; background: var(--timeline-surface); color: var(--text); border: 1px solid var(--muted); margin-block: var(--timeline-bar-inset); display: flex; align-items: center; touch-action: none; }
-.stagingMissing { border-inline: 2px dashed var(--muted); }
-.stagingContext { opacity: .65; cursor: pointer; }
-.stagingBlock:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.trackBar.stagingBlock { position: relative; inset: auto; flex: 1; min-width: 0; margin-block: var(--timeline-bar-inset); background: #d4d7dc; color: #353b45; box-shadow: inset 0 0 0 1px #858c97; }
+.trackBar.stagingContext { cursor: pointer; }
+.stagingBlock .trackHandle { pointer-events: none; cursor: inherit; }
+.stagingBlock .trackHandle:not(.temporaryHandle) { background: #858c9766; }
+:global([data-theme='dark']) .trackBar.stagingBlock { background: #454b55; color: #e1e4e9; box-shadow: inset 0 0 0 1px #929aa7; }
 .assignmentPreview { position: absolute; top: 0; height: var(--timeline-bar-height); background: var(--surface); color: var(--text); border: 1px solid var(--blue); z-index: 5; pointer-events: none; overflow: hidden; white-space: nowrap; }
 
-.stagingBlock.trackSelected { background: #518ae2; color: #fff; border-color: #2d64bc; }
+.trackBar.stagingBlock.trackSelected { background: #858c97; color: #fff; box-shadow: inset 0 0 0 1px #454b55; }
+:global([data-theme='dark']) .trackBar.stagingBlock.trackSelected { background: #727b89; color: #fff; box-shadow: inset 0 0 0 1px #c0c6d0; }
 
 .stagingLabel { display: block; color: var(--muted); font-size: 10px; margin: 0 0 3px var(--timeline-label-width, 36px); }
 

@@ -34,10 +34,12 @@ export function TimelineStaging({document,startMs,endMs,durationMs,snap,bpm,anch
   const missing=new Set(targets.filter(target=>{const item=targetInterval(projected,target);return item&&(item.beginMs===null||item.endMs===null);}).map(targetId));
   const included=new Set(missing);
   for(const target of targets)if(missing.has(targetId(target))){included.add(target.lineId);if(target.kind==='ruby')included.add(target.wordId);}
+  const ordinalById=new Map(document.lines.filter(line=>!line.backgroundOf).map((line,index)=>[line.id,index+1]));
   const activeLine=selection?.kind==='lines'?selection.activeId:selection?.lineId;
   const items=gesture?.items??targets.filter(target=>included.has(targetId(target))&&visible[target.kind]&&(activeLine?target.lineId===activeLine&&target.kind!=='line':target.kind==='line')).map(target=>{
     const item=targetInterval(document,target)!;
-    const text=target.kind==='line'?document.lines.find(l=>l.id===target.lineId)!.words.map(w=>w.text).join(''):'text'in item?item.text:'reading'in item?item.reading:'';
+    const line=document.lines.find(line=>line.id===target.lineId)!;
+    const text=target.kind==='line'?`L${ordinalById.get(line.backgroundOf??line.id)}${line.backgroundOf?` ${t('outline.background')}`:''}`:'text'in item?item.text:'reading'in item?item.reading:'';
     return {target,missing:item.beginMs===null||item.endMs===null,text};
   });
   const choose=(item:Item)=>{setSelection(targetSelection(item.target));if(!item.missing){const interval=targetInterval(document,item.target)!;onLocate?.(interval.beginMs!,interval.endMs!);}};
@@ -67,10 +69,12 @@ export function TimelineStaging({document,startMs,endMs,durationMs,snap,bpm,anch
     {items.length>0&&<div className={styles.staging} aria-label={t('timeline.staging')}><small className={styles.stagingLabel}>{t('timeline.staging')}</small>
       {(['line','word','ruby','romanization'] as const).map(kind=>{const group=items.filter(item=>item.target.kind===kind);return group.length?<div className={styles.trackRow} key={kind}><strong>{t(kind==='line'?'selection.line':kind==='word'?'selection.word':kind==='ruby'?'selection.ruby':'media.romanization')}</strong><div className={styles.stagingLane}>
         {group.map(item=><Tooltip key={targetId(item.target)} className={styles.stagingSlot} content={item.text}><div role="button" tabIndex={0} data-staging-key={targetId(item.target)} aria-label={item.text} aria-pressed={selection?.ids.includes(targetId(item.target))??false}
-          className={`${styles.stagingBlock} ${item.missing?styles.stagingMissing:styles.stagingContext} ${selection?.ids.includes(targetId(item.target))?styles.trackSelected:''}`}
+          className={`${styles.trackBar} ${styles.stagingBlock} ${item.missing?'':styles.stagingContext} ${selection?.ids.includes(targetId(item.target))?styles.trackSelected:''}`}
           onPointerDown={event=>begin(event,item)} onPointerMove={move} onPointerUp={finish} onPointerCancel={reset} onLostPointerCapture={reset}
           onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();choose(item);}}}>
+          <span aria-hidden="true" className={`${styles.trackHandle} ${item.missing?styles.temporaryHandle:''}`} />
           <span className={styles.trackBarText}>{item.text}</span>
+          <span aria-hidden="true" className={`${styles.trackHandle} ${item.missing?styles.temporaryHandle:''}`} />
         </div></Tooltip>)}
       </div></div>:null;})}
     </div>}

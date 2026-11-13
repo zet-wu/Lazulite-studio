@@ -294,8 +294,8 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       </section>;
     })}
     </div></div>
-    <TimelineStaging document={document} startMs={startMs} endMs={endMs} durationMs={durationMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const item=targetInterval(document,target);return item?[item.beginMs,item.endMs].filter((n):n is number=>n!==null):[];})]} locked={locked} visible={visible} host={tracksRef} apply={apply} onLocate={onLocate} onError={onError}/>
     {visible.gap && line && row('gaps', gaps.map(({ left, right, beginMs, endMs, overlap }) => <button data-role="secondary" disabled={locked} key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? t('timeline.removeOverlap') : t('timeline.closeGap')} onClick={() => closeGap(left, right)}>{overlap ? t('timeline.overlap') : t('timeline.gap')}</button>),[],1,t('timeline.gap'))}
+    <TimelineStaging document={document} startMs={startMs} endMs={endMs} durationMs={durationMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const item=targetInterval(document,target);return item?[item.beginMs,item.endMs].filter((n):n is number=>n!==null):[];})]} locked={locked} visible={visible} host={tracksRef} apply={apply} onLocate={onLocate} onError={onError}/>
   </div>;
 }
 
