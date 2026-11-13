@@ -29,7 +29,7 @@ def test_space_counts_current_snapshot_and_media_changes(tmp_path):
         assert wait(client,job['id'])['status']=='succeeded'
         value=check()
         assert value['vocals']==sum(path.stat().st_size for path in (directory/'vocals').rglob('*') if path.is_file())
-        assert value['vocals']>(directory/'vocals'/job['id']/'vocals.wav').stat().st_size
+        assert value['vocals']>(directory/'vocals'/job['id']/'vocals.m4a').stat().st_size
         # Neither database nor another project's files are attributed to p.
         (tmp_path/'unrelated').write_bytes(b'x'*2000)
         assert check()==value

@@ -13,10 +13,12 @@ from .runtime_devices import DeviceFailure, device_failure
 class VocalCancelled(Exception): pass
 
 class VocalRunner:
-    def __init__(self, db, root: Path, separator_factory=None, *, cleanup=True):
+    def __init__(self, db, root: Path, separator_factory=None, *, cleanup=True, media_lifetime=None):
         self.db, self.root = db, root
         self.root.mkdir(parents=True, exist_ok=True)
         self.separator_factory = separator_factory
+        from .studio.media_lifetime import MediaLifetime
+        self.media_lifetime = media_lifetime or MediaLifetime(root)
         from .vocal_process import VocalProcess
         self._worker = VocalProcess()
         if not cleanup: return
@@ -37,6 +39,11 @@ class VocalRunner:
             'project_id': project_id, 'asset_path': str(Path(asset_path).resolve()), 'params': params, 'job_id': job_id}, emit, cancelled)
 
     def run_in_process(self, project_id, asset_path, params, job_id, emit, cancelled):
+        with self.media_lifetime.use(project_id) as media:
+            return self._run_in_process(project_id, asset_path, params, job_id, emit, cancelled, media)
+
+    def _run_in_process(self, project_id, asset_path, params, job_id, emit, cancelled, media):
+        from .vocal_audio import encode_vocals, asset, analysis_samples, FORMAT
         try:
             import soundfile as sf
         except ImportError as exc:
@@ -51,7 +58,7 @@ class VocalRunner:
         result_id = job_id
         directory = self.root / project_id / 'vocals' / result_id
         directory.mkdir(parents=True, exist_ok=True)
-        vocal_path = directory / 'vocals.wav'
+        vocal_path = directory / 'vocals.m4a'
         settings = self.generation_settings(params['asset_id'], params['model_name'], params['device'])
         reuse = None
         if params.get('retry_analysis_id'):
@@ -94,20 +101,23 @@ class VocalRunner:
             if not np.isfinite(vocals.samples).all(): raise ValueError('分离人声包含非有限样本')
             peak = float(np.max(np.abs(vocals.samples), initial=0))
             gain = min(1.0, (1 - 2 ** -15) / peak) if peak else 1.0
-            # Multiply in float64 so rounding cannot push the positive peak to 1.
-            sf.write(str(vocal_path), vocals.samples.T.astype(np.float64) * gain, vocals.sample_rate, format='WAV', subtype='PCM_16')
+            encoded = encode_vocals(vocal_path, vocals.samples, vocals.sample_rate, gain)
             metadata = {'id': result_id, 'source_asset_id': params['asset_id'], 'model': description,
                         'gain': gain, 'peak_before_gain': peak, 'sample_rate': vocals.sample_rate,
                         'channels': vocals.samples.shape[0], 'frames': vocals.samples.shape[1],
-                        'duration_ms': milliseconds(vocals.duration), 'format': 'WAV PCM_16',
-                        'quantization': 'float to signed 16-bit PCM', 'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
-            metadata.update(audio_result_id=result_id, generation_settings=settings)
+                        'duration_ms': milliseconds(vocals.duration), 'format': FORMAT,
+                        'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
+            metadata.update(encoded, audio_result_id=result_id, generation_settings=settings)
+            del audio, vocals
+            decoded = media.playback_proxy(asset(vocal_path, metadata))
+            metadata['decoded_frames'] = decoded.decoded_frames
+            metadata['padding_frames'] = decoded.decoded_frames - metadata['frames']
             with self.db.transaction() as c:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', self.db.paths.store(directory), json.dumps(metadata)))
-            del audio, vocals
         boundary()
         emit('stage', 'analyzing')
-        samples, rate = sf.read(str(vocal_path), dtype='float32', always_2d=True)
+        decoded = media.playback_proxy(asset(vocal_path, metadata))
+        samples, rate = analysis_samples(decoded), decoded.rate
         audio = AudioBuffer(samples.T, rate, params['asset_id'])
         metadata.update(analysis_version='lazulite-vocal-core-v2-main-rms', runtime={'numpy': np.__version__, 'soundfile': sf.__version__, 'scipy': scipy.__version__})
         config = VocalConfig()
@@ -135,25 +145,22 @@ class VocalRunner:
                                  device=device or os.getenv('STUDIO_VOCAL_DEVICE','cpu')))
         config.pop('model_repo', None)
         config.pop('device', None)
-        return {'source_asset_id':asset_id,'config':config,'audio_format':'WAV PCM_16',
-                'generation_recipe':'demucs-44100-stereo-v1'}
+        return {'source_asset_id':asset_id,'config':config,'audio_format':'M4A AAC-LC 192k',
+                'generation_recipe':'demucs-44100-stereo-aac-v2'}
 
     def audio_path(self, project_id, metadata):
         owner, _ = self.get(project_id, metadata['audio_result_id'])
-        return self.db.paths.resolve(owner['directory']) / 'vocals.wav'
+        return self.db.paths.resolve(owner['directory']) / 'vocals.m4a'
 
     def audio_available(self, project_id, metadata):
-        import soundfile as sf
-        if metadata['format'] != 'WAV PCM_16': return False
-        path = self.audio_path(project_id, metadata)
-        try:
-            # Persistent audio is immutable under its owner ID. Read only its
-            # format/frame metadata when serving windows or reusing the source.
-            info = sf.info(path)
-            return (info.format == 'WAV' and info.subtype == 'PCM_16' and info.frames == metadata['frames'] and info.samplerate == metadata['sample_rate'] and info.channels == metadata['channels'])
-        except (OSError, sf.LibsndfileError):
-            return False
+        from .vocal_audio import available
+        return available(self.audio_path(project_id, metadata), metadata)
 
+    def decoded_audio(self, project_id, metadata):
+        from .vocal_audio import asset, analysis_samples
+        with self.media_lifetime.use(project_id) as media:
+            proxy = media.playback_proxy(asset(self.audio_path(project_id, metadata), metadata))
+            return analysis_samples(proxy), proxy.rate
 
     def get(self, project_id, result_id):
         with self.db.connect() as c:

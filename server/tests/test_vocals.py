@@ -34,7 +34,7 @@ def wait(client, job):
         time.sleep(.02)
     raise AssertionError('task did not finish')
 
-def test_vocal_wav_gain_explicit_adoption_and_source_validation(tmp_path):
+def test_vocal_aac_gain_explicit_adoption_and_source_validation(tmp_path):
     client, db = setup(tmp_path)
     with client:
         before = client.get('/api/v1/projects/p/document').json()
@@ -45,11 +45,14 @@ def test_vocal_wav_gain_explicit_adoption_and_source_validation(tmp_path):
         assert client.get('/api/v1/projects/p/document').json()['revision'] == before['revision']
         result = client.get('/api/v1/projects/p/vocals').json()['items'][0]
         assert result['status'] == 'ready' and result['gain'] < 1
-        wav = tmp_path/'projects'/'p'/'vocals'/result['id']/'vocals.wav'
-        info = sf.info(wav)
-        assert info.subtype == 'PCM_16' and info.frames == 88200 and info.channels == 2
-        samples, _ = sf.read(wav)
-        assert np.max(np.abs(samples)) < 1 and np.max(np.abs(samples[:22050])) == 0
+        wav = tmp_path/'projects'/'p'/'vocals'/result['id']/'vocals.m4a'
+        from server.vocals import VocalRunner
+        from server.vocal_audio import inspect_audio
+        info = inspect_audio(str(wav), wav.stat().st_size, wav.stat().st_mtime_ns)
+        assert info['codec_name'] == 'aac' and info['duration_ts'] == 88200 and info['channels'] == 2
+        samples, _ = VocalRunner(db, tmp_path/'projects', cleanup=False).decoded_audio('p', result)
+        assert len(samples) == 88200 and np.max(np.abs(samples[:21000])) < .001
+        assert result['padding_frames'] == result['decoded_frames'] - result['frames']
         body = {k: before[k] for k in ('schema_version','project_id','revision','document')}
         body['document']['acoustics'] = {'analysisId':result['id'], 'segments':result['segments']}
         saved = client.put('/api/v1/projects/p/document',json=body,headers={'origin':'http://studio','if-match':before['revision']})
@@ -57,7 +60,8 @@ def test_vocal_wav_gain_explicit_adoption_and_source_validation(tmp_path):
         energy = client.get(f"/api/v1/projects/p/vocals/{result['id']}/energy?start_ms=0&end_ms=2000&buckets=10")
         assert energy.status_code == 200 and len(energy.json()['values']) <= 10
         assert client.get(f"/api/v1/projects/p/audio?vocal={result['id']}", headers={'range':'bytes=0-99'}).status_code == 206
-        assert client.get(f"/api/v1/projects/p/audio?vocal={result['id']}").content == wav.read_bytes()
+        playback = client.get(f"/api/v1/projects/p/audio?vocal={result['id']}").content
+        assert playback[:4] == b'RIFF' and len(playback) == 44 + 88200 * 4
         assert client.get(f"/api/v1/projects/p/vocals/{result['id']}/file").content == wav.read_bytes()
         pcm = client.get(f"/api/v1/projects/p/pcm?vocal={result['id']}&start_ms=0&end_ms=1000")
         assert pcm.status_code == 200
@@ -108,7 +112,7 @@ def test_analysis_failure_is_retryable_and_restart_retains_ready_products(tmp_pa
     runner=VocalRunner(db,tmp_path/'projects')
     assert not orphan.exists()
     assert runner.get('p',retry['id'])[0]['status']=='ready'
-    assert (tmp_path/'projects'/'p'/'vocals'/result['id']/'vocals.wav').is_file()
+    assert (tmp_path/'projects'/'p'/'vocals'/result['id']/'vocals.m4a').is_file()
 
 
 def test_ready_reanalysis_preserves_old_result(tmp_path):
@@ -127,8 +131,8 @@ def test_ready_reanalysis_preserves_old_result(tmp_path):
         new = run(old)
         assert new != old
         assert before == {p.name: p.read_bytes() for p in directory.iterdir()}
-        assert not (tmp_path/'projects'/'p'/'vocals'/new/'vocals.wav').exists()
-        assert client.get(f'/api/v1/projects/p/vocals/{new}/file').content == before['vocals.wav']
+        assert not (tmp_path/'projects'/'p'/'vocals'/new/'vocals.m4a').exists()
+        assert client.get(f'/api/v1/projects/p/vocals/{new}/file').content == before['vocals.m4a']
         items = client.get('/api/v1/projects/p/vocals').json()['items']
         assert {r['audio_id'] for r in items} == {old}
         assert {r['audio_state'] for r in items} == {'current'}
@@ -178,15 +182,16 @@ def test_current_lazulite_profile_is_unsmoothed_main_rms_with_centered_clock(tmp
         directory = tmp_path/'projects'/'p'/'vocals'/result['id']
         from lazulite.audio.activity import VocalConfig, build_activity_profile
         from lazulite.models.audio import AudioBuffer
-        samples, rate = sf.read(directory/'vocals.wav', dtype='float32', always_2d=True)
+        from server.vocals import VocalRunner
+        samples, rate = VocalRunner(db, tmp_path/'projects', cleanup=False).decoded_audio('p', result)
         config = VocalConfig()
         expected = build_activity_profile(AudioBuffer(samples.T, rate, asset), config=config)
         values = np.load(directory/'energy.npy')
         np.testing.assert_array_equal(values, expected['main_rms'])
-        # Independent onset check: center padding includes sample zero at t=0;
-        # asymmetric main extraction gives .25 rather than stereo mean .375.
-        assert np.isclose(values[0], .25 / np.sqrt(config.frame_length))
-        assert values[config.frame_length//(2*config.hop_length)+1] == 0
+        # AAC may spread an impulse, but the centered first frame must retain
+        # source-zero energy and later silence must remain silent.
+        assert values[0] > 0
+        assert values[10] == 0
         assert len(values) == len(samples)//config.hop_length+1
         assert result['energy_hop_ms'] == config.hop_length * 1000 / rate
         assert result['analysis_config']['frame_length'] == 2048
@@ -215,15 +220,15 @@ def test_cached_separation_reanalysis_repair_and_version_update(tmp_path, monkey
         assert run() == first and Counted.calls == 1
         second = run(first)
         assert second != first and Counted.calls == 1
-        assert len(list((tmp_path/'projects').rglob('vocals.wav'))) == 1
+        assert len(list((tmp_path/'projects').rglob('vocals.m4a'))) == 1
         assert run() == second
-        # Truncated PCM must be unavailable even when the RIFF header remains.
-        path = tmp_path/'projects'/'p'/'vocals'/first/'vocals.wav'
+        # Truncated compressed products must be unavailable even with intact container metadata.
+        path = tmp_path/'projects'/'p'/'vocals'/first/'vocals.m4a'
         with path.open('r+b') as f: f.truncate(path.stat().st_size - 100)
         assert {r['audio_state'] for r in client.get('/api/v1/projects/p/vocals').json()['items']} == {'missing'}
         repaired = run(second)
         assert Counted.calls == 2 and repaired not in (first, second)
-        path = tmp_path/'projects'/'p'/'vocals'/repaired/'vocals.wav'
+        path = tmp_path/'projects'/'p'/'vocals'/repaired/'vocals.m4a'
         path.unlink()
         restored = run()
         assert Counted.calls == 3
@@ -231,14 +236,14 @@ def test_cached_separation_reanalysis_repair_and_version_update(tmp_path, monkey
         assert client.get('/api/v1/projects/p/vocals').json()['items'][0]['audio_state'] == 'outdated'
         updated = run()
         assert updated != restored and Counted.calls == 4
-        assert (tmp_path/'projects'/'p'/'vocals'/restored/'vocals.wav').exists()
+        assert (tmp_path/'projects'/'p'/'vocals'/restored/'vocals.m4a').exists()
         assert client.get('/api/v1/projects/p/vocals').json()['items'][0]['audio_state'] == 'current'
-        # An explicit historical WAV analysis keeps that audio even after model configuration changes.
+        # An explicit historical analysis keeps that audio even after model configuration changes.
         historical = run(restored)
         assert Counted.calls == 4
         item = client.get('/api/v1/projects/p/vocals').json()['items'][0]
         assert item['id'] == historical and item['audio_id'] == restored and item['audio_state'] == 'outdated'
-        assert client.get(f'/api/v1/projects/p/vocals/{historical}/file').content == (tmp_path/'projects/p/vocals'/restored/'vocals.wav').read_bytes()
+        assert client.get(f'/api/v1/projects/p/vocals/{historical}/file').content == (tmp_path/'projects/p/vocals'/restored/'vocals.m4a').read_bytes()
 
 
 def test_restart_keeps_shared_audio_and_project_deletion_releases_it(tmp_path):
@@ -259,13 +264,13 @@ def test_restart_keeps_shared_audio_and_project_deletion_releases_it(tmp_path):
         _, metadata = runner.get('p',result_id)
         assert metadata['audio_result_id'] == first
         assert metadata['generation_settings'] and metadata['audio_result_id']
-        assert runner.audio_path('p',metadata) == tmp_path/'projects'/'p'/'vocals'/first/'vocals.wav'
+        assert runner.audio_path('p',metadata) == tmp_path/'projects'/'p'/'vocals'/first/'vocals.m4a'
         assert runner.audio_available('p', metadata)
     assert before == {str(p): p.read_bytes() for p in (tmp_path/'projects').rglob('*') if p.is_file()}
     with TestClient(create_app(tmp_path, Settings(None, True), separator_factory=Separator)) as client:
         assert client.get(f'/api/v1/projects/p/vocals/{second}/file').status_code == 200
         assert client.delete('/api/v1/projects/p',headers={'origin':'http://studio'}).status_code == 200
-    assert not list((tmp_path/'projects').rglob('vocals.wav'))
+    assert not list((tmp_path/'projects').rglob('vocals.m4a'))
 
 
 def test_model_receives_direct_stereo_44100_with_sample_zero(tmp_path):
@@ -307,14 +312,14 @@ def test_vocal_access_and_reanalysis_use_headers_after_metadata_changes(tmp_path
         job = client.post('/api/v1/projects/p/jobs/vocal', json={'params': {'asset_id': 'p'}}, headers={'origin': 'http://studio'}).json()
         assert wait(client, job['id'])['status'] == 'succeeded'
         metadata = client.get('/api/v1/projects/p/vocals').json()['items'][0]
-    path = tmp_path/'projects/p/vocals'/metadata['audio_result_id']/'vocals.wav'
+    path = tmp_path/'projects/p/vocals'/metadata['audio_result_id']/'vocals.m4a'
     runner = VocalRunner(db, tmp_path/'projects', Separator, cleanup=False)
     original_open = Path.open
     def forbid_full_vocal_read(self, *args, **kwargs):
         if self == path:
             raise AssertionError('vocal availability must not scan PCM bytes')
         return original_open(self, *args, **kwargs)
-    # libsndfile checks format and actual frame count without a Python file scan.
+    # Container probing checks stream metadata without scanning PCM in Python.
     monkeypatch.setattr(Path, 'open', forbid_full_vocal_read)
     try:
         for _ in range(3):

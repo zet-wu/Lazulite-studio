@@ -1224,7 +1224,6 @@ export interface components {
             channels: number;
             frames: number;
             format: string;
-            quantization: string;
             model: {
                 [key: string]: unknown;
             };
@@ -1241,6 +1240,21 @@ export interface components {
             audio_id: string;
             /** @enum {string} */
             audio_state: "current" | "outdated" | "missing";
+            /** @description AAC product metadata; frames and valid_frames exclude decoder tail padding. */
+            valid_frames?: number;
+            /** @description AAC product metadata; frames and valid_frames exclude decoder tail padding. */
+            decoded_frames?: number;
+            /** @description AAC product metadata; frames and valid_frames exclude decoder tail padding. */
+            padding_frames?: number;
+            /** @description AAC product metadata; frames and valid_frames exclude decoder tail padding. */
+            audio_bytes?: number;
+            /** @description AAC product metadata; frames and valid_frames exclude decoder tail padding. */
+            bitrate?: number;
+            /** @description AAC product metadata; frames and valid_frames exclude decoder tail padding. */
+            audio_schema_version?: number;
+            codec?: string;
+            container?: string;
+            time_origin?: string;
         };
         VocalResults: {
             items: components["schemas"]["VocalResult"][];

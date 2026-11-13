@@ -51,6 +51,7 @@ class Proxy:
     rate: int
     channels: int
     source_start_ms: int
+    decoded_frames: int
     peaks: list[np.ndarray] | None = None
     mime_type: str = "audio/wav"
     offset_ms: int = 0
@@ -182,11 +183,12 @@ class MediaService:
                 except (OSError, subprocess.CalledProcessError) as exc:
                     raise MediaError('playback decode failed') from exc
                 pcm = result.stdout
+                decoded_frames = len(pcm) // 4
                 if asset.valid_frames is not None:
                     size = asset.valid_frames * 4
                     if len(pcm) < size: raise MediaError('vocal audio is shorter than its valid frame count')
                     pcm = pcm[:size]
-                self._resources[asset.content_hash] = Proxy(pcm, rate, 2, asset.probe.start_ms)
+                self._resources[asset.content_hash] = Proxy(pcm, rate, 2, asset.probe.start_ms, decoded_frames)
             return self._resources[asset.content_hash]
 
     def pcm_window(self, asset: Asset, *, start_ms: int, end_ms: int) -> tuple[bytes, int, int]:

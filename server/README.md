@@ -29,7 +29,7 @@ FastAPI 提供同源 `/api/v1` API，SQLite 管理项目、资源索引、修订
 
 Lazulite 源码位于仓库根目录的固定 Git 子模块 `vendor/Lazulite`，基础安装从仓库根目录读取 requirements。`STUDIO_VOCAL_MODEL` 默认 `htdemucs`，`STUDIO_VOCAL_DEVICE` 默认 `cpu`；自动对齐首次分离使用 `htdemucs`。`STUDIO_ALIGNMENT_MODELS_DIR` 提供对齐模型总目录，直接子目录支持 HF Wav2Vec2 CTC 和带 `alignment-model.json` 声明的 TorchAudio MMS_FA，`STUDIO_ALIGNMENT_DEVICE` 默认 `cpu`。模型可用性检查读取配置，计算由任务子进程执行。
 
-人声以 44.1 kHz 双声道 float32 输入 Demucs，按整曲峰值处理后保存一份 PCM_16 WAV；分析重读此文件，能量保存 `main_rms`，核心片段和配置保存于独立分析记录。每条记录以 `audio_result_id` 引用音频所有者，重分析复用 WAV。访问及复用通过 WAV 格式、位深、实际帧数、采样率与声道检查可用性，音频所有者 ID 管理持久资源身份；复用条件由源资产、公开配置及生成规则决定。已注册分析与音频保留至项目删除。
+人声以 44.1 kHz 双声道 float32 输入 Demucs，按整曲峰值处理后保存 AAC-LC／M4A，目标码率 192 kbit/s，保留输出采样率。M4A edit list 处理编码起始延迟，movie timescale 与采样率一致；元数据分别记录有效帧数、实际解码帧数和尾部填充。播放、首次分析、重新分析及对齐统一读取压缩成果解码后的 int16 PCM；分析按需转 float32。能量保存 `main_rms`，核心片段和配置保存于独立分析记录。每条记录以 `audio_result_id` 引用音频所有者，重新分析复用 M4A；下载返回 `audio/mp4` 的 `vocals.m4a`。成果可用性核对文件字节数及容器的编码、采样率、声道与有效时间范围，探测按文件状态复用。编码与首次解码成功后登记成果；已注册分析与音频保留至项目删除。
 
 原曲以 48 kHz 双声道 int16 PCM 保存在活动期内存，播放 Range、PCM 窗口和 16 级峰值共享同一解码结果，冷请求合并。页面每 30 秒续租，180 秒过期；正常离开主动解除登记，每 30 秒检查过期页。最后一个页面和在途请求释放后回收 PCM／峰值，暂停和失焦保持登记。服务启动、尚无读取者时清理项目 cache 内原曲 WAV 与 peaks-v1 派生目录。空间统计按持久文件逻辑字节计算。人声播放与窗口保持原采样率，能量通过 mmap 分桶读取。
 

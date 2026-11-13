@@ -84,7 +84,7 @@ def create_app(
     revisions = RevisionStore(db, root / "projects")
     from .vocals import VocalRunner
     from .vocal_routes import build_vocal_router, vocal_asset
-    vocal_runner = VocalRunner(db, root / 'projects', separator_factory)
+    vocal_runner = VocalRunner(db, root / 'projects', separator_factory, media_lifetime=media_lifetime)
     configured_reading_proposer = reading_proposer or SudachiReadingProposer()
     if publisher is None:
         publisher = MediaPublisher()

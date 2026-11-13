@@ -42,15 +42,20 @@ def main():
         source = directory / 'input.wav'
         with wave.open(str(source), 'wb') as stream:
             stream.setnchannels(2); stream.setsampwidth(2); stream.setframerate(44100)
-            stream.writeframes(b'\0' * 4410 * 4)
+            stream.writeframes(b'\0' * 4413 * 4)
         # One short roundtrip checks encoding, probing and decoding.
         encoded = directory / 'encoded.m4a'
-        subprocess.run([str(ffmpeg), '-v', 'error', '-i', str(source), '-c:a', 'aac', str(encoded)], check=True)
+        subprocess.run([str(ffmpeg), '-v', 'error', '-i', str(source), '-c:a', 'aac', '-profile:a', 'aac_low', '-b:a', '192k', '-movie_timescale', '44100', str(encoded)], check=True)
         probe = subprocess.check_output([str(ffprobe), '-v', 'error', '-show_streams', '-show_packets',
                                          '-show_data_hash', 'sha256', '-of', 'json', str(encoded)], text=True)
         data = json.loads(probe)
         assert data['streams'] and data['packets'][0]['data_hash'].startswith('SHA256:')
-        subprocess.run([str(ffmpeg), '-v', 'error', '-i', str(encoded), '-f', 'null', '-'], check=True)
+        stream = data['streams'][0]
+        assert stream['profile'] == 'LC' and stream['start_pts'] == 0 and stream['duration_ts'] == 4413
+        first = data['packets'][0]
+        assert first['pts'] < 0 and first['side_data_list'][0]['skip_samples'] == -first['pts']
+        pcm = subprocess.check_output([str(ffmpeg), '-v', 'error', '-i', str(encoded), '-f', 's16le', '-'])
+        assert 4413 <= len(pcm) // 4 < 4413 + 1024
     print(json.dumps({'python':sys.version, 'torch':torch.__version__, 'cuda_runtime':torch.version.cuda,
                       'torchaudio':torchaudio.__version__, 'small_resources':True, 'media_roundtrip':'0.1s AAC'}))
 

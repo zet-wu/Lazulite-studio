@@ -58,7 +58,13 @@ class AlignmentRunner:
 
 
 def run_alignment(request, emit, cancelled):
-    import soundfile as sf
+    from .studio.media_lifetime import MediaLifetime
+    media_lifetime = MediaLifetime(Path(request['root']))
+    with media_lifetime.use(request['project_id']):
+        return _run_alignment(request, emit, cancelled, media_lifetime)
+
+
+def _run_alignment(request, emit, cancelled, media_lifetime):
     from lazulite.models.audio import AudioBuffer, VocalSegment, VocalAnalysis
     from lazulite.audio.preparation import prepare_existing_vocals
     from lazulite.models.japanese import JapaneseAlignmentRequest
@@ -76,7 +82,7 @@ def run_alignment(request, emit, cancelled):
     if cancelled(): raise VocalCancelled()
     check_snapshot(params['_model'])
     projection = project_alignment(snapshot, params['use_hints'], model=params['_model'], **{k:params[k] for k in ('latin_normalize','strip_tone_digits')})
-    vocal = VocalRunner(db, root, cleanup=False)
+    vocal = VocalRunner(db, root, cleanup=False, media_lifetime=media_lifetime)
     acoustics = snapshot['acoustics']; new_acoustics = None
     if acoustics['analysisId']:
         row, metadata = vocal.get(pid, acoustics['analysisId'])
@@ -89,7 +95,7 @@ def run_alignment(request, emit, cancelled):
         normalized, _ = intersect_segments(metadata['segments'], duration_ms)
         new_acoustics = {'analysisId': metadata['id'], 'segments': normalized}
     if cancelled(): raise VocalCancelled()
-    samples, rate = sf.read(vocal.audio_path(pid, metadata), dtype='float32', always_2d=True)
+    samples, rate = vocal.decoded_audio(pid, metadata)
     audio = AudioBuffer(samples.T, rate, metadata['audio_result_id'])
     def segments(rows):
         # Samples are read only inside the decoded PCM, independently of source metadata.

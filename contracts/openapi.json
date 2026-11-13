@@ -3513,7 +3513,6 @@
           "channels",
           "frames",
           "format",
-          "quantization",
           "model",
           "analysis_version",
           "audio_id",
@@ -3552,9 +3551,6 @@
             "type": "integer"
           },
           "format": {
-            "type": "string"
-          },
-          "quantization": {
             "type": "string"
           },
           "model": {
@@ -3599,6 +3595,39 @@
               "outdated",
               "missing"
             ]
+          },
+          "valid_frames": {
+            "type": "integer",
+            "description": "AAC product metadata; frames and valid_frames exclude decoder tail padding."
+          },
+          "decoded_frames": {
+            "type": "integer",
+            "description": "AAC product metadata; frames and valid_frames exclude decoder tail padding."
+          },
+          "padding_frames": {
+            "type": "integer",
+            "description": "AAC product metadata; frames and valid_frames exclude decoder tail padding."
+          },
+          "audio_bytes": {
+            "type": "integer",
+            "description": "AAC product metadata; frames and valid_frames exclude decoder tail padding."
+          },
+          "bitrate": {
+            "type": "integer",
+            "description": "AAC product metadata; frames and valid_frames exclude decoder tail padding."
+          },
+          "audio_schema_version": {
+            "type": "integer",
+            "description": "AAC product metadata; frames and valid_frames exclude decoder tail padding."
+          },
+          "codec": {
+            "type": "string"
+          },
+          "container": {
+            "type": "string"
+          },
+          "time_origin": {
+            "type": "string"
           }
         }
       },
