@@ -1,4 +1,4 @@
-from .project_resources import stream_file
+from .project_resources import stream_memory
 from .project_document import initial_project
 import hashlib, json, os, secrets, tempfile, uuid, shutil, time
 import xml.etree.ElementTree as ET
@@ -73,10 +73,14 @@ def create_app(
                 has_music = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (directory.name,)).fetchone()[0]
             if not has_music:
                 for name in ('source','cache'): shutil.rmtree(directory / name, ignore_errors=True)
-    media_services = {}
-    def media_for(pid):
-        if pid not in media_services: media_services[pid] = MediaService(root / 'projects' / pid)
-        return media_services[pid]
+    from .studio.media_lifetime import MediaLifetime
+    media_lifetime = MediaLifetime(root / 'projects')
+    # Startup precedes all HTTP readers. Only disposable media derivatives are
+    # reclaimed here; source files and registered vocal products are separate.
+    for cache in (root / 'projects').glob('*/cache'):
+        for path in cache.glob('*.wav'): path.unlink()
+        for path in cache.glob('*.peaks-v1'):
+            if path.is_dir(): shutil.rmtree(path)
     revisions = RevisionStore(db, root / "projects")
     from .vocals import VocalRunner
     from .vocal_routes import build_vocal_router, vocal_asset
@@ -293,7 +297,7 @@ def create_app(
     def attach_music(pid: str, body: MusicUpload, subject: str = Depends(write)):
         result = replace_music(db, root, pid, body.upload_id, body.revision,
             body.expected_asset_id, body.operation_id, subject, staged_upload, asset_dto)
-        media_services.pop(pid, None)
+        media_lifetime.invalidate(pid)
         return result
 
     @api.post('/projects/{pid}/music-cleanup')
@@ -482,6 +486,17 @@ def create_app(
             MediaProbe(row[6], row[7] or 0, row[8], row[9], None, None, row[3]),
         )
 
+    @api.put('/projects/{pid}/media-users/{page_id}')
+    def media_heartbeat(pid: str, page_id: uuid.UUID, _=Depends(write)):
+        project(pid)
+        media_lifetime.heartbeat(pid, str(page_id))
+        return Response(status_code=204)
+
+    @api.delete('/projects/{pid}/media-users/{page_id}')
+    def media_leave(pid: str, page_id: uuid.UUID, _=Depends(write)):
+        media_lifetime.leave(pid, str(page_id))
+        return Response(status_code=204)
+
     @api.get("/projects/{pid}/audio")
     def audio(pid: str, request: Request, vocal: str | None = None, source: str | None = None, _: object = Depends(auth)):
         with db.transaction():
@@ -490,8 +505,13 @@ def create_app(
                 fail("audio_not_found", "audio not found", 404)
             if source and source != a[0]: fail('source_conflict', '源音频已改变，请重新加载播放', 409)
             asset = vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(a, pid)
-            proxy = media_for(pid).playback_proxy(asset)
-            return stream_file(proxy.path, proxy.mime_type, request.headers.get('range'), request.headers.get('if-range'))
+            media, release = media_lifetime.retain(pid)
+            try:
+                proxy = media.playback_proxy(asset)
+                return stream_memory(proxy, f'"{asset.content_hash}-pcm-v1"', request.headers.get('range'), request.headers.get('if-range'), release)
+            except BaseException:
+                release()
+                raise
 
     @api.get("/projects/{pid}/waveform")
     def waveform(
@@ -507,7 +527,8 @@ def create_app(
             if not a: fail('audio_not_found', '上传音乐后可用', 404)
             try:
                 asset = vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(a, pid)
-                peaks = media_for(pid).peaks(asset, level=level, start_ms=start_ms, end_ms=end_ms)
+                with media_lifetime.use(pid) as media:
+                    peaks = media.peaks(asset, level=level, start_ms=start_ms, end_ms=end_ms)
             except MediaError as exc:
                 fail("waveform_invalid", str(exc), 422)
             return {
@@ -525,13 +546,14 @@ def create_app(
 
     @api.get("/projects/{pid}/pcm")
     def pcm_window(pid: str, start_ms: int, end_ms: int, vocal: str | None = None, _: object = Depends(auth)):
-        """Read a PCM proxy window of at most 4,020,000 milliseconds (FFT context included)."""
+        """Read a PCM proxy window of at most 4,020 milliseconds (FFT context included)."""
         with db.transaction():
             _, row = asset_for(pid)
             if not row:
                 fail("audio_not_found", "audio not found", 404)
             try:
-                data, rate, channels = media_for(pid).pcm_window(vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(row, pid), start_ms=start_ms, end_ms=end_ms)
+                with media_lifetime.use(pid) as media:
+                    data, rate, channels = media.pcm_window(vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(row, pid), start_ms=start_ms, end_ms=end_ms)
             except MediaError as exc:
                 fail("pcm_invalid", str(exc), 422)
             return Response(data, media_type="application/octet-stream", headers={"X-Sample-Rate": str(rate), "X-Channels": str(channels), "Cache-Control": "private, max-age=60"})
@@ -619,9 +641,14 @@ def create_app(
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
     api.include_router(settings_router(preferences, auth=auth, write=write))
     app.state.jobs = job_service
+    app.state.media_lifetime = media_lifetime
+    @app.on_event("startup")
+    async def start_media():
+        media_lifetime.start()
     app.include_router(api)
     @app.on_event("shutdown")
     async def shutdown_jobs():
+        media_lifetime.close()
         job_service.close()
         dictionaries.close()
 

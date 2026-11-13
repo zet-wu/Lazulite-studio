@@ -1,8 +1,4 @@
-"""Small, file-backed media primitives used by the Studio HTTP layer.
-
-The original is immutable and content addressed.  Derived playback and waveform
-files are disposable and carry the source clock origin in their metadata.
-"""
+"""Immutable source files and shared, active-lifetime PCM and waveform resources."""
 
 from __future__ import annotations
 from ..time_units import milliseconds
@@ -18,10 +14,9 @@ import subprocess
 from ..process_supervisor import run as run_process
 import tempfile
 import threading
-import wave
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import BinaryIO
+import numpy as np
 
 
 class MediaError(ValueError):
@@ -47,16 +42,38 @@ class Asset:
     original_name: str
     size: int
     probe: MediaProbe
-    direct_pcm: bool = False
+    valid_frames: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass
 class Proxy:
-    path: Path
-    mime_type: str
+    pcm: bytes
+    rate: int
+    channels: int
     source_start_ms: int
-    offset_ms: int
-    duration_ms: int | None
+    peaks: list[np.ndarray] | None = None
+    mime_type: str = "audio/wav"
+    offset_ms: int = 0
+
+    @property
+    def duration_ms(self):
+        return milliseconds(len(self.pcm) / (self.rate * self.channels * 2))
+
+    @property
+    def header(self):
+        size = len(self.pcm)
+        return struct.pack('<4sI4s4sIHHIIHH4sI', b'RIFF', size + 36, b'WAVE', b'fmt ',
+                           16, 1, self.channels, self.rate, self.rate * self.channels * 2,
+                           self.channels * 2, 16, b'data', size)
+
+    @property
+    def size(self):
+        return 44 + len(self.pcm)
+
+    def read(self, start, end):
+        """Slice the virtual WAV without copying the full PCM into a container."""
+        if start >= 44: return self.pcm[start - 44:end - 44]
+        return self.header[start:min(end, 44)] + self.pcm[:max(0, end - 44)]
 
 
 @dataclass(frozen=True)
@@ -120,7 +137,7 @@ class MediaService:
     def __init__(self, root: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "ffprobe") -> None:
         self.root = Path(root)
         self._proxy_lock = threading.RLock()
-        self._peaks_lock = threading.Lock()
+        self._resources: dict[str, Proxy] = {}
         self.ffmpeg = ffmpeg
         self.ffprobe = ffprobe
         (self.root / "source").mkdir(parents=True, exist_ok=True)
@@ -148,128 +165,73 @@ class MediaService:
         probe = replace(probe, mime_type=mimetypes.guess_type(name)[0] or probe.mime_type)
         return Asset(digest, digest, destination, name, destination.stat().st_size, probe)
 
+    def clear(self):
+        with self._proxy_lock:
+            self._resources.clear()
+
     def playback_proxy(self, asset: Asset) -> Proxy:
         with self._proxy_lock:
-            return self._playback_proxy(asset)
-
-    def _playback_proxy(self, asset: Asset) -> Proxy:
-        """Create a normalized PCM WAV; Studio time starts at decoded sample zero."""
-        if asset.direct_pcm:
-            return Proxy(asset.path, 'audio/wav', 0, 0, asset.probe.duration_ms)
-        target = self.root / "cache" / f"{asset.content_hash}.wav"
-        if not target.exists():
-            fd, temporary_name = tempfile.mkstemp(prefix="proxy-", suffix=".wav", dir=self.root / "cache")
-            os.close(fd)
-            temporary = Path(temporary_name)
-            try:
-                run_process(
-                    [self.ffmpeg, "-y", "-v", "error", "-i", str(asset.path), "-map", "0:a:0", "-vn", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", str(temporary)],
-                    check=True,
-                    capture_output=True,
-                )
-                os.replace(temporary, target)
-            except (OSError, subprocess.CalledProcessError) as exc:
-                temporary.unlink(missing_ok=True)
-                raise MediaError("playback proxy generation failed") from exc
-        # Studio time starts at the first decoded sample, including source
-        # silence and codec priming. The original container PTS is diagnostic.
-        with wave.open(str(target), "rb") as audio:
-            duration_ms = milliseconds(audio.getnframes() / audio.getframerate())
-        return Proxy(target, "audio/wav", asset.probe.start_ms, 0, duration_ms)
+            if asset.content_hash not in self._resources:
+                # Vocal products keep their native sample clock. Originals use
+                # the established 48 kHz stereo playback clock.
+                rate = asset.probe.sample_rate if asset.valid_frames is not None else 48000
+                try:
+                    result = run_process([self.ffmpeg, '-v', 'error', '-i', str(asset.path),
+                        '-map', '0:a:0', '-vn', '-ac', '2', '-ar', str(rate),
+                        '-f', 's16le', '-c:a', 'pcm_s16le', 'pipe:1'], check=True, capture_output=True)
+                except (OSError, subprocess.CalledProcessError) as exc:
+                    raise MediaError('playback decode failed') from exc
+                pcm = result.stdout
+                if asset.valid_frames is not None:
+                    size = asset.valid_frames * 4
+                    if len(pcm) < size: raise MediaError('vocal audio is shorter than its valid frame count')
+                    pcm = pcm[:size]
+                self._resources[asset.content_hash] = Proxy(pcm, rate, 2, asset.probe.start_ms)
+            return self._resources[asset.content_hash]
 
     def pcm_window(self, asset: Asset, *, start_ms: int, end_ms: int) -> tuple[bytes, int, int]:
-        """Read at most 4.02 seconds from the PCM proxy, including FFT context."""
+        """Read at most 4.02 seconds, including FFT context."""
         if start_ms < 0 or end_ms <= start_ms or end_ms - start_ms > 4_020:
-            raise MediaError("invalid PCM window")
+            raise MediaError('invalid PCM window')
         proxy = self.playback_proxy(asset)
-        with wave.open(str(proxy.path), "rb") as audio:
-            rate = audio.getframerate()
-            first = round(start_ms * rate / 1_000)
-            last = min(audio.getnframes(), round(end_ms * rate / 1_000))
-            if first >= last:
-                raise MediaError("PCM window is outside the audio")
-            audio.setpos(first)
-            return audio.readframes(last - first), rate, audio.getnchannels()
+        first = round(start_ms * proxy.rate / 1000) * proxy.channels * 2
+        last = min(len(proxy.pcm), round(end_ms * proxy.rate / 1000) * proxy.channels * 2)
+        if first >= last: raise MediaError('PCM window is outside the audio')
+        return proxy.pcm[first:last], proxy.rate, proxy.channels
 
     def peaks(self, asset: Asset, *, level: int, start_ms: int, end_ms: int) -> PeakWindow:
         if level < 0 or level > 15 or end_ms <= start_ms:
-            raise MediaError("invalid waveform window")
+            raise MediaError('invalid waveform window')
         bucket_ms = 10 * (2**level)
         start_ms = max(start_ms, 0)
-        duration = self.playback_proxy(asset).duration_ms
-        end_ms = min(end_ms, duration) if duration is not None else end_ms
+        proxy = self.playback_proxy(asset)
+        end_ms = min(end_ms, proxy.duration_ms)
         if end_ms <= start_ms:
-            return PeakWindow(asset.content_hash, "peaks-v1", start_ms, end_ms, bucket_ms, (), ())
-        self._ensure_peak_files(asset)
-        path = self.root / "cache" / f"{asset.content_hash}.peaks-v1" / f"l{level}.peaks"
+            return PeakWindow(asset.content_hash, 'peaks-v1', start_ms, end_ms, bucket_ms, (), ())
+        with self._proxy_lock:
+            if proxy.peaks is None: proxy.peaks = self._build_peaks(proxy)
         aligned_start = (start_ms // bucket_ms) * bucket_ms
         aligned_end = math.ceil(end_ms / bucket_ms) * bucket_ms
-        count = (aligned_end - aligned_start) // bucket_ms
-        minimum: list[float] = []
-        maximum: list[float] = []
-        with path.open("rb") as source:
-            source.seek((aligned_start // bucket_ms) * 8)
-            for _ in range(count):
-                record = source.read(8)
-                if len(record) != 8:
-                    minimum.append(0.0); maximum.append(0.0)
-                else:
-                    low, high = struct.unpack("<ff", record)
-                    minimum.append(low); maximum.append(high)
-        return PeakWindow(asset.content_hash, "peaks-v1", aligned_start, aligned_end, bucket_ms, tuple(minimum), tuple(maximum))
+        values = proxy.peaks[level][aligned_start // bucket_ms:aligned_end // bucket_ms]
+        return PeakWindow(asset.content_hash, 'peaks-v1', aligned_start, aligned_end, bucket_ms,
+                          tuple(values[:, 0].tolist()), tuple(values[:, 1].tolist()))
 
-    def _ensure_peak_files(self, asset: Asset) -> None:
-        with self._peaks_lock:
-            self._build_peak_files(asset)
-
-    def _build_peak_files(self, asset: Asset) -> None:
-        target = self.root / "cache" / f"{asset.content_hash}.peaks-v1"
-        if target.is_dir():
-            return
-        proxy = self.playback_proxy(asset)
-        handles: list[BinaryIO] = []
-        temporary_root = Path(tempfile.mkdtemp(prefix=f".{asset.content_hash}.peaks-", dir=self.root / "cache"))
-        pending: list[tuple[float, float] | None] = [None] * 16
-        try:
-            with wave.open(str(proxy.path), "rb") as audio:
-                frame_rate = audio.getframerate()
-                bucket_frames = max(1, round(frame_rate / 100))
-                for level in range(16):
-                    path = temporary_root / f"l{level}.peaks"
-                    handles.append(path.open("wb"))
-                while block := audio.readframes(bucket_frames):
-                    samples = struct.unpack("<%dh" % (len(block) // 2), block)
-                    low, high = min(samples, default=0) / 32768, max(samples, default=0) / 32768
-                    current = (low, high)
-                    handles[0].write(struct.pack("<ff", *current))
-                    for level in range(1, 16):
-                        previous = pending[level]
-                        if previous is None:
-                            pending[level] = current
-                            break
-                        current = (min(previous[0], current[0]), max(previous[1], current[1]))
-                        handles[level].write(struct.pack("<ff", *current))
-                        pending[level] = None
-                for level in range(1, 16):
-                    if pending[level] is not None:
-                        current = pending[level]
-                        handles[level].write(struct.pack("<ff", *current))
-                        pending[level] = None
-                        for upper in range(level + 1, 16):
-                            previous = pending[upper]
-                            if previous is None:
-                                pending[upper] = current
-                                break
-                            current = (min(previous[0], current[0]), max(previous[1], current[1]))
-                            handles[upper].write(struct.pack("<ff", *current))
-                            pending[upper] = None
-        except Exception:
-            shutil.rmtree(temporary_root, ignore_errors=True)
-            raise
-        finally:
-            for handle in handles:
-                handle.close()
-        try:
-            os.replace(temporary_root, target)
-        except OSError:
-            shutil.rmtree(temporary_root, ignore_errors=True)
+    @staticmethod
+    def _build_peaks(proxy):
+        samples = np.frombuffer(proxy.pcm, dtype='<i2')
+        bucket = max(1, round(proxy.rate / 100)) * proxy.channels
+        count = math.ceil(len(samples) / bucket)
+        base = np.empty((count, 2), dtype=np.float32)
+        for index in range(count):
+            block = samples[index * bucket:(index + 1) * bucket]
+            base[index] = (int(block.min()) / 32768, int(block.max()) / 32768)
+        levels = [base]
+        for _ in range(15):
+            previous = levels[-1]
+            paired = len(previous) // 2
+            current = np.empty((math.ceil(len(previous) / 2), 2), dtype=np.float32)
+            current[:paired, 0] = np.minimum(previous[:paired*2:2, 0], previous[1:paired*2:2, 0])
+            current[:paired, 1] = np.maximum(previous[:paired*2:2, 1], previous[1:paired*2:2, 1])
+            if len(previous) % 2: current[-1] = previous[-1]
+            levels.append(current)
+        return levels

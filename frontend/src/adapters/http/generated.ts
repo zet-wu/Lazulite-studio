@@ -812,6 +812,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{pid}/media-users/{page_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Retain project media for 180 seconds */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    pid: string;
+                    page_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Media page lease updated */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Release this page media lease */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    pid: string;
+                    page_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Media page lease updated */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

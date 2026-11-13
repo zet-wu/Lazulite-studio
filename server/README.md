@@ -8,7 +8,7 @@ FastAPI 提供同源 `/api/v1` API，SQLite 管理项目、资源索引、修订
 | `documents.py`、`project_document.py`、`revisions.py` | 文档边界统一建模与 TTML 树校验、不可变修订、CAS 保存与回收 |
 | `project_resources.py`、`project_deletion.py`、`project_storage.py` | 资源访问、删除事务、逻辑空间统计 |
 | `project_archive.py` | `.lazp` ZIP 校验、导入与导出 |
-| `studio/media.py` | FFmpeg／FFprobe、播放代理、波形与 PCM 窗口 |
+| `studio/media.py`、`studio/media_lifetime.py` | FFmpeg／FFprobe、活动 PCM／峰值、页面租约与请求引用 |
 | `jobs.py`、`job_routes.py` | 持久任务、幂等启动、当前阶段、取消与产物生命周期 |
 | `vocals.py`、`vocal_process.py`、`vocal_worker.py`、`vocal_routes.py` | 独立进程人声分离、分析、音频复用、窗口及下载 |
 | `alignment_projection.py`、`alignment.py`、`alignment_worker.py` | 全局歌词投影、资源准备、受监管日语对齐 |
@@ -31,7 +31,7 @@ Lazulite 源码位于仓库根目录的固定 Git 子模块 `vendor/Lazulite`，
 
 人声以 44.1 kHz 双声道 float32 输入 Demucs，按整曲峰值处理后保存一份 PCM_16 WAV；分析重读此文件，能量保存 `main_rms`，核心片段和配置保存于独立分析记录。每条记录以 `audio_result_id` 引用音频所有者，重分析复用 WAV。访问及复用通过 WAV 格式、位深、实际帧数、采样率与声道检查可用性，音频所有者 ID 管理持久资源身份；复用条件由源资产、公开配置及生成规则决定。已注册分析与音频保留至项目删除。
 
-原曲通过 48 kHz 双声道代理播放，人声播放／窗口／下载使用真实 WAV。波形与播放代理冷构建去重，能量通过 mmap 分桶读取；窗口接口复用已知媒体元数据。
+原曲以 48 kHz 双声道 int16 PCM 保存在活动期内存，播放 Range、PCM 窗口和 16 级峰值共享同一解码结果，冷请求合并。页面每 30 秒续租，180 秒过期；正常离开主动解除登记，每 30 秒检查过期页。最后一个页面和在途请求释放后回收 PCM／峰值，暂停和失焦保持登记。服务启动、尚无读取者时清理项目 cache 内原曲 WAV 与 peaks-v1 派生目录。空间统计按持久文件逻辑字节计算。人声播放与窗口保持原采样率，能量通过 mmap 分桶读取。
 
 读音接口接收当前行文本并返回 code point 范围。Sudachi C、A 细分与 JmdictFurigana 精确分段共用整行读音；词典按结构加载，同结构数据可替换，索引按进程缓存。来源及许可见 [vendor](vendor/README.md)。
 

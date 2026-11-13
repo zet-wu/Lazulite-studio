@@ -8,6 +8,7 @@
 | --- | --- |
 | 文档 GET／PUT | GET 返回 `studio-document-v9` envelope 与项目 v9；PUT 使用 If-Match／幂等键，成功只返回 revision／ETag；歌词为 `lyrics.draftTtml` |
 | 上传与项目音乐 | 临时 upload_id 经创建或首次接入归属项目，项目 asset 是音源身份 |
+| media-users/{page_id} | PUT 续租 180 秒，DELETE 解除本页面登记；页面 UUID 隔离多个标签页 |
 | audio／waveform／pcm | 整数毫秒窗口；可选 vocal 选择已注册人声，默认原曲 |
 | shapes/analyze | 四目标与显式行正文快照；逐字素结果、UTF-16 范围及确定／歧义／失败状态 |
 | reading/analyze | 当前行 id／text 快照，返回原文 code point 范围及读音 |

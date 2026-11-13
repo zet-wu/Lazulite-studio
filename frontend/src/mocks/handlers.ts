@@ -51,6 +51,8 @@ export const handlers = [
     return HttpResponse.json({ id, status: 'failed', revision, asset_id: assetId }, { status: 202 });
   }),
   http.get(`${root}/projects/:projectId/document`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'empty' ? emptyDocument : scenario() === 'no-music' ? {...currentDocument, source_asset_id:null} : currentDocument) : error(404, 'project_not_found', '项目不存在')),
+  http.put(`${root}/projects/:projectId/media-users/:pageId`, () => new HttpResponse(null, { status: 204 })),
+  http.delete(`${root}/projects/:projectId/media-users/:pageId`, () => new HttpResponse(null, { status: 204 })),
   http.get(`${root}/projects/:projectId/waveform`, ({ params, request }) => {
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
     const query = new URL(request.url).searchParams;

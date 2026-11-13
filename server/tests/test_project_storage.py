@@ -18,13 +18,13 @@ def test_space_counts_current_snapshot_and_media_changes(tmp_path):
             return value['categories']
         before=check()
         assert before['source']==(directory/'source/original').stat().st_size
-        assert before['cache']>0 and before['snapshots']>0 and before['vocals']==0
+        assert before['cache']==0 and before['snapshots']>0 and before['vocals']==0
         envelope=client.get('/api/v1/projects/p/document').json()
         from server.revisions import RevisionStore
         RevisionStore(db,tmp_path/'projects').create('p',envelope['document'],envelope['revision'])
         assert check()['snapshots']==before['snapshots']
         client.get('/api/v1/projects/p/waveform?start_ms=0&end_ms=2000')
-        assert check()['cache']>before['cache']
+        assert check()['cache']==before['cache']
         job=client.post('/api/v1/projects/p/jobs/vocal',json={'params':{'asset_id':'p'}},headers={'origin':'http://studio'}).json()
         assert wait(client,job['id'])['status']=='succeeded'
         value=check()

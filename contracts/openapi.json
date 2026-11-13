@@ -2078,6 +2078,62 @@
           }
         }
       }
+    },
+    "/projects/{pid}/media-users/{page_id}": {
+      "put": {
+        "summary": "Retain project media for 180 seconds",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Media page lease updated"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Release this page media lease",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Media page lease updated"
+          }
+        }
+      }
     }
   },
   "components": {

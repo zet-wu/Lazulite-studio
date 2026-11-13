@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import subprocess
 import struct
 import wave
@@ -36,8 +37,8 @@ def test_import_proxy_preserves_source_and_maps_nonzero_origin(tmp_path: Path) -
     assert asset.probe.start_ms > 1900
     assert proxy.mime_type == "audio/wav"
     assert proxy.offset_ms == 0
-    assert proxy.path.stat().st_size > 44
-    with wave.open(str(proxy.path), "rb") as decoded:
+    assert proxy.size > 44
+    with wave.open(io.BytesIO(proxy.read(0, proxy.size)), "rb") as decoded:
         values = struct.unpack("<%dh" % (decoded.getnframes() * decoded.getnchannels()), decoded.readframes(decoded.getnframes()))
     peak_frame = max(range(len(values)), key=lambda index: abs(values[index])) // decoded.getnchannels()
     assert abs(peak_frame / decoded.getframerate() - 1 / 3) < 0.04
@@ -118,15 +119,18 @@ def test_concurrent_cold_windows_build_one_proxy_and_peak_set(tmp_path, monkeypa
         out.setnchannels(1);out.setsampwidth(2);out.setframerate(44100);out.writeframes(b'\0\0'*44100)
     media=MediaService(tmp_path/'data');asset=media.import_asset(source)
     from server.studio.media import run_process
-    run=run_process;mkdtemp=tempfile.mkdtemp;counts={'decode':0,'peaks':0}
+    run=run_process;build=media._build_peaks;counts={'decode':0,'peaks':0}
     def tracked_run(cmd,*a,**kw):
         if cmd[0]=='ffmpeg':counts['decode']+=1
         return run(cmd,*a,**kw)
-    def tracked_temp(*a,**kw):
-        if '.peaks-' in kw.get('prefix',''):counts['peaks']+=1
-        return mkdtemp(*a,**kw)
-    monkeypatch.setattr('server.studio.media.run_process',tracked_run);monkeypatch.setattr(tempfile,'mkdtemp',tracked_temp)
+    def tracked_build(proxy):
+        counts['peaks'] += 1
+        return build(proxy)
+    monkeypatch.setattr('server.studio.media.run_process',tracked_run)
+    monkeypatch.setattr(media, '_build_peaks', tracked_build)
     with ThreadPoolExecutor(max_workers=6) as pool:
         windows=list(pool.map(lambda _:media.peaks(asset,level=1,start_ms=0,end_ms=1000),range(6)))
     assert counts=={'decode':1,'peaks':1}
     assert all(w.maximum==windows[0].maximum for w in windows)
+
+    assert not list((media.root / 'cache').iterdir())

@@ -1,3 +1,4 @@
+import { retainProjectMedia } from '../adapters/http/media-lifetime';
 import { projectTimeline } from '../domain/timeline-projection';
 import { selectionLocation } from './editor/selection-targets';
 import { locateViewport } from '../domain/timeline-viewport';
@@ -148,6 +149,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
 
   const [loop, setLoop] = useState<LoopState>(emptyLoop);
   const [error, setError] = useMessageText("");
+  useEffect(() => retainProjectMedia(projectId, cause => setError(errorMessage(cause))), [projectId, setError]);
   const [bpm, setBpm] = useState(120);
   const [snap, setSnap] = useState(true);
   const [bottomExpanded, setExpanded] = useState(true);

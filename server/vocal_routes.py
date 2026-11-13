@@ -65,4 +65,4 @@ def vocal_asset(runner, pid, rid):
     # The producer already persisted these properties for this immutable PCM WAV.
     probe = MediaProbe(metadata['duration_ms'], 0, metadata['sample_rate'], metadata['channels'], 'pcm_s16le', 'wav', 'audio/wav')
     audio_id = metadata['audio_result_id']
-    return Asset(audio_id, f'vocal-{audio_id}', path, 'vocals.wav', path.stat().st_size, probe, direct_pcm=True)
+    return Asset(audio_id, f'vocal-{audio_id}', path, 'vocals.wav', path.stat().st_size, probe, valid_frames=metadata['frames'])
