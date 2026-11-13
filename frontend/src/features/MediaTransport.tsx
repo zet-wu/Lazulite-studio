@@ -155,7 +155,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [bottomExpanded, setExpanded] = useState(true);
   const expanded = !!timelineHost || bottomExpanded;
   const [visible, setVisible] = useState({ karaoke: true, line: true, word: true, ruby: true, romanization: true, gap: true, spectrum: false, wave: true, energy:true, segments:true });
-  const { width, height, ratio, node: measuredCanvas } = useCanvasMetrics(canvas, expanded, timelineHost);
+  const { width, height, ratio, node: measuredCanvas, observe: observeCanvas } = useCanvasMetrics(canvas, expanded);
   const [follow, setFollow] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
   viewportRef.current = { start, span, duration, follow };
@@ -374,6 +374,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     if (!c || !expanded || !(visible.wave || ui?.adding) || width <= 0 || height <= 0) return;
     const draw = () => {
       const r = c.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return;
       const scale = ratio;
       const pixelWidth = Math.max(1, Math.round(r.width * scale));
       const pixelHeight = Math.max(1, Math.round(r.height * scale));
@@ -611,7 +612,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         aria-valuenow={position}
       >
         <canvas
-          ref={canvas}
+          ref={observeCanvas}
           className={styles.wave}
         />
         <TimelineIndicators playback />

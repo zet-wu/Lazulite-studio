@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { loadTimeline } from '../fixtures/timeline-setup';
 
 test('waveform redraws after hidden zoom and remount', async ({ page }) => {
-  await page.goto('/projects/sample-project/edit');
+  await loadTimeline(page);
   const pixels = () => page.locator('[role=slider] canvas').evaluate((canvas: HTMLCanvasElement) => {
     const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
     return data.filter((_, i) => i % 4 === 3 && data[i] > 0).length;
@@ -17,6 +17,10 @@ test('waveform redraws after hidden zoom and remount', async ({ page }) => {
   await expect(page.locator('[role=slider] canvas')).toHaveCount(0);
   await page.locator('[aria-controls="timeline-plots"]').click();
   await expect.poll(pixels).toBeGreaterThan(0);
+  await page.getByRole('button', { name: '音频处理', exact: true }).click();
+  await expect.poll(pixels).toBeGreaterThan(0);
+  await page.getByRole('button', { name: '编辑', exact: true }).click();
+  await expect.poll(pixels).toBeGreaterThan(0);
 });
 
 test('hidden wave leaves every plot and lyric button zoomable without editing', async ({ page }) => {
@@ -26,12 +30,16 @@ test('hidden wave leaves every plot and lyric button zoomable without editing', 
   const undo = page.getByRole('button', { name: '撤销', exact: true });
   const history = await undo.isEnabled();
   const plots = page.locator('[data-wheel-zoom]');
+  let zoomed: string | null = null;
   for (let i = 0; i < await plots.count(); i++) {
     const plot = plots.nth(i), box = await plot.boundingBox();
     if (!box || box.height === 0) continue;
+    await page.getByRole('button', { name: '全曲', exact: true }).click();
     const before = await range.textContent();
     await plot.dispatchEvent('wheel', { deltaY: -60, clientX: box.x + box.width / 2 });
     await expect(range).not.toHaveText(before!);
+    if (zoomed) await expect(range).toHaveText(zoomed);
+    else zoomed = await range.textContent();
   }
   await page.getByRole('button', { name: '全曲', exact: true }).click();
   const word = page.getByRole('button', { name: '时间轴词 上', exact: true });
@@ -48,4 +56,10 @@ test('hidden wave leaves every plot and lyric button zoomable without editing', 
   const before = await range.textContent();
   await page.getByRole('spinbutton').first().dispatchEvent('wheel', { deltaY: -100 });
   await expect(range).toHaveText(before!);
+  await page.locator('[data-track-lane]').first().locator('..').locator('strong').dispatchEvent('wheel', { deltaY: -100 });
+  await expect(range).toHaveText(before!);
+  for (const modifier of ['ctrlKey', 'metaKey']) {
+    await word.dispatchEvent('wheel', { deltaY: -100, [modifier]: true });
+    await expect(range).toHaveText(before!);
+  }
 });

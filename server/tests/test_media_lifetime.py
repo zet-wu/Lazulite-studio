@@ -46,3 +46,38 @@ def test_http_ranges_windows_restart_and_page_lifetime(tmp_path):
         assert client.get('/api/v1/projects/p/audio').content == full.content
         assert not registry.entries
     assert not list((tmp_path/'projects/p/cache').glob('*'))
+
+
+def test_disconnected_stream_releases_request_even_when_send_raises(tmp_path):
+    import asyncio
+    import pytest
+    from server.project_resources import stream_memory
+    from server.studio.media import Proxy
+    registry = MediaLifetime(tmp_path)
+    _, release = registry.retain('p')
+    proxy = Proxy(b'\0' * 4000, 48000, 2, 0, 1000)
+    response = stream_memory(proxy, '"test"', release=release)
+    async def receive(): await asyncio.Event().wait()
+    async def send(message):
+        assert registry.entries['p'].requests == 1
+        if message['type'] == 'http.response.body': raise OSError('disconnected')
+    with pytest.raises(Exception):
+        asyncio.run(response({'type':'http','asgi':{'spec_version':'2.4'}},receive,send))
+    assert not registry.entries
+
+
+def test_startup_reclaims_only_disposable_derivatives(tmp_path):
+    from fastapi.testclient import TestClient
+    from server.app import create_app
+    from server.auth import Settings
+    client, _ = setup(tmp_path)
+    with client:
+        source = (tmp_path/'projects/p/source/original').read_bytes()
+    cache = tmp_path/'projects/p/cache'
+    (cache/'source-hash.wav').write_bytes(b'proxy')
+    peaks = cache/'source-hash.peaks-v1'; peaks.mkdir(); (peaks/'l0.peaks').write_bytes(b'peaks')
+    (cache/'other').write_bytes(b'keep')
+    with TestClient(create_app(tmp_path, Settings(None, True))) as restarted:
+        assert (tmp_path/'projects/p/source/original').read_bytes() == source
+        assert [p.name for p in cache.iterdir()] == ['other']
+        assert restarted.get('/api/v1/projects/p/audio').status_code == 200

@@ -40,7 +40,10 @@ def stream_file(path, media_type, range_header=None, if_range=None):
 
 def stream_memory(proxy, etag, range_header=None, if_range=None, release=lambda: None):
     """Range response over one shared PCM resource, held through disconnection."""
-    from starlette.background import BackgroundTask
+    class OwnedResponse(StreamingResponse):
+        async def __call__(self, scope, receive, send):
+            try: await super().__call__(scope, receive, send)
+            finally: release()
     size = proxy.size
     if if_range and if_range != etag: range_header = None
     first, last, status = 0, size - 1, 200
@@ -63,5 +66,4 @@ def stream_memory(proxy, etag, range_header=None, if_range=None, release=lambda:
             for offset in range(first, last + 1, 256 * 1024):
                 yield proxy.read(offset, min(last + 1, offset + 256 * 1024))
         finally: release()
-    return StreamingResponse(chunks(), status_code=status, headers=headers,
-                             media_type=proxy.mime_type, background=BackgroundTask(release))
+    return OwnedResponse(chunks(), status_code=status, headers=headers, media_type=proxy.mime_type)

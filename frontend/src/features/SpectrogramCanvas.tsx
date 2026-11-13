@@ -40,7 +40,7 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
   const visible = endMs > startMs && endMs - startMs <= 20_000;
   const firstTile = Math.floor(startMs / SPECTRUM_WINDOW_MS) * SPECTRUM_WINDOW_MS;
   const lastTile = Math.ceil(endMs / SPECTRUM_WINDOW_MS) * SPECTRUM_WINDOW_MS;
-  const { width, ratio } = useCanvasMetrics(canvas, visible);
+  const { width, ratio, observe: observeCanvas } = useCanvasMetrics(canvas, visible);
   const changed = () => setRevision(value => value + 1);
 
   pump.current = () => {
@@ -143,12 +143,12 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
     }
   }, [endMs, revision, startMs, visible, width, ratio]);
 
-  if (!visible) return <p className={styles.spectrumHint}>{t('spectrum.zoomHint')}</p>;
+  if (!visible) return <p data-wheel-zoom className={styles.spectrumHint}>{t('spectrum.zoomHint')}</p>;
   const displayError = error || wanted.current.map(first => failed.current.get(first)).filter(Boolean).map(value=>formatMessage(value!))[0];
   const ready = wanted.current.filter(first => cache.current.get(first)).length;
   return <div className={styles.spectrogram} data-spectrum-ready={ready} data-spectrum-wanted={wanted.current.length}
     data-spectrum-stats={stats.current ? JSON.stringify({ ...stats.current, cacheSize: cache.current.size, evictions: cache.current.evictions, pending: pending.current.size }) : undefined}>
-    <div data-wheel-zoom className={styles.spectrumPlot}><canvas ref={canvas} aria-label={t('spectrum.title')} data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
+    <div data-wheel-zoom className={styles.spectrumPlot}><canvas ref={observeCanvas} aria-label={t('spectrum.title')} data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
     {ready < wanted.current.length && !displayError && <small role="status">{t('spectrum.loading')}</small>}
     {displayError && <small role="alert">{displayError} <IconButton icon="refresh" label={t('spectrum.retry')} data-role="secondary" onClick={() => { failed.current.clear(); setError(''); setRetry(value => value + 1); }}/></small>}
   </div>;

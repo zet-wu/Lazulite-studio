@@ -1,15 +1,19 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useState, type RefObject } from 'react';
 
-/** Resize and monitor moves between desktop displays with different DPR. */
-export function useCanvasMetrics(ref: RefObject<HTMLCanvasElement | null>, enabled = true, mountIdentity?: unknown) {
-  const [metrics, setMetrics] = useState({ width: 640, height: 0, node: null as HTMLCanvasElement | null, ratio: window.devicePixelRatio || 1 });
+/** Observe each mounted canvas, including equal-sized replacements in portals. */
+export function useCanvasMetrics(ref: RefObject<HTMLCanvasElement | null>, enabled = true) {
+  const [node, setNode] = useState<HTMLCanvasElement | null>(null);
+  const [metrics, setMetrics] = useState({ width: 640, height: 0, ratio: window.devicePixelRatio || 1 });
+  const observe = useCallback((canvas: HTMLCanvasElement | null) => {
+    ref.current = canvas;
+    setNode(canvas);
+  }, [ref]);
   useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas || !enabled) return;
+    if (!node || !enabled) return;
     let resolution: MediaQueryList;
     const measure = () => {
-      const { width, height } = canvas.getBoundingClientRect();
-      setMetrics({ width, height, node: canvas, ratio: window.devicePixelRatio || 1 });
+      const { width, height } = node.getBoundingClientRect();
+      setMetrics({ width, height, ratio: window.devicePixelRatio || 1 });
     };
     const changed = () => {
       resolution.removeEventListener('change', changed);
@@ -17,8 +21,8 @@ export function useCanvasMetrics(ref: RefObject<HTMLCanvasElement | null>, enabl
     };
     const watch = () => { resolution = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`); resolution.addEventListener('change', changed); };
     const observer = new ResizeObserver(measure);
-    observer.observe(canvas); watch(); measure();
+    observer.observe(node); watch(); measure();
     return () => { observer.disconnect(); resolution.removeEventListener('change', changed); };
-  }, [ref, enabled, mountIdentity]);
-  return metrics;
+  }, [node, enabled]);
+  return { ...metrics, node, observe };
 }
