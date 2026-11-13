@@ -2,10 +2,9 @@
 from dataclasses import asdict
 from decimal import Decimal
 import json
-import unicodedata as ud
 import xml.etree.ElementTree as ET
 from lazulite.models.japanese import JapaneseAlignmentRequest, JapaneseLine, JapaneseUnit, StartHint
-from lazulite.alignment.japanese.input import prepare_input, InputOptions
+from lazulite.alignment.japanese.input import prepare_input, InputOptions, nonpronouncing
 from lazulite.alignment.japanese.backend import MMS_VOCAB
 from .amll_compatibility import TT, TM, XML, ST, RUBY
 
@@ -45,7 +44,7 @@ def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=
             if not value: continue
             for leaf in rubies or [word]:
                 reading = ''.join(leaf.itertext()) if rubies else value
-                if reading and all(c.isspace() or ud.category(c)[0] in {'P','S'} for c in reading) and not all(c in 'ー〜～~' for c in reading):
+                if nonpronouncing(reading):
                     continue
                 uid = identity(leaf)
                 units.append(JapaneseUnit(uid, (start,len(text)), reading, 'unknown', 'ruby' if rubies else 'body'))

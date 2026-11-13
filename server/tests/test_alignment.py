@@ -27,7 +27,7 @@ def test_preview_launch_isolation_idempotency_and_audio_mutex(tmp_path,monkeypat
  with client:
   preview=client.get('/api/v1/projects/p/alignment-preview',params={'revision':revision,'model':client.get('/api/v1/alignment-models').json()['items'][0]['id']}).json()
   assert preview['unknown_count']==0 and preview['hint_count']==0 and preview['emitting_count']==2
-  headers={'origin':'http://studio','idempotency-key':'launch'};body={'params':{'revision':revision,**input_options(client,revision),'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500}}
+  headers={'origin':'http://studio','idempotency-key':'launch'};body={'params':{'revision':revision,**input_options(client,revision),'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500}}
   first=client.post('/api/v1/projects/p/jobs/alignment',json=body,headers=headers)
   assert first.status_code==202,first.text
   jid=first.json()['id']
@@ -39,14 +39,14 @@ def test_preview_launch_isolation_idempotency_and_audio_mutex(tmp_path,monkeypat
   result=client.get(f'/api/v1/jobs/{jid}/result').json()
   assert result['binding']['revision']==revision and result['engine']['worker_pid']!=os.getpid()
   assert client.get('/api/v1/projects/p/document').json()['revision']==revision
-  assert client.post('/api/v1/projects/p/jobs/alignment',json={'params':{'revision':revision,**input_options(client,revision),'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500,'model_path':'/tmp/evil'}},headers={'origin':'http://studio'}).status_code==422
+  assert client.post('/api/v1/projects/p/jobs/alignment',json={'params':{'revision':revision,**input_options(client,revision),'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500,'model_path':'/tmp/evil'}},headers={'origin':'http://studio'}).status_code==422
 
 
 def test_cancellation_does_not_publish(tmp_path,monkeypatch):
  client,db,revision=prepare(tmp_path,monkeypatch)
  with client:
   headers={'origin':'http://studio'}
-  jid=client.post('/api/v1/projects/p/jobs/alignment',json={'params':{'revision':revision,**input_options(client,revision),'use_hints':True,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500}},headers=headers).json()['id']
+  jid=client.post('/api/v1/projects/p/jobs/alignment',json={'params':{'revision':revision,**input_options(client,revision),'smart_extend':False,'use_hints':True,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500}},headers=headers).json()['id']
   client.post(f'/api/v1/jobs/{jid}/cancel',headers=headers)
   assert wait(client,jid)['status']=='cancelled'
   assert client.get(f'/api/v1/jobs/{jid}/result').status_code==409
@@ -57,7 +57,7 @@ def test_cancellation_does_not_publish(tmp_path,monkeypatch):
 def test_cost_options_are_snapshotted_and_strict(tmp_path,monkeypatch):
  client,db,revision=prepare(tmp_path,monkeypatch)
  with client:
-  params={'revision':revision,**input_options(client,revision),'use_hints':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500,'line_blank':True,'rest_blank':False,'rest_token':True}
+  params={'revision':revision,**input_options(client,revision),'smart_extend':True,'use_hints':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500,'line_blank':True,'rest_blank':False,'rest_token':True}
   reply=client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers={'origin':'http://studio'})
   assert reply.status_code==202,reply.text
   jid=reply.json()['id'];assert wait(client,jid)['status']=='succeeded'
@@ -70,9 +70,9 @@ def test_cost_options_are_snapshotted_and_strict(tmp_path,monkeypatch):
 
 def test_gap_policy_validation_and_job_snapshot(tmp_path,monkeypatch):
  client,db,revision=prepare(tmp_path,monkeypatch)
- base={'revision':revision,**input_options(client,revision),'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':True,'gap_threshold_ms':499}
+ base={'revision':revision,**input_options(client,revision),'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':True,'gap_threshold_ms':499}
  with client:
-  for field,values in [('gap_threshold_ms',[None,True,False,0,-1,1.5,'500',9007199254740992]),('merge_short_gaps',[None,0,1,'true'])]:
+  for field,values in [('gap_threshold_ms',[None,True,False,0,-1,1.5,'500',9007199254740992]),('merge_short_gaps',[None,0,1,'true']),('smart_extend',[None,0,1,'true'])]:
    for value in values:
     response=client.post('/api/v1/projects/p/jobs/alignment',json={'params':{**base,field:value}},headers={'origin':'http://studio'})
     assert response.status_code==422,response.text
@@ -105,7 +105,7 @@ def test_cpu_retry_uses_original_snapshot_after_catalog_switch(tmp_path,monkeypa
  from server.tests.test_alignment_models import model
  client,db,revision=prepare(tmp_path,monkeypatch)
  with client:
-  params={'revision':revision,**input_options(client,revision),'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500}
+  params={'revision':revision,**input_options(client,revision),'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500}
   headers={'origin':'http://studio','idempotency-key':'initial'}
   response=client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers=headers)
   assert response.status_code==202,response.text

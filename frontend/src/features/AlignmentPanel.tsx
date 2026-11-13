@@ -166,6 +166,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       </fieldset>
       <fieldset className={styles.options}><legend>{t('alignment.postprocessing')}</legend>
         <label><input type="checkbox" aria-label={t('alignment.clearUnmatched')} checked={options.clear_unmatched} onChange={e=>setOptions({...options,clear_unmatched:e.target.checked})}/><span>{t('alignment.clearUnmatched')}<small className={styles.description}>{t('alignment.clearHelp')}</small></span></label>
+      <label><input type="checkbox" checked={options.smart_extend} onChange={e=>setOptions({...options,smart_extend:e.target.checked})}/><span>{t('alignment.smartExtend')}<small className={styles.description}>{t('alignment.smartExtendHelp')}</small></span></label>
       <div className={styles.gapOption}>
         <input id={gapId} type="checkbox" checked={options.merge_short_gaps} onChange={e=>{setOptions({...options,merge_short_gaps:e.target.checked});setGapError('');}}/>
         <label htmlFor={gapId}>{t('alignment.mergeGapsLabel')}</label>

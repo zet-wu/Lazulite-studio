@@ -54,9 +54,10 @@ def test_complete_scope_includes_omitted_symbols_empty_body_and_ruby():
  result=project_alignment(snapshot)
  scope={s['object_id']:s for s in result['scope']}
  assert set(scope)=={'sym','empty','mixed','r1','r2'}
- assert all(scope[k]['target_ids']==[] for k in ('sym','empty','r2'))
- assert len(scope['mixed']['target_ids'])==2 and len(scope['r1']['target_ids'])==1
+ assert all(scope[k]['target_ids']==[] for k in ('empty','r2'))
+ assert len(scope['mixed']['target_ids'])==1 and len(scope['r1']['target_ids'])==1
  assert result['summary']['emitting_count']==2
+ assert scope['sym']['target_ids']  # Unknown symbols remain traceable.
  assert [m['unit_id'] for m in result['mapping']]==[u['unit_id'] for l in result['request']['lines'] for u in l['units']]
 
 

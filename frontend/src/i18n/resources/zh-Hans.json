@@ -1707,5 +1707,9 @@
   "alignment.postprocessing": "后处理选项",
   "alignment.preparingInput": "正在准备对齐输入…",
   "singer.actorLabel": "歌手 {{id}} actor",
-  "singer.noActor": "无"
+  "singer.noActor": "无",
+  "alignment.smartExtend": "智能延长结束时间",
+  "alignment.smartExtendHelp": "改善 MMS_FA 模型的过早结束",
+  "media.locateSelection": "定位选区",
+  "timeline.staging": "时间轴暂存区"
 }

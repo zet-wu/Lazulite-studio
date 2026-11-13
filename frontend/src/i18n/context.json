@@ -11332,5 +11332,29 @@
     "source": "无",
     "params": [],
     "parameterNotes": {}
+  },
+  "alignment.smartExtend": {
+    "context": "Alignment postprocessing option",
+    "source": "智能延长结束时间",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "alignment.smartExtendHelp": {
+    "context": "Alignment postprocessing option",
+    "source": "改善 MMS_FA 模型的过早结束",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "media.locateSelection": {
+    "context": "Timeline control",
+    "source": "定位选区",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "timeline.staging": {
+    "context": "Timeline control",
+    "source": "时间轴暂存区",
+    "params": [],
+    "parameterNotes": {}
   }
 }

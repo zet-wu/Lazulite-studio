@@ -3755,7 +3755,8 @@
           "rest_token",
           "clear_unmatched",
           "merge_short_gaps",
-          "gap_threshold_ms"
+          "gap_threshold_ms",
+          "smart_extend"
         ],
         "properties": {
           "revision": {
@@ -3793,6 +3794,9 @@
             "maximum": 9007199254740991,
             "default": 500,
             "description": "Strict gap threshold in original-axis milliseconds; normalized to 500 when disabled"
+          },
+          "smart_extend": {
+            "type": "boolean"
           }
         }
       },

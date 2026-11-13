@@ -39,7 +39,7 @@ def test_independent_run_and_manual_resource_reuse(tmp_path,monkeypatch):
     with db.connect() as c:
         asset=c.execute("SELECT source_asset_id FROM projects WHERE id='p'").fetchone()[0]
     root=tmp_path/'projects'
-    params={'revision':revision,'asset_id':asset,'_model':selected,'latin_normalize':True,'strip_tone_digits':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False}
+    params={'revision':revision,'asset_id':asset,'_model':selected,'latin_normalize':True,'strip_tone_digits':False,'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False}
     request={'database':str(db.path),'root':str(root),'project_id':'p','params':params,
              'asset_path':str(root/'p/source/original'),'job_id':'first'}
     first=run_alignment(request,lambda *args:None,lambda:False)
@@ -81,6 +81,6 @@ def test_backend_is_released_on_decode_failure(tmp_path,monkeypatch):
     before=AcousticBackend.closes
     with pytest.raises(RuntimeError,match='injected'):
         run_alignment({'database':str(db.path),'root':str(tmp_path/'projects'),'project_id':'p',
-            'params':{'revision':revision,'asset_id':asset,'_model':selected,'latin_normalize':True,'strip_tone_digits':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False},
+            'params':{'revision':revision,'asset_id':asset,'_model':selected,'latin_normalize':True,'strip_tone_digits':False,'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False},
             'asset_path':str(tmp_path/'projects/p/source/original'),'job_id':'failed'},lambda *a:None,lambda:False)
     assert AcousticBackend.closes==before+1

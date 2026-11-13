@@ -35,7 +35,7 @@ class AlignmentRunner:
             return read_project(self.db.paths.resolve(row[0])), current['source_asset_id']
 
     def validate(self, pid, params):
-        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'merge_short_gaps', 'gap_threshold_ms', 'latin_normalize', 'strip_tone_digits', 'model_preview'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'merge_short_gaps', 'latin_normalize', 'strip_tone_digits')):
+        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'gap_threshold_ms', 'latin_normalize', 'strip_tone_digits', 'model_preview'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'latin_normalize', 'strip_tone_digits')):
             raise ValueError('自动对齐只接受项目版本、布尔选项及行内空隙阈值')
         if type(params['gap_threshold_ms']) is not int or not 0 < params['gap_threshold_ms'] <= 9007199254740991:
             raise ValueError('行内空隙阈值必须为正的安全整数毫秒')
@@ -124,4 +124,6 @@ def run_alignment(request, emit, cancelled):
     backend_info = result_data.get('execution', {}).get('backend', {})
     backend_info.pop('model_path', None)
     backend_info['model_name'] = params['_model']['name']
-    return {'kind':'alignment', 'alignment':result_data, 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'normalization':automatic_normalization, 'summary':projection['summary']}
+    from .alignment_postprocessing import object_timings
+    timings = object_timings(result, projection['mapping'], audio, params['smart_extend'])
+    return {'kind':'alignment', 'object_timings':timings, 'alignment':result_data, 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'normalization':automatic_normalization, 'summary':projection['summary']}

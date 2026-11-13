@@ -32,10 +32,10 @@ it('preserves absent, inverted, out-of-range and quantized-zero suggestions loca
  const one=mergeAlignment(p,result(p,[[.2,null],[2,null]]),5000).project;
  expect(one.lyrics.lines[0].words[0]).toMatchObject({beginMs:200,endMs:500});expect(one.lyrics.lines[1]).toMatchObject({beginMs:2000,endMs:null});
 });
-it('keeps a missing leading boundary and avoids history when all proposals are absent',()=>{
+it('uses available internal boundaries and avoids history when all proposals are absent',()=>{
  const p=fixture(),r=result(p,[[null,null]]);r.mapping.push({...r.mapping[0],unit_id:'middle'});r.alignment.units.push({unit_id:'middle',line_id:'a',proposed_timing:{start:{time:2,source:'x'},end:{time:3,source:'x'}}});
  r.scope=scopeFor(p,r);
- expect(mergeAlignment(p,r,5000).project.lyrics.lines[0].words[0]).toMatchObject({beginMs:null,endMs:3000});
+ expect(mergeAlignment(p,r,5000).project.lyrics.lines[0].words[0]).toMatchObject({beginMs:2000,endMs:3000});
  expect(mergeAlignment(p,result(p,[[null,null],[null,null]]),5000).project).toBe(p);
 });
 it('freezes skipped rows and restores cross-boundary links on undo',()=>{
@@ -47,7 +47,7 @@ it('freezes skipped rows and restores cross-boundary links on undo',()=>{
  expect(undoProjectCommand(executeProjectCommand(createProjectEditorState(p),{type:'alignment',source:p,project:next})).present.editing.endLinks).toEqual({a:'b'});
 });
 
-it('clears missing endpoints but preserves illegal proposals and first/last target boundaries',()=>{
+it('clears missing endpoints but preserves illegal proposals and available target envelopes',()=>{
  const p=fixture();Object.assign(p.lyrics.lines[0].words[0],{beginMs:1000,endMs:2000});
  let r=result(p,[[3,null],[null,null]]);
  const next=mergeAlignment(p,r,5000,true);
@@ -58,7 +58,7 @@ it('clears missing endpoints but preserves illegal proposals and first/last targ
   expect(merged.project.lyrics.lines[0].words[0]).toEqual(p.lyrics.lines[0].words[0]);expect(merged.retained).toHaveLength(1);expect(merged.cleared).toHaveLength(0);
  }
  r=result(p,[[null,null],[null,null]]);r.mapping.push({...r.mapping[0],unit_id:'middle'});r.alignment.units.push({unit_id:'middle',line_id:'a',proposed_timing:{start:{time:2,source:'interpolated'},end:{time:3,source:'interpolated'}}});r.scope=scopeFor(p,r);
- expect(mergeAlignment(p,r,5000,true).project.lyrics.lines[0].words[0]).toMatchObject({beginMs:null,endMs:3000});
+ expect(mergeAlignment(p,r,5000,true).project.lyrics.lines[0].words[0]).toMatchObject({beginMs:2000,endMs:3000});
 });
 
 it('clears omitted punctuation/empty leaves and stale parents without losing a voiced envelope',()=>{
@@ -98,8 +98,8 @@ it('rebuilds Ruby and row envelopes with partial singing boundaries and excludes
  const r=result(p,[[null,2],[3,4]]);r.mapping[0]={unit_id:'u0',object_id:'r1',word_id:w.id,line_id:'a',kind:'ruby'};
  r.mapping.push({unit_id:'last',object_id:'r2',word_id:w.id,line_id:'a',kind:'ruby'});r.alignment.units.push({unit_id:'last',line_id:'a',proposed_timing:{start:{time:2,source:'profile_hold'},end:{time:3,source:'profile_hold'}}});r.scope=scopeFor(p,r);
  const merged=mergeAlignment(p,r,5000,true);
- expect(merged.project.lyrics.lines[0]).toMatchObject({beginMs:null,endMs:3000});
- expect(merged.project.lyrics.lines[0].words[0]).toMatchObject({beginMs:null,endMs:3000});
+ expect(merged.project.lyrics.lines[0]).toMatchObject({beginMs:2000,endMs:3000});
+ expect(merged.project.lyrics.lines[0].words[0]).toMatchObject({beginMs:2000,endMs:3000});
  expect(merged.project.lyrics.lines[0].words[0].rubyUnits[2]).toMatchObject({reading:'！',beginMs:null,endMs:null});
  expect(parseProject(serializeProject(merged.project))).toEqual(merged.project);
  expect(merged.cleared).toHaveLength(2);

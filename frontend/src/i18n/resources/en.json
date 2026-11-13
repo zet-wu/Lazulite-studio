@@ -1720,5 +1720,9 @@
   "alignment.postprocessing": "Postprocessing options",
   "alignment.preparingInput": "Preparing alignment input…",
   "singer.actorLabel": "Singer {{id}} actor",
-  "singer.noActor": "None"
+  "singer.noActor": "None",
+  "alignment.smartExtend": "Smart end extension",
+  "alignment.smartExtendHelp": "Improve early endings from the MMS_FA model",
+  "media.locateSelection": "Locate selection",
+  "timeline.staging": "Timeline staging"
 }

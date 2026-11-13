@@ -1265,6 +1265,7 @@ export interface components {
              * @default 500
              */
             gap_threshold_ms: number;
+            smart_extend: boolean;
         };
         AlignmentResult: {
             /** @constant */

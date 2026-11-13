@@ -15,6 +15,7 @@ export type AlignmentResult = {
   mapping: { unit_id: string; object_id: string; word_id: string; line_id: string; kind: 'word' | 'ruby' }[];
   scope: {object_id:string; word_id:string; line_id:string; kind:'word'|'ruby'; target_ids:string[]}[];
   acoustics: Acoustics | null;
+  object_timings?: Record<string, { start: Endpoint; end: Endpoint }>;
 };
 type Pair = { beginMs: TimeMs; endMs: TimeMs };
 export function mergeAlignment(project: ProjectDocument, result: AlignmentResult, durationMs: number, clearUnmatched = false, gapThresholdMs: number | null = null) {
@@ -77,17 +78,19 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
     if (ids.some(uid => {const timing=units.get(uid)!.proposed_timing;return !legal({beginMs:endpoint(timing.start),endMs:endpoint(timing.end)}, durationMs);})) {
       retained.push({id,reason:'alignment.invalidEndpoint'}); return old;
     }
-    // Missing leading/trailing units cannot be replaced by a lucky middle prediction.
-    return merge(id, old, { beginMs: endpoint(units.get(ids[0])!.proposed_timing.start), endMs: endpoint(units.get(ids.at(-1)!)!.proposed_timing.end) });
+    const processed = result.object_timings?.[id];
+    const starts = ids.flatMap(uid => { const value=endpoint(units.get(uid)!.proposed_timing.start); return value===null?[]:[value]; });
+    const ends = ids.flatMap(uid => { const value=endpoint(units.get(uid)!.proposed_timing.end); return value===null?[]:[value]; });
+    return merge(id, old, processed ? {beginMs:endpoint(processed.start),endMs:endpoint(processed.end)} : {beginMs:starts.length?Math.min(...starts):null,endMs:ends.length?Math.max(...ends):null});
   }
   function envelope(old: Pair, children: Pair[]): Pair {
     if (!children.length) return clearUnmatched ? {beginMs:null,endMs:null} : old;
-    const proposed = {beginMs: children[0].beginMs, endMs: children.at(-1)!.endMs};
+    const starts = children.flatMap(c => c.beginMs === null ? [] : [c.beginMs]);
+    const ends = children.flatMap(c => c.endMs === null ? [] : [c.endMs]);
+    const proposed = {beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null};
     // Parents do not count as retained/cleared leaf objects.
     const candidate = clearUnmatched ? proposed : {beginMs:proposed.beginMs ?? old.beginMs,endMs:proposed.endMs ?? old.endMs};
     if (!legal(candidate)) return old;
-    const starts = children.flatMap(c => c.beginMs === null ? [] : [c.beginMs]);
-    const ends = children.flatMap(c => c.endMs === null ? [] : [c.endMs]);
     return {beginMs: candidate.beginMs === null ? null : Math.min(candidate.beginMs, ...starts), endMs: candidate.endMs === null ? null : Math.max(candidate.endMs, ...ends)};
   }
   for (const [lineIndex, line] of next.lyrics.lines.entries()) {

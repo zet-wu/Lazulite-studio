@@ -65,7 +65,7 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
             project = c.execute('SELECT current_revision,source_asset_id FROM projects WHERE id=?', (old['project_id'],)).fetchone()
         if not project or project[0] != revision or body.revision != revision or project[1] != params['asset_id']:
             raise HTTPException(409, '项目版本或源音频已改变，请重新发起任务')
-        public = {'asset_id', 'retry_analysis_id'} if old['kind'] == 'vocal' else {'revision','use_hints','line_blank','rest_blank','rest_token','clear_unmatched','merge_short_gaps','gap_threshold_ms'}
+        public = {'asset_id', 'retry_analysis_id'} if old['kind'] == 'vocal' else {'revision','use_hints','line_blank','rest_blank','rest_token','clear_unmatched','smart_extend', 'merge_short_gaps','gap_threshold_ms'}
         fresh = {k:v for k,v in params.items() if k in public}
         if old['kind'] == 'alignment':
             from .alignment_models import check_snapshot
