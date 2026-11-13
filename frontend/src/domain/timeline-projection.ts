@@ -22,23 +22,25 @@ export function projectTimeline(document: LyricDocument, durationMs: number | nu
     const known = (missingBegin ? item.endMs : item.beginMs)!;
     if (!legal(known)) return { ...item };
     const bounds = endpoints(children);
-    const candidates = missingBegin ? [previous?.endMs, parent?.beginMs, 0] : [next?.beginMs, parent?.endMs, duration];
+    const candidates = missingBegin ? [previous?.endMs, parent?.beginMs] : [next?.beginMs, parent?.endMs];
     const values = candidates.filter((value): value is number => value != null && legal(value)
       && (missingBegin ? value < known || value === known && known === 0 : value > known || value === known && known === duration)
       && bounds.every(bound => missingBegin ? value <= bound && bound <= known : known <= bound && bound <= value));
     if (!values.length) return { ...item };
     return { ...item, [missingBegin ? 'beginMs' : 'endMs']: missingBegin ? Math.max(...values) : Math.min(...values) };
   }
-  const lines = document.lines.map((line, index) => {
-    const shown = project(line, document.lines[index - 1], document.lines[index + 1], undefined, line.words.flatMap(word => [word, ...word.rubyUnits]));
+  const lines = document.lines.map((line) => {
+    const siblings = document.lines.filter(item => item.backgroundOf === line.backgroundOf);
+    const siblingIndex = siblings.findIndex(item => item.id === line.id);
+    const shown = project(line, siblings[siblingIndex - 1], siblings[siblingIndex + 1], undefined, line.words.flatMap(word => [word, ...word.rubyUnits]));
     return { ...shown, words: line.words.map((word, i) => {
       const previous = word.beginMs === null && word.endMs !== null ? adjacentWord(line.words, i, -1) : undefined;
       const next = word.endMs === null && word.beginMs !== null ? adjacentWord(line.words, i, 1) : undefined;
-      const shownWord = project(word, previous, next, shown, word.rubyUnits);
-      return { ...shownWord, rubyUnits: word.rubyUnits.map((unit, j) => project(unit, word.rubyUnits[j - 1], word.rubyUnits[j + 1], shownWord)) };
+      const shownWord = project(word, previous, next, line, word.rubyUnits);
+      return { ...shownWord, rubyUnits: word.rubyUnits.map((unit, j) => project(unit, word.rubyUnits[j - 1], word.rubyUnits[j + 1], word)) };
     }) };
   });
-  const byId = new Map(lines.map(line => [line.id, line]));
+  const byId = new Map(document.lines.map(line => [line.id, line]));
   const projectTracks = <T extends RomanizationTrack>(tracks: T[]): T[] => tracks.map(track => ({ ...track, contents: track.contents.map(content => content.kind === 'plain' ? content : {
     ...content, units: content.units.map((unit, index) => project(unit, content.units[index - 1], content.units[index + 1], byId.get(content.lineId))),
   }) }));

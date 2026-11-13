@@ -8,7 +8,7 @@ it('uses shortest legal candidates without excluding real descendants or borrowi
   first.beginMs = 10000; first.words[0].endMs = 15000;
   doc.lines.push({ ...createLine('b'), beginMs: 12000, endMs: null });
   const shown = projectTimeline(doc, 180000);
-  expect(shown.lines[0].endMs).toBe(180000);
+  expect(shown.lines[0].endMs).toBeNull();
   expect(shown.lines[0].words[0].beginMs).toBe(10000);
   expect(doc.lines[0].endMs).toBeNull(); expect(doc.lines[0].words[0].beginMs).toBeNull();
   expect(projectTimeline(doc).lines[0].endMs).toBeNull();
@@ -20,13 +20,13 @@ it('keeps unknown parents, uses actual sibling sides, handles media edges and in
   expect(shown.lines[0].beginMs).toBeNull(); expect(shown.lines[0].endMs).toBeNull();
   expect(shown.lines[0].words[0].endMs).toBe(12000);
   line.words[1].beginMs = 9000; shown = projectTimeline(doc, 180000);
-  expect(shown.lines[0].words[0].endMs).toBe(180000);
+  expect(shown.lines[0].words[0].endMs).toBeNull();
   line.words[0].beginMs = 180000;
-  expect(projectTimeline(doc, 180000).lines[0].words[0].endMs).toBe(180000);
+  expect(projectTimeline(doc, 180000).lines[0].words[0].endMs).toBeNull();
   line.words[0].beginMs = 180001;
   expect(projectTimeline(doc, 180000).lines[0].words[0].endMs).toBeNull();
   doc.lines.push({ ...createLine('bg'), backgroundOf: line.id, beginMs: null, endMs: 20000 });
-  expect(projectTimeline(doc, 30000).lines[1].beginMs).toBe(0);
+  expect(projectTimeline(doc, 30000).lines[1].beginMs).toBeNull();
 });
 it('resizes only the requested side without filling unknown ancestors and rejects group moves', () => {
   const doc = createLyricDocument('a'); const line = doc.lines[0], word = line.words[0];
@@ -37,16 +37,16 @@ it('resizes only the requested side without filling unknown ancestors and reject
   line.beginMs = 0;
   expect(() => moveTimeline(doc, [{ kind: 'line', lineId: line.id }], 10)).toThrow('timeline.lineTimesRequired');
 });
-it('computes parents before children while using only real sibling endpoints and all descendant constraints', () => {
+it('does not reuse projected parent boundaries while using only real sibling endpoints and all descendant constraints', () => {
   const doc = createLyricDocument('');
   doc.lines = [{ ...createLine('prior'), beginMs: 0, endMs: 2000 }, { ...createLine('target'), beginMs: null, endMs: 3000 }];
   const row = doc.lines[1];
   row.words = [{ ...createWord('a'), beginMs: 1000, endMs: null, rubyUnits: [{ id: 'r', reading: 'あ', beginMs: 500, endMs: 2500 }] }, { ...createWord('b'), beginMs: 2000, endMs: null }];
   const shown = projectTimeline(doc, 5000);
-  expect(shown.lines[1].beginMs).toBe(0); // 2000 excludes real descendants.
+  expect(shown.lines[1].beginMs).toBeNull(); // 2000 excludes real descendants.
   expect(shown.lines[1].words[0].endMs).toBeNull(); // The known start already excludes its Ruby.
   row.words[0].beginMs = null; row.words[0].endMs = 2500;
-  expect(projectTimeline(doc, 5000).lines[1].words[0].beginMs).toBe(0);
+  expect(projectTimeline(doc, 5000).lines[1].words[0].beginMs).toBeNull();
   expect(doc.lines[1].beginMs).toBeNull();
 });
 it('keeps romanization independent, discards reverse candidates and never projects two unknown endpoints', () => {
@@ -57,7 +57,7 @@ it('keeps romanization independent, discards reverse candidates and never projec
   const units = (d: typeof doc) => { const c = d.romanizationTracks[0].contents[0]; if (c.kind !== 'timed') throw Error(); return c.units; };
   expect(units(projectTimeline(doc))[0].endMs).toBe(400);
   expect(units(projectTimeline(doc))[1].endMs).toBeNull();
-  expect(units(projectTimeline(doc, 500))[1].endMs).toBe(500);
+  expect(units(projectTimeline(doc, 500))[1].endMs).toBeNull();
   expect(units(projectTimeline(doc, 500))[2]).toMatchObject({ beginMs: null, endMs: null });
 });
 it('resizing Ruby retains known parent sides when no Ruby supplies that side, and row resize includes real Ruby', () => {

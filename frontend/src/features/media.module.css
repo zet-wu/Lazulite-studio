@@ -169,3 +169,17 @@
 .trackBar[data-temporary-begin] { border-left: 2px dashed currentColor; }
 .trackBar[data-temporary-end] { border-right: 2px dashed currentColor; }
 .trackBar .temporaryHandle { border: 1px dashed currentColor; background: repeating-linear-gradient(135deg, transparent, transparent 2px, currentColor 3px, transparent 4px); min-width: 6px; }
+
+.staging { border-top: 1px solid var(--line); padding-block: 4px; }
+.stagingLane { display: flex; justify-content: center; min-width: 0; height: var(--timeline-lane-height); }
+.stagingBlock { box-sizing: border-box; flex: 1; min-width: 0; overflow: hidden; cursor: grab; background: var(--timeline-surface); color: var(--text); border: 1px solid var(--muted); margin-block: var(--timeline-bar-inset); display: flex; align-items: center; touch-action: none; }
+.stagingMissing { border-inline: 2px dashed var(--muted); }
+.stagingContext { opacity: .65; cursor: pointer; }
+.stagingBlock:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.assignmentPreview { position: absolute; top: 0; height: var(--timeline-bar-height); background: var(--surface); color: var(--text); border: 1px solid var(--blue); z-index: 5; pointer-events: none; overflow: hidden; white-space: nowrap; }
+
+.stagingBlock.trackSelected { background: #518ae2; color: #fff; border-color: #2d64bc; }
+
+.stagingLabel { display: block; color: var(--muted); font-size: 10px; margin: 0 0 3px var(--timeline-label-width, 36px); }
+
+.stagingSlot { display: flex; flex: 0 1 120px; min-width: 0; }

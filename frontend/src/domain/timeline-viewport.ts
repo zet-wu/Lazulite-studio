@@ -25,3 +25,8 @@ export function waveformRequestWindow(view: TimelineViewport, durationMs: number
   const endMs = Math.min(durationMs, Math.ceil((view.startMs + view.spanMs) / step) * step + step);
   return { startMs, endMs };
 }
+
+export function locateViewport(view: TimelineViewport, durationMs: number, beginMs: number, endMs: number): TimelineViewport {
+  const spanMs=clampViewport({startMs:0,spanMs:endMs>beginMs?2*(endMs-beginMs):view.spanMs},durationMs).spanMs;
+  return clampViewport({startMs:(beginMs+endMs-spanMs)/2,spanMs},durationMs);
+}

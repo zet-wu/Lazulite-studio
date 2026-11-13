@@ -1,3 +1,4 @@
+import { TimelineStaging } from './TimelineStaging';
 import { message as describeMessage, MessageError, errorMessage, type Message } from '../domain/messages';
 import { i18n } from '../i18n';
 import { useTranslation } from 'react-i18next';
@@ -23,12 +24,13 @@ import styles from './media.module.css';
 
 type Props = { locked?: boolean; document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
   visible: { karaoke: boolean; line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
+  onLocate?: (begin:number,end:number)=>void;
   externalAnchors?: number[]; durationMs?: number | null;
   apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string | Message) => void };
 type Drag = { started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string | Message } };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
 
-export function TimelineTracks({ locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onPan, onError }: Props) {
+export function TimelineTracks({ locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onLocate, onPan, onError }: Props) {
   useTranslation();
   const editing = useProjectEditing();
   const projectContext = useContext(KaraokeContext);
@@ -240,7 +242,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       {(!narrow || ghostEnd) && endMs <= propsEndMs && <span className={`${styles.trackHandle} ${ghostEnd ? styles.temporaryHandle : ''}`} title={ghostEnd ? description : undefined} aria-label={t('timeline.endBoundary',{label})} onPointerDown={(event) => begin(event, target, 'endMs', endMs)} onPointerMove={move} onPointerUp={finish} />}
     </div>;
   };
-  const row = (name: string, content: React.ReactNode, selectable: TimelineTarget[] = [], laneCount = 1, caption = name) => <div className={styles.trackRow} key={selectable.length?selectable.map(targetId).join(':'):name}><strong title={caption}>{caption}</strong><div data-track-lane className={styles.trackLane} style={{ height: `calc(${Math.max(1, laneCount)} * var(--timeline-lane-height))` }}
+  const row = (name: string, content: React.ReactNode, selectable: TimelineTarget[] = [], laneCount = 1, caption = name, assignmentKind?: TimelineTarget['kind']) => <div className={styles.trackRow} key={selectable.length?selectable.map(targetId).join(':'):name}><strong title={caption}>{caption}</strong><div data-track-lane data-assignment-kind={assignmentKind ?? selectable[0]?.kind} className={styles.trackLane} style={{ height: `calc(${Math.max(1, laneCount)} * var(--timeline-lane-height))` }}
     onPointerDown={(event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); boxTargets.current = selectable; begin(event, null, selectable.length > 0 && event.shiftKey ? 'select' : 'pan', selectable.length > 0 && event.shiftKey ? startMs + Math.round((event.clientX - rect.left) / rect.width * spanMs) : startMs); } }}
     onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}>
     {content}<TimelineIndicators /></div></div>;
@@ -269,7 +271,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       const number = ordinalById.get(item.backgroundOf ?? item.id);
       const background = item.backgroundOf ? ` ${t('outline.background')}` : '';
       return bar({ kind: 'line', lineId: item.id }, t('timeline.lineLabel', { number, background }), item.beginMs!, item.endMs!, false, undefined, `L${number}${background}`);
-    }), [], lineLayout.laneCount,t('edit.lineUnit'))}
+    }), [], lineLayout.laneCount,t('edit.lineUnit'),'line')}
     <div ref={scrollRef} className={styles.expandedTracks} style={!expandedLines.length ? { display: 'none' } : undefined}><div style={expandedLines.length > 20 ? { height: virtual.getTotalSize(), position: 'relative' } : undefined}>
     {(expandedLines.length > 20 ? virtual.getVirtualItems() : expandedLines.map((line, index) => ({ index, key: line.id, start: 0 }))).map(virtualRow => {
       const item = displayed.lines.find(line => line.id === expandedLines[virtualRow.index].id)!;
@@ -292,6 +294,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       </section>;
     })}
     </div></div>
+    <TimelineStaging document={document} startMs={startMs} endMs={endMs} durationMs={durationMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const item=targetInterval(document,target);return item?[item.beginMs,item.endMs].filter((n):n is number=>n!==null):[];})]} locked={locked} visible={visible} host={tracksRef} apply={apply} onLocate={onLocate} onError={onError}/>
     {visible.gap && line && row('gaps', gaps.map(({ left, right, beginMs, endMs, overlap }) => <button data-role="secondary" disabled={locked} key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? t('timeline.removeOverlap') : t('timeline.closeGap')} onClick={() => closeGap(left, right)}>{overlap ? t('timeline.overlap') : t('timeline.gap')}</button>),[],1,t('timeline.gap'))}
   </div>;
 }

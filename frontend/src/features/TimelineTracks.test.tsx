@@ -78,3 +78,25 @@ it('rejects a dragged block tail beyond the source and commits after moving back
   expect(apply).toHaveBeenCalledWith({type:'shift-lines',lineIds:[document.lines[0].id],deltaMs:400});
   cleanup();box.mockRestore();vi.unstubAllGlobals();
 });
+
+it('stages complete ancestors, switches to the active row and filters each subtrack',async()=>{
+ const {cleanup,fireEvent}=await import('@testing-library/react');cleanup();
+ vi.stubGlobal('ResizeObserver',class{observe(){}unobserve(){}disconnect(){}});
+ const doc=createLyricDocument('愛'),line=doc.lines[0],word=line.words[0];
+ line.beginMs=100;line.endMs=2000;word.beginMs=100;word.endMs=1500;
+ word.rubyUnits=[{id:'missing-ruby',reading:'あい',beginMs:null,endMs:null}];
+ doc.romanizationTracks=[{id:'track',language:'ja-Latn',contents:[{id:'content',lineId:line.id,kind:'timed',units:[{id:'missing-roman',text:'ai',beginMs:null,endMs:null}]}]}];
+ const onLocate=vi.fn(),apply=vi.fn();
+ const props={document:doc,selectedLineId:null,startMs:0,endMs:3000,durationMs:3000,positionMs:0,bpm:0,snap:false,visible:{karaoke:false,line:true,word:true,ruby:true,romanization:true,gap:false},apply,onPan:vi.fn(),onLocate,onError:vi.fn()};
+ const view=render(<SelectionProvider><TimelineTracks {...props}/></SelectionProvider>);
+ const staging=()=>view.container.querySelector('[aria-label="时间轴暂存区"]')!;
+ expect(staging().querySelectorAll('[data-staging-key]')).toHaveLength(1);
+ fireEvent.keyDown(staging().querySelector('[role="button"]')!,{key:'Enter'});
+ expect(onLocate).toHaveBeenCalledWith(100,2000);expect(apply).not.toHaveBeenCalled();
+ expect(staging().querySelectorAll('[data-staging-key]')).toHaveLength(3);
+ expect(staging().querySelector(`[data-staging-key="${word.id}"]`)).not.toBeNull();
+ view.rerender(<SelectionProvider><TimelineTracks {...props} visible={{...props.visible,ruby:false,romanization:false}}/></SelectionProvider>);
+ expect(staging().querySelectorAll('[data-staging-key]')).toHaveLength(1);
+ view.rerender(<SelectionProvider><TimelineTracks {...props} visible={{...props.visible,word:false,ruby:false,romanization:false}}/></SelectionProvider>);
+ expect(staging()).toBeNull();cleanup();vi.unstubAllGlobals();
+});

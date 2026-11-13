@@ -44,3 +44,12 @@ export function selectionEnvelope(document: LyricDocument, selection: EditorSele
   const begin_ms = Math.min(...intervals.map(item => item!.beginMs!)), end_ms = Math.max(...intervals.map(item => item!.endMs!));
   return begin_ms < end_ms && end_ms <= duration ? { range: { begin_ms, end_ms }, reason: '' } : { reason: 'selection.outsideMedia' };
 }
+
+/** Partial selections can locate any real endpoint or legal display projection. */
+export function selectionLocation(document: LyricDocument, selection: EditorSelection | null, duration: number) {
+  const intervals = selection?.kind === 'romanization-content'
+    ? attachmentTracks(document,selection).flatMap(track=>track.contents.filter(content=>selection.ids.includes(content.id)).flatMap(content=>content.kind==='timed'?content.units:[]))
+    : selectionTargets(document,selection).map(target=>targetInterval(document,target));
+  const times=intervals.flatMap(item=>item&&(item.beginMs===null||item.endMs===null||item.beginMs<=item.endMs)?[item.beginMs,item.endMs]:[]).filter((value):value is number=>value!==null&&Number.isSafeInteger(value)&&value>=0&&value<=duration);
+  return times.length?{beginMs:Math.min(...times),endMs:Math.max(...times)}:null;
+}

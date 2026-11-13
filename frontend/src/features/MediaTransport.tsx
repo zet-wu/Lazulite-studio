@@ -1,3 +1,6 @@
+import { projectTimeline } from '../domain/timeline-projection';
+import { selectionLocation } from './editor/selection-targets';
+import { locateViewport } from '../domain/timeline-viewport';
 import { errorMessage, message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { i18n } from '../i18n';
@@ -191,6 +194,14 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       loopRange.begin_ms < loopRange.end_ms &&
       loopRange.end_ms <= durationMs,
   );
+  const location = sharedSelection?.effective?.kind === 'segments'
+    ? (selectedSegments.length ? {beginMs:Math.min(...selectedSegments.map(s=>s.beginMs)),endMs:Math.max(...selectedSegments.map(s=>s.endMs))} : null)
+    : document && sharedSelection?.effective ? selectionLocation(projectTimeline(document,durationMs),sharedSelection.selection,durationMs) : null;
+  const locate = (beginMs:number,endMs:number) => {
+    const next=locateViewport({startMs,spanMs:Math.round(span*1000)},durationMs,beginMs,endMs);
+    if(moveAnimation.current!==null){cancelAnimationFrame(moveAnimation.current);moveAnimation.current=null;}
+    setFollow(false);setStart(next.startMs/1000);setSpan(next.spanMs/1000);
+  };
   const activeLoop = useCallback(() => {
     const range = activeLoopRange(loop, durationMs);
     return range ? [range[0] / 1e3, range[1] / 1e3] as const : null;
@@ -632,7 +643,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
 
         <TimelineTracks locked={editingLocked} durationMs={asset?.source_duration_ms ?? null} document={document} selectedLineId={selectedLineId ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
           visible={visible} externalAnchors={acoustics?.segments.flatMap(segment => [segment.beginMs, segment.endMs]) ?? []}
-          apply={onTimelineCommand} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
+          apply={onTimelineCommand} onLocate={locate} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
       </>}
       {visible.spectrum && asset && <SpectrogramCanvas pcmRate={graphicVocal ? sourceResults.find(result=>result.audio_id===graphicVocal)!.sample_rate : 48000} vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
       </div>
@@ -699,6 +710,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           onClick={() => setLoop(captureLoop(loopRange!.begin_ms, loopRange!.end_ms, durationMs))}
         >
           {t('media.loopSelection')}</button>
+        <IconButton data-role="secondary" icon="target" label={t('media.locateSelection')} disabled={disabled||!location} onClick={()=>{if(location)locate(location.beginMs,location.endMs);}}/>
         {error ? (
           <span className={styles.error} role="alert">{error}<IconButton icon="refresh" label={t('media.retryAudio')} onClick={retryMedia}/></span>
         ) : !asset ? (
