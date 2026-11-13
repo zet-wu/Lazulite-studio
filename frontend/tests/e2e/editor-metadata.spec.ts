@@ -50,3 +50,35 @@ test('source tags fill only blank metadata after blur and leave acquisition cond
  await page.getByRole('button',{name:'关闭歌词元数据'}).click();await page.getByRole('button',{name:'重做',exact:true}).click();await settings(page,'歌词元数据');await expect(page.getByLabel('元数据 title 值 1')).toHaveValue('源音频标题');
  const conditions=await page.evaluate(async()=> (await fetch('/api/v1/projects/sample-project/search-conditions')).json());expect(conditions).toEqual({title:'',artist:'',album:''});
 });
+
+test('default singer IDs commit on Enter and blur, cancel and recompute after undo',async({page})=>{
+ await load(page);await settings(page,'歌手管理');
+ const add=page.getByRole('button',{name:'添加歌手',exact:true});
+ await add.click();await expect(page.getByLabel('歌手 ID',{exact:true})).toHaveValue('v1');
+ await page.getByRole('button',{name:'取消新增歌手'}).click();await expect(page.getByLabel('歌手 ID v1',{exact:true})).toHaveCount(0);
+ await add.click();await page.getByLabel('歌手 ID',{exact:true}).press('Escape');
+ await add.click();await page.getByLabel('歌手 ID',{exact:true}).press('Enter');await expect(page.getByLabel('歌手 v1 type')).toBeFocused();
+ await add.click();await expect(page.getByLabel('歌手 ID',{exact:true})).toHaveValue('v2');await page.getByLabel('歌手 ID',{exact:true}).press('Tab');await expect(page.getByLabel('歌手 v2 type')).toBeFocused();
+ await page.getByRole('button',{name:'关闭歌手管理'}).click();await page.getByRole('button',{name:'撤销',exact:true}).click();await settings(page,'歌手管理');
+ await expect(page.getByLabel('歌手 ID v2',{exact:true})).toHaveCount(0);await add.click();await expect(page.getByLabel('歌手 ID',{exact:true})).toHaveValue('v2');
+ await page.getByLabel('歌手 ID',{exact:true}).fill('custom');await page.getByLabel('歌手 ID',{exact:true}).press('Enter');await expect(page.getByLabel('歌手 custom type')).toBeFocused();
+});
+
+test('actor keyboard editing preserves cycles, updates labels and clears with undo and reload',async({page})=>{
+ await load(page);await settings(page,'歌手管理');
+ const actor=page.locator('select[aria-label="歌手 actor actor"]');await actor.focus();await actor.press('Enter');
+ await expect(page.getByRole('listbox').getByRole('option')).toHaveText(['无','role 长名称角色']);await actor.press('End');await actor.press('Enter');await expect(actor).toHaveValue('role');
+ await page.getByLabel('歌手 role type').selectOption('group');await expect(page.getByLabel('歌手 role actor',{exact:true})).toHaveValue('actor');
+ await page.getByLabel('歌手 role',{exact:true}).fill('新的长名称');await page.getByLabel('歌手 role',{exact:true}).press('Enter');await expect(actor).toHaveAttribute('title','role 新的长名称');
+ await page.getByLabel('歌手 ID role',{exact:true}).fill('renamed');await page.getByLabel('歌手 ID role',{exact:true}).press('Enter');await expect(actor).toHaveValue('renamed');
+ await actor.selectOption('');await expect(actor).toHaveValue('');await page.getByRole('button',{name:'关闭歌手管理'}).click();await page.getByRole('button',{name:'撤销',exact:true}).click();await settings(page,'歌手管理');await expect(actor).toHaveValue('renamed');
+ await page.getByRole('button',{name:'关闭歌手管理'}).click();await page.getByRole('button',{name:'重做',exact:true}).click();await settings(page,'歌手管理');await expect(actor).toHaveValue('');
+ await actor.selectOption('renamed');await page.getByRole('button',{name:'关闭歌手管理'}).click();
+ await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();await page.reload();await settings(page,'歌手管理');await expect(actor).toHaveValue('renamed');await expect(page.getByLabel('歌手 renamed actor',{exact:true})).toHaveValue('actor');
+});
+
+test('an imported self reference stays visible and can be cleared without becoming a candidate',async({page})=>{
+ await load(page,xml.replace('<ttm:actor agent="actor"/>','<ttm:actor agent="role"/>'));await settings(page,'歌手管理');
+ const actor=page.locator('select[aria-label="歌手 role actor"]');await expect(actor).toHaveValue('role');await expect(actor).toHaveAttribute('title','role 长名称角色');
+ await actor.press('Enter');await expect(page.getByRole('listbox').getByRole('option')).toHaveText(['无','actor']);await actor.press('Enter');await expect(actor).toHaveValue('');
+});

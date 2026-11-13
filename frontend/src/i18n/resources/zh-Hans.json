@@ -1705,5 +1705,7 @@
   "alignment.stripTones": "去除调号数字",
   "alignment.preprocessing": "前处理选项",
   "alignment.postprocessing": "后处理选项",
-  "alignment.preparingInput": "正在准备对齐输入…"
+  "alignment.preparingInput": "正在准备对齐输入…",
+  "singer.actorLabel": "歌手 {{id}} actor",
+  "singer.noActor": "无"
 }

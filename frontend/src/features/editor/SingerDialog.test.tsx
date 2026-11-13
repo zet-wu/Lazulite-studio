@@ -22,3 +22,10 @@ it('cancels a default draft with Escape without adding a singer',()=>{
  const apply=vi.fn(()=>true);render(<SingerDialog document={createLyricDocument()} apply={apply} close={()=>{}}/>);
  fireEvent.click(screen.getByRole('button',{name:'添加歌手'}));fireEvent.keyDown(screen.getByLabelText('歌手 ID'),{key:'Escape'});expect(apply).not.toHaveBeenCalled();expect(screen.queryByLabelText('歌手 ID')).toBeNull();
 });
+it('keeps an edited draft across document updates and validates against the current agents',()=>{
+ const document=createLyricDocument(),apply=vi.fn(()=>true);
+ const view=render(<SingerDialog document={document} apply={apply} close={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'添加歌手'}));const field=screen.getByLabelText('歌手 ID');fireEvent.change(field,{target:{value:'custom'}});
+ view.rerender(<SingerDialog document={{...document,agents:[{id:'custom',type:'person',name:null}]}} apply={apply} close={()=>{}}/>);
+ expect(field).toHaveValue('custom');fireEvent.keyDown(field,{key:'Enter'});expect(apply).not.toHaveBeenCalled();expect(screen.getByRole('alert')).toBeVisible();
+});

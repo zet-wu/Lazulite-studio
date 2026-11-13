@@ -1705,5 +1705,7 @@
   "alignment.stripTones": "移除聲調數字",
   "alignment.preprocessing": "前處理選項",
   "alignment.postprocessing": "後處理選項",
-  "alignment.preparingInput": "正在準備對齊輸入…"
+  "alignment.preparingInput": "正在準備對齊輸入…",
+  "singer.actorLabel": "歌手 {{id}} actor",
+  "singer.noActor": "無"
 }

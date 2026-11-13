@@ -11316,5 +11316,21 @@
     "source": "正在准备对齐输入…",
     "params": [],
     "parameterNotes": {}
+  },
+  "singer.actorLabel": {
+    "context": "Accessible label for the direct actor reference of a singer.",
+    "source": "歌手 {{id}} actor",
+    "params": [
+      "id"
+    ],
+    "parameterNotes": {
+      "id": "Singer ID"
+    }
+  },
+  "singer.noActor": {
+    "context": "Clear the singer actor reference.",
+    "source": "无",
+    "params": [],
+    "parameterNotes": {}
   }
 }

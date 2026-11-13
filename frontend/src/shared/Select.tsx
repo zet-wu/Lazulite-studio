@@ -4,13 +4,16 @@ import { useEffect, useLayoutEffect, useId, useRef, useState, type SelectHTMLAtt
 import { createPortal } from 'react-dom';
 import './select.css';
 /** Native form/label semantics with a shared desktop listbox. */
-type Quote = { prefix: string; text: string };
-type Props = SelectHTMLAttributes<HTMLSelectElement> & { quotes?: Record<string, Quote> };
-function QuotedOption({ quote }: { quote: Quote }) {
+type OptionLabel = { prefix: string; text: string };
+type Props = SelectHTMLAttributes<HTMLSelectElement> & { quotes?: Record<string, OptionLabel>; labels?: Record<string, OptionLabel> };
+function QuotedOption({ quote }: { quote: OptionLabel }) {
   useTranslation();
   return <span className="studio-select-quote" title={`${quote.prefix}${quote.text}`}><span>{quote.prefix}</span><span className="studio-lyric-quote">{quote.text}</span></span>;
 }
-export function Select({ quotes, ...props }: Props) {
+function LabeledOption({ label }: { label: OptionLabel }) {
+  return <span className="studio-select-label" title={`${label.prefix}${label.text}`}><span>{label.prefix}</span><span>{label.text}</span></span>;
+}
+export function Select({ quotes, labels, ...props }: Props) {
   useTranslation();
   const ref=useRef<HTMLSelectElement>(null);
   const list=useRef<HTMLDivElement>(null);
@@ -22,7 +25,8 @@ export function Select({ quotes, ...props }: Props) {
   const close=()=>{setOpen(false);ref.current?.focus();};
   const show=()=>{
     if(props.disabled || ref.current?.matches(':disabled'))return;
-    setActive(Math.max(0,ref.current!.selectedIndex));setOpen(true);
+    const select=ref.current!;
+    setActive(select.selectedOptions[0]?.hidden ? Array.from(select.options).findIndex(o=>!o.hidden&&!o.disabled) : Math.max(0,select.selectedIndex));setOpen(true);
   };
   useLayoutEffect(() => {
     if (!open) return;
@@ -65,7 +69,9 @@ export function Select({ quotes, ...props }: Props) {
     return()=>{window.removeEventListener('pointerdown',outside);window.removeEventListener('resize',resize);window.removeEventListener('scroll',scroll,true);};
   },[open]);
   const selectedQuote = quotes?.[String(props.value)];
-  const trigger = <select {...props} title={selectedQuote ? `${selectedQuote.prefix}${selectedQuote.text}` : props.title} ref={ref} className={`studio-select ${selectedQuote?'studio-select-quoted':''} ${props.className??''}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open?id:undefined} aria-activedescendant={open?`${id}-${active}`:undefined}
+  const selectedLabel = labels?.[String(props.value)];
+  const selected = selectedQuote ?? selectedLabel;
+  const trigger = <select {...props} title={selected ? `${selected.prefix}${selected.text}` : props.title} ref={ref} className={`studio-select ${selected?'studio-select-quoted':''} ${props.className??''}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open?id:undefined} aria-activedescendant={open?`${id}-${active}`:undefined}
     onPointerDown={e=>{props.onPointerDown?.(e);if(e.button===0&&!e.defaultPrevented){e.preventDefault();ref.current?.focus();if(open)close();else show();}}}
     onBlur={e=>{props.onBlur?.(e);setOpen(false);}}
     onKeyDown={e=>{
@@ -76,12 +82,12 @@ export function Select({ quotes, ...props }: Props) {
         e.preventDefault();e.stopPropagation();
         if(!open){show();return;}
         if(e.key==='Enter'||e.key===' '){choose(active);return;}
-        const enabled=options.map((o,i)=>o.disabled?-1:i).filter(i=>i>=0);
+        const enabled=options.map((o,i)=>o.disabled||o.hidden?-1:i).filter(i=>i>=0);
         const index=enabled.indexOf(active);
         setActive(e.key==='Home'?enabled[0]:e.key==='End'?enabled.at(-1)!:enabled[Math.max(0,Math.min(enabled.length-1,index+(e.key==='ArrowDown'?1:-1)))]??active);
-      } else if(open&&e.key.length===1){e.preventDefault();const index=options.findIndex(o=>!o.disabled&&o.text.toLocaleLowerCase().startsWith(e.key.toLocaleLowerCase()));if(index>=0)setActive(index);}
+      } else if(open&&e.key.length===1){e.preventDefault();const index=options.findIndex(o=>!o.disabled&&!o.hidden&&o.text.toLocaleLowerCase().startsWith(e.key.toLocaleLowerCase()));if(index>=0)setActive(index);}
     }}/>;
-  return <>{quotes ? <span className="studio-select-trigger">{trigger}{selectedQuote && <span className="studio-select-value" aria-hidden="true"><QuotedOption quote={selectedQuote}/></span>}</span> : trigger}{open&&createPortal(<div ref={list} id={id} role="listbox" aria-label={props['aria-label']??ref.current?.labels?.[0]?.textContent??t('select.options')} className="studio-select-list" style={rect} onPointerDown={e=>{e.preventDefault();e.stopPropagation();}}>{options.map((o,i)=><div key={i} id={`${id}-${i}`} data-index={i} role="option" aria-selected={o.selected} aria-disabled={o.disabled} data-active={active===i} onPointerMove={()=>{if(!o.disabled)setActive(i);}} onClick={e=>{e.stopPropagation();choose(i);}} aria-label={o.text}>{quotes?.[o.value] ? <QuotedOption quote={quotes[o.value]}/> : o.text}</div>)}</div>,ref.current?.closest('[role="dialog"]')??document.body)}</>;
+  return <>{quotes || labels ? <span className="studio-select-trigger">{trigger}{selected && <span className="studio-select-value" aria-hidden="true">{selectedQuote ? <QuotedOption quote={selectedQuote}/> : <LabeledOption label={selectedLabel!}/>}</span>}</span> : trigger}{open&&createPortal(<div ref={list} id={id} role="listbox" aria-label={props['aria-label']??ref.current?.labels?.[0]?.textContent??t('select.options')} className="studio-select-list" style={rect} onPointerDown={e=>{e.preventDefault();e.stopPropagation();}}>{options.map((o,i)=>o.hidden ? null : <div key={i} id={`${id}-${i}`} data-index={i} role="option" aria-selected={o.selected} aria-disabled={o.disabled} data-active={active===i} onPointerMove={()=>{if(!o.disabled)setActive(i);}} onClick={e=>{e.stopPropagation();choose(i);}} aria-label={o.text}>{quotes?.[o.value] ? <QuotedOption quote={quotes[o.value]}/> : labels?.[o.value] ? <LabeledOption label={labels[o.value]}/> : o.text}</div>)}</div>,ref.current?.closest('[role="dialog"]')??document.body)}</>;
 }
 
 const t=i18n.t.bind(i18n);

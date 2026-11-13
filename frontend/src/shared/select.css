@@ -15,3 +15,10 @@ select.studio-select-quoted { -webkit-text-fill-color:transparent; }
 .studio-select-quote > span:first-child { flex-shrink:0; font-size:12px; font-weight:400; }
 .studio-lyric-quote { font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .studio-select-list .studio-lyric-quote { white-space:normal; overflow-wrap:anywhere; }
+
+.studio-select-label { display:flex; gap:3px; min-width:0; align-items:baseline; font-weight:400; }
+.studio-select-label > span:first-child { color:var(--muted); flex-shrink:0; }
+.studio-select-label > span:last-child { color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.studio-select-list .studio-select-label { flex-wrap:wrap; overflow-wrap:anywhere; }
+.studio-select-list .studio-select-label > span { white-space:normal; flex-shrink:1; }
+.studio-select-trigger:has(> select:disabled) .studio-select-value { opacity:.5; }

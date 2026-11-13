@@ -1718,5 +1718,7 @@
   "alignment.stripTones": "Remove trailing tone digits",
   "alignment.preprocessing": "Preprocessing options",
   "alignment.postprocessing": "Postprocessing options",
-  "alignment.preparingInput": "Preparing alignment input…"
+  "alignment.preparingInput": "Preparing alignment input…",
+  "singer.actorLabel": "Singer {{id}} actor",
+  "singer.noActor": "None"
 }
