@@ -710,7 +710,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           onClick={() => setLoop(captureLoop(loopRange!.begin_ms, loopRange!.end_ms, durationMs))}
         >
           {t('media.loopSelection')}</button>
-        <IconButton data-role="secondary" icon="target" label={t('media.locateSelection')} disabled={disabled||!location} onClick={()=>{if(location)locate(location.beginMs,location.endMs);}}/>
+        <button data-role="secondary" disabled={disabled||!location} onClick={()=>{if(location)locate(location.beginMs,location.endMs);}}>{t('media.locateSelection')}</button>
         {error ? (
           <span className={styles.error} role="alert">{error}<IconButton icon="refresh" label={t('media.retryAudio')} onClick={retryMedia}/></span>
         ) : !asset ? (
