@@ -60,3 +60,13 @@ test('ruby and romanization assign only to corresponding lanes and remove contex
  }
  await expect(page.getByLabel('时间轴暂存区',{exact:true})).toHaveCount(0);
 });
+
+test('dense staging exposes full text on keyboard focus and follows track visibility',async({page})=>{
+ await page.setViewportSize({width:1440,height:1000});await loadTimeline(page,true);await page.getByRole('button',{name:'编辑',exact:true}).click();
+ const words=Array.from({length:80},(_,i)=>`<span studio:id="dense-${i}" studio:null="begin end">待分配的完整歌词${i}</span>`).join('');
+ await importLyrics(page,{name:'dense.ttml',mimeType:'application/xml',buffer:Buffer.from(xml.replace(/<span[\s\S]*<\/span>/,words))});await page.locator('[data-outline-drag]').first().click();await page.getByRole('button',{name:'音频处理',exact:true}).click();
+ const first=page.locator('[data-staging-key="dense-0"]');await first.focus();await expect(page.getByRole('tooltip')).toHaveText('待分配的完整歌词0');
+ await page.screenshot({path:`${process.env.STUDIO_EVIDENCE_DIR??'/tmp'}/staging-dense-keyboard.png`});
+ await page.getByRole('button',{name:'词',exact:true}).click();await expect(first).toHaveCount(0);
+ await page.getByRole('button',{name:'词',exact:true}).click();await expect(first).toBeVisible();
+});

@@ -179,6 +179,7 @@ export function assignTimeline(document: LyricDocument, target: TimelineTarget, 
   const children = target.kind==='line' ? [...line.words.flatMap(w=>[w,...w.rubyUnits]),...attachments] : target.kind==='word' ? word!.rubyUnits : [];
   beginMs = Math.max(0,Math.min(beginMs,...children.flatMap(c=>c.beginMs===null?[]:[c.beginMs])));
   endMs = Math.min(durationMs,Math.max(endMs,...children.flatMap(c=>c.endMs===null?[]:[c.endMs])));
+  valid(beginMs,endMs);
   if (!Number.isSafeInteger(durationMs) || beginMs >= endMs || children.some(c=>c.endMs!==null&&c.endMs>durationMs)) throw new MessageError(message('timeline.rangeInvalid'));
   const includeChildren = <T extends {beginMs:TimeMs;endMs:TimeMs}>(parent:T, children:{beginMs:TimeMs;endMs:TimeMs}[]):T => ({...parent,
     beginMs:envelope([parent.beginMs,...children.map(c=>c.beginMs)],true),endMs:envelope([parent.endMs,...children.map(c=>c.endMs)],false)});

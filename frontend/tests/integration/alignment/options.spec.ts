@@ -25,10 +25,11 @@ test(`experimental options, clearing, undo and reopening`,async({page})=>{
  for(let bits=0;bits<8;bits++)for(const [i,label] of ['行内 blank 代价','人声休止 blank 代价','人声休止 token 代价'].entries()){
   const box=dialog.getByRole('checkbox',{name:new RegExp('^'+label+' ')});await expect(box).toBeEnabled();await box.setChecked(Boolean(bits&(1<<i)));await expect(box).toBeChecked({checked:Boolean(bits&(1<<i))});
  }
+ await dialog.getByRole('checkbox',{name:/^智能延长结束时间/}).check();
  await dialog.getByRole('checkbox',{name:'清空未匹配单元时间',exact:true}).check();
 
  await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();
- await expect.poll(()=>starts).toBe(2);expect(params).toMatchObject({use_hints:false,line_blank:true,rest_blank:true,rest_token:true,clear_unmatched:true});
+ await expect.poll(()=>starts).toBe(2);expect(params).toMatchObject({use_hints:false,line_blank:true,rest_blank:true,rest_token:true,clear_unmatched:true,smart_extend:true});
  await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeDisabled();
  status='succeeded';const notice=page.getByRole('status').filter({hasText:'清空 3 个词／注音'});await expect(notice).toBeVisible();
  await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('begin="00:03.000"');

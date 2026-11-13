@@ -46,3 +46,15 @@ it('moves timed romanization without touching lyric timing, merges updates withi
   expect(() => moveTimeline(d, targets, -11000)).toThrow();
   expect(d.romanizationTracks[0].contents[0]).toMatchObject({ units: [{ beginMs: 10000 }] });
 });
+
+it('locates partial projected selections while rejecting inverted intervals',async()=>{
+ const {selectionLocation}=await import('../src/features/editor/selection-targets');
+ const {projectTimeline}=await import('../src/domain/timeline-projection');
+ const {createLyricDocument,createWord}=await import('../src/domain/lyric-document');
+ const doc=createLyricDocument('a'),line=doc.lines[0];line.beginMs=100;line.endMs=1000;
+ line.words=[{...createWord('a'),beginMs:200,endMs:null},createWord('b')];
+ const selection={kind:'words' as const,lineId:line.id,ids:line.words.map(w=>w.id),activeId:line.words[1].id,anchorId:line.words[0].id};
+ expect(selectionLocation(projectTimeline(doc,2000),selection,2000)).toEqual({beginMs:200,endMs:1000});
+ line.endMs=null;expect(selectionLocation(projectTimeline(doc,2000),selection,2000)).toEqual({beginMs:200,endMs:200});
+ line.words[0].endMs=100;expect(selectionLocation(projectTimeline(doc,2000),selection,2000)).toBeNull();
+});

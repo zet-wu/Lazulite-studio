@@ -172,7 +172,7 @@
 
 .staging { border-top: 1px solid var(--line); padding-block: 4px; }
 .stagingLane { display: flex; justify-content: center; min-width: 0; height: var(--timeline-lane-height); }
-.stagingBlock { box-sizing: border-box; flex: 1; min-width: 0; overflow: hidden; cursor: grab; background: var(--timeline-surface); color: var(--text); border: 1px solid var(--muted); margin-block: var(--timeline-bar-inset); display: flex; align-items: center; touch-action: none; }
+.stagingBlock { white-space: nowrap; box-sizing: border-box; flex: 1; min-width: 0; overflow: hidden; cursor: grab; background: var(--timeline-surface); color: var(--text); border: 1px solid var(--muted); margin-block: var(--timeline-bar-inset); display: flex; align-items: center; touch-action: none; }
 .stagingMissing { border-inline: 2px dashed var(--muted); }
 .stagingContext { opacity: .65; cursor: pointer; }
 .stagingBlock:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }

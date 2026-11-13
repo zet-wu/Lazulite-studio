@@ -91,3 +91,12 @@ it('aggregates internal beats without creating nodes or borrowing a missing firs
  r.alignment.units[0].proposed_timing.start=null;
  expect(mergeAlignment(p,r,10000,false,500).mergedGaps).toBe(1);
 });
+
+it('merges gaps after smart extension, including its detected silence boundary',()=>{
+ const p=fixture(),r=result(p,[[1,2],[3,4],[5,6]]);
+ r.object_timings={[p.lyrics.lines[0].words[0].id]:{start:{time:1,source:'object_envelope'},end:{time:2.7,source:'smart_end_extension'}}};
+ expect(mergeAlignment(p,r,10000,true).project.lyrics.lines[0].words[0].endMs).toBe(2700);
+ const merged=mergeAlignment(p,r,10000,true,500);
+ expect(merged.project.lyrics.lines[0].words[0].endMs).toBe(3000);expect(merged.mergedGaps).toBe(1);
+ expect(merged.project.lyrics.lines[0].endMs).toBe(6000);
+});
