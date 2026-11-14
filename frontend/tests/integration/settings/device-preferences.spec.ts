@@ -7,9 +7,9 @@ test('local device preferences persist and a failed write can be retried',async(
  await open();const vocal=page.getByLabel('人声分离计算设备');await expect(vocal).toHaveValue('auto');
  let fail=true;
  await page.route('**/api/v1/settings',route=>route.request().method()==='PATCH'&&fail?route.fulfill({status:500,json:{message:'测试保存失败'}}):route.continue());
- await vocal.selectOption('cpu');await expect(page.getByRole('dialog').getByRole('alert')).toContainText('偏好保存失败');await expect(vocal).toHaveValue('auto');
+ await vocal.selectOption('cpu');await expect(page.getByRole('dialog').getByRole('alert').filter({hasText:'偏好保存失败'})).toBeVisible();await expect(vocal).toHaveValue('auto');
  fail=false;await vocal.selectOption('cpu');await expect(vocal).toHaveValue('cpu');
- expect((await(await page.request.get('/api/v1/settings')).json()).values['device.vocal']).toBe('cpu');
+ await expect.poll(async()=>(await(await page.request.get('/api/v1/settings')).json()).values['device.vocal']).toBe('cpu');
  await page.getByRole('button',{name:'关闭设置'}).click();await expect(page.locator('[data-settings-button]')).toBeFocused();
  await page.reload();await open();await expect(page.getByLabel('人声分离计算设备')).toHaveValue('cpu');await expect(page.getByLabel('自动对齐计算设备')).toHaveValue('auto');
  await page.getByLabel('人声分离计算设备').selectOption('auto');await expect(page.getByLabel('人声分离计算设备')).toHaveValue('auto');

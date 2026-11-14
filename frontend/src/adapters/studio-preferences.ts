@@ -19,8 +19,7 @@ export function alignmentDefaults() {
   const stored = preferences.getItem('studio:alignment-defaults');
   return {...defaults, ...(stored ? JSON.parse(stored) : {}), model_preview: '', convert_particles: particlesEnabled()};
 }
-export function resolveDefaultModel(items: {name:string; type:string|null; status:string; id:string|null}[]) {
-  const raw = preferences.getItem('studio:alignment-model');
+export function resolveDefaultModel(items: {name:string; type:string|null; status:string; id:string|null}[], raw = preferences.getItem('studio:alignment-model')) {
   if (!raw) return {id: '', missing: false};
   const stored = JSON.parse(raw) as {name:string; type:string};
   const model = items.find(item => item.name === stored.name && item.type === stored.type && item.status === 'ready');

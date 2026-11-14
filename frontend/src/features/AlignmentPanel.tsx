@@ -1,3 +1,4 @@
+import {preferences} from '../adapters/preferences';
 import { alignmentDefaults, resolveDefaultModel } from '../adapters/studio-preferences';
 import { Select } from '../shared/Select';
 import { capabilityReason } from './task-messages';
@@ -69,8 +70,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const reason=!assetId?t('alignment.uploadRequired'):durationMs===null?t('alignment.durationUnknown'):!project.lyrics.lines.some(l=>!project.editing.skippedAlignmentLineIds.includes(l.id))?t('alignment.noLines'):!capability?.enabled?(capability?capabilityReason(capability):t('alignment.checkingModels')):active?t('alignment.busy'):null;
   const open=async()=>{
     if(!finishDraft())return;
-    setOpening(true);setMessage('');const defaults=alignmentDefaults();setOptions(defaults);setGapDraft(String(defaults.gap_threshold_ms));setGapError('');
-    try {const saved=await control.save();if(!saved)throw new MessageError(describeMessage('alignment.saveRequired'));const data=await alignmentApi.models();if(mounted.current){setCatalog(data);const selected=resolveDefaultModel(data.items);setModel(selected.id);setDefaultMissing(selected.missing);setSummary(null);setPreviewRevision(saved.revision);setDialog(true);}}
+    setOpening(true);setMessage('');const defaults=alignmentDefaults();const defaultModel=preferences.getItem('studio:alignment-model');setOptions(defaults);setGapDraft(String(defaults.gap_threshold_ms));setGapError('');
+    try {const saved=await control.save();if(!saved)throw new MessageError(describeMessage('alignment.saveRequired'));const data=await alignmentApi.models();if(mounted.current){setCatalog(data);const selected=resolveDefaultModel(data.items,defaultModel);setModel(selected.id);setDefaultMissing(selected.missing);setSummary(null);setPreviewRevision(saved.revision);setDialog(true);}}
     catch(e){setMessage(errorMessage(e));}finally{if(mounted.current)setOpening(false);}
   };
   useEffect(()=>{

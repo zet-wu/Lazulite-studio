@@ -4,8 +4,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { DeviceSettings } from './DeviceSettings';
 const mock = vi.hoisted(() => ({ session: vi.fn(), save: vi.fn() }));
 vi.mock('../adapters/http/client', () => ({ studioApi: { getSession: mock.session }, requestHeaders: () => ({}) }));
-vi.mock('../adapters/preferences', () => ({ preferences: { getItem: () => 'auto' }, savePreference: mock.save }));
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
+vi.mock('../adapters/preferences', async importOriginal => {const actual=await importOriginal<typeof import('../adapters/preferences')>();return {...actual,savePreference:mock.save.mockImplementation(actual.savePreference)};});
+afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 function show(target: string, mode = 'local') {
   mock.session.mockResolvedValue({ mode });
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ target }) }));
@@ -26,7 +26,6 @@ it.each(['windows-x64-cuda', 'macos-arm64'])('saves independent preferences and 
   fireEvent.change(vocal, { target: { value: 'cpu' } });
   expect(await screen.findByRole('alert')).toHaveTextContent('偏好发生冲突');
   expect(vocal).toHaveValue('auto');
-  mock.save.mockResolvedValueOnce(undefined);
   fireEvent.change(vocal, { target: { value: 'cpu' } });
   await waitFor(() => expect(vocal).toHaveValue('cpu'));
   expect(mock.save).toHaveBeenLastCalledWith('device.vocal', 'cpu');
