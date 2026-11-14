@@ -14,7 +14,7 @@ export type EditorClipboard = (
   | { kind: 'romanization-content'; trackId: string; contents: RomanizationContent[]; text: string }
   | { kind: 'romanization-unit'; trackId: string; contentId: string; units: RomanizationUnit[]; text: string }) & { lineGroups?: Record<string,string>; editing?: ProjectEditing; attachment?: 'translation' };
 
-export const selectionLineId = (selection: EditorSelection | null): string | null => selection?.kind === 'lines' ? selection.activeId || null : selection?.lineId ?? null;
+export const selectionLineId = (selection: EditorSelection | null): string | null => !selection?.ids.length ? null : selection.kind === 'lines' ? selection.activeId || null : selection.lineId;
 
 export function selectIds(order: string[], current: string[], anchor: string, id: string, shift: boolean, toggle: boolean): string[] {
   if (shift) {

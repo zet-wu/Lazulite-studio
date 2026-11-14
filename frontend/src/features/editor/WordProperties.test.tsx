@@ -1,0 +1,35 @@
+import {cleanup,fireEvent,render,screen} from '@testing-library/react';
+import {afterEach,expect,it} from 'vitest';
+import {createLyricDocument,createWord} from '../../domain/lyric-document';
+import {createProjectDocument,createProjectEditorState,executeProjectCommand,undoProjectCommand,redoProjectCommand} from '../../domain/project-document';
+import {WordProperties} from './WordProperties';
+import {selectionLineId} from './editing-actions';
+afterEach(cleanup);
+it('edits explicit word memberships and mixed flags atomically, undoing the whole change',()=>{
+ const doc=createLyricDocument('a'),line=doc.lines[0];
+ doc.agents=['v1','v2'].map(id=>({id,name:id,type:'person'}));line.agentRefs=['v1'];
+ line.words=[{...createWord('a'),agentRefs:['v2'],obscene:true},createWord('b')];
+ const project=createProjectDocument(doc);project.amll.noWordAgents=false;
+ let state=createProjectEditorState(project);
+ const view=()=> <WordProperties agents={doc.agents} words={state.present.lyrics.lines[0].words.map(word=>({lineId:line.id,word}))} apply={command=>{state=executeProjectCommand(state,{type:'lyrics',command});return true;}}/>;
+ const ui=render(view());
+ expect(screen.getByLabelText('词级歌手 v1')).not.toBeChecked();
+ expect(screen.getByLabelText('词级歌手 v2')).toHaveAttribute('aria-checked','mixed');
+ fireEvent.click(screen.getByLabelText('词级歌手 v2'));ui.rerender(view());
+ expect(state.present.lyrics.lines[0].words.map(w=>w.agentRefs)).toEqual([['v2'],['v2']]);
+ expect(state.past).toHaveLength(1);
+ fireEvent.click(screen.getByLabelText('词级歌手 v2'));ui.rerender(view());
+ expect(state.present.lyrics.lines[0].words.every(w=>w.agentRefs===undefined)).toBe(true);
+ expect(screen.getByLabelText('不雅用语')).toHaveAttribute('aria-checked','mixed');
+ fireEvent.click(screen.getByLabelText('不雅用语'));ui.rerender(view());
+ expect(state.present.lyrics.lines[0].words.every(w=>w.obscene)).toBe(true);
+ const undone=undoProjectCommand(state);expect(undone.present.lyrics.lines[0].words.map(w=>w.obscene)).toEqual([true,false]);
+ expect(redoProjectCommand(undone).present).toEqual(state.present);
+ ui.rerender(<WordProperties agents={[]} words={line.words.map(word=>({lineId:line.id,word}))} noWordAgents apply={()=>true}/>);
+ expect(screen.getByLabelText('不雅用语')).toBeEnabled();expect(screen.queryByRole('group')).toBeNull();
+});
+it('empty selections have no selected line even when old owner and active IDs remain',()=>{
+ expect(selectionLineId({kind:'lines',ids:[],activeId:'old',anchorId:'old'})).toBeNull();
+ expect(selectionLineId({kind:'words',lineId:'old',ids:[],activeId:'word',anchorId:'word'})).toBeNull();
+ expect(selectionLineId({kind:'words',lineId:'new',ids:['word'],activeId:'word',anchorId:'word'})).toBe('new');
+});

@@ -61,8 +61,8 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
       return { revision: saved.revision, etag: saved.etag };
     }, asset?.id??null);
   const latestEditor=useRef(editor);latestEditor.current=editor;
-  const { selection, expanded, setSelectedSegments } = useEditorSelection()!;
-  const selectedLineId = selectionLineId(selection) ?? expanded.at(-1) ?? params.get('line');
+  const { selection, setSelectedSegments } = useEditorSelection()!;
+  const selectedLineId = selection ? selectionLineId(selection) : params.get('line');
   const [message, setMessage] = useNotice();
   const query=useQueryClient(), knownSource=useRef(asset?.id??null);
   const [audioImportBusy,setAudioImportBusy]=useState(false);
