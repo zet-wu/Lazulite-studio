@@ -1733,5 +1733,9 @@
   "markers.images": "触发与图片",
   "markers.dimensions": "图片尺寸",
   "markers.decoration": "装饰",
-  "markers.margins": "边距"
+  "markers.margins": "边距",
+  "settings.timeline": "时间轴",
+  "settings.stagingIgnored": "暂存区忽略字符",
+  "settings.stagingIgnoredHelp": "隐藏全部由这些字符组成的暂存单元，作为后代上下文所需的祖先仍会显示；留空关闭过滤。默认包含一个半角空格。",
+  "settings.stagingCharacterCount": "字符集合：{{count}} 个字符"
 }

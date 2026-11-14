@@ -1733,5 +1733,9 @@
   "markers.images": "觸發與圖片",
   "markers.dimensions": "圖片尺寸",
   "markers.decoration": "裝飾",
-  "markers.margins": "邊距"
+  "markers.margins": "邊距",
+  "settings.timeline": "時間軸",
+  "settings.stagingIgnored": "暫存區忽略字元",
+  "settings.stagingIgnoredHelp": "隱藏全部由這些字元組成的暫存單元，作為後代上下文所需的祖先仍會顯示；留空關閉篩選。預設包含一個半形空格。",
+  "settings.stagingCharacterCount": "字元集合：{{count}} 個字元"
 }

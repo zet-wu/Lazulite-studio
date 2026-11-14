@@ -1,3 +1,4 @@
+import {useTimelineVisibility, timelineLayers} from '../adapters/timeline-preferences';
 import { retainProjectMedia } from '../adapters/http/media-lifetime';
 import { projectTimeline } from '../domain/timeline-projection';
 import { selectionLocation } from './editor/selection-targets';
@@ -154,7 +155,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [snap, setSnap] = useState(true);
   const [bottomExpanded, setExpanded] = useState(true);
   const expanded = !!timelineHost || bottomExpanded;
-  const [visible, setVisible] = useState({ karaoke: true, line: true, word: true, ruby: true, romanization: true, gap: true, spectrum: false, wave: true, energy:true, segments:true });
+  const [visible, setVisible] = useTimelineVisibility();
   const { width, height, ratio, node: measuredCanvas, observe: observeCanvas } = useCanvasMetrics(canvas, expanded);
   const [follow, setFollow] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
@@ -590,8 +591,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         <IconButton data-role="secondary" disabled={disabled} icon="minus" label={t('media.zoomOut')} onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}/>
         <span className={styles.viewportRange}>{t('media.viewport')}{fmt(start)} – {fmt(end)}</span>
         <div className={styles.visibility} aria-label={t('media.layers')}>
-          {(['line', 'word', 'ruby', 'romanization', 'gap', 'karaoke', 'wave', 'spectrum', ...(timelineHost?['energy','segments'] as const:[])] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}>
-            {({ karaoke: t('media.countIn'), line: t('selection.line'), word: t('selection.word'), ruby: t('selection.ruby'), romanization: t('media.romanization'), gap: t('media.gaps'), wave: t('media.waveform'), spectrum: t('media.spectrogram'), energy:t('media.energy'),segments:t('media.segments') })[key]}
+          {(['line', 'word', 'ruby', 'romanization', 'gap', 'karaoke', 'wave', 'spectrum', ...(timelineHost?['energy','segments'] as const:[]), 'staging'] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible(key, !visible[key])}>
+            {t(timelineLayers[key])}
           </button>)}
         </div>
 </>);
