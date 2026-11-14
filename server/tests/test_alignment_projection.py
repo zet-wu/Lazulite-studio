@@ -75,3 +75,28 @@ def test_ruby_precedence_options_and_original_objects():
  failed=project_alignment(snapshot,latin_normalize=False)
  assert 'r2' in failed['summary']['unknown_objects']
  assert not any(u['reading']=='love' for u in failed['summary']['inputs'])
+
+
+def test_particles_use_whole_line_codepoints_and_preserve_ruby():
+ import copy
+ from server.reading import SudachiReadingProposer
+ analyzer=SudachiReadingProposer()
+ text='😀わたしははなへ こんにちは'
+ ranges=analyzer.particles([{'id':'l','text':text}])
+ assert [(r['start'],r['reading']) for r in ranges]==[(4,'わ'),(7,'え')]
+ def snapshot(split):
+  spans=''.join(f'<span studio:id="w{i}">{part}</span>' for i,part in enumerate(split))
+  return initial_project(f'<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="l">{spans}</p></body></tt>')
+ for parts in [[text],list(text),['😀わたしは','はなへ',' こんにちは']]:
+  source=snapshot(parts);before=copy.deepcopy(source)
+  result=project_alignment(source,convert_particles=True,particle_analyzer=analyzer)
+  reading=''.join(u['reading'] for u in result['request']['lines'][0]['units'])
+  assert reading.replace(' ','')=='😀わたしわはなえこんにちは'
+  assert source==before
+  assert result['request']['lines'][0]['text']==text
+  raw=project_alignment(source,convert_particles=True,latin_normalize=False,particle_analyzer=analyzer)
+  assert ''.join(u['reading'] for u in raw['request']['lines'][0]['units']).replace(' ','')==text.replace(' ','')
+ source=snapshot(['わたし','は','はな','へ'])
+ source['lyrics']['draftTtml']=source['lyrics']['draftTtml'].replace('<span studio:id="w1">は</span>', '<span studio:id="w1" xmlns:tts="http://www.w3.org/ns/ttml#styling" tts:ruby="container"><span tts:ruby="base">は</span><span tts:ruby="textContainer"><span studio:id="r" tts:ruby="text">は</span></span></span>')
+ result=project_alignment(source,convert_particles=True,particle_analyzer=analyzer)
+ assert next(u for u in result['summary']['inputs'] if u['object_id']=='r')['reading']=='は'

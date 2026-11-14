@@ -1,5 +1,5 @@
 """Saved Studio draft -> independent Japanese request, on Unicode code point axes."""
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from decimal import Decimal
 import json
 import xml.etree.ElementTree as ET
@@ -9,7 +9,7 @@ from lazulite.alignment.japanese.backend import MMS_VOCAB
 from .amll_compatibility import TT, TM, XML, ST, RUBY
 
 
-def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=True, strip_tone_digits=False):
+def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=True, strip_tone_digits=False, convert_particles=False, particle_analyzer=None):
     root = ET.fromstring(snapshot['lyrics']['draftTtml'])
     rows = []
     for parent in root.iter(TT+'p'):
@@ -57,6 +57,18 @@ def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=
             if use_hints: hint = StartHint(float(value), 'unknown')
         lines.append(JapaneseLine(line_id, text, tuple(units), hint))
     original_readings = {u.unit_id:u.reading for l in lines for u in l.units}
+    if latin_normalize and convert_particles:
+        if particle_analyzer is None:
+            from .reading import SudachiReadingProposer
+            particle_analyzer = SudachiReadingProposer()
+        ranges = particle_analyzer.particles([{'id': line.line_id, 'text': line.text} for line in lines])
+        converted = []
+        for line in lines:
+            positions = {item['start']: item['reading'] for item in ranges if item['line_id'] == line.line_id}
+            units = tuple(replace(unit, reading=''.join(positions.get(unit.source_range[0] + index, char) for index, char in enumerate(unit.reading)))
+                          if unit.reading_source == 'body' else unit for unit in line.units)
+            converted.append(replace(line, units=units))
+        lines = converted
     original_mapping = {m['unit_id']:m for m in mapping}
     vocabulary = model['vocabulary'] if model else MMS_VOCAB
     blank = model['blank'] if model else 0

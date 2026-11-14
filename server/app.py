@@ -30,7 +30,7 @@ from .job_routes import create_job_router
 from .jobs import JobService
 from .publish import PublishRunner, MediaPublisher
 from .publish_routes import build_publish_router
-from .reading import SudachiReadingProposer, build_analysis_router
+from .reading import SudachiReadingProposer, ReadingUnavailable, build_analysis_router
 from .revisions import INITIAL_TTML, RevisionStore
 from .studio.media import Asset, MediaError, MediaProbe, MediaService
 
@@ -575,7 +575,7 @@ def create_app(
     from .alignment_projection import project_alignment
     from .alignment_models import AlignmentModels
     model_catalog = AlignmentModels(preferences, Path(runtime_identity['data_dir']).parent if runtime_identity is not None else None)
-    alignment_runner = AlignmentRunner(db, root / 'projects', model_catalog)
+    alignment_runner = AlignmentRunner(db, root / 'projects', model_catalog, configured_reading_proposer)
 
     @api.get('/alignment-models')
     def alignment_models(refresh: bool = False, _=Depends(auth)):
@@ -589,19 +589,19 @@ def create_app(
         except (ValueError, OSError) as exc: fail('alignment_directory_invalid', str(exc), 422)
 
     @api.get('/projects/{pid}/alignment-preview')
-    def alignment_preview(pid: str, revision: str, model: str, latin_normalize: bool = True, strip_tone_digits: bool = False, _=Depends(auth)):
+    def alignment_preview(pid: str, revision: str, model: str, latin_normalize: bool = True, strip_tone_digits: bool = False, convert_particles: bool = True, _=Depends(auth)):
         project(pid)
         try:
             snapshot, _ = alignment_runner.snapshot(pid, revision)
-            options = {'latin_normalize':latin_normalize, 'strip_tone_digits':strip_tone_digits}
+            options = {'latin_normalize':latin_normalize, 'strip_tone_digits':strip_tone_digits, 'convert_particles':convert_particles}
             key, selected = model_catalog.preview(model, {**options, 'revision':revision})
-            return {**project_alignment(snapshot, model=selected, **options)['summary'], 'model_preview':key}
-        except ValueError as exc: fail('alignment_input_invalid', str(exc), 409)
+            return {**project_alignment(snapshot, model=selected, particle_analyzer=configured_reading_proposer, **options)['summary'], 'model_preview':key}
+        except (ValueError, ReadingUnavailable) as exc: fail('alignment_input_invalid', str(exc), 409)
 
     def validate_job_request(pid, kind, params):
         if kind == 'alignment':
             try: alignment_runner.validate(pid, params)
-            except ValueError as exc: fail('alignment_input_invalid', str(exc), 422)
+            except (ValueError, ReadingUnavailable) as exc: fail('alignment_input_invalid', str(exc), 422)
             return
         if kind == 'vocal':
             row = project(pid)

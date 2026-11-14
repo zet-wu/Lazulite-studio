@@ -105,3 +105,16 @@ it('preserves empty replacement lines while generating another line and keeps pl
   expect(state.present.romanizationTracks[0].contents).toEqual([doc.romanizationTracks[0].contents[0], expect.objectContaining({text:'  manual  spacing  '})]);
   expect(state.past).toHaveLength(1);
 });
+
+it('uses codepoint particle positions only for body readings while retaining source timing', () => {
+  const doc=createLyricDocument('😀わたしははなへ');
+  const line=doc.lines[0];
+  const base=line.words[0];
+  line.words=[{...base,id:'prefix',text:'😀',rubyUnits:[]},{...base,id:'body',text:'わたしははなへ',rubyUnits:[],beginMs:10,endMs:50}];
+  const ranges=[{line_id:line.id,start:4,end:5,reading:'わ'},{line_id:line.id,start:7,end:8,reading:'え'}];
+  const before=structuredClone(doc);
+  const timed=proposeRomanization(doc,[line.id],'timed',ranges);
+  expect(timed[0].groups[1]).toMatchObject({key:'body',wordId:'body',text:'watashiwahanae',beginMs:10,endMs:50});
+  expect(proposeRomanization(doc,[line.id],'plain',ranges)[0].text).toContain('watashiwahanae');
+  expect(doc).toEqual(before);
+});

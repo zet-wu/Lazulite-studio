@@ -88,7 +88,7 @@ def test_gap_policy_validation_and_job_snapshot(tmp_path,monkeypatch):
 def input_options(client,revision):
  model=client.get('/api/v1/alignment-models').json()['items'][0]['id']
  preview=client.get('/api/v1/projects/p/alignment-preview',params={'revision':revision,'model':model}).json()
- return {'model_preview':preview['model_preview'],'latin_normalize':True,'strip_tone_digits':False}
+ return {'model_preview':preview['model_preview'],'convert_particles':True,'latin_normalize':True,'strip_tone_digits':False}
 
 
 def wait(client,job):

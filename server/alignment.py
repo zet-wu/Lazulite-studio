@@ -19,9 +19,10 @@ def alignment_unavailable():
 
 
 class AlignmentRunner:
-    def __init__(self, db, root, models=None):
+    def __init__(self, db, root, models=None, particle_analyzer=None):
         self.db, self.root = db, Path(root)
         self.models = models
+        self.particle_analyzer = particle_analyzer
         self.worker = VocalProcess(module='server.alignment_worker')
 
     def close(self): self.worker.close()
@@ -35,7 +36,7 @@ class AlignmentRunner:
             return read_project(self.db.paths.resolve(row[0])), current['source_asset_id']
 
     def validate(self, pid, params):
-        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'gap_threshold_ms', 'latin_normalize', 'strip_tone_digits', 'model_preview'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'latin_normalize', 'strip_tone_digits')):
+        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'gap_threshold_ms', 'latin_normalize', 'strip_tone_digits', 'convert_particles', 'model_preview'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'latin_normalize', 'strip_tone_digits', 'convert_particles')):
             raise ValueError('自动对齐只接受项目版本、布尔选项及行内空隙阈值')
         if type(params['gap_threshold_ms']) is not int or not 0 < params['gap_threshold_ms'] <= 9007199254740991:
             raise ValueError('行内空隙阈值必须为正的安全整数毫秒')
@@ -43,8 +44,8 @@ class AlignmentRunner:
             params['gap_threshold_ms'] = 500
         snapshot, asset = self.snapshot(pid, params['revision'])
         if not isinstance(params['model_preview'], str): raise ValueError('需要有效模型预览')
-        model = self.models.capture(params['model_preview'], {k:params[k] for k in ('latin_normalize','strip_tone_digits','revision')})
-        projection = project_alignment(snapshot, params['use_hints'], model=model, **{k:params[k] for k in ('latin_normalize','strip_tone_digits')})
+        model = self.models.capture(params['model_preview'], {k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles','revision')})
+        projection = project_alignment(snapshot, params['use_hints'], model=model, particle_analyzer=self.particle_analyzer, **{k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles')})
         params['_model'] = model
         if not projection['summary']['line_count']: raise ValueError('没有未跳过的歌词行')
         if not projection['summary']['emitting_count']: raise ValueError('没有可用读音，无法计算')
@@ -81,7 +82,7 @@ def _run_alignment(request, emit, cancelled, media_lifetime):
     duration_ms = source_duration(db, pid, asset)
     if cancelled(): raise VocalCancelled()
     check_snapshot(params['_model'])
-    projection = project_alignment(snapshot, params['use_hints'], model=params['_model'], **{k:params[k] for k in ('latin_normalize','strip_tone_digits')})
+    projection = project_alignment(snapshot, params['use_hints'], model=params['_model'], **{k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles')})
     vocal = VocalRunner(db, root, cleanup=False, media_lifetime=media_lifetime)
     acoustics = snapshot['acoustics']; new_acoustics = None
     if acoustics['analysisId']:

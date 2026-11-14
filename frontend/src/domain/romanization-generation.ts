@@ -17,10 +17,16 @@ const converted = (reading: string) => {
   return text && !/[ぁ-ゖァ-ヺー]/.test(text) ? text : '';
 };
 
-function generateLine(line: LyricLine): GeneratedUnit[] {
-  const sources: SourceUnit[] = line.words.flatMap(word => word.rubyUnits.length
+export type ParticleRange = {line_id: string; start: number; end: number; reading: string};
+function generateLine(line: LyricLine, particles: readonly ParticleRange[]): GeneratedUnit[] {
+  let offset = 0;
+  const positions = new Map(particles.filter(item => item.line_id === line.id).map(item => [item.start, item.reading]));
+  const sources: SourceUnit[] = line.words.flatMap(word => {
+    const start = offset; offset += Array.from(word.text).length;
+    return word.rubyUnits.length
     ? word.rubyUnits.map(unit => ({ key: unit.id, wordId: word.id, reading: unit.reading, text: '', beginMs: unit.beginMs, endMs: unit.endMs, hint: '' }))
-    : [{ key: word.id, wordId: word.id, reading: word.text, text: '', beginMs: word.beginMs, endMs: word.endMs, hint: '' }]);
+    : [{ key: word.id, wordId: word.id, reading: Array.from(word.text).map((char, index) => positions.get(start + index) ?? char).join(''), text: '', beginMs: word.beginMs, endMs: word.endMs, hint: '' }];
+  });
   // Keep an owner for every normalized kana. Unknown positions remain in the sequence
   // so neither consonant nor vowel context can cross a missing reading.
   const chars = sources.flatMap((source, owner) => {
@@ -89,13 +95,13 @@ function generateLine(line: LyricLine): GeneratedUnit[] {
   // A separator belongs to the preceding real unit; it has no separate timing.
   return groups.map((unit, index) => ({ ...unit, text: index + 1 < groups.length && /\S$/.test(unit.text) && /^\S/.test(groups[index + 1].text) ? `${unit.text} ` : unit.text }));
 }
-export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: 'timed'): TimedProposal[];
-export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind?: 'plain'): PlainProposal[];
-export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: RomanizationKind): RomanizationProposal[];
-export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: RomanizationKind = 'plain'): RomanizationProposal[] {
+export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: 'timed', particles?: readonly ParticleRange[]): TimedProposal[];
+export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind?: 'plain', particles?: readonly ParticleRange[]): PlainProposal[];
+export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: RomanizationKind, particles?: readonly ParticleRange[]): RomanizationProposal[];
+export function proposeRomanization(document: LyricDocument, lineIds: readonly string[], kind: RomanizationKind = 'plain', particles: readonly ParticleRange[] = []): RomanizationProposal[] {
   const selected = new Set(lineIds);
   return document.lines.filter(line => selected.has(line.id)).map(line => {
-    const groups = generateLine(line);
+    const groups = generateLine(line, particles);
     return kind === 'timed' ? { lineId: line.id, kind, groups } : { lineId: line.id, kind, text: groups.map(unit => unit.text).join('') || ' ', hint: groups.some(unit => unit.hint) ? 'romanization.reviewResult' : '' };
   });
 }

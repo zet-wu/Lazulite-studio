@@ -58,6 +58,18 @@ class SudachiReadingProposer:
     def available(self) -> bool:
         return self._tokenizer is not None
 
+    def particles(self, lines: Sequence[Mapping[str, str]]) -> list[dict]:
+        if self._tokenizer is None:
+            raise ReadingUnavailable(self.unavailable_reason or "SudachiPy 不可用")
+        output = []
+        with self._tokenizer_lock:
+            for line in lines:
+                for token in self._tokenizer.tokenize(line['text'], self._mode):
+                    if token.surface() in {'は', 'へ'} and token.part_of_speech()[0] == '助詞':
+                        output.append({'line_id': line['id'], 'start': token.begin(), 'end': token.end(),
+                                       'reading': {'は': 'わ', 'へ': 'え'}[token.surface()]})
+        return output
+
     def propose(self, lines: Sequence[Mapping[str, str]]) -> Sequence[ReadingProposal]:
         if self._tokenizer is None:
             raise ReadingUnavailable(self.unavailable_reason or "SudachiPy 不可用")
@@ -151,5 +163,16 @@ def build_analysis_router(proposer: ReadingProposer, *, write) -> APIRouter:
             raise HTTPException(503, {'code': 'reading_unavailable', 'message': str(exc), 'retryable': True}) from exc
         except ValueError as exc:
             raise HTTPException(422, {'code': 'reading_invalid', 'message': str(exc), 'retryable': False}) from exc
+
+    @router.post('/reading/particles')
+    def particles(body: ReadingSnapshot, _: object = Depends(write)):
+        try:
+            if len({line.id for line in body.lines}) != len(body.lines) or sum(len(line.text) for line in body.lines) > 1000000:
+                raise ValueError('行标识重复或本次正文过长')
+            return {'ranges': proposer.particles([line.model_dump() for line in body.lines])}
+        except ReadingUnavailable as exc:
+            raise HTTPException(503, {'code': 'reading_unavailable', 'message': str(exc), 'retryable': True}) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
 
     return router
