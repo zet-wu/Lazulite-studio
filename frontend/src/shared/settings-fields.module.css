@@ -32,7 +32,7 @@
 .cardHeader > :first-child { flex:1; min-width:0; }
 .card small { color:var(--muted); line-height:1.5; }
 .card [role=alert] { color:var(--danger); }
-.panel { display:grid; gap:12px; min-width:0; }
+.panel { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; min-width:0; }
 .panelHeader { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .panelHeader h3 { margin:0; font-size:14px; }
 .panelActions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }

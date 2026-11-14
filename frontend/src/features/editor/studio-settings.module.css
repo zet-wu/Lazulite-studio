@@ -3,7 +3,7 @@
 .navigation strong { padding:8px 12px; color:var(--muted); font-size:var(--label-size); }
 .navigation small { padding:4px 12px; color:var(--muted); }
 .project { margin-top:20px; }
-.content { overflow:auto; padding:0 8px 16px 0; display:flex; flex-direction:column; gap:12px; min-width:0; container:settings-content / inline-size; }
+.content { overflow:auto; scrollbar-gutter:stable; padding:0 8px 16px 0; display:flex; flex-direction:column; gap:12px; min-width:0; container:settings-content / inline-size; }
 .content > * { flex-shrink:0; }
 .content > h2 { margin:0 0 8px; font-size:18px; }
 .content > h3 { margin:16px 0 0; font-size:14px; }

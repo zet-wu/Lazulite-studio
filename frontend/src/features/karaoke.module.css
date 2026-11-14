@@ -33,6 +33,6 @@ button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); paddin
 
 .markerEditor { display:grid; grid-template-columns:180px minmax(0,1fr); gap:24px; height:min(620px,65vh); }
 .markerList { overflow:auto; border-right:1px solid var(--line); padding-right:8px; }
-.markerFields { min-width:0; overflow:auto; padding-right:8px; container:settings-content / inline-size; }
+.markerFields { min-width:0; overflow:auto; scrollbar-gutter:stable; padding-right:8px; container:settings-content / inline-size; }
 .markerFields > h3 { margin:0 0 12px; font-size:16px; }
 @media (max-width:760px) { .markerEditor { grid-template-columns:130px minmax(0,1fr); gap:16px; } }
