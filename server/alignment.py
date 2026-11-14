@@ -131,5 +131,5 @@ def _run_alignment(request, emit, cancelled, media_lifetime):
     backend_info.pop('model_path', None)
     backend_info['model_name'] = params['_model']['name']
     from .alignment_postprocessing import object_timings
-    timings = object_timings(result, projection['mapping'], audio, params['smart_extend'])
+    timings = object_timings(result, projection['mapping'], audio, params['smart_extend'], segments=prepared.segments)
     return {'kind':'alignment', 'object_timings':timings, 'alignment':result_data, 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'normalization':automatic_normalization, 'summary':projection['summary']}

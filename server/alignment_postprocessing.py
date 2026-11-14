@@ -1,9 +1,33 @@
 """Object envelopes and optional end extension on the complete vocal waveform."""
-import math
+from bisect import bisect_left
 import numpy as np
 
 
-def object_timings(result, mapping, audio, smart_extend=False):
+def non_silent_ends(audio):
+    """FA-Kara fine RMS rule: centered 20 ms windows, 50% overlap.
+
+    Use NumPy directly so end extension needs no additional audio dependency.
+    Match float32 RMS, zero padding and the 5 ms falling-edge expansion.
+    """
+    mono = audio.samples.mean(axis=0)
+    window = int(audio.sample_rate * .02)
+    hop = window // 2
+    padded = np.pad(mono, (window // 2, window // 2))
+    frames = np.lib.stride_tricks.sliding_window_view(padded, window)[::hop]
+    rms = np.empty(len(frames), dtype=np.float32)
+    # Bound the temporary squared waveform even for long recordings.
+    for offset in range(0, len(frames), 4096):
+        block = frames[offset:offset + 4096]
+        rms[offset:offset + len(block)] = np.sqrt(np.mean(np.square(block, dtype=np.float32), axis=1))
+    active = rms > np.percentile(rms, 90) * .1
+    falling = np.flatnonzero(active[:-1] & ~active[1:]) + 1
+    ends = falling * hop / audio.sample_rate + .005
+    if active[-1]:
+        ends = np.append(ends, (len(active) - 1) * hop / audio.sample_rate)
+    return np.unique(np.ceil(ends * 100) / 100).tolist()
+
+
+def object_timings(result, mapping, audio, smart_extend=False, *, segments):
     units = {unit.unit_id:unit for unit in result.units}
     groups = {}
     for item in mapping:
@@ -16,10 +40,8 @@ def object_timings(result, mapping, audio, smart_extend=False):
                         'end': {'time':max(ends),'source':'object_envelope'} if ends else None}
     if not smart_extend:
         return timings
-    mono = audio.samples.mean(axis=0)
-    hop = round(audio.sample_rate*.01)
-    frames = mono[:len(mono)//hop*hop].reshape(-1,hop)
-    rms = np.sqrt(np.mean(frames.astype(np.float64)**2,axis=1))
+    silence_ends = non_silent_ends(audio)
+    boundaries = sorted({segment.core_end for segment in segments})
     ordered = list(timings.values())
     for index, timing in enumerate(ordered):
         if timing['start'] is None or timing['end'] is None: continue
@@ -27,16 +49,10 @@ def object_timings(result, mapping, audio, smart_extend=False):
         if not 0 <= start < end <= audio.duration: continue
         limit = min(audio.duration, next((t['start']['time'] for t in ordered[index+1:] if t['start'] is not None), audio.duration))
         if limit <= end: continue
-        lo = max(0, int(max(start,end-.5)/.01))
-        hi = min(len(rms),max(lo+1,math.ceil(end/.01)))
-        if hi <= lo: continue
-        threshold = max(float(rms[lo:hi].max())*10**(-23/20),10**(-65/20))
-        run = 0
         extended = limit
-        for frame in range(math.ceil(end/.01), min(len(rms),int(limit/.01))):
-            run = run+1 if rms[frame] < threshold else 0
-            if run >= 18:
-                extended = max(end,(frame-17)*.01)
-                break
+        for candidates in (silence_ends, boundaries):
+            candidate = bisect_left(candidates, end)
+            if candidate < len(candidates):
+                extended = min(extended, candidates[candidate])
         timing['end'] = {'time':extended,'source':'smart_end_extension'}
     return timings
