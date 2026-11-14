@@ -15,11 +15,6 @@ button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); paddin
 .handle { width:7px; height:100%; flex-shrink:0; cursor:ew-resize; border:0; padding:0; background:transparent; }
 .bar .handle:last-child { margin-left:auto; }
 
-.markerEditor { display:grid; grid-template-columns:minmax(110px,1fr) minmax(220px,2fr); gap:16px; }
-.markerList, .markerFields { display:flex; flex-direction:column; gap:8px; min-width:0; }
-.markerList { align-self:start; }
-.markerFields label { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.markerFields input:not([type="checkbox"]), .markerFields select { min-width:0; flex:1; }
 
 .thresholds { display:grid; gap:10px; margin:16px 0; container-type:inline-size; }
 .thresholds label { display:grid; grid-template-columns:minmax(0,1fr) 140px; gap:6px 16px; align-items:center; }
@@ -34,7 +29,6 @@ button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); paddin
 .groupTable td, .groupTable th { padding:4px; }
 .groupTable input { width:100%; min-width:100px; box-sizing:border-box; }
 .groupTable td:last-child { white-space:nowrap; }
-.markerFields fieldset { border:0; padding:0; margin:0; }
 
 .groupActions { display:flex; gap:4px; flex-wrap:wrap; }
 .outputGrid { display:grid; grid-template-columns:minmax(0,1fr) 110px; gap:8px 12px; align-items:center; }
@@ -43,3 +37,9 @@ button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); paddin
 .outputGrid .output input { flex-shrink:0; }
 .offset { box-sizing:border-box; width:100%; min-width:0; }
 .offset[aria-invalid="true"] { border-color:var(--danger); box-shadow:inset 0 0 0 1px var(--danger); }
+
+.markerEditor { display:grid; grid-template-columns:180px minmax(0,1fr); gap:24px; height:min(620px,65vh); }
+.markerList { overflow:auto; border-right:1px solid var(--line); padding-right:8px; }
+.markerFields { min-width:0; overflow:auto; padding-right:8px; container:settings-content / inline-size; }
+.markerFields > h3 { margin:0 0 12px; font-size:16px; }
+@media (max-width:760px) { .markerEditor { grid-template-columns:130px minmax(0,1fr); gap:16px; } }

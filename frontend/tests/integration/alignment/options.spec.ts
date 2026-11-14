@@ -2,6 +2,9 @@ import {expect,test} from '@playwright/test';
 test(`experimental options, clearing, undo and reopening`,async({page})=>{
  const pid='media-offset',url=`/api/v1/projects/${pid}/document`;
 
+ // This scenario exercises factory defaults independently of other settings scenarios.
+ const settings=await(await page.request.get('/api/v1/settings')).json();
+ expect((await page.request.patch('/api/v1/settings',{headers:{origin:'http://127.0.0.1:5175','if-match':`"${settings.revision}"`},data:{changes:{'studio:alignment-defaults':null,'studio:alignment-model':null}}})).ok()).toBeTruthy();
  const before=await(await page.request.get(url)).json();
  const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="1" end="5"><span studio:id="left" begin="1" end="2">♪</span><span studio:id="w" begin="2" end="4">love</span><span studio:id="right" begin="4" end="5">！</span></p><p xml:id="skip" begin="6" end="7"><span studio:id="sw" begin="6" end="7">keep</span></p></body></tt>';
  const snapshot={...before.document,karaoke:{...before.document.karaoke,lineGroups:{a:'main',skip:'main'},cues:[]},lyrics:{draftTtml:xml},lineOrder:[],editing:{emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:['skip'],endLinks:{}},acoustics:{analysisId:null,segments:[]}};
@@ -20,13 +23,13 @@ test(`experimental options, clearing, undo and reopening`,async({page})=>{
   mapping:[{unit_id:'u',object_id:'w',word_id:'w',line_id:'a',kind:'word'}],alignment:{schema:'lazulite-japanese-result-v1',units:[{unit_id:'u',line_id:'a',proposed_timing:{start:{time:3,source:'acoustic_path'},end:null}}]}}}));
  await page.goto(`/projects/${pid}/edit`);await page.getByRole('button',{name:'音频处理',exact:true}).click();await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});
  const dialog=page.getByRole('dialog',{name:'自动对齐',exact:true});
- await expect(dialog.getByRole('checkbox',{name:'拉丁归一化',exact:true})).toBeChecked();
- for(const checkbox of await dialog.getByRole('checkbox').all())if(await checkbox.isChecked())expect(await checkbox.evaluate(el=>el.parentElement?.textContent)).toBe('拉丁归一化');
+ await expect(dialog.getByRole('switch',{name:'拉丁归一化',exact:true})).toBeChecked();
+ for(const checkbox of await dialog.getByRole('switch').all())if(await checkbox.isChecked())expect(await checkbox.evaluate(el=>el.parentElement?.textContent)).toBe('拉丁归一化');
  for(let bits=0;bits<8;bits++)for(const [i,label] of ['行内 blank 代价','人声休止 blank 代价','人声休止 token 代价'].entries()){
-  const box=dialog.getByRole('checkbox',{name:new RegExp('^'+label+' ')});await expect(box).toBeEnabled();await box.setChecked(Boolean(bits&(1<<i)));await expect(box).toBeChecked({checked:Boolean(bits&(1<<i))});
+  const box=dialog.getByRole('switch',{name:label,exact:true});await expect(box).toBeEnabled();await box.setChecked(Boolean(bits&(1<<i)));await expect(box).toBeChecked({checked:Boolean(bits&(1<<i))});
  }
- await dialog.getByRole('checkbox',{name:/^智能延长结束时间/}).check();
- await dialog.getByRole('checkbox',{name:'清空未匹配单元时间',exact:true}).check();
+ await dialog.getByRole('switch',{name:/^智能延长结束时间/}).check();
+ await dialog.getByRole('switch',{name:'清空未匹配单元时间',exact:true}).check();
 
  await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();
  await expect.poll(()=>starts).toBe(2);expect(params).toMatchObject({use_hints:false,line_blank:true,rest_blank:true,rest_token:true,clear_unmatched:true,smart_extend:true});
@@ -39,7 +42,7 @@ test(`experimental options, clearing, undo and reopening`,async({page})=>{
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('end="00:05.000"');
  await page.getByRole('button',{name:'重做',exact:true}).click();await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toBe(saved);
  await page.reload();await page.getByRole('button',{name:'音频处理',exact:true}).click();await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});
- await expect(dialog.getByRole('checkbox',{name:'拉丁归一化',exact:true})).toBeChecked();
- for(const checkbox of await dialog.getByRole('checkbox').all())if(await checkbox.isChecked())expect(await checkbox.evaluate(el=>el.parentElement?.textContent)).toBe('拉丁归一化');
+ await expect(dialog.getByRole('switch',{name:'拉丁归一化',exact:true})).toBeChecked();
+ for(const checkbox of await dialog.getByRole('switch').all())if(await checkbox.isChecked())expect(await checkbox.evaluate(el=>el.parentElement?.textContent)).toBe('拉丁归一化');
  await dialog.getByRole('button',{name:'取消',exact:true}).click();
 });

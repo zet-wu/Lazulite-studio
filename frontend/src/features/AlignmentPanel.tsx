@@ -18,6 +18,8 @@ import { jobsApi, type JobRequest } from '../adapters/http/jobs';
 import { studioS4 } from '../adapters/http/client';
 import { mergeAlignment } from '../domain/alignment';
 import type { ProjectDocument } from '../domain/project-document';
+import {SettingField,SettingToggle} from '../shared/SettingsFields';
+import fields from '../shared/settings-fields.module.css';
 import styles from './alignment.module.css';
 import { SettingsDialog } from './editor/SettingsDialog';
 import { useAudioReview } from './AudioReviewContext';
@@ -42,7 +44,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const jobs=useProjectJobs(pid,visible);
   const [dialog,setDialog]=useState(false),[options,setOptions]=useState(defaultAlignmentOptions),[summary,setSummary]=useState<AlignmentSummary|null>(null);
   const [gapDraft,setGapDraft]=useState('500'),[gapError,setGapError]=useMessageText('');
-  const gapId=useId(),gapErrorId=useId();
+  const gapErrorId=useId();
   const [message,setMessage]=useNotice();
   const [connection,setConnection]=useNotice();
   const recent = useRef<Notice | null>(null);
@@ -157,36 +159,32 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
     </>, ui.messageHost)}
     {dialog&&<SettingsDialog title={t('settings.alignment')} close={()=>setDialog(false)} actions={<><button data-role="secondary" data-initial-focus onClick={()=>setDialog(false)}>{t('common.cancel')}</button><button data-role="primary" disabled={!summary?.emitting_count} onClick={()=>void start()}>{t('alignment.start')}</button></>}>
       {defaultMissing&&!model&&<p role="alert">{t('settings.defaultModelMissing')}</p>}
-      <label>{t('alignment.model')}<Select value={model} onChange={e=>{if(e.target.value!==model){setSummary(null);setModel(e.target.value);}}}>
+      <SettingField label={t('alignment.model')}><Select value={model} onChange={e=>{if(e.target.value!==model){setSummary(null);setModel(e.target.value);}}}>
         <option value="">{t('alignment.selectModel')}</option>
         {model&&!catalog?.items.some(item=>item.id===model&&item.status==='ready')&&<option value={model} disabled>{t('alignment.modelMissing')}</option>}
         {catalog?.items.filter(item=>item.status==='ready').map(item=><option key={item.id} value={item.id!}>{item.name} · {item.type}</option>)}
-      </Select></label>
+      </Select></SettingField>
 
       {catalog?.error&&<p role="alert">{catalog.error}</p>}
       {previewError&&<p role="alert">{previewError}<IconButton icon="refresh" data-role="secondary" label={t('common.retry')} onClick={()=>setPreviewAttempt(value=>value+1)}/></p>}
-      <fieldset className={styles.options}><legend>{t('alignment.preprocessing')}</legend>
-        <label><input type="checkbox" checked={options.latin_normalize} onChange={e=>{setSummary(null);setOptions({...options,latin_normalize:e.target.checked});}}/><span>{t('alignment.latinNormalize')}</span></label>
-        <label><input type="checkbox" checked={options.strip_tone_digits} onChange={e=>{setSummary(null);setOptions({...options,strip_tone_digits:e.target.checked});}}/><span>{t('alignment.stripTones')}</span></label>
+      <fieldset className={fields.group}><legend>{t('alignment.preprocessing')}</legend>
+        <SettingToggle label={t('alignment.latinNormalize')} checked={options.latin_normalize} onChange={value=>{setSummary(null);setOptions({...options,latin_normalize:value});}}/>
+        <SettingToggle label={t('alignment.stripTones')} checked={options.strip_tone_digits} onChange={value=>{setSummary(null);setOptions({...options,strip_tone_digits:value});}}/>
       </fieldset>
-      <fieldset className={styles.options}><legend>{t('alignment.postprocessing')}</legend>
-        <label><input type="checkbox" aria-label={t('alignment.clearUnmatched')} checked={options.clear_unmatched} onChange={e=>setOptions({...options,clear_unmatched:e.target.checked})}/><span>{t('alignment.clearUnmatched')}<small className={styles.description}>{t('alignment.clearHelp')}</small></span></label>
-      <label><input type="checkbox" checked={options.smart_extend} onChange={e=>setOptions({...options,smart_extend:e.target.checked})}/><span>{t('alignment.smartExtend')}<small className={styles.description}>{t('alignment.smartExtendHelp')}</small></span></label>
-      <div className={styles.gapOption}>
-        <input id={gapId} type="checkbox" checked={options.merge_short_gaps} onChange={e=>{setOptions({...options,merge_short_gaps:e.target.checked});setGapError('');}}/>
-        <label htmlFor={gapId}>{t('alignment.mergeGapsLabel')}</label>
-        <span className={styles.threshold}><input type="number" min="1" step="1" aria-label={t('alignment.gapThreshold')} aria-invalid={!!gapError} aria-describedby={gapError?gapErrorId:undefined} disabled={!options.merge_short_gaps} value={gapDraft} onChange={e=>{setGapDraft(e.target.value);setGapError('');}}/><label htmlFor={gapId}>ms</label></span>
-
-      </div>
-      {gapError&&<p id={gapErrorId} role="alert">{gapError}</p>}
+      <fieldset className={fields.group}><legend>{t('alignment.postprocessing')}</legend>
+        <SettingToggle label={t('alignment.clearUnmatched')} description={t('alignment.clearHelp')} checked={options.clear_unmatched} onChange={value=>setOptions({...options,clear_unmatched:value})}/>
+      <SettingToggle label={t('alignment.smartExtend')} description={t('alignment.smartExtendHelp')} checked={options.smart_extend} onChange={value=>setOptions({...options,smart_extend:value})}/>
+      <SettingToggle label={t('alignment.mergeGapsLabel')} checked={options.merge_short_gaps} onChange={value=>{setOptions({...options,merge_short_gaps:value});setGapError('');}}/>
+      <SettingField label={t('alignment.gapThreshold')}><input type="number" min="1" step="1" aria-label={t('alignment.gapThreshold')} aria-invalid={!!gapError} aria-describedby={gapError?gapErrorId:undefined} disabled={!options.merge_short_gaps} value={gapDraft} onChange={e=>{setGapDraft(e.target.value);setGapError('');}}/> ms</SettingField>
+      {gapError&&<p id={gapErrorId} className={fields.error} role="alert">{gapError}</p>}
       </fieldset>
-      <fieldset className={styles.options}><legend>{t('alignment.experimental')}</legend>
-        <label><input type="checkbox" aria-label={t('alignment.useStarts')} checked={options.use_hints} disabled={!summary?.hint_count} onChange={e=>setOptions({...options,use_hints:e.target.checked})}/><span>{t('alignment.useStarts')}<small className={styles.description}>{summary ? (summary.hint_count?t('alignment.startsHelp'):t('alignment.noStarts')) : t('alignment.startsHelp')}</small></span></label>
+      <fieldset className={fields.group}><legend>{t('alignment.experimental')}</legend>
+        <SettingToggle label={t('alignment.useStarts')} description={summary ? (summary.hint_count?t('alignment.startsHelp'):t('alignment.noStarts')) : t('alignment.startsHelp')} checked={options.use_hints} disabled={!summary?.hint_count} onChange={value=>setOptions({...options,use_hints:value})}/>
         {([
           ['line_blank',t('alignment.blankCost'),t('alignment.blankHelp')],
           ['rest_blank',t('alignment.restBlankCost'),t('alignment.restBlankHelp')],
           ['rest_token',t('alignment.restTokenCost'),t('alignment.restTokenHelp')],
-        ] as const).map(([key,label,description])=><label key={key}><input type="checkbox" checked={options[key]} onChange={e=>setOptions({...options,[key]:e.target.checked})}/><span>{label}<small className={styles.description}>{description}</small></span></label>)}
+        ] as const).map(([key,label,description])=><SettingToggle key={key} label={label} description={description} checked={options[key]} onChange={value=>setOptions({...options,[key]:value})}/>)}
       </fieldset>
       {!!summary?.unknown_count&&<p>{t('alignment.unknownReadings',{count:summary.unknown_count})}</p>}
       {summary&&!summary.emitting_count&&<p>{t('alignment.noReadings')}</p>}

@@ -19,10 +19,10 @@ test('models remain explicitly selected and stale input previews cannot enable s
   await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).press('Enter');
   await dialog.getByRole('listbox').getByRole('option',{name:'MMS_FA · torchaudio-mms-fa'}).click();
   await expect(start).toBeEnabled();
-  await dialog.getByRole('checkbox',{name:'去除调号数字',exact:true}).check();
+  await dialog.getByRole('switch',{name:'去除调号数字',exact:true}).check();
   await expect.poll(()=>delayed).toBe(true);await expect(start).toBeDisabled();
-  await dialog.getByRole('checkbox',{name:'去除调号数字',exact:true}).uncheck();
-  await dialog.getByRole('checkbox',{name:'拉丁归一化',exact:true}).uncheck();
+  await dialog.getByRole('switch',{name:'去除调号数字',exact:true}).uncheck();
+  await dialog.getByRole('switch',{name:'拉丁归一化',exact:true}).uncheck();
   await expect(start).toBeDisabled();
   const stale=page.waitForResponse(response=>response.url().includes('strip_tone_digits=true'));release();await stale;
   await page.waitForTimeout(100);
@@ -71,7 +71,7 @@ test('persistent defaults resolve a new model ID while task edits stay temporary
  await page.locator('[data-settings-button]').click();await page.getByRole('button',{name:'模型与计算',exact:true}).click();
  await page.getByLabel('默认对齐模型',{exact:true}).selectOption('first');
  await page.getByLabel('行内空隙阈值（毫秒）').fill('157');await page.getByLabel('行内空隙阈值（毫秒）').blur();
- await page.getByRole('checkbox',{name:'将短于阈值的行内空隙并入前词',exact:true}).check();await page.keyboard.press('Escape');
+ await page.getByRole('switch',{name:'将短于阈值的行内空隙并入前词',exact:true}).check();await page.keyboard.press('Escape');
  id='restarted';await page.reload();await page.getByRole('button',{name:'音频处理',exact:true}).click();
  const open=()=>page.getByRole('button',{name:'自动对齐',exact:true}).click();await open();
  const dialog=page.getByRole('dialog',{name:'自动对齐',exact:true});

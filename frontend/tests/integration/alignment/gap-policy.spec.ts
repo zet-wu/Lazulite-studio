@@ -25,7 +25,7 @@ async function setup(page:Page){
 }
 test(`short-gap controls, retry, atomic save and reopen`,async({page})=>{
 
- const state=await setup(page),dialog=page.getByRole('dialog',{name:'自动对齐',exact:true}),box=dialog.getByRole('checkbox',{name:'将短于阈值的行内空隙并入前词 ms'}),number=dialog.getByRole('spinbutton',{name:'行内空隙阈值（毫秒）'});
+ const state=await setup(page),dialog=page.getByRole('dialog',{name:'自动对齐',exact:true}),box=dialog.getByRole('switch',{name:'将短于阈值的行内空隙并入前词'}),number=dialog.getByRole('spinbutton',{name:'行内空隙阈值（毫秒）'});
  await expect(box).not.toBeChecked();await expect(number).toBeDisabled();await expect(number).toHaveValue('500');
  await dialog.getByText('将短于阈值的行内空隙并入前词',{exact:true}).click();await expect(box).toBeChecked();await box.focus();await page.keyboard.press('Tab');await expect(number).toBeFocused();
  await number.click();await number.fill('601');await number.press('ArrowUp');await expect(number).toHaveValue('602');await expect(box).toBeChecked();
@@ -34,7 +34,7 @@ test(`short-gap controls, retry, atomic save and reopen`,async({page})=>{
   await number.fill(value);await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();await expect(dialog.getByRole('alert')).toHaveText('行内空隙阈值必须为正的安全整数毫秒');expect(state.starts).toBe(0);
  }
  await number.fill('500');
- await dialog.getByRole('checkbox',{name:'清空未匹配单元时间',exact:true}).check();
+ await dialog.getByRole('switch',{name:'清空未匹配单元时间',exact:true}).check();
  await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();await expect.poll(()=>state.starts).toBe(2);
  expect(state.params).toMatchObject({merge_short_gaps:true,gap_threshold_ms:500,clear_unmatched:true,line_blank:false,rest_blank:false,rest_token:false});
  state.status='succeeded';await expect(page.getByRole('status').filter({hasText:'合并 1 处行内空隙'})).toBeVisible();
@@ -46,13 +46,13 @@ test(`short-gap controls, retry, atomic save and reopen`,async({page})=>{
  await box.check();await number.fill('700');await dialog.getByRole('button',{name:'取消',exact:true}).click();await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});await expect(number).toHaveValue('500');await expect(box).not.toBeChecked();
 });
 test('disabled invalid draft is normalized without blocking launch',async({page})=>{
- const state=await setup(page),dialog=page.getByRole('dialog',{name:'自动对齐',exact:true}),box=dialog.getByRole('checkbox',{name:'将短于阈值的行内空隙并入前词 ms'}),number=dialog.getByRole('spinbutton');
+ const state=await setup(page),dialog=page.getByRole('dialog',{name:'自动对齐',exact:true}),box=dialog.getByRole('switch',{name:'将短于阈值的行内空隙并入前词'}),number=dialog.getByRole('spinbutton');
  await box.check();await number.fill('-1');await box.uncheck();await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();await expect.poll(()=>state.starts).toBe(2);expect(state.params).toMatchObject({merge_short_gaps:false,gap_threshold_ms:500});
  state.status='succeeded';await expect(page.getByRole('status').filter({hasText:'未更新歌词时间'})).toBeVisible();
 });
 for(const ending of ['cancel','failed','conflict'])test(`enabled gap policy does not apply after ${ending}`,async({page})=>{
  const state=await setup(page),before=(await(await page.request.get(url)).json());
- await page.getByRole('checkbox',{name:'将短于阈值的行内空隙并入前词 ms'}).check();await page.getByRole('button',{name:'开始对齐',exact:true}).click();await expect.poll(()=>state.starts).toBe(2);
+ await page.getByRole('switch',{name:'将短于阈值的行内空隙并入前词'}).check();await page.getByRole('button',{name:'开始对齐',exact:true}).click();await expect.poll(()=>state.starts).toBe(2);
  if(ending==='cancel'){await page.getByRole('button',{name:'取消任务',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'已取消'})).toBeVisible();}
  else if(ending==='failed'){state.status='failed';await expect(page.getByRole('alert').filter({hasText:'服务中断'})).toBeVisible();}
  else {expect((await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:pid,revision:before.revision,document:before.document}})).ok()).toBeTruthy();state.status='succeeded';await expect(page.getByRole('alert').filter({hasText:'项目版本或音频已改变'})).toBeVisible();}

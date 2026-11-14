@@ -1,20 +1,5 @@
-.entry { display: inline-flex; align-items: center; gap: 8px; }
-
-.options { border: 0; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
-.options legend { font-weight: 600; margin-bottom: 8px; }
-.options label { display: flex; align-items: flex-start; gap: 8px; }
-.options small { display: block; margin-top: 2px; }
-
-.description { color: var(--muted); }
-.gapOption { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 0; }
-.gapOption > input { margin-right: 4px; }
-.threshold { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-.threshold input { width: 7em; min-width: 0; }
-.directoryRow { display: flex; align-items: center; gap: 8px; }
-.directoryRow > input { flex: 1; min-width: 0; }
-.directoryRow > small { flex: 1; }
-.directoryActions { display: flex; gap: 8px; margin: 8px 0; }
-.modelCards { list-style: none; padding: 0; display: grid; gap: 8px; }
-.modelCards > li { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-wrap: anywhere; }
-.modelCards small { display: block; margin-top: 4px; }
-.modelError { color: var(--danger); }
+.entry { display:inline-flex; align-items:center; gap:8px; }
+.description { color:var(--muted); display:block; margin-top:4px; }
+.directoryRow { display:flex; align-items:center; gap:8px; }
+.directoryActions { display:flex; flex-wrap:wrap; gap:8px; }
+.modelError { display:block; margin-top:4px; color:var(--danger); }

@@ -18,7 +18,7 @@ test('global alignment confirms, locks across modes, applies once, saves and can
  await page.goto(`/projects/${pid}/edit`);await page.getByRole('button',{name:'音频处理',exact:true}).click();
  await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});
  const dialog=page.getByRole('dialog',{name:'自动对齐',exact:true});
- await expect(dialog).toContainText('将对齐 2 行，跳过 1 行');await expect(dialog.getByRole('checkbox',{name:'使用已有行起始时间辅助对齐'})).not.toBeChecked();await expect(dialog.getByRole('checkbox',{name:'使用已有行起始时间辅助对齐'})).toBeDisabled();
+ await expect(dialog).toContainText('将对齐 2 行，跳过 1 行');await expect(dialog.getByRole('switch',{name:'使用已有行起始时间辅助对齐'})).not.toBeChecked();await expect(dialog.getByRole('switch',{name:'使用已有行起始时间辅助对齐'})).toBeDisabled();
  await dialog.getByRole('button',{name:'取消',exact:true}).click();expect(starts).toBe(0);
  await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();
  await expect(page.getByRole('button',{name:'正在对齐',exact:true})).toBeDisabled();
@@ -29,7 +29,7 @@ test('global alignment confirms, locks across modes, applies once, saves and can
  const saved=await(await page.request.get(url)).json();expect(saved.document.lineOrder).toEqual(['bg','main','skip']);expect(saved.document.editing.skippedAlignmentLineIds).toEqual(['skip']);expect(saved.document.lyrics.draftTtml).toContain('begin="00:06.000"');
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('studio:null="begin end"');
  await page.getByRole('button',{name:'重做',exact:true}).click();await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('begin="00:03.000"');await page.reload();await page.getByRole('button',{name:'音频处理',exact:true}).click();
- await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});await expect(dialog.getByRole('checkbox',{name:'使用已有行起始时间辅助对齐'})).not.toBeChecked();await expect(dialog.getByRole('checkbox',{name:'使用已有行起始时间辅助对齐'})).toBeEnabled();
+ await page.getByRole('button',{name:'自动对齐',exact:true}).click();await page.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});await expect(dialog.getByRole('switch',{name:'使用已有行起始时间辅助对齐'})).not.toBeChecked();await expect(dialog.getByRole('switch',{name:'使用已有行起始时间辅助对齐'})).toBeEnabled();
  status='running';await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();await page.getByRole('button',{name:'取消任务',exact:true}).click();await expect.poll(()=>cancelled).toBe(1);await expect(page.getByRole('status').filter({hasText:'已取消对齐'})).toBeVisible();
  expect(starts).toBe(2);
 });

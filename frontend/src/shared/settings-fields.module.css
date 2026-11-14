@@ -7,12 +7,14 @@
 .caption small, .toggle small { display:block; color:var(--muted); font-size:var(--label-size); font-weight:400; line-height:1.5; margin-top:4px; }
 .control { display:flex; align-items:center; gap:8px; min-width:0; }
 .control > input:not([type=checkbox]), .control > select:global(.studio-select), .control > textarea { box-sizing:border-box; width:100%; min-width:0; min-height:32px; padding:5px 8px; border:1px solid var(--line); border-radius:var(--control-radius); background:var(--panel); color:var(--ink); font:inherit; }
+.control > :disabled { opacity:.55; cursor:default; }
 .control > input[type=range] { padding:0; }
 .control > input[type=number] { max-width:120px; }
 .control > input:focus-visible, .control > textarea:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
 .toggle.toggle { grid-template-columns:minmax(0,1fr) auto; }
 .toggle > input { grid-column:2; grid-row:1; }
 .toggle > span { grid-column:1; grid-row:1; min-width:0; line-height:1.5; }
+.toggle > input:disabled { opacity:.55; cursor:default; }
 .toggle:has(:disabled) > span { color:var(--muted); }
 .stacked { grid-template-columns:minmax(0,1fr); gap:8px; }
 .error { margin:4px 0; color:var(--danger); font-size:var(--label-size); }
@@ -20,6 +22,8 @@
 .navigation { display:flex; flex-direction:column; align-items:stretch; gap:4px; min-width:0; }
 .navigation button[data-role][data-role] { text-align:left; border-color:transparent; background:transparent; box-shadow:none; padding:8px 12px; overflow-wrap:anywhere; }
 .navigation button[data-role][aria-current=page], .navigation button[data-role][aria-pressed=true] { background:var(--blue-soft); color:var(--blue); box-shadow:none; }
+.navigation button[data-role]:hover { background:var(--surface-container); }
+.navigation button[aria-current=page]:hover { background:var(--blue-soft); }
 .navigation button:focus-visible { outline:2px solid var(--blue); outline-offset:-2px; }
 .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),360px)); gap:12px; align-items:start; padding:0; margin:0; list-style:none; }
 .card { box-sizing:border-box; min-width:0; border:1px solid var(--line); border-radius:var(--surface-radius); padding:12px; background:var(--panel); overflow-wrap:anywhere; }
