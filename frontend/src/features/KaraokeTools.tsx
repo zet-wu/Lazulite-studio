@@ -20,6 +20,7 @@ import { useEditorSelection } from './editor/SelectionContext';
 import { IconButton } from '../shared/Controls';
 import type { OutputIssue } from '../adapters/output-validation';
 import styles from './karaoke.module.css';
+import './editor/management-table.css';
 export function downloadKaraoke(data: BlobPart, name: string, type: string) {
   const url=URL.createObjectURL(new Blob([data],{type})), link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
@@ -91,15 +92,14 @@ function GroupsDialog({project,close,apply,error}:{error:string;project:ProjectD
  const removed=project.karaoke.groups.filter(group=>!rows.some(row=>row.originalId===group.id));
  const count=Object.values(project.karaoke.lineGroups).filter(id=>removed.some(group=>group.id===id)).length;
  const update=(key:string,patch:Partial<typeof rows[number]>)=>setRows(rows.map(row=>row.key===key?{...row,...patch}:row));
- return <SettingsDialog title={t('karaoke.groups')} close={close}>
- <table className={styles.groupTable}><thead><tr><th>ID</th><th>{t('karaoke.name')}</th><th aria-label={t('karaoke.operation')}/></tr></thead><tbody>{rows.map((row,index)=><tr key={row.key}>
+ return <SettingsDialog title={t('karaoke.groups')} close={close} actions={<button data-role="primary" disabled={!!problem} onClick={()=>{if(apply({kind:'groups',groups,renames}))close();}}>{t('karaoke.applyGroups')}</button>}>
+ <table className="management-table"><colgroup><col style={{width:'30%'}}/><col/><col style={{width:108}}/></colgroup><thead><tr><th>ID</th><th>{t('karaoke.name')}</th><th aria-label={t('karaoke.operation')}/></tr></thead><tbody>{rows.map((row,index)=><tr key={row.key}>
  <td><input aria-label={t('karaoke.groupId',{number:index+1})} aria-invalid={(problem?.values?.number===index+1)||false} aria-describedby={(problem?.values?.number===index+1)?'group-id-error':undefined} value={row.id} onChange={event=>update(row.key,{id:event.target.value})}/>{(problem?.values?.number===index+1)&&<small id="group-id-error" role="alert">{formatMessage(problem!)}</small>}</td>
  <td><input aria-label={t('karaoke.groupName',{number:index+1})} value={row.name} onChange={event=>update(row.key,{name:event.target.value})}/></td>
- <td><div className={styles.groupActions}>{([-1,1] as const).map(direction=><IconButton key={direction} icon={direction<0?'up':'down'} label={t('karaoke.moveGroup',{direction:t(direction<0?'translation.up':'translation.down'),number:index+1})} disabled={index+direction<0||index+direction>=rows.length} onClick={()=>{const next=[...rows];[next[index],next[index+direction]]=[next[index+direction],next[index]];setRows(next);}}/>)}<IconButton icon="trash" label={t('karaoke.deleteGroup',{number:index+1})} data-role="danger" onClick={()=>setRows(rows.filter(item=>item.key!==row.key))}/></div></td>
+ <td><div className="row-actions">{([-1,1] as const).map(direction=><IconButton key={direction} icon={direction<0?'up':'down'} label={t('karaoke.moveGroup',{direction:t(direction<0?'translation.up':'translation.down'),number:index+1})} disabled={index+direction<0||index+direction>=rows.length} onClick={()=>{const next=[...rows];[next[index],next[index+direction]]=[next[index+direction],next[index]];setRows(next);}}/>)}<IconButton icon="trash" label={t('karaoke.deleteGroup',{number:index+1})} data-role="danger" onClick={()=>setRows(rows.filter(item=>item.key!==row.key))}/></div></td>
  </tr>)}</tbody></table>
- <IconButton icon="add" label={t('karaoke.addGroup')} onClick={()=>setRows([...rows,{id:nextGroupId([...project.karaoke.groups,...groups]),name:t('karaoke.newGroup'),key:crypto.randomUUID(),originalId:''}])}/>
+ <div className="management-footer"><IconButton icon="add" label={t('karaoke.addGroup')} onClick={()=>setRows([...rows,{id:nextGroupId([...project.karaoke.groups,...groups]),name:t('karaoke.newGroup'),key:crypto.randomUUID(),originalId:''}])}/></div>
  {count>0&&<p>{t('karaoke.ungrouped',{count})}</p>}{error&&<p role="alert">{error}</p>}
- <button data-role="primary" disabled={!!problem} onClick={()=>{if(apply({kind:'groups',groups,renames}))close();}}>{t('karaoke.applyGroups')}</button>
  </SettingsDialog>;
 }
 

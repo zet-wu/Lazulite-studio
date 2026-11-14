@@ -5,7 +5,7 @@
 .row, .toggle.toggle { display:grid!important; grid-template-columns:minmax(0,1fr) minmax(160px,240px); align-items:center; gap:12px 24px; min-height:36px; padding:6px 0; margin:0; }
 .caption { min-width:0; line-height:1.5; overflow-wrap:anywhere; }
 .caption small, .toggle small { display:block; color:var(--muted); font-size:var(--label-size); font-weight:400; line-height:1.5; margin-top:4px; }
-.control { display:flex; align-items:center; gap:8px; min-width:0; }
+.control { display:flex; align-items:center; justify-content:flex-end; gap:8px; min-width:0; }
 .control > input:not([type=checkbox]), .control > select:global(.studio-select), .control > textarea { box-sizing:border-box; width:100%; min-width:0; min-height:32px; padding:5px 8px; border:1px solid var(--line); border-radius:var(--control-radius); background:var(--panel); color:var(--ink); font:inherit; }
 .control > :disabled { opacity:.55; cursor:default; }
 .control > input[type=range] { padding:0; }
