@@ -53,7 +53,16 @@ def test_independent_run_and_manual_resource_reuse(tmp_path,monkeypatch):
     monkeypatch.setenv('STUDIO_VOCAL_MODEL','changed-generation-settings')
     def no_separation(*args): raise AssertionError('selected complete vocals must be consumed directly')
     monkeypatch.setattr(separation,'DemucsSeparator',no_separation)
+    from server import alignment_postprocessing
+    original_timings = alignment_postprocessing.object_timings
+    consumed_segments = []
+    def capture_timings(*args, segments, **kwargs):
+        consumed_segments.append([(s.core_start, s.core_end) for s in segments])
+        return original_timings(*args, segments=segments, **kwargs)
+    monkeypatch.setattr(alignment_postprocessing, 'object_timings', capture_timings)
+    params['smart_extend'] = True
     second=run_alignment({**request,'job_id':'second'},lambda *args:None,lambda:False)
+    assert consumed_segments == [[(.5, 1.2)]]
     assert second['acoustics'] is None
     assert second['alignment']['execution']['segment_source']=='manual'
     assert AcousticBackend.calls==AcousticBackend.closes==2
