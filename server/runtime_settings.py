@@ -16,6 +16,7 @@ PREFERENCE_KEYS = {
     'lazulite-editor-theme', 'lazulite-shortcuts',
     'lazulite-editor-columns', 'studio.playback-rate',
     'studio:sync-mode', 'studio:sync-offset',
+    'studio:timeline-layers', 'studio:staging-ignored-characters',
     'studio:reading-dictionary', 'studio:ui-language',
 }
 PROJECT_KEY = re.compile(r'^(?:lazulite-romanization-mode|studio:sync-offset|studio:download|studio:packaging|studio:workspace-mode):project:([a-zA-Z0-9_-]+)$')
@@ -61,6 +62,10 @@ class RuntimeSettings:
                     raise ValueError('设置值必须为布尔值')
                 if value is not None and key == 'studio:preview-fade' and not 0.05 <= float(value) <= 1.5:
                     raise ValueError('渐变宽度必须在 0.05 到 1.5 之间')
+                if value is not None and key == 'studio:timeline-layers':
+                    layers = json.loads(value)
+                    if not isinstance(layers, dict) or set(layers) - {'line', 'word', 'ruby', 'romanization', 'gap', 'karaoke', 'wave', 'spectrum', 'energy', 'segments', 'staging'} or any(type(v) is not bool for v in layers.values()):
+                        raise ValueError('时间轴图层偏好无效')
                 if value is not None and key == 'studio:alignment-defaults':
                     defaults = json.loads(value)
                     flags = {'latin_normalize', 'strip_tone_digits', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps'}
