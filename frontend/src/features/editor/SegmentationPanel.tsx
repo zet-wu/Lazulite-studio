@@ -60,7 +60,7 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
   const setPreview = setManualPreview;
   const [error, setError] = useMessageText('');
   const [manualBoundaries, setManualBoundaries] = useState<number[]>([]);
-  const activeWord = selection?.kind === 'words' ? document.lines.flatMap((line) => line.words).find((word) => word.id === selection.activeId) :
+  const activeWord = selection && !selection.ids.length ? undefined : selection?.kind === 'words' ? document.lines.flatMap((line) => line.words).find((word) => word.id === selection.activeId) :
     document.lines.find((line) => line.id === currentLineId)?.words[0];
   const manualLine = document.lines.find((line) => line.words.some((word) => word.id === activeWord?.id));
   const chars = activeWord ? graphemes(activeWord.text) : [];

@@ -14,7 +14,7 @@ export function AgentMembership({ agents, references, label, namedLabel, change 
     {!references.some(refs => refs.length) && <small>{t('common.unspecified')}</small>}
     {agents.map(agent => {
       const count = references.filter(refs => refs.includes(agent.id)).length;
-      return <BooleanField key={agent.id} label={namedLabel(agent.name ?? agent.id)} checked={count === references.length && count > 0}
+      return <BooleanField key={agent.id} label={agent.name ?? agent.id} ariaLabel={namedLabel(agent.name ?? agent.id)} checked={count === references.length && count > 0}
         mixed={count > 0 && count < references.length} onChange={checked => change(agent.id, checked)}/>;
     })}
   </fieldset>;

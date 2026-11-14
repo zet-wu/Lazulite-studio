@@ -1750,5 +1750,5 @@
   "settings.timeline": "Timeline",
   "settings.stagingIgnored": "Characters ignored in staging",
   "settings.stagingIgnoredHelp": "Hide staging units made entirely of these characters. Ancestors needed for descendant context remain visible. Leave empty to disable filtering. The default is one ASCII space.",
-  "settings.stagingCharacterCount": "Character set: {{count}} characters"
+  "settings.stagingCharacterCount": "Distinct characters: {{count}}"
 }

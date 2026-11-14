@@ -26,9 +26,8 @@ export function dragSelection(source: DragSource): EditorSelection {
 export function dragCommand(document: LyricDocument, source: DragSource, slot: DragSlot, copy: boolean, editing = createProjectEditing()): { command: LyricCommand; selection: EditorSelection } {
   const selection = dragSelection(source);
   if (copy && (source.kind === 'line' || source.kind === 'word')) {
-    const target: EditorSelection = source.kind === 'line'
-      ? { kind: 'lines', ids: [], anchorId: '', activeId: slot.afterId ?? '' }
-      : { kind: 'words', lineId: slot.lineId, ids: [], anchorId: '', activeId: slot.afterId ?? '' };
+    // The destination row is a real selection; the insertion predecessor is applied below.
+    const target: EditorSelection = {kind:'lines',ids:[slot.lineId],anchorId:slot.lineId,activeId:slot.lineId};
     const result = pasteRich(document, copySelection(document, selection, editing), target);
     if (result.command.type === 'batch') {
       const first = result.command.commands.find(command => command.type === (source.kind === 'line' ? 'insert-line' : 'insert-word'));
