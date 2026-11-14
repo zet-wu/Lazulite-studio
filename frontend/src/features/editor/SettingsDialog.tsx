@@ -27,7 +27,7 @@ export function SettingsDialog({ title, subtitle, close, children, actions, retu
     return () => { if (returnFocus) { returnFocus()?.focus(); return; } const target = previous.current; if (target?.isConnected && !target.matches(':disabled')) target.focus(); else document.querySelector<HTMLElement>('[data-settings-button]')?.focus(); };
   }, []);
   return createPortal(<div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <section ref={ref} tabIndex={-1} className={styles.dialog} style={wide ? {width:'min(1100px, 100%)'} : undefined} role="dialog" aria-modal="true" aria-label={title} onKeyDown={(event) => {
+    <section ref={ref} tabIndex={-1} className={styles.dialog} style={wide ? {width:'min(976px, 100%)'} : undefined} role="dialog" aria-modal="true" aria-label={title} onKeyDown={(event) => {
       if (event.nativeEvent.isComposing || event.defaultPrevented) return;
       if (event.key === 'Escape') { event.stopPropagation(); close(); return; }
       if (event.key !== 'Tab') return;

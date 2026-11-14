@@ -384,8 +384,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .batchRange { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
 .batchRange label { display:inline-flex; align-items:center; gap:5px; }
 .batchRange input { box-sizing:border-box; width:5em; min-height:32px; padding:5px 8px; border:1px solid var(--line); border-radius:var(--control-radius); background:var(--panel); color:var(--ink); }
-.replaceTarget { margin:8px 0; padding:0; border:0; display:flex; align-items:center; gap:16px; }
-.replaceTarget legend { padding:0; margin-bottom:8px; }
+.replaceOptions { display:flex; align-items:center; justify-content:flex-end; gap:16px; }
 .replaceTarget label { display:inline-flex; align-items:center; gap:6px; min-height:32px; }
 .replaceTarget input[type=radio] { margin:0; accent-color:var(--blue); }
 
