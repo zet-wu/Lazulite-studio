@@ -47,7 +47,7 @@ export function StudioSettings({close, amll, locked=false, initial='appearance'}
       <strong className={styles.project}>{t('settings.project')}</strong>
       <button data-role="secondary" disabled={!amll} aria-current={page==='amll'?'page':undefined} onClick={()=>setPage('amll')}>{t('menu.amll')}</button>{!amll&&<small>{t('settings.openProject')}</small>}
     </nav>
-    <div className={styles.content}>{saveError&&<p role="alert">{saveError}</p>}<h2>{title}</h2>
+    <div className={styles.content}>{saveError&&<p role="alert" className={fields.error}>{saveError}</p>}<h2>{title}</h2>
       {page==='appearance'&&<><LanguageSelector/><SettingField label={t('settings.theme')}><Select aria-label={t('settings.theme')} value={theme} onChange={e=>setTheme(e.target.value)}><option value="light">{t('menu.light')}</option><option value="dark">{t('menu.dark')}</option></Select></SettingField>
         {(['outlineVisible','inspectorVisible'] as const).map(key=><SettingToggle key={key} label={t(key==='outlineVisible'?'menu.outline':'menu.inspector')} checked={columnValues[key]} onChange={value=>setColumns(JSON.stringify({...columnValues,[key]:value}))}/>)}
         <SettingField label={t('settings.resetWidths')}><IconButton icon="refresh" data-role="secondary" label={t('settings.resetWidths')} onClick={()=>setColumns(JSON.stringify({...columnValues,outlineWidth:COLUMN_DEFAULTS.outlineWidth,inspectorWidth:COLUMN_DEFAULTS.inspectorWidth}))}/></SettingField></>}

@@ -89,7 +89,7 @@ it('stages complete ancestors, switches to the active row and filters each subtr
  const onLocate=vi.fn(),apply=vi.fn();
  const props={document:doc,selectedLineId:null,startMs:0,endMs:3000,durationMs:3000,positionMs:0,bpm:0,snap:false,visible:{karaoke:false,line:true,word:true,ruby:true,romanization:true,gap:false},apply,onPan:vi.fn(),onLocate,onError:vi.fn()};
  const view=render(<SelectionProvider><TimelineTracks {...props}/></SelectionProvider>);
- const staging=()=>view.container.querySelector('[aria-label="时间轴暂存区"]')!;
+ const staging=()=>view.container.querySelector('[aria-label="暂存区"]')!;
  expect(staging().querySelectorAll('[data-staging-key]')).toHaveLength(1);
  fireEvent.keyDown(staging().querySelector('[role="button"]')!,{key:'Enter'});
  expect(onLocate).toHaveBeenCalledWith(100,2000);expect(apply).not.toHaveBeenCalled();

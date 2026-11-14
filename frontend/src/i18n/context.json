@@ -11347,7 +11347,7 @@
   },
   "timeline.staging": {
     "context": "Timeline control",
-    "source": "时间轴暂存区",
+    "source": "暂存区",
     "params": [],
     "parameterNotes": {}
   },

@@ -30,10 +30,10 @@ test('settings and toolbar share saved layers, literal empty filtering, and proj
  await load(page);await expect(stage(page,'spaces')).toHaveCount(0);await expect(stage(page,'fullspace')).toBeVisible();
  let dialog=await settings(page);const ignored=dialog.getByRole('textbox',{name:'暂存区忽略字符',exact:true});await expect(ignored).toHaveValue(' ');
  await ignored.fill('');await ignored.press('Tab');await expect(stage(page,'spaces')).toBeVisible();
- await dialog.getByRole('switch',{name:'时间轴暂存区',exact:true}).uncheck();await page.keyboard.press('Escape');
- const toggle=page.getByRole('button',{name:'时间轴暂存区',exact:true});await expect(toggle).toHaveAttribute('aria-pressed','false');await expect(stage(page,'plain')).toHaveCount(0);
+ await dialog.getByRole('switch',{name:'暂存区',exact:true}).uncheck();await page.keyboard.press('Escape');
+ const toggle=page.getByRole('button',{name:'暂存区',exact:true});await expect(toggle).toHaveAttribute('aria-pressed','false');await expect(stage(page,'plain')).toHaveCount(0);
  await toggle.click();await expect(stage(page,'spaces')).toBeVisible();
- dialog=await settings(page);await expect(dialog.getByRole('switch',{name:'时间轴暂存区',exact:true})).toBeChecked();
+ dialog=await settings(page);await expect(dialog.getByRole('switch',{name:'暂存区',exact:true})).toBeChecked();
  await dialog.getByRole('switch',{name:'词',exact:true}).uncheck();await page.keyboard.press('Escape');await expect(stage(page,'parent')).toHaveCount(0);await expect(stage(page,'r1')).toBeVisible();
  await page.reload();await page.locator('[data-settings-button]').click();await page.getByRole('dialog').getByRole('button',{name:'时间轴',exact:true}).click();
  await expect(page.getByRole('textbox',{name:'暂存区忽略字符',exact:true})).toHaveValue('');await expect(page.getByRole('dialog').getByRole('switch',{name:'词',exact:true})).not.toBeChecked();

@@ -17,7 +17,7 @@
 .toggle > input:disabled { opacity:.55; cursor:default; }
 .toggle:has(:disabled) > span { color:var(--muted); }
 .stacked { grid-template-columns:minmax(0,1fr); gap:8px; }
-.error { margin:4px 0; color:var(--danger); font-size:var(--label-size); }
+.error { overflow-wrap:anywhere; line-height:1.5; margin:4px 0; color:var(--danger); font-size:var(--label-size); }
 .actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .navigation { display:flex; flex-direction:column; align-items:stretch; gap:4px; min-width:0; }
 .navigation button[data-role][data-role] { text-align:left; border-color:transparent; background:transparent; box-shadow:none; padding:8px 12px; overflow-wrap:anywhere; }

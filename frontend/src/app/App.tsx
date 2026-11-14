@@ -243,7 +243,7 @@ function PreferenceGate({ children }: { children: ReactNode }) {
   useEffect(() => { if (mock || query.isSuccess) document.documentElement.dataset.theme = preferences.getItem('lazulite-editor-theme') === 'dark' ? 'dark' : 'light'; }, [mock, query.isSuccess]);
   if (!mock && query.isPending) return <><ApplicationHeader ready={false}/><main className={styles.centerState}>{t('app.preferencesLoading')}</main></>;
   if (!mock && query.isError) return <><ApplicationHeader ready={false}/><main className={styles.centerState}>{t('app.preferencesFailed')}<button data-role="secondary" onClick={() => query.refetch()}>{t('common.retry')}</button></main></>;
-  return <ApplicationFrame>{error && <div role="alert">{error}<button data-role="secondary" onClick={() => location.reload()}>{t('app.preferencesRefresh')}</button></div>}{children}</ApplicationFrame>;
+  return <ApplicationFrame>{error && <div role="alert" className={styles.preferenceError}><span>{error}</span><button data-role="secondary" onClick={() => location.reload()}>{t('app.preferencesRefresh')}</button></div>}{children}</ApplicationFrame>;
 }
 function ApplicationHeader({ready = false}: {ready?: boolean}) {
   const [activeMenuId, onMenuChange] = useState<string | null>(null);
