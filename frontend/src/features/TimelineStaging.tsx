@@ -38,7 +38,7 @@ export function TimelineStaging({document,startMs,endMs,durationMs,snap,bpm,anch
   const label=(item:Item)=>{
     if(item.target.kind!=='line')return item.text;
     const line=document.lines.find(line=>line.id===item.target.lineId)!;
-    return `L${ordinalById.get(line.backgroundOf??line.id)}${line.backgroundOf?` ${t('outline.background')}`:''}${item.text?` ${item.text}`:''}`;
+    return `L${ordinalById.get(line.backgroundOf??line.id)}${line.backgroundOf?` ${t('outline.background')}`:''}`;
   };
   const choose=(item:Item)=>{setSelection(targetSelection(item.target));if(!item.assignable){const interval=targetInterval(document,item.target)!;const times=[interval.beginMs,interval.endMs].filter((time):time is number=>time!==null);if(times.length)onLocate?.(Math.min(...times),Math.max(...times));}};
   const begin=(event:PointerEvent<HTMLElement>,item:Item)=>{
