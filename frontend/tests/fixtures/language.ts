@@ -5,7 +5,7 @@ export async function openLanguage(page: Page) {
 }
 export async function chooseLanguage(page: Page, language: string) {
  const dialog=await openLanguage(page);
- await dialog.locator(`input[value="${language}"]`).check();
+ await dialog.locator('select[data-initial-focus]').selectOption(language);
  await expect(page.locator('html')).toHaveAttribute('lang',language==='zh-Hans'?'zh-Hans':language==='zh-Hant'?'zh-Hant-TW':'en');
  await page.keyboard.press('Escape');
 }

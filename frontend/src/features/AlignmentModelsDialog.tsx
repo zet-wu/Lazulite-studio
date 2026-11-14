@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { alignmentApi, type AlignmentCatalog } from '../adapters/http/alignment';
 import { SettingsPanel } from './editor/SettingsDialog';
 import { IconButton } from '../shared/Controls';
+import {SettingField} from '../shared/SettingsFields';
+import fields from '../shared/settings-fields.module.css';
 import styles from './alignment.module.css';
 
 export function AlignmentModelsDialog({close, returnFocus, embedded}: {close:()=>void; returnFocus?:()=>HTMLElement|null; embedded?:boolean}) {
@@ -24,17 +26,16 @@ export function AlignmentModelsDialog({close, returnFocus, embedded}: {close:()=
     catch(e){setError((e as Error).message);}finally{setBusy(false);}
   };
   const refresh=<IconButton icon="refresh" label={t('alignment.refreshModels')} data-role="secondary" disabled={busy} onClick={()=>void run()}/>;
-  return <SettingsPanel embedded={embedded} title={t('alignment.models')} close={close} returnFocus={returnFocus} actions={embedded?undefined:<button data-role="secondary" onClick={close}>{t('common.close')}</button>}>
+  return <SettingsPanel embedded={embedded} title={t('alignment.models')} headerActions={refresh} close={close} returnFocus={returnFocus} actions={embedded?undefined:<button data-role="secondary" onClick={close}>{t('common.close')}</button>}>
     {catalog?.editable?<>
-      <label htmlFor={directoryId}>{t('alignment.directory')}</label>
-      <div className={styles.directoryRow}><input id={directoryId} value={draft} onChange={e=>setDraft(e.target.value)} disabled={busy}/>{refresh}</div>
+      <SettingField stacked label={t('alignment.directory')}><input id={directoryId} value={draft} onChange={e=>setDraft(e.target.value)} disabled={busy} title={draft}/></SettingField>
       <div className={styles.directoryActions}><button data-role="primary" disabled={busy} onClick={()=>void run(draft)}>{t('alignment.applyDirectory')}</button><button data-role="secondary" disabled={busy} onClick={()=>void run(null)}>{t('alignment.defaultDirectory')}</button></div>
-    </>:<div className={styles.directoryRow}><small className={styles.description}>{catalog?t('alignment.directoryServer'):t('alignment.checkingModels')}</small>{refresh}</div>}
+    </>:<div className={styles.directoryRow}><small className={styles.description}>{catalog?t('alignment.directoryServer'):t('alignment.checkingModels')}</small></div>}
     {(error||catalog?.error)&&<p role="alert">{error||catalog?.error}</p>}
     {catalog&&!catalog.items.some(item=>item.status==='ready')&&<p>{t('alignment.noModels')}</p>}
-    <ul className={styles.modelCards}>{catalog?.items.map(item=><li key={item.name}>
+    <ul className={fields.cards}>{catalog?.items.map(item=><li className={fields.card} key={item.name}>
       <div><strong>{item.name}</strong>{item.type&&<> · {item.type}</>}</div>
-      <small className={item.status==='ready'?styles.description:styles.modelError}>{item.status==='ready'?t('alignment.structureReady'):item.reason}</small>
+      <small role={item.status==='ready'?undefined:'alert'} className={item.status==='ready'?styles.description:styles.modelError}>{item.status==='ready'?t('alignment.structureReady'):item.reason}</small>
     </li>)}</ul>
   </SettingsPanel>;
 }

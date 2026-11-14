@@ -8249,12 +8249,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "shortcuts.clear": {
-    "context": "shortcuts interface: shortcuts.clear",
-    "source": "清除自定义",
-    "params": [],
-    "parameterNotes": {}
-  },
   "shortcuts.input": {
     "context": "shortcuts interface: shortcuts.input",
     "source": "{{action}}快捷键",
@@ -11462,6 +11456,40 @@
   "settings.cpuPackage": {
     "context": "Studio preferences window",
     "source": "当前为 CPU 包，使用 CPU。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "shortcuts.resetOne": {
+    "context": "Settings UI: shortcuts.resetOne",
+    "source": "恢复“{{action}}”默认快捷键",
+    "params": [
+      "action"
+    ],
+    "parameterNotes": {
+      "action": "Shortcut action name"
+    }
+  },
+  "markers.images": {
+    "context": "Settings UI: markers.images",
+    "source": "触发与图片",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "markers.dimensions": {
+    "context": "Settings UI: markers.dimensions",
+    "source": "图片尺寸",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "markers.decoration": {
+    "context": "Settings UI: markers.decoration",
+    "source": "装饰",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "markers.margins": {
+    "context": "Settings UI: markers.margins",
+    "source": "边距",
     "params": [],
     "parameterNotes": {}
   }

@@ -6,17 +6,18 @@ import {useEffect,useMemo,useState} from 'react';
 import {amllLabels,amllDependencies,checkAmll,ruleCount,type AmllRule,type AmllResults} from '../domain/amll-compatibility';
 import type {ProjectDocument,ProjectCommand} from '../domain/project-document';
 import type {OutputIssue} from '../adapters/output-validation';
-import {BooleanField} from '../shared/Controls';
+import {SettingToggle} from '../shared/SettingsFields';
+import fields from '../shared/settings-fields.module.css';
 import {SettingsDialog} from './editor/SettingsDialog';
 import {Branch,LineGroups} from './OutputIssues';
 import styles from './editor/semantic-editor.module.css';
 export function AmllSettings({project,apply,locate}:{project:ProjectDocument;apply:(command:ProjectCommand)=>void;locate:(rule:AmllRule)=>void}) {
   useTranslation();
  const results=useMemo(()=>checkAmll(project.lyrics),[project.lyrics]);
- return <section aria-label={t('amll.settings')}>{(Object.keys(amllLabels) as AmllRule[]).map(rule=>{
+ return <section className={fields.group} aria-label={t('amll.settings')}>{(Object.keys(amllLabels) as AmllRule[]).map(rule=>{
    const locked=project.amll.simplified&&amllDependencies.includes(rule), conflict=!project.amll[rule]&&ruleCount(results,rule)>0;
-   return <div key={rule}><BooleanField label={t(amllLabels[rule])} switchControl checked={project.amll[rule]} disabled={locked||conflict} onChange={enabled=>apply({type:'amll-setting',rule,enabled})}/>
-     {locked&&<small>{t('amll.locked')}</small>}{conflict&&<><small>{t('amll.conflict')}</small><button data-role="inline" onClick={()=>locate(rule)}>{t('amll.locate')}</button></>}
+   return <div key={rule}><SettingToggle label={t(amllLabels[rule])} description={locked?t('amll.locked'):conflict?t('amll.conflict'):undefined} checked={project.amll[rule]} disabled={locked||conflict} onChange={enabled=>apply({type:'amll-setting',rule,enabled})}/>
+     {conflict&&<><button data-role="inline" onClick={()=>locate(rule)}>{t('amll.locate')}</button></>}
    </div>;
  })}</section>;
 }

@@ -1248,7 +1248,6 @@
   "shortcuts.title": "快捷键设置",
   "shortcuts.restore": "恢复全部默认",
   "shortcuts.help": "点击按键框后录入组合键。打轴按物理键位；播放定位仅在播放器内生效。清除自定义后恢复该项默认。",
-  "shortcuts.clear": "清除自定义",
   "shortcuts.input": "{{action}}快捷键",
   "shortcuts.conflict": "与“{{action}}”冲突",
   "karaoke.groupInvalid": "第 {{number}} 组 ID 须以英文字母开头，后接字母、数字、下划线或连字符",
@@ -1729,5 +1728,10 @@
   "settings.defaultModelMissing": "默认模型不可用，请选择模型",
   "settings.particleLoading": "正在分析日语助词…",
   "settings.gpuHelp": "优先使用 GPU，不可用时使用 CPU。运行失败后可使用 CPU 重试。",
-  "settings.cpuPackage": "当前为 CPU 包，使用 CPU。"
+  "settings.cpuPackage": "当前为 CPU 包，使用 CPU。",
+  "shortcuts.resetOne": "恢复“{{action}}”默认快捷键",
+  "markers.images": "触发与图片",
+  "markers.dimensions": "图片尺寸",
+  "markers.decoration": "装饰",
+  "markers.margins": "边距"
 }

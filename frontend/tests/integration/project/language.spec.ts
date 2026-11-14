@@ -20,25 +20,25 @@ test('persists the library language and keeps project content unchanged through 
  await expect.poll(async()=>((await(await page.request.get('/api/v1/settings')).json()).values['studio:ui-language'])).toBe('zh-Hans');
 });
 
-test('list language dialog retains focus, supports native arrows, and reports a delayed failure after closing',async({page})=>{
+test('list language dialog retains focus, supports dropdown keyboard selection, and reports a delayed failure after closing',async({page})=>{
  await page.goto('/projects');
  await expect(page.getByRole('button',{name:'保存',exact:true})).toHaveCount(0);
  await expect(page.locator('[data-top-menu="view"]')).toHaveCount(0);
  const dialog=await openLanguage(page);
- await expect(dialog.locator('input[value="zh-Hans"]')).toBeFocused();
- await page.keyboard.press('ArrowDown');
- await expect(dialog.locator('input[value="zh-Hant"]')).toBeChecked();
- await page.keyboard.press('ArrowDown');
- await expect(dialog.locator('input[value="en"]')).toBeChecked();
+ await expect(dialog.locator('select[data-initial-focus]')).toBeFocused();
+ await page.keyboard.press('ArrowDown');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+ await expect(dialog.locator('select[data-initial-focus]')).toHaveValue('zh-Hant');
+ await page.keyboard.press('ArrowDown');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+ await expect(dialog.locator('select[data-initial-focus]')).toHaveValue('en');
  await expect.poll(async()=>((await(await page.request.get('/api/v1/settings')).json()).values['studio:ui-language'])).toBe('en');
- await page.keyboard.press('Tab');await expect(dialog.getByRole('combobox')).toBeFocused();
- await page.keyboard.press('Shift+Tab');await expect(dialog.locator('input[value="en"]')).toBeFocused();
+ await page.keyboard.press('Tab');await expect(dialog.getByRole('combobox').nth(1)).toBeFocused();
+ await page.keyboard.press('Shift+Tab');await expect(dialog.locator('select[data-initial-focus]')).toBeFocused();
  let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);
  await page.route('**/api/v1/settings',async route=>{
   if(route.request().method()!=='PATCH')return route.continue();
   await gate;await route.fulfill({status:503,json:{}});
  });
- await dialog.locator('input[value="zh-Hans"]').check();
+ await dialog.locator('select[data-initial-focus]').selectOption('zh-Hans');
  await page.keyboard.press('Escape');
  await expect(page.locator('[data-settings-button]')).toBeFocused();
  release();
@@ -56,7 +56,7 @@ test('empty library keeps the header through loading and restores the saved them
  await page.goto('/projects');
  await expect(page.locator('[data-settings-button]')).toBeVisible();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');release();
- const dialog=await openLanguage(page);await expect(dialog.locator('input[type=radio]:checked')).toBeFocused();await page.keyboard.press('Escape');
+ const dialog=await openLanguage(page);await expect(dialog.locator('select[data-initial-focus]')).toBeFocused();await page.keyboard.press('Escape');
  await page.locator('[data-settings-button]').click();
  await expect(page.getByRole('button',{name:'AMLL 兼容设置',exact:true})).toBeDisabled();
  await page.getByRole('button',{name:'注音与拉丁化',exact:true}).click();

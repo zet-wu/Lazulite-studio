@@ -1248,7 +1248,6 @@
   "shortcuts.title": "快捷鍵設定",
   "shortcuts.restore": "還原所有預設值",
   "shortcuts.help": "點選按鍵框後輸入組合鍵。打軸使用實體鍵位；播放定位僅在播放器內生效。清除自訂後會還原該項預設值。",
-  "shortcuts.clear": "清除自訂",
   "shortcuts.input": "{{action}}快捷鍵",
   "shortcuts.conflict": "與「{{action}}」衝突",
   "karaoke.groupInvalid": "第 {{number}} 組 ID 須以英文字母開頭，後接字母、數字、底線或連字號",
@@ -1729,5 +1728,10 @@
   "settings.defaultModelMissing": "預設模型無法使用，請選擇模型",
   "settings.particleLoading": "正在分析日語助詞…",
   "settings.gpuHelp": "優先使用 GPU，無法使用時使用 CPU。執行失敗後可使用 CPU 重試。",
-  "settings.cpuPackage": "目前為 CPU 套件，使用 CPU。"
+  "settings.cpuPackage": "目前為 CPU 套件，使用 CPU。",
+  "shortcuts.resetOne": "還原「{{action}}」預設快捷鍵",
+  "markers.images": "觸發與圖片",
+  "markers.dimensions": "圖片尺寸",
+  "markers.decoration": "裝飾",
+  "markers.margins": "邊距"
 }

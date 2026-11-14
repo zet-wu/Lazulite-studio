@@ -1252,7 +1252,6 @@
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.restore": "Restore all defaults",
   "shortcuts.help": "Click a key field, then press a combination. Timing uses physical key positions; seeking works inside the player. Clearing a custom shortcut restores its default.",
-  "shortcuts.clear": "Clear custom shortcut",
   "shortcuts.input": "{{action}} shortcut",
   "shortcuts.conflict": "Conflicts with “{{action}}”",
   "karaoke.groupInvalid": "Group {{number}} ID must start with a Latin letter and contain only letters, digits, underscores, or hyphens",
@@ -1742,5 +1741,10 @@
   "settings.defaultModelMissing": "Default model unavailable. Select a model.",
   "settings.particleLoading": "Analyzing Japanese particles…",
   "settings.gpuHelp": "Prefer GPU; use CPU when unavailable. After a runtime failure, you can retry with CPU.",
-  "settings.cpuPackage": "This CPU package uses CPU."
+  "settings.cpuPackage": "This CPU package uses CPU.",
+  "shortcuts.resetOne": "Restore default shortcut for {{action}}",
+  "markers.images": "Trigger and images",
+  "markers.dimensions": "Image size",
+  "markers.decoration": "Decoration",
+  "markers.margins": "Margins"
 }

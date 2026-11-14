@@ -1,3 +1,5 @@
+import {SettingField, SettingToggle} from '../../shared/SettingsFields';
+import fields from '../../shared/settings-fields.module.css';
 import {IconButton} from '../../shared/Controls';
 import {Select} from '../../shared/Select';
 import {useEffect, useState, type ReactNode} from 'react';
@@ -35,21 +37,21 @@ export function StudioSettings({close, amll, locked=false, initial='appearance'}
   const categories=[['appearance','settings.appearance'],['reading','settings.reading'],['models','settings.modelsCompute'],['shortcuts','menu.shortcuts'],['preview','preview.title']] as const;
   const title=page==='amll'?t('menu.amll'):t(categories.find(([key])=>key===page)![1]);
   return <SettingsDialog wide title={t('menu.settings')} close={close}><div className={styles.layout}>
-    <nav aria-label={t('menu.settings')} className={styles.navigation}><strong>{t('settings.studio')}</strong>
+    <nav aria-label={t('menu.settings')} className={`${styles.navigation} ${fields.navigation}`}><strong>{t('settings.studio')}</strong>
       {categories.map(([key,label])=><button key={key} data-role="secondary" aria-current={page===key?'page':undefined} onClick={()=>setPage(key)}>{t(label)}</button>)}
       <strong className={styles.project}>{t('settings.project')}</strong>
       <button data-role="secondary" disabled={!amll} aria-current={page==='amll'?'page':undefined} onClick={()=>setPage('amll')}>{t('menu.amll')}</button>{!amll&&<small>{t('settings.openProject')}</small>}
     </nav>
     <div className={styles.content}>{saveError&&<p role="alert">{saveError}</p>}<h2>{title}</h2>
-      {page==='appearance'&&<><LanguageSelector/><label>{t('settings.theme')}<Select aria-label={t('settings.theme')} value={theme} onChange={e=>setTheme(e.target.value)}><option value="light">{t('menu.light')}</option><option value="dark">{t('menu.dark')}</option></Select></label>
-        {(['outlineVisible','inspectorVisible'] as const).map(key=><label key={key}><input type="checkbox" checked={columnValues[key]} onChange={e=>setColumns(JSON.stringify({...columnValues,[key]:e.target.checked}))}/>{t(key==='outlineVisible'?'menu.outline':'menu.inspector')}</label>)}
-        <div><IconButton icon="refresh" data-role="secondary" label={t('settings.resetWidths')} onClick={()=>setColumns(JSON.stringify({...columnValues,outlineWidth:COLUMN_DEFAULTS.outlineWidth,inspectorWidth:COLUMN_DEFAULTS.inspectorWidth}))}/></div></>}
-      {page==='reading'&&<><DictionaryManager embedded close={close}/><h3>{t('settings.latinization')}</h3><label className={styles.option}><input type="checkbox" checked={particles} onChange={e=>setParticles(e.target.checked)}/><span>{t('settings.convertParticles')}<small>{t('settings.particleHelp')}</small></span></label>
-        <label>{t('settings.defaultHighlight')}<input value={draft} onChange={e=>setDraft(e.target.value)} onBlur={()=>{try{const value=normalizeKanaHighlight(draft);setHighlight(value);setDraft(value);setError('');}catch(cause){setError(formatMessage(errorMessage(cause)));}}}/></label>{error&&<p role="alert">{error}</p>}</>}
+      {page==='appearance'&&<><LanguageSelector/><SettingField label={t('settings.theme')}><Select aria-label={t('settings.theme')} value={theme} onChange={e=>setTheme(e.target.value)}><option value="light">{t('menu.light')}</option><option value="dark">{t('menu.dark')}</option></Select></SettingField>
+        {(['outlineVisible','inspectorVisible'] as const).map(key=><SettingToggle key={key} label={t(key==='outlineVisible'?'menu.outline':'menu.inspector')} checked={columnValues[key]} onChange={value=>setColumns(JSON.stringify({...columnValues,[key]:value}))}/>)}
+        <SettingField label={t('settings.resetWidths')}><IconButton icon="refresh" data-role="secondary" label={t('settings.resetWidths')} onClick={()=>setColumns(JSON.stringify({...columnValues,outlineWidth:COLUMN_DEFAULTS.outlineWidth,inspectorWidth:COLUMN_DEFAULTS.inspectorWidth}))}/></SettingField></>}
+      {page==='reading'&&<><DictionaryManager embedded close={close}/><h3>{t('settings.latinization')}</h3><SettingToggle label={t('settings.convertParticles')} description={t('settings.particleHelp')} checked={particles} onChange={setParticles}/>
+        <SettingField label={t('settings.defaultHighlight')} error={error}><input value={draft} onChange={e=>setDraft(e.target.value)} onBlur={()=>{try{const value=normalizeKanaHighlight(draft);setHighlight(value);setDraft(value);setError('');}catch(cause){setError(formatMessage(errorMessage(cause)));}}}/></SettingField></>}
       {page==='models'&&<><AlignmentModelsDialog embedded close={close}/><AlignmentDefaults/><h3>{t('menu.devices')}</h3><DeviceSettings embedded/></>}
       {page==='shortcuts'&&<ShortcutDialog embedded close={close}/>}
-      {page==='preview'&&<>{[[translation,setTranslation,'capability.translation'],[romanization,setRomanization,'capability.romanization'],[hide,setHide,'preview.hidePlayed']].map(([value,set,label])=><label key={String(label)}><input type="checkbox" checked={Boolean(value)} onChange={e=>(set as (value:boolean)=>void)(e.target.checked)}/>{t(String(label))}</label>)}<label>{t('preview.gradient')}<input type="range" min="0.05" max="1.5" step="0.05" value={fade} onChange={e=>setFade(Number(e.target.value))}/></label></>}
-      {page==='amll'&&<fieldset disabled={locked}>{amll}</fieldset>}
+      {page==='preview'&&<>{[[translation,setTranslation,'capability.translation'],[romanization,setRomanization,'capability.romanization'],[hide,setHide,'preview.hidePlayed']].map(([value,set,label])=><SettingToggle key={String(label)} label={t(String(label))} checked={Boolean(value)} onChange={set as (value:boolean)=>void}/>)}<SettingField label={t('preview.gradient')}><input type="range" min="0.05" max="1.5" step="0.05" value={fade} onChange={e=>setFade(Number(e.target.value))}/></SettingField></>}
+      {page==='amll'&&<fieldset className={fields.group} disabled={locked}>{amll}</fieldset>}
     </div>
   </div></SettingsDialog>;
 }

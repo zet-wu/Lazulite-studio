@@ -139,8 +139,6 @@
 .syncPanel button { border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; background: var(--canvas); color: var(--ink); cursor: pointer; }
 .syncPanel button:disabled { opacity: .5; cursor: default; }
 .syncPanel input { width: 7em; padding: 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--canvas); color: var(--ink); }
-.syncBindings { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; }
-.syncBindings label { display: grid; gap: 3px; }
 .segmentPreview { display: grid; gap: 5px; max-height: 28dvh; overflow: auto; border-top: 1px solid var(--line); padding-top: 8px; font-size: 13px; }
 .segmentPreview > div { display: grid; grid-template-columns: 1fr 1.5fr; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 0; }
 .segmentPreview small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -273,7 +271,6 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .syncTime { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .syncMain > strong { max-width: 100%; overflow-wrap: anywhere; }
 .syncExtras { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px; }
-.syncBindings > label { display: grid; grid-template-columns: minmax(180px, 1fr) 150px auto; gap: 8px; align-items: center; }
 
 .syncQuote { display: flex; gap: 4px; }
 .syncQuote > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

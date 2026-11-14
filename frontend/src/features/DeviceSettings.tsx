@@ -1,3 +1,6 @@
+import {SettingField} from '../shared/SettingsFields';
+import {Select} from '../shared/Select';
+import fields from '../shared/settings-fields.module.css';
 import {usePreference} from '../adapters/studio-preferences';
 import { message as describeMessage, MessageError, errorMessage, message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
@@ -25,16 +28,15 @@ export function DeviceSettings({embedded=false}:{embedded?:boolean}) {
   if (!session.data || (session.data.mode === 'local' && !runtime.data)) return <p role="status">{t('settings.loadingDevices')}</p>;
   if (session.data.mode !== 'local') return <p>{t('settings.serviceDevices')}</p>;
   const cpuOnly = runtime.data?.target === 'windows-x64-cpu';
-  return <div style={{ display: 'grid', gap: 12 }}>
-    {(['vocal', 'alignment'] as const).map(stage => <label key={stage} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-      <span>{stage === 'vocal' ? t('settings.vocalSeparation') : t('settings.alignment')}</span>
-      <select aria-label={stage === 'vocal' ? t('settings.vocalDevice') : t('settings.alignmentDevice')} disabled={saving || cpuOnly} value={cpuOnly ? 'auto' : values[stage]} onChange={async event => {
+  return <div className={fields.group}>
+    {(['vocal', 'alignment'] as const).map(stage => <SettingField key={stage} label={stage === 'vocal' ? t('settings.vocalSeparation') : t('settings.alignment')}>
+      <Select aria-label={stage === 'vocal' ? t('settings.vocalDevice') : t('settings.alignmentDevice')} disabled={saving || cpuOnly} value={cpuOnly ? 'auto' : values[stage]} onChange={async event => {
         const value = event.target.value; setSaving(true); setError('');
         try { await savePreference(`device.${stage}`, value); }
         catch (cause) { setError(errorMessage(cause)); }
         finally { setSaving(false); }
-      }}><option value="auto">{cpuOnly ? 'CPU' : 'GPU'}</option>{!cpuOnly && <option value="cpu">CPU</option>}</select>
-    </label>)}
+      }}><option value="auto">{cpuOnly ? 'CPU' : 'GPU'}</option>{!cpuOnly && <option value="cpu">CPU</option>}</Select>
+    </SettingField>)}
     <p>{t(cpuOnly ? 'settings.cpuPackage' : 'settings.gpuHelp')}</p>
     {error && !embedded && <p role="alert">{error}</p>}
   </div>;

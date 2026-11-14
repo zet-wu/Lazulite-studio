@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { createContext, useContext, Children, isValidElement, cloneElement, Fragment, useEffect, useRef, type ReactNode, type ReactElement } from 'react';
 import { IconButton } from '../../shared/Controls';
+import fields from '../../shared/settings-fields.module.css';
 import styles from './semantic-editor.module.css';
 
 export const DialogEditingLocked = createContext(false);
@@ -48,6 +49,6 @@ export function SettingsDialog({ title, subtitle, close, children, actions, retu
 }
 
 /** Reuses setting content in the preferences window without a nested modal. */
-export function SettingsPanel({embedded, ...props}: Parameters<typeof SettingsDialog>[0] & {embedded?: boolean}) {
-  return embedded ? <section><h3>{props.title}</h3>{props.subtitle && <p>{props.subtitle}</p>}{props.children}{props.actions && <div className={styles.dialogActions}>{props.actions}</div>}</section> : <SettingsDialog {...props}/>;
+export function SettingsPanel({embedded, headerActions, hideTitle=false, ...props}: Parameters<typeof SettingsDialog>[0] & {embedded?: boolean; headerActions?: ReactNode; hideTitle?: boolean}) {
+  return embedded ? <section className={fields.panel}>{!hideTitle&&<div className={fields.panelHeader}><h3>{props.title}</h3>{headerActions}</div>}{props.subtitle && <p>{props.subtitle}</p>}{props.children}{props.actions && <div className={fields.panelActions}>{props.actions}</div>}</section> : <SettingsDialog {...props}>{headerActions&&<div className={fields.actions}>{headerActions}</div>}{props.children}</SettingsDialog>;
 }
