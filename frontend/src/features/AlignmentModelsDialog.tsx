@@ -1,12 +1,14 @@
+import {useQueryClient} from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { alignmentApi, type AlignmentCatalog } from '../adapters/http/alignment';
-import { SettingsDialog } from './editor/SettingsDialog';
+import { SettingsPanel } from './editor/SettingsDialog';
 import { IconButton } from '../shared/Controls';
 import styles from './alignment.module.css';
 
-export function AlignmentModelsDialog({close, returnFocus}: {close:()=>void; returnFocus:()=>HTMLElement|null}) {
+export function AlignmentModelsDialog({close, returnFocus, embedded}: {close:()=>void; returnFocus?:()=>HTMLElement|null; embedded?:boolean}) {
   const {t}=useTranslation();
+  const cache=useQueryClient();
   const directoryId=useId();
   const [catalog,setCatalog]=useState<AlignmentCatalog|null>(null);
   const [draft,setDraft]=useState(''),[busy,setBusy]=useState(true),[error,setError]=useState('');
@@ -18,11 +20,11 @@ export function AlignmentModelsDialog({close, returnFocus}: {close:()=>void; ret
   },[]);
   const run=async(path?:string|null)=>{
     setBusy(true);setError('');
-    try {const value=path===undefined?await alignmentApi.models(true):await alignmentApi.directory(path);setCatalog(value);if(path!==undefined||!catalog)setDraft(value.directory);}
+    try {const value=path===undefined?await alignmentApi.models(true):await alignmentApi.directory(path);setCatalog(value);cache.setQueryData(['alignment-models'],value);if(path!==undefined||!catalog)setDraft(value.directory);}
     catch(e){setError((e as Error).message);}finally{setBusy(false);}
   };
   const refresh=<IconButton icon="refresh" label={t('alignment.refreshModels')} data-role="secondary" disabled={busy} onClick={()=>void run()}/>;
-  return <SettingsDialog title={t('alignment.models')} close={close} returnFocus={returnFocus} actions={<button data-role="secondary" onClick={close}>{t('common.close')}</button>}>
+  return <SettingsPanel embedded={embedded} title={t('alignment.models')} close={close} returnFocus={returnFocus} actions={embedded?undefined:<button data-role="secondary" onClick={close}>{t('common.close')}</button>}>
     {catalog?.editable?<>
       <label htmlFor={directoryId}>{t('alignment.directory')}</label>
       <div className={styles.directoryRow}><input id={directoryId} value={draft} onChange={e=>setDraft(e.target.value)} disabled={busy}/>{refresh}</div>
@@ -34,5 +36,5 @@ export function AlignmentModelsDialog({close, returnFocus}: {close:()=>void; ret
       <div><strong>{item.name}</strong>{item.type&&<> · {item.type}</>}</div>
       <small className={item.status==='ready'?styles.description:styles.modelError}>{item.status==='ready'?t('alignment.structureReady'):item.reason}</small>
     </li>)}</ul>
-  </SettingsDialog>;
+  </SettingsPanel>;
 }

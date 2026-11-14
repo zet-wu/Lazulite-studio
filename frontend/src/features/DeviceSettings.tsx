@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { studioApi, requestHeaders } from '../adapters/http/client';
 import { preferences, savePreference } from '../adapters/preferences';
 
-export function DeviceSettings() {
+export function DeviceSettings({embedded=false}:{embedded?:boolean}) {
   useTranslation();
   const session = useQuery({ queryKey: ['session'], queryFn: studioApi.getSession });
   const runtime = useQuery({ queryKey: ['runtime'], enabled: session.data?.mode === 'local', queryFn: async () => {
@@ -30,10 +30,10 @@ export function DeviceSettings() {
         try { await savePreference(`device.${stage}`, value); setValues(old => ({ ...old, [stage]: value })); }
         catch (cause) { setError(errorMessage(cause)); }
         finally { setSaving(false); }
-      }}><option value="auto">{cpuOnly ? 'CPU' : t('settings.auto')}</option>{!cpuOnly && <option value="cpu">CPU</option>}</select>
+      }}><option value="auto">{cpuOnly ? 'CPU' : 'GPU'}</option>{!cpuOnly && <option value="cpu">CPU</option>}</select>
     </label>)}
-    <p>{t('settings.deviceHelp')}</p>
-    {error && <p role="alert">{error}</p>}
+    <p>{t(cpuOnly ? 'settings.cpuPackage' : 'settings.gpuHelp')}</p>
+    {error && !embedded && <p role="alert">{error}</p>}
   </div>;
 }
 

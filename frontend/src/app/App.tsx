@@ -6,7 +6,7 @@ import { initializeLanguage, i18n } from '../i18n';
 import { ApplicationHeaderContext } from '../shared/ApplicationHeaderContext';
 import headerStyles from '../features/editor/semantic-editor.module.css';
 import { EditorMenu } from '../features/editor/EditorMenu';
-import { DeviceSettings } from '../features/DeviceSettings';
+import { StudioSettings } from '../features/editor/StudioSettings';
 import { loadPreferences, preferences } from '../adapters/preferences';
 import { Component, useState, useEffect, type ErrorInfo, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -147,6 +147,7 @@ function Login() {
 }
 function Settings() {
   useTranslation();
+  const [open,setOpen]=useState(false);
   const query = useQuery({
     queryKey: ["capabilities"],
     queryFn: studioApi.getCapabilities,
@@ -155,7 +156,8 @@ function Settings() {
     <main className={styles.simplePage}>
       <Link to="/projects">{t('app.projectsBack')}</Link>
       <h1>{t('menu.settings')}</h1>
-      <DeviceSettings/>
+      <button data-role="secondary" onClick={()=>setOpen(true)}>{t('menu.settings')}</button>
+      {open&&<StudioSettings initial="models" close={()=>setOpen(false)}/>}
       {query.isLoading ? (
         <p>{t('app.capabilitiesLoading')}</p>
       ) : query.isError ? (

@@ -1,0 +1,13 @@
+.layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); width: 100%; height: min(660px, 72vh); gap: 24px; }
+.navigation { display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.navigation strong { padding: 8px; }
+.navigation button { text-align: left; }
+.navigation button[aria-current] { background: var(--blue-soft); color: var(--blue); }
+.project { margin-top: 18px; border-top: 1px solid var(--line); }
+.content { overflow: auto; padding: 0 12px 16px 0; display: flex; flex-direction: column; gap: 16px; }
+.content h2 { margin: 0; }
+.content label { display: flex; gap: 10px; align-items: center; }
+.content section { display: grid; gap: 12px; }
+.option { align-items: start !important; }
+.option small { display: block; margin-top: 6px; color: var(--muted); }
+.content input[type='number'], .content input:not([type]) { min-height: 28px; padding: 4px 8px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: var(--control-radius); }

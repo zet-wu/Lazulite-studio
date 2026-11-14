@@ -1,3 +1,4 @@
+import { alignmentDefaults, resolveDefaultModel } from '../adapters/studio-preferences';
 import { Select } from '../shared/Select';
 import { capabilityReason } from './task-messages';
 import { message as describeMessage, messageList, MessageError, errorMessage, type Message } from '../domain/messages';
@@ -31,8 +32,10 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   useTranslation();
   const ui=useAudioReview();
   const [catalog,setCatalog]=useState<AlignmentCatalog|null>(null),[model,setModel]=useState('');
+  const [defaultMissing,setDefaultMissing]=useState(false);
   const [previewRevision,setPreviewRevision]=useState(''),[previewError,setPreviewError]=useState('');
   const previewSerial=useRef(0);
+  const [previewAttempt,setPreviewAttempt]=useState(0);
 
   const caps=useQuery({queryKey:['capabilities'],queryFn:()=>jobsApi.capabilities()});
   const jobs=useProjectJobs(pid,visible);
@@ -66,8 +69,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const reason=!assetId?t('alignment.uploadRequired'):durationMs===null?t('alignment.durationUnknown'):!project.lyrics.lines.some(l=>!project.editing.skippedAlignmentLineIds.includes(l.id))?t('alignment.noLines'):!capability?.enabled?(capability?capabilityReason(capability):t('alignment.checkingModels')):active?t('alignment.busy'):null;
   const open=async()=>{
     if(!finishDraft())return;
-    setOpening(true);setMessage('');setOptions(defaultAlignmentOptions());setGapDraft('500');setGapError('');
-    try {const saved=await control.save();if(!saved)throw new MessageError(describeMessage('alignment.saveRequired'));const data=await alignmentApi.models();if(mounted.current){setCatalog(data);setSummary(null);setPreviewRevision(saved.revision);setDialog(true);}}
+    setOpening(true);setMessage('');const defaults=alignmentDefaults();setOptions(defaults);setGapDraft(String(defaults.gap_threshold_ms));setGapError('');
+    try {const saved=await control.save();if(!saved)throw new MessageError(describeMessage('alignment.saveRequired'));const data=await alignmentApi.models();if(mounted.current){setCatalog(data);const selected=resolveDefaultModel(data.items);setModel(selected.id);setDefaultMissing(selected.missing);setSummary(null);setPreviewRevision(saved.revision);setDialog(true);}}
     catch(e){setMessage(errorMessage(e));}finally{if(mounted.current)setOpening(false);}
   };
   useEffect(()=>{
@@ -76,10 +79,10 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
     if(!dialog||!catalog?.items.some(item=>item.id===model&&item.status==='ready'))return;
     let alive=true;
     void alignmentApi.preview(pid,previewRevision,model,options).then(data=>{
-      if(alive&&serial===previewSerial.current)setSummary(data);
+      if(alive&&serial===previewSerial.current){setSummary(data);if(!data.hint_count)setOptions(current=>({...current,use_hints:false}));}
     }).catch(e=>{if(alive&&serial===previewSerial.current)setPreviewError((e as Error).message);});
     return()=>{alive=false;};
-  },[dialog,pid,previewRevision,model,options.latin_normalize,options.strip_tone_digits,catalog]);
+  },[dialog,pid,previewRevision,model,options.latin_normalize,options.strip_tone_digits,options.convert_particles,catalog,previewAttempt]);
   const start=async(retryCpu = false)=>{
     if (operation.current) return;
     const threshold=options.merge_short_gaps?Number(gapDraft):500;
@@ -152,6 +155,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       <MessageBar notice={connection}/>
     </>, ui.messageHost)}
     {dialog&&<SettingsDialog title={t('settings.alignment')} close={()=>setDialog(false)} actions={<><button data-role="secondary" data-initial-focus onClick={()=>setDialog(false)}>{t('common.cancel')}</button><button data-role="primary" disabled={!summary?.emitting_count} onClick={()=>void start()}>{t('alignment.start')}</button></>}>
+      {defaultMissing&&!model&&<p role="alert">{t('settings.defaultModelMissing')}</p>}
       <label>{t('alignment.model')}<Select value={model} onChange={e=>{if(e.target.value!==model){setSummary(null);setModel(e.target.value);}}}>
         <option value="">{t('alignment.selectModel')}</option>
         {model&&!catalog?.items.some(item=>item.id===model&&item.status==='ready')&&<option value={model} disabled>{t('alignment.modelMissing')}</option>}
@@ -159,7 +163,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       </Select></label>
 
       {catalog?.error&&<p role="alert">{catalog.error}</p>}
-      {previewError&&<p role="alert">{previewError}</p>}
+      {previewError&&<p role="alert">{previewError}<IconButton icon="refresh" data-role="secondary" label={t('common.retry')} onClick={()=>setPreviewAttempt(value=>value+1)}/></p>}
       <fieldset className={styles.options}><legend>{t('alignment.preprocessing')}</legend>
         <label><input type="checkbox" checked={options.latin_normalize} onChange={e=>{setSummary(null);setOptions({...options,latin_normalize:e.target.checked});}}/><span>{t('alignment.latinNormalize')}</span></label>
         <label><input type="checkbox" checked={options.strip_tone_digits} onChange={e=>{setSummary(null);setOptions({...options,strip_tone_digits:e.target.checked});}}/><span>{t('alignment.stripTones')}</span></label>

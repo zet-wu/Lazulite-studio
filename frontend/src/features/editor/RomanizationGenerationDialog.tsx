@@ -1,3 +1,6 @@
+import { alignmentCall } from '../../adapters/http/alignment';
+import { particlesEnabled } from '../../adapters/studio-preferences';
+import type { ParticleRange } from '../../domain/romanization-generation';
 import { Tooltip } from '../../shared/Tooltip';
 import { useMessageText } from '../../shared/useMessageText';
 import { message as describeMessage, errorMessage } from '../../domain/messages';
@@ -7,7 +10,7 @@ import { preferences } from '../../adapters/preferences';
 import { measureTextWidth } from '../../shared/measure-text';
 import { kanaHighlightHint, defaultKanaHighlight, normalizeKanaHighlight } from './kana-highlight';
 import { Select } from '../../shared/Select';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import type { LyricDocument, LyricWord } from '../../domain/lyric-document';
 import type { LyricCommand } from '../../domain/lyric-commands';
@@ -92,8 +95,8 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
 }) {
   useTranslation();
   const [source] = useState(document);
-  const [highlight, setHighlight] = useState(defaultKanaHighlight);
-  const [highlightInput, setHighlightInput] = useState(defaultKanaHighlight);
+  const [highlight, setHighlight] = useState(() => preferences.getItem('studio:kana-highlight') ?? defaultKanaHighlight);
+  const [highlightInput, setHighlightInput] = useState(() => preferences.getItem('studio:kana-highlight') ?? defaultKanaHighlight);
   const [highlightError, setHighlightError] = useMessageText('');
   const composing = useRef(false);
   const [isComposing, setIsComposing] = useState(false);
@@ -104,7 +107,20 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   const [sourceIds] = useState(lineIds);
   const modeStorage = `lazulite-romanization-mode:${preferenceScope}`;
   const [kind, setKind] = useState<RomanizationKind>(() => preferences.getItem(modeStorage) === 'plain' ? 'plain' : 'timed');
-  const [rows, setRows] = useState<RomanizationProposal[]>(() => proposeRomanization(source, sourceIds, kind));
+  const [convertParticles] = useState(particlesEnabled);
+  const [particles, setParticles] = useState<ParticleRange[] | null>(() => convertParticles ? null : []);
+  const [analysisError, setAnalysisError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  const [rows, setRows] = useState<RomanizationProposal[]>(() => convertParticles ? [] : proposeRomanization(source, sourceIds, kind));
+  useEffect(() => {
+    if (!convertParticles) return;
+    let alive = true;
+    setAnalysisError('');
+    void alignmentCall<{ranges: ParticleRange[]}>('/reading/particles', {lines: source.lines.filter(line => sourceIds.includes(line.id)).map(line => ({id: line.id, text: line.words.map(word => word.text).join('')}))})
+      .then(result => { if (alive) {setParticles(result.ranges); setRows(proposeRomanization(source, sourceIds, kind, result.ranges));} })
+      .catch(error => {if (alive) setAnalysisError(error.message);});
+    return () => {alive = false;};
+  }, [source, sourceIds, convertParticles, attempt]);
   const [trackId, setTrackId] = useState(() => source.romanizationTracks.find(track => track.language === 'ja-Latn')?.id ?? '');
   const [targets, setTargets] = useState<Record<string, string>>({});
   const [message, setMessage] = useMessageText('');
@@ -134,7 +150,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
     catch (cause) { setMessage(errorMessage(cause)); }
   };
   return <SettingsDialog title={t('editor.romanize')} subtitle={t('reading.generatedLines',{generated:rows.filter(row=>targetFor(row.lineId)!=='skip'&&hasGeneratedContent(row)).length,total:sourceIds.length})} close={close}
-    actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={Boolean(issue)} onClick={submit}>{t('romanization.generate')}</button></>}>
+    actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={Boolean(issue) || particles === null} onClick={submit}>{t('romanization.generate')}</button></>}>
     <div className={styles.rubyGeneration} onCompositionStart={() => { composing.current = true; setIsComposing(true); }} onCompositionEnd={() => { composing.current = false; setIsComposing(false); }}>
       <div className={`${styles.rubyGenerationOptions} ${styles.romanGenerationOptions}`}>
         <div className={styles.romanTrackOptions}><label>{t('romanization.targetTrack')}<Select aria-label={t('romanization.targetTrack')} value={trackId} onChange={event => { setTrackId(event.target.value); setTargets({}); setMessage(''); }}><option value="">{t('romanization.newLatin')}</option>
@@ -142,13 +158,14 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
         </Select></label>
         <label className={styles.kanaHighlight}>{t('kana.characters')}<input aria-label={t('kana.characters')} value={highlightInput} aria-invalid={Boolean(highlightError)} onChange={event => { setHighlightInput(event.target.value); if (!composing.current) updateHighlight(event.target.value); }} onCompositionEnd={event => updateHighlight(event.currentTarget.value)} /></label></div>
         {highlightError && <span role="alert">{highlightError}</span>}
-        <label>{t('romanization.output')}<Tooltip content={t('romanization.switchClears')} id="romanization-mode-help"><Select aria-label={t('romanization.output')} aria-describedby="romanization-mode-help" disabled={isComposing} value={kind} onChange={event => {
+        <label>{t('romanization.output')}<Tooltip content={t('romanization.switchClears')} id="romanization-mode-help"><Select aria-label={t('romanization.output')} aria-describedby="romanization-mode-help" disabled={isComposing || particles === null} value={kind} onChange={event => {
           if (composing.current) return;
           const next = event.target.value as RomanizationKind;
-          setKind(next); setRows(proposeRomanization(source, sourceIds, next)); setMessage(''); setFocusedRow(null);
+          setKind(next); setRows(proposeRomanization(source, sourceIds, next, particles ?? [])); setMessage(''); setFocusedRow(null);
           preferences.setItem(modeStorage, next);
         }}><option value="plain">{t('romanization.plain')}</option><option value="timed">{t('romanization.timed')}</option></Select></Tooltip></label>
       </div>
+      {particles === null && <p role={analysisError ? 'alert' : 'status'}>{analysisError || t('settings.particleLoading')}{analysisError && <button data-role="secondary" onClick={() => setAttempt(value => value + 1)}>{t('common.retry')}</button>}</p>}
       <div ref={scroll} data-proposal-count={rows.length} className={`${styles.rubyGenerationRows} ${virtualized ? styles.rubyGenerationRowsVirtual : ''}`}>
         <div style={virtualized ? { position: 'relative', height: virtualizer.getTotalSize() } : { display: 'grid', gap: 8 }}>
           {shown.map(({ row, item }) => {

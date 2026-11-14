@@ -1467,6 +1467,14 @@
               "type": "boolean",
               "default": false
             }
+          },
+          {
+            "name": "convert_particles",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
           }
         ],
         "responses": {
@@ -2131,6 +2139,68 @@
         "responses": {
           "204": {
             "description": "Media page lease updated"
+          }
+        }
+      }
+    },
+    "/api/v1/reading/particles": {
+      "post": {
+        "operationId": "analyzeParticles",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadingSnapshot"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Whole-line particle positions in Unicode code points",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ranges"
+                  ],
+                  "properties": {
+                    "ranges": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "line_id",
+                          "start",
+                          "end",
+                          "reading"
+                        ],
+                        "properties": {
+                          "line_id": {
+                            "type": "string"
+                          },
+                          "start": {
+                            "type": "integer"
+                          },
+                          "end": {
+                            "type": "integer"
+                          },
+                          "reading": {
+                            "type": "string",
+                            "enum": [
+                              "わ",
+                              "え"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -3841,7 +3911,11 @@
           "clear_unmatched",
           "merge_short_gaps",
           "gap_threshold_ms",
-          "smart_extend"
+          "smart_extend",
+          "latin_normalize",
+          "strip_tone_digits",
+          "model_preview",
+          "convert_particles"
         ],
         "properties": {
           "revision": {
@@ -3881,6 +3955,18 @@
             "description": "Strict gap threshold in original-axis milliseconds; normalized to 500 when disabled"
           },
           "smart_extend": {
+            "type": "boolean"
+          },
+          "latin_normalize": {
+            "type": "boolean"
+          },
+          "strip_tone_digits": {
+            "type": "boolean"
+          },
+          "model_preview": {
+            "type": "string"
+          },
+          "convert_particles": {
             "type": "boolean"
           }
         }

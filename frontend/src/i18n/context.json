@@ -11356,5 +11356,113 @@
     "source": "时间轴暂存区",
     "params": [],
     "parameterNotes": {}
+  },
+  "settings.studio": {
+    "context": "Studio preferences window",
+    "source": "Studio 设置",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.project": {
+    "context": "Studio preferences window",
+    "source": "项目设置",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.appearance": {
+    "context": "Studio preferences window",
+    "source": "外观与布局",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.reading": {
+    "context": "Studio preferences window",
+    "source": "注音与拉丁化",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.modelsCompute": {
+    "context": "Studio preferences window",
+    "source": "模型与计算",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.openProject": {
+    "context": "Studio preferences window",
+    "source": "请先打开项目",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.theme": {
+    "context": "Studio preferences window",
+    "source": "主题",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.resetWidths": {
+    "context": "Studio preferences window",
+    "source": "恢复默认栏宽",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.latinization": {
+    "context": "Studio preferences window",
+    "source": "拉丁化",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.convertParticles": {
+    "context": "Studio preferences window",
+    "source": "自动转换日语助词读音",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.particleHelp": {
+    "context": "Studio preferences window",
+    "source": "将无注音正文中作为助词的「は／へ」按「わ／え」转换，用于自动对齐和日文罗马音生成。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.defaultHighlight": {
+    "context": "Studio preferences window",
+    "source": "音译高亮字符默认值",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.alignmentDefaults": {
+    "context": "Studio preferences window",
+    "source": "对齐默认值",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.defaultModel": {
+    "context": "Studio preferences window",
+    "source": "默认对齐模型",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.defaultModelMissing": {
+    "context": "Studio preferences window",
+    "source": "默认模型不可用，请选择模型",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.particleLoading": {
+    "context": "Studio preferences window",
+    "source": "正在分析日语助词…",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.gpuHelp": {
+    "context": "Studio preferences window",
+    "source": "优先使用 GPU，不可用时使用 CPU。运行失败后可使用 CPU 重试。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.cpuPackage": {
+    "context": "Studio preferences window",
+    "source": "当前为 CPU 包，使用 CPU。",
+    "params": [],
+    "parameterNotes": {}
   }
 }

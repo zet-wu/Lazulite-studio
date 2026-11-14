@@ -36,11 +36,13 @@ export const preferences = {
 export function savePreference(key: string, value: string | null): Promise<void> {
   if (!current) {
     if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+    window.dispatchEvent(new Event('studio-preference-change'));
     return Promise.resolve();
   }
   const before = current.values[key];
   if ((value ?? undefined) === before) return pending;
   if (value === null) delete current.values[key]; else current.values[key] = value;
+  window.dispatchEvent(new Event('studio-preference-change'));
   const operation = pending.then(async () => {
     // Read a fresh version so disjoint changes in other tabs are preserved.
     const latest = await read();
@@ -53,6 +55,7 @@ export function savePreference(key: string, value: string | null): Promise<void>
     if (current && current.values[key] === (value ?? undefined)) {
       if (before === undefined) delete current.values[key]; else current.values[key] = before;
     }
+    window.dispatchEvent(new Event('studio-preference-change'));
     throw error;
   });
   pending = operation.catch((error: unknown) => {

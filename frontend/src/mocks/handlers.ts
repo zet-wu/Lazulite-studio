@@ -11,6 +11,9 @@ let searchConditions={title:'',artist:'',album:''};
 
 const mockPreferences = {version:1,revision:0,library_id:'00000000000000000000000000000001',values:{} as Record<string,string>};
 export const handlers = [
+  // Synthetic demo analysis; linguistic behavior is exercised against the real service.
+  http.post(`${root}/reading/particles`, () => response({ranges:[]})),
+
   http.get(`${root}/runtime`,()=>response({library_id:mockPreferences.library_id})),
   http.get(`${root}/settings`,()=>HttpResponse.json(mockPreferences,{headers:{ETag:`"${mockPreferences.revision}"`}})),
   http.patch(`${root}/settings`,async({request})=>{

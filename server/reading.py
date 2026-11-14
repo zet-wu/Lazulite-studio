@@ -21,6 +21,9 @@ class ReadingProposal:
 
 
 class ReadingProposer(Protocol):
+    def particles(self, lines: Sequence[Mapping[str, str]]) -> list[dict]:
+        """Return は/へ particle positions using whole-line code-point offsets."""
+
     def propose(self, lines: Sequence[Mapping[str, str]]) -> Sequence[ReadingProposal]:
         """Return whole-word proposals using code-point offsets in each line."""
 

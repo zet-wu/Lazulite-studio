@@ -5,21 +5,21 @@ import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
 import { importDictionary, listDictionaries, removeDictionary, type DictionaryInfo, type DictionaryInstall } from '../../adapters/http/dictionaries';
 import { IconButton } from '../../shared/Controls';
-import { SettingsDialog } from './SettingsDialog';
+import { SettingsPanel } from './SettingsDialog';
 import styles from './dictionary-ruby.module.css';
 
 export function dictionaryLabel(item:DictionaryInfo) {
   const m=item.manifest;
   return m?`${String(m.name)} · ${String(m.version)} · ${String(m.region)}`:item.id;
 }
-export function DictionaryManager({close}:{close:()=>void}) {
+export function DictionaryManager({close, embedded}:{close:()=>void; embedded?:boolean}) {
   useTranslation();
   const [items,setItems]=useState<DictionaryInfo[]>([]),[error,setError]=useMessageText(''),[busy,setBusy]=useState(false),[installed,setInstalled]=useState<number|null>(null);
   const [pending,setPending]=useState<{file:File;info:DictionaryInstall}|null>(null),[removing,setRemoving]=useState<DictionaryInfo|null>(null);
   const refresh=async()=>{const result=await listDictionaries();setItems(result.dictionaries);setError(result.errors.join(t('notice.separator')));};
   useEffect(()=>{const abort=new AbortController();void listDictionaries(abort.signal).then(r=>{setItems(r.dictionaries);setError(r.errors.join(t('notice.separator')));}).catch(e=>{if(!abort.signal.aborted)setError(errorMessage(e));});return()=>abort.abort();},[]);
   const run=async(action:()=>Promise<void>)=>{setBusy(true);setError('');try{await action();}catch(e){setError(errorMessage(e));}finally{setBusy(false);}};
-  return <SettingsDialog returnFocus={()=>document.querySelector<HTMLElement>('[data-top-menu="settings"] summary')} title={t('dictionary.title')} close={()=>{if(!busy)close();}}>
+  return <SettingsPanel embedded={embedded} returnFocus={()=>document.querySelector<HTMLElement>('[data-settings-button]')} title={t('dictionary.title')} close={()=>{if(!busy)close();}}>
     <div className={styles.manager}>
       <label>{t('dictionary.import')}<input type="file" accept=".zip" disabled={busy} onChange={e=>{
         const file=e.target.files?.[0];e.target.value='';if(file)void run(async()=>{setPending({file,info:await importDictionary(file,true)});});
@@ -45,7 +45,7 @@ export function DictionaryManager({close}:{close:()=>void}) {
         </div></div>}
       </section>)}
     </div>
-  </SettingsDialog>;
+  </SettingsPanel>;
 }
 
 const t=i18n.t.bind(i18n);

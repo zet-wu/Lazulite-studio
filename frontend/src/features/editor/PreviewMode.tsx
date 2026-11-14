@@ -1,3 +1,4 @@
+import { usePreference } from '../../adapters/studio-preferences';
 import { i18n } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { Select } from '../../shared/Select';
@@ -13,11 +14,11 @@ import styles from './semantic-editor.module.css';
 export function PreviewMode({ document, transport, onSelectLine }: { document: LyricDocument; transport?: RefObject<TransportHandle | null>; onSelectLine?: (id: string) => void }) {
   useTranslation();
   const player = useRef<LyricPlayerRef>(null);
-  const [showTranslation, setShowTranslation] = useState(true);
-  const [showRomanization, setShowRomanization] = useState(true);
+  const [showTranslation, setShowTranslation] = usePreference('studio:preview-translation', true);
+  const [showRomanization, setShowRomanization] = usePreference('studio:preview-romanization', true);
   const [romanizationTrackId, setRomanizationTrackId] = useState<string | null>(null);
-  const [fadeWidth, setFadeWidth] = useState(0.5);
-  const [hidePassed, setHidePassed] = useState(false);
+  const [fadeWidth, setFadeWidth] = usePreference('studio:preview-fade', 0.5);
+  const [hidePassed, setHidePassed] = usePreference('studio:preview-hide', false);
   const [playing, setPlaying] = useState(false);
   const [localTime, setLocalTime] = useState(0);
   const lines = useMemo(() => toAmllLines(document, showTranslation, showRomanization, romanizationTrackId), [document, showTranslation, showRomanization, romanizationTrackId]);

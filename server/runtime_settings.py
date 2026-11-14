@@ -11,6 +11,8 @@ from .atomic_file import write_atomic
 UI_LANGUAGES = {language['id'] for language in json.loads(Path(__file__).with_name('ui_languages.json').read_text(encoding='utf-8')) if language['complete']}
 
 PREFERENCE_KEYS = {
+    'studio:convert-particles', 'studio:kana-highlight', 'studio:alignment-defaults', 'studio:alignment-model',
+    'studio:preview-translation', 'studio:preview-romanization', 'studio:preview-hide', 'studio:preview-fade',
     'lazulite-editor-theme', 'lazulite-shortcuts',
     'lazulite-editor-columns', 'studio.playback-rate',
     'studio:sync-mode', 'studio:sync-offset',
@@ -55,6 +57,22 @@ class RuntimeSettings:
             for key, value in changes.items():
                 if not allowed_key(key): raise ValueError('不支持的偏好字段')
                 if value is not None and (not isinstance(value, str) or len(value) > 16384): raise ValueError('偏好值无效')
+                if value is not None and key in {'studio:convert-particles', 'studio:preview-translation', 'studio:preview-romanization', 'studio:preview-hide'} and value not in {'true', 'false'}:
+                    raise ValueError('设置值必须为布尔值')
+                if value is not None and key == 'studio:preview-fade' and not 0.05 <= float(value) <= 1.5:
+                    raise ValueError('渐变宽度必须在 0.05 到 1.5 之间')
+                if value is not None and key == 'studio:alignment-defaults':
+                    defaults = json.loads(value)
+                    flags = {'latin_normalize', 'strip_tone_digits', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps'}
+                    if not isinstance(defaults, dict) or set(defaults) - (flags | {'gap_threshold_ms'}) or any(type(v) is not bool for k, v in defaults.items() if k in flags):
+                        raise ValueError('对齐默认参数无效')
+                    threshold = defaults.get('gap_threshold_ms', 500)
+                    if type(threshold) is not int or not 0 < threshold <= 9007199254740991:
+                        raise ValueError('行内空隙阈值必须为正的安全整数毫秒')
+                if value is not None and key == 'studio:alignment-model':
+                    model = json.loads(value)
+                    if not isinstance(model, dict) or set(model) != {'name', 'type'} or not all(isinstance(v, str) and v for v in model.values()) or model['name'] in {'.', '..'} or '/' in model['name'] or '\\' in model['name']:
+                        raise ValueError('默认模型需要子目录名和模型类型')
                 if key == 'studio:ui-language' and value not in UI_LANGUAGES: raise ValueError('界面语言未注册')
                 if key.startswith('device.') and value not in {'auto', 'cpu'}: raise ValueError('设备只能选择自动或 CPU')
                 if key == 'alignment.models_dir' and value is not None:

@@ -8,7 +8,7 @@ vi.mock('../../domain/romanization-generation', async importOriginal => {
   const actual = await importOriginal<typeof import('../../domain/romanization-generation')>();
   return { ...actual, proposeRomanization: vi.fn(actual.proposeRomanization) };
 });
-beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); localStorage.setItem('lazulite-romanization-mode:project:first', 'plain'); });
+beforeEach(() => { localStorage.setItem('studio:convert-particles','false'); vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); localStorage.setItem('lazulite-romanization-mode:project:first', 'plain'); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
 it('generates only at entry and mode change, blocks a changed source without replacing manual text', () => {
   const doc = createLyricDocument('きゃ'), apply = vi.fn(() => true), close = vi.fn();
@@ -117,4 +117,28 @@ it('keeps kana source hints after manual edits and updates dialog highlights wit
   expect(proposeRomanization).toHaveBeenCalledTimes(1);
   view.unmount(); render(<RomanizationGenerationDialog {...props} />);
   expect(screen.getByLabelText('L1单元 1音译').getAttribute('aria-description')).toContain('は、へ、を');
+});
+
+it('waits for particle analysis, retries failure, shares results across modes and keeps manual candidates', async () => {
+  localStorage.setItem('studio:convert-particles','true');
+  localStorage.setItem('studio:kana-highlight','へ');
+  let resolve!: (value:Response)=>void;
+  const fetch=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({detail:{message:'analysis unavailable'}}),{status:503})).mockImplementationOnce(()=>new Promise<Response>(done=>{resolve=done;}));
+  vi.stubGlobal('fetch',fetch);
+  const doc=createLyricDocument('わたしは'),props={document:doc,lineIds:[doc.lines[0].id],preferenceScope:'project:first',apply:vi.fn(()=>true),close:vi.fn()};
+  const view=render(<RomanizationGenerationDialog {...props}/>);
+  expect(screen.getByLabelText('高亮假名')).toHaveValue('へ');
+  await screen.findByText('analysis unavailable');
+  fireEvent.click(screen.getByRole('button',{name:'重试'}));
+  expect(screen.getByLabelText('输出')).toBeDisabled();
+  resolve(new Response(JSON.stringify({ranges:[{line_id:doc.lines[0].id,start:3,end:4,reading:'わ'}]})));
+  const input=await screen.findByLabelText('L1音译');
+  expect(input).toHaveValue('watashiwa');
+  fireEvent.change(input,{target:{value:'manual'}});
+  view.rerender(<RomanizationGenerationDialog {...props} document={{...doc}}/>);
+  expect(screen.getByLabelText('L1音译')).toHaveValue('manual');
+  expect(screen.getByRole('button',{name:'生成音译'})).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('输出'),{target:{value:'timed'}});
+  expect(screen.getByLabelText('L1单元 1音译')).toHaveValue('watashiwa');
+  expect(fetch).toHaveBeenCalledTimes(2);
 });

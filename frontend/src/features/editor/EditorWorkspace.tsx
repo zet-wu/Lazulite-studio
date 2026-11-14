@@ -28,7 +28,6 @@ import { SelectionProvider, useEditorSelection } from './SelectionContext';
 import { flushSync } from 'react-dom';
 import { JapaneseRubyDialog } from './JapaneseRubyDialog';
 import { DictionaryRubyDialog } from './DictionaryRubyDialog';
-import { DictionaryManager } from './DictionaryManager';
 import { Select } from '../../shared/Select';
 import { useAudioReview } from '../AudioReviewContext';
 import { AlignmentPanel, type AlignmentControl } from '../AlignmentPanel';
@@ -165,10 +164,9 @@ function EditorWorkspaceContent(props: Props) {
   const cue=props.project?.karaoke.cues.find(c=>c.id===selectedCue);
   const [validationTab,setValidationTab]=useState<ValidationTab>('lyrics');
   const [focusRule,setFocusRule]=useState<AmllRule>();
-  const [amllOpen,setAmllOpen]=useState(false);
-  const amllNavigating=useRef(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [columns, setColumns] = useState(readColumnPreferences);
+  useEffect(()=>{const sync=()=>setColumns(readColumnPreferences());window.addEventListener('studio-preference-change',sync);return()=>window.removeEventListener('studio-preference-change',sync);},[]);
   const layoutRef = useRef<HTMLDivElement>(null);
   const outlineRef = useRef<HTMLElement>(null), inspectorRef = useRef<HTMLElement>(null), mainRef = useRef<HTMLElement>(null);
   const [layoutWidth, setLayoutWidth] = useState(1280);
@@ -217,7 +215,6 @@ function EditorWorkspaceContent(props: Props) {
   const [japaneseRuby, setJapaneseRuby] = useState<string[] | null>(null);
   const [dictionaryRuby, setDictionaryRuby] = useState<string[] | null>(null);
   const [shapeConversion, setShapeConversion] = useState<string[] | null>(null);
-  const [dictionaryManager, setDictionaryManager] = useState(false);
   const canvasComposing = useRef(false), editRejected = useRef(false);
   const finishForAudioImport=useLiveCallback(()=>{
     if(canvasComposing.current||!finishSyncDraft())return false;
@@ -883,7 +880,7 @@ function EditorWorkspaceContent(props: Props) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
-    <EditorMenu {...props} onDictionaryManager={() => setDictionaryManager(true)} editingLocked={props.alignment?.locked} onAmllSettings={props.project&&props.applyProject?()=>{amllNavigating.current=false;setActiveMenuId(null);setAmllOpen(true);}:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />
+    <EditorMenu {...props} editingLocked={props.alignment?.locked} amllSettings={props.project&&props.applyProject?close=><AmllSettings project={props.project!} apply={command=>{if(props.alignment?.locked)return;try{props.applyProject!(command);}catch(e){setMessage(errorMessage(e));}}} locate={rule=>{close();setValidationTab('amll');setFocusRule(rule);setMode('package');}}/>:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />
     <div ref={audioReview?.setTaskHost} />
     <div ref={audioReview?.setMessageHost} />
     <MessageBar notice={message} />
@@ -1044,12 +1041,6 @@ function EditorWorkspaceContent(props: Props) {
     <DialogEditingLocked.Provider value={Boolean(props.alignment?.locked)}>
     {settingsDialog === 'translations' && <TranslationTrackDialog document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'metadata' && <SettingsDialog title={t('editor.metadata')} close={() => setSettingsDialog(null)}><MetadataPanel document={document} apply={dispatch} projectId={props.projectId} sourceAssetId={props.sourceAssetId} /></SettingsDialog>}
-    {amllOpen&&props.project&&props.applyProject&&<SettingsDialog title={t('editor.amllSettings')} subtitle={t('editor.settingsScope')} close={()=>setAmllOpen(false)}
-      returnFocus={()=>amllNavigating.current?null:globalThis.document.querySelector<HTMLElement>('[data-top-menu="settings"] > summary')??null}
-      actions={<button data-role="secondary" onClick={()=>setAmllOpen(false)}>{t('common.close')}</button>}>
-      <AmllSettings project={props.project} apply={command=>{if(props.alignment?.locked)return;try{props.applyProject!(command);}catch(e){setMessage(errorMessage(e));}}}
-        locate={rule=>{amllNavigating.current=true;setAmllOpen(false);setValidationTab('amll');setFocusRule(rule);setMode('package');}}/>
-    </SettingsDialog>}
     {settingsDialog === 'singers' && !props.project?.amll.simplified && <SingerDialog focusAgent={focusAgent} document={document} apply={dispatch} close={() => setSettingsDialog(null)} />}
     {settingsDialog === 'tracks' && <SettingsDialog title={t('editor.romanizationTrackManagement')} close={() => setSettingsDialog(null)}><div className={styles.trackManager}>
       {document.romanizationTracks.map((track, index) => <div key={track.id}><strong>{t('editor.track')}{index + 1}</strong>
@@ -1098,7 +1089,6 @@ function EditorWorkspaceContent(props: Props) {
       submit={plan => dispatch({ type: 'split-line', ...plan })} />}
     {contextMenu && !props.alignment?.locked && <ContextMenu returnFocus={()=>focusObject(contextMenu.target.isConnected ? contextMenu.target : mainRef.current!)} target={contextMenu.target} x={contextMenu.x} y={contextMenu.y} title={contextMenu.title} actions={contextMenu.actions} close={closeContext} />}
     </DialogEditingLocked.Provider>
-    {dictionaryManager && <DictionaryManager close={() => setDictionaryManager(false)} />}
   </div>;
 }
 

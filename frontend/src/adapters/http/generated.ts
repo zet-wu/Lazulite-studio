@@ -486,6 +486,7 @@ export interface paths {
                     model: string;
                     latin_normalize?: boolean;
                     strip_tone_digits?: boolean;
+                    convert_particles?: boolean;
                 };
                 header?: never;
                 path: {
@@ -865,6 +866,22 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/particles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["analyzeParticles"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1338,6 +1355,10 @@ export interface components {
              */
             gap_threshold_ms: number;
             smart_extend: boolean;
+            latin_normalize: boolean;
+            strip_tone_digits: boolean;
+            model_preview: string;
+            convert_particles: boolean;
         };
         AlignmentResult: {
             /** @constant */
@@ -3115,6 +3136,38 @@ export interface operations {
                 content: {
                     "application/json": {
                         cleanup_pending: boolean;
+                    };
+                };
+            };
+        };
+    };
+    analyzeParticles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadingSnapshot"];
+            };
+        };
+        responses: {
+            /** @description Whole-line particle positions in Unicode code points */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ranges: {
+                            line_id: string;
+                            start: number;
+                            end: number;
+                            /** @enum {string} */
+                            reading: "わ" | "え";
+                        }[];
                     };
                 };
             };

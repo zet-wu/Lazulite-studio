@@ -14,7 +14,7 @@ function lockActions(actions: ReactNode): ReactNode {
   });
 }
 
-export function SettingsDialog({ title, subtitle, close, children, actions, returnFocus }: { title: string; returnFocus?: () => HTMLElement | null; subtitle?: string; actions?: ReactNode; close: () => void; children: ReactNode }) {
+export function SettingsDialog({ title, subtitle, close, children, actions, returnFocus, wide }: { title: string; wide?: boolean; returnFocus?: () => HTMLElement | null; subtitle?: string; actions?: ReactNode; close: () => void; children: ReactNode }) {
   const {t}=useTranslation();
   const locked = useContext(DialogEditingLocked);
   const ref = useRef<HTMLElement>(null);
@@ -23,10 +23,10 @@ export function SettingsDialog({ title, subtitle, close, children, actions, retu
     const initial = ref.current?.querySelector<HTMLElement>('[data-initial-focus]');
     if (initial) initial.focus();
     else if (!ref.current?.contains(document.activeElement)) ref.current?.focus();
-    return () => { if (returnFocus) { returnFocus()?.focus(); return; } const target = previous.current; if (target?.isConnected && !target.matches(':disabled')) target.focus(); else document.querySelector<HTMLElement>('[data-top-menu="settings"] summary')?.focus(); };
+    return () => { if (returnFocus) { returnFocus()?.focus(); return; } const target = previous.current; if (target?.isConnected && !target.matches(':disabled')) target.focus(); else document.querySelector<HTMLElement>('[data-settings-button]')?.focus(); };
   }, []);
   return createPortal(<div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <section ref={ref} tabIndex={-1} className={styles.dialog} role="dialog" aria-modal="true" aria-label={title} onKeyDown={(event) => {
+    <section ref={ref} tabIndex={-1} className={styles.dialog} style={wide ? {width:'min(1100px, 94vw)'} : undefined} role="dialog" aria-modal="true" aria-label={title} onKeyDown={(event) => {
       if (event.nativeEvent.isComposing || event.defaultPrevented) return;
       if (event.key === 'Escape') { event.stopPropagation(); close(); return; }
       if (event.key !== 'Tab') return;
@@ -45,4 +45,9 @@ export function SettingsDialog({ title, subtitle, close, children, actions, retu
       {actions && <div className={styles.dialogActions}>{locked ? lockActions(actions) : actions}</div>}
     </section>
   </div>, document.body);
+}
+
+/** Reuses setting content in the preferences window without a nested modal. */
+export function SettingsPanel({embedded, ...props}: Parameters<typeof SettingsDialog>[0] & {embedded?: boolean}) {
+  return embedded ? <section><h3>{props.title}</h3>{props.subtitle && <p>{props.subtitle}</p>}{props.children}{props.actions && <div className={styles.dialogActions}>{props.actions}</div>}</section> : <SettingsDialog {...props}/>;
 }
