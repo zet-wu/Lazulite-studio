@@ -11,19 +11,18 @@
 
 本项目受 [Apple Music-like Lyrics TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 、[StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame) 、[MiliKara](https://github.com/BilyHurington/MiliKara) 的启发，旨在提供一个 [AMLL TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 编辑能力的超集、以及主要针对日语歌词的自动化注音、对齐工具。
 
-## 为什么使用TTML
+## 为什么使用 TTML
 Lazulite Studio 使用 [TTML2](https://www.w3.org/TR/ttml2/) 格式作为内部歌词格式与主要交换格式，这是由于 TTML2 提供了一个标准且可扩展的歌词字幕模型，能够承载远超原始 LRC 和各类基于 LRC 的扩展格式的数据和结构，包括但不限于：
 - 完善的注音（Ruby）结构支持
-- 完整的行级、词级、注音（Ruby）级时间
+- 完整的，独立的行级、词级、注音（Ruby）级时间
+- 时间轴几乎无任何限制，能够支持叠唱、重唱、非单调时间
 - 稳定的行级 ID，原生能够表达引用、从属等结构
 - 背景行指定以及从属主行结构
-- 重叠主行、重叠的多个背景（原生支持叠唱、重唱）
 - 无上限的、可分别指定语言（建议使用 BCP 47 标准）的独立翻译和音译轨道，支持与正文的从属关系和与正文独立的行级和词级时间
-- 原生的演唱者字段，使用稳定的 ID 管理引用
+- 原生的演唱者字段，使用稳定的 ID 管理引用，并且能够表达虚拟角色与其声优的扮演关系并区分两者
 - 精细到词级的演唱者指定
 
 还有一些 Lazulite Studio 暂不提供编辑能力，但 TTML 能够原生承载的数据，为下游的各类工具提供了极大的扩展性：
-- 演唱者字段能够表达虚拟角色与其声优的扮演关系并区分两者
 - 颜色、位置、动画等字幕样式
 - 更丰富的注音（Ruby）容器与布局，如同时在上下显示注音（Ruby）
 - 引用外部图片资源
