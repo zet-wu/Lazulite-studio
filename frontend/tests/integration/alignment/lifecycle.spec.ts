@@ -118,9 +118,9 @@ test('a server cancellation keeps the row and editing lock until the terminal st
  await expect(page.getByRole('button',{name:'取消任务',exact:true})).toBeDisabled();
  await expect(page.locator('[data-message-bar]').filter({has:page.getByRole('button',{name:'取消任务',exact:true})})).toContainText('正在取消');
  await page.getByRole('button',{name:'编辑',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeDisabled();
- await page.locator('[data-top-menu="settings"] summary').click();await page.getByRole('button',{name:'计算设备'}).click();
- await expect(page.getByRole('dialog',{name:'计算设备',exact:true})).toBeVisible();await page.getByRole('button',{name:'关闭计算设备'}).click();
- await expect(page.locator('[data-top-menu="settings"] summary')).toBeFocused();
+ await page.locator('[data-settings-button]').click();await page.getByRole('button',{name:'模型与计算'}).click();
+ await expect(page.getByRole('dialog',{name:'设置',exact:true})).toBeVisible();await page.getByRole('button',{name:'关闭设置'}).click();
+ await expect(page.locator('[data-settings-button]')).toBeFocused();
  state.status='cancelled';await expect(page.getByRole('textbox',{name:'词 love',exact:true})).toBeEnabled();
 });
 
@@ -140,11 +140,11 @@ test('language changes preserve a running operation and translate its existing r
 
 test('dictionary dialog closes during alignment without cancelling or releasing the edit lock', async ({page}) => {
  const state=await setup(page);
- await page.locator('[data-top-menu="settings"] summary').click();
- await page.getByRole('button',{name:'注音词典',exact:true}).click();
- const dialog=page.getByRole('dialog',{name:'注音词典',exact:true});
+ await page.locator('[data-settings-button]').click();
+ await page.getByRole('button',{name:'注音与拉丁化',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'设置',exact:true});
  await expect(dialog).toBeVisible();
- await dialog.getByRole('button',{name:'关闭注音词典'}).click();
+ await dialog.getByRole('button',{name:'关闭设置'}).click();
  await expect(dialog).toHaveCount(0);
  expect(state.cancels).toBe(0);expect(state.status).toBe('running');
  await page.getByRole('button',{name:'编辑',exact:true}).click();

@@ -129,7 +129,7 @@ test('UI word to empty line, 注音 and romanization drags use the same insertio
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(rubies.first().getByRole('textbox').first()).toHaveValue('ふ');
   // Preserve the source singer when moving to a line without an inherited singer.
-  await page.locator('[data-top-menu=settings] > summary').click();
+  await page.locator('[data-settings-button]').click();
   await page.getByRole('button', { name: 'AMLL 兼容设置', exact: true }).click();
   await page.getByRole('switch', { name: '禁用词级歌手', exact: true }).uncheck();
   await page.keyboard.press('Escape');

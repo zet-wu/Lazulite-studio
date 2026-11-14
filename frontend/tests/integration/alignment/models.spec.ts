@@ -28,15 +28,15 @@ test('models remain explicitly selected and stale input previews cannot enable s
   await page.waitForTimeout(100);
   await expect(start).toBeDisabled();
   await dialog.getByRole('button',{name:'取消',exact:true}).click();
-  await page.locator('[data-top-menu="settings"] summary').click();
-  await page.getByRole('button',{name:'对齐模型管理',exact:true}).click();
+  await page.locator('[data-settings-button]').click();
+  await page.getByRole('button',{name:'模型与计算',exact:true}).click();
   items=[];
   await page.getByRole('button',{name:'刷新模型列表'}).click();
   await expect(page.getByText('没有可用模型，请配置目录并刷新。')).toBeVisible();
-  await page.getByRole('button',{name:'关闭',exact:true}).click();
-  await expect(page.locator('[data-top-menu="settings"] summary')).toBeFocused();
+  await page.getByRole('button',{name:'关闭设置',exact:true}).click();
+  await expect(page.locator('[data-settings-button]')).toBeFocused();
   await page.getByRole('button',{name:'自动对齐',exact:true}).click();
-  await expect(dialog.getByRole('combobox',{name:'对齐模型',exact:true})).toHaveValue('one');
+  await expect(dialog.getByRole('combobox',{name:'对齐模型',exact:true})).toHaveValue('');
   await expect(start).toBeDisabled();
 });
 
@@ -48,9 +48,9 @@ test('settings manager is reachable without a project and refresh keeps the dire
     applied.push(r.request().postDataJSON().path);directory=applied.at(-1)??'/default';await r.fulfill({json:catalog()});
   });
   await page.goto('/projects');
-  await page.locator('[data-top-menu="settings"] summary').click();
-  await page.getByRole('button',{name:'对齐模型管理',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'对齐模型管理'}),input=dialog.getByRole('textbox');
+  await page.locator('[data-settings-button]').click();
+  await page.getByRole('button',{name:'模型与计算',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'设置'}),input=dialog.getByRole('textbox');
   await expect(input).toHaveValue('/active');await input.fill('/draft');
   await dialog.getByRole('button',{name:'刷新模型列表'}).click();
   await expect(dialog.getByRole('button',{name:'刷新模型列表'})).toBeEnabled();
@@ -60,4 +60,24 @@ test('settings manager is reachable without a project and refresh keeps the dire
   await dialog.getByRole('button',{name:'应用目录',exact:true}).click();
   await expect(dialog.getByRole('button',{name:'应用目录',exact:true})).toBeEnabled();
   expect(applied).toEqual(['/draft']);
+});
+
+test('persistent defaults resolve a new model ID while task edits stay temporary',async({page})=>{
+ await page.route('**/api/v1/capabilities',r=>r.fulfill({json:{schema_version:'studio-capabilities-v1',items:[{id:'job.alignment',enabled:true,reason:null}]}}));
+ let id='first';let available=true;
+ await page.route('**/api/v1/alignment-models?*',r=>r.fulfill({json:{directory:'/portable/models',editable:false,items:available?[{id,name:'MMS_FA',type:'torchaudio-mms-fa',status:'ready'}]:[],error:null}}));
+ await page.route('**/alignment-preview?*',r=>r.fulfill({json:{model_preview:'snapshot',line_count:1,skipped_count:0,unknown_count:0,hint_count:0,emitting_count:1}}));
+ await page.goto('/projects/media-offset/edit');
+ await page.locator('[data-settings-button]').click();await page.getByRole('button',{name:'模型与计算',exact:true}).click();
+ await page.getByLabel('默认对齐模型',{exact:true}).selectOption('first');
+ await page.getByLabel('行内空隙阈值（毫秒）').fill('157');await page.getByLabel('行内空隙阈值（毫秒）').blur();
+ await page.getByRole('checkbox',{name:'将短于阈值的行内空隙并入前词',exact:true}).check();await page.keyboard.press('Escape');
+ id='restarted';await page.reload();await page.getByRole('button',{name:'音频处理',exact:true}).click();
+ const open=()=>page.getByRole('button',{name:'自动对齐',exact:true}).click();await open();
+ const dialog=page.getByRole('dialog',{name:'自动对齐',exact:true});
+ await expect(dialog.getByRole('combobox',{name:'对齐模型',exact:true})).toHaveValue('restarted');
+ await expect(dialog.getByLabel('行内空隙阈值（毫秒）')).toHaveValue('157');
+ await dialog.getByLabel('行内空隙阈值（毫秒）').fill('89');await dialog.getByRole('button',{name:'取消',exact:true}).click();
+ await open();await expect(dialog.getByLabel('行内空隙阈值（毫秒）')).toHaveValue('157');await dialog.getByRole('button',{name:'取消',exact:true}).click();
+ available=false;await open();await expect(dialog.getByText('默认模型不可用，请选择模型')).toBeVisible();await expect(dialog.getByRole('button',{name:'开始对齐'})).toBeDisabled();
 });

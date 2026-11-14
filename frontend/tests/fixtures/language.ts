@@ -1,7 +1,6 @@
 import {expect, type Page} from '@playwright/test';
 export async function openLanguage(page: Page) {
- await page.locator('[data-top-menu="settings"] summary').click();
- await page.getByRole('button',{name:/^(界面语言|介面語言|Interface language)$/}).click();
+ await page.locator('[data-settings-button]').click();
  return page.getByRole('dialog');
 }
 export async function chooseLanguage(page: Page, language: string) {

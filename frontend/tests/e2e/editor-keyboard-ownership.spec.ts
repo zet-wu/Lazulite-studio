@@ -6,7 +6,7 @@ for (const conflict of [false,true]) test(`bottom timeline stamp and seek owners
   await page.goto('/projects/sample-project/edit');
   await importLyrics(page,{name:'sync.ttml',mimeType:'application/xml',buffer:Buffer.from(japaneseReadingTtml)});
   if (conflict) {
-    await page.locator('[data-top-menu="settings"] summary').click();
+    await page.locator('[data-settings-button]').click();
     await page.getByRole('button',{name:'快捷键设置',exact:true}).click();
     await page.getByRole('textbox',{name:'后退 1 秒快捷键'}).click(); await page.keyboard.press('s'); await page.keyboard.press('Escape');
   }

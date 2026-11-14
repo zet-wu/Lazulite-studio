@@ -6,13 +6,13 @@ test('custom ZIP installs through UI, fixed units edit, save/reopen/export after
   await page.goto('/projects/background-playback/edit');
   const xml='<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0" end="4"><span begin="0" end="2">重庆</span><span begin="2" end="4">𠮷</span></p></body></tt>';
   await importLyrics(page,{name:'dictionary.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
-  await page.locator('[data-top-menu="settings"] summary').click();
-  await page.getByRole('button',{name:'注音词典',exact:true}).click();
-  const manager=page.getByRole('dialog',{name:'注音词典',exact:true});
+  await page.locator('[data-settings-button]').click();
+  await page.getByRole('button',{name:'注音与拉丁化',exact:true}).click();
+  const manager=page.getByRole('dialog',{name:'设置',exact:true});
   await manager.locator('input[type=file]').setInputFiles(resolve('../tests/fixtures/dictionaries/custom.zip'));
   await manager.getByRole('button',{name:'安装词典',exact:true}).click();
   await expect(manager.getByText('独立契约示例 · 1 · 示例地区',{exact:true})).toBeVisible();
-  await manager.getByRole('button',{name:'关闭注音词典',exact:true}).click();
+  await manager.getByRole('button',{name:'关闭设置',exact:true}).click();
   await page.locator('[data-outline-drag]').first().click({button:'right'});
   await page.getByRole('menuitem',{name:'词典注音',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'词典注音',exact:true});

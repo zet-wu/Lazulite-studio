@@ -77,3 +77,20 @@ def test_preferences_conflicts_identity_and_project_cleanup(tmp_path):
     assert store.read()['values']['studio:workspace-mode:project:q'] == 'edit'
 
     assert store.read()['library_id'] == identity
+
+
+def test_studio_defaults_persist_without_project_data(tmp_path):
+    import json
+    settings = RuntimeSettings(tmp_path / 'settings.json')
+    changes = {'studio:convert-particles':'false','studio:kana-highlight':'',
+               'studio:alignment-defaults':json.dumps({'gap_threshold_ms':321,'use_hints':True}),
+               'studio:alignment-model':json.dumps({'name':'MMS_FA','type':'mms_fa'}),
+               'studio:preview-translation':'false','studio:preview-fade':'0.75'}
+    settings.patch(changes, settings.read()['revision'])
+    reopened = RuntimeSettings(tmp_path / 'settings.json').read()
+    assert reopened['values'] == changes
+    assert reopened['version'] == 1
+    for key, value in [('studio:alignment-defaults','{"gap_threshold_ms":0}'), ('studio:alignment-defaults','{"model_preview":"ephemeral"}'), ('studio:alignment-model','{"name":"../model","type":"mms"}'), ('studio:convert-particles','yes')]:
+        with pytest.raises(ValueError):
+            settings.patch({key:value}, settings.read()['revision'])
+    assert settings.read()['values'] == changes

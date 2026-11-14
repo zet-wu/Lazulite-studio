@@ -31,8 +31,8 @@ test('list language dialog retains focus, supports native arrows, and reports a 
  await page.keyboard.press('ArrowDown');
  await expect(dialog.locator('input[value="en"]')).toBeChecked();
  await expect.poll(async()=>((await(await page.request.get('/api/v1/settings')).json()).values['studio:ui-language'])).toBe('en');
- await page.keyboard.press('Tab');await expect(dialog.getByRole('button')).toBeFocused();
- await page.keyboard.press('Tab');await expect(dialog.locator('input[value="en"]')).toBeFocused();
+ await page.keyboard.press('Tab');await expect(dialog.getByRole('combobox')).toBeFocused();
+ await page.keyboard.press('Shift+Tab');await expect(dialog.locator('input[value="en"]')).toBeFocused();
  let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);
  await page.route('**/api/v1/settings',async route=>{
   if(route.request().method()!=='PATCH')return route.continue();
@@ -40,7 +40,7 @@ test('list language dialog retains focus, supports native arrows, and reports a 
  });
  await dialog.locator('input[value="zh-Hans"]').check();
  await page.keyboard.press('Escape');
- await expect(page.locator('[data-top-menu="settings"] summary')).toBeFocused();
+ await expect(page.locator('[data-settings-button]')).toBeFocused();
  release();
  await expect(page.getByRole('alert')).toContainText('last saved');
  await expect(page.locator('html')).toHaveAttribute('lang','en');
@@ -54,12 +54,12 @@ test('empty library keeps the header through loading and restores the saved them
  let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);
  await page.route('**/api/v1/projects',async route=>{await gate;await route.fulfill({json:{schema_version:'studio-project-list-v1',items:[],next_cursor:null}});});
  await page.goto('/projects');
- await expect(page.locator('[data-top-menu="settings"] summary')).toBeVisible();
+ await expect(page.locator('[data-settings-button]')).toBeVisible();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');release();
- const dialog=await openLanguage(page);await expect(dialog.locator('input:checked')).toBeFocused();await page.keyboard.press('Escape');
- await page.locator('[data-top-menu="settings"] summary').click();
- await expect(page.getByRole('button',{name:'AMLL 设置',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'注音词典',exact:true}).click();
+ const dialog=await openLanguage(page);await expect(dialog.locator('input[type=radio]:checked')).toBeFocused();await page.keyboard.press('Escape');
+ await page.locator('[data-settings-button]').click();
+ await expect(page.getByRole('button',{name:'AMLL 兼容设置',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'注音与拉丁化',exact:true}).click();
  await expect(page.getByRole('dialog')).toContainText('词典');await page.keyboard.press('Escape');
  const latest=await(await page.request.get('/api/v1/settings')).json();
  await page.request.patch('/api/v1/settings',{headers:{origin:'http://127.0.0.1:5175','if-match':`"${latest.revision}"`},data:{changes:{'lazulite-editor-theme':'light'}}});

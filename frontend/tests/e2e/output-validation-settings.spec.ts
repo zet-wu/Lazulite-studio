@@ -3,20 +3,20 @@ import { readFileSync } from 'node:fs';
 import { importLyrics } from '../fixtures/import-lyrics';
 const xml=readFileSync('../tests/fixtures/ttml/amll-rich.ttml','utf8');
 async function settings(page:Page) {
- await page.locator('[data-top-menu=settings] > summary').click();
+ await page.locator('[data-settings-button]').click();
  await expect(page.getByRole('switch',{name:'禁用词级歌手',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'AMLL 兼容设置',exact:true}).click();
- return page.getByRole('dialog',{name:'AMLL 兼容设置',exact:true});
+ return page.getByRole('dialog',{name:'设置',exact:true});
 }
 async function load(page:Page) {
  await page.goto('/projects/sample-project/edit?scenario=no-music');const dialog=await settings(page);
- await dialog.getByRole('switch',{name:'禁用多行背景',exact:true}).uncheck();await dialog.getByRole('switch',{name:'禁用词级歌手',exact:true}).uncheck();await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+ await dialog.getByRole('switch',{name:'禁用多行背景',exact:true}).uncheck();await dialog.getByRole('switch',{name:'禁用词级歌手',exact:true}).uncheck();await dialog.getByRole('button',{name:'关闭设置',exact:true}).click();
  await importLyrics(page,{name:'rich.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
 }
 test('settings dialog restores visible focus and navigates to the requested rule; tabs remember selection',async({page})=>{
- await load(page);await expect(page.locator('[data-top-menu=settings]')).not.toHaveAttribute('open');
- let dialog=await settings(page);await dialog.getByRole('button',{name:'关闭',exact:true}).click();
- await expect(page.locator('[data-top-menu=settings] > summary')).toBeFocused();
+ await load(page);await expect(page.getByRole('dialog',{name:'设置',exact:true})).toHaveCount(0);
+ let dialog=await settings(page);await dialog.getByRole('button',{name:'关闭设置',exact:true}).click();
+ await expect(page.locator('[data-settings-button]')).toBeFocused();
  dialog=await settings(page);await dialog.getByRole('switch',{name:'禁用多行背景',exact:true}).locator('..').locator('..').getByRole('button',{name:'定位兼容问题'}).click();
  await expect(dialog).toHaveCount(0);await expect(page.getByRole('tab',{name:'AMLL 兼容校验',exact:true})).toHaveAttribute('aria-selected','true');
  const target=page.locator('#amll-noMultipleBackgrounds > div > button[aria-expanded]');await expect(target).toHaveAttribute('aria-expanded','true');await expect(target).toBeFocused();
