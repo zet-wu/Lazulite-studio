@@ -11504,21 +11504,5 @@
     "source": "暂存区忽略字符",
     "params": [],
     "parameterNotes": {}
-  },
-  "settings.stagingIgnoredHelp": {
-    "context": "Timeline settings: local display preferences",
-    "source": "隐藏全部由这些字符组成的暂存单元，作为后代上下文所需的祖先仍会显示；留空关闭过滤。默认包含一个半角空格。",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "settings.stagingCharacterCount": {
-    "context": "Timeline settings: local display preferences",
-    "source": "字符集合：{{count}} 个字符",
-    "params": [
-      "count"
-    ],
-    "parameterNotes": {
-      "count": "Number of distinct Unicode code points, including spaces"
-    }
   }
 }
