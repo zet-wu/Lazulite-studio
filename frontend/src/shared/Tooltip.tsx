@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import './tooltip.css';
 
@@ -6,7 +6,7 @@ let hideCurrent: (() => void) | null = null;
 
 /** A small descriptive hint. The persistent description is also available while hidden. */
 export function Tooltip({ children, content, id, as: Tag = 'span', className, ...attributes }: {
-  children: ReactNode; content: string; id?: string; as?: 'span' | 'div'; className?: string;
+  children: ReactNode; content: string; id?: string; as?: 'span' | 'div'; className?: string; style?: CSSProperties;
 }) {
   const generated = useId(), description = id ?? generated;
   const anchor = useRef<HTMLElement>(null), popup = useRef<HTMLDivElement>(null);

@@ -184,4 +184,7 @@
 
 .stagingLabel { display: block; color: var(--muted); font-size: 10px; margin: 0 0 3px var(--timeline-label-width, 36px); }
 
-.stagingSlot { display: flex; flex: 0 1 120px; min-width: 0; }
+.stagingGroup { position: relative; height: 100%; flex: none; }
+.stagingSlot { position: absolute; top: 0; height: 100%; display: flex; min-width: 0; }
+
+.trackBar.stagingBlock[aria-disabled='true'] { opacity: .55; cursor: default; }

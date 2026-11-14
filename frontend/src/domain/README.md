@@ -12,7 +12,7 @@
 
 ## 时间与选择
 
-`sync-editing.ts` 提供连续／本行打轴游标与落点，空拍、忽略及行尾链接由项目 editing 保存。`timeline-editing.ts` 管实际端点与平移，`timelineDelta`／`snapTimelineTime` 为歌词与声学片段共享换算和吸附。`pack-intervals.ts` 按区间派生子轨。
+`sync-editing.ts` 提供连续／本行打轴游标与落点，空拍、忽略及行尾链接由项目 editing 保存。`timeline-editing.ts` 管实际端点与平移，`timelineDelta`／`snapTimelineTime` 为歌词与声学片段共享换算和吸附。`snapTimelineInterval` 比较两端修正量，以起点和候选时间作等距排序，由调用方按完整事务筛选合法位移。暂存分配通过 `prepareTimelineAssignment` 返回真实祖先／同级空隙、固定端点和包含约束，`applyTimelineAssignment` 保持已有后代时间并按需扩展祖先；主轨道平移沿用后代随动。`pack-intervals.ts` 按区间派生子轨。
 
 `timeline-projection.ts` 为单端未知对象计算抓取用显示副本，按真实后代和相邻端点约束，再逐层传播。保存、播放、循环与输出读取真实时间，resize 只提交操作端点。
 

@@ -53,3 +53,13 @@ export function selectionLocation(document: LyricDocument, selection: EditorSele
   const times=intervals.flatMap(item=>item&&(item.beginMs===null||item.endMs===null||item.beginMs<=item.endMs)?[item.beginMs,item.endMs]:[]).filter((value):value is number=>value!==null&&Number.isSafeInteger(value)&&value>=0&&value<=duration);
   return times.length?{beginMs:Math.min(...times),endMs:Math.max(...times)}:null;
 }
+
+export type LyricSnapAnchor={time:number;target?:TimelineTarget;side?:'beginMs'|'endMs'};
+/** Retain endpoint identity: an unrelated boundary at the same time is still usable. */
+export function lyricSnapAnchors(before:LyricDocument,after:LyricDocument|null,excluded:(target:TimelineTarget)=>boolean,external:number[]):LyricSnapAnchor[]{
+  return [...external.map(time=>({time})),...documentTargets(before).filter(target=>!excluded(target)).flatMap(target=>{
+    const old=targetInterval(before,target),next=after?targetInterval(after,target):old;
+    return old&&next?(['beginMs','endMs'] as const).flatMap(side=>old[side]!==null&&old[side]===next[side]?[{time:old[side]!,target,side}]:[]):[];
+  })];
+}
+export const stableSnapAnchor=(anchor:LyricSnapAnchor,document:LyricDocument)=>!anchor.target||targetInterval(document,anchor.target)?.[anchor.side!]===anchor.time;

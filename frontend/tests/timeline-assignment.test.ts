@@ -51,6 +51,6 @@ it('expands only outward, respects end links and keeps attachment children insid
  doc.romanizationTracks=[{id:'t',language:null,contents:[{id:'c',lineId:line.id,kind:'timed',units:[{id:'u',text:'a',beginMs:100,endMs:2500}]}]}];
  expect(assignTimeline(doc,{kind:'line',lineId:line.id},1000,3000).lines[0]).toMatchObject({beginMs:100,endMs:2500});
  const next=assignTimeline(doc,{kind:'ruby',lineId:line.id,wordId:word.id,rubyId:'r'},150,3000);
- expect(next.lines[0].words[0]).toMatchObject({beginMs:100,endMs:450});
+ expect(next.lines[0].words[0]).toMatchObject({beginMs:100,endMs:200}); // Uses the whole saved word interval.
  expect(next.lines[0]).toMatchObject({beginMs:100,endMs:2500});
 });

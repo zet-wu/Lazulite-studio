@@ -13,17 +13,17 @@ import { projectTimeline } from '../domain/timeline-projection';
 import { ContextMenu } from '../shared/ContextMenu';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useEditorSelection } from './editor/SelectionContext';
-import { documentTargets, targetId, targetSelection, selectionKind, selectionTargets, targetInterval } from './editor/selection-targets';
+import { lyricSnapAnchors, stableSnapAnchor, documentTargets, targetId, targetSelection, selectionKind, selectionTargets, targetInterval } from './editor/selection-targets';
 import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { LyricCommand } from '../domain/lyric-commands';
 import type { LyricDocument, LyricWord, RomanizationContent } from '../domain/lyric-document';
-import { moveTimeline, resizeTimeline, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
+import { moveTimeline, resizeTimeline, snapTimelineInterval, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
 import { packIntervals } from '../domain/pack-intervals';
 import styles from './media.module.css';
 
 type Props = { locked?: boolean; document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
-  visible: { karaoke: boolean; line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
+  visible: { staging?: boolean; karaoke: boolean; line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
   onLocate?: (begin:number,end:number)=>void;
   externalAnchors?: number[]; durationMs?: number | null;
   apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string | Message) => void };
@@ -91,7 +91,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
   const spanMs = Math.max(1, endMs - startMs);
   const mainLines = displayed.lines;
   const ordinalById = new Map(mainLines.filter(item => !item.backgroundOf).map((item, index) => [item.id, index + 1]));
-  const line = displayed.lines.find((item) => item.id === selectedLineId) ?? displayed.lines.find((item) => !item.backgroundOf);
+  const line = displayed.lines.find((item) => item.id === selectedLineId);
   const intersects = (begin: number | null, end: number | null) => timed(begin, end) && end! >= startMs && begin! <= endMs;
   const overview = mainLines.filter(item => intersects(item.beginMs, item.endMs));
   const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => intersects(item.beginMs, item.endMs)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs]);
@@ -135,13 +135,24 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       unsnapped = current.side === 'move' ? moveTimeline(document, moving, delta, editing)
         : resizeTimeline(document, current.target, current.side as 'beginMs' | 'endMs', proposed, editing);
     } catch { /* Invalid candidates still receive the normal validation below. */ }
-    const candidateAnchors = [...externalAnchors, ...allTargets.filter(item => !excluded(item)).flatMap(item => {
-      const before = targetInterval(document, item), after = targetInterval(unsnapped, item);
-      return before && after ? (['beginMs', 'endMs'] as const).flatMap(side => before[side] !== null && before[side] === after[side] ? [before[side]!] : []) : [];
-    })];
-    if (bpm > 0) for (let time = Math.ceil(startMs / (60000 / bpm)) * (60000 / bpm); time <= endMs && candidateAnchors.length < 20000; time += 60000 / bpm) candidateAnchors.push(Math.round(time));
-    const timeMs = current.side === 'select' || current.side === 'pan' ? proposed
-      : snapTimelineTime(proposed, candidateAnchors, spanMs, current.width, snap);
+    const options=lyricSnapAnchors(document,current.side==='move'?null:unsnapped,excluded,externalAnchors);
+    if(bpm>0)for(let time=Math.ceil(startMs/(60000/bpm))*(60000/bpm);time<=endMs&&options.length<20000;time+=60000/bpm)options.push({time:Math.round(time)});
+    const validate=(next:LyricDocument,time:number)=>{
+      if(durationMs===null)throw new MessageError(describeMessage('timeline.sourceUnknown'));
+      if(projectContext){
+        const command:LyricCommand=current.side==='move'&&moving.every(item=>item.kind==='line')?{type:'shift-lines',lineIds:moving.map(item=>item.lineId),deltaMs:time-current.originalMs}:{type:'replace-document',document:next};
+        const nextProject=executeProjectCommand(createProjectEditorState(projectContext.project),{type:'lyrics',command});
+        assertChangedTimes(projectTimes(projectContext.project),projectTimes(nextProject.present),durationMs);
+      }else assertChangedTimes(lyricTimes(document),lyricTimes(next),durationMs);
+    };
+    let timeMs=proposed;
+    if(current.side==='move'&&current.target){
+      const interval=targetInterval(document,current.target)!;
+      const correction=snapTimelineInterval(interval.beginMs!+delta,interval.endMs!+delta,options.map(option=>option.time),spanMs,current.width,snap,(correction,index)=>{
+        try{const next=moveTimeline(document,moving,delta+correction,editing);validate(next,proposed+correction);return stableSnapAnchor(options[index],next);}catch{return false;}
+      });
+      timeMs+=correction;
+    }else if(current.side!=='select'&&current.side!=='pan')timeMs=snapTimelineTime(proposed,options.map(option=>option.time),spanMs,current.width,snap);
     const candidate: Drag['candidate'] = { timeMs, document, error: '' };
     if (current.target && Math.abs(event.clientX - current.x) >= 3) {
       const target = current.target;
@@ -150,13 +161,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
         candidate.document = current.side === 'move'
           ? moveTimeline(document, moving, timeMs - current.originalMs, editing)
           : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs, editing);
-        if (projectContext) {
-          const command: LyricCommand = current.side === 'move' && moving.every(item => item.kind === 'line')
-            ? { type:'shift-lines',lineIds:moving.map(item=>item.lineId),deltaMs:timeMs-current.originalMs }
-            : { type:'replace-document',document:candidate.document };
-          const nextProject=executeProjectCommand(createProjectEditorState(projectContext.project),{type:'lyrics',command});
-          assertChangedTimes(projectTimes(projectContext.project),projectTimes(nextProject.present),durationMs);
-        } else assertChangedTimes(lyricTimes(document),lyricTimes(candidate.document),durationMs);
+        validate(candidate.document,timeMs);
       } catch (cause) { candidate.error = errorMessage(cause); }
       onError(candidate.error);
     } else if (current.target) candidate.timeMs = current.originalMs;
@@ -295,7 +300,7 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     })}
     </div></div>
     {visible.gap && line && row('gaps', gaps.map(({ left, right, beginMs, endMs, overlap }) => <button data-role="secondary" disabled={locked} key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? t('timeline.removeOverlap') : t('timeline.closeGap')} onClick={() => closeGap(left, right)}>{overlap ? t('timeline.overlap') : t('timeline.gap')}</button>),[],1,t('timeline.gap'))}
-    <TimelineStaging document={document} startMs={startMs} endMs={endMs} durationMs={durationMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const item=targetInterval(document,target);return item?[item.beginMs,item.endMs].filter((n):n is number=>n!==null):[];})]} locked={locked} visible={visible} host={tracksRef} apply={apply} onLocate={onLocate} onError={onError}/>
+    {visible.staging !== false && <TimelineStaging document={document} startMs={startMs} endMs={endMs} durationMs={durationMs} snap={snap} bpm={bpm} anchors={externalAnchors} locked={locked} visible={visible} host={tracksRef} apply={apply} onLocate={onLocate} onError={onError}/>}
   </div>;
 }
 

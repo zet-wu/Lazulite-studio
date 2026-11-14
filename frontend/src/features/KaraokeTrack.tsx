@@ -7,7 +7,7 @@ import { useKaraokeProject } from './KaraokeContext';
 import { useEditorSelection } from './editor/SelectionContext';
 import { cueProblem, type KaraokeCue } from '../domain/karaoke';
 import { packIntervals } from '../domain/pack-intervals';
-import { snapTimelineTime, timelineDelta } from '../domain/timeline-editing';
+import { snapTimelineInterval, snapTimelineTime, timelineDelta } from '../domain/timeline-editing';
 import styles from './karaoke.module.css';
 type Drag = { cue: KaraokeCue; side:'move'|'beginMs'|'endMs'; x:number; width:number; beginMs:number; endMs:number; error:string | Message; pointer:number; element:HTMLElement };
 export function KaraokeTrack({startMs,endMs,snap,bpm,anchors,onError,durationMs=null}:{durationMs?:number|null;startMs:number;endMs:number;snap:boolean;bpm:number;anchors:number[];onError:(message:string | Message)=>void}) {
@@ -29,7 +29,14 @@ export function KaraokeTrack({startMs,endMs,snap,bpm,anchors,onError,durationMs=
   let time=(value.side==='endMs'?value.cue.endMs:value.cue.beginMs)+timelineDelta(e.clientX-value.x,value.width,span);
   const options=[...anchors,...project.karaoke.cues.filter(c=>c.id!==value.cue.id).flatMap(c=>[c.beginMs,c.endMs])];
   if(bpm>0)for(let t=Math.ceil(startMs/(60000/bpm))*60000/bpm;t<=endMs&&options.length<20000;t+=60000/bpm)options.push(Math.round(t));
-  time=snapTimelineTime(time,options,span,value.width,snap);
+  if(value.side==='move'){
+    const length=value.cue.endMs-value.cue.beginMs;
+    time+=snapTimelineInterval(time,time+length,options,span,value.width,snap,delta=>{
+      const cue={...value.cue,beginMs:time+delta,endMs:time+length+delta};
+      if(cueProblem(project.lyrics,project.karaoke,cue))return false;
+      try{assertChangedTimes([{...value.cue,kind:'cue',lineId:value.cue.anchor.lineId}],[{...cue,kind:'cue',lineId:cue.anchor.lineId}],durationMs);return true;}catch{return false;}
+    });
+  }else time=snapTimelineTime(time,options,span,value.width,snap);
   const beginMs=value.side==='endMs'?value.cue.beginMs:time,end=value.side==='move'?time+value.cue.endMs-value.cue.beginMs:value.side==='endMs'?time:value.cue.endMs;
   let error: string | Message=cueProblem(project.lyrics,project.karaoke,{...value.cue,beginMs,endMs:end}) ? message(cueProblem(project.lyrics,project.karaoke,{...value.cue,beginMs,endMs:end})!) : '';
   try { assertChangedTimes([{...value.cue,kind:'cue',lineId:value.cue.anchor.lineId}],[{...value.cue,beginMs,endMs:end,kind:'cue',lineId:value.cue.anchor.lineId}],durationMs); } catch(cause) { error=errorMessage(cause); }

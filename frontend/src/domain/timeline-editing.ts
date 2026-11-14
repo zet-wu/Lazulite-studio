@@ -136,6 +136,17 @@ export const timelineDelta = (pixels: number, width: number, spanMs: number) => 
 export const snapTimelineTime = (timeMs: number, anchors: number[], spanMs: number, width: number, enabled: boolean) =>
   Math.round(enabled ? snapTime(timeMs, anchors, spanMs * 8 / width) : timeMs);
 
+/** Compare both ends, preserving duration; callers validate their own complete transaction. */
+export function snapTimelineInterval(beginMs:number,endMs:number,anchors:number[],spanMs:number,width:number,enabled:boolean,accept:(delta:number,anchorIndex:number)=>boolean=()=>true):number {
+  if(!enabled)return 0;
+  const tolerance=spanMs*8/width;
+  const candidates=anchors.flatMap((time,anchorIndex)=>[beginMs,endMs].map((end,side)=>({delta:Math.round(time-end),time,side,anchorIndex})))
+    .filter(candidate=>Math.abs(candidate.delta)<=tolerance)
+    .sort((a,b)=>Math.abs(a.delta)-Math.abs(b.delta)||a.side-b.side||a.time-b.time);
+  for(const candidate of candidates)if(accept(candidate.delta,candidate.anchorIndex))return candidate.delta;
+  return 0;
+}
+
 function editRomanization(document: LyricDocument, target: Extract<TimelineTarget, { kind: 'romanization' }>, update: (unit: import('./lyric-document').RomanizationUnit) => import('./lyric-document').RomanizationUnit): LyricDocument {
   let found = false;
   const key=target.attachment==='translation'?'translationTracks':'romanizationTracks';
@@ -154,8 +165,9 @@ export function resizeTimeline(document: LyricDocument, target: TimelineTarget, 
   return followChangedEndLinks(document, resizeTarget(document, target, side, timeMs, editing), editing);
 }
 
-/** Assign both endpoints without moving descendants; expand parents in the same transaction. */
-export function assignTimeline(document: LyricDocument, target: TimelineTarget, dropMs: number, durationMs: number, editing = createProjectEditing()): LyricDocument {
+export type TimelineAssignment={beginMs:number;endMs:number;fixed:boolean;minBegin:number;maxEnd:number;childBegin:number;childEnd:number};
+/** Choose allocation from the raw drop, before snapping. Only real ancestors constrain it. */
+export function prepareTimelineAssignment(document: LyricDocument, target: TimelineTarget, dropMs: number, durationMs: number): TimelineAssignment {
   const line = document.lines.find(line => line.id === target.lineId);
   if (!line) throw new MessageError(message('timeline.lineMissing'));
   const word = target.kind === 'word' || target.kind === 'ruby' ? line.words.find(word => word.id === target.wordId) : undefined;
@@ -170,17 +182,44 @@ export function assignTimeline(document: LyricDocument, target: TimelineTarget, 
   const global = target.kind === 'line' ? document.lines : target.kind === 'word' ? document.lines.flatMap(l=>l.words) : target.kind === 'ruby' ? document.lines.flatMap(l=>l.words.flatMap(w=>w.rubyUnits)) : tracks.flatMap(t=>t.contents.flatMap(c=>c.kind==='timed'?c.units:[]));
   const samples = (local.length ? local : global).filter(full);
   let beginMs = Math.round(dropMs), endMs = beginMs + (samples.length ? Math.round(samples.reduce((sum,item)=>sum+item.endMs!-item.beginMs!,0)/samples.length) : target.kind==='line'?1000:300);
-  const timedSiblings = siblings.filter(item=>item.id!==id && full(item));
-  for (let i=0;i<timedSiblings.length-1;i++) {
-    const left=timedSiblings[i], right=timedSiblings[i+1];
-    if (left.endMs! < right.beginMs! && dropMs >= left.endMs! && dropMs <= right.beginMs! && !timedSiblings.some(item=>item!==left&&item!==right&&item.beginMs!<right.beginMs!&&item.endMs!>left.endMs!)) { beginMs=left.endMs!; endMs=right.beginMs!; break; }
+  const ancestorBegin=target.kind==='line'?null:target.kind==='ruby'?word!.beginMs??line.beginMs:line.beginMs;
+  const ancestorEnd=target.kind==='line'?null:target.kind==='ruby'?word!.endMs??line.endMs:line.endMs;
+  const internal=(ancestorBegin===null||dropMs>=ancestorBegin)&&(ancestorEnd===null||dropMs<=ancestorEnd);
+  const minBegin=internal?Math.max(0,ancestorBegin??0):0, maxEnd=internal?Math.min(durationMs,ancestorEnd??durationMs):durationMs;
+  const timedSiblings = siblings.filter(item=>item.id!==id && full(item)).sort((a,b)=>a.beginMs!-b.beginMs!);
+  let fixed=false;
+  // Immediate occupied boundaries around the drop also handle overlapping siblings.
+  const inside=timedSiblings.some(item=>item.beginMs!<dropMs&&item.endMs!>dropMs);
+  if(!inside){
+    const left=timedSiblings.filter(item=>item.endMs!<=dropMs).reduce<number|null>((best,item)=>Math.max(best??-Infinity,item.endMs!),null);
+    const right=timedSiblings.filter(item=>item.beginMs!>=dropMs).reduce<number|null>((best,item)=>Math.min(best??Infinity,item.beginMs!),null);
+    const lower=internal&&ancestorBegin!==null?Math.max(left??-Infinity,ancestorBegin):left;
+    const upper=internal&&ancestorEnd!==null?Math.min(right??Infinity,ancestorEnd):right;
+    // Preserve the previous average-duration behavior outside ancestor bounds.
+    if(lower!==null&&upper!==null&&lower<upper&&dropMs>=lower&&dropMs<=upper){beginMs=lower;endMs=upper;fixed=true;}
+    else if(internal&&ancestorBegin!==null&&lower===ancestorBegin&&upper===null){beginMs=lower;endMs=beginMs+(endMs-Math.round(dropMs));fixed=true;}
+    else if(internal&&ancestorEnd!==null&&upper===ancestorEnd&&lower===null){const length=endMs-beginMs;endMs=upper;beginMs=endMs-length;fixed=true;}
   }
+  if(internal){beginMs=Math.max(minBegin,beginMs);endMs=Math.min(maxEnd,endMs);}
   const attachments = [...document.romanizationTracks,...document.translationTracks].flatMap(t=>t.contents.flatMap(c=>c.lineId===line.id&&c.kind==='timed'?c.units:[]));
   const children = target.kind==='line' ? [...line.words.flatMap(w=>[w,...w.rubyUnits]),...attachments] : target.kind==='word' ? word!.rubyUnits : [];
   beginMs = Math.max(0,Math.min(beginMs,...children.flatMap(c=>c.beginMs===null?[]:[c.beginMs])));
   endMs = Math.min(durationMs,Math.max(endMs,...children.flatMap(c=>c.endMs===null?[]:[c.endMs])));
   valid(beginMs,endMs);
   if (!Number.isSafeInteger(durationMs) || beginMs >= endMs || children.some(c=>c.endMs!==null&&c.endMs>durationMs)) throw new MessageError(message('timeline.rangeInvalid'));
+  return {beginMs,endMs,fixed,minBegin,maxEnd,
+    childBegin:Math.min(Infinity,...children.flatMap(child=>child.beginMs===null?[]:[child.beginMs])),
+    childEnd:Math.max(0,...children.flatMap(child=>child.endMs===null?[]:[child.endMs]))};
+}
+
+/** Assign both endpoints without moving descendants; expand parents in the same transaction. */
+export function applyTimelineAssignment(document:LyricDocument,target:TimelineTarget,assignment:TimelineAssignment,deltaMs=0,editing=createProjectEditing()):LyricDocument {
+  const {beginMs:start,endMs:end,minBegin,maxEnd,childBegin,childEnd,fixed}=assignment;
+  const beginMs=start+deltaMs,endMs=end+deltaMs;
+  if((fixed&&deltaMs!==0)||beginMs<minBegin||endMs>maxEnd||beginMs>childBegin||endMs<childEnd||beginMs>=endMs)throw new MessageError(message('timeline.rangeInvalid'));
+  valid(beginMs,endMs);
+  const line=document.lines.find(line=>line.id===target.lineId)!;
+  const attachments=[...document.romanizationTracks,...document.translationTracks].flatMap(t=>t.contents.flatMap(c=>c.lineId===line.id&&c.kind==='timed'?c.units:[]));
   const includeChildren = <T extends {beginMs:TimeMs;endMs:TimeMs}>(parent:T, children:{beginMs:TimeMs;endMs:TimeMs}[]):T => ({...parent,
     beginMs:envelope([parent.beginMs,...children.map(c=>c.beginMs)],true),endMs:envelope([parent.endMs,...children.map(c=>c.endMs)],false)});
   let next = target.kind==='romanization' ? editRomanization(document,target,unit=>({...unit,beginMs,endMs})) : editTarget(document,target,current=>{
@@ -192,4 +231,8 @@ export function assignTimeline(document: LyricDocument, target: TimelineTarget, 
   const changedLine=next.lines.find(l=>l.id===line.id)!;
   if (editing.endLinks[line.id] && changedLine.endMs!==line.endMs) throw new MessageError(message('timeline.linkConflict'));
   return followChangedEndLinks(document,next,editing);
+}
+
+export function assignTimeline(document:LyricDocument,target:TimelineTarget,dropMs:number,durationMs:number,editing=createProjectEditing()):LyricDocument {
+  return applyTimelineAssignment(document,target,prepareTimelineAssignment(document,target,dropMs,durationMs),0,editing);
 }
