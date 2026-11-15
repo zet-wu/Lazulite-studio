@@ -407,3 +407,5 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .segmentPreview > div { min-width: 0; }
 .segmentPreview > div > span { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
 .segmentManual section { content-visibility: auto; contain-intrinsic-size: auto 150px; }
+
+.segmentPreview[data-single] > div { grid-template-columns: minmax(0,1fr); }

@@ -6173,12 +6173,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "segment.title": {
-    "context": "segment interface: segment.title",
-    "source": "分词",
-    "params": [],
-    "parameterNotes": {}
-  },
   "edit.applyUndo": {
     "context": "edit interface: edit.applyUndo",
     "source": "应用（一次撤销）",
@@ -6200,18 +6194,6 @@
   "segment.advanced": {
     "context": "segment interface: segment.advanced",
     "source": "高级",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "segment.currentWord": {
-    "context": "segment interface: segment.currentWord",
-    "source": "当前词：",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "segment.selectCanvas": {
-    "context": "segment interface: segment.selectCanvas",
-    "source": "请在画布选择一个词",
     "params": [],
     "parameterNotes": {}
   },
@@ -6398,12 +6380,6 @@
   "segment.willSplit": {
     "context": "segment interface: segment.willSplit",
     "source": "词将切分",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "segment.keepRuby": {
-    "context": "segment interface: segment.keepRuby",
-    "source": "含 注音 或附属属性，保留原词",
     "params": [],
     "parameterNotes": {}
   },

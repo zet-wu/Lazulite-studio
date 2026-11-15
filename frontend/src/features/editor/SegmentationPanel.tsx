@@ -30,7 +30,7 @@ export function boundaryParts(text: string, boundaries: number[]) {
 }
 function BoundaryEditor({word, boundaries, disabled, change}: {word: LyricWord; boundaries: number[]; disabled: boolean; change: (next: number[]) => void}) {
   const chars = graphemes(word.text);
-  return <div className={styles.manualGraphemes} aria-label={t('segment.boundaries')}>{chars.map((char, index) => <span key={index}><span>{char}</span>{index < chars.length-1 && <button data-role="inline" disabled={disabled} aria-label={t('segment.boundary',{number:index+1})} aria-pressed={boundaries.includes(index+1)} onClick={() => change(boundaries.includes(index+1) ? boundaries.filter(n=>n!==index+1) : [...boundaries,index+1])}><Icon name={boundaries.includes(index+1) ? 'sync-beat' : 'sync-dot'}/></button>}</span>)}</div>;
+  return <div className={styles.manualGraphemes} aria-label={t('segment.boundaries')}>{chars.map((char, index) => <span key={index}><span>{char}</span>{index < chars.length-1 && <button data-role="inline" disabled={disabled} title={t('segment.boundary',{number:index+1})} aria-label={t('segment.boundary',{number:index+1})} aria-pressed={boundaries.includes(index+1)} onClick={() => change(boundaries.includes(index+1) ? boundaries.filter(n=>n!==index+1) : [...boundaries,index+1])}><Icon name={boundaries.includes(index+1) ? 'sync-beat' : 'sync-dot'}/></button>}</span>)}</div>;
 }
 
 function parseRules(input: string): SegmentOptions['rules'] {
@@ -75,9 +75,9 @@ export function SegmentationPanel({ document, wordIds, apply, close, navigation,
     } catch (cause) { setTestOutput([]); setError(errorMessage(cause)); }
   };
   useEffect(() => {
+    setError('');
     if (mode === 'manual') return;
     let active = true;
-    setError('');
     if (composing) return;
     const timer = setTimeout(() => { void (async () => {
       try {
@@ -107,7 +107,7 @@ export function SegmentationPanel({ document, wordIds, apply, close, navigation,
       {!targets.length && <p role="status">{t('segment.noWords')}</p>}
       {mode === 'manual' ? <div className={styles.segmentManual}>{document.lines.map((line,index) => {
         const words = targets.filter(item=>item.lineId===line.id);
-        return words.length ? <section key={line.id}><h3>{t('split.lineNumber',{number:index+1})}{line.backgroundOf && ` · ${t('editor.background')} (${document.lines.findIndex(parent=>parent.id===line.backgroundOf)+1})`}</h3><p className={styles.lyricQuote}>{lineText(line)}</p>{words.map(({word})=><div className={styles.segmentWord} key={word.id}><strong className={styles.lyricQuote}>{word.text}</strong><BoundaryEditor word={word} boundaries={drafts[word.id] ?? []} disabled={!!blockedReason(word)} change={next=>setDrafts(previous=>({...previous,[word.id]:next}))}/>{blockedReason(word) && <p className={styles.toolHint}>{blockedReason(word)}</p>}</div>)}</section> : null;
+        return words.length ? <section key={line.id}>{!singleWord && <><h3>{t('split.lineNumber',{number:index+1})}{line.backgroundOf && ` · ${t('editor.background')} (${document.lines.findIndex(parent=>parent.id===line.backgroundOf)+1})`}</h3><p className={styles.lyricQuote}>{lineText(line)}</p></>}{words.map(({word})=><div className={styles.segmentWord} key={word.id}><strong className={styles.lyricQuote}>{word.text}</strong><BoundaryEditor word={word} boundaries={drafts[word.id] ?? []} disabled={!!blockedReason(word)} change={next=>setDrafts(previous=>({...previous,[word.id]:next}))}/>{blockedReason(word) && <p className={styles.toolHint}>{blockedReason(word)}</p>}</div>)}</section> : null;
       })}</div> : <div className={fields.group}>
         <SettingToggle label={t('segment.cjk')} checked={options.splitCjk} onChange={value=>updateOption('splitCjk',value)}/>
         <SettingField label={t('segment.western')}><Select value={options.western} onChange={(event) => updateOption('western', event.target.value as SegmentOptions['western'])}><option value="word">{t('segment.words')}</option><option value="syllable">{t('segment.syllables')}</option></Select></SettingField>
@@ -125,8 +125,8 @@ export function SegmentationPanel({ document, wordIds, apply, close, navigation,
       </div>}
 
       {error && <p role="alert">{error}</p>}
-      <p role="status">{t('segment.summary',{lines:new Set(targets.map(item=>item.lineId)).size,words:targets.length,split:preview.filter(item=>item.parts.length>1&&!item.blocked).length,blocked:targets.filter(item=>blockedReason(item.word)).length})}</p>
-      {preview.length > 0 && <div className={styles.segmentPreview}><strong>{t('segment.preview')}{preview.filter((item) => item.parts.length > 1 && !item.blocked).length} {t('segment.willSplit')}</strong>{preview.map((item) => <div key={item.word.id}><small title={lineText(document.lines.find((line) => line.id === item.lineId)!)}>{lineText(document.lines.find((line) => line.id === item.lineId)!)}</small><span>{item.word.text} → <Parts parts={item.parts}/></span>{item.blocked && <em>{blockedReason(item.word)}</em>}</div>)}</div>}
+      {!singleWord && <p role="status">{t('segment.summary',{lines:new Set(targets.map(item=>item.lineId)).size,words:targets.length,split:preview.filter(item=>item.parts.length>1&&!item.blocked).length,blocked:targets.filter(item=>blockedReason(item.word)).length})}</p>}
+      {preview.length > 0 && <div className={styles.segmentPreview} data-single={singleWord || undefined}><strong>{t('segment.preview')}{preview.filter((item) => item.parts.length > 1 && !item.blocked).length} {t('segment.willSplit')}</strong>{preview.map((item) => <div key={item.word.id}>{!singleWord && <small title={lineText(document.lines.find((line) => line.id === item.lineId)!)}>{lineText(document.lines.find((line) => line.id === item.lineId)!)}</small>}<span>{item.word.text} → <Parts parts={item.parts}/></span>{item.blocked && <em>{blockedReason(item.word)}</em>}</div>)}</div>}
     </SettingsDialog>;
 }
 

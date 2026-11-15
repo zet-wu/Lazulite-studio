@@ -39,10 +39,12 @@ describe('E3 segmentation', () => {
   it('keeps known endpoints on a partly untimed word and preserves repeated spaces', () => {
     const document = createLyricDocument('a  b');
     const word = document.lines[0].words[0];
+    word.agentRefs = ['v1'];
     word.beginMs = 500;
     const parts = segmentText(word.text, { ...DEFAULT_SEGMENT_OPTIONS, whitespace: 'separate', punctuation: 'separate' });
     expect(parts).toEqual(['a', '  ', 'b']);
     const words = distributeSegmentTime(word, parts, 0.2);
+    expect(words.every(item=>item.agentRefs?.join() === 'v1')).toBe(true);
     expect(words.map((item) => [item.beginMs, item.endMs])).toEqual([[500, null], [null, null], [null, null]]);
     word.beginMs = null; word.endMs = 900;
     expect(distributeSegmentTime(word, parts, 0.2).map((item) => [item.beginMs, item.endMs])).toEqual([[null, null], [null, null], [null, 900]]);

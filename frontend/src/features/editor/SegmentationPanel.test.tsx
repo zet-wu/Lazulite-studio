@@ -2,6 +2,7 @@ import {cleanup, fireEvent, render, screen, waitFor} from '@testing-library/reac
 import {afterEach, expect, it, vi} from 'vitest';
 import {createLine, createLyricDocument, createWord} from '../../domain/lyric-document';
 import {BatchToolsPanel} from './BatchToolsPanel';
+import {DialogEditingLocked} from './SettingsDialog';
 import {SegmentationPanel} from './SegmentationPanel';
 import type {EditorSelection} from './editing-actions';
 afterEach(cleanup);
@@ -41,4 +42,16 @@ it('auto excludes hidden advanced rules and weight, restricted words remain prot
  await waitFor(()=>expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeEnabled());
  fireEvent.change(screen.getByLabelText('模式'),{target:{value:'auto'}});expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();
  await waitFor(()=>expect(screen.getByText('含消音属性，保留原词')).toBeVisible());expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();
+});
+it('selected word scope filters within a main line without including its other words or background',()=>{
+ mount({kind:'words',lineId:'a',ids:['second'],activeId:'second',anchorId:'second'});fireEvent.change(screen.getByLabelText('范围'),{target:{value:'selected'}});expect(screen.getAllByLabelText('字符切分边界')).toHaveLength(1);expect(screen.getByText('覆盖 1 行、1 词；可拆分 0 词、受限 0 词')).toBeVisible();
+});
+it('manual mixed targets apply only unrestricted words',()=>{
+ const document=createLyricDocument('你好'),words=document.lines[0].words;words.push({...createWord('世界'),obscene:true});const apply=vi.fn(),close=vi.fn();render(<SegmentationPanel document={document} wordIds={words.map(w=>w.id)} apply={apply} close={close}/>);
+ const points=screen.getAllByRole('button',{name:'切分边界 1'});fireEvent.click(points[0]);expect(points[1]).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'应用（一次撤销）'}));expect(apply.mock.calls[0][0].changes).toHaveLength(1);
+});
+
+it('automatic whole range previews all existing words, and locked single-word dialog cannot submit',async()=>{
+ const {apply}=mount();fireEvent.change(screen.getByLabelText('范围'),{target:{value:'all'}});fireEvent.change(screen.getByLabelText('模式'),{target:{value:'auto'}});await waitFor(()=>expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'应用（一次撤销）'}));expect(apply.mock.calls[0]).toMatchObject([{changes:[{lineId:'a'},{lineId:'a'},{lineId:'bg'},{lineId:'b'}]}]);
+ cleanup();const document=createLyricDocument('你好');render(<DialogEditingLocked.Provider value={true}><SegmentationPanel document={document} wordIds={[document.lines[0].words[0].id]} singleWord apply={apply} close={()=>{}}/></DialogEditingLocked.Provider>);expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();expect(screen.getByRole('button',{name:'切分边界 1'})).toBeDisabled();expect(screen.getByRole('button',{name:'取消'})).toBeEnabled();
 });
