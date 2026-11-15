@@ -160,6 +160,7 @@ def test_karaoke_project_save_reopen_keeps_cues_outside_ttml(tmp_path):
     snapshot = initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="4" end="5"><span studio:id="w" begin="4" end="5">A</span></p></body></tt>')
     cue = {'id': 'cue-1', 'text': '●●', 'anchor': {'kind': 'before', 'lineId': 'a'}, 'beginMs': 3000, 'endMs': 3900}
     snapshot['karaoke']['cues'] = [cue]
+    snapshot['karaoke']['sugSingerNames'] = [{'outputId': '["main","body",""]', 'agentIds': ['a', 'b'], 'name': '共同'}]
     snapshot['karaoke']['groups'][0]['name'] = 'Custom'
     snapshot['karaoke']['singerMarkers'] = [{'agentIds': ['a', 'b'], 'skip': True, 'trigger': 'Duet', 'beforeImage': 'external.png', 'afterImage': '', 'sizeMode': 'Zoom', 'zoom': '1', 'noDecor': True, 'forceWipeDecor': False, 'marginLeft': 0, 'marginRight': -170, 'marginBottom': 0}]
     headers = {'origin': 'http://studio', 'if-match': before.headers['etag']}
@@ -169,6 +170,9 @@ def test_karaoke_project_save_reopen_keeps_cues_outside_ttml(tmp_path):
     assert client.put('/api/v1/projects/p/document', json=invalid, headers=headers).status_code == 422
     invalid = deepcopy(body)
     invalid['document']['karaoke']['singerMarkers'].append({**snapshot['karaoke']['singerMarkers'][0], 'agentIds': ['b', 'a']})
+    assert client.put('/api/v1/projects/p/document', json=invalid, headers=headers).status_code == 422
+    invalid = deepcopy(body)
+    invalid['document']['karaoke']['sugSingerNames'].append({'outputId': '["main","body",""]', 'agentIds': ['b', 'a'], 'name': '重复'})
     assert client.put('/api/v1/projects/p/document', json=invalid, headers=headers).status_code == 422
     saved = client.put('/api/v1/projects/p/document', json=body, headers=headers)
     assert saved.status_code == 200, saved.text

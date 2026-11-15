@@ -53,7 +53,13 @@ class SingerMarker(Model):
     marginRight: StrictInt
     marginBottom: StrictInt
 
+class SugSingerName(Model):
+    outputId: str
+    agentIds: list[str]
+    name: str = Field(min_length=1)
+
 class Karaoke(Model):
+    sugSingerNames: list[SugSingerName] = Field(default_factory=list)
     singerMarkers: list[SingerMarker]
     groups: list[Group]
     lineGroups: dict[str, str]
@@ -68,12 +74,15 @@ class Karaoke(Model):
         keys = [tuple(sorted(marker.agentIds)) for marker in self.singerMarkers]
         if len(set(keys)) != len(keys) or any(not all(marker.agentIds) or len(set(marker.agentIds)) != len(marker.agentIds) for marker in self.singerMarkers):
             raise ValueError('invalid singer marker identities')
+        names = [(item.outputId, tuple(sorted(item.agentIds))) for item in self.sugSingerNames]
+        if len(set(names)) != len(names) or any(not all(item.agentIds) or len(set(item.agentIds)) != len(item.agentIds) for item in self.sugSingerNames):
+            raise ValueError('invalid SUG singer identities')
         groups = {g.id for g in self.groups}
         if len(groups) != len(self.groups) or len({c.id for c in self.cues}) != len(self.cues):
             raise ValueError('duplicate karaoke identity')
         if any(abs(offset) > 9007199254740991 for offset in self.offsets.values()):
             raise ValueError('invalid karaoke offset')
-        for output in [*self.outputs, *self.offsets]:
+        for output in [*self.outputs, *self.offsets, *(item.outputId for item in self.sugSingerNames)]:
             parts = json.loads(output)
             if not isinstance(parts, list) or len(parts) != 3 or not all(isinstance(p, str) for p in parts) or parts[1] not in ['body', 'translation', 'romanization']:
                 raise ValueError('invalid karaoke output')
@@ -89,6 +98,6 @@ def initial_karaoke(ttml):
         if node.tag == '{http://www.w3.org/ns/ttml}p' or node.get(ttm+'role') == 'x-bg':
             key = node.get(studio+'id') or node.get(xml+'id')
             if key: groups[key] = 'background' if node.get(ttm+'role') == 'x-bg' else 'main'
-    return {'singerMarkers': [], 'groups': [{'id': 'main', 'name': '主歌词'}, {'id': 'background', 'name': '背景歌词'}],
+    return {'sugSingerNames': [], 'singerMarkers': [], 'groups': [{'id': 'main', 'name': '主歌词'}, {'id': 'background', 'name': '背景歌词'}],
             'lineGroups': groups, 'defaults': {'text': '●', 'beforeMs': 3000, 'wordMs': 500, 'rubyMs': 500},
             'cues': [], 'offsets': {}, 'outputs': ['["main","body",""]', '["background","body",""]']}

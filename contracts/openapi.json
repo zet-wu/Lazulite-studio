@@ -3487,6 +3487,12 @@
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991
                     }
+                  },
+                  "sugSingerNames": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SugSingerName"
+                    }
                   }
                 },
                 "required": [
@@ -4827,6 +4833,30 @@
           "cells"
         ],
         "title": "ShapeRow"
+      },
+      "SugSingerName": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outputId",
+          "agentIds",
+          "name"
+        ],
+        "properties": {
+          "outputId": {
+            "type": "string"
+          },
+          "agentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     }
   }

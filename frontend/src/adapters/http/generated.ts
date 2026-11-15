@@ -1208,6 +1208,7 @@ export interface components {
                     offsets: {
                         [key: string]: number;
                     };
+                    sugSingerNames?: components["schemas"]["SugSingerName"][];
                 };
             };
             source_asset_id: string | null;
@@ -1645,6 +1646,11 @@ export interface components {
             id: string;
             /** Cells */
             cells: components["schemas"]["ShapeCell"][];
+        };
+        SugSingerName: {
+            outputId: string;
+            agentIds: string[];
+            name: string;
         };
     };
     responses: {

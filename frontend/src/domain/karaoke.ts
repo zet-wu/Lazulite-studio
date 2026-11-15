@@ -1,11 +1,12 @@
 import { message, MessageError, type Message } from './messages';
-import { initializeSingerMarkers, validateSingerMarkers, markerProblem, type SingerMarker } from './singer-markers';
+import { singerKey, initializeSingerMarkers, validateSingerMarkers, markerProblem, type SingerMarker } from './singer-markers';
 import type { LyricDocument, LyricLine, LyricWord } from './lyric-document';
 
 export type CueAnchor = { kind: 'before'; lineId: string } | { kind: 'word'; lineId: string; leftId: string; rightId: string } | { kind: 'ruby'; lineId: string; wordId: string; leftId: string; rightId: string };
 export type KaraokeCue = { id: string; text: string; anchor: CueAnchor; beginMs: number; endMs: number };
 export type Karaoke = {
   singerMarkers: SingerMarker[];
+  sugSingerNames?: { outputId: string; agentIds: string[]; name: string }[];
   groups: { id: string; name: string }[];
   lineGroups: Record<string, string>;
   defaults: { text: string; beforeMs: number; wordMs: number; rubyMs: number };
@@ -105,7 +106,7 @@ export function reconcileKaraoke(lyrics: LyricDocument, karaoke: Karaoke, previo
     const [groupId, kind, trackId] = JSON.parse(id);
     return karaoke.groups.some(group=>group.id===groupId) && (kind==='body' || lyrics[kind==='translation'?'translationTracks':'romanizationTracks'].some(track=>track.id===trackId));
   };
-  return { ...karaoke, offsets: Object.fromEntries(Object.entries(karaoke.offsets).filter(([id])=>validOutput(id))), outputs: karaoke.outputs.filter(validOutput), lineGroups, cues, singerMarkers: initializeSingerMarkers(lyrics, karaoke.singerMarkers) };
+  return { ...karaoke, ...(karaoke.sugSingerNames ? { sugSingerNames: karaoke.sugSingerNames.filter(item => validOutput(item.outputId) && item.agentIds.every(id => lyrics.agents.some(agent => agent.id === id))) } : {}), offsets: Object.fromEntries(Object.entries(karaoke.offsets).filter(([id])=>validOutput(id))), outputs: karaoke.outputs.filter(validOutput), lineGroups, cues, singerMarkers: initializeSingerMarkers(lyrics, karaoke.singerMarkers) };
 }
 export function nextGroupId(groups: Karaoke['groups']): string {
   const used = new Set(groups.map(group => group.id.trim().toLowerCase()));
@@ -123,10 +124,11 @@ export function groupIdProblem(original: Karaoke['groups'], groups: Karaoke['gro
   }
   return null;
 }
-export type KaraokeCommand = { kind: 'remove-lines'; lineIds: string[] } | { kind: 'singer-markers'; markers: SingerMarker[] } | { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; renames: Record<string, string> } | { kind: 'outputs'; outputs: string[] } | { kind: 'offsets'; offsets: Record<string, number> };
+export type KaraokeCommand = { kind: 'sug-singer-names'; names: NonNullable<Karaoke['sugSingerNames']> } | { kind: 'remove-lines'; lineIds: string[] } | { kind: 'singer-markers'; markers: SingerMarker[] } | { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; renames: Record<string, string> } | { kind: 'outputs'; outputs: string[] } | { kind: 'offsets'; offsets: Record<string, number> };
 export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: KaraokeCommand): Karaoke {
   let next = karaoke;
   switch (command.kind) {
+    case 'sug-singer-names': next = { ...karaoke, sugSingerNames: command.names }; break;
     case 'singer-markers': {
       validateSingerMarkers(command.markers);
       for (const marker of command.markers) { const problem=markerProblem(marker); if(problem)throw new MessageError(message(problem)); }
@@ -173,7 +175,11 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
         const [groupId, kind, trackId] = JSON.parse(id), target = resolve(groupId);
         return target ? [[outputId(target, kind, trackId), value]] : [];
       }));
-      next = { ...karaoke, groups, lineGroups, outputs, offsets }; break;
+      const sugSingerNames = karaoke.sugSingerNames?.flatMap(item => {
+        const [groupId, kind, trackId] = JSON.parse(item.outputId), target = resolve(groupId);
+        return target ? [{ ...item, outputId: outputId(target, kind, trackId) }] : [];
+      });
+      next = { ...karaoke, groups, lineGroups, outputs, offsets, ...(sugSingerNames ? { sugSingerNames } : {}) }; break;
     }
   }
   validateKaraoke(lyrics, next);
@@ -183,6 +189,16 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
 export function validateKaraoke(lyrics: LyricDocument, value: Karaoke) {
   if (!value || !Array.isArray(value.groups) || !Array.isArray(value.cues) || !value.lineGroups || !value.defaults || !Array.isArray(value.outputs)) throw new MessageError(message('karaoke.dataInvalid'));
   validateSingerMarkers(value.singerMarkers);
+  if (value.sugSingerNames !== undefined) {
+    if (!Array.isArray(value.sugSingerNames)) throw new MessageError(message('karaoke.dataInvalid'));
+    const keys = new Set<string>();
+    for (const item of value.sugSingerNames) {
+      if (!item || typeof item.outputId !== 'string' || !Array.isArray(item.agentIds) || item.agentIds.some(id => typeof id !== 'string' || !id) || new Set(item.agentIds).size !== item.agentIds.length || typeof item.name !== 'string' || !item.name.length) throw new MessageError(message('karaoke.dataInvalid'));
+      const key = JSON.stringify([item.outputId, singerKey(item.agentIds)]);
+      if (keys.has(key)) throw new MessageError(message('karaoke.dataInvalid'));
+      keys.add(key);
+    }
+  }
   const ids = new Set<string>();
   for (const group of value.groups) { if (typeof group.id !== 'string' || !group.id || ids.has(group.id) || typeof group.name !== 'string' || !group.name.trim()) throw new MessageError(message('karaoke.groupInvalidData')); ids.add(group.id); }
   if (typeof value.defaults.text !== 'string' || !value.defaults.text.length || [value.defaults.beforeMs, value.defaults.wordMs, value.defaults.rubyMs].some(n => !Number.isSafeInteger(n) || n < 0)) throw new MessageError(message('karaoke.defaultsInvalid'));
@@ -193,7 +209,7 @@ export function validateKaraoke(lyrics: LyricDocument, value: Karaoke) {
     ids.add(cue.id);
   }
   if (!value.offsets || typeof value.offsets!=='object' || Array.isArray(value.offsets) || Object.values(value.offsets).some(offset=>!Number.isSafeInteger(offset))) throw new MessageError(message('karaoke.offsetInvalid'));
-  if ([...value.outputs,...Object.keys(value.offsets)].some(id => { if (typeof id !== 'string') return true; try { const parts = JSON.parse(id); return !Array.isArray(parts) || parts.length !== 3 || parts.some(p => typeof p !== 'string') || !['body', 'translation', 'romanization'].includes(parts[1]); } catch { return true; } })) throw new MessageError(message('karaoke.outputsInvalid'));
+  if ([...value.outputs,...Object.keys(value.offsets),...(value.sugSingerNames ?? []).map(item => item.outputId)].some(id => { if (typeof id !== 'string') return true; try { const parts = JSON.parse(id); return !Array.isArray(parts) || parts.length !== 3 || parts.some(p => typeof p !== 'string') || !['body', 'translation', 'romanization'].includes(parts[1]); } catch { return true; } })) throw new MessageError(message('karaoke.outputsInvalid'));
 }
 export function cueWord(lyrics: LyricDocument, cue: KaraokeCue): LyricWord | undefined {
   const line = lyrics.lines.find(line => line.id === cue.anchor.lineId);

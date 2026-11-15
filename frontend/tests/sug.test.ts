@@ -28,7 +28,7 @@ it('selected timed auxiliary is independent of broken body ruby and preserves pe
  const p=fixture(),l=p.lyrics.lines[0];l.words[0].beginMs=null;p.lyrics.translationTracks=[{id:'t',language:null,purpose:'subtitle',contents:[{id:'c',lineId:l.id,kind:'timed',units:[{id:'u',text:'明天',beginMs:1001,endMs:2011}]}]}];p.karaoke.outputs=[outputId('main','translation','t')];expect(prepareSug(p,'s').issues).toEqual([]);expect(data(p).metadata.language).toBe('');expect(data(p).sentences[0].characters.at(-1).sentence_end_ts).toBe(2011);
  p.lyrics.translationTracks[0].contents=[{id:'c',lineId:l.id,kind:'plain',text:'明天'}];expect(prepareSug(p,'s').issues.some(i=>i.kind==='word')).toBe(true);
 });
-it('canonicalizes chorus roles, disambiguates names and assigns unspecified explicitly',()=>{
+it('canonicalizes chorus roles and assigns unspecified explicitly',()=>{
  const p=fixture(),l=p.lyrics.lines[0];p.lyrics.agents=[{id:'a',name:'同名',type:'person'},{id:'b',name:'同名',type:'person'}];l.agentRefs=['a','b'];l.words.push({...createWord('次'),beginMs:2100,endMs:2200,agentRefs:['b','a']});const d=data(p);expect(d.singers).toHaveLength(2);expect(d.sentences[0].characters.every((c:{singer_id:string})=>c.singer_id==='singer-1')).toBe(true);
 });
 it('names full track numbers, omits empty outputs and blocks unknown or ungrouped references',()=>{

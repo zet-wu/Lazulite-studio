@@ -3,7 +3,7 @@ import { message as describeMessage } from '../domain/messages';
 import { karaokeOutputs, karaokeFilenames, zipFiles } from './karaoke-output';
 import { isUntimedSeparator, type ExportUnit } from './export-separators';
 import { cueProblem, cueWord, type KaraokeCue } from '../domain/karaoke';
-import { singerSet } from '../domain/singer-markers';
+import { sugSingerSet, sugSingerName, sugOutputContent } from './sug-singers';
 import type { LyricLine, LyricWord } from '../domain/lyric-document';
 import type { ProjectDocument } from '../domain/project-document';
 import { DocumentOutputError, outputIssueKey, type OutputIssue } from './output-validation';
@@ -36,19 +36,21 @@ export function prepareSug(project: Pick<ProjectDocument, 'lyrics' | 'karaoke' |
       return true;
     };
     const textOk = (text:string,target:Target) => { if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(text)) issue(target,'output.sugControl'); };
-    const singers = [{id:'singer-0',name:'未指定',is_default:true,color:'#FF6B6B'}];
-    const roles = new Map<string,string>([['[]','singer-0']]);
-    const singerFor = (line:LyricLine, word:LyricWord, target:Target) => {
-      const set = singerSet(lyrics,line,word);
+    const defaultSet = { ids: [], key: '[]', label: '未指定', missing: false };
+    const defaultName = sugSingerName(project, output, defaultSet);
+    const singers = [{id:'singer-0',name:defaultName,is_default:true,color:'#FF6B6B'}];
+    const roles = new Map<string,string>([[defaultName,'singer-0']]);
+    const singerFor = (line:LyricLine, word:LyricWord | undefined, target:Target) => {
+      const set = sugSingerSet(project,line,word);
       if (set.missing) issue(target,'output.singerStale');
-      const existing = roles.get(set.key); if (existing) return existing;
-      const label = set.ids.map(agentId=>{const a=lyrics.agents.find(a=>a.id===agentId)!;return a.name || `歌手 ${lyrics.agents.indexOf(a)+1}`;}).join('+');
-      let name=label,n=2;while(singers.some(s=>s.name===name))name=`${label} (${n++})`;
-      const singerId=`singer-${singers.length}`;roles.set(set.key,singerId);singers.push({id:singerId,name,is_default:false,color:'#FF6B6B'});
-      if(set.ids.length>1)descriptions.push(`${output.label}：组合角色 ${name} = ${label}`);
+      const name = sugSingerName(project, output, set);
+      const existing = roles.get(name); if (existing) return existing;
+      const singerId=`singer-${singers.length}`;
+      roles.set(name,singerId);singers.push({id:singerId,name,is_default:false,color:'#FF6B6B'});
+      if(set.ids.length>1)descriptions.push(`${output.label}：组合角色 ${name} = ${set.label}`);
       return singerId;
     };
-    const lineSinger = (line:LyricLine,target:Target) => singerFor(line,{...line.words[0],agentRefs:undefined} as LyricWord,target);
+    const lineSinger = (line:LyricLine,target:Target) => singerFor(line,undefined,target);
     const cueSegment = (cue:KaraokeCue): Segment | null => {
       const target={lineId:cue.anchor.lineId,cueId:cue.id};
       const problem=cueProblem(lyrics,karaoke,cue);if(problem)issue(target,problem,'invalid-range');
@@ -56,7 +58,7 @@ export function prepareSug(project: Pick<ProjectDocument, 'lyrics' | 'karaoke' |
       textOk(cue.text,target);
       if(cue.anchor.kind==='ruby'&&/[\^＾]/.test(cue.text))issue(target,'output.sugCuePause');
       const line=lyrics.lines.find(l=>l.id===cue.anchor.lineId)!,word=cueWord(lyrics,cue);
-      return {text:cue.text,begin:cue.beginMs,end:cue.endMs,target,singer:word?singerFor(line,word,target):'singer-0',guide:true};
+      return {text:cue.text,begin:cue.beginMs,end:cue.endMs,target,singer:singerFor(line,word,target),guide:true};
     };
     let charIndex=0;
     const sentences:Sentence[]=[];
@@ -117,7 +119,7 @@ export function prepareSug(project: Pick<ProjectDocument, 'lyrics' | 'karaoke' |
       }
       return result;
     };
-    for(const line of lyrics.lines.filter(l=>karaoke.lineGroups[l.id]===output.groupId)){
+    for(const {line, contents} of sugOutputContent(project, output)){
       const target={lineId:line.id};
       if(output.kind==='body'){
         for(const cue of karaoke.cues.filter(c=>c.anchor.lineId===line.id)){const problem=cueProblem(lyrics,karaoke,cue);if(problem)issue({...target,cueId:cue.id},problem,'invalid-range');}
@@ -127,7 +129,7 @@ export function prepareSug(project: Pick<ProjectDocument, 'lyrics' | 'karaoke' |
         emit([...before,...body],target);
       }else{
         const track=lyrics[output.kind==='translation'?'translationTracks':'romanizationTracks'].find(t=>t.id===output.trackId)!;
-        for(const content of track.contents.filter(c=>c.lineId===line.id)){
+        for(const content of contents){
           const ct:Target={...target,kind:`${output.kind}-content`,trackId:track.id,contentId:content.id};
           if(content.kind==='timed')emit(mapUnits(content.units,u=>({...ct,kind:`${output.kind}-unit` as OutputIssue['kind'],unitId:u.id}),()=>lineSinger(line,ct)),ct);
           else if(content.text.length){
