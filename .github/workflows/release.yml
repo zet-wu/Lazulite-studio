@@ -43,7 +43,7 @@ jobs:
       source_ref: ${{ needs.source.outputs.commit }}
   models:
     needs: source
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:

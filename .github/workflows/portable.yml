@@ -33,7 +33,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       targets: ${{ steps.select.outputs.targets }}
     steps:
