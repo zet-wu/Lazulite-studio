@@ -1752,11 +1752,8 @@
   "segment.blockRuby": "Ruby present; keep original word",
   "segment.blockObscene": "Censoring present; keep original word",
   "segment.blockBeat": "Empty beats present; keep original word",
-  "segment.summary": "{{lines}} lines, {{words}} words; {{split}} to split, {{blocked}} restricted",
   "settings.swapWheel": "Swap wheel actions",
   "settings.swapWheelHelp": "By default, wheel zooms and Shift + wheel pans. These actions can be swapped.",
   "split.attachments": "Assign attached content",
-  "segment.movePrevious": "Move to previous segment",
-  "segment.moveNext": "Move to next segment",
   "segment.computing": "Calculating segmentation…"
 }

@@ -9,6 +9,7 @@ import { Select } from '../../shared/Select';
 import { SettingField, SettingToggle } from '../../shared/SettingsFields';
 import fields from '../../shared/settings-fields.module.css';
 import { SettingsDialog } from './SettingsDialog';
+import { selectIds } from './editing-actions';
 import { SegmentWordDraft } from './SegmentWordDraft';
 import { splitRubyWord } from '../../domain/segmentation-draft';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -35,6 +36,7 @@ function parseRules(input: string): SegmentOptions['rules'] {
 export function SegmentationPanel({ document, wordIds, apply, close, navigation, scopeControl, singleWord = false }: Props) {
   useTranslation();
   const editing = useProjectEditing();
+  const [selection, setSelection] = useState<{sourceId: string; ids: string[]; anchorId: string} | null>(null);
   const [mode, setMode] = useState<'manual' | 'auto' | 'advanced'>('manual');
   const [options, setOptions] = useState<SegmentOptions>(DEFAULT_SEGMENT_OPTIONS);
   const [ignoreText, setIgnoreText] = useState('');
@@ -54,6 +56,7 @@ export function SegmentationPanel({ document, wordIds, apply, close, navigation,
     const parts = segmentText(word.text, DEFAULT_SEGMENT_OPTIONS);
     return {[word.id]: parts.length < 2 ? [word] : word.rubyUnits.length ? splitRubyWord(word, parts) : distributeSegmentTime(word, parts, DEFAULT_SEGMENT_OPTIONS.punctuationWeight, editing)};
   });
+  useEffect(() => setSelection(null), [mode, wordIds.join()]);
   const targets = document.lines.flatMap(line=>line.words.filter(word=>wordIds.includes(word.id)).map(word=>({lineId:line.id,word})));
   const blockedReason = (word: LyricWord) => [mode !== 'manual' && word.rubyUnits.length ? t('segment.blockRuby') : '', word.obscene ? t('segment.blockObscene') : '', emptyBeatCount(editing,word.id) ? t('segment.blockBeat') : ''].filter(Boolean).join(' · ');
   const preview: PreviewItem[] = mode === 'manual' ? targets.map(item => {
@@ -123,13 +126,18 @@ export function SegmentationPanel({ document, wordIds, apply, close, navigation,
       </div>}
 
       {error && <p role="alert">{error}</p>}
-      <p role="status">{t('segment.summary',{lines:new Set(targets.map(item=>item.lineId)).size,words:targets.length,split:preview.filter(item=>item.words.length>1&&!item.blocked).length,blocked:targets.filter(item=>blockedReason(item.word)).length})}</p>
       {mode !== 'manual' && result?.inputs !== inputs && !error && <p role="status">{t('segment.computing')}</p>}
       <div className={styles.segmentManual}>{displayedLines.map(line => <section key={line.id}>
-        {displayedLines.length > 1 && <h3>{t('split.lineNumber', {number: mainNumbers.get(line.backgroundOf ?? line.id)})}{line.backgroundOf && ` · ${t('editor.background')}`}</h3>}
+        {displayedLines.length > 1 && <h3>{`L${mainNumbers.get(line.backgroundOf ?? line.id)}`}{line.backgroundOf && ` · ${t('editor.background')}`}</h3>}
         <div className={styles.segmentLine}>{line.words.filter(word => !singleWord || wordIds.includes(word.id)).map(word => {
           const item = preview.find(item => item.word.id === word.id), target = wordIds.includes(word.id);
-          return <SegmentWordDraft key={word.id} source={word} words={item?.words ?? [word]} editable={mode === 'manual' && target && !blockedReason(word)} reason={target ? blockedReason(word) : ''} change={words => setDrafts(previous => ({...previous, [word.id]: words}))}/>;
+          return <SegmentWordDraft key={word.id} source={word} words={item?.words ?? [word]} editable={mode === 'manual' && target && !blockedReason(word)} reason={target ? blockedReason(word) : ''}
+            selected={selection?.sourceId === word.id ? selection.ids : []} clearSelection={() => setSelection(null)}
+            select={(id, shift = false, toggle = false, preserve = false) => setSelection(current => {
+              const previous = current?.sourceId === word.id ? current : null;
+              if (preserve && previous?.ids.includes(id)) return previous;
+              return {sourceId: word.id, ids: selectIds(word.rubyUnits.map(unit => unit.id), previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle), anchorId: shift || toggle ? previous?.anchorId ?? id : id};
+            })} change={words => setDrafts(previous => ({...previous, [word.id]: words}))}/>;
         })}</div>
       </section>)}</div>
     </SettingsDialog>;

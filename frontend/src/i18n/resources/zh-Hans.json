@@ -1739,11 +1739,8 @@
   "segment.blockRuby": "含注音，保留原词",
   "segment.blockObscene": "含消音属性，保留原词",
   "segment.blockBeat": "含空拍，保留原词",
-  "segment.summary": "覆盖 {{lines}} 行、{{words}} 词；可拆分 {{split}} 词、受限 {{blocked}} 词",
   "settings.swapWheel": "交换滚轮操作",
   "settings.swapWheelHelp": "默认滚轮缩放，Shift＋滚轮平移。可配置为交换",
   "split.attachments": "分配附属内容",
-  "segment.movePrevious": "移到前一子词",
-  "segment.moveNext": "移到后一子词",
   "segment.computing": "正在计算分词结果…"
 }

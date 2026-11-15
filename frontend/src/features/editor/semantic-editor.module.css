@@ -404,14 +404,16 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 
 .segmentLine { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
 .segmentSource { display: inline-flex; flex-wrap: wrap; align-items: end; gap: 3px; max-width: 100%; position: relative; }
-.segmentPiece { display: inline-flex; flex-direction: column; align-items: center; max-width: 100%; border-bottom: 2px solid var(--line); padding: 3px 1px; }
+.segmentGroup { display: inline-flex; align-items: end; max-width: 100%; }
+.segmentPiece { min-width: 0; display: inline-flex; flex-direction: column; align-items: center; max-width: 100%; border-bottom: 2px solid var(--line); padding: 3px 1px; }
 .segmentPiece[data-drop] { background: var(--surface-high); outline: 2px solid var(--blue); }
 .segmentRuby { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px; min-height: 24px; font-size: 13px; overflow-wrap: anywhere; }
 .segmentRuby button { padding: 2px 4px !important; min-height: 24px; }
 .segmentRuby button[aria-pressed="true"] { color: var(--blue); background: var(--surface-high); border-color: var(--blue); }
-.segmentBody { display: flex; flex-wrap: wrap; justify-content: center; font-size: 22px; white-space: pre-wrap; }
+.segmentBody { display: flex; flex-wrap: wrap; justify-content: center; font-size: 22px; line-height: 1.5; white-space: pre-wrap; }
 .segmentBody > span { display: inline-flex; align-items: center; }
-.segmentBody button { padding: 3px !important; min-width: 17px; margin: 0 1px; }
-.segmentBody button[aria-pressed="true"] { color: var(--blue); border-color: var(--blue); }
-.segmentMoves { display: inline-flex; gap: 3px; }
+.segmentBoundary { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 33px; margin-bottom: 5px; }
+.segmentBody button, .segmentBoundary button { padding: 3px !important; min-width: 17px; margin: 0 1px; }
+.segmentBoundary button[aria-pressed="true"] { color: var(--blue); border-color: var(--blue); }
+
 .segmentSource:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
