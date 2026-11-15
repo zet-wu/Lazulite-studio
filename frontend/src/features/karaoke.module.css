@@ -3,7 +3,6 @@
 button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); padding:0; text-align:center; }
 .cue + .cue { margin-left:4px; }
 .cue input { width:8ch; min-height:0; max-width:100%; font:inherit; line-height:inherit; padding:0; border:0; border-radius:0; background:transparent; color:inherit; }
-.defaults { display:grid; grid-template-columns:minmax(120px,1fr) minmax(100px,1fr); gap:8px; align-items:center; }
 .output { display:flex; align-items:center; gap:8px; padding:5px; }
 .track { composes: row from "../shared/timeline-element.module.css"; align-items:start; font-size:10px; }
 .track > strong { padding-left:var(--timeline-label-inset); align-self:center; font-size:10px; color:var(--muted); }
@@ -15,14 +14,6 @@ button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); paddin
 .handle { width:7px; height:100%; flex-shrink:0; cursor:ew-resize; border:0; padding:0; background:transparent; }
 .bar .handle:last-child { margin-left:auto; }
 
-
-.thresholds { display:grid; gap:10px; margin:16px 0; container-type:inline-size; }
-.thresholds label { display:grid; grid-template-columns:minmax(0,1fr) 140px; gap:6px 16px; align-items:center; }
-.thresholds input { box-sizing:border-box; width:100%; min-width:0; padding:5px 8px; border:1px solid var(--line); border-radius:var(--control-radius); background:var(--canvas); color:var(--ink); }
-@container (max-width:360px) {
-  .thresholds label { grid-template-columns:minmax(0,1fr); }
-  .thresholds input { width:140px; max-width:100%; }
-}
 
 .outputGrid { display:grid; grid-template-columns:minmax(0,1fr) 110px; gap:8px 12px; align-items:center; }
 .outputRow { display:contents; }

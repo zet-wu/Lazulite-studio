@@ -1,3 +1,5 @@
+import { SettingField } from '../shared/SettingsFields';
+import fields from '../shared/settings-fields.module.css';
 import { SugSingersDialog } from './SugSingersDialog';
 import { MessageError, errorMessage, message as describeMessage } from '../domain/messages';
 import { issueText, karaokeOutputLabel } from './output-messages';
@@ -68,22 +70,23 @@ export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewI
 function DefaultsDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
   useTranslation();
  const [value,setValue]=useState(project.karaoke.defaults);
- return <SettingsDialog title={t('karaoke.defaults')} returnFocus={()=>document.querySelector<HTMLElement>('[data-top-menu="cue-tools"] summary')} close={close}>{error&&<p role="alert">{error}</p>}<div className={styles.defaults}><label htmlFor="cue-default-text">{t('karaoke.cueText')}</label><input id="cue-default-text" value={value.text} onChange={e=>setValue({...value,text:e.target.value})}/>
-</div><p>{t('karaoke.defaultHelp')}</p><button data-role="primary" onClick={()=>{if(apply({kind:'settings',defaults:value}))close();}}>{t('common.apply')}</button></SettingsDialog>;
+ return <SettingsDialog title={t('karaoke.defaults')} returnFocus={()=>document.querySelector<HTMLElement>('[data-top-menu="cue-tools"] summary')} close={close} actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" onClick={()=>{if(apply({kind:'settings',defaults:value}))close();}}>{t('common.apply')}</button></>}>
+ <SettingField label={t('karaoke.cueText')} description={t('karaoke.defaultHelp')} error={error}><input id="cue-default-text" value={value.text} onChange={e=>setValue({...value,text:e.target.value})}/></SettingField></SettingsDialog>;
 }
 function AutoInsertDialog({project,close,apply,error,initialGroups,rememberGroups}:{initialGroups:string[]|null;rememberGroups:(ids:string[])=>void;error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
   useTranslation();
  const [groups,setGroups]=useState(initialGroups?.filter(id=>project.karaoke.groups.some(group=>group.id===id))??project.karaoke.groups.map(group=>group.id));
  const [thresholds,setThresholds]=useState(Object.fromEntries((['beforeMs','wordMs','rubyMs'] as const).map(key=>[key,String(project.karaoke.defaults[key])])));
- const [inputError,setInputError]=useMessageText('');
- return <SettingsDialog title={t('karaoke.autoInsert')} returnFocus={()=>document.querySelector<HTMLElement>('[data-top-menu="cue-tools"] summary')} close={close}>{(inputError||error)&&<p role="alert">{inputError||error}</p>}
- <fieldset><legend>{t('karaoke.targetGroups')}</legend>{project.karaoke.groups.map(group=><label className={styles.output} key={group.id}><input type="checkbox" checked={groups.includes(group.id)} onChange={e=>setGroups(e.target.checked?[...groups,group.id]:groups.filter(id=>id!==group.id))}/>{group.name}</label>)}</fieldset>
- <div className={styles.thresholds}>{([['beforeMs',t('karaoke.beforeThreshold')],['wordMs',t('karaoke.wordThreshold')],['rubyMs',t('karaoke.rubyThreshold')]] as const).map(([key,label])=><label key={key}><span>{label}{t('karaoke.msSuffix')}</span><input aria-label={label} type="number" min={0} step={1} value={thresholds[key]} onChange={e=>setThresholds({...thresholds,[key]:e.target.value})}/></label>)}</div>
- <button data-role="primary" disabled={!groups.length} onClick={()=>{
- if(Object.values(thresholds).some(value=>!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value)))){setInputError(describeMessage('karaoke.invalidThreshold'));return;}
- setInputError('');
+ const [attempted,setAttempted]=useState(false);
+ const invalid=(value:string)=>!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value));
+ return <SettingsDialog title={t('karaoke.autoInsert')} returnFocus={()=>document.querySelector<HTMLElement>('[data-top-menu="cue-tools"] summary')} close={close} actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.cancel')}</button><button data-role="primary" disabled={!groups.length} onClick={()=>{
+ setAttempted(true);
+ if(Object.values(thresholds).some(invalid)){document.querySelector<HTMLInputElement>(`#threshold-${Object.keys(thresholds).find(key=>invalid(thresholds[key]))}`)?.focus();return;}
  if(apply({kind:'auto',groupIds:groups,thresholds:{beforeMs:Number(thresholds.beforeMs),wordMs:Number(thresholds.wordMs),rubyMs:Number(thresholds.rubyMs)}})){rememberGroups(groups);close();}
- }}>{t('karaoke.insert')}</button></SettingsDialog>;
+ }}>{t('karaoke.insert')}</button></>}>
+ <fieldset className={fields.group}><legend>{t('karaoke.targetGroups')}</legend>{project.karaoke.groups.map(group=><label className={styles.output} key={group.id}><input type="checkbox" checked={groups.includes(group.id)} onChange={e=>setGroups(e.target.checked?[...groups,group.id]:groups.filter(id=>id!==group.id))}/>{group.name}</label>)}</fieldset>
+ <div className={fields.group}>{([['beforeMs',t('karaoke.beforeThreshold')],['wordMs',t('karaoke.wordThreshold')],['rubyMs',t('karaoke.rubyThreshold')]] as const).map(([key,label])=><SettingField key={key} label={label+t('karaoke.msSuffix')} error={attempted&&invalid(thresholds[key])?t('karaoke.invalidThreshold'):undefined} errorId={`threshold-${key}-error`}><input id={`threshold-${key}`} aria-label={label} aria-invalid={attempted&&invalid(thresholds[key])} aria-describedby={attempted&&invalid(thresholds[key])?`threshold-${key}-error`:undefined} type="number" min={0} step={1} value={thresholds[key]} onChange={e=>setThresholds({...thresholds,[key]:e.target.value})}/></SettingField>)}</div>
+ {error&&<p role="alert">{error}</p>}</SettingsDialog>;
 }
 function GroupsDialog({project,close,apply,error}:{error:string;project:ProjectDocument;close:()=>void;apply:(c:KaraokeCommand)=>boolean}) {
   useTranslation();

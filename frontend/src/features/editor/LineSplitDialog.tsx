@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { translationText, lineText, type LyricLine, type TranslationContent, type RomanizationContent, type RomanizationTrack } from '../../domain/lyric-document';
 import { previewLineSplit, type LineSplitPlan } from '../../domain/lyric-commands';
+import { SettingField } from '../../shared/SettingsFields';
 import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
 import styles from './semantic-editor.module.css';
@@ -36,7 +37,7 @@ export function LineSplitDialog({ line, translations, backgrounds, attached, clo
       if (submit(plan)) close();
     }}>{t('common.apply')}</button>
   </>}>
-    <p>{t('split.help')}</p>
+    <h3>{t('split.points')}</h3><p>{t('split.help')}</p>
     <div className={styles.manualGraphemes} aria-label={t('split.points')}>{line.words.map((word, index) => <span key={word.id}>
       {index > 0 && <button data-role="inline" aria-label={t('split.beforeWord',{number:index+1})} aria-pressed={cuts.includes(word.id)} onClick={() => {
         const next = cuts.includes(word.id) ? cuts.filter(id => id !== word.id) : [...cuts, word.id];
@@ -45,22 +46,22 @@ export function LineSplitDialog({ line, translations, backgrounds, attached, clo
       }}>|</button>}
       <strong className={styles.splitWord}>{word.text}</strong>
     </span>)}</div>
-    {invalid && <p role="alert">{t('split.changed')}</p>}
-    <div className={styles.splitPreview} aria-label={t('split.result')}>{preview.map(({ segment, issue }, index) => <section key={keys[index]}>
+    <h3>{t('split.result')}</h3><div className={styles.splitPreview} aria-label={t('split.result')}>{preview.map(({ segment, issue }, index) => <section key={keys[index]}>
       <small>{t('split.lineNumber',{number:index+1})} · {time(segment.beginMs)} – {time(segment.endMs)}</small>
-      <p>{lineText(segment)}</p>
+      <p className={styles.lyricQuote}>{lineText(segment)}</p>
       {issue && <p role="alert">{formatMessage(issue)}</p>}
       {entries.filter(item => (targets[item.id] ?? first) === keys[index]).map(item => <small key={item.id}>{item.label} · <strong>{item.text}</strong></small>)}
       {backgrounds.filter(bg=>bgKey(bg.id)===keys[index]).map(bg=><small key={bg.id}>{t('editor.background')} · <strong>{lineText(bg)}</strong></small>)}
     </section>)}</div>
-    {entries.map((item, index) => <label key={item.id} className={styles.splitAssignment}>
-      <span>{item.label} · <strong>{item.text}</strong></span>
+    {(entries.length>0||backgrounds.length>0)&&<h3>{t('split.attachments')}</h3>}
+    {invalid && <p role="alert">{t('split.changed')}</p>}
+    {entries.map((item, index) => <SettingField key={item.id} label={item.label} description={<strong className={styles.lyricQuote}>{item.text}</strong>}>
       <Select aria-label={t('split.assignment',{label:item.label,number:index+1})} value={keys.includes(targets[item.id] ?? first) ? targets[item.id] ?? first : ''}
         onChange={event => setTargets(previous => ({ ...previous, [item.id]: event.target.value }))}>{options}</Select>
-    </label>)}
-    {backgrounds.map((background,i) => <label key={background.id} className={styles.splitAssignment}><span>{t('editor.background')} · <strong>{lineText(background)}</strong></span>
+    </SettingField>)}
+    {backgrounds.map((background,i) => <SettingField key={background.id} label={t('editor.background')} description={<strong className={styles.lyricQuote}>{lineText(background)}</strong>}>
       <Select aria-label={t('split.backgroundAssignment',{number:backgrounds.length>1 ? ` ${i+1}` : ''})} value={keys.includes(bgKey(background.id)) ? bgKey(background.id) : ''} onChange={event => setBackgroundKeys(previous=>({...previous,[background.id]:event.target.value}))}>{options}</Select>
-    </label>)}
+    </SettingField>)}
   </SettingsDialog>;
 }
 
