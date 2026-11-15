@@ -62,7 +62,7 @@ export function prepareSug(project: Pick<ProjectDocument, 'lyrics' | 'karaoke' |
     };
     let charIndex=0;
     const sentences:Sentence[]=[];
-    const emit = (segments:Segment[], target:Target) => {
+    const emit = (segments:Segment[], target:Target, line:LyricLine) => {
       if(!segments.length)return;
       let previous=-1,maxEnd=-1;
       const characters:SugCharacter[]=[];
@@ -79,7 +79,7 @@ export function prepareSug(project: Pick<ProjectDocument, 'lyrics' | 'karaoke' |
         });
       }
       if(segments.at(-1)!.end<maxEnd)issue(target,'output.sugShortEnvelope','unsupported-order');
-      if(characters.length){characters.at(-1)!.is_line_end=true;sentences.push({id:`sentence-${sentences.length}`,singer_id:'singer-0',characters});}
+      if(characters.length){characters.at(-1)!.is_line_end=true;sentences.push({id:`sentence-${sentences.length}`,singer_id:lineSinger(line,target),characters});}
     };
     const mapUnits = (units:ExportUnit[], targetFor:(u:ExportUnit)=>Target, singer:(u:ExportUnit)=>string, body=false):Segment[] => {
       const result:Segment[]=[];
@@ -126,16 +126,16 @@ export function prepareSug(project: Pick<ProjectDocument, 'lyrics' | 'karaoke' |
         const before=karaoke.cues.filter(c=>c.anchor.kind==='before'&&c.anchor.lineId===line.id).sort((a,b)=>a.beginMs-b.beginMs).flatMap(c=>{const s=cueSegment(c);return s?[s]:[];});
         const body=mapUnits(line.words,u=>({...target,kind:'word',wordId:u.id}),u=>singerFor(line,u as LyricWord,{...target,kind:'word',wordId:u.id}),true);
         if(!body.some(s=>!s.separator))issue(target,'该行没有可输出的定时正文','empty-content');
-        emit([...before,...body],target);
+        emit([...before,...body],target,line);
       }else{
         const track=lyrics[output.kind==='translation'?'translationTracks':'romanizationTracks'].find(t=>t.id===output.trackId)!;
         for(const content of contents){
           const ct:Target={...target,kind:`${output.kind}-content`,trackId:track.id,contentId:content.id};
-          if(content.kind==='timed')emit(mapUnits(content.units,u=>({...ct,kind:`${output.kind}-unit` as OutputIssue['kind'],unitId:u.id}),()=>lineSinger(line,ct)),ct);
+          if(content.kind==='timed')emit(mapUnits(content.units,u=>({...ct,kind:`${output.kind}-unit` as OutputIssue['kind'],unitId:u.id}),()=>lineSinger(line,ct)),ct,line);
           else if(content.text.length){
             const words=line.words.filter(w=>w.text.length&&!isUntimedSeparator(w,project.editing));
             if(!words.length||words.some(w=>!valid(w,{...target,kind:'word',wordId:w.id}))) {issue(target,'output.attachmentEnvelope','missing-time');continue;}
-            emit([{text:content.text,begin:Math.min(...words.map(w=>w.beginMs!)),end:Math.max(...words.map(w=>w.endMs!)),target:ct,singer:lineSinger(line,ct)}],ct);
+            emit([{text:content.text,begin:Math.min(...words.map(w=>w.beginMs!)),end:Math.max(...words.map(w=>w.endMs!)),target:ct,singer:lineSinger(line,ct)}],ct,line);
           }
         }
       }

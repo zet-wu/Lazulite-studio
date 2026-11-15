@@ -5,6 +5,7 @@ import { applyKaraoke, outputId, reconcileKaraoke, autoInsertCues } from '../src
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
 import { sugSingerOptions, sugSingerName } from '../src/adapters/sug-singers';
 import { writeFileSync } from 'node:fs';
+import { parseLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { prepareSug, sugZip } from '../src/adapters/sug';
 function fixture() {
   const p=createProjectDocument(createLyricDocument('歌'));
@@ -17,7 +18,7 @@ function fixture() {
 }
 it('collects body word and auxiliary line singers independently of selection or missing times',()=>{
   const p=fixture();p.karaoke.outputs=[];p.lyrics.lines[0].words[0].beginMs=null;
-  const options=sugSingerOptions(p);expect(options.map(o=>[o.output.kind,o.sets.map(s=>s.ids)])).toEqual([['body',[['a']]],['translation',[['b']]]]);
+  const options=sugSingerOptions(p);expect(options.map(o=>[o.output.kind,o.sets.map(s=>s.ids)])).toEqual([['body',[['b'],['a']]],['translation',[['b']]]]);
   p.karaoke.outputs=[outputId('main')];expect(sugSingerOptions(p)).toEqual(options);
   p.lyrics.translationTracks[0].contents=[];expect(sugSingerOptions(p)).toHaveLength(1);
 });
@@ -77,4 +78,29 @@ it('keeps same-language tracks independent and uses custom group IDs for romaniz
   expect(options.map(o=>sugSingerName(p,o.output,o.sets[0]))).toEqual(['B.custom.ja-Latn','B.custom.ja-Latn']);
   p.karaoke.sugSingerNames=[{outputId:options[0].output.id,agentIds:['b'],name:'共用'}];
   expect(options.map(o=>sugSingerName(p,o.output,o.sets[0]))).toEqual(['共用','B.custom.ja-Latn']);
+});
+
+it('preserves independent background sentence singers, word overrides and auxiliary roles through project roundtrip',()=>{
+  const lyrics=parseLyricTtml('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><head><metadata><ttm:agent xml:id="a" type="person"><ttm:name>A</ttm:name></ttm:agent><ttm:agent xml:id="b" type="person"><ttm:name>B</ttm:name></ttm:agent></metadata></head><body><p xml:id="lead" ttm:agent="a" begin="4" end="8"><span begin="4" end="5">主</span><span ttm:role="x-bg" ttm:agent="b" begin="6" end="8"><span begin="6" end="7">背</span><span begin="7" end="8" ttm:agent="a">景</span><span ttm:role="x-translation" xml:lang="en">backing</span></span></p></body></tt>');
+  let p=createProjectDocument(lyrics);p.amll.noWordAgents=false;
+  p=parseProject(serializeProject(p));
+  const bg=p.lyrics.lines.find(line=>line.backgroundOf)!;
+  const body=outputId('background'),translation=outputId('background','translation',p.lyrics.translationTracks[0].id);
+  p.karaoke.outputs=[outputId('main'),body,translation];
+  p.karaoke.sugSingerNames=[{outputId:body,agentIds:['b'],name:'背景独唱'}];
+  p.karaoke=autoInsertCues(p.lyrics,p.karaoke);
+  const result=prepareSug(p,'background');expect(result.issues).toEqual([]);
+  const files=result.files.map(file=>JSON.parse(file.text));
+  const role=(file:any,id:string)=>file.singers.find((s:any)=>s.id===id).name;
+  expect(files.map(file=>role(file,file.sentences[0].singer_id))).toEqual(['A','背景独唱','B.background.en']);
+  const background=files[1],characters=background.sentences[0].characters;
+  expect(characters.filter((c:any)=>!c.is_guide).map((c:any)=>role(background,c.singer_id))).toEqual(['背景独唱','A.background']);
+  expect(characters.filter((c:any)=>c.is_guide).map((c:any)=>role(background,c.singer_id))).toEqual(['背景独唱']);
+  if(process.env.SUG_CONTRACT_DIR)writeFileSync(`${process.env.SUG_CONTRACT_DIR}/background-line.zip`,sugZip(p,'background'));
+  // Even when every word overrides the line, its own exported role remains configurable.
+  bg.words.forEach(word=>word.agentRefs=['a']);
+  expect(sugSingerOptions(p).find(item=>item.output.id===body)!.sets.map(set=>set.ids)).toContainEqual(['b']);
+  bg.agentRefs=[];
+  const inherited=JSON.parse(prepareSug(p,'background').files.find(file=>file.output.id===body)!.text);
+  expect(role(inherited,inherited.sentences[0].singer_id)).toBe('A.background');
 });

@@ -24,7 +24,7 @@ export function sugOutputContent(project: Project, output: KaraokeOutput) {
 export function sugSingerOptions(project: Project) {
   return karaokeOutputs(project).map(output => {
     const sets = sugOutputContent(project, output).flatMap(({line, words, cues, contents}) => output.kind === 'body'
-      ? [...words.map(word => sugSingerSet(project, line, word)), ...cues.map(cue => sugSingerSet(project, line, cueWord(project.lyrics, cue)))]
+      ? [...(words.length || cues.length ? [sugSingerSet(project, line)] : []), ...words.map(word => sugSingerSet(project, line, word)), ...cues.map(cue => sugSingerSet(project, line, cueWord(project.lyrics, cue)))]
       : contents.length ? [sugSingerSet(project, line)] : []);
     return { output, sets: [...new Map(sets.map(set => [set.key, set])).values()] };
   }).filter(item => item.sets.length);
