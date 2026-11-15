@@ -41,3 +41,32 @@ it.each(['segment-word','segment-words'] as const)('validates and atomically und
  expect(state.present.lines[0].words).toEqual(words);expect(undoLyricCommand(state).present).toEqual(document);expect(redoLyricCommand(undoLyricCommand(state)).present).toEqual(state.present);
  words[0].rubyUnits.reverse();expect(()=>executeLyricCommand(createLyricEditorState(document),command)).toThrow('command.segmentNewAttributes');
 });
+
+it.each(['missing','changed','time'] as const)('rejects %s ruby submission without altering original',variant=>{
+ const {document,source}=fixture(), words=splitRubyWord(source,['甲乙','丙丁']);
+ if(variant==='missing') words[0].rubyUnits=words[0].rubyUnits.slice(1);
+ if(variant==='changed') words[0].rubyUnits=[{...words[0].rubyUnits[0],reading:'changed'},words[0].rubyUnits[1]];
+ if(variant==='time') words[0].beginMs=source.beginMs;
+ const state=createLyricEditorState(document);
+ expect(()=>executeLyricCommand(state,{type:'segment-words',changes:[{lineId:document.lines[0].id,wordId:source.id,words}]})).toThrow();
+ expect(state.present).toBe(document);expect(source.rubyUnits.map(r=>r.reading)).toEqual(['a','b','c','d']);
+});
+it('submission rejects a split within a combining grapheme',()=>{
+ const document=createLyricDocument('éx'), source=document.lines[0].words[0];
+ expect(()=>executeLyricCommand(createLyricEditorState(document),{type:'segment-word',lineId:document.lines[0].id,wordId:source.id,words:[{...source,text:'e'},{...source,id:'new',text:'́x'}]})).toThrow('command.segmentText');
+});
+
+it('retains ruby beat attributes and singer references through project save and reopen',async()=>{
+ const {parseProject,serializeProject}=await import('../src/adapters/project-codec');
+ const {document,source}=fixture();
+ document.agents=[{id:'v1',type:'person',name:'Singer'}];source.agentRefs=['v1'];
+ let state=createLyricEditorState(document);
+ state.project.present.amll.noWordAgents=false;state.project.present.amll.simplified=false;
+ state=executeLyricCommand(state,{type:'set-empty-beat',id:'b',kind:'ruby',count:2});
+ const words=moveSegmentRuby(splitRubyWord(source,['甲乙','丙丁']),['b'],1)!;
+ state=executeLyricCommand(state,{type:'segment-words',changes:[{lineId:document.lines[0].id,wordId:source.id,words}]});
+ const saved=parseProject(serializeProject(state.project.present));
+ expect(saved.lyrics.lines[0].words).toEqual(words);
+ expect(saved.lyrics.lines[0].words.every(word=>word.agentRefs?.join()==='v1')).toBe(true);
+ expect(saved.editing.emptyBeats.b).toEqual({kind:'ruby',count:2});
+});
