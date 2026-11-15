@@ -146,6 +146,7 @@ test('western splitting and inline space-only words preserve independent whitesp
   await input.click(); await input.fill('I still love you'); await input.press('Enter');
   await line.locator('[data-word-id]').first().click({ button: 'right', position: { x: 3, y: 3 } });
   await page.getByRole('menuitem', { name: '拆分词', exact: true }).click();
+  await page.getByRole('button', {name:'应用（一次撤销）'}).click();
   await expect(line.locator('[data-word-id]')).toHaveCount(7);
   expect(await line.locator('[data-word-id] > div[class*="wordMain"] input').evaluateAll(nodes => nodes.map(node => (node as HTMLInputElement).value))).toEqual(['I', ' ', 'still', ' ', 'love', ' ', 'you']);
   await line.getByRole('button', { name: '添加词', exact: true }).click();

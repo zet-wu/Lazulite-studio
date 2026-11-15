@@ -100,9 +100,9 @@ it('automatically previews current parameters, waits for IME, and applies the di
   const {SegmentationPanel} = await import('../src/features/editor/SegmentationPanel');
   const document = createLyricDocument('hello');
   const applied: unknown[] = [];
-  const view = render(createElement(SegmentationPanel, {document, selection:null, currentLineId:document.lines[0].id, apply:command=>{applied.push(command);return true;}, close:()=>{}}));
+  const view = render(createElement(SegmentationPanel, {document, wordIds:document.lines.flatMap(line=>line.words.map(word=>word.id)), apply:command=>{applied.push(command);return true;}, close:()=>{}}));
   try {
-    fireEvent.click(screen.getByRole('button', {name:'高级'}));
+    fireEvent.change(screen.getByLabelText('模式'), {target:{value:'advanced'}});
     const rules = screen.getByLabelText('自定义规则（每行 原文=部分|部分）');
     const apply = screen.getByRole('button', {name:'应用（一次撤销）'});
     fireEvent.change(rules, {target:{value:'hello=hel|lo'}});
@@ -129,9 +129,9 @@ it('ignores late syllable previews after newer inputs and after closing', async 
   const loader = vi.spyOn(segmentation, 'loadSyllableDivider').mockImplementation(() => new Promise(resolve => pending.push(resolve)));
   const {SegmentationPanel} = await import('../src/features/editor/SegmentationPanel');
   const document = createLyricDocument('hello'), apply = vi.fn(()=>true);
-  const view = render(createElement(SegmentationPanel, {document, selection:null, currentLineId:document.lines[0].id, apply, close:()=>{}}));
+  const view = render(createElement(SegmentationPanel, {document, wordIds:document.lines.flatMap(line=>line.words.map(word=>word.id)), apply, close:()=>{}}));
   try {
-    fireEvent.click(screen.getByRole('button',{name:'自动'}));
+    fireEvent.change(screen.getByLabelText('模式'), {target:{value:'auto'}});
     fireEvent.change(screen.getByLabelText('西文处理'),{target:{value:'syllable'}});
     await waitFor(()=>expect(pending).toHaveLength(1));
     fireEvent.change(screen.getByLabelText('音节语言'),{target:{value:'de'}});

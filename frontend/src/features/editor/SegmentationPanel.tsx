@@ -6,12 +6,13 @@ import { Icon } from '../../shared/Icon';
 import { useProjectEditing } from './ProjectEditingContext';
 import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
+import { SettingField, SettingToggle } from '../../shared/SettingsFields';
+import fields from '../../shared/settings-fields.module.css';
 import { SettingsDialog } from './SettingsDialog';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { lineText, type LyricDocument, type LyricWord } from '../../domain/lyric-document';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, loadSyllableDivider, segmentText, segmentationPreview, SYLLABLE_LANGUAGES, type SegmentOptions } from '../../domain/segmentation';
-import type { EditorSelection } from './editing-actions';
 import styles from './semantic-editor.module.css';
 
 function Parts({ parts }: { parts: string[] }) {
@@ -20,15 +21,16 @@ function Parts({ parts }: { parts: string[] }) {
 }
 
 type PreviewItem = ReturnType<typeof segmentationPreview>[number];
-type Props = { document: LyricDocument; selection: EditorSelection | null; currentLineId: string | null; apply: (command: LyricCommand) => boolean; close: () => void };
-const graphemes = (text: string) => Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), (part) => part.segment);
-
-function targetWordIds(document: LyricDocument, selection: EditorSelection | null, currentLineId: string | null, scope: string, from: number, to: number): string[] {
-  if (scope === 'selected' && selection?.kind === 'words') return selection.ids;
-  const lines = document.lines.filter((line, index) => scope === 'all' || scope === 'range' && index + 1 >= from && index + 1 <= to ||
-    scope === 'selected' && selection?.kind === 'lines' && selection.ids.includes(line.backgroundOf ?? line.id) ||
-    scope === 'current' && line.id === currentLineId);
-  return lines.flatMap((line) => line.words.map((word) => word.id));
+type Props = { document: LyricDocument; wordIds: string[]; apply: (command: LyricCommand) => boolean; close: () => void; navigation?: ReactNode; scopeControl?: ReactNode; singleWord?: boolean };
+export const graphemes = (text: string) => Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), (part) => part.segment);
+export function boundaryParts(text: string, boundaries: number[]) {
+  const chars = graphemes(text);
+  return [0, ...boundaries.filter(n => n > 0 && n < chars.length).sort((a,b) => a-b), chars.length]
+    .flatMap((end, index, points) => index ? [chars.slice(points[index-1], end).join('')] : []);
+}
+function BoundaryEditor({word, boundaries, disabled, change}: {word: LyricWord; boundaries: number[]; disabled: boolean; change: (next: number[]) => void}) {
+  const chars = graphemes(word.text);
+  return <div className={styles.manualGraphemes} aria-label={t('segment.boundaries')}>{chars.map((char, index) => <span key={index}><span>{char}</span>{index < chars.length-1 && <button data-role="inline" disabled={disabled} aria-label={t('segment.boundary',{number:index+1})} aria-pressed={boundaries.includes(index+1)} onClick={() => change(boundaries.includes(index+1) ? boundaries.filter(n=>n!==index+1) : [...boundaries,index+1])}><Icon name={boundaries.includes(index+1) ? 'sync-beat' : 'sync-dot'}/></button>}</span>)}</div>;
 }
 
 function parseRules(input: string): SegmentOptions['rules'] {
@@ -39,13 +41,10 @@ function parseRules(input: string): SegmentOptions['rules'] {
   });
 }
 
-export function SegmentationPanel({ document, selection, currentLineId, apply, close }: Props) {
+export function SegmentationPanel({ document, wordIds, apply, close, navigation, scopeControl, singleWord = false }: Props) {
   useTranslation();
   const editing = useProjectEditing();
   const [mode, setMode] = useState<'manual' | 'auto' | 'advanced'>('manual');
-  const [scope, setScope] = useState('current');
-  const [from, setFrom] = useState(1);
-  const [to, setTo] = useState(document.lines.length);
   const [options, setOptions] = useState<SegmentOptions>(DEFAULT_SEGMENT_OPTIONS);
   const [ignoreText, setIgnoreText] = useState('');
   const [ruleText, setRuleText] = useState('');
@@ -53,29 +52,20 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
   const [testOutput, setTestOutput] = useState<string[]>([]);
   const [composing, setComposing] = useState(false);
   const [retry, setRetry] = useState(0);
-  const inputs = useMemo(() => ({}), [document, selection, currentLineId, scope, from, to, options, ignoreText, ruleText, mode, editing, composing, retry]);
+  const inputs = useMemo(() => ({}), [document, wordIds.join(), options, ignoreText, ruleText, mode, editing, composing, retry]);
   const [result, setResult] = useState<{ inputs: object; items: PreviewItem[] } | null>(null);
-  const [manualPreview, setManualPreview] = useState<PreviewItem[]>([]);
-  const preview = mode === 'manual' ? manualPreview : result?.inputs === inputs ? result.items : [];
-  const setPreview = setManualPreview;
   const [error, setError] = useMessageText('');
-  const [manualBoundaries, setManualBoundaries] = useState<number[]>([]);
-  const activeWord = selection && !selection.ids.length ? undefined : selection?.kind === 'words' ? document.lines.flatMap((line) => line.words).find((word) => word.id === selection.activeId) :
-    document.lines.find((line) => line.id === currentLineId)?.words[0];
-  const manualLine = document.lines.find((line) => line.words.some((word) => word.id === activeWord?.id));
-  const chars = activeWord ? graphemes(activeWord.text) : [];
-
-  useEffect(() => { setPreview([]); setManualBoundaries([]); }, [document, activeWord?.id]);
-
-  const updateOption = <K extends keyof SegmentOptions>(key: K, value: SegmentOptions[K]) => { setOptions((current) => ({ ...current, [key]: value })); setPreview([]); };
-  const manualParts = (word: LyricWord, boundaries = manualBoundaries) => {
-    const pieces = graphemes(word.text);
-    const parts: string[] = [];
-    let current = '';
-    pieces.forEach((piece, index) => { current += piece; if (boundaries.includes(index + 1)) { parts.push(current); current = ''; } });
-    if (current) parts.push(current);
-    return parts;
-  };
+  const [drafts, setDrafts] = useState<Record<string, number[]>>(() => {
+    if (!singleWord) return {};
+    const word = document.lines.flatMap(line=>line.words).find(word=>wordIds.includes(word.id));
+    if (!word) return {};
+    let offset = 0;
+    return {[word.id]: segmentText(word.text, DEFAULT_SEGMENT_OPTIONS).slice(0,-1).map(part => (offset += graphemes(part).length))};
+  });
+  const targets = document.lines.flatMap(line=>line.words.filter(word=>wordIds.includes(word.id)).map(word=>({lineId:line.id,word})));
+  const blockedReason = (word: LyricWord) => [word.rubyUnits.length ? t('segment.blockRuby') : '', word.obscene ? t('segment.blockObscene') : '', emptyBeatCount(editing,word.id) ? t('segment.blockBeat') : ''].filter(Boolean).join(' · ');
+  const preview = mode === 'manual' ? targets.map(item=>({...item,parts:boundaryParts(item.word.text,drafts[item.word.id] ?? []),blocked:!!blockedReason(item.word)})) : result?.inputs === inputs ? result.items : [];
+  const updateOption = <K extends keyof SegmentOptions>(key: K, value: SegmentOptions[K]) => setOptions(current => ({...current,[key]:value}));
   const testRule = async () => {
     try {
       const config = { ...options, ignore: ignoreText.split('\n').map((item) => item.trim()).filter(Boolean), rules: parseRules(ruleText) };
@@ -91,9 +81,9 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
     if (composing) return;
     const timer = setTimeout(() => { void (async () => {
       try {
-        const ids = targetWordIds(document, selection, currentLineId, scope, from, to);
+        const ids = wordIds;
         if (!ids.length) throw new MessageError(describeMessage('segment.noWords'));
-        const config = { ...options, ignore: ignoreText.split('\n').map(item => item.trim()).filter(Boolean), rules: parseRules(ruleText) };
+        const config = mode === 'advanced' ? { ...options, ignore: ignoreText.split('\n').map(item => item.trim()).filter(Boolean), rules: parseRules(ruleText) } : { ...options, punctuationWeight: DEFAULT_SEGMENT_OPTIONS.punctuationWeight, ignore: [], rules: [] };
         const divide = config.western === 'syllable' ? await loadSyllableDivider(config.language) : undefined;
         const items = segmentationPreview(document, ids, config, divide, editing);
         if (active) setResult({ inputs, items });
@@ -106,39 +96,37 @@ export function SegmentationPanel({ document, selection, currentLineId, apply, c
       const changed = preview.filter((item) => item.parts.length > 1 && !item.blocked);
       if (!changed.length) return;
       const changes = changed.map((item) => ({ lineId: item.lineId, wordId: item.word.id,
-        words: distributeSegmentTime(item.word, item.parts, options.punctuationWeight, editing) }));
+        words: distributeSegmentTime(item.word, item.parts, mode === 'advanced' ? options.punctuationWeight : DEFAULT_SEGMENT_OPTIONS.punctuationWeight, editing) }));
       if (apply({ type: 'segment-words', changes })) close();
     } catch (cause) { setError(errorMessage(cause)); }
   };
-  return <SettingsDialog title={t('segment.title')} close={close} actions={<>{mode !== 'manual' && error && <button data-role="secondary" onClick={() => setRetry(value => value + 1)}>{t('common.retry')}</button>}<button data-role="primary" disabled={!preview.some((item) => item.parts.length > 1 && !item.blocked)} onClick={commit}>{t('edit.applyUndo')}</button></>}>
-      <div className={styles.dialogTabs}>{(['manual', 'auto', 'advanced'] as const).map((item) => <button data-role="secondary" key={item} className={mode === item ? styles.activeTab : ''} onClick={() => { setMode(item); setPreview([]); }}>{item === 'manual' ? t('segment.manual') : item === 'auto' ? t('segment.auto') : t('segment.advanced')}</button>)}</div>
-      {mode === 'manual' ? <div>
-        <p>{t('segment.currentWord')}{activeWord?.text ?? t('segment.selectCanvas')}</p>
-        <div className={styles.manualGraphemes} aria-label={t('segment.boundaries')}>{chars.map((char, index) => <span key={index}><span>{char}</span>{index < chars.length - 1 && <button data-role="secondary" aria-label={t('segment.boundary',{number:index+1})} aria-pressed={manualBoundaries.includes(index + 1)} onClick={() => {
-          const next = manualBoundaries.includes(index + 1) ? manualBoundaries.filter((value) => value !== index + 1) : [...manualBoundaries, index + 1];
-          setManualBoundaries(next);
-          if (activeWord && manualLine) { const parts = manualParts(activeWord, next); setPreview([{ lineId: manualLine.id, word: activeWord, parts, blocked: parts.length > 1 && Boolean(activeWord.rubyUnits.length || activeWord.obscene || emptyBeatCount(editing, activeWord.id)) }]); }
-        }}><Icon name={manualBoundaries.includes(index + 1) ? "sync-beat" : "sync-dot"}/></button>}</span>)}</div>
-      </div> : <div className={styles.dialogControls}>
-        <label>{t('edit.scope')}<Select value={scope} onChange={(event) => { setScope(event.target.value); setPreview([]); }}><option value="current">{t('edit.currentLine')}</option><option value="selected">{t('edit.selected')}</option><option value="range">{t('edit.lineRange')}</option><option value="all">{t('edit.allLines')}</option></Select></label>
-        {scope === 'range' && <div className={styles.inlineFields}><label>{t('edit.fromLine')}<input type="number" min="1" max={document.lines.length} value={from} onChange={(event) => { setFrom(Number(event.target.value)); setPreview([]); }} /> {t('edit.lineUnit')}</label><label>{t('edit.toLine')}<input type="number" min="1" max={document.lines.length} value={to} onChange={(event) => { setTo(Number(event.target.value)); setPreview([]); }} /> {t('edit.lineUnit')}</label></div>}
-        <label><input type="checkbox" checked={options.splitCjk} onChange={(event) => updateOption('splitCjk', event.target.checked)} /> {t('segment.cjk')}</label>
-        <label>{t('segment.western')}<Select value={options.western} onChange={(event) => updateOption('western', event.target.value as SegmentOptions['western'])}><option value="word">{t('segment.words')}</option><option value="syllable">{t('segment.syllables')}</option></Select></label>
-        {options.western === 'syllable' && <label>{t('segment.language')}<Select value={options.language} onChange={(event) => updateOption('language', event.target.value as SegmentOptions['language'])}>{SYLLABLE_LANGUAGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></label>}
-        <label>{t('segment.punctuation')}<Select value={options.punctuation} onChange={(event) => updateOption('punctuation', event.target.value as SegmentOptions['punctuation'])}><option value="merge">{t('segment.adjacent')}</option><option value="separate">{t('segment.separate')}</option></Select></label>
-        <label>{t('segment.whitespace')}<Select value={options.whitespace} onChange={(event) => updateOption('whitespace', event.target.value as SegmentOptions['whitespace'])}><option value="next">{t('segment.next')}</option><option value="previous">{t('segment.previous')}</option><option value="separate">{t('segment.keepSeparate')}</option></Select></label>
+  return <SettingsDialog title={t(singleWord ? 'editor.splitWord' : 'batch.title')} close={close} actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.cancel')}</button>{mode !== 'manual' && error && <button data-role="secondary" onClick={() => setRetry(value => value + 1)}>{t('common.retry')}</button>}<button data-role="primary" disabled={composing || !preview.some((item) => item.parts.length > 1 && !item.blocked)} onClick={commit}>{t('edit.applyUndo')}</button></>}>
+      {navigation}
+      {!singleWord && <SettingField label={t('segment.mode')}><Select value={mode} onChange={event=>setMode(event.target.value as typeof mode)}>{(['manual','auto','advanced'] as const).map(value=><option key={value} value={value}>{t(`segment.${value}`)}</option>)}</Select></SettingField>}
+      {scopeControl}
+      {!targets.length && <p role="status">{t('segment.noWords')}</p>}
+      {mode === 'manual' ? <div className={styles.segmentManual}>{document.lines.map((line,index) => {
+        const words = targets.filter(item=>item.lineId===line.id);
+        return words.length ? <section key={line.id}><h3>{t('split.lineNumber',{number:index+1})}{line.backgroundOf && ` · ${t('editor.background')} (${document.lines.findIndex(parent=>parent.id===line.backgroundOf)+1})`}</h3><p className={styles.lyricQuote}>{lineText(line)}</p>{words.map(({word})=><div className={styles.segmentWord} key={word.id}><strong className={styles.lyricQuote}>{word.text}</strong><BoundaryEditor word={word} boundaries={drafts[word.id] ?? []} disabled={!!blockedReason(word)} change={next=>setDrafts(previous=>({...previous,[word.id]:next}))}/>{blockedReason(word) && <p className={styles.toolHint}>{blockedReason(word)}</p>}</div>)}</section> : null;
+      })}</div> : <div className={fields.group}>
+        <SettingToggle label={t('segment.cjk')} checked={options.splitCjk} onChange={value=>updateOption('splitCjk',value)}/>
+        <SettingField label={t('segment.western')}><Select value={options.western} onChange={(event) => updateOption('western', event.target.value as SegmentOptions['western'])}><option value="word">{t('segment.words')}</option><option value="syllable">{t('segment.syllables')}</option></Select></SettingField>
+        {options.western === 'syllable' && <SettingField label={t('segment.language')}><Select value={options.language} onChange={(event) => updateOption('language', event.target.value as SegmentOptions['language'])}>{SYLLABLE_LANGUAGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></SettingField>}
+        <SettingField label={t('segment.punctuation')}><Select value={options.punctuation} onChange={(event) => updateOption('punctuation', event.target.value as SegmentOptions['punctuation'])}><option value="merge">{t('segment.adjacent')}</option><option value="separate">{t('segment.separate')}</option></Select></SettingField>
+        <SettingField label={t('segment.whitespace')}><Select value={options.whitespace} onChange={(event) => updateOption('whitespace', event.target.value as SegmentOptions['whitespace'])}><option value="next">{t('segment.next')}</option><option value="previous">{t('segment.previous')}</option><option value="separate">{t('segment.keepSeparate')}</option></Select></SettingField>
         {mode === 'advanced' && <>
-          <label>{t('segment.weight')}<input type="number" min="0" step="0.1" value={options.punctuationWeight} onChange={(event) => updateOption('punctuationWeight', Number(event.target.value))} /></label>
-          <label>{t('segment.ignore')}<textarea onKeyDown={event => { if (composing) event.stopPropagation(); }} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} value={ignoreText} onChange={(event) => { setIgnoreText(event.target.value); setPreview([]); }} /></label>
-          <label>{t('segment.rules')}<textarea onKeyDown={event => { if (composing) event.stopPropagation(); }} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} value={ruleText} onChange={(event) => { setRuleText(event.target.value); setPreview([]); }} /></label>
-          <label>{t('segment.testInput')}<input aria-label={t('segment.testInputLabel')} value={testInput} placeholder={t('segment.sample')} onChange={(event) => { setTestInput(event.target.value); setTestOutput([]); }} /></label>
+          <SettingField label={t('segment.weight')}><input type="number" min="0" step="0.1" value={options.punctuationWeight} onChange={(event) => updateOption('punctuationWeight', Number(event.target.value))} /></SettingField>
+          <SettingField label={t('segment.ignore')} stacked><textarea onKeyDown={event => { if (composing) event.stopPropagation(); }} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} value={ignoreText} onChange={(event) => { setIgnoreText(event.target.value); }} /></SettingField>
+          <SettingField label={t('segment.rules')} stacked><textarea onKeyDown={event => { if (composing) event.stopPropagation(); }} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} value={ruleText} onChange={(event) => { setRuleText(event.target.value); }} /></SettingField>
+          <SettingField label={t('segment.testInput')}><input aria-label={t('segment.testInputLabel')} value={testInput} placeholder={t('segment.sample')} onChange={(event) => { setTestInput(event.target.value); setTestOutput([]); }} /></SettingField>
           <button data-role="secondary" onClick={() => void testRule()}>{t('segment.testRules')}</button>
           {testOutput.length > 0 && <p>{t('segment.testResult')}<Parts parts={testOutput}/></p>}
         </>}
       </div>}
 
       {error && <p role="alert">{error}</p>}
-      {preview.length > 0 && <div className={styles.segmentPreview}><strong>{t('segment.preview')}{preview.filter((item) => item.parts.length > 1 && !item.blocked).length} {t('segment.willSplit')}</strong>{preview.map((item) => <div key={item.word.id}><small>{lineText(document.lines.find((line) => line.id === item.lineId)!)}</small><span>{item.word.text} → <Parts parts={item.parts}/></span>{item.blocked && <em>{t('segment.keepRuby')}</em>}</div>)}</div>}
+      <p role="status">{t('segment.summary',{lines:new Set(targets.map(item=>item.lineId)).size,words:targets.length,split:preview.filter(item=>item.parts.length>1&&!item.blocked).length,blocked:targets.filter(item=>blockedReason(item.word)).length})}</p>
+      {preview.length > 0 && <div className={styles.segmentPreview}><strong>{t('segment.preview')}{preview.filter((item) => item.parts.length > 1 && !item.blocked).length} {t('segment.willSplit')}</strong>{preview.map((item) => <div key={item.word.id}><small title={lineText(document.lines.find((line) => line.id === item.lineId)!)}>{lineText(document.lines.find((line) => line.id === item.lineId)!)}</small><span>{item.word.text} → <Parts parts={item.parts}/></span>{item.blocked && <em>{blockedReason(item.word)}</em>}</div>)}</div>}
     </SettingsDialog>;
 }
 

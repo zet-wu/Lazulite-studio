@@ -1740,5 +1740,13 @@
   "sugSingers.unspecified": "未指定",
   "sugSingers.mergeHelp": "同一文件中名称相同的歌手将合并为同一演唱者。清空名称可恢复默认值。",
   "sugSingers.reset": "恢复默认：{{output}}",
-  "sugSingers.empty": "暂无可配置的 SUG 内容。"
+  "sugSingers.empty": "暂无可配置的 SUG 内容。",
+  "segment.mode": "模式",
+  "segment.blockRuby": "含注音，保留原词",
+  "segment.blockObscene": "含消音属性，保留原词",
+  "segment.blockBeat": "含空拍，保留原词",
+  "segment.summary": "覆盖 {{lines}} 行、{{words}} 词；可拆分 {{split}} 词、受限 {{blocked}} 词",
+  "settings.swapWheel": "交换滚轮操作",
+  "settings.swapWheelHelp": "默认滚轮缩放，Shift＋滚轮平移。可配置为交换",
+  "split.attachments": "分配附属内容"
 }

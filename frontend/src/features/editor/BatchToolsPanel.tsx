@@ -9,6 +9,7 @@ import {SettingField,SettingToggle} from '../../shared/SettingsFields';
 import fields from '../../shared/settings-fields.module.css';
 import { Select } from '../../shared/Select';
 import { SettingsDialog } from './SettingsDialog';
+import { SegmentationPanel } from './SegmentationPanel';
 import { useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { replaceText, clearRuby, smoothWordTimes, syncLineTimes } from '../../domain/batch-editing';
@@ -17,7 +18,7 @@ import type { EditorSelection } from './editing-actions';
 import styles from './semantic-editor.module.css';
 
 type Props = { project?: ProjectDocument; document: LyricDocument; selection: EditorSelection | null; currentLineId: string | null; apply: (command: LyricCommand) => boolean; close: () => void };
-type Operation = 'clear-ruby' | 'replace' | 'shift' | 'smooth' | 'sync' | 'link';
+type Operation = 'segment' | 'clear-ruby' | 'replace' | 'shift' | 'smooth' | 'sync' | 'link';
 
 export function BatchToolsPanel({ project, document, selection, currentLineId, apply, close }: Props) {
   useTranslation();
@@ -100,12 +101,15 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
       if (apply(command)) { setMessage(summary); if (operation !== 'link') close(); }
     } catch (cause) { setMessage(errorMessage(cause)); }
   };
-  return <SettingsDialog title={t('batch.title')} close={close} actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.close')}</button><button data-role="primary" onClick={run}>{operation === 'link' && (current && editing.endLinks[current.id]) ? t('batch.unlink') : t('edit.applyUndo')}</button></>}>
-    <div className={styles.dialogTabs}>{([['replace', t('batch.replace')], ['clear-ruby', t('batch.clearRuby')], ['shift', t('batch.offset')], ['smooth', t('batch.smooth')], ['sync', t('batch.syncLine')], ['link', t('batch.linkEnd')]] as const).map(([value, label]) => <button data-role="secondary" key={value} aria-pressed={operation === value} className={operation === value ? styles.activeTab : ''} onClick={() => { setOperation(value); setMessage(''); }}>{label}</button>)}</div>
-    {operation !== 'link' && <div className={fields.group}>
-      <div className={styles.batchScope}><SettingField label={t('batch.scope')}><Select value={scope} onChange={(event) => setScope(event.target.value)}><option value="current">{operation === 'shift' ? t('edit.currentLine') : t('batch.lineBackground')}</option><option value="selected">{operation === 'replace' && replaceTarget === 'ruby' ? t('batch.selectedRuby') : operation === 'shift' ? t('edit.selected') : t('batch.selectedBackground')}</option><option value="range">{t('edit.lineRange')}</option><option value="all">{t('edit.allLines')}</option></Select></SettingField>
+  const navigation = (<div className={styles.dialogTabs}>{([['segment', t('editor.segment')], ['replace', t('batch.replace')], ['clear-ruby', t('batch.clearRuby')], ['shift', t('batch.offset')], ['smooth', t('batch.smooth')], ['sync', t('batch.syncLine')], ['link', t('batch.linkEnd')]] as const).map(([value, label]) => <button data-role="secondary" key={value} aria-pressed={operation === value} className={operation === value ? styles.activeTab : ''} onClick={() => { setOperation(value); setMessage(''); }}>{label}</button>)}</div>);
+  const scopeControl = (<div className={styles.batchScope}><SettingField label={t('batch.scope')}><Select value={scope} onChange={(event) => setScope(event.target.value)}><option value="current">{operation === 'shift' ? t('edit.currentLine') : t('batch.lineBackground')}</option><option value="selected">{operation === 'replace' && replaceTarget === 'ruby' ? t('batch.selectedRuby') : operation === 'shift' ? t('edit.selected') : t('batch.selectedBackground')}</option><option value="range">{t('edit.lineRange')}</option><option value="all">{t('edit.allLines')}</option></Select></SettingField>
       {scope === 'range' && <div className={styles.batchRange}><label>{t('edit.fromLine')}<input type="number" min="1" max={document.lines.length} value={from} onChange={(event) => setFrom(Number(event.target.value))} /> {t('edit.lineUnit')}</label><label>{t('edit.toLine')}<input type="number" min="1" max={document.lines.length} value={to} onChange={(event) => setTo(Number(event.target.value))} /> {t('edit.lineUnit')}</label></div>}
-      </div>
+      </div>);
+  if (operation === 'segment') return <SegmentationPanel document={document} wordIds={scope === 'selected' && selection?.kind !== 'words' && selection?.kind !== 'lines' ? [] : wordIds} apply={apply} close={close} navigation={navigation} scopeControl={scopeControl}/>;
+  return <SettingsDialog title={t('batch.title')} close={close} actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.close')}</button><button data-role="primary" onClick={run}>{operation === 'link' && (current && editing.endLinks[current.id]) ? t('batch.unlink') : t('edit.applyUndo')}</button></>}>
+    {navigation}
+    {operation !== 'link' && <div className={fields.group}>
+      {scopeControl}
       {operation === 'replace' && <div className={`${fields.row} ${styles.replaceTarget}`} role="group" aria-labelledby="batch-replace-target"><span id="batch-replace-target">{t('batch.target')}</span><div className={styles.replaceOptions}><label><input type="radio" name="replace-target" checked={replaceTarget === 'words'} onChange={() => setReplaceTarget('words')}/>{t('batch.mainText')}</label><label><input type="radio" name="replace-target" checked={replaceTarget === 'ruby'} onChange={() => setReplaceTarget('ruby')}/>{t('batch.reading')}</label></div></div>}
       {operation === 'replace' && <div className={fields.group}><SettingField label={t('batch.find')}><input value={search} onChange={(event) => setSearch(event.target.value)} /></SettingField><SettingField label={t('batch.replaceWith')}><input value={replacement} onChange={(event) => setReplacement(event.target.value)} /></SettingField><SettingToggle label={t('batch.ignoreCase')} checked={ignoreCase} onChange={setIgnoreCase}/></div>}
       {operation === 'shift' && <SettingField label={t('batch.offsetLabel')}><input type="number" step="1" value={amountMs} onChange={(event) => setAmountMs(event.target.value)} /></SettingField>}

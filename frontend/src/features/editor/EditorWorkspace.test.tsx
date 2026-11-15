@@ -88,7 +88,7 @@ it('dispatches exactly one attachment to the nearest main row, skipping backgrou
   expect(apply).toHaveBeenCalledExactlyOnceWith({ type: 'set-background-of', lineId: lyric.lines[3].id, parentLineId: lyric.lines[2].id });
 });
 
-it('splits from the word menu with default graphemes and preserved spaces, opening advanced tools for a long word', () => {
+it('splits from the word menu with default graphemes and preserved spaces, confirming boundaries for a long word', () => {
   const lyric = createLyricDocument('中文 I  still e\u0301'), word = lyric.lines[0].words[0];
   word.beginMs = 0; word.endMs = 1000;
   const apply = vi.fn();
@@ -97,6 +97,8 @@ it('splits from the word menu with default graphemes and preserved spaces, openi
     onSave={() => {}} /></MemoryRouter>);
   fireEvent.contextMenu(container.querySelector('[data-word-id]')!);
   fireEvent.click(screen.getByRole('menuitem', { name: '拆分词' }));
+  expect(apply).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', {name:'应用（一次撤销）'}));
   expect(apply.mock.calls[0][0]).toMatchObject({ type: 'segment-words', changes: [{ words: [
     { text: '中', beginMs: 0 }, { text: '文' }, { text: ' ' }, { text: 'I' }, { text: '  ' }, { text: 'still' }, { text: ' ' }, { text: 'e\u0301', endMs: 1000 },
   ] }] });
@@ -106,7 +108,8 @@ it('splits from the word menu with default graphemes and preserved spaces, openi
     onSave={() => {}} /></MemoryRouter>);
   fireEvent.contextMenu(container.querySelector('[data-word-id]')!);
   fireEvent.click(screen.getByRole('menuitem', { name: '拆分词' }));
-  expect(screen.getByRole('dialog', { name: '分词' })).toBeVisible();
+  expect(screen.getByRole('dialog', { name: '拆分词' })).toBeVisible();
+  expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();
   expect(apply).toHaveBeenCalledOnce();
 });
 

@@ -1753,5 +1753,13 @@
   "sugSingers.unspecified": "Unspecified",
   "sugSingers.mergeHelp": "Singers with identical names in the same file share one performer. Clear a name to restore its default.",
   "sugSingers.reset": "Restore default: {{output}}",
-  "sugSingers.empty": "No SUG content to configure."
+  "sugSingers.empty": "No SUG content to configure.",
+  "segment.mode": "Mode",
+  "segment.blockRuby": "Ruby present; keep original word",
+  "segment.blockObscene": "Censoring present; keep original word",
+  "segment.blockBeat": "Empty beats present; keep original word",
+  "segment.summary": "{{lines}} lines, {{words}} words; {{split}} to split, {{blocked}} restricted",
+  "settings.swapWheel": "Swap wheel actions",
+  "settings.swapWheelHelp": "By default, wheel zooms and Shift + wheel pans. These actions can be swapped.",
+  "split.attachments": "Assign attached content"
 }

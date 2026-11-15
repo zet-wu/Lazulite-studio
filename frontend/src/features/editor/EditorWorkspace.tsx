@@ -47,7 +47,6 @@ import { useObjectDrag, type DragSource } from './object-drag';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, translationsForLine } from '../../domain/lyric-document';
 import { utf16ToCodePoint } from '../../domain/text-boundaries';
-import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime, segmentText } from '../../domain/segmentation';
 import { copySelection, cutSelection, deleteSelection, invertIds, moveWordsAcrossLine, pastePlain, pasteRich, selectIds, selectionLineId, type EditorClipboard, type EditorSelection } from './editing-actions';
 import { LyricList, type ListMemory } from './LyricList';
 import { LyricLine as LyricLineView } from './LyricLine';
@@ -201,7 +200,7 @@ function EditorWorkspaceContent(props: Props) {
   const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | 'translations' | null>(null);
   const [message, publishMessage] = useNotice();
   const setMessage: typeof publishMessage = useLiveCallback((text,...options) => publishMessage(typeof text==='string' && props.project ? projectErrorText(props.project,text) : text,...options));
-  const [segmentationOpen, setSegmentationOpen] = useState(false);
+  const [splitWordId, setSplitWordId] = useState<string | null>(null);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number; afterRubyId?: string | null } | null>(null);
   const rubyShortcutSerial = useRef(0);
@@ -663,7 +662,7 @@ function EditorWorkspaceContent(props: Props) {
       title=t('editor.wordActions');
       const index=line.words.indexOf(word);
       actions.push(selectionAction(effective,'beat',t('editor.addBeats')),{id:'insert-before',label:t('editor.insertWordBefore'),run:()=>startWordDraft(line.id,line.words[index-1]?.id??null)},{id:'insert-after',label:t('editor.insertWordAfter'),run:()=>startWordDraft(line.id,word.id)},
-        single('split-word',t('editor.splitWord'),()=>{try{const parts=segmentText(word.text,DEFAULT_SEGMENT_OPTIONS);if(parts.length<2){setSegmentationOpen(true);return;}dispatch({type:'segment-words',changes:[{lineId:line.id,wordId:word.id,words:distributeSegmentTime(word,parts,DEFAULT_SEGMENT_OPTIONS.punctuationWeight,editing)}]});}catch(cause){setMessage(errorMessage(cause));}}),selectionAction(effective,'merge',t('editor.merge')));
+        single('split-word',t('editor.splitWord'),()=>setSplitWordId(word.id)),selectionAction(effective,'merge',t('editor.merge')));
       actions.push(single('add-ruby',t('editor.addRuby'),()=>setRubyShortcut({wordId:word.id,serial:++rubyShortcutSerial.current})),selectionAction(effective,'redistribute',t('editor.redistributeReading')));
     } else if(effective.kind==='lines') {
       const parent=line.backgroundOf??line.id;
@@ -675,7 +674,7 @@ function EditorWorkspaceContent(props: Props) {
         {id:'generate-roman',label:t('editor.romanize'),run:()=>setRomanizationGeneration(effective.ids)},
         single('insert-word',t('editor.addWord'),()=>startWordDraft(line.id,line.words.at(-1)?.id??null)),
         {...single('split-line',t('editor.splitLine'),()=>setSplitLineId(line.id)),disabled:multiple||!!line.backgroundOf||line.words.length<2,reason:multiple?t('editor.singleSplit'):lineStructureIssues(document,line).map(formatMessage).join(t('notice.separator'))},
-        selectionAction(effective,'merge',t('editor.merge')),{id:'segment',label:t('editor.segment'),run:()=>setSegmentationOpen(true)});
+        selectionAction(effective,'merge',t('editor.merge')));
       if(mode==='karaoke'&&props.project) {
         const count=props.project.karaoke.cues.filter(cue=>effective.ids.includes(cue.anchor.lineId)).length;
         actions.push({id:'clear-cues',danger:true,label:multiple?t('editor.clearSelectedCues'):t('editor.clearLineCue'),disabled:!count,reason:count?t('editor.clearCueCount',{count}):t('editor.noSelectedCues'),run:()=>applyKaraokeCommand({kind:'remove-lines',lineIds:effective.ids})});
@@ -921,7 +920,7 @@ function EditorWorkspaceContent(props: Props) {
       copy={() => { copy(); }} cut={() => { cut(); }} remove={() => removeSelection()} paste={() => paste(clipboard)}
       selectAll={() => selectAll(false)} invertSelection={() => selectAll(true)}
       clearSelection={() => setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' })}
-      moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openSegmentation={() => setSegmentationOpen(true)} openBatchTools={() => setBatchToolsOpen(true)}
+      moveUp={() => moveSelectedWords(-1)} moveDown={() => moveSelectedWords(1)} openBatchTools={() => setBatchToolsOpen(true)}
       canGenerateJapaneseRuby={selection?.kind === 'lines' && selection.ids.length > 0} openJapaneseRuby={() => openReadingDialog(selection?.kind === 'lines' ? selection.ids : [], 'japanese')}
       openShapeConversion={() => openShapeConversion(selection?.kind === 'lines' ? selection.ids : [])}
       openDictionaryRuby={() => openReadingDialog(selection?.kind === 'lines' ? selection.ids : [], 'dictionary')}
@@ -1073,7 +1072,7 @@ function EditorWorkspaceContent(props: Props) {
 
       </SettingsDialog>;
     })()}
-    {segmentationOpen && <SegmentationPanel document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setSegmentationOpen(false)} />}
+    {splitWordId && <SegmentationPanel key={splitWordId} document={document} wordIds={[splitWordId]} singleWord apply={dispatch} close={() => setSplitWordId(null)} />}
     {batchToolsOpen && <BatchToolsPanel project={props.project} document={document} selection={selection} currentLineId={selectedLine?.id ?? null} apply={dispatch} close={() => setBatchToolsOpen(false)} />}
     {romanizationGeneration && <RomanizationGenerationDialog document={document} lineIds={romanizationGeneration}
       preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} apply={dispatch} close={() => setRomanizationGeneration(null)} />}

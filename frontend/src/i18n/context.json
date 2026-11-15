@@ -11531,5 +11531,50 @@
     "context": "SUG singer manager",
     "params": [],
     "source": "暂无可配置的 SUG 内容。"
+  },
+  "segment.mode": {
+    "context": "segment interface: segment.mode",
+    "source": "模式",
+    "params": []
+  },
+  "segment.blockRuby": {
+    "context": "segment interface: segment.blockRuby",
+    "source": "含注音，保留原词",
+    "params": []
+  },
+  "segment.blockObscene": {
+    "context": "segment interface: segment.blockObscene",
+    "source": "含消音属性，保留原词",
+    "params": []
+  },
+  "segment.blockBeat": {
+    "context": "segment interface: segment.blockBeat",
+    "source": "含空拍，保留原词",
+    "params": []
+  },
+  "segment.summary": {
+    "context": "segment interface: segment.summary",
+    "source": "覆盖 {{lines}} 行、{{words}} 词；可拆分 {{split}} 词、受限 {{blocked}} 词",
+    "params": [
+      "lines",
+      "words",
+      "split",
+      "blocked"
+    ]
+  },
+  "settings.swapWheel": {
+    "context": "settings interface: settings.swapWheel",
+    "source": "交换滚轮操作",
+    "params": []
+  },
+  "settings.swapWheelHelp": {
+    "context": "settings interface: settings.swapWheelHelp",
+    "source": "默认滚轮缩放，Shift＋滚轮平移。可配置为交换",
+    "params": []
+  },
+  "split.attachments": {
+    "context": "split interface: split.attachments",
+    "source": "分配附属内容",
+    "params": []
   }
 }

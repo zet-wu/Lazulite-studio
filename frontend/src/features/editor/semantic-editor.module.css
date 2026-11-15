@@ -142,10 +142,8 @@
 .segmentPreview { display: grid; gap: 5px; max-height: 28dvh; overflow: auto; border-top: 1px solid var(--line); padding-top: 8px; font-size: 13px; }
 .segmentPreview > div { display: grid; grid-template-columns: 1fr 1.5fr; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 0; }
 .segmentPreview small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.segmentPreview em { grid-column: 1 / -1; color: #a45a17; }
+.segmentPreview em { grid-column: 1 / -1; color: var(--muted); }
 .toolHint { font-size: 13px; color: var(--muted); line-height: 1.5; }
-.splitAssignment { display: flex; align-items: center; justify-content: space-between; gap: .8rem; min-width: 0; }
-.splitAssignment span { min-width: 0; overflow-wrap: anywhere; }
 
 .inspector > *, .inspector label { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .inspector input:not([type="checkbox"]), .inspector select { box-sizing: border-box; min-width: 0; max-width: 100%; width: 100%; }
@@ -399,3 +397,13 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .romanTrackOptions select { min-width:0; max-width:100%; }
 .romanTrackOptions .kanaHighlight { flex:none; white-space:nowrap; }
 .kanaHighlight input { width:7em; }
+
+.segmentManual { max-height: 42vh; overflow: auto; padding: 4px; scrollbar-gutter: stable; }
+.segmentManual section + section { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
+.segmentManual h3 { font-size: 14px; margin: 4px 0; }
+.segmentWord { margin: 8px 0; }
+.lyricQuote { white-space: pre-wrap; overflow-wrap: anywhere; font-weight: 600; }
+
+.segmentPreview > div { min-width: 0; }
+.segmentPreview > div > span { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.segmentManual section { content-visibility: auto; contain-intrinsic-size: auto 150px; }

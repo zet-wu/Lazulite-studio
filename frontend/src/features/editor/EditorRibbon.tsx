@@ -20,7 +20,6 @@ type Props = MenuState & {
   clearSelection: () => void;
   moveUp: () => void;
   moveDown: () => void;
-  openSegmentation: () => void;
   openBatchTools: () => void;
   canGenerateJapaneseRuby: boolean;
   openJapaneseRuby: () => void;
@@ -54,7 +53,6 @@ export function EditorRibbon(props: Props) {
     <TopMenu id="tools" title={t('editor.tools')} className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
       <button data-role="inline" disabled={!props.canMoveUp} onClick={props.moveUp}>{t('editor.wordsUp')}</button>
       <button data-role="inline" disabled={!props.canMoveDown} onClick={props.moveDown}>{t('editor.wordsDown')}</button>
-      <button data-role="inline" onClick={props.openSegmentation}>{t('editor.segment')}</button>
       <button data-role="inline" onClick={props.openBatchTools}>{t('editor.batch')}</button>
       <button data-role="inline" disabled={!props.canGenerateRomanization} onClick={props.openRomanizationGeneration}>{t('editor.romanize')}</button>
       <button data-role="inline" disabled={!props.canGenerateJapaneseRuby} onClick={props.openJapaneseRuby}>{t('editor.japaneseRuby')}</button>
