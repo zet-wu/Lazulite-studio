@@ -27,7 +27,7 @@ export function SegmentWordDraft({ source, words, editable, reason, selected, se
     const next = moveSegmentRuby(words, ids, destination);
     if (next && !locked) { pendingFocus.current = focusId ? {kind:'ruby', id:focusId} : null; change(next); }
   };
-  const boundary = (position: number, active: boolean) => <button data-segment-boundary={position} data-role="inline" title={t('segment.boundary', {number:position})} aria-label={t('segment.boundary', {number:position})} aria-pressed={active}
+  const boundary = (position: number, active: boolean) => <button data-segment-boundary={position} data-role="inline" aria-label={t('segment.boundary', {number:position})} aria-pressed={active}
     onClick={() => {pendingFocus.current = {kind:'boundary', id:String(position)}; change(toggleSegmentBoundary(source, words, position)); clearSelection();}}><Icon name={active ? 'sync-beat' : 'sync-dot'}/></button>;
   let offset = 0;
   return <span ref={root} className={`${styles.segmentSource} ${reason ? styles.readingHint : ''}`} data-tooltip={reason || undefined} title={reason || undefined} tabIndex={reason ? 0 : undefined} aria-label={editable ? t('segment.boundaries') : undefined}>
