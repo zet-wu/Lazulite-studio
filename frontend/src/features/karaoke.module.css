@@ -37,6 +37,8 @@ button.slot[data-role][data-role] { width:var(--karaoke-slot-width,20px); paddin
 .markerFields > h3 { margin:0 0 12px; font-size:16px; }
 @media (max-width:760px) { .markerEditor { grid-template-columns:130px minmax(0,1fr); gap:16px; } }
 
+/* Leave room for the shared 2px outline plus its 2px offset inside the scrollport. */
+.sugFields { padding-left:4px; }
 .sugHeading { overflow-wrap:anywhere; }
 .sugNameRow { display:flex; gap:8px; align-items:end; margin-bottom:12px; }
 .sugNameRow label { display:grid; gap:4px; flex:1; min-width:0; overflow-wrap:anywhere; }

@@ -33,7 +33,7 @@ export function SugSingersDialog({project, close, apply, error}: {project:Projec
       <nav className={`${styles.markerList} ${fields.navigation}`} aria-label={t('markers.sets')}>
         {sets.map(item => <button key={item.key} data-role="secondary" title={label(item)} aria-current={item.key === selected ? 'page' : undefined} onClick={()=>setSelected(item.key)}>{label(item)}</button>)}
       </nav>
-      <div className={styles.markerFields}>
+      <div className={`${styles.markerFields} ${styles.sugFields}`}>
         <h3 className={styles.sugHeading}>{label(set)}</h3>
         {options.filter(item => item.sets.some(singer => singer.key === selected)).map(({output}) => {
           const name = sugSingerName(draft, output, set), custom = names.some(item => item.outputId === output.id && singerKey(item.agentIds) === selected);
