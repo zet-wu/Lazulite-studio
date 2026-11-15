@@ -1,3 +1,4 @@
+import { validateSegmentContent } from './segmentation-draft';
 import { message, MessageError, messageList, type Message } from './messages';
 import { shiftLineTimes } from './batch-editing';
 import { preserveWordAgents, wordAgents, sameAgents, validateAgents, lineAgents } from './amll-compatibility';
@@ -346,14 +347,14 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
     case 'segment-word':
       return editWord(document, command.lineId, command.wordId, (word, line) => {
         if (command.words.length < 2 || command.words.map((part) => part.text).join('') !== word.text || command.words[0].id !== word.id) throw new MessageError(message('command.segmentText'));
-        if (word.rubyUnits.length || word.obscene || emptyBeatCount(editing, word.id)) throw new MessageError(message('command.segmentAttributes'));
+        if (word.obscene || emptyBeatCount(editing, word.id)) throw new MessageError(message('command.segmentAttributes'));
         const ids = command.words.map((part) => part.id);
         if (new Set(ids).size !== ids.length || ids.slice(1).some((id) => document.lines.some((item) => item.words.some((part) => part.id === id)))) throw new MessageError(message('command.segmentIds'));
         for (const part of command.words) {
-          if (!part.text || part.rubyUnits.length || part.obscene || emptyBeatCount(editing, part.id)) throw new MessageError(message('command.segmentNewAttributes'));
+          if (!part.text || part.obscene || emptyBeatCount(editing, part.id)) throw new MessageError(message('command.segmentNewAttributes'));
           wordFitsLine(part, line);
         }
-        if (command.words[0].beginMs !== word.beginMs || command.words.at(-1)?.endMs !== word.endMs) throw new MessageError(message('command.segmentInterval'));
+        validateSegmentContent(word, command.words);
         return command.words.map(part=>({...part,...(word.agentRefs?{agentRefs:[...word.agentRefs]}:{})}));
       });
     case 'segment-words': {
@@ -369,10 +370,10 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
           const change = changes.get(word.id);
           if (!change) return [word];
           if (change.lineId !== line.id || change.words.length < 2 || change.words[0].id !== word.id || change.words.map((part) => part.text).join('') !== word.text) throw new MessageError(message('command.segmentMismatch'));
-          if (word.rubyUnits.length || word.obscene || emptyBeatCount(editing, word.id)) throw new MessageError(message('command.segmentAttributes'));
-          if (change.words[0].beginMs !== word.beginMs || change.words.at(-1)?.endMs !== word.endMs) throw new MessageError(message('command.segmentInterval'));
+          if (word.obscene || emptyBeatCount(editing, word.id)) throw new MessageError(message('command.segmentAttributes'));
+          validateSegmentContent(word, change.words);
           for (const [index, part] of change.words.entries()) {
-            if (!part.text || part.rubyUnits.length || part.obscene || emptyBeatCount(editing, part.id)) throw new MessageError(message('command.segmentNewAttributes'));
+            if (!part.text || part.obscene || emptyBeatCount(editing, part.id)) throw new MessageError(message('command.segmentNewAttributes'));
             if (generatedIds.has(part.id) || index > 0 && originalIds.has(part.id)) throw new MessageError(message('command.segmentIds'));
             generatedIds.add(part.id);
             wordFitsLine(part, line);
