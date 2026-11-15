@@ -139,10 +139,6 @@
 .syncPanel button { border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; background: var(--canvas); color: var(--ink); cursor: pointer; }
 .syncPanel button:disabled { opacity: .5; cursor: default; }
 .syncPanel input { width: 7em; padding: 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--canvas); color: var(--ink); }
-.segmentPreview { display: grid; gap: 5px; max-height: 28dvh; overflow: auto; border-top: 1px solid var(--line); padding-top: 8px; font-size: 13px; }
-.segmentPreview > div { display: grid; grid-template-columns: 1fr 1.5fr; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 0; }
-.segmentPreview small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.segmentPreview em { grid-column: 1 / -1; color: var(--muted); }
 .toolHint { font-size: 13px; color: var(--muted); line-height: 1.5; }
 
 .inspector > *, .inspector label { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
@@ -400,12 +396,22 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 
 .segmentManual { max-height: 42vh; overflow: auto; padding: 4px; scrollbar-gutter: stable; }
 .segmentManual section + section { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
-.segmentManual h3 { font-size: 14px; margin: 4px 0; }
-.segmentWord { margin: 8px 0; }
+.segmentManual h3 { color: var(--muted); font-size: 13px; font-weight: 400; margin: 4px 0; }
 .lyricQuote { white-space: pre-wrap; overflow-wrap: anywhere; font-weight: 600; }
 
-.segmentPreview > div { min-width: 0; }
-.segmentPreview > div > span { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
 .segmentManual section { content-visibility: auto; contain-intrinsic-size: auto 150px; }
 
-.segmentPreview[data-single] > div { grid-template-columns: minmax(0,1fr); }
+
+.segmentLine { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.segmentSource { display: inline-flex; flex-wrap: wrap; align-items: end; gap: 3px; max-width: 100%; position: relative; }
+.segmentPiece { display: inline-flex; flex-direction: column; align-items: center; max-width: 100%; border-bottom: 2px solid var(--line); padding: 3px 1px; }
+.segmentPiece[data-drop] { background: var(--surface-high); outline: 2px solid var(--blue); }
+.segmentRuby { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px; min-height: 24px; font-size: 13px; overflow-wrap: anywhere; }
+.segmentRuby button { padding: 2px 4px !important; min-height: 24px; }
+.segmentRuby button[aria-pressed="true"] { color: var(--blue); background: var(--surface-high); border-color: var(--blue); }
+.segmentBody { display: flex; flex-wrap: wrap; justify-content: center; font-size: 22px; white-space: pre-wrap; }
+.segmentBody > span { display: inline-flex; align-items: center; }
+.segmentBody button { padding: 3px !important; min-width: 17px; margin: 0 1px; }
+.segmentBody button[aria-pressed="true"] { color: var(--blue); border-color: var(--blue); }
+.segmentMoves { display: inline-flex; gap: 3px; }
+.segmentSource:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }

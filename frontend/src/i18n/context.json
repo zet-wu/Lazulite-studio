@@ -6371,18 +6371,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "segment.preview": {
-    "context": "segment interface: segment.preview",
-    "source": "预览：",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "segment.willSplit": {
-    "context": "segment interface: segment.willSplit",
-    "source": "词将切分",
-    "params": [],
-    "parameterNotes": {}
-  },
   "batch.selectText": {
     "context": "batch interface: batch.selectText",
     "source": "请选择词／行，或切换替换对象为注音",
@@ -11552,5 +11540,23 @@
     "context": "split interface: split.attachments",
     "source": "分配附属内容",
     "params": []
+  },
+  "segment.movePrevious": {
+    "context": "Segmentation dialog ruby movement or calculation status",
+    "source": "移到前一子词",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "segment.moveNext": {
+    "context": "Segmentation dialog ruby movement or calculation status",
+    "source": "移到后一子词",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "segment.computing": {
+    "context": "Segmentation dialog ruby movement or calculation status",
+    "source": "正在计算分词结果…",
+    "params": [],
+    "parameterNotes": {}
   }
 }

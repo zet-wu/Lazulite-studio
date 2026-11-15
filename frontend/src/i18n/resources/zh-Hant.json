@@ -984,8 +984,6 @@
   "segment.sample": "輸入任意短句",
   "segment.testRules": "測試規則",
   "segment.testResult": "測試結果：",
-  "segment.preview": "預覽：",
-  "segment.willSplit": "詞將切分",
   "batch.selectText": "請選擇詞／行，或將取代對象改為注音",
   "batch.select": "請選擇詞／行或注音",
   "batch.noLines": "所選範圍沒有歌詞行",
@@ -1744,5 +1742,8 @@
   "segment.summary": "涵蓋 {{lines}} 行、{{words}} 詞；可拆分 {{split}} 詞、受限 {{blocked}} 詞",
   "settings.swapWheel": "交換滾輪操作",
   "settings.swapWheelHelp": "預設滾輪縮放，Shift＋滾輪平移。可設定為交換",
-  "split.attachments": "分配附屬內容"
+  "split.attachments": "分配附屬內容",
+  "segment.movePrevious": "移到前一子詞",
+  "segment.moveNext": "移到後一子詞",
+  "segment.computing": "正在計算分詞結果…"
 }

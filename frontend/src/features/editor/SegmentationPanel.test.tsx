@@ -41,17 +41,35 @@ it('auto excludes hidden advanced rules and weight, restricted words remain prot
  fireEvent.change(screen.getByLabelText('模式'),{target:{value:'advanced'}});fireEvent.change(screen.getByLabelText('自定义规则（每行 原文=部分|部分）'),{target:{value:'hello=hel|lo'}});
  await waitFor(()=>expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeEnabled());
  fireEvent.change(screen.getByLabelText('模式'),{target:{value:'auto'}});expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();
- await waitFor(()=>expect(screen.getByText('含消音属性，保留原词')).toBeVisible());expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();
+ await waitFor(()=>expect(screen.getByTitle('含消音属性，保留原词')).toBeVisible());expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();
 });
 it('selected word scope filters within a main line without including its other words or background',()=>{
  mount({kind:'words',lineId:'a',ids:['second'],activeId:'second',anchorId:'second'});fireEvent.change(screen.getByLabelText('范围'),{target:{value:'selected'}});expect(screen.getAllByLabelText('字符切分边界')).toHaveLength(1);expect(screen.getByText('覆盖 1 行、1 词；可拆分 0 词、受限 0 词')).toBeVisible();
 });
 it('manual mixed targets apply only unrestricted words',()=>{
  const document=createLyricDocument('你好'),words=document.lines[0].words;words.push({...createWord('世界'),obscene:true});const apply=vi.fn(),close=vi.fn();render(<SegmentationPanel document={document} wordIds={words.map(w=>w.id)} apply={apply} close={close}/>);
- const points=screen.getAllByRole('button',{name:'切分边界 1'});fireEvent.click(points[0]);expect(points[1]).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'应用（一次撤销）'}));expect(apply.mock.calls[0][0].changes).toHaveLength(1);
+ const points=screen.getAllByRole('button',{name:'切分边界 1'});fireEvent.click(points[0]);expect(points).toHaveLength(1);fireEvent.click(screen.getByRole('button',{name:'应用（一次撤销）'}));expect(apply.mock.calls[0][0].changes).toHaveLength(1);
 });
 
 it('automatic whole range previews all existing words, and locked single-word dialog cannot submit',async()=>{
  const {apply}=mount();fireEvent.change(screen.getByLabelText('范围'),{target:{value:'all'}});fireEvent.change(screen.getByLabelText('模式'),{target:{value:'auto'}});await waitFor(()=>expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'应用（一次撤销）'}));expect(apply.mock.calls[0]).toMatchObject([{changes:[{lineId:'a'},{lineId:'a'},{lineId:'bg'},{lineId:'b'}]}]);
  cleanup();const document=createLyricDocument('你好');render(<DialogEditingLocked.Provider value={true}><SegmentationPanel document={document} wordIds={[document.lines[0].words[0].id]} singleWord apply={apply} close={()=>{}}/></DialogEditingLocked.Provider>);expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();expect(screen.getByRole('button',{name:'切分边界 1'})).toBeDisabled();expect(screen.getByRole('button',{name:'取消'})).toBeEnabled();
+});
+
+it('moves selected ruby by keyboard action and submits the visible envelope',()=>{
+ const document=createLyricDocument('甲乙丙丁'),word=document.lines[0].words[0];
+ word.beginMs=0;word.endMs=1000;word.rubyUnits=['a','b','c','d'].map((reading,i)=>({id:reading,reading,beginMs:100+i*100,endMs:200+i*100}));
+ const apply=vi.fn(()=>true);render(<SegmentationPanel document={document} wordIds={[word.id]} apply={apply} close={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'切分边界 2'}));
+ fireEvent.click(screen.getByRole('button',{name:'a'}));expect(screen.getByRole('button',{name:'移到后一子词'})).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:'b'}));fireEvent.click(screen.getByRole('button',{name:'移到后一子词'}));
+ fireEvent.click(screen.getByRole('button',{name:'应用（一次撤销）'}));
+ expect(apply.mock.calls[0]).toMatchObject([{changes:[{words:[{text:'甲乙',beginMs:100,endMs:200,rubyUnits:[{id:'a'}]},{text:'丙丁',beginMs:200,endMs:500,rubyUnits:[{id:'b'},{id:'c'},{id:'d'}]}]}]}]);
+});
+it('multi-select ruby and removing all boundaries restores an uncommittable original',()=>{
+ const document=createLyricDocument('甲乙'),word=document.lines[0].words[0];word.rubyUnits=['a','b'].map(reading=>({id:reading,reading,beginMs:null,endMs:null}));
+ render(<SegmentationPanel document={document} wordIds={[word.id]} apply={vi.fn()} close={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'切分边界 1'}));fireEvent.click(screen.getByRole('button',{name:'a'}));fireEvent.click(screen.getByRole('button',{name:'b'}),{ctrlKey:true});
+ expect(screen.getAllByRole('button',{pressed:true}).filter(el=>['a','b'].includes(el.textContent??''))).toHaveLength(2);
+ fireEvent.click(screen.getByRole('button',{name:'切分边界 1'}));expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();
 });
