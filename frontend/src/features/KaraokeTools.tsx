@@ -1,3 +1,4 @@
+import { SugSingersDialog } from './SugSingersDialog';
 import { MessageError, errorMessage, message as describeMessage } from '../domain/messages';
 import { issueText, karaokeOutputLabel } from './output-messages';
 import { useMessageText } from '../shared/useMessageText';
@@ -48,15 +49,16 @@ export function CueProperties({project,cue,apply}: {project:ProjectDocument;cue:
 export function KaraokeTools({project,apply,title,exportOpen,setExportOpen,viewIssues,focusOutputId}: {project:ProjectDocument;apply:(command:ProjectCommand)=>void;title:string;focusOutputId?:string;exportOpen:KaraokeExportFormat|null;setExportOpen:(open:KaraokeExportFormat|null)=>void;viewIssues:(format:KaraokeExportFormat)=>void}) {
   useTranslation();
  const {selection,selectedCue}=useEditorSelection()!;
- const [dialog,setDialog]=useState<'groups'|'defaults'|'auto'|'singers'|null>(null), [error,setError]=useMessageText('');
+ const [dialog,setDialog]=useState<'groups'|'defaults'|'auto'|'singers'|'sug-singers'|null>(null), [error,setError]=useMessageText('');
  const [activeMenuId,setActiveMenuId]=useState<string|null>(null);
  const [autoGroups,setAutoGroups]=useState<string[]|null>(null);
  const command=(c:KaraokeCommand)=>{try{apply({type:'karaoke',command:c});setError('');return true;}catch(e){setError(errorMessage(e));return false;}};
  return <><div className={editorStyles.ribbon} aria-label={t('karaoke.actions')}>
  <SelectionSummary selection={selection} selectedCue={selectedCue} />
  <TopMenu id="cue-tools" title={t('karaoke.guides')} className={editorStyles.ribbonMenu} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId}><button data-role="inline" onClick={()=>(setError(''),setDialog('auto'))}>{t('karaoke.autoInsert')}</button><button data-role="inline" onClick={()=>(setError(''),setDialog('defaults'))}>{t('karaoke.defaults')}</button></TopMenu>
- <button data-role="secondary" onClick={()=>(setError(''),setDialog('groups'))}>{t('karaoke.groups')}</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('singers'))}>{t('karaoke.singerMarkers')}</button><button data-karaoke-export="nicokara" data-role="primary" onClick={()=>setExportOpen('nicokara')}>{t('karaoke.exportNico')}</button><button data-karaoke-export="sug" data-role="primary" onClick={()=>setExportOpen('sug')}>{t('karaoke.exportSUG')}</button></div>
+ <button data-role="secondary" onClick={()=>(setError(''),setDialog('groups'))}>{t('karaoke.groups')}</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('singers'))}>{t('karaoke.singerMarkers')}</button><button data-role="secondary" onClick={()=>(setError(''),setDialog('sug-singers'))}>{t('karaoke.sugSingers')}</button><button data-karaoke-export="nicokara" data-role="primary" onClick={()=>setExportOpen('nicokara')}>{t('karaoke.exportNico')}</button><button data-karaoke-export="sug" data-role="primary" onClick={()=>setExportOpen('sug')}>{t('karaoke.exportSUG')}</button></div>
  {error&&!dialog&&<p role="alert">{error}</p>}
+ {dialog==='sug-singers'&&<SugSingersDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='singers'&&<SingerMarkersDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='auto'&&<AutoInsertDialog initialGroups={autoGroups} rememberGroups={setAutoGroups} error={error} project={project} close={()=>setDialog(null)} apply={command}/>}
  {dialog==='defaults'&&<DefaultsDialog error={error} project={project} close={()=>setDialog(null)} apply={command}/>}

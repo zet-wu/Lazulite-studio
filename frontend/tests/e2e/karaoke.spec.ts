@@ -58,9 +58,9 @@ test('singer marker drafts cancel locally and apply dependencies in one undo',as
  await load(page);
  const source=xml.replace('<tt xmlns=', '<tt xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns=').replace('<body>','<head><metadata><ttm:agent xml:id="singer" type="person"><ttm:name>A</ttm:name></ttm:agent></metadata></head><body>').replace('<p xml:id="a"','<p ttm:agent="singer" xml:id="a"');
  await importLyrics(page,{name:'singer.ttml',mimeType:'application/xml',buffer:Buffer.from(source)});await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();
- await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');
- await page.getByLabel('触发标记',{exact:true}).fill('cancel');await page.getByRole('button',{name:'关闭歌手标记管理'}).click();await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');
- const dialog=page.getByRole('dialog',{name:'歌手标记管理',exact:true});
+ await page.getByRole('button',{name:'NicoKara 歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');
+ await page.getByLabel('触发标记',{exact:true}).fill('cancel');await page.getByRole('button',{name:'关闭NicoKara 歌手标记管理'}).click();await page.getByRole('button',{name:'NicoKara 歌手标记管理',exact:true}).click();await expect(page.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');
+ const dialog=page.getByRole('dialog',{name:'NicoKara 歌手标记管理',exact:true});
  await dialog.getByRole('switch',{name:'NoDecor',exact:true}).uncheck();
  await dialog.getByRole('switch',{name:'ForceWipeDecor',exact:true}).check();
  await dialog.getByRole('switch',{name:'跳过生成',exact:true}).check();
@@ -68,10 +68,10 @@ test('singer marker drafts cancel locally and apply dependencies in one undo',as
  await dialog.getByRole('switch',{name:'跳过生成',exact:true}).uncheck();
  await dialog.getByLabel('触发标记',{exact:true}).fill('【Applied】');
  await dialog.getByRole('button',{name:'应用',exact:true}).click();await expect(dialog).toHaveCount(0);
- await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();
+ await page.getByRole('button',{name:'NicoKara 歌手标记管理',exact:true}).click();
  await expect(dialog.getByLabel('触发标记',{exact:true})).toHaveValue('【Applied】');await expect(dialog.getByRole('switch',{name:'ForceWipeDecor',exact:true})).toBeChecked();
  await page.keyboard.press('Escape');await page.getByRole('button',{name:'撤销',exact:true}).click();
- await page.getByRole('button',{name:'歌手标记管理',exact:true}).click();
+ await page.getByRole('button',{name:'NicoKara 歌手标记管理',exact:true}).click();
  await expect(dialog.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');await expect(dialog.getByRole('switch',{name:'NoDecor',exact:true})).toBeChecked();
 });
 test('wrapped multiline canvas keeps multi-character Ruby and editing above timing markers; normal sync stays unchanged',async({page})=>{

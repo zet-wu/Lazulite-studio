@@ -4,7 +4,8 @@ import { createProjectDocument, createProjectEditorState, executeProjectCommand,
 import { applyKaraoke, outputId, reconcileKaraoke, autoInsertCues } from '../src/domain/karaoke';
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
 import { sugSingerOptions, sugSingerName } from '../src/adapters/sug-singers';
-import { prepareSug } from '../src/adapters/sug';
+import { writeFileSync } from 'node:fs';
+import { prepareSug, sugZip } from '../src/adapters/sug';
 function fixture() {
   const p=createProjectDocument(createLyricDocument('歌'));
   p.amll.noWordAgents=false;
@@ -39,6 +40,12 @@ it('merges solos, chorus, unspecified and guides by exact final name and can spl
   expect(data.sentences.flatMap((s:any)=>[s.singer_id,...s.characters.map((c:any)=>c.singer_id)]).every((id:string)=>id===data.singers[0].id)).toBe(true);
   p.karaoke.sugSingerNames[1].name='B';data=JSON.parse(prepareSug(p,'曲').files[0].text);expect(data.singers.map((s:any)=>s.name)).toEqual(['共同','B']);
   p.karaoke.outputs.push(outputId('main','translation','t'));data=JSON.parse(prepareSug(p,'曲').files[1].text);expect(data.singers[0].name).toBe('未指定.zh-CN');
+  if(process.env.SUG_CONTRACT_DIR){
+    writeFileSync(`${process.env.SUG_CONTRACT_DIR}/split-roles.zip`,sugZip(p,'split'));
+    p.karaoke.sugSingerNames[1].name='共同';
+    p.karaoke.sugSingerNames.push({outputId:outputId('main','translation','t'),agentIds:[],name:'共同'});
+    writeFileSync(`${process.env.SUG_CONTRACT_DIR}/shared-roles.zip`,sugZip(p,'shared'));
+  }
 });
 it('merges identical default names without normalizing case or Unicode',()=>{
   const p=fixture(),line=p.lyrics.lines[0];p.lyrics.agents[1].name='A';line.words.push({...createWord('次'),agentRefs:['b'],beginMs:6000,endMs:7000});
@@ -61,4 +68,13 @@ it('moves renamed groups, retains deselected and temporarily empty content, remo
   p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);expect(p.karaoke.sugSingerNames).toHaveLength(2);
   p.lyrics.translationTracks=[];p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);expect(p.karaoke.sugSingerNames).toHaveLength(1);
   p.lyrics.agents=[];p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);expect(p.karaoke.sugSingerNames).toEqual([]);
+});
+
+it('keeps same-language tracks independent and uses custom group IDs for romanization defaults',()=>{
+  const p=fixture(),line=p.lyrics.lines[0];p.karaoke.groups.push({id:'custom',name:'展示名'});p.karaoke.lineGroups[line.id]='custom';
+  p.lyrics.romanizationTracks=['r1','r2'].map(id=>({id,language:'ja-Latn',purpose:'subtitle',contents:[{id:`c-${id}`,lineId:line.id,kind:'plain' as const,text:'uta'}]}));
+  const options=sugSingerOptions(p).filter(o=>o.output.kind==='romanization');
+  expect(options.map(o=>sugSingerName(p,o.output,o.sets[0]))).toEqual(['B.custom.ja-Latn','B.custom.ja-Latn']);
+  p.karaoke.sugSingerNames=[{outputId:options[0].output.id,agentIds:['b'],name:'共用'}];
+  expect(options.map(o=>sugSingerName(p,o.output,o.sets[0]))).toEqual(['共用','B.custom.ja-Latn']);
 });

@@ -7735,7 +7735,7 @@
   },
   "karaoke.singerMarkers": {
     "context": "karaoke interface: karaoke.singerMarkers",
-    "source": "歌手标记管理",
+    "source": "NicoKara 歌手标记管理",
     "params": [],
     "parameterNotes": {}
   },
@@ -9599,7 +9599,7 @@
   },
   "output.markerConflict": {
     "context": "output interface: output.markerConflict",
-    "source": "触发标记与实际歌词或导唱冲突，请在歌手标记管理中修改",
+    "source": "触发标记与实际歌词或导唱冲突，请在NicoKara 歌手标记管理中修改",
     "params": [],
     "parameterNotes": {}
   },
@@ -9623,7 +9623,7 @@
   },
   "output.markersAmbiguous": {
     "context": "output interface: output.markersAmbiguous",
-    "source": "不同歌手集合的触发标记相同或相互包含，请在歌手标记管理中消歧",
+    "source": "不同歌手集合的触发标记相同或相互包含，请在NicoKara 歌手标记管理中消歧",
     "params": [],
     "parameterNotes": {}
   },
@@ -11504,5 +11504,32 @@
     "source": "暂存区忽略字符",
     "params": [],
     "parameterNotes": {}
+  },
+  "karaoke.sugSingers": {
+    "context": "SUG singer manager",
+    "params": [],
+    "source": "SUG 歌手管理"
+  },
+  "sugSingers.unspecified": {
+    "context": "SUG singer manager",
+    "params": [],
+    "source": "未指定"
+  },
+  "sugSingers.mergeHelp": {
+    "context": "SUG singer manager",
+    "params": [],
+    "source": "同一文件中名称相同的歌手将合并为同一演唱者。清空名称可恢复默认值。"
+  },
+  "sugSingers.reset": {
+    "context": "SUG singer manager",
+    "params": [
+      "output"
+    ],
+    "source": "恢复默认：{{output}}"
+  },
+  "sugSingers.empty": {
+    "context": "SUG singer manager",
+    "params": [],
+    "source": "暂无可配置的 SUG 内容。"
   }
 }
