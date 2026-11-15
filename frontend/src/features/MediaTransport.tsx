@@ -1,4 +1,4 @@
-import {useTimelineVisibility, timelineLayers} from '../adapters/timeline-preferences';
+import {useTimelineSwapWheel, useTimelineVisibility, timelineLayers} from '../adapters/timeline-preferences';
 import { retainProjectMedia } from '../adapters/http/media-lifetime';
 import { projectTimeline } from '../domain/timeline-projection';
 import { selectionLocation } from './editor/selection-targets';
@@ -155,6 +155,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [snap, setSnap] = useState(true);
   const [bottomExpanded, setExpanded] = useState(true);
   const expanded = !!timelineHost || bottomExpanded;
+  const [swapWheel] = useTimelineSwapWheel();
   const [visible, setVisible] = useTimelineVisibility();
   const { width, height, ratio, node: measuredCanvas, observe: observeCanvas } = useCanvasMetrics(canvas, expanded);
   const [follow, setFollow] = useState(false);
@@ -438,7 +439,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       event.preventDefault();
       const lineHeight=parseFloat(getComputedStyle(plot).lineHeight)||16;
       const delta=(event.deltaY||event.deltaX)*(event.deltaMode===1?lineHeight:event.deltaMode===2?node.clientHeight:1);
-      zoomAt(Math.exp(delta*.001),(event.clientX-rect.left)/rect.width);
+      if(event.shiftKey !== swapWheel) {
+        if(moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current=null; }
+        setFollow(false);
+        setStart(current=>panViewport({startMs:current*1e3,spanMs:Math.round(span*1e3)},durationMs,delta/rect.width*span*1e3).startMs/1e3);
+      } else zoomAt(Math.exp(delta*.001),(event.clientX-rect.left)/rect.width);
     };
     node.addEventListener('wheel',wheel,{passive:false});
     return()=>node.removeEventListener('wheel',wheel);

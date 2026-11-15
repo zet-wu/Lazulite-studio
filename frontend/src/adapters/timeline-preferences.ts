@@ -11,3 +11,5 @@ export function useTimelineVisibility() {
   return [visible,(layer:TimelineLayer,value:boolean)=>save(JSON.stringify({...visible,[layer]:value}))] as const;
 }
 export const useStagingIgnoredCharacters = () => usePreference('studio:staging-ignored-characters',' ');
+
+export const useTimelineSwapWheel = () => usePreference('studio:timeline-swap-wheel', false);
