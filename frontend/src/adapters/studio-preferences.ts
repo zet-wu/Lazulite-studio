@@ -25,3 +25,5 @@ export function resolveDefaultModel(items: {name:string; type:string|null; statu
   const model = items.find(item => item.name === stored.name && item.type === stored.type && item.status === 'ready');
   return {id:model?.id ?? '', missing:!model};
 }
+
+export const backgroundDefaults = () => ({skipAlignment: preferences.getItem('studio:background-skip-alignment') !== 'false', skipSync: preferences.getItem('studio:background-skip-sync') !== 'false'});

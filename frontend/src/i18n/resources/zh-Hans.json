@@ -318,7 +318,7 @@
   "editor.noGroup": "未选择分组",
   "editor.multiLineTimeHelp": "多行时间请使用整体偏移或时间轴平移。",
   "editor.skipAlignment": "跳过对齐",
-  "editor.skipSync": "跳过打轴",
+  "editor.skipSync": "跳过连续打轴",
   "editor.duet": "对唱歌词",
   "editor.backgroundBefore": "背景置于主行之前",
   "editor.backgroundLyrics": "背景歌词",
@@ -1061,7 +1061,6 @@
   "sync.mode": "打轴模式",
   "sync.continuous": "连续",
   "sync.line": "本行",
-  "sync.backgroundLine": "背景 · 本行",
   "sync.offset": "输入偏移",
   "sync.reset": "归零",
   "sync.countdown": "空拍",
@@ -1083,7 +1082,7 @@
   "sync.unit": "打轴单元",
   "sync.countdownHint": "右键或 Shift+F10 调整空拍",
   "sync.emptyLine": "空行",
-  "sync.skipLine": "此行跳过打轴",
+  "sync.skipLine": "跳过连续打轴",
   "sync.addWord": "添加词",
   "preview.title": "AMLL 预览",
   "preview.track": "预览音译轨道",
@@ -1742,5 +1741,8 @@
   "settings.swapWheel": "交换滚轮操作",
   "settings.swapWheelHelp": "默认滚轮缩放，Shift＋滚轮平移。可配置为交换",
   "split.attachments": "分配附属内容",
-  "segment.computing": "正在计算分词结果…"
+  "segment.computing": "正在计算分词结果…",
+  "settings.editing": "编辑",
+  "settings.backgroundSkipAlignment": "背景行默认跳过对齐",
+  "settings.backgroundSkipSync": "背景行默认跳过连续打轴"
 }

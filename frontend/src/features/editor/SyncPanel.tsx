@@ -17,16 +17,16 @@ import { visibleLineOrdinals } from '../../adapters/output-validation';
 import type { TransportHandle } from '../MediaTransport';
 import styles from './semantic-editor.module.css';
 
-type Props = { progress: SyncProgress; onProgress: (progress: SyncProgress) => void; preferenceScope?: string; document: LyricDocument; cursor: SyncCursor | null; targetVersion?: number; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
+type Props = { lineOrder?: string[]; progress: SyncProgress; onProgress: (progress: SyncProgress) => void; preferenceScope?: string; document: LyricDocument; cursor: SyncCursor | null; targetVersion?: number; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
 
-export function SyncPanel({ progress, onProgress, document, cursor, targetVersion, apply, transport, onCursor, preferenceScope = 'local:untitled' }: Props) {
+export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, targetVersion, apply, transport, onCursor, preferenceScope = 'local:untitled' }: Props) {
   useTranslation();
   const editing = useProjectEditing();
   const [extrasOpen, setExtrasOpen] = useState(false);
   const extrasId = useId();
-  const background = document.lines.find(line => line.id === cursor?.lineId)?.backgroundOf;
-  const units = useMemo(() => syncUnits(document, editing, background ? cursor?.lineId : undefined), [document, editing, background, cursor?.lineId]);
+  const skipped = editing.ignoredSyncLineIds.includes(cursor?.lineId ?? '');
   const [mode, setMode] = usePreference<SyncMode>('studio:sync-mode', 'continuous', (v): v is SyncMode => v === 'continuous' || v === 'line');
+  const units = useMemo(() => syncUnits(document, editing, mode === 'continuous' && skipped ? cursor?.lineId : undefined, lineOrder, mode === 'line'), [document, editing, mode, skipped, cursor?.lineId, lineOrder]);
   const { completed, consumed: emptyBeats } = progress;
   const keys = useShortcuts();
   const [offsetMs, setOffsetMs] = usePreference<number>(`studio:sync-offset:${preferenceScope}`, 0, (v): v is number => Number.isSafeInteger(v));
@@ -40,7 +40,7 @@ export function SyncPanel({ progress, onProgress, document, cursor, targetVersio
   const endMs = ruby ? ruby.endMs : word?.endMs ?? null;
   useEffect(() => { setError(''); }, [cursor?.lineId, cursor?.wordId, cursor?.rubyUnitId, targetVersion]);
   const beatCount = active ? emptyBeatCount(editing, active.rubyUnitId ?? active.wordId) : 0;
-  const effectiveMode = background ? 'line' : mode;
+  const effectiveMode = skipped ? 'line' : mode;
   const lineUnits = units.filter(unit => unit.lineId === active?.lineId);
   const lineIndex = syncIndex(lineUnits, active);
   const lineNumber = line ? visibleLineOrdinals(document).get(line.id) : null;
@@ -59,7 +59,7 @@ export function SyncPanel({ progress, onProgress, document, cursor, targetVersio
     const timeMs = Math.max(0, clock.getPositionMs() + Math.round(offsetMs));
     if (action !== 'start' && (beginMs === null || !Number.isSafeInteger(beginMs) || beginMs < 0)) { setError(describeMessage('sync.startFirst')); return; }
     if (action === 'next' && emptyBeats < beatCount) { onProgress({ completed: false, consumed: emptyBeats + 1 }); setError(''); return; }
-    if (!apply({ type: 'sync-stamp', cursor: active, action, timeMs, mode: effectiveMode })) return;
+    if (!apply({ type: 'sync-stamp', cursor: active, action, timeMs, mode: effectiveMode, lineOrder })) return;
     setError('');
     if (action === 'start') { onProgress({ completed: false, consumed: 0 }); return; }
     const next = units[index + 1];
@@ -96,8 +96,7 @@ export function SyncPanel({ progress, onProgress, document, cursor, targetVersio
     <strong>{active ? t('sync.progress',{line:lineNumber,number:lineIndex+1,total:lineUnits.length}) : t('sync.excluded')}</strong>
     <span className={styles.syncQuote}><span>{word?.text}</span>{ruby && <b> → {ruby.reading}</b>}</span>
     <small className={styles.syncTime}>{beginMs === null ? '—' : (beginMs / 1e3).toFixed(3)}–{endMs === null ? '—' : (endMs / 1e3).toFixed(3)} s</small>
-    <Select aria-label={t('sync.mode')} disabled={Boolean(background)} value={effectiveMode} onChange={event => { setMode(event.target.value as SyncMode); onProgress({ completed: false, consumed: 0 }); }}><option value="continuous">{t('sync.continuous')}</option><option value="line">{t('sync.line')}</option></Select>
-    {background && <span>{t('sync.backgroundLine')}</span>}
+    <Select aria-label={t('sync.mode')} disabled={skipped} value={effectiveMode} onChange={event => { setMode(event.target.value as SyncMode); onProgress({ completed: false, consumed: 0 }); }}><option value="continuous">{t('sync.continuous')}</option><option value="line">{t('sync.line')}</option></Select>
     {offsetMs !== 0 && <small>{t('sync.offset')} {offsetMs} ms <button data-role="secondary" onClick={() => setOffsetMs(0)}>{t('sync.reset')}</button></small>}
     {emptyBeats > 0 && <small>{t('sync.countdown')} {emptyBeats}/{beatCount}</small>}
     <div className={styles.syncButtons}>

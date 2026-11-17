@@ -1,3 +1,4 @@
+import {defaultBackgroundDefaults, type BackgroundDefaults} from './project-editing';
 import { message, MessageError, messageList } from './messages';
 import { cueProblem, createKaraoke, reconcileKaraoke, applyKaraoke, type Karaoke, type KaraokeCommand } from './karaoke';
 import { assertAmll, checkAmll, createAmllSettings, amllDependencies, displayLines, groupDisplayLines, lineAgents, type AmllRule, type AmllSettings } from './amll-compatibility';
@@ -30,7 +31,7 @@ export function validateSegments(segments: VocalSegment[]) {
   }
 }
 export function createProjectEditorState(present: ProjectDocument): ProjectEditorState { return { present, past: [], future: [] }; }
-export function executeProjectCommand(state: ProjectEditorState, command: ProjectCommand): ProjectEditorState {
+export function executeProjectCommand(state: ProjectEditorState, command: ProjectCommand, defaults: BackgroundDefaults = defaultBackgroundDefaults): ProjectEditorState {
   let present: ProjectDocument;
   if (command.type === 'karaoke') {
     const karaoke = applyKaraoke(state.present.lyrics, state.present.karaoke, command.command);
@@ -96,10 +97,10 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
       }
     }
     if(JSON.stringify(lyrics)===JSON.stringify(state.present.lyrics)) return state;
-    const result=applyLyricTransaction(state.present.lyrics,{type:'replace-document',document:lyrics},state.present.editing);
+    const result=applyLyricTransaction(state.present.lyrics,{type:'replace-document',document:lyrics},state.present.editing, defaults);
     present={...state.present,...result, lineOrder:command.type==='amll-batch'&&command.rule==='noMultipleBackgrounds'?lyrics.lines.map(line=>line.id):state.present.lineOrder};
   } else if (command.type === 'lyrics') {
-    const result = applyLyricTransaction(state.present.lyrics, command.command, state.present.editing);
+    const result = applyLyricTransaction(state.present.lyrics, command.command, state.present.editing, defaults);
     if (result.lyrics === state.present.lyrics && result.editing === state.present.editing) return state;
     let karaoke = state.present.karaoke;
     const commands = command.command.type === 'batch' ? command.command.commands : [command.command];

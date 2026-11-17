@@ -55,9 +55,9 @@ it('finishes silently at the final unit, ignores repeat end, and start reopens',
   const history = run.state().past.length; stamp('连续轴'); stamp('结束轴'); expect(run.state().past).toHaveLength(history);
   run.time(3000); stamp('起始轴'); expect(run.progress().completed).toBe(false); expect(run.state().present.lyrics.lines[1].words[0].beginMs).toBe(3000);
 });
-it('background stays in its own line and preserves the main mode preference', () => {
-  const run = setup(true); stamp('choose last'); expect(screen.getByText('背景 · 本行')).toBeVisible();
-  expect(screen.getByRole('combobox', { name: '打轴模式' })).toBeDisabled();
+it('background participates in continuous timing', () => {
+  const run = setup(true); stamp('choose last');
+  expect(screen.getByRole('combobox', { name: '打轴模式' })).toBeEnabled();
   stamp('起始轴'); run.time(1250); stamp('连续轴'); expect(run.progress().consumed).toBe(1);
   run.time(1500); stamp('连续轴'); expect(run.progress().completed).toBe(true);
   expect(run.state().present.lyrics.lines[0].words.every(word => word.beginMs === null)).toBe(true);

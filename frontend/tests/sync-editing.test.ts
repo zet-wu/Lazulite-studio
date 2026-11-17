@@ -7,7 +7,7 @@ import { stampSync, syncUnits } from '../src/domain/sync-editing';
 import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 
 describe('E5 sync editing', () => {
-  it('advances 注音 before ordinary words and skips background and ignored lines', () => {
+  it('advances 注音 before ordinary words and includes backgrounds and skips ignored lines', () => {
     const document = createLyricDocument('今日');
     document.lines[0].words[0].rubyUnits = [
       { id: 'r1', reading: 'きょ', beginMs: null, endMs: null },
@@ -22,6 +22,7 @@ describe('E5 sync editing', () => {
       [document.lines[0].id, document.lines[0].words[0].id, 'r1'],
       [document.lines[0].id, document.lines[0].words[0].id, 'r2'],
       [document.lines[0].id, 'also', null],
+      ['background', background.words[0].id, null],
       ['final', final.words[0].id, null],
     ]);
   });

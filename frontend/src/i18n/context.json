@@ -2010,8 +2010,8 @@
     "parameterNotes": {}
   },
   "editor.skipSync": {
-    "context": "editor interface: editor.skipSync",
-    "source": "跳过打轴",
+    "context": "Editing defaults and continuous timing participation; manual timing remains available",
+    "source": "跳过连续打轴",
     "params": [],
     "parameterNotes": {}
   },
@@ -6833,12 +6833,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "sync.backgroundLine": {
-    "context": "sync interface: sync.backgroundLine",
-    "source": "背景 · 本行",
-    "params": [],
-    "parameterNotes": {}
-  },
   "sync.offset": {
     "context": "sync interface: sync.offset",
     "source": "输入偏移",
@@ -6966,8 +6960,8 @@
     "parameterNotes": {}
   },
   "sync.skipLine": {
-    "context": "sync interface: sync.skipLine",
-    "source": "此行跳过打轴",
+    "context": "Editing defaults and continuous timing participation; manual timing remains available",
+    "source": "跳过连续打轴",
     "params": [],
     "parameterNotes": {}
   },
@@ -11534,6 +11528,24 @@
   "segment.computing": {
     "context": "Segmentation dialog ruby movement or calculation status",
     "source": "正在计算分词结果…",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.editing": {
+    "context": "Editing defaults and continuous timing participation; manual timing remains available",
+    "source": "编辑",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.backgroundSkipAlignment": {
+    "context": "Editing defaults and continuous timing participation; manual timing remains available",
+    "source": "背景行默认跳过对齐",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.backgroundSkipSync": {
+    "context": "Editing defaults and continuous timing participation; manual timing remains available",
+    "source": "背景行默认跳过连续打轴",
     "params": [],
     "parameterNotes": {}
   }

@@ -32,6 +32,8 @@ export function StudioSettings({close, amll, locked=false, initial='appearance'}
   const [theme,setTheme]=usePreference('lazulite-editor-theme','light');
   const [columns,setColumns]=usePreference(COLUMN_STORAGE,JSON.stringify(COLUMN_DEFAULTS));
   const columnValues={...readColumnPreferences(),...JSON.parse(columns)};
+  const [skipAlignment,setSkipAlignment]=usePreference('studio:background-skip-alignment',true);
+  const [skipSync,setSkipSync]=usePreference('studio:background-skip-sync',true);
   const [particles,setParticles]=usePreference('studio:convert-particles',true);
   const [highlight,setHighlight]=usePreference('studio:kana-highlight',defaultKanaHighlight);
   const [draft,setDraft]=useState(highlight),[error,setError]=useState('');
@@ -40,7 +42,7 @@ export function StudioSettings({close, amll, locked=false, initial='appearance'}
   const [hide,setHide]=usePreference('studio:preview-hide',false);
   const [fade,setFade]=usePreference('studio:preview-fade',0.5);
   useEffect(()=>{document.documentElement.dataset.theme=theme;},[theme]);
-  const categories=[['appearance','settings.appearance'],['reading','settings.reading'],['models','settings.modelsCompute'],['timeline','settings.timeline'],['shortcuts','menu.shortcuts'],['preview','preview.title']] as const;
+  const categories=[['appearance','settings.appearance'],['editing','settings.editing'],['reading','settings.reading'],['models','settings.modelsCompute'],['timeline','settings.timeline'],['shortcuts','menu.shortcuts'],['preview','preview.title']] as const;
   const title=page==='amll'?t('menu.amll'):t(categories.find(([key])=>key===page)![1]);
   return <SettingsDialog wide title={t('menu.settings')} close={close}><div className={styles.layout}>
     <nav aria-label={t('menu.settings')} className={`${styles.navigation} ${fields.navigation}`}><strong>{t('settings.studio')}</strong>
@@ -52,6 +54,7 @@ export function StudioSettings({close, amll, locked=false, initial='appearance'}
       {page==='appearance'&&<><LanguageSelector/><SettingField label={t('settings.theme')}><Select aria-label={t('settings.theme')} value={theme} onChange={e=>setTheme(e.target.value)}><option value="light">{t('menu.light')}</option><option value="dark">{t('menu.dark')}</option></Select></SettingField>
         {(['outlineVisible','inspectorVisible'] as const).map(key=><SettingToggle key={key} label={t(key==='outlineVisible'?'menu.outline':'menu.inspector')} checked={columnValues[key]} onChange={value=>setColumns(JSON.stringify({...columnValues,[key]:value}))}/>)}
         <SettingField label={t('settings.resetWidths')}><IconButton icon="refresh" data-role="secondary" label={t('settings.resetWidths')} onClick={()=>setColumns(JSON.stringify({...columnValues,outlineWidth:COLUMN_DEFAULTS.outlineWidth,inspectorWidth:COLUMN_DEFAULTS.inspectorWidth}))}/></SettingField></>}
+      {page==='editing'&&<><SettingToggle label={t('settings.backgroundSkipAlignment')} checked={skipAlignment} onChange={setSkipAlignment}/><SettingToggle label={t('settings.backgroundSkipSync')} checked={skipSync} onChange={setSkipSync}/></>}
       {page==='reading'&&<><DictionaryManager embedded close={close}/><h3>{t('settings.latinization')}</h3><SettingToggle label={t('settings.convertParticles')} description={t('settings.particleHelp')} checked={particles} onChange={setParticles}/>
         <SettingField label={t('settings.defaultHighlight')} error={error}><input value={draft} onChange={e=>setDraft(e.target.value)} onBlur={()=>{try{const value=normalizeKanaHighlight(draft);setHighlight(value);setDraft(value);setError('');}catch(cause){setError(formatMessage(errorMessage(cause)));}}}/></SettingField></>}
       {page==='models'&&<><AlignmentModelsDialog embedded close={close}/><AlignmentDefaults/><h3>{t('menu.devices')}</h3><DeviceSettings embedded/></>}

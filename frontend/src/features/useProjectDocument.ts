@@ -1,3 +1,4 @@
+import {backgroundDefaults} from '../adapters/studio-preferences';
 import { ApiError, isRejectedDocument } from '../adapters/http/client';
 import { message, MessageError, errorMessage } from '../domain/messages';
 import { projectErrorText } from './project-error';
@@ -82,7 +83,7 @@ export function useProjectDocument(
   const dispatch = useCallback(
     (command: LyricCommand) => {
       if (editingLock.current) throw new MessageError(message('save.editingLocked'));
-      const next = executeProjectCommand(stateRef.current, { type: 'lyrics', command });
+      const next = executeProjectCommand(stateRef.current, { type: 'lyrics', command }, backgroundDefaults());
       if (next !== stateRef.current) {
         stateRef.current = next;
         setState(next);
@@ -269,7 +270,7 @@ export function useProjectDocument(
     },
     document: state.present.lyrics,
     project: state.present,
-    applyProject: (command: ProjectCommand) => history(s => executeProjectCommand(s, command)),
+    applyProject: (command: ProjectCommand) => history(s => executeProjectCommand(s, command, backgroundDefaults())),
     state,
     revision,
     dirty,

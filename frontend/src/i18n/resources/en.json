@@ -318,7 +318,7 @@
   "editor.noGroup": "No group selected",
   "editor.multiLineTimeHelp": "Use a time offset or timeline movement to adjust multiple lines.",
   "editor.skipAlignment": "Skip alignment",
-  "editor.skipSync": "Skip timing",
+  "editor.skipSync": "Skip continuous timing",
   "editor.duet": "Duet lyrics",
   "editor.backgroundBefore": "Place background before main line",
   "editor.backgroundLyrics": "Background lyrics",
@@ -1065,7 +1065,6 @@
   "sync.mode": "Timing mode",
   "sync.continuous": "Continuous",
   "sync.line": "This line",
-  "sync.backgroundLine": "Background · This line",
   "sync.offset": "Input offset",
   "sync.reset": "Reset to zero",
   "sync.countdown": "Countdown",
@@ -1087,7 +1086,7 @@
   "sync.unit": "Timing unit",
   "sync.countdownHint": "Right-click or press Shift+F10 to adjust the countdown",
   "sync.emptyLine": "Empty line",
-  "sync.skipLine": "Skip timing for this line",
+  "sync.skipLine": "Skip continuous timing",
   "sync.addWord": "Add word",
   "preview.title": "AMLL preview",
   "preview.track": "Preview romanization track",
@@ -1755,5 +1754,8 @@
   "settings.swapWheel": "Swap wheel actions",
   "settings.swapWheelHelp": "By default, wheel zooms and Shift + wheel pans. These actions can be swapped.",
   "split.attachments": "Assign attached content",
-  "segment.computing": "Calculating segmentation…"
+  "segment.computing": "Calculating segmentation…",
+  "settings.editing": "Editing",
+  "settings.backgroundSkipAlignment": "Skip background lines in alignment by default",
+  "settings.backgroundSkipSync": "Skip background lines in continuous timing by default"
 }

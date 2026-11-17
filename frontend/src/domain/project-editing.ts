@@ -88,3 +88,18 @@ export function followChangedEndLinks(before: LyricDocument, after: LyricDocumen
   });
   return changed ? { ...after, lines } : after;
 }
+
+export type BackgroundDefaults = { skipAlignment: boolean; skipSync: boolean };
+export const defaultBackgroundDefaults: BackgroundDefaults = {skipAlignment: true, skipSync: true};
+/** Apply only identity changes; copied project editing state remains authoritative. */
+export function applyBackgroundDefaults(before: LyricDocument, after: LyricDocument, editing: ProjectEditing, defaults: BackgroundDefaults) {
+  for (const line of after.lines) {
+    const previous = before.lines.find(item => item.id === line.id);
+    if (Boolean(previous?.backgroundOf) === Boolean(line.backgroundOf)) continue;
+    for (const [key, enabled] of [['skippedAlignmentLineIds', defaults.skipAlignment], ['ignoredSyncLineIds', defaults.skipSync]] as const) {
+      if (!enabled) continue;
+      editing[key] = editing[key].filter(id => id !== line.id);
+      if (line.backgroundOf) editing[key].push(line.id);
+    }
+  }
+}

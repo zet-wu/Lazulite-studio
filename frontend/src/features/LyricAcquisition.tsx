@@ -1,9 +1,10 @@
+import {backgroundDefaults} from '../adapters/studio-preferences';
 import { useMessageText } from '../shared/useMessageText';
 import { message as describeMessage, MessageError, errorMessage, isMessage, type Message } from '../domain/messages';
 import { i18n, formatMessage } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { EmbeddedLyrics } from './EmbeddedLyrics';
-import { createProjectEditing } from '../domain/project-editing';
+import { applyBackgroundDefaults, createProjectEditing } from '../domain/project-editing';
 import { translationsForLine, translationText, type LyricDocument } from '../domain/lyric-document';
 import { Select } from '../shared/Select';
 import { IconButton } from '../shared/Controls';
@@ -66,7 +67,9 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   const confirm = () => {
     if (!incoming) return;
     if (base !== document) { setBase(document); setChoices(defaultChoices(document, incoming)); setMessage(describeMessage('acquire.changed')); return; }
-    try { apply({ type: 'replace-document', editing: createProjectEditing(), document: { ...incoming, metadata: selectedMetadata(base, incoming, choices) } }); setIncoming(null); store.cancelAll(); if (filename) onImportName?.(filename); onImported(); }
+    const editing = createProjectEditing();
+    applyBackgroundDefaults({...incoming, lines: []}, incoming, editing, backgroundDefaults());
+    try { apply({ type: 'replace-document', editing, document: { ...incoming, metadata: selectedMetadata(base, incoming, choices) } }); setIncoming(null); store.cancelAll(); if (filename) onImportName?.(filename); onImported(); }
     catch (e) { setMessage(errorMessage(e)); }
   };
   return <div className={styles.page}>

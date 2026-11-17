@@ -1,3 +1,4 @@
+import {displayLines} from './amll-compatibility';
 import { message, MessageError } from './messages';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit } from './lyric-document';
@@ -6,8 +7,8 @@ export type SyncCursor = { lineId: string; wordId: string; rubyUnitId: string | 
 export type SyncMode = 'continuous' | 'line';
 export type SyncAction = 'start' | 'next' | 'end';
 
-export function syncUnits(document: LyricDocument, editing = createProjectEditing(), backgroundLineId?: string): SyncCursor[] {
-  return document.lines.filter(line => (backgroundLineId ? line.id === backgroundLineId : !line.backgroundOf) && !editing.ignoredSyncLineIds.includes(line.id)).flatMap(line =>
+export function syncUnits(document: LyricDocument, editing = createProjectEditing(), selectedLineId?: string, lineOrder: string[] = [], allLines = false): SyncCursor[] {
+  return displayLines(document, lineOrder).filter(line => selectedLineId ? line.id === selectedLineId : allLines || !editing.ignoredSyncLineIds.includes(line.id)).flatMap(line =>
     line.words.flatMap((word): SyncCursor[] => word.rubyUnits.length
       ? word.rubyUnits.filter(unit => unit.reading.trim().length > 0).map(unit => ({ lineId: line.id, wordId: word.id, rubyUnitId: unit.id }))
       : word.text.trim().length > 0 ? [{ lineId: line.id, wordId: word.id, rubyUnitId: null }] : []));
@@ -46,10 +47,10 @@ function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endM
   return { ...line, words, beginMs, endMs };
 }
 
-export function stampSync(document: LyricDocument, cursor: SyncCursor, action: SyncAction, timeMs: number, mode: SyncMode = 'continuous', editing = createProjectEditing()): LyricDocument {
+export function stampSync(document: LyricDocument, cursor: SyncCursor, action: SyncAction, timeMs: number, mode: SyncMode = 'continuous', editing = createProjectEditing(), lineOrder: string[] = []): LyricDocument {
   if (!Number.isSafeInteger(timeMs) || timeMs < 0) throw new MessageError(message('sync.integerTime'));
-  const background = document.lines.find(line => line.id === cursor.lineId)?.backgroundOf;
-  const units = syncUnits(document, editing, background ? cursor.lineId : undefined);
+  const local = mode === 'line' || editing.ignoredSyncLineIds.includes(cursor.lineId);
+  const units = syncUnits(document, editing, local ? cursor.lineId : undefined, lineOrder);
   const index = syncIndex(units, cursor);
   if (index < 0) throw new MessageError(message('sync.cursorStale'));
   const current = units[index];

@@ -1,3 +1,4 @@
+import {applyBackgroundDefaults, defaultBackgroundDefaults, type BackgroundDefaults} from './project-editing';
 import { validateSegmentContent } from './segmentation-draft';
 import { message, MessageError, messageList, type Message } from './messages';
 import { shiftLineTimes } from './batch-editing';
@@ -50,7 +51,7 @@ type AtomicLyricCommand =
   | { type: 'rename-agent'; id: string; nextId: string }
   | { type: 'delete-agent'; id: string }
   | { type: 'rename-metadata'; key: string; nextKey: string }
-  | { type: 'sync-stamp'; cursor: SyncCursor; action: SyncAction; timeMs: number; mode?: SyncMode }
+  | { type: 'sync-stamp'; cursor: SyncCursor; action: SyncAction; timeMs: number; mode?: SyncMode; lineOrder?: string[] }
   | { type: 'replace-document'; document: LyricDocument; editing?: ProjectEditing }
   | { type: 'restore-editing'; editing: ProjectEditing }
   | { type: 'set-empty-beat'; kind: 'word' | 'ruby'; id: string; count: number }
@@ -216,7 +217,7 @@ export function previewLineSplit(line: LyricLine, beforeWordIds: string[]) {
 
 function applyStructure(document: LyricDocument, command: AtomicLyricCommand, editing: ProjectEditing): LyricDocument | null {
   switch (command.type) {
-    case 'sync-stamp': return stampSync(document, command.cursor, command.action, command.timeMs, command.mode, editing);
+    case 'sync-stamp': return stampSync(document, command.cursor, command.action, command.timeMs, command.mode, editing, command.lineOrder);
     case 'insert-line': {
       const line = command.line ?? createLine('');
       if (document.lines.some((item) => item.id === line.id)) throw new MessageError(message('command.lineDuplicate'));
@@ -756,10 +757,12 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
   });
 }
 
-export function applyLyricTransaction(document: LyricDocument, command: LyricCommand, original: ProjectEditing) {
+export function applyLyricTransaction(document: LyricDocument, command: LyricCommand, original: ProjectEditing, defaults: BackgroundDefaults = defaultBackgroundDefaults) {
   const editing = structuredClone(original);
+  const restoring = command.type === 'batch' && command.commands.some(item => item.type === 'restore-editing');
   const atomic = (before: LyricDocument, command: AtomicLyricCommand) => {
     const after = applyAtomic(before, command, editing);
+    if (!(command.type === 'replace-document' && command.editing) && !restoring) applyBackgroundDefaults(before, after, editing, defaults);
     return after;
   };
   const lyrics = command.type === 'batch' ? command.commands.reduce(atomic, document) : atomic(document, command);

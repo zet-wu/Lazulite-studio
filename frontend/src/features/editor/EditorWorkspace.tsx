@@ -285,7 +285,7 @@ function EditorWorkspaceContent(props: Props) {
   const propertyText = activePropertyTarget?.kind === 'ruby' ? propertyWord?.rubyUnits.find(unit => unit.id === activePropertyTarget.rubyId)?.reading : propertyWord?.text;
   const activePropertyInterval = activePropertyTarget && targetInterval(document, activePropertyTarget);
   const syncLine = document.lines.find(line => line.id === activePropertyTarget?.lineId);
-  const syncCursor = syncUnits(document, editing, syncLine?.backgroundOf ? syncLine.id : undefined).find(unit => {
+  const syncCursor = syncUnits(document, editing, syncLine?.id).find(unit => {
     if (!selection || !selection.ids.includes(selection.activeId)) return false;
     if (selection.kind === 'lines') return unit.lineId === selection.activeId;
     if (selection.kind === 'words') return unit.wordId === selection.activeId;
@@ -912,7 +912,7 @@ function EditorWorkspaceContent(props: Props) {
     {mode === 'package' && <PackagingPanel {...props} validationFilter={karaokeValidation} onValidationFilter={setKaraokeValidation} karaokeExportSource={karaokeExportSource} resumeKaraoke={()=>{setMode("karaoke");setKaraokeExportOpen(karaokeExportSource);}} validationTab={validationTab} onValidationTab={setValidationTab} focusRule={focusRule} onRuleLocated={()=>setFocusRule(undefined)} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
     {mode === 'preview' && <Suspense fallback={<p>{t('editor.previewLoading')}</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={id => { const line = document.lines.find(line => line.id === id); if (line) selectLine(line); }} /></Suspense>}
     {mode === 'karaoke' && props.project && props.applyProject && <KaraokeTools focusOutputId={karaokeFocusOutput} project={props.project} apply={props.applyProject} title={props.title} exportOpen={karaokeExportOpen} setExportOpen={setKaraokeExportOpen} viewIssues={format=>{setKaraokeExportSource(format);setMode('package');setValidationTab('lyrics');setKaraokeValidation(format);}}/>}
-    {mode === 'sync' && <SyncPanel progress={syncProgress} onProgress={setSyncProgress} preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} document={document} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
+    {mode === 'sync' && <SyncPanel progress={syncProgress} onProgress={setSyncProgress} preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} document={document} lineOrder={props.project?.lineOrder} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
       onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
     {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canCopy={canCopySelection} canPaste={Boolean(clipboard)}
       canMoveUp={selectedWordLineIndexes.length === 1 && selectedWordLineIndexes[0] > 0}
