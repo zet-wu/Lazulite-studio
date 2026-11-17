@@ -122,7 +122,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
         {(repair||update) && <span>{repair?t('vocal.fileUnavailable'): t('vocal.versionMismatch')}</span>}
         <button data-role="inline" disabled={locked||busy||!!active||!adoptedAvailable} title={t('vocal.reuseHelp')} onClick={()=>void run(project.acoustics.analysisId!)}>{t('vocal.reanalyze')}</button>
         {adoptedAvailable && project.acoustics.analysisId && <a data-role="secondary" href={download(project.acoustics.analysisId)} download>{t('vocal.download')}</a>}
-      </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run()}>{repair?t('vocal.regenerate'):update?t('vocal.updateSeparation'):currentAudio?t('vocal.useExisting'):t('vocal.separate')}</button>}
+      </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run(currentAudio?.source_kind==='upload' ? currentAudio.id : undefined)}>{repair?t('vocal.regenerate'):update?t('vocal.updateSeparation'):currentAudio?t('vocal.useExisting'):t('vocal.separate')}</button>}
     </>, ui.analysisHost)}
     {ui.taskHost && (active || busy) && createPortal(<MessageBar notice={{ text: t('task.vocalProgress',{progress:`${task ? cancelling ? t('task.cancelling') : status[task.status] : t('task.preparing')}${task?.stage ? ` · ${{separating:t('vocal.separate'),analyzing:t('vocal.acousticAnalysis')}[task.stage] ?? task.stage}` : ''}`,device:deviceText?' · '+deviceText:''}), role:'status', origin:null, dismissible:false }} actions={<button data-role="secondary" disabled={cancelling || active?.status==='cancel_requested'} onClick={()=>void cancel()}>{t('task.cancel')}</button>}/>,ui.taskHost)}
     {ui.messageHost && createPortal(<>

@@ -51,3 +51,22 @@ test('uploaded vocals launch analysis, adopt automatically and retain an indepen
  await expect(dialog).toHaveCount(0);await expect(page.getByRole('button',{name:'替换人声',exact:true})).toBeEnabled();
  await expect.poll(async()=>page.evaluate(async()=>{const r=await fetch('/api/v1/projects/sample-project/document');return(await r.json()).document.acoustics.analysisId;})).toBe('uploaded-result');
 });
+
+test('playback and waveform stay bound to adopted analysis while a newer upload is unadopted',async({page})=>{
+ await page.addInitScript(()=>{
+  const original=window.fetch;
+  window.fetch=async(input,init)=>{
+   const url=String(input);
+   if(url.endsWith('/vocals'))return Response.json({items:[
+    {id:'new-upload',audio_id:'new-upload',source_asset_id:'sample-asset',source_kind:'upload',status:'ready',audio_state:'current'},
+    {id:'adopted',audio_id:'old-audio',source_asset_id:'sample-asset',status:'ready',audio_state:'current'}]});
+   const response=await original(input,init);
+   if(url.endsWith('/sample-project/document')&&(!init?.method||init.method==='GET')){const data=await response.json();data.document.acoustics={analysisId:'adopted',segments:[]};return Response.json(data,{headers:response.headers});}
+   return response;
+  };
+ });
+ const waveform:string[]=[];page.on('request',request=>{if(request.url().includes('/waveform')&&request.url().includes('vocal='))waveform.push(request.url());});
+ await page.goto('/projects/sample-project/edit');await page.getByRole('combobox',{name:'播放音源',exact:true}).selectOption('vocal');
+ await expect(page.locator('audio')).toHaveAttribute('src',/vocal=old-audio/);
+ await expect.poll(()=>waveform.length).toBeGreaterThan(0);expect(waveform.every(url=>url.includes('vocal=old-audio'))).toBe(true);
+});

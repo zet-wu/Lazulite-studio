@@ -106,7 +106,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const keys = useShortcuts();
   const results = useQuery({ queryKey:['vocals',projectId], queryFn:()=>vocalApi.list(projectId), refetchInterval:3000, enabled:!!asset });
   const sourceResults = results.data?.items.filter(r=>r.source_asset_id===asset?.id && r.audio_state!=='missing') ?? [];
-  const vocalId = (sourceResults.find(r=>r.audio_state==='current') ?? sourceResults[0])?.audio_id ?? null;
+  const vocalId = (acoustics ? sourceResults.find(r=>r.id===acoustics.analysisId) : sourceResults.find(r=>r.status==='ready'))?.audio_id ?? null;
   const [playbackChoice,setPlaybackChoice] = useState(false);
   const [graphicChoice,setGraphicChoice] = useState(true);
   const [playbackVocal,setPlaybackVocal] = useState<string|null>(null);
