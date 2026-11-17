@@ -50,7 +50,6 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const sourceResults = results.data?.items.filter(r=>r.source_asset_id===sourceAssetId) ?? [];
   const currentAudio = sourceResults.find(r=>r.audio_state==='current') ?? sourceResults[0];
   const repair = currentAudio?.audio_state==='missing';
-  const update = currentAudio?.audio_state==='outdated';
   const failure = latest && ['failed','cancelled','interrupted'].includes(latest.status);
   const conflict = pending && latest?.status==='succeeded' && !handled.current.has(pending.id) && pending.baseline!==JSON.stringify(project.acoustics);
   const adopted = sourceResults.find(r=>r.id===project.acoustics.analysisId);
@@ -83,13 +82,13 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   useEffect(()=>{
     if(pending && latest?.status==='succeeded' && result?.status==='ready' && !conflict && !handled.current.has(pending.id) && !error) adopt();
   },[pending,latest?.status,result,conflict,error]);
-  const run = async (reuse?: string, upload?: {upload_id:string;offset_ms:number}) => {
+  const run = async (reuse?: string, upload?: {upload_id:string;offset_ms:number}, force=false) => {
     if(locked)return false;
     if (!sourceAssetId || submitting.current || active) return false;
     submitting.current=true;cancelRequested.current=false;setCancelling(false);
     const baseline=JSON.stringify(project.acoustics);
     setBusy(true); setError(''); publish(null); setDismissed(null);
-    try { const job=await jobsApi.createVocal(projectId, sourceAssetId, reuse, upload); setPending({id:job.id,baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); return true; }
+    try { const job=await jobsApi.createVocal(projectId, sourceAssetId, reuse, upload, force); setPending({id:job.id,baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); return true; }
     catch(e) { if(upload)throw e; setError(errorMessage(e)); return false; }
     finally { submitting.current=false; setBusy(false); }
   };
@@ -118,11 +117,11 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     {visible && ui.uploadHost && createPortal(<VocalUpload key={sourceAssetId} projectId={projectId} sourceAssetId={sourceAssetId} durationMs={durationMs} available={sourceResults.some(r=>r.audio_state!=='missing')} disabled={!!locked||busy||!!hasActive} submit={(upload_id,offset_ms)=>run(undefined,{upload_id,offset_ms})}/>,ui.uploadHost)}
     {visible && ui.analysisHost && createPortal(<>
       {ready ? <TopMenu id="audio-analysis" title={t('vocal.analysis')} className={editorStyles.ribbonMenu} activeMenuId={menu} onMenuChange={setMenu}>
-        {(!currentAudio || repair || update) && <button data-role="inline" disabled={locked||busy||!!active} title={t('vocal.replaceHelp')} onClick={()=>void run()}>{repair?t('vocal.regenerate'):update?t('vocal.updateSeparation'):t('vocal.separate')}</button>}
-        {(repair||update) && <span>{repair?t('vocal.fileUnavailable'): t('vocal.versionMismatch')}</span>}
+        {<button data-role="inline" disabled={locked||busy||!!active} title={t('vocal.replaceHelp')} onClick={()=>void run(undefined,undefined,true)}>{currentAudio?t('vocal.reseparate'):t('vocal.separate')}</button>}
+        {repair && <span>{t('vocal.fileUnavailable')}</span>}
         <button data-role="inline" disabled={locked||busy||!!active||!adoptedAvailable} title={t('vocal.reuseHelp')} onClick={()=>void run(project.acoustics.analysisId!)}>{t('vocal.reanalyze')}</button>
         {adoptedAvailable && project.acoustics.analysisId && <a data-role="secondary" href={download(project.acoustics.analysisId)} download>{t('vocal.download')}</a>}
-      </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run(currentAudio?.source_kind==='upload' ? currentAudio.id : undefined)}>{repair?t('vocal.regenerate'):update?t('vocal.updateSeparation'):currentAudio?t('vocal.useExisting'):t('vocal.separate')}</button>}
+      </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run(currentAudio?.source_kind==='upload' ? currentAudio.id : undefined)}>{repair?t('vocal.regenerate'):currentAudio?t('vocal.useExisting'):t('vocal.separate')}</button>}
     </>, ui.analysisHost)}
     {ui.taskHost && (active || busy) && createPortal(<MessageBar notice={{ text: t('task.vocalProgress',{progress:`${task ? cancelling ? t('task.cancelling') : status[task.status] : t('task.preparing')}${task?.stage ? ` · ${{separating:t('vocal.separate'),analyzing:t('vocal.acousticAnalysis')}[task.stage] ?? task.stage}` : ''}`,device:deviceText?' · '+deviceText:''}), role:'status', origin:null, dismissible:false }} actions={<button data-role="secondary" disabled={cancelling || active?.status==='cancel_requested'} onClick={()=>void cancel()}>{t('task.cancel')}</button>}/>,ui.taskHost)}
     {ui.messageHost && createPortal(<>

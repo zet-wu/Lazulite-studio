@@ -42,7 +42,8 @@ function SyncText({ id, text, label, active, draft, commit }: { id: string; text
   </span>;
 }
 
-export function SyncLine({ line, ordinal, gutterDigits, editing, selection, cursor, progress, draft, apply, selectLine, selectWord, selectRuby, renderWordDraft, addWord, rubyDraft, closeRubyDraft, placeholder, karaoke }: {
+export function SyncLine({ line, ordinal, gutterDigits, editing, selection, cursor, progress, draft, apply, selectLine, selectWord, selectRuby, renderWordDraft, addWord, rubyDraft, closeRubyDraft, placeholder, karaoke, presentation = 'sync' }: {
+  presentation?: 'edit' | 'sync' | 'karaoke';
   karaoke?: { add: ReactNode; before: ReactNode; gap: (leftId: string, rightId: string, wordId?: string) => ReactNode };
   line: LyricLine; ordinal?: number; gutterDigits: number; editing: ProjectEditing; selection: EditorSelection | null; cursor: SyncCursor | null; progress: SyncProgress; draft: DraftController;
   apply: (command: LyricCommand) => boolean; selectLine: (shift: boolean, toggle: boolean) => void;
@@ -52,29 +53,29 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
   placeholder: (kind: 'line' | 'word' | 'ruby', id: string) => boolean;
 }) {
   useTranslation();
-  const ignored = editing.ignoredSyncLineIds.includes(line.id);
-  const activeId = !ignored && !progress.completed && cursor?.lineId === line.id ? cursor.rubyUnitId ?? cursor.wordId : null;
+  const ignored = presentation !== 'edit' && editing.ignoredSyncLineIds.includes(line.id);
+  const activeId = presentation !== 'edit' && !ignored && !progress.completed && cursor?.lineId === line.id ? cursor.rubyUnitId ?? cursor.wordId : null;
   const selected = (kind: EditorSelection['kind'], id: string) => selection?.kind === kind && selection.ids.includes(id);
   const chooseKey = (event: React.KeyboardEvent, choose: () => void, id?: string) => {
     if (event.target !== event.currentTarget) return;
     if (event.key === 'F2' && id) { event.preventDefault(); draft.open(id); }
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); }
   };
-  const markers = (id: string, kind: 'word' | 'ruby', participates: boolean, choose: () => void) => participates && <div className={styles.syncMarkers}>
+  const markers = (id: string, kind: 'word' | 'ruby', participates: boolean, choose: () => void) => presentation !== 'edit' && participates && <div className={styles.syncMarkers}>
     <button data-role="inline" className={styles.syncDot} tabIndex={-1} aria-label={t('sync.unit')} data-sync-marker="dot" data-current={activeId === id && progress.consumed === 0 || undefined}
       onClick={event => { event.stopPropagation(); choose(); }}><Icon name="sync-dot" size={16}/></button>
     {Array.from({ length: emptyBeatCount(editing, id) }, (_, index) => <button key={index} data-role="inline" className={styles.syncBeat} data-beat-owner={id} data-beat-kind={kind} data-sync-marker="beat"
       data-current={activeId === id && progress.consumed === index + 1 || undefined} data-passed={activeId === id && progress.consumed > index + 1 || undefined}
       aria-label={t('sync.trailingBeat',{number:index+1})} title={t('sync.countdownHint')} onClick={event => event.stopPropagation()}><Icon name="sync-beat" size={16}/></button>)}
   </div>;
-  return <section className={styles.syncLine} style={{ '--gutter-digits': gutterDigits } as CSSProperties} data-line-id={line.id} data-karaoke={Boolean(karaoke)||undefined} data-background={Boolean(line.backgroundOf) || undefined} data-ignored-sync={ignored || undefined}
+  return <section className={styles.syncLine} style={{ '--gutter-digits': gutterDigits } as CSSProperties} data-line-id={line.id} data-presentation={presentation} data-karaoke={Boolean(karaoke)||undefined} data-background={Boolean(line.backgroundOf) || undefined} data-ignored-sync={ignored || undefined}
     data-selected={selected('lines', line.id) || undefined} data-drag-placeholder={placeholder('line', line.backgroundOf ?? line.id) ? '' : undefined} tabIndex={0} aria-label={t('sync.lineLabel',{text:line.words.map(word => word.text).join('') || t('sync.emptyLine')})}
     onKeyDown={event => chooseKey(event, () => selectLine(event.shiftKey, event.ctrlKey || event.metaKey))}
     onClick={event => { if (!(event.target as Element).closest('[data-word-id],button,input')) selectLine(event.shiftKey, event.ctrlKey || event.metaKey); }}>
     <div className={styles.syncLineNumber}>{karaoke?.add}<span className={styles.syncOrdinal}>L{ordinal}</span>{line.backgroundOf && <span>{t('outline.background')}</span>}{ignored && <span tabIndex={0} data-tooltip={t('sync.skipLine')} aria-label={t('sync.skipLine')}><Icon name="skip"/></span>}</div>
     <div className={styles.syncWords}>{karaoke && <div className={styles.karaokeBodySlot}><div className={styles.syncBody}>{karaoke.before}</div></div>}{renderWordDraft(null)}{line.words.map((word, wordIndex) => {
       const hasRuby = word.rubyUnits.length > 0;
-      const count = !hasRuby && word.text.trim() ? emptyBeatCount(editing, word.id) : 0;
+      const count = presentation !== 'edit' && !hasRuby && word.text.trim() ? emptyBeatCount(editing, word.id) : 0;
       const hasDraft = rubyDraft?.wordId === word.id;
       const rubySlot = hasDraft && <div className={styles.syncRubyDraft} style={{ gridColumn: rubyDraft.afterRubyId == null ? 1 : word.rubyUnits.findIndex(r => r.id === rubyDraft.afterRubyId) + 2 }} key={`new-${rubyDraft.serial}`}><InlineDraft label={t('sync.newReading',{text:word.text})} close={closeRubyDraft} commit={reading => {
         if (!reading.trim()) return true;
@@ -90,7 +91,7 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
         onDoubleClick={event => { if (!(event.target as Element).closest('[data-ruby-id],button,input')) { event.stopPropagation(); draft.open(word.id); } }}
         onKeyDown={event => chooseKey(event, () => selectWord(word, event.shiftKey, event.ctrlKey || event.metaKey), word.id)}>
         {hasDraft && rubyDraft.afterRubyId == null && rubySlot}
-        {hasRuby && word.rubyUnits.map((unit, index) => <Fragment key={unit.id}><div className={styles.syncRubyColumn} style={{ gridColumn: index * (karaoke ? 2 : 1) + 1 + Number(hasDraft && (rubyDraft.afterRubyId == null || word.rubyUnits.findIndex(r => r.id === rubyDraft.afterRubyId) < index)), '--beat-space': `${unit.reading.trim() ? emptyBeatCount(editing, unit.id) * 16 : 0}px` } as CSSProperties}>
+        {hasRuby && word.rubyUnits.map((unit, index) => <Fragment key={unit.id}><div className={styles.syncRubyColumn} style={{ gridColumn: index * (karaoke ? 2 : 1) + 1 + Number(hasDraft && (rubyDraft.afterRubyId == null || word.rubyUnits.findIndex(r => r.id === rubyDraft.afterRubyId) < index)), '--beat-space': `${presentation !== 'edit' && unit.reading.trim() ? emptyBeatCount(editing, unit.id) * 16 : 0}px` } as CSSProperties}>
           <div data-ruby-id={unit.id} tabIndex={0} className={styles.syncRuby} data-selected={selected('ruby', unit.id) || undefined} data-drag-placeholder={placeholder('ruby', unit.id) ? '' : undefined}
             onClick={event => { event.stopPropagation(); selectRuby(word, unit.id, event.shiftKey, event.ctrlKey || event.metaKey); }}
             onFocus={event => { if (event.target === event.currentTarget && !event.currentTarget.closest('[data-pointer-focus], [data-selection-focus]')) selectRuby(word, unit.id); }}

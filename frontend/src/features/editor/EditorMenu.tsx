@@ -1,3 +1,4 @@
+import {changeEditorDisplay} from '../../adapters/editor-display';
 import { StudioSettings } from './StudioSettings';
 import { usePreference } from '../../adapters/studio-preferences';
 import type { ReactNode } from 'react';
@@ -43,6 +44,7 @@ export function EditorMenu(props: Props) {
   const [settingsOpen,setSettingsOpen]=useState(false);
   const [theme,setTheme]=usePreference('lazulite-editor-theme','light');
   const dark=theme==='dark';
+  const [display]=usePreference('studio:editor-display','advanced');
   useEffect(()=>{document.documentElement.dataset.theme=theme;},[theme]);
   const content = <header ref={header} className={styles.header}>
     <Link to="/projects" className={styles.brand}>Lazulite Studio</Link>
@@ -53,6 +55,7 @@ export function EditorMenu(props: Props) {
       <IconButton icon="undo" label={t('menu.undo')} data-role="inline" onClick={props.undo} disabled={!props.canUndo}/>
       <IconButton icon="redo" label={t('menu.redo')} data-role="inline" onClick={props.redo} disabled={!props.canRedo}/>
       <TopMenu id="view" title={t('menu.view')} className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
+        {(['simple','advanced'] as const).map(value=><button key={value} data-role="inline" aria-pressed={display===value} onClick={()=>changeEditorDisplay(value)}><Icon name="check"/>{t(`settings.${value}Mode`)}</button>)}
         <button data-role="inline" aria-label={t('menu.outline')} aria-pressed={props.outlineVisible} onClick={props.onToggleOutline}><Icon name="check"/>{t('menu.outline')}</button>
         <button data-role="inline" aria-label={t('menu.inspector')} aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}><Icon name="check"/>{t('menu.inspector')}</button>
         <button data-role="inline" onClick={() => { const next = !dark; setTheme(next?'dark':'light'); document.documentElement.dataset.theme = next ? 'dark' : 'light'; }}>{dark ? t('menu.light') : t('menu.dark')}</button>

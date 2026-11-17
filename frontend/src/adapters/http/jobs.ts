@@ -58,7 +58,7 @@ const isJob = (value: unknown): value is Job =>
   typeof value.status === "string";
 export const jobsApi = {
   retryCpu: (jobId: string, revision: string, key = crypto.randomUUID()) => call<Job>(`/jobs/${encodeURIComponent(jobId)}/retry-cpu`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ revision }) }),
-  createVocal: (projectId: string, asset_id: string, retry_analysis_id?: string, upload?: {upload_id:string;offset_ms:number}) => call<Job>(`/projects/${encodeURIComponent(projectId)}/jobs/vocal`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ params: { asset_id, ...upload, ...(retry_analysis_id ? {retry_analysis_id} : {}) } }) }),
+  createVocal: (projectId: string, asset_id: string, retry_analysis_id?: string, upload?: {upload_id:string;offset_ms:number}, force_separation=false) => call<Job>(`/projects/${encodeURIComponent(projectId)}/jobs/vocal`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ params: { asset_id, ...(force_separation?{force_separation:true}:{}), ...upload, ...(retry_analysis_id ? {retry_analysis_id} : {}) } }) }),
   capabilities: () =>
     call<Capabilities>("/capabilities").then((value) =>
       validate<Capabilities>(value, isCapabilities, "能力"),

@@ -1,3 +1,4 @@
+import {usePreference} from '../../adapters/studio-preferences';
 import { message as describeMessage, errorMessage } from '../../domain/messages';
 import { i18n, formatMessage } from '../../i18n';
 import { useTranslation } from 'react-i18next';
@@ -156,6 +157,8 @@ function EditorWorkspaceContent(props: Props) {
     return props.projectId && !document.lines.some(line => line.words.some(word => word.text.trim())) ? 'acquire' : 'edit';
   });
   useEffect(() => { if (props.projectId) preferences.setItem(`studio:workspace-mode:project:${props.projectId}`, mode); }, [props.projectId, mode]);
+  const [editorDisplay]=usePreference('studio:editor-display','advanced');
+  const compact = mode === 'sync' || mode === 'karaoke' || mode === 'edit' && editorDisplay === 'simple';
   const [karaokeExportOpen,setKaraokeExportOpen]=useState<'nicokara' | 'sug' | null>(null);
   const [karaokeExportSource,setKaraokeExportSource]=useState<'nicokara'|'sug'>('nicokara');
   const [karaokeFocusOutput,setKaraokeFocusOutput]=useState<string>();
@@ -271,10 +274,34 @@ function EditorWorkspaceContent(props: Props) {
       const node = outlineRef.current?.querySelector<HTMLElement>(`[data-line-id="${CSS.escape(lineId)}"] [data-outline-drag]`);
       if (node) { focusObject(node); node.scrollIntoView({ block: 'nearest' }); return; }
     }
-    const lineOnly = (mode === 'sync' || mode === 'karaoke') && (next.kind === 'romanization-content' || next.kind === 'romanization-unit');
+    const lineOnly = compact && (next.kind === 'romanization-content' || next.kind === 'romanization-unit');
     if (lineOnly) setSelection({ kind: 'lines', ids: [lineId], anchorId: lineId, activeId: lineId });
     setLocate({ id: lineId, focus: next.kind === 'lines' || lineOnly ? ':scope' : selectionSelector(next), nearest: true, serial: ++locateSerial.current });
   }, [focusRequest, selection]);
+  useEffect(()=>{
+    const prepare=(event:Event)=>{
+      if(canvasComposing.current||!finishSyncDraft()){event.preventDefault();return;}
+      flushSync(()=>{const active=window.document.activeElement;if(active instanceof HTMLElement && pageRef.current?.contains(active) && !active.closest('[role="dialog"]'))active.blur();});
+      if(editRejected.current||pageRef.current?.querySelector('[aria-invalid="true"]'))event.preventDefault();
+    };
+    window.addEventListener('studio-editor-display-request',prepare);
+    return()=>window.removeEventListener('studio-editor-display-request',prepare);
+  },[finishForAudioImport]);
+  const previousDisplay=useRef(editorDisplay);
+  useLayoutEffect(()=>{
+    if(previousDisplay.current===editorDisplay)return;
+    previousDisplay.current=editorDisplay;
+    if(mode!=='edit')return;
+    const current=selectionRef.current;
+    if(!current)return;
+    const lineId=selectionLineId(current);
+    if(!lineId)return;
+    const hidden=editorDisplay==='simple'&&(current.kind==='romanization-content'||current.kind==='romanization-unit');
+    const next=hidden?{kind:'lines' as const,ids:[lineId],anchorId:lineId,activeId:lineId}:current;
+    if(hidden)setSelection(next);
+    const target=next.kind==='lines'?':scope':selectionSelector(next);
+    setLocate({id:lineId,...(window.document.querySelector('[role="dialog"]')?{selector:target}:{focus:target}),nearest:true,serial:++locateSerial.current});
+  },[editorDisplay,mode]);
   const activeLineId = selection ? selectionLineId(selection) : props.selectedLineId;
   const selectedLine = document.lines.find((line) => line.id === activeLineId);
   // The active canvas selection is the single source of the timing target.
@@ -581,7 +608,7 @@ function EditorWorkspaceContent(props: Props) {
       if (!dispatch({ type: 'insert-word', lineId: line.id, afterWordId, word })) return false;
       setSelection({ kind: 'words', lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id });
       props.onSelectLine?.(line.id); props.onSelectUnit?.(line.id, word.id, null);
-      requestLocate(line.id, `[data-word-id="${word.id}"]${mode === 'sync' ? '' : ' input[data-editor-field="word"]'}`);
+      requestLocate(line.id, `[data-word-id="${word.id}"]${compact ? '' : ' input[data-editor-field="word"]'}`);
       return true;
     }} /></span>;
   const selectionAction = (current: EditorSelection, action: SelectionAction, label: string): ContextAction => {
@@ -604,7 +631,7 @@ function EditorWorkspaceContent(props: Props) {
           const selected = { ...current, ids:[id], activeId:id, anchorId:id, ...(current.kind==='lines'?{}:{lineId}), ...(current.kind==='romanization-content'?{contentId:id}:{}) };
           setSelection(selected);
           const attr=current.kind==='lines'?'data-line-id':current.kind==='words'?'data-word-id':current.kind==='ruby'?'data-ruby-id':current.attachment==='translation'?current.kind==='romanization-content'?'data-translation-id':'data-translation-unit-id':current.kind==='romanization-content'?'data-romanization-content-id':'data-romanization-unit-id';
-          requestLocate(lineId,`[${attr}="${CSS.escape(id)}"]${current.kind==='words'&&mode==='edit'?' input[data-editor-field="word"]':current.kind==='ruby'&&mode==='edit'?' input':''}`);
+          requestLocate(lineId,`[${attr}="${CSS.escape(id)}"]${current.kind==='words'&&!compact?' input[data-editor-field="word"]':current.kind==='ruby'&&!compact?' input':''}`);
         }
       } catch(cause) { setMessage(errorMessage(cause)); }
     } };
@@ -820,7 +847,7 @@ function EditorWorkspaceContent(props: Props) {
     onLostPointerCapture={() => { if (drag.active()) drag.cancel(); }}
     onClickCapture={(event) => { if (drag.suppressClick.current) { drag.suppressClick.current = false; event.preventDefault(); event.stopPropagation(); } }}
     onDoubleClick={event => {
-      if (mode !== 'sync' || isTextInput(event.target)) return;
+      if (!compact || isTextInput(event.target)) return;
       const node = window.document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-ruby-id], [data-word-id]');
       const id = node?.dataset.rubyId ?? node?.dataset.wordId;
       if (id && finishSyncDraft()) setSyncEditingId(id);
@@ -938,7 +965,7 @@ function EditorWorkspaceContent(props: Props) {
     </div></aside>}{columns.outlineVisible && separator('outline')}
       <main ref={mainRef} tabIndex={-1} className={styles.canvas} onFocusCapture={() => { selectionArea.current = 'canvas'; }}>
         <LyricList lineVersion={line => JSON.stringify([
-          mode, mode==='karaoke' ? [props.project?.karaoke,selectedCue] : null, ordinalById.get(line.backgroundOf ?? line.id), props.playheadLineId === line.id,
+          mode, editorDisplay, mode==='karaoke' ? [props.project?.karaoke,selectedCue] : null, ordinalById.get(line.backgroundOf ?? line.id), props.playheadLineId === line.id,
           selection?.kind, selectedTargets.filter(target => target.lineId === line.id).map(targetId),
           selection?.kind === 'romanization-content' && selection.lineId === line.id ? selection.ids : null,
           selection?.kind === 'romanization-unit' && selection.attachment && selection.lineId === line.id ? selection.ids : null,
@@ -949,13 +976,13 @@ function EditorWorkspaceContent(props: Props) {
           syncCursor?.lineId === line.id ? [syncCursor, syncProgress] : null,
           editing.ignoredSyncLineIds.includes(line.id), line.words.map(word => [editing.emptyBeats[word.id], word.rubyUnits.map(unit => editing.emptyBeats[unit.id])]),
           drag.placeholders?.ids ? [...drag.placeholders.ids] : null,
-        ])} pinnedLineIds={document.lines.filter(line => line.id === wordDraft?.lineId || line.words.some(word => word.id === syncEditingId || word.id === rubyShortcut?.wordId || word.rubyUnits.some(unit => unit.id === syncEditingId))).map(line => line.id)} key={mode} memory={listMemory.current[mode]} lines={displayed.lines} locate={locate} append={() => {
+        ])} pinnedLineIds={document.lines.filter(line => line.id === wordDraft?.lineId || line.words.some(word => word.id === syncEditingId || word.id === rubyShortcut?.wordId || word.rubyUnits.some(unit => unit.id === syncEditingId))).map(line => line.id)} key={`${mode}:${mode==='edit'?editorDisplay:''}`} memory={listMemory.current[mode]} lines={displayed.lines} locate={locate} append={() => {
           const line = createLine('');
           if (dispatch({ type: 'insert-line', afterLineId: mainLines.at(-1)?.id ?? null, line })) {
             setSelection({ kind: 'lines', ids: [line.id], anchorId: line.id, activeId: line.id });
             props.onSelectLine?.(line.id); requestLocate(line.id);
           }
-        }} renderLine={(line) => mode === 'sync' || mode === 'karaoke' ? <SyncLine karaoke={mode==='karaoke'&&props.project ? {
+        }} renderLine={(line) => compact ? <SyncLine presentation={mode==='edit'?'edit':mode==='karaoke'?'karaoke':'sync'} karaoke={mode==='karaoke'&&props.project ? {
           add:<button data-role="inline" aria-label={t('editor.addCountIn')} onClick={()=>insertKaraoke({kind:'insert',anchor:{kind:'before',lineId:line.id}})}>＋</button>,
           before:<CueSlot project={props.project} anchor={{kind:'before',lineId:line.id}} apply={applyKaraokeCommand}/>,
           gap:(leftId,rightId,wordId)=><CueSlot project={props.project!} anchor={wordId?{kind:'ruby',lineId:line.id,wordId,leftId,rightId}:{kind:'word',lineId:line.id,leftId,rightId}} apply={applyKaraokeCommand}/>

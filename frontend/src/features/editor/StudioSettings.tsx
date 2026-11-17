@@ -1,3 +1,5 @@
+import {changeEditorDisplay, type EditorDisplay} from '../../adapters/editor-display';
+import {VocalModels} from '../VocalModels';
 import {useTimelineSwapWheel, useTimelineVisibility, useStagingIgnoredCharacters, timelineLayers, type TimelineLayer} from '../../adapters/timeline-preferences';
 import {SettingField, SettingToggle} from '../../shared/SettingsFields';
 import fields from '../../shared/settings-fields.module.css';
@@ -29,6 +31,7 @@ export function StudioSettings({close, amll, locked=false, initial='appearance'}
   const [ignoredDraft,setIgnoredDraft]=useState(ignored);
   useEffect(()=>setIgnoredDraft(ignored),[ignored]);
   const [page,setPage]=useState(initial);
+  const [display]=usePreference('studio:editor-display','advanced');
   const [theme,setTheme]=usePreference('lazulite-editor-theme','light');
   const [columns,setColumns]=usePreference(COLUMN_STORAGE,JSON.stringify(COLUMN_DEFAULTS));
   const columnValues={...readColumnPreferences(),...JSON.parse(columns)};
@@ -52,12 +55,13 @@ export function StudioSettings({close, amll, locked=false, initial='appearance'}
     </nav>
     <div className={styles.content}>{saveError&&<p role="alert" className={fields.error}>{saveError}</p>}<h2>{title}</h2>
       {page==='appearance'&&<><LanguageSelector/><SettingField label={t('settings.theme')}><Select aria-label={t('settings.theme')} value={theme} onChange={e=>setTheme(e.target.value)}><option value="light">{t('menu.light')}</option><option value="dark">{t('menu.dark')}</option></Select></SettingField>
+        <SettingField label={t('settings.editorDisplay')}><Select aria-label={t('settings.editorDisplay')} value={display} onChange={e=>changeEditorDisplay(e.target.value as EditorDisplay)}><option value="simple">{t('settings.simpleMode')}</option><option value="advanced">{t('settings.advancedMode')}</option></Select></SettingField>
         {(['outlineVisible','inspectorVisible'] as const).map(key=><SettingToggle key={key} label={t(key==='outlineVisible'?'menu.outline':'menu.inspector')} checked={columnValues[key]} onChange={value=>setColumns(JSON.stringify({...columnValues,[key]:value}))}/>)}
         <SettingField label={t('settings.resetWidths')}><IconButton icon="refresh" data-role="secondary" label={t('settings.resetWidths')} onClick={()=>setColumns(JSON.stringify({...columnValues,outlineWidth:COLUMN_DEFAULTS.outlineWidth,inspectorWidth:COLUMN_DEFAULTS.inspectorWidth}))}/></SettingField></>}
       {page==='editing'&&<><SettingToggle label={t('settings.backgroundSkipAlignment')} checked={skipAlignment} onChange={setSkipAlignment}/><SettingToggle label={t('settings.backgroundSkipSync')} checked={skipSync} onChange={setSkipSync}/></>}
       {page==='reading'&&<><DictionaryManager embedded close={close}/><h3>{t('settings.latinization')}</h3><SettingToggle label={t('settings.convertParticles')} description={t('settings.particleHelp')} checked={particles} onChange={setParticles}/>
         <SettingField label={t('settings.defaultHighlight')} error={error}><input value={draft} onChange={e=>setDraft(e.target.value)} onBlur={()=>{try{const value=normalizeKanaHighlight(draft);setHighlight(value);setDraft(value);setError('');}catch(cause){setError(formatMessage(errorMessage(cause)));}}}/></SettingField></>}
-      {page==='models'&&<><AlignmentModelsDialog embedded close={close}/><AlignmentDefaults/><h3>{t('menu.devices')}</h3><DeviceSettings embedded/></>}
+      {page==='models'&&<><AlignmentModelsDialog embedded close={close}/><AlignmentDefaults/><VocalModels/><h3>{t('menu.devices')}</h3><DeviceSettings embedded/></>}
       {page==='timeline'&&<><SettingToggle label={t('settings.swapWheel')} description={t('settings.swapWheelHelp')} checked={swapWheel} onChange={setSwapWheel}/><SettingField label={t('settings.stagingIgnored')}><input aria-label={t('settings.stagingIgnored')} name="staging-ignored-characters" autoComplete="off" spellCheck={false} value={ignoredDraft} onChange={e=>setIgnoredDraft(e.target.value)} onBlur={()=>setIgnored(ignoredDraft)} onKeyDown={e=>{if(e.key==='Enter'){setIgnored(ignoredDraft);e.currentTarget.blur();}if(e.key==='Escape'&&ignoredDraft!==ignored){setIgnoredDraft(ignored);e.stopPropagation();}}}/></SettingField><h3>{t('media.layers')}</h3>{(Object.keys(timelineLayers) as TimelineLayer[]).map(key=><SettingToggle key={key} label={t(timelineLayers[key])} checked={layers[key]} onChange={value=>setLayer(key,value)}/>)}</>}
       {page==='shortcuts'&&<ShortcutDialog embedded close={close}/>}
       {page==='preview'&&<>{[[translation,setTranslation,'capability.translation'],[romanization,setRomanization,'capability.romanization'],[hide,setHide,'preview.hidePlayed']].map(([value,set,label])=><SettingToggle key={String(label)} label={t(String(label))} checked={Boolean(value)} onChange={set as (value:boolean)=>void}/>)}<SettingField label={t('preview.gradient')}><input type="range" min="0.05" max="1.5" step="0.05" value={fade} onChange={e=>setFade(Number(e.target.value))}/></SettingField></>}

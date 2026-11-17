@@ -11611,5 +11611,47 @@
     "context": "Failure before uploaded audio was registered; do not start separation on retry",
     "params": [],
     "parameterNotes": {}
+  },
+  "settings.editorDisplay": {
+    "context": "Editor display preference",
+    "source": "编辑显示模式",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.simpleMode": {
+    "context": "Editor display preference",
+    "source": "简洁模式",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.advancedMode": {
+    "context": "Editor display preference",
+    "source": "高级模式",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.models": {
+    "context": "Vocal separation model selection and explicit recomputation",
+    "source": "人声分离模型",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.lead": {
+    "context": "Vocal separation model selection and explicit recomputation",
+    "source": "主唱",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.vocals": {
+    "context": "Vocal separation model selection and explicit recomputation",
+    "source": "人声",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.reseparate": {
+    "context": "Vocal separation model selection and explicit recomputation",
+    "source": "重新分离",
+    "params": [],
+    "parameterNotes": {}
   }
 }

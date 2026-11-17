@@ -934,6 +934,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/vocal-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scan vocal model directories without loading weights */
+        get: {
+            parameters: {
+                query?: {
+                    refresh?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Directory source and structural status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vocal-models/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a portable vocal model directory */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        path: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Directory source and structural status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1304,7 +1388,7 @@ export interface components {
             diagnostics?: string[];
             audio_id: string;
             /** @enum {string} */
-            audio_state: "current" | "outdated" | "missing";
+            audio_state: "current" | "missing";
             /** @description AAC product metadata; frames and valid_frames exclude decoder tail padding. */
             valid_frames?: number;
             /** @description AAC product metadata; frames and valid_frames exclude decoder tail padding. */

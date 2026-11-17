@@ -1754,5 +1754,12 @@
   "vocal.calculateOffset": "自動計算偏移",
   "vocal.calculatingOffset": "正在計算偏移…",
   "vocal.offsetUncertain": "無法確定統一偏移，請手動調整",
-  "vocal.uploadAgain": "上傳人聲處理未完成，請重新選擇人聲檔案。"
+  "vocal.uploadAgain": "上傳人聲處理未完成，請重新選擇人聲檔案。",
+  "settings.editorDisplay": "編輯顯示模式",
+  "settings.simpleMode": "簡潔模式",
+  "settings.advancedMode": "進階模式",
+  "vocal.models": "人聲分離模型",
+  "vocal.lead": "主唱",
+  "vocal.vocals": "人聲",
+  "vocal.reseparate": "重新分離"
 }

@@ -2264,6 +2264,74 @@
           }
         }
       }
+    },
+    "/vocal-models": {
+      "get": {
+        "summary": "Scan vocal model directories without loading weights",
+        "responses": {
+          "200": {
+            "description": "Directory source and structural status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ]
+      }
+    },
+    "/vocal-models/directory": {
+      "post": {
+        "summary": "Apply a portable vocal model directory",
+        "responses": {
+          "200": {
+            "description": "Directory source and structural status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "path"
+                ],
+                "properties": {
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3728,7 +3796,6 @@
             "type": "string",
             "enum": [
               "current",
-              "outdated",
               "missing"
             ]
           },

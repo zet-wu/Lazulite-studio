@@ -3,3 +3,7 @@
 .directoryRow { display:flex; align-items:center; gap:8px; }
 .directoryActions { display:flex; flex-wrap:wrap; gap:8px; }
 .modelError { display:block; margin-top:4px; color:var(--danger); }
+
+.vocalChoice { text-align: start; white-space: normal; }
+.vocalChoice[data-role][aria-checked="true"] { background: var(--blue-soft); color: var(--ink); border-color: var(--blue); }
+.vocalChoice strong { display: flex; align-items: center; justify-content: space-between; }

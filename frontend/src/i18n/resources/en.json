@@ -1767,5 +1767,12 @@
   "vocal.calculateOffset": "Calculate offset",
   "vocal.calculatingOffset": "Calculating offset…",
   "vocal.offsetUncertain": "Unable to determine a uniform offset. Adjust it manually.",
-  "vocal.uploadAgain": "Vocal upload processing did not finish. Select the vocal file again."
+  "vocal.uploadAgain": "Vocal upload processing did not finish. Select the vocal file again.",
+  "settings.editorDisplay": "Editor display mode",
+  "settings.simpleMode": "Simple mode",
+  "settings.advancedMode": "Advanced mode",
+  "vocal.models": "Vocal separation model",
+  "vocal.lead": "Lead vocals",
+  "vocal.vocals": "Vocals",
+  "vocal.reseparate": "Separate again"
 }

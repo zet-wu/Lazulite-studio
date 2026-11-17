@@ -9,17 +9,24 @@ const error = (status: number, code: string, message: string, retryable = false)
 let currentDocument: typeof document = JSON.parse(sessionStorage.getItem('studio-mock-document') ?? 'null') ?? document;
 let searchConditions={title:'',artist:'',album:''};
 
-const mockPreferences = {version:1,revision:0,library_id:'00000000000000000000000000000001',values:{} as Record<string,string>};
+const mockPreferences = {version:1,revision:0,library_id:'00000000000000000000000000000001',values:JSON.parse(sessionStorage.getItem('studio-mock-preferences')??'{}') as Record<string,string>};
 export const handlers = [
+  http.get(`${root}/vocal-models`,()=>response({directory:'/portable/vocal-models',editable:true,source:'portable',error:null,items:[
+    {id:'demucs',type:'demucs',name:'Demucs',status:'ready'},
+    {id:'bs-karaoke',type:'bs-karaoke',name:'BS Karaoke',status:scenario()==='missing-vocal-model'?'invalid':'ready',reason:'Missing weights'},
+  ]})),
+  http.get(`${root}/alignment-models`,()=>response({directory:'/portable/models',editable:true,source:'portable',error:null,items:[]})),
   // Synthetic demo analysis; linguistic behavior is exercised against the real service.
   http.post(`${root}/reading/particles`, () => response({ranges:[]})),
 
   http.get(`${root}/runtime`,()=>response({library_id:mockPreferences.library_id})),
   http.get(`${root}/settings`,()=>HttpResponse.json(mockPreferences,{headers:{ETag:`"${mockPreferences.revision}"`}})),
   http.patch(`${root}/settings`,async({request})=>{
+    if(scenario()==='preference-failure')return error(500,'write_failed','Preference write failed');
     if(request.headers.get('if-match')!==`"${mockPreferences.revision}"`)return error(409,'settings_conflict','偏好发生冲突');
     const body=await request.json() as {changes:Record<string,string|null>};
     for(const [key,value] of Object.entries(body.changes)){if(value===null)delete mockPreferences.values[key];else mockPreferences.values[key]=value;}
+    sessionStorage.setItem('studio-mock-preferences',JSON.stringify(mockPreferences.values));
     mockPreferences.revision++;return response(mockPreferences);
   }),
   http.post(`${root}/jobs/:jid/retry-cpu`,()=>error(409,'retry_unavailable','演示任务不执行模型重试')),

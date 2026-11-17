@@ -417,3 +417,9 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .segmentBoundary button[aria-pressed="true"] { color: var(--blue); border-color: var(--blue); }
 
 .segmentSource:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* Compact editing has ruby and body rows, with no timing-marker slot. */
+.syncLine[data-presentation="edit"] .syncWord { grid-template-rows: minmax(24px, auto) minmax(34px, auto); }
+.syncLine[data-presentation="edit"] .syncRubyColumn { grid-row: 1 / 3; }
+.syncLine[data-presentation="edit"] .syncAddWord { grid-template-rows: 24px 34px; }
+.syncLine[data-presentation="edit"] .syncWords { min-height: 58px; }
