@@ -94,10 +94,19 @@ class JobService:
             if kind in {'vocal', 'alignment'}:
                 active = c.execute("SELECT id,kind FROM jobs WHERE project_id=? AND kind IN ('vocal','alignment') AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone()
                 if active and (kind != 'vocal' or active['kind'] != 'vocal'): raise ValueError('已有音频处理运行，请等待完成或取消')
-                if active: return self.get(active[0])
+                if active:
+                    if request.get('upload_id'): raise ValueError('已有音频处理运行，请等待完成或取消')
+                    return self.get(active[0])
             if kind == 'publish' and c.execute("SELECT 1 FROM jobs WHERE project_id=? AND kind='publish' AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone():
                 raise ValueError('此项目已有活动打包任务，请等待完成或取消')
             jid=uuid.uuid4().hex; t=now()
+            if request.get('_upload_path'):
+                import shutil
+                pinned = self.vocal_runner.root / project_id / 'vocals' / jid
+                pinned.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(request['_upload_path'], pinned / 'uploaded')
+                request = {**request, '_upload_path': str(pinned / 'uploaded')}
+
             c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",(jid,project_id,kind,"queued",json.dumps(request, ensure_ascii=False),t,t))
 
             if idem_key: c.execute("INSERT INTO job_idempotency VALUES(?,?,?,?)",(project_id,idem_key,digest,jid))
@@ -121,8 +130,8 @@ class JobService:
             request=json.loads(record[4]); kind=record[2]
             if kind in {'vocal', 'alignment'}:
                 self.emit(jid, 'stage', 'preparing')
-                request['devices'] = self.devices.snapshot(kind, cpu_retry=request.get('cpu_retry', False))
-                if kind == 'vocal': request['device'] = request['devices']['vocal']['actual']
+                request['devices'] = {} if request.get('upload_id') or request.get('retry_analysis_id') else self.devices.snapshot(kind, cpu_retry=request.get('cpu_retry', False))
+                if kind == 'vocal' and request['devices']: request['device'] = request['devices']['vocal']['actual']
                 with self.db.transaction() as c:
                     c.execute('UPDATE jobs SET request_json=? WHERE id=?', (json.dumps(request), jid))
                 for snapshot in request['devices'].values():
@@ -176,7 +185,7 @@ class JobService:
         except (EngineUnavailable, ReadingUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
         except Exception as exc:
             logger.warning("job %s failed (%s)", jid, type(exc).__name__)
-            self._finish_error(jid, "engine_error", str(exc) if kind == "alignment" else "Lazulite engine failed; inspect server logs")
+            self._finish_error(jid, "engine_error", str(exc) if kind == "alignment" or kind == "vocal" and isinstance(exc, ValueError) else "Lazulite engine failed; inspect server logs")
 
         finally:
             if record and record[2] in {'vocal','alignment'}:
@@ -214,7 +223,9 @@ class JobService:
             elif row[0]=="running": status="cancel_requested"
             else: return self.get(jid)
             t=now(); c.execute("UPDATE jobs SET status=?,cancel_requested=1,updated_at=?,finished_at=? WHERE id=?",(status,t,t if status=="cancelled" else None,jid))
-        if status == "cancelled": self.revisions.collect(row[1])
+        if status == "cancelled":
+            if self.vocal_runner: self.vocal_runner.clean_unregistered(row[1], jid)
+            self.revisions.collect(row[1])
         return self.get(jid)
 
     def get(self,jid):

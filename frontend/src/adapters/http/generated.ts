@@ -887,6 +887,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{pid}/vocal-offset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Estimate a uniform uploaded vocal offset */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    pid: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        asset_id: string;
+                        upload_id: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description An offset in ms, or null if not reliable */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            offset_ms: number | null;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1273,6 +1320,10 @@ export interface components {
             codec?: string;
             container?: string;
             time_origin?: string;
+            /** @enum {string} */
+            source_kind?: "demucs" | "upload";
+            original_filename?: string;
+            offset_ms?: number;
         };
         VocalResults: {
             items: components["schemas"]["VocalResult"][];

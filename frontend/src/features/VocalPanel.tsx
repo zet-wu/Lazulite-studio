@@ -1,3 +1,4 @@
+import {VocalUpload} from './VocalUpload';
 import { message as describeMessage, messageList, MessageError, errorMessage, type Message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { deviceSummary, taskError } from './task-messages';
@@ -82,14 +83,14 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   useEffect(()=>{
     if(pending && latest?.status==='succeeded' && result?.status==='ready' && !conflict && !handled.current.has(pending.id) && !error) adopt();
   },[pending,latest?.status,result,conflict,error]);
-  const run = async (reuse?: string) => {
-    if(locked)return;
-    if (!sourceAssetId || submitting.current || active) return;
+  const run = async (reuse?: string, upload?: {upload_id:string;offset_ms:number}) => {
+    if(locked)return false;
+    if (!sourceAssetId || submitting.current || active) return false;
     submitting.current=true;cancelRequested.current=false;setCancelling(false);
     const baseline=JSON.stringify(project.acoustics);
     setBusy(true); setError(''); publish(null); setDismissed(null);
-    try { const job=await jobsApi.createVocal(projectId, sourceAssetId, reuse); setPending({id:job.id,baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); }
-    catch(e) { setError(errorMessage(e)); }
+    try { const job=await jobsApi.createVocal(projectId, sourceAssetId, reuse, upload); setPending({id:job.id,baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); return true; }
+    catch(e) { if(upload)throw e; setError(errorMessage(e)); return false; }
     finally { submitting.current=false; setBusy(false); }
   };
   const retryCpu = async () => {
@@ -101,7 +102,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     catch(e) { setError(errorMessage(e)); }
     finally { submitting.current=false; setBusy(false); }
   };
-  const retry=()=>void run(result?.id ?? latest?.request?.retry_analysis_id);
+  const retry=()=>{if(latest?.request?.upload_id&&!result){setError(describeMessage('vocal.uploadAgain'));return;}void run(result?.id ?? latest?.request?.retry_analysis_id);};
   const download=(id:string)=>`/api/v1/projects/${encodeURIComponent(projectId)}/vocals/${encodeURIComponent(id)}/file`;
   const cancel = async () => {
     if(cancelling)return;
@@ -114,6 +115,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const deviceText=deviceSummary(task?.request?.devices);
   const status = { queued: t('task.queued'), running: t('task.processing'), cancel_requested: t('task.waitingCancel'), cancelled: t('task.cancelled'), failed: t('task.failed'), interrupted: t('task.interrupted'), succeeded: t('task.applying') };
   return <>
+    {visible && ui.uploadHost && createPortal(<VocalUpload key={sourceAssetId} projectId={projectId} sourceAssetId={sourceAssetId} durationMs={durationMs} available={sourceResults.some(r=>r.audio_state!=='missing')} disabled={!!locked||busy||!!hasActive} submit={(upload_id,offset_ms)=>run(undefined,{upload_id,offset_ms})}/>,ui.uploadHost)}
     {visible && ui.analysisHost && createPortal(<>
       {ready ? <TopMenu id="audio-analysis" title={t('vocal.analysis')} className={editorStyles.ribbonMenu} activeMenuId={menu} onMenuChange={setMenu}>
         {(!currentAudio || repair || update) && <button data-role="inline" disabled={locked||busy||!!active} title={t('vocal.replaceHelp')} onClick={()=>void run()}>{repair?t('vocal.regenerate'):update?t('vocal.updateSeparation'):t('vocal.separate')}</button>}

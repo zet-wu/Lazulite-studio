@@ -65,12 +65,12 @@ class VocalRunner:
             row, candidate = self.get(project_id, params['retry_analysis_id'])
             if row['source_asset_id'] != params['asset_id']: raise ValueError('人声来源不匹配')
             if self.audio_available(project_id, candidate): reuse = (row, candidate)
-        else:
+        elif not params.get('upload_id'):
             with self.db.connect() as c:
                 rows = c.execute('SELECT * FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id, params['asset_id'])).fetchall()
             for row in rows:
                 candidate = json.loads(row['metadata_json'])
-                if candidate['generation_settings'] == settings and self.audio_available(project_id, candidate):
+                if candidate.get('source_kind') != 'upload' and candidate['generation_settings'] == settings and self.audio_available(project_id, candidate):
                     reuse = (row, candidate)
                     break
         if reuse:
@@ -86,18 +86,28 @@ class VocalRunner:
             with self.db.transaction() as c:
                 c.execute('INSERT INTO vocal_results VALUES(?,?,?,?,?,?)', (result_id, project_id, params['asset_id'], 'separated', self.db.paths.store(directory), json.dumps(metadata)))
         else:
-            emit('stage', 'separating')
-            try:
-                from lazulite.audio.separation import DemucsSeparator, DemucsConfig
-                separator = self.separator_factory() if self.separator_factory else DemucsSeparator(DemucsConfig(model_name=params['model_name'], device=params['device'], model_repo=os.getenv('STUDIO_DEMUCS_REPO')))
-                audio = decode_audio(asset_path, sample_rate=44100, channels=2)
-                vocals = separator.separate(audio)
-                description = {'model': params['model_name'], 'config': {k:v for k,v in asdict(separator.config).items() if k != 'model_repo'}}
-            except (ImportError, OSError, RuntimeError) as exc:
-                if device_failure(exc, params['device']): raise DeviceFailure('vocal', params['device']) from exc
-                raise EngineUnavailable('人声模型加载或计算失败，请检查包内模型、依赖及输入音频') from exc
-            finally:
-                if 'separator' in locals(): separator.close()
+            if params.get('upload_id'):
+                from .vocal_offset import shift_samples, decode_stereo
+                emit('stage', 'preparing')
+                upload = decode_stereo(params['_upload_path'], trim_padding=True)
+                source = decode_stereo(asset_path)
+                vocals = AudioBuffer(shift_samples(upload, source.shape[1], 48000, params['offset_ms']), 48000, params['asset_id'])
+                description = {'model': 'uploaded', 'config': {}}
+                audio = source
+                del upload, source
+            else:
+                emit('stage', 'separating')
+                try:
+                    from lazulite.audio.separation import DemucsSeparator, DemucsConfig
+                    separator = self.separator_factory() if self.separator_factory else DemucsSeparator(DemucsConfig(model_name=params['model_name'], device=params['device'], model_repo=os.getenv('STUDIO_DEMUCS_REPO')))
+                    audio = decode_audio(asset_path, sample_rate=44100, channels=2)
+                    vocals = separator.separate(audio)
+                    description = {'model': params['model_name'], 'config': {k:v for k,v in asdict(separator.config).items() if k != 'model_repo'}}
+                except (ImportError, OSError, RuntimeError) as exc:
+                    if device_failure(exc, params['device']): raise DeviceFailure('vocal', params['device']) from exc
+                    raise EngineUnavailable('人声模型加载或计算失败，请检查包内模型、依赖及输入音频') from exc
+                finally:
+                    if 'separator' in locals(): separator.close()
             if not np.isfinite(vocals.samples).all(): raise ValueError('分离人声包含非有限样本')
             peak = float(np.max(np.abs(vocals.samples), initial=0))
             gain = min(1.0, (1 - 2 ** -15) / peak) if peak else 1.0
@@ -108,6 +118,10 @@ class VocalRunner:
                         'duration_ms': milliseconds(vocals.duration), 'format': FORMAT,
                         'analysis_version': 'lazulite-vocal-core-v2-main-rms', 'runtime': {'numpy': np.__version__, 'soundfile': sf.__version__}}
             metadata.update(encoded, audio_result_id=result_id, generation_settings=settings)
+            if params.get('upload_id'):
+                metadata.update(source_kind='upload', original_filename=params['upload_name'], offset_ms=params['offset_ms'])
+                Path(params['_upload_path']).unlink(missing_ok=True)
+            else: metadata['source_kind'] = 'demucs'
             del audio, vocals
             decoded = media.playback_proxy(asset(vocal_path, metadata))
             metadata['decoded_frames'] = decoded.decoded_frames

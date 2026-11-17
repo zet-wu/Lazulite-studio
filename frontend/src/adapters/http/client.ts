@@ -288,6 +288,7 @@ export const studioS4 = {
 
 export type VocalResult = components['schemas']['VocalResult'];
 export const vocalApi = {
+  offset: (pid:string, asset_id:string, upload_id:string, signal?:AbortSignal) => s4<{offset_ms:number|null}>(`/projects/${encodeURIComponent(pid)}/vocal-offset`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({asset_id,upload_id}),signal}),
   jobResult: (id: string) => s4<{kind: 'vocal'; analysis_id: string}>(`/jobs/${encodeURIComponent(id)}/result`),
   list: (pid: string) => s4<components['schemas']['VocalResults']>(`/projects/${encodeURIComponent(pid)}/vocals`),
   energy: (pid: string, rid: string, start: number, end: number, signal?: AbortSignal) => s4<components['schemas']['VocalEnergyWindow']>(`/projects/${encodeURIComponent(pid)}/vocals/${encodeURIComponent(rid)}/energy?start_ms=${start}&end_ms=${end}&buckets=1000`, { signal }),

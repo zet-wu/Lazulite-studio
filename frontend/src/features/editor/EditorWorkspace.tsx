@@ -891,6 +891,7 @@ function EditorWorkspaceContent(props: Props) {
       <div className={vocalStyles.analysisTools} ref={audioReview.setAnalysisHost}/>
       {!props.sourceAssetId && <button data-role="primary" disabled>{t('vocal.separate')}</button>}
       {props.onImportAudio && <button data-role="secondary" disabled={props.audioImportDisabled || props.alignment?.locked || props.saving} onClick={() => { if (finishForAudioImport()) props.onImportAudio?.(); }}>{t(props.sourceAssetId ? 'music.replace' : 'menu.importAudio')}</button>}
+      <span ref={audioReview.setUploadHost}/>
       <div className={vocalStyles.alignmentTools} ref={audioReview.setAlignmentHost}/>
     </div>}
     {props.projectId && props.project && props.alignment && <AlignmentPanel pid={props.projectId} project={props.project} control={props.alignment} assetId={props.sourceAssetId} durationMs={props.audioDurationMs??null} visible={mode==='audio'} finishDraft={()=>{

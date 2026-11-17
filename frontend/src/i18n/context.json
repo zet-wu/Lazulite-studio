@@ -6811,7 +6811,7 @@
   },
   "sync.excluded": {
     "context": "sync interface: sync.excluded",
-    "source": "当前选择不参与打轴",
+    "source": "当前选择没有可打轴单元",
     "params": [],
     "parameterNotes": {}
   },
@@ -9155,7 +9155,7 @@
   },
   "editing.skipTimingInvalid": {
     "context": "editing interface: editing.skipTimingInvalid",
-    "source": "忽略打轴的行无效",
+    "source": "跳过连续打轴的行无效",
     "params": [],
     "parameterNotes": {}
   },
@@ -11546,6 +11546,69 @@
   "settings.backgroundSkipSync": {
     "context": "Editing defaults and continuous timing participation; manual timing remains available",
     "source": "背景行默认跳过连续打轴",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.upload": {
+    "context": "Uploaded vocal uniform offset dialog",
+    "source": "上传人声",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.replaceUpload": {
+    "context": "Uploaded vocal uniform offset dialog",
+    "source": "替换人声",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.offsetTitle": {
+    "context": "Uploaded vocal uniform offset dialog",
+    "source": "人声偏移",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.durations": {
+    "context": "Uploaded vocal uniform offset dialog",
+    "source": "源音频 {{source}} s · 上传人声 {{uploaded}} s",
+    "params": [
+      "source",
+      "uploaded"
+    ],
+    "parameterNotes": {}
+  },
+  "vocal.offsetMs": {
+    "context": "Uploaded vocal uniform offset dialog",
+    "source": "偏移（ms）",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.offsetHelp": {
+    "context": "Uploaded vocal uniform offset dialog",
+    "source": "正值延后，负值提前",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.calculateOffset": {
+    "context": "Uploaded vocal uniform offset dialog",
+    "source": "自动计算偏移",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.calculatingOffset": {
+    "context": "Uploaded vocal uniform offset dialog",
+    "source": "正在计算偏移…",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.offsetUncertain": {
+    "context": "Uploaded vocal uniform offset dialog",
+    "source": "无法确定统一偏移，请手动调整",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "vocal.uploadAgain": {
+    "source": "上传人声处理未完成，请重新选择人声文件。",
+    "context": "Failure before uploaded audio was registered; do not start separation on retry",
     "params": [],
     "parameterNotes": {}
   }

@@ -3,7 +3,7 @@ import type { Capabilities } from "./client";
 import { requestHeaders, readApiError } from "./client";
 import { isCapabilities } from "./validate";
 
-export type JobRequest = {retry_analysis_id?:string; revision?:string; bound_revision?:string; devices?: Record<string, { preferred: string; actual: string; label: string; reason?: string | null; reason_code?: string | null }>; asset_id:string};
+export type JobRequest = {upload_id?:string;retry_analysis_id?:string; revision?:string; bound_revision?:string; devices?: Record<string, { preferred: string; actual: string; label: string; reason?: string | null; reason_code?: string | null }>; asset_id:string};
 export type JobStatus =
   | "queued"
   | "running"
@@ -58,7 +58,7 @@ const isJob = (value: unknown): value is Job =>
   typeof value.status === "string";
 export const jobsApi = {
   retryCpu: (jobId: string, revision: string, key = crypto.randomUUID()) => call<Job>(`/jobs/${encodeURIComponent(jobId)}/retry-cpu`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ revision }) }),
-  createVocal: (projectId: string, asset_id: string, retry_analysis_id?: string) => call<Job>(`/projects/${encodeURIComponent(projectId)}/jobs/vocal`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ params: { asset_id, ...(retry_analysis_id ? {retry_analysis_id} : {}) } }) }),
+  createVocal: (projectId: string, asset_id: string, retry_analysis_id?: string, upload?: {upload_id:string;offset_ms:number}) => call<Job>(`/projects/${encodeURIComponent(projectId)}/jobs/vocal`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ params: { asset_id, ...upload, ...(retry_analysis_id ? {retry_analysis_id} : {}) } }) }),
   capabilities: () =>
     call<Capabilities>("/capabilities").then((value) =>
       validate<Capabilities>(value, isCapabilities, "能力"),

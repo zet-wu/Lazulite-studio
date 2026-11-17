@@ -2204,6 +2204,66 @@
           }
         }
       }
+    },
+    "/projects/{pid}/vocal-offset": {
+      "post": {
+        "summary": "Estimate a uniform uploaded vocal offset",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "asset_id",
+                  "upload_id"
+                ],
+                "properties": {
+                  "asset_id": {
+                    "type": "string"
+                  },
+                  "upload_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "An offset in ms, or null if not reliable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "offset_ms"
+                  ],
+                  "properties": {
+                    "offset_ms": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3704,6 +3764,19 @@
           },
           "time_origin": {
             "type": "string"
+          },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "demucs",
+              "upload"
+            ]
+          },
+          "original_filename": {
+            "type": "string"
+          },
+          "offset_ms": {
+            "type": "number"
           }
         }
       },

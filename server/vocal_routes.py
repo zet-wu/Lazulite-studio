@@ -21,7 +21,7 @@ def build_vocal_router(runner, *, auth, project_exists):
             owner = metadata['audio_result_id']
             if owner not in availability: availability[owner] = runner.audio_available(pid, metadata)
             available = availability[owner]
-            state = 'missing' if not available else 'current' if metadata['generation_settings'] == settings[asset_id] else 'outdated'
+            state = 'missing' if not available else 'current' if (metadata.get('source_kind') == 'upload' or metadata['generation_settings'] == settings[asset_id]) else 'outdated'
             items.append({**metadata, 'status': row['status'], 'audio_id': metadata['audio_result_id'], 'audio_state': state})
         return {'items': items}
 

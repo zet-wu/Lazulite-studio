@@ -1,5 +1,6 @@
 from .project_resources import stream_memory
 from .project_document import initial_project
+import math
 import hashlib, json, os, secrets, tempfile, uuid, shutil, time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
@@ -228,7 +229,7 @@ def create_app(
         }
 
     def staged_upload(token):
-        if not token or len(token) != 32 or any(ch not in '0123456789abcdef' for ch in token):
+        if not isinstance(token, str) or len(token) != 32 or any(ch not in '0123456789abcdef' for ch in token):
             fail('upload_not_found', '上传已失效，请重新上传', 404)
         directory = uploads / token
         try: metadata = json.loads((directory / 'asset.json').read_text())
@@ -263,13 +264,16 @@ def create_app(
                     out.write(chunk)
                     digest.update(chunk)
             media = MediaService(directory)
-            asset = await run_in_threadpool(media.import_asset, temporary, file.filename, verified_sha256=digest.hexdigest())
+            from .upload_audio import normalize_upload
+            normalized, name = await run_in_threadpool(normalize_upload, temporary, file.filename or 'audio')
+            asset = await run_in_threadpool(media.import_asset, normalized, name, verified_sha256=digest.hexdigest() if normalized == temporary else None)
+            if normalized != temporary: normalized.unlink()
             proxy = await run_in_threadpool(media.playback_proxy, asset)
             if await request.is_disconnected(): fail('upload_cancelled', '上传已取消', 409)
             record = [token, asset.content_hash, asset.size, asset.probe.mime_type, asset.original_name, 1,
                       asset.probe.duration_ms, asset.probe.start_ms, asset.probe.sample_rate, asset.probe.channels,
                       json.dumps({'codec': asset.probe.codec, 'container': asset.probe.container,
-                                  'proxy_offset_ms': proxy.offset_ms, 'proxy_duration_ms': proxy.duration_ms}), stamp()]
+                                  'proxy_offset_ms': proxy.offset_ms, 'proxy_duration_ms': proxy.duration_ms, 'upload_name': file.filename}), stamp()]
             (directory / 'asset.json').write_text(json.dumps(record))
             successful = True
             return asset_dto(record)
@@ -309,6 +313,29 @@ def create_app(
             if journal.exists(): _recover(db, root, journal)
         except OSError: fail('music_cleanup_pending', '旧音频文件尚未释放，请停止播放／下载后重试', 409)
         return {'cleanup_pending': False}
+
+    class VocalOffsetRequest(BaseModel):
+        asset_id: str
+        upload_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+
+    @api.post('/projects/{pid}/vocal-offset')
+    def vocal_offset(pid: str, body: VocalOffsetRequest, _: object = Depends(write)):
+        if project(pid)[2] != body.asset_id: fail('source_changed', '源音频已改变', 409)
+        directory, _ = staged_upload(body.upload_id)
+        from .vocal_offset import decode_reference, estimate_offset
+        reference = decode_reference(asset_path_for_project(pid))
+        uploaded = decode_reference(directory / 'source' / 'original')
+        offset = estimate_offset(reference, uploaded)
+        if offset is None:
+            with db.connect() as c:
+                rows = c.execute('SELECT metadata_json FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (pid, body.asset_id)).fetchall()
+            for row in rows:
+                metadata = json.loads(row[0])
+                if metadata.get('source_kind') != 'upload' and vocal_runner.audio_available(pid, metadata):
+                    offset = estimate_offset(decode_reference(vocal_runner.audio_path(pid, metadata)), uploaded)
+                    break
+        if project(pid)[2] != body.asset_id: fail('source_changed', '源音频已改变', 409)
+        return {'offset_ms': offset}
 
     @api.post("/projects")
     def create_project(
@@ -606,7 +633,15 @@ def create_app(
         if kind == 'vocal':
             row = project(pid)
             if not row[2] or params.get('asset_id') != row[2]: fail('job_input_invalid', '人声任务需要当前项目源音频', 422)
-            if set(params) - {'asset_id', 'retry_analysis_id'}: fail('job_input_invalid', '人声参数由服务配置', 422)
+            if set(params) - {'asset_id', 'retry_analysis_id', 'upload_id', 'offset_ms'}: fail('job_input_invalid', '人声参数由服务配置', 422)
+            if 'offset_ms' in params and 'upload_id' not in params: fail('job_input_invalid', '偏移仅用于上传人声', 422)
+            if 'upload_id' in params:
+                if params.get('retry_analysis_id'): fail('job_input_invalid', '上传与重试不可同时指定', 422)
+                offset = params.get('offset_ms')
+                if isinstance(offset, bool) or not isinstance(offset, (int, float)) or not math.isfinite(offset): fail('job_input_invalid', '偏移必须为有效毫秒数', 422)
+                directory, upload = staged_upload(params['upload_id'])
+                params['_upload_path'] = str(directory / 'source' / 'original')
+                params['upload_name'] = json.loads(upload[10]).get('upload_name', upload[4])
             if params.get('retry_analysis_id'):
                 if not isinstance(params['retry_analysis_id'], str): fail('job_input_invalid', '分析结果标识无效', 422)
                 try: result, _ = vocal_runner.get(pid, params['retry_analysis_id'])
