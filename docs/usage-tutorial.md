@@ -9,6 +9,8 @@ Lazulite Studio 支持从网易、QQ、酷狗、AMLL TTML DB 四个在线源搜�
 
 ### 人声分离和声学分析
 
+Lazulite Studio 默认使用 [Demucs](https://github.com/adefossez/demucs) 人声分离模型，该模型在大部分情况下已可满足对齐所需，但对于背景嘈杂、和声复杂的歌曲（尤其是 Live 版歌曲），或者单纯地想要获得更好的分离效果，可考虑使用 [BS Karaoke](https://huggingface.co/becruily/bs-roformer-karaoke)，该模型能够有效地分离背景人声和和声，但需要的时间显著增加，不建议在 CPU 推理下使用，耗时极长。
+
 人声分离后，通过声学分析算法为歌曲划分为若干人声片段（界面显示为“片段”）。在“音频处理界面”，可以使用“分配”按钮，手动将某一行的时间对齐到某一片段。也可以手动调整每个片段的起止，新增或删除片段，为自动对齐做准备。
 
 ### 自动对齐

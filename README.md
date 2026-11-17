@@ -36,7 +36,7 @@ Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML�
 支持从网易、QQ、酷狗、AMLL TTML DB 四个在线源搜索和获取歌词，并能保留其提供的词级时间和音译/翻译行。
 
 ### 音频处理
-以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) Python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs)）、声学分析分片、人声能量与频谱图、自动对齐等功能。
+以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) Python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs) 或 [BS-RoFormer-karaoke](https://huggingface.co/becruily/bs-roformer-karaoke)）、声学分析分片、人声能量与频谱图、自动对齐等功能。
 
 ### 编辑与打轴
 简洁而功能强大的编辑与打轴界面，提供多种自动化工具，可参阅[下一小节](README.md#自动化工具)的详细说明。打轴界面支持空拍、单行打轴、定位回听等功能。
@@ -64,7 +64,7 @@ Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 
 ### 自动对齐
 Lazulite Studio 提供基于两个 Wav2Vec CTC 对齐模型的自动对齐功能，分别是通用的 [MMS_FA](https://docs.pytorch.org/audio/main/generated/torchaudio.pipelines.MMS_FA.html) 和针对日语歌唱后训练的[NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn)（简称 NextFire-karaoke-ja-Latn）。结合自动注音功能，能够完成从歌词正文到细粒度逐读音时间轴的全自动化流程，与 [MiliKara](https://github.com/BilyHurington/MiliKara)、[Timing](https://github.com/Zennmn/Timing)、[StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame)、[yohane](https://github.com/Japan7/yohane) 和 [FA-Kara](https://github.com/moriwx/FA-Kara) 几个已有的歌曲对齐项目比较，在笔者有限的日语歌曲测试集上，Lazulite Studio 的多项指标均做到最佳，详见下图：
 
-人工读音 + 各自分离器：共同正文边界的误差指标：
+人工读音 + 各自分离器（Lazulite Studio 使用 Demucs）：共同正文边界的误差指标：
 ![人工读音 + 各自分离器：共同正文边界的误差指标](https://raw.githubusercontent.com/zet-wu/lyric-auto-report/refs/heads/main/results/figures/g1-comparison.png)
 
 由于某些工具在对齐时会将某些读音单元合并（如长音、促音等），因此输出的总单元数量，即准确率的分母会不一致。共同正文边界即指将所有路线的结果的单元边界取交集，仅计算这些共同边界的准确率。
@@ -85,7 +85,7 @@ Lazulite Studio 提供基于两个 Wav2Vec CTC 对齐模型的自动对齐功能
 - Windows cuda 版：`LazuliteStudio-windows-x64-cuda.7z`（需要 Nvidia 显卡及驱动）
 - Mac 版：`LazuliteStudio-macos-arm64.7z`
 
-主包包含完整运行时、词典和 Demucs 人声分离模型。对齐模型可通过自动脚本下载：双击包内 `download-models.cmd`（Windows）或 `download-models.command`（macOS），选择 NextFire、MMS_FA 或全部下载。也可手动把 `NextFire-karaoke-ja-Latn.zip`、`MMS_FA.zip` 解压到程序根 `models/`，形成 `models/NextFire-karaoke-ja-Latn/` 和 `models/MMS_FA/`，然后在设置的模型管理中刷新。若配置了自定义总目录，请恢复默认或自行将模型移入该目录。下载脚本会跳过已存在的同名目录。
+主包包含完整运行时、词典和 Demucs 人声分离模型。对齐模型与可选的 BS Karaoke 人声分离模型均通过独立 ZIP 安装。模型可通过自动脚本下载：BS Karaoke 分离模型双击包内 `download-vocal-models.cmd`（Windows）或 `download-vocal-models.command`（macOS），输入 Y 确认开始下载；对齐模型双击包内 `download-align-models.cmd`（Windows）或 `download-align-models.command`（macOS），选择 NextFire、MMS_FA 或全部下载。也可手动把对应 Release 的 `bs-karaoke.zip`，解压到 vocal-models/，保留 ZIP 内的 bs-karaoke/ 目录，形成`vocal-models/bs-karaoke`，对齐模型同理下载 `NextFire-karaoke-ja-Latn.zip`、`MMS_FA.zip` 解压到程序根 `models/`，形成 `models/NextFire-karaoke-ja-Latn/` 和 `models/MMS_FA/`，然后在设置的人声分离/对齐模型管理中刷新。若配置了自定义总目录，请恢复默认或自行将模型移入该目录。下载脚本会跳过已存在的同名目录。
 
 使用支持 7z 的解压工具完整解压后打开其中的文件夹，双击启动入口运行。不要直接在压缩包内运行。
 - Windows 启动入口：`start.exe`。
@@ -225,7 +225,23 @@ Cookie `Secure` 根据实际请求协议设置。HTTPS 在代理终止时，将 
 python -m pip install -r server/requirements-vocal.txt
 ```
 
-需要配置 `STUDIO_VOCAL_MODEL`（默认 `htdemucs`）和 `STUDIO_VOCAL_DEVICE`（默认 `cpu`）环境变量。Demucs 使用 Torch 模型缓存，首次获取权重需要网络；`TORCH_HOME` 可配置缓存目录。
+启动服务前，将 `STUDIO_VOCAL_MODELS_DIR` 设置为本地人声模型总目录的绝对路径，将 `STUDIO_VOCAL_DEVICE` 设置为 `cpu` 或 `cuda`（默认 `cpu`）：
+
+```sh
+export STUDIO_VOCAL_MODELS_DIR=/absolute/path/to/vocal-models
+export STUDIO_VOCAL_DEVICE=cpu
+```
+
+模型按以下直接子目录放置，可按需准备其中一种或两种：
+
+| 子目录 | 必需文件 |
+| --- | --- |
+| `demucs/` | `htdemucs.yaml` 及其引用的 `.th` 权重 |
+| `bs-karaoke/` | `bs_roformer_karaoke_frazer_becruily.ckpt` 和 `config_karaoke_frazer_becruily.yaml` |
+
+在设置“模型与计算”的“人声分离模型管理”中刷新并选择可用模型，初始默认 Demucs。BS Karaoke 提取主唱，支持 CPU 和 NVIDIA GPU；macOS 使用 CPU。开发／独立部署的人声模型总目录由环境变量管理，便携包则默认使用包内 `vocal-models/`，并可在设置中修改目录。
+
+仅配置 Demucs 时，也可通过 `STUDIO_DEMUCS_REPO` 直接指定包含配置和权重的目录；设置了 `STUDIO_VOCAL_MODELS_DIR` 后，以总目录下的 `demucs/` 为准。
 
 自动对齐：
 
@@ -235,4 +251,6 @@ python -m pip install -r server/requirements-alignment.txt
 
 该文件包含人声依赖并引用 `constraints-alignment.txt` 的 Linux CUDA 设备栈约束。Windows/macOS 的 Torch／torchaudio 安装需选用相容的平台构建。
 
-准备本地 C2C 对齐模型目录，包含 `config.json`、`processor_config.json`、`vocab.json`、`model.safetensors` 等模型资源，然后将模型放在总目录的直接子目录，并设置 `STUDIO_ALIGNMENT_MODELS_DIR` 为总目录绝对路径。环境变量 `STUDIO_ALIGNMENT_DEVICE` 使用 `cpu` 或 `cuda`，默认 `cpu`；自动对齐首次准备人声使用 `htdemucs` 和 `STUDIO_VOCAL_DEVICE`。设置页显示当前能力和缺失原因。
+准备本地 CTC 对齐模型目录，将模型放在总目录的直接子目录，并设置 `STUDIO_ALIGNMENT_MODELS_DIR` 为总目录绝对路径。NextFire 模型目录包含 `config.json`、`processor_config.json`、`vocab.json`、`model.safetensors` 等资源；MMS_FA 模型目录包含 `alignment-model.json` 和 `model.pt`。环境变量 `STUDIO_ALIGNMENT_DEVICE` 使用 `cpu` 或 `cuda`，默认 `cpu`。
+
+自动对齐需要新生成人声时，使用设置中当前选中的人声模型和 `STUDIO_VOCAL_DEVICE` 指定的设备；已有可用人声继续复用。切换模型影响后续新分离，需要重算时使用“重新分离”。设置页显示模型可用状态和缺失原因。

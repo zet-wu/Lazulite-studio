@@ -9,27 +9,39 @@ macOS 启动脚本：start.command。
 
 使用
 新建项目、导入音频、编辑保存并重开；试用分离、日语对齐时，可在设置中核对实际设备。
-无需另装 Python、Node、FFmpeg 或 CUDA Toolkit；下载对齐模型和在线歌词搜索需要网络。
+无需另装 Python、Node、FFmpeg 或 CUDA Toolkit；下载对齐模型、BS Karaoke 模型和在线歌词搜索需要网络；模型安装完成后，人声分离和自动对齐可在本地离线运行。
 CUDA 版需要兼容 NVIDIA 驱动；GPU 不可用时可选择 CPU，计算失败不会自动重跑。
 Mac 版未经开发者签名和公证；首次打开可能受系统安全策略限制，请核对来源并按系统提示处理。
 
 数据与更新
 data 保存项目和设置，logs 保存日志。
 
+模型下载与安装
+主包包含完整运行时、词典和默认的 Demucs 人声分离模型。对齐模型与可选的 BS Karaoke 主唱模型通过独立 ZIP 安装。
+以下目录均相对于解压后的程序包根目录。
 
+对齐模型
+Windows 双击 download-align-models.cmd；macOS 双击 download-align-models.command。
+按菜单选择 NextFire-karaoke-ja-Latn、MMS_FA 或全部下载，输入 0 退出。模型安装到包内 models/。
+手动安装：下载对应 Release 的 NextFire-karaoke-ja-Latn.zip／MMS_FA.zip，解压到 models/，保留 ZIP 内的模型目录，形成：
+  models/NextFire-karaoke-ja-Latn/
+  models/MMS_FA/
+安装后，在设置“模型与计算”的“对齐模型管理”中刷新，再在自动对齐时选择模型。
+MMS_FA 的 ZIP 已包含 alignment-model.json 及配套权重，无需手动编写配置。该模型在已测日语歌曲上有结束时间偏早现象，可结合“智能延长结束时间”选项使用。
 
-主包保留完整运行时、词典与 Demucs 人声分离模型；对齐权重由同一 Release 的两个 ZIP 提供。
-Windows 双击 download-models.cmd；macOS 双击 download-models.command。选择模型后下载到当前程序包。
-手动安装：下载 NextFire-karaoke-ja-Latn.zip／MMS_FA.zip，解压到 models/，形成 models/NextFire-karaoke-ja-Latn/ 与 models/MMS_FA/。
-下载脚本跳过同名已有目录，未校验其完整性；异常目录请自行处理后重试。临时内容仅存于包内 tmp/。
-安装后请在设置的模型管理中刷新；自定义总目录用户可恢复默认或自行把模型移入该目录，脚本不修改设置。
+人声分离模型
+Demucs 随主包提供，位于 vocal-models/demucs/，可直接使用。
+下载 BS Karaoke：Windows 双击 download-vocal-models.cmd；macOS 双击 download-vocal-models.command。
+脚本直接询问是否下载并安装 BS Karaoke，输入 Y 开始，输入 N 退出，大小写均可。模型安装到 vocal-models/bs-karaoke/。
+手动安装：下载对应 Release 的 bs-karaoke.zip，解压到 vocal-models/，保留 ZIP 内的 bs-karaoke/ 目录，形成：
+  vocal-models/bs-karaoke/bs_roformer_karaoke_frazer_becruily.ckpt
+  vocal-models/bs-karaoke/config_karaoke_frazer_becruily.yaml
+安装后，在设置“模型与计算”的“人声分离模型管理”中刷新并选择 BS Karaoke。安装脚本不会自动切换当前模型。
+BS Karaoke 提取主唱，支持 CPU 和 NVIDIA GPU；macOS 用户选择 CPU。
+切换模型影响新的分离，已有音频可继续复用。需要按当前模型重新计算时，使用音频处理菜单中的“重新分离”；“重新分析”继续分析原有音频。
 
-对齐模型：默认放在包根 models/ 的直接子目录；在“对齐模型管理”中刷新并选择。
-可在便携版管理窗口应用自定义绝对路径或恢复默认目录。默认目录随整包移动重新解析。
-人声模型：总目录默认为包内 vocal-models/，可在设置“模型与计算”修改、恢复默认和刷新。
-Demucs 默认使用 demucs/。可选 BS Karaoke 主唱模型使用 bs-karaoke/，放置
-bs_roformer_karaoke_frazer_becruily.ckpt 与 config_karaoke_frazer_becruily.yaml；在设置卡片中选择。
-BS Karaoke 支持 CPU 和 NVIDIA GPU，Apple GPU 用户可在设备设置选择 CPU。
-模型切换影响新的分离；已有音频可继续使用，音频处理菜单提供“重新分离”。
-MMS_FA：模型子目录包含 alignment-model.json（type 为 torchaudio-mms-fa，weights 为 model.pt）及原始权重。
-MMS_FA 在已测日语歌曲上有尾点偏早现象；模型结构检查通过不等于质量验收通过。
+目录与重试
+两个下载脚本都安装到当前程序包，目标目录不存在或为空时可安装；同名非空目录会被跳过，脚本不会检查或覆盖其中的模型。若目录内容不完整，请先自行移走该目录，再运行脚本重试。
+下载过程中可按 Ctrl+C 取消。失败或取消只清理本次下载的临时内容，已安装模型保留；可重新运行脚本重试。临时内容位于包内 tmp/。
+两类模型总目录均可在对应模型管理中修改、恢复默认和刷新。默认目录随整包移动重新解析。
+脚本不修改自定义目录设置；使用自定义总目录时，可恢复默认目录，或自行将下载后的模型子目录移入所选总目录，再刷新。
