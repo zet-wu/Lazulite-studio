@@ -2,7 +2,7 @@ name: Upload distribution assets
 description: Upload each main archive, volume or model ZIP without an outer archive
 inputs:
   path:
-    description: Directory containing verified archives
+    description: Directory containing assembled archives
     required: true
 runs:
   using: node24

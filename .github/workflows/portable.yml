@@ -107,7 +107,7 @@ jobs:
           assert not release['isDraft'], 'Preview models must be published'
           assert {'NextFire-karaoke-ja-Latn.zip', 'MMS_FA.zip', 'bs-karaoke.zip'} <= {a['name'] for a in release['assets']}, 'Missing model ZIPs'
           PY
-      - name: Assemble, smoke and package distribution
+      - name: Assemble and package distribution
         shell: bash
         env:
           MODEL_TAG: ${{ inputs.model_release_tag }}
@@ -115,7 +115,7 @@ jobs:
         run: python packaging/build.py --model-release-tag "$MODEL_TAG" --model-repository "$MODEL_REPOSITORY" --target '${{ matrix.target }}' --output "$BUILD_OUTPUT"
       - name: Install archive upload client
         run: npm ci --prefix .github/actions/upload-packages --ignore-scripts --no-audit --no-fund
-      - name: Upload verified portable archives
+      - name: Upload portable archives
         uses: ./.github/actions/upload-packages
         with:
           path: ${{ env.BUILD_OUTPUT }}/artifacts

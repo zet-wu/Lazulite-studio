@@ -1,7 +1,7 @@
 """Resolve and build a complete wheelhouse on the target native host.
 
 Run from the repository root in a fresh CPython 3.12 build environment. Outputs
-are installed and checked once in the final bundled runtime.
+are installed in the bundled runtime; runtime tests run separately during development.
 """
 import argparse
 import json

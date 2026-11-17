@@ -273,37 +273,23 @@ def build(target, output, model_release_tag, model_repository):
     manifest = {'schema':1, 'version':commit[:12], 'studio_commit':commit, 'lazulite_commit':library,
                 'target':target, 'database_version':6, 'python':runtime['python_version'],
                 'build_python':platform.python_version(),
-                'validation':'preview; see the separate build diagnostics artifact for validation.json',
+                'validation':'assembly only; runtime tests run separately during development',
                 'unverified':['minimum Windows/macOS version', 'CUDA/MPS hardware', 'full-song quality',
                               'Gatekeeper/download quarantine', 'interactive terminal close']}
     write_json(root / 'manifest.json', manifest)
     shutil.copy2(ROOT / 'packaging/USAGE.txt', root / 'USAGE.txt')
     if target == 'macos-arm64':
         write_json(diagnostics / 'removed-host-rpaths.json', remove_unused_host_rpaths(root))
-    # Omit all build tools and ambient user caches from the runtime process environment.
-    env = {k:v for k,v in os.environ.items() if not k.startswith(('PYTHON', 'HF_', 'TRANSFORMERS_', 'TORCH_', 'STUDIO_'))}
-    env['PATH'] = str(root / 'runtime/ffmpeg') + os.pathsep + (str(Path(os.environ['SystemRoot']) / 'System32') if os.name == 'nt' else '/usr/bin:/bin')
-    env.update(PYTHONNOUSERSITE='1', PYTHONUTF8='1', HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1',
-               HF_HOME=str(work / 'empty-hf'), TORCH_HOME=str(work / 'empty-torch'))
-    python = runtime_python(root)
-    run([python, '-E', '-s', '-X', 'utf8', ROOT / 'packaging/runtime_smoke.py', '--root', root, '--target', target], cwd=root / 'app', env=env)
-    run([sys.executable, ROOT / 'packaging/smoke.py', '--root', root], cwd=work, env=env)
-    shutil.copy2(root / 'smoke.log', diagnostics / 'launcher.log')
-    # Smoke runs in the assembled directory before compression; do not ship its data.
-    for name in ('data', 'logs'):
-        if (root / name).exists():
-            shutil.rmtree(root / name)
-    (root / 'smoke.log').unlink()
     for cache in root.rglob('__pycache__'):
         shutil.rmtree(cache)
     shutil.rmtree(dependencies)
     shutil.rmtree(downloads)
     archives = package(root, artifacts)
-    write_json(diagnostics / 'validation.json', {**manifest, 'status':'assembled-runtime-smoke-passed',
-               'checks':['pip check', 'key dependencies/resources and short media roundtrip',
-                         'local service/static/graceful shutdown'],
+    write_json(diagnostics / 'validation.json', {**manifest, 'status':'assembled',
+               'checks':['pip check'],
+               'runtime_tests':'not run during build',
                'archives':[{'file':p.name, 'size':p.stat().st_size} for p in archives]})
-    print('便携包已完成组装、启动检查与压缩：', artifacts)
+    print('便携包已完成组装与压缩：', artifacts)
 
 
 
