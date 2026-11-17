@@ -9,7 +9,7 @@
 ---
 ## 项目简介
 
-本项目受 [Apple Music-like Lyrics TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 、[StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame) 、[MiliKara](https://github.com/BilyHurington/MiliKara) 的启发，旨在提供一个 [AMLL TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 编辑能力的超集、以及主要针对日语歌词的自动化注音、对齐工具。
+本项目受 [Apple Music-like Lyrics TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 、[StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame) 、[MiliKara](https://github.com/BilyHurington/MiliKara) 的启发，旨在提供一个 [AMLL TTML Tool](https://github.com/amll-dev/amll-ttml-tool) 编辑能力的超集、以及功能强大的针对歌词编辑、打轴的自动化工具。
 
 ## 为什么使用 TTML
 Lazulite Studio 使用 [TTML2](https://www.w3.org/TR/ttml2/) 格式作为内部歌词格式与主要交换格式，这是由于 TTML2 提供了一个标准且可扩展的歌词字幕模型，能够承载远超原始 LRC 和各类基于 LRC 的扩展格式的数据和结构，包括但不限于：
@@ -27,6 +27,8 @@ Lazulite Studio 使用 [TTML2](https://www.w3.org/TR/ttml2/) 格式作为内部�
 - 更丰富的注音（Ruby）容器与布局，如同时在上下显示注音（Ruby）
 - 引用外部图片资源
 
+TTML 标准的以上特性，使得它非常适合作为围绕歌词的各类工具和应用（例如播放器、卡拉 OK 视频制作工具）之间的交换格式，因此笔者提倡这类项目的开发者能够将 TTML 加入支持格式，以方便不同工具之间的上下游衔接。
+
 Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML，这些格式都会不可避免地损失或多或少的信息。
 
 ## 功能特性
@@ -36,15 +38,8 @@ Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML�
 ### 音频处理
 以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) Python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs)）、声学分析分片、人声能量与频谱图、自动对齐等功能。
 
-### 自动对齐
-Release 单独提供两个基于 [facebook/mms-300m](https://huggingface.co/facebook/mms-300m) 的 Wav2Vec CTC 对齐模型，用于对有注音的歌词进行自动化对轴，分别是：
-- [NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn)：使用日语歌唱音频后训练的专门模型，对日语歌曲有很好的对齐效果，该模型使用 CC-BY-NC-SA-4.0 协议，需注意商用限制；
-- [MMS_FA](https://docs.pytorch.org/audio/main/generated/torchaudio.pipelines.MMS_FA.html)：通用的跨语言的对齐模型，在长音、尾音延长等方面表现不如前者，该模型使用 CC-BY-NC-4.0 协议，同样需注意商用限制。
-
-关于 Lazulite Studio 所使用的自动对齐路线的技术报告与比较，参见[歌词自动对齐管线探索](https://github.com/zet-wu/lyric-auto-report)
-
 ### 编辑与打轴
-简洁而功能强大的编辑与打轴界面，针对日语歌词提供多种自动化工具，涵盖智能假名注音（不依赖 Windows 系统日语语言包）和罗马字生成。对其他语言提供词典注音功能，本地包附带汉语拼音和粤拼词典，更多方言可在 [Lazulite Studio 注音词典仓库](https://github.com/zet-wu/Lazulite-studio-dict)获取或根据格式制作。打轴界面支持空拍、单行打轴、定位回听等功能。
+简洁而功能强大的编辑与打轴界面，提供多种自动化工具，可参阅[下一小节](README.md#自动化工具)的详细说明。打轴界面支持空拍、单行打轴、定位回听等功能。
 
 ### 文件打包
 支持向 MP4/M4A 文件的 STPP 歌词轨道写入 TTML 内嵌歌词，可配合 [Musicovite](https://github.com/zet-wu/Musicovite) 本地音乐播放器使用。也支持向 MP3 USLT、FLAC LYRICS、MP4/M4A ©lyr 元数据标签写入普通或扩展 LRC ，兼容大部分播放器。
@@ -53,10 +48,35 @@ Release 单独提供两个基于 [facebook/mms-300m](https://huggingface.co/face
 支持导出能够输入到 [NicoKaraMaker 3](https://github.com/shinta0806/NicoKaraMaker3) 中的歌词文件，支持写入演唱者标记（借鉴自 [StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame)），支持分组文件输出，支持输出独立的翻译和音译轨道文件。
 
 ### StrangeUtaGame / Lin-K 兼容
-支持导出 SUG 项目文件，可导入到 [Lin-K](https://github.com/karaoke-studio/karaoke-studio) 中，同样支持分组文件输出和独立的翻译与音译轨道文件。
+支持导出 SUG 项目文件，可导入到 [Lin-K](https://github.com/karaoke-studio/karaoke-studio) 中，同样支持分组文件输出和独立的翻译与音译轨道文件，并支持同一个歌手在不同分组中输出不同的演唱者字段，方便分轨样式编辑。
 
 ### [Apple Music Like Lyric](https://github.com/amll-dev/applemusic-like-lyrics) 生态兼容
 Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 AMLL 对 TTML 的歌词模型做了一定的简化，舍弃了一些本项目认为很有用的数据承载能力，因此 Lazulite Studio 不保证其产物能够完整无损地被 AMLL 生态系列工具和库导入，也不保证其格式完全符合 [AMLL TTML DB](https://github.com/amll-dev/amll-ttml-db) 投稿的要求，若有较高的对 AMLL 兼容的要求，可以调整设置中的“AMLL 兼容设置”项。
+
+## 自动化工具
+
+### 智能日文注音
+本功能基于 [Sudachi](https://github.com/WorksApplications/SudachiPy) 和 [JmdictFurigana](https://github.com/Doublevil/JmdictFurigana)，为日文汉字提供高准确率、细粒度的假名注音，并且不依赖 Windows 日语语言包和外部 LLM 调用。同时支持自动拆分或合并正文词。
+
+### 词典注音
+本功能基于从已有网络数据来源中转换得到的专有格式词典来对正文进行注音，旨在提供通用的、不同语言/方言的自动注音功能。目前本地包附带两个词典：普通话汉语拼音和粤语粤拼。除此之外，[词典仓库](https://github.com/zet-wu/Lazulite-studio-dict) 提供了潮州话词典（提供不同地区口音），同时维护词典的格式要求以及构建指南，有兴趣的开发者可以构建自己的词典包或为仓库贡献。
+
+### 自动对齐
+Lazulite Studio 提供两个基于 Wav2Vec CTC 对齐模型的自动对齐功能，结合自动注音功能，能够完成从歌词正文到细粒度逐读音时间轴的全自动化流程，与 [MiliKara](https://github.com/BilyHurington/MiliKara)、[Timing](https://github.com/Zennmn/Timing)、[StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame)、[yohane](https://github.com/Japan7/yohane) 和 [FA-Kara](https://github.com/moriwx/FA-Kara) 几个已有的歌曲对齐项目比较，在笔者有限的日语歌曲测试集上，Lazulite Studio 的多项指标均做到最佳，详见下图：
+
+人工读音 + 各自分离器：共同正文边界的误差指标：
+![人工读音 + 各自分离器：共同正文边界的误差指标](https://raw.githubusercontent.com/zet-wu/lyric-auto-report/refs/heads/main/results/figures/g1-comparison.png)
+
+由于某些工具在对齐时会将某些读音单元合并（如长音、促音等），因此输出的总单元数量，即准确率的分母会不一致。共同正文边界即指将所有路线的结果的单元边界取交集，仅计算这些共同边界的准确率。
+图中 `*` 标记各指标最佳值：命中率越高越好，平均绝对误差与绝对误差 P95 越低越好，以下两图相同，不再赘述。
+
+人工读音 + 统一 BS Karaoke 分离器：共同正文边界的误差指标，此组衡量剔除人声分离器的差异后的各路线对齐效果：
+![人工读音 + 统一 BS Karaoke 分离器：共同正文边界的误差指标](https://raw.githubusercontent.com/zet-wu/lyric-auto-report/refs/heads/main/results/figures/g2-comparison.png)
+
+自动分词注音 + 各自分离器：人工读音边界的误差指标，此组衡量在完全自动化情形下，从无注音、无分词的歌词正文开始进行分词、注音、对齐的最终效果：
+![自动分词注音 + 各自分离器：人工读音边界的误差指标](https://raw.githubusercontent.com/zet-wu/lyric-auto-report/refs/heads/main/results/figures/g3-comparison.png)
+
+详细的测试集、方法和结果见 [歌词自动对齐管线探索仓库](https://github.com/zet-wu/lyric-auto-report)。尽管这一功能最初是仅为日语歌曲所设计和调试，但经过多次改进，使用通用 `MMS_FA` 模型也可在其他语言上接近日语 Karaoke 专用模型的效果（需要结合词典注音功能给出合适的拉丁化注音）。详细的自动对齐步骤可以参见教程中的[相关章节](docs/usage-tutorial.md#studio-对齐流程及建议)
 
 ## 本地包安装与使用
 
