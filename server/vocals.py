@@ -105,6 +105,8 @@ class VocalRunner:
                     audio = decode_audio(asset_path, sample_rate=44100, channels=2)
                     vocals = separator.separate(audio)
                     description = {'model': params['model_name'], 'config': {k:v for k,v in asdict(separator.config).items() if k != 'model_repo'}}
+                    if params.get('_vocal_model', {}).get('configuration_yaml'):
+                        description['configuration_yaml'] = params['_vocal_model']['configuration_yaml']
                 except (ImportError, OSError, RuntimeError) as exc:
                     if device_failure(exc, params['device']): raise DeviceFailure('vocal', params['device']) from exc
                     raise EngineUnavailable('人声模型加载或计算失败，请检查包内模型、依赖及输入音频') from exc

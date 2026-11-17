@@ -18,6 +18,7 @@ def test_catalog_directory_snapshot_and_missing_resources(tmp_path):
     captured=models.capture()
     settings.patch({'studio:vocal-model':'demucs'},1)
     assert captured['type']=='bs-karaoke'
+    assert captured['configuration_yaml']=='audio: {}'
     check_snapshot(captured)
     (bs/'config_karaoke_frazer_becruily.yaml').write_text('audio: {changed: true}')
     with pytest.raises(ValueError,match='已改变'):check_snapshot(captured)

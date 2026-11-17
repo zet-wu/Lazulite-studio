@@ -60,7 +60,8 @@ class VocalModels(AlignmentModels):
             from dataclasses import asdict
             config = asdict(DemucsConfig(model_repo=str(path.resolve())))
             config.pop('device')
-        return {'type':kind, 'name':'BS Karaoke' if kind == 'bs-karaoke' else 'Demucs', 'config':config, 'files':states}
+        return {'type':kind, 'name':'BS Karaoke' if kind == 'bs-karaoke' else 'Demucs', 'config':config, 'files':states,
+                **({'configuration_yaml':(path / BS_FILES[1]).read_text()} if kind == 'bs-karaoke' else {})}
 
     def scan(self, refresh=False):
         items=[]
