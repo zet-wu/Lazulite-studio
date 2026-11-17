@@ -15,6 +15,10 @@ def prepare(tmp_path,monkeypatch):
  from server.tests.test_alignment_models import model
  models=tmp_path/'models';model(models)
  monkeypatch.setenv('STUDIO_ALIGNMENT_MODELS_DIR',str(models))
+ vocal=tmp_path/'vocal-models'/'demucs';vocal.mkdir(parents=True)
+ (vocal/'htdemucs.yaml').write_text('models: [test]')
+ (vocal/'test-weights.th').write_bytes(b'fixture-weights')
+ monkeypatch.setenv('STUDIO_VOCAL_MODELS_DIR',str(vocal.parent))
  client,db=setup(tmp_path,factory=None)
  with db.connect() as c:row=c.execute("SELECT current_revision FROM projects WHERE id='p'").fetchone()
  snapshot=initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="l" studio:null="begin end"><span studio:id="w" studio:null="begin end">あlove漢字</span></p></body></tt>')

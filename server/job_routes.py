@@ -27,23 +27,25 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
     @router.post("/projects/{pid}/jobs/{kind}", status_code=202, **write_auth)
     def create_kind(pid: str, kind: str, body: JobParams, request: Request, subject=Depends(write_dependency) if write_dependency else None):
         check_project(pid)
-        # Resolve a lost launch response from its durable request before consulting the current catalog.
-        if kind == 'alignment' and request.headers.get('idempotency-key'):
+        # A repeated client intent resolves to its original task, before any
+        # current model, device or resource settings are consulted.
+        incoming = dict(body.params)
+        if kind in {'alignment','vocal'} and request.headers.get('idempotency-key'):
             with service.db.connect() as c:
-                previous=c.execute('SELECT job_id FROM job_idempotency WHERE project_id=? AND idem_key=?', (pid,request.headers['idempotency-key'])).fetchone()
+                previous = c.execute('SELECT job_id,request_hash FROM job_idempotency WHERE project_id=? AND idem_key=?', (pid,request.headers['idempotency-key'])).fetchone()
             if previous:
-                frozen={k:v for k,v in service.get(previous[0])['request'].items() if k!='devices'}
-                incoming=dict(body.params)
-                if incoming.get('merge_short_gaps') is False: incoming['gap_threshold_ms']=500
-                public={k:v for k,v in frozen.items() if k not in {'_model','asset_id'}}
-                if json.dumps(incoming, sort_keys=True) != json.dumps(public, sort_keys=True): raise HTTPException(409, 'idempotency key was used for another request')
-                from .alignment_models import check_snapshot
-                try:
-                    check_snapshot(frozen['_model'])
-                    return public_job(service.create(pid, kind, frozen, idem_key=request.headers['idempotency-key'], subject=subject or 'local'))
-                except ValueError as exc: raise HTTPException(409, str(exc))
+                old = service.get(previous['job_id'])
+                owner, previous_kind, _ = json.loads(previous['request_hash'])
+                if owner != (subject or 'local') or previous_kind != kind or incoming != old['request'].get('_client_params'):
+                    raise HTTPException(409, 'idempotency key was used for another request')
+                if kind == 'alignment':
+                    from .alignment_models import check_snapshot
+                    try: check_snapshot(old['request']['_model'])
+                    except ValueError as exc: raise HTTPException(409, str(exc))
+                return public_job(old)
         if validate_request:
             validate_request(pid, kind, body.params)
+        if kind in {'alignment','vocal'}: body.params['_client_params'] = incoming
         try: return public_job(service.create(pid, kind, body.params, idem_key=request.headers.get("idempotency-key"), subject=subject or "local"))
         except ValueError as exc: raise HTTPException(409, {"code":"idempotency_mismatch","message":str(exc),"retryable":False})
     @router.get("/projects/{pid}/jobs", **read_auth)

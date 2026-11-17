@@ -86,4 +86,5 @@ class VocalModels(AlignmentModels):
 
     def capture(self):
         kind=self.settings.read()['values'].get('studio:vocal-model','demucs')
-        return self.describe(kind)
+        try: return self.describe(kind)
+        except (KeyError, TypeError) as exc: raise ValueError('人声模型配置无效，请刷新并检查模型文件') from exc
