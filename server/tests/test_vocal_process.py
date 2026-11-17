@@ -7,7 +7,11 @@ from server.vocals import VocalCancelled
 from server.tests.test_vocals import setup, wait
 
 @pytest.fixture
-def isolated_worker(monkeypatch):
+def isolated_worker(monkeypatch, tmp_path):
+    root=tmp_path/'models'/'demucs';root.mkdir(parents=True)
+    (root/'htdemucs.yaml').write_text('models: [test]')
+    (root/'test-weights.th').write_bytes(b'fixture-weights')
+    monkeypatch.setenv('STUDIO_VOCAL_MODELS_DIR',str(root.parent))
     from server import vocal_process
     original = vocal_process.subprocess.Popen
     def spawn(args, **kwargs):

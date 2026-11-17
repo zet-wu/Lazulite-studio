@@ -255,6 +255,7 @@ def build(target, output, model_release_tag, model_repository):
                 run([python, '-I', '-c', 'import demucs,pathlib,shutil,sys; shutil.copyfile(pathlib.Path(demucs.__file__).parent/"remote/htdemucs.yaml",sys.argv[1])', destination], cwd=work)
             else:
                 download(item.get('url', models[family].get('source')), destination, item['sha256'], item['size'])
+    (root / 'vocal-models' / 'bs-karaoke').mkdir(parents=True, exist_ok=True)
     licenses(root, dependencies, pnpm)
     shutil.copy2(ROOT / 'packaging/models.json', root / 'licenses/models.json')
     shutil.copy2(ROOT / 'packaging/runtime-manifest.json', root / 'licenses/runtime-sources.json')

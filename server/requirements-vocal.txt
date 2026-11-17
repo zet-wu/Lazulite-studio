@@ -1,3 +1,9 @@
 # Optional real vocal separation runtime
 demucs==4.0.1
 soundfile==0.13.1
+
+# BS Karaoke network runtime (weights configured separately)
+einops==0.8.2
+beartype==0.23.1
+rotary-embedding-torch==0.9.1
+PyYAML==6.0.3

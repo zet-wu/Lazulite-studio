@@ -72,3 +72,20 @@ def test_queued_device_snapshot_is_fixed(tmp_path):
         assert frozen['devices']['vocal']['actual']=='cuda'
         assert frozen['_vocal_model']['config']['model_repo']=='original'
     finally:service.close()
+
+
+def test_cpu_retry_retains_original_model_and_force_intent(tmp_path):
+    client,db=setup(tmp_path)
+    with client:
+        revision=client.get('/api/v1/projects/p/document').json()['revision']
+        params={'asset_id':'p','bound_revision':revision,'model_name':'BS Karaoke','device':'cuda','force_separation':True,
+                '_vocal_model':{'type':'bs-karaoke','name':'BS Karaoke','config':{'model_repo':'original'},'files':[]}}
+        with db.transaction() as c:
+            c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,error_json,created_at,updated_at) VALUES('failed','p','vocal','failed',?,?,'0','0')",(json.dumps(params),json.dumps({'code':'device_failed','cpu_retry':True})))
+        response=client.post('/api/v1/jobs/failed/retry-cpu',json={'revision':revision},headers={'origin':'http://studio'})
+        assert response.status_code==202,response.text
+        job=wait(client,response.json()['id']);assert job['status']=='succeeded',job
+        with db.connect() as c:
+            request=json.loads(c.execute('SELECT request_json FROM jobs WHERE id=?',(job['id'],)).fetchone()[0])
+        assert request['_vocal_model']==params['_vocal_model']
+        assert request['device']=='cpu' and request['force_separation'] is True

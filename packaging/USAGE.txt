@@ -26,6 +26,10 @@ Windows 双击 download-models.cmd；macOS 双击 download-models.command。选�
 
 对齐模型：默认放在包根 models/ 的直接子目录；在“对齐模型管理”中刷新并选择。
 可在便携版管理窗口应用自定义绝对路径或恢复默认目录。默认目录随整包移动重新解析。
-人声模型：包内 vocal-models/demucs/，与对齐模型目录独立。
+人声模型：总目录默认为包内 vocal-models/，可在设置“模型与计算”修改、恢复默认和刷新。
+Demucs 默认使用 demucs/。可选 BS Karaoke 主唱模型使用 bs-karaoke/，放置
+bs_roformer_karaoke_frazer_becruily.ckpt 与 config_karaoke_frazer_becruily.yaml；在设置卡片中选择。
+BS Karaoke 支持 CPU 和 NVIDIA GPU，Apple GPU 用户可在设备设置选择 CPU。
+模型切换影响新的分离；已有音频可继续使用，音频处理菜单提供“重新分离”。
 MMS_FA：模型子目录包含 alignment-model.json（type 为 torchaudio-mms-fa，weights 为 model.pt）及原始权重。
 MMS_FA 在已测日语歌曲上有尾点偏早现象；模型结构检查通过不等于质量验收通过。

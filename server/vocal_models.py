@@ -37,9 +37,18 @@ class VocalModels(AlignmentModels):
         path = root / kind if root else Path(os.environ['STUDIO_DEMUCS_REPO']) if kind == 'demucs' and os.getenv('STUDIO_DEMUCS_REPO') else None
         if path is None:
             raise ValueError('人声模型总目录尚未配置')
-        files = [path / name for name in BS_FILES] if kind == 'bs-karaoke' else [path / 'htdemucs.yaml', *sorted(path.glob('*.th'))]
-        if kind == 'demucs' and len(files) < 2:
-            raise ValueError('缺少 Demucs 权重')
+        if kind == 'bs-karaoke':
+            files = [path / name for name in BS_FILES]
+        else:
+            import yaml
+            description = path / 'htdemucs.yaml'
+            try: models = yaml.safe_load(description.read_text())['models']
+            except yaml.YAMLError as exc: raise ValueError('Demucs 配置无法读取') from exc
+            files = [description]
+            for signature in models:
+                weights = sorted(path.glob(f'{signature}-*.th'))
+                if len(weights) != 1: raise ValueError(f'缺少或存在重复的 Demucs 权重：{signature}')
+                files.extend(weights)
         states = []
         for file in files:
             if not file.is_file() or file.stat().st_size == 0:
@@ -60,7 +69,7 @@ class VocalModels(AlignmentModels):
             try:
                 self.describe(kind)
                 item['status']='ready'
-            except (OSError, ValueError) as exc:
+            except (OSError, ValueError, KeyError, TypeError) as exc:
                 item.update(status='invalid', reason=self.scan_error(exc,self.directory()))
             items.append(item)
         return {'directory':str(self.directory() or ''), 'editable':self.package_root is not None,

@@ -16,3 +16,9 @@ torch @ https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-w
 torchaudio @ https://download-r2.pytorch.org/whl/cpu/torchaudio-2.11.0%2Bcpu-cp312-cp312-win_amd64.whl#sha256=95d517bd1a0a28dacd1c37550ced95cab64f3a7a4ef9b8219b41049388a71163
 
 uroman==1.3.1.1
+
+# BS Karaoke network runtime (weights configured separately)
+einops==0.8.2
+beartype==0.23.1
+rotary-embedding-torch==0.9.1
+PyYAML==6.0.3
