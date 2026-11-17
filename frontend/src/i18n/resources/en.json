@@ -1771,7 +1771,7 @@
   "settings.editorDisplay": "Editor display mode",
   "settings.simpleMode": "Simple mode",
   "settings.advancedMode": "Advanced mode",
-  "vocal.models": "Vocal separation model",
+  "vocal.models": "Vocal separation model management",
   "vocal.lead": "Lead vocals",
   "vocal.vocals": "Vocals",
   "vocal.reseparate": "Separate again"

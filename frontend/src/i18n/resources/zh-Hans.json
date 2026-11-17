@@ -1758,7 +1758,7 @@
   "settings.editorDisplay": "编辑显示模式",
   "settings.simpleMode": "简洁模式",
   "settings.advancedMode": "高级模式",
-  "vocal.models": "人声分离模型",
+  "vocal.models": "人声分离模型管理",
   "vocal.lead": "主唱",
   "vocal.vocals": "人声",
   "vocal.reseparate": "重新分离"

@@ -61,7 +61,7 @@ for(const theme of ['light','dark'])test(`model cards support keyboard selection
   const dialog=page.getByRole('dialog',{name:'设置',exact:true});
   await dialog.getByRole('combobox',{name:'主题',exact:true}).selectOption(theme);
   await dialog.getByRole('button',{name:'模型与计算',exact:true}).click();
-  const group=dialog.getByRole('radiogroup',{name:'人声分离模型'});
+  const group=dialog.getByRole('radiogroup',{name:'人声分离模型管理'});
   const demucs=group.getByRole('radio',{name:/Demucs/}),bs=group.getByRole('radio',{name:/BS Karaoke/});
   await expect(demucs).toHaveAttribute('aria-checked','true');
   await demucs.focus();await page.keyboard.press('ArrowRight');

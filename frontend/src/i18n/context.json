@@ -11632,7 +11632,7 @@
   },
   "vocal.models": {
     "context": "Vocal separation model selection and explicit recomputation",
-    "source": "人声分离模型",
+    "source": "人声分离模型管理",
     "params": [],
     "parameterNotes": {}
   },

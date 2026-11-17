@@ -23,7 +23,7 @@ export function VocalModels(){
   };
   useEffect(()=>{void run();},[]);
   return <SettingsPanel embedded title={t('vocal.models')} close={()=>undefined} headerActions={<IconButton icon="refresh" data-role="secondary" label={t('alignment.refreshModels')} disabled={busy} onClick={()=>void run()}/>}>
-    {catalog?.editable?<><SettingField stacked label={t('alignment.directory')}><input name="vocal-model-directory" autoComplete="off" spellCheck={false} value={draft} onChange={e=>setDraft(e.target.value)} disabled={busy} title={draft}/></SettingField><div className={styles.directoryActions}><button data-role="primary" disabled={busy} onClick={()=>void run(draft)}>{t('alignment.applyDirectory')}</button><button data-role="secondary" disabled={busy} onClick={()=>void run(null)}>{t('alignment.defaultDirectory')}</button></div></>:<small>{t('alignment.directoryServer')}</small>}
+    {catalog?.editable?<><SettingField stacked label={t('alignment.directory')}><input name="vocal-model-directory" autoComplete="off" spellCheck={false} value={draft} onChange={e=>setDraft(e.target.value)} disabled={busy} title={draft}/></SettingField><div className={styles.directoryActions}><button data-role="primary" disabled={busy} onClick={()=>void run(draft)}>{t('alignment.applyDirectory')}</button><button data-role="secondary" disabled={busy} onClick={()=>void run(null)}>{t('alignment.defaultDirectory')}</button></div></>:<div className={styles.directoryRow}><small className={styles.description}>{t('alignment.directoryServer')}</small></div>}
     {error&&<p role="alert">{error}</p>}
     <div className={fields.cards} role="radiogroup" aria-label={t('vocal.models')} onKeyDown={event=>{
       if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))return;
