@@ -62,7 +62,7 @@ Lazulite Studio 尽量产出兼容 AMLL 生态的 TTML 歌词，然而，由于 
 本功能基于从已有网络数据来源中转换得到的专有格式词典来对正文进行注音，旨在提供通用的、不同语言/方言的自动注音功能。目前本地包附带两个词典：普通话汉语拼音和粤语粤拼。除此之外，[词典仓库](https://github.com/zet-wu/Lazulite-studio-dict) 提供了潮州话词典（提供不同地区口音），同时维护词典的格式要求以及构建指南，有兴趣的开发者可以构建自己的词典包或为仓库贡献。
 
 ### 自动对齐
-Lazulite Studio 提供两个基于 Wav2Vec CTC 对齐模型的自动对齐功能，结合自动注音功能，能够完成从歌词正文到细粒度逐读音时间轴的全自动化流程，与 [MiliKara](https://github.com/BilyHurington/MiliKara)、[Timing](https://github.com/Zennmn/Timing)、[StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame)、[yohane](https://github.com/Japan7/yohane) 和 [FA-Kara](https://github.com/moriwx/FA-Kara) 几个已有的歌曲对齐项目比较，在笔者有限的日语歌曲测试集上，Lazulite Studio 的多项指标均做到最佳，详见下图：
+Lazulite Studio 提供基于两个 Wav2Vec CTC 对齐模型的自动对齐功能，分别是通用的 [MMS_FA](https://docs.pytorch.org/audio/main/generated/torchaudio.pipelines.MMS_FA.html) 和针对日语歌唱后训练的[NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn](https://huggingface.co/NextFire/mms-300m-ForcedAligner-karaoke-ja-Latn)（简称 NextFire-karaoke-ja-Latn）。结合自动注音功能，能够完成从歌词正文到细粒度逐读音时间轴的全自动化流程，与 [MiliKara](https://github.com/BilyHurington/MiliKara)、[Timing](https://github.com/Zennmn/Timing)、[StrangeUtaGame](https://github.com/karaoke-studio/StrangeUtaGame)、[yohane](https://github.com/Japan7/yohane) 和 [FA-Kara](https://github.com/moriwx/FA-Kara) 几个已有的歌曲对齐项目比较，在笔者有限的日语歌曲测试集上，Lazulite Studio 的多项指标均做到最佳，详见下图：
 
 人工读音 + 各自分离器：共同正文边界的误差指标：
 ![人工读音 + 各自分离器：共同正文边界的误差指标](https://raw.githubusercontent.com/zet-wu/lyric-auto-report/refs/heads/main/results/figures/g1-comparison.png)
@@ -76,7 +76,7 @@ Lazulite Studio 提供两个基于 Wav2Vec CTC 对齐模型的自动对齐功能
 自动分词注音 + 各自分离器：人工读音边界的误差指标，此组衡量在完全自动化情形下，从无注音、无分词的歌词正文开始进行分词、注音、对齐的最终效果：
 ![自动分词注音 + 各自分离器：人工读音边界的误差指标](https://raw.githubusercontent.com/zet-wu/lyric-auto-report/refs/heads/main/results/figures/g3-comparison.png)
 
-详细的测试集、方法和结果见 [歌词自动对齐管线探索仓库](https://github.com/zet-wu/lyric-auto-report)。尽管这一功能最初是仅为日语歌曲所设计和调试，但经过多次改进，使用通用 `MMS_FA` 模型也可在其他语言上接近日语 Karaoke 专用模型的效果（需要结合词典注音功能给出合适的拉丁化注音）。详细的自动对齐步骤可以参见教程中的[相关章节](docs/usage-tutorial.md#studio-对齐流程及建议)
+详细的测试集、方法和结果见 [歌词自动对齐管线探索仓库](https://github.com/zet-wu/lyric-auto-report)。尽管这一功能最初是仅为日语歌曲所设计和调试，但经过多次改进，使用通用 `MMS_FA` 模型也可在其他语言上接近日语 Karaoke 专用模型 `NextFire-karaoke-ja-Latn` 的效果（需要结合词典注音功能给出合适的拉丁化注音）。详细的自动对齐步骤可以参见教程中的[相关章节](docs/usage-tutorial.md#studio-对齐流程及建议)
 
 ## 本地包安装与使用
 
