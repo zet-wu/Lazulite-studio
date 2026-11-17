@@ -280,7 +280,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 
 .inspector .panelBody > label, .inspector .panelBody > fieldset { margin:0; }
 .inspector .singerSelection.singerSelection label { display:flex; gap:8px; min-height:26px; }
-.syncPanel button[data-role][data-role], .ribbon > button[data-role][data-role] { min-height:26px; padding:4px 6px; font:inherit; }
+.syncPanel button[data-role][data-role] { min-height:26px; padding:4px 6px; font:inherit; }
 
 .romanGenerationOptions { align-items:center; }
 .romanGenerationOptions label { display:flex; align-items:center; }
