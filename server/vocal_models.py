@@ -1,0 +1,80 @@
+"""Lightweight local vocal-model catalog and immutable task resources."""
+import os
+from pathlib import Path
+from .alignment_models import AlignmentModels
+
+BS_FILES = ('bs_roformer_karaoke_frazer_becruily.ckpt', 'config_karaoke_frazer_becruily.yaml')
+
+
+def check_snapshot(snapshot):
+    for item in snapshot['files']:
+        path = Path(item['path'])
+        if not path.is_file() or path.stat().st_size != item['size'] or path.stat().st_mtime_ns != item['mtime_ns']:
+            raise ValueError('人声模型文件已改变，请刷新并重新发起任务')
+
+
+def separator_for(snapshot, device):
+    check_snapshot(snapshot)
+    if snapshot['type'] == 'bs-karaoke':
+        if device not in {'cpu', 'cuda'}:
+            raise ValueError('BS Karaoke 当前支持 CPU 或 NVIDIA GPU，请选择 CPU 或其他模型')
+        from lazulite.audio.bs_karaoke import BSKaraokeConfig, BSKaraokeSeparator
+        return BSKaraokeSeparator(BSKaraokeConfig(**snapshot['config'], device=device))
+    from lazulite.audio.separation import DemucsConfig, DemucsSeparator
+    return DemucsSeparator(DemucsConfig(**snapshot['config'], device=device))
+
+
+class VocalModels(AlignmentModels):
+    def directory(self):
+        if self.package_root is not None:
+            custom = self.settings.read()['values'].get('vocal.models_dir')
+            return Path(custom) if custom else self.package_root / 'vocal-models'
+        value = os.getenv('STUDIO_VOCAL_MODELS_DIR')
+        return Path(value) if value else None
+
+    def describe(self, kind):
+        root = self.directory()
+        path = root / kind if root else Path(os.environ['STUDIO_DEMUCS_REPO']) if kind == 'demucs' and os.getenv('STUDIO_DEMUCS_REPO') else None
+        if path is None:
+            raise ValueError('人声模型总目录尚未配置')
+        files = [path / name for name in BS_FILES] if kind == 'bs-karaoke' else [path / 'htdemucs.yaml', *sorted(path.glob('*.th'))]
+        if kind == 'demucs' and len(files) < 2:
+            raise ValueError('缺少 Demucs 权重')
+        states = []
+        for file in files:
+            if not file.is_file() or file.stat().st_size == 0:
+                raise ValueError(f'缺少模型文件：{file.name}')
+            states.append({'path':str(file.resolve()), 'size':file.stat().st_size, 'mtime_ns':file.stat().st_mtime_ns})
+        config = {'model_repo':str(path.resolve())}
+        if kind == 'demucs':
+            from lazulite.audio.separation import DemucsConfig
+            from dataclasses import asdict
+            config = asdict(DemucsConfig(model_repo=str(path.resolve())))
+            config.pop('device')
+        return {'type':kind, 'name':'BS Karaoke' if kind == 'bs-karaoke' else 'Demucs', 'config':config, 'files':states}
+
+    def scan(self, refresh=False):
+        items=[]
+        for kind, name, target in [('demucs','Demucs','vocals'), ('bs-karaoke','BS Karaoke','lead')]:
+            item={'id':kind, 'type':kind, 'name':name, 'target':target}
+            try:
+                self.describe(kind)
+                item['status']='ready'
+            except (OSError, ValueError) as exc:
+                item.update(status='invalid', reason=self.scan_error(exc,self.directory()))
+            items.append(item)
+        return {'directory':str(self.directory() or ''), 'editable':self.package_root is not None,
+                'source':'portable' if self.package_root else 'environment', 'items':items, 'error':None}
+
+    def apply(self, path):
+        if self.package_root is None: raise ValueError('服务端目录由部署配置管理')
+        if path is not None and (not isinstance(path,str) or not Path(path).is_absolute()):
+            raise ValueError('模型总目录必须为绝对路径')
+        list((Path(path) if path else self.package_root/'vocal-models').iterdir())
+        current=self.settings.read()
+        self.settings.patch({'vocal.models_dir':path},current['revision'])
+        return self.scan(True)
+
+    def capture(self):
+        kind=self.settings.read()['values'].get('studio:vocal-model','demucs')
+        return self.describe(kind)

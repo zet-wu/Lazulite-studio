@@ -99,6 +99,11 @@ class JobService:
                     return self.get(active[0])
             if kind == 'publish' and c.execute("SELECT 1 FROM jobs WHERE project_id=? AND kind='publish' AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone():
                 raise ValueError('此项目已有活动打包任务，请等待完成或取消')
+            if kind in {'vocal','alignment'}:
+                request['devices'] = {} if request.get('upload_id') or request.get('retry_analysis_id') else self.devices.snapshot(kind, cpu_retry=request.get('cpu_retry', False))
+                if kind == 'vocal' and request['devices']: request['device'] = request['devices']['vocal']['actual']
+                if request.get('_vocal_model', {}).get('type') == 'bs-karaoke' and request['devices']['vocal']['actual'] not in {'cpu','cuda'}:
+                    raise ValueError('BS Karaoke 当前支持 CPU 或 NVIDIA GPU，请选择 CPU 或其他模型')
             jid=uuid.uuid4().hex; t=now()
             if request.get('_upload_path'):
                 import shutil
@@ -130,8 +135,6 @@ class JobService:
             request=json.loads(record[4]); kind=record[2]
             if kind in {'vocal', 'alignment'}:
                 self.emit(jid, 'stage', 'preparing')
-                request['devices'] = {} if request.get('upload_id') or request.get('retry_analysis_id') else self.devices.snapshot(kind, cpu_retry=request.get('cpu_retry', False))
-                if kind == 'vocal' and request['devices']: request['device'] = request['devices']['vocal']['actual']
                 with self.db.transaction() as c:
                     c.execute('UPDATE jobs SET request_json=? WHERE id=?', (json.dumps(request), jid))
                 for snapshot in request['devices'].values():

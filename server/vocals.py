@@ -59,18 +59,19 @@ class VocalRunner:
         directory = self.root / project_id / 'vocals' / result_id
         directory.mkdir(parents=True, exist_ok=True)
         vocal_path = directory / 'vocals.m4a'
-        settings = self.generation_settings(params['asset_id'], params['model_name'], params['device'])
+        settings = {'source_asset_id':params['asset_id'], 'model':params['_vocal_model']['type'], 'config':{k:v for k,v in params['_vocal_model']['config'].items() if k != 'model_repo'}} if params.get('_vocal_model') else self.generation_settings(params['asset_id'], params['model_name'], params['device'])
         reuse = None
-        if params.get('retry_analysis_id'):
-            row, candidate = self.get(project_id, params['retry_analysis_id'])
+        if params.get('retry_analysis_id') or params.get('_reuse_vocal_id'):
+            row, candidate = self.get(project_id, params.get('retry_analysis_id') or params['_reuse_vocal_id'])
+            if not self.audio_available(project_id, candidate): raise ValueError('复用的人声音频已不可用，请重新发起任务')
             if row['source_asset_id'] != params['asset_id']: raise ValueError('人声来源不匹配')
             if self.audio_available(project_id, candidate): reuse = (row, candidate)
-        elif not params.get('upload_id'):
+        elif not params.get('upload_id') and not params.get('force_separation'):
             with self.db.connect() as c:
                 rows = c.execute('SELECT * FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id, params['asset_id'])).fetchall()
             for row in rows:
                 candidate = json.loads(row['metadata_json'])
-                if candidate.get('source_kind') != 'upload' and candidate['generation_settings'] == settings and self.audio_available(project_id, candidate):
+                if candidate.get('source_kind') != 'upload' and self.audio_available(project_id, candidate):
                     reuse = (row, candidate)
                     break
         if reuse:
@@ -99,7 +100,8 @@ class VocalRunner:
                 emit('stage', 'separating')
                 try:
                     from lazulite.audio.separation import DemucsSeparator, DemucsConfig
-                    separator = self.separator_factory() if self.separator_factory else DemucsSeparator(DemucsConfig(model_name=params['model_name'], device=params['device'], model_repo=os.getenv('STUDIO_DEMUCS_REPO')))
+                    from .vocal_models import separator_for
+                    separator = self.separator_factory() if self.separator_factory else separator_for(params['_vocal_model'], params['device']) if params.get('_vocal_model') else DemucsSeparator(DemucsConfig(model_name=params['model_name'], device=params['device'], model_repo=os.getenv('STUDIO_DEMUCS_REPO')))
                     audio = decode_audio(asset_path, sample_rate=44100, channels=2)
                     vocals = separator.separate(audio)
                     description = {'model': params['model_name'], 'config': {k:v for k,v in asdict(separator.config).items() if k != 'model_repo'}}
@@ -121,7 +123,9 @@ class VocalRunner:
             if params.get('upload_id'):
                 metadata.update(source_kind='upload', original_filename=params['upload_name'], offset_ms=params['offset_ms'])
                 Path(params['_upload_path']).unlink(missing_ok=True)
-            else: metadata['source_kind'] = 'demucs'
+            else:
+                metadata['source_kind'] = params.get('_vocal_model', {}).get('type', 'demucs')
+                metadata['execution_device'] = params['device']
             del audio, vocals
             decoded = media.playback_proxy(asset(vocal_path, metadata))
             metadata['decoded_frames'] = decoded.decoded_frames
@@ -152,6 +156,15 @@ class VocalRunner:
     @staticmethod
     def result(project_id, metadata):
         return {'kind': 'vocal', 'analysis_id': metadata['id'], 'binding': {'project_id': project_id, 'asset_id': metadata['source_asset_id']}, 'engine': metadata['model']}
+
+    def reusable(self, project_id, asset_id):
+        with self.db.connect() as c:
+            rows = c.execute('SELECT metadata_json FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id,asset_id)).fetchall()
+        for row in rows:
+            metadata = json.loads(row[0])
+            if metadata.get('source_kind') != 'upload' and self.audio_available(project_id,metadata):
+                return metadata['id']
+        return None
 
     def generation_settings(self, asset_id, model_name=None, device=None):
         from lazulite.audio.separation import DemucsConfig

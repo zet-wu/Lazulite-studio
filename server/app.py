@@ -602,7 +602,33 @@ def create_app(
     from .alignment_projection import project_alignment
     from .alignment_models import AlignmentModels
     model_catalog = AlignmentModels(preferences, Path(runtime_identity['data_dir']).parent if runtime_identity is not None else None)
+    from .vocal_models import VocalModels
+    vocal_models = VocalModels(preferences, model_catalog.package_root)
     alignment_runner = AlignmentRunner(db, root / 'projects', model_catalog, configured_reading_proposer)
+
+    @api.get('/vocal-models')
+    def vocal_catalog(refresh: bool = False, _=Depends(auth)):
+        return vocal_models.scan(refresh)
+
+    @api.post('/vocal-models/directory')
+    def vocal_directory(body: dict, _=Depends(write)):
+        try:
+            if set(body) != {'path'}: raise ValueError('需要模型目录或默认目录')
+            return vocal_models.apply(body['path'])
+        except (ValueError, OSError) as exc: fail('vocal_directory_invalid', str(exc), 422)
+
+    def capture_vocal(pid, params):
+        if params.get('upload_id') or params.get('retry_analysis_id'): return
+        if not params.get('force_separation'):
+            reusable = vocal_runner.reusable(pid, params['asset_id'])
+            if reusable:
+                params['_reuse_vocal_id'] = reusable
+                return
+        if vocal_runner.separator_factory: return
+        try:
+            params['_vocal_model'] = vocal_models.capture()
+            params['model_name'] = params['_vocal_model']['name']
+        except (ValueError, OSError) as exc: fail('vocal_model_unavailable', str(exc), 422)
 
     @api.get('/alignment-models')
     def alignment_models(refresh: bool = False, _=Depends(auth)):
@@ -629,11 +655,14 @@ def create_app(
         if kind == 'alignment':
             try: alignment_runner.validate(pid, params)
             except (ValueError, ReadingUnavailable) as exc: fail('alignment_input_invalid', str(exc), 422)
+            snapshot, _ = alignment_runner.snapshot(pid, params['revision'])
+            if not snapshot['acoustics']['analysisId']: capture_vocal(pid, params)
             return
         if kind == 'vocal':
             row = project(pid)
             if not row[2] or params.get('asset_id') != row[2]: fail('job_input_invalid', '人声任务需要当前项目源音频', 422)
-            if set(params) - {'asset_id', 'retry_analysis_id', 'upload_id', 'offset_ms'}: fail('job_input_invalid', '人声参数由服务配置', 422)
+            if set(params) - {'asset_id', 'retry_analysis_id', 'upload_id', 'offset_ms', 'force_separation'}: fail('job_input_invalid', '人声参数由服务配置', 422)
+            if 'force_separation' in params and (type(params['force_separation']) is not bool or params.get('retry_analysis_id') or params.get('upload_id')): fail('job_input_invalid', '重新分离参数无效', 422)
             if 'offset_ms' in params and 'upload_id' not in params: fail('job_input_invalid', '偏移仅用于上传人声', 422)
             if 'upload_id' in params:
                 if params.get('retry_analysis_id'): fail('job_input_invalid', '上传与重试不可同时指定', 422)
@@ -650,6 +679,7 @@ def create_app(
             params['bound_revision'] = row[3]
             params['model_name'] = os.getenv('STUDIO_VOCAL_MODEL', 'htdemucs')
             params['device'] = os.getenv('STUDIO_VOCAL_DEVICE', 'cpu')
+            capture_vocal(pid, params)
             return
         if kind == "publish":
             fail("publish_endpoint_required", "publish jobs must use /projects/{pid}/publish", 422)

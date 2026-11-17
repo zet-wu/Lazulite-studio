@@ -43,7 +43,7 @@ def test_cpu_retry_new_task_and_stale_revision_rejected(tmp_path):
         revision = client.get('/api/v1/projects/p/document').json()['revision']
         import json
         with db.transaction() as c:
-            c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,error_json,created_at,updated_at) VALUES('failed','p','vocal','failed',?,?,'0','0')", (json.dumps({'asset_id':'p','bound_revision':revision}), json.dumps({'code':'device_failed','cpu_retry':True})))
+            c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,error_json,created_at,updated_at) VALUES('failed','p','vocal','failed',?,?,'0','0')", (json.dumps({'asset_id':'p','bound_revision':revision,'model_name':'htdemucs','device':'cuda'}), json.dumps({'code':'device_failed','cpu_retry':True})))
         assert client.post('/api/v1/jobs/failed/retry-cpu',json={'revision':'stale'},headers=headers).status_code == 409
         result = client.post('/api/v1/jobs/failed/retry-cpu',json={'revision':revision},headers={**headers,'Idempotency-Key':'fresh'}).json()
         assert result['id'] != 'failed'

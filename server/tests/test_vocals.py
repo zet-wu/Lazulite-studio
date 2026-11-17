@@ -226,23 +226,26 @@ def test_cached_separation_reanalysis_repair_and_version_update(tmp_path, monkey
         path = tmp_path/'projects'/'p'/'vocals'/first/'vocals.m4a'
         with path.open('r+b') as f: f.truncate(path.stat().st_size - 100)
         assert {r['audio_state'] for r in client.get('/api/v1/projects/p/vocals').json()['items']} == {'missing'}
-        repaired = run(second)
+        retry = client.post('/api/v1/projects/p/jobs/vocal', json={'params':{'asset_id':asset,'retry_analysis_id':second}}, headers={'origin':'http://studio'}).json()
+        assert wait(client,retry['id'])['status']=='failed'
+        assert Counted.calls == 1
+        repaired = run()
         assert Counted.calls == 2 and repaired not in (first, second)
         path = tmp_path/'projects'/'p'/'vocals'/repaired/'vocals.m4a'
         path.unlink()
         restored = run()
         assert Counted.calls == 3
         monkeypatch.setenv('STUDIO_VOCAL_MODEL', 'new-fixed-model')
-        assert client.get('/api/v1/projects/p/vocals').json()['items'][0]['audio_state'] == 'outdated'
+        assert client.get('/api/v1/projects/p/vocals').json()['items'][0]['audio_state'] == 'current'
         updated = run()
-        assert updated != restored and Counted.calls == 4
+        assert updated == restored and Counted.calls == 3
         assert (tmp_path/'projects'/'p'/'vocals'/restored/'vocals.m4a').exists()
         assert client.get('/api/v1/projects/p/vocals').json()['items'][0]['audio_state'] == 'current'
         # An explicit historical analysis keeps that audio even after model configuration changes.
         historical = run(restored)
-        assert Counted.calls == 4
+        assert Counted.calls == 3
         item = client.get('/api/v1/projects/p/vocals').json()['items'][0]
-        assert item['id'] == historical and item['audio_id'] == restored and item['audio_state'] == 'outdated'
+        assert item['id'] == historical and item['audio_id'] == restored and item['audio_state'] == 'current'
         assert client.get(f'/api/v1/projects/p/vocals/{historical}/file').content == (tmp_path/'projects/p/vocals'/restored/'vocals.m4a').read_bytes()
 
 

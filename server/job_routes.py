@@ -72,7 +72,12 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
             try: check_snapshot(params['_model'])
             except ValueError as exc: raise HTTPException(409, str(exc))
             fresh = {k:v for k,v in params.items() if k not in {'devices','cpu_retry','retry_of'}}
-        elif validate_request: validate_request(old['project_id'], old['kind'], fresh)
+        else:
+            fresh = {k:v for k,v in params.items() if k not in {'devices','cpu_retry','retry_of'}}
+        if fresh.get('_vocal_model'):
+            from .vocal_models import check_snapshot as check_vocal_snapshot
+            try: check_vocal_snapshot(fresh['_vocal_model'])
+            except ValueError as exc: raise HTTPException(409, str(exc))
         fresh['cpu_retry'] = True
         fresh['retry_of'] = jid
         try:

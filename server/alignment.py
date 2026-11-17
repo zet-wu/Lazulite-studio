@@ -14,7 +14,7 @@ from .alignment_projection import project_alignment
 
 def alignment_unavailable():
     from importlib.util import find_spec
-    if any(find_spec(name) is None for name in ('torch', 'torchaudio', 'transformers', 'uroman', 'soundfile', 'demucs')): return {'code':'dependencies_missing','message':'Alignment model dependencies are missing'}
+    if any(find_spec(name) is None for name in ('torch', 'torchaudio', 'transformers', 'uroman', 'soundfile')): return {'code':'dependencies_missing','message':'Alignment model dependencies are missing'}
     return None
 
 
@@ -91,7 +91,7 @@ def _run_alignment(request, emit, cancelled, media_lifetime):
             raise ValueError('现有人工片段无法匹配完整人声，请先检查音频处理')
     else:
         if acoustics['segments']: raise ValueError('现有片段没有可匹配的人声资源')
-        result = vocal.run_in_process(pid, Path(request['asset_path']), {'asset_id': asset, 'model_name': 'htdemucs', 'device': params.get('devices', {}).get('vocal', {}).get('actual', os.getenv('STUDIO_VOCAL_DEVICE','cpu'))}, request['job_id'], emit, cancelled)
+        result = vocal.run_in_process(pid, Path(request['asset_path']), {**{k:v for k,v in params.items() if k in {'_vocal_model', '_reuse_vocal_id'}}, 'asset_id': asset, 'model_name': params.get('_vocal_model', {}).get('name', 'htdemucs'), 'device': params.get('devices', {}).get('vocal', {}).get('actual', os.getenv('STUDIO_VOCAL_DEVICE','cpu'))}, request['job_id'], emit, cancelled)
         _, metadata = vocal.get(pid, result['analysis_id'])
         normalized, _ = intersect_segments(metadata['segments'], duration_ms)
         new_acoustics = {'analysisId': metadata['id'], 'segments': normalized}
