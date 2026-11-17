@@ -200,7 +200,8 @@
 .dragGhost[data-drop-error] { outline: 2px dashed var(--danger); outline-offset: 2px; }
 .actions > button { border: 0; background: transparent; }
 .actions > .primaryButton { background-color: var(--blue); color: var(--on-primary); padding-inline: 12px; }
-.settingsMenu button[aria-pressed] > svg { flex-shrink: 0; color: var(--blue); }
+.settingsMenu > div button { display: flex; justify-content: flex-start; }
+.settingsMenu button[aria-pressed] > svg { margin-inline-start: auto; flex-shrink: 0; color: var(--blue); }
 .settingsMenu button[aria-pressed="false"] > svg { visibility: hidden; }
 .settingsMenu button[aria-pressed="true"] { background: var(--blue-soft); }
 

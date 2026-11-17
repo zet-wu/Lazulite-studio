@@ -55,10 +55,10 @@ export function EditorMenu(props: Props) {
       <IconButton icon="undo" label={t('menu.undo')} data-role="inline" onClick={props.undo} disabled={!props.canUndo}/>
       <IconButton icon="redo" label={t('menu.redo')} data-role="inline" onClick={props.redo} disabled={!props.canRedo}/>
       <TopMenu id="view" title={t('menu.view')} className={styles.settingsMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
-        {(['simple','advanced'] as const).map(value=><button key={value} data-role="inline" aria-pressed={display===value} onClick={()=>changeEditorDisplay(value)}><Icon name="check"/>{t(`settings.${value}Mode`)}</button>)}
-        <button data-role="inline" aria-label={t('menu.outline')} aria-pressed={props.outlineVisible} onClick={props.onToggleOutline}><Icon name="check"/>{t('menu.outline')}</button>
-        <button data-role="inline" aria-label={t('menu.inspector')} aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}><Icon name="check"/>{t('menu.inspector')}</button>
+        <button data-role="inline" onClick={()=>changeEditorDisplay(display==='simple'?'advanced':'simple')}>{display==='simple'?t('settings.advancedMode'):t('settings.simpleMode')}</button>
         <button data-role="inline" onClick={() => { const next = !dark; setTheme(next?'dark':'light'); document.documentElement.dataset.theme = next ? 'dark' : 'light'; }}>{dark ? t('menu.light') : t('menu.dark')}</button>
+        <button data-role="inline" aria-label={t('menu.outline')} aria-pressed={props.outlineVisible} onClick={props.onToggleOutline}>{t('menu.outline')}<Icon name="check"/></button>
+        <button data-role="inline" aria-label={t('menu.inspector')} aria-pressed={props.inspectorVisible} onClick={props.onToggleInspector}>{t('menu.inspector')}<Icon name="check"/></button>
       </TopMenu>
       </>}
       <button data-settings-button data-role="secondary" onClick={()=>{props.onMenuChange?.(null);setSettingsOpen(true);}}>{t('menu.settings')}</button>
