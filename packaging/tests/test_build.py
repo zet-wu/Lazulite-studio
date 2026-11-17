@@ -77,3 +77,35 @@ def test_build_rejects_wrong_native_platform_before_downloads(tmp_path, monkeypa
     with pytest.raises(RuntimeError, match='原生架构'):
         build.build('windows-x64-cpu', tmp_path, 'v1', 'owner/repo')
     assert list(tmp_path.iterdir()) == []
+
+
+def test_assembled_downloaders_run_isolated_with_non_ascii_path(tmp_path):
+    import json
+    import subprocess
+    import zipfile
+    root = tmp_path / '程序 with spaces'; root.mkdir()
+    build.model_downloads(root, 'v1.2.3', 'owner/repo')
+    config_path = root / 'model-downloads.json'
+    config = json.loads(config_path.read_text())
+    assert config['vocal_models']['bs-karaoke'] == 'https://github.com/owner/repo/releases/download/v1.2.3/bs-karaoke.zip'
+    assert not (root / 'vocal-models/bs-karaoke').exists()
+    def run(category, answer):
+        return subprocess.run([sys.executable, '-I', '-X', 'utf8', str(root / f'download_{category}_models.py')],
+                              input=answer, text=True, capture_output=True, cwd=tmp_path)
+    assert run('align', '0\n').returncode == 0
+    assert run('vocal', 'N\n').returncode == 0
+    archive = tmp_path / 'bs.zip'
+    with zipfile.ZipFile(archive, 'w') as stream:
+        for name in ('bs_roformer_karaoke_frazer_becruily.ckpt', 'config_karaoke_frazer_becruily.yaml'):
+            stream.writestr('bs-karaoke/' + name, b'fixture')
+    config['vocal_models']['bs-karaoke'] = archive.as_uri()
+    config_path.write_text(json.dumps(config))
+    result = run('vocal', 'y\n')
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert '安装完成' in result.stdout
+    assert (root / 'vocal-models/bs-karaoke/bs_roformer_karaoke_frazer_becruily.ckpt').is_file()
+    # A different package using a missing URL must expose a failing exit status.
+    for file in (root / 'vocal-models/bs-karaoke').iterdir():
+        file.unlink()
+    archive.unlink()
+    assert run('vocal', 'Y\n').returncode == 1

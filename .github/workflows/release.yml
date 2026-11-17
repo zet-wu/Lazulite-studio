@@ -69,7 +69,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
-          pattern: "{LazuliteStudio-*.7z*,NextFire-karaoke-ja-Latn.zip,MMS_FA.zip}"
+          pattern: "{LazuliteStudio-*.7z*,NextFire-karaoke-ja-Latn.zip,MMS_FA.zip,bs-karaoke.zip}"
           merge-multiple: true
           skip-decompress: true
           path: release-assets

@@ -21,6 +21,8 @@ def main():
     manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
     assert platform.python_version() == manifest['python'], (platform.python_version(), manifest['python'])
     import fastapi, uvicorn, torch, torchaudio, demucs, transformers, soundfile, lazulite, uroman
+    from lazulite.audio.bs_karaoke import BSKaraokeConfig, BSKaraokeSeparator
+    from lazulite.audio._bs_roformer.bs_roformer import BSRoformer
     # Load small required resources; exact linguistic results belong to development tests.
     uroman.Uroman()
     from sudachipy import dictionary

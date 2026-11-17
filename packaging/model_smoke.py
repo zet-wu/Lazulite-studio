@@ -1,4 +1,4 @@
-"""Real CPU smoke with all Python socket connections denied in this process."""
+"""Real model smoke with all Python socket connections denied in this process."""
 import argparse
 import json,os,time,socket,sys
 
@@ -9,6 +9,9 @@ def deny_network(event, args):
 from pathlib import Path
 parser=argparse.ArgumentParser()
 parser.add_argument('--root', type=Path, required=True)
+parser.add_argument('--vocal-model', choices=('demucs', 'bs-karaoke'), default='demucs')
+parser.add_argument('--device', choices=('cpu', 'cuda'), default='cpu')
+parser.add_argument('--vocal-only', action='store_true')
 parser.add_argument('--os-isolated', action='store_true')
 args=parser.parse_args()
 if args.os_isolated:
@@ -37,17 +40,24 @@ except PermissionError: pass
 rate=44100
 samples=(.15*np.sin(np.arange(rate*3)*2*np.pi*220/rate)).astype(np.float32)
 audio=AudioBuffer(np.stack([samples,samples]),rate,'synthetic')
-separator=DemucsSeparator(DemucsConfig(device='cpu',model_repo=str(args.root/'vocal-models'/'demucs')))
-vocals=separator.separate(audio);separator.close()
+if args.vocal_model == 'bs-karaoke':
+    from lazulite.audio.bs_karaoke import BSKaraokeConfig, BSKaraokeSeparator
+    separator=BSKaraokeSeparator(BSKaraokeConfig(device=args.device,model_repo=str(args.root/'vocal-models'/'bs-karaoke')))
+else:
+    separator=DemucsSeparator(DemucsConfig(device=args.device,model_repo=str(args.root/'vocal-models'/'demucs')))
+try:
+    vocals=separator.separate(audio)
+finally:
+    separator.close()
 assert vocals.samples.shape==(2,rate*3) and np.isfinite(vocals.samples).all()
 segment=VocalSegment('s',None,0,3,0,3,None,None)
-prepared=prepare_existing_vocals(vocals,original_id='synthetic',analysis=VocalAnalysis('synthetic',(segment,)),analysis_description={'configuration':{},'reference':'full_scale'},segments=(segment,),separation={'model':'htdemucs'})
+prepared=prepare_existing_vocals(vocals,original_id='synthetic',analysis=VocalAnalysis('synthetic',(segment,)),analysis_description={'configuration':{},'reference':'full_scale'},segments=(segment,),separation={'model':args.vocal_model})
 
 request=JapaneseAlignmentRequest.from_dict({'schema':'lazulite-japanese-request-v1','lines':[{'line_id':'l','text':'あ','units':[{'unit_id':'u','source_range':[0,1],'reading':'あ','reading_language':'ja','reading_source':'edited','reading_range':None}],'start_hint':None}]})
 results=[]
-for name in ('NextFire-karaoke-ja-Latn', 'MMS_FA'):
+for name in (() if args.vocal_only else ('NextFire-karaoke-ja-Latn', 'MMS_FA')):
     backend=open_backend(args.root/'models'/name, device='cpu')
     result=align_japanese(prepared,request,backend=backend,config=JapaneseConfig());backend.close()
     assert result.status == 'complete' and len(result.units) == 1, result
     results.append({'model':name, 'status':result.status, 'units':len(result.units)})
-print(json.dumps({'network':'OS isolation with rejected connectivity probe and Python socket hook' if args.os_isolated else 'Python socket audit hook only; not OS firewall isolation','torch':torch.__version__,'separation_frames':vocals.samples.shape[1],'models':results,'seconds':time.monotonic()-start,'scope':'synthetic 3 seconds, CPU after model installation; not song quality or target-platform validation'}))
+print(json.dumps({'network':'OS isolation with rejected connectivity probe and Python socket hook' if args.os_isolated else 'Python socket audit hook only; not OS firewall isolation','torch':torch.__version__,'vocal_model':args.vocal_model,'device':args.device,'separation_frames':vocals.samples.shape[1],'models':results,'seconds':time.monotonic()-start,'scope':'synthetic 3 seconds after model installation; not song quality or target-platform validation'}))

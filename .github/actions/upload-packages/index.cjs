@@ -5,8 +5,8 @@ const path = require('node:path');
   const {DefaultArtifactClient} = await import('@actions/artifact');
   const root = path.resolve(process.env.INPUT_PATH);
   const files = fs.readdirSync(root).sort();
-  if (!files.length || files.some(name => !/^(?:LazuliteStudio-(?:windows-x64-cpu|windows-x64-cuda|macos-arm64)\.7z(?:\.\d{3,})?|NextFire-karaoke-ja-Latn\.zip|MMS_FA\.zip)$/.test(name))) {
-    throw new Error('Expected portable 7z archives/volumes or the two model ZIPs');
+  if (!files.length || files.some(name => !/^(?:LazuliteStudio-(?:windows-x64-cpu|windows-x64-cuda|macos-arm64)\.7z(?:\.\d{3,})?|NextFire-karaoke-ja-Latn\.zip|MMS_FA\.zip|bs-karaoke\.zip)$/.test(name))) {
+    throw new Error('Expected portable 7z archives/volumes or alignment or vocal model ZIPs');
   }
   const client = new DefaultArtifactClient();
   for (const name of files) {

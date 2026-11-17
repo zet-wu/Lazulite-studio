@@ -17,14 +17,14 @@ def assets(root):
 
 def test_requires_models_and_contiguous_main_volumes(tmp_path):
     assets(tmp_path)
-    assert len(release.assets_in(tmp_path)) == 5
+    assert len(release.assets_in(tmp_path)) == 6
     cpu = tmp_path / 'LazuliteStudio-windows-x64-cpu.7z'
     cpu.rename(cpu.with_suffix('.7z.001'))
     with pytest.raises(ValueError):
         release.assets_in(tmp_path)
     cpu.with_suffix('.7z.002').write_bytes(b'volume')
-    assert len(release.assets_in(tmp_path)) == 6
-    (tmp_path / 'MMS_FA.zip').unlink()
+    assert len(release.assets_in(tmp_path)) == 7
+    (tmp_path / 'bs-karaoke.zip').unlink()
     with pytest.raises(ValueError, match='模型附件缺失'):
         release.assets_in(tmp_path)
 
@@ -41,7 +41,7 @@ def test_draft_replaces_managed_assets_but_preserves_other_assets(tmp_path, monk
     release.prepare_draft(tmp_path)
     deleted = [call.args[0][4] for call in calls.call_args_list if call.args[0][2] == 'delete-asset']
     assert set(deleted) == set(names)
-    assert sum(call.args[0][2] == 'upload' for call in calls.call_args_list) == 5
+    assert sum(call.args[0][2] == 'upload' for call in calls.call_args_list) == 6
 
 
 @pytest.mark.parametrize('moved', [False, True])

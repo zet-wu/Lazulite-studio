@@ -35,8 +35,11 @@ def extract_model(archive, destination, name):
     return model
 
 
-def install(root, name, url):
-    models = root / 'models'
+BS_FILES = ('bs_roformer_karaoke_frazer_becruily.ckpt', 'config_karaoke_frazer_becruily.yaml')
+
+
+def install(root, name, url, *, category='align'):
+    models = root / {'align': 'models', 'vocal': 'vocal-models'}[category]
     temporary = root / 'tmp'
     # Keep staging and installation physically inside this package.
     for folder in (models, temporary):
@@ -44,7 +47,9 @@ def install(root, name, url):
             raise ValueError(f'包内目录不能指向外部：{folder}')
         folder.mkdir(exist_ok=True)
     target = models / name
-    if os.path.lexists(target):
+    if target.is_symlink():
+        raise ValueError(f'模型目标不能是符号链接：{target}')
+    if os.path.lexists(target) and (not target.is_dir() or any(target.iterdir())):
         print(f'跳过已存在的目标：{target}（未校验模型；异常目录请自行处理后重试）')
         return
     print(f'安装到：{target}')
@@ -63,8 +68,17 @@ def install(root, name, url):
             if total is not None and received != total:
                 raise ValueError('下载不完整')
         model = extract_model(archive, work / 'unpacked', name)
+        if category == 'vocal':
+            for filename in BS_FILES:
+                file = model / filename
+                if not file.is_file() or file.stat().st_size == 0:
+                    raise ValueError(f'缺少模型文件：{filename}')
+        if target.is_symlink():
+            raise ValueError(f'模型目标不能是符号链接：{target}')
         if os.path.lexists(target):
-            raise FileExistsError(f'目标已由其他操作创建，请重新运行：{target}')
+            if not target.is_dir() or any(target.iterdir()):
+                raise FileExistsError(f'目标已由其他操作创建，请重新运行：{target}')
+            target.rmdir()  # Only remove an empty placeholder after extraction succeeds.
         model.rename(target)
     print(f'安装完成：{target}')
 
@@ -88,18 +102,26 @@ def menu(root, config):
         print('请在设置的模型管理中刷新。若使用自定义模型总目录，请恢复默认或自行将模型移入该目录。')
 
 
-def main():
+def vocal_menu(root, config):
+    while True:
+        choice = input('下载并安装 BS Karaoke？[Y/N] ').strip().lower()
+        if choice == 'n':
+            return
+        if choice == 'y':
+            install(root, 'bs-karaoke', config['vocal_models']['bs-karaoke'], category='vocal')
+            print('请在设置的人声分离模型中刷新并选择 BS Karaoke。若使用自定义总目录，请恢复默认或自行移入该目录。')
+            return
+        print('请输入 Y 或 N')
+
+
+def main(category):
     root = Path(__file__).resolve().parent
     try:
         config = json.loads((root / 'model-downloads.json').read_text(encoding='utf-8'))
-        menu(root, config)
+        (menu if category == 'align' else vocal_menu)(root, config)
     except (KeyboardInterrupt, EOFError):
         print('\n已取消，已完成的模型保留。')
     except Exception as error:
-        print(f'无法下载模型：{error}')
+        print(f'无法下载模型：{error}；可重新运行重试。')
         return 1
     return 0
-
-
-if __name__ == '__main__':
-    raise SystemExit(main())

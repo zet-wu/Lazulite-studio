@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       model_release_tag:
-        description: 'Published release tag containing the two model ZIPs'
+        description: 'Published release tag containing alignment and vocal model ZIPs'
         type: string
         required: true
       target:
@@ -105,7 +105,7 @@ jobs:
           import json, sys
           release = json.load(open(sys.argv[1]))
           assert not release['isDraft'], 'Preview models must be published'
-          assert {'NextFire-karaoke-ja-Latn.zip', 'MMS_FA.zip'} <= {a['name'] for a in release['assets']}, 'Missing model ZIPs'
+          assert {'NextFire-karaoke-ja-Latn.zip', 'MMS_FA.zip', 'bs-karaoke.zip'} <= {a['name'] for a in release['assets']}, 'Missing model ZIPs'
           PY
       - name: Assemble, smoke and package distribution
         shell: bash

@@ -85,3 +85,93 @@ def test_crc_failure_and_symlinks_are_not_installed(tmp_path):
         downloader.install(tmp_path, 'MMS_FA', path.as_uri())
     assert not (tmp_path / 'models/MMS_FA').exists()
     assert list((tmp_path / 'tmp').iterdir()) == []
+
+
+def vocal_archive(path, missing=None):
+    return archive(path, 'bs-karaoke', [
+        ('bs-karaoke/' + name, b'fixture') for name in downloader.BS_FILES if name != missing])
+
+
+@pytest.mark.parametrize('placeholder', [False, True])
+def test_vocal_install_empty_or_missing_target_and_skip_existing(tmp_path, placeholder):
+    root = tmp_path / '程序 with spaces'
+    root.mkdir()
+    target = root / 'vocal-models/bs-karaoke'
+    if placeholder:
+        target.mkdir(parents=True)
+    url = vocal_archive(tmp_path / 'source.zip')
+    downloader.install(root, 'bs-karaoke', url, category='vocal')
+    assert all((target / name).read_bytes() == b'fixture' for name in downloader.BS_FILES)
+    downloader.install(root, 'bs-karaoke', 'invalid:must-not-download', category='vocal')
+    assert not (root / 'models').exists()
+    assert not list((root / 'tmp').iterdir())
+
+
+@pytest.mark.parametrize('missing', downloader.BS_FILES)
+def test_incomplete_vocal_zip_preserves_placeholder_and_retries(tmp_path, missing):
+    target = tmp_path / 'vocal-models/bs-karaoke'
+    target.mkdir(parents=True)
+    url = vocal_archive(tmp_path / 'source.zip', missing)
+    with pytest.raises(ValueError, match='缺少模型文件'):
+        downloader.install(tmp_path, 'bs-karaoke', url, category='vocal')
+    assert list(target.iterdir()) == []
+    assert list((tmp_path / 'tmp').iterdir()) == []
+    vocal_archive(tmp_path / 'source.zip')
+    downloader.install(tmp_path, 'bs-karaoke', url, category='vocal')
+    assert (target / missing).is_file()
+
+
+@pytest.mark.parametrize('answer', ['Y', 'y', 'N', 'n', 'invalid\ny'])
+def test_vocal_confirmation(tmp_path, monkeypatch, answer):
+    answers = iter(answer.splitlines())
+    monkeypatch.setattr('builtins.input', lambda _: next(answers))
+    url = vocal_archive(tmp_path / 'source.zip')
+    downloader.vocal_menu(tmp_path, {'vocal_models': {'bs-karaoke': url}})
+    assert (tmp_path / 'vocal-models/bs-karaoke').exists() == (answer.lower().endswith('y'))
+    if answer.lower() == 'n':
+        assert not (tmp_path / 'tmp').exists()
+
+
+@pytest.mark.parametrize('phase', ['confirm', 'download'])
+@pytest.mark.parametrize('error', [KeyboardInterrupt, EOFError])
+def test_vocal_cancel_cleans_only_own_files(tmp_path, monkeypatch, phase, error):
+    import json
+    monkeypatch.setattr(downloader, '__file__', str(tmp_path / 'download_models.py'))
+    (tmp_path / 'model-downloads.json').write_text(json.dumps({'vocal_models': {'bs-karaoke': 'unused'}}))
+    (tmp_path / 'tmp').mkdir()
+    (tmp_path / 'tmp/user.txt').write_text('keep')
+    def cancel(*args, **kwargs):
+        raise error()
+    monkeypatch.setattr('builtins.input', cancel if phase == 'confirm' else lambda _: 'y')
+    monkeypatch.setattr(downloader.urllib.request, 'urlopen', cancel)
+    assert downloader.main('vocal') == 0
+    assert sorted(p.name for p in (tmp_path / 'tmp').iterdir()) == ['user.txt']
+    assert not (tmp_path / 'vocal-models/bs-karaoke').exists()
+
+
+@pytest.mark.parametrize('location', ['vocal-models', 'vocal-models/bs-karaoke', 'tmp'])
+def test_vocal_rejects_symlink_destinations(tmp_path, location):
+    root = tmp_path / 'package'; root.mkdir()
+    outside = tmp_path / 'outside'; outside.mkdir()
+    link = root / location
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError):
+        downloader.install(root, 'bs-karaoke', 'invalid:never-downloaded', category='vocal')
+    assert list(outside.iterdir()) == []
+
+
+def test_vocal_concurrent_target_preserved(tmp_path, monkeypatch):
+    url = vocal_archive(tmp_path / 'source.zip')
+    extract = downloader.extract_model
+    def concurrent(*args):
+        model = extract(*args)
+        target = tmp_path / 'vocal-models/bs-karaoke'
+        target.mkdir()
+        (target / 'user.txt').write_text('keep')
+        return model
+    monkeypatch.setattr(downloader, 'extract_model', concurrent)
+    with pytest.raises(FileExistsError):
+        downloader.install(tmp_path, 'bs-karaoke', url, category='vocal')
+    assert (tmp_path / 'vocal-models/bs-karaoke/user.txt').read_text() == 'keep'
+    assert list((tmp_path / 'tmp').iterdir()) == []

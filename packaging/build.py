@@ -193,12 +193,15 @@ def model_downloads(root, tag, repository):
     names = ('NextFire-karaoke-ja-Latn', 'MMS_FA')
     write_json(root / 'model-downloads.json', {
         'release_tag': tag, 'repository': repository,
-        'models': {name: f'{base}/{name}.zip' for name in names}})
-    shutil.copy2(ROOT / 'packaging/download_models.py', root / 'download_models.py')
-    entry = 'download-models.cmd' if os.name == 'nt' else 'download-models.command'
-    shutil.copy2(ROOT / 'packaging/launchers' / entry, root / entry)
-    if os.name != 'nt':
-        (root / entry).chmod(0o755)
+        'models': {name: f'{base}/{name}.zip' for name in names},
+        'vocal_models': {'bs-karaoke': f'{base}/bs-karaoke.zip'}})
+    for module in ('download_models.py', 'download_align_models.py', 'download_vocal_models.py'):
+        shutil.copy2(ROOT / 'packaging' / module, root / module)
+    for category in ('align', 'vocal'):
+        entry = f'download-{category}-models.' + ('cmd' if os.name == 'nt' else 'command')
+        shutil.copy2(ROOT / 'packaging/launchers' / entry, root / entry)
+        if os.name != 'nt':
+            (root / entry).chmod(0o755)
     (root / 'models').mkdir()
 
 
@@ -255,7 +258,6 @@ def build(target, output, model_release_tag, model_repository):
                 run([python, '-I', '-c', 'import demucs,pathlib,shutil,sys; shutil.copyfile(pathlib.Path(demucs.__file__).parent/"remote/htdemucs.yaml",sys.argv[1])', destination], cwd=work)
             else:
                 download(item.get('url', models[family].get('source')), destination, item['sha256'], item['size'])
-    (root / 'vocal-models' / 'bs-karaoke').mkdir(parents=True, exist_ok=True)
     licenses(root, dependencies, pnpm)
     shutil.copy2(ROOT / 'packaging/models.json', root / 'licenses/models.json')
     shutil.copy2(ROOT / 'packaging/runtime-manifest.json', root / 'licenses/runtime-sources.json')

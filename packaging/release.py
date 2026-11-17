@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 from urllib.parse import quote
 
-MODEL_ASSETS = {'NextFire-karaoke-ja-Latn.zip', 'MMS_FA.zip'}
+MODEL_ASSETS = {'NextFire-karaoke-ja-Latn.zip', 'MMS_FA.zip', 'bs-karaoke.zip'}
 
 TARGETS = ('windows-x64-cpu', 'windows-x64-cuda', 'macos-arm64')
 
@@ -49,7 +49,7 @@ def prepare_draft(directory):
     existing = next((item for page in pages for item in page if item['tag_name'] == tag), None)
     if existing and not existing['draft']:
         raise ValueError('该版本已经发布，请使用新版本号；不会覆盖已发布附件')
-    notes = f'''Lazulite Studio {tag} 预发布\n\n源码提交：{commit}\n\n下载适合系统的完整 .7z 包。CUDA 若有分卷，下载全部 .7z.001、.7z.002 等文件，放在同一目录，从 .001 解压。\n\nWindows：双击 start.exe；macOS：双击 start.command。主包包含运行时、词典和人声分离模型，对齐权重单独提供。双击 download-models.cmd（Windows）或 download-models.command（macOS）选择下载。也可手动下载本 Release 的 NextFire-karaoke-ja-Latn.zip 和 MMS_FA.zip，解压到程序根 models/，保留 ZIP 内的模型目录，然后在设置的模型管理中刷新。自定义总目录用户可恢复默认或自行移入所选目录。详细说明见包内 USAGE.txt。\n\nmacOS 未经开发者签名或公证；此版本标记为预发布，供试用反馈。\n'''
+    notes = f'''Lazulite Studio {tag} 预发布\n\n源码提交：{commit}\n\n下载适合系统的完整 .7z 包。CUDA 若有分卷，下载全部 .7z.001、.7z.002 等文件，放在同一目录，从 .001 解压。\n\nWindows：双击 start.exe；macOS：双击 start.command。主包包含运行时、词典和 Demucs，BS Karaoke 与对齐权重单独提供。双击 download-align-models.cmd（Windows）或 download-align-models.command（macOS）选择对齐模型；双击 download-vocal-models.cmd 或 download-vocal-models.command，以 Y/N 确认下载 BS Karaoke。也可手动下载本 Release 的 NextFire-karaoke-ja-Latn.zip 和 MMS_FA.zip，解压到程序根 models/，保留 ZIP 内的模型目录，然后在设置的模型管理中刷新。自定义总目录用户可恢复默认或自行移入所选目录。BS Karaoke 也可手动下载 bs-karaoke.zip，解压到程序根 vocal-models/，保留 bs-karaoke/ 子目录，然后在人声分离模型设置中刷新并选择。\n\nmacOS 未经开发者签名或公证；此版本标记为预发布，供试用反馈。\n'''
     if existing:
         # Preserve the user's title and release notes. Pin a new tag to the built SHA.
         subprocess.run(['gh', 'release', 'edit', tag, '--draft', '--prerelease',
