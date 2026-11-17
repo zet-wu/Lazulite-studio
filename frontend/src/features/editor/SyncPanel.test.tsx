@@ -9,11 +9,12 @@ import { SyncPanel } from './SyncPanel';
 import { useSyncProgress } from './sync-progress';
 import { ProjectEditingContext } from './ProjectEditingContext';
 afterEach(() => { cleanup(); localStorage.clear(); });
-function setup(background = false, audio = true) {
+function setup(background = false, audio = true, skip = false) {
   const document = createLyricDocument(); document.lines = [createLine('', 'a'), createLine('', 'b')];
   document.lines[0].words = [createWord('A', 'A'), createWord('B', 'B')]; document.lines[1].words = [createWord('C', 'C')];
   if (background) document.lines[1].backgroundOf = 'a';
   let state = createProjectEditorState(createProjectDocument(document)), timeMs = 1000;
+  if(skip)state.present.editing.ignoredSyncLineIds=['b'];
   state.present.editing.emptyBeats.A = { kind: 'word', count: 2 };
   state.present.editing.emptyBeats.C = { kind: 'word', count: 1 };
   const transport = { current: { getPositionMs: () => timeMs, getPlaybackRate: () => 1, isPlaying: () => false, seekMs() {}, play() {}, pause() {}, audition() {} } satisfies TransportHandle };
@@ -24,7 +25,7 @@ function setup(background = false, audio = true) {
     return <ProjectEditingContext value={project.editing}><SyncPanel document={project.lyrics} cursor={cursor} transport={audio ? transport : undefined} onCursor={setCursor} progress={progress} onProgress={setProgress}
       apply={command => { try { state = executeProjectCommand(state, { type: 'lyrics', command }); setProject(state.present); return true; } catch { return false; } }} />
       <output data-testid="progress">{JSON.stringify(progress)}</output>
-      <button onClick={() => { setVersion(v => v + 1); setCursor(syncUnits(project.lyrics, project.editing, background ? 'b' : undefined).at(-1)!); }}>choose last</button>
+      <button onClick={() => { setVersion(v => v + 1); setCursor(syncUnits(project.lyrics, project.editing, background || skip ? 'b' : undefined).at(-1)!); }}>choose last</button>
       <button onClick={() => { state = undoProjectCommand(state); setProject(state.present); setVersion(v => v + 1); }}>undo</button>
     </ProjectEditingContext>;
   }
@@ -70,4 +71,21 @@ it('ignores no-audio stamping keys while keeping unit navigation available',()=>
  expect(run.state().past).toHaveLength(0);expect(screen.queryByRole('alert')).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'下一单元'}));
  expect(run.state().past).toHaveLength(0);
+});
+
+it('manual skipped row temporarily uses line mode without changing continuous preference',()=>{
+ localStorage.setItem('studio:sync-mode',JSON.stringify('continuous'));
+ const run=setup(false,true,true);stamp('choose last');
+ expect(screen.getByRole('combobox',{name:'打轴模式'})).toHaveValue('line');
+ expect(screen.getByRole('button',{name:'上一单元'})).toBeDisabled();
+ expect(localStorage.getItem('studio:sync-mode')).toBe(JSON.stringify('continuous'));
+ stamp('起始轴');run.time(2000);stamp('结束轴');expect(run.progress().completed).toBe(true);
+ expect(run.state().present.lyrics.lines[1].words[0].endMs).toBe(2000);
+});
+it('line mode can navigate to a skipped row, but its unit stepping remains local',()=>{
+ localStorage.setItem('studio:sync-mode',JSON.stringify('line'));
+ setup(false,true,true);stamp('下一行');
+ expect(screen.getByRole('button',{name:'上一单元'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'上一行'})).toBeEnabled();stamp('上一行');
+ expect(screen.getByRole('combobox',{name:'打轴模式'})).toBeEnabled();
 });

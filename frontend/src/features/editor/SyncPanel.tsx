@@ -49,6 +49,8 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
     if (!next) return;
     onProgress({ completed: false, consumed: 0 }); setError(''); onCursor(next);
   };
+  const canMoveUnit = (at:number) => !!units[at] && (!skipped || units[at].lineId === active?.lineId);
+  const moveUnit = (at:number) => {if(canMoveUnit(at))moveTo(at);};
   const previousLine = () => { const before = units.slice(0, index).reverse().find((unit) => unit.lineId !== active?.lineId); if (before) moveTo(units.findIndex((unit) => unit.lineId === before.lineId)); };
   const followingLine = () => { const at = units.findIndex((unit, position) => position > index && unit.lineId !== active?.lineId); if (at >= 0) moveTo(at); };
   const canStamp = (action: SyncAction) => !!transport && !!active && (action === 'start' || !completed);
@@ -76,8 +78,8 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
         && (!['start', 'next', 'end'].includes(action)
           || (['seekStart', 'seekEnd', 'seekBack', 'seekForward'] as const).some(key => matchesBinding(event, keys[key])))) return;
       event.preventDefault();
-      if (action === 'previous') moveTo(index - 1);
-      else if (action === 'following') moveTo(index + 1);
+      if (action === 'previous') moveUnit(index - 1);
+      else if (action === 'following') moveUnit(index + 1);
       else if (action === 'previousLine') previousLine();
       else if (action === 'followingLine') followingLine();
       else stamp(action);
@@ -100,12 +102,12 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
     {offsetMs !== 0 && <small>{t('sync.offset')} {offsetMs} ms <button data-role="secondary" onClick={() => setOffsetMs(0)}>{t('sync.reset')}</button></small>}
     {emptyBeats > 0 && <small>{t('sync.countdown')} {emptyBeats}/{beatCount}</small>}
     <div className={styles.syncButtons}>
-      <button data-role="secondary" disabled={index <= 0} onClick={() => moveTo(index - 1)}>{t('sync.previousUnit')}</button>
+      <button data-role="secondary" disabled={!canMoveUnit(index - 1)} onClick={() => moveUnit(index - 1)}>{t('sync.previousUnit')}</button>
       <button data-role="secondary" disabled={!units.slice(0, index).some((unit) => unit.lineId !== active?.lineId)} onClick={previousLine}>{t('sync.previousLine')}</button>
       <button data-role="secondary" disabled={!canStamp('start')} onClick={() => stamp('start')}>{t('sync.start')}</button>
       <button data-role="secondary" disabled={!canStamp('next')} onClick={() => stamp('next')}>{t('sync.step')}</button>
       <button data-role="secondary" disabled={!canStamp('end')} onClick={() => stamp('end')}>{t('sync.end')}</button>
-      <button data-role="secondary" disabled={index < 0 || index >= units.length - 1} onClick={() => moveTo(index + 1)}>{t('sync.nextUnit')}</button>
+      <button data-role="secondary" disabled={index < 0 || !canMoveUnit(index + 1)} onClick={() => moveUnit(index + 1)}>{t('sync.nextUnit')}</button>
       <button data-role="secondary" disabled={!units.some((unit, position) => position > index && unit.lineId !== active?.lineId)} onClick={followingLine}>{t('sync.nextLine')}</button>
     </div>
     <DisclosureTrigger open={extrasOpen} controls={extrasId} toggle={() => setExtrasOpen(open => !open)}>{t('sync.audition')}</DisclosureTrigger>

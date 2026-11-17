@@ -21,3 +21,12 @@ it('uses preceding background display order for candidates and actual stamps, wh
  project.editing.ignoredSyncLineIds=['bg'];expect(syncUnits(lyrics,project.editing,undefined,order).map(u=>u.lineId)).toEqual([main.id]);
  const manual=stampSync(started,units[0],'next',300,'continuous',project.editing,order);expect(manual.lines[0].words[0].beginMs).toBeNull();expect(manual.lines[1].words[0].endMs).toBe(300);
 });
+it('preserves explicit copied editing state and does not reset values on reparenting',()=>{
+ const lyrics=createLyricDocument('main');const second=createLine('second','second'),bg=createLine('background','bg');bg.backgroundOf=lyrics.lines[0].id;lyrics.lines.push(bg,second);
+ const state=createProjectEditorState(createProjectDocument(lyrics));state.present.amll.noMultipleBackgrounds=false;
+ const moved=executeProjectCommand(state,{type:'lyrics',command:{type:'set-background-of',lineId:'bg',parentLineId:'second'}});
+ expect(moved.present.editing.ignoredSyncLineIds).toEqual([]);expect(moved.present.editing.skippedAlignmentLineIds).toEqual([]);
+ const copy=createLine('copied','copy');copy.backgroundOf='second';
+ const pasted=executeProjectCommand(moved,{type:'lyrics',command:{type:'batch',commands:[{type:'replace-document',document:{...moved.present.lyrics,lines:[...moved.present.lyrics.lines,copy]}},{type:'restore-editing',editing:{emptyBeats:{},endLinks:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:[]}}]}});
+ expect(pasted.present.editing.ignoredSyncLineIds).toEqual([]);expect(pasted.present.editing.skippedAlignmentLineIds).toEqual([]);
+});

@@ -762,7 +762,7 @@ export function applyLyricTransaction(document: LyricDocument, command: LyricCom
   const restoring = command.type === 'batch' && command.commands.some(item => item.type === 'restore-editing');
   const atomic = (before: LyricDocument, command: AtomicLyricCommand) => {
     const after = applyAtomic(before, command, editing);
-    if (!(command.type === 'replace-document' && command.editing) && !restoring) applyBackgroundDefaults(before, after, editing, defaults);
+    if (!(command.type === 'replace-document' && command.editing) && !restoring && command.type !== 'split-line') applyBackgroundDefaults(before, after, editing, defaults);
     return after;
   };
   const lyrics = command.type === 'batch' ? command.commands.reduce(atomic, document) : atomic(document, command);
