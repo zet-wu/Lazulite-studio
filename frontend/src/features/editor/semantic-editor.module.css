@@ -323,7 +323,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .outlineRow[data-active-context] .outlineNumber { color: var(--primary); font-weight: 600; }
 
 /* Compact timing canvas: reading, body and markers occupy fixed grid rows. */
-.syncLine { display: grid; grid-template-columns: max(36px, calc((var(--gutter-digits) + 1) * 1ch + 8px)) minmax(0, 1fr); column-gap: 8px; user-select: none; cursor: default; padding: 12px 10px 16px; border-radius: 8px; outline-offset: -2px; }
+.syncLine { background: var(--panel); display: grid; grid-template-columns: max(36px, calc((var(--gutter-digits) + 1) * 1ch + 8px)) minmax(0, 1fr); column-gap: 8px; user-select: none; cursor: default; padding: 12px 10px 16px; border-radius: 8px; outline-offset: -2px; }
 .syncLineNumber { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding-top: 24px; color: var(--muted); font-size: 12px; min-height: 22px; }
 .syncLineNumber > span { display: inline-flex; }
 .syncOrdinal { min-height: 34px; align-items: center; }
@@ -350,9 +350,8 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .syncMarkers button[data-current] svg { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--blue) 80%, transparent)); }
 .syncMarkers button[data-role][data-passed] { color: var(--muted); opacity: .55; }
 .syncLine[data-ignored-sync] .syncText, .syncLine[data-ignored-sync] .syncMarkers { opacity: .65; }
-.syncLine:hover:not(:has(.syncWord:hover, button:hover)), .syncLine:focus-visible { background: var(--surface-container); }
-.syncWord:hover:not(:has(.syncRuby:hover, button:hover)), .syncWord:focus-visible { background: var(--surface-container-high); }
-.syncRuby:hover, .syncRuby:focus-visible { background: var(--blue-soft); }
+.syncWord:not([data-selected]):hover:not(:has(.syncRuby:hover, button:hover)) { background: var(--surface-container); }
+.syncRuby:not([data-selected]):hover { background: var(--surface-container); }
 .syncLine[data-selected], .syncWord[data-selected], .syncRuby[data-selected] { background: var(--blue-soft); }
 .syncWord:focus-visible, .syncRuby:focus-visible, .syncLine:focus-visible { outline: 2px solid var(--blue); }
 .outlineRow[data-active-context] .outlineNumber { color: var(--blue); }
