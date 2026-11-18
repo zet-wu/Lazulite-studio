@@ -493,7 +493,7 @@
   "vocal.versionMismatch": "現有人聲不符合目前分離版本",
   "vocal.reuseHelp": "重用現有人聲，取代全部片段及人工修正",
   "vocal.reanalyze": "重新進行聲學分析",
-  "vocal.download": "下載人聲 WAV",
+  "vocal.download": "下載人聲 M4A",
   "vocal.useExisting": "使用現有人聲",
   "vocal.acousticAnalysis": "聲學分析",
   "vocal.retry": "重試人聲處理",

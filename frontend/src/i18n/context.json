@@ -3131,7 +3131,7 @@
   },
   "vocal.download": {
     "context": "vocal interface: vocal.download",
-    "source": "下载人声 WAV",
+    "source": "下载人声 M4A",
     "params": [],
     "parameterNotes": {}
   },

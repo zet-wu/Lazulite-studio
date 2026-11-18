@@ -497,7 +497,7 @@
   "vocal.versionMismatch": "The existing vocals do not match the current separation version.",
   "vocal.reuseHelp": "Reuse existing vocals, replacing all segments and manual corrections.",
   "vocal.reanalyze": "Run acoustic analysis again",
-  "vocal.download": "Download vocal WAV",
+  "vocal.download": "Download vocal M4A",
   "vocal.useExisting": "Use existing vocals",
   "vocal.acousticAnalysis": "Acoustic analysis",
   "vocal.retry": "Retry vocal processing",
