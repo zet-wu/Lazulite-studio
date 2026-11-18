@@ -139,7 +139,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
       <MessageBar notice={readError} actions={<IconButton icon="refresh" label={t('vocal.retryRead')} data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();if(completed.isError)void completed.refetch();}}/>}/>
     </>,ui.messageHost)}
     {ui.statusHost && (conflictVisible || !ready || pendingFailure && !notice) && createPortal(<section className={styles.panel} aria-label={t('vocal.results')}>
-      {conflictVisible ? <><p>{t('vocal.changed')}</p><button data-role="primary" disabled={locked} onClick={adopt}>{t('vocal.replaceSegments')}</button>{ready && <button data-role="secondary" onClick={()=>setDismissed(latest!.id)}>{t('vocal.previous')}</button>}</> : pendingFailure && !notice ? <><p>{latest.error ? formatMessage(taskError(latest.error)) : t('vocal.interrupted')}</p>{retryActions}</> : <p>{active||busy?t('vocal.runningHelp'):t('vocal.empty')}</p>}
+      {conflictVisible ? <><p>{t('vocal.changed')}</p><button data-role="primary" disabled={locked} onClick={adopt}>{t('vocal.replaceSegments')}</button>{ready && <button data-role="secondary" onClick={()=>setDismissed(latest!.id)}>{t('vocal.previous')}</button>}</> : pendingFailure && !notice ? <><p>{latest.error ? formatMessage(taskError(latest.error)) : t(latest.status==='failed'?'vocal.failed':'vocal.interrupted')}</p>{retryActions}</> : <p>{active||busy?t('vocal.runningHelp'):t('vocal.empty')}</p>}
     </section>,ui.statusHost)}
   </>;
 }
