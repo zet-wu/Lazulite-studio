@@ -323,7 +323,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .outlineRow[data-active-context] .outlineNumber { color: var(--primary); font-weight: 600; }
 
 /* Compact timing canvas: reading, body and markers occupy fixed grid rows. */
-.syncLine { background: var(--panel); display: grid; grid-template-columns: max(36px, calc((var(--gutter-digits) + 1) * 1ch + 8px)) minmax(0, 1fr); column-gap: 8px; user-select: none; cursor: default; padding: 12px 10px 16px; border-radius: 8px; outline-offset: -2px; }
+.syncLine { margin-bottom: 6px; background: var(--panel); display: grid; grid-template-columns: max(36px, calc((var(--gutter-digits) + 1) * 1ch + 8px)) minmax(0, 1fr); column-gap: 8px; user-select: none; cursor: default; padding: 12px 10px 16px; border-radius: 8px; outline-offset: -2px; }
 .syncLineNumber { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding-top: 24px; color: var(--muted); font-size: 12px; min-height: 22px; }
 .syncLineNumber > span { display: inline-flex; }
 .syncOrdinal { min-height: 34px; align-items: center; }
