@@ -12,3 +12,9 @@ it('allows disjoint arrow scopes but rejects global and fixed conflicts with exa
   expect(formatBinding(custom, true)).toBe('⌥ + ⇧ + G');
   expect(formatBinding(custom, false)).toBe('Alt + Shift + G');
 });
+
+it('reserves plain Space for playback even when playback has an additional custom key', () => {
+  const bindings = {...defaultBindings, play: {...defaultBindings.play, code: 'KeyP'}};
+  expect(bindingError('start', defaultBindings.play, bindings)?.key).toBe('shortcuts.reserved');
+  expect(bindingError('play', bindings.play, bindings)).toBeNull();
+});

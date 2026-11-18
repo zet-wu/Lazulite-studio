@@ -1,3 +1,4 @@
+import { usePlaybackShortcut } from '../shortcuts';
 import {usePreference} from '../../adapters/studio-preferences';
 import { message as describeMessage, errorMessage } from '../../domain/messages';
 import { i18n, formatMessage } from '../../i18n';
@@ -125,6 +126,11 @@ function isTextInput(target: EventTarget) {
 }
 
 export function EditorWorkspace(props: Props) {
+  usePlaybackShortcut(() => {
+    const transport = props.transport?.current;
+    if (transport?.isPlaying()) transport.pause();
+    else transport?.play();
+  });
   useTranslation();
   const shared = useEditorSelection();
   return shared ? <EditorWorkspaceContent key={props.projectId} {...props} /> : <SelectionProvider><EditorWorkspaceContent key={props.projectId} {...props} /></SelectionProvider>;

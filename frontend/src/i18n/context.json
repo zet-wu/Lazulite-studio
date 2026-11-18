@@ -8203,7 +8203,7 @@
   },
   "shortcuts.help": {
     "context": "shortcuts interface: shortcuts.help",
-    "source": "点击按键框后录入组合键。打轴按物理键位；播放定位仅在播放器内生效。清除自定义后恢复该项默认。",
+    "source": "点击按键框后录入组合键。打轴按物理键位；播放定位仅在播放器内生效。清除自定义后恢复该项默认。工作台非输入状态下，空格始终用于播放／暂停，自定义播放键也可使用。",
     "params": [],
     "parameterNotes": {}
   },

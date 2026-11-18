@@ -28,6 +28,7 @@ export function bindingError(action: ShortcutAction, binding: Binding, bindings:
   if (/^F/.test(binding.code) || (binding.alt && (/^Arrow/.test(binding.code) || binding.code === 'Space')) ||
     ((binding.ctrl || binding.meta) && /^(Key[ACVXSZYWLNTRPQHJKOFDBEGUIM]|Digit[0-9]|Space|Arrow.*|Home|End)$/.test(binding.code)) ||
     (binding.ctrl && binding.alt)) return message('shortcuts.system');
+  if (action !== 'play' && same(binding, defaultBindings.play)) return message('shortcuts.reserved');
   const scope = shortcutActions[action][0];
   for (const other of Object.keys(shortcutActions) as ShortcutAction[]) {
     if (other === action) continue;
@@ -74,4 +75,25 @@ export function shortcutInput(target: EventTarget | null, code?: string) {
   // take precedence over timing shortcuts; editable and composite controls always do.
   if (target instanceof Element && target.closest('button') && (!code || code === 'Space' || code === 'Enter')) return true;
   return target instanceof Element && Boolean(target.closest('input, textarea, select, a, summary, [contenteditable="true"], [role="dialog"], [role="menu"], [role="separator"], [data-top-menu]'));
+}
+
+/** The workspace owns playback keys even when no media is loaded. */
+export function usePlaybackShortcut(toggle: () => void) {
+  const keys = useShortcuts();
+  useEffect(() => {
+    const handle = (event: KeyboardEvent) => {
+      if (!matchesBinding(event, defaultBindings.play) && !matchesBinding(event, keys.play)) return;
+      if (event.defaultPrevented || event.isComposing || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"], details[data-top-menu][open]')) return;
+      if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="separator"], [data-top-menu]')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.type === 'keydown' && !event.repeat) toggle();
+    };
+    window.addEventListener('keydown', handle, true);
+    window.addEventListener('keyup', handle, true);
+    return () => {
+      window.removeEventListener('keydown', handle, true);
+      window.removeEventListener('keyup', handle, true);
+    };
+  }, [keys, toggle]);
 }

@@ -1244,7 +1244,7 @@
   "shortcuts.system": "This shortcut is reserved by a fixed action, the system, or the browser",
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.restore": "Restore all defaults",
-  "shortcuts.help": "Click a key field, then press a combination. Timing uses physical key positions; seeking works inside the player. Clearing a custom shortcut restores its default.",
+  "shortcuts.help": "Click a key field, then press a combination. Timing uses physical key positions; seeking works inside the player. Clearing a custom shortcut restores its default. Outside inputs in the workspace, Space always toggles playback; a custom playback key also works.",
   "shortcuts.input": "{{action}} shortcut",
   "shortcuts.conflict": "Conflicts with “{{action}}”",
   "karaoke.groupInvalid": "Group {{number}} ID must start with a Latin letter and contain only letters, digits, underscores, or hyphens",

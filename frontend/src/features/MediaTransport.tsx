@@ -534,17 +534,6 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         panDrag.current = null; loopDrag.current = null;
         e.preventDefault(); return;
       }
-      if (
-        matchesBinding(e, keys.play) &&
-        !e.defaultPrevented &&
-        !e.isComposing &&
-        !e.repeat &&
-        asset &&
-        !shortcutInput(e.target)
-      ) {
-        e.preventDefault();
-        play();
-      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

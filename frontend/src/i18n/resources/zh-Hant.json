@@ -1240,7 +1240,7 @@
   "shortcuts.system": "此組合鍵用於固定操作或系統／瀏覽器，無法可靠攔截",
   "shortcuts.title": "快捷鍵設定",
   "shortcuts.restore": "還原所有預設值",
-  "shortcuts.help": "點選按鍵框後輸入組合鍵。打軸使用實體鍵位；播放定位僅在播放器內生效。清除自訂後會還原該項預設值。",
+  "shortcuts.help": "點選按鍵框後輸入組合鍵。打軸使用實體鍵位；播放定位僅在播放器內生效。清除自訂後會還原該項預設值。工作台非輸入狀態下，空格固定用於播放／暫停，也可使用自訂播放鍵。",
   "shortcuts.input": "{{action}}快捷鍵",
   "shortcuts.conflict": "與「{{action}}」衝突",
   "karaoke.groupInvalid": "第 {{number}} 組 ID 須以英文字母開頭，後接字母、數字、底線或連字號",

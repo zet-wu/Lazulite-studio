@@ -1240,7 +1240,7 @@
   "shortcuts.system": "此组合键用于固定操作或系统/浏览器，不能可靠接管",
   "shortcuts.title": "快捷键设置",
   "shortcuts.restore": "恢复全部默认",
-  "shortcuts.help": "点击按键框后录入组合键。打轴按物理键位；播放定位仅在播放器内生效。清除自定义后恢复该项默认。",
+  "shortcuts.help": "点击按键框后录入组合键。打轴按物理键位；播放定位仅在播放器内生效。清除自定义后恢复该项默认。工作台非输入状态下，空格始终用于播放／暂停，自定义播放键也可使用。",
   "shortcuts.input": "{{action}}快捷键",
   "shortcuts.conflict": "与“{{action}}”冲突",
   "karaoke.groupInvalid": "第 {{number}} 组 ID 须以英文字母开头，后接字母、数字、下划线或连字符",

@@ -59,7 +59,7 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
   const chooseKey = (event: React.KeyboardEvent, choose: () => void, id?: string) => {
     if (event.target !== event.currentTarget) return;
     if (event.key === 'F2' && id) { event.preventDefault(); draft.open(id); }
-    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); }
+    if (event.key === 'Enter') { event.preventDefault(); choose(); }
   };
   const markers = (id: string, kind: 'word' | 'ruby', participates: boolean, choose: () => void) => presentation !== 'edit' && participates && <div className={styles.syncMarkers}>
     <button data-role="inline" className={styles.syncDot} tabIndex={-1} aria-label={t('sync.unit')} data-sync-marker="dot" data-current={activeId === id && progress.consumed === 0 || undefined}
