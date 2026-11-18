@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { MessageBar, useNotice } from './MessageBar';
@@ -26,4 +27,17 @@ it('keeps running status non-dismissible and pauses timed actions while focused'
  view.rerender(<MessageBar notice={{text:'完成',role:'status',origin:null,timeout:4000}} actions={<button>查看结果</button>}/>);
  act(()=>screen.getByRole('button',{name:'查看结果'}).focus());act(()=>vi.advanceTimersByTime(10000));expect(screen.getByText('完成')).toBeVisible();
  act(()=>screen.getByRole('button',{name:'查看结果'}).blur());act(()=>vi.advanceTimersByTime(4000));expect(screen.queryByText('完成')).toBeNull();
+});
+
+it('dismissal and expiry survive a message host remount while explicit replay creates a new event',()=>{
+ vi.useFakeTimers();
+ function Host(){
+  const [notice,publish]=useNotice();const [host,setHost]=useState(0);
+  return <><button onClick={()=>publish('结果','status',4000)}>发布</button><button onClick={()=>setHost(x=>x+1)}>换宿主</button><MessageBar key={host} notice={notice}/></>;
+ }
+ render(<Host/>);
+ fireEvent.click(screen.getByText('发布'));fireEvent.click(screen.getByRole('button',{name:'关闭提示'}));
+ fireEvent.click(screen.getByText('换宿主'));expect(screen.queryByRole('status')).toBeNull();
+ fireEvent.click(screen.getByText('发布'));expect(screen.getByRole('status')).toHaveTextContent('结果');
+ act(()=>vi.advanceTimersByTime(4000));fireEvent.click(screen.getByText('换宿主'));expect(screen.queryByRole('status')).toBeNull();
 });

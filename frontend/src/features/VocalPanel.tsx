@@ -2,7 +2,7 @@ import {VocalUpload} from './VocalUpload';
 import { message as describeMessage, messageList, MessageError, errorMessage, type Message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { deviceSummary, taskError } from './task-messages';
-import { i18n } from '../i18n';
+import { i18n, formatMessage } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { intersectSegments } from '../domain/time-boundaries';
 import { useProjectJobs } from './useProjectJobs';
@@ -37,6 +37,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   });
   useEffect(()=>{if(pending)sessionStorage.setItem(intentKey,JSON.stringify(pending));else sessionStorage.removeItem(intentKey);},[intentKey,pending]);
   const handled = useRef(new Set<string>());
+  const observedTasks = useRef(new Map<string, string>());
   const jobs = useProjectJobs(projectId,visible);
   const hasActive=jobs.data?.items.some(job=>['queued','running','cancel_requested'].includes(job.status));
   const results = useQuery({ queryKey: ['vocals', projectId], queryFn: () => vocalApi.list(projectId), refetchInterval: hasActive ? 1000 : 15000, refetchOnWindowFocus: 'always' });
@@ -58,7 +59,10 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const conflictVisible = !!conflict && dismissed !== latest?.id;
   useEffect(()=>ui.setTimelineReady(ready && !conflictVisible),[ready,conflictVisible,ui.setTimelineReady]);
   useEffect(() => {
-    if (!latest || !['failed','cancelled','interrupted','succeeded'].includes(latest.status)) return;
+    if (!latest) return;
+    const previous = observedTasks.current.get(latest.id);
+    observedTasks.current.set(latest.id, latest.status);
+    if (!previous || previous === latest.status || !['failed','cancelled','interrupted','succeeded'].includes(latest.status)) return;
     const success = latest.status === 'succeeded' || latest.status === 'cancelled';
     const text=describeMessage(latest.status==='failed'?'vocal.failed':latest.status==='interrupted'?'vocal.interrupted':latest.status==='cancelled'?'vocal.cancelled':'vocal.completed');
     publish(latest.error ? taskError(latest.error) : text, success ? 'status' : 'alert', success ? 4000 : undefined, latest.id);
@@ -88,7 +92,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     submitting.current=true;cancelRequested.current=false;setCancelling(false);
     const baseline=JSON.stringify(project.acoustics);
     setBusy(true); setError(''); publish(null); setDismissed(null);
-    try { const job=await jobsApi.createVocal(projectId, sourceAssetId, reuse, upload, force); setPending({id:job.id,baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); return true; }
+    try { const job=await jobsApi.createVocal(projectId, sourceAssetId, reuse, upload, force); observedTasks.current.set(job.id, 'queued'); setPending({id:job.id,baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }); return true; }
     catch(e) { if(upload)throw e; setError(errorMessage(e)); return false; }
     finally { submitting.current=false; setBusy(false); }
   };
@@ -97,7 +101,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     if (!latest || !pending || pending.id !== latest.id || pending.baseline !== JSON.stringify(project.acoustics) || latest.request?.asset_id !== sourceAssetId) { setError(describeMessage('vocal.intentChanged')); return; }
     if (!latest.request?.bound_revision) { setError(describeMessage('vocal.noRetryRevision')); return; }
     submitting.current=true; cancelRequested.current=false; setCancelling(false); setBusy(true); setError(''); publish(null);
-    try { const job = await jobsApi.retryCpu(latest.id, latest.request.bound_revision); setPending({id:job.id, baseline:pending.baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await jobs.refetch(); }
+    try { const job = await jobsApi.retryCpu(latest.id, latest.request.bound_revision); observedTasks.current.set(job.id, 'queued'); setPending({id:job.id, baseline:pending.baseline}); if(cancelRequested.current) await jobsApi.cancel(job.id); await jobs.refetch(); }
     catch(e) { setError(errorMessage(e)); }
     finally { submitting.current=false; setBusy(false); }
   };
@@ -110,6 +114,11 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     try { await jobsApi.cancel(active.id); await jobs.refetch(); }
     catch(e) { setError(describeMessage('task.cancelFailed',{diagnostic:(e as Error).message}));setCancelling(false); }
   };
+  const pendingFailure = !!pending && pending.id === latest?.id && failure && latest.status !== 'cancelled';
+  const retryActions = latest && failure && latest.status !== 'cancelled' ? <>
+    <IconButton icon="refresh" label={t('vocal.retry')} data-role="secondary" disabled={locked||busy||!!active} onClick={retry}/>
+    {latest.error?.cpu_retry && <button data-role="secondary" disabled={locked||busy||!!active} onClick={()=>void retryCpu()}>{t('task.retryCpu')}</button>}
+  </> : null;
   const task = active;
   const deviceText=deviceSummary(task?.request?.devices);
   const status = { queued: t('task.queued'), running: t('task.processing'), cancel_requested: t('task.waitingCancel'), cancelled: t('task.cancelled'), failed: t('task.failed'), interrupted: t('task.interrupted'), succeeded: t('task.applying') };
@@ -125,15 +134,12 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     </>, ui.analysisHost)}
     {ui.taskHost && (active || busy) && createPortal(<MessageBar notice={{ text: t('task.vocalProgress',{progress:`${task ? cancelling ? t('task.cancelling') : status[task.status] : t('task.preparing')}${task?.stage ? ` · ${{separating:t('vocal.separate'),analyzing:t('vocal.acousticAnalysis')}[task.stage] ?? task.stage}` : ''}`,device:deviceText?' · '+deviceText:''}), role:'status', origin:null, dismissible:false }} actions={<button data-role="secondary" disabled={cancelling || active?.status==='cancel_requested'} onClick={()=>void cancel()}>{t('task.cancel')}</button>}/>,ui.taskHost)}
     {ui.messageHost && createPortal(<>
-      <MessageBar notice={notice} actions={notice?.taskId===latest?.id && failure && latest.status!=='cancelled' ? <>
-        <IconButton icon="refresh" label={t('vocal.retry')} data-role="secondary" disabled={locked||busy||!!active} onClick={retry}/>
-        {latest.error?.cpu_retry && <button data-role="secondary" disabled={locked||busy||!!active} onClick={()=>void retryCpu()}>{t('task.retryCpu')}</button>}
-      </> : undefined}/>
+      <MessageBar notice={notice} actions={notice?.taskId===latest?.id ? retryActions : undefined}/>
       <MessageBar notice={issue} actions={!active && !busy ? <IconButton icon="refresh" label={t('vocal.retry')} data-role="secondary" disabled={locked} onClick={()=>{if(pending && result?.status==='ready' && latest?.status==='succeeded')setError('');else retry();}}/> : undefined}/>
       <MessageBar notice={readError} actions={<IconButton icon="refresh" label={t('vocal.retryRead')} data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();if(completed.isError)void completed.refetch();}}/>}/>
     </>,ui.messageHost)}
-    {ui.statusHost && (conflictVisible || !ready) && createPortal(<section className={styles.panel} aria-label={t('vocal.results')}>
-      {conflictVisible ? <><p>{t('vocal.changed')}</p><button data-role="primary" disabled={locked} onClick={adopt}>{t('vocal.replaceSegments')}</button>{ready && <button data-role="secondary" onClick={()=>setDismissed(latest!.id)}>{t('vocal.previous')}</button>}</> : <p>{active||busy?t('vocal.runningHelp'):t('vocal.empty')}</p>}
+    {ui.statusHost && (conflictVisible || !ready || pendingFailure && !notice) && createPortal(<section className={styles.panel} aria-label={t('vocal.results')}>
+      {conflictVisible ? <><p>{t('vocal.changed')}</p><button data-role="primary" disabled={locked} onClick={adopt}>{t('vocal.replaceSegments')}</button>{ready && <button data-role="secondary" onClick={()=>setDismissed(latest!.id)}>{t('vocal.previous')}</button>}</> : pendingFailure && !notice ? <><p>{latest.error ? formatMessage(taskError(latest.error)) : t('vocal.interrupted')}</p>{retryActions}</> : <p>{active||busy?t('vocal.runningHelp'):t('vocal.empty')}</p>}
     </section>,ui.statusHost)}
   </>;
 }

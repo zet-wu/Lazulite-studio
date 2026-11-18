@@ -5,12 +5,12 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { IconButton } from './Controls';
 import './message-bar.css';
 
-export type Notice = { text: string | Message; role: 'alert' | 'status'; timeout?: number; origin: HTMLElement | null; dismissible?: boolean; taskId?: string };
+export type Notice = { text: string | Message; role: 'alert' | 'status'; timeout?: number; origin: HTMLElement | null; dismissible?: boolean; taskId?: string; onDismiss?: () => void };
 // Each publication is a new event, even when its text is unchanged.
 export function useNotice() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const publish = useCallback((text: string | Message | null, role: Notice['role'] = 'alert', timeout?: number, taskId?: string) => {
-    const event = text ? { text, role, timeout, taskId, origin: document.activeElement instanceof HTMLElement ? document.activeElement : null } : null;
+    const event: Notice | null = text ? { text, role, timeout, taskId, origin: document.activeElement instanceof HTMLElement ? document.activeElement : null, onDismiss: () => setNotice(current => current === event ? null : current) } : null;
     setNotice(event);
     return event;
   }, []);
@@ -30,6 +30,7 @@ export function MessageBar({ notice, actions }: { notice: Notice | null; actions
     }
     setFocused(false);
     setDismissed(notice);
+    notice?.onDismiss?.();
   }, [notice]);
   useEffect(() => { setFocused(!!root.current?.contains(document.activeElement)); }, [notice]);
   useEffect(() => {

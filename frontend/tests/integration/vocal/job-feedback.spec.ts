@@ -34,9 +34,10 @@ test('vocal running status remains reachable, failures close independently and o
  await failure.getByRole('button',{name:'使用 CPU 重试'}).click();await expect.poll(()=>state.retries).toBe(1);
  await expect(failure).toHaveCount(0);await expect(running).toBeVisible();
  state.status='failed';await expect(failure).toBeVisible();await failure.getByRole('button',{name:'关闭提示'}).click();
- await expect(page.getByRole('button',{name:'使用 CPU 重试'})).toHaveCount(0);
+ await expect(failure).toHaveCount(0);
  await page.getByRole('button',{name:'音频处理',exact:true}).click();await expect(page.locator('[data-segment-id]').first()).toBeVisible();
  await expect(failure).toHaveCount(0);
+ await expect(page.getByRole('region',{name:'音频处理结果'}).getByRole('button',{name:'使用 CPU 重试'})).toBeVisible();
 });
 test('closing success leaves result replacement decisions intact',async({page})=>{
  const {state}=await setup(page);
@@ -59,4 +60,24 @@ test('a stale source result is rejected without replacing existing segments',asy
  const {state}=await setup(page);state.resultAsset='other-source';state.status='succeeded';
  await expect(page.getByRole('alert').filter({hasText:'音源已改变'})).toBeVisible();
  await expect(page.locator('[data-segment-id="old1"]')).toBeVisible();await expect(page.locator('[data-segment-id="new15"]')).toHaveCount(0);
+});
+
+test('reopening restores pending failure actions without replaying a terminal banner',async({page})=>{
+ const {pid,state}=await setup(page);state.status='failed';
+ const failure=page.locator('[data-message-bar]').filter({hasText:'GPU 人声测试失败'});await expect(failure).toBeVisible();
+ await page.goto('/projects');await page.goto(`/projects/${pid}/edit`);
+ await page.getByRole('button',{name:'音频处理',exact:true}).click();
+ await expect(failure).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'使用 CPU 重试'})).toBeVisible();
+ await page.reload();await page.getByRole('button',{name:'音频处理',exact:true}).click();
+ await expect(failure).toHaveCount(0);await expect(page.getByRole('button',{name:'使用 CPU 重试'})).toBeVisible();
+});
+test('a running task restored on entry emits its new terminal state once',async({page})=>{
+ const {pid,state}=await setup(page);await page.reload();
+ await expect(page.getByRole('button',{name:'取消任务',exact:true})).toBeVisible();state.status='succeeded';
+ const success=page.locator('[data-message-bar]').filter({hasText:'人声处理完成'});await expect(success).toBeVisible();
+ await success.getByRole('button',{name:'关闭提示'}).click();
+ await page.getByRole('button',{name:'打轴',exact:true}).click();await expect(success).toHaveCount(0);
+ await page.goto('/projects');await page.goto(`/projects/${pid}/edit`);await expect(success).toHaveCount(0);
+ await page.reload();await expect(success).toHaveCount(0);
 });
