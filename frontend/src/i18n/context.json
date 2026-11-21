@@ -11763,5 +11763,21 @@
   "translation.replacement": {
     "source": "替换",
     "context": "导出内容列表中翻译轨道的用途，区分字幕与替换。"
+  },
+  "parse.sugInvalid": {
+    "source": "SUG 数据损坏或包含无法解析的引用，请检查源文件。",
+    "context": "单个 SUG 0.3.0 歌词文件导入；预览显示缺少的源检查点数量，解析错误保留原项目。"
+  },
+  "parse.sugVersion": {
+    "source": "仅支持 SUG 0.3.0 文件结构。",
+    "context": "单个 SUG 0.3.0 歌词文件导入；预览显示缺少的源检查点数量，解析错误保留原项目。"
+  },
+  "parse.sugProjectOutput": {
+    "source": "SUG 需在歌词导出面板中按项目内容选择输出。",
+    "context": "单个 SUG 0.3.0 歌词文件导入；预览显示缺少的源检查点数量，解析错误保留原项目。"
+  },
+  "acquire.sugTiming": {
+    "source": "SUG 尚缺 {{count}} 个检查点；已有时间将随歌词导入，可在导入后继续打轴。映射后 {{missing}} 个对象缺少端点。",
+    "context": "单个 SUG 0.3.0 歌词文件导入；预览显示缺少的源检查点数量，解析错误保留原项目。"
   }
 }

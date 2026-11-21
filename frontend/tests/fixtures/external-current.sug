@@ -1,0 +1,173 @@
+{
+  "version": "0.3.0",
+  "id": "external",
+  "metadata": {
+    "title": "外部 SUG",
+    "artist": "Artist",
+    "album": "",
+    "language": "ja",
+    "created_at": "2026-11-22T00:20:44.448192",
+    "updated_at": "2026-11-22T00:20:44.448208",
+    "extra": {}
+  },
+  "audio_duration_ms": 10000,
+  "singers": [
+    {
+      "id": "source lead",
+      "name": "完整名称 A＋B",
+      "color": "#FF6B6B",
+      "complement_color": "#6BFFFF",
+      "color_mode": "solid",
+      "split_colors": [],
+      "is_default": false,
+      "is_placeholder": false,
+      "display_priority": 0,
+      "enabled": true,
+      "backend_number": 0,
+      "group": "",
+      "ttml_agent_id": "lead",
+      "ttml_agent_type": "person",
+      "ttml_agent_named": true
+    },
+    {
+      "id": "source same",
+      "name": "完整名称 A＋B",
+      "color": "#FF6B6B",
+      "complement_color": "#6BFFFF",
+      "color_mode": "solid",
+      "split_colors": [],
+      "is_default": false,
+      "is_placeholder": false,
+      "display_priority": 0,
+      "enabled": true,
+      "backend_number": 0,
+      "group": ""
+    }
+  ],
+  "sentences": [
+    {
+      "id": "translation",
+      "singer_id": "source same",
+      "characters": [
+        {
+          "char": "现在",
+          "check_count": 0,
+          "timestamps": [],
+          "sentence_end_ts": null,
+          "linked_to_next": false,
+          "is_line_end": false,
+          "is_sentence_end": false,
+          "is_rest": false,
+          "singer_id": "",
+          "needs_guide": false,
+          "is_guide": false,
+          "force_singer_tag": false
+        }
+      ],
+      "aux_role": "x-translation",
+      "aux_parent_id": "main",
+      "aux_lang": "zh-Hans",
+      "aux_order": 0,
+      "aux_begin": 1100,
+      "aux_end": 2800
+    },
+    {
+      "id": "background",
+      "singer_id": "source same",
+      "characters": [
+        {
+          "char": "声",
+          "check_count": 1,
+          "timestamps": [
+            1800
+          ],
+          "sentence_end_ts": 3100,
+          "linked_to_next": false,
+          "is_line_end": false,
+          "is_sentence_end": true,
+          "is_rest": false,
+          "singer_id": "",
+          "needs_guide": false,
+          "is_guide": false,
+          "force_singer_tag": false
+        }
+      ],
+      "aux_role": "x-bg",
+      "aux_parent_id": "main",
+      "aux_order": 0
+    },
+    {
+      "id": "main",
+      "singer_id": "source lead",
+      "characters": [
+        {
+          "char": "今",
+          "check_count": 2,
+          "timestamps": [
+            1000,
+            1600
+          ],
+          "sentence_end_ts": null,
+          "linked_to_next": true,
+          "is_line_end": false,
+          "is_sentence_end": false,
+          "is_rest": false,
+          "singer_id": "",
+          "needs_guide": false,
+          "is_guide": false,
+          "force_singer_tag": false,
+          "ruby": {
+            "parts": [
+              {
+                "text": "い",
+                "offset_ms": 0
+              },
+              {
+                "text": "ま",
+                "offset_ms": 0
+              }
+            ]
+          }
+        },
+        {
+          "char": "は",
+          "check_count": 0,
+          "timestamps": [],
+          "sentence_end_ts": 2800,
+          "linked_to_next": false,
+          "is_line_end": true,
+          "is_sentence_end": true,
+          "is_rest": false,
+          "singer_id": "",
+          "needs_guide": false,
+          "is_guide": false,
+          "force_singer_tag": false
+        }
+      ]
+    },
+    {
+      "id": "tail",
+      "singer_id": "source lead",
+      "characters": [
+        {
+          "char": "é",
+          "check_count": 1,
+          "timestamps": [
+            4000
+          ],
+          "sentence_end_ts": null,
+          "linked_to_next": false,
+          "is_line_end": true,
+          "is_sentence_end": true,
+          "is_rest": false,
+          "singer_id": "",
+          "needs_guide": false,
+          "is_guide": false,
+          "force_singer_tag": false
+        }
+      ]
+    }
+  ],
+  "global_offset_ms": -100,
+  "media_path": "/unreadable/source-media.mp4"
+}

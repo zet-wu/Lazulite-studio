@@ -1,3 +1,4 @@
+import { importSugFile } from '../adapters/sug-import';
 import {backgroundDefaults} from '../adapters/studio-preferences';
 import { useMessageText } from '../shared/useMessageText';
 import { message as describeMessage, MessageError, errorMessage, isMessage, type Message } from '../domain/messages';
@@ -38,6 +39,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   const [dismissed, setDismissed] = useState(false);
   const [text, setText] = useState('');
   const [format, setFormat] = useState<Exclude<LyricFormat, 'ass'>>('txt');
+  const [sugIncomplete,setSugIncomplete]=useState<number|null>(null);
   const [incoming, setIncoming] = useState<LyricDocument | null>(null);
   const [base, setBase] = useState(document);
   const [choices, setChoices] = useState<MetadataChoices>({});
@@ -46,14 +48,14 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   const [message, setMessage] = useMessageText('');
   const fileInput = useRef<HTMLInputElement>(null);
   const request = useRef(0);
-  const stage = (next: LyricDocument) => { setIncoming(next); setPreviewPage(0); setBase(document); setChoices(defaultChoices(document, next)); setMessage(''); };
+  const stage = (next: LyricDocument) => { setSugIncomplete(null); setIncoming(next); setPreviewPage(0); setBase(document); setChoices(defaultChoices(document, next)); setMessage(''); };
   useEffect(() => {
     if (networkPreview) stage(networkPreview); else if (network) setIncoming(null);
   }, [networkPreview, tab]);
   useEffect(() => { if (tab === 'embedded') setIncoming(null); }, [sourceAssetId]);
   useEffect(() => setDismissed(false), [tab, selected?.candidate.id, selected?.error]);
   const parse = (content: string, kind: Exclude<LyricFormat, 'ass'>) => {
-    try { stage(importLyricFile(content, kind)); } catch (e) { setIncoming(null); setMessage(errorMessage(e)); }
+    try { if(kind==='sug'){const result=importSugFile(content);stage(result.document);setSugIncomplete(result.incompleteCheckpoints);}else{stage(importLyricFile(content,kind));setSugIncomplete(null);} } catch (e) { setIncoming(null); setMessage(errorMessage(e)); }
   };
   const open = async (file: File) => {
     const serial = ++request.current; setFilename(file.name); setIncoming(null); setMessage(describeMessage('common.reading'));
@@ -78,8 +80,8 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
     </div>
       {network && <NetworkLyrics store={store} searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} />}
       {tab === 'embedded' && <EmbeddedLyrics projectId={projectId} sourceAssetId={sourceAssetId} onPreview={parse} />}
-      {tab === 'file' && <><button data-role="secondary" onClick={() => fileInput.current?.click()}>{t('acquire.chooseFile')}</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
-      {tab === 'text' && <><label>{t('acquire.textFormat')}<Select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys'].map(id => <option key={id}>{id}</option>)}</Select></label><textarea aria-label={t('acquire.textInput')} value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button data-role="secondary" onClick={() => parse(text, format)}>{t('acquire.previewText')}</button></>}
+      {tab === 'file' && <><button data-role="secondary" onClick={() => fileInput.current?.click()}>{t('acquire.chooseFile')}</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys,.sug" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
+      {tab === 'text' && <><label>{t('acquire.textFormat')}<Select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys','sug'].map(id => <option key={id}>{id}</option>)}</Select></label><textarea aria-label={t('acquire.textInput')} value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button data-role="secondary" onClick={() => parse(text, format)}>{t('acquire.previewText')}</button></>}
       {onNew && <button data-role="secondary" onClick={onNew}>{t('acquire.emptyLyrics')}</button>}
       {message && <p role="status">{message}</p>}
     </section>
@@ -87,6 +89,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
       {selected && selected.error && !dismissed && <div className={styles.previewError} role="status"><span>{t(checkLabels[selected.status])}：{(isMessage(selected.error)?formatMessage(selected.error):selected.error).slice(0,160)}</span><IconButton icon="close" data-role="secondary" label={t('acquire.dismissCandidate')} onClick={()=>setDismissed(true)}/></div>}
       {selected && ['pending','fetching','parsing'].includes(selected.status) && <p role="status">{t(checkLabels[selected.status])}…</p>}
       {incoming ? <>
+      {sugIncomplete!==null&&<p className={styles.hint}>{t('acquire.sugTiming',{count:sugIncomplete,missing:incoming.lines.flatMap(line=>line.words.flatMap(word=>[word,...word.rubyUnits])).filter(item=>item.beginMs===null||item.endMs===null).length+ [...incoming.translationTracks,...incoming.romanizationTracks].flatMap(track=>track.contents.flatMap(content=>content.kind==='timed'?content.units:[])).filter(item=>item.beginMs===null||item.endMs===null).length})}</p>}
       <div className={styles.preview}>{incoming.lines.slice(previewPage * 100, (previewPage + 1) * 100).map(line => <p key={line.id}>{line.words.map(word => word.rubyUnits.length ? <ruby key={word.id}>{word.text}<rt>{word.rubyUnits.map(u => u.reading).join('')}</rt></ruby> : word.text)}{translationsForLine(incoming, line.id).map((t, i) => <small key={i}>{translationText(t)}</small>)}{incoming.romanizationTracks.flatMap(track => track.contents.filter(c => c.lineId === line.id).map(c => <small key={c.id}>{c.kind === 'plain' ? c.text : c.units.map(u => u.text).join('')}</small>))}</p>)}</div>
       {incoming.lines.length > 100 && <div className={styles.actions}><IconButton icon="back" label={t('common.previousPage')} data-role="secondary" disabled={previewPage === 0} onClick={() => setPreviewPage(p => p - 1)}/><span>{t('acquire.page',{page:previewPage+1,pages:Math.ceil(incoming.lines.length/100)})}</span><IconButton icon="chevron" label={t('common.nextPage')} data-role="secondary" disabled={(previewPage + 1) * 100 >= incoming.lines.length} onClick={() => setPreviewPage(p => p + 1)}/></div>}
       <p className={styles.hint}>{t('acquire.metadataHelp')}</p>

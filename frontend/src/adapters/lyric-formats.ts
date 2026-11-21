@@ -1,3 +1,4 @@
+import { importSugFile } from './sug-import';
 import { message, MessageError } from '../domain/messages';
 import type { ProjectEditing } from '../domain/project-editing';
 import { prepareAss, renderAss } from './ass';
@@ -8,7 +9,7 @@ import { renderLrc } from './lrc';
 import { parseEslrc, parseLrc, parseLys, parseQrc, parseYrc, stringifyEslrc, type LyricLine as FormatLine } from '@applemusic-like-lyrics/lyric';
 import { parseLyricTtml, serializeLyricTtml } from './ttml/lyric-codec';
 
-export type LyricFormat = 'ttml' | 'txt' | 'lrc' | 'elrc' | 'eslrc' | 'qrc' | 'krc' | 'yrc' | 'lys' | 'ass';
+export type LyricFormat = 'sug' | 'ttml' | 'txt' | 'lrc' | 'elrc' | 'eslrc' | 'qrc' | 'krc' | 'yrc' | 'lys' | 'ass';
 export const exportFormats = [
   ['ttml', 'TTML'], ['txt', 'format.txt'], ['lrc', 'format.lrc'], ['elrc', 'format.elrc'],
   ['eslrc', 'format.eslrc'], ['qrc', 'QRC'], ['yrc', 'YRC'], ['lys', 'LYS'], ['ass', 'ASS'],
@@ -24,11 +25,12 @@ const milliseconds = (ms: number): number => {
 export function detectLyricFormat(name: string): LyricFormat {
   const extension = name.split('.').at(-1)?.toLowerCase();
   if (extension === 'xml') return 'ttml';
-  if (extension && ['ttml', 'txt', 'lrc', 'elrc', 'eslrc', 'qrc', 'krc', 'yrc', 'lys', 'ass'].includes(extension)) return extension as LyricFormat;
+  if (extension && ['ttml', 'txt', 'lrc', 'elrc', 'eslrc', 'qrc', 'krc', 'yrc', 'lys', 'ass', 'sug'].includes(extension)) return extension as LyricFormat;
   throw new MessageError(message('parse.unsupportedFormat'));
 }
 
 export function importLyricFile(content: string, format: Exclude<LyricFormat, 'ass'>, onSidecarIssue?: () => void, lineTimedWords?: Set<string>): LyricDocument {
+  if (format === 'sug') return importSugFile(content).document;
   if (format === 'ttml') return parseLyricTtml(content);
   if (format === 'txt') {
     const text = content.replace(/^\uFEFF/, '').split(/\r?\n/).filter((value) => value.trim());
@@ -63,6 +65,7 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
 }
 
 export function exportLyricFile(document: LyricDocument, format: LyricFormat, editing?: ProjectEditing): string {
+  if (format === 'sug') throw new MessageError(message('parse.sugProjectOutput'));
   if (format === 'krc') throw new MessageError(message('parse.krcImportOnly'));
   if (format === 'ass') {
     const prepared = prepareAss(document,editing);

@@ -130,7 +130,8 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
       if (problem) throw new MessageError(messageList([message('project.cueLocation',{number:result.lyrics.lines.findIndex(line=>line.id===cue.anchor.lineId)+1,text:cue.text}),message(problem)]));
     }
     const previous=displayLines(state.present.lyrics,state.present.lineOrder);
-    const before=previous.filter((line,i)=>line.backgroundOf&&i<previous.findIndex(item=>item.id===line.backgroundOf)).map(line=>line.id);
+    const ordering=commands.some(item=>item.type==='replace-document'&&item.editing)?result.lyrics.lines:previous;
+    const before=ordering.filter((line,i)=>line.backgroundOf&&i<ordering.findIndex(item=>item.id===line.backgroundOf)).map(line=>line.id);
     const changedOrder=result.lyrics.lines.map(line=>line.id).join(' ')!==state.present.lyrics.lines.map(line=>line.id).join(' ');
     present = { ...state.present, ...result, karaoke, lineOrder:changedOrder?groupDisplayLines(result.lyrics,before).map(line=>line.id):state.present.lineOrder };
   } else {

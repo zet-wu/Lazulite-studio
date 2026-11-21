@@ -1797,5 +1797,9 @@
   "format.selectedRowsDetail": "Selected content is merged as independent rows. TXT and the LRC family cannot fully retain track identity. Plain text uses its parent line timing; timed content uses its own timing.",
   "format.notSelected": "This content is excluded by the current selection.",
   "translation.subtitle": "Subtitle",
-  "translation.replacement": "Replacement"
+  "translation.replacement": "Replacement",
+  "parse.sugInvalid": "SUG data is damaged or contains unresolved references. Check the source file.",
+  "parse.sugVersion": "Only the SUG 0.3.0 file structure is supported.",
+  "parse.sugProjectOutput": "Export SUG from the lyric export panel using the project content selection.",
+  "acquire.sugTiming": "SUG has {{count}} missing checkpoints. Existing timing will be imported so you can continue timing.{{missing}} mapped objects have missing endpoints. "
 }

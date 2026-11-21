@@ -1784,5 +1784,9 @@
   "format.selectedRowsDetail": "所選內容按獨立行合併；TXT 和 LRC 家族無法完整保留軌道身分。普通文字按所屬行時間輸出，定時內容保留自身時間。",
   "format.notSelected": "目前內容選擇未納入此項。",
   "translation.subtitle": "字幕",
-  "translation.replacement": "替換"
+  "translation.replacement": "替換",
+  "parse.sugInvalid": "SUG 資料損壞或包含無法解析的參照，請檢查來源檔案。",
+  "parse.sugVersion": "僅支援 SUG 0.3.0 檔案結構。",
+  "parse.sugProjectOutput": "SUG 需在歌詞匯出面板中按專案內容選擇輸出。",
+  "acquire.sugTiming": "SUG 尚缺 {{count}} 個檢查點；已有時間將隨歌詞匯入，可在匯入後繼續打軸。映射後 {{missing}} 個物件缺少端點。"
 }
