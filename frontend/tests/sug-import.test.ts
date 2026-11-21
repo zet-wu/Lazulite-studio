@@ -21,7 +21,7 @@ it('retains zero checkpoints and linked word groups, with whitespace taking no s
 });
 it('uses ink and ruby-part weights across multi-checkpoint leaders and following characters',()=>{
  const base: SugCharacter={text:'a',checkCount:2,timestamps:[1000,2000],release:null,stop:false,linked:false,singerId:'',parts:['i','mmm']};
- const measured:MeasureSugText=text=>({advance:text==='a'?2:text.length,ink:1});
+ const measured:MeasureSugText=text=>({advance:text==='a'?2:text.length,ink:text==='a'?2:text.length});
  const times=allocateSugTimes([base,{...base,text:'b',checkCount:0,timestamps:[],parts:[]}],null,3000,measured);
  expect(times[0]).toMatchObject({beginMs:1000,endMs:2555,rubyEnd:3000});expect(times[1]).toMatchObject({beginMs:2555,endMs:3000});
 });
@@ -82,4 +82,7 @@ it('round-trips an upstream-saved external file with forward background order an
  expect(incompleteCheckpoints).toBe(1);expect(displayLines(reopened.lyrics,reopened.lineOrder).map(l=>l.words.map(w=>w.text).join(''))).toEqual(['声','今は','é']);
  expect(reopened.lyrics.lines.find(l=>l.words[0]?.text==='é')!.endMs).toBeNull();expect(reopened.lyrics.agents.map(a=>a.name)).toEqual(['完整名称 A＋B','完整名称 A＋B']);
  expect(reopened.karaoke.outputs).toEqual(project.karaoke.outputs);if(process.env.SUG_SNAPSHOT_PATH)writeFileSync(process.env.SUG_SNAPSHOT_PATH,JSON.stringify(snapshot,null,2)+'\n');
+});
+it('retains an explicit resolvable self actor reference',()=>{
+ const {document}=parse([row('a',[char('歌')])],{singers:[{id:'self',name:'角色',actorRef:'self'}]});expect(document.agents[0].actorRef).toBe('v1');
 });

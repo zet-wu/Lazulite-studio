@@ -38,7 +38,8 @@ export function allocateSugTimes(chars:SugCharacter[],left:TimeMs,right:TimeMs,m
    const candidate=next!==undefined?(chars[next].timestamps[0]??null):chars[segmentEnd].stop?chars[segmentEnd].release:right;
    const boundary=candidate!==null&&begin!==null&&candidate<begin?null:candidate;
    const group=chars.slice(start,end+1),metrics=group.map(char=>measure(char.text));
-   let weights=metrics.map(value=>value.ink>0?value.advance:0);if(!weights.some(value=>value>0))weights=metrics.map(value=>value.advance);
+   const multipleAnchors=leader.timestamps.length>=2&&end>start;
+   let weights=metrics.map(value=>multipleAnchors?value.ink:value.ink>0?value.advance:0);if(!weights.some(value=>value>0))weights=metrics.map(value=>value.advance);
    if(!weights.some(value=>value>0))weights=group.map(()=>1);
    const sum=weights.reduce((a,b)=>a+b,0);let cumulative=0;
    const checkpoints=leader.checkCount>0?Array.from({length:leader.checkCount},(_,i)=>leader.timestamps[i]??null):[begin];

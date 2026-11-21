@@ -35,7 +35,7 @@ export function importSugFile(content:string,measure?:MeasureSugText):{document:
  // Resolve only explicit, unambiguous source references. Names never imply membership or actors.
  const sourceAliases=new Map<string,string[]>();
  for(const singer of singers){const alias=string(singer.ttml_agent_id);if(alias)sourceAliases.set(alias,[...(sourceAliases.get(alias)??[]),agentMap.get(string(singer.id))!]);}
- singers.forEach((singer,index)=>{const ref=string(singer.actorRef??singer.actor_ref);const target=agentMap.get(ref)??(sourceAliases.get(ref)?.length===1?sourceAliases.get(ref)![0]:undefined);if(target&&target!==agents[index].id)agents[index].actorRef=target;});
+ singers.forEach((singer,index)=>{const ref=string(singer.actorRef??singer.actor_ref);const target=agentMap.get(ref)??(sourceAliases.get(ref)?.length===1?sourceAliases.get(ref)![0]:undefined);if(target)agents[index].actorRef=target;});
  const reference=(value:unknown)=>{const id=string(value);if(id&&!agentMap.has(id))invalid();return id;};
  const sourceIds=new Set<string>();let incompleteCheckpoints=0,totalCharacters=0;
  const sentences=array(data!.sentences).map((value):Sentence=>{
