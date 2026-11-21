@@ -4,7 +4,7 @@ import type { LyricFormat } from './lyric-formats';
 
 export type FormatComparison = { element: string; result: string; status: 'preserved' | 'omitted' | 'partial'; detail: Message };
 const elements = ['format.timing','batch.reading','capability.translation','capability.romanization','editor.background','format.overlap'];
-const results: Record<Exclude<LyricFormat,'krc'>,string[]> = {
+const results: Record<Exclude<LyricFormat,'krc'|'sug'>,string[]> = {
  ttml:['preserved','preserved','preserved','preserved','preserved','preserved'],
  txt:['omitted','omitted','omitted','omitted','omitted','omitted'],
  lrc:['format.lrcResult','omitted','omitted','omitted','omitted','format.startLabels'],
@@ -23,7 +23,7 @@ export function overlappingMainLines(document: LyricDocument): number[] {
  return [...overlap].sort((a,b)=>a-b);
 }
 /** TTML is the current Studio exchange baseline, not a claim of full TTML2 support. */
-export function describeLyricFormat(document: LyricDocument, format: Exclude<LyricFormat,'krc'>): FormatComparison[] {
+export function describeLyricFormat(document: LyricDocument, format: Exclude<LyricFormat,'krc'|'sug'>): FormatComparison[] {
  const overlap=overlappingMainLines(document);
  return elements.map((element,index)=>{
   const result=results[format][index];
@@ -44,5 +44,20 @@ export function describeLyricFormat(document: LyricDocument, format: Exclude<Lyr
    if(overlap.length)parts.push(message('format.knownOverlap',{lines:overlap.join(', ')}));
   }
   return {element,result: result === 'preserved' ? 'format.preserved' : result === 'omitted' ? 'format.omitted' : result, status: result === 'preserved' || result === 'omitted' ? result : 'partial',detail:messageList([message(detailKey),...parts])};
+ });
+}
+
+/** Describe the same selected content that preparation validates and serializes. */
+export function describeSelectedOutput(project:import('./lyric-output').OutputProject,format:import('./lyric-output').DownloadFormat,projection:import('./lyric-output').LyricOutputProjection):FormatComparison[]{
+ if(format==='ttml')return describeLyricFormat(project.lyrics,format);
+ const multi=format==='nicokara'||format==='sug';
+ const rows=multi?elements.map(element=>({element,result:'format.preserved',status:'preserved' as FormatComparison['status'],detail:message('format.preservedDetail')})):describeLyricFormat(projection.document,format);
+ return rows.map((row,index)=>{
+  const kind=index===2?'translation':index===3?'romanization':null;
+  const selected=kind?[...projection.origins.values()].some(origin=>origin.kind===kind):index===4?projection.document.lines.some(line=>project.lyrics.lines.find(source=>source.id===projection.origins.get(line.id)?.lineId)?.backgroundOf):true;
+  if((kind||index===4)&&!selected)return {...row,result:'format.omitted',status:'omitted',detail:message('format.notSelected')};
+  if(kind&&!multi)return {...row,result:format==='ass'?'format.trackEvents':'format.selectedRows',status:'partial',detail:message(format==='ass'?'format.assAttachments':'format.selectedRowsDetail')};
+  if(index===4&&['txt','lrc','elrc'].includes(format))return {...row,result:'format.parentheses',status:'partial',detail:message('format.backgroundDetail')};
+  return row;
  });
 }

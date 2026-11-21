@@ -1783,5 +1783,19 @@
   "settings.spectrumHeightRange": "36–216 px, step 1",
   "settings.spectrumHeightInvalid": "Enter an integer from 36 to 216.",
   "timeline.clearTimes": "Clear timing",
-  "timeline.clearLinked": "Unlink the related line ends before clearing timing."
+  "timeline.clearLinked": "Unlink the related line ends before clearing timing.",
+  "output.noSelectedContent": "No content to export. Select lyrics, translation, or romanization.",
+  "packaging.content": "Export content",
+  "packaging.outputType": "Output type",
+  "packaging.lyricsExport": "Lyric export",
+  "packaging.musicEmbed": "Embed in music",
+  "packaging.exportNamed": "Export {{format}}",
+  "packaging.ttmlAll": "TTML includes all lyrics, backgrounds, translations, and romanizations.",
+  "packaging.fileSummary": "{{count}} files · {{issues}} issues",
+  "validation.currentOutput": "Current output: {{format}}",
+  "format.selectedRows": "Independent rows",
+  "format.selectedRowsDetail": "Selected content is merged as independent rows. TXT and the LRC family cannot fully retain track identity. Plain text uses its parent line timing; timed content uses its own timing.",
+  "format.notSelected": "This content is excluded by the current selection.",
+  "translation.subtitle": "Subtitle",
+  "translation.replacement": "Replacement"
 }

@@ -1,4 +1,4 @@
-import {cleanup,render,screen,waitFor} from '@testing-library/react';
+import {cleanup,render,screen,waitFor,fireEvent} from '@testing-library/react';
 import {afterEach,expect,it,vi} from 'vitest';
 import {PackagingPanel} from './PackagingPanel';
 import {createProjectDocument} from '../domain/project-document';
@@ -21,8 +21,9 @@ it('uses a neutral zero-line state, validates a blank line, and keeps explicit k
  const next={...project,karaoke:{...project.karaoke,outputs:[]},lyrics:{...project.lyrics,lines:[createLine('')]}};
  view.rerender(<PackagingPanel {...props} project={next} document={next.lyrics}/>);
  await waitFor(()=>expect(screen.queryByText('暂无歌词可校验')).toBeNull());
+ fireEvent.change(screen.getByLabelText('校验格式筛选'),{target:{value:'all'}});
  await waitFor(()=>expect(screen.getAllByText(/输出配置/).length).toBeGreaterThan(0));
  view.rerender(<PackagingPanel {...props}/>);
  await screen.findByText('暂无歌词可校验');
- expect(screen.queryByText(/输出配置/)).toBeNull();
+ expect(view.container.querySelector('#validation-panel-lyrics')!.textContent).not.toMatch(/输出配置/);
 });

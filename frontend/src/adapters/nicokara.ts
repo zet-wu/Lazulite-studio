@@ -177,6 +177,9 @@ export function prepareNicokara(project: Pick<ProjectDocument, 'lyrics' | 'karao
 export function nicokaraZip(project: ProjectDocument, title: string) {
   const result = prepareNicokara(project, title);
   if (result.issues.length) throw new DocumentOutputError(result.issues);
+  return zipFiles(nicokaraArchiveFiles(result));
+}
+export function nicokaraArchiveFiles(result: ReturnType<typeof prepareNicokara>) {
   const image = Uint8Array.from(atob(transparentPng.split(',')[1]), char=>char.charCodeAt(0));
-  return zipFiles([...result.files, { name: 'summary.txt', text: '\uFEFF' + result.summary }, { name: 'transparent-1x1.png', data: image }]);
+  return [...result.files, { name: 'summary.txt', text: '\uFEFF' + result.summary }, { name: 'transparent-1x1.png', data: image }];
 }

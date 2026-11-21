@@ -11707,5 +11707,61 @@
     "source": "请先解除相关行尾链接，再清空时间。",
     "params": [],
     "parameterNotes": {}
+  },
+  "output.noSelectedContent": {
+    "source": "当前选择没有可输出的内容，请选择正文、翻译或音译。",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "packaging.content": {
+    "source": "导出内容",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "packaging.outputType": {
+    "source": "输出类型",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "packaging.lyricsExport": {
+    "source": "歌词导出",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "packaging.musicEmbed": {
+    "source": "音乐文件嵌入",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "packaging.exportNamed": {
+    "source": "导出 {{format}}",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "packaging.ttmlAll": {
+    "source": "TTML 输出全部正文、背景、翻译与音译。",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "packaging.fileSummary": {
+    "source": "{{count}} 个文件 · {{issues}} 个问题",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "validation.currentOutput": {
+    "source": "当前产物：{{format}}",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "format.selectedRows": {
+    "source": "独立内容行",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "format.selectedRowsDetail": {
+    "source": "所选内容按独立行合并；TXT 和 LRC 家族无法完整保留轨道身份。普通文本按所属行时间输出，定时内容保留自身时间。",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "format.notSelected": {
+    "source": "当前内容选择未纳入此项。",
+    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
+  },
+  "translation.subtitle": {
+    "source": "字幕",
+    "context": "导出内容列表中翻译轨道的用途，区分字幕与替换。"
+  },
+  "translation.replacement": {
+    "source": "替换",
+    "context": "导出内容列表中翻译轨道的用途，区分字幕与替换。"
   }
 }

@@ -1770,5 +1770,19 @@
   "settings.spectrumHeightRange": "36–216 px，步长 1",
   "settings.spectrumHeightInvalid": "请输入 36–216 之间的整数。",
   "timeline.clearTimes": "清空时间",
-  "timeline.clearLinked": "请先解除相关行尾链接，再清空时间。"
+  "timeline.clearLinked": "请先解除相关行尾链接，再清空时间。",
+  "output.noSelectedContent": "当前选择没有可输出的内容，请选择正文、翻译或音译。",
+  "packaging.content": "导出内容",
+  "packaging.outputType": "输出类型",
+  "packaging.lyricsExport": "歌词导出",
+  "packaging.musicEmbed": "音乐文件嵌入",
+  "packaging.exportNamed": "导出 {{format}}",
+  "packaging.ttmlAll": "TTML 输出全部正文、背景、翻译与音译。",
+  "packaging.fileSummary": "{{count}} 个文件 · {{issues}} 个问题",
+  "validation.currentOutput": "当前产物：{{format}}",
+  "format.selectedRows": "独立内容行",
+  "format.selectedRowsDetail": "所选内容按独立行合并；TXT 和 LRC 家族无法完整保留轨道身份。普通文本按所属行时间输出，定时内容保留自身时间。",
+  "format.notSelected": "当前内容选择未纳入此项。",
+  "translation.subtitle": "字幕",
+  "translation.replacement": "替换"
 }

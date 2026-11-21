@@ -78,6 +78,7 @@ import { clearTimelineTimes } from '../../domain/timeline-editing';
 import { ContextMenu, type ContextAction } from '../../shared/ContextMenu';
 import { RubyGenerationDialog } from './RubyGenerationDialog';
 import type { TransportHandle } from '../MediaTransport';
+import type { DownloadFormat } from '../../adapters/lyric-output';
 import type { LyricFormat } from '../../adapters/lyric-formats';
 import styles from './semantic-editor.module.css';
 
@@ -166,10 +167,8 @@ function EditorWorkspaceContent(props: Props) {
   useEffect(() => { if (props.projectId) preferences.setItem(`studio:workspace-mode:project:${props.projectId}`, mode); }, [props.projectId, mode]);
   const [editorDisplay]=usePreference('studio:editor-display','advanced');
   const compact = mode === 'sync' || mode === 'karaoke' || mode === 'edit' && editorDisplay === 'simple';
-  const [karaokeExportOpen,setKaraokeExportOpen]=useState<'nicokara' | 'sug' | null>(null);
-  const [karaokeExportSource,setKaraokeExportSource]=useState<'nicokara'|'sug'>('nicokara');
+  const [downloadFormat,setDownloadFormat]=useState<DownloadFormat>();
   const [karaokeFocusOutput,setKaraokeFocusOutput]=useState<string>();
-  const [karaokeValidation,setKaraokeValidation]=useState<ValidationFilter>('all');
   const {selectedCue,cueNavigation,selectCue}=useEditorSelection()!;
   const cue=props.project?.karaoke.cues.find(c=>c.id===selectedCue);
   const [validationTab,setValidationTab]=useState<ValidationTab>('lyrics');
@@ -440,7 +439,11 @@ function EditorWorkspaceContent(props: Props) {
   const locateIssue = (issue: OutputIssue) => {
     if (issue.segmentId) { setMode('audio'); audioReview?.setSelected([issue.segmentId]); return; }
     if(issue.cueId && props.project) { const cue=props.project.karaoke.cues.find(c=>c.id===issue.cueId);if(cue){setMode('karaoke');selectCue(cue.id,cue.anchor.lineId);requestLocate(cue.anchor.lineId,`[data-cue-id="${CSS.escape(cue.id)}"]`);}return;}
-    if(issue.karaokeSettings){setKaraokeFocusOutput(issue.outputIds?.[0]);setMode('karaoke');if(issue.lineId){const line=document.lines.find(l=>l.id===issue.lineId);if(line){selectLine(line);setColumns(value=>({...value,inspectorVisible:true}));requestAnimationFrame(()=>inspectorRef.current?.querySelector<HTMLElement>('[data-output-group]')?.focus());}}else setKaraokeExportOpen(issue.formats?.includes('SUG')?'sug':'nicokara');return;}
+    if(issue.karaokeSettings){
+      if(issue.lineId){setMode('karaoke');const line=document.lines.find(line=>line.id===issue.lineId);if(line){selectLine(line);setColumns(value=>({...value,inspectorVisible:true}));requestAnimationFrame(()=>inspectorRef.current?.querySelector<HTMLElement>('[data-output-group]')?.focus());}}
+      else {setKaraokeFocusOutput(issue.outputIds?.[0]);setMode('package');if(issue.formats?.includes('SUG'))setDownloadFormat('sug');else if(issue.formats?.includes('Nicokara'))setDownloadFormat('nicokara');}
+      return;
+    }
     if(issue.kind === 'agent') { setMode('edit'); setFocusAgent(issue.agentId); setSettingsDialog('singers'); return; }
     if (issue.kind === 'romanization-content' || issue.kind === 'romanization-unit' || issue.kind === 'translation-content' || issue.kind === 'translation-unit') {
       const tracks = issue.kind.startsWith('translation') ? document.translationTracks : document.romanizationTracks;
@@ -946,9 +949,9 @@ function EditorWorkspaceContent(props: Props) {
     </div> : <section className={styles.auxiliaryPlaceholder}><h1>{t('editor.vocalAnalysis')}</h1><p>{t('editor.audioRequired')}</p></section>)}
     <fieldset disabled={props.alignment?.locked} style={{display:"contents"}}>
     {mode === 'acquire' && <LyricAcquisition projectId={props.projectId} sourceAssetId={props.sourceAssetId} store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
-    {mode === 'package' && <PackagingPanel {...props} validationFilter={karaokeValidation} onValidationFilter={setKaraokeValidation} karaokeExportSource={karaokeExportSource} resumeKaraoke={()=>{setMode("karaoke");setKaraokeExportOpen(karaokeExportSource);}} validationTab={validationTab} onValidationTab={setValidationTab} focusRule={focusRule} onRuleLocated={()=>setFocusRule(undefined)} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
+    {mode === 'package' && <PackagingPanel {...props} downloadFormat={downloadFormat} onDownloadFormat={setDownloadFormat} focusOutputId={karaokeFocusOutput} validationTab={validationTab} onValidationTab={setValidationTab} focusRule={focusRule} onRuleLocated={()=>setFocusRule(undefined)} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
     {mode === 'preview' && <Suspense fallback={<p>{t('editor.previewLoading')}</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={id => { const line = document.lines.find(line => line.id === id); if (line) selectLine(line); }} /></Suspense>}
-    {mode === 'karaoke' && props.project && props.applyProject && <KaraokeTools focusOutputId={karaokeFocusOutput} project={props.project} apply={props.applyProject} title={props.title} exportOpen={karaokeExportOpen} setExportOpen={setKaraokeExportOpen} viewIssues={format=>{setKaraokeExportSource(format);setMode('package');setValidationTab('lyrics');setKaraokeValidation(format);}}/>}
+    {mode === 'karaoke' && props.project && props.applyProject && <KaraokeTools project={props.project} apply={props.applyProject} openExport={format=>{setDownloadFormat(format);setMode('package');setValidationTab('lyrics');}}/>}
     {mode === 'sync' && <SyncPanel progress={syncProgress} onProgress={setSyncProgress} preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} document={document} lineOrder={props.project?.lineOrder} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
       onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
     {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canCopy={canCopySelection} canPaste={Boolean(clipboard)}

@@ -67,3 +67,11 @@
   .packagingPage { grid-template-columns:minmax(0,1fr); overflow:auto; align-content:start; }
   .packagingPage > .pane { overflow:visible; }
 }
+.outputGroup { margin: 8px 0; padding: 4px 8px 8px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.outputGroup legend { color: var(--muted); font-size: 12px; padding-inline: 4px; }
+.contentRow { display: flex; align-items: center; gap: 8px; min-width: 0; padding-block: 3px; }
+.contentRow > label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.packagingPage [role=tabpanel] { min-width: 0; }
+.packagingPage [role=tabpanel][hidden] { display: none; }
+.contentRow > input { flex: 0 0 110px; width: 110px; }
+.contentRow > label > input { flex-shrink: 0; }
