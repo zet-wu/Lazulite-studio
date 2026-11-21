@@ -23,3 +23,12 @@ it('allows existing zoom to expose millisecond endpoints and clamps at 10ms', ()
   expect(next).toEqual({ startMs: 2000, spanMs: 10 });
   expect(zoomViewport({ startMs: 0, spanMs: 5 }, 5, 0.5, 0)).toEqual({ startMs: 0, spanMs: 5 });
 });
+
+it('follow zoom uses the latest playhead and converges at track boundaries', async () => {
+ const {zoomFollowingViewport}=await import('../src/domain/timeline-viewport');
+ const view={startMs:10000,spanMs:20000};
+ expect(zoomFollowingViewport(view,120000,.5,36000)).toEqual({startMs:32500,spanMs:10000});
+ expect(zoomFollowingViewport(view,120000,.5,0)).toEqual({startMs:0,spanMs:10000});
+ expect(zoomFollowingViewport(view,120000,.5,119000)).toEqual({startMs:110000,spanMs:10000});
+ expect(zoomFollowingViewport(view,120000,20,36000)).toEqual({startMs:0,spanMs:120000});
+});

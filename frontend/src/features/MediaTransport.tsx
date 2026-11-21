@@ -45,7 +45,7 @@ import { TimelineTracks } from './TimelineTracks';
 import { useCanvasMetrics } from './useCanvasMetrics';
 import { SpectrogramCanvas } from './SpectrogramCanvas';
 import { estimateBpm } from '../domain/bpm';
-import { panViewport, waveformRequestWindow, zoomViewport } from '../domain/timeline-viewport';
+import { panViewport, waveformRequestWindow, zoomViewport, zoomFollowingViewport } from '../domain/timeline-viewport';
 import { captureLoop, emptyLoop, loopRange as activeLoopRange, setLoopA, setLoopB, type LoopState } from '../domain/timeline-loop';
 
 const fmt = (s: number) => {
@@ -406,9 +406,13 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   }, [endMs, startMs, waveform.data, width, height, ratio, measuredCanvas, expanded, visible.wave, ui?.adding, timelineHost]);
   const zoomAt = (factor: number, fraction: number) => {
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }
-    const next = zoomViewport({ startMs, spanMs: Math.round(span * 1e3) }, durationMs, factor, fraction);
-    if (next.startMs === startMs && next.spanMs === Math.round(span * 1e3)) return false;
-    setFollow(false);
+    const view = viewportRef.current;
+    const current = {startMs: Math.round(view.start * 1e3), spanMs: Math.round(view.span * 1e3)};
+    const next = view.follow
+      ? zoomFollowingViewport(current, Math.round(view.duration * 1e3), factor, readPosition() * 1e3)
+      : zoomViewport(current, Math.round(view.duration * 1e3), factor, fraction);
+    if (next.startMs === current.startMs && next.spanMs === current.spanMs) return false;
+    viewportRef.current = {...view, start: next.startMs / 1e3, span: next.spanMs / 1e3};
     setStart(next.startMs / 1e3);
     setSpan(next.spanMs / 1e3);
     return true;
@@ -581,8 +585,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           {t('media.fullTrack')}</button>
         <IconButton data-role="secondary" disabled={disabled} icon="back" label={t('media.previousWindow')} onClick={() => move(-1)}/>
         <IconButton data-role="secondary" disabled={disabled} icon="chevron" label={t('media.nextWindow')} onClick={() => move(1)}/>
-        <IconButton data-role="secondary" disabled={disabled} icon="add" label={t('media.zoomIn')} onClick={() => zoomAt(0.5, span ? (positionRef.current - start) / span : 0.5)}/>
-        <IconButton data-role="secondary" disabled={disabled} icon="minus" label={t('media.zoomOut')} onClick={() => zoomAt(2, span ? (positionRef.current - start) / span : 0.5)}/>
+        <IconButton data-role="secondary" disabled={disabled} icon="add" label={t('media.zoomIn')} onClick={() => zoomAt(0.5, viewportRef.current.span ? (readPosition() - viewportRef.current.start) / viewportRef.current.span : 0.5)}/>
+        <IconButton data-role="secondary" disabled={disabled} icon="minus" label={t('media.zoomOut')} onClick={() => zoomAt(2, viewportRef.current.span ? (readPosition() - viewportRef.current.start) / viewportRef.current.span : 0.5)}/>
         <span className={styles.viewportRange}>{t('media.viewport')}{fmt(start)} – {fmt(end)}</span>
         <div className={styles.visibility} aria-label={t('media.layers')}>
           {(['line', 'word', 'ruby', 'romanization', 'gap', 'karaoke', 'wave', 'spectrum', ...(timelineHost?['energy','segments'] as const:[]), 'staging'] as const).map((key) => <button data-role="secondary" key={key} className={visible[key] ? styles.active : ''} aria-pressed={visible[key]} onClick={() => setVisible(key, !visible[key])}>

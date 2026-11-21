@@ -14,6 +14,12 @@ export function zoomViewport(view: TimelineViewport, durationMs: number, factor:
   return clampViewport({ startMs: view.startMs + u * view.spanMs - u * next.spanMs, spanMs: next.spanMs }, durationMs);
 }
 
+/** Keep the real playhead at the same follow target, including paused zooms. */
+export function zoomFollowingViewport(view: TimelineViewport, durationMs: number, factor: number, positionMs: number): TimelineViewport {
+  const next = zoomViewport(view, durationMs, factor, 0);
+  return clampViewport({startMs: positionMs - next.spanMs * 0.35, spanMs: next.spanMs}, durationMs);
+}
+
 export function panViewport(view: TimelineViewport, durationMs: number, deltaMs: number): TimelineViewport {
   return clampViewport({ ...view, startMs: view.startMs + deltaMs }, durationMs);
 }
