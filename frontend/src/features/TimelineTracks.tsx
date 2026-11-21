@@ -1,3 +1,4 @@
+import { useTimelineAutoExpand } from '../adapters/timeline-preferences';
 import { TimelineStaging } from './TimelineStaging';
 import { message as describeMessage, MessageError, errorMessage, type Message } from '../domain/messages';
 import { i18n } from '../i18n';
@@ -11,18 +12,18 @@ import { KaraokeTrack } from './KaraokeTrack';
 import { useProjectEditing } from './editor/ProjectEditingContext';
 import { projectTimeline } from '../domain/timeline-projection';
 import { ContextMenu } from '../shared/ContextMenu';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { useEditorSelection } from './editor/SelectionContext';
 import { lyricSnapAnchors, stableSnapAnchor, documentTargets, targetId, targetSelection, selectionKind, selectionTargets, targetInterval } from './editor/selection-targets';
 import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
-import { useCallback, useContext, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
 import type { LyricCommand } from '../domain/lyric-commands';
 import type { LyricDocument, LyricWord, RomanizationContent } from '../domain/lyric-document';
 import { moveTimeline, resizeTimeline, snapTimelineInterval, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
 import { packIntervals } from '../domain/pack-intervals';
 import styles from './media.module.css';
 
-type Props = { locked?: boolean; document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
+type Props = { follow?: boolean; locked?: boolean; document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
   visible: { staging?: boolean; karaoke: boolean; line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
   onLocate?: (begin:number,end:number)=>void;
   externalAnchors?: number[]; durationMs?: number | null;
@@ -30,7 +31,7 @@ type Props = { locked?: boolean; document: LyricDocument; selectedLineId: string
 type Drag = { started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string | Message } };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
 
-export function TimelineTracks({ locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onLocate, onPan, onError }: Props) {
+export function TimelineTracks({ follow = false, locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onLocate, onPan, onError }: Props) {
   useTranslation();
   const editing = useProjectEditing();
   const projectContext = useContext(KaraokeContext);
@@ -44,11 +45,37 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
   }, [visible.line, visible.word, visible.ruby]);
   const [drag, setDrag] = useState<Drag | null>(null);
   const { selection, setSelection, expanded, commands, area, focusRequest } = useEditorSelection()!;
-  const expandedLines = document.lines.filter(line => expanded.includes(line.id) && (visible.word || visible.ruby && line.words.some(word => word.rubyUnits.length) || visible.romanization && [...document.romanizationTracks,...document.translationTracks].some(track => track.contents.some(content => content.lineId === line.id))));
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const virtual = useVirtualizer({ count: expandedLines.length, getScrollElement: () => scrollRef.current, estimateSize: () => 80, overscan: 3, getItemKey: index => expandedLines[index].id });
+  const [autoExpand] = useTimelineAutoExpand();
+  const activeLineIds = autoExpand === 'always' || autoExpand === 'follow' && follow
+    ? document.lines.filter(line => line.beginMs !== null && line.endMs !== null && line.beginMs <= positionMs && positionMs < line.endMs).map(line => line.id) : [];
+  const activeKey = activeLineIds.join(':');
+  const [focusedTargetId, setFocusedTargetId] = useState<string | null>(null);
+  const [focusedLineId, setFocusedLineId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; target: HTMLElement } | null>(null);
-  useEffect(() => { if (locked) setMenu(null); }, [locked]);
+  const heldTargetIds = [focusedTargetId, drag?.target ? targetId(drag.target) : null, menu?.target.dataset.timelineKey];
+  const heldLineIds = [focusedLineId, drag?.target?.lineId, menu?.target.closest<HTMLElement>('[data-expanded-line]')?.dataset.expandedLine];
+  const expandedLines = document.lines.filter(line => (expanded.includes(line.id) || activeLineIds.includes(line.id) || heldLineIds.includes(line.id)) && (visible.word || visible.ruby && line.words.some(word => word.rubyUnits.length) || visible.romanization && [...document.romanizationTracks,...document.translationTracks].some(track => track.contents.some(content => content.lineId === line.id))));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtual = useVirtualizer({ count: expandedLines.length, getScrollElement: () => scrollRef.current, estimateSize: () => 80, overscan: 3, getItemKey: index => expandedLines[index].id,
+    rangeExtractor: range => [...new Set([...defaultRangeExtractor(range), ...expandedLines.flatMap((line,index) => heldLineIds.includes(line.id) ? [index] : [])])].sort((a,b) => a-b) });
+  useEffect(() => {
+    const focus = (event: FocusEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('[role="menu"]')) return;
+      setFocusedTargetId(tracksRef.current?.contains(target) ? target.closest<HTMLElement>('[data-timeline-key]')?.dataset.timelineKey ?? null : null);
+      setFocusedLineId(tracksRef.current?.contains(target) ? target.closest<HTMLElement>('[data-expanded-line]')?.dataset.expandedLine ?? null : null);
+    };
+    window.addEventListener('focusin', focus);
+    return () => window.removeEventListener('focusin', focus);
+  }, []);
+  useLayoutEffect(() => {
+    if (!activeLineIds.length || drag || menu) return;
+    const index = expandedLines.findIndex(line => activeLineIds.includes(line.id));
+    if (index < 0) return;
+    if (expandedLines.length > 20) virtual.scrollToIndex(index, {align:'auto'});
+    else tracksRef.current?.querySelector<HTMLElement>(`[data-expanded-line="${CSS.escape(expandedLines[index].id)}"]`)?.scrollIntoView({block:'nearest',inline:'nearest'});
+  }, [activeKey, expandedLines.length]);
+  useEffect(() => { setMenu(null); }, [document, locked]);
   const closeMenu = () => setMenu(null);
   const allTargets = useMemo(() => documentTargets(document), [document]);
   const choose = (target: TimelineTarget, shift = false, toggle = false) => {
@@ -83,7 +110,11 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     window.addEventListener('keydown', escape); return () => { window.removeEventListener('keydown', escape); cancel(); };
   }, [cancel]);
   useEffect(() => { cancel(); }, [document, durationMs, visible.line, visible.word, visible.ruby, visible.romanization, cancel]);
-  useEffect(() => { if (dragRef.current?.side !== 'pan') cancel(); }, [startMs, endMs, cancel]);
+  const previousViewport = useRef({startMs,endMs});
+  useEffect(() => {
+    const previous=previousViewport.current;previousViewport.current={startMs,endMs};
+    if(dragRef.current?.side!=='pan' && (!follow || endMs-startMs!==previous.endMs-previous.startMs)) cancel();
+  }, [startMs,endMs,follow,cancel]);
   const projection = useMemo(() => projectTimeline(document, durationMs), [document, durationMs]);
   const candidateDocument = drag?.candidate.document ?? document;
   const displayed = projectTimeline(candidateDocument, durationMs);
@@ -93,8 +124,8 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
   const ordinalById = new Map(mainLines.filter(item => !item.backgroundOf).map((item, index) => [item.id, index + 1]));
   const line = displayed.lines.find((item) => item.id === selectedLineId);
   const intersects = (begin: number | null, end: number | null) => timed(begin, end) && end! >= startMs && begin! <= endMs;
-  const overview = mainLines.filter(item => intersects(item.beginMs, item.endMs));
-  const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => intersects(item.beginMs, item.endMs)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs]);
+  const overview = mainLines.filter(item => intersects(item.beginMs, item.endMs) || heldTargetIds.includes(item.id));
+  const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => intersects(item.beginMs, item.endMs) || heldTargetIds.includes(item.id)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs, focusedTargetId, menu]);
   const frozenLayout = useRef(currentLayout);
   const draggingTime = drag && !['pan', 'select'].includes(drag.side);
   if (!draggingTime) frozenLayout.current = currentLayout;
@@ -227,12 +258,13 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
     const ghostBegin = real?.beginMs === null, ghostEnd = real?.endMs === null;
     const description = ghostBegin || ghostEnd ? t('timeline.temporary',{side:t(ghostBegin?'time.begin':'time.end'),time:ghostBegin?beginMs:endMs}) : undefined;
     active = selection?.kind === selectionKind(target) && selection.ids.includes(key) || false;
-    const clippedBegin = Math.max(startMs, beginMs);
+    const outside = endMs < startMs || beginMs > propsEndMs;
+    const clippedBegin = outside ? beginMs : Math.max(startMs, beginMs);
     const right = Math.min(endMs, propsEndMs);
     const narrow = (Math.min(endMs, propsEndMs) - clippedBegin) / spanMs * plotWidth < 16;
     return <div key={key} data-timeline-key={key} data-line-id={target.lineId} data-word-id={target.kind==='word'||target.kind==='ruby'?target.wordId:undefined} data-ruby-id={target.kind==='ruby'?target.rubyId:undefined} data-romanization-content-id={target.kind==='romanization'&&!target.attachment?target.contentId:undefined} data-romanization-unit-id={target.kind==='romanization'&&!target.attachment?target.unitId:undefined} data-translation-id={target.kind==='romanization'&&target.attachment?target.contentId:undefined} data-translation-unit-id={target.kind==='romanization'&&target.attachment?target.unitId:undefined}
       className={`${styles.trackBar} ${target.kind === 'line' && document.lines.find(line => line.id === target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${playing ? styles.trackPlaying : ''}`} role="button" aria-current={playing ? "time" : undefined} aria-disabled={locked} tabIndex={0} aria-label={label} title={description} aria-description={description} data-temporary-begin={ghostBegin || undefined} data-temporary-end={ghostEnd || undefined}
-      style={{ transform: narrow && beginMs === endMs && beginMs === propsEndMs ? 'translateX(-100%)' : undefined, left: pct(clippedBegin), width: `${(right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
+      style={{ transform: narrow && beginMs === endMs && beginMs === propsEndMs ? 'translateX(-100%)' : undefined, left: pct(clippedBegin), width: `${Math.max(0, right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
       onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
       onFocus={event => { if (!preserveSelectionOnFocus(selection, event.currentTarget) && !dragRef.current) choose(target); }}
       onContextMenu={event => { event.preventDefault(); if(locked)return; event.stopPropagation(); if(!commands.current?.openContext(event.currentTarget,event.clientX,event.clientY)){choose(target); setMenu({ x: event.clientX, y: event.clientY, target: event.currentTarget });} }}
@@ -282,12 +314,12 @@ export function TimelineTracks({ locked, document, selectedLineId, startMs, endM
       const item = displayed.lines.find(line => line.id === expandedLines[virtualRow.index].id)!;
       const label = `L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ` ${t('outline.background')}` : ''}`;
       const renderTargets = (name: string, targets: TimelineTarget[]) => {
-        const intervals = targets.filter(target => { const value = targetInterval(projection, target); return value && intersects(value.beginMs, value.endMs); });
+        const intervals = targets.filter(target => { const value = targetInterval(projection, target); return value && (intersects(value.beginMs, value.endMs) || heldTargetIds.includes(targetId(target))); });
         const layout = packIntervals(intervals.map(target => { const value = targetInterval(projection, target)!; return { key: targetId(target), beginMs: value.beginMs!, endMs: value.endMs! }; }));
         return row(`${label} ${name}`, intervals.map(target => { const value = targetInterval(displayed, target)!; const text = 'text' in value ? value.text : 'reading' in value ? value.reading : ''; return bar(target, t('timeline.itemLabel',{name,text}), value.beginMs!, value.endMs!, false, layout, text); }), targets, layout.laneCount, name);
       };
       const targets = allTargets.filter(target => target.lineId === item.id);
-      return <section key={item.id} data-index={virtualRow.index} ref={expandedLines.length > 20 ? virtual.measureElement : undefined} className={styles.expandedGroup} style={expandedLines.length > 20 ? { position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` } : undefined} aria-label={t('timeline.subtracks',{label})}>
+      return <section key={item.id} data-expanded-line={item.id} data-index={virtualRow.index} ref={expandedLines.length > 20 ? virtual.measureElement : undefined} className={styles.expandedGroup} style={expandedLines.length > 20 ? { position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` } : undefined} aria-label={t('timeline.subtracks',{label})}>
         <strong className={styles.groupLabel}>{label}</strong>
         {visible.word && renderTargets(t('selection.word'), targets.filter(target => target.kind === 'word'))}
         {visible.ruby && targets.some(target => target.kind === 'ruby') && renderTargets(t('batch.reading'), targets.filter(target => target.kind === 'ruby'))}

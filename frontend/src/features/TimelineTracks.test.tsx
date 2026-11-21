@@ -100,3 +100,23 @@ it('stages complete ancestors, switches to the active row and filters each subtr
  view.rerender(<SelectionProvider><TimelineTracks {...props} visible={{...props.visible,word:false,ruby:false,romanization:false}}/></SelectionProvider>);
  expect(staging()).toBeNull();cleanup();vi.unstubAllGlobals();
 });
+
+it('unions real active overlaps and backgrounds with manual expansion without changing selection',async()=>{
+ const {cleanup}=await import('@testing-library/react');cleanup();
+ const {createLine}=await import('../domain/lyric-document');
+ vi.stubGlobal('ResizeObserver',class{observe(){}unobserve(){}disconnect(){}});
+ const scrolling=vi.fn();Object.defineProperty(HTMLElement.prototype,'scrollIntoView',{configurable:true,value:scrolling});
+ localStorage.removeItem('studio:timeline-auto-expand');
+ const document=createLyricDocument('');
+ document.lines=[[0,1000],[1000,3000],[1500,3500],[null,4000]].map(([beginMs,endMs],index)=>({...createLine('歌',`line-${index}`),beginMs,endMs,backgroundOf:index===2?'line-1':null}));
+ const props={document,selectedLineId:'line-0',startMs:0,endMs:5000,positionMs:2000,bpm:0,snap:false,visible:{karaoke:false,line:true,word:true,ruby:true,romanization:true,gap:false,staging:false},apply:vi.fn(),onPan:vi.fn(),onError:vi.fn()};
+ function Probe(){const {selection}=useEditorSelection()!;return <output data-testid="selection">{selection?.activeId}</output>;}
+ const show=(follow:boolean,positionMs=2000)=><SelectionProvider><InitialSelection id="line-0"><Probe/><TimelineTracks {...props} follow={follow} positionMs={positionMs}/></InitialSelection></SelectionProvider>;
+ const view=render(show(false));const groups=()=>[...view.container.querySelectorAll<HTMLElement>('[data-expanded-line]')].map(node=>node.dataset.expandedLine);
+ expect(groups()).toEqual(['line-0']);view.rerender(show(true));expect(groups()).toEqual(['line-0','line-1','line-2']);expect(screen.getByTestId('selection')).toHaveTextContent('line-0');
+ view.rerender(show(true,3000));expect(groups()).toEqual(['line-0','line-2']);view.rerender(show(true,3500));expect(groups()).toEqual(['line-0']);
+ localStorage.setItem('studio:timeline-auto-expand','always');view.rerender(show(false));expect(groups()).toEqual(['line-0','line-1','line-2']);
+ localStorage.setItem('studio:timeline-auto-expand','off');view.rerender(show(true));expect(groups()).toEqual(['line-0']);
+ expect(screen.getByTestId('selection')).toHaveTextContent('line-0');expect(props.apply).not.toHaveBeenCalled();expect(props.onPan).not.toHaveBeenCalled();
+ cleanup();localStorage.removeItem('studio:timeline-auto-expand');vi.unstubAllGlobals();
+});
