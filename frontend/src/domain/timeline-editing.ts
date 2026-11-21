@@ -236,3 +236,29 @@ export function applyTimelineAssignment(document:LyricDocument,target:TimelineTa
 export function assignTimeline(document:LyricDocument,target:TimelineTarget,dropMs:number,durationMs:number,editing=createProjectEditing()):LyricDocument {
   return applyTimelineAssignment(document,target,prepareTimelineAssignment(document,target,dropMs,durationMs),0,editing);
 }
+
+/** Clear only explicit targets, preserving descendant times and editing configuration. */
+export function clearTimelineTimes(document: LyricDocument, targets: TimelineTarget[], editing = createProjectEditing()): LyricDocument {
+  const clearedLines = new Set(targets.filter(target => target.kind === 'line').map(target => target.lineId));
+  if (Object.entries(editing.endLinks).some(([source,target]) => clearedLines.has(source) || clearedLines.has(target))) throw new MessageError(message('timeline.clearLinked'));
+  let next = document;
+  for (const target of targets) {
+    if (target.kind === 'romanization') next = editRomanization(next,target,unit => ({...unit,beginMs:null,endMs:null}));
+    else next = editTarget(next,target,line => {
+      if (target.kind === 'line') return {...line,beginMs:null,endMs:null};
+      const index = line.words.findIndex(word => word.id === target.wordId);
+      if (index < 0) throw new MessageError(message('timeline.wordMissing'));
+      const words = line.words.slice(), word = words[index];
+      if (target.kind === 'word') words[index] = {...word,beginMs:null,endMs:null};
+      else {
+        const rubyIndex = word.rubyUnits.findIndex(unit => unit.id === target.rubyId);
+        if (rubyIndex < 0) throw new MessageError(message('timeline.rubyMissing'));
+        const rubyUnits = word.rubyUnits.slice();
+        rubyUnits[rubyIndex] = {...rubyUnits[rubyIndex],beginMs:null,endMs:null};
+        words[index] = {...word,rubyUnits};
+      }
+      return {...line,words};
+    });
+  }
+  return next;
+}

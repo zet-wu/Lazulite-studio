@@ -633,7 +633,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   </div>);
   const plots = (
     <TimelineIndicatorContext.Provider value={{ startMs, endMs, preview: timelinePreview, publish: publishTimelinePreview }}>
-      <div id="timeline-plots" ref={plotsRef} className={styles.timelinePlots}
+      <div id="timeline-plots" tabIndex={-1} aria-label={t('media.timeline')} ref={plotsRef} className={styles.timelinePlots}
         onPointerDown={event => {
           const plot = (event.target as Element).closest<HTMLElement>('[data-timeline-pan]');
           if (plot) beginPan(event, plot, plot.dataset.timelinePan === 'seek');

@@ -1,7 +1,8 @@
 import { useTimelineAutoExpand } from '../adapters/timeline-preferences';
 import { TimelineStaging } from './TimelineStaging';
 import { message as describeMessage, MessageError, errorMessage, type Message } from '../domain/messages';
-import { i18n } from '../i18n';
+import { i18n, formatMessage } from '../i18n';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { assertChangedTimes, lyricTimes, projectTimes } from '../domain/time-boundaries';
 import { focusObject, selectionSelector, preserveSelectionOnFocus } from './editor/selection-recovery';
@@ -19,7 +20,7 @@ import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicato
 import { useCallback, useContext, useEffect, useMemo, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
 import type { LyricCommand } from '../domain/lyric-commands';
 import type { LyricDocument, LyricWord, RomanizationContent } from '../domain/lyric-document';
-import { moveTimeline, resizeTimeline, snapTimelineInterval, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
+import { clearTimelineTimes, moveTimeline, resizeTimeline, snapTimelineInterval, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
 import { packIntervals } from '../domain/pack-intervals';
 import styles from './media.module.css';
 
@@ -28,7 +29,7 @@ type Props = { follow?: boolean; locked?: boolean; document: LyricDocument; sele
   onLocate?: (begin:number,end:number)=>void;
   externalAnchors?: number[]; durationMs?: number | null;
   apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string | Message) => void };
-type Drag = { started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string | Message } };
+type Drag = { pointerY?:number; clear?: boolean; validDrop?: boolean; started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; y: number; current: number; width: number; originalMs: number; candidate: { timeMs: number; document: LyricDocument; error: string | Message } };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
 
 export function TimelineTracks({ follow = false, locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onLocate, onPan, onError }: Props) {
@@ -44,7 +45,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     observer.observe(lane); return () => observer.disconnect();
   }, [visible.line, visible.word, visible.ruby]);
   const [drag, setDrag] = useState<Drag | null>(null);
-  const { selection, setSelection, expanded, commands, area, focusRequest } = useEditorSelection()!;
+  const { selection, setSelection, expanded, commands, area, focusRequest, requestFocus } = useEditorSelection()!;
   const [autoExpand] = useTimelineAutoExpand();
   const activeLineIds = autoExpand === 'always' || autoExpand === 'follow' && follow
     ? document.lines.filter(line => line.beginMs !== null && line.endMs !== null && line.beginMs <= positionMs && positionMs < line.endMs).map(line => line.id) : [];
@@ -109,14 +110,14 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && dragRef.current) { event.preventDefault(); cancel(); } };
     window.addEventListener('keydown', escape); return () => { window.removeEventListener('keydown', escape); cancel(); };
   }, [cancel]);
-  useEffect(() => { cancel(); }, [document, durationMs, visible.line, visible.word, visible.ruby, visible.romanization, cancel]);
+  useEffect(() => { cancel(); }, [document, locked, durationMs, visible.staging, visible.line, visible.word, visible.ruby, visible.romanization, cancel]);
   const previousViewport = useRef({startMs,endMs});
   useEffect(() => {
     const previous=previousViewport.current;previousViewport.current={startMs,endMs};
     if(dragRef.current?.side!=='pan' && (!follow || endMs-startMs!==previous.endMs-previous.startMs)) cancel();
   }, [startMs,endMs,follow,cancel]);
   const projection = useMemo(() => projectTimeline(document, durationMs), [document, durationMs]);
-  const candidateDocument = drag?.candidate.document ?? document;
+  const candidateDocument = drag?.clear ? document : drag?.candidate.document ?? document;
   const displayed = projectTimeline(candidateDocument, durationMs);
   const propsEndMs = endMs;
   const spanMs = Math.max(1, endMs - startMs);
@@ -124,8 +125,8 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
   const ordinalById = new Map(mainLines.filter(item => !item.backgroundOf).map((item, index) => [item.id, index + 1]));
   const line = displayed.lines.find((item) => item.id === selectedLineId);
   const intersects = (begin: number | null, end: number | null) => timed(begin, end) && end! >= startMs && begin! <= endMs;
-  const overview = mainLines.filter(item => intersects(item.beginMs, item.endMs) || heldTargetIds.includes(item.id));
-  const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => intersects(item.beginMs, item.endMs) || heldTargetIds.includes(item.id)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs, focusedTargetId, menu]);
+  const overview = mainLines.filter(item => intersects(item.beginMs, item.endMs) || timed(item.beginMs,item.endMs) && heldTargetIds.includes(item.id));
+  const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => intersects(item.beginMs, item.endMs) || timed(item.beginMs,item.endMs) && heldTargetIds.includes(item.id)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs, focusedTargetId, menu]);
   const frozenLayout = useRef(currentLayout);
   const draggingTime = drag && !['pan', 'select'].includes(drag.side);
   if (!draggingTime) frozenLayout.current = currentLayout;
@@ -138,6 +139,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
   const begin = (event: PointerEvent<HTMLElement>, target: TimelineTarget | null, side: Drag['side'], originalMs: number) => {
     if (event.button !== 0 || locked && target !== null) return;
     event.preventDefault(); event.stopPropagation();
+    onError('');
     if (target) {
       const node = event.currentTarget.closest<HTMLElement>('[data-timeline-key]');
       if (node) focusObject(node);
@@ -145,7 +147,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       if (event.shiftKey || event.ctrlKey || event.metaKey) return;
     }
     const lane = (event.currentTarget.closest('[data-track-lane]') ?? tracksRef.current!.querySelector('[data-track-lane]')) as HTMLElement;
-    const next: Drag = { started: false, source: document, target, side, x: event.clientX, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, candidate: { timeMs: originalMs, document, error: '' } };
+    const next: Drag = { started: false, source: document, target, side, x: event.clientX, y: event.clientY, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, candidate: { timeMs: originalMs, document, error: '' } };
     event.currentTarget.setPointerCapture(event.pointerId);
     capture.current = { element: event.currentTarget, id: event.pointerId };
     if (side !== 'pan') publish({ timeMs: originalMs, valid: true });
@@ -158,6 +160,18 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     const delta = timelineDelta(event.clientX - current.x, current.width, spanMs);
     const proposed = current.originalMs + delta;
     const moving = current.target ? (selectionTargets(document, selection).some(item => targetId(item) === targetId(current.target!)) ? selectionTargets(document, selection) : [current.target]) : [];
+    const hit = window.document.elementFromPoint(event.clientX,event.clientY);
+    const drop = hit?.closest('[data-staging-drop]');
+    if (current.side === 'move' && current.target && drop && tracksRef.current?.contains(drop)) {
+      const candidate: Drag['candidate'] = {timeMs:current.originalMs,document,error:''};
+      try {
+        candidate.document = clearTimelineTimes(document,moving,editing);
+        if(projectContext) executeProjectCommand(createProjectEditorState(projectContext.project),{type:'lyrics',command:{type:'replace-document',document:candidate.document}});
+      } catch(cause) { candidate.error = errorMessage(cause); }
+      const next = {...current,clear:true,validDrop:true,current:event.clientX,pointerY:event.clientY,started:current.started || Math.hypot(event.clientX-current.x,event.clientY-current.y)>=3,candidate};
+      dragRef.current=next;setDrag(next);publish(null);return;
+    }
+    const validDrop = !!hit?.closest('[data-track-lane]') && !!hit && !!tracksRef.current?.contains(hit);
     const excluded = (item: TimelineTarget) => moving.some(target => targetId(target) === targetId(item) || current.side === 'move' && (target.kind === 'line' && item.lineId === target.lineId || target.kind === 'word' && item.kind === 'ruby' && item.wordId === target.wordId));
     // Parent envelopes and linked ends can change indirectly. Compare endpoint
     // identities against the unsnapped edit, preserving unrelated equal times.
@@ -194,14 +208,14 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
           : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs, editing);
         validate(candidate.document,timeMs);
       } catch (cause) { candidate.error = errorMessage(cause); }
-      onError(candidate.error);
     } else if (current.target) candidate.timeMs = current.originalMs;
-    const next = { ...current, started: current.started || Math.abs(event.clientX - current.x) >= 3, current: event.clientX, candidate };
+    const next = { ...current, clear:false, validDrop, pointerY:event.clientY, started: current.started || Math.abs(event.clientX - current.x) >= 3, current: event.clientX, candidate };
     dragRef.current = next; setDrag(next);
     if (next.side === 'pan') { if (Math.abs(next.current - next.x) >= 4) onPan(next.originalMs - delta); }
     else publish({ timeMs: candidate.timeMs, valid: !candidate.error });
   };
-  const finish = () => {
+  const finish = (event: PointerEvent<HTMLElement>) => {
+    if (dragRef.current?.target && dragRef.current.started) move(event);
     const current = dragRef.current;
     cancel();
     if (!current || current.source !== document || current.side === 'pan') return;
@@ -215,16 +229,21 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       if (current.target) choose(current.target);
       return;
     }
+    if (!current.validDrop) return;
     if (current.candidate.error) { onError(current.candidate.error); return; }
     const moving = selectionTargets(document, selection).some(item => targetId(item) === targetId(current.target!)) ? selectionTargets(document, selection) : [current.target];
-    apply(current.side === 'move' && moving.every(target => target.kind === 'line')
+    try {
+      apply(!current.clear && current.side === 'move' && moving.every(target => target.kind === 'line')
       ? { type: 'shift-lines', lineIds: moving.map(target => target.lineId), deltaMs: current.candidate.timeMs - current.originalMs }
       : { type: 'replace-document', document: current.candidate.document }); onError('');
+      if(current.clear) requestFocus(selection,'timeline');
+    } catch(cause) { onError(errorMessage(cause)); }
   };
   useEffect(() => {
     if (focusRequest?.area !== 'timeline' || focusRequest.selection !== selection) return;
     const wanted = focusRequest.selection;
-    if (!wanted) { focusObject(tracksRef.current!); return; }
+    const focusTimeline=()=>focusObject(tracksRef.current!.querySelector<HTMLElement>('[data-staging-drop]') ?? tracksRef.current!.closest<HTMLElement>('#timeline-plots')!);
+    if (!wanted) { focusTimeline(); return; }
     const lineId = selectionLineId(wanted)!;
     const index = expandedLines.findIndex(line => line.id === lineId);
     if (expandedLines.length > 20 && index >= 0 && !virtual.getVirtualItems().some(item => item.index === index)) virtual.scrollToIndex(index, { align: 'auto' });
@@ -237,14 +256,13 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     let frame = 0, attempts = 0;
     const focus = () => {
       const selector = wanted.kind === 'romanization-content' ? `${selectionSelector(wanted)}:not([data-timeline-key])` : `[data-timeline-key="${CSS.escape(wanted.activeId)}"]`;
-      const exact = tracksRef.current?.querySelector<HTMLElement>(selector);
+      const exact = tracksRef.current?.querySelector<HTMLElement>(`[data-staging-key="${CSS.escape(wanted.activeId)}"]`) ?? tracksRef.current?.querySelector<HTMLElement>(selector);
       if (exact) { focusObject(exact); exact.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return; }
       if (++attempts < 12) { frame = requestAnimationFrame(focus); return; }
       const parent = tracksRef.current?.querySelector<HTMLElement>(`[data-timeline-key="${CSS.escape(lineId)}"]`);
       if (parent) {
-        setSelection({ kind: 'lines', ids: [lineId], activeId: lineId, anchorId: lineId });
         focusObject(parent);
-      } else focusObject(tracksRef.current!);
+      } else focusTimeline();
     };
     frame = requestAnimationFrame(focus);
     return () => cancelAnimationFrame(frame);
@@ -297,10 +315,12 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     onCopy={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.copy(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onCut={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.cut(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onPaste={event => { event.preventDefault(); commands.current?.paste(event.clipboardData.getData('application/x-lazulite-lyric') === commands.current.clipboardToken() ? undefined : event.clipboardData.getData('text/plain')); }}>
+    {drag?.candidate.error && createPortal(<p role="alert" className={styles.dragError} style={{left:Math.max(8,Math.min(drag.current+12,window.innerWidth-328)),top:Math.min((drag.pointerY??drag.y)+12,window.innerHeight-60)}}>{typeof drag.candidate.error==='string'?drag.candidate.error:formatMessage(drag.candidate.error)}</p>,window.document.body)}
     {menu && !locked && <ContextMenu target={menu.target} x={menu.x} y={menu.y} title={t('timeline.menu')} close={closeMenu} actions={[
       { label: t('common.copy'), disabled: !commands.current?.canCopy, run: () => { commands.current?.copy(); } },
       { label: t('common.cut'), disabled: !commands.current?.canCopy, run: () => { commands.current?.cut(); } },
       { label: t('common.paste'), disabled: !commands.current?.canPaste, run: () => commands.current?.paste() },
+      { label:t('timeline.clearTimes'), disabled:!selectionTargets(document,selection).length, run:()=>{try{apply({type:'replace-document',document:clearTimelineTimes(document,selectionTargets(document,selection),editing)});requestFocus(selection,'timeline');}catch(cause){onError(errorMessage(cause));}} },
       { danger:true, label: t('timeline.deleteSelected'), disabled: !selection?.ids.length, run: () => commands.current?.remove() },
     ]} />}
     {visible.karaoke && <KaraokeTrack durationMs={durationMs} startMs={startMs} endMs={endMs} snap={snap} bpm={bpm} anchors={[...externalAnchors,...allTargets.flatMap(target=>{const interval=targetInterval(document,target);return interval?[interval.beginMs,interval.endMs].filter((n):n is number=>n!==null):[];})]} onError={onError}/>}
@@ -314,7 +334,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       const item = displayed.lines.find(line => line.id === expandedLines[virtualRow.index].id)!;
       const label = `L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ` ${t('outline.background')}` : ''}`;
       const renderTargets = (name: string, targets: TimelineTarget[]) => {
-        const intervals = targets.filter(target => { const value = targetInterval(projection, target); return value && (intersects(value.beginMs, value.endMs) || heldTargetIds.includes(targetId(target))); });
+        const intervals = targets.filter(target => { const value = targetInterval(projection, target); return value && timed(value.beginMs,value.endMs) && (intersects(value.beginMs, value.endMs) || heldTargetIds.includes(targetId(target))); });
         const layout = packIntervals(intervals.map(target => { const value = targetInterval(projection, target)!; return { key: targetId(target), beginMs: value.beginMs!, endMs: value.endMs! }; }));
         return row(`${label} ${name}`, intervals.map(target => { const value = targetInterval(displayed, target)!; const text = 'text' in value ? value.text : 'reading' in value ? value.reading : ''; return bar(target, t('timeline.itemLabel',{name,text}), value.beginMs!, value.endMs!, false, layout, text); }), targets, layout.laneCount, name);
       };
@@ -332,7 +352,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     })}
     </div></div>
     {visible.gap && line && row('gaps', gaps.map(({ left, right, beginMs, endMs, overlap }) => <button data-role="secondary" disabled={locked} key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? t('timeline.removeOverlap') : t('timeline.closeGap')} onClick={() => closeGap(left, right)}>{overlap ? t('timeline.overlap') : t('timeline.gap')}</button>),[],1,t('timeline.gap'))}
-    {visible.staging !== false && <TimelineStaging document={document} startMs={startMs} endMs={endMs} durationMs={durationMs} snap={snap} bpm={bpm} anchors={externalAnchors} locked={locked} visible={visible} host={tracksRef} apply={apply} onLocate={onLocate} onError={onError}/>}
+    {visible.staging !== false && <TimelineStaging clearPreview={drag?.clear} document={document} startMs={startMs} endMs={endMs} durationMs={durationMs} snap={snap} bpm={bpm} anchors={externalAnchors} locked={locked} visible={visible} host={tracksRef} apply={apply} onLocate={onLocate} onError={onError}/>}
   </div>;
 }
 

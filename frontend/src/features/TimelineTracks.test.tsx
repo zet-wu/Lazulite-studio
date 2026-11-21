@@ -70,6 +70,7 @@ it('rejects a dragged block tail beyond the source and commits after moving back
   render(<SelectionProvider><InitialSelection id={document.lines[0].id}><TimelineTracks document={document} selectedLineId={document.lines[0].id} startMs={0} endMs={10000} durationMs={10000} positionMs={0} bpm={120} snap={false} visible={{karaoke:false,line:true,word:false,ruby:false,gap:false,romanization:false}} apply={apply} onPan={()=>{}} onError={onError}/></InitialSelection></SelectionProvider>);
   const bar=screen.getByRole('button',{name:'时间轴行 L1'});
   bar.setPointerCapture=vi.fn();bar.hasPointerCapture=vi.fn(()=>false);
+  Object.defineProperty(window.document,'elementFromPoint',{configurable:true,value:()=>bar});
   const pointer=(type:string,x:number)=>{const event=new MouseEvent(type,{bubbles:true,button:0,clientX:x});Object.defineProperty(event,'pointerId',{value:1});fireEvent(bar,event);};
   pointer('pointerdown',100);pointer('pointermove',200);pointer('pointerup',200);
   expect(onError).toHaveBeenCalledWith(expect.objectContaining({key:'time.endOutsideSource'}));
@@ -98,7 +99,7 @@ it('stages complete ancestors, switches to the active row and filters each subtr
  view.rerender(<SelectionProvider><TimelineTracks {...props} visible={{...props.visible,ruby:false,romanization:false}}/></SelectionProvider>);
  expect(staging().querySelectorAll('[data-staging-key]')).toHaveLength(1);
  view.rerender(<SelectionProvider><TimelineTracks {...props} visible={{...props.visible,word:false,ruby:false,romanization:false}}/></SelectionProvider>);
- expect(staging()).toBeNull();cleanup();vi.unstubAllGlobals();
+ expect(staging()).not.toBeNull();expect(staging().querySelectorAll('[data-staging-key]')).toHaveLength(0);cleanup();vi.unstubAllGlobals();
 });
 
 it('unions real active overlaps and backgrounds with manual expansion without changing selection',async()=>{

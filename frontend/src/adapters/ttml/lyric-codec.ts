@@ -167,10 +167,11 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
     unitIndex++;
   }
   if (!rubyUnits.length) throw new MessageError(message('command.rubyEmpty'));
+  const explicitNulls = (attr(element, STUDIO, 'null') ?? '').split(/\s+/);
   return {
     ...createWord(text, wordId), obscene, ...identity,
-    beginMs: beginMs ?? (rubyUnits.every((unit) => unit.beginMs !== null) ? Math.min(...rubyUnits.map((unit) => unit.beginMs!)) : null),
-    endMs: endMs ?? (rubyUnits.every((unit) => unit.endMs !== null) ? Math.max(...rubyUnits.map((unit) => unit.endMs!)) : null),
+    beginMs: explicitNulls.includes('begin') ? null : beginMs ?? (rubyUnits.every((unit) => unit.beginMs !== null) ? Math.min(...rubyUnits.map((unit) => unit.beginMs!)) : null),
+    endMs: explicitNulls.includes('end') ? null : endMs ?? (rubyUnits.every((unit) => unit.endMs !== null) ? Math.max(...rubyUnits.map((unit) => unit.endMs!)) : null),
     rubyUnits,
   };
 }
@@ -384,7 +385,8 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
           const last = bgWords.length - 1;
           bgWords[last] = { ...bgWords[last], text: bgWords[last].text.replace(/\)$/, '') };
         }
-        lines.push({ id: bgId, words: bgWords, beginMs: bgBegin ?? (bgWords.every((word) => word.beginMs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginMs!)) : null), endMs: bgEnd ?? (bgWords.every((word) => word.endMs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endMs!)) : null), agentRefs: bgAgents, backgroundOf: id, songPart: null });
+        const explicitNulls = (attr(background, STUDIO, 'null') ?? '').split(/\s+/);
+        lines.push({ id: bgId, words: bgWords, beginMs: explicitNulls.includes('begin') ? null : bgBegin ?? (bgWords.every((word) => word.beginMs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginMs!)) : null), endMs: explicitNulls.includes('end') ? null : bgEnd ?? (bgWords.every((word) => word.endMs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endMs!)) : null), agentRefs: bgAgents, backgroundOf: id, songPart: null });
       }
     }
   };

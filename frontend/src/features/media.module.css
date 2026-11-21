@@ -188,3 +188,9 @@
 .stagingSlot { position: absolute; top: 0; height: 100%; display: flex; min-width: 0; }
 
 .trackBar.stagingBlock[aria-disabled='true'] { opacity: .55; cursor: default; }
+
+.stagingContent { min-height: var(--timeline-lane-height); }
+.staging[data-clearing] { border-color: var(--blue); background: var(--blue-soft); }
+.staging[data-clearing] .stagingLabel { color: var(--blue); font-weight: 600; }
+.staging:focus-visible, .timelinePlots:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.dragError { position: fixed; z-index: 1200; pointer-events: none; max-width: 320px; margin: 0; padding: 4px 8px; border: 1px solid var(--danger); border-radius: 4px; background: var(--panel); color: var(--danger); font-size: 11px; }

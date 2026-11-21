@@ -74,6 +74,7 @@ import {WordProperties} from './WordProperties';
 import { SingerSelection } from './SingerSelection';
 import { SingerDialog } from './SingerDialog';
 import { SettingsDialog, DialogEditingLocked } from './SettingsDialog';
+import { clearTimelineTimes } from '../../domain/timeline-editing';
 import { ContextMenu, type ContextAction } from '../../shared/ContextMenu';
 import { RubyGenerationDialog } from './RubyGenerationDialog';
 import type { TransportHandle } from '../MediaTransport';
@@ -733,6 +734,8 @@ function EditorWorkspaceContent(props: Props) {
         else {const ordered=document.translationTracks.slice(); const [track]=ordered.splice(index,1);ordered.splice(index+direction,0,track);dispatch({type:'set-translation-tracks',source:document.translationTracks,tracks:ordered});}
       }});
     }
+    const clearTargets=selectionTargets(document,effective);
+    if(clearTargets.some(target=>{const value=targetInterval(document,target);return value?.beginMs!==null||value?.endMs!==null;})) actions.push({id:'clear-times',label:t('timeline.clearTimes'),run:()=>{try{if(dispatch({type:'replace-document',document:clearTimelineTimes(document,clearTargets,editing)}))requestFocus(effective,selectionArea.current);}catch(cause){setMessage(errorMessage(cause));}}});
     const noun=effective.kind==='lines'?t('selection.line'):effective.kind==='words'?t('selection.word'):effective.kind==='ruby'?t('editor.reading'):effective.kind==='romanization-content'?t('editor.content'):t('editor.unit');
     actions.push({id:'delete',danger:true,label:multiple?t('editor.deleteSelected',{kind:noun,count:effective.ids.length}):t('editor.deleteObject',{kind:noun}),run:()=>removeSelection(effective)});
     const shared: ContextAction[] = [
@@ -752,7 +755,7 @@ function EditorWorkspaceContent(props: Props) {
     return Boolean(outlineRef.current?.contains(target) || mainRef.current?.contains(target));
   };
   const ownsClipboard = (target: EventTarget) => ownsSelection(target) && !window.getSelection()?.toString();
-  useEffect(() => { if (props.alignment?.locked) setContextMenu(null); }, [props.alignment?.locked]);
+  useEffect(() => { setContextMenu(null); }, [document, props.alignment?.locked]);
   const closeContext = () => setContextMenu(null);
   const navigateWord = (wordId: string, direction: -1 | 1) => {
     const order = document.lines.flatMap((line) => line.words.map((word) => ({ lineId: line.id, wordId: word.id })));

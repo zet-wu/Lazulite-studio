@@ -58,7 +58,7 @@ test('ruby and romanization assign only to corresponding lanes and remove contex
   const to=(await page.locator(`[data-assignment-kind="${kind}"]`).first().boundingBox())!;
   await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(to.x+to.width*.2,to.y+to.height/2,{steps:4});await page.mouse.up();await expect(source).toHaveCount(0);
  }
- await expect(page.getByLabel('暂存区',{exact:true})).toHaveCount(0);
+ await expect(page.getByLabel('暂存区',{exact:true})).toBeVisible();await expect(page.locator('[data-staging-key]')).toHaveCount(0);
 });
 
 test('dense staging exposes full text on keyboard focus and follows track visibility',async({page})=>{
