@@ -22,3 +22,20 @@ it('preserves input, composition, modifiers and modal or menu isolation',()=>{
  for(const role of ['dialog','menu','listbox']){const overlay=document.createElement('div');overlay.setAttribute('role',role);document.body.append(overlay);expect(fireEvent.keyDown(button,{code:'Space',key:' '})).toBe(true);overlay.remove();}
  expect(toggle).not.toHaveBeenCalled();
 });
+
+it.each(['checkbox','radio','range','button','color','file'])('owns playback on non-text input %s and preserves other keys',type=>{
+ const toggle=vi.fn();render(<Harness toggle={toggle}/>);
+ const input=document.createElement('input');input.type=type;document.body.append(input);input.focus();
+ for(const event of ['keydown','keyup'])expect(fireEvent(input,new KeyboardEvent(event,{code:'Space',key:' ',bubbles:true,cancelable:true}))).toBe(false);
+ expect(toggle).toHaveBeenCalledTimes(1);expect(input).toHaveFocus();expect(fireEvent.keyDown(input,{code:'ArrowRight',key:'ArrowRight'})).toBe(true);input.remove();
+});
+it.each(['text','number','search','email','password','tel','url','date','time'])('preserves text and value input %s',type=>{
+ const toggle=vi.fn();render(<Harness toggle={toggle}/>);const input=document.createElement('input');input.type=type;document.body.append(input);
+ expect(fireEvent.keyDown(input,{code:'Space',key:' '})).toBe(true);expect(toggle).not.toHaveBeenCalled();input.remove();
+});
+it('consumes release after focus changes and ignores duplicate downs',()=>{
+ const toggle=vi.fn();render(<Harness toggle={toggle}/>);const button=screen.getByRole('button');
+ fireEvent.keyDown(button,{code:'Space',key:' '});fireEvent.keyDown(button,{code:'Space',key:' '});
+ const input=screen.getByRole('textbox');input.focus();expect(fireEvent.keyUp(input,{code:'Space',key:' '})).toBe(false);expect(toggle).toHaveBeenCalledTimes(1);
+ expect(fireEvent.keyDown(input,{code:'Space',key:' '})).toBe(true);
+});

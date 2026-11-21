@@ -88,3 +88,17 @@ test('space without music leaves button action unchanged',async({page})=>{
  await expect(page.getByRole('region',{name:'连续打轴'})).toHaveCount(0);await expect(button).toBeFocused();
  await page.keyboard.press('Enter');await expect(page.getByRole('region',{name:'连续打轴'})).toBeVisible();
 });
+
+test('space owns native non-text controls while modal checkboxes keep their context',async({page})=>{
+ await page.goto('/projects/sample-project/edit?scenario=no-music');
+ await expect(page.locator('[data-workspace]')).toBeVisible();
+ await page.locator('[data-workspace]').evaluate(host=>{const input=document.createElement('input');input.type='checkbox';input.setAttribute('aria-label','原生复选验证');host.append(input);});
+ const checkbox=page.getByRole('checkbox',{name:'原生复选验证'});
+ const checked=await checkbox.isChecked();await checkbox.focus();
+ await page.keyboard.down('Space');await page.keyboard.down('Space');await page.keyboard.up('Space');
+ expect(await checkbox.isChecked()).toBe(checked);await expect(checkbox).toBeFocused();
+ await page.evaluate(()=>{const host=document.querySelector('[data-workspace]')!;const input=document.createElement('input');input.type='radio';input.setAttribute('aria-label','原生单选验证');host.append(input);});
+ const radio=page.getByRole('radio',{name:'原生单选验证'});await radio.focus();await page.keyboard.press('Space');await expect(radio).not.toBeChecked();await expect(radio).toBeFocused();
+ await page.evaluate(()=>{const modal=document.createElement('div');modal.setAttribute('role','dialog');modal.innerHTML='<input type="checkbox" aria-label="弹窗复选验证">';document.body.append(modal);});
+ const modalCheck=page.getByRole('checkbox',{name:'弹窗复选验证'});await modalCheck.focus();await page.keyboard.press('Space');await expect(modalCheck).toBeChecked();
+});
