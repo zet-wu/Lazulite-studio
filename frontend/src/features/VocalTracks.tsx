@@ -1,3 +1,4 @@
+import { TimelineContent, timelineViewStart } from './TimelineContent';
 import { ContextMenu } from '../shared/ContextMenu';
 import { MessageError, errorMessage, type Message, message as describeMessage } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
@@ -21,12 +22,12 @@ import { editSegments } from '../domain/vocal-editing';
 import type { Acoustics, VocalSegment } from '../domain/project-document';
 import styles from './vocal.module.css';
 type Props = { sourceDurationMs: number | null; locked?: boolean; children: ReactNode; bpm: number; snap: boolean; anchors: number[]; showEnergy: boolean; showSegments: boolean; lineLabel: string; projectId: string; acoustics: Acoustics; startMs: number; endMs: number; durationMs: number; selectedLineId: string | null; apply: (acoustics: Acoustics) => void; assign: (lineId: string, segment: VocalSegment) => void; pause: () => void };
-type Drag = { error?: string | Message; segment?: VocalSegment; side: 'move'|'beginMs'|'endMs'|'new'; x: number; now: number; width: number; left: number; document: Acoustics; ids: string[]; candidate: VocalSegment };
+type Drag = { viewStartMs: number; error?: string | Message; segment?: VocalSegment; side: 'move'|'beginMs'|'endMs'|'new'; x: number; now: number; width: number; left: number; document: Acoustics; ids: string[]; candidate: VocalSegment };
 export const VOCAL_LINE_MIME = 'application/x-studio-vocal-line';
 export function VocalTracks(props: Props) {
   useTranslation();
   const { acoustics, startMs, endMs, durationMs } = props;
-  const { publish } = useContext(TimelineIndicatorContext);
+  const { publish, paddingMs = 0 } = useContext(TimelineIndicatorContext);
   const capture = useRef<{ element: HTMLElement; id: number } | null>(null);
   const sharedSelection = useEditorSelection()!;
   const {selected,setSelected,adding,setAdding,toolsHost}=useAudioReview();
@@ -39,7 +40,7 @@ export function VocalTracks(props: Props) {
   useEffect(() => { if (props.locked) setMenu(null); }, [props.locked]);
   const [dropId,setDropId] = useState<string | null>(null);
   const span = Math.max(1,endMs-startMs);
-  const visible = acoustics.segments.filter(s=>s.endMs>startMs && s.beginMs<endMs);
+  const visible = acoustics.segments.filter(s=>s.endMs>startMs-paddingMs && s.beginMs<endMs+paddingMs);
   const layout = useMemo(()=>packIntervals(visible.map(s=>({key:s.id,...s}))),[acoustics,startMs,endMs]);
   const frozen = useRef(layout); if (!drag) frozen.current = layout;
   const requestWindow = waveformRequestWindow({ startMs, spanMs: span }, durationMs);
@@ -51,7 +52,7 @@ export function VocalTracks(props: Props) {
     // Keep one previous window while fetching, but never reuse a different source/resolution.
     placeholderData: (data, query) => query?.queryKey[1] === props.projectId && query.queryKey[2] === acoustics.analysisId && query.queryKey[3] === span ? data : undefined,
   });
-  const energyView = visibleEnergy(energy.data, startMs, endMs);
+  const energyView = visibleEnergy(energy.data, startMs-paddingMs, endMs+paddingMs);
   const clearDrag = useCallback(() => {
     dragRef.current = null; setDrag(null); publish(null);
     const held = capture.current; capture.current = null;
@@ -63,7 +64,9 @@ export function VocalTracks(props: Props) {
     const key = (e:KeyboardEvent)=>{if(e.key==='Escape'&&(dragRef.current||adding)){ e.preventDefault(); cancel(); }};
     window.addEventListener('keydown',key); return()=>window.removeEventListener('keydown',key);
   },[adding,menu]);
-  useEffect(() => { clearDrag(); }, [acoustics, startMs, endMs, props.showEnergy, props.showSegments, props.sourceDurationMs, clearDrag]);
+  useEffect(() => { clearDrag(); }, [acoustics, props.showEnergy, props.showSegments, props.sourceDurationMs, clearDrag]);
+  const previousSpan = useRef(span);
+  useEffect(() => { if (!paddingMs || previousSpan.current !== span) clearDrag(); previousSpan.current=span; }, [startMs,endMs,paddingMs]);
   useEffect(()=>{setSelected(ids=>ids.filter(id=>acoustics.segments.some(s=>s.id===id)));},[acoustics,setSelected]);
   const sorted=useMemo(()=>[...acoustics.segments].sort((a,b)=>a.beginMs-b.beginMs||a.endMs-b.endMs||a.id.localeCompare(b.id)),[acoustics]);
   const labels=useMemo(()=>new Map(sorted.map((s,i)=>[s.id,`S${i+1}`])),[sorted]);
@@ -75,10 +78,10 @@ export function VocalTracks(props: Props) {
   const candidate = (d:Drag): VocalSegment => {
     const durationMs = props.sourceDurationMs;
     if (durationMs === null) throw new MessageError(describeMessage('vocal.sourceUnknown'));
-    const delta=timelineDelta(d.now-d.x,d.width,span);
+    const delta=timelineDelta(d.now-d.x,d.width,span)+Math.round(timelineViewStart(capture.current?.element??window.document.body,startMs)-d.viewStartMs);
     if(d.side==='new') {
-      const a=Math.max(0,Math.min(durationMs,snapAt(startMs+(d.x-d.left)/d.width*span,d)));
-      const b=Math.max(0,Math.min(durationMs,snapAt(startMs+(d.now-d.left)/d.width*span,d)));
+      const a=Math.max(0,Math.min(durationMs,snapAt(d.viewStartMs+(d.x-d.left)/d.width*span,d)));
+      const b=Math.max(0,Math.min(durationMs,snapAt(timelineViewStart(capture.current?.element??window.document.body,startMs)+(d.now-d.left)/d.width*span,d)));
       return {id:'preview',beginMs:Math.min(a,b),endMs:Math.max(a,b)};
     }
     const s=d.segment!;
@@ -100,7 +103,7 @@ export function VocalTracks(props: Props) {
     if(segment && !selected.includes(segment.id))setSelected([segment.id]);
     const lane=e.currentTarget.closest('[data-vocal-lane]')??e.currentTarget.querySelector('[data-vocal-lane]')??e.currentTarget;
     const box=lane.getBoundingClientRect();
-    const next: Drag = {segment,side,x:e.clientX,now:e.clientX,width:box.width,left:box.left,document:acoustics,ids:segment?(selected.includes(segment.id)?selected:[segment.id]):[], candidate: segment ?? { id: 'preview', beginMs: 0, endMs: 0 }};
+    const next: Drag = {viewStartMs:timelineViewStart(lane,startMs),segment,side,x:e.clientX,now:e.clientX,width:box.width,left:box.left,document:acoustics,ids:segment?(selected.includes(segment.id)?selected:[segment.id]):[], candidate: segment ?? { id: 'preview', beginMs: 0, endMs: 0 }};
     next.candidate = candidate(next);
     dragRef.current=next;setDrag(next);e.currentTarget.setPointerCapture(e.pointerId);
     capture.current = { element: e.currentTarget, id: e.pointerId };
@@ -139,17 +142,17 @@ export function VocalTracks(props: Props) {
     {props.children}
     {error&&<p role="alert">{error}</p>}
     {showEnergy && <div className={styles.segmentRow}><strong data-timeline-text>{t('vocal.energy')}</strong><div className={styles.energyFrame} data-wheel-zoom data-timeline-pan="seek" tabIndex={-1}>
-      <svg className={styles.energy} viewBox="0 0 1000 55" preserveAspectRatio="none" aria-label={t('vocal.energyLabel')}><polyline fill="none" stroke="currentColor" strokeWidth="1" points={upper?energyView!.values.map((v,i)=>`${pct(energyView!.start_ms+i*energyView!.step_ms)*10},${54-v/upper*52}`).join(' '):''}/></svg>
+      <TimelineContent><svg className={styles.energy} viewBox="0 0 1000 55" preserveAspectRatio="none" aria-label={t('vocal.energyLabel')}><polyline fill="none" stroke="currentColor" strokeWidth="1" points={upper?energyView!.values.map((v,i)=>`${pct(energyView!.start_ms+i*energyView!.step_ms)*10},${54-v/upper*52}`).join(' '):''}/></svg></TimelineContent>
       {!energy.isError && <TimelineIndicators playback />}
       {upper!==null && <small className={styles.scale}>{upper}</small>}
       {energy.isError && <span className={styles.energyError} role="alert">{t('vocal.energyFailed')}<IconButton icon="refresh" label={t('vocal.retryEnergy')} onClick={()=>void energy.refetch()}/></span>}
     </div></div>}
     {showSegments && <div className={styles.segmentRow}><strong data-timeline-text>{t('vocal.segment')}</strong><div data-wheel-zoom data-vocal-lane data-timeline-pan="pan" tabIndex={-1} className={styles.lane} style={{height:`calc(${Math.max(1,frozen.current.laneCount)} * var(--timeline-lane-height))`}} onPointerDown={e=>begin(e)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={clearDrag}>
-      {visible.map(s=>{const p=preview&&drag?.side==='move'&&drag.ids.includes(s.id)?{...s,beginMs:s.beginMs+preview.beginMs-drag.segment!.beginMs,endMs:s.endMs+preview.beginMs-drag.segment!.beginMs}:preview&&drag?.segment?.id===s.id?preview:s;return <button data-role="secondary" key={s.id} className={styles.segment} data-segment-id={s.id} title={t('vocal.interval',{label:labels.get(s.id),begin:s.beginMs,end:s.endMs})} aria-label={t('vocal.segmentLabel',{label:labels.get(s.id),begin:s.beginMs,end:s.endMs})} aria-pressed={selected.includes(s.id)} style={{left:`${Math.max(0,pct(p.beginMs))}%`,width:`${Math.min(100,pct(p.endMs))-Math.max(0,pct(p.beginMs))}%`,top:`calc(${frozen.current.lanes.get(s.id)??0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`,outline:dropId===s.id?'3px solid var(--primary, #3367ab)':undefined}} onPointerDown={e=>{if(!adding)begin(e,s,'move');}} onClick={e=>{if(e.detail===0 && !selected.includes(s.id)){setSelected([s.id]);}}} onKeyDown={e=>{if(!props.locked&&(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')){e.preventDefault();if(!selected.includes(s.id))setSelected([s.id]);const r=e.currentTarget.getBoundingClientRect();setMenu({x:r.left,y:r.bottom,target:e.currentTarget});}}} onContextMenu={e=>{if(props.locked){e.preventDefault();return;}e.preventDefault();if(adding)return;if(!selected.includes(s.id))setSelected([s.id]);setMenu({x:e.clientX,y:e.clientY,target:e.currentTarget});}} onDragOver={e=>{if(props.locked)return;if(!adding&&e.dataTransfer.types.includes(VOCAL_LINE_MIME)){e.preventDefault();setDropId(s.id);}}} onDragLeave={()=>setDropId(null)} onDrop={e=>{if(props.locked)return;e.preventDefault();setDropId(null);if(adding)return;const id=e.dataTransfer.getData(VOCAL_LINE_MIME);if(id){setSelected([s.id]);assign(id,s);}}}>
+      <TimelineContent>{visible.map(s=>{const p=preview&&drag?.side==='move'&&drag.ids.includes(s.id)?{...s,beginMs:s.beginMs+preview.beginMs-drag.segment!.beginMs,endMs:s.endMs+preview.beginMs-drag.segment!.beginMs}:preview&&drag?.segment?.id===s.id?preview:s;return <button data-role="secondary" key={s.id} className={styles.segment} data-segment-id={s.id} title={t('vocal.interval',{label:labels.get(s.id),begin:s.beginMs,end:s.endMs})} aria-label={t('vocal.segmentLabel',{label:labels.get(s.id),begin:s.beginMs,end:s.endMs})} aria-pressed={selected.includes(s.id)} style={{left:`${pct(p.beginMs)}%`,width:`${pct(p.endMs)-pct(p.beginMs)}%`,top:`calc(${frozen.current.lanes.get(s.id)??0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`,outline:dropId===s.id?'3px solid var(--primary, #3367ab)':undefined}} onPointerDown={e=>{if(!adding)begin(e,s,'move');}} onClick={e=>{if(e.detail===0 && !selected.includes(s.id)){setSelected([s.id]);}}} onKeyDown={e=>{if(!props.locked&&(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')){e.preventDefault();if(!selected.includes(s.id))setSelected([s.id]);const r=e.currentTarget.getBoundingClientRect();setMenu({x:r.left,y:r.bottom,target:e.currentTarget});}}} onContextMenu={e=>{if(props.locked){e.preventDefault();return;}e.preventDefault();if(adding)return;if(!selected.includes(s.id))setSelected([s.id]);setMenu({x:e.clientX,y:e.clientY,target:e.currentTarget});}} onDragOver={e=>{if(props.locked)return;if(!adding&&e.dataTransfer.types.includes(VOCAL_LINE_MIME)){e.preventDefault();setDropId(s.id);}}} onDragLeave={()=>setDropId(null)} onDrop={e=>{if(props.locked)return;e.preventDefault();setDropId(null);if(adding)return;const id=e.dataTransfer.getData(VOCAL_LINE_MIME);if(id){setSelected([s.id]);assign(id,s);}}}>
         <span>{labels.get(s.id)}</span><span className={`${styles.edge} ${styles.begin}`} onPointerDown={e=>{if(!adding)begin(e,s,'beginMs');}}/><span className={`${styles.edge} ${styles.end}`} onPointerDown={e=>{if(!adding)begin(e,s,'endMs');}}/>
       </button>;})}
       {preview&&drag?.side==='new'&&<span className={styles.newRange} style={{left:`${pct(preview.beginMs)}%`,width:`${pct(preview.endMs)-pct(preview.beginMs)}%`}}/>}
-      <TimelineIndicators />
+      </TimelineContent><TimelineIndicators />
     </div></div>}
     {menu && !props.locked && <ContextMenu {...menu} title={t('vocal.segment')} close={()=>setMenu(null)} actions={[
       {label:t('vocal.assignSelected'),disabled:adding||!active||!props.selectedLineId,run:()=>assign(props.selectedLineId,active)},

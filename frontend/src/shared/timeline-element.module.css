@@ -22,3 +22,5 @@
   border-radius: var(--timeline-element-radius);
   cursor: grab;
 }
+.content { position: absolute; inset: 0; transform: translateX(var(--timeline-shift, 0%)); pointer-events: none; }
+.content > * { pointer-events: auto; }

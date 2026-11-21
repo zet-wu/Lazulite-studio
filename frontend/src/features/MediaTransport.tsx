@@ -41,6 +41,7 @@ import {
 import styles from "./media.module.css";
 import type { LyricCommand } from '../domain/lyric-commands';
 import type { LyricDocument } from '../domain/lyric-document';
+import { TimelineContent } from './TimelineContent';
 import { TimelineTracks } from './TimelineTracks';
 import { useCanvasMetrics } from './useCanvasMetrics';
 import { SpectrogramCanvas } from './SpectrogramCanvas';
@@ -131,7 +132,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const panDrag = useRef<{ x: number; startMs: number; left: number; width: number; pointerId: number; started: boolean; seek: boolean; element: HTMLElement } | null>(null);
   const loopDrag = useRef<{ side: 'a' | 'b'; original: LoopState; left: number; width: number; pointerId: number } | null>(null);
   const lastTrackPaint = useRef(0);
-  const lastFollowPaint = useRef(0);
+  const layoutStart = useRef(0);
   const positionRef = useRef(0);
   const auditionEnd = useRef<number | null>(null);
   const [duration, setDuration] = useState(
@@ -158,9 +159,14 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const [swapWheel] = useTimelineSwapWheel();
   const [visible, setVisible] = useTimelineVisibility();
   const { width, height, ratio, node: measuredCanvas, observe: observeCanvas } = useCanvasMetrics(canvas, expanded);
-  const [follow, setFollow] = useState(false);
+  const [follow, setFollowState] = useState(false);
   const viewportRef = useRef({ start, span, duration, follow });
-  viewportRef.current = { start, span, duration, follow };
+  const setFollow = (value: boolean) => { if (!value) setStart(viewportRef.current.start); setFollowState(value); };
+  const committedViewport = useRef({start,span});
+  if (committedViewport.current.start !== start || committedViewport.current.span !== span) viewportRef.current.start = start;
+  committedViewport.current = {start,span};
+  layoutStart.current = start;
+  Object.assign(viewportRef.current, {span,duration,follow});
   const [bpmStatus, setBpmStatus] = useMessageText('');
   useEffect(() => () => { if (moveAnimation.current !== null) cancelAnimationFrame(moveAnimation.current); }, []);
   const tapTimes = useRef<number[]>([]);
@@ -168,7 +174,9 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const end = Math.min(duration, start + span);
   const endMs = Math.round(end * 1e3);
   const durationMs = Math.round(duration * 1e3);
-  const requestWindow = waveformRequestWindow({ startMs, spanMs: Math.round(span * 1e3) }, durationMs);
+  const paddingMs = follow ? Math.round(span * 250) : 0;
+  const drawStartMs = startMs - paddingMs, drawEndMs = endMs + paddingMs;
+  const requestWindow = waveformRequestWindow({ startMs: Math.max(0,drawStartMs), spanMs: drawEndMs - Math.max(0,drawStartMs) }, durationMs);
   const level = Math.max(
     0,
     Math.min(
@@ -219,6 +227,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   );
   const projectHead = useCallback((current: number) => {
     const { start, span } = viewportRef.current;
+    plotsRef.current?.setAttribute('data-view-start', String(start * 1000));
+    plotsRef.current?.style.setProperty('--timeline-shift', `${span ? (layoutStart.current - start) / span * 100 : 0}%`);
     plotsRef.current?.style.setProperty('--playhead-left', `${span ? (current - start) / span * 100 : 0}%`);
     plotsRef.current?.style.setProperty('--playhead-display', current >= start && current <= start + span ? 'block' : 'none');
   }, []);
@@ -331,18 +341,15 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     if (!el || !playing) return;
     const frame = () => {
       const current = readPosition();
+      const view = viewportRef.current;
+      if (view.follow && view.span < view.duration) {
+        view.start = Math.max(0, Math.min(view.duration - view.span, current - view.span * 0.35));
+        if (performance.now() - lastTrackPaint.current > 80 || Math.abs(view.start-layoutStart.current) > view.span * .125) setStart(view.start);
+      }
       updateDom(current);
       if (performance.now() - lastTrackPaint.current > 80) {
         setPosition(current);
         lastTrackPaint.current = performance.now();
-      }
-      const view = viewportRef.current;
-      if (view.follow && view.span < view.duration && performance.now() - lastFollowPaint.current >= 32) {
-        const target = Math.max(0, Math.min(view.duration - view.span, current - view.span * 0.35));
-        const elapsed = Math.min(100, performance.now() - lastFollowPaint.current);
-        lastFollowPaint.current = performance.now();
-        const blend = 1 - Math.exp(-elapsed / 130);
-        setStart((value) => Math.abs(target - value) < 0.001 ? target : value + (target - value) * blend);
       }
       if (auditionEnd.current !== null && current >= auditionEnd.current) {
         auditionEnd.current = null;
@@ -389,13 +396,13 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       const d = waveform.data;
       if (!d || endMs <= startMs) return;
       ctx.strokeStyle = "#91aee4";
-      const view = endMs - startMs;
+      const view = drawEndMs - drawStartMs;
       ctx.beginPath();
       d.maximum.forEach((max, i) => {
-        if (d.start_ms + (i + 1) * d.bucket_ms < startMs || d.start_ms + i * d.bucket_ms > endMs) return;
+        if (d.start_ms + (i + 1) * d.bucket_ms < drawStartMs || d.start_ms + i * d.bucket_ms > drawEndMs) return;
         const min = d.minimum[i] ?? max;
         const x =
-          ((d.start_ms + i * d.bucket_ms - startMs) / view) * r.width +
+          ((d.start_ms + i * d.bucket_ms - drawStartMs) / view) * r.width +
           Math.max(1, (d.bucket_ms / view) * r.width) / 2;
         ctx.moveTo(Math.round(x) + 0.5, ((1 - max) * r.height) / 2);
         ctx.lineTo(Math.round(x) + 0.5, ((1 - min) * r.height) / 2);
@@ -403,7 +410,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       ctx.stroke();
     };
     draw();
-  }, [endMs, startMs, waveform.data, width, height, ratio, measuredCanvas, expanded, visible.wave, ui?.adding, timelineHost]);
+  }, [drawEndMs, drawStartMs, waveform.data, width, height, ratio, measuredCanvas, expanded, visible.wave, ui?.adding, timelineHost]);
   const zoomAt = (factor: number, fraction: number) => {
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }
     const view = viewportRef.current;
@@ -460,7 +467,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     window.getSelection()?.removeAllRanges();
     plot.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
-    panDrag.current = { x: event.clientX, startMs, left: rect.left, width: rect.width, pointerId: event.pointerId, started: false, seek, element: event.currentTarget };
+    panDrag.current = { x: event.clientX, startMs: viewportRef.current.start * 1000, left: rect.left, width: rect.width, pointerId: event.pointerId, started: false, seek, element: event.currentTarget };
   };
   const movePan = (event: PointerEvent<HTMLElement>) => {
     const current = panDrag.current;
@@ -597,7 +604,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         </div>
 </>);
   const acousticPlots=(<div>
-      <div data-wheel-zoom className={styles.ruler} aria-label={t('media.ruler')} data-timeline-pan="seek" tabIndex={-1}><TimelineIndicators />{ticks.map((time) => <span data-timeline-text data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
+      <div data-wheel-zoom className={styles.ruler} aria-label={t('media.ruler')} data-timeline-pan="seek" tabIndex={-1}><TimelineIndicators /><TimelineContent>{ticks.map((time) => <span data-timeline-text data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</TimelineContent></div>
       <div className={styles.waveRow}>
         <div className={styles.sourceLabel}><Select aria-label={t('media.graphicSource')} title={t('media.graphicSource')} value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">{t('media.original')}</option>{vocalId && <option value="vocal">{t('media.vocals')}</option>}</Select></div>
       <div
@@ -612,12 +619,13 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         aria-valuemax={duration}
         aria-valuenow={position}
       >
-        <canvas
+        <TimelineContent><canvas
+          style={paddingMs ? {width:"150%", marginLeft:"-25%"} : undefined}
           ref={observeCanvas}
           className={styles.wave}
         />
-        <TimelineIndicators playback />
-        {snap && span <= 30 && Array.from({ length: beatCount }, (_, index) => <span key={index} className={styles.beatLine} style={{ left: `${((firstBeat + index) * beatMs - startMs) / (endMs - startMs) * 100}%` }} />)}
+        </TimelineContent><TimelineIndicators playback />
+        <TimelineContent>{snap && span <= 30 && Array.from({ length: beatCount }, (_, index) => <span key={index} className={styles.beatLine} style={{ left: `${((firstBeat + index) * beatMs - startMs) / (endMs - startMs) * 100}%` }} />)}
         {bandA != null && bandB != null && bandB > bandA && bandB >= start && bandA <= end && (
           <span
             className={styles.band}
@@ -631,10 +639,10 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
           style={{ left: `${Math.max(0, Math.min(100, ((bandA - start) / span) * 100))}%` }} onPointerDown={(event) => beginLoopDrag(event, 'a')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={(event) => endLoopDrag(event, true)} />}
         {bandA != null && bandB != null && (bandB >= start && bandB <= end || loopDrag.current?.side === 'b') && <span data-loop-handle="b" className={styles.loopHandle} role="slider" tabIndex={0} aria-label={t('media.loopB')} aria-valuemin={bandA} aria-valuemax={duration} aria-valuenow={bandB}
           style={{ left: `${Math.max(0, Math.min(100, ((bandB - start) / span) * 100))}%` }} onPointerDown={(event) => beginLoopDrag(event, 'b')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={(event) => endLoopDrag(event, true)} />}
-      </div></div>
+      </TimelineContent></div></div>
   </div>);
   const plots = (
-    <TimelineIndicatorContext.Provider value={{ startMs, endMs, preview: timelinePreview, publish: publishTimelinePreview }}>
+    <TimelineIndicatorContext.Provider value={{ paddingMs, startMs, endMs, preview: timelinePreview, publish: publishTimelinePreview }}>
       <div id="timeline-plots" tabIndex={-1} aria-label={t('media.timeline')} ref={plotsRef} className={styles.timelinePlots}
         onPointerDown={event => {
           const plot = (event.target as Element).closest<HTMLElement>('[data-timeline-pan]');
