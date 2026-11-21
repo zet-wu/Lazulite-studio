@@ -55,7 +55,15 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
   const [menu, setMenu] = useState<{ x: number; y: number; target: HTMLElement } | null>(null);
   const heldTargetIds = [focusedTargetId, drag?.target ? targetId(drag.target) : null, menu?.target.dataset.timelineKey];
   const heldLineIds = [focusedLineId, drag?.target?.lineId, menu?.target.closest<HTMLElement>('[data-expanded-line]')?.dataset.expandedLine];
-  const expandedLines = document.lines.filter(line => (expanded.includes(line.id) || activeLineIds.includes(line.id) || heldLineIds.includes(line.id)) && (visible.word || visible.ruby && line.words.some(word => word.rubyUnits.length) || visible.romanization && [...document.romanizationTracks,...document.translationTracks].some(track => track.contents.some(content => content.lineId === line.id))));
+  const projection = useMemo(() => projectTimeline(document, durationMs), [document, durationMs]);
+  const intersects = (begin: number | null, end: number | null) => timed(begin, end) && end! >= startMs && begin! <= endMs;
+  const expandedLines = projection.lines.filter(line => {
+    if (!expanded.includes(line.id) && !activeLineIds.includes(line.id) && !heldLineIds.includes(line.id)) return false;
+    if (!(visible.word || visible.ruby && line.words.some(word => word.rubyUnits.length) || visible.romanization && [...document.romanizationTracks,...document.translationTracks].some(track => track.contents.some(content => content.lineId === line.id)))) return false;
+    return heldLineIds.includes(line.id) || intersects(line.beginMs, line.endMs)
+      || line.words.some(word => visible.word && intersects(word.beginMs,word.endMs) || visible.ruby && word.rubyUnits.some(unit => intersects(unit.beginMs,unit.endMs)))
+      || visible.romanization && [...projection.translationTracks,...projection.romanizationTracks].some(track => track.contents.some(content => content.lineId === line.id && content.kind === 'timed' && content.units.some(unit => intersects(unit.beginMs,unit.endMs))));
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtual = useVirtualizer({ count: expandedLines.length, getScrollElement: () => scrollRef.current, estimateSize: () => 80, overscan: 3, getItemKey: index => expandedLines[index].id,
     rangeExtractor: range => [...new Set([...defaultRangeExtractor(range), ...expandedLines.flatMap((line,index) => heldLineIds.includes(line.id) ? [index] : [])])].sort((a,b) => a-b) });
@@ -116,7 +124,6 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     const previous=previousViewport.current;previousViewport.current={startMs,endMs};
     if(dragRef.current?.side!=='pan' && (!follow || endMs-startMs!==previous.endMs-previous.startMs)) cancel();
   }, [startMs,endMs,follow,cancel]);
-  const projection = useMemo(() => projectTimeline(document, durationMs), [document, durationMs]);
   const candidateDocument = drag?.clear ? document : drag?.candidate.document ?? document;
   const displayed = projectTimeline(candidateDocument, durationMs);
   const propsEndMs = endMs;
@@ -124,7 +131,6 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
   const mainLines = displayed.lines;
   const ordinalById = new Map(mainLines.filter(item => !item.backgroundOf).map((item, index) => [item.id, index + 1]));
   const line = displayed.lines.find((item) => item.id === selectedLineId);
-  const intersects = (begin: number | null, end: number | null) => timed(begin, end) && end! >= startMs && begin! <= endMs;
   const overview = mainLines.filter(item => intersects(item.beginMs, item.endMs) || timed(item.beginMs,item.endMs) && heldTargetIds.includes(item.id));
   const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => intersects(item.beginMs, item.endMs) || timed(item.beginMs,item.endMs) && heldTargetIds.includes(item.id)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs, focusedTargetId, menu]);
   const frozenLayout = useRef(currentLayout);
@@ -336,6 +342,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       const label = `L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ` ${t('outline.background')}` : ''}`;
       const renderTargets = (name: string, targets: TimelineTarget[]) => {
         const intervals = targets.filter(target => { const value = targetInterval(projection, target); return value && timed(value.beginMs,value.endMs) && (intersects(value.beginMs, value.endMs) || heldTargetIds.includes(targetId(target))); });
+        if (!intervals.length && !heldLineIds.includes(item.id)) return null;
         const layout = packIntervals(intervals.map(target => { const value = targetInterval(projection, target)!; return { key: targetId(target), beginMs: value.beginMs!, endMs: value.endMs! }; }));
         return row(`${label} ${name}`, intervals.map(target => { const value = targetInterval(displayed, target)!; const text = 'text' in value ? value.text : 'reading' in value ? value.reading : ''; return bar(target, t('timeline.itemLabel',{name,text}), value.beginMs!, value.endMs!, false, layout, text); }), targets, layout.laneCount, name);
       };

@@ -121,3 +121,23 @@ it('unions real active overlaps and backgrounds with manual expansion without ch
  expect(screen.getByTestId('selection')).toHaveTextContent('line-0');expect(props.apply).not.toHaveBeenCalled();expect(props.onPan).not.toHaveBeenCalled();
  cleanup();localStorage.removeItem('studio:timeline-auto-expand');vi.unstubAllGlobals();
 });
+
+it('filters expanded groups before layout, keeps visible children and restores expansion on pan',async()=>{
+ const {cleanup,fireEvent}=await import('@testing-library/react');cleanup();
+ const {createLine}=await import('../domain/lyric-document');
+ vi.stubGlobal('ResizeObserver',class{observe(){}unobserve(){}disconnect(){}});
+ const document=createLyricDocument('');
+ document.lines=Array.from({length:30},(_,i)=>{const line=createLine(`歌${i}`,`line-${i}`);line.beginMs=i*1000;line.endMs=i*1000+800;Object.assign(line.words[0],{beginMs:line.beginMs,endMs:line.endMs});return line;});
+ document.lines[0].beginMs=null;document.lines[0].endMs=null;
+ document.lines[1].backgroundOf='line-0';
+ function Expand(){const {setSelection}=useEditorSelection()!;useEffect(()=>setSelection({kind:'lines',ids:document.lines.map(l=>l.id),activeId:'line-0',anchorId:'line-0'}),[]);return null;}
+ const props={document,selectedLineId:'line-0',startMs:0,endMs:900,positionMs:0,bpm:0,snap:false,visible:{karaoke:false,line:true,word:true,ruby:true,romanization:true,gap:false,staging:false},apply:vi.fn(),onPan:vi.fn(),onError:vi.fn()};
+ const show=(startMs:number,endMs:number)=><SelectionProvider><Expand/><TimelineTracks {...props} startMs={startMs} endMs={endMs}/></SelectionProvider>;
+ const view=render(show(0,900));const groups=()=>[...view.container.querySelectorAll<HTMLElement>('[data-expanded-line]')].map(n=>n.dataset.expandedLine);
+ expect(groups()).toEqual(['line-0']);
+ const word=view.container.querySelector<HTMLElement>('[data-timeline-key="'+document.lines[0].words[0].id+'"]')!;fireEvent.focusIn(word);
+ view.rerender(show(2000,2900));expect(groups()).toEqual(['line-0','line-2']);
+ fireEvent.focusIn(window.document.body);expect(groups()).toEqual(['line-2']);
+ view.rerender(show(0,900));expect(groups()).toEqual(['line-0']);
+ expect(props.apply).not.toHaveBeenCalled();cleanup();vi.unstubAllGlobals();
+});
