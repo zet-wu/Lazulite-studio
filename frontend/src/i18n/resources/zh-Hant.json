@@ -1761,5 +1761,14 @@
   "vocal.models": "人聲分離模型管理",
   "vocal.lead": "主唱",
   "vocal.vocals": "人聲",
-  "vocal.reseparate": "重新分離"
+  "vocal.reseparate": "重新分離",
+  "settings.autoExpand": "活動行自動展開顯示",
+  "settings.autoExpand.always": "始終",
+  "settings.autoExpand.follow": "僅跟隨播放時",
+  "settings.autoExpand.off": "關閉",
+  "settings.spectrumHeight": "頻譜圖高度",
+  "settings.spectrumHeightRange": "36–216 px，步長 1",
+  "settings.spectrumHeightInvalid": "請輸入 36–216 之間的整數。",
+  "timeline.clearTimes": "清空時間",
+  "timeline.clearLinked": "請先解除相關行尾連結，再清空時間。"
 }

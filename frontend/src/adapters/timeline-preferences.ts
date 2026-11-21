@@ -12,4 +12,8 @@ export function useTimelineVisibility() {
 }
 export const useStagingIgnoredCharacters = () => usePreference('studio:staging-ignored-characters',' ');
 
+export type AutoExpandMode = 'always' | 'follow' | 'off';
+export const useTimelineAutoExpand = () => usePreference('studio:timeline-auto-expand', 'follow') as [AutoExpandMode, (mode: AutoExpandMode) => void];
+export const useSpectrumHeight = () => usePreference('studio:spectrum-height', 72);
+
 export const useTimelineSwapWheel = () => usePreference('studio:timeline-swap-wheel', false);

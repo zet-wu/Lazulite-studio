@@ -1774,5 +1774,14 @@
   "vocal.models": "Vocal separation model management",
   "vocal.lead": "Lead vocals",
   "vocal.vocals": "Vocals",
-  "vocal.reseparate": "Separate again"
+  "vocal.reseparate": "Separate again",
+  "settings.autoExpand": "Automatically expand active lines",
+  "settings.autoExpand.always": "Always",
+  "settings.autoExpand.follow": "When playback follow is on",
+  "settings.autoExpand.off": "Off",
+  "settings.spectrumHeight": "Spectrogram height",
+  "settings.spectrumHeightRange": "36–216 px, step 1",
+  "settings.spectrumHeightInvalid": "Enter an integer from 36 to 216.",
+  "timeline.clearTimes": "Clear timing",
+  "timeline.clearLinked": "Unlink the related line ends before clearing timing."
 }

@@ -11653,5 +11653,59 @@
     "source": "重新分离",
     "params": [],
     "parameterNotes": {}
+  },
+  "settings.autoExpand": {
+    "context": "Timeline settings: active line expansion and spectrogram display height",
+    "source": "活动行自动展开显示",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.autoExpand.always": {
+    "context": "Timeline settings: active line expansion and spectrogram display height",
+    "source": "始终",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.autoExpand.follow": {
+    "context": "Timeline settings: active line expansion and spectrogram display height",
+    "source": "仅跟随播放时",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.autoExpand.off": {
+    "context": "Timeline settings: active line expansion and spectrogram display height",
+    "source": "关闭",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.spectrumHeight": {
+    "context": "Timeline settings: active line expansion and spectrogram display height",
+    "source": "频谱图高度",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.spectrumHeightRange": {
+    "context": "Timeline settings: active line expansion and spectrogram display height",
+    "source": "36–216 px，步长 1",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.spectrumHeightInvalid": {
+    "context": "Timeline settings: active line expansion and spectrogram display height",
+    "source": "请输入 36–216 之间的整数。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "timeline.clearTimes": {
+    "context": "Clear the selected lyric units own times; related end links must be removed explicitly",
+    "source": "清空时间",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "timeline.clearLinked": {
+    "context": "Clear the selected lyric units own times; related end links must be removed explicitly",
+    "source": "请先解除相关行尾链接，再清空时间。",
+    "params": [],
+    "parameterNotes": {}
   }
 }

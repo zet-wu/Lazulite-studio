@@ -1,3 +1,4 @@
+import { useSpectrumHeight } from '../adapters/timeline-preferences';
 import { useMessageText } from '../shared/useMessageText';
 import { message as describeMessage, errorMessage, type Message } from '../domain/messages';
 import { i18n, formatMessage } from '../i18n';
@@ -24,6 +25,7 @@ export function SpectrogramCanvas(props: Props) {
 
 function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs, endMs, durationMs }: Props) {
   useTranslation();
+  const [displayHeight] = useSpectrumHeight();
   const canvas = useRef<HTMLCanvasElement>(null);
   const worker = useRef<Worker | null>(null);
   const [diagnostics] = useState(spectrumDiagnosticsEnabled);
@@ -117,7 +119,7 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
   useEffect(() => {
     const element = canvas.current;
     if (!element || !visible) return;
-    element.width = Math.max(1, Math.round(width * ratio)); element.height = Math.round(72 * ratio);
+    element.width = Math.max(1, Math.round(width * ratio)); element.height = Math.round(displayHeight * ratio);
     const context = element.getContext('2d')!;
     context.fillStyle = '#101622'; context.fillRect(0, 0, element.width, element.height);
     const x = (time: number) => Math.round((time - startMs) / (endMs - startMs) * element.width);
@@ -141,14 +143,14 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
       offscreen.getContext('2d')!.putImageData(image, 0, 0);
       context.drawImage(offscreen, left, 0, right - left, element.height);
     }
-  }, [endMs, revision, startMs, visible, width, ratio]);
+  }, [endMs, revision, startMs, visible, width, ratio, displayHeight]);
 
   if (!visible) return <p data-wheel-zoom className={styles.spectrumHint}>{t('spectrum.zoomHint')}</p>;
   const displayError = error || wanted.current.map(first => failed.current.get(first)).filter(Boolean).map(value=>formatMessage(value!))[0];
   const ready = wanted.current.filter(first => cache.current.get(first)).length;
   return <div className={styles.spectrogram} data-spectrum-ready={ready} data-spectrum-wanted={wanted.current.length}
     data-spectrum-stats={stats.current ? JSON.stringify({ ...stats.current, cacheSize: cache.current.size, evictions: cache.current.evictions, pending: pending.current.size }) : undefined}>
-    <div data-wheel-zoom className={styles.spectrumPlot}><canvas ref={observeCanvas} aria-label={t('spectrum.title')} data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
+    <div data-wheel-zoom className={styles.spectrumPlot} style={{height:displayHeight}}><canvas ref={observeCanvas} aria-label={t('spectrum.title')} data-timeline-pan="seek" tabIndex={-1} /><TimelineIndicators playback /></div>
     {ready < wanted.current.length && !displayError && <small role="status">{t('spectrum.loading')}</small>}
     {displayError && <small role="alert">{displayError} <IconButton icon="refresh" label={t('spectrum.retry')} data-role="secondary" onClick={() => { failed.current.clear(); setError(''); setRetry(value => value + 1); }}/></small>}
   </div>;
