@@ -43,6 +43,7 @@ export function TimelineStaging({clearPreview,document,startMs,endMs,durationMs,
   const choose=(item:Item)=>{setSelection(targetSelection(item.target));if(!item.assignable){const interval=targetInterval(document,item.target)!;const times=[interval.beginMs,interval.endMs].filter((time):time is number=>time!==null);if(times.length)onLocate?.(Math.min(...times),Math.max(...times));}};
   const begin=(event:PointerEvent<HTMLElement>,item:Item)=>{
     if(event.button!==0)return;event.preventDefault();event.stopPropagation();
+    window.getSelection()?.removeAllRanges();
     if(!item.assignable||locked){choose(item);return;}
     const next:Gesture={target:item.target,rows,width:event.currentTarget.closest('[data-staging-lane]')!.getBoundingClientRect().width,x:event.clientX,y:event.clientY,started:false,element:event.currentTarget,pointer:event.pointerId,candidate:null,lane:null};
     active.current=next;setGesture(next);event.currentTarget.setPointerCapture(event.pointerId);setSelection(targetSelection(item.target));
@@ -78,7 +79,7 @@ export function TimelineStaging({clearPreview,document,startMs,endMs,durationMs,
   const preview=gesture?.candidate?targetInterval(gesture.candidate,gesture.target):null;
   return <>
     <div tabIndex={-1} data-staging-drop data-clearing={clearPreview||undefined} className={styles.staging} aria-label={t('timeline.staging')}><small className={styles.stagingLabel}>{clearPreview?t('timeline.clearTimes'):t('timeline.staging')}</small><div className={styles.stagingContent}>
-      {rows.map(row=><div className={styles.trackRow} key={row.key}><strong>{t(row.kind==='line'?'selection.line':row.kind==='word'?'selection.word':row.kind==='ruby'?'selection.ruby':row.key.startsWith('translation:')?'capability.translation':'media.romanization')}</strong><div data-staging-lane className={styles.stagingLane}>
+      {rows.map(row=><div className={styles.trackRow} key={row.key}><strong data-timeline-text>{t(row.kind==='line'?'selection.line':row.kind==='word'?'selection.word':row.kind==='ruby'?'selection.ruby':row.key.startsWith('translation:')?'capability.translation':'media.romanization')}</strong><div data-staging-lane className={styles.stagingLane}>
         <div className={styles.stagingGroup} style={{width:gesture?Math.min(gesture.width,row.width):`min(100%, ${row.width}px)`}}>
         {row.slots.map(({item,left,width})=><Tooltip key={targetId(item.target)} className={styles.stagingSlot} style={{left:`${left/row.width*100}%`,width:`${width/row.width*100}%`}} content={label(item)}><div role="button" tabIndex={0} data-staging-key={targetId(item.target)} data-staging-assignable={item.assignable} aria-disabled={locked&&item.assignable||undefined} aria-label={label(item)} aria-pressed={selection?.ids.includes(targetId(item.target))??false}
           className={`${styles.trackBar} ${styles.stagingBlock} ${item.assignable?'':styles.stagingContext} ${selection?.ids.includes(targetId(item.target))?styles.trackSelected:''}`}

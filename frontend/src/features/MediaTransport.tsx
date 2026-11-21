@@ -453,9 +453,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     return()=>node.removeEventListener('wheel',wheel);
   });
   const beginPan = (event: PointerEvent<HTMLElement>, plot: HTMLElement, seek: boolean) => {
-    if (event.defaultPrevented || ui?.adding || !asset || event.button !== 0 || (event.target as Element).closest('[data-loop-handle], button, input, select')) return;
+    if (event.defaultPrevented || ui?.adding || !asset || event.button !== 0 || (event.target as Element).closest('[data-timeline-text], [data-loop-handle], button, input, textarea, select, [contenteditable="true"]')) return;
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }
     const rect = plot.getBoundingClientRect();
+    event.preventDefault();
+    window.getSelection()?.removeAllRanges();
     plot.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
     panDrag.current = { x: event.clientX, startMs, left: rect.left, width: rect.width, pointerId: event.pointerId, started: false, seek, element: event.currentTarget };
@@ -595,7 +597,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         </div>
 </>);
   const acousticPlots=(<div>
-      <div data-wheel-zoom className={styles.ruler} aria-label={t('media.ruler')} data-timeline-pan="seek" tabIndex={-1}><TimelineIndicators />{ticks.map((time) => <span data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
+      <div data-wheel-zoom className={styles.ruler} aria-label={t('media.ruler')} data-timeline-pan="seek" tabIndex={-1}><TimelineIndicators />{ticks.map((time) => <span data-timeline-text data-tick-ms={Math.round(time * 1e3)} key={time} style={{ left: `${(time - start) / span * 100}%` }}>{fmt(time)}</span>)}</div>
       <div className={styles.waveRow}>
         <div className={styles.sourceLabel}><Select aria-label={t('media.graphicSource')} title={t('media.graphicSource')} value={graphicVocal?'vocal':''} onChange={e=>setGraphicChoice(e.target.value==='vocal')}><option value="">{t('media.original')}</option>{vocalId && <option value="vocal">{t('media.vocals')}</option>}</Select></div>
       <div

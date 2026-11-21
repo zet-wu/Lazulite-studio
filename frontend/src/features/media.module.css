@@ -56,7 +56,7 @@
 }
 .ruler { position: relative; height: 14px; overflow: hidden; color: #697485; font-size: 9px; font-variant-numeric: tabular-nums; }
 .ruler { cursor: grab; }
-.ruler span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; pointer-events: none; }
+.ruler span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
 .wave {
   display: block;
   width: 100%;
@@ -189,8 +189,17 @@
 
 .trackBar.stagingBlock[aria-disabled='true'] { opacity: .55; cursor: default; }
 
+/* The gesture origin owns selection. Only actual names and ticks allow text. */
+.timelinePlots { user-select: none; -webkit-user-select: none; }
+.timelinePlots [data-timeline-text], .timelinePlots input, .timelinePlots textarea,
+.timelinePlots [contenteditable="true"], .timelinePlots [role="alert"] {
+  user-select: text; -webkit-user-select: text;
+}
+.timelinePlots [data-timeline-text] { cursor: text; }
 .stagingContent { min-height: var(--timeline-lane-height); }
 .staging[data-clearing] { border-color: var(--blue); background: var(--blue-soft); }
 .staging[data-clearing] .stagingLabel { color: var(--blue); font-weight: 600; }
+
 .staging:focus-visible, .timelinePlots:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+
 .dragError { position: fixed; z-index: 1200; pointer-events: none; max-width: 320px; margin: 0; padding: 4px 8px; border: 1px solid var(--danger); border-radius: 4px; background: var(--panel); color: var(--danger); font-size: 11px; }

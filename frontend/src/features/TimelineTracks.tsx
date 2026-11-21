@@ -139,6 +139,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
   const begin = (event: PointerEvent<HTMLElement>, target: TimelineTarget | null, side: Drag['side'], originalMs: number) => {
     if (event.button !== 0 || locked && target !== null) return;
     event.preventDefault(); event.stopPropagation();
+    window.getSelection()?.removeAllRanges();
     onError('');
     if (target) {
       const node = event.currentTarget.closest<HTMLElement>('[data-timeline-key]');
@@ -297,7 +298,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       {(!narrow || ghostEnd) && endMs <= propsEndMs && <span className={`${styles.trackHandle} ${ghostEnd ? styles.temporaryHandle : ''}`} title={ghostEnd ? description : undefined} aria-label={t('timeline.endBoundary',{label})} onPointerDown={(event) => begin(event, target, 'endMs', endMs)} onPointerMove={move} onPointerUp={finish} />}
     </div>;
   };
-  const row = (name: string, content: React.ReactNode, selectable: TimelineTarget[] = [], laneCount = 1, caption = name, assignmentKind?: TimelineTarget['kind']) => <div className={styles.trackRow} key={selectable.length?selectable.map(targetId).join(':'):name}><strong title={caption}>{caption}</strong><div data-wheel-zoom data-track-lane data-assignment-kind={assignmentKind ?? selectable[0]?.kind} className={styles.trackLane} style={{ height: `calc(${Math.max(1, laneCount)} * var(--timeline-lane-height))` }}
+  const row = (name: string, content: React.ReactNode, selectable: TimelineTarget[] = [], laneCount = 1, caption = name, assignmentKind?: TimelineTarget['kind']) => <div className={styles.trackRow} key={selectable.length?selectable.map(targetId).join(':'):name}><strong data-timeline-text title={caption}>{caption}</strong><div data-wheel-zoom data-track-lane data-assignment-kind={assignmentKind ?? selectable[0]?.kind} className={styles.trackLane} style={{ height: `calc(${Math.max(1, laneCount)} * var(--timeline-lane-height))` }}
     onPointerDown={(event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); boxTargets.current = selectable; begin(event, null, selectable.length > 0 && event.shiftKey ? 'select' : 'pan', selectable.length > 0 && event.shiftKey ? startMs + Math.round((event.clientX - rect.left) / rect.width * spanMs) : startMs); } }}
     onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}>
     {content}<TimelineIndicators /></div></div>;
@@ -312,9 +313,9 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
   };
   return <div ref={tracksRef} className={styles.tracks} data-editable-timeline aria-label={t('timeline.editable')} tabIndex={-1} onFocusCapture={() => { area.current = 'timeline'; }}
     onKeyDown={event => { if (event.key === 'Delete' && !locked && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); } }}
-    onCopy={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.copy(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
-    onCut={event => { if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.cut(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
-    onPaste={event => { event.preventDefault(); commands.current?.paste(event.clipboardData.getData('application/x-lazulite-lyric') === commands.current.clipboardToken() ? undefined : event.clipboardData.getData('text/plain')); }}>
+    onCopy={event => { if ((event.target as Element).closest('input,textarea,[contenteditable="true"]')) return; if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.copy(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
+    onCut={event => { if ((event.target as Element).closest('input,textarea,[contenteditable="true"]')) return; if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.cut(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
+    onPaste={event => { if ((event.target as Element).closest('input,textarea,[contenteditable="true"]')) return; event.preventDefault(); commands.current?.paste(event.clipboardData.getData('application/x-lazulite-lyric') === commands.current.clipboardToken() ? undefined : event.clipboardData.getData('text/plain')); }}>
     {drag?.candidate.error && createPortal(<p role="alert" className={styles.dragError} style={{left:Math.max(8,Math.min(drag.current+12,window.innerWidth-328)),top:Math.min((drag.pointerY??drag.y)+12,window.innerHeight-60)}}>{typeof drag.candidate.error==='string'?drag.candidate.error:formatMessage(drag.candidate.error)}</p>,window.document.body)}
     {menu && !locked && <ContextMenu target={menu.target} x={menu.x} y={menu.y} title={t('timeline.menu')} close={closeMenu} actions={[
       { label: t('common.copy'), disabled: !commands.current?.canCopy, run: () => { commands.current?.copy(); } },
