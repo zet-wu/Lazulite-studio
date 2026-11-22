@@ -77,13 +77,14 @@ def test_publish_rejects_malformed_ttml(tmp_path: Path) -> None:
         raise AssertionError("malformed TTML was accepted")
 
 
-def test_publish_rejects_existing_stpp(tmp_path: Path) -> None:
+def test_publish_adds_second_stpp_track_preserving_existing(tmp_path: Path) -> None:
+    from server.publishing import stpp_tracks
     source, first, second = tmp_path / "source.m4a", tmp_path / "first.m4a", tmp_path / "second.m4a"
     _m4a(source)
     publish_stpp(source, TTML, first)
-    try:
-        publish_stpp(first, TTML, second)
-    except ValueError as error:
-        assert "select an existing" in str(error)
-    else:
-        raise AssertionError("existing stpp track was accepted")
+    second_ttml = TTML.replace(b"hello", b"second")
+    publish_stpp(first, second_ttml, second)
+    tracks = stpp_tracks(second)
+    assert len(tracks) == 2
+    assert extract_stpp(second, tracks[0]["track_id"]) == TTML
+    assert extract_stpp(second, tracks[1]["track_id"]) == second_ttml

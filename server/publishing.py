@@ -204,9 +204,7 @@ def publish_stpp(source: Path, ttml: str | bytes, output: Path, *, ffprobe: str 
     if _find(moov, b"mvex") is not None:
         raise PublishingError("fragmented MP4 is not supported")
     tracks = _tracks(moov)
-    if tracks and target_track_id not in {t['track_id'] for t in tracks}:
-        raise PublishingError("select an existing STPP track ID")
-    if not tracks and target_track_id is not None:
+    if target_track_id is not None and target_track_id not in {t['track_id'] for t in tracks}:
         raise PublishingError("target STPP track no longer exists")
     # Keep every original top-level box and append the sample. Existing chunk
     # offsets remain valid because their media bytes are never moved.

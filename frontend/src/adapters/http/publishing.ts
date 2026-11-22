@@ -1,170 +1,91 @@
 import { ApiError, requestHeaders } from "./client";
 
-export type PublishReport = {
-  passed?: boolean;
-  lyrics_preserved?: boolean;
-  track_id?: number | null;
-  audio_streams?: number;
-  audio_preserved?: boolean;
-  metadata_preserved?: boolean;
-  subtitle_handler?: string;
-  subtitle_codec?: string;
-  sample_count?: number;
+export type PackagingTrack = {
+  track_id: number;
+  language: string;
+  name: string;
 };
 
-export type ExportItem = {
-  id: string;
+export type PackagingInfo = {
+  filename: string;
+  format_label: string;
+  asset_id: string;
+  supported: boolean;
+  container: string | null;
+  tracks: PackagingTrack[];
+  error: string | null;
+};
+
+export type PackagingDownloadOptions = {
   revision: string;
   asset_id: string;
-  asset_filename?: string;
-  filename?: string;
-  container?: string | null;
-  format_label?: string | null;
-  track_id?: number | null;
-  lrc_kind?: 'none' | 'lrc' | 'elrc';
-  target_track_id?: number | null;
-  status:
-    | "queued"
-    | "running"
-    | "processing"
-    | "cancel_requested"
-    | "succeeded"
-    | "failed"
-    | "cancelled"
-    | "interrupted"
-    | "unavailable"
-    | "superseded";
-  created_at: string;
-  stale: boolean;
-  report: PublishReport | null;
-  download_url: string | null;
-  error: string | Record<string, unknown> | null;
+  stpp_action: "none" | "add" | "overwrite";
+  target_track_id: number | null;
+  lrc_kind: "none" | "lrc" | "elrc";
+  lrc_text: string | null;
 };
 
-type ExportList = {
-  schema_version: "studio-export-list-v1";
-  items: ExportItem[];
-};
-type PublishJob = {
-  id: string;
-  status?: string;
-  revision?: string;
-  asset_id?: string;
-};
 const root = "/api/v1";
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object";
-const asExport = (value: unknown): ExportItem | null => {
-  if (
-    !isObject(value) ||
-    typeof value.id !== "string" ||
-    typeof value.revision !== "string" ||
-    typeof value.asset_id !== "string" ||
-    typeof value.status !== "string" ||
-    typeof value.created_at !== "string"
-  )
-    return null;
-  return {
-    asset_filename: value.asset_filename as string | undefined,
-    filename: value.filename as string | undefined,
-    container: value.container as string | null,
-    format_label: value.format_label as string | null,
-    track_id: value.track_id as number | null,
-    id: value.id,
-    revision: value.revision,
-    lrc_kind: value.lrc_kind as ExportItem['lrc_kind'],
-    target_track_id: value.target_track_id as number | null,
-    asset_id: value.asset_id,
-    status: value.status as ExportItem["status"],
-    created_at: value.created_at,
-    stale: value.stale === true,
-    report: isObject(value.report) ? (value.report as PublishReport) : null,
-    download_url:
-      typeof value.download_url === "string" ? value.download_url : null,
-    error:
-      typeof value.error === "string" || isObject(value.error)
-        ? value.error
-        : null,
-  };
+
+const parseFilename = (disposition: string | null): string => {
+  if (!disposition) return "audio";
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+  const plainMatch = disposition.match(/filename="?([^";]+)"?/i);
+  return plainMatch ? plainMatch[1] : "audio";
 };
-const parse = async <T>(
-  response: Response,
-  validate: (value: unknown) => T | null,
-): Promise<T> => {
+
+const throwHttpError = async (response: Response, fallbackMessage: string): Promise<never> => {
   let body: unknown = null;
   try {
     body = await response.json();
   } catch {
-    /* handled below */
+    /* ignore non-JSON body */
   }
-  if (!response.ok)
-    throw new ApiError(response.status, {
-      code: "publish_request_failed",
-      message:
-        isObject(body) && typeof body.message === "string"
-          ? body.message
-          : "发布请求失败，请重试",
-      request_id: "",
-      retryable: response.status >= 500,
-    });
-  const value = validate(body);
-  if (value === null)
-    throw new ApiError(502, {
-      code: "invalid_response",
-      message: "发布服务返回了不支持的响应",
-      request_id: "",
-      retryable: false,
-    });
-  return value;
+  const detail = isObject(body) && isObject(body.detail) ? body.detail : body;
+  throw new ApiError(response.status, {
+    code: isObject(detail) && typeof detail.code === "string" ? detail.code : "packaging_failed",
+    message: isObject(detail) && typeof detail.message === "string" ? detail.message : fallbackMessage,
+    request_id: isObject(body) && typeof body.request_id === "string" ? body.request_id : "",
+    retryable: response.status >= 500,
+  });
 };
 
 export const publishingApi = {
-  list: async (projectId: string): Promise<ExportList> =>
-    parse(
-      await fetch(`${root}/projects/${encodeURIComponent(projectId)}/exports`, {
-        credentials: "include",
-        headers: requestHeaders(),
-      }),
-      (value) => {
-        if (
-          !isObject(value) ||
-          value.schema_version !== "studio-export-list-v1" ||
-          !Array.isArray(value.items)
-        )
-          return null;
-        const items = value.items.map(asExport);
-        return items.every((item): item is ExportItem => item !== null)
-          ? { schema_version: "studio-export-list-v1", items }
-          : null;
-      },
-    ),
-  publish: async (
+  info: async (projectId: string): Promise<PackagingInfo> => {
+    const response = await fetch(`${root}/projects/${encodeURIComponent(projectId)}/packaging`, {
+      credentials: "include",
+      headers: requestHeaders(),
+    });
+    if (!response.ok) await throwHttpError(response, "无法读取音乐文件信息");
+    return (await response.json()) as PackagingInfo;
+  },
+
+  download: async (
     projectId: string,
-    revision: string,
-    assetId: string,
-    options: { lrc_kind: 'none' | 'lrc' | 'elrc'; lrc_text: string | null; target_track_id: number | null },
-  ): Promise<PublishJob> =>
-    parse(
-      await fetch(`${root}/projects/${encodeURIComponent(projectId)}/publish`, {
+    options: PackagingDownloadOptions,
+  ): Promise<{ blob: Blob; filename: string }> => {
+    const response = await fetch(
+      `${root}/projects/${encodeURIComponent(projectId)}/packaging/download`,
+      {
         method: "POST",
         credentials: "include",
-        headers: requestHeaders({
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        }),
-        body: JSON.stringify({ revision, asset_id: assetId, ...options }),
-      }),
-      (value) =>
-        isObject(value) && typeof value.id === "string"
-          ? {
-              id: value.id,
-              status:
-                typeof value.status === "string" ? value.status : undefined,
-              revision:
-                typeof value.revision === "string" ? value.revision : undefined,
-              asset_id:
-                typeof value.asset_id === "string" ? value.asset_id : undefined,
-            }
-          : null,
-    ),
+        headers: requestHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(options),
+      },
+    );
+    if (!response.ok) await throwHttpError(response, "音频打包失败，请重试");
+    return {
+      blob: await response.blob(),
+      filename: parseFilename(response.headers.get("content-disposition")),
+    };
+  },
 };

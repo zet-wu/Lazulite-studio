@@ -1,31 +1,43 @@
 from __future__ import annotations
 
+import re
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Callable, Literal
-
-from fastapi import APIRouter, Depends, Header, HTTPException
-from fastapi.responses import StreamingResponse
 from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .publish import PublishInvalid, serialize_output_ttml
+from .publishing import PublishingError
 
-class PublishRequest(BaseModel):
+
+class PackagingDownloadRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     revision: str = Field(min_length=1)
     asset_id: str = Field(min_length=1)
-    lrc_kind: Literal['none', 'lrc', 'elrc']
-    lrc_text: str | None = Field(min_length=1)
+    stpp_action: Literal['none', 'add', 'overwrite']
     target_track_id: int | None = Field(default=None, gt=0)
+    lrc_kind: Literal['none', 'lrc', 'elrc']
+    lrc_text: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode='after')
-    def lyric_payload(self):
+    def validate_payload(self):
         if (self.lrc_kind == 'none') != (self.lrc_text is None):
             raise ValueError('不写入须使用 null；写入 LRC 须提供歌词')
+        if self.stpp_action == 'overwrite' and self.target_track_id is None:
+            raise ValueError('覆盖 STPP 轨道须指定目标轨道 ID')
+        if self.stpp_action != 'overwrite' and self.target_track_id is not None:
+            raise ValueError('仅覆盖模式可指定目标轨道 ID')
+        if self.stpp_action == 'none' and self.lrc_kind == 'none':
+            raise ValueError('至少需要选择一项写入内容')
         return self
 
 
-
-def build_publish_router(service, *, auth: Callable, write: Callable,
+def build_publish_router(db, revisions, *, publisher, auth: Callable, write: Callable,
                          project_row: Callable[[str], object], asset_path: Callable):
     router = APIRouter()
 
@@ -38,12 +50,6 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
             raise HTTPException(404, {"code": "project_not_found", "message": "project not found", "retryable": False})
         return row
 
-    def validate(pid, body):
-        row = project(pid)
-        if not row[2]:
-            raise HTTPException(422, {'code':'audio_required','message':'上传音乐后才可打包音乐文件','retryable':False})
-        if body.asset_id != row[2]:
-            raise HTTPException(422, {"code": "publish_input_invalid", "message": "asset does not belong to project", "retryable": False})
     @router.get("/projects/{pid}/embedded-lyrics")
     def embedded_lyrics(pid: str, _: object = Depends(auth)):
         import struct
@@ -67,7 +73,7 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
         row = project(pid)
         if not row[2]:
             raise HTTPException(422, {'code':'audio_required','message':'上传音乐后才可打包音乐文件','retryable':False})
-        with service.db.connect() as c:
+        with db.connect() as c:
             asset = c.execute('SELECT filename FROM assets WHERE id=?', (row[2],)).fetchone()
         path = Path(asset_path(pid))
         media = File(path)
@@ -79,77 +85,86 @@ def build_publish_router(service, *, auth: Callable, write: Callable,
         return {'filename': asset[0], **describe_media(path, media, asset[0]), 'asset_id':row[2], 'supported':isinstance(media,(MP4,MP3,FLAC)) and not error,
                 'tracks':tracks,'error':error}
 
-    @router.post("/projects/{pid}/publish", status_code=202)
-    def publish(pid: str, body: PublishRequest,
-                subject: str = Depends(write), idem: str | None = Header(default=None, alias="Idempotency-Key")):
-        validate(pid, body)
-        import re
-        if body.lrc_kind == 'none':
-            from mutagen import File
-            from mutagen.mp4 import MP4
-            if not isinstance(File(asset_path(pid)), MP4):
-                raise HTTPException(422, {'code':'invalid_lrc','message':'此容器需要写入 LRC','retryable':False})
-        elif not all(re.match(r'^\[\d+:\d{2}\.\d{3}\]', line) for line in body.lrc_text.splitlines()) or '\x00' in body.lrc_text:
-            raise HTTPException(422, {'code':'invalid_lrc','message':'兼容歌词格式无效','retryable':False})
-        if body.lrc_kind == 'lrc' and re.search(r'<\d+:\d{2}\.\d{3}>',body.lrc_text):
-            raise HTTPException(422, {'code':'invalid_lrc','message':'普通 LRC 不能包含扩展时间标签','retryable':False})
-        try:
-            return service.create(pid, "publish", body.model_dump(), idem_key=idem, subject=subject)
-        except ValueError as exc:
-            raise HTTPException(409, {"code": "idempotency_mismatch", "message": str(exc), "retryable": False})
+    @router.post("/projects/{pid}/packaging/download")
+    def packaging_download(pid: str, body: PackagingDownloadRequest, _: str = Depends(write)):
+        row = project(pid)
+        if not row[2]:
+            raise HTTPException(422, {'code':'audio_required','message':'上传音乐后才可打包音乐文件','retryable':False})
+        if body.asset_id != row[2]:
+            raise HTTPException(422, {"code": "publish_input_invalid", "message": "asset does not belong to project", "retryable": False})
+        if publisher is None or not callable(getattr(publisher, "publish", None)) or shutil.which("ffprobe") is None:
+            raise HTTPException(503, {"code": "capability_unavailable", "message": "STPP publisher is not configured", "retryable": False})
+        if body.lrc_kind != 'none':
+            if not all(re.match(r'^\[\d+:\d{2}\.\d{3}\]', line) for line in body.lrc_text.splitlines()) or '\x00' in body.lrc_text:
+                raise HTTPException(422, {'code':'invalid_lrc','message':'兼容歌词格式无效','retryable':False})
+            if body.lrc_kind == 'lrc' and re.search(r'<\d+:\d{2}\.\d{3}>', body.lrc_text):
+                raise HTTPException(422, {'code':'invalid_lrc','message':'普通 LRC 不能包含扩展时间标签','retryable':False})
+        with db.connect() as c:
+            bound = c.execute(
+                'SELECT p.source_asset_id,p.name,a.filename FROM projects p JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?',
+                (pid,),
+            ).fetchone()
+            has_rev = c.execute('SELECT 1 FROM revisions WHERE id=? AND project_id=?', (body.revision, pid)).fetchone()
+        if not bound or bound[0] != body.asset_id:
+            raise HTTPException(422, {"code": "publish_input_invalid", "message": "asset does not belong to project", "retryable": False})
+        if not has_rev:
+            raise HTTPException(409, {"code": "revision_unavailable", "message": "项目保存版本不可用，请重新保存后再试", "retryable": False})
 
-    @router.get("/projects/{pid}/exports")
-    def exports(pid: str, _: object = Depends(auth)):
-        prow = project(pid)
-        service.reconcile_exports()
-        with service.db.connect() as c:
-            assets = {row['id']: row['filename'] for row in c.execute("SELECT id,filename FROM assets")}
-            rows = c.execute("SELECT id FROM jobs WHERE project_id=? AND kind='publish' ORDER BY created_at DESC", (pid,)).fetchall()
-        items = []
-        for row in rows:
-            job = service.get(row[0]); request = job["request"]; result = service.result(row[0]) or {}
-            report = result.get("report")
-            path = result.get("output_path")
-            passed = isinstance(report, dict) and report.get("passed") is True
-            available = not result.get("superseded") and job["status"] == "succeeded" and passed and bool(path) and service.db.paths.resolve(path).is_file()
-            status = "superseded" if result.get("superseded") else "unavailable" if job["status"] == "succeeded" and (not path or not service.db.paths.resolve(path).is_file()) else job["status"]
-            items.append({"filename": result.get('filename'), "asset_filename": assets.get(request.get('asset_id')),
-                          "container": result.get('container'), "format_label": result.get('format_label'), "track_id": report.get('track_id') if isinstance(report,dict) else None,
-                          "id": job["id"], "revision": request.get("revision"), "asset_id": request.get("asset_id"),
-                          "lrc_kind": request.get("lrc_kind"), "target_track_id": request.get("target_track_id"), "status": status, "created_at": job["created_at"], "stale": request.get("revision") != prow[3],
-                          "report": report, "download_url": f"/api/v1/projects/{pid}/exports/{job['id']}/download" if available else None,
-                          "error": job["error"]})
-        return {"schema_version": "studio-export-list-v1", "items": items}
+        from mutagen import File
+        from mutagen.mp4 import MP4
+        from .media_format import describe_media, download_filename
 
-    @router.get("/projects/{pid}/exports/{job_id}/download")
-    def download(pid: str, job_id: str, _: object = Depends(auth)):
-        project(pid)
-        job = service.get(job_id)
-        if not job or job["project_id"] != pid or job["kind"] != "publish":
-            raise HTTPException(404, {"code": "export_not_found", "message": "export not found", "retryable": False})
-        with service._lock, service.db.transaction():
-            result = service.result(job_id) or {}; report = result.get("report") or {}
-            if result.get('superseded'):
-                raise HTTPException(410, {"code":"export_replaced","message":"此产物已被较新的成功产物替换","retryable":False})
-            if job['status'] != 'succeeded' or report.get('passed') is not True:
-                raise HTTPException(409, {"code":"export_unavailable","message":"export is not available","retryable":False})
-            path = service.db.paths.resolve(result.get('output_path', ''))
+        path = Path(asset_path(pid))
+        media = File(path)
+        format_info = describe_media(path, media, bound[2])
+        if format_info['extension'] is None:
+            raise HTTPException(422, {'code': 'unsupported_format', 'message': '源文件格式不支持打包', 'retryable': False})
+        if body.stpp_action != 'none' and not isinstance(media, MP4):
+            raise HTTPException(422, {'code': 'unsupported_stpp', 'message': '此容器不支持 STPP 轨道', 'retryable': False})
+
+        ttml = None
+        if body.stpp_action != 'none':
             try:
-                handle = path.open('rb')
-            except (FileNotFoundError, IsADirectoryError):
-                raise HTTPException(410, {"code":"export_unavailable","message":"export file is unavailable","retryable":False})
-        # Open before releasing the switching lock. POSIX keeps the inode alive;
-        # Windows defers deletion until this handle closes. Retry in either case.
+                _, snapshot = revisions.read(pid, body.revision)
+                ttml = serialize_output_ttml(snapshot)
+            except (PublishInvalid, ValueError) as exc:
+                raise HTTPException(422, {'code': 'publish_failed', 'message': str(exc), 'retryable': False}) from exc
+
+        tmp_dir = tempfile.TemporaryDirectory(prefix='lazulite-pack-')
+        output = Path(tmp_dir.name) / f"packaged{format_info['extension']}"
+        try:
+            target_track = body.target_track_id if body.stpp_action == 'overwrite' else None
+            result = dict(publisher.publish(ttml, path, output, body.lrc_text, target_track) or {})
+            report = result.get("report")
+            if not isinstance(report, dict) or report.get("passed") is not True:
+                raise PublishInvalid("publisher report did not pass")
+            handle = output.open('rb')
+        except (PublishInvalid, PublishingError, ValueError) as exc:
+            tmp_dir.cleanup()
+            raise HTTPException(422, {'code': 'publish_failed', 'message': str(exc), 'retryable': False}) from exc
+        except Exception as exc:
+            tmp_dir.cleanup()
+            raise HTTPException(500, {'code': 'packaging_failed', 'message': '音频打包失败，请检查服务日志', 'retryable': True}) from exc
+
+        filename = download_filename(bound[1], format_info["extension"])
+
         def chunks():
             try:
                 while block := handle.read(256 * 1024):
                     yield block
             finally:
-                handle.close()
-                service.reconcile_exports()
-        filename = result.get('filename') or path.name
-        return StreamingResponse(chunks(), media_type='application/octet-stream', headers={
-            'Content-Disposition': "attachment; filename*=UTF-8''" + quote(filename),
-        })
+                try:
+                    handle.close()
+                finally:
+                    tmp_dir.cleanup()
+
+        return StreamingResponse(
+            chunks(),
+            media_type='application/octet-stream',
+            headers={
+                'Content-Disposition': "attachment; filename*=UTF-8''" + quote(filename),
+                'Cache-Control': 'no-store',
+            },
+        )
 
     return router

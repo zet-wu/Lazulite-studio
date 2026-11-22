@@ -1,6 +1,6 @@
 import { zipFiles } from '../adapters/nicokara';
 import { http, HttpResponse } from 'msw';
-import { capabilities, document, emptyDocument, exports, jobs, projects, sampleProject, session } from './data';
+import { capabilities, document, emptyDocument, jobs, projects, sampleProject, session } from './data';
 
 const root = '/api/v1';
 const scenario = () => new URL(location.href).searchParams.get('scenario') ?? 'normal';
@@ -50,16 +50,8 @@ export const handlers = [
   http.get(`${root}/projects`, () => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : scenario() === 'empty' ? response({ schema_version: 'studio-project-list-v1', items: [], next_cursor: null }) : response(projects)),
   http.get(`${root}/projects/:projectId`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'no-music' ? { ...sampleProject, asset: null } : scenario() === 'long' ? { ...sampleProject, asset: { ...sampleProject.asset, duration_ms: 1_800_000, source_duration_ms: 1_800_000 } } : sampleProject) : error(404, 'project_not_found', '项目不存在')),
   http.get(`${root}/projects/:projectId/jobs`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(jobs) : error(404, 'project_not_found', '项目不存在')),
-  http.get(`${root}/projects/:projectId/exports`, ({ params }) => params.projectId === 'sample-project' ? response(exports) : error(404, 'project_not_found', '项目不存在')),
-  http.post(`${root}/projects/:projectId/publish`, async ({ params, request }) => {
-    if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
-    const body = await request.json() as { revision?: string; asset_id?: string };
-    const id = `export-${Date.now()}`;
-    const revision = body.revision ?? document.revision;
-    const assetId = body.asset_id ?? 'sample-asset';
-    exports.items.unshift({ id, revision, asset_id: assetId, status: 'failed', created_at: new Date().toISOString(), stale: false, report: null, download_url: null, error: '演示模式不生成媒体文件，请连接真实服务发布' });
-    return HttpResponse.json({ id, status: 'failed', revision, asset_id: assetId }, { status: 202 });
-  }),
+  http.get(`${root}/projects/:projectId/packaging`, ({ params }) => params.projectId === 'sample-project' ? response({ filename: 'hoshi.m4a', format_label: 'M4A', asset_id: 'sample-asset', supported: true, container: 'mp4', tracks: [], error: null }) : error(404, 'project_not_found', '项目不存在')),
+  http.post(`${root}/projects/:projectId/packaging/download`, ({ params }) => params.projectId !== 'sample-project' ? error(404, 'project_not_found', '项目不存在') : error(422, 'mock_packaging', '演示模式不生成媒体文件，请连接真实服务打包')),
   http.get(`${root}/projects/:projectId/document`, ({ params }) => scenario() === 'error' ? error(503, 'service_unavailable', '服务暂不可用', true) : params.projectId === 'sample-project' ? response(scenario() === 'empty' ? emptyDocument : scenario() === 'no-music' ? {...currentDocument, source_asset_id:null} : currentDocument) : error(404, 'project_not_found', '项目不存在')),
   http.put(`${root}/projects/:projectId/media-users/:pageId`, () => new HttpResponse(null, { status: 204 })),
   http.delete(`${root}/projects/:projectId/media-users/:pageId`, () => new HttpResponse(null, { status: 204 })),

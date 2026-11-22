@@ -3393,21 +3393,9 @@
       "diagnostic": "Original technical diagnostic; never treat it as a translation key."
     }
   },
-  "packaging.readSourceFailed": {
-    "context": "packaging interface: packaging.readSourceFailed",
-    "source": "无法读取源文件打包信息",
-    "params": [],
-    "parameterNotes": {}
-  },
   "packaging.serializeFailed": {
     "context": "packaging interface: packaging.serializeFailed",
     "source": "序列化失败",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.lrcRequired": {
-    "context": "packaging interface: packaging.lrcRequired",
-    "source": "此容器需要写入 LRC",
     "params": [],
     "parameterNotes": {}
   },
@@ -3417,69 +3405,9 @@
     "params": [],
     "parameterNotes": {}
   },
-  "packaging.failed": {
-    "context": "packaging interface: packaging.failed",
-    "source": "打包失败",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.source": {
-    "context": "packaging interface: packaging.source",
-    "source": "源文件：",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.keepTags": {
-    "context": "packaging interface: packaging.keepTags",
-    "source": "保留源文件已有歌词标签",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.extended": {
-    "context": "packaging interface: packaging.extended",
-    "source": "扩展",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.plain": {
-    "context": "packaging interface: packaging.plain",
-    "source": "普通",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.chooseOverwrite": {
-    "context": "packaging interface: packaging.chooseOverwrite",
-    "source": "请选择覆盖轨道",
-    "params": [],
-    "parameterNotes": {}
-  },
   "packaging.addStpp": {
     "context": "packaging interface: packaging.addStpp",
     "source": "新增 STPP 轨道",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.id3": {
-    "context": "packaging interface: packaging.id3",
-    "source": "LRC → ID3 USLT 歌词标签",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.flac": {
-    "context": "packaging interface: packaging.flac",
-    "source": "LRC → FLAC LYRICS 歌词标签",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.unsupported": {
-    "context": "packaging interface: packaging.unsupported",
-    "source": "此格式不支持打包",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.copyHelp": {
-    "context": "packaging interface: packaging.copyHelp",
-    "source": "生成副本，不转码。",
     "params": [],
     "parameterNotes": {}
   },
@@ -3507,33 +3435,9 @@
     "params": [],
     "parameterNotes": {}
   },
-  "packaging.usltHelp": {
-    "context": "packaging interface: packaging.usltHelp",
-    "source": "目标：USLT，语言 eng，空描述；其他语言／描述保留。",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.overwriteStpp": {
-    "context": "packaging interface: packaging.overwriteStpp",
-    "source": "覆盖 STPP 轨道",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.chooseTrack": {
-    "context": "packaging interface: packaging.chooseTrack",
-    "source": "请选择目标轨道",
-    "params": [],
-    "parameterNotes": {}
-  },
   "packaging.unnamed": {
     "context": "packaging interface: packaging.unnamed",
     "source": "未命名",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.noStpp": {
-    "context": "packaging interface: packaging.noStpp",
-    "source": "源文件没有 STPP，将新增歌词轨道。",
     "params": [],
     "parameterNotes": {}
   },
@@ -3552,132 +3456,6 @@
   "packaging.unsupportedHelp": {
     "context": "packaging interface: packaging.unsupportedHelp",
     "source": "源音频格式不支持打包；可下载歌词文件。",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.submitting": {
-    "context": "packaging interface: packaging.submitting",
-    "source": "保存并提交中…",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.submit": {
-    "context": "packaging interface: packaging.submit",
-    "source": "打包文件",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.download": {
-    "context": "packaging interface: packaging.download",
-    "source": "下载产物",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.newerEdits": {
-    "context": "packaging interface: packaging.newerEdits",
-    "source": "当前歌词有较新修改，已提交任务使用之前捕获的修订。",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.history": {
-    "context": "packaging interface: packaging.history",
-    "source": "打包任务与最近产物",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.historyFailed": {
-    "context": "packaging interface: packaging.historyFailed",
-    "source": "记录读取失败",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.retryHistory": {
-    "context": "packaging interface: packaging.retryHistory",
-    "source": "重试读取打包任务记录",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.elrc": {
-    "context": "packaging interface: packaging.elrc",
-    "source": "扩展 LRC",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.running": {
-    "context": "packaging interface: packaging.running",
-    "source": "正在打包",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.keepTagsSuffix": {
-    "context": "packaging interface: packaging.keepTagsSuffix",
-    "source": " · 保留已有歌词标签",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.unavailable": {
-    "context": "packaging interface: packaging.unavailable",
-    "source": "产物不可用",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.interrupted": {
-    "context": "packaging interface: packaging.interrupted",
-    "source": "打包中断",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.recent": {
-    "context": "packaging interface: packaging.recent",
-    "source": "最近产物",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.currentTask": {
-    "context": "packaging interface: packaging.currentTask",
-    "source": "当前任务",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.unsaved": {
-    "context": "packaging interface: packaging.unsaved",
-    "source": "当前歌词有未保存修改，此产物不包含这些修改。",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.noSourceName": {
-    "context": "packaging interface: packaging.noSourceName",
-    "source": "未记录源文件名",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.unknownFormat": {
-    "context": "packaging interface: packaging.unknownFormat",
-    "source": "格式待确认",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.revision": {
-    "context": "packaging interface: packaging.revision",
-    "source": "修订",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.oldRevision": {
-    "context": "packaging interface: packaging.oldRevision",
-    "source": "· 旧修订",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.report": {
-    "context": "packaging interface: packaging.report",
-    "source": "回读报告",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.empty": {
-    "context": "packaging interface: packaging.empty",
-    "source": "还没有打包产物。",
     "params": [],
     "parameterNotes": {}
   },
@@ -3824,78 +3602,6 @@
     "source": "上传音乐后可打包音乐文件；单独下载歌词无需音乐。",
     "params": [],
     "parameterNotes": {}
-  },
-  "packaging.submitted": {
-    "context": "packaging interface: packaging.submitted",
-    "source": "已提交打包，修订 {{revision}}",
-    "params": [
-      "revision"
-    ],
-    "parameterNotes": {
-      "revision": "Saved document revision identifier."
-    }
-  },
-  "packaging.mp4Target": {
-    "context": "packaging interface: packaging.mp4Target",
-    "source": "TTML → STPP 歌词轨道；{{tags}}。{{track}}",
-    "params": [
-      "tags",
-      "track"
-    ],
-    "parameterNotes": {
-      "tags": "Content metadata tags.",
-      "track": "Formatted track label or displayed track number."
-    }
-  },
-  "packaging.tagTarget": {
-    "context": "packaging interface: packaging.tagTarget",
-    "source": "{{kind}} LRC → 歌词标签",
-    "params": [
-      "kind"
-    ],
-    "parameterNotes": {
-      "kind": "Localized object kind."
-    }
-  },
-  "packaging.overwriteTrack": {
-    "context": "packaging interface: packaging.overwriteTrack",
-    "source": "覆盖轨道 {{track}}",
-    "params": [
-      "track"
-    ],
-    "parameterNotes": {
-      "track": "Formatted track label or displayed track number."
-    }
-  },
-  "packaging.wroteStpp": {
-    "context": "packaging interface: packaging.wroteStpp",
-    "source": "已写入 STPP{{tags}}",
-    "params": [
-      "tags"
-    ],
-    "parameterNotes": {
-      "tags": "Content metadata tags."
-    }
-  },
-  "packaging.wroteLyrics": {
-    "context": "packaging interface: packaging.wroteLyrics",
-    "source": "已写入 {{format}}",
-    "params": [
-      "format"
-    ],
-    "parameterNotes": {
-      "format": "Protocol or file format name; preserve it."
-    }
-  },
-  "packaging.stppTrack": {
-    "context": "packaging interface: packaging.stppTrack",
-    "source": "STPP 轨道 {{track}}",
-    "params": [
-      "track"
-    ],
-    "parameterNotes": {
-      "track": "Formatted track label or displayed track number."
-    }
   },
   "preferences.changed": {
     "context": "preferences interface: preferences.changed",
@@ -11801,5 +11507,33 @@
   "packaging.blockingHint": {
     "context": "packaging interface: packaging.blockingHint",
     "source": "存在 {{count}} 个阻塞问题，请查看左侧校验。"
+  },
+  "packaging.stppField": {
+    "context": "packaging interface: packaging.stppField",
+    "source": "TTML → STPP"
+  },
+  "packaging.lrcField": {
+    "context": "packaging interface: packaging.lrcField",
+    "source": "LRC → 元数据标签"
+  },
+  "packaging.overwriteTrackOption": {
+    "context": "packaging interface: packaging.overwriteTrackOption",
+    "source": "覆盖轨道 {{track}} · {{lang}} · {{name}}"
+  },
+  "packaging.stppUnsupported": {
+    "context": "packaging interface: packaging.stppUnsupported",
+    "source": "此格式不支持"
+  },
+  "packaging.selectAtLeastOne": {
+    "context": "packaging interface: packaging.selectAtLeastOne",
+    "source": "至少选择一项写入内容。"
+  },
+  "packaging.downloadAudio": {
+    "context": "packaging interface: packaging.downloadAudio",
+    "source": "下载嵌入音频"
+  },
+  "packaging.downloading": {
+    "context": "packaging interface: packaging.downloading",
+    "source": "正在打包并下载…"
   }
 }

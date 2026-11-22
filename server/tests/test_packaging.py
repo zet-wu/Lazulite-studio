@@ -34,6 +34,12 @@ def test_preserves_media_tags_cover_and_lyrics(tmp_path,extension,codec):
         out2=tmp_path/'second.m4a'; package_media(out,out2,TTML.replace(b'synthetic',b'updated'),LRC,tracks[0]['track_id'])
         assert extract_stpp(out2,tracks[0]['track_id'])==TTML.replace(b'synthetic',b'updated')
         assert len(stpp_tracks(out2))==1
+        out_add=tmp_path/'added.m4a'; package_media(out,out_add,TTML.replace(b'synthetic',b'added'),None,None)
+        assert len(stpp_tracks(out_add))==2
+        out_lrc_only=tmp_path/'lrc-only.m4a'; rep=package_media(source,out_lrc_only,None,LRC)
+        assert rep['report']['passed'] and rep['report']['subtitle_codec'] is None and stpp_tracks(out_lrc_only)==[]
+        assert File(out_lrc_only)['\xa9lyr']==[LRC]
+        with pytest.raises(ValueError): package_media(out,out2,None,None)
         with pytest.raises(ValueError): package_media(out,out2,TTML,LRC,999)
 
 

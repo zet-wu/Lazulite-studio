@@ -29,7 +29,7 @@ from .search_conditions import SearchConditions, initial_conditions, read_condit
 from .documents import DocumentService, build_router
 from .job_routes import create_job_router
 from .jobs import JobService
-from .publish import PublishRunner, MediaPublisher
+from .publish import MediaPublisher
 from .publish_routes import build_publish_router
 from .reading import SudachiReadingProposer, ReadingUnavailable, build_analysis_router
 from .revisions import INITIAL_TTML, RevisionStore
@@ -215,7 +215,7 @@ def create_app(
     @api.get("/capabilities")
     def capabilities():
         alignment_reason = alignment_unavailable()
-        publish_available = publish_runner.available()
+        publish_available = publisher is not None and callable(getattr(publisher, "publish", None)) and shutil.which("ffprobe") is not None
         return {
             "schema_version": "studio-capabilities-v1",
             "items": [
@@ -681,15 +681,12 @@ def create_app(
             params['device'] = os.getenv('STUDIO_VOCAL_DEVICE', 'cpu')
             capture_vocal(pid, params)
             return
-        if kind == "publish":
-            fail("publish_endpoint_required", "publish jobs must use /projects/{pid}/publish", 422)
         fail('job_kind_removed', '不支持此任务类别', 422)
 
-    publish_runner = PublishRunner(revisions, asset_path_for_project, root / "projects", publisher=publisher)
     from .runtime_devices import RuntimeDevices
     devices = RuntimeDevices(preferences if cfg.mode == "local" else None,
                              (runtime_manifest or {'target':'windows-x64-cpu'}) if cfg.mode == 'local' else None)
-    job_service = JobService(db, devices=devices, asset_path=asset_path_for_project, publish_runner=publish_runner, vocal_runner=vocal_runner, alignment_runner=alignment_runner)
+    job_service = JobService(db, devices=devices, asset_path=asset_path_for_project, vocal_runner=vocal_runner, alignment_runner=alignment_runner)
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
     api.include_router(build_vocal_router(vocal_runner, auth=auth, project_exists=project))
     api.include_router(build_analysis_router(configured_reading_proposer, write=write))
@@ -702,7 +699,7 @@ def create_app(
     api.include_router(build_router(DocumentService(revisions), auth=auth, write=write, project_exists=project))
     from .lyric_sources import build_sources_router
     api.include_router(build_sources_router(write=write))
-    api.include_router(build_publish_router(job_service, auth=auth, write=write, project_row=project, asset_path=asset_path_for_project))
+    api.include_router(build_publish_router(db, revisions, publisher=publisher, auth=auth, write=write, project_row=project, asset_path=asset_path_for_project))
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
     api.include_router(settings_router(preferences, auth=auth, write=write))
     app.state.jobs = job_service

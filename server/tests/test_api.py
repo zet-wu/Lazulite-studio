@@ -113,21 +113,19 @@ def test_project_creation_idempotency_and_pagination(authenticated_client):
 
 def test_studio_http_lifecycle(tmp_path, authenticated_client):
     client, settings, headers = authenticated_client
-    from server.tests.test_publish import _project, _save, _wait
+    from server.tests.test_publish import _project, _save
     pid, asset_id = _project(client, headers, tmp_path)
     revision = client.get(f"/api/v1/projects/{pid}/document").json()["revision"]
     revision = _save(client, headers, pid, revision,
                      '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0s" end="1s">hello</p></body></tt>')
     response = client.post(
-        f"/api/v1/projects/{pid}/publish",
-        json={"revision": revision, "asset_id": asset_id,
+        f"/api/v1/projects/{pid}/packaging/download",
+        json={"revision": revision, "asset_id": asset_id, "stpp_action": "add",
               "lrc_kind": "lrc", "lrc_text": "[00:00.000]hello\n"},
         headers=headers,
     )
-    assert response.status_code == 202
-    job_id = response.json()["id"]
-    assert _wait(client, job_id)["status"] == "succeeded"
-    assert client.get(f"/api/v1/jobs/{job_id}/result").status_code == 200
+    assert response.status_code == 200
+    assert b"ftyp" in response.content[:32]
 
 
 def test_trusted_gateway_access(tmp_path):

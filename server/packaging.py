@@ -34,17 +34,25 @@ def tag_snapshot(media, preserve_lyrics=False):
 def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str | None, target_track_id=None):
     media = File(source)
     if not isinstance(media,(MP3, FLAC, MP4)): raise ValueError('仅支持 MP4/M4A、MP3 和 FLAC')
-    if lrc is None and not isinstance(media, MP4): raise ValueError('此容器需要写入 LRC')
+    if ttml is None and lrc is None: raise ValueError('至少需要选择一项写入内容')
+    if not isinstance(media, MP4):
+        if ttml is not None or target_track_id is not None: raise ValueError('此容器不支持 STPP 轨道')
+        if lrc is None: raise ValueError('此容器需要写入 LRC')
+    elif ttml is None and target_track_id is not None:
+        raise ValueError('跳过 STPP 写入时不能指定目标轨道')
     before_tags, before_extra = tag_snapshot(media, lrc is None)
     before_audio = packet_hashes(source)
     if not before_audio: raise ValueError('源文件没有音轨')
+    original_stpp_ids: set[int] = set()
     if isinstance(media, MP4):
-        if ttml is None: raise ValueError('MP4 打包需要完整 TTML')
-        original_stpp_ids = {track['track_id'] for track in stpp_tracks(source)}
-        before_tracks, before_mdats = mp4_snapshot(source, target_track_id)
-        publish_stpp(source,ttml,output,target_track_id=target_track_id)
+        if ttml is not None:
+            original_stpp_ids = {track['track_id'] for track in stpp_tracks(source)}
+            before_tracks, before_mdats = mp4_snapshot(source, target_track_id)
+            publish_stpp(source, ttml, output, target_track_id=target_track_id)
+        else:
+            before_tracks, before_mdats = mp4_snapshot(source, None)
+            shutil.copyfile(source, output)
     else:
-        if target_track_id is not None: raise ValueError('此容器没有 STPP 轨道')
         shutil.copyfile(source, output)
     result = File(output)
     if lrc is not None and result.tags is None: result.add_tags()
@@ -64,15 +72,17 @@ def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str | Non
         actual = checked.tags.get('USLT::eng').text if isinstance(checked,MP3) else checked['\xa9lyr' if isinstance(checked,MP4) else 'LYRICS'][0]
         if actual != lrc: raise ValueError('歌词标签回读不一致')
     if before_audio != packet_hashes(output): raise ValueError('音频载荷回读不一致')
+    target = None
     if isinstance(checked,MP4):
-        after_tracks, after_mdats = mp4_snapshot(output, target_track_id)
+        after_tracks, after_mdats = mp4_snapshot(output, target_track_id if ttml is not None else None)
         if any(after_tracks.get(key) != value for key, value in before_tracks.items()) or after_mdats[:len(before_mdats)] != before_mdats:
             raise ValueError('非目标轨道或原始媒体数据回读不一致')
-        new_ids = {track['track_id'] for track in stpp_tracks(output)} - original_stpp_ids
-        if target_track_id is None and len(new_ids) != 1: raise ValueError('新增 STPP 轨道无法唯一确认')
-        target = target_track_id if target_track_id is not None else new_ids.pop()
-        if extract_stpp(output,target) != ttml: raise ValueError('STPP 回读不一致')
-    return {'report':{'passed':True,'audio_preserved':True,'metadata_preserved':True,'lyrics_preserved':True,'audio_streams':len(before_audio),'subtitle_codec':'stpp' if isinstance(checked,MP4) else None,'track_id':target if isinstance(checked,MP4) else None}}
+        if ttml is not None:
+            new_ids = {track['track_id'] for track in stpp_tracks(output)} - original_stpp_ids
+            if target_track_id is None and len(new_ids) != 1: raise ValueError('新增 STPP 轨道无法唯一确认')
+            target = target_track_id if target_track_id is not None else new_ids.pop()
+            if extract_stpp(output,target) != ttml: raise ValueError('STPP 回读不一致')
+    return {'report':{'passed':True,'audio_preserved':True,'metadata_preserved':True,'lyrics_preserved':True,'audio_streams':len(before_audio),'subtitle_codec':'stpp' if isinstance(checked,MP4) and ttml is not None else None,'track_id':target}}
 
 
 def mp4_snapshot(path, excluded_track_id=None):

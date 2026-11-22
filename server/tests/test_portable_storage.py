@@ -26,11 +26,6 @@ def test_move_complete_library(tmp_path):
         snapshot['acoustics']['analysisId'] = job['id']
         second = RevisionStore(db, source / 'projects').create('p', snapshot, first)['id']
         identity = client.get('/api/v1/session').json()['library_id']
-        # A successful immutable export participates in startup collection too.
-        output = source / 'projects/p/exports/finished.m4a'
-        output.parent.mkdir(); output.write_bytes(b'export fixture')
-        with db.transaction() as c:
-            c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,result_json,created_at,updated_at) VALUES('export','p','publish','succeeded','{}',?,'0','0')", (json.dumps({'output_path': db.paths.store(output), 'report': {'passed': True}}),))
     destination = tmp_path / '中文 空格 (搬移) &'
     shutil.move(source, destination)
     with TestClient(create_app(destination, Settings(None, True))) as moved:
@@ -38,7 +33,6 @@ def test_move_complete_library(tmp_path):
         assert moved.get('/api/v1/projects/p/document').json()['revision'] == second
         assert moved.get(f'/api/v1/projects/p/vocals/{job["id"]}/energy?start_ms=0&end_ms=1000').status_code == 200
         assert moved.get(f'/api/v1/projects/p/vocals/{job["id"]}/file', headers={'Range': 'bytes=0-9'}).status_code == 206
-        assert moved.get('/api/v1/projects/p/exports/export/download').content == b'export fixture'
         assert moved.get('/api/v1/projects/p/archive').status_code == 200
 
 

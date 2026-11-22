@@ -8,8 +8,6 @@ from typing import Any
 from .db import Database
 from .engine import EngineUnavailable
 from .reading import ReadingUnavailable
-from .publish import PublishInvalid
-from .publishing import PublishingError
 from .vocals import VocalCancelled
 from .runtime_devices import DeviceFailure, RuntimeDevices
 
@@ -19,8 +17,8 @@ def now(): return datetime.now(timezone.utc).isoformat()
 
 class JobService:
     """Durable single-slot executor. Current state and latest stage are committed for polling."""
-    def __init__(self, db: Database, *, asset_path=None, publish_runner=None, vocal_runner=None, alignment_runner=None, devices=None):
-        self.db, self.asset_path, self.publish_runner = db, asset_path, publish_runner
+    def __init__(self, db: Database, *, asset_path=None, vocal_runner=None, alignment_runner=None, devices=None):
+        self.db, self.asset_path = db, asset_path
         from .revisions import RevisionStore
         self.revisions = RevisionStore(db, db.paths.root / 'projects')
         self.vocal_runner = vocal_runner
@@ -34,42 +32,7 @@ class JobService:
             for row in rows:
                 t = now(); c.execute("UPDATE jobs SET status='interrupted',updated_at=?,finished_at=? WHERE id=?", (t,t,row[0]))
 
-
-        self.reconcile_exports(startup=True)
         self.revisions.recover()
-
-    def reconcile_exports(self, *, startup=False):
-        """Retire historical successes; retry deferred deletion without claiming success."""
-        with self._lock:
-            with self.db.transaction() as c:
-                rows = c.execute("SELECT id,project_id,result_json FROM jobs WHERE kind='publish' AND status='succeeded' ORDER BY finished_at DESC,created_at DESC,id DESC").fetchall()
-                seen = set()
-                for row in rows:
-                    result = json.loads(row['result_json'] or '{}')
-                    if result.get('superseded') or result.get('report', {}).get('passed') is not True:
-                        continue
-                    if row['project_id'] in seen:
-                        result['superseded'] = True
-                        c.execute('UPDATE jobs SET result_json=? WHERE id=?', (json.dumps(result), row['id']))
-                    else:
-                        seen.add(row['project_id'])
-            with self.db.connect() as c:
-                records = c.execute("SELECT status,result_json FROM jobs WHERE kind='publish'").fetchall()
-            keep, obsolete = set(), set()
-            for row in records:
-                result = json.loads(row['result_json'] or '{}')
-                if result.get('output_path'):
-                    path = self.db.paths.resolve(result['output_path'])
-                    (keep if row['status'] == 'succeeded' and not result.get('superseded') and result.get('report', {}).get('passed') is True else obsolete).add(path)
-            # Only at startup: no worker can still be writing an unrecorded temporary file.
-            root = getattr(self.publish_runner, 'output_root', None)
-            if startup and root:
-                obsolete.update(path for path in Path(root).glob('*/exports/*') if path.is_file() and path not in keep)
-            for path in obsolete - keep:
-                try:
-                    path.unlink(missing_ok=True)
-                except OSError:
-                    logger.warning('Export cleanup deferred: %s', path)
 
     def create(self, project_id, kind, request, *, idem_key=None, subject="local"):
         digest=json.dumps([subject, kind, request],sort_keys=True,separators=(",",":"),ensure_ascii=False)
@@ -83,7 +46,7 @@ class JobService:
             if kind in {'vocal', 'alignment'}:
                 source = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (project_id,)).fetchone()
                 if not source or source[0] != request.get('asset_id'): raise ValueError('源音频已改变，请重新发起任务')
-            if kind in {'alignment', 'publish'}:
+            if kind == 'alignment':
                 revision = request.get('revision')
                 if not c.execute('SELECT 1 FROM revisions WHERE id=? AND project_id=?', (revision, project_id)).fetchone():
                     raise ValueError('项目输入版本已不可用，请重新保存后发起任务')
@@ -97,8 +60,6 @@ class JobService:
                 if active:
                     if request.get('upload_id'): raise ValueError('已有音频处理运行，请等待完成或取消')
                     return self.get(active[0])
-            if kind == 'publish' and c.execute("SELECT 1 FROM jobs WHERE project_id=? AND kind='publish' AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone():
-                raise ValueError('此项目已有活动打包任务，请等待完成或取消')
             if kind in {'vocal','alignment'}:
                 request['devices'] = {} if request.get('upload_id') or request.get('retry_analysis_id') else self.devices.snapshot(kind, cpu_retry=request.get('cpu_retry', False))
                 if kind == 'vocal' and request['devices']: request['device'] = request['devices']['vocal']['actual']
@@ -128,7 +89,6 @@ class JobService:
         record = None
         kind = None
         result = None
-        published = False
         try:
             with self.db.connect() as c: record=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
             if not record: return
@@ -146,10 +106,6 @@ class JobService:
             elif kind == "alignment":
                 result = self.alignment_runner.run(record[1], self.asset_path(record[1]), request, jid,
                     lambda *x: self.emit(jid, *x), lambda: self.get(jid)["status"] == "cancel_requested")
-            elif kind == "publish":
-                if self.publish_runner is None:
-                    raise RuntimeError("STPP publisher is not configured")
-                result = self.publish_runner.run(record[1], request)
             else:
                 raise ValueError("不支持此任务类别")
             if kind != "vocal":
@@ -164,19 +120,12 @@ class JobService:
                                      "revision": bound_revision}
             with self._lock, self.db.transaction() as c:
                 cancelled = c.execute('SELECT cancel_requested FROM jobs WHERE id=?', (jid,)).fetchone()
-                if kind in {'publish', 'vocal', 'alignment'} and cancelled[0]:
+                if kind in {'vocal', 'alignment'} and cancelled[0]:
                     t = now()
                     c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=? WHERE id=?", (t,t,jid))
 
                     return
-                if kind == 'publish':
-                    for old in c.execute("SELECT id,result_json FROM jobs WHERE project_id=? AND kind='publish' AND status='succeeded'", (record[1],)).fetchall():
-                        previous = json.loads(old['result_json'] or '{}')
-                        previous['superseded'] = True
-                        c.execute('UPDATE jobs SET result_json=? WHERE id=?', (json.dumps(previous),old['id']))
                 t=now(); c.execute("UPDATE jobs SET status='succeeded',result_json=?,engine_json=?,updated_at=?,finished_at=? WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps(result,ensure_ascii=False),json.dumps(result.get("engine",{})),t,t,jid))
-            published = True
-            if kind == 'publish': self.reconcile_exports()
         except DeviceFailure as exc:
             self._finish_error(jid, 'device_failed', str(exc), stage=exc.stage, cpu_retry=True)
         except VocalCancelled:
@@ -184,7 +133,6 @@ class JobService:
                 t = now()
                 c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=? WHERE id=?", (t,t,jid))
 
-        except (PublishInvalid, PublishingError) as exc: self._finish_error(jid, "publish_failed", str(exc))
         except (EngineUnavailable, ReadingUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
         except Exception as exc:
             logger.warning("job %s failed (%s)", jid, type(exc).__name__)
@@ -194,11 +142,6 @@ class JobService:
             if record and record[2] in {'vocal','alignment'}:
                 try: self.vocal_runner.clean_unregistered(record[1], jid)
                 except OSError: logger.warning('未注册人声文件清理待重试：%s', jid)
-            if not published and isinstance(result, dict) and result.get('output_path') and record[2] == 'publish':
-                try:
-                    self.db.paths.resolve(result['output_path']).unlink(missing_ok=True)
-                except OSError:
-                    logger.warning('Unpublished export cleanup deferred: %s',result['output_path'])
 
             if record:
                 self.revisions.collect(record[1])

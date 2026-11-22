@@ -2,24 +2,36 @@ import json
 from server.project_document import initial_project
 import time
 import threading
-from fastapi.testclient import TestClient
 
 from server.db import Database
 from server.jobs import JobService
-from server.app import create_app
+
+
+class FakeVocal:
+    def clean_unregistered(self, pid, jid):
+        pass
+
+    def close(self):
+        pass
 
 
 class FakeEngine:
-    def run(self, pid, request):
-        return {"kind": "publish", "engine": {"name": "fake", "build": "test"}, "items": []}
+    def run(self, pid, asset, request, jid, emit, cancelled):
+        return {"kind": "alignment", "engine": {"name": "fake", "build": "test"}, "items": []}
+
+    def close(self):
+        pass
+
 
 class BlockingEngine(FakeEngine):
-    started = threading.Event()
-    release = threading.Event()
-    def run(self, pid, request):
+    def __init__(self):
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def run(self, pid, asset, request, jid, emit, cancelled):
         self.started.set()
         self.release.wait(2)
-        return super().run(pid, request)
+        return super().run(pid, asset, request, jid, emit, cancelled)
 
 
 def wait_for(service, job_id):
@@ -42,13 +54,17 @@ def seed_project(db, root=None):
             conn.execute("INSERT INTO revisions VALUES(?,?,?,?,?)", ("r", "p", None, db.paths.store(path), "t"))
 
 
+def _service(db, tmp_path, engine):
+    return JobService(db, asset_path=lambda pid: tmp_path / "audio.wav", vocal_runner=FakeVocal(), alignment_runner=engine)
+
+
 def test_job_persists_result_and_idempotency(tmp_path):
     db = Database(tmp_path / "studio.sqlite3")
     seed_project(db, tmp_path)
-    service = JobService(db, publish_runner=FakeEngine())
-    request = {"title": "demo", "revision": "r", "asset_id": "a"}
-    first = service.create("p", "publish", request, idem_key="request-1")
-    second = service.create("p", "publish", request, idem_key="request-1")
+    service = _service(db, tmp_path, FakeEngine())
+    request = {"title": "demo", "revision": "r", "asset_id": "a", "retry_analysis_id": "v1"}
+    first = service.create("p", "alignment", dict(request), idem_key="request-1")
+    second = service.create("p", "alignment", dict(request), idem_key="request-1")
     assert second["id"] == first["id"]
     assert wait_for(service, first["id"])["status"] == "succeeded"
     assert service.result(first["id"])["engine"]["name"] == "fake"
@@ -60,24 +76,26 @@ def test_restart_marks_running_interrupted(tmp_path):
     seed_project(db)
     with db.transaction() as conn:
         conn.execute("UPDATE projects SET current_revision=NULL WHERE id='p'")
-        conn.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", ("j", "p", "publish", "running", "{}", "t", "t"))
-    service = JobService(db, publish_runner=FakeEngine())
+        conn.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", ("j", "p", "alignment", "running", "{}", "t", "t"))
+    service = _service(db, tmp_path, FakeEngine())
     assert service.get("j")["status"] == "interrupted"
     assert service.get("j")["stage"] is None
     service.close()
+
 
 def test_queued_job_can_be_cancelled_while_executor_is_blocked(tmp_path):
     db = Database(tmp_path / "studio.sqlite3")
     seed_project(db, tmp_path)
     engine = BlockingEngine()
-    service = JobService(db, publish_runner=engine)
-    request = {"title": "demo", "revision": "r", "asset_id": "a"}
-    first = service.create("p", "publish", request)
+    service = _service(db, tmp_path, engine)
+    request = {"title": "demo", "revision": "r", "asset_id": "a", "retry_analysis_id": "v1"}
+    first = service.create("p", "alignment", request)
     assert engine.started.wait(1)
-    with db.transaction() as c: c.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)", ("p2","demo",None,None,"t","t"))
+    with db.transaction() as c:
+        c.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)", ("p2", "demo", "a", None, "t", "t"))
     from server.revisions import RevisionStore
     revision = RevisionStore(db, tmp_path / 'projects').create_initial('p2', operation_id='init-p2')['id']
-    second = service.create("p2", "publish", {**request, 'revision': revision})
+    second = service.create("p2", "alignment", {**request, 'revision': revision})
     assert service.cancel(second["id"])["status"] == "cancelled"
     engine.release.set()
     assert wait_for(service, first["id"])["status"] == "succeeded"
@@ -85,21 +103,22 @@ def test_queued_job_can_be_cancelled_while_executor_is_blocked(tmp_path):
     service.close()
 
 
-
 def test_active_cancelled_worker_keeps_input_until_exit(tmp_path):
     from server.revisions import RevisionStore
     db = Database(tmp_path / 'studio.sqlite3'); seed_project(db, tmp_path)
     store = RevisionStore(db, tmp_path / 'projects')
     started, release = threading.Event(), threading.Event()
+
     class Reader(FakeEngine):
-        def run(self, pid, request):
+        def run(self, pid, asset, request, jid, emit, cancelled):
             started.set()
             assert release.wait(5)
             assert store.read(pid, request['revision'])[0] == 'r'
-            return super().run(pid, request)
-    service = JobService(db, publish_runner=Reader())
+            return super().run(pid, asset, request, jid, emit, cancelled)
+
+    service = _service(db, tmp_path, Reader())
     try:
-        job = service.create('p', 'publish', {'revision': 'r', 'asset_id': 'a'})
+        job = service.create('p', 'alignment', {'revision': 'r', 'asset_id': 'a', 'retry_analysis_id': 'v1'})
         assert started.wait(2)
         service.emit(job['id'], 'stage', 'writing')
         assert service.get(job['id'])['stage'] == 'writing'

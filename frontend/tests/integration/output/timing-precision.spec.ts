@@ -10,12 +10,10 @@ test('quantized save, download and actual STPP extraction agree with external pa
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.locator('header').getByText('已保存',{exact:true})).toBeVisible();
  await page.reload();await expect(page.getByLabel('词 歌开始秒数')).toHaveValue('0.185');
  await page.getByRole('button',{name:'文件打包',exact:true}).click();
- const lyrics=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
+ const lyrics=page.waitForEvent('download');await page.locator('#output-panel-lyrics').getByRole('button',{name:'导出 TTML'}).click();
  const xml=await readFile((await (await lyrics).path())!,'utf8');
- const link=page.getByRole('link',{name:'下载产物'}); const old=await link.count() ? await link.getAttribute('href') : null;
- await page.getByRole('button',{name:'打包文件'}).click();await expect(page.getByRole('link',{name:'下载产物'})).toBeVisible({timeout:15000});
- await expect.poll(()=>page.getByRole('link',{name:'下载产物'}).getAttribute('href'),{timeout:15000}).not.toBe(old);
- const music=page.waitForEvent('download');await page.getByRole('link',{name:'下载产物'}).click();
+ await page.getByRole('tab',{name:'音乐文件嵌入',exact:true}).click();
+ const music=page.waitForEvent('download');await page.getByRole('button',{name:'下载嵌入音频',exact:true}).click();
  const path=(await (await music).path())!;
  const embedded=execFileSync('server/.venv/bin/python',['-c','from server.publishing import extract_stpp; from pathlib import Path; import sys; sys.stdout.buffer.write(extract_stpp(Path(sys.argv[1])))',path],{cwd:'..',encoding:'utf8'});
  for(const text of [xml,embedded]){

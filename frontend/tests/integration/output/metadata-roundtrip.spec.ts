@@ -9,10 +9,10 @@ test('actor references, declaration order and metadata survive actual revision r
  await page.locator('[data-top-menu="lyrics-settings"] summary').click();await page.getByRole('button',{name:'歌手管理',exact:true}).click();
  await page.getByLabel('歌手 ID actor',{exact:true}).fill('performer');await page.getByLabel('歌手 ID actor',{exact:true}).press('Enter');await page.getByRole('button',{name:'上移歌手 performer'}).click();await page.getByRole('button',{name:'关闭歌手管理'}).click();
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.locator('header').getByText('已保存',{exact:true})).toBeVisible();await page.reload();
- await page.getByRole('button',{name:'文件打包',exact:true}).click();const lyrics=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词'}).click();const xml=await readFile((await (await lyrics).path())!,'utf8');
- const link=page.getByRole('link',{name:'下载产物'}),old=await link.count()?await link.getAttribute('href'):null;
- await page.getByLabel('内嵌歌词').selectOption('elrc');await page.getByRole('button',{name:'编辑',exact:true}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByLabel('内嵌歌词')).toHaveValue('elrc');await expect(page.getByLabel('导出格式')).toHaveValue('ttml');
- await page.getByRole('button',{name:'打包文件'}).click();await expect.poll(()=>link.getAttribute('href'),{timeout:15000}).not.toBe(old);const music=page.waitForEvent('download');await link.click();const path=(await (await music).path())!;
+ await page.getByRole('button',{name:'文件打包',exact:true}).click();const lyrics=page.waitForEvent('download');await page.locator('#output-panel-lyrics').getByRole('button',{name:'导出 TTML'}).click();const xml=await readFile((await (await lyrics).path())!,'utf8');
+ await page.getByRole('tab',{name:'音乐文件嵌入',exact:true}).click();
+ await page.getByRole('combobox',{name:'LRC → 元数据标签',exact:true}).selectOption('elrc');await page.getByRole('button',{name:'编辑',exact:true}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByRole('tab',{name:'音乐文件嵌入',exact:true}).click();await expect(page.getByRole('combobox',{name:'LRC → 元数据标签',exact:true})).toHaveValue('elrc');
+ const music=page.waitForEvent('download');await page.getByRole('button',{name:'下载嵌入音频',exact:true}).click();const path=(await (await music).path())!;
  const embedded=execFileSync('server/.venv/bin/python',['-c','from server.publishing import extract_stpp; from pathlib import Path; import sys; sys.stdout.buffer.write(extract_stpp(Path(sys.argv[1])))',path],{cwd:'..',encoding:'utf8'});
  const saved=(await (await page.request.get('/api/v1/projects/music-packaging/document')).json()).document.lyrics.draftTtml;
  for(const text of [saved,xml,embedded]) {

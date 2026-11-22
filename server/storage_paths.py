@@ -44,9 +44,3 @@ def validate_database_paths(db):
         for row in conn.execute('SELECT id,project_id,directory FROM vocal_results'):
             if row[2] != f'projects/{row[1]}/vocals/{row[0]}' or not exists(row[2], directory=True):
                 raise ValueError('人声引用无效或目录缺失；已停止启动清理')
-        for row in conn.execute('SELECT project_id,result_json FROM jobs WHERE result_json IS NOT NULL'):
-            result = json.loads(row[1])
-            if result.get('output_path'):
-                path = db.paths.resolve(result['output_path'])
-                if path.parent != db.paths.resolve(f'projects/{row[0]}/exports'):
-                    raise ValueError('发布产物引用无效；已停止启动清理')

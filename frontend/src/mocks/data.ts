@@ -44,10 +44,6 @@ export const sampleProject = {
     proxy_offset_ms: 0,
   },
 };
-export const exports = {
-  schema_version: "studio-export-list-v1" as const,
-  items: [] as Array<Record<string, unknown>>,
-};
 export const projects: ProjectList = {
   schema_version: "studio-project-list-v1",
   items: [sampleProject],

@@ -72,7 +72,7 @@ export function PackagingPanel(props:Props){
   if(format==='nicokara'||format==='sug')downloadKaraoke(zipFiles(final.archiveFiles),`${safeFilename(title)}-${format}.zip`,'application/zip');
   else if(final.files[0])downloadKaraoke(final.files[0].text,final.files[0].name,'text/plain;charset=utf-8');
  };
- const issues=props.document.lines.length===0?[]:all?(allResults?.project===project?allResults.issues:[]):prepared.issues;
+ const issues=outputTab==='music'&&musicBlocking.length?musicBlocking:props.document.lines.length===0?[]:all?(allResults?.project===project?allResults.issues:[]):prepared.issues;
  const ready=!all||allResults?.project===project;
  const audioIssues=!all&&format==='txt'?[]:audioRangeIssues(all?props.document:prepared.projection.document,all?props.project?.acoustics:undefined,props.sourceAssetId,props.audioDurationMs).filter(issue=>all||format!=='lrc'||issue.kind==='line');
  const label=downloadFormats.find(([id])=>id===format)![1];
@@ -83,7 +83,7 @@ export function PackagingPanel(props:Props){
  <div role="tabpanel" id={`validation-panel-${tab}`} aria-labelledby={`validation-tab-${tab}`} aria-busy={tab==='lyrics'?!ready:!amllCurrent}>
  {tab==='lyrics'?<><div className={styles.downloadRow}><label>{t('validation.formats')}<Select aria-label={t('validation.formatFilter')} value={all?'all':'current'} onChange={event=>setAll(event.target.value==='all')}><option value="current">{t('validation.currentOutput',{format:t(label,{defaultValue:label})})}</option><option value="all">{t('validation.allFormats')}</option></Select></label></div>
  {!ready&&<p role="status">{t('validation.updating')}</p>}
- <OutputIssues document={props.document} issues={[...issues,...audioIssues]} highlighted={attempted&&!all?prepared.issues:[]} locate={locate}/>
+ <OutputIssues document={props.document} issues={[...issues,...audioIssues]} highlighted={outputTab==='music'&&musicBlocking.length?musicBlocking:attempted&&!all?prepared.issues:[]} locate={locate}/>
  {ready&&issues.length===0&&<p>{t(props.document.lines.length===0?'validation.noLyrics':all?'validation.clean':'validation.noBlocking')}</p>}</>:
  <>{!amllCurrent&&<p role="status">{t('validation.updating')}</p>}{amll?.error&&<p role="alert">{formatMessage(amll.error)}</p>}{props.project&&props.applyProject&&amll?.amll&&<AmllPanel project={props.project} results={amll.amll} current={amllCurrent} apply={props.applyProject} locate={locate} focusRule={props.focusRule} onRuleLocated={props.onRuleLocated}/>}</>}
  </div></section>
@@ -100,8 +100,7 @@ export function PackagingPanel(props:Props){
  {message&&<p role="alert">{message}</p>}
  </div>
  <div role="tabpanel" id="output-panel-music" aria-labelledby="output-tab-music" hidden={outputTab!=='music'}>
- <OutputIssues document={props.document} issues={musicBlocking} highlighted={musicBlocking} locate={locate}/>
- {props.projectId&&props.sourceAssetId&&props.saveForPackaging?<MusicPackaging dirty={props.dirty} key={props.projectId} onIssues={setMusicBlocking} projectId={props.projectId} document={props.document} saveForPackaging={props.saveForPackaging}/>:<p>{t('packaging.uploadHelp')}</p>}
+ {props.projectId&&props.sourceAssetId&&props.saveForPackaging?<MusicPackaging key={props.projectId} onIssues={next=>{setMusicBlocking(next);if(next.length){choose('lyrics');setAll(false);}}} projectId={props.projectId} document={props.document} saveForPackaging={props.saveForPackaging}/>:<p>{t('packaging.uploadHelp')}</p>}
  </div>
  {dialog&&props.project&&<>{dialog==='sug-singers'?<SugSingersDialog error={message} project={props.project} close={()=>setDialog(null)} apply={command=>apply({type:'karaoke',command})}/>:<SingerMarkersDialog error={message} project={props.project} close={()=>setDialog(null)} apply={command=>apply({type:'karaoke',command})}/>}</>}
  </section></div>;

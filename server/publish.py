@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import math
 import shutil
-import uuid
 import unicodedata
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -20,7 +19,10 @@ class PublishInvalid(ValueError):
 
 
 class MediaPublisher:
-    """Single container-writing boundary, injectable in the persistent job runner."""
+    """Single container-writing boundary for direct streaming packaging."""
+    def available(self) -> bool:
+        return shutil.which("ffprobe") is not None
+
     def publish(self, ttml: bytes | None, asset_path: Path, output: Path, lrc: str | None, target_track_id: int | None):
         from .packaging import package_media
         return package_media(asset_path, output, ttml, lrc, target_track_id)
@@ -138,53 +140,3 @@ def serialize_output_ttml(snapshot: dict) -> bytes:
         for key in list(element.attrib):
             if key.startswith('{'+STUDIO_NS+'}'): del element.attrib[key]
     return serialize_ttml(root).encode('utf-8')
-
-
-class PublishRunner:
-    capability = "publish.stpp"
-
-    def __init__(self, revisions, asset_path, output_root: str | Path, publisher=None):
-        self.revisions, self.asset_path, self.output_root = revisions, asset_path, Path(output_root)
-        self.publisher = publisher
-        self.output_root.mkdir(parents=True, exist_ok=True)
-
-    def available(self) -> bool:
-        return (self.publisher is not None and callable(getattr(self.publisher, "publish", None))
-                and shutil.which("ffprobe") is not None)
-
-    def run(self, project_id: str, request: dict[str, Any]) -> dict[str, Any]:
-        if not self.available():
-            raise RuntimeError("STPP publisher is not configured")
-        revision = request["revision"]
-        with self.revisions.db.connect() as c:
-            bound = c.execute('SELECT p.source_asset_id,p.name,a.filename FROM projects p JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?', (project_id,)).fetchone()
-        if not bound or bound[0] != request['asset_id']: raise PublishInvalid('bound asset changed')
-        _, snapshot = self.revisions.read(project_id, revision)
-        asset = Path(self.asset_path(project_id))
-        from mutagen import File
-        from mutagen.mp4 import MP4
-        media = File(asset)
-        ttml = None
-        if isinstance(media, MP4):
-            ttml = serialize_output_ttml(snapshot)
-        from .media_format import describe_media, download_filename
-        format_info = describe_media(asset, media, bound[2])
-        if format_info['extension'] is None: raise PublishInvalid('源文件格式不支持打包')
-        directory = self.output_root / project_id / "exports"
-        directory.mkdir(parents=True, exist_ok=True)
-        output = directory / f"{uuid.uuid4().hex}{format_info['extension']}"
-        try:
-            result = dict(self.publisher.publish(ttml, asset, output, request['lrc_text'], request.get('target_track_id')) or {})
-            if not isinstance(result.get("report"), dict) or "passed" not in result["report"]:
-                raise PublishInvalid("publisher did not return a complete report")
-            if result["report"].get("passed") is not True:
-                raise PublishInvalid("publisher report did not pass")
-            result.update(format_info)
-            result["filename"] = download_filename(bound[1], format_info["extension"])
-            # The service owns the output path, including cleanup on failure/cancel.
-            result["output_path"] = self.revisions.db.paths.store(output)
-        except Exception:
-            output.unlink(missing_ok=True)
-            raise
-        result["binding"] = {"project_id": project_id, "revision": revision, "asset_id": request["asset_id"]}
-        return result

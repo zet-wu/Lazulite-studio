@@ -1,31 +1,113 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MusicPackaging } from './MusicPackaging';
 import { publishingApi } from '../adapters/http/publishing';
 import { createLyricDocument } from '../domain/lyric-document';
-vi.mock('../adapters/http/publishing', () => ({ publishingApi: { list: vi.fn(), publish: vi.fn() } }));
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
-it('download follows the last available success through active, failed and cancelled tasks, and disables without a valid record', async () => {
-  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ filename:'song.flac', format_label:'FLAC', asset_id:'source', supported:true, container:'flac', tracks:[], error:null })));
-  const client = new QueryClient({ defaultOptions: { queries: { retry:false } } });
-  const document = createLyricDocument('歌'), onIssues=vi.fn(), save=vi.fn();
-  let items: any[] = [];
-  vi.mocked(publishingApi.list).mockImplementation(async () => ({items}) as any);
-  render(<QueryClientProvider client={client}><MusicPackaging projectId="downloads" document={document} saveForPackaging={save} onIssues={onIssues} dirty /></QueryClientProvider>);
-  await expect(screen.findByRole('button', { name:'下载产物' })).resolves.toBeDisabled();
-  const success={id:'old',status:'succeeded',download_url:'/old.flac',revision:'r1',stale:true,lrc_kind:'lrc',report:{passed:true,lyrics_preserved:true}};
-  for (const status of ['running','failed','cancelled']) {
-    items=[{id:'new',status,revision:'r2',lrc_kind:'lrc'},success];
-    await client.invalidateQueries({queryKey:['exports','downloads']});
-    await waitFor(() => expect(screen.getByRole('link',{name:'下载产物'})).toHaveAttribute('href','/old.flac'));
-    expect(screen.getByText(/旧修订/)).toBeVisible();
-    expect(screen.getByText(/此产物不包含这些修改/)).toBeVisible();
-    expect(screen.queryByRole('link',{name:'下载音乐文件'})).toBeNull();
-  }
-  items=[{...success,status:'unavailable',download_url:null}];
-  await client.invalidateQueries({queryKey:['exports','downloads']});
-  await waitFor(() => expect(screen.getByRole('button',{name:'下载产物'})).toBeDisabled());
-  expect(save).not.toHaveBeenCalled(); expect(publishingApi.publish).not.toHaveBeenCalled();
+
+vi.mock('../adapters/http/publishing', () => ({
+  publishingApi: {
+    info: vi.fn(),
+    download: vi.fn(),
+  },
+}));
+vi.mock('./KaraokeTools', () => ({
+  downloadKaraoke: vi.fn(),
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
+
+it('shows container-appropriate dropdowns, blocks both-none and forces save before direct download', async () => {
+  vi.mocked(publishingApi.info).mockResolvedValue({
+    filename: 'song.m4a',
+    format_label: 'M4A',
+    asset_id: 'asset-1',
+    supported: true,
+    container: 'mp4',
+    tracks: [{ track_id: 2, language: 'und', name: 'Lazulite TTML' }],
+    error: null,
+  });
+  vi.mocked(publishingApi.download).mockResolvedValue({
+    blob: new Blob([new Uint8Array([1, 2])], { type: 'audio/mp4' }),
+    filename: 'song.m4a',
+  });
+
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const document = createLyricDocument('歌');
+  document.lines[0].beginMs = 0;
+  document.lines[0].endMs = 1000;
+  document.lines[0].words[0].beginMs = 0;
+  document.lines[0].words[0].endMs = 1000;
+  const onIssues = vi.fn();
+  const save = vi.fn(async () => ({ revision: 'rev-secret-123', document }));
+
+  render(
+    <QueryClientProvider client={client}>
+      <MusicPackaging projectId="p1" document={document} saveForPackaging={save} onIssues={onIssues} />
+    </QueryClientProvider>,
+  );
+
+  const stppSelect = await screen.findByRole('combobox', { name: 'TTML → STPP' });
+  const lrcSelect = screen.getByRole('combobox', { name: 'LRC → 元数据标签' });
+  const button = screen.getByRole('button', { name: '下载嵌入音频' });
+
+  await waitFor(() => expect(button).toBeEnabled());
+  expect(screen.getByText('song.m4a · M4A')).toBeVisible();
+  expect(screen.getByText('©lyr')).toBeVisible();
+  expect(stppSelect).toHaveValue('add');
+  expect(screen.getByRole('option', { name: /覆盖轨道 2/ })).toBeInTheDocument();
+
+  // Selecting none for both disables the primary action with a hint
+  fireEvent.change(stppSelect, { target: { value: 'none' } });
+  fireEvent.change(lrcSelect, { target: { value: 'none' } });
+  expect(button).toBeDisabled();
+  expect(screen.getByRole('status')).toHaveTextContent('至少选择一项写入内容');
+
+  // Switch back to overwrite track 2 and download
+  fireEvent.change(stppSelect, { target: { value: 'overwrite:2' } });
+  expect(button).toBeEnabled();
+  fireEvent.click(button);
+
+  await waitFor(() => expect(publishingApi.download).toHaveBeenCalledTimes(1));
+  expect(save).toHaveBeenCalledTimes(1);
+  expect(publishingApi.download).toHaveBeenCalledWith('p1', {
+    revision: 'rev-secret-123',
+    asset_id: 'asset-1',
+    stpp_action: 'overwrite',
+    target_track_id: 2,
+    lrc_kind: 'none',
+    lrc_text: null,
+  });
+  expect(screen.queryByText(/rev-secret-123/)).toBeNull();
+  expect(screen.queryByText(/旧修订/)).toBeNull();
+  client.clear();
+});
+
+it('disables STPP field for MP3/FLAC and shows tag hint', async () => {
+  vi.mocked(publishingApi.info).mockResolvedValue({
+    filename: 'song.flac',
+    format_label: 'FLAC',
+    asset_id: 'asset-2',
+    supported: true,
+    container: 'flac',
+    tracks: [],
+    error: null,
+  });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const document = createLyricDocument('歌');
+
+  render(
+    <QueryClientProvider client={client}>
+      <MusicPackaging projectId="p2" document={document} saveForPackaging={vi.fn()} onIssues={vi.fn()} />
+    </QueryClientProvider>,
+  );
+
+  const stppSelect = await screen.findByRole('combobox', { name: 'TTML → STPP' });
+  expect(stppSelect).toBeDisabled();
+  await waitFor(() => expect(screen.getByText('LYRICS')).toBeVisible());
   client.clear();
 });
