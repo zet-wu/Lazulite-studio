@@ -1720,5 +1720,14 @@
   "sync.externalConflict": "External update detected while local edits are unsaved.",
   "sync.reloadExternal": "Reload external version",
   "sync.keepLocal": "Keep local draft",
-  "sync.reloaded": "Loaded latest external version."
+  "sync.reloaded": "Loaded latest external version.",
+  "sync.externalAlignmentApplied": "External alignment applied.",
+  "alignment.backgroundReady": "Background alignment finished.",
+  "alignment.applyResult": "Apply alignment",
+  "alignment.dismissResult": "Dismiss",
+  "alignment.backgroundStale": "Background alignment result is outdated because the document or audio changed. Run alignment again.",
+  "alignment.backgroundDirty": "Background alignment finished. Save or discard local unsaved edits before applying.",
+  "alignment.rerun": "Re-run alignment",
+  "vocal.backgroundApplied": "Background vocal separation finished and applied.",
+  "vocal.backgroundConflict": "Background vocal separation finished. Replace existing acoustic segments with the new result?"
 }

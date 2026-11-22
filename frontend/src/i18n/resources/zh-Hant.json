@@ -1707,5 +1707,14 @@
   "sync.externalConflict": "偵測到外部更新，目前有未儲存修改",
   "sync.reloadExternal": "重新載入外部版本",
   "sync.keepLocal": "保留本機草稿",
-  "sync.reloaded": "已載入外部最新版本"
+  "sync.reloaded": "已載入外部最新版本",
+  "sync.externalAlignmentApplied": "外部自動對齊已套用",
+  "alignment.backgroundReady": "背景自動對齊已完成",
+  "alignment.applyResult": "套用對齊結果",
+  "alignment.dismissResult": "忽略",
+  "alignment.backgroundStale": "背景自動對齊結果已過期：文件或音訊已變更，請重新對齊",
+  "alignment.backgroundDirty": "背景自動對齊已完成，請先儲存或放棄本機未儲存草稿後再套用",
+  "alignment.rerun": "重新對齊",
+  "vocal.backgroundApplied": "背景人聲分離已完成並自動套用",
+  "vocal.backgroundConflict": "背景人聲分離已完成，是否採用新結果覆蓋目前聲學片段？"
 }

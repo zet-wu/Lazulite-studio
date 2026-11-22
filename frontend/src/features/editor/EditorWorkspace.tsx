@@ -164,6 +164,13 @@ function EditorWorkspaceContent(props: Props) {
     return props.projectId && !document.lines.some(line => line.words.some(word => word.text.trim())) ? 'acquire' : 'edit';
   });
   useEffect(() => { if (props.projectId) preferences.setItem(`studio:workspace-mode:project:${props.projectId}`, mode); }, [props.projectId, mode]);
+  const alignmentRequest = audioReview?.alignmentRequest ?? 0;
+  const handledAlignmentRequest = useRef(alignmentRequest);
+  useEffect(() => {
+    if (alignmentRequest === handledAlignmentRequest.current) return;
+    handledAlignmentRequest.current = alignmentRequest;
+    setMode('audio');
+  }, [alignmentRequest]);
   const [editorDisplay]=usePreference('studio:editor-display','advanced');
   const compact = mode === 'sync' || mode === 'karaoke' || mode === 'edit' && editorDisplay === 'simple';
   const [downloadFormat,setDownloadFormat]=useState<DownloadFormat>();

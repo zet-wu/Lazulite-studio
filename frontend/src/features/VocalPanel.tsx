@@ -36,6 +36,9 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     return saved?JSON.parse(saved):null;
   });
   useEffect(()=>{if(pending)sessionStorage.setItem(intentKey,JSON.stringify(pending));else sessionStorage.removeItem(intentKey);},[intentKey,pending]);
+  useEffect(()=>{
+    if(pending?.id) ui.claimJobId(pending.id);
+  },[pending?.id,ui.claimJobId]);
   const handled = useRef(new Set<string>());
   const observedTasks = useRef(new Map<string, string>());
   const jobs = useProjectJobs(projectId,visible);

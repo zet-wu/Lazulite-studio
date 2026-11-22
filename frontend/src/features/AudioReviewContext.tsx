@@ -1,5 +1,5 @@
 import { SelectionProvider, useEditorSelection } from './editor/SelectionContext';
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 function useAudioState() {
   const shared = useEditorSelection()!;
   const selected = shared.selectedSegments, setSelected = shared.setSelectedSegments;
@@ -11,7 +11,18 @@ function useAudioState() {
   const [alignmentHost, setAlignmentHost] = useState<HTMLDivElement | null>(null);
   const [statusHost, setStatusHost] = useState<HTMLDivElement | null>(null);
   const [timelineReady, setTimelineReady] = useState(false);
-  return { uploadHost, setUploadHost, analysisHost, setAnalysisHost, selected, setSelected, segmentTarget, adding, setAdding, toolsHost, setToolsHost, alignmentHost, setAlignmentHost, statusHost, setStatusHost, timelineReady, setTimelineReady };
+  const [claimedJobIds, setClaimedJobIds] = useState<ReadonlySet<string>>(() => new Set());
+  const claimJobId = useCallback((id: string) => {
+    setClaimedJobIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+  const [alignmentRequest, setAlignmentRequest] = useState(0);
+  const requestAlignmentOpen = useCallback(() => setAlignmentRequest((v) => v + 1), []);
+  return { uploadHost, setUploadHost, analysisHost, setAnalysisHost, selected, setSelected, segmentTarget, adding, setAdding, toolsHost, setToolsHost, alignmentHost, setAlignmentHost, statusHost, setStatusHost, timelineReady, setTimelineReady, claimedJobIds, claimJobId, alignmentRequest, requestAlignmentOpen };
 }
 const Context = createContext<ReturnType<typeof useAudioState> | null>(null);
 export const useAudioReview = () => useContext(Context)!;

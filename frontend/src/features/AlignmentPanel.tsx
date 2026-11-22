@@ -88,7 +88,14 @@ export function AlignmentPanel({
   const launchButton = useRef<HTMLButtonElement>(null);
   const resultMessage = (text: string | Message, role: Notice['role'] = 'alert', timeout?: number, taskId?: string) => {
     recent.current = setMessage(text, role, timeout, taskId);
-    if (recent.current) recent.current.origin = launchButton.current;
+    if (recent.current) {
+      recent.current.origin = launchButton.current;
+      if (taskId) {
+        recent.current.onDismiss = () => {
+          void jobsApi.acknowledge(taskId, 'dismissed').catch(() => undefined);
+        };
+      }
+    }
   };
   const [cpuFailure, setCpuFailure] = useState<{
     id: string;
@@ -100,6 +107,7 @@ export function AlignmentPanel({
   const [opening, setOpening] = useState(false);
   const [pendingRun, setPendingRun] = useState<PendingRun | null>(null);
   const handledRuns = useRef(new Set<string>());
+  const handledAlignmentRequest = useRef(ui.alignmentRequest);
   const mounted = useRef(true);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -109,6 +117,10 @@ export function AlignmentPanel({
   durationRef.current = durationMs;
   const assetIdRef = useRef(assetId);
   assetIdRef.current = assetId;
+
+  useEffect(() => {
+    if (pendingRun?.id) ui.claimJobId(pendingRun.id);
+  }, [pendingRun?.id, ui.claimJobId]);
 
   useEffect(() => {
     mounted.current = true;
@@ -265,6 +277,14 @@ export function AlignmentPanel({
       if (mounted.current) setOpening(false);
     }
   };
+
+  useEffect(() => {
+    if (ui.alignmentRequest === handledAlignmentRequest.current) return;
+    handledAlignmentRequest.current = ui.alignmentRequest;
+    if (!dialog && !active && !launching && !opening && !reason) {
+      void open();
+    }
+  }, [ui.alignmentRequest, dialog, active, launching, opening, reason]);
 
   useEffect(() => {
     const serial = ++previewSerial.current;

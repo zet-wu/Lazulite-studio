@@ -9,7 +9,7 @@ import { useNotice } from '../shared/MessageBar';
 import { ProjectEditingContext } from './editor/ProjectEditingContext';
 import { selectionLineId } from './editor/editing-actions';
 import { SelectionProvider, useEditorSelection } from './editor/SelectionContext';
-import { AudioReviewProvider } from './AudioReviewContext';
+import { AudioReviewProvider, useAudioReview } from './AudioReviewContext';
 import { createActiveLineTracker } from '../domain/active-lines';
 import { assignVocalSegmentCommand, AssignmentError } from '../domain/vocal-editing';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -25,6 +25,7 @@ import { downloadBlob } from '../shared/download';
 import { FloatingTrayProvider, useTrayEntry } from './FloatingTray';
 import { MediaTransport, type TransportHandle } from './MediaTransport';
 import { deviceSummary } from './task-messages';
+import { useBackgroundJobRecovery } from './useBackgroundJobRecovery';
 import { useProjectJobs } from './useProjectJobs';
 import { EditorWorkspace } from './editor/EditorWorkspace';
 import { useProjectDocument } from './useProjectDocument';
@@ -67,14 +68,36 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
   const [audioImportBusy,setAudioImportBusy]=useState(false);
   const [importRequest,setImportRequest]=useState(0);
   const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
+  const audioReview = useAudioReview();
   const jobs = useProjectJobs(projectId, true);
   const activeJob = jobs.data?.items.find((job) => ['queued', 'running', 'cancel_requested'].includes(job.status));
+  const recovery = useBackgroundJobRecovery({
+    projectId,
+    sourceAssetId: asset?.id ?? null,
+    durationMs: asset?.source_duration_ms ?? asset?.duration_ms ?? null,
+    revision: editor.revision,
+    dirty: editor.dirty,
+    conflict: editor.conflict,
+    editingLocked: editor.editingLocked,
+    project: editor.project,
+    jobs: jobs.data?.items,
+    claimedJobIds: audioReview.claimedJobIds,
+    lockEditing: editor.lockEditing,
+    saveForPackaging: editor.saveForPackaging,
+    applyProject: (command) => {
+      if (editor.conflict) throw new MessageError(describeMessage('workspace.conflict'));
+      editor.applyProject(command);
+    },
+    requestAlignmentOpen: audioReview.requestAlignmentOpen,
+    onNotice: setMessage,
+  });
   useEffect(() => {
     if (!activeJob && cancellingJobId) setCancellingJobId(null);
   }, [activeJob, cancellingJobId]);
   useEffect(() => subscribeProjectEvents(projectId, {
     onRevisionChanged: (event) => {
       void latestEditor.current.syncExternalRevision(event.revision);
+      void query.invalidateQueries({ queryKey: ['vocal-jobs', projectId] });
     },
     onJobUpdated: (event) => {
       void query.invalidateQueries({ queryKey: ['vocal-jobs', projectId] });
@@ -90,7 +113,144 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
 
   useTrayEntry('workspace-message', message ? { kind: 'notice', notice: message } : null);
   useTrayEntry('document-error', editor.errorNotice ? { kind: 'notice', notice: editor.errorNotice } : null);
-  useTrayEntry('document-sync', editor.syncNotice ? { kind: 'notice', notice: editor.syncNotice } : null);
+  useTrayEntry(
+    'document-sync',
+    editor.syncNotice
+      ? {
+          kind: 'notice',
+          notice: recovery.externalAlignmentApplied
+            ? { ...editor.syncNotice, text: describeMessage('sync.externalAlignmentApplied') }
+            : editor.syncNotice,
+        }
+      : null,
+  );
+  useTrayEntry(
+    'bg-alignment-recovery',
+    recovery.alignmentPrompt
+      ? recovery.alignmentPrompt.kind === 'ready'
+        ? {
+            kind: 'notice',
+            tone: 'info',
+            order: 8,
+            version: `${recovery.alignmentPrompt.job.id}:ready:${recovery.applyingAlignment}`,
+            notice: {
+              text: describeMessage('alignment.backgroundReady'),
+              role: 'status',
+              origin: null,
+              dismissible: false,
+            },
+            actions: (
+              <>
+                <button
+                  data-role="primary"
+                  disabled={recovery.applyingAlignment}
+                  onClick={() => void recovery.applyAlignment()}
+                >
+                  {t('alignment.applyResult')}
+                </button>
+                <button
+                  data-role="secondary"
+                  disabled={recovery.applyingAlignment}
+                  onClick={() => void recovery.dismissAlignment()}
+                >
+                  {t('alignment.dismissResult')}
+                </button>
+              </>
+            ),
+          }
+        : {
+            kind: 'notice',
+            tone: 'warning',
+            order: 8,
+            version: `${recovery.alignmentPrompt.job.id}:${recovery.alignmentPrompt.kind}`,
+            notice: {
+              text: describeMessage(
+                recovery.alignmentPrompt.kind === 'dirty'
+                  ? 'alignment.backgroundDirty'
+                  : 'alignment.backgroundStale',
+              ),
+              role: 'alert',
+              origin: null,
+              dismissible: false,
+            },
+            actions: (
+              <>
+                {recovery.alignmentPrompt.kind === 'stale' && (
+                  <button data-role="primary" onClick={() => void recovery.rerunAlignment()}>
+                    {t('alignment.rerun')}
+                  </button>
+                )}
+                <button data-role="secondary" onClick={() => void recovery.dismissAlignment()}>
+                  {t('alignment.dismissResult')}
+                </button>
+              </>
+            ),
+          }
+      : null,
+  );
+  useTrayEntry(
+    'bg-vocal-conflict',
+    recovery.vocalConflictPrompt
+      ? {
+          kind: 'notice',
+          tone: 'warning',
+          order: 8,
+          version: `${recovery.vocalConflictPrompt.job.id}:${recovery.busyVocal}`,
+          notice: {
+            text: describeMessage('vocal.backgroundConflict'),
+            role: 'alert',
+            origin: null,
+            dismissible: false,
+          },
+          actions: (
+            <>
+              <button
+                data-role="primary"
+                disabled={recovery.busyVocal}
+                onClick={() => void recovery.adoptVocal()}
+              >
+                {t('vocal.replaceSegments')}
+              </button>
+              <button
+                data-role="secondary"
+                disabled={recovery.busyVocal}
+                onClick={() => void recovery.dismissVocal()}
+              >
+                {t('vocal.previous')}
+              </button>
+            </>
+          ),
+        }
+      : null,
+  );
+  const failureNotice = useMemo(
+    () =>
+      recovery.failurePrompt
+        ? {
+            text: recovery.failurePrompt.message,
+            role: 'alert' as const,
+            origin: null,
+            dismissible: true,
+            taskId: recovery.failurePrompt.job.id,
+            onDismiss: () => {
+              void recovery.dismissFailure();
+            },
+          }
+        : null,
+    [recovery.failurePrompt?.job.id, recovery.dismissFailure],
+  );
+  useTrayEntry(
+    'bg-job-failure',
+    failureNotice
+      ? {
+          kind: 'notice',
+          tone: 'alert',
+          order: 9,
+          version: recovery.failurePrompt?.job.id,
+          notice: failureNotice,
+        }
+      : null,
+  );
   useTrayEntry(
     'external-conflict',
     editor.externalUpdate
