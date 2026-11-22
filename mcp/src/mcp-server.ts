@@ -3,6 +3,7 @@ import type { StudioClient } from './client';
 import { registerLyricAcquisitionTools } from './tools/lyrics-acquisition';
 import { registerMetadataAndSingerTools } from './tools/metadata-singers';
 import { registerReadTools } from './tools/read';
+import { registerReadingTools } from './tools/reading';
 import { formatToolError, ToolRegistry } from './tools/registry';
 import { installXmlDomShim } from './xml-shim';
 
@@ -12,6 +13,7 @@ export function createToolRegistry(): ToolRegistry {
   registerReadTools(registry);
   registerMetadataAndSingerTools(registry);
   registerLyricAcquisitionTools(registry);
+  registerReadingTools(registry);
   return registry;
 }
 

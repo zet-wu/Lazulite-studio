@@ -132,6 +132,37 @@ export type EmbeddedLyricCandidate = {
   error_code?: string;
 };
 
+export type JapaneseReadingRange = {
+  line_id: string;
+  base_start: number;
+  base_end: number;
+  base: string;
+  reading: string;
+};
+
+export type DictionaryInfo = {
+  id: string;
+  instance: string;
+  manifest: Record<string, unknown> | null;
+  sources: unknown;
+  error: string | null;
+};
+
+export type DictionaryRange = {
+  line_id: string;
+  base_start: number;
+  base_end: number;
+  base: string;
+  status: 'known' | 'unknown' | 'ambiguous' | 'boundary' | 'unannotated';
+  units: string[];
+};
+
+export type DictionaryAnalysis = {
+  instance: string;
+  version: string;
+  ranges: DictionaryRange[];
+};
+
 export type StudioErrorBody = {
   code: string;
   message: string;
@@ -434,5 +465,31 @@ export class StudioClient {
 
   getEmbeddedLyrics(projectId: string): Promise<{ candidates: EmbeddedLyricCandidate[] }> {
     return this.json(`/projects/${encodeURIComponent(projectId)}/embedded-lyrics`);
+  }
+
+  analyzeJapaneseReading(
+    lines: Array<{ id: string; text: string }>,
+  ): Promise<{ ranges: JapaneseReadingRange[] }> {
+    return this.json('/reading/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lines }),
+    });
+  }
+
+  listDictionaries(): Promise<{ dictionaries: DictionaryInfo[]; errors: string[] }> {
+    return this.json('/reading/dictionaries');
+  }
+
+  analyzeDictionaryReading(
+    id: string,
+    instance: string,
+    lines: Array<{ id: string; text: string }>,
+  ): Promise<DictionaryAnalysis> {
+    return this.json(`/reading/dictionaries/${encodeURIComponent(id)}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instance, lines }),
+    });
   }
 }
