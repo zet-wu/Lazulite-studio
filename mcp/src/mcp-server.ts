@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { StudioClient } from './client';
+import { registerAlignmentTools } from './tools/alignment';
 import { registerLyricAcquisitionTools } from './tools/lyrics-acquisition';
 import { registerMetadataAndSingerTools } from './tools/metadata-singers';
 import { registerReadTools } from './tools/read';
@@ -14,6 +15,7 @@ export function createToolRegistry(): ToolRegistry {
   registerMetadataAndSingerTools(registry);
   registerLyricAcquisitionTools(registry);
   registerReadingTools(registry);
+  registerAlignmentTools(registry);
   return registry;
 }
 

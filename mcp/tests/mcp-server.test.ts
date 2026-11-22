@@ -80,6 +80,12 @@ describe('MCP Server transports', () => {
       'list_dictionaries',
       'analyze_dictionary_reading',
       'apply_readings',
+      'list_alignment_models',
+      'preview_alignment',
+      'start_alignment',
+      'get_job_status',
+      'cancel_job',
+      'apply_alignment_result',
     ]);
 
     const result = await client.callTool({ name: 'get_lyrics', arguments: { project_id: 'p1' } });

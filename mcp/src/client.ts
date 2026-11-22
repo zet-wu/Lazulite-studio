@@ -74,6 +74,8 @@ export type StudioJob = {
   kind: string;
   status: string;
   stage: string | null;
+  progress?: number | null;
+  acknowledged_state?: 'applied' | 'dismissed' | null;
   request: Record<string, unknown>;
   result_available: boolean;
   error: {
@@ -85,6 +87,46 @@ export type StudioJob = {
   engine: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AlignmentCatalogItem = {
+  id: string | null;
+  name: string;
+  type: string | null;
+  status: string;
+  reason?: string;
+};
+
+export type AlignmentCatalog = {
+  directory: string;
+  source: string;
+  editable: boolean;
+  error: string | null;
+  items: AlignmentCatalogItem[];
+};
+
+export type AlignmentPreviewSummary = {
+  model_preview: string;
+  line_count: number;
+  skipped_count: number;
+  unknown_count: number;
+  hint_count: number;
+  emitting_count: number;
+};
+
+export type AlignmentOptions = {
+  convert_particles: boolean;
+  latin_normalize: boolean;
+  strip_tone_digits: boolean;
+  model_preview: string;
+  use_hints: boolean;
+  line_blank: boolean;
+  rest_blank: boolean;
+  rest_token: boolean;
+  clear_unmatched: boolean;
+  smart_extend: boolean;
+  merge_short_gaps: boolean;
+  gap_threshold_ms: number;
 };
 
 export type StudioSearchConditions = {
@@ -491,5 +533,63 @@ export class StudioClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ instance, lines }),
     });
+  }
+
+  listAlignmentModels(refresh = false): Promise<AlignmentCatalog> {
+    return this.json(`/alignment-models?refresh=${refresh}`);
+  }
+
+  previewAlignment(
+    projectId: string,
+    revision: string,
+    model: string,
+    options: Pick<AlignmentOptions, 'convert_particles' | 'latin_normalize' | 'strip_tone_digits'>,
+  ): Promise<AlignmentPreviewSummary> {
+    const query = new URLSearchParams({
+      revision,
+      model,
+      convert_particles: String(options.convert_particles),
+      latin_normalize: String(options.latin_normalize),
+      strip_tone_digits: String(options.strip_tone_digits),
+    });
+    return this.json(`/projects/${encodeURIComponent(projectId)}/alignment-preview?${query.toString()}`);
+  }
+
+  startAlignment(
+    projectId: string,
+    revision: string,
+    options: AlignmentOptions,
+    idempotencyKey: string = crypto.randomUUID(),
+  ): Promise<StudioJob> {
+    return this.json(`/projects/${encodeURIComponent(projectId)}/jobs/alignment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify({ params: { revision, ...options } }),
+    });
+  }
+
+  getJob(jobId: string): Promise<StudioJob> {
+    return this.json(`/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  cancelJob(jobId: string): Promise<StudioJob> {
+    return this.json(`/jobs/${encodeURIComponent(jobId)}/cancel`, {
+      method: 'POST',
+    });
+  }
+
+  acknowledgeJob(jobId: string, state: 'applied' | 'dismissed'): Promise<StudioJob> {
+    return this.json(`/jobs/${encodeURIComponent(jobId)}/acknowledge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state }),
+    });
+  }
+
+  getJobResult<T = Record<string, unknown>>(jobId: string): Promise<T & { schema_version: string; job_id: string }> {
+    return this.json(`/jobs/${encodeURIComponent(jobId)}/result`);
   }
 }
