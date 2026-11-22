@@ -73,7 +73,7 @@ it('leaves fully untimed content unknown even with media duration, and rejects a
  expect(parse([row('a',[char('歌',[1500])])],{audio_duration_ms:1000}).document.lines[0].words[0]).toMatchObject({beginMs:1500,endMs:null});
 });
 it('round-trips an upstream-saved external file with forward background order and missing release',async()=>{
- const {readFileSync,writeFileSync}=await import('node:fs');const {createProjectEditing}=await import('../src/domain/project-editing');const {displayLines}=await import('../src/domain/amll-compatibility');
+ const {readFileSync}=await import('node:fs');const {createProjectEditing}=await import('../src/domain/project-editing');const {displayLines}=await import('../src/domain/amll-compatibility');
  const {document,incompleteCheckpoints}=importSugFile(readFileSync('tests/fixtures/external-current.sug','utf8'),measure);
  const original=createProjectDocument();original.amll.noIndependentBackground=false;original.amll.noWordAgents=false;
  const state=executeProjectCommand(createProjectEditorState(original),{type:'lyrics',command:{type:'replace-document',document,editing:createProjectEditing()}});
@@ -81,7 +81,7 @@ it('round-trips an upstream-saved external file with forward background order an
  const snapshot=serializeProject(project),reopened=parseProject(snapshot);
  expect(incompleteCheckpoints).toBe(1);expect(displayLines(reopened.lyrics,reopened.lineOrder).map(l=>l.words.map(w=>w.text).join(''))).toEqual(['声','今は','é']);
  expect(reopened.lyrics.lines.find(l=>l.words[0]?.text==='é')!.endMs).toBeNull();expect(reopened.lyrics.agents.map(a=>a.name)).toEqual(['完整名称 A＋B','完整名称 A＋B']);
- expect(reopened.karaoke.outputs).toEqual(project.karaoke.outputs);if(process.env.SUG_SNAPSHOT_PATH)writeFileSync(process.env.SUG_SNAPSHOT_PATH,JSON.stringify(snapshot,null,2)+'\n');
+ expect(reopened.karaoke.outputs).toEqual(project.karaoke.outputs);
 });
 it('retains an explicit resolvable self actor reference',()=>{
  const {document}=parse([row('a',[char('歌')])],{singers:[{id:'self',name:'角色',actorRef:'self'}]});expect(document.agents[0].actorRef).toBe('v1');

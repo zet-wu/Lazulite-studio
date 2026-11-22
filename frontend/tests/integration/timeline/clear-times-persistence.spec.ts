@@ -16,7 +16,7 @@ test('self-only clear, undo redo and new timeline preferences persist through re
  const savedResponse=page.waitForResponse(response=>response.url().endsWith(`/api/v1/projects/${pid}/document`)&&response.request().method()==='PUT');await page.getByRole('button',{name:'保存',exact:true}).click();expect((await savedResponse).status()).toBe(200);await expect(page.getByText('已保存',{exact:true})).toBeVisible();
  await expect.poll(async()=>{const settings=await(await page.request.get('/api/v1/settings')).json();return settings.values['studio:spectrum-height'];}).toBe('216');
  await page.reload();await page.getByRole('button',{name:'编辑',exact:true}).click();await page.locator('[data-outline-drag]').first().click();
- const persisted=await page.evaluate(async pid=>{const hp='/src/adapters/http/client.ts',cp='/src/adapters/project-codec.ts';const h=await import(hp),c=await import(cp);return c.parseProject((await h.studioS4.getDocumentEnvelope(pid)).document).lyrics;},pid);
+ const persisted=await page.evaluate(async pid=>{const hp='/src/adapters/http/client.ts',cp='/src/adapters/project-codec.ts';const h=await import(hp),c=await import(cp);return c.parseProject((await h.studioApi.getDocumentEnvelope(pid)).document).lyrics;},pid);
  expect(persisted.lines[0]).toMatchObject({id:'clear-line',beginMs:1000,endMs:4000,words:[{id:'clear-word',beginMs:null,endMs:null,rubyUnits:[{id:'clear-ruby',beginMs:1300,endMs:3000}]}]});
  await page.locator('[data-settings-button]').click();await dialog.getByRole('button',{name:'时间轴',exact:true}).click();await expect(height).toHaveValue('216');await expect(dialog.getByRole('combobox',{name:'活动行自动展开显示'})).toHaveValue('always');await expect(dialog.getByRole('switch',{name:'交换滚轮操作'})).toBeChecked();
 });

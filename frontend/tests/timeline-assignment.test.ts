@@ -1,6 +1,9 @@
 import {expect,it} from 'vitest';
 import {createLyricDocument,createWord} from '../src/domain/lyric-document';
-import {assignTimeline} from '../src/domain/timeline-editing';
+import {prepareTimelineAssignment,applyTimelineAssignment,type TimelineTarget} from '../src/domain/timeline-editing';
+import type {LyricDocument} from '../src/domain/lyric-document';
+import type {ProjectEditing} from '../src/domain/project-editing';
+const assignTimeline=(doc:LyricDocument,target:TimelineTarget,dropMs:number,durationMs:number,editing?:ProjectEditing)=>applyTimelineAssignment(doc,target,prepareTimelineAssignment(doc,target,dropMs,durationMs),0,editing);
 import {createProjectDocument,createProjectEditorState,executeProjectCommand,undoProjectCommand,redoProjectCommand} from '../src/domain/project-document';
 import {parseProject,serializeProject} from '../src/adapters/project-codec';
 import {locateViewport} from '../src/domain/timeline-viewport';

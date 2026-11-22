@@ -11,7 +11,6 @@ test('word batch flags and explicit singers retain other references, undo once a
  const word=(id:string)=>page.locator(`main [data-word-id="${id}"]`),singer=(id:string)=>page.getByLabel(`词级歌手 ${id}`,{exact:true});
  await word('one').click({position:{x:2,y:2}});await word('two').click({position:{x:2,y:2},modifiers:['Control']});
  await expect(singer('v1')).not.toBeChecked();await expect(singer('v2')).toHaveAttribute('aria-checked','mixed');await expect(singer('v3')).toHaveAttribute('aria-checked','mixed');
- if(process.env.STUDIO_EVIDENCE_DIR)for(const theme of ['light','dark']){await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await page.screenshot({path:`${process.env.STUDIO_EVIDENCE_DIR}/word-batch-${theme}.png`});}
  await singer('v2').focus();await page.keyboard.press('Space');await expect(singer('v2')).toBeChecked();await expect(singer('v3')).toHaveAttribute('aria-checked','mixed');
  const obscene=page.getByLabel('不雅用语',{exact:true});await expect(obscene).toHaveAttribute('aria-checked','mixed');await obscene.focus();await page.keyboard.press('Space');await expect(obscene).toBeChecked();
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(obscene).toHaveAttribute('aria-checked','mixed');await page.getByRole('button',{name:'重做',exact:true}).click();await expect(obscene).toBeChecked();

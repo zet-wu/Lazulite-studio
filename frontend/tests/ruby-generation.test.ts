@@ -1,4 +1,4 @@
-import { createProjectEditing, emptyBeatCount, setEmptyBeat } from '../src/domain/project-editing';
+import { createProjectEditing } from '../src/domain/project-editing';
 import { describe, expect, it } from 'vitest';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand, redoLyricCommand } from './helpers/project-history';
 import { createLyricDocument, createWord } from '../src/domain/lyric-document';
@@ -206,7 +206,7 @@ describe('structured reverse-ruby issues', () => {
     return { document, line, rows, issues, editing };
   }
   it('compares entire groups, folds kana scripts only, and keeps differences nonblocking', () => {
-    const { document, line, rows, issues, editing } = fixture();
+    const { document, line, rows, issues } = fixture();
     expect(issues()).toMatchObject([{ kind: 'kana-difference', severity: 'warning', rowKeys: ['c:a', 'c:b'] }]);
     expect(() => rubyGenerationCommand(document, document, rows, {}, new Set(), new Set())).not.toThrow();
     expect(issues({ 'c:b': 'な' })).toEqual([]);

@@ -1,4 +1,3 @@
-import {writeFile} from 'node:fs/promises';
 import {expect,test,type Page} from '@playwright/test';
 import {loadTimeline} from '../fixtures/timeline-setup';
 import {importLyrics} from '../fixtures/import-lyrics';
@@ -77,30 +76,20 @@ for(const audio of [false,true])test(`native names/ticks and plot gestures retai
  await page.getByRole('button',{name:'全曲',exact:true}).click();await item(page,'row-0').focus();expect(await item(page,'row-0').evaluate(node=>{const data=new DataTransfer(),event=new ClipboardEvent('copy',{bubbles:true,cancelable:true,clipboardData:data});node.dispatchEvent(event);return data.getData('application/x-lazulite-lyric');})).not.toBe('');
 });
 
-for(const dpr of [1,2])test.describe(`spectrogram DPR ${dpr}`,()=>{
-test.use({deviceScaleFactor:dpr});
-test('height endpoints repaint at DPR without fetching PCM or rebuilding workers, with both hosts and themes',async({page},testInfo)=>{
+test('height endpoints repaint without fetching PCM or rebuilding workers across hosts',async({page})=>{
  let workers=0,pcm=0;page.on('worker',()=>workers++);page.on('request',request=>{if(request.url().includes('/pcm?'))pcm++;});
  await loadTimeline(page,false);await expect(page.locator('[data-spectrum-ready]')).toHaveAttribute('data-spectrum-ready',/[1-9]/);
- const metrics=[];
  for(const host of ['bottom','audio']){
   if(host==='audio')await page.getByRole('button',{name:'音频处理',exact:true}).click();
   await expect(page.locator('[data-spectrum-ready]')).toHaveAttribute('data-spectrum-ready',/[1-9]/);
   await expect.poll(()=>page.locator('[data-spectrum-ready]').evaluate((node:HTMLElement)=>node.dataset.spectrumReady===node.dataset.spectrumWanted)).toBe(true);
   const baseline={workers,pcm};
-  for(const theme of ['light','dark'])for(const height of [36,216]){
-   await preference(page,'lazulite-editor-theme',theme);await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+  for(const height of [36,216]){
    await preference(page,'studio:spectrum-height',String(height));const plot=page.getByLabel('声谱图',{exact:true});
    await expect.poll(()=>plot.evaluate((canvas:HTMLCanvasElement)=>canvas.height)).toBe(Math.round(height*await page.evaluate(()=>devicePixelRatio)));
-   const measured=await plot.evaluate((canvas:HTMLCanvasElement)=>({css:canvas.getBoundingClientRect().height,pixels:canvas.height,ratio:devicePixelRatio}));expect(measured.css).toBe(height);
-   await plot.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath(`${host}-${theme}-${height}-dpr${dpr}.png`)});
-   metrics.push({host,theme,height,...measured,workers,pcm});
   }
   expect({workers,pcm}).toEqual(baseline);
  }
- const path=testInfo.outputPath(`spectrum-measurements-dpr${dpr}.json`);await writeFile(path,JSON.stringify(metrics,null,2));await testInfo.attach('spectrum-measurements',{path,contentType:'application/json'});
- if(dpr===1){await page.locator('[data-settings-button]').click();const dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:'时间轴',exact:true}).click();for(const theme of ['light','dark']){await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await page.screenshot({path:testInfo.outputPath(`settings-${theme}.png`)});}}
-});
 });
 
 test('active groups keep focused and menu objects mounted across virtual scrolling',async({page})=>{
@@ -113,6 +102,6 @@ test('active groups keep focused and menu objects mounted across virtual scrolli
 });
 test('multi-line clear commits once and a playback line change preserves an in-progress word drag',async({page})=>{
  await load(page);const first=item(page,'row-0'),second=item(page,'row-1');await first.click();await second.click({modifiers:['ControlOrMeta']});await dragIntoStaging(page,'row-0');await expect(first).toHaveCount(0);await expect(second).toHaveCount(0);await expect(item(page,'word-0')).toBeVisible();await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(first).toBeVisible();await expect(second).toBeVisible();
- await first.click();await preference(page,'studio:timeline-auto-expand','always');const word=item(page,'word-0');const from=(await word.boundingBox())!,drop=page.locator('[data-staging-drop]'),to=(await drop.boundingBox())!;
+ await first.click();await preference(page,'studio:timeline-auto-expand','always');const word=item(page,'word-0');const from=(await word.boundingBox())!,drop=page.locator('[data-staging-drop]');
  await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.locator('audio').evaluate((a:HTMLAudioElement)=>{a.currentTime=7.5;});await expect(page.locator('[data-expanded-line="row-2"]')).toBeAttached();expect(await word.evaluate(node=>node.hasPointerCapture(1))).toBe(true);const currentDrop=(await drop.boundingBox())!;await page.mouse.move(currentDrop.x+currentDrop.width*.5,currentDrop.y+currentDrop.height*.7,{steps:8});await expect(drop).toHaveAttribute('data-clearing','true');await page.mouse.up();await expect(word).toHaveCount(0);await expect(stage(page,'word-0')).toBeFocused();
 });

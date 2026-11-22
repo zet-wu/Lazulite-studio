@@ -4,9 +4,8 @@ import { createProjectDocument, createProjectEditorState, executeProjectCommand,
 import { applyKaraoke, outputId, reconcileKaraoke, autoInsertCues } from '../src/domain/karaoke';
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
 import { sugSingerOptions, sugSingerName } from '../src/adapters/sug-singers';
-import { writeFileSync } from 'node:fs';
 import { parseLyricTtml } from '../src/adapters/ttml/lyric-codec';
-import { prepareSug, sugZip } from '../src/adapters/sug';
+import { prepareSug } from '../src/adapters/sug';
 function fixture() {
   const p=createProjectDocument(createLyricDocument('歌'));
   p.amll.noWordAgents=false;
@@ -41,12 +40,6 @@ it('merges solos, chorus, unspecified and guides by exact final name and can spl
   expect(data.sentences.flatMap((s:any)=>[s.singer_id,...s.characters.map((c:any)=>c.singer_id)]).every((id:string)=>id===data.singers[0].id)).toBe(true);
   p.karaoke.sugSingerNames[1].name='B';data=JSON.parse(prepareSug(p,'曲').files[0].text);expect(data.singers.map((s:any)=>s.name)).toEqual(['共同','B']);
   p.karaoke.outputs.push(outputId('main','translation','t'));data=JSON.parse(prepareSug(p,'曲').files[1].text);expect(data.singers[0].name).toBe('未指定.zh-CN');
-  if(process.env.SUG_CONTRACT_DIR){
-    writeFileSync(`${process.env.SUG_CONTRACT_DIR}/split-roles.zip`,sugZip(p,'split'));
-    p.karaoke.sugSingerNames[1].name='共同';
-    p.karaoke.sugSingerNames.push({outputId:outputId('main','translation','t'),agentIds:[],name:'共同'});
-    writeFileSync(`${process.env.SUG_CONTRACT_DIR}/shared-roles.zip`,sugZip(p,'shared'));
-  }
 });
 it('merges identical default names without normalizing case or Unicode',()=>{
   const p=fixture(),line=p.lyrics.lines[0];p.lyrics.agents[1].name='A';line.words.push({...createWord('次'),agentRefs:['b'],beginMs:6000,endMs:7000});
@@ -96,7 +89,6 @@ it('preserves independent background sentence singers, word overrides and auxili
   const background=files[1],characters=background.sentences[0].characters;
   expect(characters.filter((c:any)=>!c.is_guide).map((c:any)=>role(background,c.singer_id))).toEqual(['背景独唱','A.background']);
   expect(characters.filter((c:any)=>c.is_guide).map((c:any)=>role(background,c.singer_id))).toEqual(['背景独唱']);
-  if(process.env.SUG_CONTRACT_DIR)writeFileSync(`${process.env.SUG_CONTRACT_DIR}/background-line.zip`,sugZip(p,'background'));
   // Even when every word overrides the line, its own exported role remains configurable.
   bg.words.forEach(word=>word.agentRefs=['a']);
   expect(sugSingerOptions(p).find(item=>item.output.id===body)!.sets.map(set=>set.ids)).toContainEqual(['b']);

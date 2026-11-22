@@ -31,7 +31,7 @@ test('document translation tracks survive actual save, reopen, reorder, partial 
   const saved = await (await page.request.get('/api/v1/projects/background-playback/document')).json();
   await page.reload(); await expect(page.locator('[data-outline-drag]')).toHaveCount(3);
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
-  const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
+  const download = page.waitForEvent('download'); await page.getByRole('button', { name: '导出 TTML', exact: true }).click();
   const final = await readFile(await (await download).path(), 'utf8');
   const evidence = await page.evaluate(async ({ draft, final }) => {
     const path = '/src/adapters/ttml/lyric-codec.ts'; const { parseLyricTtml } = await import(path) as typeof import('../../../src/adapters/ttml/lyric-codec');

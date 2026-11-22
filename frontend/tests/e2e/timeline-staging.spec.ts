@@ -2,13 +2,12 @@ import {expect,test} from '@playwright/test';
 import {loadTimeline} from '../fixtures/timeline-setup';
 import {importLyrics} from '../fixtures/import-lyrics';
 const xml=`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><div><p xml:id="stage" begin="00:00:01.000" end="00:00:08.000"><span studio:id="a" begin="00:00:01.000" end="00:00:02.000">前</span><span studio:id="b" studio:null="begin end">待分配</span><span studio:id="c" begin="00:00:05.000" end="00:00:08.000">后</span></p></div></body></tt>`;
-for(const theme of ['light','dark'])test(`staging assignment, cancellation, locate and undo in ${theme}`,async({page})=>{
+test('staging assignment, cancellation, locate and undo',async({page})=>{
  await page.setViewportSize({width:1440,height:1000});await loadTimeline(page,true);
  await page.getByRole('button',{name:'编辑',exact:true}).click();
  await importLyrics(page,{name:'staging.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
  await page.locator('[data-outline-drag]').first().click();
  await page.getByRole('button',{name:'音频处理',exact:true}).click();
- await page.evaluate(theme=>window.document.documentElement.dataset.theme=theme,theme);
  const source=page.locator('[data-staging-key="b"]');await expect(source).toBeVisible();
  const locate=page.getByRole('button',{name:'定位选区',exact:true});
  await source.press('Enter');await expect(locate).toBeDisabled();
@@ -25,7 +24,6 @@ for(const theme of ['light','dark'])test(`staging assignment, cancellation, loca
  const position=await page.locator('audio').evaluate((audio:HTMLAudioElement)=>audio.currentTime);
  await locate.click();expect(await page.locator('audio').evaluate((audio:HTMLAudioElement)=>audio.currentTime)).toBe(position);
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(source).toBeVisible();
- await page.screenshot({path:`${process.env.STUDIO_EVIDENCE_DIR??'/tmp'}/staging-${theme}.png`});
 });
 
 test('staging line drag freezes grouping and complete ancestors locate without editing',async({page})=>{
@@ -68,7 +66,6 @@ test('dense staging exposes full text on keyboard focus and follows track visibi
  const words=Array.from({length:80},(_,i)=>`<span studio:id="dense-${i}" studio:null="begin end">待分配的完整歌词${i}</span>`).join('');
  await importLyrics(page,{name:'dense.ttml',mimeType:'application/xml',buffer:Buffer.from(xml.replace(/<span[\s\S]*<\/span>/,words))});await page.locator('[data-outline-drag]').first().click();await page.getByRole('button',{name:'音频处理',exact:true}).click();
  const first=page.locator('[data-staging-key="dense-0"]');await first.focus();await expect(page.getByRole('tooltip')).toHaveText('待分配的完整歌词0');
- await page.screenshot({path:`${process.env.STUDIO_EVIDENCE_DIR??'/tmp'}/staging-dense-keyboard.png`});
  await page.getByRole('button',{name:'词',exact:true}).click();await expect(first).toHaveCount(0);
  await page.getByRole('button',{name:'词',exact:true}).click();await expect(first).toBeVisible();
 });

@@ -15,7 +15,8 @@ test('quantized save, download and actual STPP extraction agree with external pa
  await page.getByRole('tab',{name:'音乐文件嵌入',exact:true}).click();
  const music=page.waitForEvent('download');await page.getByRole('button',{name:'下载嵌入音频',exact:true}).click();
  const path=(await (await music).path())!;
- const embedded=execFileSync('server/.venv/bin/python',['-c','from server.publishing import extract_stpp; from pathlib import Path; import sys; sys.stdout.buffer.write(extract_stpp(Path(sys.argv[1])))',path],{cwd:'..',encoding:'utf8'});
+ const python = process.env.STUDIO_TEST_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
+ const embedded=execFileSync(python,['-c','from server.publishing import extract_stpp; from pathlib import Path; import sys; sys.stdout.buffer.write(extract_stpp(Path(sys.argv[1])))',path],{cwd:'..',encoding:'utf8'});
  for(const text of [xml,embedded]){
   expect(text).toContain('00:00.185');expect(text).toContain('00:03.000');
   const times=await page.evaluate(async text=>{

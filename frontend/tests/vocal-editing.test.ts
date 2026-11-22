@@ -1,4 +1,4 @@
-import { createProjectDocument } from '../src/domain/project-document';
+import { createProjectDocument, createProjectEditorState, executeProjectCommand } from '../src/domain/project-document';
 import { assignVocalSegmentCommand } from '../src/domain/vocal-editing';
 import { expect, it } from 'vitest';
 import { createLyricDocument, createLine, createWord } from '../src/domain/lyric-document';
@@ -45,5 +45,5 @@ it('merges only consecutive time-ordered selections and never edits lyrics',()=>
  expect(()=>editSegments(acoustics,{type:'merge',ids:['a','c']})).toThrow();
  const next=editSegments(acoustics,{type:'merge',ids:['a','b']});expect(next.segments).toContainEqual({id:'a',beginMs:0,endMs:1200});expect(next.analysisId).toBe('r');
  expect(editSegments(next,{type:'delete',ids:['a']}).segments).toEqual([acoustics.segments[2]]);
- expect(()=>editSegments(next,{type:'put',segment:{id:'z',beginMs:2,endMs:2}})).toThrow();
+ expect(()=>executeProjectCommand(createProjectEditorState(createProjectDocument()),{type:'acoustics',acoustics:editSegments(next,{type:'put',segment:{id:'z',beginMs:2,endMs:2}})})).toThrow();
 });

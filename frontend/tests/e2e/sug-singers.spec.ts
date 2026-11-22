@@ -13,10 +13,7 @@ test('SUG singer drafts, merge download, selection independence, undo and reset'
  await input.fill('共同演唱');await dialog.getByRole('button',{name:'B',exact:true}).click();await input.fill('共同演唱');await dialog.getByRole('button',{name:'应用',exact:true}).click();
  await page.getByRole('button',{name:'撤销',exact:true}).click();await open.click();await expect(input).toHaveValue('A');await page.keyboard.press('Escape');await page.getByRole('button',{name:'重做',exact:true}).click();
  await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式',{exact:true}).selectOption('sug');let exporting=page.locator('#output-panel-lyrics');await exporting.getByLabel('主歌词 · 正文',{exact:true}).uncheck();await open.click();await expect(input).toHaveValue('共同演唱');
- if(process.env.SUG_CONTRACT_DIR){await page.screenshot({path:`${process.env.SUG_CONTRACT_DIR}/singers-light.png`});await page.evaluate(()=>document.documentElement.dataset.theme='dark');await page.screenshot({path:`${process.env.SUG_CONTRACT_DIR}/singers-dark.png`});}
  await input.fill('');await expect(input).toHaveValue('A');await input.fill('长名称'.repeat(45));
- if(process.env.SUG_CONTRACT_DIR){await page.setViewportSize({width:900,height:720});await page.screenshot({path:`${process.env.SUG_CONTRACT_DIR}/singers-long.png`});}
  await dialog.getByRole('button',{name:'恢复默认：主歌词 · 正文'}).click();await expect(input).toHaveValue('A');await page.keyboard.press('Escape');await expect(open).toBeFocused();
  await page.getByLabel('导出格式',{exact:true}).selectOption('sug');exporting=page.locator('#output-panel-lyrics');await exporting.getByLabel('主歌词 · 正文',{exact:true}).check();const downloading=page.waitForEvent('download');await exporting.getByRole('button',{name:'导出 SUG'}).click();const download=await downloading;const bytes=await readFile((await download.path())!);expect(bytes.toString()).toContain('"name": "共同演唱"');expect(bytes.toString()).not.toContain('"name": "A"');
- if(process.env.SUG_CONTRACT_DIR)await download.saveAs(`${process.env.SUG_CONTRACT_DIR}/singers.zip`);
 });

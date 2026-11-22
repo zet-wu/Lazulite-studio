@@ -42,7 +42,7 @@ test('no music: import, shared beat properties, translation, metadata, undo and 
   expect((await envelope(page,id)).document.editing.emptyBeats).toEqual({A:{kind:'word',count:2},r1:{kind:'ruby',count:1}});
   await page.reload();await expect(line.getByLabel('翻译 1',{exact:true})).toHaveValue('译文');
   await page.getByRole('button',{name:'AMLL 预览',exact:true}).click();await page.getByLabel('预览位置').fill('3500');
-  await page.getByRole('button',{name:'文件打包',exact:true}).click();const downloading=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
+  await page.getByRole('button',{name:'文件打包',exact:true}).click();const downloading=page.waitForEvent('download');await page.getByRole('button',{name:'导出 TTML',exact:true}).click();
   const output=await readFile((await(await downloading).path())!,'utf8');expect(output).toContain('作者乙');expect(output).not.toContain('emptyBeat');
 });
 test('generated whitespace is omitted from saved timing and playback projection',async({page})=>{

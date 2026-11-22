@@ -5,7 +5,7 @@ import { createLine, createLyricDocument, createWord } from '../src/domain/lyric
 import { createProjectDocument, createProjectEditorState, executeProjectCommand, undoProjectCommand, redoProjectCommand } from '../src/domain/project-document';
 import { emptyBeatCount, validateProjectEditing } from '../src/domain/project-editing';
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
-import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
+import { parseLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { copySelection, pasteRich } from '../src/features/editor/editing-actions';
 import { syncUnits } from '../src/domain/sync-editing';
 import type { LyricCommand } from '../src/domain/lyric-commands';

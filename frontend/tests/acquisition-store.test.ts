@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { AcquisitionStore, PREVIEW_CAPACITY, SOURCES } from '../src/acquisition-store';
+import { AcquisitionStore, PREVIEW_CAPACITY } from '../src/acquisition-store';
 import type { Candidate, Source } from '../src/adapters/http/lyric-sources';
 const row = (source: Source,id: string,title='Song'): Candidate=>({source,id,title,artists:[],album:'',duration_ms:null});
 const query = {title:'Song (Live)!',artist:'',album:''};

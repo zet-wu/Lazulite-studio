@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {importLyrics} from '../fixtures/import-lyrics';
 import {japaneseReadingTtml} from '../fixtures/japanese-reading';
 
-test('simple editor shares editing, preferences, selection and sync data',async({page},info)=>{
+test('simple editor shares editing, preferences, selection and sync data',async({page})=>{
   await page.goto('/projects/sample-project/edit');
   await importLyrics(page,{name:'ruby.ttml',mimeType:'application/xml',buffer:Buffer.from(japaneseReadingTtml)});
   const view=page.locator('[data-top-menu="view"]');
@@ -17,10 +17,6 @@ test('simple editor shares editing, preferences, selection and sync data',async(
   await expect(word).toContainText('修改');
   await page.getByRole('button',{name:'撤销',exact:true}).click();
   await expect(word).not.toContainText('修改');
-  await page.screenshot({path:info.outputPath('simple-light.png')});
-  await page.evaluate(()=>{document.documentElement.dataset.theme='dark';});
-  await page.screenshot({path:info.outputPath('simple-dark.png')});
-  await page.evaluate(()=>{document.documentElement.dataset.theme='light';});
   await page.locator('[data-settings-button]').click();
   const dialog=page.getByRole('dialog',{name:'设置',exact:true});
   await expect(dialog.getByRole('combobox',{name:'编辑显示模式'})).toHaveValue('simple');
@@ -55,18 +51,16 @@ test('composition blocks display switching and hidden tracks become line selecti
   await expect(page.locator('main [data-romanization-unit-id]')).toHaveCount(4);
 });
 
-for(const theme of ['light','dark'])test(`model cards support keyboard selection and ${theme} theme`,async({page},info)=>{
+test('model cards support keyboard selection and persistence',async({page})=>{
   await page.goto('/projects/sample-project/edit');
   await page.locator('[data-settings-button]').click();
   const dialog=page.getByRole('dialog',{name:'设置',exact:true});
-  await dialog.getByRole('combobox',{name:'主题',exact:true}).selectOption(theme);
   await dialog.getByRole('button',{name:'模型与计算',exact:true}).click();
   const group=dialog.getByRole('radiogroup',{name:'人声分离模型管理'});
   const demucs=group.getByRole('radio',{name:/Demucs/}),bs=group.getByRole('radio',{name:/BS Karaoke/});
   await expect(demucs).toHaveAttribute('aria-checked','true');
   await demucs.focus();await page.keyboard.press('ArrowRight');
   await expect(bs).toBeFocused();await expect(bs).toHaveAttribute('aria-checked','true');
-  await group.scrollIntoViewIfNeeded();await dialog.screenshot({path:info.outputPath(`models-${theme}.png`)});
   await page.keyboard.press('Escape');await page.locator('[data-settings-button]').click();
   await dialog.getByRole('button',{name:'模型与计算',exact:true}).click();
   await expect(bs).toHaveAttribute('aria-checked','true');

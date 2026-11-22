@@ -20,14 +20,6 @@ test('custom ZIP installs through UI, fixed units edit, save/reopen/export after
   await expect(dialog.getByLabel('重读音 1',{exact:true})).toHaveValue('chóng');
   await dialog.getByLabel('重读音 1',{exact:true}).fill('chóng edited');
   await dialog.getByLabel('𠮷读音 1',{exact:true}).fill('jí jí');
-  const light=test.info().outputPath('dictionary-preview-light.png');
-  await page.screenshot({path:light});
-  await test.info().attach('dictionary-preview-light',{path:light,contentType:'image/png'});
-  await page.evaluate(()=>document.documentElement.dataset.theme='dark');
-  const dark=test.info().outputPath('dictionary-preview-dark.png');
-  await page.screenshot({path:dark});
-  await test.info().attach('dictionary-preview-dark',{path:dark,contentType:'image/png'});
-  await page.evaluate(()=>document.documentElement.dataset.theme='light');
   await dialog.getByRole('button',{name:'应用',exact:true}).click();
   await expect(page.locator('main [data-ruby-id]')).toHaveCount(3);
   await page.getByRole('button',{name:'保存',exact:true}).click();

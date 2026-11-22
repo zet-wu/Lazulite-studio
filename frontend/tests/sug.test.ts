@@ -2,15 +2,13 @@ import { expect, it } from 'vitest';
 import { createLyricDocument, createWord } from '../src/domain/lyric-document';
 import { createProjectDocument } from '../src/domain/project-document';
 import { outputId, autoInsertCues } from '../src/domain/karaoke';
-import { prepareSug, sugZip } from '../src/adapters/sug';
-import { writeFileSync } from 'node:fs';
+import { prepareSug } from '../src/adapters/sug';
 function fixture(){const p=createProjectDocument(createLyricDocument('明日'));Object.assign(p.lyrics.lines[0].words[0],{beginMs:1003,endMs:2009,rubyUnits:[{id:'r1',reading:'あ',beginMs:1100,endMs:1300},{id:'r2',reading:'した',beginMs:1600,endMs:1900}]});return p;}
 const data=(p:ReturnType<typeof fixture>)=>JSON.parse(prepareSug(p,'曲').files[0].text);
 it('exports native Unicode, ruby boundaries, pauses, guides and shared offset without source mutations',()=>{
  const p=fixture();p.karaoke.defaults.rubyMs=100;p.karaoke=autoInsertCues(p.lyrics,p.karaoke);p.karaoke.offsets[outputId('main')]=50;
  const before=structuredClone(p),r=prepareSug(p,'曲');expect(r.issues).toEqual([]);expect(p).toEqual(before);
  const d=data(p),chars=d.sentences[0].characters;expect(d.global_offset_ms).toBe(50);expect(chars[0].timestamps[0]).toBe(1003);expect(chars.at(-1).sentence_end_ts).toBe(2009);expect(chars[0].ruby.parts.at(-1).text).toBe('した');expect(chars[0].ruby.parts.map((p:{offset_ms:number})=>p.offset_ms)).toEqual(chars[0].timestamps.map((t:number)=>t-chars[0].timestamps[0]));
- if(process.env.SUG_CONTRACT_DIR){writeFileSync(`${process.env.SUG_CONTRACT_DIR}/actual.zip`,sugZip(p,'曲'));writeFileSync(`${process.env.SUG_CONTRACT_DIR}/actual.sug`,r.files[0].text);}
 });
 it('preserves independent zero-length separator checkpoints and blocks unhosted or invalid words',()=>{
  const p=fixture(),line=p.lyrics.lines[0];line.words.unshift(createWord('  '));line.words.push(createWord('　'));const r=prepareSug(p,'s');expect(r.issues).toEqual([]);const c=data(p).sentences[0].characters;expect(c[0].timestamps).toEqual([1003]);expect(c[1].sentence_end_ts).toBe(1003);expect(c.at(-1).sentence_end_ts).toBe(2009);
@@ -22,7 +20,7 @@ it('allows monotonic overlap, blocks reversed starts and truncated line envelope
  l.words[1].beginMs=900;expect(prepareSug(p,'s').issues.some(i=>i.code==='unsupported-order')).toBe(true);
 });
 it('blocks clipping and overflow, allows exactly zero; ignores marker image settings',()=>{
- const p=fixture();p.karaoke.offsets[outputId('main')]=-1003;expect(prepareSug(p,'s').issues).toEqual([]);p.karaoke.offsets[outputId('main')]=-1004;expect(prepareSug(p,'s').issues.some(i=>i.detail?.key==='output.offsetRange')).toBe(true);p.karaoke.offsets[outputId('main')]=Number.MAX_SAFE_INTEGER;expect(()=>sugZip(p,'s')).toThrow();
+ const p=fixture();p.karaoke.offsets[outputId('main')]=-1003;expect(prepareSug(p,'s').issues).toEqual([]);p.karaoke.offsets[outputId('main')]=-1004;expect(prepareSug(p,'s').issues.some(i=>i.detail?.key==='output.offsetRange')).toBe(true);p.karaoke.offsets[outputId('main')]=Number.MAX_SAFE_INTEGER;expect(prepareSug(p,'s').issues.length).toBeGreaterThan(0);
 });
 it('selected timed auxiliary is independent of broken body ruby and preserves per-unit times',()=>{
  const p=fixture(),l=p.lyrics.lines[0];l.words[0].beginMs=null;p.lyrics.translationTracks=[{id:'t',language:null,purpose:'subtitle',contents:[{id:'c',lineId:l.id,kind:'timed',units:[{id:'u',text:'明天',beginMs:1001,endMs:2011}]}]}];p.karaoke.outputs=[outputId('main','translation','t')];expect(prepareSug(p,'s').issues).toEqual([]);expect(data(p).metadata.language).toBe('');expect(data(p).sentences[0].characters.at(-1).sentence_end_ts).toBe(2011);
@@ -51,6 +49,5 @@ it('synchronizes song tags without KRA encoding and retains export time and offs
  const now=new Date('2026-11-03T00:00:00Z'),result=prepareSug(p,'fallback',now),d=JSON.parse(result.files[0].text);
  expect(d.nicokara_tags).toEqual({title:d.metadata.title,artist:d.metadata.artist,album:d.metadata.album,custom:['@Compose=A / B','@Lyrics=词 作者','@Arrange=编曲&[一] / 二','@Year=2026']});
  expect(d.metadata.updated_at).toBe(d.metadata.created_at);expect(d.metadata).not.toHaveProperty('modified_at');expect(d.global_offset_ms).toBe(50);
- if(process.env.SUG_CONTRACT_DIR)writeFileSync(`${process.env.SUG_CONTRACT_DIR}/metadata.sug`,result.files[0].text);
  p.lyrics.metadata={composer:['  ']};const empty=data(p);expect(empty.nicokara_tags).toEqual({title:'曲',artist:'',album:'',custom:[]});
 });

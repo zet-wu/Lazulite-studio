@@ -16,6 +16,6 @@ test('empty, untimed and timed lyrics retain the correct no-audio preview and va
   await page.getByRole('button',{name:'文件打包',exact:true}).click();
   if(state==='empty')await expect(page.getByText('暂无歌词可校验')).toBeVisible();
   else await expect(page.getByText('暂无歌词可校验')).toHaveCount(0);
-  if(state==='timed'){const download=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();expect((await download).suggestedFilename()).toMatch(/\.ttml$/);}
+  if(state==='timed'){const download=page.waitForEvent('download');await page.getByRole('button',{name:'导出 TTML',exact:true}).click();expect((await download).suggestedFilename()).toMatch(/\.ttml$/);}
  }
 });

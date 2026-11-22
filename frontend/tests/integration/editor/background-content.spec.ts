@@ -28,7 +28,7 @@ test('background sublyrics and independent singers survive service save/reopen a
   await page.locator('[data-line-id="L1-bg"] > [data-outline-drag]').click();
   for (const name of ['Main', 'Backing']) await expect(page.getByRole('checkbox', { name: `歌手 ${name}`, exact: true })).toBeChecked();
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
-  const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
+  const download = page.waitForEvent('download'); await page.getByRole('button', { name: '导出 TTML', exact: true }).click();
   const finalXml = await readFile(await (await download).path(), 'utf8');
   expect(await semantics(finalXml)).toEqual(before);
   expect(finalXml).not.toContain('studio:'); expect(finalXml).not.toContain('x-roman');

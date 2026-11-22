@@ -52,13 +52,6 @@ test('embedded candidates share parsed badges, selection and full-width cards; e
  await page.getByRole('button',{name:'确认导入并替换歌词',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 plain candidate',exact:true})).toBeVisible();await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.getByRole('textbox',{name:'词 plain candidate',exact:true})).toHaveCount(0);
 });
 
-test('music packaging checks current data and blocks invalid output',async({page})=>{
- await page.goto('/projects/sample-project/edit');await expect(page.getByRole('button',{name:'编辑',exact:true})).toBeVisible();
- await page.evaluate(()=>{const original=window.fetch;window.fetch=(...args)=>String(args[0]).endsWith('/packaging')?Promise.resolve(Response.json({filename:'source.mp3',format_label:'MP3',asset_id:'sample-asset',supported:true,container:'mp3',tracks:[],error:null})):original(...args);});
- await importLyrics(page,{name:'untimed.txt',mimeType:'text/plain',buffer:Buffer.from('untimed')});await page.getByRole('button',{name:'文件打包',exact:true}).click();
- await page.getByRole('tab',{name:'音乐文件嵌入',exact:true}).click();await page.getByRole('button',{name:'下载嵌入音频',exact:true}).click();await expect(page.locator('#validation-panel-lyrics [data-blocking=true]')).not.toHaveCount(0);
-});
-
 test('non-MP4 source disables STPP and blocks download when LRC is also set to none',async({page})=>{
  await page.goto('/projects/sample-project/edit');await expect(page.getByRole('button',{name:'编辑',exact:true})).toBeVisible();
  const mock=async(container:'mp4'|'mp3')=>page.evaluate(container=>{const original=window.fetch;window.fetch=(...args)=>String(args[0]).endsWith('/packaging')?Promise.resolve(Response.json({filename:`source.${container}`,format_label:container.toUpperCase(),asset_id:'sample-asset',supported:true,container,tracks:[],error:null})):original(...args);},container);

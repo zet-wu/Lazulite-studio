@@ -1,6 +1,6 @@
 import {expect,it} from 'vitest';
 import {createLine,createLyricDocument} from '../src/domain/lyric-document';
-import {clearTimelineTimes,assignTimeline,type TimelineTarget} from '../src/domain/timeline-editing';
+import {clearTimelineTimes,prepareTimelineAssignment,applyTimelineAssignment,type TimelineTarget} from '../src/domain/timeline-editing';
 import {createProjectDocument,createProjectEditorState,executeProjectCommand,undoProjectCommand,redoProjectCommand} from '../src/domain/project-document';
 import {serializeLyricTtml,parseLyricTtml} from '../src/adapters/ttml/lyric-codec';
 function sample(){
@@ -20,7 +20,7 @@ it('clears only a line itself and retains children, background, text and configu
  expect(state.past).toHaveLength(1);expect(state.present.editing).toBe(project.editing);
  expect(undoProjectCommand(state).present).toBe(project);expect(redoProjectCommand(undoProjectCommand(state)).present).toBe(state.present);
  const reopened=parseLyricTtml(serializeLyricTtml(cleared,{draft:true}),{draft:true});expect(reopened.lines[0].beginMs).toBeNull();expect(reopened.lines[0].words[0].beginMs).toBe(1200);
- const reassigned=assignTimeline(cleared,targets[0],6000,10000);expect(reassigned.lines[0].beginMs).toBeLessThanOrEqual(1200);expect(reassigned.lines[0].endMs).toBeGreaterThanOrEqual(3600);
+ const reassigned=applyTimelineAssignment(cleared,targets[0],prepareTimelineAssignment(cleared,targets[0],6000,10000));expect(reassigned.lines[0].beginMs).toBeLessThanOrEqual(1200);expect(reassigned.lines[0].endMs).toBeGreaterThanOrEqual(3600);
 });
 it('clears each child kind without changing ancestors or siblings',()=>{
  for(let i=1;i<5;i++){

@@ -15,7 +15,7 @@ test('word flags save to actual service, reopen and exchange formal TTML without
   await page.reload(); await page.getByRole('button', { name: '打轴', exact: true }).click();
   for (const id of ['A', 'W', 'BG']) { await page.locator(`main [data-word-id="${id}"]`).click(); await expect(page.getByLabel('不雅用语', { exact: true })).toBeChecked(); }
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
-  const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
+  const download = page.waitForEvent('download'); await page.getByRole('button', { name: '导出 TTML', exact: true }).click();
   const file = await download; const output = await readFile((await file.path())!, 'utf8');
   expect(output.match(/amll:obscene="true"/g)).toHaveLength(3); expect(output).not.toContain('studio:');
   await importLyrics(page, { name: 'reopened.ttml', mimeType: 'application/xml', buffer: Buffer.from(output) });

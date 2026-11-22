@@ -1,6 +1,5 @@
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
 import { describe, expect, it } from 'vitest';
-import { parseLyricTtml, serializeLyricTtml } from '../src/adapters/ttml/lyric-codec';
 import { replaceText, shiftLineTimes, smoothWordTimes, syncLineTimes } from '../src/domain/batch-editing';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';

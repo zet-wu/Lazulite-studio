@@ -15,10 +15,6 @@ test('native whole-line conversion keeps word boundaries, background, undo and s
   await expect(dialog.getByLabel('猫的目标字',{exact:true})).toHaveValue('');
   await dialog.getByLabel('弁的目标字',{exact:true}).focus();
   await page.keyboard.press('Tab');await expect(dialog.getByLabel('猫的目标字',{exact:true})).toBeFocused();
-  await page.screenshot({path:test.info().outputPath('shape-preview.png')});
-  await page.evaluate(()=>document.documentElement.dataset.theme='dark');
-  await page.screenshot({path:test.info().outputPath('shape-preview-dark.png')});
-  await page.evaluate(()=>delete document.documentElement.dataset.theme);
   await dialog.getByRole('button',{name:'应用',exact:true}).click();
   await expect(page.getByLabel('词 頭',{exact:true})).toHaveValue('頭');
   await expect(page.getByLabel('词 髮',{exact:true})).toHaveValue('髮');

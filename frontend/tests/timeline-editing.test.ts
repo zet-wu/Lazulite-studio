@@ -23,7 +23,6 @@ describe('E6 timeline editing', () => {
 
   it('moves only the explicitly selected line and its own children in one undo step', () => {
     const document = sample();
-    const word = document.lines[0].words[0];
     const moved = moveTimeline(document, [{ kind: 'line', lineId: document.lines[0].id }], 500);
     const state = executeLyricCommand(createLyricEditorState(document), { type: 'replace-document', document: moved });
     expect(state.present.lines[0].words[0].rubyUnits[0].beginMs).toBe(1500);

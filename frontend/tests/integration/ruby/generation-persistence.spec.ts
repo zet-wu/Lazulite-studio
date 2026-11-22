@@ -27,7 +27,7 @@ for (const kind of ['plain', 'timed']) test(`${kind} manual results persist and 
     { kind, units: [{ text: 'shin ', beginMs: 4e3, endMs: 5e3 }, { text: 'you', beginMs: 5e3, endMs: 6e3 }] },
   ]);
   await page.reload(); await expect(outline).toHaveCount(3);
-  await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '下载歌词', exact: true }).click();
+  await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: '导出 TTML', exact: true }).click();
   const finalXml = await readFile(await (await download).path(), 'utf8'), final = await semantics(finalXml);
   expect(final).toEqual(draft); expect(finalXml).toContain('transliterations'); expect(finalXml).not.toContain('x-roman'); expect(finalXml).not.toContain('studio:');
   await importLyrics(page, { name: 'final.ttml', mimeType: 'application/xml', buffer: Buffer.from(finalXml) });

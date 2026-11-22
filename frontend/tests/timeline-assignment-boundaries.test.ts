@@ -1,6 +1,6 @@
 import {expect,it} from 'vitest';
 import {createLyricDocument,createWord} from '../src/domain/lyric-document';
-import {prepareTimelineAssignment,applyTimelineAssignment,assignTimeline,snapTimelineInterval,moveTimeline} from '../src/domain/timeline-editing';
+import {prepareTimelineAssignment,applyTimelineAssignment,snapTimelineInterval,moveTimeline} from '../src/domain/timeline-editing';
 import {lyricSnapAnchors,stableSnapAnchor,targetId} from '../src/features/editor/selection-targets';
 function fixture(){
  const doc=createLyricDocument('a'),line=doc.lines[0],word=line.words[0];
@@ -23,12 +23,12 @@ it('allocates ancestor first and last gaps, whole ancestors and ruby fallback si
 });
 it('external drops may extend ancestors; fixed assignments cannot slide and invalid assignments cannot snap into validity',()=>{
  const {doc,word,target}=fixture();
- const outer=assignTimeline(doc,target,2600,5000);
+ const outer=applyTimelineAssignment(doc,target,prepareTimelineAssignment(doc,target,2600,5000));
  expect(outer.lines[0]).toMatchObject({endMs:2800});
  expect(outer.lines[0].words[0].rubyUnits[1]).toEqual(word.rubyUnits[1]);
  const assignment=prepareTimelineAssignment(doc,target,1200,5000);
  expect(()=>applyTimelineAssignment(doc,target,assignment,10)).toThrow();
- expect(()=>assignTimeline(doc,target,5000,5000)).toThrow();
+ expect(()=>applyTimelineAssignment(doc,target,prepareTimelineAssignment(doc,target,5000,5000))).toThrow();
 });
 it('free intervals snap by end inside ancestor bounds, checking other candidates after an invalid nearest',()=>{
  const {doc,word,target}=fixture();word.rubyUnits[1].beginMs=1000;word.rubyUnits[1].endMs=1400;

@@ -44,8 +44,8 @@ test('timeline click is selection-only; multi-selection and deletion restore tim
  const {loadTimeline}=await import('../fixtures/timeline-setup');await loadTimeline(page);await importMergeSplit(page,1);await page.locator('[data-outline-drag]').first().click();
  const bar=(id:string)=>page.locator(`[data-timeline-key="${id}"]`);
  await bar('w0-2').click();await bar('w0-3').click({modifiers:['Shift']});
- const undo=page.getByRole('button',{name:'撤销',exact:true});const undoLabel=await undo.getAttribute('title');
- await bar('w0-3').click();expect(await undo.getAttribute('title')).toBe(undoLabel);
+ const undo=page.getByRole('button',{name:'撤销',exact:true});const undoLabel=await undo.getAttribute('data-tooltip');
+ await bar('w0-3').click();expect(await undo.getAttribute('data-tooltip')).toBe(undoLabel);
  await bar('w0-3').press('Delete');await expect(bar('w0-2')).toBeFocused();
  await bar('w0-2').press('Delete');await expect(bar('w0-1')).toBeFocused();
 });

@@ -1,5 +1,4 @@
 import { createProjectEditing } from '../src/domain/project-editing';
-import { createProjectDocument } from '../src/domain/project-document';
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
 import { expect, it } from 'vitest';
 import { createLine, createWord, createLyricDocument } from '../src/domain/lyric-document';

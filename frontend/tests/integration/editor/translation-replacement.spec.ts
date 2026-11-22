@@ -23,7 +23,7 @@ test('timed replacement translations survive real save, reload, final download a
  const reopened = await (await page.request.get('/api/v1/projects/background-playback/document')).json();
  expect(await compare(reopened.document.lyrics.draftTtml,true)).toEqual(before);
  await page.getByRole('button',{name:'文件打包',exact:true}).click();
- const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
+ const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'导出 TTML',exact:true}).click();
  const xml=await readFile(await (await downloaded).path(),'utf8');
  expect(xml).not.toContain('studio:'); expect(xml).toContain('type="replacement"');
  expect(await compare(xml,false)).toEqual(await compare(saved.document.lyrics.draftTtml,false));

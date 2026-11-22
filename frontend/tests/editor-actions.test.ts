@@ -1,4 +1,4 @@
-import { createProjectEditing, emptyBeatCount, setEmptyBeat } from '../src/domain/project-editing';
+import { createProjectEditing } from '../src/domain/project-editing';
 import { describe, expect, it } from 'vitest';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
 import { createLine, createLyricDocument, lineText } from '../src/domain/lyric-document';

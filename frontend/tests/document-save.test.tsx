@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ApiError, studioS4 } from '../src/adapters/http/client';
+import { ApiError, studioApi } from '../src/adapters/http/client';
 import { createProjectDocument } from '../src/domain/project-document';
 import { serializeProject } from '../src/adapters/project-codec';
 import { useProjectDocument } from '../src/features/useProjectDocument';
@@ -14,12 +14,12 @@ const snapshot = () => serializeProject(createProjectDocument());
 it('preserves HTTP diagnostics on the real save adapter', async () => {
   const body = { code: 'document_invalid', reason: 'segment_order', params: { object_id: 'segment-1' }, message: '片段结束必须晚于开始', request_id: 'req-1', retryable: false };
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 422 })));
-  await expect(studioS4.saveRichDocument('p', snapshot(), 'r0', 'op1', 1)).rejects.toMatchObject({ status: 422, body, message: body.message });
+  await expect(studioApi.saveRichDocument('p', snapshot(), 'r0', 'op1', 1)).rejects.toMatchObject({ status: 422, body, message: body.message });
 });
 
 it('keeps a non-JSON HTTP failure distinguishable from a document rejection', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('gateway unavailable', { status: 503, headers: { 'X-Request-ID': 'gateway-1' } })));
-  await expect(studioS4.saveRichDocument('p', snapshot(), 'r0', 'op1', 1)).rejects.toMatchObject({ status: 503, body: { code: 'http_error', request_id: 'gateway-1', retryable: true } });
+  await expect(studioApi.saveRichDocument('p', snapshot(), 'r0', 'op1', 1)).rejects.toMatchObject({ status: 503, body: { code: 'http_error', request_id: 'gateway-1', retryable: true } });
 });
 
 it.each(['rejected', 'uncertain'] as const)('%s save retries use the correct snapshot and operation identity', async kind => {
@@ -52,5 +52,5 @@ it.each(['rejected', 'uncertain'] as const)('%s save retries use the correct sna
 
 it('keeps valid partial framework diagnostics and request IDs without treating them as confirmed document rejection',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({detail:{message:'save failed',reason:'storage_unavailable'}}),{status:503,headers:{'X-Request-ID':'partial'}})));
- await expect(studioS4.saveRichDocument('p',snapshot(),'r0','op',1)).rejects.toMatchObject({status:503,body:{message:'save failed',reason:'storage_unavailable',request_id:'partial',code:'http_error',retryable:true}});
+ await expect(studioApi.saveRichDocument('p',snapshot(),'r0','op',1)).rejects.toMatchObject({status:503,body:{message:'save failed',reason:'storage_unavailable',request_id:'partial',code:'http_error',retryable:true}});
 });

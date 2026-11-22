@@ -2,11 +2,42 @@ import { expect, it } from 'vitest';
 import { createLyricDocument, createWord, createLine } from '../src/domain/lyric-document';
 import { createProjectDocument } from '../src/domain/project-document';
 import { autoInsertCues, outputId, reconcileKaraoke } from '../src/domain/karaoke';
-import { prepareNicokara, nicokaraZip, encodeKraText, safeFilename } from '../src/adapters/nicokara';
-import { execFileSync } from 'node:child_process';
-import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { prepareNicokara, nicokaraArchiveFiles, encodeKraText } from '../src/adapters/nicokara';
+import { safeFilename, zipFiles } from '../src/adapters/karaoke-output';
+
+function readStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const decoder = new TextDecoder();
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= 0; i--) {
+    if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  expect(eocd).toBeGreaterThanOrEqual(0);
+  const count = view.getUint16(eocd + 10, true);
+  let cdOffset = view.getUint32(eocd + 16, true);
+  const entries = new Map<string, Uint8Array>();
+  for (let i = 0; i < count; i++) {
+    expect(view.getUint32(cdOffset, true)).toBe(0x02014b50);
+    const expectedCrc = view.getUint32(cdOffset + 16, true);
+    const size = view.getUint32(cdOffset + 20, true);
+    const nameLen = view.getUint16(cdOffset + 28, true);
+    const extraLen = view.getUint16(cdOffset + 30, true);
+    const commentLen = view.getUint16(cdOffset + 32, true);
+    const localOffset = view.getUint32(cdOffset + 42, true);
+    const name = decoder.decode(bytes.subarray(cdOffset + 46, cdOffset + 46 + nameLen));
+    cdOffset += 46 + nameLen + extraLen + commentLen;
+    expect(view.getUint32(localOffset, true)).toBe(0x04034b50);
+    const lNameLen = view.getUint16(localOffset + 26, true);
+    const lExtraLen = view.getUint16(localOffset + 28, true);
+    const start = localOffset + 30 + lNameLen + lExtraLen;
+    const data = bytes.subarray(start, start + size);
+    let crc = 0xffffffff;
+    for (const b of data) { crc ^= b; for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0); }
+    expect((crc ^ 0xffffffff) >>> 0).toBe(expectedCrc);
+    entries.set(name, data);
+  }
+  return entries;
+}
 function fixture(){const p=createProjectDocument(createLyricDocument('愛'));const l=p.lyrics.lines[0];l.beginMs=20000;l.endMs=21000;Object.assign(l.words[0],{beginMs:20000,endMs:21000,rubyUnits:[{id:'r1',reading:'あ',beginMs:20200,endMs:20300},{id:'r2',reading:'い',beginMs:20600,endMs:20800}]});return p;}
 it('preserves ruby leading, internal, trailing silence and manually shortened cue',()=>{
  const p=fixture();p.karaoke.defaults.rubyMs=100;p.karaoke=autoInsertCues(p.lyrics,p.karaoke);
@@ -43,8 +74,11 @@ it('encodes field commas and references without stripping punctuation or variati
 });
 it('creates an independently readable ZIP with UTF-8 BOM and unique safe names',()=>{
  const p=fixture();p.karaoke.groups.push({id:'MAIN',name:'collision'});const other=createLine('B');Object.assign(other.words[0],{beginMs:20000,endMs:21000});p.lyrics.lines.push(other);p.karaoke.lineGroups[other.id]='MAIN';p.karaoke.outputs.push(outputId('MAIN'));
- const zip=nicokaraZip(p,'../曲:*'),dir=mkdtempSync(join(tmpdir(),'kra-')),file=join(dir,'a.zip');
- try{writeFileSync(file,zip);const names=JSON.parse(execFileSync('python',['-c','import zipfile,json,sys; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; assert all(z.read(n).startswith(bytes([239,187,191])) for n in z.namelist() if not n.endswith(".png")); assert z.read("transparent-1x1.png").startswith(bytes([137,80,78,71])); print(json.dumps(z.namelist()))',file],{encoding:'utf8'}));expect(names).toHaveLength(4);expect(new Set(names.map((n:string)=>n.toLowerCase())).size).toBe(4);expect(names.every((n:string)=>!n.includes('/'))).toBe(true);}finally{rmSync(dir,{recursive:true,force:true});}
+ const zip=zipFiles(nicokaraArchiveFiles(prepareNicokara(p,'../曲:*')));
+ const entries=readStoredZip(zip),names=[...entries.keys()];
+ expect(names).toHaveLength(4);expect(new Set(names.map(n=>n.toLowerCase())).size).toBe(4);expect(names.every(n=>!n.includes('/'))).toBe(true);
+ for(const [name,data] of entries) if(!name.endsWith('.png')) expect([...data.subarray(0,3)]).toEqual([239,187,191]);
+ expect([...entries.get('transparent-1x1.png')!.subarray(0,4)]).toEqual([137,80,78,71]);
  expect(safeFilename('CON')).toBe('_CON');
 });
 it('detects a Ruby base crossing a neighboring word boundary',()=>{
@@ -70,7 +104,7 @@ it('uses custom markers to resolve name collisions, encodes fields and rejects a
  marker.trigger='B';marker.beforeImage='bad\nimage';expect(prepareNicokara(p,'s').issues.some(i=>i.detail?.key==='output.nicoControl')).toBe(true);
  p.lyrics.translationTracks=[{id:'t',language:'zh',purpose:'subtitle',contents:[{id:'t1',lineId:line.id,kind:'plain',text:'translation'}]}];
  p.karaoke.outputs=[outputId('main','translation','t')];result=prepareNicokara(p,'s');expect(result.issues).toEqual([]);expect(result.files[0].text).not.toContain('@Emoji');
- const bytes=nicokaraZip(p,'s');expect(new TextDecoder().decode(bytes)).toContain('transparent-1x1.png');
+ const bytes=zipFiles(nicokaraArchiveFiles(prepareNicokara(p,'s')));expect(new TextDecoder().decode(bytes)).toContain('transparent-1x1.png');
 });
 it('suppresses ForceWipeDecor with NoDecor and supports mutually exclusive Fix',()=>{
  const p=fixture();p.lyrics.agents=[{id:'a',name:'A',type:'person'}];p.lyrics.lines[0].agentRefs=['a'];p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);
