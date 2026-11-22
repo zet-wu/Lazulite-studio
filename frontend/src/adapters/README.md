@@ -1,36 +1,21 @@
-# Adapters：格式、服务与恢复
+# Adapters：格式、HTTP 与本地恢复
 
-本地歌词导入由 `source-codec.ts` 和格式适配器生成前端预览，确认后通过项目事务一次替换。适配器将外部文件、HTTP 与浏览器存储转换为领域数据，用户采用提案由功能组件和项目命令管理。
+适配器层负责外部文件格式转换、服务端 HTTP 通信、长期偏好同步与浏览器本地恢复，将外部输入转换为 `domain` 可直接处理的强类型数据。
 
-## TTML 与项目
+## TTML 与项目快照
 
-`ttml/lyric-codec.ts` 读取支持的 TTML／Apple 扩展／AMLL 约定，映射为 LyricDocument；草稿序列化保留稳定身份和待定时间，正式输出保留歌词语义与 XML 身份。翻译与音译写头部轨道，背景附属内容按背景 ID 引用；正文、背景、词、Ruby 和定时单元保留自身时间。
+- `ttml/lyric-codec.ts`：解析与序列化 Studio TTML（含正文、注音、背景行、歌手与 `actorRef`、翻译/音译轨道、不雅用语及支持的 Apple/AMLL 扩展）。草稿序列化保留内部身份与未定时间，正式导出清除内部属性。
+- `project-codec.ts`：读写项目 JSON v9（`lyrics.draftTtml`、`editing`、`acoustics`、`amll`、`lineOrder`、`karaoke`）。
+- `recovery/index.ts`：复用单一 IndexedDB 连接读写 `recovery-v11` 本地恢复点（含当前项目、基础修订与源音频身份），读盘校验通过后以空撤销历史恢复。
 
-词级 `obscene` 写 `amll:obscene` 与标准 `ttm:role="expletive"`，读取任一标记并检查冲突。歌手定义支持 `actorRef`，codec 校验引用；歌词编辑界面提供歌手身份、名称、类型及顺序管理。
+## 歌词格式与卡拉 OK 输出
 
-`project-codec.ts` 读写项目 v9：lyrics 在 JSON 边界保存为 draftTtml，editing、acoustics、amll、lineOrder、karaoke 独立保存并验证引用。`recovery` 用 IndexedDB 保存 recovery-v10 检查点：当前项目 v9 与基础修订一起读写，恢复时创建空撤销历史。源音频身份由项目资源接口提供。
+- `lyric-formats.ts`、`source-codec.ts`、`lrc.ts`、`ass.ts`、`sug-import.ts`、`sug-timing.ts`：处理纯文本、LRC / 扩展 LRC / ESLRC / QRC / YRC / LYS、KRC 导入、ASS 导出与单个 SUG 0.3.0 文件导入。`export-separators.ts` 保留空白分隔并按格式能力输出。
+- `karaoke-output.ts`、`nicokara.ts`、`sug.ts`、`sug-singers.ts`：共享分组与附属轨道输出编号、跨平台文件名与 ZIP 打包。`nicokara.ts` 输出 `.kra`（厘秒时间、注音标签、歌手触发串与透明占位图），`sug.ts` 输出 SUG 0.3.0 JSON（毫秒时间、导唱符与按输出映射合并的歌手名称）。
+- `lyric-output.ts`、`output-validation.ts`、`format-description.ts`：统一生成各格式内容投影、阻塞与警告问题列表（按稳定对象 ID 定位）及格式说明。
 
-## 格式投影
+## HTTP 与偏好
 
-`lyric-formats.ts` 分派文本、LRC／扩展 LRC／ESLRC／QRC／YRC／LYS 导入导出、KRC 导入及 ASS 导出。`source-codec.ts` 处理来源载荷，`lrc.ts` 统一歌词下载与媒体内嵌 LRC。`export-separators.ts` 保留空白原文并按格式能力附着到相邻有效单元。
-
-`ass.ts` 从正文、背景和附属内容生成事件，先量化绝对端点至厘秒，再计算相对 karaoke 时长；普通附属取所属行时间，定时附属取自身包络。事件使用四类角色样式与按时间分配的纵向行位，画布宽 1920、高至少 1080，真实间隙用空计时段表示。
-
-`nicokara.ts` 按组与轨道生成 `.kra` 文件和 UTF-8 ZIP，使用项目导唱、歌手标记及 Emoji 声明，附带透明占位图片。Ruby 绝对端点先量化，齐平时省略 reading 尾标签。碰撞、时间范围、所选输出及项目级未分组问题由同一准备函数返回。附属轨道使用完整列表序号，重复语言的文件名加 `trackN`；同一映射用于标签、文件名及说明清单。被跳过歌手集合不发声明且保留输出声部状态，每文件独立。
-
-`output-validation.ts` 与各格式准备函数共享检查，问题携带稳定对象 ID、类别及严重度。`format-description.ts` 描述当前选择的表达差异。正式输出执行实际格式校验，草稿保存保留可继续编辑的状态。
-
-## HTTP
-
-`http/client.ts` 处理会话、CSRF 与错误；专用适配器管理读音、对齐、任务、来源和发布。`generated.ts` 从仓库 OpenAPI 生成，`validate.ts` 在使用边界校验所需响应。媒体打包以保存返回的确切 revision 为输入，归档与源音频由服务资源接口交付。
-
-
-`preferences.ts` 将长期偏好映射到服务端 settings 字段，以 ETag 和逐字段原值检查处理并发修改；值以当前资料库的服务端设置为准，独立模拟环境使用本地偏好。`playback-speed.ts` 承担读取播放速度的副作用。恢复 IndexedDB 与 sessionStorage 应用意图按 library ID 隔离，偏好加载完成后才挂载依赖初始值的编辑器。
-
-下载操作将一次生成的内容交给下载器。ASS 准备同时返回事件与问题，LRC 在统一格式边界检查后生成；NicoKara 检查按项目不可变引用、标题及实际校验页复用。
-
-## 卡拉 OK 文件输出
-
-`karaoke-output.ts` 共享分组／轨道输出身份、完整轨道编号、跨平台文件名与 UTF-8 ZIP 写入。`nicokara.ts` 负责厘秒 `.kra`、Ruby 标签和 Emoji 资源；`sug.ts` 直接将项目转换为 SUG 0.3.0 JSON，每个所选非空输出独立成文件，附带 `summary.txt`。
-
-SUG 保留毫秒端点，以词包络表达行，Ruby 首尾填满所属词、中间空隙写为停顿 part。Unicode 字符通过连词与显式释放点保留整体词区间，无时间横向分隔投影为邻词边界的零时长字符。有效导唱随正文输出，附属定时内容保留独立单元，普通附属文本采用关联行词包络。`sug-singers.ts` 为管理窗口与导出共用内容及有效歌手分析，正文句子采用有效行歌手，字符保留有效词歌手覆盖；附属轨道的句子与字符均采用有效行歌手。管理列表包含这些实际输出的行／词歌手。每输出按集合 ID 读取项目覆盖名称，缺省由集合显示名、分组 ID 与附属语言组成；文件内最终名称完全相同的集合共用一个角色，未指定身份也参与合并并保持默认角色有效。输出偏移仅写 `global_offset_ms`，边界统一阻塞负时间、溢出、失效引用、Ruby 冲突、起点倒序或尾单元未覆盖行最大结束。准备函数返回同一项目快照的文件、问题、空输出和转换说明；ZIP 在所有所选输出无阻塞时生成。
+- `http/client.ts`：提供统一的 `apiFetch` / `apiJson` 基础封装、会话、CSRF 与错误解析；`generated.ts` 由 `contracts/openapi.json` 自动生成，`validate.ts` 承担必要的响应边界检查。
+- 其余 `http/*.ts` 模块按业务封装任务、读音、词典、对齐、字形、在线歌词源、打包直下与媒体租约调用。
+- `preferences.ts` 与 `project-lifecycle.ts`：将长期偏好映射到服务端 `/settings`（带 `If-Match` 并发检查），并按库 ID 隔离本地恢复与跨标签页项目变更通知。

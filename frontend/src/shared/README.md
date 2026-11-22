@@ -1,11 +1,9 @@
-# Shared：通用界面与工具
+# Shared：通用界面与基础工具
 
-共享层提供通用控件与显示工具，业务规则由 domain 和 features 管理。`tokens.css` 定义紧凑桌面的语义颜色、文字、间距、圆角及明暗主题；组件布局由 CSS Modules 表达。
+共享层提供跨页面复用的主题样式、图标、表单控件与基础工具，不包含业务领域逻辑。
 
-`Controls` 中的按钮通过 `data-role` 声明 primary、secondary、inline、danger 或 danger-primary，选中态使用 ARIA 属性。`Icon` 的通用图形采用 Lucide SVG，使用 24×24 坐标、统一描边与圆角，卡拉 OK 标识及打轴标记使用专用图形。Lucide／Feather 完整许可随 `public/third-party/lucide-LICENSE.txt` 发布。IconButton 组合可访问名称、悬停与键盘提示，并使用固定尺寸居中显示；BooleanField 使用原生 checkbox 支持开关与三态。
-
-`SettingsFields` 统一设置名称、说明、控件与就近错误；普通字段左右对齐，路径采用纵向布局，窄内容区域自动换行。SettingToggle 使用 BooleanField 的开关语义，说明通过可访问描述关联。共享样式提供分组、竖向导航及有宽度上限的资源卡片，管理表格继续按条目组织。
-
-`Select` 根据实际弹层尺寸及视口空间定位，保留键盘和焦点行为；歌词引用采用独立文本层级。`Disclosure` 管理按需挂载与 ARIA 关联，`MessageBar` 管理持续状态和事件反馈呈现（可选操作、关闭与时效），事件对象区分同文案的不同发布；关闭收起本次事件和操作，计时器随事件清理，键盘焦点在栏内时暂停自动关闭，`measure-text` 提供当前字体的文字测宽。对话框统一内容滚动、固定操作区、焦点圈定与返回。
-
-`Tooltip` 提供带持续可访问描述的轻量说明：鼠标延迟、键盘即时显示、操作收起及视口定位。`ContextMenu` 提供歌词和音频片段共用的 portal 外壳、实际尺寸定位、可用项导航和关闭焦点策略，动作与业务选区由调用方提供。
+- **样式与主题**：`tokens.css` 定义紧凑桌面布局的语义色、字号、间距、圆角与明暗主题，组件布局使用 CSS Modules。
+- **按钮与图标**：`Controls` 通过 `data-role` 声明主操作、次要操作、行内辅助与危险操作；`Icon` 基于 Lucide SVG 提供统一图标（许可随 `public/third-party/lucide-LICENSE.txt` 分发），`IconButton` 提供固定尺寸、可访问名称与轻量提示。
+- **表单与设置**：`SettingsFields`、`BooleanField` 与 `Select` 统一设置行布局、三态复选框、键盘导航和就近错误提示；长卡片与管理表格共享紧凑样式。
+- **弹层与反馈**：`Tooltip`、`ContextMenu`、`Disclosure` 与对话框基座统一视口定位、焦点圈定和键盘退出；`MessageBar` 管理常驻状态与可关闭的通知消息。
+- **基础工具**：`measure-text.ts` 提供当前字体的文字测宽，`download.ts` 提供统一的浏览器 Blob 下载辅助。

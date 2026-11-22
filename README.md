@@ -36,7 +36,7 @@ Lazulite Studio 也支持导入和导出各种格式的歌词，但相比 TTML�
 支持从网易、QQ、酷狗、AMLL TTML DB 四个在线源搜索和获取歌词，并能保留其提供的词级时间和音译/翻译行。
 
 ### 音频处理
-以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) Python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs) 或 [BS-RoFormer-karaoke](https://huggingface.co/becruily/bs-roformer-karaoke)）、声学分析分片、人声能量与频谱图、自动对齐等功能。
+以 [Lazulite](https://github.com/wuchenyanmo/Lazulite) Python 库作为后端，支持人声分离（使用 [Demucs](https://github.com/adefossez/demucs) 或 [BS-RoFormer-karaoke](https://huggingface.co/becruily/bs-roformer-karaoke)）、声学分析分片、人声能量与声谱图、自动对齐等功能。
 
 ### 编辑与打轴
 简洁而功能强大的编辑与打轴界面，提供多种自动化工具，可参阅[下一小节](README.md#自动化工具)的详细说明。打轴界面支持空拍、单行打轴、定位回听等功能。
@@ -85,7 +85,11 @@ Lazulite Studio 提供基于两个 Wav2Vec CTC 对齐模型的自动对齐功能
 - Windows cuda 版：`LazuliteStudio-windows-x64-cuda.7z`（需要 Nvidia 显卡及驱动）
 - Mac 版：`LazuliteStudio-macos-arm64.7z`
 
-主包包含完整运行时、词典和 Demucs 人声分离模型。对齐模型与可选的 BS Karaoke 人声分离模型均通过独立 ZIP 安装。模型可通过自动脚本下载：BS Karaoke 分离模型双击包内 `download-vocal-models.cmd`（Windows）或 `download-vocal-models.command`（macOS），输入 Y 确认开始下载；对齐模型双击包内 `download-align-models.cmd`（Windows）或 `download-align-models.command`（macOS），选择 NextFire、MMS_FA 或全部下载。也可手动把对应 Release 的 `bs-karaoke.zip`，解压到 vocal-models/，保留 ZIP 内的 bs-karaoke/ 目录，形成`vocal-models/bs-karaoke`，对齐模型同理下载 `NextFire-karaoke-ja-Latn.zip`、`MMS_FA.zip` 解压到程序根 `models/`，形成 `models/NextFire-karaoke-ja-Latn/` 和 `models/MMS_FA/`，然后在设置的人声分离/对齐模型管理中刷新。若配置了自定义总目录，请恢复默认或自行将模型移入该目录。下载脚本会跳过已存在的同名目录。
+主包已包含完整运行时、内置词典和默认的 Demucs 人声分离模型。对齐模型与可选的 BS Karaoke 主唱分离模型需要额外安装：
+- **自动下载脚本（推荐）**：
+  - 对齐模型：双击包内 `download-align-models.cmd`（Windows）或 `download-align-models.command`（macOS），按提示选择 `NextFire`、`MMS_FA` 或全部下载。
+  - BS Karaoke 分离模型：双击包内 `download-vocal-models.cmd`（Windows）或 `download-vocal-models.command`（macOS），输入 `Y` 确认下载。
+- **手动安装**：从对应 Release 下载 ZIP，保留压缩包内的模型目录直接解压即可——`bs-karaoke.zip` 解压为 `vocal-models/bs-karaoke/`，`NextFire-karaoke-ja-Latn.zip` 和 `MMS_FA.zip` 解压为 `models/NextFire-karaoke-ja-Latn/` 和 `models/MMS_FA/`，之后在设置中的人声分离/对齐模型管理页面点击刷新。如果修改过自定义模型总目录，请恢复默认或手动将模型目录移入自定义目录。下载脚本会自动跳过已存在的同名目录。
 
 使用支持 7z 的解压工具完整解压后打开其中的文件夹，双击启动入口运行。不要直接在压缩包内运行。
 - Windows 启动入口：`start.exe`。
@@ -108,28 +112,16 @@ Lazulite Studio 提供基于两个 Wav2Vec CTC 对齐模型的自动对齐功能
 ![应用截图](docs/images/file.png)
 ![应用截图](docs/images/project.png)
 
-## 开发与生产构建指南
+## 从源码运行与部署
 
-本节适用于希望对 Lazulite 进行开发，或希望在服务器部署并从异机访问的用户，监听外部端口时务必注意鉴权。
+如果希望参与开发，或在自己的机器/服务器上从源码运行，可以参考以下基本步骤（要求 Python 3.12+、Node.js 22、pnpm 10 与 `ffmpeg` / `ffprobe`）：
 
-### 环境
-
-- Python 3.12 或更高版本：Lazulite 子模块 的 `Requires-Python` 为 `>=3.12`。
-- Node.js 22.22.2：与仓库 `.node-version` 一致。
-- pnpm 10.30.3：与 `frontend/package.json` 的 `packageManager` 一致。可用 Corepack 执行 `corepack pnpm@10.30.3` 代替下列 `pnpm`。
-- FFmpeg 和 FFprobe：可从服务进程的 PATH 调用，负责媒体探测、解码及打包校验。
-
-### 克隆仓库
-
-仓库内包含 [Lazulite](https://github.com/wuchenyanmo/Lazulite) 子模块。
 ```sh
 git clone --recurse-submodules https://github.com/zet-wu/Lazulite-studio.git
+cd Lazulite-studio
 ```
-后续命令从仓库根目录运行。
 
-### 安装基础依赖
-
-macOS／Linux shell：
+安装后端与前端依赖（macOS / Linux，Windows PowerShell 命令见开发指南）：
 
 ```sh
 python3 -m venv server/.venv
@@ -138,119 +130,20 @@ python -m pip install -r server/requirements.txt
 pnpm --dir frontend install --frozen-lockfile
 ```
 
-Windows PowerShell：
-
-```powershell
-py -3 -m venv server/.venv
-& ./server/.venv/Scripts/Activate.ps1
-python -m pip install -r server/requirements.txt
-pnpm --dir frontend install --frozen-lockfile
-```
-
-虚拟环境创建用的 Python 须满足上述版本。PowerShell 若限制激活脚本，可直接用 `./server/.venv/Scripts/python.exe` 替代 `python` 执行后续命令。
-
-基础依赖包含 API、歌词获取、日文读音及媒体处理所需的 Python 库，Lazulite 基础服务从固定的 `vendor/Lazulite` Git 子模块构建安装。JmdictFurigana 数据随仓库交付，服务读取固定资源。人声分离和自动对齐使用下文可选运行时。
-
-开发运行时通过「注音词典」导入所需 ZIP；`STUDIO_DICTIONARIES_DIR` 可指定首次安装的默认包目录。词典保存在资料库的 `dictionaries/`，停止服务后可以直接编辑其中的文本内容；重启后按实际内容重建索引。相同版本号的修改包也可显式重新导入。
-
-### 开发运行
-
-终端一在仓库根目录激活虚拟环境，配置登录密码，启动服务端。
-
-macOS／Linux：
+分别在两个终端启动后端和前端：
 
 ```sh
+# 终端一：启动后端 API
 export STUDIO_PASSWORD='replace-with-your-password'
 python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --no-proxy-headers --reload --reload-dir server
-```
 
-Windows PowerShell：
-
-```powershell
-$env:STUDIO_PASSWORD='replace-with-your-password'
-python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --no-proxy-headers --reload --reload-dir server
-```
-
-终端二在仓库根目录启动前端：
-
-```sh
+# 终端二：启动前端开发服务器
 pnpm --dir frontend dev --host 127.0.0.1 --port 5173
 ```
 
-浏览器访问 `http://127.0.0.1:5173`，输入配置的密码。Vite 将 `/api` 代理至 `http://127.0.0.1:8000`。API 端口变化时，在启动前端的终端设置 `STUDIO_API_TARGET`，例如 `http://127.0.0.1:8100`。监听地址／端口可通过 Vite 的 `--host`／`--port` 和 Uvicorn 的同名参数配置；默认回环，端口占用时明确失败。
+浏览器访问 `http://127.0.0.1:5173`，输入上面设置的密码即可进入工作台。
 
-SSH 转发或自定义域名通过同一浏览器入口访问页面与相对 `/api` 路径。开发服务器允许自定义 Host。
-
-仅调试前端界面可运行 `pnpm --dir frontend dev:mock`，它在开发环境启动 MSW 模拟 API。
-
-### 便携包与模型资源构建
-
-`packaging/build.py` 在对应 Windows x64 或 macOS arm64 主机上装配主包，使用 `--target`、`--output` 和必填的 `--model-release-tag` 指定目标、仓库外输出目录及模型附件所属 Release。预览工作流要求该资源标签已发布并包含两份 ZIP；正式 Release 工作流将本次标签绑定到三个主包，并独立构建一次共享模型 ZIP，准备草稿后由维护者人工发布。
-
-`packaging/build_models.py --output <附件目录> --cache <下载缓存目录>` 按 `packaging/models.json` 生成 `NextFire-karaoke-ja-Latn.zip` 和 `MMS_FA.zip`。模型 ZIP 包含唯一顶层模型目录、原始权重、必要配置及来源／许可说明。
-
-### 生产构建与运行
-
-```sh
-pnpm --dir frontend build
-```
-
-产物位于 `frontend/dist`。配置 Web 服务器，以该目录为静态根目录，页面路由回退到 `index.html`，同源 `/api/` 请求转发至 API。API 在已激活虚拟环境的仓库根目录运行：
-
-```sh
-python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 --workers 1 --no-proxy-headers
-```
-
-服务继承进程环境中的 `STUDIO_PASSWORD` 和可选 `STUDIO_DATA_DIR`。密码模式使用密码登录、8 小时会话和写操作 CSRF token。受信网关模式设置 `STUDIO_TRUSTED_GATEWAY=true`，由部署者在前置网关实际配置认证，应用直接进入；普通反向代理本身不提供认证。任务队列、文件切换及下载锁由 API 进程管理，因此单个数据目录使用一个 API worker，由操作系统服务管理器维持进程生命周期。
-
-Web 服务器需要以下配置：
-
-| 项目 | 配置要求 |
-| --- | --- |
-| 页面 | 静态文件及 SPA `index.html` 回退 |
-| API | 保留 `/api/` 前缀转发至 Uvicorn |
-| Cookie／请求头 | 透传 cookie、CSRF、Range 及条件请求头 |
-| 上传 | 按实际部署配置代理请求体策略与磁盘空间；应用分块接收上传并执行格式校验 |
-| 超时 | 允许上传后的媒体探测／代理生成和较大工程包传输完成 |
-
-Cookie `Secure` 根据实际请求协议设置。HTTPS 在代理终止时，将 `--no-proxy-headers` 替换为 `--proxy-headers --forwarded-allow-ips <受信代理地址>`，并让代理覆盖 `X-Forwarded-Proto`；仅信任明确配置的代理，避免客户端伪造协议头。
-
-生产静态站点使用编译后的文件，`vite preview` 用于本机构建预览。前端 API 使用相对路径，同源代理是部署组成部分。
-
-### 可选人声与自动对齐
-
-人声分离：
-
-```sh
-python -m pip install -r server/requirements-vocal.txt
-```
-
-启动服务前，将 `STUDIO_VOCAL_MODELS_DIR` 设置为本地人声模型总目录的绝对路径，将 `STUDIO_VOCAL_DEVICE` 设置为 `cpu` 或 `cuda`（默认 `cpu`）：
-
-```sh
-export STUDIO_VOCAL_MODELS_DIR=/absolute/path/to/vocal-models
-export STUDIO_VOCAL_DEVICE=cpu
-```
-
-模型按以下直接子目录放置，可按需准备其中一种或两种：
-
-| 子目录 | 必需文件 |
-| --- | --- |
-| `demucs/` | `htdemucs.yaml` 及其引用的 `.th` 权重 |
-| `bs-karaoke/` | `bs_roformer_karaoke_frazer_becruily.ckpt` 和 `config_karaoke_frazer_becruily.yaml` |
-
-在设置“模型与计算”的“人声分离模型管理”中刷新并选择可用模型，初始默认 Demucs。BS Karaoke 提取主唱，支持 CPU 和 NVIDIA GPU；macOS 使用 CPU。开发／独立部署的人声模型总目录由环境变量管理，便携包则默认使用包内 `vocal-models/`，并可在设置中修改目录。
-
-仅配置 Demucs 时，也可通过 `STUDIO_DEMUCS_REPO` 直接指定包含配置和权重的目录；设置了 `STUDIO_VOCAL_MODELS_DIR` 后，以总目录下的 `demucs/` 为准。
-
-自动对齐：
-
-```sh
-python -m pip install -r server/requirements-alignment.txt
-```
-
-该文件包含人声依赖并引用 `constraints-alignment.txt` 的 Linux CUDA 设备栈约束。Windows/macOS 的 Torch／torchaudio 安装需选用相容的平台构建。
-
-准备本地 CTC 对齐模型目录，将模型放在总目录的直接子目录，并设置 `STUDIO_ALIGNMENT_MODELS_DIR` 为总目录绝对路径。NextFire 模型目录包含 `config.json`、`processor_config.json`、`vocab.json`、`model.safetensors` 等资源；MMS_FA 模型目录包含 `alignment-model.json` 和 `model.pt`。环境变量 `STUDIO_ALIGNMENT_DEVICE` 使用 `cpu` 或 `cuda`，默认 `cpu`。
-
-自动对齐需要新生成人声时，使用设置中当前选中的人声模型和 `STUDIO_VOCAL_DEVICE` 指定的设备；已有可用人声继续复用。切换模型影响后续新分离，需要重算时使用“重新分离”。设置页显示模型可用状态和缺失原因。
+更多面向开发者和运维的文档：
+- [开发与构建指南](docs/development.md)：Windows 命令、可选人声分离/自动对齐环境、便携包与模型资源构建、前端界面调试与翻译维护。
+- [生产部署指南](docs/deployment.md)：前端生产构建、单 worker 服务端启动、认证方式与反向代理/HTTPS 配置。
+- [项目架构说明](docs/architecture.md)：前后端模块划分、数据模型、编辑事务、媒体处理与测试分层。

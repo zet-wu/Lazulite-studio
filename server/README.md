@@ -1,87 +1,46 @@
 # Server 架构
 
-FastAPI 提供同源 `/api/v1` API，SQLite 管理项目、资源索引、修订、会话、幂等与任务，文件系统保存源音频、缓存、项目 JSON 和产物。`app:create_app` 是 Uvicorn factory 入口，配置和启动见[项目 README](../README.md)。服务以单 worker 维护进程内队列与锁，登录者共享项目库。
+服务端基于 FastAPI 提供同源 `/api/v1` 接口，以 SQLite 管理项目元数据、修订指针、会话、幂等与任务状态，文件系统保存源音频、修订快照、人声结果与词典数据。`server.app:create_app` 为 Uvicorn 入口，安装和部署方式见 [开发与构建指南](../docs/development.md) 与 [生产部署指南](../docs/deployment.md)。
+
+## 模块划分
 
 | 模块 | 职责 |
 | --- | --- |
-| `app.py`、`auth.py`、`upload.py` | 应用组合、会话／来源／CSRF、上传边界 |
-| `documents.py`、`project_document.py`、`revisions.py` | 文档边界统一建模与 TTML 树校验、不可变修订、CAS 保存与回收 |
-| `project_resources.py`、`project_deletion.py`、`project_storage.py` | 资源访问、删除事务、逻辑空间统计 |
-| `project_archive.py` | `.lazp` ZIP 校验、导入与导出 |
-| `studio/media.py`、`studio/media_lifetime.py` | FFmpeg／FFprobe、活动 PCM／峰值、页面租约与请求引用 |
-| `jobs.py`、`job_routes.py` | 持久任务、幂等启动、当前阶段、取消与产物生命周期 |
-| `vocals.py`、`vocal_process.py`、`vocal_worker.py`、`vocal_routes.py` | 独立进程人声分离、分析、音频复用、窗口及下载 |
-| `alignment_projection.py`、`alignment.py`、`alignment_worker.py` | 全局歌词投影、资源准备、受监管日语对齐 |
-| `reading.py`、`furigana.py` | 无状态日文读音快照与词典结构边界与分段 |
-| `dictionaries.py`、`dictionary_format.py` | 资料库词典安装、活动记录、实例租约及公开格式 v1 校验 |
-| `dictionary_engine.py`、`dictionary_routes.py` | 懒加载前缀索引、全局最优路径及可取消快照注音 |
-| `lyric_sources.py`、`embedded_lyrics.py` | 在线载荷与媒体内嵌歌词读取 |
-| `publish.py`、`publish_routes.py`、`packaging.py`、`publishing.py` | 快照绑定、歌词写入、媒体回读与下载 |
-| `time_units.py`、`amll_compatibility.py`、`karaoke.py` | 时间、输出投影与项目配置边界 |
+| `app.py`、`auth.py`、`upload_audio.py` | 路由装配、密码/网关认证、CSRF 校验与音频/视频上传规范化 |
+| `db.py`、`storage_paths.py`、`atomic_file.py` | SQLite（WAL）连接管理、项目级读写锁、相对路径校验与原子文件写入 |
+| `documents.py`、`project_document.py`、`revisions.py` | 写入边界 TTML/快照校验、不可变 JSON 修订读取与 CAS 保存/回收 |
+| `project_resources.py`、`project_deletion.py`、`music_replacement.py`、`project_storage.py` | Range 流式资源返回、项目删除隔离、音源原子替换与空间统计 |
+| `project_archive.py` | `.lazp` 工程归档导出与导入校验 |
+| `studio/media.py`、`studio/media_lifetime.py` | FFmpeg 解码、内存 PCM 代理、NumPy 波形峰值与页面租约回收 |
+| `jobs.py`、`job_routes.py`、`worker_process.py`、`process_supervisor.py`、`runtime_devices.py` | 单槽任务队列、子进程监督、内存事件取消与设备探测缓存 |
+| `vocals.py`、`vocal_audio.py`、`vocal_models.py`、`vocal_offset.py`、`vocal_worker.py`、`vocal_routes.py` | 人声分离与上传处理、偏移估算、声学分析与人声模型管理 |
+| `alignment.py`、`alignment_models.py`、`alignment_projection.py`、`alignment_postprocessing.py`、`alignment_worker.py` | CTC 对齐输入投影、模型目录管理、受监管子进程推理与尾点延长 |
+| `reading.py`、`furigana.py`、`dictionaries.py`、`dictionary_format.py`、`dictionary_engine.py`、`dictionary_cache.py`、`dictionary_routes.py` | Sudachi/JmdictFurigana 日文注音与助词分析、固定词典安装及压缩前缀树索引 |
+| `shape_conversion.py`、`shape_routes.py`、`generate_shapes.py` | OpenCC 多目标字形转换分析与词典资源生成 |
+| `lyric_sources.py`、`embedded_lyrics.py`、`search_conditions.py` | 在线歌词源抓取、内嵌歌词读取与源音频标签搜索条件 |
+| `publish.py`、`publish_routes.py`、`packaging.py`、`publishing.py`、`media_format.py` | 无持久化音乐文件打包（MP4 STPP / LRC、MP3 USLT、FLAC LYRICS）与回读校验 |
+| `portable.py`、`local_web.py`、`local_server.py`、`instance_lock.py`、`runtime_settings.py` | 本机便携运行入口、防重开锁、本地静态托管与资料库偏好 |
 
-## 持久化
+## 持久化与并发
 
-默认目录 `server/data-projects-v6` 可由 `STUDIO_DATA_DIR` 配置。每个项目独立持有 `source/original`、`cache`、`revisions` 和 `vocals`。临时上传在接收时计算一次资源摘要，完成探测及代理后，在创建或音源替换事务中归属项目。资源摘要用于缓存身份，相同文件可分别属于多个项目。
+- 数据目录默认为 `server/data-projects-v6`（可通过 `STUDIO_DATA_DIR` 覆盖），每个项目目录包含 `source/original`、`revisions/` 与 `vocals/`。
+- SQLite 数据库（版本 6）开启 WAL 模式，配合 `db.py` 提供的按项目粒度读写锁：媒体读取、修订读取与打包下载持有共享读锁，项目删除、音源替换与修订写入/回收持有独占写锁，耗时解码和文件操作均在短 DB 事务之外执行。
+- 写入 `PUT /document` 时在外部边界校验并规范化 TTML 与项目快照 v9，原子写入不可变 `revisions/{rev}.json` 并通过 `If-Match` CAS 更新当前指针；内部读取已落盘修订直接走快速反序列化。修订回收保留当前版本与活动任务引用的输入。
+- 项目删除先校验无活动任务并将目录移入 `.deleting/` 隔离，再清理数据库记录，异常时回移恢复；音源替换同样通过 `.replacing/` 日志保障崩溃回滚。
 
-项目快照 v9 通过文档 envelope v9 传输，歌词为 draft TTML，资源数据库版本为 6。RevisionStore 原子写文件后比较并交换当前 revision；幂等提交响应保存原修订身份，响应与发布均复用本次处理结果；回收只保留当前版本与活动任务实际使用的输入；SQLite 事务保护选取至读完文件的过程，取消请求保持输入至工作进程退出。删除项目先检查任务并隔离目录，失败回移，启动按数据库状态恢复。归档 v1 在写入／解包流中计算摘要，导入验证后复用摘要并创建新项目、校验引用；空间接口按项目实际文件统计五类逻辑字节。
+## 媒体、人声与自动对齐
 
-## 模型与媒体
+- **原曲内存代理**：原曲按需解码为 48 kHz 双声道 int16 PCM 与多级波形峰值，全部驻留内存供 `/audio`、`/waveform`、`/pcm` 复用。页面通过 `media-users/{page_id}` 续租，最后一个页面和在途请求释放后自动回收内存。
+- **视频上传处理**：`upload_audio.py` 对视频上传提取第一条音轨，优先无损重封装，若容器时间轴不一致则回退为 24-bit FLAC，并校验解码后的播放时间轴一致。
+- **人声与对齐**：人声统一编码为 M4A（AAC-LC）并记录有效采样帧数；`vocals.py` 复用单次 `build_activity_profile` 计算人声能量与片段。对齐与人声分离都在独立子进程中执行，设备探测结果在锁外按首选设备去重并缓存，取消状态通过内存 `Event` 即时通知。
 
-Lazulite 源码位于仓库根目录的固定 Git 子模块 `vendor/Lazulite`，基础安装从仓库根目录读取 requirements。`STUDIO_VOCAL_MODEL` 默认 `htdemucs`，`STUDIO_VOCAL_DEVICE` 默认 `cpu`；自动对齐首次分离使用 `htdemucs`。`STUDIO_ALIGNMENT_MODELS_DIR` 提供对齐模型总目录，直接子目录支持 HF Wav2Vec2 CTC 和带 `alignment-model.json` 声明的 TorchAudio MMS_FA，`STUDIO_ALIGNMENT_DEVICE` 默认 `cpu`。模型可用性检查读取配置，计算由任务子进程执行。
+## 注音、词典与字形
 
-人声以 44.1 kHz 双声道 float32 输入 Demucs，按整曲峰值处理后保存 AAC-LC／M4A，目标码率 192 kbit/s，保留输出采样率。M4A edit list 处理编码起始延迟，movie timescale 与采样率一致；元数据分别记录有效帧数、实际解码帧数和尾部填充。播放、首次分析、重新分析及对齐统一读取压缩成果解码后的 int16 PCM；分析按需转 float32。能量保存 `main_rms`，核心片段和配置保存于独立分析记录。每条记录以 `audio_result_id` 引用音频所有者，重新分析复用 M4A；下载返回 `audio/mp4` 的 `vocals.m4a`。成果可用性核对文件字节数及容器的编码、采样率、声道与有效时间范围，探测按文件状态复用。编码与首次解码成功后登记成果；已注册分析与音频保留至项目删除。
+- **日文注音与助词**：`reading.py` 复用 Sudachi 与按需懒加载的 JmdictFurigana 索引，提供整行读音分段与 `は`/`へ` 助词识别；第三方词典来源与许可见 [vendor/README.md](vendor/README.md)。
+- **固定词典**：词典安装时在临时目录完成公开格式 v1 校验与压缩前缀树构建，原子发布后生效，最多保留两份活动内存索引，并在 `dictionaries/.indexes/` 维护受文件锁保护的运行期磁盘缓存（服务退出自动清理）。分析接口支持 NDJSON 流式进度（`stream=true`）。
+- **字形转换**：`shape_conversion.py` 调用原生 OpenCC 输出歧义候选，返回逐字素转换结果与 UTF-16 范围。
 
-原曲以 48 kHz 双声道 int16 PCM 保存在活动期内存，播放 Range、PCM 窗口和 16 级峰值共享同一解码结果，冷请求合并。页面每 30 秒续租，180 秒过期；正常离开主动解除登记，每 30 秒检查过期页。最后一个页面和在途请求释放后回收 PCM／峰值，暂停和失焦保持登记。服务启动、尚无读取者时清理项目 cache 内原曲 WAV 与 peaks-v1 派生目录。空间统计按持久文件逻辑字节计算。人声播放与窗口保持原采样率，能量通过 mmap 分桶读取。
+## 媒体打包与本机便携模式
 
-读音接口接收当前行文本并返回 code point 范围。Sudachi C、A 细分与 JmdictFurigana 精确分段共用整行读音；词典按结构加载，同结构数据可替换，索引按进程缓存。来源及许可见 [vendor](vendor/README.md)。
-
-`/api/v1/reading/particles` 复用 Sudachi SplitMode.C，返回整行「は／へ」助词的码点范围与临时读音。自动对齐在输入准备前仅转换正文来源，显式 ruby 读音保留；预览凭据绑定助词开关，执行与 CPU 重试沿用任务快照。音译前端以同一接口结果准备 WanaKana 输入，并保持原来源对象、时间和展示文字。
-
-固定词典由 `/api/v1/reading/dictionaries` 管理。选择 ZIP 时仅读取目录与必要元数据；确认后在临时目录中一次校验词条并建索引，原子发布成功后更新缓存，失败保留旧实例和缓存。每次安装及服务启动分配新的实例身份；请求绑定实例，更新和移除保留进行中请求所需的旧目录，文件占用导致的清理延后会在管理界面报告。活动记录原子写入，默认包的首次安装和明确移除随资料库保存。索引采用压缩前缀树与紧凑候选数据，按安装实例保留最多两份 LRU 活动内存索引，安装成功后接管本次构建的索引；内存未命中时优先恢复本次运行的编译索引缓存；基础成本或包内整数成本参与整行动态规划，最佳路径中无法一致确定的最小正文范围返回歧义。API 用 code point 范围，字素边界与固定单元由格式契约约束。
-
-`STUDIO_DICTIONARIES_DIR` 指定默认 ZIP 目录；便携启动指向 `resources/dictionaries`。`packaging/dictionaries.json` 选择公开 Release，打包时下载所列资产并使用相同格式校验。词典来源与许可随 ZIP 保存，完整词典可在离线目标机首次安装。用户编辑后的合法内容按实际文件读取，项目只保存最终 Ruby 单元。
-
-## 输出与接口
-
-TTML 草稿保存保留待修正时间与 Studio 身份，发布阶段检查实际目标格式。MP4/M4A 的 STPP 与歌词标签、MP3 的 USLT、FLAC 的 LYRICS 写入独立副本，回读检查音频 packet hash、原有媒体数据、非目标轨道与标签。成功报告通过后开放下载；替换产物保留任务记录，文件占用时延后重试清理。
-
-服务接收稳定 ID、revision 与业务参数，资源路径与模型配置由服务构造。密码模式结合 8 小时会话 cookie 与 CSRF；Cookie Secure 依据请求协议，代理协议头由 Uvicorn 显式信任地址配置处理。接口字段见[契约](../contracts/README.md)，跨模块行为见[项目架构](../docs/architecture.md)。
-
-
-## 本机便携运行
-
-`python -m server.portable --root <完整包目录>` 只绑定 `127.0.0.1`，默认端口 15173，提供生产前端与 API 同源入口。运行模式为 local，免口令，监听回环作为本机入口边界；请求 Host 与 Origin 可随转发地址变化。该模式的可访问边界由监听和部署入口决定。私人部署继续使用上述密码／网关入口；本机模式不继承宿主设备设置。启动器在初始化／清理前取得 OS 文件锁，重复启动通过 nonce、资料库 ID、目录和端口握手。仅在 readiness 成功后打开浏览器。
-
-便携包 `data/projects` 保存 SQLite 与项目树，`data/settings.json` 保存资料库身份及长期偏好；偏好 API 为 `GET/PATCH /api/v1/settings`，PATCH 需要 `If-Match` 并只修改提交字段。数据库为 v6，资源路径只记录相对数据根的 POSIX 路径；启动清理前验证归属、缺失修订及符号链接。项目 v9／歌词 v10／文档 v9／工程包 v1。
-
-服务只打开当前 v6 数据库；不支持的版本在写入前明确拒绝。移动整个便携目录保留 library ID；复制为另一独立库时停服执行 `python -m server.portable --root <副本> --new-library-id`。
-
-分离／对齐设备在任务开始时探测并固定进请求；GPU 不可用可在准备阶段选 CPU，GPU 计算失败不自动重跑。`POST /api/v1/jobs/{id}/retry-cpu` 仅接受可归因设备的失败及原 revision，创建新任务；长期偏好不变。`STUDIO_DEMUCS_REPO` 指向完整本地 htdemucs 仓库，本机包强制离线模型路径。分离复用身份不含安装路径或计算设备。
-
-停服先拒绝新任务、取消排队、请求运行任务停止，再在宽限后回收模型及 FFmpeg 进程树。POSIX 使用独立进程组；Windows 使用 kill-on-close Job Object。轮换日志为 5 MiB × 3 份备份，常规日志省略模型原始输出和 traceback，不自动上传。
-
-卡拉数据模型允许空分组列表；导唱默认值由文字和三个阈值组成，标准组角色由 ID 决定。歌手集合配置含必需 `skip`，与项目 v9 快照一同通过保存及归档往返。源音频标签接口 `GET /api/v1/projects/{pid}/source-metadata` 复用创建项目标签解析，返回当前 `asset_id` 与 `title`／`artist`／`album`，获取页由调用方明确保存搜索条件；歌词元数据窗口通过 `tags_only=true` 读取纯标签，空标题保持为空。标签失败返回对象级错误说明。
-
-
-### 固定词典索引生命周期
-
-`dictionary_cache.py` 在资料库 `dictionaries/.indexes/run-*` 独立临时目录中保存 marshal 普通数据：压缩前缀树边、终端成本、候选字节及元数据。恢复只解码并还原 Entry 对象。构建成功后完整写临时文件再发布，淘汰内存时无需写盘。内存命中和磁盘恢复更新最近使用时间；磁盘闲置 30 分钟后不可复用，在词典操作时清理。过期不会驱逐仍可用的内存索引。
-
-管理器锁只保护实例、租约、LRU 和正在加载的 Future。最多两个工作线程在锁外构建／恢复，同实例请求共享加载；单个请求取消只释放自己的等待和租约。加载任务另持目录租约，替换／移除后的结果只交给已持有旧实例的请求，发布前重新确认身份。缓存读写故障记录服务日志，恢复失败重新校验当前源词典；安装发布失败保留原词典。
-
-运行目录由操作系统文件锁保护，启动时串行清理失去锁所有者的遗留目录，服务退出等待加载工作结束并清理自己的缓存。每次启动重新分配实例和运行目录，首次使用按当前安装文本构建。两份活动索引是数量上限；进行中的请求、序列化和恢复可能额外持有对象。
-
-分析接口的 `stream=true` 以 NDJSON 发送 `loading`、`analyzing` 阶段及最终结果或错误，界面据此显示等待状态；原 JSON 调用继续返回完整分析结果。日文资源保持独立的进程缓存。
-
-`shape_conversion.py` 通过原生 OpenCC 1.4.2 的歧义输出分析四目标字形转换。`shape_routes.py` 接收显式行快照、限制并行请求并取消断开请求；整批使用唯一非汉字边界隔离行，返回完整字素及 UTF-16 范围。`python -m server.generate_shapes` 从固定 wheel 生成 `vendor/opencc-shapes` 资源和日文筛选明细。混合来源按实际词条键合并；来源默认冲突留空，中间歧义贯穿目标转换。资源随代码和便携包分发。
-
-文档校验在修订写入前执行，422 拒绝不会推进修订。可定位的编辑引用与声学校验错误提供 `reason`、`params`，参数包含对象身份；请求字段错误提供字段路径与校验原因。
-
-项目声学快照校验区间与分析归属，允许手工端点超过源音频时长。自动对齐读取新分析时按源范围求交，解码取样再与实际 PCM 范围求交；人工快照保留原时间。
-
-`music_replacement.py` 在任务启动共用的 SQLite 写事务中核对 revision、源身份和活动任务，切换暂存目录及声学为空的新修订。`.replacing` 日志支持启动回滚与提交后清理；清理失败由项目状态报告并提供重试入口。每次主动上传使用新资产身份，幂等重试复用原结果。旧声学、任务、历史修订及源文件随成功替换回收。
-
-
-模型管理窗口轻量扫描直接子目录，显示结构状态；对齐窗口明确选择模型并预览 Ruby 优先、正文回退的实际输入。拉丁归一化默认开启、末尾调号数字删除默认关闭，两项参数与模型文件大小/修改时间一起冻结到任务。CPU 重试沿用该快照，模型替换后需重新发起。MMS_FA 在既有日语样本中存在尾点偏早限制。
-
-便携包默认从包根 `models/` 读取对齐模型，`vocal-models/demucs/` 读取人声分离模型。模型管理窗口可应用绝对路径，保存于 `data/settings.json` 的 `alignment.models_dir`；恢复默认后随包移动动态解析。服务端通过环境变量分别配置对齐总目录和 `STUDIO_DEMUCS_REPO`。MMS_FA 子目录声明示例：`{"type":"torchaudio-mms-fa","weights":"model.pt"}`，权重使用原始 MMS_FA 检查点。包内 Python 安装 uroman 1.3.1.1 及其数据/许可，离线冒烟检查实际转写。
+- **媒体打包**：`POST /projects/{pid}/packaging/download` 按指定已保存修订实时将歌词写入临时副本并返回流式下载，响应结束后自动清理临时目录。MP4/M4A 支持新增或覆盖 STPP 轨道并可选写入兼容 LRC，MP3 写入 USLT，FLAC 写入 LYRICS；`packaging.py` 在写入完成后执行单遍音频数据包、原媒体箱体与标签/歌词回读校验。
+- **本机便携运行**：`python -m server.portable --root <目录>` 仅监听 `127.0.0.1`（默认端口 15173），免密码同源托管 `frontend/dist` 与 API，使用文件锁防止重复启动，并通过相对路径管理 `data/projects` 与 `data/settings.json`。复制便携目录为新资料库时，可在停服后执行 `--new-library-id` 重新生成库 ID。

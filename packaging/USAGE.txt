@@ -1,47 +1,39 @@
 Lazulite Studio 本地打包版
 
-解压与启动
-下载适合系统的 7z 包，使用支持 7z 的解压工具完整解压后打开其中的文件夹，双击启动入口运行。不要直接在压缩包内运行。
-分卷包需下载全部 .7z.001、.7z.002 等文件，放在同一目录，从 .7z.001 开始解压；不要逐卷解压。
-Windows 启动入口：start.exe。
-macOS 启动脚本：start.command。
-保留终端窗口，浏览器会在服务就绪后打开，或者手动访问 http://127.0.0.1:15173 。Ctrl+C 停止服务。
+一、解压与启动
+1. 下载对应系统的 7z 包，使用支持 7z 的工具完整解压到任意目录（不要直接在压缩包内运行）。
+   如果是分卷包，请将全部 .7z.001、.7z.002 等文件放在同一文件夹，从 .7z.001 开始解压。
+2. 双击启动程序：
+   - Windows：start.exe
+   - macOS：start.command
+3. 保持终端窗口开启，服务就绪后会自动打开浏览器；也可手动访问 http://127.0.0.1:15173 。在终端按 Ctrl+C 停止服务。
 
-使用
-新建项目、导入音频、编辑保存并重开；试用分离、日语对齐时，可在设置中核对实际设备。
-无需另装 Python、Node、FFmpeg 或 CUDA Toolkit；下载对齐模型、BS Karaoke 模型和在线歌词搜索需要网络；模型安装完成后，人声分离和自动对齐可在本地离线运行。
-CUDA 版需要兼容 NVIDIA 驱动；GPU 不可用时可选择 CPU，计算失败不会自动重跑。
-Mac 版未经开发者签名和公证；首次打开可能受系统安全策略限制，请核对来源并按系统提示处理。
+二、使用说明
+- 程序已内置完整运行环境、内置词典和默认 Demucs 人声分离模型，无需额外安装 Python、Node.js、FFmpeg 或 CUDA Toolkit。
+- 下载可选模型和在线搜索歌词需要联网；模型下载完成后，人声分离与自动对齐均可离线运行。
+- Windows CUDA 版需要兼容的 NVIDIA 显卡驱动；如 GPU 不可用，可在设置中改选 CPU。
+- macOS 版未做开发者签名与公证，首次打开如遇系统拦截，请在「系统设置 → 隐私与安全性」中允许运行。
+- 项目数据与设置保存在程序目录下的 data/，运行日志保存在 logs/。
 
-数据与更新
-data 保存项目和设置，logs 保存日志。
+三、安装可选模型
+以下目录均相对于解压后的程序根目录。
 
-模型下载与安装
-主包包含完整运行时、词典和默认的 Demucs 人声分离模型。对齐模型与可选的 BS Karaoke 主唱模型通过独立 ZIP 安装。
-以下目录均相对于解压后的程序包根目录。
-
-对齐模型
-Windows 双击 download-align-models.cmd；macOS 双击 download-align-models.command。
-按菜单选择 NextFire-karaoke-ja-Latn、MMS_FA 或全部下载，输入 0 退出。模型安装到包内 models/。
-手动安装：下载对应 Release 的 NextFire-karaoke-ja-Latn.zip／MMS_FA.zip，解压到 models/，保留 ZIP 内的模型目录，形成：
+1. 对齐模型（NextFire / MMS_FA）
+- 自动下载：Windows 双击 download-align-models.cmd，macOS 双击 download-align-models.command，按菜单选择模型即可，下载完成后位于 models/。
+- 手动安装：下载对应 Release 中的 NextFire-karaoke-ja-Latn.zip 或 MMS_FA.zip，保留压缩包内的模型目录直接解压到 models/，形成：
   models/NextFire-karaoke-ja-Latn/
   models/MMS_FA/
-安装后，在设置“模型与计算”的“对齐模型管理”中刷新，再在自动对齐时选择模型。
-MMS_FA 的 ZIP 已包含 alignment-model.json 及配套权重，无需手动编写配置。该模型在已测日语歌曲上有结束时间偏早现象，可结合“智能延长结束时间”选项使用。
+- 安装后在设置「模型与计算 → 对齐模型管理」中点击刷新即可选用。MMS_FA 通用模型在部分歌曲上结束时间可能偏早，建议配合「智能延长结束时间」选项使用。
 
-人声分离模型
-Demucs 随主包提供，位于 vocal-models/demucs/，可直接使用。
-下载 BS Karaoke：Windows 双击 download-vocal-models.cmd；macOS 双击 download-vocal-models.command。
-脚本直接询问是否下载并安装 BS Karaoke，输入 Y 开始，输入 N 退出，大小写均可。模型安装到 vocal-models/bs-karaoke/。
-手动安装：下载对应 Release 的 bs-karaoke.zip，解压到 vocal-models/，保留 ZIP 内的 bs-karaoke/ 目录，形成：
+2. BS Karaoke 主唱分离模型
+- 默认已内置 Demucs（位于 vocal-models/demucs/）。如需更好的和声与背景人声分离效果，可额外安装 BS Karaoke（较耗时，不建议仅用 CPU 推理；macOS 版使用 CPU）。
+- 自动下载：Windows 双击 download-vocal-models.cmd，macOS 双击 download-vocal-models.command，输入 Y 开始下载，完成后位于 vocal-models/bs-karaoke/。
+- 手动安装：下载 bs-karaoke.zip，保留压缩包内的 bs-karaoke/ 目录解压到 vocal-models/，形成：
   vocal-models/bs-karaoke/bs_roformer_karaoke_frazer_becruily.ckpt
   vocal-models/bs-karaoke/config_karaoke_frazer_becruily.yaml
-安装后，在设置“模型与计算”的“人声分离模型管理”中刷新并选择 BS Karaoke。安装脚本不会自动切换当前模型。
-BS Karaoke 提取主唱，支持 CPU 和 NVIDIA GPU；macOS 用户选择 CPU。
-切换模型影响新的分离，已有音频可继续复用。需要按当前模型重新计算时，使用音频处理菜单中的“重新分离”；“重新分析”继续分析原有音频。
+- 安装后在设置「模型与计算 → 人声分离模型管理」中刷新并手动切换模型。切换模型只影响后续新分离，已有音频可继续复用，如需按新模型重算请使用「重新分离」。
 
-目录与重试
-两个下载脚本都安装到当前程序包，目标目录不存在或为空时可安装；同名非空目录会被跳过，脚本不会检查或覆盖其中的模型。若目录内容不完整，请先自行移走该目录，再运行脚本重试。
-下载过程中可按 Ctrl+C 取消。失败或取消只清理本次下载的临时内容，已安装模型保留；可重新运行脚本重试。临时内容位于包内 tmp/。
-两类模型总目录均可在对应模型管理中修改、恢复默认和刷新。默认目录随整包移动重新解析。
-脚本不修改自定义目录设置；使用自定义总目录时，可恢复默认目录，或自行将下载后的模型子目录移入所选总目录，再刷新。
+四、下载脚本注意事项
+- 若目标模型目录已存在且非空，脚本会自动跳过；若目录内容损坏，请先手动移走该目录再重试。
+- 下载过程中按 Ctrl+C 取消或失败时，会自动清理 tmp/ 中的临时文件，不影响已安装的模型。
+- 如果在设置中修改过自定义模型总目录，请恢复默认，或将下载后的模型子目录移入你的自定义目录后再刷新。
