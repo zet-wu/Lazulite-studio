@@ -111,7 +111,7 @@ class PreferencePatch(BaseModel):
     changes: dict[str, str | None]
 
 
-def settings_router(settings, *, auth, write):
+def settings_router(settings, *, auth, write, on_change=None):
     from fastapi.responses import JSONResponse
     router = APIRouter()
     def response(value):
@@ -125,7 +125,10 @@ def settings_router(settings, *, auth, write):
     def patch_settings(body: PreferencePatch, if_match: str = Header(), _=Depends(write)):
         try:
             if not re.fullmatch(r'"\d+"', if_match): raise ValueError('需要偏好版本 ETag')
-            return response(settings.patch(body.changes, int(if_match.strip('"'))))
+            updated = settings.patch(body.changes, int(if_match.strip('"')))
+            if on_change is not None:
+                on_change()
+            return response(updated)
         except SettingsConflict:
             raise HTTPException(409, {'code': 'settings_conflict', 'message': '偏好已在另一页面修改，请刷新后重试', 'retryable': True})
         except ValueError as exc:

@@ -5,7 +5,7 @@ from .runtime_devices import DeviceFailure
 from pathlib import Path
 from .db import Database
 from .engine import EngineUnavailable
-from .vocal_process import PREFIX
+from .worker_process import PREFIX
 from .vocals import VocalRunner, VocalCancelled
 
 

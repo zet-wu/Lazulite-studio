@@ -64,17 +64,24 @@ class VocalModels(AlignmentModels):
                 **({'configuration_yaml':(path / BS_FILES[1]).read_text()} if kind == 'bs-karaoke' else {})}
 
     def scan(self, refresh=False):
-        items=[]
-        for kind, name, target in [('demucs','Demucs','vocals'), ('bs-karaoke','BS Karaoke','lead')]:
-            item={'id':kind, 'type':kind, 'name':name, 'target':target}
-            try:
-                self.describe(kind)
-                item['status']='ready'
-            except (OSError, ValueError, KeyError, TypeError) as exc:
-                item.update(status='invalid', reason=self.scan_error(exc,self.directory()))
-            items.append(item)
-        return {'directory':str(self.directory() or ''), 'editable':self.package_root is not None,
-                'source':'portable' if self.package_root else 'environment', 'items':items, 'error':None}
+        with self.lock:
+            root = self.directory()
+            cache_key = (str(root or ''), os.getenv('STUDIO_DEMUCS_REPO', ''))
+            if not refresh and self.catalog is not None and getattr(self, '_scan_key', None) == cache_key:
+                return self.catalog
+            items = []
+            for kind, name, target in [('demucs', 'Demucs', 'vocals'), ('bs-karaoke', 'BS Karaoke', 'lead')]:
+                item = {'id': kind, 'type': kind, 'name': name, 'target': target}
+                try:
+                    self.describe(kind)
+                    item['status'] = 'ready'
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    item.update(status='invalid', reason=self.scan_error(exc, root))
+                items.append(item)
+            self._scan_key = cache_key
+            self.catalog = {'directory': str(root or ''), 'editable': self.package_root is not None,
+                            'source': 'portable' if self.package_root else 'environment', 'items': items, 'error': None}
+            return self.catalog
 
     def apply(self, path):
         if self.package_root is None: raise ValueError('服务端目录由部署配置管理')

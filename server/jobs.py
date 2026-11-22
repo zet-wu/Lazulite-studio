@@ -1,9 +1,7 @@
 from __future__ import annotations
 import json, threading, uuid, logging
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from typing import Any
 
 from .db import Database
 from .engine import EngineUnavailable
@@ -26,6 +24,7 @@ class JobService:
         self.devices = devices or RuntimeDevices()
         self._closing = False
         self._closed = False
+        self._cancel_events: dict[str, threading.Event] = {}
         self._lock = threading.RLock(); self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="studio-job")
         with db.transaction() as c:
             rows = c.execute("SELECT id FROM jobs WHERE status IN ('queued','running','cancel_requested')").fetchall()
@@ -35,7 +34,12 @@ class JobService:
         self.revisions.recover()
 
     def create(self, project_id, kind, request, *, idem_key=None, subject="local"):
+        if kind not in {'vocal', 'alignment'}:
+            raise ValueError("不支持此任务类别")
         digest=json.dumps([subject, kind, request],sort_keys=True,separators=(",",":"),ensure_ascii=False)
+        need_devices = not (request.get('upload_id') or request.get('retry_analysis_id') or (kind == 'vocal' and request.get('_reuse_vocal_id')))
+        skip_vocal = bool(request.get('_reuse_vocal_id') or request.get('_has_vocal'))
+        devices_snapshot = self.devices.snapshot(kind, cpu_retry=request.get('cpu_retry', False), skip_vocal=skip_vocal) if need_devices else {}
         with self._lock, self.db.transaction() as c:
             if self._closing: raise ValueError("服务正在停止，不再接受任务")
             if idem_key:
@@ -43,9 +47,8 @@ class JobService:
                 if old:
                     if old[0]!=digest: raise ValueError("idempotency key was used for another request")
                     return self.get(old[1])
-            if kind in {'vocal', 'alignment'}:
-                source = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (project_id,)).fetchone()
-                if not source or source[0] != request.get('asset_id'): raise ValueError('源音频已改变，请重新发起任务')
+            source = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (project_id,)).fetchone()
+            if not source or source[0] != request.get('asset_id'): raise ValueError('源音频已改变，请重新发起任务')
             if kind == 'alignment':
                 revision = request.get('revision')
                 if not c.execute('SELECT 1 FROM revisions WHERE id=? AND project_id=?', (revision, project_id)).fetchone():
@@ -54,17 +57,15 @@ class JobService:
                 revision = request.get('revision', request.get('bound_revision'))
                 current = c.execute('SELECT current_revision FROM projects WHERE id=?', (project_id,)).fetchone()
                 if not current or current[0] != revision: raise ValueError('项目版本已改变，请重新发起任务')
-            if kind in {'vocal', 'alignment'}:
-                active = c.execute("SELECT id,kind FROM jobs WHERE project_id=? AND kind IN ('vocal','alignment') AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone()
-                if active and (kind != 'vocal' or active['kind'] != 'vocal'): raise ValueError('已有音频处理运行，请等待完成或取消')
-                if active:
-                    if request.get('upload_id'): raise ValueError('已有音频处理运行，请等待完成或取消')
-                    return self.get(active[0])
-            if kind in {'vocal','alignment'}:
-                request['devices'] = {} if request.get('upload_id') or request.get('retry_analysis_id') else self.devices.snapshot(kind, cpu_retry=request.get('cpu_retry', False))
-                if kind == 'vocal' and request['devices']: request['device'] = request['devices']['vocal']['actual']
-                if request.get('_vocal_model', {}).get('type') == 'bs-karaoke' and request['devices']['vocal']['actual'] not in {'cpu','cuda'}:
-                    raise ValueError('BS Karaoke 当前支持 CPU 或 NVIDIA GPU，请选择 CPU 或其他模型')
+            active = c.execute("SELECT id,kind FROM jobs WHERE project_id=? AND kind IN ('vocal','alignment') AND status IN ('queued','running','cancel_requested')", (project_id,)).fetchone()
+            if active and (kind != 'vocal' or active['kind'] != 'vocal'): raise ValueError('已有音频处理运行，请等待完成或取消')
+            if active:
+                if request.get('upload_id'): raise ValueError('已有音频处理运行，请等待完成或取消')
+                return self.get(active[0])
+            request['devices'] = devices_snapshot
+            if kind == 'vocal' and request['devices']: request['device'] = request['devices']['vocal']['actual']
+            if request.get('_vocal_model', {}).get('type') == 'bs-karaoke' and request['devices']['vocal']['actual'] not in {'cpu','cuda'}:
+                raise ValueError('BS Karaoke 当前支持 CPU 或 NVIDIA GPU，请选择 CPU 或其他模型')
             jid=uuid.uuid4().hex; t=now()
             if request.get('_upload_path'):
                 import shutil
@@ -76,16 +77,22 @@ class JobService:
             c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",(jid,project_id,kind,"queued",json.dumps(request, ensure_ascii=False),t,t))
 
             if idem_key: c.execute("INSERT INTO job_idempotency VALUES(?,?,?,?)",(project_id,idem_key,digest,jid))
+            self._cancel_events[jid] = threading.Event()
         with self._lock:
             if not self._closing: self._pool.submit(self._run,jid)
         return self.get(jid)
 
     def _run(self,jid):
         with self._lock, self.db.transaction() as c:
-            if self._closing: return
+            if self._closing:
+                self._cancel_events.pop(jid, None)
+                return
             row=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
-            if not row or row[3] != "queued": return
+            if not row or row[3] != "queued":
+                self._cancel_events.pop(jid, None)
+                return
             t=now(); c.execute("UPDATE jobs SET status='running',started_at=?,updated_at=? WHERE id=?",(t,t,jid))
+            cancel_event = self._cancel_events.setdefault(jid, threading.Event())
         record = None
         kind = None
         result = None
@@ -95,32 +102,31 @@ class JobService:
             request=json.loads(record[4]); kind=record[2]
             if kind in {'vocal', 'alignment'}:
                 self.emit(jid, 'stage', 'preparing')
-                with self.db.transaction() as c:
-                    c.execute('UPDATE jobs SET request_json=? WHERE id=?', (json.dumps(request), jid))
                 for snapshot in request['devices'].values():
                     if not snapshot.get('runtime_ok', True): raise EngineUnavailable(snapshot['reason'])
-                if self.get(jid)['status'] == 'cancel_requested': raise VocalCancelled()
+                if cancel_event.is_set(): raise VocalCancelled()
             if kind == "vocal":
                 result = self.vocal_runner.run(record[1], self.asset_path(record[1]), request, jid,
-                    lambda *x: self.emit(jid, *x), lambda: self.get(jid)['status'] == 'cancel_requested')
+                    lambda *x: self.emit(jid, *x), cancel_event.is_set)
             elif kind == "alignment":
                 result = self.alignment_runner.run(record[1], self.asset_path(record[1]), request, jid,
-                    lambda *x: self.emit(jid, *x), lambda: self.get(jid)["status"] == "cancel_requested")
+                    lambda *x: self.emit(jid, *x), cancel_event.is_set)
             else:
                 raise ValueError("不支持此任务类别")
-            if kind != "vocal":
+            if kind == "alignment":
                 with self.db.connect() as c:
                     project = c.execute("SELECT source_asset_id,current_revision FROM projects WHERE id=?", (record[1],)).fetchone()
                     bound_revision = request.get("revision")
                     bound_asset = request.get("asset_id")
-                    if kind == "alignment" and (project is None or project["current_revision"] != bound_revision or project["source_asset_id"] != bound_asset): raise ValueError("项目版本或源音频已改变，请重新运行")
+                    if project is None or project["current_revision"] != bound_revision or project["source_asset_id"] != bound_asset:
+                        raise ValueError("项目版本或源音频已改变，请重新运行")
                     if not c.execute("SELECT 1 FROM revisions WHERE id=? AND project_id=?", (bound_revision, record[1])).fetchone():
                         raise RuntimeError("bound revision disappeared")
                 result["binding"] = {"project_id": record[1], "asset_id": bound_asset,
                                      "revision": bound_revision}
             with self._lock, self.db.transaction() as c:
                 cancelled = c.execute('SELECT cancel_requested FROM jobs WHERE id=?', (jid,)).fetchone()
-                if kind in {'vocal', 'alignment'} and cancelled[0]:
+                if cancelled[0]:
                     t = now()
                     c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=? WHERE id=?", (t,t,jid))
 
@@ -139,6 +145,8 @@ class JobService:
             self._finish_error(jid, "engine_error", str(exc) if kind == "alignment" or kind == "vocal" and isinstance(exc, ValueError) else "Lazulite engine failed; inspect server logs")
 
         finally:
+            with self._lock:
+                self._cancel_events.pop(jid, None)
             if record and record[2] in {'vocal','alignment'}:
                 try: self.vocal_runner.clean_unregistered(record[1], jid)
                 except OSError: logger.warning('未注册人声文件清理待重试：%s', jid)
@@ -162,14 +170,18 @@ class JobService:
                 c.execute("UPDATE jobs SET stage=?,updated_at=? WHERE id=? AND status IN ('running','cancel_requested')", (stage, now(), jid))
 
     def cancel(self,jid):
-        with self.db.transaction() as c:
+        with self._lock, self.db.transaction() as c:
             row=c.execute("SELECT status,project_id FROM jobs WHERE id=?",(jid,)).fetchone()
             if not row: return None
             if row[0]=="queued": status="cancelled"
             elif row[0]=="running": status="cancel_requested"
             else: return self.get(jid)
             t=now(); c.execute("UPDATE jobs SET status=?,cancel_requested=1,updated_at=?,finished_at=? WHERE id=?",(status,t,t if status=="cancelled" else None,jid))
+            if ev := self._cancel_events.get(jid):
+                ev.set()
         if status == "cancelled":
+            with self._lock:
+                self._cancel_events.pop(jid, None)
             if self.vocal_runner: self.vocal_runner.clean_unregistered(row[1], jid)
             self.revisions.collect(row[1])
         return self.get(jid)
@@ -195,6 +207,8 @@ class JobService:
         with self._lock:
             if self._closing: return
             self._closing = True
+            for ev in self._cancel_events.values():
+                ev.set()
             with self.db.transaction() as c:
                 for row in c.execute("SELECT id,status FROM jobs WHERE status IN ('queued','running','cancel_requested')").fetchall():
                     state = 'cancelled' if row['status'] == 'queued' else 'cancel_requested'

@@ -8,9 +8,9 @@ def test_half_millisecond_and_clock_carries(raw,expected):
     assert milliseconds(raw)==expected
     normalized=normalized_ttml(f'<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="{raw}" end="3601">歌</p></body></tt>')
     assert normalized_ttml(normalized)==normalized
-    from server.publish import _time
+    from server.time_units import parse_ttml_seconds
     p=ET.fromstring(normalized).find('.//{http://www.w3.org/ns/ttml}p')
-    assert milliseconds(_time(p.get('begin')))==expected
+    assert milliseconds(parse_ttml_seconds(p.get('begin')))==expected
 
 def test_relative_round_once_and_original_inversion():
     normalized=normalized_ttml('<tt xmlns="http://www.w3.org/ns/ttml"><body><div begin="0.0004s"><p begin="0.0004s" end="0.0005s">歌</p></div></body></tt>')

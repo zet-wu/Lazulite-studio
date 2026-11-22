@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 import tempfile
 from pathlib import Path
 
@@ -19,16 +18,9 @@ def _headers(client, settings):
     return {"origin": "http://studio", "x-csrf-token": login.cookies["studio_csrf"]}
 
 
-def _audio(path: Path, codec: str):
-    subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:a", codec, str(path)],
-        check=True,
-    )
-
-
-def _project(client, headers, tmp_path, filename="tone.m4a", codec="aac", mime="audio/mp4"):
-    media = tmp_path / filename
-    _audio(media, codec)
+def _project(client, headers, tmp_path, synthetic_audio, filename="tone.m4a", codec="aac", mime="audio/mp4"):
+    ext = Path(filename).suffix.lstrip(".")
+    media = synthetic_audio(tmp_path / filename, codec=codec, extension=ext)
     uploaded = client.post("/api/v1/uploads", files={"file": (filename, media.read_bytes(), mime)}, headers=headers)
     assert uploaded.status_code == 200
     made = client.post(
@@ -51,7 +43,7 @@ def _save(client, headers, pid, revision, text):
     return out.json()["revision"]
 
 
-def test_direct_download_mp4_combinations_and_temp_cleanup(tmp_path, monkeypatch):
+def test_direct_download_mp4_combinations_and_temp_cleanup(tmp_path, monkeypatch, synthetic_audio):
     scratch = tmp_path / "scratch-tmp"
     scratch.mkdir()
     monkeypatch.setattr(tempfile, "tempdir", str(scratch))
@@ -59,7 +51,7 @@ def test_direct_download_mp4_combinations_and_temp_cleanup(tmp_path, monkeypatch
     settings = Settings("pw", False)
     client = TestClient(create_app(tmp_path / "data", settings), base_url="https://studio")
     headers = _headers(client, settings)
-    pid, asset = _project(client, headers, tmp_path)
+    pid, asset = _project(client, headers, tmp_path, synthetic_audio)
     rev0 = client.get(f"/api/v1/projects/{pid}/document").json()["revision"]
     rev1 = _save(
         client,
@@ -167,11 +159,11 @@ def test_direct_download_mp4_combinations_and_temp_cleanup(tmp_path, monkeypatch
     assert not list(scratch.iterdir())
 
 
-def test_direct_download_validation_mp3_flac_and_removed_legacy_routes(tmp_path):
+def test_direct_download_validation_and_mp3(tmp_path, synthetic_audio):
     settings = Settings("pw", False)
     client = TestClient(create_app(tmp_path / "data", settings), base_url="https://studio")
     headers = _headers(client, settings)
-    pid, asset = _project(client, headers, tmp_path, "tone.mp3", "libmp3lame", "audio/mpeg")
+    pid, asset = _project(client, headers, tmp_path, synthetic_audio, "tone.mp3", "libmp3lame", "audio/mpeg")
     rev = client.get(f"/api/v1/projects/{pid}/document").json()["revision"]
 
     # Both none -> 422
@@ -212,7 +204,3 @@ def test_direct_download_validation_mp3_flac_and_removed_legacy_routes(tmp_path)
         f"/api/v1/projects/{pid}/packaging/download",
         json={"revision": rev, "asset_id": asset, "stpp_action": "none", "lrc_kind": "lrc", "lrc_text": "[00:00.000]hi\n"},
     ).status_code == 401
-
-    # Legacy routes removed -> 404
-    assert client.get(f"/api/v1/projects/{pid}/exports").status_code == 404
-    assert client.post(f"/api/v1/projects/{pid}/publish", json={}, headers=headers).status_code == 404

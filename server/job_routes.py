@@ -24,17 +24,21 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
         return {**item, 'request':{k:v for k,v in item['request'].items() if not k.startswith('_')}}
     def check_project(pid):
         if not project_exists(pid): raise HTTPException(404, {"code":"project_not_found","message":"project not found","retryable":False})
-    @router.post("/projects/{pid}/jobs/{kind}", status_code=202, **write_auth)
+    @router.post("/projects/{pid}/jobs/{kind}", status_code=202, **read_auth)
     def create_kind(pid: str, kind: str, body: JobParams, request: Request, subject=Depends(write_dependency) if write_dependency else None):
         check_project(pid)
         # A repeated client intent resolves to its original task, before any
         # current model, device or resource settings are consulted.
         incoming = dict(body.params)
-        if kind in {'alignment','vocal'} and request.headers.get('idempotency-key'):
+        idem_key = request.headers.get('idempotency-key')
+        if kind in {'alignment','vocal'} and idem_key:
             with service.db.connect() as c:
-                previous = c.execute('SELECT job_id,request_hash FROM job_idempotency WHERE project_id=? AND idem_key=?', (pid,request.headers['idempotency-key'])).fetchone()
+                previous = c.execute(
+                    'SELECT j.*, i.request_hash FROM job_idempotency i JOIN jobs j ON j.id=i.job_id WHERE i.project_id=? AND i.idem_key=?',
+                    (pid, idem_key),
+                ).fetchone()
             if previous:
-                old = service.get(previous['job_id'])
+                old = service._job(previous)
                 owner, previous_kind, _ = json.loads(previous['request_hash'])
                 if owner != (subject or 'local') or previous_kind != kind or incoming != old['request'].get('_client_params'):
                     raise HTTPException(409, 'idempotency key was used for another request')
@@ -46,7 +50,7 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
         if validate_request:
             validate_request(pid, kind, body.params)
         if kind in {'alignment','vocal'}: body.params['_client_params'] = incoming
-        try: return public_job(service.create(pid, kind, body.params, idem_key=request.headers.get("idempotency-key"), subject=subject or "local"))
+        try: return public_job(service.create(pid, kind, body.params, idem_key=idem_key, subject=subject or "local"))
         except ValueError as exc: raise HTTPException(409, {"code":"idempotency_mismatch","message":str(exc),"retryable":False})
     @router.get("/projects/{pid}/jobs", **read_auth)
     def list_jobs(pid: str, limit: int=50):
@@ -56,7 +60,7 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
         item=service.get(jid)
         if not item: raise HTTPException(404, {"code":"job_not_found","message":"job not found","retryable":False})
         return item
-    @router.post('/jobs/{jid}/retry-cpu', status_code=202, **write_auth)
+    @router.post('/jobs/{jid}/retry-cpu', status_code=202, **read_auth)
     def retry_cpu(jid: str, body: CpuRetry, request: Request, subject=Depends(write_dependency) if write_dependency else None):
         old = owned(jid)
         if old['status'] != 'failed' or not (old.get('error') or {}).get('cpu_retry') or old['kind'] not in {'vocal','alignment'}:
@@ -67,15 +71,11 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
             project = c.execute('SELECT current_revision,source_asset_id FROM projects WHERE id=?', (old['project_id'],)).fetchone()
         if not project or project[0] != revision or body.revision != revision or project[1] != params['asset_id']:
             raise HTTPException(409, '项目版本或源音频已改变，请重新发起任务')
-        public = {'asset_id', 'retry_analysis_id'} if old['kind'] == 'vocal' else {'revision','use_hints','line_blank','rest_blank','rest_token','clear_unmatched','smart_extend', 'merge_short_gaps','gap_threshold_ms'}
-        fresh = {k:v for k,v in params.items() if k in public}
         if old['kind'] == 'alignment':
             from .alignment_models import check_snapshot
             try: check_snapshot(params['_model'])
             except ValueError as exc: raise HTTPException(409, str(exc))
-            fresh = {k:v for k,v in params.items() if k not in {'devices','cpu_retry','retry_of'}}
-        else:
-            fresh = {k:v for k,v in params.items() if k not in {'devices','cpu_retry','retry_of'}}
+        fresh = {k:v for k,v in params.items() if k not in {'devices','cpu_retry','retry_of'}}
         if fresh.get('_vocal_model'):
             from .vocal_models import check_snapshot as check_vocal_snapshot
             try: check_vocal_snapshot(fresh['_vocal_model'])

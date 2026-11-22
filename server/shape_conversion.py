@@ -1,5 +1,4 @@
 """Native OpenCC shape analysis with explicit source conflicts and positional output."""
-import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -64,7 +63,6 @@ def parse_output(raw, source, conflicts):
 
 def native_convert(text, tables, conflicts, cancelled):
     import opencc
-    if importlib.metadata.version('OpenCC')!='1.4.2': raise ValueError('需要 OpenCC 1.4.2 转换资源')
     executable=Path(opencc.__file__).parent/'clib/bin'/('opencc.exe' if os.name=='nt' else 'opencc')
     dictionaries=[{'type':'ocd2','file':str((ROOT/(table+'.ocd2')).resolve())} for table in tables]
     dictionary=dictionaries[0] if len(dictionaries)==1 else {'type':'group','match_policy':'short_circuit','dicts':dictionaries}

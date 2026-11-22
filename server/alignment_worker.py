@@ -4,7 +4,7 @@ import sys
 from .runtime_devices import DeviceFailure
 from lazulite.events import Cancelled
 from .vocals import VocalCancelled
-from .vocal_process import PREFIX
+from .worker_process import PREFIX
 from .alignment import run_alignment
 
 

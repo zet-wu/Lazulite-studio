@@ -17,7 +17,9 @@ def test_reimport_same_bytes_clears_acoustics_and_preserves_lyrics_and_idempoten
         saved=client.put(url+'/document',json=before,headers={**HEADERS,'if-match':before['revision']})
         assert saved.status_code==200
         original=client.get(url+'/document').json()['document']
-        old_file=tmp_path/'projects'/pid/'cache'/'old-product';old_file.write_bytes(b'old')
+        old_file=tmp_path/'projects'/pid/'cache'/'old-product'
+        old_file.parent.mkdir(exist_ok=True)
+        old_file.write_bytes(b'old')
         new_token=upload(client);request=binding(client,pid,new_token)
         result=client.post(url+'/music',json=request,headers=HEADERS)
         assert result.status_code==200,result.text

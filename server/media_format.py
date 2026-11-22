@@ -4,12 +4,12 @@ import re
 from mutagen.mp4 import MP4
 from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
-from .publishing import _probe
+from .publishing import probe_media
 
 
 def describe_media(path, media, source_filename=None):
     if isinstance(media, MP4):
-        video = any(stream.get('codec_type') == 'video' and not stream.get('disposition', {}).get('attached_pic') for stream in _probe(path).get('streams', []))
+        video = any(stream.get('codec_type') == 'video' and not stream.get('disposition', {}).get('attached_pic') for stream in probe_media(path).get('streams', []))
         suffix = Path(source_filename or path).suffix.lower()
         extension = '.mp4' if video else (suffix if suffix in {'.m4a', '.mp4'} else '.m4a')
         return {'container': 'mp4', 'format_label': 'MP4' if video else 'M4A（MP4 容器）', 'extension': extension}

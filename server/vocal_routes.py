@@ -16,7 +16,6 @@ def build_vocal_router(runner, *, auth, project_exists):
         availability = {}
         for row in rows:
             metadata = json.loads(row['metadata_json'])
-            asset_id = metadata['source_asset_id']
             owner = metadata['audio_result_id']
             if owner not in availability: availability[owner] = runner.audio_available(pid, metadata)
             available = availability[owner]
@@ -44,7 +43,7 @@ def build_vocal_router(runner, *, auth, project_exists):
 
     @router.get('/projects/{pid}/vocals/{rid}/file')
     def file(pid: str, rid: str, request: Request, _=Depends(auth)):
-        with runner.db.transaction():
+        with runner.db.project_read(pid):
             project_exists(pid)
             try: row, metadata = runner.get(pid, rid)
             except KeyError: raise HTTPException(404, '人声结果不存在')

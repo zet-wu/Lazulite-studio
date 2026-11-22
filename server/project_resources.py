@@ -4,27 +4,36 @@ import re
 from fastapi.responses import Response, StreamingResponse
 
 
-def stream_file(path, media_type, range_header=None, if_range=None):
-    handle = path.open('rb')
-    stat = os.fstat(handle.fileno())
-    size = stat.st_size
-    etag = f'"{stat.st_mtime_ns:x}-{size:x}"'
-    if if_range and if_range != etag: range_header = None
+def parse_range(size: int, etag: str, range_header: str | None, if_range: str | None):
+    """Return (first, last, status, headers), or None when Range is unsatisfiable (416)."""
+    if if_range and if_range != etag:
+        range_header = None
     first, last, status = 0, size - 1, 200
     if range_header:
         match = re.fullmatch(r'bytes=(\d*)-(\d*)', range_header)
         if not match or not any(match.groups()):
-            handle.close()
-            return Response(status_code=416, headers={'Content-Range': f'bytes */{size}'})
+            return None
         start, end = match.groups()
         first = int(start) if start else max(0, size - int(end))
         last = min(size - 1, int(end)) if start and end else size - 1
         if first > last or first >= size:
-            handle.close()
-            return Response(status_code=416, headers={'Content-Range': f'bytes */{size}'})
+            return None
         status = 206
-    headers = {'ETag':etag, 'Accept-Ranges':'bytes', 'Content-Length':str(last-first+1)}
-    if status == 206: headers['Content-Range'] = f'bytes {first}-{last}/{size}'
+    headers = {'ETag': etag, 'Accept-Ranges': 'bytes', 'Content-Length': str(last - first + 1)}
+    if status == 206:
+        headers['Content-Range'] = f'bytes {first}-{last}/{size}'
+    return first, last, status, headers
+
+
+def stream_file(path, media_type, range_header=None, if_range=None):
+    handle = path.open('rb')
+    stat = os.fstat(handle.fileno())
+    size = stat.st_size
+    parsed = parse_range(size, f'"{stat.st_mtime_ns:x}-{size:x}"', range_header, if_range)
+    if parsed is None:
+        handle.close()
+        return Response(status_code=416, headers={'Content-Range': f'bytes */{size}'})
+    first, last, status, headers = parsed
     def chunks():
         remaining = last-first+1
         try:
@@ -45,22 +54,11 @@ def stream_memory(proxy, etag, range_header=None, if_range=None, release=lambda:
             try: await super().__call__(scope, receive, send)
             finally: release()
     size = proxy.size
-    if if_range and if_range != etag: range_header = None
-    first, last, status = 0, size - 1, 200
-    if range_header:
-        match = re.fullmatch(r'bytes=(\d*)-(\d*)', range_header)
-        if not match or not any(match.groups()):
-            release()
-            return Response(status_code=416, headers={'Content-Range': f'bytes */{size}'})
-        start, end = match.groups()
-        first = int(start) if start else max(0, size - int(end))
-        last = min(size - 1, int(end)) if start and end else size - 1
-        if first > last or first >= size:
-            release()
-            return Response(status_code=416, headers={'Content-Range': f'bytes */{size}'})
-        status = 206
-    headers = {'ETag': etag, 'Accept-Ranges': 'bytes', 'Content-Length': str(last-first+1)}
-    if status == 206: headers['Content-Range'] = f'bytes {first}-{last}/{size}'
+    parsed = parse_range(size, etag, range_header, if_range)
+    if parsed is None:
+        release()
+        return Response(status_code=416, headers={'Content-Range': f'bytes */{size}'})
+    first, last, status, headers = parsed
     def chunks():
         try:
             for offset in range(first, last + 1, 256 * 1024):

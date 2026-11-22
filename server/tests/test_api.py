@@ -111,10 +111,10 @@ def test_project_creation_idempotency_and_pagination(authenticated_client):
     assert len(seen) == 3 and len(set(seen)) == 3
 
 
-def test_studio_http_lifecycle(tmp_path, authenticated_client):
+def test_studio_http_lifecycle(tmp_path, authenticated_client, synthetic_audio):
     client, settings, headers = authenticated_client
     from server.tests.test_publish import _project, _save
-    pid, asset_id = _project(client, headers, tmp_path)
+    pid, asset_id = _project(client, headers, tmp_path, synthetic_audio)
     revision = client.get(f"/api/v1/projects/{pid}/document").json()["revision"]
     revision = _save(client, headers, pid, revision,
                      '<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0s" end="1s">hello</p></body></tt>')

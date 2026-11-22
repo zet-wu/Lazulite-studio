@@ -8,7 +8,8 @@ from threading import Lock
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from .furigana import load_index, token_segments
+from . import furigana
+from .furigana import token_segments
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +46,7 @@ class SudachiReadingProposer:
     def __init__(self) -> None:
         self._tokenizer = None
         self._tokenizer_lock = Lock()
+        self._furigana = None
         self.unavailable_reason: str | None = None
         try:
             from sudachipy import dictionary, tokenizer
@@ -52,14 +54,13 @@ class SudachiReadingProposer:
             self._tokenizer = dictionary.Dictionary().create()
             self._mode = tokenizer.Tokenizer.SplitMode.C
             self._mode_a = tokenizer.Tokenizer.SplitMode.A
-            self._furigana = load_index()
         except Exception as exc:  # dependency/model data can be absent on a server
             self._tokenizer = None
             self.unavailable_reason = f"日文读音资源不可用：{type(exc).__name__}: {exc}"
 
     @property
     def available(self) -> bool:
-        return self._tokenizer is not None
+        return self._tokenizer is not None and (self._furigana is not None or furigana.RESOURCE.is_file())
 
     def particles(self, lines: Sequence[Mapping[str, str]]) -> list[dict]:
         if self._tokenizer is None:
@@ -77,9 +78,14 @@ class SudachiReadingProposer:
         if self._tokenizer is None:
             raise ReadingUnavailable(self.unavailable_reason or "SudachiPy 不可用")
         output: list[ReadingProposal] = []
-        for line in lines:
-            line_id, text = line["id"], line["text"]
-            with self._tokenizer_lock:
+        with self._tokenizer_lock:
+            if self._furigana is None:
+                try:
+                    self._furigana = furigana.load_index()
+                except Exception as exc:
+                    raise ReadingUnavailable(f"日文读音资源不可用：{type(exc).__name__}: {exc}") from exc
+            for line in lines:
+                line_id, text = line["id"], line["text"]
                 # Keep token reads and split(A) inside the tokenizer lock too.
                 for token in self._tokenizer.tokenize(text, self._mode):
                     segments = token_segments(token, self._furigana, self._mode_a, _hiragana)
@@ -138,10 +144,13 @@ def analyze_snapshot(body: ReadingSnapshot, proposer: ReadingProposer) -> Readin
     if sum(len(line.text) for line in body.lines) > 1000000:
         raise ValueError('本次正文过长，请减少所选行')
     proposals = propose_readings(lines, proposer)
+    by_line: dict[str, list[ReadingProposal]] = {}
+    for p in proposals:
+        by_line.setdefault(p.line_id, []).append(p)
     ranges = []
     for line in body.lines:
         offset = 0
-        for item in sorted((p for p in proposals if p.line_id == line.id), key=lambda p: p.base_start):
+        for item in sorted(by_line.get(line.id, ()), key=lambda p: p.base_start):
             if item.base_start < offset:
                 raise ValueError('读音分析范围重叠')
             if offset < item.base_start:

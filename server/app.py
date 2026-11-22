@@ -1,8 +1,9 @@
+from .atomic_file import write_atomic
 from .project_resources import stream_memory
 from .project_document import initial_project
+from dataclasses import replace
 import math
-import hashlib, json, os, secrets, tempfile, uuid, shutil, time
-import xml.etree.ElementTree as ET
+import hashlib, json, mimetypes, os, secrets, uuid, shutil, time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Annotated
@@ -19,7 +20,7 @@ from fastapi import (
 )
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -66,14 +67,13 @@ def create_app(
     shutil.rmtree(uploads, ignore_errors=True)
     uploads.mkdir(parents=True)
     with db.connect() as c:
-        known = {r[0] for r in c.execute('SELECT id FROM projects')}
+        known = {r[0]: r[1] for r in c.execute('SELECT id, source_asset_id FROM projects')}
     for directory in (root / 'projects').glob('*'):
-        if directory.name not in known: shutil.rmtree(directory)
-        else:
-            with db.connect() as c:
-                has_music = c.execute('SELECT source_asset_id FROM projects WHERE id=?', (directory.name,)).fetchone()[0]
-            if not has_music:
-                for name in ('source','cache'): shutil.rmtree(directory / name, ignore_errors=True)
+        if directory.name not in known:
+            shutil.rmtree(directory)
+        elif not known[directory.name]:
+            for name in ('source', 'cache'):
+                shutil.rmtree(directory / name, ignore_errors=True)
     from .studio.media_lifetime import MediaLifetime
     media_lifetime = MediaLifetime(root / 'projects')
     # Startup precedes all HTTP readers. Only disposable media derivatives are
@@ -241,7 +241,8 @@ def create_app(
         destination = root / 'projects' / pid
         destination.mkdir(parents=True, exist_ok=True)
         for name in ('source', 'cache'):
-            (directory / name).rename(destination / name)
+            if (directory / name).exists():
+                (directory / name).rename(destination / name)
         c.execute('INSERT INTO assets VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', record)
         return c.execute('SELECT * FROM assets WHERE id=?', (token,)).fetchone()
 
@@ -263,17 +264,29 @@ def create_app(
                 while chunk := await file.read(1024 * 1024):
                     out.write(chunk)
                     digest.update(chunk)
-            media = MediaService(directory)
-            from .upload_audio import normalize_upload
-            normalized, name = await run_in_threadpool(normalize_upload, temporary, file.filename or 'audio')
-            asset = await run_in_threadpool(media.import_asset, normalized, name, verified_sha256=digest.hexdigest() if normalized == temporary else None)
-            if normalized != temporary: normalized.unlink()
-            proxy = await run_in_threadpool(media.playback_proxy, asset)
+            from .studio.media import content_hash, probe_media
+            from .upload_audio import prepare_upload
+            normalized, name, decoded_duration_ms = await run_in_threadpool(prepare_upload, temporary, file.filename or 'audio')
+            destination = directory / 'source' / 'original'
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if normalized == temporary:
+                os.replace(temporary, destination)
+                file_hash = digest.hexdigest()
+            else:
+                os.replace(normalized, destination)
+                file_hash = await run_in_threadpool(content_hash, destination)
+            probe = await run_in_threadpool(probe_media, destination)
+            proxy_duration_ms = decoded_duration_ms if decoded_duration_ms is not None else probe.duration_ms
+            size = destination.stat().st_size
+            mime_type = mimetypes.guess_type(name)[0] or probe.mime_type
+            if proxy_duration_ms is None:
+                asset = Asset(token, file_hash, destination, name, size, replace(probe, mime_type=mime_type))
+                proxy_duration_ms = (await run_in_threadpool(MediaService(directory).playback_proxy, asset)).duration_ms
             if await request.is_disconnected(): fail('upload_cancelled', '上传已取消', 409)
-            record = [token, asset.content_hash, asset.size, asset.probe.mime_type, asset.original_name, 1,
-                      asset.probe.duration_ms, asset.probe.start_ms, asset.probe.sample_rate, asset.probe.channels,
-                      json.dumps({'codec': asset.probe.codec, 'container': asset.probe.container,
-                                  'proxy_offset_ms': proxy.offset_ms, 'proxy_duration_ms': proxy.duration_ms, 'upload_name': file.filename}), stamp()]
+            record = [token, file_hash, size, mime_type, name, 1,
+                      probe.duration_ms, probe.start_ms, probe.sample_rate, probe.channels,
+                      json.dumps({'codec': probe.codec, 'container': probe.container,
+                                  'proxy_offset_ms': 0, 'proxy_duration_ms': proxy_duration_ms, 'upload_name': file.filename}), stamp()]
             (directory / 'asset.json').write_text(json.dumps(record))
             successful = True
             return asset_dto(record)
@@ -340,7 +353,6 @@ def create_app(
     @api.post("/projects")
     def create_project(
         body: ProjectCreate,
-        request: Request,
         subject: str = Depends(write),
         idem: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
     ):
@@ -372,7 +384,7 @@ def create_app(
                 asset = adopt_upload(c, body.upload_id, pid) if body.upload_id else None
                 asset_id = asset[0] if asset else None
                 path = root / 'projects' / pid / 'revisions' / f'{rev}.json'
-                revisions._write_atomic(path, json.dumps(initial_project(INITIAL_TTML), ensure_ascii=False).encode())
+                write_atomic(path, json.dumps(initial_project(INITIAL_TTML), ensure_ascii=False).encode())
                 c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)', (pid, name, asset_id, rev, t, t))
                 conditions = initial_conditions(root / 'projects' / pid / 'source' / 'original', body.source_filename or asset[4]) if asset else {'title':'','artist':'','album':''}
                 c.execute('INSERT INTO search_conditions VALUES(?,?,?,?)', (pid, conditions['title'], conditions['artist'], conditions['album']))
@@ -414,7 +426,7 @@ def create_app(
     from .project_storage import build_storage_router
     api.include_router(build_storage_router(db, root, auth=auth, project_exists=project))
     from .project_archive import build_archive_router
-    api.include_router(build_archive_router(db, root, revisions, auth=auth, write=write, project_exists=project))
+    api.include_router(build_archive_router(db, root, auth=auth, write=write, project_exists=project))
 
     @api.get("/projects")
     def projects(_: object = Depends(auth), limit: int = 50, cursor: str | None = None):
@@ -454,9 +466,7 @@ def create_app(
 
     @api.get("/projects/{pid}")
     def get_project(pid: str, _: object = Depends(auth)):
-        r = project(pid)
-        with db.connect() as c:
-            a = c.execute("SELECT * FROM assets WHERE id=?", (r[2],)).fetchone()
+        r, a = asset_for(pid)
         return {
             "schema_version": "studio-project-v1",
             "id": r[0],
@@ -498,10 +508,14 @@ def create_app(
         preferences.delete_project(pid)
         return result
 
-    def asset_for(pid):
-        r = project(pid)
-        with db.connect() as c:
-            return r, c.execute("SELECT * FROM assets WHERE id=?", (r[2],)).fetchone()
+    def asset_for(pid, conn=None):
+        if conn is None:
+            with db.connect() as c:
+                return asset_for(pid, c)
+        r = conn.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone()
+        if not r:
+            fail("project_not_found", "project not found", 404)
+        return r, conn.execute("SELECT * FROM assets WHERE id=?", (r[2],)).fetchone() if r[2] else None
 
     def asset_model(row, pid):
         return Asset(
@@ -526,8 +540,8 @@ def create_app(
 
     @api.get("/projects/{pid}/audio")
     def audio(pid: str, request: Request, vocal: str | None = None, source: str | None = None, _: object = Depends(auth)):
-        with db.transaction():
-            r, a = asset_for(pid)
+        with db.project_read(pid):
+            _, a = asset_for(pid)
             if not a:
                 fail("audio_not_found", "audio not found", 404)
             if source and source != a[0]: fail('source_conflict', '源音频已改变，请重新加载播放', 409)
@@ -549,7 +563,7 @@ def create_app(
         end_ms: int = 1_000,
         _: object = Depends(auth),
     ):
-        with db.transaction():
+        with db.project_read(pid):
             _, a = asset_for(pid)
             if not a: fail('audio_not_found', '上传音乐后可用', 404)
             try:
@@ -574,7 +588,7 @@ def create_app(
     @api.get("/projects/{pid}/pcm")
     def pcm_window(pid: str, start_ms: int, end_ms: int, vocal: str | None = None, _: object = Depends(auth)):
         """Read a PCM proxy window of at most 4,020 milliseconds (FFT context included)."""
-        with db.transaction():
+        with db.project_read(pid):
             _, row = asset_for(pid)
             if not row:
                 fail("audio_not_found", "audio not found", 404)
@@ -606,15 +620,23 @@ def create_app(
     vocal_models = VocalModels(preferences, model_catalog.package_root)
     alignment_runner = AlignmentRunner(db, root / 'projects', model_catalog, configured_reading_proposer)
 
+    from .runtime_devices import RuntimeDevices
+    devices = RuntimeDevices(preferences if cfg.mode == "local" else None,
+                             (runtime_manifest or {'target':'windows-x64-cpu'}) if cfg.mode == 'local' else None)
+
     @api.get('/vocal-models')
     def vocal_catalog(refresh: bool = False, _=Depends(auth)):
+        if refresh:
+            devices.refresh()
         return vocal_models.scan(refresh)
 
     @api.post('/vocal-models/directory')
     def vocal_directory(body: dict, _=Depends(write)):
         try:
             if set(body) != {'path'}: raise ValueError('需要模型目录或默认目录')
-            return vocal_models.apply(body['path'])
+            result = vocal_models.apply(body['path'])
+            devices.refresh()
+            return result
         except (ValueError, OSError) as exc: fail('vocal_directory_invalid', str(exc), 422)
 
     def capture_vocal(pid, params):
@@ -632,13 +654,17 @@ def create_app(
 
     @api.get('/alignment-models')
     def alignment_models(refresh: bool = False, _=Depends(auth)):
+        if refresh:
+            devices.refresh()
         return model_catalog.scan(refresh)
 
     @api.post('/alignment-models/directory')
     def alignment_models_directory(body: dict, _=Depends(write)):
         try:
             if set(body) != {'path'}: raise ValueError('需要模型目录或默认目录')
-            return model_catalog.apply(body['path'])
+            result = model_catalog.apply(body['path'])
+            devices.refresh()
+            return result
         except (ValueError, OSError) as exc: fail('alignment_directory_invalid', str(exc), 422)
 
     @api.get('/projects/{pid}/alignment-preview')
@@ -653,10 +679,12 @@ def create_app(
 
     def validate_job_request(pid, kind, params):
         if kind == 'alignment':
-            try: alignment_runner.validate(pid, params)
+            try: snapshot = alignment_runner.validate(pid, params)
             except (ValueError, ReadingUnavailable) as exc: fail('alignment_input_invalid', str(exc), 422)
-            snapshot, _ = alignment_runner.snapshot(pid, params['revision'])
-            if not snapshot['acoustics']['analysisId']: capture_vocal(pid, params)
+            if snapshot['acoustics']['analysisId']:
+                params['_has_vocal'] = True
+            else:
+                capture_vocal(pid, params)
             return
         if kind == 'vocal':
             row = project(pid)
@@ -683,9 +711,6 @@ def create_app(
             return
         fail('job_kind_removed', '不支持此任务类别', 422)
 
-    from .runtime_devices import RuntimeDevices
-    devices = RuntimeDevices(preferences if cfg.mode == "local" else None,
-                             (runtime_manifest or {'target':'windows-x64-cpu'}) if cfg.mode == 'local' else None)
     job_service = JobService(db, devices=devices, asset_path=asset_path_for_project, vocal_runner=vocal_runner, alignment_runner=alignment_runner)
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
     api.include_router(build_vocal_router(vocal_runner, auth=auth, project_exists=project))
@@ -701,7 +726,7 @@ def create_app(
     api.include_router(build_sources_router(write=write))
     api.include_router(build_publish_router(db, revisions, publisher=publisher, auth=auth, write=write, project_row=project, asset_path=asset_path_for_project))
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
-    api.include_router(settings_router(preferences, auth=auth, write=write))
+    api.include_router(settings_router(preferences, auth=auth, write=write, on_change=devices.refresh))
     app.state.jobs = job_service
     app.state.media_lifetime = media_lifetime
     @app.on_event("startup")

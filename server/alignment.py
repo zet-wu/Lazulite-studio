@@ -1,13 +1,11 @@
 """Global alignment orchestration; model work always runs outside the API process."""
-import json
 import os
 from pathlib import Path
 from dataclasses import asdict
-from .engine import EngineUnavailable
 from .runtime_devices import DeviceFailure, device_failure
 from .vocals import VocalCancelled
-from .vocal_process import VocalProcess
-from .project_document import read_project
+from .worker_process import WorkerProcess
+from .project_document import load_project
 from .audio_boundaries import source_duration, intersect_segments
 from .alignment_projection import project_alignment
 
@@ -23,17 +21,19 @@ class AlignmentRunner:
         self.db, self.root = db, Path(root)
         self.models = models
         self.particle_analyzer = particle_analyzer
-        self.worker = VocalProcess(module='server.alignment_worker')
+        self.worker = WorkerProcess(module='server.alignment_worker')
 
     def close(self): self.worker.close()
 
     def snapshot(self, pid, revision):
-        with self.db.transaction() as c:
-            current = c.execute('SELECT source_asset_id,current_revision FROM projects WHERE id=?', (pid,)).fetchone()
-            if not current or current['current_revision'] != revision: raise ValueError('项目版本已改变，请重新运行')
-            row = c.execute('SELECT project_path FROM revisions WHERE id=? AND project_id=?', (revision,pid)).fetchone()
-            if not current['source_asset_id']: raise ValueError('请先上传源音频')
-            return read_project(self.db.paths.resolve(row[0])), current['source_asset_id']
+        with self.db.project_read(pid):
+            with self.db.connect() as c:
+                current = c.execute('SELECT source_asset_id,current_revision FROM projects WHERE id=?', (pid,)).fetchone()
+                if not current or current['current_revision'] != revision: raise ValueError('项目版本已改变，请重新运行')
+                row = c.execute('SELECT project_path FROM revisions WHERE id=? AND project_id=?', (revision,pid)).fetchone()
+                if not current['source_asset_id']: raise ValueError('请先上传源音频')
+                path = self.db.paths.resolve(row[0])
+            return load_project(path), current['source_asset_id']
 
     def validate(self, pid, params):
         if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'gap_threshold_ms', 'latin_normalize', 'strip_tone_digits', 'convert_particles', 'model_preview'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'latin_normalize', 'strip_tone_digits', 'convert_particles')):
@@ -52,6 +52,7 @@ class AlignmentRunner:
         reason = alignment_unavailable()
         if reason: raise ValueError(reason['message'])
         params['asset_id'] = asset
+        return snapshot
 
     def run(self, pid, asset_path, params, jid, emit, cancelled):
         return self.worker.run({'database': str(Path(self.db.path).resolve()), 'root': str(self.root.resolve()),
@@ -108,7 +109,6 @@ def _run_alignment(request, emit, cancelled, media_lifetime):
         analysis=automatic, analysis_description={'configuration': metadata['analysis_config'], 'reference':'full_scale'},
         segments=selected, separation=metadata['model'])
     if not prepared.segments: raise ValueError('没有可用人声片段')
-    check_snapshot(params['_model'])
     backend = open_backend(params['_model']['path'], device=params.get('devices', {}).get('alignment', {}).get('actual', os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu')))
     try:
         result = align_japanese(prepared, JapaneseAlignmentRequest.from_dict(projection['request']), backend=backend,
@@ -121,7 +121,10 @@ def _run_alignment(request, emit, cancelled, media_lifetime):
     finally:
         backend.close()
     if cancelled(): raise VocalCancelled()
-    runner.snapshot(pid, params['revision'])
+    with db.connect() as c:
+        current = c.execute('SELECT source_asset_id,current_revision FROM projects WHERE id=?', (pid,)).fetchone()
+    if not current or current['current_revision'] != params['revision'] or current['source_asset_id'] != asset:
+        raise ValueError('项目版本已改变，请重新运行')
     if result.status == 'unresolved': raise ValueError('无法计算对齐：' + ', '.join(issue.code for issue in result.issues))
     expected = [(m['unit_id'],m['line_id']) for m in projection['mapping']]
     if [(u.unit_id,u.line_id) for u in result.units] != expected:

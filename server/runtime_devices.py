@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from . import process_supervisor
 
 LABELS = {'cpu': 'CPU', 'cuda': 'NVIDIA GPU', 'mps': 'Apple GPU'}
@@ -32,17 +33,37 @@ def probe(preferred):
 class RuntimeDevices:
     def __init__(self, settings=None, manifest=None, probe_fn=probe):
         self.settings, self.manifest, self.probe = settings, manifest, probe_fn
+        self._lock = threading.Lock()
+        self._cache: dict[str, dict] = {}
 
-    def snapshot(self, kind, *, cpu_retry=False):
+    def refresh(self) -> None:
+        with self._lock:
+            self._cache.clear()
+
+    def _probe_cached(self, preferred: str) -> dict:
+        with self._lock:
+            cached = self._cache.get(preferred)
+            if cached is not None:
+                return dict(cached)
+        resolved = self.probe(preferred)
+        with self._lock:
+            self._cache[preferred] = dict(resolved)
+        return resolved
+
+    def snapshot(self, kind, *, cpu_retry=False, skip_vocal=False):
         values = self.settings.read()['values'] if self.settings else {}
         target = (self.manifest or {}).get('target')
         automatic = {'windows-x64-cpu': 'cpu', 'windows-x64-cuda': 'cuda', 'macos-arm64': 'mps'}.get(target, 'cpu')
+        stages = ('alignment',) if (kind == 'alignment' and skip_vocal) else ('vocal', 'alignment') if kind == 'alignment' else ('vocal',)
         snapshots = {}
-        for stage in (('vocal', 'alignment') if kind == 'alignment' else ('vocal',)):
+        probed: dict[str, dict] = {}
+        for stage in stages:
             if target:
                 preference = values.get('device.' + stage, 'auto')
                 preferred = 'cpu' if cpu_retry or preference == 'cpu' else automatic
-                resolved = self.probe(preferred)
+                if preferred not in probed:
+                    probed[preferred] = self._probe_cached(preferred)
+                resolved = probed[preferred]
             else:
                 preferred = 'cpu' if cpu_retry else os.getenv('STUDIO_VOCAL_DEVICE' if stage == 'vocal' else 'STUDIO_ALIGNMENT_DEVICE', 'cpu')
                 # Private deployments keep their explicitly configured behavior.

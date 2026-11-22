@@ -16,7 +16,8 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
-from .project_document import read_project, validate_project
+from .atomic_file import write_atomic
+from .project_document import load_project, validate_project
 from .studio.media import MediaService, MediaError
 from .media_format import download_filename
 
@@ -99,7 +100,7 @@ def validate_archive_references(snapshot):
             raise ValueError('工程导唱锚点引用或相邻关系无效')
 
 
-def build_archive_router(db, root, revisions, *, auth, write, project_exists):
+def build_archive_router(db, root, *, auth, write, project_exists):
     router = APIRouter()
 
     @router.get('/projects/{pid}/archive')
@@ -108,13 +109,14 @@ def build_archive_router(db, root, revisions, *, auth, write, project_exists):
         path = Path(temp.name) / 'project.lazp'
         try:
             # Pin the revision and source together, and protect their files from deletion.
-            with db.transaction() as c:
-                project = project_exists(pid)
-                row = c.execute('SELECT project_path FROM revisions WHERE id=? AND project_id=?', (project['current_revision'], pid)).fetchone()
-                snapshot = read_project(db.paths.resolve(row[0]))
+            with db.project_read(pid):
+                with db.connect() as c:
+                    project = project_exists(pid)
+                    row = c.execute('SELECT project_path FROM revisions WHERE id=? AND project_id=?', (project['current_revision'], pid)).fetchone()
+                    asset = c.execute('SELECT * FROM assets WHERE id=?', (project['source_asset_id'],)).fetchone()
+                snapshot = load_project(db.paths.resolve(row[0]))
                 snapshot['acoustics']['analysisId'] = None
                 manifest = {'format':'lazulite-studio-project', 'version':1, 'name':project['name'], 'project':'project.json'}
-                asset = c.execute('SELECT * FROM assets WHERE id=?', (project['source_asset_id'],)).fetchone()
                 with zipfile.ZipFile(path, 'w', compression=zipfile.ZIP_STORED) as archive:
                     if asset:
                         source = root / 'projects' / pid / 'source' / 'original'
@@ -155,7 +157,7 @@ def build_archive_router(db, root, revisions, *, auth, write, project_exists):
                 snapshot = validate_project(snapshot, c, pid)
                 validate_archive_references(snapshot)
                 relative = Path('revisions') / f'{rid}.json'
-                revisions._write_atomic(staged_project / relative, json.dumps(snapshot, ensure_ascii=False).encode())
+                write_atomic(staged_project / relative, json.dumps(snapshot, ensure_ascii=False).encode())
                 c.execute('INSERT INTO revisions VALUES(?,?,?,?,?)', (rid, pid, None, db.paths.store(destination / relative), now))
                 c.execute('INSERT INTO search_conditions VALUES(?,?,?,?)', (pid, '', '', ''))
                 staged_project.rename(destination)

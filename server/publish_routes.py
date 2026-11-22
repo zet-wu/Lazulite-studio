@@ -42,10 +42,7 @@ def build_publish_router(db, revisions, *, publisher, auth: Callable, write: Cal
     router = APIRouter()
 
     def project(pid):
-        try:
-            row = project_row(pid)
-        except HTTPException:
-            raise
+        row = project_row(pid)
         if not row:
             raise HTTPException(404, {"code": "project_not_found", "message": "project not found", "retryable": False})
         return row
@@ -87,11 +84,6 @@ def build_publish_router(db, revisions, *, publisher, auth: Callable, write: Cal
 
     @router.post("/projects/{pid}/packaging/download")
     def packaging_download(pid: str, body: PackagingDownloadRequest, _: str = Depends(write)):
-        row = project(pid)
-        if not row[2]:
-            raise HTTPException(422, {'code':'audio_required','message':'上传音乐后才可打包音乐文件','retryable':False})
-        if body.asset_id != row[2]:
-            raise HTTPException(422, {"code": "publish_input_invalid", "message": "asset does not belong to project", "retryable": False})
         if publisher is None or not callable(getattr(publisher, "publish", None)) or shutil.which("ffprobe") is None:
             raise HTTPException(503, {"code": "capability_unavailable", "message": "STPP publisher is not configured", "retryable": False})
         if body.lrc_kind != 'none':
@@ -99,52 +91,54 @@ def build_publish_router(db, revisions, *, publisher, auth: Callable, write: Cal
                 raise HTTPException(422, {'code':'invalid_lrc','message':'兼容歌词格式无效','retryable':False})
             if body.lrc_kind == 'lrc' and re.search(r'<\d+:\d{2}\.\d{3}>', body.lrc_text):
                 raise HTTPException(422, {'code':'invalid_lrc','message':'普通 LRC 不能包含扩展时间标签','retryable':False})
-        with db.connect() as c:
-            bound = c.execute(
-                'SELECT p.source_asset_id,p.name,a.filename FROM projects p JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?',
-                (pid,),
-            ).fetchone()
-            has_rev = c.execute('SELECT 1 FROM revisions WHERE id=? AND project_id=?', (body.revision, pid)).fetchone()
-        if not bound or bound[0] != body.asset_id:
-            raise HTTPException(422, {"code": "publish_input_invalid", "message": "asset does not belong to project", "retryable": False})
-        if not has_rev:
-            raise HTTPException(409, {"code": "revision_unavailable", "message": "项目保存版本不可用，请重新保存后再试", "retryable": False})
+        with db.project_read(pid):
+            with db.connect() as c:
+                bound = c.execute(
+                    'SELECT p.source_asset_id,p.name,a.filename FROM projects p LEFT JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?',
+                    (pid,),
+                ).fetchone()
+                if not bound:
+                    raise HTTPException(404, {"code": "project_not_found", "message": "project not found", "retryable": False})
+                if not bound[0]:
+                    raise HTTPException(422, {'code':'audio_required','message':'上传音乐后才可打包音乐文件','retryable':False})
+                if body.asset_id != bound[0] or bound[2] is None:
+                    raise HTTPException(422, {"code": "publish_input_invalid", "message": "asset does not belong to project", "retryable": False})
+                has_rev = c.execute('SELECT 1 FROM revisions WHERE id=? AND project_id=?', (body.revision, pid)).fetchone()
+            if not has_rev:
+                raise HTTPException(409, {"code": "revision_unavailable", "message": "项目保存版本不可用，请重新保存后再试", "retryable": False})
 
-        from mutagen import File
-        from mutagen.mp4 import MP4
-        from .media_format import describe_media, download_filename
+            from mutagen import File
+            from mutagen.mp4 import MP4
+            from .media_format import describe_media, download_filename
 
-        path = Path(asset_path(pid))
-        media = File(path)
-        format_info = describe_media(path, media, bound[2])
-        if format_info['extension'] is None:
-            raise HTTPException(422, {'code': 'unsupported_format', 'message': '源文件格式不支持打包', 'retryable': False})
-        if body.stpp_action != 'none' and not isinstance(media, MP4):
-            raise HTTPException(422, {'code': 'unsupported_stpp', 'message': '此容器不支持 STPP 轨道', 'retryable': False})
+            path = Path(asset_path(pid))
+            media = File(path)
+            format_info = describe_media(path, media, bound[2])
+            if format_info['extension'] is None:
+                raise HTTPException(422, {'code': 'unsupported_format', 'message': '源文件格式不支持打包', 'retryable': False})
+            if body.stpp_action != 'none' and not isinstance(media, MP4):
+                raise HTTPException(422, {'code': 'unsupported_stpp', 'message': '此容器不支持 STPP 轨道', 'retryable': False})
 
-        ttml = None
-        if body.stpp_action != 'none':
+            ttml = None
+            if body.stpp_action != 'none':
+                try:
+                    _, snapshot = revisions.read(pid, body.revision)
+                    ttml = serialize_output_ttml(snapshot)
+                except (PublishInvalid, ValueError) as exc:
+                    raise HTTPException(422, {'code': 'publish_failed', 'message': str(exc), 'retryable': False}) from exc
+
+            tmp_dir = tempfile.TemporaryDirectory(prefix='lazulite-pack-')
+            output = Path(tmp_dir.name) / f"packaged{format_info['extension']}"
             try:
-                _, snapshot = revisions.read(pid, body.revision)
-                ttml = serialize_output_ttml(snapshot)
-            except (PublishInvalid, ValueError) as exc:
+                target_track = body.target_track_id if body.stpp_action == 'overwrite' else None
+                publisher.publish(ttml, path, output, body.lrc_text, target_track)
+                handle = output.open('rb')
+            except (PublishInvalid, PublishingError, ValueError) as exc:
+                tmp_dir.cleanup()
                 raise HTTPException(422, {'code': 'publish_failed', 'message': str(exc), 'retryable': False}) from exc
-
-        tmp_dir = tempfile.TemporaryDirectory(prefix='lazulite-pack-')
-        output = Path(tmp_dir.name) / f"packaged{format_info['extension']}"
-        try:
-            target_track = body.target_track_id if body.stpp_action == 'overwrite' else None
-            result = dict(publisher.publish(ttml, path, output, body.lrc_text, target_track) or {})
-            report = result.get("report")
-            if not isinstance(report, dict) or report.get("passed") is not True:
-                raise PublishInvalid("publisher report did not pass")
-            handle = output.open('rb')
-        except (PublishInvalid, PublishingError, ValueError) as exc:
-            tmp_dir.cleanup()
-            raise HTTPException(422, {'code': 'publish_failed', 'message': str(exc), 'retryable': False}) from exc
-        except Exception as exc:
-            tmp_dir.cleanup()
-            raise HTTPException(500, {'code': 'packaging_failed', 'message': '音频打包失败，请检查服务日志', 'retryable': True}) from exc
+            except Exception as exc:
+                tmp_dir.cleanup()
+                raise HTTPException(500, {'code': 'packaging_failed', 'message': '音频打包失败，请检查服务日志', 'retryable': True}) from exc
 
         filename = download_filename(bound[1], format_info["extension"])
 

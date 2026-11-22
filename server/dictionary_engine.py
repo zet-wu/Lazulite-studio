@@ -1,7 +1,6 @@
 """Fixed-reading prefix lookup and an optimal-path DAG; offsets are code points."""
 from dataclasses import dataclass
 import json
-from threading import Event
 
 import regex
 

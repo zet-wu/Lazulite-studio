@@ -25,7 +25,6 @@ class StoragePaths:
 
 def validate_database_paths(db):
     """Run before recovery/collection; never clean a partially validated library."""
-    import json
     for directory in ('projects', '.deleting'):
         for path in (db.paths.root / directory).rglob('*'):
             if path.is_symlink(): raise ValueError('数据目录含符号链接，已停止启动清理')

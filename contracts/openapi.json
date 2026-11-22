@@ -1087,7 +1087,7 @@
         }
       }
     },
-    "/api/v1/reading/analyze": {
+    "/reading/analyze": {
       "post": {
         "operationId": "analyzeCurrentReadings",
         "requestBody": {
@@ -1684,7 +1684,7 @@
         "summary": "读取当前源音频搜索元数据"
       }
     },
-    "/api/v1/reading/dictionaries": {
+    "/reading/dictionaries": {
       "get": {
         "summary": "Listing",
         "operationId": "listing_api_v1_reading_dictionaries_get",
@@ -1702,7 +1702,7 @@
         }
       }
     },
-    "/api/v1/reading/dictionaries/import": {
+    "/reading/dictionaries/import": {
       "post": {
         "summary": "Install",
         "operationId": "install_api_v1_reading_dictionaries_import_post",
@@ -1762,7 +1762,7 @@
         }
       }
     },
-    "/api/v1/reading/dictionaries/{ident}": {
+    "/reading/dictionaries/{ident}": {
       "delete": {
         "summary": "Remove",
         "operationId": "remove_api_v1_reading_dictionaries__ident__delete",
@@ -1794,7 +1794,7 @@
         }
       }
     },
-    "/api/v1/reading/dictionaries/{ident}/analyze": {
+    "/reading/dictionaries/{ident}/analyze": {
       "post": {
         "summary": "Analyze",
         "operationId": "analyze_api_v1_reading_dictionaries__ident__analyze_post",
@@ -2050,7 +2050,7 @@
         }
       }
     },
-    "/api/v1/reading/particles": {
+    "/reading/particles": {
       "post": {
         "operationId": "analyzeParticles",
         "requestBody": {
@@ -2947,225 +2947,6 @@
         },
         "additionalProperties": false
       },
-      "PublishRequest": {
-        "properties": {
-          "revision": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Revision"
-          },
-          "asset_id": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Asset Id"
-          },
-          "lrc_kind": {
-            "type": "string",
-            "enum": [
-              "none",
-              "lrc",
-              "elrc"
-            ],
-            "title": "Lrc Kind"
-          },
-          "lrc_text": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lrc Text"
-          },
-          "target_track_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Target Track Id"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "revision",
-          "asset_id",
-          "lrc_kind",
-          "lrc_text"
-        ],
-        "title": "PublishRequest"
-      },
-      "Export": {
-        "type": "object",
-        "required": [
-          "id",
-          "revision",
-          "asset_id",
-          "status",
-          "created_at",
-          "stale",
-          "report",
-          "download_url",
-          "error"
-        ],
-        "properties": {
-          "lrc_kind": {
-            "enum": [
-              "lrc",
-              "elrc"
-            ]
-          },
-          "target_track_id": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "id": {
-            "type": "string"
-          },
-          "revision": {
-            "type": "string"
-          },
-          "asset_id": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "created_at": {
-            "type": "string"
-          },
-          "stale": {
-            "type": "boolean"
-          },
-          "report": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PublishReport"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "download_url": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "error": {
-            "type": [
-              "object",
-              "null"
-            ]
-          },
-          "asset_filename": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "filename": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "container": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "format_label": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "track_id": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          }
-        }
-      },
-      "ExportList": {
-        "type": "object",
-        "required": [
-          "schema_version",
-          "items"
-        ],
-        "properties": {
-          "schema_version": {
-            "const": "studio-export-list-v1"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Export"
-            }
-          }
-        }
-      },
-      "PublishReport": {
-        "type": "object",
-        "required": [
-          "passed",
-          "audio_streams",
-          "audio_preserved",
-          "metadata_preserved",
-          "lyrics_preserved",
-          "subtitle_codec",
-          "track_id"
-        ],
-        "properties": {
-          "passed": {
-            "type": "boolean"
-          },
-          "audio_streams": {
-            "type": "integer"
-          },
-          "audio_preserved": {
-            "type": "boolean"
-          },
-          "metadata_preserved": {
-            "type": "boolean"
-          },
-          "subtitle_handler": {
-            "type": "string"
-          },
-          "subtitle_codec": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "sample_count": {
-            "type": "integer"
-          },
-          "lyrics_preserved": {
-            "type": "boolean"
-          },
-          "track_id": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          }
-        }
-      },
       "JobResult": {
         "type": "object",
         "required": [
@@ -3202,8 +2983,7 @@
           "kind": {
             "enum": [
               "alignment",
-              "vocal",
-              "publish"
+              "vocal"
             ]
           },
           "alignment": {
@@ -4025,78 +3805,6 @@
               "type": "object",
               "additionalProperties": true
             }
-          }
-        }
-      },
-      "AlignmentStart": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "revision",
-          "use_hints",
-          "line_blank",
-          "rest_blank",
-          "rest_token",
-          "clear_unmatched",
-          "merge_short_gaps",
-          "gap_threshold_ms",
-          "smart_extend",
-          "latin_normalize",
-          "strip_tone_digits",
-          "model_preview",
-          "convert_particles"
-        ],
-        "properties": {
-          "revision": {
-            "type": "string"
-          },
-          "use_hints": {
-            "type": "boolean",
-            "default": false
-          },
-          "line_blank": {
-            "type": "boolean",
-            "default": false
-          },
-          "rest_blank": {
-            "type": "boolean",
-            "default": false
-          },
-          "rest_token": {
-            "type": "boolean",
-            "default": false
-          },
-          "clear_unmatched": {
-            "type": "boolean",
-            "default": false,
-            "description": "Studio merge policy; never an acoustic parameter"
-          },
-          "merge_short_gaps": {
-            "type": "boolean",
-            "default": false,
-            "description": "Studio result policy; excluded from acoustic and decoding configuration"
-          },
-          "gap_threshold_ms": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991,
-            "default": 500,
-            "description": "Strict gap threshold in original-axis milliseconds; normalized to 500 when disabled"
-          },
-          "smart_extend": {
-            "type": "boolean"
-          },
-          "latin_normalize": {
-            "type": "boolean"
-          },
-          "strip_tone_digits": {
-            "type": "boolean"
-          },
-          "model_preview": {
-            "type": "string"
-          },
-          "convert_particles": {
-            "type": "boolean"
           }
         }
       },

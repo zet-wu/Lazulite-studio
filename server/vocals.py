@@ -1,5 +1,6 @@
 """Persistent vocal products; cancellation is honoured between real model stages."""
 from __future__ import annotations
+import inspect
 import json
 import os
 import shutil
@@ -9,8 +10,9 @@ import numpy as np
 from .engine import EngineUnavailable
 from .time_units import milliseconds
 from .runtime_devices import DeviceFailure, device_failure
+from .worker_process import WorkerCancelled, WorkerProcess
 
-class VocalCancelled(Exception): pass
+VocalCancelled = WorkerCancelled
 
 class VocalRunner:
     def __init__(self, db, root: Path, separator_factory=None, *, cleanup=True, media_lifetime=None):
@@ -19,8 +21,7 @@ class VocalRunner:
         self.separator_factory = separator_factory
         from .studio.media_lifetime import MediaLifetime
         self.media_lifetime = media_lifetime or MediaLifetime(root)
-        from .vocal_process import VocalProcess
-        self._worker = VocalProcess()
+        self._worker = WorkerProcess()
         if not cleanup: return
         # Startup has no live model worker. Discard only unregistered partial products.
         with db.connect() as c:
@@ -67,13 +68,7 @@ class VocalRunner:
             if row['source_asset_id'] != params['asset_id']: raise ValueError('人声来源不匹配')
             reuse = (row, candidate)
         elif not params.get('upload_id') and not params.get('force_separation'):
-            with self.db.connect() as c:
-                rows = c.execute('SELECT * FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id, params['asset_id'])).fetchall()
-            for row in rows:
-                candidate = json.loads(row['metadata_json'])
-                if candidate.get('source_kind') != 'upload' and self.audio_available(project_id, candidate):
-                    reuse = (row, candidate)
-                    break
+            reuse = self._find_reusable(project_id, params['asset_id'])
         if reuse:
             row, metadata = reuse
             if not params.get('retry_analysis_id') and row['status'] == 'ready':
@@ -141,11 +136,14 @@ class VocalRunner:
         audio = AudioBuffer(samples.T, rate, params['asset_id'])
         metadata.update(analysis_version='lazulite-vocal-core-v2-main-rms', runtime={'numpy': np.__version__, 'soundfile': sf.__version__, 'scipy': scipy.__version__})
         config = VocalConfig()
-        analysis = analyze_vocals(audio, config=config)
         # Public Lazulite profile: centered frames of its main-vocal signal.
         # main_rms has no temporal smoothing; activity/split_activity are different
         # normalized, smoothed curves and are not the Studio energy display.
         profile = build_activity_profile(audio, config=config)
+        if 'profile' in inspect.signature(analyze_vocals).parameters:
+            analysis = analyze_vocals(audio, config=config, profile=profile)
+        else:
+            analysis = analyze_vocals(audio, config=config)
         np.save(directory / 'energy.npy', profile['main_rms'].astype(np.float32), allow_pickle=False)
         del profile
         metadata.update({'segments': [{'id': s.id, 'beginMs': milliseconds(s.core_start), 'endMs': milliseconds(s.core_end)} for s in analysis.segments],
@@ -159,14 +157,18 @@ class VocalRunner:
     def result(project_id, metadata):
         return {'kind': 'vocal', 'analysis_id': metadata['id'], 'binding': {'project_id': project_id, 'asset_id': metadata['source_asset_id']}, 'engine': metadata['model']}
 
-    def reusable(self, project_id, asset_id):
+    def _find_reusable(self, project_id, asset_id):
         with self.db.connect() as c:
-            rows = c.execute('SELECT metadata_json FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id,asset_id)).fetchall()
+            rows = c.execute('SELECT * FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id, asset_id)).fetchall()
         for row in rows:
-            metadata = json.loads(row[0])
-            if metadata.get('source_kind') != 'upload' and self.audio_available(project_id,metadata):
-                return metadata['id']
+            candidate = json.loads(row['metadata_json'])
+            if candidate.get('source_kind') != 'upload' and self.audio_available(project_id, candidate):
+                return row, candidate
         return None
+
+    def reusable(self, project_id, asset_id):
+        found = self._find_reusable(project_id, asset_id)
+        return found[1]['id'] if found else None
 
     def generation_settings(self, asset_id, model_name=None, device=None):
         from lazulite.audio.separation import DemucsConfig

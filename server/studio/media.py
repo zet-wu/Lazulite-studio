@@ -130,7 +130,7 @@ def content_hash(path: Path, *, chunk_size: int = 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
-def _asset_path(root: Path, digest: str) -> Path:
+def _asset_path(root: Path) -> Path:
     return root / "source" / "original"
 
 
@@ -142,7 +142,6 @@ class MediaService:
         self.ffmpeg = ffmpeg
         self.ffprobe = ffprobe
         (self.root / "source").mkdir(parents=True, exist_ok=True)
-        (self.root / "cache").mkdir(parents=True, exist_ok=True)
 
     def import_asset(self, temporary_path: Path, original_name: str | None = None, *, verified_sha256: str | None = None) -> Asset:
         """Import staged bytes; callers may supply the digest computed from the upload/archive stream."""
@@ -152,7 +151,7 @@ class MediaService:
         digest = verified_sha256 if verified_sha256 is not None else content_hash(source)
         name = original_name or source.name
         probe = probe_media(source, ffprobe=self.ffprobe)
-        destination = _asset_path(self.root, digest)
+        destination = _asset_path(self.root)
         destination.parent.mkdir(parents=True, exist_ok=True)
         if not destination.exists():
             fd, temporary_name = tempfile.mkstemp(prefix=f".{digest}.upload-", dir=destination.parent)
@@ -224,9 +223,15 @@ class MediaService:
         bucket = max(1, round(proxy.rate / 100)) * proxy.channels
         count = math.ceil(len(samples) / bucket)
         base = np.empty((count, 2), dtype=np.float32)
-        for index in range(count):
-            block = samples[index * bucket:(index + 1) * bucket]
-            base[index] = (int(block.min()) / 32768, int(block.max()) / 32768)
+        full = len(samples) // bucket
+        if full:
+            blocks = samples[:full * bucket].reshape(full, bucket)
+            base[:full, 0] = blocks.min(axis=1).astype(np.float32) / np.float32(32768.0)
+            base[:full, 1] = blocks.max(axis=1).astype(np.float32) / np.float32(32768.0)
+        if full < count:
+            tail = samples[full * bucket:]
+            base[full, 0] = np.float32(int(tail.min()) / 32768)
+            base[full, 1] = np.float32(int(tail.max()) / 32768)
         levels = [base]
         for _ in range(15):
             previous = levels[-1]

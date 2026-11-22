@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 import math
-import shutil
 import unicodedata
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any
-from .time_units import milliseconds, clock, serialize_ttml
+from .time_units import milliseconds, clock, serialize_ttml, try_parse_media_seconds
 
 TTML_NS = "http://www.w3.org/ns/ttml"
 TTP_NS = "http://www.w3.org/ns/ttml#parameter"
@@ -20,31 +18,9 @@ class PublishInvalid(ValueError):
 
 class MediaPublisher:
     """Single container-writing boundary for direct streaming packaging."""
-    def available(self) -> bool:
-        return shutil.which("ffprobe") is not None
-
     def publish(self, ttml: bytes | None, asset_path: Path, output: Path, lrc: str | None, target_track_id: int | None):
         from .packaging import package_media
         return package_media(asset_path, output, ttml, lrc, target_track_id)
-
-
-def _time(value: str | None) -> float | None:
-    if value is None:
-        return None
-    value = value.strip()
-    try:
-        if value.endswith("ms"):
-            return float(value[:-2]) / 1000
-        if value.endswith("s"):
-            return float(value[:-1])
-        if ':' not in value: return float(value)
-        parts = value.split(":")
-        if len(parts) == 2: return int(parts[0]) * 60 + float(parts[1])
-        if len(parts) == 3:
-            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
-    except (TypeError, ValueError):
-        return None
-    return None
 
 
 def _untimed_space(node, *, body=False):
@@ -53,8 +29,8 @@ def _untimed_space(node, *, body=False):
         unicodedata.category(char) == 'Zs' or body and char in '\t\r\n\u2028\u2029\ufeff' for char in text)
 
 
-def validate_output_ttml(path: str | Path, *, xml: bool = False) -> dict[str, Any]:
-    """Validate ordinary TTML output, retaining optional body and Ruby endpoints."""
+def validate_output_ttml(path: str | Path, *, xml: bool = False) -> ET.Element:
+    """Validate ordinary TTML output, returning the parsed root element."""
     try:
         from .documents import validate_ttml
         raw = str(path) if xml else Path(path).read_text(encoding="utf-8")
@@ -64,7 +40,6 @@ def validate_output_ttml(path: str | Path, *, xml: bool = False) -> dict[str, An
     for agent in root.iter("{http://www.w3.org/ns/ttml#metadata}agent"):
         if agent.get("type") not in {"person", "character", "group", "organization", "other"}:
             raise PublishInvalid(f"歌手 {agent.get('{http://www.w3.org/XML/1998/namespace}id')}：缺失或非法 type")
-    lines = root.findall(".//{%s}p" % TTML_NS)
     # Translation drafts never borrow body timing or become plain text on publication.
     for translation in root.iter():
         if translation.tag.rsplit('}', 1)[-1] not in {'translation', 'transliteration'}:
@@ -94,21 +69,20 @@ def validate_output_ttml(path: str | Path, *, xml: bool = False) -> dict[str, An
         if any(key in {f"{{{TTP_NS}}}{name}" for name in unsupported_clock} for key in element.attrib):
             raise PublishInvalid("unsupported TTML clock parameter")
         begin, end = element.get("begin"), element.get("end")
-        for value in (begin, end):
-            if value is not None:
-                seconds = _time(value)
-                if seconds is None or not math.isfinite(seconds) or seconds < 0:
-                    raise PublishInvalid("timing must be finite and non-negative")
-        if begin is not None and end is not None and _time(end) < _time(begin):
+        begin_s = try_parse_media_seconds(begin) if begin is not None else None
+        end_s = try_parse_media_seconds(end) if end is not None else None
+        if (begin is not None and (begin_s is None or not math.isfinite(begin_s) or begin_s < 0)) or (
+            end is not None and (end_s is None or not math.isfinite(end_s) or end_s < 0)
+        ):
+            raise PublishInvalid("timing must be finite and non-negative")
+        if begin_s is not None and end_s is not None and end_s < begin_s:
             raise PublishInvalid("end timing precedes begin")
-    return {"passed": True, "line_count": len(lines)}
+    return root
 
 
 def serialize_output_ttml(snapshot: dict) -> bytes:
     """Output copy with the same optional endpoints and whitespace as ordinary TTML."""
-    source_xml = snapshot['lyrics']['draftTtml']
-    validate_output_ttml(source_xml, xml=True)
-    root = ET.fromstring(source_xml)
+    root = validate_output_ttml(snapshot['lyrics']['draftTtml'], xml=True)
     ttm = '{http://www.w3.org/ns/ttml#metadata}'
     tts = '{http://www.w3.org/ns/ttml#styling}'
     sidecar_units = set()
@@ -136,7 +110,7 @@ def serialize_output_ttml(snapshot: dict) -> bytes:
     for element in root.iter():
         for name in ('begin', 'end', 'dur'):
             if element.get(name) is not None:
-                element.set(name, clock(milliseconds(_time(element.get(name)))))
+                element.set(name, clock(milliseconds(try_parse_media_seconds(element.get(name)))))
         for key in list(element.attrib):
             if key.startswith('{'+STUDIO_NS+'}'): del element.attrib[key]
     return serialize_ttml(root).encode('utf-8')

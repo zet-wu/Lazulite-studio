@@ -93,8 +93,8 @@ def test_queued_job_can_be_cancelled_while_executor_is_blocked(tmp_path):
     assert engine.started.wait(1)
     with db.transaction() as c:
         c.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)", ("p2", "demo", "a", None, "t", "t"))
-    from server.revisions import RevisionStore
-    revision = RevisionStore(db, tmp_path / 'projects').create_initial('p2', operation_id='init-p2')['id']
+    from server.revisions import INITIAL_TTML, RevisionStore
+    revision = RevisionStore(db, tmp_path / 'projects').create('p2', initial_project(INITIAL_TTML), None, operation_id='init-p2')['id']
     second = service.create("p2", "alignment", {**request, 'revision': revision})
     assert service.cancel(second["id"])["status"] == "cancelled"
     engine.release.set()

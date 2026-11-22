@@ -3,14 +3,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
-import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .atomic_file import write_atomic
 from .db import Database
-from .project_document import ProjectSnapshot, initial_project, validate_project, read_project
+from .project_document import ProjectSnapshot, load_project, validate_project
 
 INITIAL_TTML = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div/></body></tt>'
 logger = logging.getLogger(__name__)
@@ -29,12 +28,6 @@ class RevisionStore:
     def __init__(self, db: Database, root: str | Path):
         self.db, self.root = db, Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
-
-    def create_initial(
-        self, project_id: str, *, operation_id: str, subject: str = "local"
-    ) -> dict:
-        return self.create(project_id, initial_project(INITIAL_TTML), None,
-                           operation_id=operation_id, subject=subject)
 
     def create(
         self,
@@ -57,69 +50,70 @@ class RevisionStore:
                 ).encode()
             ).hexdigest()
         now = datetime.now(timezone.utc).isoformat()
-        with self.db.transaction() as conn:
-            if operation_id:
-                old = conn.execute(
-                    "SELECT response,request_hash FROM idempotency WHERE key=?",
-                    (operation_id,),
-                ).fetchone()
-                if old:
-                    if old[1] != request_hash:
-                        raise IdempotencyConflict(operation_id)
-                    return json.loads(old[0])
-            row = conn.execute(
-                "SELECT current_revision FROM projects WHERE id=?", (project_id,)
-            ).fetchone()
-            if row is None:
-                raise KeyError(project_id)
-            if row[0] != base:
-                raise RevisionConflict(row[0])
-            revision = uuid.uuid4().hex
-            path = self.root / project_id / "revisions" / f"{revision}.json"
-            self._write_atomic(path, encoded)
-            try:
-                conn.execute(
-                    "INSERT INTO revisions(id,project_id,parent_id,project_path,created_at) VALUES(?,?,?,?,?)",
-                    (revision, project_id, base, self.db.paths.store(path), now),
-                )
-                if (
-                    conn.execute(
-                        "UPDATE projects SET current_revision=?,updated_at=? WHERE id=? AND current_revision IS ?",
-                        (revision, now, project_id, base),
-                    ).rowcount
-                    != 1
-                ):
-                    raise RevisionConflict(row[0])
-                result = {
-                    "id": revision,
-                    "etag": f'"{revision}"',
-                    "created_at": now,
-                }
+        with self.db.project_write(project_id):
+            with self.db.transaction() as conn:
                 if operation_id:
+                    old = conn.execute(
+                        "SELECT response,request_hash FROM idempotency WHERE key=?",
+                        (operation_id,),
+                    ).fetchone()
+                    if old:
+                        if old[1] != request_hash:
+                            raise IdempotencyConflict(operation_id)
+                        return json.loads(old[0])
+                row = conn.execute(
+                    "SELECT current_revision FROM projects WHERE id=?", (project_id,)
+                ).fetchone()
+                if row is None:
+                    raise KeyError(project_id)
+                if row[0] != base:
+                    raise RevisionConflict(row[0])
+                revision = uuid.uuid4().hex
+                path = self.root / project_id / "revisions" / f"{revision}.json"
+                write_atomic(path, encoded)
+                try:
                     conn.execute(
-                        "INSERT INTO idempotency VALUES(?,?,?,?,?)",
-                        (operation_id, subject, request_hash, json.dumps(result), now),
+                        "INSERT INTO revisions(id,project_id,parent_id,project_path,created_at) VALUES(?,?,?,?,?)",
+                        (revision, project_id, base, self.db.paths.store(path), now),
                     )
-            except Exception:
-                path.unlink(missing_ok=True)
-                raise
-        try: self.collect(project_id)
-        except OSError: logger.warning('修订回收待重试：%s', project_id, exc_info=True)
+                    if (
+                        conn.execute(
+                            "UPDATE projects SET current_revision=?,updated_at=? WHERE id=? AND current_revision IS ?",
+                            (revision, now, project_id, base),
+                        ).rowcount
+                        != 1
+                    ):
+                        raise RevisionConflict(row[0])
+                    result = {
+                        "id": revision,
+                        "etag": f'"{revision}"',
+                        "created_at": now,
+                    }
+                    if operation_id:
+                        conn.execute(
+                            "INSERT INTO idempotency VALUES(?,?,?,?,?)",
+                            (operation_id, subject, request_hash, json.dumps(result), now),
+                        )
+                except Exception:
+                    path.unlink(missing_ok=True)
+                    raise
+            try: self._collect_unlocked(project_id)
+            except OSError: logger.warning('修订回收待重试：%s', project_id, exc_info=True)
         return result
 
     def collect(self, project_id: str) -> None:
-        """Keep current snapshots and inputs still used by active jobs.
+        """Keep current snapshots and inputs still used by active jobs."""
+        with self.db.project_write(project_id):
+            self._collect_unlocked(project_id)
 
-        Reads and enqueue use the same SQLite write transaction as collection,
-        including subprocess readers. Terminal results keep identity, not bytes.
-        """
+    def _collect_unlocked(self, project_id: str) -> None:
         paths = []
         with self.db.transaction() as conn:
             rows = conn.execute('SELECT id,project_path FROM revisions WHERE project_id=?', (project_id,)).fetchall()
             current = conn.execute('SELECT current_revision FROM projects WHERE id=?', (project_id,)).fetchone()
             if not current: return
             protected = {current[0]}
-            for job in conn.execute("SELECT request_json FROM jobs WHERE project_id=? AND kind IN ('alignment','publish') AND status IN ('queued','running','cancel_requested')", (project_id,)):
+            for job in conn.execute("SELECT request_json FROM jobs WHERE project_id=? AND kind='alignment' AND status IN ('queued','running','cancel_requested')", (project_id,)):
                 request = json.loads(job[0])
                 protected.add(request.get('revision'))
             for row in rows:
@@ -137,44 +131,24 @@ class RevisionStore:
 
     def read_bound(self, project_id: str, revision: str | None = None) -> tuple[str, dict, str | None]:
         """Read an immutable revision and return (revision id, project snapshot)."""
-        with self.db.transaction() as conn:
-            row = conn.execute(
-                "SELECT p.current_revision, r.id, r.project_path, p.source_asset_id FROM projects p "
-                "JOIN revisions r ON r.project_id=p.id AND r.id=COALESCE(?, p.current_revision) "
-                "WHERE p.id=?",
-                (revision, project_id),
-            ).fetchone()
-            if row is None:
-                raise KeyError(project_id if revision is None else revision)
-            path = self.db.paths.resolve(row[2])
-            root = self.root.resolve()
-            if root not in path.parents or path.suffix != ".json":
-                raise ValueError("revision path is outside revision store")
+        with self.db.project_read(project_id):
+            with self.db.connect() as conn:
+                row = conn.execute(
+                    "SELECT p.current_revision, r.id, r.project_path, p.source_asset_id FROM projects p "
+                    "JOIN revisions r ON r.project_id=p.id AND r.id=COALESCE(?, p.current_revision) "
+                    "WHERE p.id=?",
+                    (revision, project_id),
+                ).fetchone()
+                if row is None:
+                    raise KeyError(project_id if revision is None else revision)
+                path = self.db.paths.resolve(row[2])
+                root = self.root.resolve()
+                if root not in path.parents or path.suffix != ".json":
+                    raise ValueError("revision path is outside revision store")
             try:
-                return row[1], read_project(path), row[3]
-            except (OSError, UnicodeError) as exc:
+                return row[1], load_project(path), row[3]
+            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
                 raise ValueError("revision cannot be read") from exc
-
-    def _write_atomic(self, destination: Path, content: bytes) -> None:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        fd, name = tempfile.mkstemp(
-            prefix=f".{destination.name}-", dir=destination.parent
-        )
-        temporary = Path(name)
-        try:
-            with os.fdopen(fd, "wb") as handle:
-                handle.write(content)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, destination)
-            self._fsync_dir(destination.parent)
-        finally:
-            temporary.unlink(missing_ok=True)
-
-    @staticmethod
-    def _fsync_dir(path: Path) -> None:
-        from .atomic_file import fsync_directory
-        fsync_directory(path)
 
     def recover(self) -> None:
         with self.db.transaction() as conn:

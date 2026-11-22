@@ -1,12 +1,11 @@
 """Saved Studio draft -> independent Japanese request, on Unicode code point axes."""
 from dataclasses import asdict, replace
-from decimal import Decimal
-import json
 import xml.etree.ElementTree as ET
 from lazulite.models.japanese import JapaneseAlignmentRequest, JapaneseLine, JapaneseUnit, StartHint
 from lazulite.alignment.japanese.input import prepare_input, InputOptions, nonpronouncing
 from lazulite.alignment.japanese.backend import MMS_VOCAB
 from .amll_compatibility import TT, TM, XML, ST, RUBY
+from .time_units import parse_ttml_seconds
 
 
 def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=True, strip_tone_digits=False, convert_particles=False, particle_analyzer=None):
@@ -21,7 +20,8 @@ def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=
         return value
     by_id = {identity(row): row for row in rows}
     order = snapshot['lineOrder']
-    rows = [by_id[key] for key in order] + [row for row in rows if identity(row) not in order]
+    order_set = set(order)
+    rows = [by_id[key] for key in order] + [row for row in rows if identity(row) not in order_set]
     skipped = set(snapshot['editing']['skippedAlignmentLineIds'])
     mapping, lines, unknown, hinted, emitted = [], [], set(), 0, 0
     scope = []
@@ -51,8 +51,7 @@ def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=
                 mapping.append({'unit_id':uid,'object_id':uid,'word_id':identity(word),'line_id':line_id,'kind':'ruby' if rubies else 'word'})
         hint = None
         if 'begin' not in row.get(ST+'null', '').split() and row.get('begin') is not None:
-            value = Decimal(0)
-            for part in row.get('begin').split(':'): value = value*60 + Decimal(part)
+            value = parse_ttml_seconds(row.get('begin'))
             hinted += 1
             if use_hints: hint = StartHint(float(value), 'unknown')
         lines.append(JapaneseLine(line_id, text, tuple(units), hint))
@@ -62,9 +61,12 @@ def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=
             from .reading import SudachiReadingProposer
             particle_analyzer = SudachiReadingProposer()
         ranges = particle_analyzer.particles([{'id': line.line_id, 'text': line.text} for line in lines])
+        positions_by_line: dict[str, dict[int, str]] = {}
+        for item in ranges:
+            positions_by_line.setdefault(item['line_id'], {})[item['start']] = item['reading']
         converted = []
         for line in lines:
-            positions = {item['start']: item['reading'] for item in ranges if item['line_id'] == line.line_id}
+            positions = positions_by_line.get(line.line_id, {})
             units = tuple(replace(unit, reading=''.join(positions.get(unit.source_range[0] + index, char) for index, char in enumerate(unit.reading)))
                           if unit.reading_source == 'body' else unit for unit in line.units)
             converted.append(replace(line, units=units))

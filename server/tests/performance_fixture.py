@@ -7,7 +7,8 @@ from tempfile import TemporaryDirectory
 from server.app import create_app
 from server.auth import Settings
 from server.db import Database
-from server.revisions import RevisionStore
+from server.project_document import initial_project
+from server.revisions import INITIAL_TTML, RevisionStore
 from server.tests.media_fixture import add_media_project, add_real_vocal_fixture
 
 
@@ -18,7 +19,7 @@ def create_performance_app():
     store = RevisionStore(db, root / "projects")
     with db.transaction() as c:
         c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)', ('no-music','无音乐性能夹具',None,None,'now','now'))
-    store.create_initial('no-music', operation_id='performance-empty')
+    store.create('no-music', initial_project(INITIAL_TTML), None, operation_id='performance-empty')
     synthetic = root / "synthetic.wav"
     subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=640.123", "-ac", "2", str(synthetic)], check=True)
     sources = {"synthetic": synthetic}

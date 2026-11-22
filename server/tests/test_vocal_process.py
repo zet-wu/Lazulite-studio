@@ -2,8 +2,7 @@ import os
 import threading
 import time
 import pytest
-from server.vocal_process import VocalProcess
-from server.vocals import VocalCancelled
+from server.worker_process import WorkerCancelled, WorkerProcess
 from server.tests.test_vocals import setup, wait
 
 @pytest.fixture
@@ -12,13 +11,13 @@ def isolated_worker(monkeypatch, tmp_path):
     (root/'htdemucs.yaml').write_text('models: [test]')
     (root/'test-weights.th').write_bytes(b'fixture-weights')
     monkeypatch.setenv('STUDIO_VOCAL_MODELS_DIR',str(root.parent))
-    from server import vocal_process
-    original = vocal_process.subprocess.Popen
+    from server import worker_process
+    original = worker_process.subprocess.Popen
     def spawn(args, **kwargs):
         if args[-1] == 'server.vocal_worker':
             args = [*args[:-1], 'server.tests.vocal_worker_fixture']
         return original(args, **kwargs)
-    monkeypatch.setattr(vocal_process.subprocess, 'Popen', spawn)
+    monkeypatch.setattr(worker_process.subprocess, 'Popen', spawn)
 
 def test_api_remains_responsive_while_model_holds_child_gil(tmp_path, isolated_worker):
     client, db = setup(tmp_path, factory=None)
@@ -53,8 +52,8 @@ def test_cancel_at_boundary_and_shutdown_reap_child(tmp_path, isolated_worker):
     from server.db import Database
     db=Database(tmp_path/'studio.sqlite3')
     request={'database':db.path,'root':str(tmp_path/'projects'),'project_id':'p','asset_path':str(tmp_path/'source.wav'),'params':{},'job_id':'cancel'}
-    runner=VocalProcess()
-    with pytest.raises(VocalCancelled): runner.run(request,lambda *args:None,lambda:True)
+    runner=WorkerProcess()
+    with pytest.raises(WorkerCancelled): runner.run(request,lambda *args:None,lambda:True)
     started=threading.Event();errors=[]
     request['params']={'seconds':20}
     def run():

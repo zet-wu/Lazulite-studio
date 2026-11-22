@@ -5,20 +5,12 @@ import subprocess
 from pathlib import Path
 import pytest
 
-from server.publishing import extract_stpp, publish_stpp
+from server.publishing import extract_stpp, find_box, iter_boxes, publish_stpp, read_box_payload, scan_top, stpp_tracks
 
 
 TTML = b'''<?xml version="1.0" encoding="UTF-8"?>
 <tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="0s" end="1s">hello</p></body></tt>
 '''
-
-
-def _m4a(path: Path, codec: str = "aac", faststart: bool = False) -> None:
-    flags = ["-movflags", "+faststart"] if faststart else []
-    subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-metadata", "title=Publisher test", "-metadata", "artist=Studio", "-c:a", codec, *flags, str(path)],
-        check=True,
-    )
 
 
 def _pcm_hash(path: Path) -> str:
@@ -30,9 +22,9 @@ def _pcm_hash(path: Path) -> str:
 
 
 @pytest.mark.parametrize("codec,faststart", [("aac", False), ("aac", True), ("alac", False), ("alac", True)])
-def test_publish_adds_one_stpp_sample_and_preserves_audio_metadata(tmp_path: Path, codec: str, faststart: bool) -> None:
-    source, output = tmp_path / "source.m4a", tmp_path / "published.m4a"
-    _m4a(source, codec, faststart)
+def test_publish_adds_one_stpp_sample_and_preserves_audio_metadata(tmp_path: Path, synthetic_audio, codec: str, faststart: bool) -> None:
+    source = synthetic_audio(codec=codec, extension="m4a", faststart=faststart, with_metadata=True)
+    output = tmp_path / "published.m4a"
     report = publish_stpp(source, TTML, output)
 
     assert report.subtitle_handler == "subt"
@@ -41,13 +33,12 @@ def test_publish_adds_one_stpp_sample_and_preserves_audio_metadata(tmp_path: Pat
     assert report.audio_streams == 1
     assert report.metadata_preserved
     assert extract_stpp(output) == TTML
-    from server.publishing import _scan_top, _read_payload, _boxes, _find
-    moov = next(box for box in _scan_top(output) if box[0] == b'moov')
-    for kind, trak, _, _ in _boxes(_read_payload(output, *moov[1:])):
+    moov = next(box for box in scan_top(output) if box[0] == b'moov')
+    for kind, trak, _, _ in iter_boxes(read_box_payload(output, *moov[1:])):
         if kind != b'trak': continue
-        stbl = _find(_find(_find(trak, b'mdia'), b'minf'), b'stbl')
-        if not any(kind == b'stpp' for kind, *_ in _boxes(_find(stbl, b'stsd')[8:])): continue
-        table = _find(stbl, b'co64')
+        stbl = find_box(find_box(find_box(trak, b'mdia'), b'minf'), b'stbl')
+        if not any(kind == b'stpp' for kind, *_ in iter_boxes(find_box(stbl, b'stsd')[8:])): continue
+        table = find_box(stbl, b'co64')
         count, offset = struct.unpack_from('>IQ', table, 4)
         assert count == 1
         with output.open('rb') as stream:
@@ -66,9 +57,8 @@ def test_publish_adds_one_stpp_sample_and_preserves_audio_metadata(tmp_path: Pat
     assert '"codec_tag_string": "stpp"' in probe.stdout
 
 
-def test_publish_rejects_malformed_ttml(tmp_path: Path) -> None:
-    source = tmp_path / "source.m4a"
-    _m4a(source)
+def test_publish_rejects_malformed_ttml(tmp_path: Path, synthetic_audio) -> None:
+    source = synthetic_audio(codec="aac", extension="m4a")
     try:
         publish_stpp(source, b"<tt>", tmp_path / "out.m4a")
     except ValueError as error:
@@ -77,10 +67,9 @@ def test_publish_rejects_malformed_ttml(tmp_path: Path) -> None:
         raise AssertionError("malformed TTML was accepted")
 
 
-def test_publish_adds_second_stpp_track_preserving_existing(tmp_path: Path) -> None:
-    from server.publishing import stpp_tracks
-    source, first, second = tmp_path / "source.m4a", tmp_path / "first.m4a", tmp_path / "second.m4a"
-    _m4a(source)
+def test_publish_adds_second_stpp_track_preserving_existing(tmp_path: Path, synthetic_audio) -> None:
+    source = synthetic_audio(codec="aac", extension="m4a")
+    first, second = tmp_path / "first.m4a", tmp_path / "second.m4a"
     publish_stpp(source, TTML, first)
     second_ttml = TTML.replace(b"hello", b"second")
     publish_stpp(first, second_ttml, second)

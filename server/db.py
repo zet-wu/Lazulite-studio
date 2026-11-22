@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 from pathlib import Path
 from contextlib import contextmanager
 from typing import Iterator
@@ -48,24 +49,115 @@ CREATE TABLE IF NOT EXISTS job_idempotency (
 """
 
 
+class _ProjectRWLock:
+    """Reentrant per-project reader-writer lock (writer-preferring for fresh readers)."""
+
+    def __init__(self) -> None:
+        self._cond = threading.Condition()
+        self._readers: dict[int, int] = {}
+        self._writer_tid: int | None = None
+        self._writer_depth = 0
+        self._waiting_writers = 0
+
+    def acquire_read(self) -> None:
+        tid = threading.get_ident()
+        with self._cond:
+            if self._writer_tid == tid:
+                self._writer_depth += 1
+                return
+            if tid in self._readers:
+                self._readers[tid] += 1
+                return
+            while self._writer_tid is not None or self._waiting_writers > 0:
+                self._cond.wait()
+            self._readers[tid] = 1
+
+    def release_read(self) -> None:
+        tid = threading.get_ident()
+        with self._cond:
+            if self._writer_tid == tid:
+                self._writer_depth -= 1
+                return
+            count = self._readers[tid] - 1
+            if count:
+                self._readers[tid] = count
+            else:
+                del self._readers[tid]
+                if not self._readers:
+                    self._cond.notify_all()
+
+    def acquire_write(self) -> None:
+        tid = threading.get_ident()
+        with self._cond:
+            if self._writer_tid == tid:
+                self._writer_depth += 1
+                return
+            self._waiting_writers += 1
+            try:
+                while self._writer_tid is not None or self._readers:
+                    self._cond.wait()
+            finally:
+                self._waiting_writers -= 1
+            self._writer_tid = tid
+            self._writer_depth = 1
+
+    def release_write(self) -> None:
+        with self._cond:
+            self._writer_depth -= 1
+            if self._writer_depth == 0:
+                self._writer_tid = None
+                self._cond.notify_all()
+
+
 class Database:
     def __init__(self, path: str | Path):
         self.path = str(Path(path).resolve())
         from .storage_paths import StoragePaths
         self.paths = StoragePaths(Path(self.path).parent)
+        self._project_locks_guard = threading.Lock()
+        self._project_locks: dict[str, _ProjectRWLock] = {}
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
             version = conn.execute('PRAGMA user_version').fetchone()[0]
             if version != 6 and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
                 raise RuntimeError('旧项目存储不兼容（需要 v6）；请使用当前格式的资料库')
             conn.executescript(SCHEMA)
             conn.execute('PRAGMA user_version=6')
 
+    def _project_lock(self, project_id: str) -> _ProjectRWLock:
+        with self._project_locks_guard:
+            lock = self._project_locks.get(project_id)
+            if lock is None:
+                lock = _ProjectRWLock()
+                self._project_locks[project_id] = lock
+            return lock
+
+    @contextmanager
+    def project_read(self, project_id: str) -> Iterator[None]:
+        lock = self._project_lock(project_id)
+        lock.acquire_read()
+        try:
+            yield
+        finally:
+            lock.release_read()
+
+    @contextmanager
+    def project_write(self, project_id: str) -> Iterator[None]:
+        lock = self._project_lock(project_id)
+        lock.acquire_write()
+        try:
+            yield
+        finally:
+            lock.release_write()
+
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
         conn = sqlite3.connect(self.path, timeout=10, isolation_level=None)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("PRAGMA synchronous=NORMAL")
         try:
             yield conn
         finally:

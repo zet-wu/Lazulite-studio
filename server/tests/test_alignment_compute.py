@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 from server.tests.test_alignment import prepare
 from server.tests.test_vocals import Separator
-from server.project_document import read_project
 from server.revisions import RevisionStore
 from server.alignment import run_alignment,AlignmentRunner
 from lazulite.alignment.japanese.stages import FrameMap

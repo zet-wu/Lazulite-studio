@@ -23,7 +23,7 @@ def build_storage_router(db, root, *, auth, project_exists):
     router = APIRouter()
     @router.get('/projects/{pid}/storage')
     def storage(pid: str, _=Depends(auth)):
-        with db.transaction():
+        with db.project_read(pid):
             project_exists(pid)
             try: return project_storage(root / 'projects' / pid)
             except OSError as exc: raise HTTPException(503, '项目空间统计失败，请刷新重试') from exc

@@ -1,5 +1,5 @@
 import json,sys,time,os
-from server.vocal_process import PREFIX
+from server.worker_process import PREFIX
 from server.db import Database
 from server.alignment import AlignmentRunner
 from server.alignment_projection import project_alignment

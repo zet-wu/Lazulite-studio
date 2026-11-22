@@ -33,7 +33,8 @@ def validate_amll(snapshot, root):
             background_ids.add(bg.get(ST+'id') or bg.get(XML+'id'))
             check_line(bg,refs(bg) or refs(line),refs(line))
     before=snapshot['lineOrder']
-    if len(set(before))!=len(before) or any(key not in background_ids|line_ids for key in before):raise ValueError('背景前置引用无效')
+    valid_ids = background_ids | line_ids
+    if len(set(before))!=len(before) or any(key not in valid_ids for key in before):raise ValueError('背景前置引用无效')
     for key in issues:
         if flags[key] or flags['simplified'] and key in ('noChorus','noWordAgents','noIndependentBackground'):
             raise ValueError(f'AMLL 项目限制不满足：{key}')

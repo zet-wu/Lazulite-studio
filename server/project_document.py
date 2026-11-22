@@ -56,9 +56,9 @@ def initial_project(ttml: str) -> dict:
     return {'schemaVersion': 'studio-project-v9', 'karaoke': initial_karaoke(ttml), 'amll': dict(DEFAULTS), 'lineOrder': [],
             'editing': {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
 
-def read_project(path: str | Path) -> dict:
-    snapshot = _validate_snapshot(ProjectSnapshot.model_validate_json(Path(path).read_text(encoding='utf-8')))
-    return snapshot
+def load_project(path: str | Path) -> dict:
+    """Fast load of an immutable, already-validated persisted revision snapshot."""
+    return json.loads(Path(path).read_text(encoding='utf-8'))
 
 
 def validate_project(value: dict | ProjectSnapshot, conn, project_id: str) -> dict:
@@ -93,7 +93,7 @@ def _validate_snapshot(model: ProjectSnapshot) -> dict:
 
 
 def validate_editing(snapshot, root):
-    from decimal import Decimal
+    from .time_units import milliseconds, parse_ttml_seconds
     studio = '{urn:lazulite:studio:draft}'
     tt = '{http://www.w3.org/ns/ttml}'
     tts = '{http://www.w3.org/ns/ttml#styling}'
@@ -133,10 +133,7 @@ def validate_editing(snapshot, root):
     def time(node, side):
         if side in node.get(studio+'null', '').split(): return None
         raw = node.get(side)
-        if raw is None: return None
-        value = Decimal(0)
-        for part in raw.split(':'): value = value * 60 + Decimal(part)
-        return int(value * 1000)
+        return milliseconds(parse_ttml_seconds(raw)) if raw is not None else None
     for source, target in editing['endLinks'].items():
         if source not in lines or target not in lines or source == target or source in backgrounds or target in backgrounds: raise DocumentInvalid('end_link_invalid_reference', f'行尾链接 {source} → {target} 不合法', object_id=source, target_id=target)
         line, destination = lines[source], lines[target]

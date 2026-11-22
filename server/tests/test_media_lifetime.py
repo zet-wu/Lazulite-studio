@@ -74,6 +74,7 @@ def test_startup_reclaims_only_disposable_derivatives(tmp_path):
     with client:
         source = (tmp_path/'projects/p/source/original').read_bytes()
     cache = tmp_path/'projects/p/cache'
+    cache.mkdir(parents=True, exist_ok=True)
     (cache/'source-hash.wav').write_bytes(b'proxy')
     peaks = cache/'source-hash.peaks-v1'; peaks.mkdir(); (peaks/'l0.peaks').write_bytes(b'peaks')
     (cache/'other').write_bytes(b'keep')

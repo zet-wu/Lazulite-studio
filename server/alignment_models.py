@@ -1,4 +1,5 @@
 """Alignment catalog and frozen execution resources, independent of project data."""
+from collections import OrderedDict
 from dataclasses import asdict
 import os
 from pathlib import Path
@@ -19,8 +20,14 @@ def model_snapshot(path):
 
 def check_snapshot(snapshot):
     try:
-        if snapshot != model_snapshot(snapshot['path']):
-            raise ValueError('模型文件已改变，请重新预览并发起任务')
+        files = snapshot['files']
+        if not isinstance(files, list):
+            raise TypeError
+        for item in files:
+            path = Path(item['path'])
+            stat = path.stat()
+            if not path.is_file() or stat.st_size != item['size'] or stat.st_mtime_ns != item['mtime_ns']:
+                raise ValueError('模型文件已改变，请重新预览并发起任务')
     except (OSError, KeyError, TypeError) as exc:
         raise ValueError('模型文件已丢失或改变，请重新发起任务') from exc
 
@@ -30,7 +37,7 @@ class AlignmentModels:
         self.settings, self.package_root = settings, package_root
         self.catalog = None
         self.models = {}
-        self.previews = {}
+        self.previews: OrderedDict[str, dict] = OrderedDict()
         self.lock = threading.RLock()
 
     def directory(self):
@@ -101,8 +108,14 @@ class AlignmentModels:
         with self.lock:
             snapshot = self.select(model)
             value = {'model':snapshot, **options}
-            key = next((key for key,old in self.previews.items() if old == value), uuid.uuid4().hex)
-            self.previews[key] = value
+            key = next((key for key,old in self.previews.items() if old == value), None)
+            if key is None:
+                key = uuid.uuid4().hex
+                self.previews[key] = value
+                if len(self.previews) > 64:
+                    self.previews.popitem(last=False)
+            else:
+                self.previews.move_to_end(key)
             return key, snapshot
 
     def capture(self, key, options):

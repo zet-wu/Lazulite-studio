@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from server.app import create_app
 from server.auth import Settings
 from server.db import Database
-from server.revisions import RevisionStore
+from server.revisions import INITIAL_TTML, RevisionStore
 from server.project_document import initial_project
 from server.tests.test_api import wav_bytes
 
@@ -94,7 +94,7 @@ def test_deleted_target_and_invalid_upload_leave_no_owned_resources(tmp_path):
 def test_revision_collection_keeps_only_current_and_actual_active_inputs(tmp_path):
     db = Database(tmp_path/'studio.sqlite3'); store = RevisionStore(db,tmp_path/'projects')
     with db.transaction() as c: c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)',('p','p',None,None,'now','now'))
-    base = store.create_initial('p', operation_id='initial')['id']
+    base = store.create('p', initial_project(INITIAL_TTML), None, operation_id='initial')['id']
     with db.transaction() as c:
         c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at) VALUES('j','p','alignment','queued',?,'now','now')", (json.dumps({'revision':base}),))
     for i in range(6):
@@ -106,7 +106,7 @@ def test_revision_collection_keeps_only_current_and_actual_active_inputs(tmp_pat
     with db.transaction() as c: c.execute("UPDATE jobs SET status='cancelled',result_json=? WHERE id='j'", (json.dumps({'binding': {'revision': base}}),))
     store.collect('p')
     assert {p.stem for p in (tmp_path/'projects/p/revisions').glob('*.json')} == {current}
-    assert store.create_initial('p', operation_id='initial')['id'] == base
+    assert store.create('p', initial_project(INITIAL_TTML), None, operation_id='initial')['id'] == base
 
 def test_create_failure_restores_upload_for_retry_and_attach_failure_cleans(tmp_path):
     import pytest

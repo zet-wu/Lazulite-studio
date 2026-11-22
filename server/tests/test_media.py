@@ -133,4 +133,4 @@ def test_concurrent_cold_windows_build_one_proxy_and_peak_set(tmp_path, monkeypa
     assert counts=={'decode':1,'peaks':1}
     assert all(w.maximum==windows[0].maximum for w in windows)
 
-    assert not list((media.root / 'cache').iterdir())
+    assert not (media.root / 'cache').exists()

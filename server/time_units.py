@@ -1,5 +1,40 @@
 """Studio integer milliseconds; external engines and media keep native units."""
 from decimal import Decimal, ROUND_HALF_UP
+import re
+
+_MEDIA_TIME = re.compile(r"^(?:\d+(?:\.\d+)?(?:ms|s)?|\d+:\d{2}(?::\d{2})?(?:\.\d+)?)$")
+
+
+def parse_ttml_seconds(raw: str | None) -> Decimal | None:
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if re.fullmatch(r"\d+(?:\.\d+)?ms", raw):
+        return Decimal(raw[:-2]) / 1000
+    if re.fullmatch(r"\d+(?:\.\d+)?s?", raw):
+        return Decimal(raw.rstrip("s"))
+    match = re.fullmatch(r"(?:(\d+):)?(\d+):(\d{2}(?:\.\d+)?)", raw)
+    if match and Decimal(match[3]) < 60 and (match[1] is None or int(match[2]) < 60):
+        return Decimal(match[1] or 0) * 3600 + Decimal(match[2]) * 60 + Decimal(match[3])
+    raise ValueError("unsupported or invalid TTML time")
+
+
+def try_parse_media_seconds(value: str | None) -> float | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not _MEDIA_TIME.match(value):
+        return None
+    if value.endswith("ms"):
+        return float(value[:-2]) / 1000
+    if value.endswith("s"):
+        return float(value[:-1])
+    if ":" not in value:
+        return float(value)
+    parts = value.split(":")
+    h, m, rest = parts if len(parts) == 3 else ("0", *parts)
+    return int(h) * 3600 + int(m) * 60 + float(rest)
+
 
 def milliseconds(seconds):
     if seconds is None:
@@ -18,27 +53,16 @@ def clock(ms):
 
 
 def normalize_ttml_tree(root):
-    import re
     absolute = any(f'{{{namespace}}}timing' in root.attrib for namespace in ('http://music.apple.com/lyric-ttml-internal', 'http://itunes.apple.com/lyric-ttml-extensions'))
-    def seconds(raw):
-        if raw is None:
-            return None
-        raw = raw.strip()
-        if re.fullmatch(r'\d+(?:\.\d+)?ms',raw): return Decimal(raw[:-2]) / 1000
-        if re.fullmatch(r'\d+(?:\.\d+)?s?',raw): return Decimal(raw.rstrip('s'))
-        match = re.fullmatch(r'(?:(\d+):)?(\d+):(\d{2}(?:\.\d+)?)',raw)
-        if match and Decimal(match[3]) < 60 and (match[1] is None or int(match[2]) < 60):
-            return Decimal(match[1] or 0) * 3600 + Decimal(match[2]) * 60 + Decimal(match[3])
-        raise ValueError('unsupported or invalid TTML time')
     def visit(node, parent):
         def position(name):
             raw = node.get(name)
-            parsed = seconds(raw)
+            parsed = parse_ttml_seconds(raw)
             if parsed is None: return None
             return parsed if absolute or ':' in raw or not raw.endswith(('s','ms')) else parent + parsed
         begin, end = position('begin'), position('end')
         start = begin if begin is not None else parent
-        duration = seconds(node.get('dur'))
+        duration = parse_ttml_seconds(node.get('dur'))
         if duration is not None:
             end = min(end, start+duration) if end is not None else start+duration
         if begin is not None and end is not None and end < begin:

@@ -9,15 +9,15 @@ import re
 import xml.etree.ElementTree as ET
 from typing import Callable
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from .document_errors import DocumentInvalid
 from .revisions import IdempotencyConflict, RevisionConflict, RevisionStore
+from .time_units import try_parse_media_seconds
 
 TTML_NS = "http://www.w3.org/ns/ttml"
 _DOCTYPE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.I)
-_TIME = re.compile(r"^(?:\d+(?:\.\d+)?(?:ms|s)?|\d+:\d{2}(?::\d{2})?(?:\.\d+)?)$")
 
 
 from .project_document import ProjectSnapshot
@@ -43,72 +43,74 @@ def validate_ttml(ttml: str) -> ET.Element:
         raise ValueError("invalid XML") from exc
     if root.tag != f"{{{TTML_NS}}}tt":
         raise ValueError("root must be TTML tt element")
-    # Reject parser-resolved entity references and pathological nesting while
-    # retaining all valid unknown elements, attributes, and namespaces.
-    def walk(element: ET.Element, depth: int) -> None:
+    # Pass 1: depth check, xml:id uniqueness, timing ordering, content-flag placement,
+    # and collecting agent definitions & references.
+    ids: set[str] = set()
+    agents: set[str | None] = set()
+    agent_refs: list[tuple[ET.Element, str]] = []
+    actor_elements: list[ET.Element] = []
+    amll_obscene = "{http://www.example.com/ns/amll}obscene"
+    ruby = "{http://www.w3.org/ns/ttml#styling}ruby"
+    role = "{http://www.w3.org/ns/ttml#metadata}role"
+    ttm_agent = "{http://www.w3.org/ns/ttml#metadata}agent"
+    ttm_actor = "{http://www.w3.org/ns/ttml#metadata}actor"
+    xml_id_attr = "{http://www.w3.org/XML/1998/namespace}id"
+    ttml_prefix = f"{{{TTML_NS}}}"
+    word_span_tag = f"{ttml_prefix}span"
+    line_p_tag = f"{ttml_prefix}p"
+
+    def walk(element: ET.Element, parent: ET.Element | None, grandparent: ET.Element | None, depth: int) -> None:
         if depth > 128:
             raise ValueError("TTML nesting exceeds depth 128")
-        for child in list(element):
-            walk(child, depth + 1)
-    walk(root, 1)
-    ids: set[str] = set()
-    for element in root.iter():
-        xml_id = element.attrib.get("{http://www.w3.org/XML/1998/namespace}id")
+        xml_id = element.attrib.get(xml_id_attr)
         if xml_id:
             if xml_id in ids:
                 raise ValueError("duplicate xml:id")
             ids.add(xml_id)
-        begin, end = element.attrib.get("begin"), element.attrib.get("end")
-        # Known media-time forms get basic ordering validation. Other TTML
-        # expressions (frame/tick/WallClock) remain intact and read-only for
-        # the browser codec.
-        def seconds(value: str | None) -> float | None:
-            if value is None or not _TIME.match(value.strip()):
-                return None
-            value = value.strip()
-            if value.endswith("ms"):
-                return float(value[:-2]) / 1000
-            if value.endswith("s"):
-                return float(value[:-1])
-            if ":" not in value:
-                return float(value)
-            parts = value.split(":")
-            h, m, rest = parts if len(parts) == 3 else ["0", *parts]
-            return int(h) * 3600 + int(m) * 60 + float(rest)
-        if element.tag == f"{{{TTML_NS}}}tt" or element.tag.startswith(f"{{{TTML_NS}}}"):
-            b, e = seconds(begin), seconds(end)
+        if element.tag.startswith(ttml_prefix):
+            b = try_parse_media_seconds(element.attrib.get("begin"))
+            e = try_parse_media_seconds(element.attrib.get("end"))
             if b is not None and e is not None and e < b:
                 raise ValueError("end timing precedes begin")
-    # The AMLL content flag belongs only to a body word (including a Ruby
-    # container or background word), never an individual reading or line.
-    parents = {child: parent for parent in root.iter() for child in parent}
-    amll_obscene = "{http://www.example.com/ns/amll}obscene"
-    ruby = "{http://www.w3.org/ns/ttml#styling}ruby"
-    role = "{http://www.w3.org/ns/ttml#metadata}role"
-    for element in root.iter():
-        roles = element.get(role, '').split()
-        expletive = 'expletive' in roles
-        if amll_obscene not in element.attrib and not expletive:
-            continue
-        if expletive and element.get(amll_obscene) == 'false':
-            raise ValueError('expletive conflicts with amll:obscene=false')
-        parent = parents.get(element)
-        background = parent is not None and parent.tag == f"{{{TTML_NS}}}span" and parent.get(role) == 'x-bg' and parents.get(parent) is not None and parents[parent].tag == f"{{{TTML_NS}}}p"
-        if (element.get(amll_obscene) not in (None, 'true', 'false') or element.tag != f"{{{TTML_NS}}}span"
-                or element.get(ruby) not in (None, 'container') or any(value != 'expletive' for value in roles)
-                or parent is None or not (parent.tag == f"{{{TTML_NS}}}p" or background)):
-            raise ValueError('amll:obscene requires a word and a true/false value')
-    agents = {
-        e.attrib.get("{http://www.w3.org/XML/1998/namespace}id")
-        for e in root.iter()
-        if e.tag == "{http://www.w3.org/ns/ttml#metadata}agent"
-    }
-    for element in root.iter():
-        ref = element.attrib.get("{http://www.w3.org/ns/ttml#metadata}agent", "")
-        if ref and element.get(ruby) in ('base','text','textContainer'): raise ValueError('Ruby 不支持独立歌手')
+        roles = element.get(role, "").split()
+        expletive = "expletive" in roles
+        if amll_obscene in element.attrib or expletive:
+            if expletive and element.get(amll_obscene) == "false":
+                raise ValueError("expletive conflicts with amll:obscene=false")
+            background = (
+                parent is not None
+                and parent.tag == word_span_tag
+                and parent.get(role) == "x-bg"
+                and grandparent is not None
+                and grandparent.tag == line_p_tag
+            )
+            if (
+                element.get(amll_obscene) not in (None, "true", "false")
+                or element.tag != word_span_tag
+                or element.get(ruby) not in (None, "container")
+                or any(value != "expletive" for value in roles)
+                or parent is None
+                or not (parent.tag == line_p_tag or background)
+            ):
+                raise ValueError("amll:obscene requires a word and a true/false value")
+        if element.tag == ttm_agent:
+            agents.add(xml_id)
+        ref = element.attrib.get(ttm_agent, "")
+        if ref:
+            agent_refs.append((element, ref))
+        if element.tag == ttm_actor:
+            actor_elements.append(element)
+        for child in element:
+            walk(child, element, parent, depth + 1)
+
+    walk(root, None, None, 1)
+    # Pass 2: validate agent and actor references against collected agent definitions.
+    for element, ref in agent_refs:
+        if element.get(ruby) in ("base", "text", "textContainer"):
+            raise ValueError("Ruby 不支持独立歌手")
         if any(item not in agents for item in ref.split()):
             raise ValueError("unknown ttm:agent reference")
-    for element in root.iter("{http://www.w3.org/ns/ttml#metadata}actor"):
+    for element in actor_elements:
         if element.attrib.get("agent") not in agents:
             raise ValueError("unknown actor agent reference")
     return root
@@ -160,7 +162,7 @@ class DocumentService:
 
 
 def build_router(service: DocumentService, *, auth: Callable, write: Callable,
-                 project_exists: Callable[[str], object], fail: Callable | None = None) -> APIRouter:
+                 project_exists: Callable[[str], object]) -> APIRouter:
     router = APIRouter()
 
     @router.get("/projects/{pid}/document")
@@ -175,7 +177,7 @@ def build_router(service: DocumentService, *, auth: Callable, write: Callable,
         return out
 
     @router.put("/projects/{pid}/document")
-    def put_document(pid: str, body: DocumentEnvelope, request: Request,
+    def put_document(pid: str, body: DocumentEnvelope,
                      response: Response, subject: str = Depends(write),
                      if_match: str | None = Header(default=None, alias="If-Match"),
                      operation_id: str | None = Header(default=None, alias="Idempotency-Key")):

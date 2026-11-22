@@ -23,8 +23,9 @@ def test_stop_cancels_queue_and_prevents_new_work(tmp_path):
     service = JobService(db, asset_path=lambda pid: tmp_path / 'audio.wav', vocal_runner=FakeVocal(), alignment_runner=Runner())
     first = service.create('p', 'alignment', {'revision': 'r', 'asset_id': 'a', 'retry_analysis_id': 'v1'})
     assert started.wait(1)
-    from server.revisions import RevisionStore
-    revision = RevisionStore(db, tmp_path/'projects').create_initial('q', operation_id='init-q')['id']
+    from server.project_document import initial_project
+    from server.revisions import INITIAL_TTML, RevisionStore
+    revision = RevisionStore(db, tmp_path/'projects').create('q', initial_project(INITIAL_TTML), None, operation_id='init-q')['id']
     second = service.create('q', 'alignment', {'revision': revision, 'asset_id': 'a', 'retry_analysis_id': 'v1'})
     service.begin_stop()
     with pytest.raises(ValueError, match='停止'):

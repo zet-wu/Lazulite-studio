@@ -5,13 +5,13 @@ from server.revisions import RevisionStore
 
 
 def prepare(tmp_path,monkeypatch):
- from server import vocal_process,alignment
+ from server import worker_process,alignment
  monkeypatch.setattr(alignment,'alignment_unavailable',lambda:None)
- original=vocal_process.subprocess.Popen
+ original=worker_process.subprocess.Popen
  def spawn(args,**kwargs):
   if args[-1]=='server.alignment_worker':args=[*args[:-1],'server.tests.alignment_worker_fixture']
   return original(args,**kwargs)
- monkeypatch.setattr(vocal_process.subprocess,'Popen',spawn)
+ monkeypatch.setattr(worker_process.subprocess,'Popen',spawn)
  from server.tests.test_alignment_models import model
  models=tmp_path/'models';model(models)
  monkeypatch.setenv('STUDIO_ALIGNMENT_MODELS_DIR',str(models))

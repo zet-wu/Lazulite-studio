@@ -2,7 +2,7 @@ from server.project_document import initial_project
 from pathlib import Path
 
 from server.db import Database
-from server.revisions import IdempotencyConflict, RevisionConflict, RevisionStore
+from server.revisions import INITIAL_TTML, IdempotencyConflict, RevisionConflict, RevisionStore
 
 
 def test_revision_cas_and_recovery(tmp_path: Path):
@@ -52,8 +52,8 @@ def test_initial_revision_replays_identity_after_old_snapshot_is_collected(
             "INSERT INTO projects VALUES(?,?,?,?,?,?)",
             ("p", "demo", None, None, "now", "now"),
         )
-    first = store.create_initial("p", operation_id="op-1", subject="user")
-    assert store.create_initial("p", operation_id="op-1", subject="user") == first
+    first = store.create("p", initial_project(INITIAL_TTML), None, operation_id="op-1", subject="user")
+    assert store.create("p", initial_project(INITIAL_TTML), None, operation_id="op-1", subject="user") == first
     try:
         store.create(
             "p",
@@ -74,7 +74,7 @@ def test_initial_revision_replays_identity_after_old_snapshot_is_collected(
     store.recover()
     assert second["id"] != first["id"]
     assert "two" in store.read("p")[1]["lyrics"]["draftTtml"]
-    assert store.create_initial("p", operation_id="op-1", subject="user") == first
+    assert store.create("p", initial_project(INITIAL_TTML), None, operation_id="op-1", subject="user") == first
     with db.connect() as conn:
         assert conn.execute("SELECT count(*) FROM revisions").fetchone()[0] == 1
 
@@ -85,14 +85,14 @@ def test_read_transaction_protects_file_until_snapshot_is_loaded(tmp_path, monke
     import server.revisions as module
     db = Database(tmp_path / 'db.sqlite'); store = RevisionStore(db, tmp_path / 'projects')
     with db.transaction() as c: c.execute('INSERT INTO projects VALUES(?,?,?,?,?,?)', ('p','p',None,None,'now','now'))
-    first = store.create_initial('p', operation_id='init')['id']
+    first = store.create('p', initial_project(INITIAL_TTML), None, operation_id='init')['id']
     started, release, writing = threading.Event(), threading.Event(), threading.Event()
-    original = module.read_project
+    original = module.load_project
     def read(path):
         started.set()
         assert release.wait(5)
         return original(path)
-    monkeypatch.setattr(module, 'read_project', read)
+    monkeypatch.setattr(module, 'load_project', read)
     def save():
         writing.set()
         return store.create('p', initial_project('<tt xmlns="http://www.w3.org/ns/ttml"><body><p>new</p></body></tt>'), first)

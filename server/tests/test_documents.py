@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from server.app import create_app
 from server.auth import Settings
 from server.db import Database
-from server.revisions import RevisionStore
+from server.revisions import INITIAL_TTML, RevisionStore
 
 
 def setup_project(tmp_path: Path) -> str:
@@ -15,7 +15,7 @@ def setup_project(tmp_path: Path) -> str:
     store = RevisionStore(db, tmp_path / "projects")
     with db.transaction() as c:
         c.execute("INSERT INTO projects VALUES(?,?,?,?,?,?)", ("p", "Demo", None, None, "now", "now"))
-    store.create_initial("p", operation_id="init")
+    store.create("p", initial_project(INITIAL_TTML), None, operation_id="init")
     return "p"
 
 

@@ -4,14 +4,22 @@ from pathlib import Path
 import hashlib
 import json
 import shutil
-import subprocess
 from .process_supervisor import run as run_process
 from mutagen import File
 from mutagen.id3 import USLT
 from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
 from mutagen.mp4 import MP4
-from .publishing import publish_stpp, extract_stpp, stpp_tracks
+from .publishing import (
+    extract_stpp,
+    iter_boxes,
+    make_box,
+    publish_stpp,
+    read_box_payload,
+    scan_top,
+    stpp_tracks,
+    trak_id,
+)
 
 
 def packet_hashes(path):
@@ -48,7 +56,7 @@ def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str | Non
         if ttml is not None:
             original_stpp_ids = {track['track_id'] for track in stpp_tracks(source)}
             before_tracks, before_mdats = mp4_snapshot(source, target_track_id)
-            publish_stpp(source, ttml, output, target_track_id=target_track_id)
+            publish_stpp(source, ttml, output, target_track_id=target_track_id, verify=False)
         else:
             before_tracks, before_mdats = mp4_snapshot(source, None)
             shutil.copyfile(source, output)
@@ -87,22 +95,20 @@ def package_media(source: Path, output: Path, ttml: bytes | None, lrc: str | Non
 
 def mp4_snapshot(path, excluded_track_id=None):
     """Preserve every original mdat and non-target track, allowing chunk relocation."""
-    import struct
-    from .publishing import _scan_top, _read_payload, _boxes, _find, _trak_id, _box
-    top = list(_scan_top(path))
+    top = list(scan_top(path))
     moov_box = next(item for item in top if item[0] == b'moov')
-    moov = _read_payload(path, *moov_box[1:])
+    moov = read_box_payload(path, *moov_box[1:])
     def normalize(payload):
         parts = []
-        for kind, body, _, _ in _boxes(payload):
+        for kind, body, _, _ in iter_boxes(payload):
             if kind in (b'stco', b'co64'):
                 # Same ordered chunks; their absolute offsets change when tags grow.
-                parts.append(_box(b'co64', body[:8]))
+                parts.append(make_box(b'co64', body[:8]))
             else:
-                parts.append(_box(kind, normalize(body) if kind in (b'mdia', b'minf', b'stbl') else body))
+                parts.append(make_box(kind, normalize(body) if kind in (b'mdia', b'minf', b'stbl') else body))
         return b''.join(parts)
-    tracks = {_trak_id(body): normalize(body) for kind, body, _, _ in _boxes(moov)
-              if kind == b'trak' and _trak_id(body) != excluded_track_id}
+    tracks = {trak_id(body): normalize(body) for kind, body, _, _ in iter_boxes(moov)
+              if kind == b'trak' and trak_id(body) != excluded_track_id}
     mdats = []
     with path.open('rb') as stream:
         for kind, pos, size, header in top:
