@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { spectrumDiagnosticsEnabled } from './spectrum-diagnostics';
 import { IconButton } from '../shared/Controls';
 import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { studioApi } from '../adapters/http/client';
 import { SPECTRUM_HEIGHT, SPECTRUM_WIDTH, SPECTRUM_WINDOW_MS, PROXY_SAMPLE_RATE, spectrumWindow } from '../domain/spectrogram';
 import { useCanvasMetrics } from './useCanvasMetrics';
@@ -120,13 +120,14 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
     changed();
   }, [durationMs, firstTile, lastTile, visible, retry]);
 
-  useEffect(() => {
+  // Match the new content origin in the same paint as the translated layers.
+  useLayoutEffect(() => {
     const element = canvas.current;
     if (!element || !visible) return;
     element.width = Math.max(1, Math.round(width * ratio)); element.height = Math.round(displayHeight * ratio);
     const context = element.getContext('2d')!;
     context.fillStyle = '#101622'; context.fillRect(0, 0, element.width, element.height);
-    const x = (time: number) => Math.round((time - drawStart) / (drawEnd - drawStart) * element.width);
+    const x = (time: number) => (time - drawStart) / (drawEnd - drawStart) * element.width;
     for (const first of wanted.current) {
       const last = Math.min(first + SPECTRUM_WINDOW_MS, durationMs), left = x(first), right = x(last);
       const tile = cache.current.get(first);

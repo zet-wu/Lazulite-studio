@@ -378,7 +378,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   useEffect(() => {
     if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; }
   }, [rate, asset?.id, projectId]);
-  useEffect(() => {
+  // Repaint with the shared content origin in the same commit, before the next paint.
+  useLayoutEffect(() => {
     const c = canvas.current;
     if (!c || !expanded || !(visible.wave || ui?.adding) || width <= 0 || height <= 0) return;
     const draw = () => {
@@ -404,8 +405,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         const x =
           ((d.start_ms + i * d.bucket_ms - drawStartMs) / view) * r.width +
           Math.max(1, (d.bucket_ms / view) * r.width) / 2;
-        ctx.moveTo(Math.round(x) + 0.5, ((1 - max) * r.height) / 2);
-        ctx.lineTo(Math.round(x) + 0.5, ((1 - min) * r.height) / 2);
+        ctx.moveTo(x, ((1 - max) * r.height) / 2);
+        ctx.lineTo(x, ((1 - min) * r.height) / 2);
       });
       ctx.stroke();
     };
