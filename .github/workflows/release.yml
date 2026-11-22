@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       commit: ${{ steps.source.outputs.commit }}
+      asset_pattern: ${{ steps.source.outputs.asset_pattern }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,6 +35,14 @@ jobs:
             commit="$SOURCE_COMMIT"
           fi
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          import json, os
+          manifest = json.load(open('packaging/models.json'))
+          model_zips = [f"{spec['directory']}.zip" for spec in manifest.values() if isinstance(spec, dict) and 'directory' in spec]
+          pattern = '{LazuliteStudio-*.7z*,' + ','.join(model_zips) + '}'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'asset_pattern={pattern}\n')
+          PY
   build:
     needs: source
     uses: ./.github/workflows/portable.yml
@@ -54,7 +63,14 @@ jobs:
           python-version: '3.12.10'
       - name: Build shared model ZIPs
         run: python packaging/build_models.py --output "$RUNNER_TEMP/model-assets" --cache "$RUNNER_TEMP/model-cache"
-      - run: npm ci --prefix .github/actions/upload-packages --ignore-scripts --no-audit --no-fund
+      - name: Cache archive upload client
+        id: upload-client-cache
+        uses: actions/cache@v4
+        with:
+          path: .github/actions/upload-packages/node_modules
+          key: ${{ runner.os }}-upload-packages-${{ hashFiles('.github/actions/upload-packages/package-lock.json') }}
+      - if: steps.upload-client-cache.outputs.cache-hit != 'true'
+        run: npm ci --prefix .github/actions/upload-packages --ignore-scripts --no-audit --no-fund
       - uses: ./.github/actions/upload-packages
         with:
           path: ${{ runner.temp }}/model-assets
@@ -69,7 +85,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
-          pattern: "{LazuliteStudio-*.7z*,NextFire-karaoke-ja-Latn.zip,MMS_FA.zip,bs-karaoke.zip}"
+          pattern: ${{ needs.source.outputs.asset_pattern }}
           merge-multiple: true
           skip-decompress: true
           path: release-assets

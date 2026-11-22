@@ -8,9 +8,22 @@ import subprocess
 import tempfile
 from urllib.parse import quote
 
-MODEL_ASSETS = {'NextFire-karaoke-ja-Latn.zip', 'MMS_FA.zip', 'bs-karaoke.zip'}
+PACKAGING = Path(__file__).resolve().parent
 
-TARGETS = ('windows-x64-cpu', 'windows-x64-cuda', 'macos-arm64')
+
+def load_model_assets(models_path=PACKAGING / 'models.json'):
+    manifest = json.loads(Path(models_path).read_text(encoding='utf-8'))
+    return {f"{spec['directory']}.zip" for spec in manifest.values() if isinstance(spec, dict) and 'directory' in spec}
+
+
+def load_targets(manifest_path=PACKAGING / 'runtime-manifest.json'):
+    manifest = json.loads(Path(manifest_path).read_text(encoding='utf-8'))
+    return tuple(manifest['targets'])
+
+
+MODEL_ASSETS = load_model_assets()
+TARGETS = load_targets()
+ARCHIVE_RE = re.compile(rf"LazuliteStudio-({'|'.join(re.escape(target) for target in TARGETS)})\.7z(?:\.(\d{{3,}}))?")
 
 
 def assets_in(directory):
@@ -22,7 +35,7 @@ def assets_in(directory):
     for path in files:
         if path.name in MODEL_ASSETS and path.is_file() and 0 < path.stat().st_size < 2 * 1024**3:
             continue
-        match = re.fullmatch(r'LazuliteStudio-(windows-x64-cpu|windows-x64-cuda|macos-arm64)\.7z(?:\.(\d{3,}))?', path.name)
+        match = ARCHIVE_RE.fullmatch(path.name)
         if not match or not path.is_file() or not 0 < path.stat().st_size < 2 * 1024**3:
             raise ValueError(f'无效 Release 附件或超过单附件限制：{path}')
         groups[match[1]].append(int(match[2]) if match[2] else 0)
@@ -56,7 +69,7 @@ def prepare_draft(directory):
                         '--target', commit], check=True)
         # Clear old managed archives so a failed rerun cannot mix build versions.
         for asset in existing['assets']:
-            if asset['name'] in MODEL_ASSETS or re.fullmatch(r'LazuliteStudio-(windows-x64-cpu|windows-x64-cuda|macos-arm64)\.7z(?:\.\d{3,})?', asset['name']):
+            if asset['name'] in MODEL_ASSETS or ARCHIVE_RE.fullmatch(asset['name']):
                 subprocess.run(['gh', 'release', 'delete-asset', tag, asset['name'], '--yes'], check=True)
     else:
         with tempfile.TemporaryDirectory() as temp:

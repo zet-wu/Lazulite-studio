@@ -1,5 +1,4 @@
-"""Audit native dependency names/architectures; no claim of minimum-OS validation."""
-import os
+"""Remove unused host search paths from bundled macOS Mach-O binaries."""
 import re
 from pathlib import Path
 import subprocess
@@ -26,97 +25,11 @@ def macho_dependencies(commands):
     return dependencies
 
 
-def macho_minimum_versions(commands):
-    versions = []
-    for block in re.split(r'(?m)^Load command \d+\s*$', commands)[1:]:
-        if re.search(r'(?m)^\s*cmd\s+LC_BUILD_VERSION\s*$', block):
-            field = 'minos'  # Its nested build tool also has a "version" field.
-        elif re.search(r'(?m)^\s*cmd\s+LC_VERSION_MIN_MACOSX\s*$', block):
-            field = 'version'
-        else:
-            continue
-        match = re.search(r'(?m)^\s*' + field + r'\s+(\d+\.\d+(?:\.\d+)?)\s*$', block)
-        if not match:
-            raise ValueError('无法解析 Mach-O 最低系统版本')
-        versions.append(tuple(map(int, match[1].split('.'))))
-    return versions
-
-
-def audit(root, target):
-    root = Path(root).resolve()
-    report = []
-    minimum_versions = []
-    errors = []
-    if target.startswith('windows'):
-        import pefile  # Build-only dependency; never installed into the distribution.
-        files = [p for p in root.rglob('*') if p.suffix.lower() in ('.exe', '.dll', '.pyd')]
-        bundled = {p.name.lower() for p in files}
-        system = Path(os.environ['SystemRoot']) / 'System32'
-        for path in files:
-            pe = pefile.PE(str(path), fast_load=True)
-            try:
-                if pe.FILE_HEADER.Machine != 0x8664:
-                    errors.append(f'非 x64 PE：{path}')
-                    continue
-                pe.parse_data_directories(directories=[1, 13])
-                imports = [entry.dll.decode().lower() for attr in ('DIRECTORY_ENTRY_IMPORT', 'DIRECTORY_ENTRY_DELAY_IMPORT')
-                           for entry in getattr(pe, attr, [])]
-                missing = []
-                for name in imports:
-                    if name in bundled or name.startswith(('api-ms-win-', 'ext-ms-win-')):
-                        continue
-                    if name in ('nvcuda.dll', 'nvml.dll') and target.endswith('cuda'):
-                        continue  # Driver-provided; CUDA hardware validation remains separate.
-                    if name.startswith(('vcruntime', 'msvcp1', 'msvcr1', 'concrt', 'vcomp')) or not (system / name).is_file():
-                        missing.append(name)
-                if missing:
-                    errors.append(f'未闭合 DLL：{path.relative_to(root)}: {missing}')
-                report.append({'file':path.relative_to(root).as_posix(), 'imports':imports})
-            finally:
-                pe.close()
-    else:
-        bundled = {p.name for p in root.rglob('*') if p.is_file()}
-        for path in root.rglob('*'):
-            if not path.is_file() or path.is_symlink():
-                continue
-            with path.open('rb') as stream:
-                magic = stream.read(4)
-            if magic not in (b'\xcf\xfa\xed\xfe', b'\xfe\xed\xfa\xcf', b'\xca\xfe\xba\xbe', b'\xbe\xba\xfe\xca', b'\xca\xfe\xba\xbf', b'\xbf\xba\xfe\xca'):
-                continue
-            arch = subprocess.check_output(['lipo', '-archs', str(path)], text=True).strip()
-            if 'arm64' not in arch.split():
-                errors.append(f'非 arm64 Mach-O：{path}')
-                continue
-            commands = subprocess.check_output(['otool', '-arch', 'arm64', '-l', str(path)], text=True)
-            # otool prefixes its output with the input filename, which is an
-            # absolute build path. Only inspect actual load commands below it.
-            if 'Load command ' not in commands:
-                raise ValueError(f'无法读取 Mach-O load commands：{path}')
-            load_commands = commands.split('Load command ', 1)[1]
-            imports = macho_dependencies(commands)
-            for name in imports:
-                if name.startswith('/') and not name.startswith(('/usr/lib/', '/System/Library/')):
-                    errors.append(f'包外动态依赖：{path}: {name}')
-                if name.startswith('@') and Path(name).name not in bundled:
-                    errors.append(f'包内动态依赖缺失：{path}: {name}')
-            minimum_versions.extend(macho_minimum_versions(commands))
-            if '/opt/homebrew' in load_commands or '/Users/runner' in load_commands:
-                # Debug strings are not included in otool load commands.
-                errors.append(f'构建机路径出现在 Mach-O load commands：{path}')
-            report.append({'file':path.relative_to(root).as_posix(), 'arch':arch,
-                           'imports':imports, 'load_commands':commands})
-    if errors:
-        raise ValueError('原生依赖审计失败：\n' + '\n'.join(errors))
-    return {'target':target, 'binaries':report,
-            'declared_macos_minimum':'.'.join(map(str, max(minimum_versions))) if minimum_versions else None,
-            'scope':'static imports and architecture; actual loader verified by assembled runtime smoke; minimum OS/GPU unverified'}
-
-
 def remove_unused_host_rpaths(root):
     """Remove stale wheel build search paths only from binaries without @rpath imports.
 
     Direct external dependencies remain errors. Never redirect them to arbitrary
-    same-named libraries. Re-sign modified Mach-O files before the final audit.
+    same-named libraries. Re-sign modified Mach-O files after stripping rpaths.
     """
     changes = []
     for path in sorted(Path(root).rglob('*')):

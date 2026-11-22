@@ -13,7 +13,7 @@ from download_models import extract_model, install, BS_FILES
 def test_model_archives_install_and_failed_download_can_retry(tmp_path, monkeypatch):
     source = tmp_path / 'weights'
     source.write_bytes(b'original weights')
-    manifest = {}
+    manifest = {'schema': 1, 'demucs': {'files': [{'name': 'ignored.th'}]}}
     for family, directory in [('nextfire','NextFire-karaoke-ja-Latn'), ('mms_fa','MMS_FA'), ('bs_karaoke','bs-karaoke')]:
         manifest[family] = {'directory':directory,'source':source.as_uri(),'license':'fixture',
             'license_url':'https://example.com/license','files':[{'name':name,'size':source.stat().st_size,
@@ -30,7 +30,7 @@ def test_model_archives_install_and_failed_download_can_retry(tmp_path, monkeypa
     assert not list(output.iterdir())
     source.write_bytes(b'original weights')
     assert len(build_models.build(output,cache)) == 3
-    for spec in manifest.values():
+    for spec in (v for v in manifest.values() if isinstance(v, dict) and 'directory' in v):
         name=spec['directory']
         model=extract_model(output/(name+'.zip'),tmp_path/'unpacked',name)
         for item in spec['files']:

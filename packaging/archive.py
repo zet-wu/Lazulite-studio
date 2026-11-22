@@ -84,17 +84,16 @@ def seven_zip():
 def package(root, output, volume_size=1900 * 1024 * 1024):
     root, output = Path(root).resolve(), Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    for path in root.rglob('*'):
-        if not path.resolve().is_relative_to(root):
-            raise ValueError(f'归档符号链接越界：{path}')
-    # PBS aliases must remain usable with extractors that do not restore links.
     for path in sorted(root.rglob('*')):
+        resolved = path.resolve()
+        if not resolved.is_relative_to(root):
+            raise ValueError(f'归档符号链接越界：{path}')
+        # PBS aliases must remain usable with extractors that do not restore links.
         if path.is_symlink():
             if not path.is_file():
                 raise ValueError(f'不支持归档目录符号链接：{path}')
-            source = path.resolve()
             path.unlink()
-            shutil.copy2(source, path)
+            shutil.copy2(resolved, path)
     archive = output / f'{root.name}.7z'
     # Bounded solid blocks and dictionary keep extraction memory practical.
     subprocess.run([seven_zip(), 'a', '-t7z', '-mx=7', '-m0=LZMA2', '-md=64m',

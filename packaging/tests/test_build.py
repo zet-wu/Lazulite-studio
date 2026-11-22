@@ -109,3 +109,85 @@ def test_assembled_downloaders_run_isolated_with_non_ascii_path(tmp_path):
         file.unlink()
     archive.unlink()
     assert run('vocal', 'Y\n').returncode == 1
+
+
+def test_licenses_reads_site_packages_and_prebuilt_frontend(tmp_path, monkeypatch):
+    repo = tmp_path / 'repo'
+    (repo / 'server/vendor/pkg').mkdir(parents=True)
+    (repo / 'server/vendor/pkg/LICENSE').write_text('vendor license')
+    (repo / 'server/vendor/pkg/helper.py').write_text('# ignored')
+    (repo / 'vendor/Lazulite').mkdir(parents=True)
+    (repo / 'vendor/Lazulite/LICENSE').write_text('agpl')
+    (repo / 'vendor/Lazulite/THIRD_PARTY_LICENSES').write_text('third party')
+    (repo / 'LICENSE').write_text('studio license')
+    monkeypatch.setattr(build, 'ROOT', repo)
+
+    root = tmp_path / 'dist'
+    dist_info = root / 'runtime/python/lib/python3.12/site-packages/demo-1.0.dist-info'
+    (dist_info / 'licenses').mkdir(parents=True)
+    (dist_info / 'METADATA').write_text('Name: demo\nVersion: 1.0\n')
+    (dist_info / 'licenses/LICENSE').write_text('mit')
+    (dist_info / 'WHEEL').write_text('ignored')
+
+    prebuilt = tmp_path / 'prebuilt-licenses'
+    (prebuilt / 'frontend/1').mkdir(parents=True)
+    (prebuilt / 'frontend/1/package.json').write_text('{"name":"dep"}')
+    (prebuilt / 'frontend/1/LICENSE').write_text('mit')
+    (prebuilt / 'frontend-dependencies.json').write_text('[]')
+
+    build.licenses(root, frontend_licenses=prebuilt)
+
+    assert (root / 'licenses/python/demo-1.0.dist-info/METADATA').read_text() == 'Name: demo\nVersion: 1.0\n'
+    assert (root / 'licenses/python/demo-1.0.dist-info/licenses/LICENSE').read_text() == 'mit'
+    assert not (root / 'licenses/python/demo-1.0.dist-info/WHEEL').exists()
+    assert (root / 'licenses/frontend/1/LICENSE').read_text() == 'mit'
+    assert (root / 'licenses/frontend-dependencies.json').read_text() == '[]'
+    assert (root / 'licenses/Studio-LICENSE').read_text() == 'studio license'
+    assert not (root / 'licenses/server-vendor/pkg/helper.py').exists()
+
+
+def test_validate_frontend_dist_strips_msw_and_rejects_external_urls(tmp_path):
+    source = tmp_path / 'source'
+    source.mkdir()
+    (source / 'index.html').write_text('<html><script src="/assets/app.js"></script></html>')
+    (source / 'mockServiceWorker.js').write_text('msw')
+    dest = tmp_path / 'dest'
+    build.validate_frontend_dist(source, dest)
+    assert (dest / 'index.html').is_file()
+    assert not (dest / 'mockServiceWorker.js').exists()
+
+    (source / 'index.html').write_text('<html><script src="https://cdn.example.com/a.js"></script></html>')
+    with pytest.raises(ValueError, match='外部地址'):
+        build.validate_frontend_dist(source, tmp_path / 'dest-bad')
+
+
+def test_ffmpeg_uses_matching_cache_without_downloading(tmp_path, monkeypatch):
+    import json
+    import os
+    names = ('ffmpeg.exe', 'ffprobe.exe') if os.name == 'nt' else ('ffmpeg', 'ffprobe')
+    spec = {'version': '9.0.2', 'source': 'https://example.com/ffmpeg.tar.xz', 'sha256': 'abc'}
+    cache = tmp_path / 'ffmpeg-cache'
+    (cache / 'bin').mkdir(parents=True)
+    (cache / 'licenses').mkdir(parents=True)
+    for name in names:
+        (cache / 'bin' / name).write_bytes(b'binary')
+    (cache / 'licenses/COPYING.LGPLv2.1').write_text('lgpl')
+    (cache / 'spec.json').write_text(json.dumps(spec))
+
+    monkeypatch.setattr(build, 'download', lambda *a, **k: (_ for _ in ()).throw(AssertionError('should not download')))
+    root = tmp_path / 'root'
+    build.ffmpeg(root, spec, tmp_path / 'dl', tmp_path / 'work', cache_dir=cache)
+    for name in names:
+        assert (root / 'runtime/ffmpeg' / name).read_bytes() == b'binary'
+    assert (root / 'licenses/ffmpeg/COPYING.LGPLv2.1').read_text() == 'lgpl'
+
+
+def test_main_requires_both_prebuilt_frontend_flags(tmp_path, monkeypatch):
+    output = tmp_path / 'out'
+    monkeypatch.setattr(sys, 'argv', [
+        'build.py', '--target', 'windows-x64-cpu', '--output', str(output),
+        '--model-release-tag', 'v1', '--frontend-dist', str(tmp_path / 'dist'),
+    ])
+    with pytest.raises(SystemExit) as error:
+        build.main()
+    assert error.value.code != 0

@@ -7,7 +7,7 @@ import zipfile
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from archive import digest, download, extract
+from archive import digest, download, extract, package
 
 
 def test_download_rejects_bad_identity_and_cleans_partial(tmp_path):
@@ -48,3 +48,34 @@ def test_tar_rejects_escaping_symlink(tmp_path):
         target.addfile(info)
     with pytest.raises(tarfile.FilterError):
         extract(archive, tmp_path / 'out')
+
+
+def test_package_dereferences_file_symlinks_and_rejects_bad_symlinks(tmp_path, monkeypatch):
+    root = tmp_path / 'pkg'
+    root.mkdir()
+    (root / 'real.txt').write_text('hello')
+    (root / 'alias.txt').symlink_to(root / 'real.txt')
+    out = tmp_path / 'out'
+
+    monkeypatch.setattr('archive.seven_zip', lambda: '7zz')
+    def fake_run(cmd, **kwargs):
+        (out / f'{root.name}.7z.001').write_bytes(b'7z')
+    monkeypatch.setattr('archive.subprocess.run', fake_run)
+
+    archives = package(root, out)
+    assert archives == [out / f'{root.name}.7z']
+    assert not (root / 'alias.txt').is_symlink()
+    assert (root / 'alias.txt').read_text() == 'hello'
+
+    sub = root / 'sub'
+    sub.mkdir()
+    (root / 'dirlink').symlink_to(sub, target_is_directory=True)
+    with pytest.raises(ValueError, match='目录符号链接'):
+        package(root, out)
+    (root / 'dirlink').unlink()
+
+    outside = tmp_path / 'outside.txt'
+    outside.write_text('escape')
+    (root / 'escape.txt').symlink_to(outside)
+    with pytest.raises(ValueError, match='越界'):
+        package(root, out)

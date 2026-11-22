@@ -37,25 +37,75 @@ jobs:
     outputs:
       targets: ${{ steps.select.outputs.targets }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
       - id: select
         env:
           TARGET: ${{ inputs.target }}
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import json, os
-          values = [
-              {'runner': 'windows-2022', 'target': 'windows-x64-cpu'},
-              {'runner': 'windows-2022', 'target': 'windows-x64-cuda'},
-              {'runner': 'macos-15', 'target': 'macos-arm64'},
-          ]
+          runners = {
+              'windows-x64-cpu': 'windows-2022',
+              'windows-x64-cuda': 'windows-2022',
+              'macos-arm64': 'macos-15',
+          }
+          manifest = json.load(open('packaging/runtime-manifest.json'))
+          values = [{'runner': runners[target], 'target': target} for target in manifest['targets']]
           values = [v for v in values if os.environ['TARGET'] in ('all', v['target'])]
           if not values:
               raise SystemExit('invalid target')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write('targets=' + json.dumps({'include': values}) + '\n')
           PY
-  build:
+      - name: Verify preview model release assets
+        if: github.event_name == 'workflow_dispatch' && github.workflow == 'Build portable previews'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODEL_TAG: ${{ inputs.model_release_tag }}
+        run: |
+          gh release view "$MODEL_TAG" --json isDraft,assets > "$RUNNER_TEMP/model-release.json"
+          python3 - "$RUNNER_TEMP/model-release.json" <<'PY'
+          import json, sys
+          release = json.load(open(sys.argv[1]))
+          assert not release['isDraft'], 'Preview models must be published'
+          manifest = json.load(open('packaging/models.json'))
+          expected = {f"{spec['directory']}.zip" for spec in manifest.values() if isinstance(spec, dict) and 'directory' in spec}
+          actual = {a['name'] for a in release['assets']}
+          assert expected <= actual, f'Missing model ZIPs: {sorted(expected - actual)}'
+          PY
+  frontend:
     needs: matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.30.3'
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.2'
+          cache: 'pnpm'
+          cache-dependency-path: 'frontend/pnpm-lock.yaml'
+      - name: Build frontend and collect licenses
+        run: python packaging/build.py --prepare-frontend "$RUNNER_TEMP/frontend-bundle"
+      - name: Upload prebuilt frontend bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-bundle
+          path: ${{ runner.temp }}/frontend-bundle
+          retention-days: 1
+  build:
+    needs: [matrix, frontend]
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.matrix.outputs.targets) }}
@@ -75,13 +125,11 @@ jobs:
         with:
           # Host build tools use actions/python-versions; shipped PBS is pinned separately.
           python-version: '3.12.10'
-      - uses: actions/setup-node@v4
+      - name: Download prebuilt frontend bundle
+        uses: actions/download-artifact@v8
         with:
-          node-version: '22.22.2'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: '10.30.3'
-          run_install: false
+          name: frontend-bundle
+          path: ${{ runner.temp }}/frontend-bundle
       - name: Set build output directory
         shell: python
         env:
@@ -93,27 +141,48 @@ jobs:
       - name: Install pinned 7-Zip build tool
         shell: bash
         run: python packaging/setup_7zip.py "$RUNNER_TEMP/studio-7zip"
-      - name: Verify preview model release assets
-        if: github.event_name == 'workflow_dispatch' && github.workflow == 'Build portable previews'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MODEL_TAG: ${{ inputs.model_release_tag }}
+      - name: Compute macOS FFmpeg cache key
+        if: matrix.target == 'macos-arm64'
+        id: ffmpeg-cache-key
+        shell: python
         run: |
-          gh release view "$MODEL_TAG" --json isDraft,assets > "$RUNNER_TEMP/model-release.json"
-          python - "$RUNNER_TEMP/model-release.json" <<'PY'
-          import json, sys
-          release = json.load(open(sys.argv[1]))
-          assert not release['isDraft'], 'Preview models must be published'
-          assert {'NextFire-karaoke-ja-Latn.zip', 'MMS_FA.zip', 'bs-karaoke.zip'} <= {a['name'] for a in release['assets']}, 'Missing model ZIPs'
-          PY
+          import hashlib, json, os
+          spec = json.load(open('packaging/runtime-manifest.json'))['targets']['macos-arm64']['ffmpeg']
+          digest = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:16]
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f"key=ffmpeg-{os.environ['RUNNER_OS']}-macos-arm64-{spec['version']}-{digest}\n")
+      - name: Cache compiled macOS FFmpeg
+        if: matrix.target == 'macos-arm64'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ffmpeg-cache
+          key: ${{ steps.ffmpeg-cache-key.outputs.key }}
       - name: Assemble and package distribution
         shell: bash
         env:
           MODEL_TAG: ${{ inputs.model_release_tag }}
           MODEL_REPOSITORY: ${{ github.repository }}
-        run: python packaging/build.py --model-release-tag "$MODEL_TAG" --model-repository "$MODEL_REPOSITORY" --target '${{ matrix.target }}' --output "$BUILD_OUTPUT"
+        run: |
+          extra_args=()
+          if [ "${{ matrix.target }}" = "macos-arm64" ]; then
+            extra_args+=(--ffmpeg-cache "$RUNNER_TEMP/ffmpeg-cache")
+          fi
+          python packaging/build.py \
+            --model-release-tag "$MODEL_TAG" \
+            --model-repository "$MODEL_REPOSITORY" \
+            --target '${{ matrix.target }}' \
+            --output "$BUILD_OUTPUT" \
+            --frontend-dist "$RUNNER_TEMP/frontend-bundle/dist" \
+            --frontend-licenses "$RUNNER_TEMP/frontend-bundle/licenses" \
+            "${extra_args[@]}"
+      - name: Cache archive upload client
+        id: upload-client-cache
+        uses: actions/cache@v4
+        with:
+          path: .github/actions/upload-packages/node_modules
+          key: ${{ runner.os }}-upload-packages-${{ hashFiles('.github/actions/upload-packages/package-lock.json') }}
       - name: Install archive upload client
+        if: steps.upload-client-cache.outputs.cache-hit != 'true'
         run: npm ci --prefix .github/actions/upload-packages --ignore-scripts --no-audit --no-fund
       - name: Upload portable archives
         uses: ./.github/actions/upload-packages

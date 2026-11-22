@@ -21,6 +21,5 @@ def assemble(root, specification):
                 if size > 128 * 1024 * 1024:
                     raise ValueError("词典压缩包超过下载资源限制")
                 out.write(chunk)
-        # The following runtime smoke installs through Studio's normal boundary
-        # validator. Do not scan every entry a second time in the downloader.
+        # Studio's normal boundary validator checks entries on install; do not scan twice here.
     (root / "licenses/dictionary-sources.json").write_text(json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

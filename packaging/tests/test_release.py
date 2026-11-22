@@ -56,3 +56,14 @@ def test_published_release_or_moved_tag_never_mutated(tmp_path, monkeypatch, mov
     with pytest.raises(ValueError):
         release.prepare_draft(tmp_path)
     run.assert_not_called()
+
+
+def test_release_lists_match_manifests():
+    import json
+    packaging = Path(__file__).resolve().parents[1]
+    models = json.loads((packaging / 'models.json').read_text(encoding='utf-8'))
+    runtime = json.loads((packaging / 'runtime-manifest.json').read_text(encoding='utf-8'))
+    assert release.MODEL_ASSETS == {
+        f"{spec['directory']}.zip" for spec in models.values() if isinstance(spec, dict) and 'directory' in spec
+    }
+    assert release.TARGETS == tuple(runtime['targets'])

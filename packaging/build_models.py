@@ -14,7 +14,8 @@ def build(output, cache):
     output.mkdir(parents=True, exist_ok=True)
     manifest = json.loads((ROOT / 'models.json').read_text(encoding='utf-8'))
     results = []
-    for family in ('nextfire', 'mms_fa', 'bs_karaoke'):
+    families = [family for family, spec in manifest.items() if isinstance(spec, dict) and 'directory' in spec]
+    for family in families:
         spec = manifest[family]
         name = spec['directory']
         archive = output / (name + '.zip')
@@ -25,9 +26,9 @@ def build(output, cache):
                 model.mkdir()
                 for item in spec['files']:
                     download(item.get('url', spec['source']), cache / name / item['name'], item['sha256'], item['size'])
-                    # ZIP reads directly from cache: no second copy of the large weights.
-                    if family == 'mms_fa':
-                        (model / 'alignment-model.json').write_text('{"type":"torchaudio-mms-fa","weights":"model.pt"}\n', encoding='utf-8')
+                # ZIP reads directly from cache: no second copy of the large weights.
+                if family == 'mms_fa':
+                    (model / 'alignment-model.json').write_text('{"type":"torchaudio-mms-fa","weights":"model.pt"}\n', encoding='utf-8')
                 (model / 'SOURCE.json').write_text(json.dumps(spec, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
                 (model / 'NOTICE.txt').write_text(
                     f"Source: {spec['source']}\nLicense: {spec['license']}\n{spec['license_url']}\n"
