@@ -4,7 +4,7 @@ import {importLyrics} from '../fixtures/import-lyrics';
 test('unified SUG export commits offsets, locates invalid drafts and downloads its prepared archive',async({page})=>{
  await page.goto('/projects/sample-project/edit?scenario=no-music');
  await importLyrics(page,{name:'sug.ttml',mimeType:'application/xml',buffer:Buffer.from('<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="1" end="3"><span begin="1.003" end="2.009">歌</span></p></body></tt>')});
- await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();await page.getByRole('button',{name:'导出 SUG',exact:true}).click();
+ await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式',{exact:true}).selectOption('sug');
  const pane=page.locator('#output-panel-lyrics'),button=pane.getByRole('button',{name:'导出 SUG',exact:true}),input=pane.getByLabel('主歌词 · 正文 输出偏移（毫秒）',{exact:true});
  await expect(page.getByRole('dialog')).toHaveCount(0);await input.fill('-');await button.click();await expect(input).toBeFocused();await expect(input).toHaveAttribute('aria-invalid','true');
  await input.fill('200');await input.press('Enter');await expect(input).toHaveValue('200');

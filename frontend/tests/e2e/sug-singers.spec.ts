@@ -12,7 +12,7 @@ test('SUG singer drafts, merge download, selection independence, undo and reset'
  await dialog.getByRole('button',{name:'取消',exact:true}).click();await expect(open).toBeFocused();await open.click();await expect(input).toHaveValue('A');
  await input.fill('共同演唱');await dialog.getByRole('button',{name:'B',exact:true}).click();await input.fill('共同演唱');await dialog.getByRole('button',{name:'应用',exact:true}).click();
  await page.getByRole('button',{name:'撤销',exact:true}).click();await open.click();await expect(input).toHaveValue('A');await page.keyboard.press('Escape');await page.getByRole('button',{name:'重做',exact:true}).click();
- await page.getByRole('button',{name:'导出 SUG',exact:true}).click();let exporting=page.locator('#output-panel-lyrics');await exporting.getByLabel('主歌词 · 正文',{exact:true}).uncheck();await open.click();await expect(input).toHaveValue('共同演唱');
+ await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式',{exact:true}).selectOption('sug');let exporting=page.locator('#output-panel-lyrics');await exporting.getByLabel('主歌词 · 正文',{exact:true}).uncheck();await open.click();await expect(input).toHaveValue('共同演唱');
  if(process.env.SUG_CONTRACT_DIR){await page.screenshot({path:`${process.env.SUG_CONTRACT_DIR}/singers-light.png`});await page.evaluate(()=>document.documentElement.dataset.theme='dark');await page.screenshot({path:`${process.env.SUG_CONTRACT_DIR}/singers-dark.png`});}
  await input.fill('');await expect(input).toHaveValue('A');await input.fill('长名称'.repeat(45));
  if(process.env.SUG_CONTRACT_DIR){await page.setViewportSize({width:900,height:720});await page.screenshot({path:`${process.env.SUG_CONTRACT_DIR}/singers-long.png`});}

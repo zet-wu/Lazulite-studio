@@ -7697,18 +7697,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "karaoke.exportNico": {
-    "context": "karaoke interface: karaoke.exportNico",
-    "source": "导出 NicoKara",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "karaoke.exportSUG": {
-    "context": "karaoke interface: karaoke.exportSUG",
-    "source": "导出 SUG",
-    "params": [],
-    "parameterNotes": {}
-  },
   "karaoke.defaultHelp": {
     "context": "karaoke interface: karaoke.defaultHelp",
     "source": "默认文字只影响之后新增的导唱。",
@@ -7784,36 +7772,6 @@
   "karaoke.applyGroups": {
     "context": "karaoke interface: karaoke.applyGroups",
     "source": "应用分组",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "karaoke.exportNicoTitle": {
-    "context": "karaoke interface: karaoke.exportNicoTitle",
-    "source": "导出 Nicokara",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "karaoke.check": {
-    "context": "karaoke interface: karaoke.check",
-    "source": "查看校验",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "karaoke.downloadZip": {
-    "context": "karaoke interface: karaoke.downloadZip",
-    "source": "下载 ZIP",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "karaoke.offsetHelp": {
-    "context": "karaoke interface: karaoke.offsetHelp",
-    "source": "单位：毫秒；正数延后，负数提前。NicoKara 与 SUG 共用输出选择和偏移设置。",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "karaoke.outputFile": {
-    "context": "karaoke interface: karaoke.outputFile",
-    "source": "输出文件",
     "params": [],
     "parameterNotes": {}
   },
@@ -11736,10 +11694,6 @@
     "source": "TTML 输出全部正文、背景、翻译与音译。",
     "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
   },
-  "packaging.fileSummary": {
-    "source": "{{count}} 个文件 · {{issues}} 个问题",
-    "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
-  },
   "validation.currentOutput": {
     "source": "当前产物：{{format}}",
     "context": "统一歌词导出面板：内容选择、产物校验与导出对照。"
@@ -11823,5 +11777,29 @@
   "format.multiOverlap": {
     "source": "各文件保留独立区间；多文件装配与字幕位置由接收端配置。",
     "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "packaging.globalOffset": {
+    "context": "packaging interface: packaging.globalOffset",
+    "source": "全局偏移"
+  },
+  "packaging.offsetDirection": {
+    "context": "packaging interface: packaging.offsetDirection",
+    "source": "正数延后，负数提前"
+  },
+  "packaging.mergeSingleFile": {
+    "context": "packaging interface: packaging.mergeSingleFile",
+    "source": "所选多轨将合并为单个文件导出。"
+  },
+  "packaging.bracketBackground": {
+    "context": "packaging interface: packaging.bracketBackground",
+    "source": "背景人声将以括号行导出。"
+  },
+  "packaging.multiFileSummary": {
+    "context": "packaging interface: packaging.multiFileSummary",
+    "source": "将导出 {{count}} 个文件"
+  },
+  "packaging.blockingHint": {
+    "context": "packaging interface: packaging.blockingHint",
+    "source": "存在 {{count}} 个阻塞问题，请查看左侧校验。"
   }
 }

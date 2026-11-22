@@ -21,7 +21,7 @@ test('yellow slots insert once on double click, share cue properties and keep or
 test('auto insertion is idempotent and export ZIP can return from focused validation',async({page})=>{
  await load(page);await page.locator('[data-top-menu="cue-tools"] summary').click();await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await page.getByRole('button',{name:'插入',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(3);
  await page.locator('[data-top-menu="cue-tools"] summary').click();await page.getByRole('button',{name:'自动插入导唱符',exact:true}).click();await page.getByRole('button',{name:'插入',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveCount(3);
- await page.getByRole('button',{name:'导出 NicoKara',exact:true}).click();await expect(page.locator('#output-panel-lyrics').getByRole('status')).toContainText('0 个问题');
+ await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式',{exact:true}).selectOption('nicokara');await expect(page.locator('#output-panel-lyrics').getByRole('status')).toContainText('将导出 1 个文件');await expect(page.locator('#output-panel-lyrics')).not.toContainText('阻塞问题');
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'导出 NicoKara',exact:true}).click();expect((await download).suggestedFilename()).toMatch(/-nicokara.zip$/);
  await expect(page.getByLabel('校验格式筛选')).toHaveValue('current');await expect(page.getByLabel('导出格式')).toHaveValue('nicokara');
 });
@@ -39,10 +39,10 @@ test('timeline cue selects shared properties, resizes within range and rejects o
 test('fresh selected-output validation locates a retimed cue and returns after repair',async({page})=>{
  await load(page);await page.getByRole('button',{name:'插入行内导唱',exact:true}).click();
  await page.locator('main [data-word-id="b"]').click();await page.getByLabel('选中对象开始秒数').fill('5.2');await page.getByLabel('选中对象开始秒数').press('Tab');
- await page.getByRole('button',{name:'导出 NicoKara',exact:true}).click();await expect(page.locator('#output-panel-lyrics').getByRole('status')).not.toContainText('0 个问题');
+ await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式',{exact:true}).selectOption('nicokara');await expect(page.locator('#output-panel-lyrics')).toContainText('阻塞问题');
  await page.locator('#validation-panel-lyrics').getByRole('button',{name:/^时间范围 ·/}).click();await page.getByRole('button',{name:/^第 1 行 · 1 项/}).click();await page.getByRole('button',{name:/导唱双端必须位于原空隙内且具有正时长/}).click();
  await expect(page.getByLabel('导唱结束秒数')).toHaveValue('5.6');await page.getByLabel('导唱结束秒数').fill('5.1');await page.getByLabel('导唱结束秒数').press('Tab');
- await page.getByRole('button',{name:'导出 NicoKara',exact:true}).click();await expect(page.locator('#output-panel-lyrics').getByRole('status')).toContainText('0 个问题');
+ await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.locator('#output-panel-lyrics')).not.toContainText('阻塞问题');
 });
 test('automatic dialog cancels drafts, checks thresholds and undoes insertion as one change',async({page})=>{
  await load(page);await expect(page.getByRole('button',{name:'下载项目',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'重开项目',exact:true})).toHaveCount(0);

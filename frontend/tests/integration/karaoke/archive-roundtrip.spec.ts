@@ -6,7 +6,7 @@ test('project manager exports and imports saved cues and markers without audio',
  await importLyrics(page,{name:'test.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
  await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();await page.getByRole('button',{name:'NicoKara 歌手标记管理',exact:true}).click();await page.getByLabel('触发标记',{exact:true}).fill('archive-singer');await page.getByRole('button',{name:'应用',exact:true}).click();await page.getByRole('button',{name:'添加行前导唱',exact:true}).click();await page.getByRole('button',{name:'插入行内导唱',exact:true}).click();await page.getByRole('button',{name:'插入 Ruby 内导唱',exact:true}).click();
  await page.getByRole('button',{name:'SUG 歌手管理',exact:true}).click();await page.getByLabel('主歌词 · 正文',{exact:true}).fill('SUG保存');await page.getByRole('button',{name:'应用',exact:true}).click();
- await page.getByRole('button',{name:'导出 SUG',exact:true}).click();await page.getByLabel('主歌词 · 正文 输出偏移（毫秒）',{exact:true}).fill('123');await page.getByLabel('主歌词 · 正文 输出偏移（毫秒）',{exact:true}).press('Enter');await page.getByRole('button',{name:'关闭导出 SUG'}).click();
+ await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式',{exact:true}).selectOption('sug');await page.getByLabel('主歌词 · 正文 输出偏移（毫秒）',{exact:true}).fill('123');await page.getByLabel('主歌词 · 正文 输出偏移（毫秒）',{exact:true}).press('Enter');
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();
  let saved=await(await page.request.get(`/api/v1/projects/${id}/document`)).json();
  const full={...saved.document,lineOrder:['a'],acoustics:{analysisId:null,segments:[{id:'hand',beginMs:123,endMs:4567}]}};

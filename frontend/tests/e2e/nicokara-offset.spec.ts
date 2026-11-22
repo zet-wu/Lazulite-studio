@@ -5,7 +5,7 @@ test('offset drafts block downloads, keep disabled values and commit once',async
  await page.goto('/projects/sample-project/edit?scenario=no-music');
  await importLyrics(page,{name:'offset.ttml',mimeType:'application/xml',buffer:Buffer.from('<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="1" end="2"><span begin="1" end="2">歌</span></p></body></tt>')});
  await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();
- const open=()=>page.getByRole('button',{name:'导出 NicoKara',exact:true}).click();await open();
+ const open=async()=>{await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式',{exact:true}).selectOption('nicokara');};await open();
  const dialog=page.locator('#output-panel-lyrics'),input=dialog.getByLabel('主歌词 · 正文 @Offset',{exact:true}),check=dialog.getByLabel('主歌词 · 正文',{exact:true});
  await input.fill('-');await dialog.getByRole('button',{name:'导出 NicoKara'}).click();await expect(input).toHaveAttribute('aria-invalid','true');await expect(input).toBeFocused();await expect(dialog.getByRole('alert')).toContainText('整数');
  await check.uncheck();await expect(input).toBeDisabled();

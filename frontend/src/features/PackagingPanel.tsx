@@ -20,7 +20,6 @@ import {audioRangeIssues} from '../adapters/audio-validation';
 import {useProjectEditing} from './editor/ProjectEditingContext';
 import {usePreference} from './editor/use-preference';
 import {useAutomaticValidation,type ValidationTab} from './useAutomaticValidation';
-import {issueText} from './output-messages';
 import {OutputIssues} from './OutputIssues';
 import {OutputSelection,type OutputSelectionHandle} from './OutputSelection';
 import {AmllPanel} from './AmllPanel';
@@ -96,8 +95,8 @@ export function PackagingPanel(props:Props){
  {props.project&&props.applyProject&&<OutputSelection ref={selection} project={props.project} format={format} apply={apply} focusOutputId={props.focusOutputId}/>}
  {format==='ttml'&&<p className={styles.hint}>{t('packaging.ttmlAll')}</p>}
  {(format==='nicokara'||format==='sug')&&<button data-role="secondary" onClick={()=>setDialog(format==='sug'?'sug-singers':'singers')}>{t(format==='sug'?'karaoke.sugSingers':'karaoke.singerMarkers')}</button>}
- <p role="status">{t('packaging.fileSummary',{count:prepared.files.length,issues:prepared.issues.length})}</p>
- {prepared.issues[0]&&<p>{issueText(prepared.issues[0],props.document)}</p>}
+ {(format==='nicokara'||format==='sug')&&prepared.files.length>0&&<p role="status">{t('packaging.multiFileSummary',{count:prepared.files.length})}</p>}
+ {prepared.issues.some(issue=>issue.severity!=='warning')&&<p role="status">{t('packaging.blockingHint',{count:prepared.issues.filter(issue=>issue.severity!=='warning').length})}</p>}
  {message&&<p role="alert">{message}</p>}
  </div>
  <div role="tabpanel" id="output-panel-music" aria-labelledby="output-tab-music" hidden={outputTab!=='music'}>
