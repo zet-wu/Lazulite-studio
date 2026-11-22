@@ -98,6 +98,40 @@ export type StudioSourceMetadata = {
   conditions: StudioSearchConditions;
 };
 
+export type OnlineLyricSource = 'netease' | 'qqmusic' | 'kugou' | 'amll';
+
+export type OnlineLyricCandidate = {
+  source: OnlineLyricSource;
+  id: string;
+  title: string;
+  artists: string[];
+  album: string;
+  duration_ms: number | null;
+  songmid?: string | null;
+  songid?: string | null;
+  platform?: string | null;
+  file?: string | null;
+};
+
+export type OnlineLyricPayload = {
+  empty: boolean;
+  format?: 'ttml' | 'lrc' | 'elrc' | 'eslrc' | 'qrc' | 'krc' | 'yrc' | 'lys';
+  content?: string;
+  metadata?: Record<string, string[]>;
+  translation?: string;
+  romanization?: string;
+  partial?: boolean;
+};
+
+export type EmbeddedLyricCandidate = {
+  id: string;
+  label: string;
+  format?: 'ttml' | 'lrc' | 'elrc' | 'eslrc';
+  content?: string;
+  error?: string;
+  error_code?: string;
+};
+
 export type StudioErrorBody = {
   code: string;
   message: string;
@@ -369,5 +403,36 @@ export class StudioClient {
 
   getCapabilities(): Promise<StudioCapabilities> {
     return this.json<StudioCapabilities>('/capabilities');
+  }
+
+  searchOnlineLyrics(
+    source: OnlineLyricSource,
+    query: string,
+  ): Promise<{ items: OnlineLyricCandidate[] }> {
+    return this.json('/lyric-sources/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source, query }),
+    });
+  }
+
+  resolveOnlineLyric(candidate: OnlineLyricCandidate): Promise<OnlineLyricCandidate> {
+    return this.json('/lyric-sources/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(candidate),
+    });
+  }
+
+  fetchOnlineLyric(candidate: OnlineLyricCandidate): Promise<OnlineLyricPayload> {
+    return this.json('/lyric-sources/fetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(candidate),
+    });
+  }
+
+  getEmbeddedLyrics(projectId: string): Promise<{ candidates: EmbeddedLyricCandidate[] }> {
+    return this.json(`/projects/${encodeURIComponent(projectId)}/embedded-lyrics`);
   }
 }

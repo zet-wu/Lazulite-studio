@@ -70,6 +70,12 @@ describe('MCP Server transports', () => {
       'get_project_summary',
       'get_source_metadata',
       'get_lyrics',
+      'update_metadata',
+      'manage_singers',
+      'search_online_lyrics',
+      'fetch_online_lyrics',
+      'get_embedded_lyrics',
+      'import_lyrics',
     ]);
 
     const result = await client.callTool({ name: 'get_lyrics', arguments: { project_id: 'p1' } });

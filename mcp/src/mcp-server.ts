@@ -1,5 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { StudioClient } from './client';
+import { registerLyricAcquisitionTools } from './tools/lyrics-acquisition';
+import { registerMetadataAndSingerTools } from './tools/metadata-singers';
 import { registerReadTools } from './tools/read';
 import { formatToolError, ToolRegistry } from './tools/registry';
 import { installXmlDomShim } from './xml-shim';
@@ -8,6 +10,8 @@ export function createToolRegistry(): ToolRegistry {
   installXmlDomShim();
   const registry = new ToolRegistry();
   registerReadTools(registry);
+  registerMetadataAndSingerTools(registry);
+  registerLyricAcquisitionTools(registry);
   return registry;
 }
 
