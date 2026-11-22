@@ -98,7 +98,7 @@ it('splits from the word menu with default graphemes and preserved spaces, confi
   fireEvent.contextMenu(container.querySelector('[data-word-id]')!);
   fireEvent.click(screen.getByRole('menuitem', { name: '拆分词' }));
   expect(apply).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', {name:'应用（一次撤销）'}));
+  fireEvent.click(screen.getByRole('button', {name:'应用'}));
   expect(apply.mock.calls[0][0]).toMatchObject({ type: 'segment-words', changes: [{ words: [
     { text: '中', beginMs: 0 }, { text: '文' }, { text: ' ' }, { text: 'I' }, { text: '  ' }, { text: 'still' }, { text: ' ' }, { text: 'e\u0301', endMs: 1000 },
   ] }] });
@@ -109,7 +109,7 @@ it('splits from the word menu with default graphemes and preserved spaces, confi
   fireEvent.contextMenu(container.querySelector('[data-word-id]')!);
   fireEvent.click(screen.getByRole('menuitem', { name: '拆分词' }));
   expect(screen.getByRole('dialog', { name: '拆分词' })).toBeVisible();
-  expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();
+  expect(screen.getByRole('button',{name:'应用'})).toBeDisabled();
   expect(apply).toHaveBeenCalledOnce();
 });
 

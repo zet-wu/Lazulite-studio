@@ -7,10 +7,10 @@ const batch=async(page:Page)=>{await page.locator('[data-top-menu="tools"] summa
 test.beforeEach(async({page})=>{await page.setViewportSize({width:1440,height:1000});await page.goto('/projects/sample-project/edit?scenario=no-music');await importMergeSplit(page,3);});
 test('batch feedback, literal body and Ruby replacements, clear preview and undo',async({page})=>{
  await edge(page,0);let dialog=await batch(page);await expect(dialog.getByRole('button',{name:'替换',exact:true})).toHaveAttribute('aria-pressed','true');
- await dialog.getByLabel('查找',{exact:true}).fill('今');await dialog.getByLabel('替换为',{exact:true}).fill('新');await expect(dialog.getByRole('status')).toContainText('实际修改 1');await dialog.getByRole('button',{name:'应用（一次撤销）'}).click();
+ await dialog.getByLabel('查找',{exact:true}).fill('今');await dialog.getByLabel('替换为',{exact:true}).fill('新');await expect(dialog.getByRole('status')).toContainText('实际修改 1');await dialog.getByRole('button',{name:'应用'}).click();
  await expect(line(page).getByLabel('词 新',{exact:true})).toHaveValue('新');await expect(line(page).locator('[data-ruby-id]')).toHaveCount(2);
- dialog=await batch(page);await dialog.getByRole('radio',{name:'注音',exact:true}).check();await dialog.getByLabel('查找',{exact:true}).fill('きょ');await dialog.getByLabel('替换为',{exact:true}).fill('きょう');await dialog.getByRole('button',{name:'应用（一次撤销）'}).click();await expect(line(page).getByLabel('读音 新',{exact:true})).toHaveValue('きょう');
- dialog=await batch(page);await dialog.getByRole('button',{name:'清除注音',exact:true}).click();await expect(dialog.getByRole('status')).toContainText('清除 2 个 Ruby');await dialog.getByRole('button',{name:'应用（一次撤销）'}).click();await expect(line(page).locator('[data-ruby-id]')).toHaveCount(0);
+ dialog=await batch(page);await dialog.getByRole('radio',{name:'注音',exact:true}).check();await dialog.getByLabel('查找',{exact:true}).fill('きょ');await dialog.getByLabel('替换为',{exact:true}).fill('きょう');await dialog.getByRole('button',{name:'应用'}).click();await expect(line(page).getByLabel('读音 新',{exact:true})).toHaveValue('きょう');
+ dialog=await batch(page);await dialog.getByRole('button',{name:'清除注音',exact:true}).click();await expect(dialog.getByRole('status')).toContainText('清除 2 个 Ruby');await dialog.getByRole('button',{name:'应用'}).click();await expect(line(page).locator('[data-ruby-id]')).toHaveCount(0);
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(line(page).locator('[data-ruby-id]')).toHaveCount(2);
 });
 test('multi-word beats and group movement, main merge attachment migration and song-part draft',async({page})=>{

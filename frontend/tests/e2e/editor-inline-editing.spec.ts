@@ -25,7 +25,7 @@ test('注音 main-row right click preserves multi-selection and updates content/
   await expect(dialog).toContainText('生成 1 / 3 行');
   await dialog.getByLabel('跳过生成', { exact: true }).check();
   await expect(dialog.getByRole('status')).toHaveText('所有单元均跳过，无需生成');
-  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '生成注音', exact: true })).toBeDisabled();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await outline.nth(1).click({ button: 'right' });
   await page.getByRole('menuitem', { name: '从音译生成注音' }).click();
@@ -146,7 +146,7 @@ test('western splitting and inline space-only words preserve independent whitesp
   await input.click(); await input.fill('I still love you'); await input.press('Enter');
   await line.locator('[data-word-id]').first().click({ button: 'right', position: { x: 3, y: 3 } });
   await page.getByRole('menuitem', { name: '拆分词', exact: true }).click();
-  await page.getByRole('button', {name:'应用（一次撤销）'}).click();
+  await page.getByRole('button', {name:'应用'}).click();
   await expect(line.locator('[data-word-id]')).toHaveCount(7);
   expect(await line.locator('[data-word-id] > div[class*="wordMain"] input').evaluateAll(nodes => nodes.map(node => (node as HTMLInputElement).value))).toEqual(['I', ' ', 'still', ' ', 'love', ' ', 'you']);
   await line.getByRole('button', { name: '添加词', exact: true }).click();

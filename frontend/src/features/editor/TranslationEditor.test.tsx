@@ -37,7 +37,7 @@ it('deletes immediately in the draft, clears target and selection, and allows ca
   fireEvent.click(screen.getByRole('button', { name: '删除轨道及 1 份内容（轨道 1）' }));
   expect(screen.getByLabelText('翻译归轨目标')).toHaveValue('');
   expect(screen.getByRole('button', { name: '转入目标轨道' })).toBeDisabled();
-  expect(screen.getByText(/已选择 0 份内容/)).toBeVisible();
+  expect(screen.getByText(/已选 0 项/)).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: '取消' }));
   expect(close).toHaveBeenCalledOnce(); expect(apply).not.toHaveBeenCalled(); expect(document.translationTracks[0].contents).toEqual([content]);
 });
@@ -52,7 +52,7 @@ it('selects all content across tracks with mixed states and reports only actual 
   fireEvent.click(global); expect(global).toBeChecked();
   expect(screen.getAllByRole('checkbox', { name: '全选本轨内容' }).at(-1)).toBeDisabled();
   fireEvent.change(screen.getByLabelText('翻译归轨目标'), { target: { value: 't0' } });
-  expect(screen.getByText(/实际转入 39 份，将移除 39 条/)).toBeVisible();
+  expect(screen.getByText(/将转入 39 项并移除 39 条/)).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: '转入目标轨道' }));
   fireEvent.click(screen.getByRole('button', { name: '应用' }));
   const command = apply.mock.calls[0][0];

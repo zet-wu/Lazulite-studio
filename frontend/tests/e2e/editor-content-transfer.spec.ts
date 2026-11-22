@@ -34,7 +34,7 @@ test(`keyboard mixed selection and scoped transfer`, async ({ page }) => {
   await expect(dialog.getByRole('checkbox', { name: '选择翻译轨道 30 · L29 · 内容 1', exact: true })).toBeChecked();
   await expect(dialog.getByRole('checkbox', { name: '全选本轨内容', exact: true }).last()).toBeDisabled();
   await dialog.getByLabel('翻译归轨目标').selectOption('t0');
-  await expect(dialog).toContainText('已选择 31 份内容；实际转入 29 份，将移除 29 条');
+  await expect(dialog).toContainText('已选 31 项，将转入 29 项并移除 29 条');
   await first.focus();
   await dialog.getByRole('button', { name: '转入目标轨道', exact: true }).click();
   await expect(dialog.getByRole('checkbox', { name: '全选本轨内容', exact: true })).toHaveCount(2);

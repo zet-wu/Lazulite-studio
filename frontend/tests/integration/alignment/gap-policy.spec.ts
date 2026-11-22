@@ -25,7 +25,7 @@ async function setup(page:Page){
 }
 test(`short-gap controls, retry, atomic save and reopen`,async({page})=>{
 
- const state=await setup(page),dialog=page.getByRole('dialog',{name:'自动对齐',exact:true}),box=dialog.getByRole('switch',{name:'将短于阈值的行内空隙并入前词'}),number=dialog.getByRole('spinbutton',{name:'行内空隙阈值（毫秒）'});
+ const state=await setup(page),dialog=page.getByRole('dialog',{name:'自动对齐',exact:true}),box=dialog.getByRole('switch',{name:'将短于阈值的行内空隙并入前词'}),number=dialog.getByRole('spinbutton',{name:'行内空隙阈值'});
  await expect(box).not.toBeChecked();await expect(number).toBeDisabled();await expect(number).toHaveValue('500');
  await dialog.getByText('将短于阈值的行内空隙并入前词',{exact:true}).click();await expect(box).toBeChecked();await box.focus();await page.keyboard.press('Tab');await expect(number).toBeFocused();
  await number.click();await number.fill('601');await number.press('ArrowUp');await expect(number).toHaveValue('602');await expect(box).toBeChecked();

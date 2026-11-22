@@ -28,7 +28,7 @@ async function open(page: Page, count = 3, source = 'ka', body = 'は', setup: '
     await page.getByRole('button', { name: '批处理', exact: true }).click();
     const batch = page.getByRole('dialog', { name: '批处理', exact: true });
     await batch.getByRole('button', { name: '结束时间链接', exact: true }).click();
-    await batch.getByRole('button', { name: '应用（一次撤销）', exact: true }).click();
+    await batch.getByRole('button', { name: '应用', exact: true }).click();
     await batch.getByRole('button', { name: '关闭', exact: true }).click();
   }
   await page.locator('[data-top-menu="tools"] summary').click();
@@ -41,8 +41,8 @@ test(`compact warning, correction, skip, direct navigation and Esc`, async ({ pa
 
   const patrol = dialog.getByRole('button', { name: '下一处错误／警告' });
   const rows = dialog.locator('[data-ruby-row]');
-  const readings = rows.getByLabel('目标 注音');
-  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeEnabled();
+  const readings = rows.getByLabel('目标注音');
+  await expect(dialog.getByRole('button', { name: '生成注音', exact: true })).toBeEnabled();
   await expect(readings.first()).not.toHaveAttribute('aria-invalid');
   await patrol.click(); await expect(readings.nth(0)).toBeFocused();
   await expect(page.getByRole('tooltip')).toContainText('读音不同');
@@ -66,30 +66,30 @@ test('virtual patrol navigates between distant repeated sources', async ({ page 
   const dialog = await open(page, 2000);
   const issues = dialog.getByRole('button', { name: /核对 · L1/ });
   await issues.nth(1990).click();
-  const row = dialog.locator('[data-ruby-row="c:u1990"]'), input = row.getByLabel('目标 注音');
+  const row = dialog.locator('[data-ruby-row="c:u1990"]'), input = row.getByLabel('目标注音');
   await expect(input).toBeFocused(); await expect(input).toBeInViewport();
   await dialog.getByRole('button', { name: '下一处错误／警告' }).click();
-  await expect(dialog.locator('[data-ruby-row="c:u1991"]').getByLabel('目标 注音')).toBeFocused();
+  await expect(dialog.locator('[data-ruby-row="c:u1991"]').getByLabel('目标注音')).toBeFocused();
   await expect(dialog.getByRole('button', { name: '下一处错误／警告' })).toBeInViewport();
 });
 
 test('invalid readings recover after manual edits, output resets patrol and punctuation empties proposal', async ({ page }) => {
   const dialog = await open(page, 2, '★', '字');
   const rows = dialog.locator('[data-ruby-row]');
-  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '生成注音', exact: true })).toBeDisabled();
   await dialog.getByRole('button', { name: '下一处错误／警告' }).click();
-  await expect(rows.first().getByLabel('目标 注音')).toBeFocused();
-  await rows.first().getByLabel('目标 注音').fill('じ');
-  await expect(rows.first().getByLabel('目标 注音')).not.toHaveAttribute('aria-invalid');
+  await expect(rows.first().getByLabel('目标注音')).toBeFocused();
+  await rows.first().getByLabel('目标注音').fill('じ');
+  await expect(rows.first().getByLabel('目标注音')).not.toHaveAttribute('aria-invalid');
   await rows.last().getByLabel('跳过生成').check();
-  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: '生成注音', exact: true })).toBeEnabled();
   await expect(dialog.getByRole('button', { name: '下一处错误／警告' })).toBeDisabled();
   await dialog.getByLabel('字符输出').selectOption('roman');
-  await expect(rows.first().getByLabel('目标 注音')).toHaveValue('★');
+  await expect(rows.first().getByLabel('目标注音')).toHaveValue('★');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   const empty = await open(page, 2, '，。…', '字');
   await expect(empty).toContainText('没有可生成的音译单元');
-  await expect(empty.getByRole('button', { name: '生成 注音', exact: true })).toBeDisabled();
+  await expect(empty.getByRole('button', { name: '生成注音', exact: true })).toBeDisabled();
 });
 
 test('target and overwrite navigation focus real controls, links stay blocked', async ({ page }) => {
@@ -98,30 +98,30 @@ test('target and overwrite navigation focus real controls, links stay blocked', 
   await patrol.click();
   await expect(dialog.getByLabel('目标词').first()).toBeFocused();
   await dialog.getByLabel('目标词').first().selectOption('w1');
-  await expect(dialog.getByLabel('目标 注音').first()).toHaveValue('か');
+  await expect(dialog.getByLabel('目标注音').first()).toHaveValue('か');
   await patrol.click(); await expect(dialog.getByLabel('目标词').last()).toBeFocused();
   await dialog.getByLabel('目标词').last().selectOption('w0');
-  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: '生成注音', exact: true })).toBeEnabled();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   dialog = await open(page, 2, 'ka', '字', 'overwrite');
   await dialog.getByRole('button', { name: /阻塞.*显式选择覆盖/ }).click();
   await expect(dialog.getByRole('checkbox', { name: /覆盖/ })).toBeFocused();
   await dialog.getByRole('checkbox', { name: /覆盖/ }).check();
-  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: '生成注音', exact: true })).toBeEnabled();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   dialog = await open(page, 2, 'ka', '字', 'link');
   await dialog.getByRole('button', { name: /阻塞.*行尾链接/ }).click();
   await expect(dialog.locator('[data-ruby-source]').first()).toBeFocused();
   await expect(page.getByRole('tooltip')).toContainText('请先处理链接');
-  await expect(dialog.getByRole('button', { name: '生成 注音', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '生成注音', exact: true })).toBeDisabled();
 });
 
 for (const count of [80, 81]) test(`virtualization boundary ${count} and output change reset巡查`, async ({ page }) => {
   const dialog = await open(page, count);
   const issues = dialog.getByRole('button', { name: /核对 · L1/ });
   await issues.last().click();
-  await expect(dialog.locator(`[data-ruby-row="c:u${count - 1}"]`).getByLabel('目标 注音')).toBeFocused();
+  await expect(dialog.locator(`[data-ruby-row="c:u${count - 1}"]`).getByLabel('目标注音')).toBeFocused();
   await dialog.getByLabel('字符输出').selectOption('katakana');
   await dialog.getByRole('button', { name: '下一处错误／警告' }).click();
-  await expect(dialog.locator('[data-ruby-row="c:u0"]').getByLabel('目标 注音')).toBeFocused();
+  await expect(dialog.locator('[data-ruby-row="c:u0"]').getByLabel('目标注音')).toBeFocused();
 });

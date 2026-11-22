@@ -101,9 +101,7 @@ export function ProjectList() {
     <main className={styles.projectsPage}>
       <div className={styles.pageHeading}>
         <div>
-          <div className={styles.eyebrow}>{t('projects.workspace')}</div>
           <h1>{t('projects.title')}</h1>
-          <p className={styles.muted}>{t('projects.description')}</p>
         </div>
         <div className={styles.pageHeadingActions}>
           {importControl}

@@ -113,12 +113,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "menu.dictionary": {
-    "context": "menu interface message",
-    "source": "注音词典",
-    "params": [],
-    "parameterNotes": {}
-  },
   "menu.devices": {
     "context": "menu interface message",
     "source": "计算设备",
@@ -457,18 +451,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "projects.importFailed": {
-    "context": "projects interface message",
-    "source": "导入失败",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "projects.exportFailed": {
-    "context": "projects interface message",
-    "source": "导出失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "projects.loading": {
     "context": "projects interface message",
     "source": "正在加载项目…",
@@ -499,21 +481,9 @@
     "params": [],
     "parameterNotes": {}
   },
-  "projects.workspace": {
-    "context": "projects interface message",
-    "source": "工作台",
-    "params": [],
-    "parameterNotes": {}
-  },
   "projects.title": {
     "context": "projects interface message",
     "source": "项目",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "projects.description": {
-    "context": "projects interface message",
-    "source": "管理歌曲与歌词项目",
     "params": [],
     "parameterNotes": {}
   },
@@ -561,13 +531,7 @@
   },
   "projects.deleteCleanupFailed": {
     "context": "projects interface message",
-    "source": "项目已删除，本地恢复数据清理失败。重新打开也无法保存到已删除项目。",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "projects.deleteFailed": {
-    "context": "projects interface message",
-    "source": "删除失败，请重试",
+    "source": "项目已删除，但本地恢复缓存未能清理。",
     "params": [],
     "parameterNotes": {}
   },
@@ -669,7 +633,7 @@
   },
   "music.empty": {
     "context": "music interface message",
-    "source": "未上传音乐；歌词可编辑、保存及下载。",
+    "source": "尚未上传音频",
     "params": [],
     "parameterNotes": {}
   },
@@ -784,12 +748,6 @@
   "workspace.newRevision": {
     "context": "workspace interface message",
     "source": "服务器已有新版本，本地修改已保留。",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "workspace.downloadFailed": {
-    "context": "workspace interface message",
-    "source": "下载失败",
     "params": [],
     "parameterNotes": {}
   },
@@ -1027,30 +985,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "common.reset": {
-    "context": "common interface: common.reset",
-    "source": "恢复默认",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "common.moveUp": {
-    "context": "common interface: common.moveUp",
-    "source": "上移",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "common.moveDown": {
-    "context": "common interface: common.moveDown",
-    "source": "下移",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "common.name": {
-    "context": "common interface: common.name",
-    "source": "名称",
-    "params": [],
-    "parameterNotes": {}
-  },
   "common.actions": {
     "context": "common interface: common.actions",
     "source": "操作",
@@ -1066,12 +1000,6 @@
   "common.language": {
     "context": "common interface: common.language",
     "source": "语言",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "common.type": {
-    "context": "common interface: common.type",
-    "source": "类型",
     "params": [],
     "parameterNotes": {}
   },
@@ -1221,7 +1149,7 @@
   },
   "singer.deleteHelp": {
     "context": "singer interface: singer.deleteHelp",
-    "source": "移除此歌手定义及上述引用，保留歌词与其他歌手；引用清空后变为未指定。",
+    "source": "将同时清除上述引用，不影响歌词正文。",
     "params": [],
     "parameterNotes": {}
   },
@@ -1288,12 +1216,6 @@
   "ruby.addFailed": {
     "context": "ruby interface: ruby.addFailed",
     "source": "添加失败，请检查读音后重试",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "ruby.splitFailed": {
-    "context": "ruby interface: ruby.splitFailed",
-    "source": "拆分失败",
     "params": [],
     "parameterNotes": {}
   },
@@ -1505,12 +1427,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "editor.failed": {
-    "context": "editor interface: editor.failed",
-    "source": "编辑失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "editor.crossContentCopy": {
     "context": "editor interface: editor.crossContentCopy",
     "source": "跨内容音译复制暂不支持，请选择同一份内容",
@@ -1523,21 +1439,9 @@
     "params": [],
     "parameterNotes": {}
   },
-  "editor.pasteFailed": {
-    "context": "editor interface: editor.pasteFailed",
-    "source": "粘贴失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "editor.moveTargetRequired": {
     "context": "editor interface: editor.moveTargetRequired",
     "source": "跨来源行移动需要明确目标",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "editor.moveFailed": {
-    "context": "editor interface: editor.moveFailed",
-    "source": "跨行移动失败",
     "params": [],
     "parameterNotes": {}
   },
@@ -1549,7 +1453,7 @@
   },
   "editor.rubyScope": {
     "context": "editor interface: editor.rubyScope",
-    "source": "作用于所涉父词的全部 Ruby，每词一次",
+    "source": "作用于所涉父词的全部注音，每词一次",
     "params": [],
     "parameterNotes": {}
   },
@@ -1817,12 +1721,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "editor.deleteFailed": {
-    "context": "editor interface: editor.deleteFailed",
-    "source": "删除失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "editor.mode": {
     "context": "editor interface: editor.mode",
     "source": "工作模式",
@@ -1897,7 +1795,7 @@
   },
   "editor.audioRequired": {
     "context": "editor interface: editor.audioRequired",
-    "source": "请从底部上传音乐文件，再进行人声处理。歌词可继续编辑、保存和下载。",
+    "source": "请先从底部上传音频，再进行人声处理。",
     "params": [],
     "parameterNotes": {}
   },
@@ -2057,18 +1955,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "editor.amllSettings": {
-    "context": "editor interface: editor.amllSettings",
-    "source": "AMLL 兼容设置",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "editor.settingsScope": {
-    "context": "editor interface: editor.settingsScope",
-    "source": "当前项目 · 修改立即生效并自动保存，可撤销",
-    "params": [],
-    "parameterNotes": {}
-  },
   "editor.romanizationTrackManagement": {
     "context": "editor interface: editor.romanizationTrackManagement",
     "source": "音译轨道管理",
@@ -2101,7 +1987,7 @@
   },
   "editor.addRomanizationTrack": {
     "context": "editor interface: editor.addRomanizationTrack",
-    "source": "新增轨道音译轨道",
+    "source": "新增音译轨道",
     "params": [],
     "parameterNotes": {}
   },
@@ -2125,7 +2011,7 @@
   },
   "editor.applyOneUndo": {
     "context": "editor interface: editor.applyOneUndo",
-    "source": "应用（一次撤销）",
+    "source": "应用",
     "params": [],
     "parameterNotes": {}
   },
@@ -2160,12 +2046,6 @@
   "field.precision": {
     "context": "field interface: field.precision",
     "source": "时间超出毫秒精度范围",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "field.invalidTime": {
-    "context": "field interface: field.invalidTime",
-    "source": "时间格式错误",
     "params": [],
     "parameterNotes": {}
   },
@@ -2499,18 +2379,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "media.setAFailed": {
-    "context": "media interface: media.setAFailed",
-    "source": "设置 A 失败",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "media.setBFailed": {
-    "context": "media interface: media.setBFailed",
-    "source": "设置 B 失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "media.loopAB": {
     "context": "media interface: media.loopAB",
     "source": "循环 A/B",
@@ -2640,12 +2508,6 @@
   "settings.auto": {
     "context": "settings interface: settings.auto",
     "source": "自动",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "settings.deviceHelp": {
-    "context": "settings interface: settings.deviceHelp",
-    "source": "修改仅影响后续任务；自动按服务配置选择设备。",
     "params": [],
     "parameterNotes": {}
   },
@@ -2915,13 +2777,13 @@
   },
   "alignment.clearHelp": {
     "context": "alignment interface: alignment.clearHelp",
-    "source": "清空本次对齐范围内没有新时间建议的词／注音端点，包括未送入对齐的符号、标点和空白；可一次撤销。",
+    "source": "清空未获得对齐时间的词和注音（如标点、空格和不支持的字符）原有时间。",
     "params": [],
     "parameterNotes": {}
   },
   "alignment.gapThreshold": {
     "context": "alignment interface: alignment.gapThreshold",
-    "source": "行内空隙阈值（毫秒）",
+    "source": "行内空隙阈值",
     "params": [],
     "parameterNotes": {}
   },
@@ -3015,12 +2877,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "vocal.createFailed": {
-    "context": "vocal interface: vocal.createFailed",
-    "source": "无法创建人声任务",
-    "params": [],
-    "parameterNotes": {}
-  },
   "vocal.intentChanged": {
     "context": "vocal interface: vocal.intentChanged",
     "source": "声学内容或本页应用意图已改变，请重新发起任务",
@@ -3093,12 +2949,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "vocal.updateSeparation": {
-    "context": "vocal interface: vocal.updateSeparation",
-    "source": "更新人声分离结果",
-    "params": [],
-    "parameterNotes": {}
-  },
   "vocal.separate": {
     "context": "vocal interface: vocal.separate",
     "source": "分离人声",
@@ -3108,12 +2958,6 @@
   "vocal.fileUnavailable": {
     "context": "vocal interface: vocal.fileUnavailable",
     "source": "人声文件缺失、损坏或存储版本不支持",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "vocal.versionMismatch": {
-    "context": "vocal interface: vocal.versionMismatch",
-    "source": "现有人声未匹配当前分离版本",
     "params": [],
     "parameterNotes": {}
   },
@@ -3483,12 +3327,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "validation.failed": {
-    "context": "validation interface: validation.failed",
-    "source": "校验失败：",
-    "params": [],
-    "parameterNotes": {}
-  },
   "validation.formats": {
     "context": "validation interface: validation.formats",
     "source": "适用格式",
@@ -3507,30 +3345,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "validation.sugSelection": {
-    "context": "validation interface: validation.sugSelection",
-    "source": "SUG · 当前所选文件",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "validation.nicokaraSelection": {
-    "context": "validation interface: validation.nicokaraSelection",
-    "source": "NicoKara · 当前所选文件",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "common.back": {
-    "context": "common interface: common.back",
-    "source": "返回",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "common.export": {
-    "context": "common interface: common.export",
-    "source": "导出",
-    "params": [],
-    "parameterNotes": {}
-  },
   "validation.clean": {
     "context": "validation interface: validation.clean",
     "source": "当前检查未发现问题",
@@ -3543,27 +3357,9 @@
     "params": [],
     "parameterNotes": {}
   },
-  "packaging.lyricsDownload": {
-    "context": "packaging interface: packaging.lyricsDownload",
-    "source": "歌词下载",
-    "params": [],
-    "parameterNotes": {}
-  },
   "packaging.exportFormat": {
     "context": "packaging interface: packaging.exportFormat",
     "source": "导出格式",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.exportFailed": {
-    "context": "packaging interface: packaging.exportFailed",
-    "source": "导出失败",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "packaging.downloadLyrics": {
-    "context": "packaging interface: packaging.downloadLyrics",
-    "source": "下载歌词",
     "params": [],
     "parameterNotes": {}
   },
@@ -3591,15 +3387,9 @@
     "params": [],
     "parameterNotes": {}
   },
-  "packaging.musicFile": {
-    "context": "packaging interface: packaging.musicFile",
-    "source": "音乐文件",
-    "params": [],
-    "parameterNotes": {}
-  },
   "packaging.uploadHelp": {
     "context": "packaging interface: packaging.uploadHelp",
-    "source": "上传音乐后可打包音乐文件；单独下载歌词无需音乐。",
+    "source": "上传音频后可将歌词写入音乐文件。",
     "params": [],
     "parameterNotes": {}
   },
@@ -3633,12 +3423,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "preferences.readFailed": {
-    "context": "preferences interface: preferences.readFailed",
-    "source": "偏好读取失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "preferences.saveConflict": {
     "context": "preferences interface: preferences.saveConflict",
     "source": "偏好保存发生并发冲突",
@@ -3648,18 +3432,6 @@
   "save.checkpointFailed": {
     "context": "save interface: save.checkpointFailed",
     "source": "本地检查点保存失败，当前修改仍保留",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "save.failed": {
-    "context": "save interface: save.failed",
-    "source": "保存失败，修改已保留",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "save.recoveryReadFailed": {
-    "context": "save interface: save.recoveryReadFailed",
-    "source": "本地恢复记录读取失败",
     "params": [],
     "parameterNotes": {}
   },
@@ -3877,13 +3649,7 @@
   },
   "validation.controlCharacters": {
     "context": "validation interface: validation.controlCharacters",
-    "source": "此格式不能忠实表达正文中的制表符或换行",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "validation.punctuationZero": {
-    "context": "validation interface: validation.punctuationZero",
-    "source": "标点起止时间相同",
+    "source": "此格式不支持正文中的制表符或换行",
     "params": [],
     "parameterNotes": {}
   },
@@ -4103,7 +3869,7 @@
   },
   "amll.simplifyHelp": {
     "context": "amll interface: amll.simplifyHelp",
-    "source": "选中歌手归对唱侧，其余归默认侧。全项目清除自定义身份、词级及背景独立歌手；主行按引用首项映射。",
+    "source": "勾选的歌手归为对唱侧，其余归为默认侧；同时清除词级与背景独立歌手。",
     "params": [],
     "parameterNotes": {}
   },
@@ -4134,12 +3900,6 @@
   "amll.clearBackgroundSingers": {
     "context": "amll interface: amll.clearBackgroundSingers",
     "source": "清除背景行及其词的歌手",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "amll.failed": {
-    "context": "amll interface: amll.failed",
-    "source": "处理失败",
     "params": [],
     "parameterNotes": {}
   },
@@ -4293,12 +4053,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "amll.ruleConflict": {
-    "context": "amll interface: amll.ruleConflict",
-    "source": "当前内容不满足 AMLL 限制，请到兼容校验定位处理",
-    "params": [],
-    "parameterNotes": {}
-  },
   "amll.duplicateSinger": {
     "context": "amll interface: amll.duplicateSinger",
     "source": "歌手标识重复",
@@ -4319,7 +4073,7 @@
   },
   "amll.unassignedWord": {
     "context": "amll interface: amll.unassignedWord",
-    "source": "无歌手词无法在有歌手目标行中保真，请先统一歌手",
+    "source": "未指定歌手的词无法直接移入已指定歌手的行，请先统一歌手",
     "params": [],
     "parameterNotes": {}
   },
@@ -4368,12 +4122,6 @@
   "acquire.changed": {
     "context": "acquire interface: acquire.changed",
     "source": "当前歌词已变化，已重新对照元数据，请检查后再次导入。",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "acquire.failed": {
-    "context": "acquire interface: acquire.failed",
-    "source": "导入失败",
     "params": [],
     "parameterNotes": {}
   },
@@ -4440,12 +4188,6 @@
   "acquire.previewText": {
     "context": "acquire interface: acquire.previewText",
     "source": "预览文本",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "acquire.emptyLyrics": {
-    "context": "acquire interface: acquire.emptyLyrics",
-    "source": "新建空白歌词",
     "params": [],
     "parameterNotes": {}
   },
@@ -4566,12 +4308,6 @@
   "search.linked": {
     "context": "search interface: search.linked",
     "source": "歌曲 ID 已关联，可撤销",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "search.linkFailed": {
-    "context": "search interface: search.linkFailed",
-    "source": "关联失败",
     "params": [],
     "parameterNotes": {}
   },
@@ -4743,12 +4479,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "embedded.failed": {
-    "context": "embedded interface: embedded.failed",
-    "source": "内嵌歌词读取失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "embedded.sourceChanged": {
     "context": "embedded interface: embedded.sourceChanged",
     "source": "音乐文件已变化，请重新打开内嵌来源。",
@@ -4791,21 +4521,9 @@
     "params": [],
     "parameterNotes": {}
   },
-  "search.conditionsReadError": {
-    "context": "search interface: search.conditionsReadError",
-    "source": "获取条件读取失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "search.conditionsSaveFailed": {
     "context": "search interface: search.conditionsSaveFailed",
     "source": "获取条件保存失败，请重试",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "search.conditionsSaveError": {
-    "context": "search interface: search.conditionsSaveError",
-    "source": "获取条件保存失败",
     "params": [],
     "parameterNotes": {}
   },
@@ -4826,22 +4544,6 @@
     "source": "源音频标签响应无效",
     "params": [],
     "parameterNotes": {}
-  },
-  "search.tagsReadError": {
-    "context": "search interface: search.tagsReadError",
-    "source": "源音频标签读取失败",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "acquire.parseFailed": {
-    "context": "acquire interface: acquire.parseFailed",
-    "source": "解析失败：{{diagnostic}}",
-    "params": [
-      "diagnostic"
-    ],
-    "parameterNotes": {
-      "diagnostic": "Original technical diagnostic; never treat it as a translation key."
-    }
   },
   "acquire.page": {
     "context": "acquire interface: acquire.page",
@@ -5133,12 +4835,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "reading.failed": {
-    "context": "reading interface: reading.failed",
-    "source": "读音生成失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "reading.emptySkip": {
     "context": "reading interface: reading.emptySkip",
     "source": "空白项跳过生成。",
@@ -5190,12 +4886,6 @@
   "romanization.emptySkip": {
     "context": "romanization interface: romanization.emptySkip",
     "source": "留空则不生成",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "romanization.chunk": {
-    "context": "romanization interface: romanization.chunk",
-    "source": "分片",
     "params": [],
     "parameterNotes": {}
   },
@@ -5301,12 +4991,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "ruby.generateFailed": {
-    "context": "ruby interface: ruby.generateFailed",
-    "source": "生成 注音 失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "ruby.nextIssue": {
     "context": "ruby interface: ruby.nextIssue",
     "source": "下一处错误／警告",
@@ -5315,7 +4999,7 @@
   },
   "ruby.generate": {
     "context": "ruby interface: ruby.generate",
-    "source": "生成 注音",
+    "source": "生成注音",
     "params": [],
     "parameterNotes": {}
   },
@@ -5393,7 +5077,7 @@
   },
   "ruby.targetReading": {
     "context": "ruby interface: ruby.targetReading",
-    "source": "目标 注音",
+    "source": "目标注音",
     "params": [],
     "parameterNotes": {}
   },
@@ -5405,7 +5089,7 @@
   },
   "ruby.existing": {
     "context": "ruby interface: ruby.existing",
-    "source": "已有 注音",
+    "source": "已有注音",
     "params": [],
     "parameterNotes": {}
   },
@@ -5417,7 +5101,7 @@
   },
   "ruby.existingAlignment": {
     "context": "ruby interface: ruby.existingAlignment",
-    "source": "现有 注音 及其对齐结果",
+    "source": "现有注音及其对齐结果",
     "params": [],
     "parameterNotes": {}
   },
@@ -5429,7 +5113,7 @@
   },
   "ruby.confirmOverwrite": {
     "context": "ruby interface: ruby.confirmOverwrite",
-    "source": "请显式选择覆盖",
+    "source": "请勾选覆盖",
     "params": [],
     "parameterNotes": {}
   },
@@ -5777,7 +5461,7 @@
   },
   "ruby.groupConversion": {
     "context": "ruby interface: ruby.groupConversion",
-    "source": "整组转换：{{conversion}}；请手动确认每个 注音 的拆分",
+    "source": "整组转换：{{conversion}}；请手动确认每个注音的拆分",
     "params": [
       "conversion"
     ],
@@ -5793,13 +5477,13 @@
   },
   "ruby.readingRequired": {
     "context": "ruby interface: ruby.readingRequired",
-    "source": "尚未确认 注音 读音",
+    "source": "尚未确认注音读音",
     "params": [],
     "parameterNotes": {}
   },
   "ruby.overwriteRequired": {
     "context": "ruby interface: ruby.overwriteRequired",
-    "source": "已有 注音，请显式选择覆盖",
+    "source": "已有注音，请勾选覆盖",
     "params": [],
     "parameterNotes": {}
   },
@@ -5823,7 +5507,7 @@
   },
   "ruby.noChanges": {
     "context": "ruby interface: ruby.noChanges",
-    "source": "没有可应用的 注音",
+    "source": "没有可应用的注音",
     "params": [],
     "parameterNotes": {}
   },
@@ -5881,7 +5565,7 @@
   },
   "edit.applyUndo": {
     "context": "edit interface: edit.applyUndo",
-    "source": "应用（一次撤销）",
+    "source": "应用",
     "params": [],
     "parameterNotes": {}
   },
@@ -5906,12 +5590,6 @@
   "segment.boundaries": {
     "context": "segment interface: segment.boundaries",
     "source": "字符切分边界",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "edit.scope": {
-    "context": "edit interface: edit.scope",
-    "source": "应用范围",
     "params": [],
     "parameterNotes": {}
   },
@@ -6121,13 +5799,13 @@
   },
   "batch.noSmooth": {
     "context": "batch interface: batch.noSmooth",
-    "source": "范围内没有可平滑的 CJK 相邻词边界；含 注音 的边界会跳过",
+    "source": "范围内没有可平滑的 CJK 相邻词边界；含注音的边界会跳过",
     "params": [],
     "parameterNotes": {}
   },
   "batch.selectLead": {
     "context": "batch interface: batch.selectLead",
-    "source": "请先选择主唱行",
+    "source": "请先选择主行",
     "params": [],
     "parameterNotes": {}
   },
@@ -6139,13 +5817,7 @@
   },
   "batch.noNextLead": {
     "context": "batch interface: batch.noNextLead",
-    "source": "当前行后没有主唱行",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "batch.failed": {
-    "context": "batch interface: batch.failed",
-    "source": "批量操作失败",
+    "source": "当前行后没有主行",
     "params": [],
     "parameterNotes": {}
   },
@@ -6211,7 +5883,7 @@
   },
   "batch.selectedRuby": {
     "context": "batch interface: batch.selectedRuby",
-    "source": "选中词／行／Ruby（主行含背景）",
+    "source": "选中词／行／注音（主行含背景）",
     "params": [],
     "parameterNotes": {}
   },
@@ -6259,7 +5931,7 @@
   },
   "batch.offsetLabel": {
     "context": "batch interface: batch.offsetLabel",
-    "source": "偏移毫秒（负数为提前）",
+    "source": "偏移毫秒（正值延后，负值提前）",
     "params": [],
     "parameterNotes": {}
   },
@@ -6271,7 +5943,7 @@
   },
   "batch.clearHelp": {
     "context": "batch interface: batch.clearHelp",
-    "source": "清除范围内正文词的全部 Ruby 及其空拍、失效导唱；正文及独立音译／翻译保持。",
+    "source": "清除所选范围内的全部注音，以及关联的空拍和失效导唱符。",
     "params": [],
     "parameterNotes": {}
   },
@@ -6283,7 +5955,7 @@
   },
   "batch.linkHelp": {
     "context": "batch interface: batch.linkHelp",
-    "source": "将当前主唱行结束时间链接到下一主唱行的开始时间。",
+    "source": "将当前主行的结束时间链接到下一主行的开始时间。",
     "params": [],
     "parameterNotes": {}
   },
@@ -6413,12 +6085,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "translation.contentUnit": {
-    "context": "translation interface: translation.contentUnit",
-    "source": "份内容",
-    "params": [],
-    "parameterNotes": {}
-  },
   "translation.up": {
     "context": "translation interface: translation.up",
     "source": "上移",
@@ -6491,12 +6157,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "sync.connectAudio": {
-    "context": "sync interface: sync.connectAudio",
-    "source": "请先连接项目音频",
-    "params": [],
-    "parameterNotes": {}
-  },
   "sync.startFirst": {
     "context": "sync interface: sync.startFirst",
     "source": "请先为当前单元打起始轴",
@@ -6511,7 +6171,7 @@
   },
   "sync.noAudio": {
     "context": "sync interface: sync.noAudio",
-    "source": "上传音乐后可播放、回听和按播放位置打轴；仍可手工编辑时间。",
+    "source": "上传音频后即可播放、回听和按位置打轴。",
     "params": [],
     "parameterNotes": {}
   },
@@ -6715,13 +6375,13 @@
   },
   "preview.backgroundLimit": {
     "context": "preview interface: preview.backgroundLimit",
-    "source": "当前 AMLL 预览不能忠实呈现多条背景歌词；完整内容保留在编辑与打轴中。",
+    "source": "AMLL 预览仅显示单条背景行，不影响项目实际内容。",
     "params": [],
     "parameterNotes": {}
   },
   "preview.singerLimit": {
     "context": "preview interface: preview.singerLimit",
-    "source": "当前 AMLL 预览只呈现行级默认／对唱两侧，不能忠实呈现合唱和词级歌手；完整身份保留在编辑中。",
+    "source": "AMLL 预览仅区分主唱与对唱，不显示合唱和词级歌手。",
     "params": [],
     "parameterNotes": {}
   },
@@ -6869,7 +6529,7 @@
   },
   "translation.moveSummary": {
     "context": "translation interface: translation.moveSummary",
-    "source": "已选择 {{selected}} 份内容；实际转入 {{moved}} 份，将移除 {{removed}} 条本次搬空的源轨道。源轨道见各内容上方。文字、所属行及时间不变，语言和类型改用目标轨道属性；目标已有内容将保留，新内容追加到末尾。",
+    "source": "已选 {{selected}} 项，将转入 {{moved}} 项并移除 {{removed}} 条空轨道。转入后沿用目标轨道的语言和类型，追加到末尾。",
     "params": [
       "selected",
       "moved",
@@ -7021,7 +6681,7 @@
   },
   "batch.clearSummary": {
     "context": "batch interface: batch.clearSummary",
-    "source": "涉及 {{words}} 词，清除 {{ruby}} 个 Ruby、{{beats}} 个空拍",
+    "source": "涉及 {{words}} 词，清除 {{ruby}} 个注音、{{beats}} 个空拍",
     "params": [
       "words",
       "ruby",
@@ -7035,7 +6695,7 @@
   },
   "batch.replaceSummary": {
     "context": "batch interface: batch.replaceSummary",
-    "source": "匹配 {{matches}} 处，实际修改 {{changed}} 个对象；删除 {{words}} 词、{{ruby}} 个 Ruby、{{beats}} 个空拍",
+    "source": "匹配 {{matches}} 处，实际修改 {{changed}} 个对象；删除 {{words}} 词、{{ruby}} 个注音、{{beats}} 个空拍",
     "params": [
       "matches",
       "changed",
@@ -7123,7 +6783,7 @@
   },
   "batch.syncHelp": {
     "context": "batch interface: batch.syncHelp",
-    "source": "目标：{{count}} 行；行首尾取已定时间词的包络，未定词不变；改变已链接行的结束时间会取消链接。",
+    "source": "共 {{count}} 行：按行内已有词时间更新行起止（若改变链接行末尾，将自动取消链接）。",
     "params": [
       "count"
     ],
@@ -7147,21 +6807,9 @@
     "params": [],
     "parameterNotes": {}
   },
-  "timeline.failed": {
-    "context": "timeline interface: timeline.failed",
-    "source": "时间轴编辑失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "timeline.narrow": {
     "context": "timeline interface: timeline.narrow",
     "source": "窄区间，请用时间轴缩放后调整边界",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "timeline.closeFailed": {
-    "context": "timeline interface: timeline.closeFailed",
-    "source": "无法闭合空隙",
     "params": [],
     "parameterNotes": {}
   },
@@ -7285,12 +6933,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "spectrum.tileFailed": {
-    "context": "spectrum interface: spectrum.tileFailed",
-    "source": "声谱图片段加载失败",
-    "params": [],
-    "parameterNotes": {}
-  },
   "spectrum.zoomHint": {
     "context": "spectrum interface: spectrum.zoomHint",
     "source": "放大到 20 秒以内显示声谱图",
@@ -7333,7 +6975,7 @@
   },
   "karaoke.insertRuby": {
     "context": "karaoke interface: karaoke.insertRuby",
-    "source": "插入 Ruby 内导唱",
+    "source": "插入注音内导唱符",
     "params": [],
     "parameterNotes": {}
   },
@@ -7429,7 +7071,7 @@
   },
   "karaoke.rubyThreshold": {
     "context": "karaoke interface: karaoke.rubyThreshold",
-    "source": "Ruby 内阈值",
+    "source": "注音内阈值",
     "params": [],
     "parameterNotes": {}
   },
@@ -7643,28 +7285,6 @@
       "count": "Item count used for grammatical plural selection."
     }
   },
-  "karaoke.outputSummary": {
-    "context": "karaoke interface: karaoke.outputSummary",
-    "source": "所选文件：{{files}} 个有内容，{{issues}} 项阻塞",
-    "params": [
-      "files",
-      "issues"
-    ],
-    "parameterNotes": {
-      "files": "Number of files; preserve the numeric value (or supplied list for lines).",
-      "issues": "Number of issues; preserve the numeric value (or supplied list for lines)."
-    }
-  },
-  "karaoke.omitted": {
-    "context": "karaoke interface: karaoke.omitted",
-    "source": "省略 {{count}} 个空输出",
-    "params": [
-      "count"
-    ],
-    "parameterNotes": {
-      "count": "Item count used for grammatical plural selection."
-    }
-  },
   "vocal.selectedCount": {
     "context": "vocal interface: vocal.selectedCount",
     "source": "片段已选 {{count}}",
@@ -7867,7 +7487,7 @@
   },
   "shortcuts.help": {
     "context": "shortcuts interface: shortcuts.help",
-    "source": "点击按键框后录入组合键。打轴按物理键位；播放定位仅在播放器内生效。清除自定义后恢复该项默认。工作台非输入状态下，空格始终用于播放／暂停，自定义播放键也可使用。",
+    "source": "点击按键框录入快捷键。打轴按物理键位，空格在非输入状态下固定控制播放／暂停。",
     "params": [],
     "parameterNotes": {}
   },
@@ -8099,7 +7719,7 @@
   },
   "command.linkTarget": {
     "context": "command interface: command.linkTarget",
-    "source": "只能链接到其他已定开始时间的主唱行",
+    "source": "只能链接到其他已定开始时间的主行",
     "params": [],
     "parameterNotes": {}
   },
@@ -8273,7 +7893,7 @@
   },
   "command.rubyOverwrite": {
     "context": "command interface: command.rubyOverwrite",
-    "source": "已有手动 注音，需明确选择覆盖",
+    "source": "已有手动注音，请勾选覆盖",
     "params": [],
     "parameterNotes": {}
   },
@@ -8519,13 +8139,13 @@
   },
   "timeline.rubyMissing": {
     "context": "timeline interface: timeline.rubyMissing",
-    "source": "时间轴 注音 已不存在",
+    "source": "时间轴注音已不存在",
     "params": [],
     "parameterNotes": {}
   },
   "timeline.rubyTimesRequired": {
     "context": "timeline interface: timeline.rubyTimesRequired",
-    "source": "请先为 注音 设置完整时间",
+    "source": "请先为注音设置完整时间",
     "params": [],
     "parameterNotes": {}
   },
@@ -8537,7 +8157,7 @@
   },
   "timeline.wordExcludesRuby": {
     "context": "timeline interface: timeline.wordExcludesRuby",
-    "source": "词边界不能排除 注音",
+    "source": "词边界不能排除注音",
     "params": [],
     "parameterNotes": {}
   },
@@ -8579,7 +8199,7 @@
   },
   "alignment.invalidEndpoint": {
     "context": "alignment interface: alignment.invalidEndpoint",
-    "source": "非法建议端点",
+    "source": "对齐时间无效",
     "params": [],
     "parameterNotes": {}
   },
@@ -8628,18 +8248,6 @@
   "batch.emptySearch": {
     "context": "batch interface: batch.emptySearch",
     "source": "查找内容不能为空",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "karaoke.mainLyrics": {
-    "context": "karaoke interface: karaoke.mainLyrics",
-    "source": "主歌词",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "karaoke.backgroundLyrics": {
-    "context": "karaoke interface: karaoke.backgroundLyrics",
-    "source": "背景歌词",
     "params": [],
     "parameterNotes": {}
   },
@@ -8799,18 +8407,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "editing.oldLyricFields": {
-    "context": "editing interface: editing.oldLyricFields",
-    "source": "旧歌词编辑字段不再支持",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "editing.oldWordBeats": {
-    "context": "editing interface: editing.oldWordBeats",
-    "source": "旧词空拍字段不再支持",
-    "params": [],
-    "parameterNotes": {}
-  },
   "editing.beatsInvalid": {
     "context": "editing interface: editing.beatsInvalid",
     "source": "空拍对象、类别或数量无效",
@@ -8945,7 +8541,7 @@
   },
   "spectrum.contextMissing": {
     "context": "spectrum interface: spectrum.contextMissing",
-    "source": "PCM窗口缺少FFT上下文",
+    "source": "PCM 窗口缺少 FFT 上下文",
     "params": [],
     "parameterNotes": {}
   },
@@ -8957,7 +8553,7 @@
   },
   "sync.rubyMissing": {
     "context": "sync interface: sync.rubyMissing",
-    "source": "打轴 注音 单元已不存在",
+    "source": "打轴注音单元已不存在",
     "params": [],
     "parameterNotes": {}
   },
@@ -9125,7 +8721,7 @@
   },
   "output.assControl": {
     "context": "output interface: output.assControl",
-    "source": "ASS 不能忠实表达制表符或控制字符",
+    "source": "ASS 不支持制表符或控制字符",
     "params": [],
     "parameterNotes": {}
   },
@@ -9185,7 +8781,7 @@
   },
   "output.nicoControl": {
     "context": "output interface: output.nicoControl",
-    "source": "此字段的控制字符或换行无法忠实写入 Nicokara 单行",
+    "source": "此字段包含控制字符或换行，无法写入 NicoKara 单行",
     "params": [],
     "parameterNotes": {}
   },
@@ -9203,13 +8799,13 @@
   },
   "output.rubyRange": {
     "context": "output interface: output.rubyRange",
-    "source": "Ruby 重叠、倒序或超出正文范围",
+    "source": "注音重叠、倒序或超出正文范围",
     "params": [],
     "parameterNotes": {}
   },
   "output.rubyLength": {
     "context": "output interface: output.rubyLength",
-    "source": "Ruby 字段超过规范单行 1024 字符限制",
+    "source": "注音字段超过规范单行 1024 字符限制",
     "params": [],
     "parameterNotes": {}
   },
@@ -9221,7 +8817,7 @@
   },
   "output.markerConflict": {
     "context": "output interface: output.markerConflict",
-    "source": "触发标记与实际歌词或导唱冲突，请在NicoKara 歌手标记管理中修改",
+    "source": "触发标记与实际歌词或导唱符冲突，请在 NicoKara 歌手标记管理中修改",
     "params": [],
     "parameterNotes": {}
   },
@@ -9233,7 +8829,7 @@
   },
   "output.rubyAmbiguous": {
     "context": "output interface: output.rubyAmbiguous",
-    "source": "Ruby 规则会匹配同文或子串的另一对象，请调整输出分组",
+    "source": "注音规则会匹配同文或子串的另一对象，请调整输出分组",
     "params": [],
     "parameterNotes": {}
   },
@@ -9245,7 +8841,7 @@
   },
   "output.markersAmbiguous": {
     "context": "output interface: output.markersAmbiguous",
-    "source": "不同歌手集合的触发标记相同或相互包含，请在NicoKara 歌手标记管理中消歧",
+    "source": "不同歌手集合的触发标记相同或相互包含，请在 NicoKara 歌手标记管理中消歧",
     "params": [],
     "parameterNotes": {}
   },
@@ -9287,13 +8883,13 @@
   },
   "output.sugCuePause": {
     "context": "output interface: output.sugCuePause",
-    "source": "Ruby 导唱与 SUG 保留停顿编码冲突",
+    "source": "注音导唱符与 SUG 保留停顿编码冲突",
     "params": [],
     "parameterNotes": {}
   },
   "output.sugOrder": {
     "context": "output interface: output.sugOrder",
-    "source": "SUG 无法忠实消费此正文顺序；请调整输出分组或时间",
+    "source": "SUG 不支持当前正文时间顺序，请调整输出分组或时间",
     "params": [],
     "parameterNotes": {}
   },
@@ -9461,13 +9057,13 @@
   },
   "format.assDetail": {
     "context": "format interface: format.assDetail",
-    "source": "正文保留有效行边界；正文和定时翻译／音译的绝对端点统一量化到厘秒，再计算间隙与时长。短单元可能为零，文字保留但高亮精度降低；事件内单元重叠、倒序或正文越出行边界会阻塞。",
+    "source": "正文与定时翻译／音译端点按厘秒量化，过短单元可能归零；行内重叠、倒序或词越出行界将无法导出。",
     "params": [],
     "parameterNotes": {}
   },
   "format.assAttachments": {
     "context": "format interface: format.assAttachments",
-    "source": "每份内容分别形成事件，按样式、名称区分。普通内容使用所属行时间，定时内容使用独立包络；不保留原生轨道身份、关联或 replacement 语义，不代表容器内可选字幕流。",
+    "source": "每条附属内容导出为独立字幕事件，以样式和名称区分；不保留与正文的原生轨道关联。",
     "params": [],
     "parameterNotes": {}
   },
@@ -9479,7 +9075,7 @@
   },
   "format.assOverlap": {
     "context": "format interface: format.assOverlap",
-    "source": "各主行输出独立事件，默认按时间分配纵向位置；复杂多声部、长行及消费者字体差异仍需检查排版。",
+    "source": "各主行导出为独立事件并自动错开纵位；多声部或长行建议导入字幕工具后再微调排版。",
     "params": [],
     "parameterNotes": {}
   },
@@ -9533,7 +9129,7 @@
   },
   "projects.deleteConfirm": {
     "context": "projects interface: projects.deleteConfirm",
-    "source": "删除项目“{{name}}”？将删除歌词修订、任务和产物。原始上传文件和共享音频保留。",
+    "source": "删除项目“{{name}}”？将一并删除该项目保存的音频、歌词修订、任务和产物，此操作无法撤销。",
     "params": [
       "name"
     ],
@@ -9661,7 +9257,7 @@
   },
   "editing.singerLoss": {
     "context": "editing interface: editing.singerLoss",
-    "source": "无歌手词无法在有歌手目标行中保真",
+    "source": "未指定歌手的词无法直接移入已指定歌手的行",
     "params": [],
     "parameterNotes": {}
   },
@@ -10115,7 +9711,7 @@
   },
   "ttml.rubySinger": {
     "context": "ttml interface: ttml.rubySinger",
-    "source": "Ruby 不支持独立歌手",
+    "source": "注音不支持独立歌手",
     "params": [],
     "parameterNotes": {}
   },
@@ -10623,16 +10219,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "packaging.returnExport": {
-    "context": "packaging interface: packaging.returnExport",
-    "source": "返回 {{format}} 导出",
-    "params": [
-      "format"
-    ],
-    "parameterNotes": {
-      "format": "Protocol or file format name; preserve it."
-    }
-  },
   "songPart.selected_other": {
     "context": "songPart interface: songPart.selected",
     "source": "编辑明确选中的 {{count}} 条主行",
@@ -11035,7 +10621,7 @@
   },
   "settings.particleHelp": {
     "context": "Studio preferences window",
-    "source": "将无注音正文中作为助词的「は／へ」按「わ／え」转换，用于自动对齐和日文罗马音生成。",
+    "source": "将无注音正文中作为助词的「は／へ」按「わ／え」转换，用于自动对齐和日文罗马字生成。",
     "params": [],
     "parameterNotes": {}
   },
@@ -11071,7 +10657,7 @@
   },
   "settings.gpuHelp": {
     "context": "Studio preferences window",
-    "source": "优先使用 GPU，不可用时使用 CPU。运行失败后可使用 CPU 重试。",
+    "source": "优先使用 GPU，不可用时自动回退到 CPU。",
     "params": [],
     "parameterNotes": {}
   },
@@ -11140,7 +10726,7 @@
   "sugSingers.mergeHelp": {
     "context": "SUG singer manager",
     "params": [],
-    "source": "同一文件中名称相同的歌手将合并为同一演唱者。清空名称可恢复默认值。"
+    "source": "同一文件内同名歌手会合并为同一演唱者，留空则恢复默认名称。"
   },
   "sugSingers.reset": {
     "context": "SUG singer manager",
@@ -11166,7 +10752,7 @@
   },
   "segment.blockObscene": {
     "context": "segment interface: segment.blockObscene",
-    "source": "含消音属性，保留原词",
+    "source": "含不雅用语，保留原词",
     "params": []
   },
   "segment.blockBeat": {
@@ -11181,7 +10767,7 @@
   },
   "settings.swapWheelHelp": {
     "context": "settings interface: settings.swapWheelHelp",
-    "source": "默认滚轮缩放，Shift＋滚轮平移。可配置为交换",
+    "source": "默认滚轮缩放、Shift＋滚轮平移；开启后两者互换。",
     "params": []
   },
   "split.attachments": {
@@ -11344,7 +10930,7 @@
   },
   "settings.spectrumHeight": {
     "context": "Timeline settings: active line expansion and spectrogram display height",
-    "source": "频谱图高度",
+    "source": "声谱图高度",
     "params": [],
     "parameterNotes": {}
   },
@@ -11437,7 +11023,7 @@
     "context": "单个 SUG 0.3.0 歌词文件导入；预览显示缺少的源检查点数量，解析错误保留原项目。"
   },
   "acquire.sugTiming": {
-    "source": "SUG 尚缺 {{count}} 个检查点；已有时间将随歌词导入，可在导入后继续打轴。映射后 {{missing}} 个对象缺少端点。",
+    "source": "有 {{count}} 处未打轴（对应 {{missing}} 个对象缺少时间），已打轴部分会正常导入。",
     "context": "单个 SUG 0.3.0 歌词文件导入；预览显示缺少的源检查点数量，解析错误保留原项目。"
   },
   "format.multiFiles": {
@@ -11465,7 +11051,7 @@
     "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
   },
   "format.multiReading": {
-    "source": "所选正文携带分组注音与导唱；SUG 的 Ruby 首尾按所属词包络投影。",
+    "source": "所选正文含分组注音与导唱符；SUG 会按所属词边界投影注音起止。",
     "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
   },
   "format.multiBackground": {
@@ -11490,7 +11076,7 @@
   },
   "packaging.offsetDirection": {
     "context": "packaging interface: packaging.offsetDirection",
-    "source": "正数延后，负数提前"
+    "source": "正值延后，负值提前"
   },
   "packaging.mergeSingleFile": {
     "context": "packaging interface: packaging.mergeSingleFile",
@@ -11535,5 +11121,17 @@
   "packaging.downloading": {
     "context": "packaging interface: packaging.downloading",
     "source": "正在打包并下载…"
+  },
+  "common.delete": {
+    "source": "删除",
+    "context": "Generic delete action button label",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.openStudio": {
+    "source": "打开 Studio 设置",
+    "context": "Button on /settings page to open the Studio settings modal",
+    "params": [],
+    "parameterNotes": {}
   }
 }

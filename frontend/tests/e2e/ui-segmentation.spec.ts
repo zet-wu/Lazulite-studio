@@ -8,6 +8,6 @@ test('batch manual drafts commit all words once, cancel and history preserve tex
  await open();const dialog=page.getByRole('dialog');await dialog.getByRole('combobox',{name:'范围',exact:true}).selectOption('all');
  const boundaries=dialog.getByRole('button',{name:'切分边界 1',exact:true});for(let i=0;i<3;i++)await boundaries.nth(i).click();
  await dialog.getByRole('button',{name:'取消',exact:true}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(3);
- await open();await dialog.getByRole('combobox',{name:'范围',exact:true}).selectOption('all');for(let i=0;i<3;i++)await boundaries.nth(i).click();await dialog.getByRole('button',{name:'应用（一次撤销）'}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(6);
+ await open();await dialog.getByRole('combobox',{name:'范围',exact:true}).selectOption('all');for(let i=0;i<3;i++)await boundaries.nth(i).click();await dialog.getByRole('button',{name:'应用'}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(6);
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(3);await page.getByRole('button',{name:'重做',exact:true}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(6);
 });

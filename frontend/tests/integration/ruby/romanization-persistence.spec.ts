@@ -25,9 +25,9 @@ test('filtering, warning and explicit overwrite apply atomically and survive rea
   const dialog = page.getByRole('dialog', { name: '从音译生成注音', exact: true });
   await expect(dialog.locator('[data-ruby-row]')).toHaveCount(2);
   await dialog.getByRole('checkbox', { name: /覆盖/ }).check();
-  await dialog.getByLabel('目标 注音').last().fill('じ');
+  await dialog.getByLabel('目标注音').last().fill('じ');
   await expect(dialog.getByRole('button', { name: /核对 · L1/ })).toHaveCount(1);
-  await dialog.getByRole('button', { name: '生成 注音', exact: true }).click();
+  await dialog.getByRole('button', { name: '生成注音', exact: true }).click();
   const line = page.locator('main section[data-line-id="p11"]');
   await expect(line.getByLabel('读音 は', { exact: true })).toHaveValue('わ');
   await page.getByRole('button', { name: '撤销', exact: true }).click();

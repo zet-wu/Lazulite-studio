@@ -9,7 +9,7 @@ test('settings persist defaults and share preview preferences',async({page})=>{
  const highlight=dialog.getByLabel('音译高亮字符默认值');await highlight.fill('ヘ は ヘ');await highlight.blur();await expect(highlight).toHaveValue('へは');
  await dialog.getByLabel('自动转换日语助词读音',{exact:false}).uncheck();
  await dialog.getByRole('button',{name:'模型与计算',exact:true}).click();
- const gap=dialog.getByLabel('行内空隙阈值（毫秒）');await gap.fill('321');await gap.blur();
+ const gap=dialog.getByLabel('行内空隙阈值');await gap.fill('321');await gap.blur();
  await dialog.getByRole('button',{name:'AMLL 预览',exact:true}).click();
  await dialog.getByLabel('翻译', {exact:true}).uncheck();
  await page.keyboard.press('Escape');await expect(page.locator('[data-settings-button]')).toBeFocused();

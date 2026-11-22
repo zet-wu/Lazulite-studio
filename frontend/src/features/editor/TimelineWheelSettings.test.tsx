@@ -24,13 +24,13 @@ it('active expansion and height save on commit, retain invalid drafts and restor
  const mount=()=>render(<StudioSettings initial="timeline" close={()=>{}}/>);const view=mount();
  expect(screen.getByRole('combobox',{name:'活动行自动展开显示'})).toHaveValue('follow');
  fireEvent.change(screen.getByRole('combobox',{name:'活动行自动展开显示'}),{target:{value:'always'}});
- const height=screen.getByRole('spinbutton',{name:'频谱图高度'});
+ const height=screen.getByRole('spinbutton',{name:'声谱图高度'});
  expect(height).toHaveValue(72);
  fireEvent.change(height,{target:{value:'35'}});fireEvent.blur(height);
  expect(height).toHaveValue(35);expect(height).toHaveAttribute('aria-invalid','true');expect(values['studio:spectrum-height']).toBeUndefined();
  fireEvent.keyDown(height,{key:'Escape'});expect(height).toHaveValue(72);expect(height).toHaveAttribute('aria-invalid','false');
  fireEvent.change(height,{target:{value:'216'}});fireEvent.keyDown(height,{key:'Enter'});
  await waitFor(()=>expect(values['studio:spectrum-height']).toBe('216'));
- view.unmount();mount();expect(screen.getByRole('spinbutton',{name:'频谱图高度'})).toHaveValue(216);expect(screen.getByRole('combobox',{name:'活动行自动展开显示'})).toHaveValue('always');
- fail=true;const reopenedHeight=screen.getByRole('spinbutton',{name:'频谱图高度'});fireEvent.change(reopenedHeight,{target:{value:'36'}});fireEvent.keyDown(reopenedHeight,{key:'Enter'});await waitFor(()=>expect(screen.getByRole('alert')).toBeVisible());expect(reopenedHeight).toHaveValue(216);
+ view.unmount();mount();expect(screen.getByRole('spinbutton',{name:'声谱图高度'})).toHaveValue(216);expect(screen.getByRole('combobox',{name:'活动行自动展开显示'})).toHaveValue('always');
+ fail=true;const reopenedHeight=screen.getByRole('spinbutton',{name:'声谱图高度'});fireEvent.change(reopenedHeight,{target:{value:'36'}});fireEvent.keyDown(reopenedHeight,{key:'Enter'});await waitFor(()=>expect(screen.getByRole('alert')).toBeVisible());expect(reopenedHeight).toHaveValue(216);
 });

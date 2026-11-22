@@ -106,7 +106,7 @@ it('automatically previews current parameters, waits for IME, and applies the di
   try {
     fireEvent.change(screen.getByLabelText('模式'), {target:{value:'advanced'}});
     const rules = screen.getByLabelText('自定义规则（每行 原文=部分|部分）');
-    const apply = screen.getByRole('button', {name:'应用（一次撤销）'});
+    const apply = screen.getByRole('button', {name:'应用'});
     fireEvent.change(rules, {target:{value:'hello=hel|lo'}});
     await waitFor(()=>expect(apply).toBeEnabled());
     fireEvent.compositionStart(rules);
@@ -137,11 +137,11 @@ it('ignores late syllable previews after newer inputs and after closing', async 
     fireEvent.change(screen.getByLabelText('西文处理'),{target:{value:'syllable'}});
     await waitFor(()=>expect(pending).toHaveLength(1));
     fireEvent.change(screen.getByLabelText('音节语言'),{target:{value:'de'}});
-    expect(screen.getByRole('button',{name:'应用（一次撤销）'})).toBeDisabled();
+    expect(screen.getByRole('button',{name:'应用'})).toBeDisabled();
     await waitFor(()=>expect(pending).toHaveLength(2));
     await act(async()=>pending[1](()=>['he','llo']));
     await act(async()=>pending[0](()=>['hel','lo']));
-    fireEvent.click(screen.getByRole('button',{name:'应用（一次撤销）'}));
+    fireEvent.click(screen.getByRole('button',{name:'应用'}));
     expect(apply).toHaveBeenCalledWith(expect.objectContaining({changes:[expect.objectContaining({words:[expect.objectContaining({text:'he'}),expect.objectContaining({text:'llo'})]})]}));
     fireEvent.change(screen.getByLabelText('音节语言'),{target:{value:'fr'}});
     await waitFor(()=>expect(pending).toHaveLength(3));

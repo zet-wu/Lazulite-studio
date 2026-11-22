@@ -156,7 +156,7 @@ function Settings() {
     <main className={styles.simplePage}>
       <Link to="/projects">{t('app.projectsBack')}</Link>
       <h1>{t('menu.settings')}</h1>
-      <button data-role="secondary" onClick={()=>setOpen(true)}>{t('menu.settings')}</button>
+      <button data-role="secondary" onClick={()=>setOpen(true)}>{t('settings.openStudio')}</button>
       {open&&<StudioSettings initial="models" close={()=>setOpen(false)}/>}
       {query.isLoading ? (
         <p>{t('app.capabilitiesLoading')}</p>

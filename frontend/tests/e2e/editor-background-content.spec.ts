@@ -37,7 +37,7 @@ test('background editing, mixed singer selection, relation and generation use ex
   await page.getByRole('menuitem', { name: '从音译生成注音', exact: true }).click();
   const ruby = page.getByRole('dialog', { name: '从音译生成注音', exact: true });
   await ruby.getByLabel('字符输出').selectOption('roman');
-  await ruby.getByRole('button', { name: '生成 注音', exact: true }).click();
+  await ruby.getByRole('button', { name: '生成注音', exact: true }).click();
   await expect(ruby).toHaveCount(0);
   await expect(main.locator('[data-romanization-content-id]')).toHaveCount(1);
   await expect(page.getByText(/Lundefined/)).toHaveCount(0);
@@ -48,7 +48,7 @@ test('background content transfer and clipboard deletion preserve its parent', a
   await bg.locator('[data-romanization-content-id]').getByText('音译 · ja-Latn', { exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: '转移到其他歌词行', exact: true }).click();
   const transfer = page.getByRole('dialog', { name: '转移附属内容' });
-  await transfer.getByLabel('目标歌词行').selectOption('L2'); await transfer.getByRole('button', { name: '应用（一次撤销）' }).click();
+  await transfer.getByLabel('目标歌词行').selectOption('L2'); await transfer.getByRole('button', { name: '应用' }).click();
   await expect(bg.locator('[data-romanization-content-id]')).toHaveCount(0);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   const content = bg.locator('[data-romanization-content-id]');

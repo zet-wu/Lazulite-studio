@@ -21,7 +21,7 @@ test('ruby drag enforces order, keyboard movement commits and survives save undo
  await expect(pieces.nth(0).getByRole('button',{name:'b',exact:true})).toBeVisible();
  await page.keyboard.press('ArrowRight');
  await expect(dialog.getByRole('button',{name:'b',exact:true})).toBeFocused();
- await dialog.getByRole('button',{name:'应用（一次撤销）'}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(4);
+ await dialog.getByRole('button',{name:'应用'}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(4);
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(3);
  await page.getByRole('button',{name:'重做',exact:true}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(4);
  await page.getByRole('button',{name:'保存',exact:true}).click();await expect(page.getByText('已保存',{exact:true})).toBeVisible();await page.reload();await expect(page.locator('main [data-word-id]')).toHaveCount(4);
@@ -39,7 +39,7 @@ test('single word ruby preset uses the same editable draft',async({page})=>{
  const dialog=await prepare(page);await dialog.getByRole('button',{name:'取消',exact:true}).click();
  await page.locator('main [data-word-id]').first().click({button:'right',position:{x:3,y:3}});await page.getByRole('menuitem',{name:'拆分词',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'拆分词'})).toBeVisible();await expect(dialog.getByRole('button',{name:'切分边界 2',exact:true})).toHaveAttribute('aria-pressed','true');
- await dialog.getByRole('button',{name:'切分边界 2',exact:true}).click();await expect(dialog.getByRole('button',{name:'切分边界 2',exact:true})).toBeFocused();await dialog.getByRole('button',{name:'应用（一次撤销）'}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(5);
+ await dialog.getByRole('button',{name:'切分边界 2',exact:true}).click();await expect(dialog.getByRole('button',{name:'切分边界 2',exact:true})).toBeFocused();await dialog.getByRole('button',{name:'应用'}).click();await expect(page.locator('main [data-word-id]')).toHaveCount(5);
 });
 
 test('ruby clicks are exclusive across sources and modifier selections follow editor semantics',async({page})=>{
