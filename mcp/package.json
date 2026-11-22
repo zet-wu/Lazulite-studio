@@ -1,0 +1,24 @@
+{
+  "name": "@lazulite-studio/mcp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@applemusic-like-lyrics/lyric": "1.0.2",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@xmldom/xmldom": "^0.9.8",
+    "wanakana": "5.3.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.0",
+    "esbuild": "^0.25.0",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}
