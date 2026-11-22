@@ -20,7 +20,7 @@ from fastapi import (
 )
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -82,7 +82,9 @@ def create_app(
         for path in cache.glob('*.wav'): path.unlink()
         for path in cache.glob('*.peaks-v1'):
             if path.is_dir(): shutil.rmtree(path)
-    revisions = RevisionStore(db, root / "projects")
+    from .events import ProjectEventHub
+    event_hub = ProjectEventHub()
+    revisions = RevisionStore(db, root / "projects", event_hub=event_hub)
     from .vocals import VocalRunner
     from .vocal_routes import build_vocal_router, vocal_asset
     vocal_runner = VocalRunner(db, root / 'projects', separator_factory, media_lifetime=media_lifetime)
@@ -315,6 +317,7 @@ def create_app(
         result = replace_music(db, root, pid, body.upload_id, body.revision,
             body.expected_asset_id, body.operation_id, subject, staged_upload, asset_dto)
         media_lifetime.invalidate(pid)
+        event_hub.publish(pid, "revision_changed", revision=result["revision"], source_asset_id=result["asset"]["id"])
         return result
 
     @api.post('/projects/{pid}/music-cleanup')
@@ -711,7 +714,7 @@ def create_app(
             return
         fail('job_kind_removed', '不支持此任务类别', 422)
 
-    job_service = JobService(db, devices=devices, asset_path=asset_path_for_project, vocal_runner=vocal_runner, alignment_runner=alignment_runner)
+    job_service = JobService(db, devices=devices, asset_path=asset_path_for_project, vocal_runner=vocal_runner, alignment_runner=alignment_runner, event_hub=event_hub)
     api.include_router(create_job_router(job_service, job_project_exists, auth_dependency=auth, write_dependency=write, validate_request=validate_job_request))
     api.include_router(build_vocal_router(vocal_runner, auth=auth, project_exists=project))
     api.include_router(build_analysis_router(configured_reading_proposer, write=write))
@@ -725,9 +728,47 @@ def create_app(
     from .lyric_sources import build_sources_router
     api.include_router(build_sources_router(write=write))
     api.include_router(build_publish_router(db, revisions, publisher=publisher, auth=auth, write=write, project_row=project, asset_path=asset_path_for_project))
+
+    @api.get("/projects/{pid}/events")
+    async def project_events(pid: str, request: Request, _: object = Depends(auth)):
+        project(pid)
+
+        async def stream():
+            import asyncio
+            yield ": connected\n\n"
+            iterator = event_hub.subscribe(pid)
+            pending = asyncio.create_task(anext(iterator, None))
+            try:
+                while True:
+                    if await request.is_disconnected():
+                        break
+                    done, _ = await asyncio.wait({pending}, timeout=25.0)
+                    if not done:
+                        yield ": ping\n\n"
+                        continue
+                    event = pending.result()
+                    if event is None:
+                        break
+                    yield f"event: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+                    pending = asyncio.create_task(anext(iterator, None))
+            finally:
+                pending.cancel()
+                try:
+                    await pending
+                except asyncio.CancelledError:
+                    pass
+                await iterator.aclose()
+
+        return StreamingResponse(
+            stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     app = FastAPI(title="Lazulite Studio API", version="0.3.0")
     api.include_router(settings_router(preferences, auth=auth, write=write, on_change=devices.refresh))
     app.state.jobs = job_service
+    app.state.event_hub = event_hub
     app.state.media_lifetime = media_lifetime
     @app.on_event("startup")
     async def start_media():
@@ -735,6 +776,7 @@ def create_app(
     app.include_router(api)
     @app.on_event("shutdown")
     async def shutdown_jobs():
+        event_hub.close()
         media_lifetime.close()
         job_service.close()
         dictionaries.close()

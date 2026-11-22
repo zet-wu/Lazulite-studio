@@ -15,13 +15,14 @@ def now(): return datetime.now(timezone.utc).isoformat()
 
 class JobService:
     """Durable single-slot executor. Current state and latest stage are committed for polling."""
-    def __init__(self, db: Database, *, asset_path=None, vocal_runner=None, alignment_runner=None, devices=None):
+    def __init__(self, db: Database, *, asset_path=None, vocal_runner=None, alignment_runner=None, devices=None, event_hub=None):
         self.db, self.asset_path = db, asset_path
         from .revisions import RevisionStore
-        self.revisions = RevisionStore(db, db.paths.root / 'projects')
+        self.revisions = RevisionStore(db, db.paths.root / 'projects', event_hub=event_hub)
         self.vocal_runner = vocal_runner
         self.alignment_runner = alignment_runner
         self.devices = devices or RuntimeDevices()
+        self.event_hub = event_hub
         self._closing = False
         self._closed = False
         self._cancel_events: dict[str, threading.Event] = {}
@@ -32,6 +33,10 @@ class JobService:
                 t = now(); c.execute("UPDATE jobs SET status='interrupted',updated_at=?,finished_at=? WHERE id=?", (t,t,row[0]))
 
         self.revisions.recover()
+
+    def _publish(self, project_id: str, job_id: str, kind: str, status: str, stage: str | None = None) -> None:
+        if self.event_hub is not None:
+            self.event_hub.publish(project_id, "job_updated", job_id=job_id, kind=kind, status=status, stage=stage)
 
     def create(self, project_id, kind, request, *, idem_key=None, subject="local"):
         if kind not in {'vocal', 'alignment'}:
@@ -78,11 +83,13 @@ class JobService:
 
             if idem_key: c.execute("INSERT INTO job_idempotency VALUES(?,?,?,?)",(project_id,idem_key,digest,jid))
             self._cancel_events[jid] = threading.Event()
+        self._publish(project_id, jid, kind, "queued", None)
         with self._lock:
             if not self._closing: self._pool.submit(self._run,jid)
         return self.get(jid)
 
     def _run(self,jid):
+        started_row = None
         with self._lock, self.db.transaction() as c:
             if self._closing:
                 self._cancel_events.pop(jid, None)
@@ -92,7 +99,10 @@ class JobService:
                 self._cancel_events.pop(jid, None)
                 return
             t=now(); c.execute("UPDATE jobs SET status='running',started_at=?,updated_at=? WHERE id=?",(t,t,jid))
+            started_row = row
             cancel_event = self._cancel_events.setdefault(jid, threading.Event())
+        if started_row is not None:
+            self._publish(started_row[1], jid, started_row[2], "running", started_row["stage"])
         record = None
         kind = None
         result = None
@@ -125,19 +135,29 @@ class JobService:
                 result["binding"] = {"project_id": record[1], "asset_id": bound_asset,
                                      "revision": bound_revision}
             with self._lock, self.db.transaction() as c:
-                cancelled = c.execute('SELECT cancel_requested FROM jobs WHERE id=?', (jid,)).fetchone()
+                cancelled = c.execute('SELECT cancel_requested, stage FROM jobs WHERE id=?', (jid,)).fetchone()
                 if cancelled[0]:
                     t = now()
                     c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=? WHERE id=?", (t,t,jid))
-
-                    return
-                t=now(); c.execute("UPDATE jobs SET status='succeeded',result_json=?,engine_json=?,updated_at=?,finished_at=? WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps(result,ensure_ascii=False),json.dumps(result.get("engine",{})),t,t,jid))
+                    final_status = "cancelled"
+                    final_stage = cancelled[1]
+                else:
+                    t=now(); c.execute("UPDATE jobs SET status='succeeded',result_json=?,engine_json=?,updated_at=?,finished_at=? WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps(result,ensure_ascii=False),json.dumps(result.get("engine",{})),t,t,jid))
+                    final_status = "succeeded"
+                    final_stage = cancelled[1]
+            self._publish(record[1], jid, kind, final_status, final_stage)
+            if final_status == "cancelled":
+                return
         except DeviceFailure as exc:
             self._finish_error(jid, 'device_failed', str(exc), stage=exc.stage, cpu_retry=True)
         except VocalCancelled:
+            cancelled_row = None
             with self.db.transaction() as c:
                 t = now()
                 c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=? WHERE id=?", (t,t,jid))
+                cancelled_row = c.execute("SELECT project_id, kind, stage FROM jobs WHERE id=?", (jid,)).fetchone()
+            if cancelled_row:
+                self._publish(cancelled_row[0], jid, cancelled_row[1], "cancelled", cancelled_row[2])
 
         except (EngineUnavailable, ReadingUnavailable) as exc: self._finish_error(jid,"capability_unavailable",str(exc))
         except Exception as exc:
@@ -155,23 +175,33 @@ class JobService:
                 self.revisions.collect(record[1])
 
     def _finish_error(self,jid,code,message, **extra):
+        updated = None
         with self.db.transaction() as c:
-            state = c.execute('SELECT cancel_requested FROM jobs WHERE id=?', (jid,)).fetchone()
+            state = c.execute('SELECT cancel_requested, project_id, kind, stage FROM jobs WHERE id=?', (jid,)).fetchone()
             if state and state[0]:
                 t = now()
                 c.execute("UPDATE jobs SET status='cancelled',updated_at=?,finished_at=? WHERE id=?", (t,t,jid))
-
-                return
-            t=now(); c.execute("UPDATE jobs SET status='failed',error_json=?,updated_at=?,finished_at=? WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps({"code":code,"message":message, **extra}),t,t,jid))
+                updated = (state[1], state[2], "cancelled", state[3])
+            else:
+                t=now(); c.execute("UPDATE jobs SET status='failed',error_json=?,updated_at=?,finished_at=? WHERE id=? AND status IN ('running','cancel_requested')",(json.dumps({"code":code,"message":message, **extra}),t,t,jid))
+                if state:
+                    updated = (state[1], state[2], "failed", state[3])
+        if updated:
+            self._publish(updated[0], jid, updated[1], updated[2], updated[3])
 
     def emit(self,jid,kind,stage):
         if kind == 'stage':
+            row = None
             with self.db.transaction() as c:
-                c.execute("UPDATE jobs SET stage=?,updated_at=? WHERE id=? AND status IN ('running','cancel_requested')", (stage, now(), jid))
+                cur = c.execute("UPDATE jobs SET stage=?,updated_at=? WHERE id=? AND status IN ('running','cancel_requested')", (stage, now(), jid))
+                if cur.rowcount:
+                    row = c.execute("SELECT project_id, kind, status, stage FROM jobs WHERE id=?", (jid,)).fetchone()
+            if row:
+                self._publish(row[0], jid, row[1], row[2], row[3])
 
     def cancel(self,jid):
         with self._lock, self.db.transaction() as c:
-            row=c.execute("SELECT status,project_id FROM jobs WHERE id=?",(jid,)).fetchone()
+            row=c.execute("SELECT status,project_id,kind,stage FROM jobs WHERE id=?",(jid,)).fetchone()
             if not row: return None
             if row[0]=="queued": status="cancelled"
             elif row[0]=="running": status="cancel_requested"
@@ -179,6 +209,7 @@ class JobService:
             t=now(); c.execute("UPDATE jobs SET status=?,cancel_requested=1,updated_at=?,finished_at=? WHERE id=?",(status,t,t if status=="cancelled" else None,jid))
             if ev := self._cancel_events.get(jid):
                 ev.set()
+        self._publish(row[1], jid, row[2], status, row[3])
         if status == "cancelled":
             with self._lock:
                 self._cancel_events.pop(jid, None)
@@ -186,18 +217,47 @@ class JobService:
             self.revisions.collect(row[1])
         return self.get(jid)
 
+    def acknowledge(self, jid: str, state: str):
+        if state not in {'applied', 'dismissed'}:
+            raise ValueError('无效的任务确认状态')
+        with self.db.transaction() as c:
+            row = c.execute("SELECT project_id FROM jobs WHERE id=?", (jid,)).fetchone()
+            if not row:
+                return None
+            c.execute(
+                "INSERT INTO job_acknowledgements(job_id, project_id, state, updated_at) VALUES(?,?,?,?) "
+                "ON CONFLICT(job_id) DO UPDATE SET state=excluded.state, updated_at=excluded.updated_at",
+                (jid, row[0], state, now()),
+            )
+        return self.get(jid)
+
     def get(self,jid):
-        with self.db.connect() as c: row=c.execute("SELECT * FROM jobs WHERE id=?",(jid,)).fetchone()
+        with self.db.connect() as c:
+            row=c.execute("SELECT j.*, a.state AS ack_state FROM jobs j LEFT JOIN job_acknowledgements a ON a.job_id=j.id WHERE j.id=?",(jid,)).fetchone()
         return self._job(row) if row else None
 
     def list(self, project_id, limit):
         with self.db.connect() as c:
-            rows = c.execute("SELECT * FROM jobs WHERE project_id=? ORDER BY created_at DESC LIMIT ?", (project_id, limit)).fetchall()
+            rows = c.execute("SELECT j.*, a.state AS ack_state FROM jobs j LEFT JOIN job_acknowledgements a ON a.job_id=j.id WHERE j.project_id=? ORDER BY j.created_at DESC LIMIT ?", (project_id, limit)).fetchall()
         return [self._job(row) for row in rows]
 
     @staticmethod
     def _job(row):
-        return {"stage": row["stage"], "schema_version":"studio-job-v1","id":row[0],"project_id":row[1],"kind":row[2],"status":row[3],"request":json.loads(row[4]),"result_available":row[5] is not None,"error":json.loads(row[6]) if row[6] else None,"engine":json.loads(row[7]) if row[7] else None,"created_at":row[8],"updated_at":row[9]}
+        return {
+            "stage": row["stage"],
+            "schema_version":"studio-job-v1",
+            "id":row[0],
+            "project_id":row[1],
+            "kind":row[2],
+            "status":row[3],
+            "request":json.loads(row[4]),
+            "result_available":row[5] is not None,
+            "error":json.loads(row[6]) if row[6] else None,
+            "engine":json.loads(row[7]) if row[7] else None,
+            "created_at":row[8],
+            "updated_at":row[9],
+            "acknowledged_state": row["ack_state"] if "ack_state" in row.keys() else None,
+        }
 
     def result(self,jid):
         with self.db.connect() as c: row=c.execute("SELECT result_json FROM jobs WHERE id=?",(jid,)).fetchone()

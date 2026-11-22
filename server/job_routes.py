@@ -4,11 +4,16 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from typing import Literal
+
 class JobParams(BaseModel):
     params: dict = {}
 
 class CpuRetry(BaseModel):
     revision: str
+
+class JobAcknowledge(BaseModel):
+    state: Literal["applied", "dismissed"]
 
 def create_job_router(service, project_exists, *, auth_dependency=None, write_dependency=None, validate_request=None):
     router=APIRouter()
@@ -90,6 +95,10 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
     def get(jid): return public_job(owned(jid))
     @router.post("/jobs/{jid}/cancel", **write_auth)
     def cancel(jid): owned(jid); return public_job(service.cancel(jid))
+    @router.post("/jobs/{jid}/acknowledge", **write_auth)
+    def acknowledge(jid: str, body: JobAcknowledge):
+        owned(jid)
+        return public_job(service.acknowledge(jid, body.state))
     @router.get("/jobs/{jid}/result", **read_auth)
     def result(jid):
         owned(jid); value=service.result(jid)

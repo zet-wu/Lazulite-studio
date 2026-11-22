@@ -25,8 +25,8 @@ class IdempotencyConflict(Exception):
 
 
 class RevisionStore:
-    def __init__(self, db: Database, root: str | Path):
-        self.db, self.root = db, Path(root)
+    def __init__(self, db: Database, root: str | Path, event_hub=None):
+        self.db, self.root, self.event_hub = db, Path(root), event_hub
         self.root.mkdir(parents=True, exist_ok=True)
 
     def create(
@@ -62,12 +62,13 @@ class RevisionStore:
                             raise IdempotencyConflict(operation_id)
                         return json.loads(old[0])
                 row = conn.execute(
-                    "SELECT current_revision FROM projects WHERE id=?", (project_id,)
+                    "SELECT current_revision, source_asset_id FROM projects WHERE id=?", (project_id,)
                 ).fetchone()
                 if row is None:
                     raise KeyError(project_id)
                 if row[0] != base:
                     raise RevisionConflict(row[0])
+                source_asset_id = row[1]
                 revision = uuid.uuid4().hex
                 path = self.root / project_id / "revisions" / f"{revision}.json"
                 write_atomic(path, encoded)
@@ -99,6 +100,8 @@ class RevisionStore:
                     raise
             try: self._collect_unlocked(project_id)
             except OSError: logger.warning('修订回收待重试：%s', project_id, exc_info=True)
+        if self.event_hub is not None:
+            self.event_hub.publish(project_id, "revision_changed", revision=revision, source_asset_id=source_asset_id)
         return result
 
     def collect(self, project_id: str) -> None:

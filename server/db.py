@@ -46,6 +46,11 @@ CREATE TABLE IF NOT EXISTS job_idempotency (
  project_id TEXT NOT NULL, idem_key TEXT NOT NULL, request_hash TEXT NOT NULL, job_id TEXT NOT NULL,
  PRIMARY KEY(project_id, idem_key), FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
+CREATE TABLE IF NOT EXISTS job_acknowledgements (
+ job_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, state TEXT NOT NULL, updated_at TEXT NOT NULL,
+ FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+ FOREIGN KEY(project_id) REFERENCES projects(id)
+);
 """
 
 

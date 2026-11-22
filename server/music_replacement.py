@@ -88,7 +88,7 @@ def replace_music(db, root, pid, upload_id, revision, expected_asset, operation_
                 fsync_directory(destination.parent)
                 conn.execute('INSERT INTO assets VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', record)
                 conn.execute("DELETE FROM idempotency WHERE json_extract(response,'$.id')=? OR json_extract(response,'$.id') IN (SELECT id FROM revisions WHERE project_id=?)", (pid,pid))
-                for table in ('vocal_results','job_idempotency','jobs','revisions'):
+                for table in ('vocal_results','job_acknowledgements','job_idempotency','jobs','revisions'):
                     conn.execute(f'DELETE FROM {table} WHERE project_id=?', (pid,))
                 path = db.paths.store(destination / 'revisions' / f'{new_revision}.json')
                 conn.execute('INSERT INTO revisions VALUES(?,?,?,?,?)', (new_revision,pid,None,path,stamp))
