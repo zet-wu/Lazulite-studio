@@ -1,4 +1,4 @@
-import { zipFiles } from '../adapters/nicokara';
+import { zipFiles } from '../adapters/karaoke-output';
 import { http, HttpResponse } from 'msw';
 import { capabilities, document, emptyDocument, jobs, projects, sampleProject, session } from './data';
 

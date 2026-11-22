@@ -1,7 +1,7 @@
 import { importSugFile } from '../adapters/sug-import';
 import {backgroundDefaults} from '../adapters/studio-preferences';
 import { useMessageText } from '../shared/useMessageText';
-import { message as describeMessage, MessageError, errorMessage, isMessage, type Message } from '../domain/messages';
+import { message as describeMessage, MessageError, errorMessage, isMessage } from '../domain/messages';
 import { i18n, formatMessage } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { EmbeddedLyrics } from './EmbeddedLyrics';
@@ -29,7 +29,7 @@ export function selectedMetadata(current: LyricDocument, incoming: LyricDocument
     return values?.length ? [[key, [...values]]] : [];
   }));
 }
-export function LyricAcquisition({ store, searchConditions, document, apply, onImported, onNew, onImportName, projectId, sourceAssetId }: { projectId?: string; sourceAssetId?: string | null; store: AcquisitionStore; searchConditions: ReturnType<typeof useSearchConditions>; document: LyricDocument; apply: (command: LyricCommand) => void; onImported: () => void; onNew?: () => void; onImportName?: (name: string) => void }) {
+export function LyricAcquisition({ store, searchConditions, document, apply, onImported, projectId, sourceAssetId }: { projectId?: string; sourceAssetId?: string | null; store: AcquisitionStore; searchConditions: ReturnType<typeof useSearchConditions>; document: LyricDocument; apply: (command: LyricCommand) => void; onImported: () => void }) {
   useTranslation();
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const tab = snapshot.tab;
@@ -44,7 +44,6 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
   const [base, setBase] = useState(document);
   const [choices, setChoices] = useState<MetadataChoices>({});
   const [previewPage, setPreviewPage] = useState(0);
-  const [filename, setFilename] = useState<string | null>(null);
   const [message, setMessage] = useMessageText('');
   const fileInput = useRef<HTMLInputElement>(null);
   const request = useRef(0);
@@ -58,7 +57,7 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
     try { if(kind==='sug'){const result=importSugFile(content);stage(result.document);setSugIncomplete(result.incompleteCheckpoints);}else{stage(importLyricFile(content,kind));setSugIncomplete(null);} } catch (e) { setIncoming(null); setMessage(errorMessage(e)); }
   };
   const open = async (file: File) => {
-    const serial = ++request.current; setFilename(file.name); setIncoming(null); setMessage(describeMessage('common.reading'));
+    const serial = ++request.current; setIncoming(null); setMessage(describeMessage('common.reading'));
     try {
       const kind = detectLyricFormat(file.name);
       if (kind === 'ass') throw new MessageError(describeMessage('acquire.assExportOnly'));
@@ -71,18 +70,17 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
     if (base !== document) { setBase(document); setChoices(defaultChoices(document, incoming)); setMessage(describeMessage('acquire.changed')); return; }
     const editing = createProjectEditing();
     applyBackgroundDefaults({...incoming, lines: []}, incoming, editing, backgroundDefaults());
-    try { apply({ type: 'replace-document', editing, document: { ...incoming, metadata: selectedMetadata(base, incoming, choices) } }); setIncoming(null); store.cancelAll(); if (filename) onImportName?.(filename); onImported(); }
+    try { apply({ type: 'replace-document', editing, document: { ...incoming, metadata: selectedMetadata(base, incoming, choices) } }); setIncoming(null); store.cancelAll(); onImported(); }
     catch (e) { setMessage(errorMessage(e)); }
   };
   return <div className={styles.page}>
     <section className={styles.pane}><h2>{t('editor.acquire')}</h2><div className={styles.tabs} role="tablist" aria-label={t('acquire.source')}>
-      {[['netease',t('source.netease')],['qqmusic',t('source.qq')],['kugou',t('source.kugou')],['amll','AMLL DB'],['embedded', t('source.embedded')], ['file', t('source.file')], ['text', t('source.text')]].map(([id, label]) => <button data-role="secondary" key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; store.setTab(id as typeof tab); setFilename(null); setIncoming(null); setMessage(''); }}>{label}</button>)}
+      {[['netease',t('source.netease')],['qqmusic',t('source.qq')],['kugou',t('source.kugou')],['amll','AMLL DB'],['embedded', t('source.embedded')], ['file', t('source.file')], ['text', t('source.text')]].map(([id, label]) => <button data-role="secondary" key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; store.setTab(id as typeof tab); setIncoming(null); setMessage(''); }}>{label}</button>)}
     </div>
       {network && <NetworkLyrics store={store} searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} />}
       {tab === 'embedded' && <EmbeddedLyrics projectId={projectId} sourceAssetId={sourceAssetId} onPreview={parse} />}
       {tab === 'file' && <><button data-role="secondary" onClick={() => fileInput.current?.click()}>{t('acquire.chooseFile')}</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys,.sug" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
       {tab === 'text' && <><label>{t('acquire.textFormat')}<Select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys','sug'].map(id => <option key={id}>{id}</option>)}</Select></label><textarea aria-label={t('acquire.textInput')} value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button data-role="secondary" onClick={() => parse(text, format)}>{t('acquire.previewText')}</button></>}
-      {onNew && <button data-role="secondary" onClick={onNew}>{t('acquire.emptyLyrics')}</button>}
       {message && <p role="status">{message}</p>}
     </section>
     <section className={styles.pane}><h2>{t('acquire.previewImport')}</h2>

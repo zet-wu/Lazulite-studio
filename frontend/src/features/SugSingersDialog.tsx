@@ -31,7 +31,7 @@ export function SugSingersDialog({project, close, apply, error}: {project:Projec
     {error && <p role="alert">{error}</p>}
     {set ? <div className={styles.markerEditor}>
       <nav className={`${styles.markerList} ${fields.navigation}`} aria-label={t('markers.sets')}>
-        {sets.map(item => <button key={item.key} data-role="secondary" title={label(item)} aria-current={item.key === selected ? 'page' : undefined} onClick={()=>setSelected(item.key)}>{label(item)}</button>)}
+        {sets.map(item => <button key={item.key} data-role="secondary" aria-current={item.key === selected ? 'page' : undefined} onClick={()=>setSelected(item.key)}>{label(item)}</button>)}
       </nav>
       <div className={`${styles.markerFields} ${styles.sugFields}`}>
         <h3 className={styles.sugHeading}>{label(set)}</h3>

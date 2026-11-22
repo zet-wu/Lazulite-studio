@@ -4,7 +4,7 @@ import { createProjectEditing, remapEditing, type ProjectEditing } from '../../d
 import { applyLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationUnit, type RubyUnit } from '../../domain/lyric-document';
 
-import { attachmentTracks, type ObjectSelection } from '../../domain/selection-editing';
+import { type ObjectSelection } from '../../domain/selection-editing';
 export type EditorSelection = ObjectSelection;
 
 export type EditorClipboard = (

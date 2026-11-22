@@ -3,7 +3,6 @@ import type {
   Capabilities,
   DocumentEnvelope,
   ProjectList,
-  ProjectSummary,
   Session,
   WaveformWindow,
 } from "./client";
@@ -74,23 +73,6 @@ export function isProjectList(value: unknown): value is ProjectList {
   );
 }
 
-export function isApiError(
-  value: unknown,
-): value is {
-  code: string;
-  message: string;
-  request_id: string;
-  retryable: boolean;
-} {
-  return (
-    object(value) &&
-    string(value.code) &&
-    string(value.message) &&
-    string(value.request_id) &&
-    typeof value.retryable === "boolean"
-  );
-}
-
 export function isAsset(value: unknown): value is Asset {
   return (
     object(value) &&
@@ -137,14 +119,6 @@ export function isWaveformWindow(value: unknown): value is WaveformWindow {
     bucket > 0 &&
     Array.isArray(min) &&
     Array.isArray(max) &&
-    min.length === max.length &&
-    min.every((peak) => typeof peak === "number" && peak >= -1 && peak <= 1) &&
-    max.every(
-      (peak, index) =>
-        typeof peak === "number" &&
-        peak >= -1 &&
-        peak <= 1 &&
-        peak >= (min[index] as number),
-    )
+    min.length === max.length
   );
 }

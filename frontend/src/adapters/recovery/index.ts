@@ -24,14 +24,25 @@ export type RecoveryAdapter = {
   clear(slotKey: string): Promise<void>;
 };
 
-async function openDatabase(): Promise<IDBDatabase> {
+let cachedDatabase: { name: string; promise: Promise<IDBDatabase> } | null = null;
+
+function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') return Promise.reject(new Error('Local recovery is unavailable in this browser'));
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(`${DATABASE}:${libraryIdentity()}`, 1);
+  const name = `${DATABASE}:${libraryIdentity()}`;
+  if (cachedDatabase && cachedDatabase.name === name) return cachedDatabase.promise;
+  const promise = new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(name, 1);
     request.onupgradeneeded = () => request.result.createObjectStore(STORE);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(new Error('Could not open local recovery storage'));
+    request.onsuccess = () => {
+      const database = request.result;
+      database.onversionchange = () => { database.close(); if (cachedDatabase?.promise === promise) cachedDatabase = null; };
+      database.onclose = () => { if (cachedDatabase?.promise === promise) cachedDatabase = null; };
+      resolve(database);
+    };
+    request.onerror = () => { if (cachedDatabase?.promise === promise) cachedDatabase = null; reject(new Error('Could not open local recovery storage')); };
   });
+  cachedDatabase = { name, promise };
+  return promise;
 }
 
 const transaction = async <T>(mode: IDBTransactionMode, operation: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> => {
@@ -41,9 +52,9 @@ const transaction = async <T>(mode: IDBTransactionMode, operation: (store: IDBOb
     const request = operation(tx.objectStore(STORE));
     let result: T | undefined;
     request.onsuccess = () => { result = request.result; };
-    tx.oncomplete = () => { database.close(); resolve(result as T); };
-    tx.onerror = () => { database.close(); reject(new Error('Local recovery storage operation failed')); };
-    tx.onabort = () => { database.close(); reject(new Error('Local recovery storage operation aborted')); };
+    tx.oncomplete = () => resolve(result as T);
+    tx.onerror = () => reject(new Error('Local recovery storage operation failed'));
+    tx.onabort = () => reject(new Error('Local recovery storage operation aborted'));
   });
 };
 
@@ -52,13 +63,16 @@ const validDocument = (document: unknown): document is ProjectDocument => {
     const project = document as ProjectDocument;
     if (project.schemaVersion !== 'studio-project-v9' || !project.acoustics || !Array.isArray(project.acoustics.segments)) return false;
     if (project.acoustics.analysisId !== null && typeof project.acoustics.analysisId !== 'string') return false;
-    try { validateKaraoke(project.lyrics, project.karaoke); assertAmll(project.lyrics,project.amll); validateAgents(project.lyrics); if(!Array.isArray(project.lineOrder)||project.lineOrder.some(id=>!project.lyrics.lines.some(line=>line.id===id)))return false; validateSegments(project.acoustics.segments); validateProjectEditing(project.lyrics, project.editing); } catch { return false; }
     const item = project.lyrics as LyricDocument;
     if (!item || typeof item !== 'object') return false;
-    return item.schemaVersion === LYRIC_SCHEMA_VERSION && Array.isArray(item.lines) && Array.isArray(item.romanizationTracks) && Array.isArray(item.translationTracks) && Array.isArray(item.agents)
-      && !!item.metadata && typeof item.metadata === 'object'
-      && item.lines.every((line) => !!line && typeof line.id === 'string' && Array.isArray(line.words)
-        && line.words.every((word) => !!word && typeof word.id === 'string' && typeof word.text === 'string' && typeof word.obscene === 'boolean' && Array.isArray(word.rubyUnits) ));
+    if (item.schemaVersion !== LYRIC_SCHEMA_VERSION || !Array.isArray(item.lines) || !Array.isArray(item.romanizationTracks) || !Array.isArray(item.translationTracks) || !Array.isArray(item.agents)
+      || !item.metadata || typeof item.metadata !== 'object'
+      || !item.lines.every((line) => !!line && typeof line.id === 'string' && Array.isArray(line.words)
+        && line.words.every((word) => !!word && typeof word.id === 'string' && typeof word.text === 'string' && typeof word.obscene === 'boolean' && Array.isArray(word.rubyUnits)))) return false;
+    const lineIds = new Set(item.lines.map(line => line.id));
+    if (!Array.isArray(project.lineOrder) || project.lineOrder.some(id => !lineIds.has(id))) return false;
+    try { validateKaraoke(item, project.karaoke); assertAmll(item, project.amll); validateAgents(item); validateSegments(project.acoustics.segments); validateProjectEditing(item, project.editing); } catch { return false; }
+    return true;
   };
 const isRecord = (value: unknown): value is RecoveryRecord => {
   if (!value || typeof value !== 'object') return false;

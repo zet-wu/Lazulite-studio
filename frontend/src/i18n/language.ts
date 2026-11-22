@@ -1,6 +1,5 @@
 import registry from '../../../server/ui_languages.json';
 export const languages=registry.filter(language=>language.complete);
-export type Language = string;
 export function registeredLanguage(value: string | null | undefined): string {
   return languages.some(language=>language.id===value)?value!:'zh-Hans';
 }

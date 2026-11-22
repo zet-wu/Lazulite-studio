@@ -28,12 +28,20 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
     if (!transport) return;
     let frame = 0;
     let lastPlaying = false;
+    let lastTimeMs = -1;
+    let lastRate = -1;
     const update = () => {
       const current = transport.current;
       if (current) {
-        (player.current?.lyricPlayer as StudioLyricPlayer | undefined)?.syncMedia(current.getPositionMs(), current.getPlaybackRate(), current.isPlaying());
-        const next = current.isPlaying();
-        if (next !== lastPlaying) { lastPlaying = next; setPlaying(next); }
+        const timeMs = current.getPositionMs();
+        const rate = current.getPlaybackRate();
+        const nextPlaying = current.isPlaying();
+        if (nextPlaying || lastPlaying || timeMs !== lastTimeMs || rate !== lastRate) {
+          (player.current?.lyricPlayer as StudioLyricPlayer | undefined)?.syncMedia(timeMs, rate, nextPlaying);
+          lastTimeMs = timeMs;
+          lastRate = rate;
+        }
+        if (nextPlaying !== lastPlaying) { lastPlaying = nextPlaying; setPlaying(nextPlaying); }
       }
       frame = requestAnimationFrame(update);
     };

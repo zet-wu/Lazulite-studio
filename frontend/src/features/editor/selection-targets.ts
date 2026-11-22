@@ -1,5 +1,5 @@
 import { attachmentTracks } from '../../domain/selection-editing';
-import type { LyricDocument } from '../../domain/lyric-document';
+import type { LyricDocument, LyricLine, LyricWord, RomanizationTrack, RomanizationUnit, RubyUnit } from '../../domain/lyric-document';
 import type { TimelineTarget } from '../../domain/timeline-editing';
 import type { EditorSelection } from './editing-actions';
 
@@ -13,9 +13,51 @@ export function documentTargets(document: LyricDocument): TimelineTarget[] {
   ]), ...(['romanizationTracks','translationTracks'] as const).flatMap(key=>document[key].flatMap(track => track.contents.flatMap(content => content.kind === 'timed' ? content.units.map(unit => ({ kind: 'romanization' as const, ...(key==='translationTracks'?{attachment:'translation' as const}:{}), lineId: content.lineId, trackId: track.id, contentId: content.id, unitId: unit.id })) : [])))];
   targetCache.set(document, targets); return targets;
 }
+
+type LineIndex = { line: LyricLine; words: Map<string, { word: LyricWord; rubies: Map<string, RubyUnit> }> };
+type AttachmentIndex = Map<string, Map<string, Map<string, RomanizationUnit>>>;
+type DocumentIndex = { lines: Map<string, LineIndex>; romanization: AttachmentIndex; translation: AttachmentIndex };
+const indexCache = new WeakMap<LyricDocument, DocumentIndex>();
+
+function indexTracks(tracks: RomanizationTrack[]): AttachmentIndex {
+  const result: AttachmentIndex = new Map();
+  for (const track of tracks) {
+    const contents = new Map<string, Map<string, RomanizationUnit>>();
+    for (const content of track.contents) {
+      if (content.kind === 'timed') {
+        contents.set(content.id, new Map(content.units.map(unit => [unit.id, unit])));
+      }
+    }
+    result.set(track.id, contents);
+  }
+  return result;
+}
+
+function documentIndex(document: LyricDocument): DocumentIndex {
+  const cached = indexCache.get(document);
+  if (cached) return cached;
+  const lines = new Map<string, LineIndex>();
+  for (const line of document.lines) {
+    const words = new Map<string, { word: LyricWord; rubies: Map<string, RubyUnit> }>();
+    for (const word of line.words) {
+      words.set(word.id, { word, rubies: new Map(word.rubyUnits.map(unit => [unit.id, unit])) });
+    }
+    lines.set(line.id, { line, words });
+  }
+  const index: DocumentIndex = {
+    lines,
+    romanization: indexTracks(document.romanizationTracks),
+    translation: indexTracks(document.translationTracks),
+  };
+  indexCache.set(document, index);
+  return index;
+}
+
 export const selectionKind = (target: TimelineTarget): EditorSelection['kind'] => target.kind === 'line' ? 'lines' : target.kind === 'word' ? 'words' : target.kind === 'ruby' ? 'ruby' : 'romanization-unit';
 export function selectionTargets(document: LyricDocument, selection: EditorSelection | null) {
-  return selection ? documentTargets(document).filter(target => selectionKind(target) === selection.kind && selection.ids.includes(targetId(target))) : [];
+  if (!selection) return [];
+  const selectedIds = new Set(selection.ids);
+  return documentTargets(document).filter(target => selectionKind(target) === selection.kind && selectedIds.has(targetId(target)));
 }
 export function targetSelection(target: TimelineTarget, ids = [targetId(target)], anchorId = targetId(target)): EditorSelection {
   const common = { ids, anchorId, activeId: targetId(target) };
@@ -25,14 +67,17 @@ export function targetSelection(target: TimelineTarget, ids = [targetId(target)]
   return { kind: 'romanization-unit', ...(target.attachment?{attachment:target.attachment}:{}), lineId: target.lineId, trackId: target.trackId, contentId: target.contentId, ...common };
 }
 export function targetInterval(document: LyricDocument, target: TimelineTarget) {
-  const line = document.lines.find(line => line.id === target.lineId)!;
-  if (target.kind === 'line') return line;
+  const index = documentIndex(document);
   if (target.kind === 'romanization') {
-    const content = attachmentTracks(document,target).find(track => track.id === target.trackId)?.contents.find(content => content.id === target.contentId);
-    return content?.kind === 'timed' ? content.units.find(unit => unit.id === target.unitId)! : undefined;
+    const tracks = target.attachment === 'translation' ? index.translation : index.romanization;
+    return tracks.get(target.trackId)?.get(target.contentId)?.get(target.unitId);
   }
-  const word = line?.words.find(word => word.id === target.wordId);
-  return target.kind === 'word' ? word : word?.rubyUnits.find(unit => unit.id === target.rubyId);
+  const lineEntry = index.lines.get(target.lineId);
+  if (!lineEntry) return undefined;
+  if (target.kind === 'line') return lineEntry.line;
+  const wordEntry = lineEntry.words.get(target.wordId);
+  if (!wordEntry) return undefined;
+  return target.kind === 'word' ? wordEntry.word : wordEntry.rubies.get(target.rubyId);
 }
 export function selectionEnvelope(document: LyricDocument, selection: EditorSelection | null, duration: number) {
   const targets = selectionTargets(document, selection);

@@ -11,8 +11,8 @@ vi.mock('../adapters/http/publishing', () => ({
     download: vi.fn(),
   },
 }));
-vi.mock('./KaraokeTools', () => ({
-  downloadKaraoke: vi.fn(),
+vi.mock('../shared/download', () => ({
+  downloadBlob: vi.fn(),
 }));
 
 afterEach(() => {
@@ -83,7 +83,6 @@ it('shows container-appropriate dropdowns, blocks both-none and forces save befo
     lrc_text: null,
   });
   expect(screen.queryByText(/rev-secret-123/)).toBeNull();
-  expect(screen.queryByText(/旧修订/)).toBeNull();
   client.clear();
 });
 

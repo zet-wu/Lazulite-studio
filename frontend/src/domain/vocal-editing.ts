@@ -44,7 +44,6 @@ export function editSegments(acoustics: Acoustics, operation: { type: 'put'; seg
       segments.push({ id: selected[0].id, beginMs: Math.min(...selected.map(s => s.beginMs)), endMs: Math.max(...selected.map(s => s.endMs)) });
     }
   }
-  validateSegments(segments);
   return { ...acoustics, segments };
 }
 

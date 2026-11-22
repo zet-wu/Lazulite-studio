@@ -1,5 +1,6 @@
 import {useTimelineSwapWheel, useTimelineVisibility, timelineLayers} from '../adapters/timeline-preferences';
 import { retainProjectMedia } from '../adapters/http/media-lifetime';
+import { createActiveLineTracker } from '../domain/active-lines';
 import { projectTimeline } from '../domain/timeline-projection';
 import { selectionLocation } from './editor/selection-targets';
 import { locateViewport } from '../domain/timeline-viewport';
@@ -28,12 +29,13 @@ import {
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   studioApi,
   type Asset,
@@ -105,7 +107,9 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const loopRange = sharedSelection?.effective?.kind === 'segments' ? (selectedSegments.length ? { begin_ms: Math.min(...selectedSegments.map(segment => segment.beginMs)), end_ms: Math.max(...selectedSegments.map(segment => segment.endMs)) } : undefined) : lyricEnvelope.range;
   const plotsRef=useRef<HTMLDivElement>(null);
   const keys = useShortcuts();
-  const results = useQuery({ queryKey:['vocals',projectId], queryFn:()=>vocalApi.list(projectId), refetchInterval:3000, enabled:!!asset });
+  const queryClient = useQueryClient();
+  const results = useQuery({ queryKey:['vocals',projectId], queryFn:()=>vocalApi.list(projectId), enabled:!!asset });
+  useEffect(()=>{if(timelineHost&&asset)void queryClient.invalidateQueries({queryKey:['vocals',projectId]});},[timelineHost,asset,projectId,queryClient]);
   const sourceResults = results.data?.items.filter(r=>r.source_asset_id===asset?.id && r.audio_state!=='missing') ?? [];
   const vocalId = (acoustics ? sourceResults.find(r=>r.id===acoustics.analysisId) : sourceResults.find(r=>r.status==='ready'))?.audio_id ?? null;
   const [playbackChoice,setPlaybackChoice] = useState(false);
@@ -205,9 +209,12 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       loopRange.begin_ms < loopRange.end_ms &&
       loopRange.end_ms <= durationMs,
   );
+  const projectedDocument = useMemo(() => document ? projectTimeline(document, durationMs) : undefined, [document, durationMs]);
+  const documentAnchors = useMemo(() => document ? documentTargets(document).flatMap(target => { const value = targetInterval(document, target); return value ? [value.beginMs, value.endMs].filter((time): time is number => time !== null) : []; }) : [], [document]);
+  const segmentAnchors = useMemo(() => acoustics?.segments.flatMap(segment => [segment.beginMs, segment.endMs]) ?? [], [acoustics?.segments]);
   const location = sharedSelection?.effective?.kind === 'segments'
     ? (selectedSegments.length ? {beginMs:Math.min(...selectedSegments.map(s=>s.beginMs)),endMs:Math.max(...selectedSegments.map(s=>s.endMs))} : null)
-    : document && sharedSelection?.effective ? selectionLocation(projectTimeline(document,durationMs),sharedSelection.selection,durationMs) : null;
+    : projectedDocument && sharedSelection?.effective ? selectionLocation(projectedDocument,sharedSelection.selection,durationMs) : null;
   const locate = (beginMs:number,endMs:number) => {
     const next=locateViewport({startMs,spanMs:Math.round(span*1000)},durationMs,beginMs,endMs);
     if(moveAnimation.current!==null){cancelAnimationFrame(moveAnimation.current);moveAnimation.current=null;}
@@ -232,6 +239,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     plotsRef.current?.style.setProperty('--playhead-display', current >= start && current <= start + span ? 'block' : 'none');
   }, []);
   useLayoutEffect(() => { projectHead(readPosition()); }, [start, span, expanded, timelineHost, readPosition, projectHead]);
+  const onPositionRef = useRef(onPosition);
+  onPositionRef.current = onPosition;
   const updateDom = useCallback(
     (raw: number) => {
       const { duration: mediaDuration } = viewportRef.current;
@@ -241,9 +250,9 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         clock.current.textContent = `${fmt(current)} / ${fmt(mediaDuration)}`;
       slider.current?.setAttribute("aria-valuenow", String(current));
       projectHead(current);
-      onPosition?.(Math.round(current * 1_000));
+      onPositionRef.current?.(Math.round(current * 1_000));
     },
-    [onPosition, projectHead],
+    [projectHead],
   );
   const seekTo = useCallback(
     (raw: number) => {
@@ -335,19 +344,15 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       el.removeEventListener("ended", ended);
     };
   }, [activeLoop, asset, readPosition, updateDom]);
-  const documentRef = useRef(document);
-  documentRef.current = document;
+  const activeLineTracker = useMemo(() => createActiveLineTracker(document?.lines ?? []), [document?.lines]);
+  const trackerRef = useRef(activeLineTracker);
+  trackerRef.current = activeLineTracker;
   const lastActiveLines = useRef('');
-  const activeLinesKey = (ms: number) =>
-    (documentRef.current?.lines ?? [])
-      .filter((line) => line.beginMs !== null && line.endMs !== null && line.beginMs <= ms && ms < line.endMs)
-      .map((line) => line.id)
-      .join(',');
 
   useEffect(() => {
     const el = audio.current;
     if (!el || !playing) return;
-    lastActiveLines.current = activeLinesKey(Math.round(readPosition() * 1_000));
+    lastActiveLines.current = trackerRef.current.key(Math.round(readPosition() * 1_000));
     const frame = () => {
       const current = readPosition();
       const view = viewportRef.current;
@@ -356,7 +361,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         if (Math.abs(view.start - layoutStart.current) > view.span * 0.125) setStart(view.start);
       }
       updateDom(current);
-      const nextActive = activeLinesKey(Math.round(current * 1_000));
+      const nextActive = trackerRef.current.key(Math.round(current * 1_000));
       if (nextActive !== lastActiveLines.current) {
         lastActiveLines.current = nextActive;
         setPosition(current);
@@ -444,10 +449,13 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     };
     moveAnimation.current = requestAnimationFrame(frame);
   };
+  const wheelStateRef = useRef({ asset, adding: Boolean(ui?.adding), swapWheel, span, durationMs, setFollow, zoomAt });
+  wheelStateRef.current = { asset, adding: Boolean(ui?.adding), swapWheel, span, durationMs, setFollow, zoomAt };
   useEffect(()=>{
     const node=plotsRef.current;if(!node)return;
     const wheel=(event:globalThis.WheelEvent)=>{
-      if(!asset||event.ctrlKey||event.metaKey||ui?.adding)return;
+      const state=wheelStateRef.current;
+      if(!state.asset||event.ctrlKey||event.metaKey||state.adding)return;
       const target=event.target as Element;
       const plot=target.closest<HTMLElement>('[data-wheel-zoom]');
       if(!plot||target.closest('input,select,textarea,[role="combobox"],[role="menu"],[role="listbox"]'))return;
@@ -456,15 +464,15 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       event.preventDefault();
       const lineHeight=parseFloat(getComputedStyle(plot).lineHeight)||16;
       const delta=(event.deltaY||event.deltaX)*(event.deltaMode===1?lineHeight:event.deltaMode===2?node.clientHeight:1);
-      if(event.shiftKey !== swapWheel) {
+      if(event.shiftKey !== state.swapWheel) {
         if(moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current=null; }
-        setFollow(false);
-        setStart(current=>panViewport({startMs:current*1e3,spanMs:Math.round(span*1e3)},durationMs,delta/rect.width*span*1e3).startMs/1e3);
-      } else zoomAt(Math.exp(delta*.001),(event.clientX-rect.left)/rect.width);
+        state.setFollow(false);
+        setStart(current=>panViewport({startMs:current*1e3,spanMs:Math.round(state.span*1e3)},state.durationMs,delta/rect.width*state.span*1e3).startMs/1e3);
+      } else state.zoomAt(Math.exp(delta*.001),(event.clientX-rect.left)/rect.width);
     };
     node.addEventListener('wheel',wheel,{passive:false});
     return()=>node.removeEventListener('wheel',wheel);
-  });
+  },[]);
   const beginPan = (event: PointerEvent<HTMLElement>, plot: HTMLElement, seek: boolean) => {
     if (event.defaultPrevented || ui?.adding || !asset || event.button !== 0 || (event.target as Element).closest('[data-timeline-text], [data-loop-handle], button, input, textarea, select, [contenteditable="true"]')) return;
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }
@@ -659,11 +667,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       {timelineError && <p role="alert" className={styles.error}>{timelineError}</p>}
       {timelineHost && <div className={styles.header}>{viewportTools}</div>}
 
-      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks sourceDurationMs={asset?.source_duration_ms ?? null} locked={editingLocked} projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?` ${t('outline.background')}`:''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={document ? documentTargets(document).flatMap(target => { const value = targetInterval(document, target); return value ? [value.beginMs, value.endMs].filter((time): time is number => time !== null) : []; }) : []} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
+      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks sourceDurationMs={asset?.source_duration_ms ?? null} locked={editingLocked} projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?` ${t('outline.background')}`:''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={documentAnchors} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
       {document && onTimelineCommand && <>
 
         <TimelineTracks follow={follow} locked={editingLocked} durationMs={asset?.source_duration_ms ?? null} document={document} selectedLineId={selectedLineId ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
-          visible={visible} externalAnchors={acoustics?.segments.flatMap(segment => [segment.beginMs, segment.endMs]) ?? []}
+          visible={visible} externalAnchors={segmentAnchors}
           apply={onTimelineCommand} onLocate={locate} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
       </>}
       {visible.spectrum && asset && <SpectrogramCanvas pcmRate={graphicVocal ? sourceResults.find(result=>result.audio_id===graphicVocal)!.sample_rate : 48000} vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}

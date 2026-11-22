@@ -1,5 +1,5 @@
 import { message, MessageError } from './messages';
-import { createProjectEditing, emptyBeatCount, type ProjectEditing } from './project-editing';
+import { createProjectEditing, emptyBeatCount } from './project-editing';
 import type { LyricCommand } from './lyric-commands';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
 

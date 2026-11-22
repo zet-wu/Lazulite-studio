@@ -1,4 +1,4 @@
-import type { RomanizationTrack, LyricDocument, LyricWord, TimeMs } from './lyric-document';
+import type { RomanizationTrack, LyricDocument, LyricLine, LyricWord, TimeMs } from './lyric-document';
 
 type Interval = { beginMs: TimeMs; endMs: TimeMs };
 const endpoints = (items: Interval[]) => items.flatMap(item => [item.beginMs, item.endMs]).filter((time): time is number => time !== null);
@@ -15,6 +15,7 @@ function adjacentWord(words: LyricWord[], index: number, direction: -1 | 1): Lyr
 /** Display-only copies. Never pass this projection to commands, playback or persistence. */
 export function projectTimeline(document: LyricDocument, durationMs: number | null = null): LyricDocument {
   const duration = durationMs !== null && Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : null;
+
   const legal = (time: number) => Number.isFinite(time) && time >= 0 && (duration === null || time <= duration);
   function project<T extends Interval & { id: string }>(item: T, previous?: Interval, next?: Interval, parent?: Interval, children: Interval[] = []): T {
     if ((item.beginMs === null) === (item.endMs === null)) return { ...item };
@@ -29,10 +30,22 @@ export function projectTimeline(document: LyricDocument, durationMs: number | nu
     if (!values.length) return { ...item };
     return { ...item, [missingBegin ? 'beginMs' : 'endMs']: missingBegin ? Math.max(...values) : Math.min(...values) };
   }
+
+  const groups = new Map<string | null, LyricLine[]>();
+  const siblingIndex = new Map<string, number>();
+  const byId = new Map<string, LyricLine>();
+  for (const line of document.lines) {
+    byId.set(line.id, line);
+    let group = groups.get(line.backgroundOf);
+    if (!group) { group = []; groups.set(line.backgroundOf, group); }
+    siblingIndex.set(line.id, group.length);
+    group.push(line);
+  }
+
   const lines = document.lines.map((line) => {
-    const siblings = document.lines.filter(item => item.backgroundOf === line.backgroundOf);
-    const siblingIndex = siblings.findIndex(item => item.id === line.id);
-    const shown = project(line, siblings[siblingIndex - 1], siblings[siblingIndex + 1], undefined, line.words.flatMap(word => [word, ...word.rubyUnits]));
+    const siblings = groups.get(line.backgroundOf)!;
+    const index = siblingIndex.get(line.id)!;
+    const shown = project(line, siblings[index - 1], siblings[index + 1], undefined, line.words.flatMap(word => [word, ...word.rubyUnits]));
     return { ...shown, words: line.words.map((word, i) => {
       const previous = word.beginMs === null && word.endMs !== null ? adjacentWord(line.words, i, -1) : undefined;
       const next = word.endMs === null && word.beginMs !== null ? adjacentWord(line.words, i, 1) : undefined;
@@ -40,7 +53,6 @@ export function projectTimeline(document: LyricDocument, durationMs: number | nu
       return { ...shownWord, rubyUnits: word.rubyUnits.map((unit, j) => project(unit, word.rubyUnits[j - 1], word.rubyUnits[j + 1], word)) };
     }) };
   });
-  const byId = new Map(document.lines.map(line => [line.id, line]));
   const projectTracks = <T extends RomanizationTrack>(tracks: T[]): T[] => tracks.map(track => ({ ...track, contents: track.contents.map(content => content.kind === 'plain' ? content : {
     ...content, units: content.units.map((unit, index) => project(unit, content.units[index - 1], content.units[index + 1], byId.get(content.lineId))),
   }) }));

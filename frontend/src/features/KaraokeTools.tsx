@@ -19,9 +19,6 @@ import { useEditorSelection } from './editor/SelectionContext';
 import { IconButton } from '../shared/Controls';
 import styles from './karaoke.module.css';
 import './editor/management-table.css';
-export function downloadKaraoke(data: BlobPart, name: string, type: string) {
-  const url=URL.createObjectURL(new Blob([data],{type})), link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
 export function CueSlot({project, anchor, apply}: {project:ProjectDocument;anchor:CueAnchor;apply:(command:KaraokeCommand)=>void}) {
   useTranslation();
   const shared=useEditorSelection()!, cues=project.karaoke.cues.filter(cue=>anchorKey(cue.anchor)===anchorKey(anchor));

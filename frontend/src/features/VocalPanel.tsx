@@ -1,6 +1,5 @@
 import {VocalUpload} from './VocalUpload';
-import { message as describeMessage, messageList, MessageError, errorMessage, type Message } from '../domain/messages';
-import { useMessageText } from '../shared/useMessageText';
+import { message as describeMessage, MessageError, errorMessage, type Message } from '../domain/messages';
 import { deviceSummary, taskError } from './task-messages';
 import { i18n, formatMessage } from '../i18n';
 import { useTranslation } from 'react-i18next';

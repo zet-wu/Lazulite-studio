@@ -1,12 +1,12 @@
 import { songInformation } from './song-information';
 import { message as describeMessage } from '../domain/messages';
-import { karaokeOutputs, karaokeFilenames, zipFiles } from './karaoke-output';
+import { karaokeOutputs, karaokeFilenames } from './karaoke-output';
 import { isUntimedSeparator, type ExportUnit } from './export-separators';
 import { cueProblem, cueWord, type KaraokeCue } from '../domain/karaoke';
 import { sugSingerSet, sugSingerName, sugOutputContent } from './sug-singers';
 import type { LyricLine, LyricWord } from '../domain/lyric-document';
 import type { ProjectDocument } from '../domain/project-document';
-import { DocumentOutputError, outputIssueKey, type OutputIssue } from './output-validation';
+import { outputIssueKey, type OutputIssue } from './output-validation';
 
 export type SugCharacter = { id: string; char: string; timestamps: number[]; check_count: number; linked_to_next: boolean; is_sentence_end: boolean; sentence_end_ts: number | null; is_line_end: boolean; singer_id: string; is_guide: boolean; ruby?: { parts: { text: string; offset_ms: number }[] } };
 type Sentence = { id: string; singer_id: string; characters: SugCharacter[] };
@@ -155,4 +155,3 @@ export function prepareSug(project: Pick<ProjectDocument, 'lyrics' | 'karaoke' |
   for(const issue of issues){const key=outputIssueKey(issue)+issue.message,previous=merged.get(key);merged.set(key,previous?{...previous,outputIds:[...new Set([...(previous.outputIds??[]),...(issue.outputIds??[])])]}:issue);}
   return {files,issues:[...merged.values()],omitted,summary};
 }
-export function sugZip(project:ProjectDocument,title:string){const result=prepareSug(project,title);if(result.issues.length)throw new DocumentOutputError(result.issues);return zipFiles([...result.files,{name:'summary.txt',text:result.summary}]);}

@@ -15,7 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import { alignmentApi, defaultAlignmentOptions, type AlignmentSummary, type AlignmentCatalog } from '../adapters/http/alignment';
 import { jobsApi, type JobRequest } from '../adapters/http/jobs';
-import { studioS4 } from '../adapters/http/client';
+import { studioApi } from '../adapters/http/client';
 import { mergeAlignment } from '../domain/alignment';
 import type { ProjectDocument } from '../domain/project-document';
 import {SettingField,SettingToggle} from '../shared/SettingsFields';
@@ -40,7 +40,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const previewSerial=useRef(0);
   const [previewAttempt,setPreviewAttempt]=useState(0);
 
-  const caps=useQuery({queryKey:['capabilities'],queryFn:()=>jobsApi.capabilities()});
+  const caps=useQuery({queryKey:['capabilities'],queryFn:()=>studioApi.getCapabilities()});
   const jobs=useProjectJobs(pid,visible);
   const [dialog,setDialog]=useState(false),[options,setOptions]=useState(defaultAlignmentOptions),[summary,setSummary]=useState<AlignmentSummary|null>(null);
   const [gapDraft,setGapDraft]=useState('500'),[gapError,setGapError]=useMessageText('');
@@ -63,7 +63,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
   const mounted=useRef(true);
   useEffect(()=>{
     mounted.current=true;
-    const leave=()=>{const op=operation.current;if(op){op.alive=false;op.cancel=true;op.lock.release();if(op.id)void alignmentApi.cancel(op.id).catch(()=>undefined);}};
+    const leave=()=>{const op=operation.current;if(op){op.alive=false;op.cancel=true;op.lock.release();if(op.id)void jobsApi.cancel(op.id,true).catch(()=>undefined);}};
     window.addEventListener('pagehide',leave);
     return()=>{mounted.current=false;leave();window.removeEventListener('pagehide',leave);};
   },[pid]);
@@ -109,8 +109,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
       try {job=failed ? await jobsApi.retryCpu(failed.id,saved.revision,key) : await alignmentApi.start(pid,saved.revision,selected,key);}
       catch(e){if(e instanceof TypeError)job=failed ? await jobsApi.retryCpu(failed.id,saved.revision,key) : await alignmentApi.start(pid,saved.revision,selected,key);else throw e;}
       op.id=job.id;
-      if(!op.alive){void alignmentApi.cancel(job.id).catch(()=>undefined);return;}
-      if(op.cancel) await alignmentApi.cancel(job.id).catch(e=>{setCancelling(false);setConnection(describeMessage('task.cancelFailed',{diagnostic:e.message}));});
+      if(!op.alive){void jobsApi.cancel(job.id,true).catch(()=>undefined);return;}
+      if(op.cancel) await jobsApi.cancel(job.id,true).catch(e=>{setCancelling(false);setConnection(describeMessage('task.cancelFailed',{diagnostic:e.message}));});
       let disconnected = false;
       while(op.alive){
         if(job.request?.devices)setDevices(job.request.devices);
@@ -118,7 +118,7 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
         if(job.status==='succeeded'){
           if(op.cancel){setMessage(describeMessage('alignment.applyCancelled'),'status',4000);break;}
           const result=await alignmentApi.result(job.id);
-          const current=await studioS4.getDocumentEnvelope(pid);
+          const current=await studioApi.getDocumentEnvelope(pid);
           if(!op.alive||op.cancel){if(op.alive)setMessage(describeMessage('alignment.applyCancelled'),'status',4000);break;}
           if(current.revision!==saved.revision || result.binding.revision!==saved.revision || result.binding.project_id!==pid || result.binding.asset_id!==assetId)throw new MessageError(describeMessage('alignment.sourceChanged'));
           if (durationMs === null) throw new MessageError(describeMessage('alignment.resultDurationUnknown'));
@@ -148,8 +148,8 @@ export function AlignmentPanel({pid, assetId, durationMs, project, control, visi
     }catch(e){if(op.alive)resultMessage(errorMessage(e));}
     finally{op.lock.release();if(operation.current===op)operation.current=null;if(mounted.current){setRunning(false);setConnection('');}void jobs.refetch();}
   };
-  const cancel=()=>{const op=operation.current;if(!op)return;op.cancel=true;setCancelling(true);setProgress(describeMessage('task.cancelling'));if(op.id)void alignmentApi.cancel(op.id).catch(e=>{setCancelling(false);setConnection(describeMessage('task.cancelFailed',{diagnostic:e.message}));});};
-  const button=<span className={styles.entry}><button ref={launchButton} data-role="primary" disabled={!!reason||opening||running||control.locked} title={reason??undefined} onClick={()=>void open()}>{running?t('task.aligning'):t('settings.alignment')}</button>{reason&&!running&&<small>{reason}</small>}{!running&&recent.current&&<button data-role="inline" onClick={()=>{const notice=recent.current!;setMessage(notice.text,notice.role,notice.timeout,notice.taskId);}}>{t('alignment.recent')}</button>}</span>;
+  const cancel=()=>{const op=operation.current;if(!op)return;op.cancel=true;setCancelling(true);setProgress(describeMessage('task.cancelling'));if(op.id)void jobsApi.cancel(op.id,true).catch(e=>{setCancelling(false);setConnection(describeMessage('task.cancelFailed',{diagnostic:e.message}));});};
+  const button=<span className={styles.entry}><button ref={launchButton} data-role="primary" disabled={!!reason||opening||running||control.locked} onClick={()=>void open()}>{running?t('task.aligning'):t('settings.alignment')}</button>{reason&&!running&&<small>{reason}</small>}{!running&&recent.current&&<button data-role="inline" onClick={()=>{const notice=recent.current!;setMessage(notice.text,notice.role,notice.timeout,notice.taskId);}}>{t('alignment.recent')}</button>}</span>;
   return <>
     {visible&&ui.alignmentHost&&createPortal(button,ui.alignmentHost)}
     {ui.taskHost && running && createPortal(<MessageBar notice={{ text: t('task.alignmentProgress',{progress,device:deviceText?' · '+deviceText:''}), role: 'status', origin: null, dismissible: false }} actions={<button data-role="secondary" disabled={cancelling} onClick={cancel}>{t('task.cancel')}</button>}/>, ui.taskHost)}

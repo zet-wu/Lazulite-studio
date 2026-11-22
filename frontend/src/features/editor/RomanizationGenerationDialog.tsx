@@ -1,9 +1,9 @@
-import { alignmentCall } from '../../adapters/http/alignment';
+import { apiJson } from '../../adapters/http/client';
 import { particlesEnabled } from '../../adapters/studio-preferences';
 import type { ParticleRange } from '../../domain/romanization-generation';
 import { Tooltip } from '../../shared/Tooltip';
 import { useMessageText } from '../../shared/useMessageText';
-import { message as describeMessage, errorMessage } from '../../domain/messages';
+import { errorMessage } from '../../domain/messages';
 import { i18n, formatMessage } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { preferences } from '../../adapters/preferences';
@@ -116,7 +116,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
     if (!convertParticles) return;
     let alive = true;
     setAnalysisError('');
-    void alignmentCall<{ranges: ParticleRange[]}>('/reading/particles', {lines: source.lines.filter(line => sourceIds.includes(line.id)).map(line => ({id: line.id, text: line.words.map(word => word.text).join('')}))})
+    void apiJson<{ranges: ParticleRange[]}>('/reading/particles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({lines: source.lines.filter(line => sourceIds.includes(line.id)).map(line => ({id: line.id, text: line.words.map(word => word.text).join('')}))}) })
       .then(result => { if (alive) {setParticles(result.ranges); setRows(proposeRomanization(source, sourceIds, kind, result.ranges));} })
       .catch(error => {if (alive) setAnalysisError(error.message);});
     return () => {alive = false;};

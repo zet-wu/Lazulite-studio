@@ -233,10 +233,6 @@ export function applyTimelineAssignment(document:LyricDocument,target:TimelineTa
   return followChangedEndLinks(document,next,editing);
 }
 
-export function assignTimeline(document:LyricDocument,target:TimelineTarget,dropMs:number,durationMs:number,editing=createProjectEditing()):LyricDocument {
-  return applyTimelineAssignment(document,target,prepareTimelineAssignment(document,target,dropMs,durationMs),0,editing);
-}
-
 /** Clear only explicit targets, preserving descendant times and editing configuration. */
 export function clearTimelineTimes(document: LyricDocument, targets: TimelineTarget[], editing = createProjectEditing()): LyricDocument {
   const clearedLines = new Set(targets.filter(target => target.kind === 'line').map(target => target.lineId));

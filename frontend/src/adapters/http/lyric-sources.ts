@@ -1,15 +1,18 @@
 import {message,MessageError} from '../../domain/messages';
 import { lyricCapabilities } from '../lyric-capabilities';
-import { requestHeaders } from './client';
+import { ApiError, apiJson } from './client';
 import { importLyricFile, type LyricFormat } from '../lyric-formats';
 import { attachSidecar } from '../source-codec';
 export type Source = 'netease' | 'qqmusic' | 'kugou' | 'amll';
 export type Candidate = { source: Source; id: string; title: string; artists: string[]; album: string; duration_ms: number | null; songmid?: string | null; songid?: string | null; platform?: string | null; file?: string | null };
 export class SourceError extends MessageError { constructor(diagnostic:string,readonly code:string) {super(message(code==='session_expired'?'search.sessionExpired':'search.requestError',{diagnostic}));this.message=diagnostic;} }
 export async function sourceRequest<T>(action: 'search' | 'fetch' | 'resolve', body: unknown, signal?: AbortSignal): Promise<T> {
- const response = await fetch(`/api/v1/lyric-sources/${action}`, { method: 'POST', credentials: 'include', signal, headers: requestHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
- if (!response.ok) { const error = await response.json(); throw new SourceError(error.message ?? error.detail?.message ?? `HTTP ${response.status}`, response.status===401?'session_expired':error.code ?? error.detail?.code ?? 'source_network'); }
- return response.json();
+ try {
+   return await apiJson<T>(`/lyric-sources/${action}`, { method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+ } catch (error) {
+   if (error instanceof ApiError) throw new SourceError(error.body.message, error.status === 401 ? 'session_expired' : error.body.code);
+   throw error;
+ }
 }
 export type Payload = { empty: boolean; format: Exclude<LyricFormat, 'ass'>; content: string; metadata: Record<string, string[]>; translation?: string; romanization?: string; partial?: boolean };
 export function parsePayload(payload: Payload) {

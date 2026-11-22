@@ -1,4 +1,4 @@
-import {message,MessageError,type Message} from './messages';
+import {message,MessageError} from './messages';
 import { toHiragana, toRomaji } from 'wanakana';
 import type { LyricDocument, LyricLine, RomanizationContent, TimeMs } from './lyric-document';
 import type { LyricCommand } from './lyric-commands';

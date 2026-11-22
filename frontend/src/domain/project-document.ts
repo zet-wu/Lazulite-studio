@@ -49,13 +49,14 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
     if (JSON.stringify(amll) === JSON.stringify(state.present.amll)) return state;
     present = {...state.present, amll};
   } else if (command.type === 'background-position') {
-    if (!state.present.lyrics.lines.find(line=>line.id===command.lineId)?.backgroundOf) throw new MessageError(message('project.backgroundPrepend'));
-    const line = state.present.lyrics.lines.find(line=>line.id===command.lineId)!;
+    const lineById = new Map(state.present.lyrics.lines.map(line => [line.id, line]));
+    const line = lineById.get(command.lineId);
+    if (!line?.backgroundOf) throw new MessageError(message('project.backgroundPrepend'));
     const shown=displayLines(state.present.lyrics,state.present.lineOrder);
     if((shown.indexOf(line)<shown.findIndex(item=>item.id===line.backgroundOf))===command.before)return state;
     const ids=shown.map(item=>item.id).filter(id=>id!==line.id);
     const parent=ids.indexOf(line.backgroundOf!);
-    const end=ids.reduce((last,id,i)=>state.present.lyrics.lines.find(item=>item.id===id)?.backgroundOf===line.backgroundOf ? Math.max(last,i):last,parent);
+    const end=ids.reduce((last,id,i)=>lineById.get(id)?.backgroundOf===line.backgroundOf ? Math.max(last,i):last,parent);
     ids.splice((command.before?parent:end+1),0,line.id);
     if(ids.join(' ')==shown.map(item=>item.id).join(' '))return state;
     present = {...state.present,lineOrder:ids};
@@ -68,22 +69,27 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
       const id=command.duet?'v2':'v1';
       if(!lyrics.agents.some(agent=>agent.id===id)) lyrics.agents.push({id,name:null,type:'person'});
       line.agentRefs=[id];
-      for(const bg of lyrics.lines.filter(bg=>bg.backgroundOf===line.id)) bg.agentRefs=[];
+      for(const bg of lyrics.lines) if(bg.backgroundOf===line.id) bg.agentRefs=[];
     } else {
-      const ids=command.ids?.length?command.ids:checkAmll(lyrics)[command.rule].map(issue=>issue.id);
-      const included=(id:string)=>ids.includes(id);
+      const ids=new Set(command.ids?.length?command.ids:checkAmll(lyrics)[command.rule].map(issue=>issue.id));
+      const included=(id:string)=>ids.has(id);
       if(command.rule==='simplified') {
+        const duetAgents=new Set(command.duetAgents);
         for(const line of lyrics.lines) {
-          line.agentRefs=line.backgroundOf?[]:[command.duetAgents?.includes(line.agentRefs[0])?'v2':'v1'];
+          line.agentRefs=line.backgroundOf?[]:[duetAgents.has(line.agentRefs[0])?'v2':'v1'];
           for(const word of line.words) delete word.agentRefs;
         }
         lyrics.agents=[{id:'v1',name:null,type:'person'},{id:'v2',name:null,type:'person'}];
       } else if(command.rule==='noMultipleBackgrounds') {
         const displayed=displayLines(lyrics,state.present.lineOrder);
+        const byId=new Map(lyrics.lines.map(line=>[line.id,line]));
+        const bgByParent=new Map<string,typeof lyrics.lines>();
+        for(const line of lyrics.lines) if(line.backgroundOf){const group=bgByParent.get(line.backgroundOf)??[];group.push(line);bgByParent.set(line.backgroundOf,group);}
         let converted=false;
-        for(const parent of lyrics.lines.filter(line=>!line.backgroundOf&&included(line.id))) {
-          for(const bg of lyrics.lines.filter(line=>line.backgroundOf===parent.id).slice(1)) {
-            bg.agentRefs=[...lineAgents(lyrics,bg)]; bg.backgroundOf=null; converted=true;
+        for(const parent of lyrics.lines) {
+          if(parent.backgroundOf||!included(parent.id)) continue;
+          for(const bg of (bgByParent.get(parent.id)??[]).slice(1)) {
+            bg.agentRefs=[...lineAgents(lyrics,bg,byId)]; bg.backgroundOf=null; converted=true;
           }
         }
         if(converted) lyrics.lines=displayed;
@@ -125,13 +131,17 @@ export function executeProjectCommand(state: ProjectEditorState, command: Projec
         return { ...cue, beginMs: cue.beginMs + item.deltaMs, endMs: cue.endMs + item.deltaMs };
       }) };
     }
-    for (const cue of karaoke.cues) if (moved.has(cue.id)) {
-      const problem = cueProblem(result.lyrics, karaoke, cue);
-      if (problem) throw new MessageError(messageList([message('project.cueLocation',{number:result.lyrics.lines.findIndex(line=>line.id===cue.anchor.lineId)+1,text:cue.text}),message(problem)]));
+    if (moved.size) {
+      const resultLineIndex = new Map(result.lyrics.lines.map((line, idx) => [line.id, idx]));
+      for (const cue of karaoke.cues) if (moved.has(cue.id)) {
+        const problem = cueProblem(result.lyrics, karaoke, cue);
+        if (problem) throw new MessageError(messageList([message('project.cueLocation',{number:(resultLineIndex.get(cue.anchor.lineId) ?? -1)+1,text:cue.text}),message(problem)]));
+      }
     }
     const previous=displayLines(state.present.lyrics,state.present.lineOrder);
     const ordering=commands.some(item=>item.type==='replace-document'&&item.editing)?result.lyrics.lines:previous;
-    const before=ordering.filter((line,i)=>line.backgroundOf&&i<ordering.findIndex(item=>item.id===line.backgroundOf)).map(line=>line.id);
+    const orderingIndex=new Map(ordering.map((item,idx)=>[item.id,idx]));
+    const before=ordering.filter((line,i)=>line.backgroundOf&&i<(orderingIndex.get(line.backgroundOf)??-1)).map(line=>line.id);
     const changedOrder=result.lyrics.lines.map(line=>line.id).join(' ')!==state.present.lyrics.lines.map(line=>line.id).join(' ');
     present = { ...state.present, ...result, karaoke, lineOrder:changedOrder?groupDisplayLines(result.lyrics,before).map(line=>line.id):state.present.lineOrder };
   } else {

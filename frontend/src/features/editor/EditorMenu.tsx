@@ -20,7 +20,6 @@ type Props = MenuState & Partial<{
   saving?: boolean;
   canUndo: boolean;
   canRedo: boolean;
-  onNew?: () => void;
   onSave: () => void;
   undo: () => void;
   redo: () => void;

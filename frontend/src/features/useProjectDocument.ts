@@ -1,7 +1,6 @@
 import {backgroundDefaults} from '../adapters/studio-preferences';
-import { ApiError, isRejectedDocument } from '../adapters/http/client';
+import { isRejectedDocument } from '../adapters/http/client';
 import { message, MessageError, errorMessage } from '../domain/messages';
-import { projectErrorText } from './project-error';
 import { useNotice } from '../shared/MessageBar';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listenProjectDeletion, clearProjectLocalData } from "../adapters/project-lifecycle";
@@ -57,28 +56,74 @@ export function useProjectDocument(
     snapshot: ProjectSnapshot;
   } | null>(null);
   const recoveryQueue = useRef<Promise<void>>(Promise.resolve());
+  const checkpointSerial = useRef(0);
+  const checkpointTimer = useRef<number | null>(null);
+  const pendingCheckpoint = useRef<{ project: ProjectDocument; baseRevision: string; sourceAssetId: string | null } | null>(null);
   const enqueueRecovery = useCallback((operation: () => Promise<void>) => {
     const next = recoveryQueue.current.catch(() => undefined).then(operation);
     recoveryQueue.current = next;
     return next;
   }, []);
+  const cancelPendingCheckpoint = useCallback(() => {
+    ++checkpointSerial.current;
+    pendingCheckpoint.current = null;
+    if (checkpointTimer.current !== null) {
+      window.clearTimeout(checkpointTimer.current);
+      checkpointTimer.current = null;
+    }
+  }, []);
+  const writeCheckpoint = useCallback(
+    async (project: ProjectDocument, baseRevision: string, assetId: string | null) => {
+      if (deletedRef.current) return;
+      const serial = ++checkpointSerial.current;
+      await enqueueRecovery(async () => {
+        if (deletedRef.current || serial !== checkpointSerial.current) return;
+        await createRecoveryAdapter().save(projectId, project, baseRevision, assetId);
+      });
+    },
+    [enqueueRecovery, projectId],
+  );
+  const flushCheckpoint = useCallback(() => {
+    if (checkpointTimer.current !== null) {
+      clearTimeout(checkpointTimer.current);
+      checkpointTimer.current = null;
+    }
+    const entry = pendingCheckpoint.current;
+    pendingCheckpoint.current = null;
+    if (entry && !deletedRef.current) {
+      void writeCheckpoint(entry.project, entry.baseRevision, entry.sourceAssetId).catch(() =>
+        setError(message('save.checkpointFailed')),
+      );
+    }
+  }, [writeCheckpoint]);
+  useEffect(() => {
+    window.addEventListener('pagehide', flushCheckpoint);
+    window.addEventListener('beforeunload', flushCheckpoint);
+    return () => {
+      window.removeEventListener('pagehide', flushCheckpoint);
+      window.removeEventListener('beforeunload', flushCheckpoint);
+      if (checkpointTimer.current !== null) {
+        clearTimeout(checkpointTimer.current);
+        checkpointTimer.current = null;
+      }
+    };
+  }, [flushCheckpoint]);
   const checkpoint = useCallback(
     async (next: ProjectEditorState) => {
-      if (deletedRef.current) return;
-      await enqueueRecovery(async () => { if (!deletedRef.current) await createRecoveryAdapter().save(projectId, next.present, revision, sourceIdentity.current); });
+      await writeCheckpoint(next.present, revision, sourceIdentity.current);
     },
-    [enqueueRecovery, projectId, revision],
+    [revision, writeCheckpoint],
   );
   const commit = useCallback(
     (next: ProjectEditorState) => {
       ++sequence.current;
       setDirty(true);
       setError(null);
-      void checkpoint(next).catch(() =>
-        setError(message('save.checkpointFailed')),
-      );
+      pendingCheckpoint.current = { project: next.present, baseRevision: revision, sourceAssetId: sourceIdentity.current };
+      if (checkpointTimer.current !== null) clearTimeout(checkpointTimer.current);
+      checkpointTimer.current = window.setTimeout(flushCheckpoint, 300);
     },
-    [checkpoint],
+    [flushCheckpoint, revision],
   );
   const dispatch = useCallback(
     (command: LyricCommand) => {
@@ -128,15 +173,12 @@ export function useProjectDocument(
       pending.current = null;
       if (sequence.current === request.seq) {
         setDirty(false);
+        cancelPendingCheckpoint();
         await enqueueRecovery(() => createRecoveryAdapter().clear(projectId));
         setRecovery({ available: false });
       } else {
-        await enqueueRecovery(() => createRecoveryAdapter().save(
-          projectId,
-          stateRef.current.present,
-          result.revision,
-          sourceIdentity.current,
-        ));
+        cancelPendingCheckpoint();
+        await writeCheckpoint(stateRef.current.present, result.revision, sourceIdentity.current);
       }
       return { revision: result.revision, document: captured.lyrics, editing: captured.editing };
     } catch (caught) {
@@ -151,7 +193,7 @@ export function useProjectDocument(
       inFlight.current = false;
       setSaving(false);
     }
-  }, [conflict, dirty, enqueueRecovery, etag, projectId, revision, saveDocument]);
+  }, [cancelPendingCheckpoint, conflict, dirty, enqueueRecovery, etag, projectId, revision, saveDocument, writeCheckpoint]);
   useEffect(() => {
     if (!dirty || error || conflict || deleted) return;
     const timer = window.setTimeout(() => void save(), 700);
@@ -215,9 +257,10 @@ export function useProjectDocument(
     };
   }, [projectId]);
   const discardRecovery = useCallback(async () => {
+    cancelPendingCheckpoint();
     await enqueueRecovery(() => createRecoveryAdapter().clear(projectId));
     setRecovery({ available: false });
-  }, [enqueueRecovery, projectId]);
+  }, [cancelPendingCheckpoint, enqueueRecovery, projectId]);
   const restore = useCallback(async () => {
     const ok = await recover();
     if (ok) setRecovery({ available: false });
@@ -225,11 +268,13 @@ export function useProjectDocument(
   }, [recover]);
   useEffect(() => listenProjectDeletion(projectId, () => {
     deletedRef.current = true; setDeleted(true);
-    void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError(message('save.deletedCleanupFailed')));
-  }), [enqueueRecovery, projectId]);
+  }), [projectId]);
   useEffect(() => {
-    if (deleted) void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError(message('save.deletedCleanupFailed')));
-  }, [deleted, enqueueRecovery, projectId]);
+    if (deleted) {
+      cancelPendingCheckpoint();
+      void enqueueRecovery(() => clearProjectLocalData(projectId)).catch(() => setError(message('save.deletedCleanupFailed')));
+    }
+  }, [cancelPendingCheckpoint, deleted, enqueueRecovery, projectId]);
   return {
     deleted, historyVersion, editingLocked,
     acceptSource: async (assetId: string | null, nextRevision: string, remote?: ProjectSnapshot) => {
@@ -241,10 +286,12 @@ export function useProjectDocument(
       stateRef.current=next;setState(next);setHistoryVersion(v=>v+1);
       if (remote && hasLocalChanges) {
         setConflict(true);setError(message('save.sourceConflict'));
+        cancelPendingCheckpoint();
         await checkpoint(next);
       } else {
         pending.current=null;setRevision(nextRevision);setEtag(`"${nextRevision}"`);
         savedSequence.current=sequence.current;setDirty(false);
+        cancelPendingCheckpoint();
         await enqueueRecovery(()=>createRecoveryAdapter().clear(projectId));setRecovery({available:false});
       }
     },

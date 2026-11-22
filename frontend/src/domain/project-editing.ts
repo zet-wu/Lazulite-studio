@@ -1,5 +1,5 @@
 import { message, MessageError } from './messages';
-import type { LyricDocument } from './lyric-document';
+import type { LyricDocument, LyricLine } from './lyric-document';
 
 /** Project-only editing data. Never encoded in a lyric or a TTML node. */
 export type ProjectEditing = {
@@ -20,11 +20,12 @@ export function validateProjectEditing(document: LyricDocument, editing: Project
   if (!editing || typeof editing !== 'object' || !editing.emptyBeats || Array.isArray(editing.emptyBeats) || !Array.isArray(editing.skippedAlignmentLineIds) || !Array.isArray(editing.ignoredSyncLineIds) || !editing.endLinks || Array.isArray(editing.endLinks)
     || Object.keys(editing).some(key => !['emptyBeats', 'ignoredSyncLineIds', 'skippedAlignmentLineIds', 'endLinks'].includes(key))) throw new MessageError(message('editing.configInvalid'));
   const objects = new Map<string, 'line' | 'word' | 'ruby'>();
+  const lineById = new Map<string, LyricLine>();
   const add = (id: string, kind: 'line' | 'word' | 'ruby') => { if (!id || objects.has(id)) throw new MessageError(message('editing.objectIdInvalid')); objects.set(id, kind); };
   for (const line of document.lines) {
     add(line.id, 'line');
-    if ('endLink' in line || 'ignoreSync' in line) throw new MessageError(message('editing.oldLyricFields'));
-    for (const word of line.words) { add(word.id, 'word'); if ('emptyBeat' in word) throw new MessageError(message('editing.oldWordBeats')); for (const ruby of word.rubyUnits) add(ruby.id, 'ruby'); }
+    lineById.set(line.id, line);
+    for (const word of line.words) { add(word.id, 'word'); for (const ruby of word.rubyUnits) add(ruby.id, 'ruby'); }
   }
   for (const [id, value] of Object.entries(editing.emptyBeats)) {
     if (!value || !['word', 'ruby'].includes(value.kind) || objects.get(id) !== value.kind || !Number.isSafeInteger(value.count) || value.count < 1 || value.count > 32 || Object.keys(value).some(key => !['kind', 'count'].includes(key))) throw new MessageError(message('editing.beatsInvalid'));
@@ -32,7 +33,7 @@ export function validateProjectEditing(document: LyricDocument, editing: Project
   if (new Set(editing.ignoredSyncLineIds).size !== editing.ignoredSyncLineIds.length || editing.ignoredSyncLineIds.some(id => objects.get(id) !== 'line')) throw new MessageError(message('editing.skipTimingInvalid'));
   if (new Set(editing.skippedAlignmentLineIds).size !== editing.skippedAlignmentLineIds.length || editing.skippedAlignmentLineIds.some(id => objects.get(id) !== 'line')) throw new MessageError(message('editing.skipAlignmentInvalid'));
   for (const [id, targetId] of Object.entries(editing.endLinks)) {
-    const line = document.lines.find(line => line.id === id), target = document.lines.find(line => line.id === targetId);
+    const line = lineById.get(id), target = lineById.get(targetId);
     if (!line || !target || line === target || line.backgroundOf || target.backgroundOf || target.beginMs === null || line.endMs !== target.beginMs
       || line.beginMs !== null && line.beginMs > line.endMs! || line.words.some(word => word.endMs !== null && word.endMs > line.endMs!)) throw new MessageError(message('editing.linkInvalid'));
   }
@@ -76,7 +77,8 @@ export function remapEditing(source: ProjectEditing, ids: Map<string, string>): 
 }
 
 export function followChangedEndLinks(before: LyricDocument, after: LyricDocument, editing: ProjectEditing): LyricDocument {
-  const changedStarts = new Map(after.lines.filter(line => before.lines.find(old => old.id === line.id)?.beginMs !== line.beginMs).map(line => [line.id, line.beginMs]));
+  const beforeById = new Map(before.lines.map(line => [line.id, line]));
+  const changedStarts = new Map(after.lines.filter(line => beforeById.get(line.id)?.beginMs !== line.beginMs).map(line => [line.id, line.beginMs]));
   let changed = false;
   const lines = after.lines.map(line => {
     const target = editing.endLinks[line.id];
@@ -93,13 +95,17 @@ export type BackgroundDefaults = { skipAlignment: boolean; skipSync: boolean };
 export const defaultBackgroundDefaults: BackgroundDefaults = {skipAlignment: true, skipSync: true};
 /** Apply only identity changes; copied project editing state remains authoritative. */
 export function applyBackgroundDefaults(before: LyricDocument, after: LyricDocument, editing: ProjectEditing, defaults: BackgroundDefaults) {
+  const beforeById = new Map(before.lines.map(item => [item.id, item]));
+  const toggled = new Map<string, boolean>();
   for (const line of after.lines) {
-    const previous = before.lines.find(item => item.id === line.id);
-    if (Boolean(previous?.backgroundOf) === Boolean(line.backgroundOf)) continue;
-    for (const [key, enabled] of [['skippedAlignmentLineIds', defaults.skipAlignment], ['ignoredSyncLineIds', defaults.skipSync]] as const) {
-      if (!enabled) continue;
-      editing[key] = editing[key].filter(id => id !== line.id);
-      if (line.backgroundOf) editing[key].push(line.id);
-    }
+    const previous = beforeById.get(line.id);
+    if (Boolean(previous?.backgroundOf) !== Boolean(line.backgroundOf)) toggled.set(line.id, Boolean(line.backgroundOf));
+  }
+  if (!toggled.size) return;
+  for (const [key, enabled] of [['skippedAlignmentLineIds', defaults.skipAlignment], ['ignoredSyncLineIds', defaults.skipSync]] as const) {
+    if (!enabled) continue;
+    const list = editing[key].filter(id => !toggled.has(id));
+    for (const [id, isBg] of toggled) if (isBg) list.push(id);
+    editing[key] = list;
   }
 }

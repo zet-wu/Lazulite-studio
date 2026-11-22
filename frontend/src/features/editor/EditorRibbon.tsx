@@ -44,7 +44,7 @@ export function EditorRibbon(props: Props) {
     <TopMenu id="clipboard" title={t('editor.clipboard')} className={styles.ribbonMenu} activeMenuId={props.activeMenuId} onMenuChange={props.onMenuChange}>
       <button data-role="inline" onClick={props.copy} disabled={!selection?.ids.length || !props.canCopy}>{t('common.copy')}</button>
       <button data-role="inline" onClick={props.cut} disabled={!selection?.ids.length || !props.canCopy}>{t('common.cut')}</button>
-      <button data-role="inline" onClick={props.remove} disabled={!selection?.ids.length}>删除</button>
+      <button data-role="inline" onClick={props.remove} disabled={!selection?.ids.length}>{t('common.delete')}</button>
       <button data-role="inline" onClick={props.paste} disabled={!props.canPaste}>{t('common.paste')}</button>
       <button data-role="inline" onClick={props.selectAll}>{t('common.selectAll')}</button>
       <button data-role="inline" onClick={props.invertSelection}>{t('common.invertSelection')}</button>

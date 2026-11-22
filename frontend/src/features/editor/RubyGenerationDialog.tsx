@@ -1,11 +1,10 @@
 import { Tooltip } from '../../shared/Tooltip';
 import { useMessageText } from '../../shared/useMessageText';
-import { message as describeMessage, errorMessage } from '../../domain/messages';
+import { errorMessage } from '../../domain/messages';
 import { i18n, formatMessage } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { Disclosure } from '../../shared/Disclosure';
 import { useProjectEditing } from './ProjectEditingContext';
-import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';

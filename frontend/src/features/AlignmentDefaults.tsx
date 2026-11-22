@@ -25,7 +25,7 @@ export function AlignmentDefaults() {
       <option value="">{t('alignment.selectModel')}</option>{catalog.data?.items.filter(item=>item.status==='ready').map(item=><option key={item.name} value={item.id!}>{item.name} · {item.type}</option>)}
     </Select></SettingField>
     {selected&&!valid&&<p role="alert">{t('settings.defaultModelMissing')}</p>}
-    {catalog.isError&&<p role="alert">{catalog.error.message}<button data-role="secondary" onClick={()=>void catalog.refetch()}>{t('alignment.retry')}</button></p>}
+    {catalog.isError&&<p role="alert">{catalog.error.message}<button data-role="secondary" onClick={()=>void catalog.refetch()}>{t('common.retry')}</button></p>}
     {groups.map(([title,items])=><fieldset key={title} className={fields.group}><legend>{t(title)}</legend>{items.map(([key,label])=><SettingToggle key={key} label={t(label)} description={descriptions[key]?t(descriptions[key]!):undefined} checked={Boolean(options[key])} onChange={value=>choose(key,value)}/>)}
       {title==='alignment.postprocessing'&&<SettingField label={t('alignment.gapThreshold')} error={error}><input type="number" min="1" step="1" value={gap} onChange={e=>setGap(e.target.value)} onBlur={()=>{const value=Number(gap);if(!gap.trim()||!Number.isSafeInteger(value)||value<=0){setError(t('alignment.gapRange'));return;}setError('');choose('gap_threshold_ms',value);}}/> ms</SettingField>}
     </fieldset>)}

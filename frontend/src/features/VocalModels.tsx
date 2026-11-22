@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {alignmentCall,type AlignmentCatalog} from '../adapters/http/alignment';
+import { type AlignmentCatalog } from '../adapters/http/alignment';
+import { apiJson } from '../adapters/http/client';
 import {usePreference} from '../adapters/studio-preferences';
 import {SettingsPanel} from './editor/SettingsDialog';
 import {SettingField} from '../shared/SettingsFields';
@@ -17,7 +18,9 @@ export function VocalModels(){
   const run=async(path?:string|null)=>{
     setBusy(true);setError('');
     try{
-      const value=await alignmentCall<AlignmentCatalog>(path===undefined?'/vocal-models?refresh=true':'/vocal-models/directory',path===undefined?undefined:{path});
+      const value=path===undefined
+        ? await apiJson<AlignmentCatalog>('/vocal-models?refresh=true')
+        : await apiJson<AlignmentCatalog>('/vocal-models/directory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) });
       setCatalog(value);setDraft(value.directory);
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   };

@@ -1,5 +1,5 @@
 import { useMessageText } from '../../shared/useMessageText';
-import { message as describeMessage, errorMessage } from '../../domain/messages';
+import { errorMessage } from '../../domain/messages';
 import { i18n } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../../shared/Controls';

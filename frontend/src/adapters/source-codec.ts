@@ -1,5 +1,5 @@
 import { message, MessageError } from '../domain/messages';
-import { plainTranslation, createLyricDocument, createLine, createWord, lineText, type LyricDocument, type LyricLine, type RomanizationTrack } from '../domain/lyric-document';
+import { plainTranslation, createLyricDocument, createLine, createWord, lineText, type LyricDocument, type RomanizationTrack } from '../domain/lyric-document';
 const time = (ms: number) => { if (!Number.isFinite(ms) || ms < 0) throw new MessageError(message('parse.timeInvalid')); return Math.round(ms); };
 export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc', onSidecarIssue: () => void = () => {}): LyricDocument {
   if (kind === 'qrc' && text.trim().startsWith('<')) {

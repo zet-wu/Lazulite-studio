@@ -58,18 +58,64 @@ export function insertCue(lyrics: LyricDocument, karaoke: Karaoke, anchor: CueAn
   return { ...karaoke, cues: [...karaoke.cues, { id: crypto.randomUUID(), text: karaoke.defaults.text, anchor, beginMs, endMs }] };
 }
 export function autoInsertCues(lyrics: LyricDocument, karaoke: Karaoke, groupIds = karaoke.groups.map(group => group.id)): Karaoke {
-  if (!groupIds.length || groupIds.some(id => !karaoke.groups.some(group => group.id === id))) throw new MessageError(message('karaoke.chooseGroups'));
+  const validGroups = new Set(karaoke.groups.map(group => group.id));
+  if (!groupIds.length || groupIds.some(id => !validGroups.has(id))) throw new MessageError(message('karaoke.chooseGroups'));
+  const targetGroups = new Set(groupIds);
+  const existingCueKeys = new Set(karaoke.cues.map(cue => anchorKey(cue.anchor)));
+  const groupPeers = new Map<string, { lineId: string; firstBegin: number; maxEnd: number | null }[]>();
+  const unknownBeforeLine = new Set<string>();
+  const unknownSeenInGroup = new Set<string>();
+  for (const line of lyrics.lines) {
+    const group = karaoke.lineGroups[line.id];
+    if (!group || !targetGroups.has(group)) continue;
+    if (unknownSeenInGroup.has(group)) unknownBeforeLine.add(line.id);
+    let hasUntimed = false;
+    let maxEnd: number | null = 0;
+    for (const word of line.words) {
+      if (!word.text.trim()) continue;
+      if (!timed(word)) { hasUntimed = true; maxEnd = null; }
+      else if (maxEnd !== null) maxEnd = Math.max(maxEnd, word.endMs!);
+    }
+    if (hasUntimed) unknownSeenInGroup.add(group);
+    const first = firstLyric(line);
+    if (first && timed(first)) {
+      let list = groupPeers.get(group);
+      if (!list) { list = []; groupPeers.set(group, list); }
+      list.push({ lineId: line.id, firstBegin: first.beginMs!, maxEnd });
+    }
+  }
+  const groupMaxBefore = new Map<string, { starts: number[]; prefixEnds: (number | null)[] }>();
+  for (const [group, list] of groupPeers) {
+    list.sort((a, b) => a.firstBegin - b.firstBegin);
+    const starts: number[] = [];
+    const prefixEnds: (number | null)[] = [];
+    let running: number | null = 0;
+    for (const item of list) {
+      running = running === null || item.maxEnd === null ? null : Math.max(running, item.maxEnd);
+      starts.push(item.firstBegin);
+      prefixEnds.push(running);
+    }
+    groupMaxBefore.set(group, { starts, prefixEnds });
+  }
+  const precedingEnd = (group: string, beginMs: number): number | null => {
+    const entry = groupMaxBefore.get(group);
+    if (!entry) return 0;
+    const { starts, prefixEnds } = entry;
+    let lo = 0, hi = starts.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (starts[mid] < beginMs) lo = mid + 1; else hi = mid; }
+    return lo === 0 ? 0 : prefixEnds[lo - 1];
+  };
   let next = karaoke;
   for (const line of lyrics.lines) {
     const group = karaoke.lineGroups[line.id], first = firstLyric(line);
-    if (!groupIds.includes(group)) continue;
+    if (!targetGroups.has(group)) continue;
     if (group && first && timed(first)) {
-      const peers = lyrics.lines.filter(other => other.id !== line.id && karaoke.lineGroups[other.id] === group && firstLyric(other)?.beginMs !== null && firstLyric(other)?.beginMs! < first.beginMs!);
-      const ends = peers.flatMap(other => other.words.filter(word => word.text.trim()).map(word => timed(word) ? word.endMs! : null));
-      const unknownBefore=lyrics.lines.slice(0,lyrics.lines.indexOf(line)).some(other=>karaoke.lineGroups[other.id]===group&&other.words.some(word=>word.text.trim()&&!timed(word)));
-      const preceding = unknownBefore || ends.includes(null) ? null : Math.max(0, ...ends as number[]);
+      const preceding = unknownBeforeLine.has(line.id) ? null : precedingEnd(group, first.beginMs!);
       const anchor: CueAnchor = { kind: 'before', lineId: line.id };
-      if (preceding !== null && first.beginMs! - preceding > karaoke.defaults.beforeMs && !next.cues.some(cue => anchorKey(cue.anchor) === anchorKey(anchor))) next = insertCue(lyrics, next, anchor);
+      if (preceding !== null && first.beginMs! - preceding > karaoke.defaults.beforeMs && !existingCueKeys.has(anchorKey(anchor))) {
+        next = insertCue(lyrics, next, anchor);
+        existingCueKeys.add(anchorKey(anchor));
+      }
     }
     for (const anchor of gapAnchors(line)) {
       const range = anchorRange(lyrics, anchor);
@@ -80,33 +126,47 @@ export function autoInsertCues(lyrics: LyricDocument, karaoke: Karaoke, groupIds
 }
 /** Structural edits update identity ownership only. Retiming never moves a cue. */
 export function reconcileKaraoke(lyrics: LyricDocument, karaoke: Karaoke, previous?: LyricDocument): Karaoke {
-  const standard = (id: string) => karaoke.groups.some(group => group.id === id);
+  const groupIds = new Set(karaoke.groups.map(group => group.id));
+  const prevById = previous ? new Map(previous.lines.map(item => [item.id, item])) : null;
+  const hasMainAndBg = groupIds.has('main') && groupIds.has('background');
   const lineGroups = Object.fromEntries(lyrics.lines.map(line => {
     const target = line.backgroundOf ? 'background' : 'main';
-    let group = karaoke.lineGroups[line.id] ?? (standard(target) ? target : '');
-    const old = previous?.lines.find(item => item.id === line.id);
-    if (old && !!old.backgroundOf !== !!line.backgroundOf && standard('main') && standard('background') && group === (old.backgroundOf ? 'background' : 'main')) group = target;
+    let group = karaoke.lineGroups[line.id] ?? (groupIds.has(target) ? target : '');
+    const old = prevById?.get(line.id);
+    if (old && !!old.backgroundOf !== !!line.backgroundOf && hasMainAndBg && group === (old.backgroundOf ? 'background' : 'main')) group = target;
     return [line.id, group];
   }));
-  const cues = karaoke.cues.flatMap(cue => {
-    const anchor = cue.anchor;
-    if (anchor.kind === 'before') return lyrics.lines.some(line => line.id === anchor.lineId) ? [cue] : [];
-    for (const line of lyrics.lines) {
-      if (anchor.kind === 'word') {
-        const index = line.words.findIndex(word => word.id === anchor.leftId);
-        if (index >= 0 && line.words[index + 1]?.id === anchor.rightId) return [{ ...cue, anchor: { ...anchor, lineId: line.id } }];
-      } else for (const word of line.words) {
-        const index = word.rubyUnits.findIndex(unit => unit.id === anchor.leftId);
-        if (index >= 0 && word.rubyUnits[index + 1]?.id === anchor.rightId) return [{ ...cue, anchor: { ...anchor, lineId: line.id, wordId: word.id } }];
+  const lineIds = new Set<string>();
+  const wordPairs = new Map<string, string>();
+  const rubyPairs = new Map<string, { lineId: string; wordId: string }>();
+  for (const line of lyrics.lines) {
+    lineIds.add(line.id);
+    for (let i = 0; i < line.words.length; i++) {
+      const word = line.words[i];
+      if (i + 1 < line.words.length) wordPairs.set(`${word.id}\0${line.words[i + 1].id}`, line.id);
+      for (let j = 0; j < word.rubyUnits.length - 1; j++) {
+        rubyPairs.set(`${word.rubyUnits[j].id}\0${word.rubyUnits[j + 1].id}`, { lineId: line.id, wordId: word.id });
       }
     }
-    return [];
+  }
+  const cues = karaoke.cues.flatMap(cue => {
+    const anchor = cue.anchor;
+    if (anchor.kind === 'before') return lineIds.has(anchor.lineId) ? [cue] : [];
+    if (anchor.kind === 'word') {
+      const lineId = wordPairs.get(`${anchor.leftId}\0${anchor.rightId}`);
+      return lineId !== undefined ? [{ ...cue, anchor: { ...anchor, lineId } }] : [];
+    }
+    const owner = rubyPairs.get(`${anchor.leftId}\0${anchor.rightId}`);
+    return owner ? [{ ...cue, anchor: { ...anchor, lineId: owner.lineId, wordId: owner.wordId } }] : [];
   });
+  const translationTrackIds = new Set(lyrics.translationTracks.map(track => track.id));
+  const romanizationTrackIds = new Set(lyrics.romanizationTracks.map(track => track.id));
+  const agentIds = new Set(lyrics.agents.map(agent => agent.id));
   const validOutput = (id: string) => {
     const [groupId, kind, trackId] = JSON.parse(id);
-    return karaoke.groups.some(group=>group.id===groupId) && (kind==='body' || lyrics[kind==='translation'?'translationTracks':'romanizationTracks'].some(track=>track.id===trackId));
+    return groupIds.has(groupId) && (kind === 'body' || (kind === 'translation' ? translationTrackIds : romanizationTrackIds).has(trackId));
   };
-  return { ...karaoke, ...(karaoke.sugSingerNames ? { sugSingerNames: karaoke.sugSingerNames.filter(item => validOutput(item.outputId) && item.agentIds.every(id => lyrics.agents.some(agent => agent.id === id))) } : {}), offsets: Object.fromEntries(Object.entries(karaoke.offsets).filter(([id])=>validOutput(id))), outputs: karaoke.outputs.filter(validOutput), lineGroups, cues, singerMarkers: initializeSingerMarkers(lyrics, karaoke.singerMarkers) };
+  return { ...karaoke, ...(karaoke.sugSingerNames ? { sugSingerNames: karaoke.sugSingerNames.filter(item => validOutput(item.outputId) && item.agentIds.every(id => agentIds.has(id))) } : {}), offsets: Object.fromEntries(Object.entries(karaoke.offsets).filter(([id])=>validOutput(id))), outputs: karaoke.outputs.filter(validOutput), lineGroups, cues, singerMarkers: initializeSingerMarkers(lyrics, karaoke.singerMarkers) };
 }
 export function nextGroupId(groups: Karaoke['groups']): string {
   const used = new Set(groups.map(group => group.id.trim().toLowerCase()));
@@ -130,14 +190,12 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
   switch (command.kind) {
     case 'sug-singer-names': next = { ...karaoke, sugSingerNames: command.names }; break;
     case 'singer-markers': {
-      validateSingerMarkers(command.markers);
       for (const marker of command.markers) { const problem=markerProblem(marker); if(problem)throw new MessageError(message(problem)); }
       next = { ...karaoke, singerMarkers: command.markers }; break;
     }
     case 'insert': next = insertCue(lyrics, karaoke, command.anchor); break;
     case 'auto': {
       const configured = { ...karaoke, defaults: { ...karaoke.defaults, ...command.thresholds } };
-      validateKaraoke(lyrics, configured);
       next = autoInsertCues(lyrics, configured, command.groupIds); break;
     }
     case 'remove-lines':
@@ -202,7 +260,8 @@ export function validateKaraoke(lyrics: LyricDocument, value: Karaoke) {
   const ids = new Set<string>();
   for (const group of value.groups) { if (typeof group.id !== 'string' || !group.id || ids.has(group.id) || typeof group.name !== 'string' || !group.name.trim()) throw new MessageError(message('karaoke.groupInvalidData')); ids.add(group.id); }
   if (typeof value.defaults.text !== 'string' || !value.defaults.text.length || [value.defaults.beforeMs, value.defaults.wordMs, value.defaults.rubyMs].some(n => !Number.isSafeInteger(n) || n < 0)) throw new MessageError(message('karaoke.defaultsInvalid'));
-  if (Object.entries(value.lineGroups).some(([id, group]) => !lyrics.lines.some(line => line.id === id) || typeof group !== 'string')) throw new MessageError(message('karaoke.groupReference'));
+  const lineIds = new Set(lyrics.lines.map(line => line.id));
+  if (Object.entries(value.lineGroups).some(([id, group]) => !lineIds.has(id) || typeof group !== 'string')) throw new MessageError(message('karaoke.groupReference'));
   ids.clear();
   for (const cue of value.cues) {
     if (typeof cue.id !== 'string' || !cue.id || ids.has(cue.id) || typeof cue.text !== 'string' || !Number.isSafeInteger(cue.beginMs) || !Number.isSafeInteger(cue.endMs) || !cue.anchor || !['before', 'word', 'ruby'].includes(cue.anchor.kind) || typeof cue.anchor.lineId !== 'string' || cue.anchor.kind !== 'before' && (typeof cue.anchor.leftId !== 'string' || typeof cue.anchor.rightId !== 'string') || cue.anchor.kind === 'ruby' && typeof cue.anchor.wordId !== 'string') throw new MessageError(message('karaoke.cueData'));

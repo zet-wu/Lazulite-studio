@@ -6,7 +6,7 @@ import { preserveWordAgents, wordAgents, sameAgents, validateAgents, lineAgents 
 import { createProjectEditing, emptyBeatCount, setEmptyBeat, reconcileEditing, validateProjectEditing, type ProjectEditing } from './project-editing';
 import { lineStructureIssues } from './line-structure';
 import { validateTranslationTracks } from './translation-editing';
-import { createLine, createWord, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type TranslationTrack, type TranslationContent, type TimeMs } from './lyric-document';
+import { createLine, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type TranslationTrack, type TranslationContent, type TimeMs } from './lyric-document';
 import { splitAtGrapheme } from './text-boundaries';
 import { distributeRubyTime, isKanaReading, splitReadingMora } from './ruby-editing';
 import { stampSync, type SyncAction, type SyncCursor, type SyncMode } from './sync-editing';
@@ -760,12 +760,14 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
 export function applyLyricTransaction(document: LyricDocument, command: LyricCommand, original: ProjectEditing, defaults: BackgroundDefaults = defaultBackgroundDefaults) {
   const editing = structuredClone(original);
   const restoring = command.type === 'batch' && command.commands.some(item => item.type === 'restore-editing');
-  const atomic = (before: LyricDocument, command: AtomicLyricCommand) => {
-    const after = applyAtomic(before, command, editing);
-    if (!(command.type === 'replace-document' && command.editing) && !restoring && command.type !== 'split-line') applyBackgroundDefaults(before, after, editing, defaults);
+  let shouldApplyDefaults = false;
+  const atomic = (before: LyricDocument, item: AtomicLyricCommand) => {
+    const after = applyAtomic(before, item, editing);
+    if (!(item.type === 'replace-document' && item.editing) && !restoring && item.type !== 'split-line') shouldApplyDefaults = true;
     return after;
   };
   const lyrics = command.type === 'batch' ? command.commands.reduce(atomic, document) : atomic(document, command);
+  if (shouldApplyDefaults) applyBackgroundDefaults(document, lyrics, editing, defaults);
   reconcileEditing(document, lyrics, editing);
   validateProjectEditing(lyrics, editing);
   validateAgents(lyrics);

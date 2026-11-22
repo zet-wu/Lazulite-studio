@@ -8,7 +8,7 @@ import { useProjectEditing } from './ProjectEditingContext';
 import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
 import { usePreference } from './use-preference';
-import { useEffect, useMemo, useState, useId, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, useId, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import type { LyricDocument } from '../../domain/lyric-document';
 import { syncIndex, syncUnits, type SyncAction, type SyncMode, type SyncCursor } from '../../domain/sync-editing';
@@ -68,25 +68,27 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
     if (!next || effectiveMode === 'line' && next.lineId !== active.lineId) onProgress({ completed: true, consumed: 0 });
     else moveTo(index + 1);
   };
+  const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
+  keyHandlerRef.current = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.isComposing || event.repeat) return;
+    if (shortcutInput(event.target, event.code)) return;
+    const action = (['start', 'next', 'end', 'previous', 'following', 'previousLine', 'followingLine'] as const).find(action => matchesBinding(event, keys[action]));
+    if (!action) return;
+    if (event.target instanceof Element && event.target.closest('[data-transport]')
+      && (!['start', 'next', 'end'].includes(action)
+        || (['seekStart', 'seekEnd', 'seekBack', 'seekForward'] as const).some(key => matchesBinding(event, keys[key])))) return;
+    event.preventDefault();
+    if (action === 'previous') moveUnit(index - 1);
+    else if (action === 'following') moveUnit(index + 1);
+    else if (action === 'previousLine') previousLine();
+    else if (action === 'followingLine') followingLine();
+    else stamp(action);
+  };
   useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing || event.repeat) return;
-      if (shortcutInput(event.target, event.code)) return;
-      const action = (['start', 'next', 'end', 'previous', 'following', 'previousLine', 'followingLine'] as const).find(action => matchesBinding(event, keys[action]));
-      if (!action) return;
-      if (event.target instanceof Element && event.target.closest('[data-transport]')
-        && (!['start', 'next', 'end'].includes(action)
-          || (['seekStart', 'seekEnd', 'seekBack', 'seekForward'] as const).some(key => matchesBinding(event, keys[key])))) return;
-      event.preventDefault();
-      if (action === 'previous') moveUnit(index - 1);
-      else if (action === 'following') moveUnit(index + 1);
-      else if (action === 'previousLine') previousLine();
-      else if (action === 'followingLine') followingLine();
-      else stamp(action);
-    };
+    const handler = (event: KeyboardEvent) => keyHandlerRef.current(event);
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  });
+  }, []);
   const audition = (before: boolean) => {
     if (beginMs === null || endMs === null) return;
     const start = before ? Math.max(0, beginMs - 600) : endMs;

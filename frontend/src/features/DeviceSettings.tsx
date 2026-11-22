@@ -2,7 +2,7 @@ import {SettingField} from '../shared/SettingsFields';
 import {Select} from '../shared/Select';
 import fields from '../shared/settings-fields.module.css';
 import {usePreference} from '../adapters/studio-preferences';
-import { message as describeMessage, MessageError, errorMessage, message } from '../domain/messages';
+import { message as describeMessage, MessageError, errorMessage } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { i18n } from '../i18n';
 import { useTranslation } from 'react-i18next';

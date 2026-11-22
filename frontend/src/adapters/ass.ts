@@ -13,7 +13,6 @@ export function prepareAss(document: LyricDocument, editing?: ProjectEditing): {
   const events: AssEvent[] = [], issues: OutputIssue[] = [];
   const ordinals = new Map(document.lines.filter(line=>!line.backgroundOf).map((line,index)=>[line.id,index+1]));
   for (const line of document.lines) {
-    const label = `第 ${ordinals.get(line.backgroundOf ?? line.id)} 行${line.backgroundOf ? ' · 背景' : ''}`;
     const lineBase = { kind: 'line' as const, lineId: line.id };
     const problem = (base: Omit<OutputIssue,'missing'|'message'>, reason: string, missing: OutputIssue['missing'] = []) => {
       issues.push({ ...base, missing, message: reason, detail: message(reason) });

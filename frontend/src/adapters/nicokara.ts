@@ -1,15 +1,13 @@
 import { songInformation } from './song-information';
 import { message as describeMessage } from '../domain/messages';
-import { karaokeOutputs, karaokeFilenames, zipFiles, type KaraokeOutput } from './karaoke-output';
-export { karaokeOutputs, safeFilename, zipFiles } from './karaoke-output';
-export type { KaraokeOutput } from './karaoke-output';
+import { karaokeOutputs, karaokeFilenames, type KaraokeOutput } from './karaoke-output';
 import { isUntimedSeparator } from './export-separators';
 import { defaultSingerMarker, singerKey, singerSet, markerProblem, type SingerMarker } from '../domain/singer-markers';
 import transparentPng from '../assets/transparent-1x1.png?inline';
 import { cueProblem, cueWord, type KaraokeCue } from '../domain/karaoke';
 import type { LyricLine, LyricWord, TimeMs } from '../domain/lyric-document';
 import type { ProjectDocument } from '../domain/project-document';
-import { DocumentOutputError, outputIssueKey, type OutputIssue } from './output-validation';
+import { outputIssueKey, type OutputIssue } from './output-validation';
 
 export const quantize = (ms: number) => Math.floor(ms / 10) * 10;
 export function nicokaraTime(ms: number) {
@@ -167,17 +165,12 @@ export function prepareNicokara(project: Pick<ProjectDocument, 'lyrics' | 'karao
     if (current.key!==other.key && (current.marker.trigger.includes(other.marker.trigger)||other.marker.trigger.includes(current.marker.trigger))) add(current.target,'output.markersAmbiguous',current.outputId);
   }
   // Invalid assignments cannot silently drop lyrics from an otherwise selected output.
-  for (const [index,line] of lyrics.lines.entries()) if (!karaoke.groups.some(group => group.id === karaoke.lineGroups[line.id])) add({ lineId: line.id, karaokeSettings: true }, 'output.groupRequired', null);
+  for (const line of lyrics.lines) if (!karaoke.groups.some(group => group.id === karaoke.lineGroups[line.id])) add({ lineId: line.id, karaokeSettings: true }, 'output.groupRequired', null);
   if (!selected.length) add({ karaokeSettings: true }, 'output.chooseFiles', null, 'output-configuration');
   else if (!files.length && !issues.length) add({ karaokeSettings: true }, 'output.chooseNonempty', null, 'output-configuration');
   const merged = new Map<string, OutputIssue>();
   for (const issue of issues) { const key = outputIssueKey(issue) + issue.message; const previous = merged.get(key); merged.set(key, previous ? { ...previous, outputIds: [...new Set([...previous.outputIds!, ...issue.outputIds!])] } : issue); }
   return { files, issues: [...merged.values()], omitted, summary: [...files.map(file => `${file.name} — ${file.output.label}`), ...omitted.map(label => `空输出已省略：${label}`), '时间向下量化为厘秒；源项目毫秒时间不变。', '翻译／音译按整句输出；请在 NKM3 中将扫色前后颜色设为相同以显示静态字幕。', '歌手标记写入输出副本；未指定歌手时沿用已输出声部。'].join('\r\n') + '\r\n' };
-}
-export function nicokaraZip(project: ProjectDocument, title: string) {
-  const result = prepareNicokara(project, title);
-  if (result.issues.length) throw new DocumentOutputError(result.issues);
-  return zipFiles(nicokaraArchiveFiles(result));
 }
 export function nicokaraArchiveFiles(result: ReturnType<typeof prepareNicokara>) {
   const image = Uint8Array.from(atob(transparentPng.split(',')[1]), char=>char.charCodeAt(0));

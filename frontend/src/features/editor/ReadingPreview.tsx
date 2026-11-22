@@ -33,7 +33,7 @@ export function ReadingInput({value,label,hint,disabled,needsReview=false,change
 }) {
  const start=useRef(value),composing=useRef(false);
  const missing=!value.trim()||needsReview;
- return <input title={hint||value||undefined} aria-label={label} aria-description={hint}
+ return <input title={hint||value||undefined} aria-label={label} aria-description={hint} data-status={missing?'missing':undefined}
   className={`${styles.romanPreviewInput} ${missing?styles.japaneseRubyMissing:''}`} value={value} disabled={disabled}
   onChange={e=>change(e.target.value)} onFocus={()=>{start.current=value;focus(true);}} onBlur={()=>focus(false)}
   onCompositionStart={()=>{composing.current=true;composition(true);}} onCompositionEnd={()=>{composing.current=false;composition(false);}}

@@ -2,8 +2,6 @@ import { message, MessageError } from './messages';
 import { intersectSegments } from './time-boundaries';
 import type { Acoustics, ProjectDocument } from './project-document';
 import { validateSegments } from './project-document';
-import { validateProjectEditing } from './project-editing';
-import { assertAmll } from './amll-compatibility';
 import type { TimeMs } from './lyric-document';
 
 type Endpoint = { time: number; source: string } | null;
@@ -129,6 +127,5 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
     if (line.endMs !== destination.beginMs || destination.beginMs === null) delete next.editing.endLinks[id];
   }
   if (result.acoustics) { validateSegments(result.acoustics.segments); next.acoustics = {...result.acoustics, segments:intersectSegments(result.acoustics.segments,durationMs).segments}; }
-  validateProjectEditing(next.lyrics, next.editing); assertAmll(next.lyrics, next.amll);
   return { project: JSON.stringify(next) === JSON.stringify(project) ? project : next, retained, cleared, mergedGaps };
 }

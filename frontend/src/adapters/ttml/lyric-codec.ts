@@ -176,8 +176,6 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   };
 }
 
-// Parentheses in external background nodes are decorative, not lyric text.
-function stripDecoration(text: string) { return text.startsWith('(') && text.endsWith(')') ? text.slice(1, -1) : text; }
 function readRomanization(item: Element, lineId: string, absoluteTimes: boolean, namespace: string, background = false): RomanizationContent {
   if (background) {
     // Remove the wrapper before reading bare separators, so edge whitespace keeps unknown endpoints.

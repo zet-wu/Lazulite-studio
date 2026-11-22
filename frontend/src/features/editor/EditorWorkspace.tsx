@@ -4,7 +4,6 @@ import { message as describeMessage, errorMessage } from '../../domain/messages'
 import { i18n, formatMessage } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { ShapeConversionDialog } from './ShapeConversionDialog';
-import type { ValidationFilter } from '../../adapters/lyric-formats';
 import { projectErrorText } from '../project-error';
 import { preferences } from '../../adapters/preferences';
 import { recoverSelection, survivingSelection, selectionSelector, focusObject, preserveSelectionOnFocus } from './selection-recovery';
@@ -15,7 +14,7 @@ import { CueSlot, CueProperties, KaraokeTools } from '../KaraokeTools';
 import type { KaraokeCommand } from '../../domain/karaoke';
 import { MessageBar, useNotice, type Notice } from '../../shared/MessageBar';
 import { AmllSettings } from '../AmllPanel';
-import type { ValidationTab } from '../useAutomaticValidation';
+import type { ValidationTab } from '../PackagingPanel';
 import type { AmllRule } from '../../domain/amll-compatibility';
 import { displayLines } from '../../domain/amll-compatibility';
 import type { ProjectEditing } from '../../domain/project-editing';
@@ -25,7 +24,7 @@ import { useProjectEditing } from './ProjectEditingContext';
 import { emptyBeatCount } from '../../domain/project-editing';
 import { Icon } from '../../shared/Icon';
 import { Fragment, lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
-import { documentTargets, selectionKind, targetId, targetSelection, selectionTargets, targetInterval } from './selection-targets';
+import { targetId, selectionTargets, targetInterval } from './selection-targets';
 import { SelectionProvider, useEditorSelection } from './SelectionContext';
 import { flushSync } from 'react-dom';
 import { JapaneseRubyDialog } from './JapaneseRubyDialog';
@@ -79,7 +78,6 @@ import { ContextMenu, type ContextAction } from '../../shared/ContextMenu';
 import { RubyGenerationDialog } from './RubyGenerationDialog';
 import type { TransportHandle } from '../MediaTransport';
 import type { DownloadFormat } from '../../adapters/lyric-output';
-import type { LyricFormat } from '../../adapters/lyric-formats';
 import styles from './semantic-editor.module.css';
 
 const CLIPBOARD_MIME = 'application/x-lazulite-lyric';
@@ -108,19 +106,11 @@ type Props = {
   dirty: boolean;
   saving?: boolean;
   notices?: (Notice | null)[];
-  outputIssues?: OutputIssue[];
   onSave: () => void;
-  onNew?: () => void;
-  onImportName?: (name: string) => void;
-  onExportFormat?: (format: LyricFormat, content: string) => void;
   saveForPackaging?: () => Promise<{ revision: string; document: LyricDocument; editing?: ProjectEditing } | undefined>;
   selectedLineId?: string | null;
   playheadLineId?: string | null;
-  onSelectLine?: (id: string | null) => void;
-  onSelectUnit?: (lineId: string | null, wordId: string | null, rubyId: string | null) => void;
-  onSelectRomanization?: (trackId: string | null, contentId: string | null) => void;
   transport?: RefObject<TransportHandle | null>;
-  embedded?: boolean;
 };
 
 function isTextInput(target: EventTarget) {
@@ -342,6 +332,40 @@ function EditorWorkspaceContent(props: Props) {
     }
     return result;
   }, [document.romanizationTracks, document.translationTracks]);
+  const selectedTargetsByLine = useMemo(() => {
+    const result = new Map<string, string[]>();
+    for (const target of selectedTargets) {
+      const list = result.get(target.lineId);
+      const id = targetId(target);
+      if (list) list.push(id);
+      else result.set(target.lineId, [id]);
+    }
+    return result;
+  }, [selectedTargets]);
+  const ignoredSyncSet = useMemo(() => new Set(editing.ignoredSyncLineIds), [editing.ignoredSyncLineIds]);
+  const karaokeLineVersion = useMemo(() => {
+    if (mode !== 'karaoke' || !props.project) return null;
+    const { cues } = props.project.karaoke;
+    const result = new Map<string, { cues: typeof cues; selected: string | null }>();
+    for (const cue of cues) {
+      const lineId = cue.anchor.lineId;
+      const entry = result.get(lineId);
+      const selected = cue.id === selectedCue ? cue.id : null;
+      if (entry) {
+        entry.cues.push(cue);
+        if (selected) entry.selected = selected;
+      } else {
+        result.set(lineId, { cues: [cue], selected });
+      }
+    }
+    return result;
+  }, [mode, props.project, selectedCue]);
+  const pinnedLineIds = useMemo(
+    () => document.lines
+      .filter((line) => line.id === wordDraft?.lineId || line.words.some((word) => word.id === syncEditingId || word.id === rubyShortcut?.wordId || word.rubyUnits.some((unit) => unit.id === syncEditingId)))
+      .map((line) => line.id),
+    [document.lines, wordDraft?.lineId, syncEditingId, rubyShortcut?.wordId],
+  );
   const previousMode = useRef(mode);
   const externalSelection = useRef(props.selectedLineId);
   useEffect(() => {
@@ -387,8 +411,6 @@ function EditorWorkspaceContent(props: Props) {
     const previous = currentSelection?.kind === 'lines' ? currentSelection : null;
     const ids = selectIds(displayLines(document,props.project?.lineOrder??[]).map(l => l.id), previous?.ids ?? [], previous?.anchorId ?? id, id, shift, toggle);
     setSelection({ kind: 'lines', ids, anchorId: shift || toggle ? previous?.anchorId ?? id : id, activeId: line.id });
-    props.onSelectLine?.(ids.length ? line.id : null);
-    props.onSelectUnit?.(ids.length ? line.id : null, null, null);
   });
   const selectWord = useLiveCallback((line: LyricLine, word: LyricWord, shift: boolean = false, toggle: boolean = false) => {
     if (syncDraftCommit.current && !finishSyncDraft()) return;
@@ -398,8 +420,6 @@ function EditorWorkspaceContent(props: Props) {
     const order = displayLines(document, props.project?.lineOrder ?? []).flatMap(item => item.words.map(word => word.id));
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? word.id, word.id, shift, toggle);
     setSelection({ kind: 'words', lineId: line.id, ids, anchorId: shift || toggle ? previous?.anchorId ?? word.id : word.id, activeId: word.id });
-    props.onSelectLine?.(ids.length ? line.id : null);
-    props.onSelectUnit?.(ids.length ? line.id : null, ids.length ? word.id : null, null);
   });
   const selectRuby = useLiveCallback((line: LyricLine, word: LyricWord, rubyId: string, shift: boolean = false, toggle: boolean = false) => {
     if (syncDraftCommit.current && !finishSyncDraft()) return;
@@ -409,8 +429,6 @@ function EditorWorkspaceContent(props: Props) {
     const order = displayLines(document, props.project?.lineOrder ?? []).flatMap(line => line.words.flatMap(word => word.rubyUnits.map(unit => unit.id)));
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? rubyId, rubyId, shift, toggle);
     setSelection({ kind: 'ruby', lineId: line.id, wordId: word.id, ids, anchorId: shift || toggle ? previous?.anchorId ?? rubyId : rubyId, activeId: rubyId });
-    props.onSelectLine?.(ids.length ? line.id : null);
-    props.onSelectUnit?.(ids.length ? line.id : null, ids.length ? word.id : null, ids.length ? rubyId : null);
   });
   const selectRomanizationContent = useLiveCallback((lineId: string, trackId: string, contentId: string, shift: boolean = false, toggle: boolean = false) => {
     if (syncDraftCommit.current && !finishSyncDraft()) return;
@@ -420,20 +438,15 @@ function EditorWorkspaceContent(props: Props) {
     const order = document.romanizationTracks.find((track) => track.id === trackId)?.contents.filter((content) => content.lineId === lineId).map((content) => content.id) ?? [];
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? contentId, contentId, shift, toggle);
     setSelection({ kind: 'romanization-content', lineId, trackId, contentId, ids, anchorId: shift || toggle ? previous?.anchorId ?? contentId : contentId, activeId: contentId });
-    props.onSelectLine?.(ids.length ? lineId : null);
-    props.onSelectRomanization?.(ids.length ? trackId : null, ids.length ? contentId : null);
   });
   const selectRomanizationUnit = useLiveCallback((lineId: string, trackId: string, contentId: string, unitId: string, shift: boolean = false, toggle: boolean = false) => {
     if (syncDraftCommit.current && !finishSyncDraft()) return;
     setSyncTargetVersion(value => value + 1);
     const currentSelection = selectionRef.current;
     const previous = currentSelection?.kind === 'romanization-unit' ? currentSelection : null;
-    const content = document.romanizationTracks.find((track) => track.id === trackId)?.contents.find((item) => item.id === contentId);
     const order = document.romanizationTracks.find(track => track.id === trackId)?.contents.flatMap(content => content.kind === 'timed' ? content.units.map(unit => unit.id) : []) ?? [];
     const ids = selectIds(order, previous?.ids ?? [], previous?.anchorId ?? unitId, unitId, shift, toggle);
     setSelection({ kind: 'romanization-unit', lineId, trackId, contentId, ids, anchorId: shift || toggle ? previous?.anchorId ?? unitId : unitId, activeId: unitId });
-    props.onSelectLine?.(ids.length ? lineId : null);
-    props.onSelectRomanization?.(ids.length ? trackId : null, ids.length ? contentId : null);
   });
   const [focusAgent,setFocusAgent] = useState<string>();
   const locateIssue = (issue: OutputIssue) => {
@@ -550,7 +563,6 @@ function EditorWorkspaceContent(props: Props) {
       const ids = invert ? invertIds(order, selection.ids) : order;
       setSelection({ ...selection, ids, anchorId: ids[0] ?? '', activeId: ids.at(-1) ?? '' });
     } else if (selection?.kind === 'romanization-unit') {
-      const content = attachmentTracks(document,selection).find((track) => track.id === selection.trackId)?.contents.find((item) => item.id === selection.contentId);
       const order = attachmentTracks(document,selection).find(track => track.id === selection.trackId)?.contents.flatMap(content => content.kind === 'timed' ? content.units.map(unit => unit.id) : []) ?? [];
       const ids = invert ? invertIds(order, selection.ids) : order;
       setSelection({ ...selection, ids, anchorId: ids[0] ?? '', activeId: ids.at(-1) ?? '' });
@@ -576,7 +588,6 @@ function EditorWorkspaceContent(props: Props) {
     try {
       if (dispatch(moveWordsAcrossLine(document, selection, target.id))) {
         setSelection({ ...selection, lineId: target.id });
-        props.onSelectLine?.(target.id);
       }
     } catch (error) { setMessage(errorMessage(error)); }
   };
@@ -617,7 +628,6 @@ function EditorWorkspaceContent(props: Props) {
       const word = createWord(text);
       if (!dispatch({ type: 'insert-word', lineId: line.id, afterWordId, word })) return false;
       setSelection({ kind: 'words', lineId: line.id, ids: [word.id], anchorId: word.id, activeId: word.id });
-      props.onSelectLine?.(line.id); props.onSelectUnit?.(line.id, word.id, null);
       requestLocate(line.id, `[data-word-id="${word.id}"]${compact ? '' : ' input[data-editor-field="word"]'}`);
       return true;
     }} /></span>;
@@ -747,8 +757,6 @@ function EditorWorkspaceContent(props: Props) {
       { label: t('common.paste'), disabled: !clipboard, run: () => paste(clipboard, undefined, effective) },
     ];
     setSelection(effective);
-    props.onSelectLine?.(line.id);
-    if ((effective.kind === 'romanization-content' || effective.kind === 'romanization-unit') && !effective.attachment) props.onSelectRomanization?.(effective.trackId, effective.contentId);
     setContextMenu({ x, y, title, actions: [...shared, ...actions], target: target.closest<HTMLElement>('[data-translation-unit-id], [data-translation-id], [data-ruby-id], [data-romanization-unit-id], [data-romanization-content-id], [data-word-id], [data-line-id]') ?? target });
     return true;
   };
@@ -796,7 +804,7 @@ function EditorWorkspaceContent(props: Props) {
     </div>
     <TimePair begin={word.beginMs} end={word.endMs} label={t('editor.wordLabel',{text:word.text})} onCommit={(beginMs, endMs) => dispatch({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginMs, endMs })} />
   </LyricWordView>;
-  return <div ref={pageRef} data-workspace className={`${styles.page} ${props.embedded ? styles.embeddedPage : ''}`}
+  return <div ref={pageRef} data-workspace className={styles.page}
     onFocusCapture={event => {
       const node = event.target as Element;
       if (outlineRef.current?.contains(node)) selectionArea.current = 'outline';
@@ -948,8 +956,8 @@ function EditorWorkspaceContent(props: Props) {
       <main ref={mainRef} tabIndex={-1} className={vocalStyles.main}><div ref={audioReview.setStatusHost}/><div hidden={!audioReview.timelineReady} className={vocalStyles.host} ref={props.onTimelineHost}/></main>
     </div> : <section className={styles.auxiliaryPlaceholder}><h1>{t('editor.vocalAnalysis')}</h1><p>{t('editor.audioRequired')}</p></section>)}
     <fieldset disabled={props.alignment?.locked} style={{display:"contents"}}>
-    {mode === 'acquire' && <LyricAcquisition projectId={props.projectId} sourceAssetId={props.sourceAssetId} store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} onNew={props.onNew} onImportName={props.onImportName} />}
-    {mode === 'package' && <PackagingPanel {...props} downloadFormat={downloadFormat} onDownloadFormat={setDownloadFormat} focusOutputId={karaokeFocusOutput} validationTab={validationTab} onValidationTab={setValidationTab} focusRule={focusRule} onRuleLocated={()=>setFocusRule(undefined)} externalIssues={props.outputIssues} locateIssue={locateIssue} />}
+    {mode === 'acquire' && <LyricAcquisition projectId={props.projectId} sourceAssetId={props.sourceAssetId} store={acquisitionStore} searchConditions={searchConditions} document={document} apply={apply} onImported={() => setMode('edit')} />}
+    {mode === 'package' && <PackagingPanel audioDurationMs={props.audioDurationMs} downloadFormat={downloadFormat} onDownloadFormat={setDownloadFormat} focusOutputId={karaokeFocusOutput} validationTab={validationTab} onValidationTab={setValidationTab} focusRule={focusRule} onRuleLocated={()=>setFocusRule(undefined)} project={props.project} applyProject={props.applyProject} title={props.title} document={document} saveForPackaging={props.saveForPackaging} projectId={props.projectId} sourceAssetId={props.sourceAssetId} locateIssue={locateIssue} />}
     {mode === 'preview' && <Suspense fallback={<p>{t('editor.previewLoading')}</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={id => { const line = document.lines.find(line => line.id === id); if (line) selectLine(line); }} /></Suspense>}
     {mode === 'karaoke' && props.project && props.applyProject && <KaraokeTools project={props.project} apply={props.applyProject} />}
     {mode === 'sync' && <SyncPanel progress={syncProgress} onProgress={setSyncProgress} preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} document={document} lineOrder={props.project?.lineOrder} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
@@ -977,8 +985,8 @@ function EditorWorkspaceContent(props: Props) {
     </div></aside>}{columns.outlineVisible && separator('outline')}
       <main ref={mainRef} tabIndex={-1} className={styles.canvas} onFocusCapture={() => { selectionArea.current = 'canvas'; }}>
         <LyricList lineVersion={line => JSON.stringify([
-          mode, editorDisplay, mode==='karaoke' ? [props.project?.karaoke,selectedCue] : null, ordinalById.get(line.backgroundOf ?? line.id), props.playheadLineId === line.id,
-          selection?.kind, selectedTargets.filter(target => target.lineId === line.id).map(targetId),
+          mode, editorDisplay, mode==='karaoke' ? karaokeLineVersion?.get(line.id) : null, ordinalById.get(line.backgroundOf ?? line.id), props.playheadLineId === line.id,
+          selection?.kind, selectedTargetsByLine.get(line.id),
           selection?.kind === 'romanization-content' && selection.lineId === line.id ? selection.ids : null,
           selection?.kind === 'romanization-unit' && selection.attachment && selection.lineId === line.id ? selection.ids : null,
           translationVersion.current.serial, attachmentVersions.get(line.id),
@@ -986,13 +994,13 @@ function EditorWorkspaceContent(props: Props) {
           line.words.some(word => word.id === rubyShortcut?.wordId) ? rubyShortcut : null,
           line.words.some(word => word.id === syncEditingId || word.rubyUnits.some(unit => unit.id === syncEditingId)) ? syncEditingId : null,
           syncCursor?.lineId === line.id ? [syncCursor, syncProgress] : null,
-          editing.ignoredSyncLineIds.includes(line.id), line.words.map(word => [editing.emptyBeats[word.id], word.rubyUnits.map(unit => editing.emptyBeats[unit.id])]),
+          ignoredSyncSet.has(line.id), line.words.map(word => [editing.emptyBeats[word.id], word.rubyUnits.map(unit => editing.emptyBeats[unit.id])]),
           drag.placeholders?.ids ? [...drag.placeholders.ids] : null,
-        ])} pinnedLineIds={document.lines.filter(line => line.id === wordDraft?.lineId || line.words.some(word => word.id === syncEditingId || word.id === rubyShortcut?.wordId || word.rubyUnits.some(unit => unit.id === syncEditingId))).map(line => line.id)} key={`${mode}:${mode==='edit'?editorDisplay:''}`} memory={listMemory.current[mode]} lines={displayed.lines} locate={locate} append={() => {
+        ])} pinnedLineIds={pinnedLineIds} key={`${mode}:${mode==='edit'?editorDisplay:''}`} memory={listMemory.current[mode]} lines={displayed.lines} locate={locate} append={() => {
           const line = createLine('');
           if (dispatch({ type: 'insert-line', afterLineId: mainLines.at(-1)?.id ?? null, line })) {
             setSelection({ kind: 'lines', ids: [line.id], anchorId: line.id, activeId: line.id });
-            props.onSelectLine?.(line.id); requestLocate(line.id);
+            requestLocate(line.id);
           }
         }} renderLine={(line) => compact ? <SyncLine presentation={mode==='edit'?'edit':mode==='karaoke'?'karaoke':'sync'} karaoke={mode==='karaoke'&&props.project ? {
           add:<button data-role="inline" aria-label={t('editor.addCountIn')} onClick={()=>insertKaraoke({kind:'insert',anchor:{kind:'before',lineId:line.id}})}>＋</button>,
@@ -1008,7 +1016,7 @@ function EditorWorkspaceContent(props: Props) {
           onSelect={(shift, toggle) => selectLine(line, shift, toggle)} onMove={(direction) => moveLine(line, direction)}>
           <div className={styles.lineHeader}><span>L{ordinalById.get(line.backgroundOf ?? line.id)} · {line.backgroundOf ? t('outline.background') : t('editor.mainVocal')}</span></div>
           <div className={styles.words}>{renderWordDraft(line, null)}{line.words.map(word => <Fragment key={word.id}>{wordView(line, word)}{renderWordDraft(line, word.id)}</Fragment>)}
-            <button data-role="inline" className="icon-button" title={t('editor.addWord')} data-tooltip={t('editor.addWord')} aria-label={t('editor.addWord')} onClick={event => { event.stopPropagation(); startWordDraft(line.id, line.words.at(-1)?.id ?? null); }}><Icon name="add"/></button>
+            <button data-role="inline" className="icon-button" data-tooltip={t('editor.addWord')} aria-label={t('editor.addWord')} onClick={event => { event.stopPropagation(); startWordDraft(line.id, line.words.at(-1)?.id ?? null); }}><Icon name="add"/></button>
           </div>
           <TranslationEditor document={document} lineId={line.id} apply={dispatch} />
           <div className={styles.romanizationTracks}>

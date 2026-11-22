@@ -1,5 +1,5 @@
 import {message,MessageError,type Message} from './messages';
-import { createProjectEditing, type ProjectEditing } from './project-editing';
+import { createProjectEditing } from './project-editing';
 import { toHiragana, toKatakana } from 'wanakana';
 import type { LyricCommand } from './lyric-commands';
 import type { LyricDocument, LyricWord, RomanizationContent, RubyUnit, TimeMs } from './lyric-document';

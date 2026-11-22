@@ -11,7 +11,6 @@ import type {ProjectDocument,ProjectCommand} from '../domain/project-document';
 import type {ProjectEditing} from '../domain/project-editing';
 import type {LyricDocument} from '../domain/lyric-document';
 import type {AmllRule} from '../domain/amll-compatibility';
-import type {LyricFormat,ValidationFilter} from '../adapters/lyric-formats';
 import {downloadFormats,prepareLyricDownload,defaultOutputProject,type DownloadFormat} from '../adapters/lyric-output';
 import {safeFilename,zipFiles} from '../adapters/karaoke-output';
 import {describeSelectedOutput} from '../adapters/format-description';
@@ -19,16 +18,17 @@ import {outputIssueKey,type OutputIssue} from '../adapters/output-validation';
 import {audioRangeIssues} from '../adapters/audio-validation';
 import {useProjectEditing} from './editor/ProjectEditingContext';
 import {usePreference} from './editor/use-preference';
-import {useAutomaticValidation,type ValidationTab} from './useAutomaticValidation';
+import {useAutomaticValidation} from './useAutomaticValidation';
 import {OutputIssues} from './OutputIssues';
 import {OutputSelection,type OutputSelectionHandle} from './OutputSelection';
 import {AmllPanel} from './AmllPanel';
 import {MusicPackaging} from './MusicPackaging';
 import {SingerMarkersDialog} from './SingerMarkersDialog';
 import {SugSingersDialog} from './SugSingersDialog';
-import {downloadKaraoke} from './KaraokeTools';
+import {downloadBlob} from '../shared/download';
 import styles from './acquisition.module.css';
-type Props={audioDurationMs?:number;downloadFormat?:DownloadFormat;onDownloadFormat?:(format:DownloadFormat)=>void;focusOutputId?:string;validationFilter?:ValidationFilter;onValidationFilter?:(filter:ValidationFilter)=>void;validationTab?:ValidationTab;onValidationTab?:(tab:ValidationTab)=>void;focusRule?:AmllRule;onRuleLocated?:()=>void;project?:ProjectDocument;applyProject?:(command:ProjectCommand)=>void;title?:string;document:LyricDocument;dirty?:boolean;onExportFormat?:(format:LyricFormat,content:string)=>void;saveForPackaging?:()=>Promise<{revision:string;document:LyricDocument;editing?:ProjectEditing}|undefined>;projectId?:string;sourceAssetId?:string;locateIssue:(issue:OutputIssue)=>void;externalIssues?:OutputIssue[]};
+export type ValidationTab = 'lyrics' | 'amll';
+type Props={audioDurationMs?:number;downloadFormat?:DownloadFormat;onDownloadFormat?:(format:DownloadFormat)=>void;focusOutputId?:string;validationTab?:ValidationTab;onValidationTab?:(tab:ValidationTab)=>void;focusRule?:AmllRule;onRuleLocated?:()=>void;project?:ProjectDocument;applyProject?:(command:ProjectCommand)=>void;title?:string;document:LyricDocument;saveForPackaging?:()=>Promise<{revision:string;document:LyricDocument;editing?:ProjectEditing}|undefined>;projectId?:string;sourceAssetId?:string;locateIssue:(issue:OutputIssue)=>void};
 export function PackagingPanel(props:Props){
  const {t}=useTranslation(),editing=useProjectEditing();
  const title=props.title??t('workspace.defaultName');
@@ -54,7 +54,7 @@ export function PackagingPanel(props:Props){
   return()=>{cancelled=true;};
  },[all,tab,project,title]);
  // AMLL examines the complete semantic document independently of file content selection.
- const {result:amll,current:amllCurrent}=useAutomaticValidation(props.document,editing,props.projectId,'amll');
+ const {result:amll,current:amllCurrent}=useAutomaticValidation(props.document,props.projectId);
  const [attempted,setAttempted]=useState(false);
  const [message,setMessage]=useMessageText(''),[musicBlocking,setMusicBlocking]=useState<OutputIssue[]>([]),[dialog,setDialog]=useState<'singers'|'sug-singers'|null>(null);
  const selection=useRef<OutputSelectionHandle>(null),validationPane=useRef<HTMLElement>(null);
@@ -69,8 +69,8 @@ export function PackagingPanel(props:Props){
   const snapshot=selection.current?.commit()??(format==='ttml'||!props.project?project:null);if(!snapshot)return;
   const final=prepareLyricDownload(snapshot,format,title);
   if(final.issues.some(issue=>issue.severity!=='warning')){setAttempted(true);choose('lyrics');setAll(false);return;}
-  if(format==='nicokara'||format==='sug')downloadKaraoke(zipFiles(final.archiveFiles),`${safeFilename(title)}-${format}.zip`,'application/zip');
-  else if(final.files[0])downloadKaraoke(final.files[0].text,final.files[0].name,'text/plain;charset=utf-8');
+  if(format==='nicokara'||format==='sug')downloadBlob(zipFiles(final.archiveFiles),`${safeFilename(title)}-${format}.zip`,'application/zip');
+  else if(final.files[0])downloadBlob(final.files[0].text,final.files[0].name,'text/plain;charset=utf-8');
  };
  const issues=outputTab==='music'&&musicBlocking.length?musicBlocking:props.document.lines.length===0?[]:all?(allResults?.project===project?allResults.issues:[]):prepared.issues;
  const ready=!all||allResults?.project===project;

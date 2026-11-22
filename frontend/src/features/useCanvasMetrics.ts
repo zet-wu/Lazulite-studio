@@ -13,7 +13,8 @@ export function useCanvasMetrics(ref: RefObject<HTMLCanvasElement | null>, enabl
     let resolution: MediaQueryList;
     const measure = () => {
       const { width, height } = node.getBoundingClientRect();
-      setMetrics({ width, height, ratio: window.devicePixelRatio || 1 });
+      const ratio = window.devicePixelRatio || 1;
+      setMetrics((previous) => previous.width === width && previous.height === height && previous.ratio === ratio ? previous : { width, height, ratio });
     };
     const changed = () => {
       resolution.removeEventListener('change', changed);

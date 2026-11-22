@@ -1,8 +1,7 @@
 import { MessageError, message } from '../../domain/messages';
 import type { ProjectSnapshot } from '../../domain/project-document';
-import type { components, paths } from "./generated";
+import type { components } from "./generated";
 import {
-  isApiError,
   isAsset,
   isCapabilities,
   isDocumentEnvelope,
@@ -31,54 +30,37 @@ export const requestHeaders = (extra: HeadersInit = {}) => ({
   ...extra,
 });
 
-async function request<T>(
-  path: string,
-  validate: (value: unknown) => value is T,
-  signal?: AbortSignal,
-): Promise<T> {
-  const response = await fetch(`${API_ROOT}${path}`, {
-    credentials: "include",
-    cache: "no-store",
-    signal,
-    headers: requestHeaders(),
-  });
-  if (!response.ok) {
-    throw await readApiError(response);
-  }
-  const value: unknown = await response.json();
-  if (!validate(value))
-    throw new ApiError(502, {
-      code: "invalid_response",
-      message: "Studio API 返回了不支持的响应",
-      request_id: "",
-      retryable: false,
-    });
-  return value;
-}
-
-async function mutate<T>(
-  path: string,
-  init: RequestInit,
-  validate: (value: unknown) => value is T,
-): Promise<T> {
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const response = await fetch(`${API_ROOT}${path}`, {
     credentials: "include",
     ...init,
     headers: requestHeaders(init.headers),
   });
-  if (!response.ok) {
-    throw await readApiError(response);
-  }
+  if (!response.ok) throw await readApiError(response);
+  return response;
+}
+
+export async function apiJson<T>(
+  path: string,
+  init: RequestInit & { validate?: (value: unknown) => value is T } = {},
+): Promise<T> {
+  const { validate, ...requestInit } = init;
+  const response = await apiFetch(path, requestInit);
+  if (response.status === 204) return undefined as T;
   const value: unknown = await response.json();
-  if (!validate(value))
+  if (validate && !validate(value)) {
     throw new ApiError(502, {
       code: "invalid_response",
       message: "Studio API 返回了不支持的响应",
       request_id: "",
       retryable: false,
     });
-  return value;
+  }
+  return value as T;
 }
+
+const request = <T>(path: string, validate: (value: unknown) => value is T, signal?: AbortSignal) =>
+  apiJson<T>(path, { cache: "no-store", signal, validate });
 
 export function uploadMusic(
   file: File,
@@ -173,7 +155,7 @@ export function apiErrorBody(value: unknown, status: number, requestId=''): ApiE
 export async function readApiError(response: Response): Promise<ApiError> {
   let body: unknown;
   try { body = await response.json(); } catch { /* HTTP errors may have no JSON body. */ }
-  return new ApiError(response.status, apiErrorBody(body,response.status,response.headers.get('X-Request-ID')??''));
+  return new ApiError(response.status, apiErrorBody(body,response.status,response.headers?.get('X-Request-ID')??''));
 }
 
 /** Only explicit document rejections prove that this snapshot was not committed. */
@@ -186,31 +168,24 @@ export function isRejectedDocument(error: unknown): boolean {
 export const studioApi = {
   projectStorage: (id:string) => request(`/projects/${encodeURIComponent(id)}/storage`, (value:unknown): value is components['schemas']['ProjectStorage'] => {
     const v=value as components['schemas']['ProjectStorage'];
-    return !!v && Number.isSafeInteger(v.total_bytes) && v.total_bytes>=0 && typeof v.measured_at==='string' && !!v.categories && ['source','vocals','cache','snapshots','other'].every(key=>Number.isSafeInteger(v.categories[key as keyof typeof v.categories]) && v.categories[key as keyof typeof v.categories]>=0) && Object.values(v.categories).reduce((a,b)=>a+b,0)===v.total_bytes;
+    return !!v && typeof v === 'object' && Number.isSafeInteger(v.total_bytes) && v.total_bytes>=0 && typeof v.measured_at==='string' && !!v.categories && typeof v.categories === 'object';
   }),
   importProject: (file: File) => {
     const body = new FormData(); body.append('file', file);
-    return mutate('/project-archives', { method: 'POST', body }, isProjectSummary);
+    return apiJson('/project-archives', { method: 'POST', body, validate: isProjectSummary });
   },
-  exportProject: async (id: string) => {
-    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(id)}/archive`, { credentials:'include', headers:requestHeaders() });
-    if (!response.ok) throw await readApiError(response);
-    return response.blob();
-  },
+  exportProject: async (id: string) => (await apiFetch(`/projects/${encodeURIComponent(id)}/archive`)).blob(),
   getSession: () => request("/session", isSession),
-  login: (password: string, username?: string) =>
-    mutate(
-      "/session",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(username ? { username, password } : { password }),
-      },
-      isSession,
-    ),
-  discardUpload: (id: string) => s4<{cancelled:string}>(`/uploads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  cleanupMusic: (projectId:string) => s4<{cleanup_pending:boolean}>(`/projects/${encodeURIComponent(projectId)}/music-cleanup`,{method:'POST'}),
-  attachMusic: (projectId: string, request: {upload_id:string;revision:string;expected_asset_id:string|null;operation_id:string}) => s4<{asset:Asset;revision:string;cleanup_pending:boolean}>(`/projects/${encodeURIComponent(projectId)}/music`, { method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request) }),
+  login: (password: string) =>
+    apiJson("/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+      validate: isSession,
+    }),
+  discardUpload: (id: string) => apiJson<{cancelled:string}>(`/uploads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  cleanupMusic: (projectId:string) => apiJson<{cleanup_pending:boolean}>(`/projects/${encodeURIComponent(projectId)}/music-cleanup`,{method:'POST'}),
+  attachMusic: (projectId: string, payload: {upload_id:string;revision:string;expected_asset_id:string|null;operation_id:string}) => apiJson<{asset:Asset;revision:string;cleanup_pending:boolean}>(`/projects/${encodeURIComponent(projectId)}/music`, { method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload) }),
   createProject: (
     name: string,
     uploadId: string | null,
@@ -218,20 +193,17 @@ export const studioApi = {
     signal?: AbortSignal,
     sourceFilename?: string,
   ) =>
-    mutate(
-      "/projects",
-      {
-        method: "POST",
-        signal,
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
-        },
-        body: JSON.stringify({ name, upload_id: uploadId, source_filename: sourceFilename }),
+    apiJson("/projects", {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
       },
-      isProjectSummary,
-    ),
-  deleteProject: (projectId: string) => mutate(`/projects/${encodeURIComponent(projectId)}`, { method: 'DELETE' }, (value: unknown): value is {deleted: string} => !!value && typeof value === 'object' && typeof (value as {deleted?: unknown}).deleted === 'string'),
+      body: JSON.stringify({ name, upload_id: uploadId, source_filename: sourceFilename }),
+      validate: isProjectSummary,
+    }),
+  deleteProject: (projectId: string) => apiJson(`/projects/${encodeURIComponent(projectId)}`, { method: 'DELETE', validate: (value: unknown): value is {deleted: string} => !!value && typeof value === 'object' && typeof (value as {deleted?: unknown}).deleted === 'string' }),
   getCapabilities: () => request("/capabilities", isCapabilities),
   listProjects: (cursor?: string) =>
     request(
@@ -256,40 +228,30 @@ export const studioApi = {
   audioUrl: (projectId: string, vocal?: string | null, source?: string) =>
     `${API_ROOT}/projects/${encodeURIComponent(projectId)}/audio?source=${encodeURIComponent(source??'')}${vocal ? `&vocal=${encodeURIComponent(vocal)}` : ""}`,
   getPcmWindow: async (projectId: string, startMs: number, endMs: number, signal?: AbortSignal, vocal?: string | null) => {
-    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/pcm?start_ms=${startMs}&end_ms=${endMs}${vocal ? `&vocal=${encodeURIComponent(vocal)}` : ""}`, { credentials: 'include', cache:'no-store', signal });
-    if (!response.ok) throw await readApiError(response);
+    const response = await apiFetch(`/projects/${encodeURIComponent(projectId)}/pcm?start_ms=${startMs}&end_ms=${endMs}${vocal ? `&vocal=${encodeURIComponent(vocal)}` : ""}`, { cache: 'no-store', signal });
     const rate = Number(response.headers.get('x-sample-rate'));
     const channels = Number(response.headers.get('x-channels'));
     if (!Number.isSafeInteger(rate) || rate < 1000 || !Number.isSafeInteger(channels) || channels < 1 || channels > 8) throw new MessageError(message('http.pcmHeaders'));
     return { pcm: await response.arrayBuffer(), rate, channels };
   },
-};
-
-export type StudioPaths = paths;
-
-export type SaveDocumentResult = components["schemas"]["DocumentSaveResponse"];
-export type JobResult = components["schemas"]["JobResult"];
-const s4 = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
-  const response = await fetch(`${API_ROOT}${path}`, { credentials: 'include', ...init, headers: requestHeaders(init.headers) });
-  if (!response.ok) throw await readApiError(response);
-  return (await response.json()) as T;
-};
-
-export const studioS4 = {
   getDocumentEnvelope: async (projectId: string): Promise<RichDocumentEnvelope> => {
-    const response = await fetch(`${API_ROOT}/projects/${encodeURIComponent(projectId)}/document`, { credentials: "include", headers: requestHeaders() });
-    if (!response.ok) throw await readApiError(response);
+    const response = await apiFetch(`/projects/${encodeURIComponent(projectId)}/document`);
     const body: unknown = await response.json();
     if (!isDocumentEnvelope(body) || !body.revision) throw new ApiError(502, { code: "invalid_response", message: "文档响应无有效 revision", request_id: "", retryable: false });
     return { ...body, source_asset_id: body.source_asset_id, revision: body.revision, etag: response.headers.get("ETag") ?? undefined };
   },
-  saveRichDocument: async (projectId: string, document: ProjectSnapshot, baseRevision: string, operationId: string, seq: number, etag?: string) => { const result = await s4<unknown>(`/projects/${encodeURIComponent(projectId)}/document`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag ?? `"${baseRevision}"`, "Idempotency-Key": operationId }, body: JSON.stringify({ schema_version: "studio-document-v9", project_id: projectId, revision: baseRevision, client_seq: seq, document }) }); if (!result || typeof result !== 'object' || !('revision' in result) || typeof result.revision !== 'string' || !result.revision) throw new ApiError(502, { code: "invalid_response", message: "保存响应无有效 revision", request_id: "", retryable: false }); return { revision: result.revision, etag: `"${result.revision}"` }; },
+  saveRichDocument: async (projectId: string, document: ProjectSnapshot, baseRevision: string, operationId: string, seq: number, etag?: string) => {
+    const result = await apiJson<unknown>(`/projects/${encodeURIComponent(projectId)}/document`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag ?? `"${baseRevision}"`, "Idempotency-Key": operationId }, body: JSON.stringify({ schema_version: "studio-document-v9", project_id: projectId, revision: baseRevision, client_seq: seq, document }) });
+    if (!result || typeof result !== 'object' || !('revision' in result) || typeof result.revision !== 'string' || !result.revision) throw new ApiError(502, { code: "invalid_response", message: "保存响应无有效 revision", request_id: "", retryable: false });
+    return { revision: result.revision, etag: `"${result.revision}"` };
+  },
 };
 
+export type JobResult = components["schemas"]["JobResult"];
 export type VocalResult = components['schemas']['VocalResult'];
 export const vocalApi = {
-  offset: (pid:string, asset_id:string, upload_id:string, signal?:AbortSignal) => s4<{offset_ms:number|null}>(`/projects/${encodeURIComponent(pid)}/vocal-offset`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({asset_id,upload_id}),signal}),
-  jobResult: (id: string) => s4<{kind: 'vocal'; analysis_id: string}>(`/jobs/${encodeURIComponent(id)}/result`),
-  list: (pid: string) => s4<components['schemas']['VocalResults']>(`/projects/${encodeURIComponent(pid)}/vocals`),
-  energy: (pid: string, rid: string, start: number, end: number, signal?: AbortSignal) => s4<components['schemas']['VocalEnergyWindow']>(`/projects/${encodeURIComponent(pid)}/vocals/${encodeURIComponent(rid)}/energy?start_ms=${start}&end_ms=${end}&buckets=1000`, { signal }),
+  offset: (pid:string, asset_id:string, upload_id:string, signal?:AbortSignal) => apiJson<{offset_ms:number|null}>(`/projects/${encodeURIComponent(pid)}/vocal-offset`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({asset_id,upload_id}),signal}),
+  jobResult: (id: string) => apiJson<{kind: 'vocal'; analysis_id: string}>(`/jobs/${encodeURIComponent(id)}/result`),
+  list: (pid: string) => apiJson<components['schemas']['VocalResults']>(`/projects/${encodeURIComponent(pid)}/vocals`),
+  energy: (pid: string, rid: string, start: number, end: number, signal?: AbortSignal) => apiJson<components['schemas']['VocalEnergyWindow']>(`/projects/${encodeURIComponent(pid)}/vocals/${encodeURIComponent(rid)}/energy?start_ms=${start}&end_ms=${end}&buckets=1000`, { signal }),
 };

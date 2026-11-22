@@ -2,10 +2,12 @@ import { createProjectDocument, type ProjectSnapshot } from '../domain/project-d
 import { serializeProject } from '../adapters/project-codec';
 import { parseLyricTtml } from '../adapters/ttml/lyric-codec';
 const snapshot = (xml: string) => serializeProject(createProjectDocument(parseLyricTtml(xml)));
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { StrictMode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProjectDocument } from "./useProjectDocument";
+
+afterEach(cleanup);
 
 const saveMock = vi.fn();
 const recovery = {

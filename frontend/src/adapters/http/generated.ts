@@ -292,54 +292,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/projects/{projectId}/publish": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["publishProject"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects/{projectId}/exports": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listExports"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects/{projectId}/exports/{jobId}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["downloadExport"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/projects/{pid}/vocals": {
         parameters: {
             query?: never;
@@ -391,7 +343,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/reading/analyze": {
+    "/reading/analyze": {
         parameters: {
             query?: never;
             header?: never;
@@ -628,7 +580,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/reading/dictionaries": {
+    "/reading/dictionaries": {
         parameters: {
             query?: never;
             header?: never;
@@ -645,7 +597,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/reading/dictionaries/import": {
+    "/reading/dictionaries/import": {
         parameters: {
             query?: never;
             header?: never;
@@ -662,7 +614,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/reading/dictionaries/{ident}": {
+    "/reading/dictionaries/{ident}": {
         parameters: {
             query?: never;
             header?: never;
@@ -679,7 +631,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/reading/dictionaries/{ident}/analyze": {
+    "/reading/dictionaries/{ident}/analyze": {
         parameters: {
             query?: never;
             header?: never;
@@ -871,7 +823,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/reading/particles": {
+    "/reading/particles": {
         parameters: {
             query?: never;
             header?: never;
@@ -1012,6 +964,22 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectId}/packaging/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["downloadPackagedAudio"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1175,57 +1143,6 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        /** PublishRequest */
-        PublishRequest: {
-            /** Revision */
-            revision: string;
-            /** Asset Id */
-            asset_id: string;
-            /**
-             * Lrc Kind
-             * @enum {string}
-             */
-            lrc_kind: "none" | "lrc" | "elrc";
-            /** Lrc Text */
-            lrc_text: string | null;
-            /** Target Track Id */
-            target_track_id?: number | null;
-        };
-        Export: {
-            /** @enum {unknown} */
-            lrc_kind?: "lrc" | "elrc";
-            target_track_id?: number | null;
-            id: string;
-            revision: string;
-            asset_id: string;
-            status: string;
-            created_at: string;
-            stale: boolean;
-            report: components["schemas"]["PublishReport"] | null;
-            download_url: string | null;
-            error: Record<string, never> | null;
-            asset_filename?: string | null;
-            filename?: string | null;
-            container?: string | null;
-            format_label?: string | null;
-            track_id?: number | null;
-        };
-        ExportList: {
-            /** @constant */
-            schema_version: "studio-export-list-v1";
-            items: components["schemas"]["Export"][];
-        };
-        PublishReport: {
-            passed: boolean;
-            audio_streams: number;
-            audio_preserved: boolean;
-            metadata_preserved: boolean;
-            subtitle_handler?: string;
-            subtitle_codec: string | null;
-            sample_count?: number;
-            lyrics_preserved: boolean;
-            track_id: number | null;
-        };
         JobResult: {
             /** @constant */
             schema_version: "studio-job-result-v1";
@@ -1236,7 +1153,7 @@ export interface components {
                 revision: string;
             };
             /** @enum {unknown} */
-            kind?: "alignment" | "vocal" | "publish";
+            kind?: "alignment" | "vocal";
             alignment?: components["schemas"]["AlignmentResult"];
             mapping?: {
                 unit_id: string;
@@ -1464,37 +1381,6 @@ export interface components {
             inputs: {
                 [key: string]: unknown;
             }[];
-        };
-        AlignmentStart: {
-            revision: string;
-            /** @default false */
-            use_hints: boolean;
-            /** @default false */
-            line_blank: boolean;
-            /** @default false */
-            rest_blank: boolean;
-            /** @default false */
-            rest_token: boolean;
-            /**
-             * @description Studio merge policy; never an acoustic parameter
-             * @default false
-             */
-            clear_unmatched: boolean;
-            /**
-             * @description Studio result policy; excluded from acoustic and decoding configuration
-             * @default false
-             */
-            merge_short_gaps: boolean;
-            /**
-             * @description Strict gap threshold in original-axis milliseconds; normalized to 500 when disabled
-             * @default 500
-             */
-            gap_threshold_ms: number;
-            smart_extend: boolean;
-            latin_normalize: boolean;
-            strip_tone_digits: boolean;
-            model_preview: string;
-            convert_particles: boolean;
         };
         AlignmentResult: {
             /** @constant */
@@ -2552,83 +2438,6 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
-    publishProject: {
-        parameters: {
-            query?: never;
-            header?: {
-                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PublishRequest"];
-            };
-        };
-        responses: {
-            /** @description Queued publication */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Job"];
-                };
-            };
-            409: components["responses"]["Error"];
-            default: components["responses"]["Error"];
-        };
-    };
-    listExports: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Publication exports */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExportList"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    downloadExport: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: components["parameters"]["ProjectId"];
-                jobId: components["parameters"]["JobId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description STPP file */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            409: components["responses"]["Error"];
-            410: components["responses"]["Error"];
-            default: components["responses"]["Error"];
-        };
-    };
     results_api_v1_projects__pid__vocals_get: {
         parameters: {
             query?: never;
@@ -3312,6 +3121,42 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    downloadPackagedAudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    revision: string;
+                    asset_id: string;
+                    /** @enum {string} */
+                    stpp_action: "none" | "add" | "overwrite";
+                    target_track_id?: number | null;
+                    /** @enum {string} */
+                    lrc_kind: "none" | "lrc" | "elrc";
+                    lrc_text?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Packaged audio stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
         };
     };
 }

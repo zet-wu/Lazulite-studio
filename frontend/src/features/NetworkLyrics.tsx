@@ -1,10 +1,10 @@
 import { useMessageText } from '../shared/useMessageText';
-import { message as describeMessage, MessageError, errorMessage, isMessage, type Message } from '../domain/messages';
+import { message as describeMessage, errorMessage } from '../domain/messages';
 import { i18n } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../shared/Controls';
 import { LyricCandidate } from './LyricCandidate';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { type Source } from '../adapters/http/lyric-sources';
 import type { AcquisitionStore, CandidateRecord } from '../acquisition-store';
 import type { useSearchConditions } from './useSearchConditions';
@@ -33,7 +33,7 @@ export function NetworkLyrics({ store, searchConditions, source, document, apply
  return <>
  <form className={styles.searchFields} onSubmit={e=>{e.preventDefault();store.search(searchConditions.values);setMessage('');}}>
  {(['title','artist','album'] as const).map((field,i)=><label key={field}>{[t('search.title'),t('search.artist'),t('search.album')][i]}<input aria-label={[t('search.titleInput'),t('search.artistInput'),t('search.albumInput')][i]} maxLength={2000} disabled={!searchConditions.ready} value={searchConditions.values[field]} onChange={e=>searchConditions.change(field,e.target.value)} /></label>)}
- <button type="button" data-role="secondary" aria-label={t('search.fillMetadata')} style={{minWidth:'10em'}} title={searchConditions.hasSource?t('search.replaceConditions'):t('alignment.uploadRequired')} data-tooltip={searchConditions.hasSource?t('search.replaceConditions'):t('alignment.uploadRequired')} disabled={!searchConditions.ready||!searchConditions.hasSource||searchConditions.readingMetadata} aria-busy={searchConditions.readingMetadata} onClick={()=>void searchConditions.fillMetadata()}>{searchConditions.readingMetadata?t('common.reading'):t('search.fillMetadata')}</button>
+ <button type="button" data-role="secondary" aria-label={t('search.fillMetadata')} style={{minWidth:'10em'}} title={searchConditions.hasSource?t('search.replaceConditions'):t('alignment.uploadRequired')} disabled={!searchConditions.ready||!searchConditions.hasSource||searchConditions.readingMetadata} aria-busy={searchConditions.readingMetadata} onClick={()=>void searchConditions.fillMetadata()}>{searchConditions.readingMetadata?t('common.reading'):t('search.fillMetadata')}</button>
  <IconButton icon="search" label={t('search.submit')} type="submit" data-role="primary" disabled={!searchConditions.ready || !searchConditions.values.title.trim()}/></form>
  {searchConditions.metadataError&&<p role="alert">{searchConditions.metadataError}</p>}
  {searchConditions.error && <p role="alert">{searchConditions.error} <IconButton icon="refresh" label={t('search.retryConditions')} data-role="secondary" onClick={()=>void searchConditions.retry()}/></p>}

@@ -1,6 +1,5 @@
 import { useMessageText } from '../../shared/useMessageText';
 import { message } from '../../domain/messages';
-import { i18n } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../../shared/Icon';
 import { useRef, useState } from 'react';
@@ -40,5 +39,3 @@ export function InlineAdd({ label, commit }: { label: string; commit: (text: str
   return active ? <InlineDraft label={label} commit={commit} close={() => setActive(false)} />
     : <span className={styles.inlineAdd} onClick={event => event.stopPropagation()}><button data-role="inline" className="icon-button" title={label} data-tooltip={label} aria-label={label} onClick={() => setActive(true)}><Icon name="add"/></button></span>;
 }
-
-const t=i18n.t.bind(i18n);

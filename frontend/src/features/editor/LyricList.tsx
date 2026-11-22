@@ -89,7 +89,9 @@ function VirtualLyricList(props: ListProps) {
   const focusedIndex = lines.findIndex(line => line.id === focusedLineId);
   const layoutKey = lines.map(line => props.lineVersion?.(line) ?? '').join('\n');
   const cached = props.memory?.measured;
-  const font = getComputedStyle(window.document.documentElement).font;
+  const fontRef = useRef<string | null>(null);
+  if (fontRef.current === null) fontRef.current = getComputedStyle(window.document.documentElement).font;
+  const font = fontRef.current;
   const virtualizer = useVirtualizer({
     initialMeasurementsCache: cached?.lines === lines && cached.key === layoutKey && cached.viewport === innerWidth && cached.font === font ? cached.items : undefined,
     count: lines.length,
@@ -112,11 +114,11 @@ function VirtualLyricList(props: ListProps) {
     if (cached && cached.width !== width) virtualizer.measure();
     const resize = new ResizeObserver(() => { if (node.clientWidth !== width) { width = node.clientWidth; virtualizer.measure(); } });
     resize.observe(node);
-    const fonts = () => virtualizer.measure();
+    const fonts = () => { fontRef.current = getComputedStyle(window.document.documentElement).font; virtualizer.measure(); };
     window.document.fonts.addEventListener('loadingdone', fonts);
     return () => {
       resize.disconnect(); window.document.fonts.removeEventListener('loadingdone', fonts);
-      if (props.memory) props.memory.measured = { ...latestLayout.current, width, viewport: innerWidth, font: getComputedStyle(window.document.documentElement).font, items: virtualizer.takeSnapshot() };
+      if (props.memory) props.memory.measured = { ...latestLayout.current, width, viewport: innerWidth, font: fontRef.current ?? getComputedStyle(window.document.documentElement).font, items: virtualizer.takeSnapshot() };
     };
   }, []);
   // The stable virtualizer instance owns the coarse mount; smooth scrolling uses measured DOM.

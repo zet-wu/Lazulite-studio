@@ -8,20 +8,21 @@ export type AmllSettings = Record<AmllRule, boolean>;
 export const createAmllSettings = (): AmllSettings => ({ simplified: false, noMultipleBackgrounds: true, noChorus: false, noWordAgents: true, noIndependentBackground: false });
 export const amllDependencies: AmllRule[] = ['noChorus', 'noWordAgents', 'noIndependentBackground'];
 export const sameAgents = (a: string[], b: string[]) => a.length === b.length && a.every(id => b.includes(id));
-export const lineAgents = (doc: LyricDocument, line: LyricLine): string[] => line.agentRefs.length ? line.agentRefs : line.backgroundOf ? doc.lines.find(item => item.id === line.backgroundOf)!.agentRefs : [];
-export const wordAgents = (doc: LyricDocument, line: LyricLine, word: LyricWord) => word.agentRefs ?? lineAgents(doc, line);
+export const lineAgents = (doc: LyricDocument, line: LyricLine, byId?: Map<string, LyricLine>): string[] => line.agentRefs.length ? line.agentRefs : line.backgroundOf ? (byId ? byId.get(line.backgroundOf) : doc.lines.find(item => item.id === line.backgroundOf))!.agentRefs : [];
+export const wordAgents = (doc: LyricDocument, line: LyricLine, word: LyricWord, byId?: Map<string, LyricLine>) => word.agentRefs ?? lineAgents(doc, line, byId);
 export type AmllIssue = { id: string; lineId?: string; wordId?: string; agentId?: string; message: string; detail?:Message };
 export type AmllResults = Record<AmllRule, AmllIssue[]>;
 export function checkAmll(doc: LyricDocument): AmllResults {
   const result: AmllResults = { simplified: [], noMultipleBackgrounds: [], noChorus: [], noWordAgents: [], noIndependentBackground: [] };
   for (const agent of doc.agents) if (!['v1','v2'].includes(agent.id) || agent.type !== 'person' || agent.name !== null || agent.actorRef) result.simplified.push({id:agent.id,agentId:agent.id,message:'自定义歌手不符合简化歌手模型',detail:message('amll.customSinger')});
+  const byId = new Map(doc.lines.map(line => [line.id, line]));
   const backgrounds = new Map<string, LyricLine[]>();
   for (const line of doc.lines) {
     const base = { id:line.id, lineId:line.id, message:lineText(line) };
     if (line.backgroundOf) { const group=backgrounds.get(line.backgroundOf)??[]; group.push(line);backgrounds.set(line.backgroundOf,group); }
     if (line.agentRefs.length>1) result.noChorus.push(base);
-    const parent = line.backgroundOf ? doc.lines.find(item=>item.id===line.backgroundOf) : null;
-    if (parent && (!sameAgents(lineAgents(doc,line),parent.agentRefs) || line.words.some(word=>!sameAgents(wordAgents(doc,line,word),parent.agentRefs)))) result.noIndependentBackground.push(base);
+    const parent = line.backgroundOf ? byId.get(line.backgroundOf) ?? null : null;
+    if (parent && (!sameAgents(lineAgents(doc,line,byId),parent.agentRefs) || line.words.some(word=>!sameAgents(wordAgents(doc,line,word,byId),parent.agentRefs)))) result.noIndependentBackground.push(base);
     for (const word of line.words) {
       const item = {id:word.id,lineId:line.id,wordId:word.id,message:word.text};
       if (word.agentRefs?.length) result.noWordAgents.push(item);
@@ -60,8 +61,16 @@ export function displayLines(doc: LyricDocument, order: string[]) {
   return [...order.flatMap(id=>byId.has(id)?[byId.get(id)!]:[]),...doc.lines.filter(line=>!included.has(line.id))];
 }
 export function groupDisplayLines(doc: LyricDocument, before: string[]) {
+  const beforeSet = new Set(before);
+  const bgByParent = new Map<string, LyricLine[]>();
+  for (const item of doc.lines) {
+    if (!item.backgroundOf) continue;
+    let group = bgByParent.get(item.backgroundOf);
+    if (!group) { group = []; bgByParent.set(item.backgroundOf, group); }
+    group.push(item);
+  }
   return doc.lines.filter(line=>!line.backgroundOf).flatMap(line=>{
-    const bg=doc.lines.filter(item=>item.backgroundOf===line.id);
-    return [...bg.filter(item=>before.includes(item.id)),line,...bg.filter(item=>!before.includes(item.id))];
+    const bg = bgByParent.get(line.id) ?? [];
+    return [...bg.filter(item=>beforeSet.has(item.id)),line,...bg.filter(item=>!beforeSet.has(item.id))];
   });
 }

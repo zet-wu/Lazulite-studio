@@ -18,7 +18,7 @@ export const session: Session = {
 export const capabilities: Capabilities = {
   schema_version: "studio-capabilities-v1",
   items: [
-    { id: "project.read", enabled: true, reason: null },
+    { id: "assets", enabled: true, reason: null },
     { id: "document.edit", enabled: true, reason: null },
     { id: "job.run", enabled: true, reason: null },
     { id: "job.alignment", enabled: false, reason: "演示环境未加载对齐模型" },
@@ -56,7 +56,7 @@ export const jobs: JobList = {
       schema_version: "studio-job-v1",
       id: "sample-job",
       project_id: "sample-project",
-      kind: "align",
+      kind: "alignment",
       status: "succeeded",
       request: { revision: "sample-r1", asset_id: "sample-asset" },
       result_available: true,

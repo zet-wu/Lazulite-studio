@@ -1,4 +1,4 @@
-import {message,MessageError,type Message} from './messages';
+import {message,MessageError} from './messages';
 import { toHiragana } from 'wanakana';
 export type ReadingRange = { line_id: string; base_start: number; base_end: number; base: string; reading: string };
 import { lineText, rubyReading, type LyricDocument, type LyricWord } from './lyric-document';

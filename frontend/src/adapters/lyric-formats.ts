@@ -15,7 +15,6 @@ export const exportFormats = [
   ['eslrc', 'format.eslrc'], ['qrc', 'QRC'], ['yrc', 'YRC'], ['lys', 'LYS'], ['ass', 'ASS'],
 ] as const;
 export type ExportFormat = typeof exportFormats[number][0];
-export type ValidationFilter = ExportFormat | 'all' | 'nicokara' | 'sug';
 const parseTimed = { elrc: parseLrc, lrc: parseLrc, eslrc: parseEslrc, qrc: parseQrc, yrc: parseYrc, lys: parseLys };
 const milliseconds = (ms: number): number => {
   if (!Number.isFinite(ms) || ms < 0) throw new MessageError(message('parse.timeInvalid'));

@@ -128,18 +128,17 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
   }, [durationMs, retry]);
 
   useEffect(() => {
-    wanted.current = visible ? Array.from({ length: Math.max(0, (lastTile - firstTile) / SPECTRUM_WINDOW_MS) }, (_, index) => firstTile + index * SPECTRUM_WINDOW_MS).filter(first => first < durationMs) : [];
-    for (const first of failed.current.keys()) if (!wanted.current.includes(first)) failed.current.delete(first);
-    const cancelWorker = [...pending.current].some(([first, request]) => request.posted && !wanted.current.includes(first));
-    if (cancelWorker) {
-      // Stop obsolete computation too, so rapid panning cannot build an unbounded worker queue.
-      worker.current?.terminate(); worker.current = null;
-      for (const request of pending.current.values()) request.controller.abort();
-      pending.current.clear(); setRetry(value => value + 1);
-    } else {
-      for (const [first, request] of pending.current) if (!wanted.current.includes(first)) { request.controller.abort(); pending.current.delete(first); }
-      pump.current();
+    const nextWanted = visible ? Array.from({ length: Math.max(0, (lastTile - firstTile) / SPECTRUM_WINDOW_MS) }, (_, index) => firstTile + index * SPECTRUM_WINDOW_MS).filter(first => first < durationMs) : [];
+    wanted.current = nextWanted;
+    const wantedSet = new Set(nextWanted);
+    for (const first of failed.current.keys()) if (!wantedSet.has(first)) failed.current.delete(first);
+    for (const [first, request] of pending.current) {
+      if (!wantedSet.has(first)) {
+        request.controller.abort();
+        pending.current.delete(first);
+      }
     }
+    pump.current();
     changed();
   }, [durationMs, firstTile, lastTile, visible, retry]);
 

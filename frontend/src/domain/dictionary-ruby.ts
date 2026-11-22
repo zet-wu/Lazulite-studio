@@ -1,4 +1,4 @@
-import {message,MessageError,type Message} from './messages';
+import {message,MessageError} from './messages';
 import { lineText, type LyricDocument, type LyricWord, type RubyUnit } from './lyric-document';
 import { planWordMerge, type LyricCommand } from './lyric-commands';
 

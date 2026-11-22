@@ -1,15 +1,11 @@
-import { readApiError, requestHeaders } from './client';
+import { apiFetch } from './client';
 
 /** A page retains its project's decoded media across pause and focus changes. */
 export function retainProjectMedia(projectId: string, onError: (error: unknown) => void) {
   let pageId = crypto.randomUUID();
   let active = true;
-  const send = async (method: 'PUT' | 'DELETE') => {
-    const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/media-users/${pageId}`, {
-      method, credentials: 'include', headers: requestHeaders(), keepalive: true,
-    });
-    if (!response.ok) throw await readApiError(response);
-  };
+  const send = (method: 'PUT' | 'DELETE') =>
+    apiFetch(`/projects/${encodeURIComponent(projectId)}/media-users/${pageId}`, { method, keepalive: true });
   const renew = () => { if (active) void send('PUT').catch(onError); };
   const leave = () => { if (active) { active = false; void send('DELETE').catch(onError); } };
   const resume = () => { if (!active) { pageId = crypto.randomUUID(); active = true; renew(); } };

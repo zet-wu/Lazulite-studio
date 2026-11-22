@@ -209,7 +209,7 @@ export function useObjectDrag(document: LyricDocument, root: RefObject<HTMLDivEl
     const key = slot ? `${slot.lineId}:${slot.wordId}:${slot.afterId}:${current.copy}` : '';
     if (key !== current.key) {
       current.key = key; current.slot = slot; current.preview = null;
-      current.ghost!.dataset.dropError = '此处无法放置';
+      current.ghost!.dataset.dropError = formatMessage(message('editing.dropInvalid'));
       if (slot) {
         try {
           const result = dragCommand(latest.current.document, current.source, slot, current.copy, latest.current.editing);

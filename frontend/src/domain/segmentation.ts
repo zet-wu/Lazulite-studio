@@ -1,5 +1,5 @@
 import { message, MessageError } from './messages';
-import { createProjectEditing, emptyBeatCount, type ProjectEditing } from './project-editing';
+import { createProjectEditing, emptyBeatCount } from './project-editing';
 import { createWord, type LyricDocument, type LyricWord } from './lyric-document';
 import { isGraphemeBoundary } from './text-boundaries';
 

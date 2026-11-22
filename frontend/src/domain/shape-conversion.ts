@@ -1,4 +1,4 @@
-import {message,MessageError,type Message} from './messages';
+import {message,MessageError} from './messages';
 import { lineText, type LyricDocument } from './lyric-document';
 import type { LyricCommand } from './lyric-commands';
 

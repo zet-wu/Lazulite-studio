@@ -6,7 +6,7 @@ import type { ProjectDocument } from '../domain/project-document';
 import { createKaraoke, outputId } from '../domain/karaoke';
 import { exportFormats, exportLyricFile, type ExportFormat } from './lyric-formats';
 import { prepareAss, renderAss } from './ass';
-import { karaokeOutputs, safeFilename } from './karaoke-output';
+import { safeFilename } from './karaoke-output';
 import { prepareNicokara, nicokaraArchiveFiles } from './nicokara';
 import { prepareSug } from './sug';
 import { DocumentOutputError, uniqueOutputIssues, type OutputIssue } from './output-validation';

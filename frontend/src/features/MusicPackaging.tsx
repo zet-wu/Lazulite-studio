@@ -14,7 +14,7 @@ import { uniqueOutputIssues, DocumentOutputError, type OutputIssue } from '../ad
 import { publishingApi } from '../adapters/http/publishing';
 import { useProjectEditing } from './editor/ProjectEditingContext';
 import { usePreference } from './editor/use-preference';
-import { downloadKaraoke } from './KaraokeTools';
+import { downloadBlob } from '../shared/download';
 import styles from './acquisition.module.css';
 
 type PackagingLrcKind = 'none' | 'lrc' | 'elrc';
@@ -148,7 +148,7 @@ export function MusicPackaging({
         lrc_kind: lrcKind,
         lrc_text: lrcText,
       });
-      downloadKaraoke(blob, filename, blob.type || 'application/octet-stream');
+      downloadBlob(blob, filename, blob.type || 'application/octet-stream');
     } catch (cause) {
       if (cause instanceof DocumentOutputError) onIssues(uniqueOutputIssues(cause.issues));
       else setError(errorMessage(cause));
