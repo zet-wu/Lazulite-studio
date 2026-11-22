@@ -506,7 +506,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     const current = loopDrag.current;
     if (!current || current.pointerId !== event.pointerId || loop.aMs === null || loop.bMs === null) return;
     event.preventDefault(); event.stopPropagation();
-    const value = Math.round(startMs + (event.clientX - current.left) / current.width * span * 1e3);
+    const value = Math.round(viewportRef.current.start * 1000 + (event.clientX - current.left) / current.width * span * 1e3);
     setLoop((state) => current.side === 'a'
       ? { ...state, aMs: Math.max(0, Math.min(state.bMs! - 1, value)) }
       : { ...state, bMs: Math.min(durationMs, Math.max(state.aMs! + 1, value)) });
@@ -581,11 +581,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     }
   };
   const beatMs = 60_000 / bpm;
-  const firstBeat = Math.ceil(startMs / beatMs);
-  const beatCount = bpm > 0 && endMs > startMs ? Math.max(0, Math.min(500, Math.floor((endMs - firstBeat * beatMs) / beatMs) + 1)) : 0;
+  const firstBeat = Math.ceil(Math.max(0,drawStartMs) / beatMs);
+  const beatCount = bpm > 0 && endMs > startMs ? Math.max(0, Math.min(500, Math.floor((drawEndMs - firstBeat * beatMs) / beatMs) + 1)) : 0;
   const maxTicks = Math.max(2, Math.floor(width / 82));
   const tickStep = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((value) => span / value <= maxTicks) ?? 600;
-  const ticks = span > 0 ? Array.from({ length: Math.min(maxTicks + 1, Math.max(0, Math.floor(end / tickStep) - Math.ceil(start / tickStep) + 1)) }, (_, index) => (Math.ceil(start / tickStep) + index) * tickStep) : [];
+  const ticks = span > 0 ? Array.from({ length: Math.min(Math.ceil((maxTicks + 1)*(paddingMs?1.5:1)), Math.max(0, Math.floor(Math.min(duration,drawEndMs/1000) / tickStep) - Math.ceil(Math.max(0,drawStartMs/1000) / tickStep) + 1)) }, (_, index) => (Math.ceil(Math.max(0,drawStartMs/1000) / tickStep) + index) * tickStep) : [];
   const viewportTools = (<>
         <button data-role="secondary"
           disabled={disabled}

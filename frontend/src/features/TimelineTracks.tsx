@@ -47,6 +47,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     observer.observe(lane); return () => observer.disconnect();
   }, [visible.line, visible.word, visible.ruby]);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [stagingTarget,setStagingTarget]=useState<TimelineTarget|null>(null);
   const { selection, setSelection, expanded, commands, area, focusRequest, requestFocus } = useEditorSelection()!;
   const [autoExpand] = useTimelineAutoExpand();
   const activeLineIds = autoExpand === 'always' || autoExpand === 'follow' && follow
@@ -56,7 +57,8 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
   const [focusedLineId, setFocusedLineId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; target: HTMLElement } | null>(null);
   const heldTargetIds = [focusedTargetId, drag?.target ? targetId(drag.target) : null, menu?.target.dataset.timelineKey];
-  const heldLineIds = [focusedLineId, drag?.target?.lineId, menu?.target.closest<HTMLElement>('[data-expanded-line]')?.dataset.expandedLine];
+  const interactionLineIds = [focusedLineId, drag?.target?.lineId, menu?.target.closest<HTMLElement>('[data-expanded-line]')?.dataset.expandedLine];
+  const heldLineIds = [...interactionLineIds,stagingTarget?.lineId];
   const projection = useMemo(() => projectTimeline(document, durationMs), [document, durationMs]);
   const intersects = (begin: number | null, end: number | null) => timed(begin, end) && end! >= startMs && begin! <= endMs;
   const buffered = (begin: number | null, end: number | null) => timed(begin,end) && end! >= startMs-paddingMs && begin! <= endMs+paddingMs;
@@ -75,7 +77,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       const target = event.target as HTMLElement;
       if (target.closest('[role="menu"]')) return;
       setFocusedTargetId(tracksRef.current?.contains(target) ? target.closest<HTMLElement>('[data-timeline-key]')?.dataset.timelineKey ?? null : null);
-      setFocusedLineId(tracksRef.current?.contains(target) ? target.closest<HTMLElement>('[data-expanded-line]')?.dataset.expandedLine ?? null : null);
+      setFocusedLineId(tracksRef.current?.contains(target) ? target.closest<HTMLElement>('[data-expanded-line]')?.dataset.expandedLine ?? target.closest<HTMLElement>('[data-timeline-key]')?.dataset.lineId ?? null : null);
     };
     window.addEventListener('focusin', focus);
     return () => window.removeEventListener('focusin', focus);
@@ -107,7 +109,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     return <span role="button" tabIndex={0} className={previous?.ids.includes(content.id)?styles.trackSelected:undefined} title={content.text} aria-pressed={!!previous?.ids.includes(content.id)} data-line-id={content.lineId} data-translation-id={attachment?content.id:undefined} data-romanization-content-id={!attachment?content.id:undefined}
       onClick={event=>chooseContent(event.shiftKey,event.ctrlKey||event.metaKey)}
       onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();chooseContent(event.shiftKey,event.ctrlKey||event.metaKey);}if(event.key==='ContextMenu'||event.shiftKey&&event.key==='F10'){event.preventDefault();event.stopPropagation();const rect=event.currentTarget.getBoundingClientRect();commands.current?.openContext(event.currentTarget,rect.left,rect.bottom);}}}
-      onContextMenu={event=>{event.preventDefault();event.stopPropagation();commands.current?.openContext(event.currentTarget,event.clientX,event.clientY);}}>{content.text}</span>;
+      onContextMenu={event=>{event.preventDefault();event.stopPropagation();focusObject(event.currentTarget);commands.current?.openContext(event.currentTarget,event.clientX,event.clientY);}}>{content.text}</span>;
   };
   const dragRef = useRef<Drag | null>(null);
   const { publish } = useContext(TimelineIndicatorContext);
@@ -135,7 +137,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
   const ordinalById = new Map(mainLines.filter(item => !item.backgroundOf).map((item, index) => [item.id, index + 1]));
   const line = displayed.lines.find((item) => item.id === selectedLineId);
   const overview = mainLines.filter(item => buffered(item.beginMs, item.endMs) || timed(item.beginMs,item.endMs) && heldTargetIds.includes(item.id));
-  const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => buffered(item.beginMs, item.endMs) || timed(item.beginMs,item.endMs) && heldTargetIds.includes(item.id)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs, focusedTargetId, menu]);
+  const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => buffered(item.beginMs, item.endMs) || timed(item.beginMs,item.endMs) && heldTargetIds.includes(item.id)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs, focusedTargetId, menu, paddingMs]);
   const frozenLayout = useRef(currentLayout);
   const draggingTime = drag && !['pan', 'select'].includes(drag.side);
   if (!draggingTime) frozenLayout.current = currentLayout;
@@ -294,7 +296,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       style={{ transform: narrow && beginMs === endMs && beginMs === propsEndMs ? 'translateX(-100%)' : undefined, left: pct(clippedBegin), width: `${Math.max(0, right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
       onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
       onFocus={event => { if (!preserveSelectionOnFocus(selection, event.currentTarget) && !dragRef.current) choose(target); }}
-      onContextMenu={event => { event.preventDefault(); if(locked)return; event.stopPropagation(); if(!commands.current?.openContext(event.currentTarget,event.clientX,event.clientY)){choose(target); setMenu({ x: event.clientX, y: event.clientY, target: event.currentTarget });} }}
+      onContextMenu={event => { event.preventDefault(); if(locked)return; event.stopPropagation(); focusObject(event.currentTarget); if(!commands.current?.openContext(event.currentTarget,event.clientX,event.clientY)){choose(target); setMenu({ x: event.clientX, y: event.clientY, target: event.currentTarget });} }}
       onKeyDown={event => {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(target, event.shiftKey, event.ctrlKey || event.metaKey); }
         if (!locked && (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10')) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); if(!commands.current?.openContext(event.currentTarget,box.left,box.bottom)){choose(target);setMenu({ x: box.left, y: box.bottom, target: event.currentTarget });} }
@@ -344,7 +346,8 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       const label = `L${ordinalById.get(item.backgroundOf ?? item.id)}${item.backgroundOf ? ` ${t('outline.background')}` : ''}`;
       const renderTargets = (name: string, targets: TimelineTarget[]) => {
         const intervals = targets.filter(target => { const value = targetInterval(projection, target); return value && timed(value.beginMs,value.endMs) && (buffered(value.beginMs, value.endMs) || heldTargetIds.includes(targetId(target))); });
-        if (!intervals.length && !heldLineIds.includes(item.id)) return null;
+        const assigning=stagingTarget&&targets.some(target=>targetId(target)===targetId(stagingTarget));
+        if (!intervals.length && !assigning && !interactionLineIds.includes(item.id)) return null;
         const layout = packIntervals(intervals.map(target => { const value = targetInterval(projection, target)!; return { key: targetId(target), beginMs: value.beginMs!, endMs: value.endMs! }; }));
         return row(`${label} ${name}`, intervals.map(target => { const value = targetInterval(displayed, target)!; const text = 'text' in value ? value.text : 'reading' in value ? value.reading : ''; return bar(target, t('timeline.itemLabel',{name,text}), value.beginMs!, value.endMs!, false, layout, text); }), targets, layout.laneCount, name);
       };
@@ -362,7 +365,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     })}
     </div></div>
     {visible.gap && line && row('gaps', gaps.map(({ left, right, beginMs, endMs, overlap }) => <button data-role="secondary" disabled={locked} key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? t('timeline.removeOverlap') : t('timeline.closeGap')} onClick={() => closeGap(left, right)}>{overlap ? t('timeline.overlap') : t('timeline.gap')}</button>),[],1,t('timeline.gap'))}
-    {visible.staging !== false && <TimelineStaging clearPreview={drag?.clear} document={document} startMs={startMs} endMs={endMs} durationMs={durationMs} snap={snap} bpm={bpm} anchors={externalAnchors} locked={locked} visible={visible} host={tracksRef} apply={apply} onLocate={onLocate} onError={onError}/>}
+    {visible.staging !== false && <TimelineStaging clearPreview={drag?.clear} onDragTarget={setStagingTarget} document={document} startMs={startMs} endMs={endMs} durationMs={durationMs} snap={snap} bpm={bpm} anchors={externalAnchors} locked={locked} visible={visible} host={tracksRef} apply={apply} onLocate={onLocate} onError={onError}/>}
   </div>;
 }
 

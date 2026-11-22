@@ -23,4 +23,4 @@
   cursor: grab;
 }
 .content { position: absolute; inset: 0; transform: translateX(var(--timeline-shift, 0%)); pointer-events: none; }
-.content > * { pointer-events: auto; }
+.content > :is([role=button], button, canvas, [data-loop-handle], [data-timeline-text]) { pointer-events: auto; }

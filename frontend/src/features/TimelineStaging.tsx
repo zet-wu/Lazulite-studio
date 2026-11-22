@@ -1,3 +1,5 @@
+import {timelineViewStart} from './TimelineContent';
+import {TimelineIndicatorContext} from './TimelineIndicators';
 import {useStagingIgnoredCharacters} from '../adapters/timeline-preferences';
 import {stagingItems,stagingRows,type StagingItem,type StagingRow} from './editor/staging-layout';
 import {selectionLineId} from './editor/editing-actions';
@@ -17,22 +19,25 @@ import { useEditorSelection } from './editor/SelectionContext';
 import { lyricSnapAnchors, stableSnapAnchor, targetId, targetInterval, targetSelection } from './editor/selection-targets';
 import styles from './media.module.css';
 
-type Props={clearPreview?: boolean;document:LyricDocument;startMs:number;endMs:number;durationMs:number|null;snap:boolean;bpm:number;anchors:number[];locked?:boolean;
+type Props={onDragTarget:(target:TimelineTarget|null)=>void;clearPreview?: boolean;document:LyricDocument;startMs:number;endMs:number;durationMs:number|null;snap:boolean;bpm:number;anchors:number[];locked?:boolean;
   visible:{line:boolean;word:boolean;ruby:boolean;romanization:boolean};host:React.RefObject<HTMLDivElement|null>;
   apply:(command:LyricCommand)=>void;onLocate?:(begin:number,end:number)=>void;onError:(error:ReturnType<typeof errorMessage>|'')=>void};
 type Item=StagingItem;
 type Gesture={target:TimelineTarget;rows:StagingRow[];width:number;x:number;y:number;started:boolean;element:HTMLElement;pointer:number;candidate:LyricDocument|null;lane:HTMLElement|null};
 
-export function TimelineStaging({clearPreview,document,startMs,endMs,durationMs,snap,bpm,anchors,locked,visible,host,apply,onLocate,onError}:Props){
+export function TimelineStaging({onDragTarget,clearPreview,document,startMs,endMs,durationMs,snap,bpm,anchors,locked,visible,host,apply,onLocate,onError}:Props){
   const {t}=useTranslation();
   const editing=useProjectEditing();
+  const {paddingMs=0}=useContext(TimelineIndicatorContext);
   const [ignored]=useStagingIgnoredCharacters();
   const projectContext=useContext(KaraokeContext);
   const {selection,setSelection}=useEditorSelection()!;
   const [gesture,setGesture]=useState<Gesture|null>(null), active=useRef<Gesture|null>(null);
-  const reset=()=>{const current=active.current;active.current=null;setGesture(null);if(current?.element.hasPointerCapture(current.pointer))current.element.releasePointerCapture(current.pointer);};
+  const reset=()=>{const current=active.current;active.current=null;setGesture(null);onDragTarget(null);if(current?.element.hasPointerCapture(current.pointer))current.element.releasePointerCapture(current.pointer);};
   useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&active.current){event.preventDefault();reset();}};window.addEventListener('keydown',escape);return()=>{window.removeEventListener('keydown',escape);reset();};},[]);
-  useEffect(()=>{reset();},[document,durationMs,locked,startMs,endMs,visible.line,visible.word,visible.ruby,visible.romanization,ignored]);
+  useEffect(()=>{reset();},[document,durationMs,locked,visible.line,visible.word,visible.ruby,visible.romanization,ignored]);
+  const previousSpan=useRef(endMs-startMs);
+  useEffect(()=>{if(!paddingMs||previousSpan.current!==endMs-startMs)reset();previousSpan.current=endMs-startMs;},[startMs,endMs,paddingMs]);
   const ordinalById=new Map(document.lines.filter(line=>!line.backgroundOf).map((line,index)=>[line.id,index+1]));
   const rows=gesture?.rows??stagingRows(stagingItems(document,durationMs,ignored),selectionLineId(selection),visible);
   const label=(item:Item)=>{
@@ -46,7 +51,7 @@ export function TimelineStaging({clearPreview,document,startMs,endMs,durationMs,
     window.getSelection()?.removeAllRanges();
     if(!item.assignable||locked){choose(item);return;}
     const next:Gesture={target:item.target,rows,width:event.currentTarget.closest('[data-staging-lane]')!.getBoundingClientRect().width,x:event.clientX,y:event.clientY,started:false,element:event.currentTarget,pointer:event.pointerId,candidate:null,lane:null};
-    active.current=next;setGesture(next);event.currentTarget.setPointerCapture(event.pointerId);setSelection(targetSelection(item.target));
+    active.current=next;setGesture(next);onDragTarget(item.target);event.currentTarget.setPointerCapture(event.pointerId);setSelection(targetSelection(item.target));
   };
   const move=(event:PointerEvent<HTMLElement>)=>{
     const current=active.current;if(!current)return;
@@ -56,7 +61,7 @@ export function TimelineStaging({clearPreview,document,startMs,endMs,durationMs,
       const rect=lane.getBoundingClientRect();
       if(event.clientX>=rect.left&&event.clientX<=rect.right){
         const points=[...anchors];if(bpm>0)for(let x=Math.ceil(startMs/(60000/bpm))*(60000/bpm);x<endMs&&points.length<20000;x+=60000/bpm)points.push(Math.round(x));
-        const drop=startMs+(event.clientX-rect.left)/rect.width*(endMs-startMs);
+        const drop=timelineViewStart(lane,startMs)+(event.clientX-rect.left)/rect.width*(endMs-startMs);
         try{
           const assignment=prepareTimelineAssignment(document,current.target,drop,durationMs);
           const validate=(candidate:LyricDocument)=>{
@@ -75,7 +80,7 @@ export function TimelineStaging({clearPreview,document,startMs,endMs,durationMs,
     }
     active.current=next;setGesture(next);
   };
-  const finish=()=>{const current=active.current;reset();if(current?.started&&current.candidate&&current.lane){apply({type:'replace-document',document:current.candidate});onError('');}};
+  const finish=(event:PointerEvent<HTMLElement>)=>{if(active.current?.started)move(event);const current=active.current;reset();if(current?.started&&current.candidate&&current.lane){apply({type:'replace-document',document:current.candidate});onError('');}};
   const preview=gesture?.candidate?targetInterval(gesture.candidate,gesture.target):null;
   return <>
     <div tabIndex={-1} data-staging-drop data-clearing={clearPreview||undefined} className={styles.staging} aria-label={t('timeline.staging')}><small className={styles.stagingLabel}>{clearPreview?t('timeline.clearTimes'):t('timeline.staging')}</small><div className={styles.stagingContent}>

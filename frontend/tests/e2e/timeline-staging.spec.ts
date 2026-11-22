@@ -55,8 +55,10 @@ test('ruby and romanization assign only to corresponding lanes and remove contex
   const source=page.locator(`[data-staging-key="${id}"]`);await expect(source).toBeVisible();
   const from=(await source.boundingBox())!,wrong=(await page.locator('[data-assignment-kind="line"]').boundingBox())!;
   await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(wrong.x+wrong.width*.2,wrong.y+wrong.height/2,{steps:4});await page.mouse.up();await expect(source).toBeVisible();
+  const again=(await source.boundingBox())!;
+  await page.mouse.move(again.x+again.width/2,again.y+again.height/2);await page.mouse.down();
   const to=(await page.locator(`[data-assignment-kind="${kind}"]`).first().boundingBox())!;
-  await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(to.x+to.width*.2,to.y+to.height/2,{steps:4});await page.mouse.up();await expect(source).toHaveCount(0);
+  await page.mouse.move(to.x+to.width*.2,to.y+to.height/2,{steps:4});await page.mouse.up();await expect(source).toHaveCount(0);
  }
  await expect(page.getByLabel('暂存区',{exact:true})).toBeVisible();await expect(page.locator('[data-staging-key]')).toHaveCount(0);
 });
