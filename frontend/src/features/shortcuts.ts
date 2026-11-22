@@ -89,7 +89,7 @@ export function usePlaybackShortcut(toggle: () => void) {
       if (!matchesBinding(event, defaultBindings.play) && !matchesBinding(event, keys.play)) return;
       if (event.defaultPrevented || event.isComposing || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"], details[data-top-menu][open]')) return;
       if (event.target instanceof Element) {
-        if (event.target.closest('textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [data-top-menu]')) return;
+        if (event.target.closest('textarea, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [data-top-menu]')) return;
         const input = event.target.closest('input');
         if (input && !['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'image', 'color', 'file'].includes(input.type)) return;
       }

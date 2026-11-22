@@ -70,6 +70,9 @@ test('space controls playback from buttons and lyric blocks without activation',
     await page.keyboard.press('Space');await expect.poll(()=>audio.evaluate((a:HTMLAudioElement)=>a.paused)).toBe(true);
     await expect(block).toBeFocused();
   }
+  const select=page.locator('select[aria-haspopup="listbox"]').first();await select.focus();const value=await select.inputValue();
+  await page.keyboard.press('Space');await expect.poll(()=>audio.evaluate((a:HTMLAudioElement)=>a.paused)).toBe(false);await expect(page.getByRole('listbox')).toHaveCount(0);await expect(select).toHaveValue(value);
+  await page.keyboard.press('Space');await expect.poll(()=>audio.evaluate((a:HTMLAudioElement)=>a.paused)).toBe(true);await page.keyboard.press('ArrowDown');await expect(page.getByRole('listbox')).toBeVisible();await page.keyboard.press('Space');await expect(page.getByRole('listbox')).toHaveCount(0);await expect.poll(()=>audio.evaluate((a:HTMLAudioElement)=>a.paused)).toBe(true);
   await page.evaluate(async()=>{const path='/src/features/shortcuts.ts';const {saveBindings,defaultBindings}=await import(path);saveBindings({...defaultBindings,play:{...defaultBindings.play,code:'KeyP'}});});
   await button.focus();await page.keyboard.press('p');await expect.poll(()=>audio.evaluate((a:HTMLAudioElement)=>a.paused)).toBe(false);
   await page.keyboard.press('Space');await expect.poll(()=>audio.evaluate((a:HTMLAudioElement)=>a.paused)).toBe(true);

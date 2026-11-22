@@ -39,3 +39,9 @@ it('consumes release after focus changes and ignores duplicate downs',()=>{
  const input=screen.getByRole('textbox');input.focus();expect(fireEvent.keyUp(input,{code:'Space',key:' '})).toBe(false);expect(toggle).toHaveBeenCalledTimes(1);
  expect(fireEvent.keyDown(input,{code:'Space',key:' '})).toBe(true);
 });
+
+it('owns collapsed non-text selects while expanded listboxes retain space selection',()=>{
+ const toggle=vi.fn();render(<Harness toggle={toggle}/>);const select=document.createElement('select');select.innerHTML='<option>选项</option>';document.body.append(select);select.focus();
+ expect(fireEvent.keyDown(select,{code:'Space',key:' '})).toBe(false);expect(fireEvent.keyUp(select,{code:'Space',key:' '})).toBe(false);expect(select).toHaveFocus();expect(toggle).toHaveBeenCalledTimes(1);
+ const list=document.createElement('div');list.setAttribute('role','listbox');document.body.append(list);expect(fireEvent.keyDown(select,{code:'Space',key:' '})).toBe(true);expect(toggle).toHaveBeenCalledTimes(1);select.remove();list.remove();
+});
