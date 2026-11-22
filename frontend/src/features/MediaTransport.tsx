@@ -131,7 +131,6 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const moveAnimation = useRef<number | null>(null);
   const panDrag = useRef<{ x: number; startMs: number; left: number; width: number; pointerId: number; started: boolean; seek: boolean; element: HTMLElement } | null>(null);
   const loopDrag = useRef<{ side: 'a' | 'b'; original: LoopState; left: number; width: number; pointerId: number } | null>(null);
-  const lastTrackPaint = useRef(0);
   const layoutStart = useRef(0);
   const positionRef = useRef(0);
   const auditionEnd = useRef<number | null>(null);
@@ -336,20 +335,31 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       el.removeEventListener("ended", ended);
     };
   }, [activeLoop, asset, readPosition, updateDom]);
+  const documentRef = useRef(document);
+  documentRef.current = document;
+  const lastActiveLines = useRef('');
+  const activeLinesKey = (ms: number) =>
+    (documentRef.current?.lines ?? [])
+      .filter((line) => line.beginMs !== null && line.endMs !== null && line.beginMs <= ms && ms < line.endMs)
+      .map((line) => line.id)
+      .join(',');
+
   useEffect(() => {
     const el = audio.current;
     if (!el || !playing) return;
+    lastActiveLines.current = activeLinesKey(Math.round(readPosition() * 1_000));
     const frame = () => {
       const current = readPosition();
       const view = viewportRef.current;
       if (view.follow && view.span < view.duration) {
         view.start = Math.max(0, Math.min(view.duration - view.span, current - view.span * 0.35));
-        if (performance.now() - lastTrackPaint.current > 80 || Math.abs(view.start-layoutStart.current) > view.span * .125) setStart(view.start);
+        if (Math.abs(view.start - layoutStart.current) > view.span * 0.125) setStart(view.start);
       }
       updateDom(current);
-      if (performance.now() - lastTrackPaint.current > 80) {
+      const nextActive = activeLinesKey(Math.round(current * 1_000));
+      if (nextActive !== lastActiveLines.current) {
+        lastActiveLines.current = nextActive;
         setPosition(current);
-        lastTrackPaint.current = performance.now();
       }
       if (auditionEnd.current !== null && current >= auditionEnd.current) {
         auditionEnd.current = null;
@@ -382,35 +392,30 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   useLayoutEffect(() => {
     const c = canvas.current;
     if (!c || !expanded || !(visible.wave || ui?.adding) || width <= 0 || height <= 0) return;
-    const draw = () => {
-      const r = c.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return;
-      const scale = ratio;
-      const pixelWidth = Math.max(1, Math.round(r.width * scale));
-      const pixelHeight = Math.max(1, Math.round(r.height * scale));
-      if (c.width !== pixelWidth) c.width = pixelWidth;
-      if (c.height !== pixelHeight) c.height = pixelHeight;
-      const ctx = c.getContext("2d");
-      if (!ctx) return;
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      ctx.clearRect(0, 0, r.width, r.height);
-      const d = waveform.data;
-      if (!d || endMs <= startMs) return;
-      ctx.strokeStyle = "#91aee4";
-      const view = drawEndMs - drawStartMs;
-      ctx.beginPath();
-      d.maximum.forEach((max, i) => {
-        if (d.start_ms + (i + 1) * d.bucket_ms < drawStartMs || d.start_ms + i * d.bucket_ms > drawEndMs) return;
-        const min = d.minimum[i] ?? max;
-        const x =
-          ((d.start_ms + i * d.bucket_ms - drawStartMs) / view) * r.width +
-          Math.max(1, (d.bucket_ms / view) * r.width) / 2;
-        ctx.moveTo(x, ((1 - max) * r.height) / 2);
-        ctx.lineTo(x, ((1 - min) * r.height) / 2);
-      });
-      ctx.stroke();
-    };
-    draw();
+    const scale = ratio;
+    const pixelWidth = Math.max(1, Math.round(width * scale));
+    const pixelHeight = Math.max(1, Math.round(height * scale));
+    if (c.width !== pixelWidth) c.width = pixelWidth;
+    if (c.height !== pixelHeight) c.height = pixelHeight;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    const d = waveform.data;
+    if (!d || endMs <= startMs) return;
+    ctx.strokeStyle = "#91aee4";
+    const view = drawEndMs - drawStartMs;
+    ctx.beginPath();
+    d.maximum.forEach((max, i) => {
+      if (d.start_ms + (i + 1) * d.bucket_ms < drawStartMs || d.start_ms + i * d.bucket_ms > drawEndMs) return;
+      const min = d.minimum[i] ?? max;
+      const x =
+        ((d.start_ms + i * d.bucket_ms - drawStartMs) / view) * width +
+        Math.max(1, (d.bucket_ms / view) * width) / 2;
+      ctx.moveTo(x, ((1 - max) * height) / 2);
+      ctx.lineTo(x, ((1 - min) * height) / 2);
+    });
+    ctx.stroke();
   }, [drawEndMs, drawStartMs, waveform.data, width, height, ratio, measuredCanvas, expanded, visible.wave, ui?.adding, timelineHost]);
   const zoomAt = (factor: number, fraction: number) => {
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }

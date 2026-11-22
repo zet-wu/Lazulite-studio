@@ -20,6 +20,24 @@ type Props = { pcmRate?: number; vocal?: string | null; projectId: string; asset
 type Request = { token: number; controller: AbortController; began?: number; posted: boolean };
 type Result = { id: number; token: number; pixels: Uint8Array; computeMs?: number; error?: Message };
 
+function colorizeTile(pixels: Uint8Array): HTMLCanvasElement | undefined {
+  const offscreen = document.createElement('canvas');
+  offscreen.width = SPECTRUM_WIDTH;
+  offscreen.height = SPECTRUM_HEIGHT;
+  const ctx = offscreen.getContext('2d');
+  if (!ctx) return undefined;
+  const image = ctx.createImageData(SPECTRUM_WIDTH, SPECTRUM_HEIGHT);
+  for (let index = 0; index < pixels.length; index++) {
+    const color = spectrumPalette[pixels[index]];
+    image.data[index * 4] = color[0];
+    image.data[index * 4 + 1] = color[1];
+    image.data[index * 4 + 2] = color[2];
+    image.data[index * 4 + 3] = 255;
+  }
+  ctx.putImageData(image, 0, 0);
+  return offscreen;
+}
+
 export function SpectrogramCanvas(props: Props) {
   useTranslation();
   return <AssetSpectrum key={`${props.projectId}:${props.assetIdentity}:${props.durationMs}:${props.pcmRate ?? PROXY_SAMPLE_RATE}:fft512-${SPECTRUM_WIDTH}x${SPECTRUM_HEIGHT}`} {...props} />;
@@ -83,7 +101,12 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
       pending.current.delete(result.id);
       if (result.error) { failed.current.set(result.id, result.error); }
       else {
-        cache.current.set({ startMs: result.id, endMs: Math.min(result.id + SPECTRUM_WINDOW_MS, durationMs), pixels: result.pixels });
+        cache.current.set({
+          startMs: result.id,
+          endMs: Math.min(result.id + SPECTRUM_WINDOW_MS, durationMs),
+          pixels: result.pixels,
+          bitmap: colorizeTile(result.pixels),
+        });
         if (stats.current) {
           stats.current.completed++;
           stats.current.computeMs = [...stats.current.computeMs.slice(-127), result.computeMs!];
@@ -120,12 +143,18 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
     changed();
   }, [durationMs, firstTile, lastTile, visible, retry]);
 
+  useEffect(() => () => { cache.current.clear(); }, []);
+
   // Match the new content origin in the same paint as the translated layers.
   useLayoutEffect(() => {
     const element = canvas.current;
     if (!element || !visible) return;
-    element.width = Math.max(1, Math.round(width * ratio)); element.height = Math.round(displayHeight * ratio);
-    const context = element.getContext('2d')!;
+    const pixelWidth = Math.max(1, Math.round(width * ratio));
+    const pixelHeight = Math.max(1, Math.round(displayHeight * ratio));
+    if (element.width !== pixelWidth) element.width = pixelWidth;
+    if (element.height !== pixelHeight) element.height = pixelHeight;
+    const context = element.getContext('2d');
+    if (!context) return;
     context.fillStyle = '#101622'; context.fillRect(0, 0, element.width, element.height);
     const x = (time: number) => (time - drawStart) / (drawEnd - drawStart) * element.width;
     for (const first of wanted.current) {
@@ -136,19 +165,10 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
         context.fillRect(left, 0, right - left, element.height);
         continue;
       }
-      const image = context.createImageData(SPECTRUM_WIDTH, SPECTRUM_HEIGHT);
-      for (let index = 0; index < tile.pixels.length; index++) {
-        const color = spectrumPalette[tile.pixels[index]];
-        image.data[index * 4] = color[0];
-        image.data[index * 4 + 1] = color[1];
-        image.data[index * 4 + 2] = color[2];
-        image.data[index * 4 + 3] = 255;
-      }
-      const offscreen = document.createElement('canvas'); offscreen.width = SPECTRUM_WIDTH; offscreen.height = SPECTRUM_HEIGHT;
-      offscreen.getContext('2d')!.putImageData(image, 0, 0);
-      context.drawImage(offscreen, left, 0, right - left, element.height);
+      if (!tile.bitmap) tile.bitmap = colorizeTile(tile.pixels);
+      if (tile.bitmap) context.drawImage(tile.bitmap, left, 0, right - left, element.height);
     }
-  }, [drawEnd, revision, drawStart, visible, width, ratio, displayHeight]);
+  }, [drawEnd, revision, drawStart, visible, width, ratio, displayHeight, durationMs]);
 
   if (!visible) return <p data-wheel-zoom className={styles.spectrumHint}>{t('spectrum.zoomHint')}</p>;
   const displayError = error || wanted.current.map(first => failed.current.get(first)).filter(Boolean).map(value=>formatMessage(value!))[0];
