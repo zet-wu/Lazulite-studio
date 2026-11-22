@@ -476,7 +476,7 @@
   "vocal.changed": "声学内容已改变，本次结果已保留。",
   "vocal.replaceSegments": "替换当前片段",
   "vocal.previous": "返回上次结果",
-  "vocal.runningHelp": "正在处理音频，可在上方查看任务状态。",
+  "vocal.runningHelp": "正在处理音频，可在右下角浮层查看任务状态。",
   "vocal.empty": "尚无可用片段，请通过音频工具分离人声。",
   "notice.separator": "；",
   "notice.list": "{{text}}",
@@ -1696,5 +1696,16 @@
   "packaging.downloadAudio": "下载嵌入音频",
   "packaging.downloading": "正在打包并下载…",
   "common.delete": "删除",
-  "settings.openStudio": "打开 Studio 设置"
+  "settings.openStudio": "打开 Studio 设置",
+  "tray.title": "消息与处理队列",
+  "tray.collapse": "折叠浮层",
+  "tray.expand": "展开浮层",
+  "tray.clearAll": "清空提示",
+  "tray.summary": "{{running}} 运行中 · {{notices}} 提示",
+  "tray.resetPosition": "双击复位右下角",
+  "sync.externalApplied": "项目已由外部工具更新并同步",
+  "sync.externalConflict": "检测到外部更新，当前有未保存修改",
+  "sync.reloadExternal": "重新加载外部版本",
+  "sync.keepLocal": "保留本地草稿",
+  "sync.reloaded": "已加载外部最新版本"
 }

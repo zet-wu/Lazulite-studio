@@ -50,7 +50,7 @@ test('closing success leaves result replacement decisions intact',async({page})=
 });
 test('no-result state stays actionable and cancellation waits for the terminal status',async({page})=>{
  const {state}=await setup(page,false);state.cancelFails=false;
- await expect(page.getByText('正在处理音频，可在上方查看任务状态。')).toBeVisible();
+ await expect(page.getByText('正在处理音频，可在右下角浮层查看任务状态。')).toBeVisible();
  await page.getByRole('button',{name:'取消任务',exact:true}).click();await expect(page.getByRole('button',{name:'取消任务',exact:true})).toBeDisabled();
  state.status='cancelled';await expect(page.getByRole('status').filter({hasText:'人声处理已取消'})).toBeVisible();
  await expect(page.getByRole('button',{name:'分离人声',exact:true})).toBeEnabled();await expect(page.getByText('尚无可用片段，请通过音频工具分离人声。')).toBeVisible();

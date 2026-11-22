@@ -1,5 +1,5 @@
 import {backgroundDefaults} from '../adapters/studio-preferences';
-import { isRejectedDocument } from '../adapters/http/client';
+import { isRejectedDocument, studioApi } from '../adapters/http/client';
 import { message, MessageError, errorMessage } from '../domain/messages';
 import { useNotice } from '../shared/MessageBar';
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,6 +17,12 @@ type Save = (
   sequence: number,
   etag?: string,
 ) => Promise<{ revision: string; etag?: string }>;
+type Load = () => Promise<{
+  revision: string;
+  etag?: string;
+  document: ProjectSnapshot;
+  source_asset_id: string | null;
+}>;
 export function useProjectDocument(
   projectId: string,
   initialSnapshot: ProjectSnapshot,
@@ -24,6 +30,7 @@ export function useProjectDocument(
   initialEtag: string | undefined,
   saveDocument: Save,
   sourceAssetId: string | null = null,
+  loadDocument: Load = () => studioApi.getDocumentEnvelope(projectId),
 ) {
   const sourceIdentity = useRef(sourceAssetId);
   const editingLock = useRef<symbol | null>(null);
@@ -37,12 +44,28 @@ export function useProjectDocument(
   const stateRef = useRef(state);
   stateRef.current = state;
   const [revision, setRevision] = useState(initialRevision);
+  const revisionRef = useRef(revision);
+  revisionRef.current = revision;
   const [etag, setEtag] = useState<string | undefined>(initialEtag);
   const [dirty, setDirty] = useState(false);
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
+  const [externalUpdate, setExternalUpdate] = useState<{
+    revision: string;
+    etag?: string;
+    document: ProjectSnapshot;
+  } | null>(null);
+  const [keptLocalRevision, setKeptLocalRevision] = useState<string | null>(null);
+  const keptLocalRevisionRef = useRef(keptLocalRevision);
+  keptLocalRevisionRef.current = keptLocalRevision;
+  const [syncNotice, setSyncNotice] = useNotice();
   const [errorNotice, setError] = useNotice();
   const error = errorNotice?.text ?? null;
+  const selfCommittedRevisions = useRef(new Set<string>([initialRevision]));
+  const pendingExternalCheck = useRef<string | null>(null);
+  const syncInFlight = useRef(false);
   const [recovery, setRecovery] = useState<{
     available: boolean;
     baseRevision?: string;
@@ -166,13 +189,18 @@ export function useProjectDocument(
         etag,
       );
       if (deletedRef.current || saveSource !== sourceIdentity.current) return;
+      selfCommittedRevisions.current.add(result.revision);
       setRevision(result.revision);
+      revisionRef.current = result.revision;
       setEtag(result.etag);
       setError(null);
+      setExternalUpdate(null);
+      setKeptLocalRevision(null);
       savedSequence.current = request.seq;
       pending.current = null;
       if (sequence.current === request.seq) {
         setDirty(false);
+        dirtyRef.current = false;
         cancelPendingCheckpoint();
         await enqueueRecovery(() => createRecoveryAdapter().clear(projectId));
         setRecovery({ available: false });
@@ -192,14 +220,137 @@ export function useProjectDocument(
     } finally {
       inFlight.current = false;
       setSaving(false);
+      const queuedCheck = pendingExternalCheck.current;
+      pendingExternalCheck.current = null;
+      if (queuedCheck !== null && !deletedRef.current) {
+        queueMicrotask(() => { void syncExternalRevision(queuedCheck || undefined); });
+      }
     }
   }, [cancelPendingCheckpoint, conflict, dirty, enqueueRecovery, etag, projectId, revision, saveDocument, writeCheckpoint]);
   useEffect(() => {
-    if (!dirty || error || conflict || deleted) return;
+    if (!dirty || error || conflict || deleted || externalUpdate || keptLocalRevision) return;
     const timer = window.setTimeout(() => void save(), 700);
     return () => window.clearTimeout(timer);
-  }, [conflict, deleted, dirty, error, save]);
+  }, [conflict, deleted, dirty, error, externalUpdate, keptLocalRevision, save]);
   const [historyVersion, setHistoryVersion] = useState(0);
+  const acceptSource = useCallback(async (assetId: string | null, nextRevision: string, remote?: ProjectSnapshot) => {
+    const changed = sourceIdentity.current !== assetId;
+    sourceIdentity.current = assetId;
+    if (!changed) return;
+    selfCommittedRevisions.current.add(nextRevision);
+    const hasLocalChanges = sequence.current !== savedSequence.current || !!pending.current || !!inFlight.current;
+    const next = remote && !hasLocalChanges ? createProjectEditorState(parseProject(remote)) : clearAcousticHistory(stateRef.current);
+    stateRef.current = next;
+    setState(next);
+    setHistoryVersion((v) => v + 1);
+    if (remote && hasLocalChanges) {
+      setConflict(true);
+      setError(message('save.sourceConflict'));
+      cancelPendingCheckpoint();
+      await checkpoint(next);
+    } else {
+      pending.current = null;
+      setRevision(nextRevision);
+      revisionRef.current = nextRevision;
+      setEtag(`"${nextRevision}"`);
+      savedSequence.current = sequence.current;
+      setDirty(false);
+      dirtyRef.current = false;
+      setExternalUpdate(null);
+      setKeptLocalRevision(null);
+      cancelPendingCheckpoint();
+      await enqueueRecovery(() => createRecoveryAdapter().clear(projectId));
+      setRecovery({ available: false });
+    }
+  }, [cancelPendingCheckpoint, checkpoint, enqueueRecovery, projectId]);
+  const syncExternalRevision = useCallback(async (reportedRevision?: string) => {
+    if (deletedRef.current) return;
+    if (reportedRevision && selfCommittedRevisions.current.has(reportedRevision)) return;
+    if (inFlight.current) {
+      pendingExternalCheck.current = reportedRevision ?? '';
+      return;
+    }
+    if (syncInFlight.current) return;
+    syncInFlight.current = true;
+    try {
+      const envelope = await loadDocument();
+      if (
+        deletedRef.current ||
+        selfCommittedRevisions.current.has(envelope.revision) ||
+        envelope.revision === revisionRef.current
+      ) {
+        return;
+      }
+      if (envelope.source_asset_id !== sourceIdentity.current) {
+        await acceptSource(envelope.source_asset_id, envelope.revision, envelope.document);
+        return;
+      }
+      const hasLocalChanges =
+        dirtyRef.current ||
+        sequence.current !== savedSequence.current ||
+        !!pending.current ||
+        inFlight.current;
+      if (!hasLocalChanges) {
+        const next = createProjectEditorState(parseProject(envelope.document));
+        stateRef.current = next;
+        setState(next);
+        setHistoryVersion((v) => v + 1);
+        selfCommittedRevisions.current.add(envelope.revision);
+        setRevision(envelope.revision);
+        revisionRef.current = envelope.revision;
+        setEtag(envelope.etag ?? `"${envelope.revision}"`);
+        setConflict(false);
+        setExternalUpdate(null);
+        setKeptLocalRevision(null);
+        setError(null);
+        cancelPendingCheckpoint();
+        await enqueueRecovery(() => createRecoveryAdapter().clear(projectId));
+        setRecovery({ available: false });
+        setSyncNotice(message('sync.externalApplied'), 'status', 4000);
+      } else if (keptLocalRevisionRef.current !== envelope.revision) {
+        setExternalUpdate({
+          revision: envelope.revision,
+          etag: envelope.etag,
+          document: envelope.document,
+        });
+        setKeptLocalRevision(null);
+      }
+    } catch {
+      // Transient fetch failures should not overwrite local editor state; next focus/SSE event reconciles.
+    } finally {
+      syncInFlight.current = false;
+    }
+  }, [acceptSource, cancelPendingCheckpoint, enqueueRecovery, loadDocument, projectId, setError, setSyncNotice]);
+  const reloadExternal = useCallback(async () => {
+    if (deletedRef.current) return;
+    const envelope = await loadDocument();
+    const next = createProjectEditorState(parseProject(envelope.document));
+    sourceIdentity.current = envelope.source_asset_id;
+    stateRef.current = next;
+    setState(next);
+    setHistoryVersion((v) => v + 1);
+    selfCommittedRevisions.current.add(envelope.revision);
+    setRevision(envelope.revision);
+    revisionRef.current = envelope.revision;
+    setEtag(envelope.etag ?? `"${envelope.revision}"`);
+    savedSequence.current = sequence.current;
+    pending.current = null;
+    setDirty(false);
+    dirtyRef.current = false;
+    setConflict(false);
+    setExternalUpdate(null);
+    setKeptLocalRevision(null);
+    setError(null);
+    cancelPendingCheckpoint();
+    await enqueueRecovery(() => createRecoveryAdapter().clear(projectId));
+    setRecovery({ available: false });
+    setSyncNotice(message('sync.reloaded'), 'status', 4000);
+  }, [cancelPendingCheckpoint, enqueueRecovery, loadDocument, projectId, setError, setSyncNotice]);
+  const keepLocalDraft = useCallback(() => {
+    if (!externalUpdate) return;
+    setKeptLocalRevision(externalUpdate.revision);
+    setExternalUpdate(null);
+  }, [externalUpdate]);
   const history = useCallback(
     (change: (s: ProjectEditorState) => ProjectEditorState) => {
       if (editingLock.current) throw new MessageError(message('save.editingLocked'));
@@ -277,24 +428,12 @@ export function useProjectDocument(
   }, [cancelPendingCheckpoint, deleted, enqueueRecovery, projectId]);
   return {
     deleted, historyVersion, editingLocked,
-    acceptSource: async (assetId: string | null, nextRevision: string, remote?: ProjectSnapshot) => {
-      const changed = sourceIdentity.current !== assetId;
-      sourceIdentity.current=assetId;
-      if (!changed) return;
-      const hasLocalChanges=sequence.current!==savedSequence.current || !!pending.current || !!inFlight.current;
-      const next=remote && !hasLocalChanges ? createProjectEditorState(parseProject(remote)) : clearAcousticHistory(stateRef.current);
-      stateRef.current=next;setState(next);setHistoryVersion(v=>v+1);
-      if (remote && hasLocalChanges) {
-        setConflict(true);setError(message('save.sourceConflict'));
-        cancelPendingCheckpoint();
-        await checkpoint(next);
-      } else {
-        pending.current=null;setRevision(nextRevision);setEtag(`"${nextRevision}"`);
-        savedSequence.current=sequence.current;setDirty(false);
-        cancelPendingCheckpoint();
-        await enqueueRecovery(()=>createRecoveryAdapter().clear(projectId));setRecovery({available:false});
-      }
-    },
+    acceptSource,
+    syncExternalRevision,
+    reloadExternal,
+    keepLocalDraft,
+    externalUpdate,
+    syncNotice,
     prepareSource: async () => {
       if(editingLock.current || conflict || deletedRef.current || inFlight.current || pending.current) throw new MessageError(message('save.finishBeforeImport'));
       const token=Symbol('music');editingLock.current=token;setEditingLocked(true);

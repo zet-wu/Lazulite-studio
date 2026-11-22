@@ -10,6 +10,7 @@ import { useProjectDocument } from "./useProjectDocument";
 afterEach(cleanup);
 
 const saveMock = vi.fn();
+const loadMock = vi.fn();
 const recovery = {
   save: vi.fn().mockResolvedValue(undefined),
   readCheckpoint: vi.fn().mockResolvedValue(null),
@@ -29,6 +30,8 @@ const hook = () =>
     undefined,
     (xml: ProjectSnapshot, base: string, op: string, seq: number, etag?: string) =>
       saveMock(xml, base, op, seq, etag),
+    null,
+    loadMock,
   );
 
 describe("useProjectDocument save lifecycle", () => {
@@ -132,4 +135,68 @@ it('locks every project command and late callbacks until one atomic result is ap
   expect(result.current.state.past).toHaveLength(1);expect(result.current.editingLocked).toBe(false);
   expect(()=>lock.apply(updated)).toThrow(/save.alignmentExpired/);
   act(()=>result.current.undo());expect(result.current.project).toBe(lock.source);
+});
+
+it('auto-syncs external revisions when clean, ignores self-committed revisions, and warns when dirty', async () => {
+  const remoteXml =
+    '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="a" begin="0s" end="1s">External</p></div></body></tt>';
+  loadMock.mockResolvedValue({
+    revision: 'r2',
+    etag: '"r2"',
+    document: snapshot(remoteXml),
+    source_asset_id: null,
+  });
+  const { result } = renderHook(hook);
+
+  await act(async () => {
+    await result.current.syncExternalRevision('r2');
+  });
+  expect(result.current.revision).toBe('r2');
+  expect(result.current.document.lines[0].words[0].text).toBe('External');
+  expect(result.current.syncNotice?.text).toMatchObject({ key: 'sync.externalApplied' });
+
+  // Self-committed revision does not trigger remote refetch.
+  saveMock.mockResolvedValueOnce({ revision: 'r3', etag: '"r3"' });
+  act(() => {
+    result.current.apply({ type: 'edit-word', lineId: 'a', wordId: 'a:word:0', text: 'LocalSaved' });
+  });
+  await act(async () => {
+    await result.current.save();
+  });
+  loadMock.mockClear();
+  await act(async () => {
+    await result.current.syncExternalRevision('r3');
+  });
+  expect(loadMock).not.toHaveBeenCalled();
+
+  // Dirty local state surfaces externalUpdate without discarding local edits.
+  const newerXml =
+    '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="a" begin="0s" end="1s">ServerNewer</p></div></body></tt>';
+  loadMock.mockResolvedValue({
+    revision: 'r4',
+    etag: '"r4"',
+    document: snapshot(newerXml),
+    source_asset_id: null,
+  });
+  act(() => {
+    result.current.apply({ type: 'edit-word', lineId: 'a', wordId: 'a:word:0', text: 'UnsavedDraft' });
+  });
+  await act(async () => {
+    await result.current.syncExternalRevision('r4');
+  });
+  expect(result.current.externalUpdate?.revision).toBe('r4');
+  expect(result.current.document.lines[0].words[0].text).toBe('UnsavedDraft');
+
+  act(() => {
+    result.current.keepLocalDraft();
+  });
+  expect(result.current.externalUpdate).toBeNull();
+  expect(result.current.document.lines[0].words[0].text).toBe('UnsavedDraft');
+
+  await act(async () => {
+    await result.current.reloadExternal();
+  });
+  expect(result.current.revision).toBe('r4');
+  expect(result.current.dirty).toBe(false);
+  expect(result.current.document.lines[0].words[0].text).toBe('ServerNewer');
 });

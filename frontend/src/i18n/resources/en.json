@@ -480,7 +480,7 @@
   "vocal.changed": "Acoustic content changed. This result has been preserved.",
   "vocal.replaceSegments": "Replace current segments",
   "vocal.previous": "Return to previous result",
-  "vocal.runningHelp": "Audio is being processed. View the task status above.",
+  "vocal.runningHelp": "Audio is being processed. View the task status in the bottom-right tray.",
   "vocal.empty": "No segments are available. Use the audio tools to separate vocals.",
   "notice.separator": "; ",
   "notice.list": "{{text}}",
@@ -1709,5 +1709,16 @@
   "packaging.downloadAudio": "Download embedded audio",
   "packaging.downloading": "Packaging & downloading…",
   "common.delete": "Delete",
-  "settings.openStudio": "Open Studio settings"
+  "settings.openStudio": "Open Studio settings",
+  "tray.title": "Queue & notices",
+  "tray.collapse": "Collapse tray",
+  "tray.expand": "Expand tray",
+  "tray.clearAll": "Clear notices",
+  "tray.summary": "{{running}} running · {{notices}} notices",
+  "tray.resetPosition": "Double-click to reset position",
+  "sync.externalApplied": "Project updated externally and synced.",
+  "sync.externalConflict": "External update detected while local edits are unsaved.",
+  "sync.reloadExternal": "Reload external version",
+  "sync.keepLocal": "Keep local draft",
+  "sync.reloaded": "Loaded latest external version."
 }

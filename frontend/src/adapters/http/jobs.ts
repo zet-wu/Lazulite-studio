@@ -20,6 +20,7 @@ export type Job = {
   request?: JobRequest;
   result_available?: boolean;
   error?: { code?: string; message?: string; cpu_retry?: boolean; stage?: string } | null;
+  acknowledged_state?: 'applied' | 'dismissed' | null;
 };
 export type JobsResponse = {
   schema_version: "studio-job-list-v1";
@@ -48,4 +49,6 @@ export const jobsApi = {
   },
   cancel: (jobId: string, keepalive = false) =>
     apiJson<Job>(`/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST", keepalive }),
+  acknowledge: (jobId: string, state: 'applied' | 'dismissed') =>
+    apiJson<Job>(`/jobs/${encodeURIComponent(jobId)}/acknowledge`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ state }) }),
 };

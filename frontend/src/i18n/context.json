@@ -3029,7 +3029,7 @@
   },
   "vocal.runningHelp": {
     "context": "vocal interface: vocal.runningHelp",
-    "source": "正在处理音频，可在上方查看任务状态。",
+    "source": "正在处理音频，可在右下角浮层查看任务状态。",
     "params": [],
     "parameterNotes": {}
   },
@@ -11131,6 +11131,78 @@
   "settings.openStudio": {
     "source": "打开 Studio 设置",
     "context": "Button on /settings page to open the Studio settings modal",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "tray.title": {
+    "context": "floating queue and notices tray title",
+    "source": "消息与处理队列",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "tray.collapse": {
+    "context": "floating tray collapse button",
+    "source": "折叠浮层",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "tray.expand": {
+    "context": "floating tray expand button",
+    "source": "展开浮层",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "tray.clearAll": {
+    "context": "floating tray clear dismissible notices button",
+    "source": "清空提示",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "tray.summary": {
+    "context": "collapsed tray status summary",
+    "source": "{{running}} 运行中 · {{notices}} 提示",
+    "params": [
+      "running",
+      "notices"
+    ],
+    "parameterNotes": {
+      "running": "Active task count.",
+      "notices": "Visible notice count."
+    }
+  },
+  "tray.resetPosition": {
+    "context": "floating tray header tooltip",
+    "source": "双击复位右下角",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "sync.externalApplied": {
+    "context": "external revision auto-synced notice",
+    "source": "项目已由外部工具更新并同步",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "sync.externalConflict": {
+    "context": "external revision conflict warning while local edits are unsaved",
+    "source": "检测到外部更新，当前有未保存修改",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "sync.reloadExternal": {
+    "context": "button to discard local edits and load server revision",
+    "source": "重新加载外部版本",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "sync.keepLocal": {
+    "context": "button to keep local draft when external update arrives",
+    "source": "保留本地草稿",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "sync.reloaded": {
+    "context": "notice after reloading external revision",
+    "source": "已加载外部最新版本",
     "params": [],
     "parameterNotes": {}
   }

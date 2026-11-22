@@ -6,7 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { intersectSegments } from '../domain/time-boundaries';
 import { useProjectJobs } from './useProjectJobs';
 import { IconButton } from '../shared/Controls';
-import { MessageBar, useNotice } from '../shared/MessageBar';
+import { useNotice } from '../shared/MessageBar';
+import { useTrayEntry } from './FloatingTray';
 import { scopedSessionKey } from '../adapters/preferences';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -79,6 +80,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
       const normalized = intersectSegments(result.segments!, durationMs);
       apply({type:'acoustics', acoustics:{analysisId:result.id,segments:normalized.segments}});
       if(normalized.clipped || normalized.dropped) publish(describeMessage('task.normalized',{clipped:normalized.clipped,dropped:normalized.dropped}), 'status');
+      void jobsApi.acknowledge(pending.id, 'applied').catch(() => undefined);
       handled.current.add(pending.id); setPending(null); setError('');
     } catch(e) {setError(errorMessage(e));}
   };
@@ -118,9 +120,30 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
     <IconButton icon="refresh" label={t('vocal.retry')} data-role="secondary" disabled={locked||busy||!!active} onClick={retry}/>
     {latest.error?.cpu_retry && <button data-role="secondary" disabled={locked||busy||!!active} onClick={()=>void retryCpu()}>{t('task.retryCpu')}</button>}
   </> : null;
-  const task = active;
-  const deviceText=deviceSummary(task?.request?.devices);
-  const status = { queued: t('task.queued'), running: t('task.processing'), cancel_requested: t('task.waitingCancel'), cancelled: t('task.cancelled'), failed: t('task.failed'), interrupted: t('task.interrupted'), succeeded: t('task.applying') };
+  useTrayEntry('vocal-launching', busy && !active ? {
+    kind: 'task',
+    order: 10,
+    version: `launching:${cancelling}`,
+    notice: { text: t('task.vocalProgress', { progress: cancelling ? t('task.cancelling') : t('task.preparing'), device: '' }), role: 'status', origin: null, dismissible: false },
+    actions: <button data-role="secondary" disabled={cancelling} onClick={() => void cancel()}>{t('task.cancel')}</button>,
+  } : null);
+  useTrayEntry('vocal-notice', notice ? {
+    kind: 'notice',
+    version: `${notice.taskId ?? ''}:${locked}:${busy}:${Boolean(active)}`,
+    notice,
+    actions: notice.taskId === latest?.id ? retryActions : undefined,
+  } : null);
+  useTrayEntry('vocal-issue', issue ? {
+    kind: 'notice',
+    version: `${locked}:${Boolean(active)}:${busy}:${latest?.status ?? ''}`,
+    notice: issue,
+    actions: !active && !busy ? <IconButton icon="refresh" label={t('vocal.retry')} data-role="secondary" disabled={locked} onClick={()=>{if(pending && result?.status==='ready' && latest?.status==='succeeded')setError('');else retry();}}/> : undefined,
+  } : null);
+  useTrayEntry('vocal-read-error', readError ? {
+    kind: 'notice',
+    notice: readError,
+    actions: <IconButton icon="refresh" label={t('vocal.retryRead')} data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();if(completed.isError)void completed.refetch();}}/>,
+  } : null);
   return <>
     {visible && ui.uploadHost && createPortal(<VocalUpload key={sourceAssetId} projectId={projectId} sourceAssetId={sourceAssetId} durationMs={durationMs} available={sourceResults.some(r=>r.audio_state!=='missing')} disabled={!!locked||busy||!!hasActive} submit={(upload_id,offset_ms)=>run(undefined,{upload_id,offset_ms})}/>,ui.uploadHost)}
     {visible && ui.analysisHost && createPortal(<>
@@ -131,12 +154,6 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
         {adoptedAvailable && project.acoustics.analysisId && <a data-role="secondary" href={download(project.acoustics.analysisId)} download>{t('vocal.download')}</a>}
       </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run(currentAudio?.source_kind==='upload' ? currentAudio.id : undefined)}>{repair?t('vocal.regenerate'):currentAudio?t('vocal.useExisting'):t('vocal.separate')}</button>}
     </>, ui.analysisHost)}
-    {ui.taskHost && (active || busy) && createPortal(<MessageBar notice={{ text: t('task.vocalProgress',{progress:`${task ? cancelling ? t('task.cancelling') : status[task.status] : t('task.preparing')}${task?.stage ? ` · ${{separating:t('vocal.separate'),analyzing:t('vocal.acousticAnalysis')}[task.stage] ?? task.stage}` : ''}`,device:deviceText?' · '+deviceText:''}), role:'status', origin:null, dismissible:false }} actions={<button data-role="secondary" disabled={cancelling || active?.status==='cancel_requested'} onClick={()=>void cancel()}>{t('task.cancel')}</button>}/>,ui.taskHost)}
-    {ui.messageHost && createPortal(<>
-      <MessageBar notice={notice} actions={notice?.taskId===latest?.id ? retryActions : undefined}/>
-      <MessageBar notice={issue} actions={!active && !busy ? <IconButton icon="refresh" label={t('vocal.retry')} data-role="secondary" disabled={locked} onClick={()=>{if(pending && result?.status==='ready' && latest?.status==='succeeded')setError('');else retry();}}/> : undefined}/>
-      <MessageBar notice={readError} actions={<IconButton icon="refresh" label={t('vocal.retryRead')} data-role="secondary" onClick={()=>{void jobs.refetch();void results.refetch();if(completed.isError)void completed.refetch();}}/>}/>
-    </>,ui.messageHost)}
     {ui.statusHost && (conflictVisible || !ready || pendingFailure && !notice) && createPortal(<section className={styles.panel} aria-label={t('vocal.results')}>
       {conflictVisible ? <><p>{t('vocal.changed')}</p><button data-role="primary" disabled={locked} onClick={adopt}>{t('vocal.replaceSegments')}</button>{ready && <button data-role="secondary" onClick={()=>setDismissed(latest!.id)}>{t('vocal.previous')}</button>}</> : pendingFailure && !notice ? <><p>{latest.error ? formatMessage(taskError(latest.error)) : t(latest.status==='failed'?'vocal.failed':'vocal.interrupted')}</p>{retryActions}</> : <p>{active||busy?t('vocal.runningHelp'):t('vocal.empty')}</p>}
     </section>,ui.statusHost)}

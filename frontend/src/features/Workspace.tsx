@@ -16,11 +16,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { studioApi, type Asset } from '../adapters/http/client';
+import { subscribeProjectEvents } from '../adapters/http/events';
+import { jobsApi } from '../adapters/http/jobs';
 import { DocumentOutputError, type OutputIssue } from '../adapters/output-validation';
 import { exportLyricFile, type LyricFormat } from '../adapters/lyric-formats';
 import type { ProjectSnapshot } from '../domain/project-document';
 import { downloadBlob } from '../shared/download';
+import { FloatingTrayProvider, useTrayEntry } from './FloatingTray';
 import { MediaTransport, type TransportHandle } from './MediaTransport';
+import { deviceSummary } from './task-messages';
+import { useProjectJobs } from './useProjectJobs';
 import { EditorWorkspace } from './editor/EditorWorkspace';
 import { useProjectDocument } from './useProjectDocument';
 import { MusicUpload } from './MusicUpload';
@@ -38,8 +43,8 @@ export function Workspace({ projectId }: { projectId: string }) {
   if(!paired.current&&mismatch)return <main>{t('workspace.sourceChanging')}</main>;
   if (envelope.isLoading || project.isLoading) return <main>{t('workspace.loading')}</main>;
   if (envelope.isError || !envelope.data) return <main><p role="alert">{(envelope.error as {status?:number})?.status === 404 ? t('workspace.missing') : t('workspace.openFailed')}</p><button data-role="secondary" onClick={() => void envelope.refetch()}>{t('common.retry')}</button></main>;
-  return <SelectionProvider><AudioReviewProvider>{project.data?.music_cleanup_pending&&<aside role="alert">{t('workspace.cleanupPending')}<button data-role="secondary" onClick={()=>void studioApi.cleanupMusic(projectId).then(()=>project.refetch()).catch(cause=>setCleanupError(errorMessage(cause)))}>{t('music.cleanupRetry')}</button>{cleanupError}</aside>}<ProjectEditor key={projectId} projectId={projectId} title={project.data?.name ?? t('workspace.defaultName')} initialSnapshot={envelope.data.document}
-    initialRevision={envelope.data.revision ?? ''} asset={project.data?.asset ?? null} /></AudioReviewProvider></SelectionProvider>;
+  return <SelectionProvider><AudioReviewProvider><FloatingTrayProvider>{project.data?.music_cleanup_pending&&<aside role="alert">{t('workspace.cleanupPending')}<button data-role="secondary" onClick={()=>void studioApi.cleanupMusic(projectId).then(()=>project.refetch()).catch(cause=>setCleanupError(errorMessage(cause)))}>{t('music.cleanupRetry')}</button>{cleanupError}</aside>}<ProjectEditor key={projectId} projectId={projectId} title={project.data?.name ?? t('workspace.defaultName')} initialSnapshot={envelope.data.document}
+    initialRevision={envelope.data.revision ?? ''} asset={project.data?.asset ?? null} /></FloatingTrayProvider></AudioReviewProvider></SelectionProvider>;
 }
 
 function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, asset }: { projectId: string; title: string; initialSnapshot: ProjectSnapshot; initialRevision: string; asset: Asset | null }) {
@@ -61,6 +66,146 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
   const query=useQueryClient(), knownSource=useRef(asset?.id??null);
   const [audioImportBusy,setAudioImportBusy]=useState(false);
   const [importRequest,setImportRequest]=useState(0);
+  const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
+  const jobs = useProjectJobs(projectId, true);
+  const activeJob = jobs.data?.items.find((job) => ['queued', 'running', 'cancel_requested'].includes(job.status));
+  useEffect(() => {
+    if (!activeJob && cancellingJobId) setCancellingJobId(null);
+  }, [activeJob, cancellingJobId]);
+  useEffect(() => subscribeProjectEvents(projectId, {
+    onRevisionChanged: (event) => {
+      void latestEditor.current.syncExternalRevision(event.revision);
+    },
+    onJobUpdated: (event) => {
+      void query.invalidateQueries({ queryKey: ['vocal-jobs', projectId] });
+      if (['succeeded', 'failed', 'cancelled', 'interrupted'].includes(event.status)) {
+        void query.invalidateQueries({ queryKey: ['vocals', projectId] });
+      }
+    },
+    onResync: () => {
+      void latestEditor.current.syncExternalRevision();
+      void query.invalidateQueries({ queryKey: ['vocal-jobs', projectId] });
+    },
+  }), [projectId, query]);
+
+  useTrayEntry('workspace-message', message ? { kind: 'notice', notice: message } : null);
+  useTrayEntry('document-error', editor.errorNotice ? { kind: 'notice', notice: editor.errorNotice } : null);
+  useTrayEntry('document-sync', editor.syncNotice ? { kind: 'notice', notice: editor.syncNotice } : null);
+  useTrayEntry(
+    'external-conflict',
+    editor.externalUpdate
+      ? {
+          kind: 'notice',
+          tone: 'warning',
+          order: 5,
+          version: editor.externalUpdate.revision,
+          notice: {
+            text: describeMessage('sync.externalConflict'),
+            role: 'alert',
+            origin: null,
+            dismissible: false,
+          },
+          actions: (
+            <>
+              <button
+                data-role="primary"
+                onClick={() =>
+                  void editor.reloadExternal().catch((cause) => setMessage(errorMessage(cause)))
+                }
+              >
+                {t('sync.reloadExternal')}
+              </button>
+              <button data-role="secondary" onClick={editor.keepLocalDraft}>
+                {t('sync.keepLocal')}
+              </button>
+            </>
+          ),
+        }
+      : null,
+  );
+  const activeJobText = activeJob
+    ? (() => {
+        const deviceText = deviceSummary(activeJob.request?.devices);
+        const cancelling = cancellingJobId === activeJob.id || activeJob.status === 'cancel_requested';
+        if (activeJob.kind === 'vocal') {
+          const statusLabel = {
+            queued: t('task.queued'),
+            running: t('task.processing'),
+            cancel_requested: t('task.waitingCancel'),
+            cancelled: t('task.cancelled'),
+            failed: t('task.failed'),
+            interrupted: t('task.interrupted'),
+            succeeded: t('task.applying'),
+          }[activeJob.status];
+          const stageLabel = activeJob.stage
+            ? ({ separating: t('vocal.separate'), analyzing: t('vocal.acousticAnalysis') }[activeJob.stage] ?? activeJob.stage)
+            : '';
+          return t('task.vocalProgress', {
+            progress: `${cancelling ? t('task.cancelling') : statusLabel}${stageLabel ? ` · ${stageLabel}` : ''}`,
+            device: deviceText ? ` · ${deviceText}` : '',
+          });
+        }
+        const stageText = cancelling
+          ? t('task.cancelling')
+          : activeJob.status === 'queued'
+            ? t('task.queued')
+            : ({
+                separating: t('task.separating'),
+                analyzing: t('task.analyzingRegions'),
+                acoustic: t('task.probabilities'),
+                decode: t('task.globalAlignment'),
+              }[activeJob.stage ?? ''] ?? t('task.aligning'));
+        return t('task.alignmentProgress', {
+          progress: stageText,
+          device: deviceText ? ` · ${deviceText}` : '',
+        });
+      })()
+    : '';
+  const activeJobNotice = useMemo(
+    () =>
+      activeJob
+        ? {
+            text: activeJobText,
+            role: 'status' as const,
+            origin: null,
+            dismissible: false,
+          }
+        : null,
+    [activeJob?.id, activeJobText],
+  );
+  useTrayEntry(
+    'active-job',
+    activeJob && activeJobNotice
+      ? {
+          kind: 'task',
+          order: 10,
+          version: `${activeJob.id}:${activeJob.status}:${activeJob.stage ?? ''}:${cancellingJobId === activeJob.id}`,
+          notice: activeJobNotice,
+          actions: (
+            <button
+              data-role="secondary"
+              disabled={cancellingJobId === activeJob.id || activeJob.status === 'cancel_requested'}
+              onClick={() => {
+                setCancellingJobId(activeJob.id);
+                void jobsApi
+                  .cancel(activeJob.id)
+                  .then(() => query.invalidateQueries({ queryKey: ['vocal-jobs', projectId] }))
+                  .catch((cause) => {
+                    setCancellingJobId(null);
+                    setMessage(
+                      describeMessage('task.cancelFailed', {
+                        diagnostic: cause instanceof Error ? cause.message : String(cause),
+                      }),
+                    );
+                  });
+              }}
+            >
+              {t('task.cancel')}
+            </button>
+          ),
+        }
+      : null,
+  );
   const refreshMedia=async()=>{
     sessionStorage.removeItem(scopedSessionKey(`studio-vocal-intent-v1:${projectId}`));
     setSelectedSegments([]);
@@ -102,7 +247,7 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
     if(event.key.toLowerCase()==='z'&&!editor.editingLocked){event.preventDefault();if(event.shiftKey)editor.redo();else editor.undo();}
     if(event.key.toLowerCase()==='s'){event.preventDefault();void editor.save();}
   }}><EditorWorkspace audioImportDisabled={audioImportBusy||editor.editingLocked||editor.saving} prepareAudioImport={prepareAudioImport} onImportAudio={()=>setImportRequest(v=>v+1)} alignment={{locked:editor.editingLocked,lock:editor.lockEditing,save:editor.saveForPackaging}} historyVersion={editor.historyVersion} project={editor.project} applyProject={command=>{if(editor.conflict)throw new MessageError(describeMessage('workspace.conflict'));editor.applyProject(command);}} sourceAssetId={asset?.id} audioDurationMs={asset?.source_duration_ms ?? undefined} onTimelineHost={setTimelineHost} assignmentError={assignmentError} projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new MessageError(describeMessage('workspace.conflict')); }} undo={editor.undo} redo={editor.redo}
-    canUndo={editor.canUndo&&!editor.editingLocked} canRedo={editor.canRedo&&!editor.editingLocked} dirty={editor.dirty} saving={editor.saving} notices={[message, editor.errorNotice]}
+    canUndo={editor.canUndo&&!editor.editingLocked} canRedo={editor.canRedo&&!editor.editingLocked} dirty={editor.dirty} saving={editor.saving}
     onSave={() => void editor.save()}
     saveForPackaging={editor.saveForPackaging}
     selectedLineId={selectedLineId} playheadLineId={playheadLineId} transport={asset ? transport : undefined} />

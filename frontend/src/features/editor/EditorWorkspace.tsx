@@ -12,7 +12,8 @@ import { planSelectionAction, attachmentSelection, attachmentTracks, type Select
 import { createProjectDocument, createProjectEditorState, executeProjectCommand } from '../../domain/project-document';
 import { CueSlot, CueProperties, KaraokeTools } from '../KaraokeTools';
 import type { KaraokeCommand } from '../../domain/karaoke';
-import { MessageBar, useNotice, type Notice } from '../../shared/MessageBar';
+import { useNotice, type Notice } from '../../shared/MessageBar';
+import { FloatingTrayProvider, useOptionalFloatingTray, useTrayEntry } from '../FloatingTray';
 import { AmllSettings } from '../AmllPanel';
 import type { ValidationTab } from '../PackagingPanel';
 import type { AmllRule } from '../../domain/amll-compatibility';
@@ -125,7 +126,15 @@ export function EditorWorkspace(props: Props) {
   });
   useTranslation();
   const shared = useEditorSelection();
-  return shared ? <EditorWorkspaceContent key={props.projectId} {...props} /> : <SelectionProvider><EditorWorkspaceContent key={props.projectId} {...props} /></SelectionProvider>;
+  const existingTray = useOptionalFloatingTray();
+  const body = shared ? (
+    <EditorWorkspaceContent key={props.projectId} {...props} />
+  ) : (
+    <SelectionProvider>
+      <EditorWorkspaceContent key={props.projectId} {...props} />
+    </SelectionProvider>
+  );
+  return existingTray ? body : <FloatingTrayProvider>{body}</FloatingTrayProvider>;
 }
 
 // Cached rows keep event functions stable while every invocation reads current state.
@@ -199,6 +208,9 @@ function EditorWorkspaceContent(props: Props) {
   const [settingsDialog, setSettingsDialog] = useState<'metadata' | 'singers' | 'tracks' | 'translations' | null>(null);
   const [message, publishMessage] = useNotice();
   const setMessage: typeof publishMessage = useLiveCallback((text,...options) => publishMessage(typeof text==='string' && props.project ? projectErrorText(props.project,text) : text,...options));
+  useTrayEntry('editor-message', message ? { kind: 'notice', notice: message } : null);
+  useTrayEntry('editor-prop-notice-0', props.notices?.[0] ? { kind: 'notice', notice: props.notices[0] } : null);
+  useTrayEntry('editor-prop-notice-1', props.notices?.[1] ? { kind: 'notice', notice: props.notices[1] } : null);
   const [splitWordId, setSplitWordId] = useState<string | null>(null);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [rubyShortcut, setRubyShortcut] = useState<{ wordId: string; serial: number; afterRubyId?: string | null } | null>(null);
@@ -928,10 +940,6 @@ function EditorWorkspaceContent(props: Props) {
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
     <EditorMenu {...props} editingLocked={props.alignment?.locked} amllSettings={props.project&&props.applyProject?close=><AmllSettings project={props.project!} apply={command=>{if(props.alignment?.locked)return;try{props.applyProject!(command);}catch(e){setMessage(errorMessage(e));}}} locate={rule=>{close();setValidationTab('amll');setFocusRule(rule);setMode('package');}}/>:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />
-    <div ref={audioReview?.setTaskHost} />
-    <div ref={audioReview?.setMessageHost} />
-    <MessageBar notice={message} />
-    {props.notices?.map((notice, index) => <MessageBar key={index} notice={notice} />)}
     <nav className={styles.modeTabs} aria-label={t('editor.mode')}>{([['acquire',t('editor.acquire'),'cloud'],['audio',t('editor.audio'),'music'],['edit',t('editor.edit'),'pencil'],['sync',t('editor.sync'),'target'],['karaoke',t('editor.karaoke'),'karaoke'],['preview',t('editor.amllPreview'),'lyric-list'],['package',t('editor.package'),'folder']] as const).map(([id,label,icon]) => <button data-role="inline" key={id} aria-current={mode === id ? 'page' : undefined} onClick={() => { if (canvasComposing.current || !finishSyncDraft()) return; flushSync(() => { const input = window.document.activeElement; if (input instanceof HTMLInputElement) input.blur(); }); if (pageRef.current?.querySelector('[aria-invalid="true"]')) return; setLocate(null); setRubyShortcut(null); setMode(id); setActiveMenuId(null); }}><Icon name={icon} size={17}/>{label}</button>)}</nav>
     {mode === 'audio' && <div className={styles.ribbon} aria-label={t('vocal.actions')}>
       <div className={vocalStyles.segmentTools} ref={audioReview.setToolsHost}/>
@@ -941,7 +949,7 @@ function EditorWorkspaceContent(props: Props) {
       <span ref={audioReview.setUploadHost}/>
       <div className={vocalStyles.alignmentTools} ref={audioReview.setAlignmentHost}/>
     </div>}
-    {props.projectId && props.project && props.alignment && <AlignmentPanel pid={props.projectId} project={props.project} control={props.alignment} assetId={props.sourceAssetId} durationMs={props.audioDurationMs??null} visible={mode==='audio'} finishDraft={()=>{
+    {props.projectId && props.project && props.alignment && <AlignmentPanel pid={props.projectId} project={props.project} dirty={props.dirty} control={props.alignment} assetId={props.sourceAssetId} durationMs={props.audioDurationMs??null} visible={mode==='audio'} finishDraft={()=>{
       if(canvasComposing.current || !finishSyncDraft())return false;
       flushSync(()=>{const active=window.document.activeElement;if(active instanceof HTMLElement)active.blur();});
       return !editRejected.current && !pageRef.current?.querySelector('[aria-invalid="true"]');
