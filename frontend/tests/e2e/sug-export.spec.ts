@@ -15,5 +15,5 @@ test('unified SUG export commits offsets, locates invalid drafts and downloads i
  if(process.env.SUG_CONTRACT_DIR)await writeFile(`${process.env.SUG_CONTRACT_DIR}/browser.zip`,bytes);
  await page.getByLabel('导出格式',{exact:true}).selectOption('nicokara');await expect(pane.getByLabel('主歌词 · 正文 @Offset',{exact:true})).toHaveValue('200');
  await page.getByRole('button',{name:'撤销',exact:true}).click();await page.getByLabel('导出格式',{exact:true}).selectOption('sug');await expect(input).toHaveValue('0');
- await input.fill('-2000');await input.press('Enter');await button.click();await expect(pane).toContainText('请调整输出偏移');
+ await input.fill('-2000');await input.press('Enter');await button.click();await expect(page.locator('#validation-panel-lyrics')).toContainText('请调整输出偏移');await page.locator('#validation-panel-lyrics').getByRole('button',{name:/请调整输出偏移/}).click();await expect(input).toBeFocused();
 });

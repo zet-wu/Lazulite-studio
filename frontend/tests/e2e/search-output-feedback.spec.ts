@@ -10,13 +10,13 @@ test('pure TTML shows every relevant issue; error links select and focus exact t
  await page.goto('/projects/sample-project/edit?scenario=no-music');await importLyrics(page,file(issueXml));
  await page.getByRole('button',{name:'文件打包',exact:true}).click();
 
- await page.getByRole('button',{name:'下载歌词',exact:true}).click();
+ await page.locator('#output-panel-lyrics').getByRole('button',{name:/^导出 /}).click();
  await expect(page.getByRole('alert')).toContainText('有 2 项需要处理');
  const issue=page.getByRole('button',{name:/第 2 行.*轨道 2.*第 1 单元.*缺少结束时间/});
  await issue.focus();await page.keyboard.press('Enter');
  await expect(page.locator('main [data-romanization-unit-id="r2"]')).toBeFocused();
- await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('lrc');
- const download=page.waitForEvent('download');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
+ await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('lrc');await page.locator('#output-panel-lyrics').getByRole('checkbox',{name:'背景歌词 · 正文',exact:true}).uncheck();
+ const download=page.waitForEvent('download');await page.locator('#output-panel-lyrics').getByRole('button',{name:/^导出 /}).click();
  expect(await readFile(await(await download).path(),'utf8')).toContain('word');
 });
 
@@ -57,10 +57,11 @@ test('automatic validation links focus body, background and 注音',async({page}
   [/^第 1 行 · \d+ 项/, /第 1 行 · 第 1 词: 缺少开始和结束时间/, '[data-word-id="word1"]'],
   [/^第 1 行 · 背景 · \d+ 项/, /第 1 行 · 背景: 缺少结束时间/, '[data-line-id="bg"]'],
   [/^第 1 行 · 背景 · \d+ 项/, /第 1 行 · 背景 · 第 1 词: 缺少开始和结束时间/, '[data-word-id="bgword"]'],
-  [/^第 2 行 · \d+ 项/, /第 2 行 · 第 1 词 · 第 1 注音: 缺少/, '[data-ruby-id="ruby1"]'],
+  [/^第 2 行 · \d+ 项/, /第 2 行 · 第 1 词 · 第 1 注音: /, '[data-ruby-id="ruby1"]'],
  ] as const;
  for(const [group,name,selector] of targets){
   await page.getByRole('button',{name:'文件打包',exact:true}).click();
+  await page.getByLabel('校验格式筛选').selectOption('all');
   const panel=page.getByRole('tabpanel',{name:'歌词校验'});
   await panel.getByRole('button',{name:/^缺少时间 ·/}).click();
   await panel.getByRole('button',{name:group}).click();
@@ -73,7 +74,7 @@ test('output issue mounts a distant virtual row and transfers keyboard focus',as
  await page.goto('/projects/sample-project/edit?scenario=no-music');
  const lines=Array.from({length:82},(_,i)=>`<p xml:id="virtual${i}" begin="${i*2}" ${i===81 ? 'studio:null="end"' : `end="${i*2+1}"`}><span begin="${i*2}" end="${i*2+1}">word${i}</span></p>`).join('');
  await importLyrics(page,file(`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body>${lines}</body></tt>`));
- await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('qrc');await page.getByRole('button',{name:'下载歌词',exact:true}).click();
+ await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式').selectOption('qrc');await page.locator('#output-panel-lyrics').getByRole('button',{name:/^导出 /}).click();
  const link=page.getByRole('button',{name:/第 82 行.*缺少结束时间/});await link.focus();await page.keyboard.press('Enter');
  const row=page.locator('main [data-line-id="virtual81"]');await expect(row).toBeFocused();await expect(row).toBeInViewport();
 });

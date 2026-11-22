@@ -1801,5 +1801,16 @@
   "parse.sugInvalid": "SUG data is damaged or contains unresolved references. Check the source file.",
   "parse.sugVersion": "Only the SUG 0.3.0 file structure is supported.",
   "parse.sugProjectOutput": "Export SUG from the lyric export panel using the project content selection.",
-  "acquire.sugTiming": "SUG has {{count}} missing checkpoints. Existing timing will be imported so you can continue timing.{{missing}} mapped objects have missing endpoints. "
+  "acquire.sugTiming": "SUG has {{count}} missing checkpoints. Existing timing will be imported so you can continue timing.{{missing}} mapped objects have missing endpoints. ",
+  "format.multiFiles": "Group / track files",
+  "format.millisecondFiles": "Milliseconds; separate files",
+  "format.centisecondFiles": "Centiseconds; separate files",
+  "format.multiReadingLabel": "Grouped readings",
+  "format.nicoTimingOutput": "Lyrics and readings use centiseconds. Each group and attachment track gets a file; source millisecond timing stays unchanged.",
+  "format.sugTimingOutput": "Millisecond timing is retained. Lines use body word envelopes; the consumer derives character display timing from checkpoints.",
+  "format.multiReading": "Selected lyrics carry grouped readings and guide cues. SUG projects Ruby edges to the parent word envelope.",
+  "format.multiBackground": "Selected groups and tracks become separate files. Background-to-main structural relationships are not stored in these files.",
+  "format.nicoAttachments": "Selected translations and romanizations get separate files. Timed content becomes a whole sentence using its own envelope; plain content uses the parent line interval.",
+  "format.sugAttachments": "Selected attachment tracks get separate files. Timed content retains unit timing; plain content uses the parent body word envelope.",
+  "format.multiOverlap": "Files retain independent intervals. The consumer configures file assembly and subtitle placement."
 }

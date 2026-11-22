@@ -37,6 +37,6 @@ export const OutputSelection=forwardRef<OutputSelectionHandle,{project:ProjectDo
     onChange={event=>setDrafts(previous=>({...previous,[output.id]:event.target.value}))} onBlur={()=>{if(selected)commit([output.id]);}} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();event.stopPropagation();commit([output.id]);}}}/>}
   </div>;
  })}</fieldset>)}
- {invalid.length>0&&multiple&&<p id="offset-error" role="alert">{t('karaoke.offsetInvalid')}</p>}
+ {invalid.length>0&&multiple&&<p id="offset-error" role="alert">{t('output.integerOffset')}</p>}
  </div>;
 });

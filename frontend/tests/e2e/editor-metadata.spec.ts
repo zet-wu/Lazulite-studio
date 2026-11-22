@@ -21,7 +21,7 @@ test('singer rename and reorder retain focus and nested deletion confirmation ca
  await page.getByRole('button',{name:'删除歌手 performer',exact:true}).click();await page.getByRole('button',{name:'确认删除'}).click();await expect(page.getByLabel('歌手 ID performer',{exact:true})).toHaveCount(0);
 });
 test('invalid singer types locate the field and do not block plain text',async({page})=>{
- await load(page,xml.replace('type="person"','type="invalid"'));await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByRole('button',{name:'下载歌词'}).click();await page.getByRole('button',{name:'歌手 actor: 歌手 type 无效：invalid',exact:true}).click();await expect(page.getByLabel('歌手 actor type')).toBeFocused();await page.getByLabel('歌手 actor type').selectOption('person');await page.getByRole('button',{name:'关闭歌手管理'}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByRole('button',{name:'歌手 actor: 歌手 type 无效：invalid'})).toHaveCount(0);
+ await load(page,xml.replace('type="person"','type="invalid"'));await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.locator('#output-panel-lyrics').getByRole('button',{name:/^导出 /}).click();await page.getByRole('button',{name:'歌手 actor: 歌手 type 无效：invalid',exact:true}).click();await expect(page.getByLabel('歌手 actor type')).toBeFocused();await page.getByLabel('歌手 actor type').selectOption('person');await page.getByRole('button',{name:'关闭歌手管理'}).click();await page.getByRole('button',{name:'文件打包',exact:true}).click();await expect(page.getByRole('button',{name:'歌手 actor: 歌手 type 无效：invalid'})).toHaveCount(0);
 });
 test('output preference survives a panel switch', async ({ page }) => {
  await load(page);
@@ -32,8 +32,8 @@ test('output preference survives a panel switch', async ({ page }) => {
  await expect(page.getByLabel('导出格式')).toHaveValue('lrc');
 });
 test('single switches and mixed batch checkboxes preserve one-step undo',async({page})=>{
- await load(page);await page.locator('[data-outline-drag]').first().click();await page.getByRole('switch',{name:'跳过打轴'}).check();
- await page.locator('[data-outline-drag]').nth(1).click({modifiers:['ControlOrMeta']});const batch=page.getByRole('checkbox',{name:'跳过打轴'});await expect(batch).toHaveAttribute('aria-checked','mixed');await batch.click();await expect(batch).toBeChecked();await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(batch).toHaveAttribute('aria-checked','mixed');
+ await load(page);await page.locator('[data-outline-drag]').first().click();await page.getByRole('switch',{name:'跳过连续打轴'}).check();
+ await page.locator('[data-outline-drag]').nth(1).click({modifiers:['ControlOrMeta']});const batch=page.getByRole('checkbox',{name:'跳过连续打轴'});await expect(batch).toHaveAttribute('aria-checked','mixed');await batch.click();await expect(batch).toBeChecked();await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(batch).toHaveAttribute('aria-checked','mixed');
 });
 test('table fields protect IME and cancel drafts without changing the saved metadata',async({page})=>{
  await load(page);await settings(page,'歌词元数据');const field=page.getByLabel('元数据 artist 值 1');await field.focus();await field.dispatchEvent('compositionstart');await field.fill('新内容');await field.press('Enter');await expect(field).toBeFocused();await field.dispatchEvent('compositionend');await field.press('Escape');await expect(field).toHaveValue('甲');

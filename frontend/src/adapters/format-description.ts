@@ -56,6 +56,18 @@ export function describeSelectedOutput(project:import('./lyric-output').OutputPr
   const kind=index===2?'translation':index===3?'romanization':null;
   const selected=kind?[...projection.origins.values()].some(origin=>origin.kind===kind):index===4?projection.document.lines.some(line=>project.lyrics.lines.find(source=>source.id===projection.origins.get(line.id)?.lineId)?.backgroundOf):true;
   if((kind||index===4)&&!selected)return {...row,result:'format.omitted',status:'omitted',detail:message('format.notSelected')};
+  if(multi&&index!==5){
+   if(index===1&&!project.lyrics.lines.some(line=>projection.origins.get(line.id)?.kind==='body'&&line.words.some(word=>word.rubyUnits.length)))return {...row,result:'format.omitted',status:'omitted',detail:message('format.notSelected')};
+   const key=index===0?(format==='sug'?'format.sugTimingOutput':'format.nicoTimingOutput'):index===1?'format.multiReading':index===4?'format.multiBackground':format==='sug'?'format.sugAttachments':'format.nicoAttachments';
+   return {...row,result:index===0?(format==='sug'?'format.millisecondFiles':'format.centisecondFiles'):index===1?'format.multiReadingLabel':'format.multiFiles',status:'partial',detail:message(key)};
+  }
+  if(index===5){
+   const sourceOrdinals=new Map(project.lyrics.lines.filter(line=>!line.backgroundOf).map((line,index)=>[line.id,index+1]));
+   const overlaps=overlappingMainLines(projection.document);
+   const lines=[...new Set(overlaps.map(ordinal=>{const row=projection.document.lines.filter(line=>!line.backgroundOf)[ordinal-1],origin=projection.origins.get(row.id),source=project.lyrics.lines.find(line=>line.id===origin?.lineId);return sourceOrdinals.get(source?.backgroundOf??source?.id??'');}).filter((value):value is number=>value!==undefined))];
+   const base=multi?message('format.multiOverlap'):describeLyricFormat({...projection.document,lines:[]},format)[5].detail;
+   return {...row,detail:messageList([base,...(lines.length?[message('format.knownOverlap',{lines:lines.join(', ')})]:[])])};
+  }
   if(kind&&!multi)return {...row,result:format==='ass'?'format.trackEvents':'format.selectedRows',status:'partial',detail:message(format==='ass'?'format.assAttachments':'format.selectedRowsDetail')};
   if(index===4&&['txt','lrc','elrc'].includes(format))return {...row,result:'format.parentheses',status:'partial',detail:message('format.backgroundDetail')};
   return row;

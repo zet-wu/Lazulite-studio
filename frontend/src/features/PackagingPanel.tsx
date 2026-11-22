@@ -20,6 +20,7 @@ import {audioRangeIssues} from '../adapters/audio-validation';
 import {useProjectEditing} from './editor/ProjectEditingContext';
 import {usePreference} from './editor/use-preference';
 import {useAutomaticValidation,type ValidationTab} from './useAutomaticValidation';
+import {issueText} from './output-messages';
 import {OutputIssues} from './OutputIssues';
 import {OutputSelection,type OutputSelectionHandle} from './OutputSelection';
 import {AmllPanel} from './AmllPanel';
@@ -48,7 +49,7 @@ export function PackagingPanel(props:Props){
    const issues:OutputIssue[]=[];
    for(const [target] of downloadFormats){await new Promise<void>(resolve=>setTimeout(resolve,0));if(cancelled)return;issues.push(...prepareLyricDownload(project,target,title).issues);}
    const combined=new Map<string,OutputIssue>();
-   for(const issue of issues){const key=outputIssueKey(issue),previous=combined.get(key);combined.set(key,{...issue,formats:[...new Set([...(previous?.formats??[]),...(issue.formats??[])])]});}
+   for(const issue of issues){const key=outputIssueKey(issue),previous=combined.get(key);combined.set(key,{...(previous??issue),formats:[...new Set([...(previous?.formats??[]),...(issue.formats??[])])]});}
    if(!cancelled)setAllResults({project,issues:[...combined.values()]});
   })();
   return()=>{cancelled=true;};
@@ -62,7 +63,7 @@ export function PackagingPanel(props:Props){
  useEffect(()=>{validationPane.current?.scrollTo?.(0,0);},[tab]);
  const apply=(command:ProjectCommand)=>{try{props.applyProject?.(command);setMessage('');return true;}catch(cause){setMessage(errorMessage(cause));return false;}};
  const locate=(issue:OutputIssue)=>{
-  if(issue.karaokeSettings&&!issue.lineId){setOutputTab('lyrics');const id=issue.outputIds?.[0];const root=window.document.querySelector('[data-output-selection]');(id?Array.from(root?.querySelectorAll<HTMLInputElement>('[data-output-offset], [data-output-id]')??[]).find(node=>(node.dataset.outputOffset??node.dataset.outputId)===id):root?.querySelector<HTMLInputElement>('input'))?.focus();return;}
+  if(issue.karaokeSettings&&!issue.lineId){setOutputTab('lyrics');const id=issue.outputIds?.[0];const root=window.document.querySelector('[data-output-selection]');(id?Array.from(root?.querySelectorAll<HTMLInputElement>('[data-output-offset]')??[]).find(node=>node.dataset.outputOffset===id)??Array.from(root?.querySelectorAll<HTMLInputElement>('[data-output-id]')??[]).find(node=>node.dataset.outputId===id):root?.querySelector<HTMLInputElement>('input'))?.focus();return;}
   props.locateIssue(issue);
  };
  const download=()=>{
@@ -74,7 +75,7 @@ export function PackagingPanel(props:Props){
  };
  const issues=props.document.lines.length===0?[]:all?(allResults?.project===project?allResults.issues:[]):prepared.issues;
  const ready=!all||allResults?.project===project;
- const audioIssues=audioRangeIssues(all?props.document:prepared.projection.document,all?props.project?.acoustics:undefined,props.sourceAssetId,props.audioDurationMs);
+ const audioIssues=!all&&format==='txt'?[]:audioRangeIssues(all?props.document:prepared.projection.document,all?props.project?.acoustics:undefined,props.sourceAssetId,props.audioDurationMs).filter(issue=>all||format!=='lrc'||issue.kind==='line');
  const label=downloadFormats.find(([id])=>id===format)![1];
  const tabs=(side:'validation'|'output',values:readonly string[],selected:string,change:(value:string)=>void,names:string[])=><div className={styles.validationTabs} role="tablist" aria-label={t(side==='validation'?'validation.type':'packaging.outputType')}>{values.map((value,index)=><button key={value} id={`${side}-tab-${value}`} data-role="secondary" role="tab" aria-selected={selected===value} aria-controls={`${side}-panel-${value}`} tabIndex={selected===value?0:-1} onClick={()=>change(value)} onKeyDown={event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?values[0]:event.key==='End'?values.at(-1)!:values[(index+1)%values.length];change(next);event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`#${side}-tab-${next}`)?.focus();}}>{names[index]}</button>)}</div>;
  return <div className={`${styles.page} ${styles.packagingPage}`}>
@@ -83,7 +84,7 @@ export function PackagingPanel(props:Props){
  <div role="tabpanel" id={`validation-panel-${tab}`} aria-labelledby={`validation-tab-${tab}`} aria-busy={tab==='lyrics'?!ready:!amllCurrent}>
  {tab==='lyrics'?<><div className={styles.downloadRow}><label>{t('validation.formats')}<Select aria-label={t('validation.formatFilter')} value={all?'all':'current'} onChange={event=>setAll(event.target.value==='all')}><option value="current">{t('validation.currentOutput',{format:t(label,{defaultValue:label})})}</option><option value="all">{t('validation.allFormats')}</option></Select></label></div>
  {!ready&&<p role="status">{t('validation.updating')}</p>}
- <OutputIssues document={props.document} issues={[...issues,...audioIssues]} highlighted={[]} locate={locate}/>
+ <OutputIssues document={props.document} issues={[...issues,...audioIssues]} highlighted={attempted&&!all?prepared.issues:[]} locate={locate}/>
  {ready&&issues.length===0&&<p>{t(props.document.lines.length===0?'validation.noLyrics':all?'validation.clean':'validation.noBlocking')}</p>}</>:
  <>{!amllCurrent&&<p role="status">{t('validation.updating')}</p>}{amll?.error&&<p role="alert">{formatMessage(amll.error)}</p>}{props.project&&props.applyProject&&amll?.amll&&<AmllPanel project={props.project} results={amll.amll} current={amllCurrent} apply={props.applyProject} locate={locate} focusRule={props.focusRule} onRuleLocated={props.onRuleLocated}/>}</>}
  </div></section>
@@ -96,7 +97,7 @@ export function PackagingPanel(props:Props){
  {format==='ttml'&&<p className={styles.hint}>{t('packaging.ttmlAll')}</p>}
  {(format==='nicokara'||format==='sug')&&<button data-role="secondary" onClick={()=>setDialog(format==='sug'?'sug-singers':'singers')}>{t(format==='sug'?'karaoke.sugSingers':'karaoke.singerMarkers')}</button>}
  <p role="status">{t('packaging.fileSummary',{count:prepared.files.length,issues:prepared.issues.length})}</p>
- <OutputIssues document={props.document} issues={prepared.issues} highlighted={attempted?prepared.issues:[]} locate={locate}/>
+ {prepared.issues[0]&&<p>{issueText(prepared.issues[0],props.document)}</p>}
  {message&&<p role="alert">{message}</p>}
  </div>
  <div role="tabpanel" id="output-panel-music" aria-labelledby="output-tab-music" hidden={outputTab!=='music'}>

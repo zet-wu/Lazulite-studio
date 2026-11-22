@@ -154,7 +154,7 @@ test('western splitting and inline space-only words preserve independent whitesp
   await expect(line.locator('[data-word-id]')).toHaveCount(8);
   await expect(line.locator('[data-word-id]').last().locator('[class*="wordMain"] input')).toHaveValue('  ');
   await page.getByRole('button', { name: '文件打包', exact: true }).click(); const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '下载歌词', exact: true }).click();
+  await page.locator('#output-panel-lyrics').getByRole('button',{name:/^导出 /}).click();
   const xml = await (await import('node:fs/promises')).readFile(await (await download).path(), 'utf8');
   expect(xml).toContain('  '); expect(xml).not.toContain('studio:');
   await page.getByRole('button', { name: '编辑', exact: true }).click();

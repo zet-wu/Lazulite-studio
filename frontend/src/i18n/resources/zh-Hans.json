@@ -1788,5 +1788,16 @@
   "parse.sugInvalid": "SUG 数据损坏或包含无法解析的引用，请检查源文件。",
   "parse.sugVersion": "仅支持 SUG 0.3.0 文件结构。",
   "parse.sugProjectOutput": "SUG 需在歌词导出面板中按项目内容选择输出。",
-  "acquire.sugTiming": "SUG 尚缺 {{count}} 个检查点；已有时间将随歌词导入，可在导入后继续打轴。映射后 {{missing}} 个对象缺少端点。"
+  "acquire.sugTiming": "SUG 尚缺 {{count}} 个检查点；已有时间将随歌词导入，可在导入后继续打轴。映射后 {{missing}} 个对象缺少端点。",
+  "format.multiFiles": "分组／轨道文件",
+  "format.millisecondFiles": "毫秒；分文件",
+  "format.centisecondFiles": "厘秒；分文件",
+  "format.multiReadingLabel": "分组读音",
+  "format.nicoTimingOutput": "正文与注音按厘秒输出；各分组及附属轨道分别生成文件，原项目毫秒时间保留。",
+  "format.sugTimingOutput": "保留毫秒时间，行使用正文词包络；接收端按字符与检查点推导显示时间。",
+  "format.multiReading": "所选正文携带分组注音与导唱；SUG 的 Ruby 首尾按所属词包络投影。",
+  "format.multiBackground": "按所选分组与轨道输出独立文件，背景与主行的结构关联不随这些文件保存。",
+  "format.nicoAttachments": "所选翻译／音译分别输出文件；定时内容取自身包络并合为整句，普通内容使用所属行区间。",
+  "format.sugAttachments": "所选附属轨道分别输出文件；定时内容保留单元时间，普通内容使用所属正文词包络。",
+  "format.multiOverlap": "各文件保留独立区间；多文件装配与字幕位置由接收端配置。"
 }

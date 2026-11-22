@@ -12,7 +12,7 @@ test('translation-only TXT, TTML selection restoration and undo share the saved 
  await page.getByLabel('导出格式',{exact:true}).selectOption('ttml');await expect(pane.getByRole('checkbox')).toHaveCount(0);
  await page.getByLabel('导出格式',{exact:true}).selectOption('qrc');await expect(body).not.toBeChecked();await expect(translation).toBeChecked();
  await pane.getByRole('button',{name:'导出对照',exact:true}).click();await expect(pane.getByRole('table')).toBeVisible();
- await page.screenshot({path:info.outputPath('selected-light.png')});await page.evaluate(()=>document.documentElement.dataset.theme='dark');await page.screenshot({path:info.outputPath('selected-dark.png')});
+ await page.screenshot({path:process.env.SUG_CONTRACT_DIR?`${process.env.SUG_CONTRACT_DIR}/selected-light.png`:info.outputPath('selected-light.png')});await page.evaluate(()=>document.documentElement.dataset.theme='dark');await page.screenshot({path:process.env.SUG_CONTRACT_DIR?`${process.env.SUG_CONTRACT_DIR}/selected-dark.png`:info.outputPath('selected-dark.png')});
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(translation).not.toBeChecked();await page.getByRole('button',{name:'重做',exact:true}).click();await expect(translation).toBeChecked();
  await page.getByRole('button',{name:'保存',exact:true}).click();await page.reload();await page.getByRole('button',{name:'文件打包',exact:true}).click();await page.getByLabel('导出格式',{exact:true}).selectOption('txt');await expect(translation).toBeChecked();await expect(body).not.toBeChecked();
 });

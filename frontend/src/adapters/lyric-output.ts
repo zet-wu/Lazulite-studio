@@ -1,3 +1,5 @@
+import {isUntimedSeparator} from './export-separators';
+import {displayLines} from '../domain/amll-compatibility';
 import { errorMessage, message } from '../domain/messages';
 import { createLine, createWord, type LyricDocument, type LyricLine } from '../domain/lyric-document';
 import type { ProjectDocument } from '../domain/project-document';
@@ -7,11 +9,11 @@ import { prepareAss, renderAss } from './ass';
 import { karaokeOutputs, safeFilename } from './karaoke-output';
 import { prepareNicokara, nicokaraArchiveFiles } from './nicokara';
 import { prepareSug } from './sug';
-import { DocumentOutputError, type OutputIssue } from './output-validation';
+import { DocumentOutputError, uniqueOutputIssues, type OutputIssue } from './output-validation';
 
 export const downloadFormats = [...exportFormats, ['nicokara','NicoKara'], ['sug','SUG']] as const;
 export type DownloadFormat = ExportFormat | 'nicokara' | 'sug';
-export type OutputProject = Pick<ProjectDocument,'lyrics'|'karaoke'|'editing'>;
+export type OutputProject = Pick<ProjectDocument,'lyrics'|'karaoke'|'editing'> & Partial<Pick<ProjectDocument,'lineOrder'>>;
 type Origin = { lineId:string; kind:'body'|'translation'|'romanization'; trackId?:string; contentId?:string; plain?:boolean; name:string };
 export type LyricOutputProjection = { document:LyricDocument; origins:Map<string,Origin>; selected:string[] };
 
@@ -30,17 +32,21 @@ export function projectLyricOutput(project:OutputProject, format:DownloadFormat)
   }
   rows.push({...line,words,backgroundOf:bracket?null:line.backgroundOf});origins.set(line.id,origin);
  };
- for(const [ordinal,line] of lyrics.lines.entries()){
+ const shown=displayLines(lyrics,project.lineOrder??[]);
+ const ordinals=new Map(shown.filter(line=>!line.backgroundOf).map((line,index)=>[line.id,index+1]));
+ for(const line of shown){
+  const label=`L${ordinals.get(line.backgroundOf??line.id)}${line.backgroundOf?'-bg':''}`;
   const group=karaoke.lineGroups[line.id];
-  if(karaoke.outputs.includes(outputId(group)))append(line,{lineId:line.id,kind:'body',name:`L${ordinal+1}`});
+  if(karaoke.outputs.includes(outputId(group)))append(line,{lineId:line.id,kind:'body',name:label});
   for(const kind of ['translation','romanization'] as const){
    const tracks=lyrics[kind==='translation'?'translationTracks':'romanizationTracks'];
    tracks.forEach((track,index)=>{
     if(!karaoke.outputs.includes(outputId(group,kind,track.id)))return;
-    for(const content of track.contents.filter(content=>content.lineId===line.id)){
+    for(const [number,content] of track.contents.filter(content=>content.lineId===line.id).entries()){
      const words=content.kind==='plain'?[{...createWord(content.text,content.id),beginMs:line.beginMs,endMs:format==='elrc'?null:line.endMs}]:content.units.map(unit=>({...createWord(unit.text,unit.id),beginMs:unit.beginMs,endMs:unit.endMs}));
-     const endpoints=(key:'beginMs'|'endMs')=>content.kind==='plain'?line[key]:words.some(word=>word[key]===null)?null:words.length?(key==='beginMs'?Math.min:Math.max)(...words.map(word=>word[key]!)):null;
-     append({...createLine('',content.id),words,beginMs:endpoints('beginMs'),endMs:endpoints('endMs'),backgroundOf:line.backgroundOf},{lineId:line.id,kind,trackId:track.id,contentId:content.id,plain:content.kind==='plain',name:`L${ordinal+1} ${kind==='translation'?'Translation':'Romanization'} ${index+1} ${track.language??'und'}${'purpose' in track?` ${track.purpose}`:''}`});
+     const timedWords=words.filter(word=>!isUntimedSeparator(word));
+     const endpoints=(key:'beginMs'|'endMs')=>content.kind==='plain'?line[key]:format==='lrc'?(key==='beginMs'?timedWords[0]?.beginMs??null:timedWords.at(-1)?.endMs??null):timedWords.some(word=>word[key]===null)?null:timedWords.length?(key==='beginMs'?Math.min:Math.max)(...timedWords.map(word=>word[key]!)):null;
+     append({...createLine('',content.id),words,beginMs:endpoints('beginMs'),endMs:endpoints('endMs'),backgroundOf:line.backgroundOf},{lineId:line.id,kind,trackId:track.id,contentId:content.id,plain:content.kind==='plain',name:`${label} ${kind==='translation'?'Translation':'Romanization'} ${index+1}.${number+1} ${track.language??'und'}${'purpose' in track?` ${track.purpose}`:''}`});
     }
    });
   }
@@ -52,7 +58,7 @@ export function sourceOutputIssue(issue:OutputIssue,projection:LyricOutputProjec
  const origin=projection.origins.get(issue.lineId);
  if(!origin||origin.kind==='body')return issue;
  const unit=issue.kind==='word'&&!origin.plain;
- return {...issue,lineId:origin.lineId,kind:origin.plain&&issue.kind==='line'?'line':`${origin.kind}-${unit?'unit':'content'}`,trackId:origin.trackId,contentId:origin.contentId,unitId:unit?issue.wordId:undefined,wordId:undefined};
+ return {...issue,lineId:origin.lineId,kind:origin.plain&&(issue.kind==='line'||issue.code==='missing-time'||issue.code==='invalid-range')?'line':`${origin.kind}-${unit?'unit':'content'}`,trackId:origin.trackId,contentId:origin.contentId,unitId:unit?issue.wordId:undefined,wordId:undefined};
 }
 export function prepareLyricDownload(project:OutputProject,format:DownloadFormat,title:string){
  const projection=projectLyricOutput(project,format);
@@ -76,12 +82,12 @@ export function prepareLyricDownload(project:OutputProject,format:DownloadFormat
    }else text=exportLyricFile(projection.document,format,project.editing);
    const kinds=[...new Set([...projection.origins.values()].map(origin=>origin.kind))];
    const suffix=kinds.length&&!kinds.includes('body')?`.${kinds.join('-')}`:'';
-   files=[{name:`${safeFilename(title)}${suffix}.${format==='elrc'?'lrc':format}`,text}];
+   files=[{name:`${safeFilename(title)}${suffix}.${format==='elrc'?'extended.lrc':format}`,text}];
   }
  }catch(cause){
   issues=cause instanceof DocumentOutputError?cause.issues:[{kind:'line',lineId:'',missing:[],code:'serialization',detail:errorMessage(cause),message:cause instanceof Error?cause.message:String(cause)}];
  }
- return {files,archiveFiles,projection,issues:issues.map(issue=>({...sourceOutputIssue(issue,projection),severity:issue.severity??'error' as const,formats:[format==='nicokara'?'Nicokara':format.toUpperCase()]}))};
+ return {files,archiveFiles,projection,issues:uniqueOutputIssues(issues.map(issue=>({...sourceOutputIssue(issue,projection),severity:issue.severity??'error' as const,formats:[format==='nicokara'?'Nicokara':format.toUpperCase()]})))};
 }
 export function defaultOutputProject(lyrics:LyricDocument,editing:ProjectDocument['editing']):OutputProject {
  return {lyrics,editing,karaoke:createKaraoke(lyrics)};

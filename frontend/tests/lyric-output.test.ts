@@ -34,3 +34,15 @@ it('attachment timing errors map to their actual editor unit',()=>{
  const p=fixture();p.karaoke.outputs=[outputId('main','romanization','ro')];const content=p.lyrics.romanizationTracks[0].contents[0];if(content.kind==='timed')content.units[0].endMs=null;
  expect(prepareLyricDownload(p,'yrc','歌').issues).toContainEqual(expect.objectContaining({kind:'romanization-unit',lineId:p.lyrics.lines[0].id,trackId:'ro',contentId:'roman',unitId:'unit'}));
 });
+it('TXT follows the project display order including backgrounds placed before their main line',()=>{
+ const p=fixture();p.lineOrder=[p.lyrics.lines[1].id,p.lyrics.lines[0].id];
+ expect(prepareLyricDownload(p,'txt','歌').files[0].text).toBe('（ 背景 ）\n正文\n');
+});
+it('plain LRC requires the attachment start and keeps later untimed units as text',()=>{
+ const p=fixture();p.karaoke.outputs=[outputId('main','romanization','ro')];const content=p.lyrics.romanizationTracks[0].contents[0];if(content.kind==='timed')content.units.push({id:'later',text:'!',beginMs:null,endMs:null});
+ expect(prepareLyricDownload(p,'lrc','歌').issues).toEqual([]);expect(prepareLyricDownload(p,'lrc','歌').files[0].text).toContain('uta!');expect(prepareLyricDownload(p,'elrc','歌').issues.length).toBeGreaterThan(0);
+});
+it('ASS ignores untimed separator endpoints while retaining their exact text',async()=>{
+ const {translationWhitespaceDocument}=await import('./fixtures/translation-whitespace');const p=createProjectDocument(translationWhitespaceDocument());const {karaokeOutputs}=await import('../src/adapters/karaoke-output');p.karaoke.outputs=karaokeOutputs(p).map(o=>o.id);
+ const result=prepareLyricDownload(p,'ass','歌');expect(result.issues).toEqual([]);expect(result.files[0].text.match(/^Dialogue:/gm)).toHaveLength(8);expect(result.files[0].text).toContain('roman-main');
+});

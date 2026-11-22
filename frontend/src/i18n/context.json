@@ -11779,5 +11779,49 @@
   "acquire.sugTiming": {
     "source": "SUG 尚缺 {{count}} 个检查点；已有时间将随歌词导入，可在导入后继续打轴。映射后 {{missing}} 个对象缺少端点。",
     "context": "单个 SUG 0.3.0 歌词文件导入；预览显示缺少的源检查点数量，解析错误保留原项目。"
+  },
+  "format.multiFiles": {
+    "source": "分组／轨道文件",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "format.millisecondFiles": {
+    "source": "毫秒；分文件",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "format.centisecondFiles": {
+    "source": "厘秒；分文件",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "format.multiReadingLabel": {
+    "source": "分组读音",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "format.nicoTimingOutput": {
+    "source": "正文与注音按厘秒输出；各分组及附属轨道分别生成文件，原项目毫秒时间保留。",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "format.sugTimingOutput": {
+    "source": "保留毫秒时间，行使用正文词包络；接收端按字符与检查点推导显示时间。",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "format.multiReading": {
+    "source": "所选正文携带分组注音与导唱；SUG 的 Ruby 首尾按所属词包络投影。",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "format.multiBackground": {
+    "source": "按所选分组与轨道输出独立文件，背景与主行的结构关联不随这些文件保存。",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "format.nicoAttachments": {
+    "source": "所选翻译／音译分别输出文件；定时内容取自身包络并合为整句，普通内容使用所属行区间。",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "format.sugAttachments": {
+    "source": "所选附属轨道分别输出文件；定时内容保留单元时间，普通内容使用所属正文词包络。",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
+  },
+  "format.multiOverlap": {
+    "source": "各文件保留独立区间；多文件装配与字幕位置由接收端配置。",
+    "context": "统一导出对照：NicoKara／SUG 按实际分组选择说明各元素的输出和损失。"
   }
 }

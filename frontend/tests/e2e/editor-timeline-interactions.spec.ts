@@ -206,7 +206,7 @@ test('file input survives cancellation, same-file reselection and format export'
   await page.getByRole('button', { name: '文件打包', exact: true }).click();
   await page.getByLabel('导出格式').selectOption('txt');
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '下载歌词' }).click();
+  await page.locator('#output-panel-lyrics').getByRole('button',{name:/^导出 /}).click();
   expect((await download).suggestedFilename()).toMatch(/\.txt$/);
 });
 
