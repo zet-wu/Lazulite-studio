@@ -138,19 +138,18 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
   const selectedLineId = selectionLineId(selection);
   const currentLine = document.lines.find((line) => line.id === selectedLineId);
   if (clipboard.kind === 'ruby') {
-    if (selection?.kind !== 'ruby') throw new MessageError(message('editing.chooseReadingTarget'));
-    const word = currentLine?.words.find((item) => item.id === selection.wordId);
+    if (selection?.kind !== 'ruby' && selection?.kind !== 'words') throw new MessageError(message('editing.chooseReadingTarget'));
+    const word = currentLine?.words.find((item) => item.id === (selection.kind === 'ruby' ? selection.wordId : selection.activeId));
     if (!word) throw new MessageError(message('editing.readingWordMissing'));
-    const copied = clipboard.units.map((unit) => ({ ...unit, id: copyId(unit.id, idMap) }));
-    const commands: Array<Extract<LyricCommand, { type: 'insert-ruby' | 'set-ruby-time' }>> = [];
-    let afterRubyId = selection.activeId;
+    const copied = clipboard.units.map((unit) => ({ ...unit, id: copyId(unit.id, idMap), beginMs: null, endMs: null }));
+    const commands: Array<Extract<LyricCommand, { type: 'insert-ruby' }>> = [];
+    let afterRubyId = selection.kind === 'ruby' ? selection.activeId : word.rubyUnits.at(-1)?.id ?? null;
     for (const unit of copied) {
       commands.push({ type: 'insert-ruby', lineId: selection.lineId, wordId: word.id, afterRubyId, reading: unit.reading, rubyId: unit.id });
-      if (unit.beginMs !== null || unit.endMs !== null) commands.push({ type: 'set-ruby-time', lineId: selection.lineId, wordId: word.id, rubyId: unit.id, beginMs: unit.beginMs, endMs: unit.endMs });
       afterRubyId = unit.id;
     }
     return { command: { type: 'batch', commands },
-      selection: { ...selection, ids: copied.map((unit) => unit.id), anchorId: copied[0].id, activeId: copied.at(-1)!.id } };
+      selection: { ...selection, kind: 'ruby', wordId: word.id, ids: copied.map((unit) => unit.id), anchorId: copied[0].id, activeId: copied.at(-1)!.id } };
   }
   if (clipboard.kind === 'romanization-content') {
     if (!currentLine) throw new MessageError(message('editing.chooseLine'));
@@ -166,7 +165,7 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
     if (!content || content.kind !== 'timed') throw new MessageError(message('editing.chooseTimedRomanization'));
     const units = content.units.slice();
     const after = selection.kind === 'romanization-unit' ? units.findIndex((unit) => unit.id === selection.activeId) : units.length - 1;
-    const copied = clipboard.units.map((unit) => ({ ...unit, id: copyId(unit.id, idMap) }));
+    const copied = clipboard.units.map((unit) => ({ ...unit, id: copyId(unit.id, idMap), beginMs: null, endMs: null }));
     units.splice(after + 1, 0, ...copied);
     return { command: { type: 'set-romanization-content', trackId: selection.trackId, content: { ...content, units } },
       selection: { kind: 'romanization-unit', lineId: selection.lineId, trackId: selection.trackId, contentId: content.id, ids: copied.map((unit) => unit.id), anchorId: copied[0].id, activeId: copied.at(-1)!.id } };
@@ -175,9 +174,11 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
     if (!currentLine) throw new MessageError(message('editing.choosePasteLine'));
     const afterWordId = selection?.kind === 'words' && currentLine.words.some((word) => word.id === selection.activeId) ? selection.activeId : currentLine.words.at(-1)?.id ?? null;
     const words = clipboard.words.map(word => {const effective=clipboard.sources?.[word.id]; if(!word.agentRefs&&effective&&!sameAgents(effective,lineAgents(document,currentLine))) {if(!effective.length)throw new MessageError(message('editing.singerLoss'));return cloneWord({...word,agentRefs:effective},idMap);}return cloneWord(word,idMap);});
-    const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'insert-word' }>> = [];
-    const { beginMs, endMs } = expandedLineTime(currentLine, words);
-    if (beginMs !== currentLine.beginMs || endMs !== currentLine.endMs) commands.push({ type: 'set-line-time', lineId: currentLine.id, beginMs, endMs });
+    const commands: Array<Extract<LyricCommand, { type: 'insert-word' }>> = [];
+    for (const word of words) {
+      word.beginMs = null; word.endMs = null;
+      word.rubyUnits = word.rubyUnits.map(unit => ({ ...unit, beginMs: null, endMs: null }));
+    }
     let after = afterWordId;
     for (const word of words) { commands.push({ type: 'insert-word', lineId: currentLine.id, afterWordId: after, word }); after = word.id; }
     return { command: { type: 'batch', commands }, selection: { kind: 'words', lineId: currentLine.id, ids: words.map((word) => word.id), anchorId: words[0].id, activeId: words.at(-1)!.id } };

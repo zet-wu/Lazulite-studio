@@ -41,3 +41,27 @@ test('object multi-cut is one undo; repeated keyboard undo and redo from outline
     await page.keyboard.press('Control+z'); await expect(rows).toHaveCount(count);
   }
 });
+
+test('cross-line ruby paste into a word clears timing and one undo restores the empty reading', async ({ page }) => {
+  const { continuousBoundariesTtml } = await import('../fixtures/continuous-boundaries');
+  const xml = continuousBoundariesTtml.replace('</div></body>', '<p xml:id="destination" begin="8" end="9"><span begin="8" end="9">丁</span></p></div></body>');
+  await page.goto('/projects/sample-project/edit?scenario=no-music');
+  await importLyrics(page, { name: 'ruby-paste.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await page.locator('main [data-ruby-id]').first().click({ position: { x: 3, y: 3 } });
+  await page.keyboard.press('Control+c');
+  const destination = page.locator('main [data-line-id="destination"]');
+  await destination.locator('[data-word-id]').click({ position: { x: 3, y: 3 } });
+  await page.keyboard.press('Control+v');
+  await expect(destination.locator('[data-ruby-id]')).toHaveCount(1);
+  await expect(destination.getByRole('textbox', { name: '读音 丁', exact: true })).toHaveValue('こう');
+  for (const input of await destination.locator('[data-ruby-id] input').all()) {
+    if ((await input.getAttribute('aria-label')) !== '读音 丁') await expect(input).toHaveValue('');
+  }
+  await page.locator('[data-outline-drag]').nth(1).click();
+  await expect(page.getByLabel('行 2开始秒数', { exact: true })).toHaveValue('8');
+  await expect(page.getByLabel('行 2结束秒数', { exact: true })).toHaveValue('9');
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(destination.locator('[data-ruby-id]')).toHaveCount(0);
+  await page.getByRole('button', { name: '重做', exact: true }).click();
+  await expect(destination.locator('[data-ruby-id]')).toHaveCount(1);
+});

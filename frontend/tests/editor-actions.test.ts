@@ -12,7 +12,7 @@ describe('editor selection and clipboard', () => {
     expect(selectIds(order, ['b', 'c'], 'b', 'b', false, true)).toEqual(['c']);
   });
 
-  it('copies a 注音 word with timing while assigning fresh word and ruby IDs', () => {
+  it('pastes a 注音 word untimed while assigning fresh word and ruby IDs', () => {
     const document = createLyricDocument('今日');
     const line = document.lines[0];
     line.beginMs = 0; line.endMs = 2000;
@@ -25,13 +25,13 @@ describe('editor selection and clipboard', () => {
     const state = executeLyricCommand(createLyricEditorState(document), pasted.command);
     const clone = state.present.lines[0].words[1];
     expect(clone.id).not.toBe(word.id);
-    expect(clone).toMatchObject({ text: '今日', beginMs: 0, endMs: 1000 });
-    expect(clone.rubyUnits[0]).toMatchObject({ reading: 'きょう', beginMs: 0, endMs: 1000 });
+    expect(clone).toMatchObject({ text: '今日', beginMs: null, endMs: null });
+    expect(clone.rubyUnits[0]).toMatchObject({ reading: 'きょう', beginMs: null, endMs: null });
     expect(clone.rubyUnits[0].id).not.toBe('ruby');
     expect(undoLyricCommand(state).present).toBe(document);
   });
 
-  it('copies a selected 注音 unit while preserving original timing', () => {
+  it('pastes a selected 注音 unit without timing', () => {
     const document = createLyricDocument('歌');
     const line = document.lines[0], word = line.words[0];
     line.beginMs = 0; line.endMs = 1000;
@@ -42,7 +42,7 @@ describe('editor selection and clipboard', () => {
     const pasted = pasteRich(document, clipboard, selection);
     const state = executeLyricCommand(createLyricEditorState(document), pasted.command);
     const result = state.present.lines[0].words[0];
-    expect(result.rubyUnits.map((unit) => [unit.reading, unit.beginMs, unit.endMs])).toEqual([['うた', 0, 1000], ['うた', 0, 1000]]);
+    expect(result.rubyUnits.map((unit) => [unit.reading, unit.beginMs, unit.endMs])).toEqual([['うた', 0, 1000], ['うた', null, null]]);
     expect(result.rubyUnits[1].id).not.toBe('ruby');
     expect(undoLyricCommand(state).present).toBe(document);
   });
@@ -116,7 +116,7 @@ describe('editor selection and clipboard', () => {
     const clipboard = copySelection(document, selection);
     const targetSelection = { kind: 'lines' as const, ids: [target.id], anchorId: target.id, activeId: target.id };
     const pasted = executeLyricCommand(createLyricEditorState(document), pasteRich(document, clipboard, targetSelection).command);
-    expect(pasted.present.lines[1].beginMs).toBe(0);
+    expect(pasted.present.lines[1].beginMs).toBe(1000);
     expect(pasted.present.lines[1].words[1].rubyUnits[0].reading).toBe('きょう');
     expect(undoLyricCommand(pasted).present).toBe(document);
   });
@@ -134,4 +134,63 @@ it('batch deletion freezes incoming ends and undo restores both removed lines', 
   expect(deleted.present.lines[0]).toMatchObject({ endMs: 3000 });
   expect(undoLyricCommand(deleted).present).toBe(doc);
   expect(state.present).toEqual(before); expect(state.past).toHaveLength(0);
+});
+
+it.each([false, true])('appends copied ruby to a selected word (existing ruby=%s), retains beats and leaves destination times', existing => {
+  const document = createLyricDocument('源');
+  const source = document.lines[0], word = source.words[0];
+  Object.assign(source, { beginMs: 0, endMs: 1000 }); Object.assign(word, { beginMs: 0, endMs: 1000 });
+  word.rubyUnits = [{ id: 'r', reading: 'げん', beginMs: 0, endMs: 1000 }];
+  const destination = createLine('目标'); Object.assign(destination, { beginMs: 8000, endMs: 9000 });
+  const target = destination.words[0]; Object.assign(target, { beginMs: 8000, endMs: 9000 });
+  if (existing) target.rubyUnits = [{ id: 'old', reading: 'もく', beginMs: 8000, endMs: 9000 }];
+  document.lines.push(destination);
+  const editing = createProjectEditing(); editing.emptyBeats.r = { kind: 'ruby', count: 2 };
+  const copied = copySelection(document, { kind: 'ruby', lineId: source.id, wordId: word.id, ids: ['r'], activeId: 'r', anchorId: 'r' }, editing);
+  const paste = pasteRich(document, copied, { kind: 'words', lineId: destination.id, ids: [target.id], activeId: target.id, anchorId: target.id });
+  const state = executeLyricCommand(createLyricEditorState(document, editing), paste.command);
+  const result = state.present.lines[1].words[0];
+  expect(result.rubyUnits).toHaveLength(existing ? 2 : 1);
+  const ruby = result.rubyUnits.at(-1)!;
+  expect(ruby).toMatchObject({ reading: 'げん', beginMs: null, endMs: null });
+  expect(state.editing.emptyBeats[ruby.id]).toEqual({ kind: 'ruby', count: 2 });
+  expect(result).toMatchObject({ beginMs: 8000, endMs: 9000 });
+  expect(state.present.lines[1]).toMatchObject({ beginMs: 8000, endMs: 9000 });
+  expect(paste.selection).toMatchObject({ kind: 'ruby', wordId: target.id, ids: [ruby.id] });
+  expect(undoLyricCommand(state).present).toBe(document);
+});
+
+it.each(['romanizationTracks', 'translationTracks'] as const)('pastes timed units across lines untimed in %s without changing text', key => {
+  const document = createLyricDocument('源'); const source = document.lines[0];
+  const destination = createLine('目标'); document.lines.push(destination);
+  Object.assign(destination, { beginMs: 8000, endMs: 9000 });
+  document[key] = [{ id: 't', language: 'ja', purpose: 'subtitle' as const, contents: [
+    { id: 'c1', lineId: source.id, kind: 'timed', units: [{ id: 'u1', text: ' gen ', beginMs: 0, endMs: 1000 }] },
+    { id: 'c2', lineId: destination.id, kind: 'timed', units: [{ id: 'u2', text: 'mokuhyou', beginMs: 8000, endMs: 9000 }] },
+  ] }];
+  const attachment = key === 'translationTracks' ? { attachment: 'translation' as const } : {};
+  const copied = copySelection(document, { kind: 'romanization-unit', ...attachment, lineId: source.id, trackId: 't', contentId: 'c1', ids: ['u1'], activeId: 'u1', anchorId: 'u1' });
+  const paste = pasteRich(document, copied, { kind: 'romanization-unit', ...attachment, lineId: destination.id, trackId: 't', contentId: 'c2', ids: ['u2'], activeId: 'u2', anchorId: 'u2' });
+  const state = executeLyricCommand(createLyricEditorState(document), paste.command);
+  const content = state.present[key][0].contents[1];
+  expect(content.kind === 'timed' && content.units[1]).toMatchObject({ text: ' gen ', beginMs: null, endMs: null });
+  expect(state.present.lines[1]).toBe(destination);
+  expect(undoLyricCommand(state).present).toBe(document);
+});
+
+it('pastes words across singer lines with nested beats intact and every copied timestamp cleared', () => {
+  const document = createLyricDocument('源'); const source = document.lines[0], word = source.words[0];
+  document.agents = [{ id: 'a', type: 'person', name: '甲' }, { id: 'b', type: 'person', name: '乙' }];
+  source.agentRefs = ['a']; Object.assign(source, { beginMs: 0, endMs: 1000 });
+  Object.assign(word, { beginMs: 0, endMs: 1000 }); word.rubyUnits = [{ id: 'r', reading: 'げん', beginMs: 0, endMs: 1000 }];
+  const destination = createLine('目标'); destination.agentRefs = ['b']; Object.assign(destination, { beginMs: 8000, endMs: 9000 }); document.lines.push(destination);
+  const editing = createProjectEditing(); editing.emptyBeats.r = { kind: 'ruby', count: 3 };
+  const copied = copySelection(document, { kind: 'words', lineId: source.id, ids: [word.id], activeId: word.id, anchorId: word.id }, editing);
+  const paste = pasteRich(document, copied, { kind: 'lines', ids: [destination.id], activeId: destination.id, anchorId: destination.id });
+  const initial = createLyricEditorState(document, editing); initial.project.present.amll.noWordAgents = false;
+  const state = executeLyricCommand(initial, paste.command), result = state.present.lines[1].words[1];
+  expect(result).toMatchObject({ text: '源', agentRefs: ['a'], beginMs: null, endMs: null, rubyUnits: [{ reading: 'げん', beginMs: null, endMs: null }] });
+  expect(state.editing.emptyBeats[result.rubyUnits[0].id]).toEqual({ kind: 'ruby', count: 3 });
+  expect(state.present.lines[1]).toMatchObject({ beginMs: 8000, endMs: 9000 });
+  expect(undoLyricCommand(state).present).toBe(document);
 });
