@@ -540,7 +540,7 @@ function EditorWorkspaceContent(props: Props) {
     const next = copySelection(document, current, editing, props.project?.karaoke.lineGroups);
     clipboardToken.current = crypto.randomUUID();
     setClipboard(next);
-    setMessage(describeMessage('editor.copied'), 'status');
+    setMessage(describeMessage('editor.copied'), 'status', 3000);
     return next;
   };
   const cut = (target?: EditorSelection) => {

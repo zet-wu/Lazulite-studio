@@ -113,17 +113,16 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
 
   useTrayEntry('workspace-message', message ? { kind: 'notice', notice: message } : null);
   useTrayEntry('document-error', editor.errorNotice ? { kind: 'notice', notice: editor.errorNotice } : null);
-  useTrayEntry(
-    'document-sync',
-    editor.syncNotice
-      ? {
-          kind: 'notice',
-          notice: recovery.externalAlignmentApplied
-            ? { ...editor.syncNotice, text: describeMessage('sync.externalAlignmentApplied') }
-            : editor.syncNotice,
-        }
-      : null,
+  const syncNotice = useMemo(
+    () =>
+      editor.syncNotice
+        ? recovery.externalAlignmentApplied
+          ? { ...editor.syncNotice, text: describeMessage('sync.externalAlignmentApplied') }
+          : editor.syncNotice
+        : null,
+    [editor.syncNotice, recovery.externalAlignmentApplied],
   );
+  useTrayEntry('document-sync', syncNotice ? { kind: 'notice', notice: syncNotice } : null);
   useTrayEntry(
     'bg-alignment-recovery',
     recovery.alignmentPrompt

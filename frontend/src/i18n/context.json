@@ -11152,22 +11152,24 @@
     "params": [],
     "parameterNotes": {}
   },
-  "tray.clearAll": {
-    "context": "floating tray clear dismissible notices button",
-    "source": "清空提示",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "tray.summary": {
-    "context": "collapsed tray status summary",
-    "source": "{{running}} 运行中 · {{notices}} 提示",
+  "tray.runningCount": {
+    "context": "collapsed tray running task count",
+    "source": "{{count}} 运行中",
     "params": [
-      "running",
-      "notices"
+      "count"
     ],
     "parameterNotes": {
-      "running": "Active task count.",
-      "notices": "Visible notice count."
+      "count": "Active task count."
+    }
+  },
+  "tray.noticeCount_other": {
+    "context": "collapsed tray notice count",
+    "source": "{{count}} 提示",
+    "params": [
+      "count"
+    ],
+    "parameterNotes": {
+      "count": "Visible notice count."
     }
   },
   "tray.resetPosition": {

@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
@@ -32,6 +33,7 @@ type TrayContextValue = {
   remove: (id: string) => void;
 };
 
+const DEFAULT_STATUS_TIMEOUT_MS = 4000;
 const TrayContext = createContext<TrayContextValue | null>(null);
 
 export function useOptionalFloatingTray() {
@@ -65,60 +67,51 @@ function clampPosition(left: number, top: number, width: number, height: number)
   };
 }
 
+function isSimpleStatusNotice(item: TrayItem): boolean {
+  return (
+    item.kind === 'notice' &&
+    item.notice.role === 'status' &&
+    item.tone !== 'warning' &&
+    item.tone !== 'alert' &&
+    !item.actions &&
+    item.notice.dismissible !== false
+  );
+}
+
+function resolveAutoDismissMs(item: TrayItem): number | null {
+  if (!isSimpleStatusNotice(item)) return null;
+  if (item.notice.timeout === undefined) return DEFAULT_STATUS_TIMEOUT_MS;
+  return item.notice.timeout > 0 ? item.notice.timeout : null;
+}
+
 function TrayRow({
   item,
-  paused,
-  onDismissed,
+  snackbar,
+  showCollapse,
+  onCollapse,
+  onDismiss,
 }: {
   item: TrayItem;
-  paused: boolean;
-  onDismissed: (notice: Notice) => void;
+  snackbar: boolean;
+  showCollapse: boolean;
+  onCollapse: () => void;
+  onDismiss: (notice: Notice, rowEl?: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
   const rowRef = useRef<HTMLDivElement>(null);
   const { notice } = item;
 
-  const hide = useCallback(() => {
-    const root = rowRef.current;
-    if (root?.contains(document.activeElement)) {
-      const tray = root.closest<HTMLElement>('[data-floating-tray]');
-      const origin = notice.origin;
-      if (
-        origin?.isConnected &&
-        !origin.closest('[data-floating-tray]') &&
-        origin.matches('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex]')
-      ) {
-        origin.focus();
-      } else {
-        const sibling = tray
-          ? Array.from(tray.querySelectorAll<HTMLElement>('button:not(:disabled)')).find((btn) => !root.contains(btn))
-          : null;
-        if (sibling) sibling.focus();
-        else {
-          document
-            .querySelector<HTMLElement>('[data-workspace] main, [data-workspace] nav button[aria-current="page"]')
-            ?.focus();
-        }
-      }
-    }
-    onDismissed(notice);
-    notice.onDismiss?.();
-  }, [notice, onDismissed]);
-
-  useEffect(() => {
-    if (!notice.timeout || notice.dismissible === false || paused) return;
-    const timer = window.setTimeout(hide, notice.timeout);
-    return () => window.clearTimeout(timer);
-  }, [notice, paused, hide]);
-
-  const toneClass =
-    item.kind === 'task'
+  const toneClass = snackbar
+    ? styles.itemSnackbar
+    : item.kind === 'task'
       ? styles.itemTask
       : item.tone === 'warning'
         ? styles.itemWarning
         : notice.role === 'alert' || item.tone === 'alert'
           ? styles.itemAlert
-          : '';
+          : item.actions
+            ? styles.itemAccent
+            : '';
 
   const text = isMessage(notice.text) ? formatMessage(notice.text) : notice.text;
 
@@ -128,16 +121,33 @@ function TrayRow({
         <span className={styles.itemText} role={notice.role}>
           {text}
         </span>
-        {notice.dismissible !== false && (
-          <IconButton icon="close" label={t('notice.dismiss')} onClick={hide} />
+        {(showCollapse || notice.dismissible !== false) && (
+          <div className={styles.rowActions}>
+            {showCollapse && (
+              <IconButton
+                className={styles.collapseBtn}
+                icon="down"
+                label={t('tray.collapse')}
+                aria-expanded={true}
+                onClick={onCollapse}
+              />
+            )}
+            {notice.dismissible !== false && (
+              <IconButton
+                icon="close"
+                label={t('notice.dismiss')}
+                onClick={() => onDismiss(notice, rowRef.current)}
+              />
+            )}
+          </div>
         )}
       </div>
+      {item.actions && <div className={styles.itemActions}>{item.actions}</div>}
       {item.kind === 'task' && (
-        <div className={styles.progressTrack} aria-hidden="true">
+        <div className={`${styles.progressTrack} ${styles.progressTrackEdge}`} aria-hidden="true">
           <div className={styles.progressBar} />
         </div>
       )}
-      {item.actions && <div className={styles.itemActions}>{item.actions}</div>}
     </div>
   );
 }
@@ -151,6 +161,11 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const trayRef = useRef<HTMLDivElement>(null);
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
+  const timersRef = useRef<
+    Map<Notice, { remainingMs: number; startedAt: number | null; timeoutId: number | null }>
+  >(new Map());
   const dragState = useRef<{
     pointerId: number;
     startX: number;
@@ -189,17 +204,51 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const handleDismissed = useCallback((notice: Notice) => {
+  const restoreFocusForNotice = (notice: Notice, rowEl?: HTMLElement | null) => {
+    const tray = trayRef.current;
+    if (!tray?.contains(document.activeElement)) return;
+    if (rowEl && !rowEl.contains(document.activeElement)) return;
+    const origin = notice.origin;
+    if (
+      origin?.isConnected &&
+      !origin.closest('[data-floating-tray]') &&
+      origin.matches(
+        'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex]',
+      )
+    ) {
+      origin.focus();
+      return;
+    }
+    const sibling = Array.from(tray.querySelectorAll<HTMLElement>('button:not(:disabled)')).find(
+      (btn) => !rowEl?.contains(btn),
+    );
+    if (sibling) {
+      sibling.focus();
+      return;
+    }
+    document
+      .querySelector<HTMLElement>('[data-workspace] main, [data-workspace] nav button[aria-current="page"]')
+      ?.focus();
+  };
+
+  const dismissNotice = useCallback((notice: Notice, rowEl?: HTMLElement | null) => {
+    restoreFocusForNotice(notice, rowEl);
+    const record = timersRef.current.get(notice);
+    if (record) {
+      if (record.timeoutId !== null) window.clearTimeout(record.timeoutId);
+      timersRef.current.delete(notice);
+    }
     setDismissedNotices((prev) => {
       if (prev.has(notice)) return prev;
       const next = new WeakSet<Notice>();
-      for (const item of entries.values()) {
+      for (const item of entriesRef.current.values()) {
         if (prev.has(item.notice)) next.add(item.notice);
       }
       next.add(notice);
       return next;
     });
-  }, [entries]);
+    notice.onDismiss?.();
+  }, []);
 
   const visibleItems = useMemo(() => {
     return Array.from(entries.values())
@@ -211,9 +260,74 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
       });
   }, [entries, dismissedNotices]);
 
+  const isSingleSimpleNotice = visibleItems.length === 1 && isSimpleStatusNotice(visibleItems[0]);
+  const isCollapsed = collapsed && !isSingleSimpleNotice;
+
+  useEffect(() => {
+    if (visibleItems.length === 0) {
+      setPaused(false);
+      setCollapsed(false);
+      setDragging(false);
+      dragState.current = null;
+    } else if (isSingleSimpleNotice && collapsed) {
+      setCollapsed(false);
+    }
+  }, [visibleItems.length, isSingleSimpleNotice, collapsed]);
+
+  useEffect(() => {
+    const timers = timersRef.current;
+    const activeAuto = new Map<Notice, number>();
+    for (const item of visibleItems) {
+      const ms = resolveAutoDismissMs(item);
+      if (ms !== null) activeAuto.set(item.notice, ms);
+    }
+    for (const [notice, record] of timers) {
+      if (!activeAuto.has(notice)) {
+        if (record.timeoutId !== null) window.clearTimeout(record.timeoutId);
+        timers.delete(notice);
+      }
+    }
+    for (const [notice, ms] of activeAuto) {
+      let record = timers.get(notice);
+      if (!record) {
+        record = { remainingMs: ms, startedAt: null, timeoutId: null };
+        timers.set(notice, record);
+      }
+      if (paused) {
+        if (record.timeoutId !== null) {
+          window.clearTimeout(record.timeoutId);
+          record.timeoutId = null;
+        }
+        if (record.startedAt !== null) {
+          record.remainingMs = Math.max(0, record.remainingMs - (Date.now() - record.startedAt));
+          record.startedAt = null;
+        }
+      } else if (record.timeoutId === null) {
+        record.startedAt = Date.now();
+        record.timeoutId = window.setTimeout(() => {
+          record.timeoutId = null;
+          record.startedAt = null;
+          dismissNotice(notice);
+        }, record.remainingMs);
+      }
+    }
+  }, [visibleItems, paused, dismissNotice]);
+
+  useEffect(
+    () => () => {
+      for (const record of timersRef.current.values()) {
+        if (record.timeoutId !== null) window.clearTimeout(record.timeoutId);
+      }
+      timersRef.current.clear();
+    },
+    [],
+  );
+
   const taskCount = visibleItems.filter((item) => item.kind === 'task').length;
   const noticeCount = visibleItems.length - taskCount;
-  const hasDismissible = visibleItems.some((item) => item.notice.dismissible !== false);
+  const summaryParts: string[] = [];
+  if (taskCount > 0) summaryParts.push(t('tray.runningCount', { count: taskCount }));
+  if (noticeCount > 0) summaryParts.push(t('tray.noticeCount', { count: noticeCount }));
 
   useLayoutEffect(() => {
     if (!position || !trayRef.current) return;
@@ -222,7 +336,7 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
     if (clamped.left !== position.left || clamped.top !== position.top) {
       setPosition(clamped);
     }
-  }, [position, collapsed, visibleItems.length]);
+  }, [position, isCollapsed, isSingleSimpleNotice, visibleItems.length]);
 
   useEffect(() => {
     if (!position) return;
@@ -235,15 +349,13 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('resize', onResize);
   }, [position]);
 
+  const nonDraggableTarget = (target: EventTarget | null) =>
+    (target as Element | null)?.closest(
+      `button, a, input, select, textarea, [role="button"], .${styles.itemText}`,
+    );
+
   const onTrayPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
-    if (
-      event.button !== 0 ||
-      (event.target as Element).closest(
-        `button, a, input, select, textarea, [role="button"], .${styles.itemText}`,
-      )
-    ) {
-      return;
-    }
+    if (event.button !== 0 || nonDraggableTarget(event.target)) return;
     const box = trayRef.current?.getBoundingClientRect();
     if (!box) return;
     event.preventDefault();
@@ -279,22 +391,8 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const clearAll = () => {
-    const dismissible = visibleItems.filter((item) => item.notice.dismissible !== false);
-    if (!dismissible.length) return;
-    setDismissedNotices((prev) => {
-      const next = new WeakSet<Notice>();
-      for (const item of entries.values()) {
-        if (prev.has(item.notice)) next.add(item.notice);
-      }
-      for (const item of dismissible) {
-        next.add(item.notice);
-      }
-      return next;
-    });
-    for (const item of dismissible) {
-      item.notice.onDismiss?.();
-    }
+  const onBlankDoubleClick = (event: ReactMouseEvent<HTMLElement>) => {
+    if (!nonDraggableTarget(event.target)) setPosition(null);
   };
 
   const contextValue = useMemo<TrayContextValue>(() => ({ upsert, remove }), [upsert, remove]);
@@ -307,7 +405,9 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
           ref={trayRef}
           data-floating-tray
           aria-label={t('tray.title')}
-          className={`${styles.tray} ${collapsed ? styles.collapsed : ''} ${dragging ? styles.dragging : ''}`}
+          className={`${styles.tray} ${
+            isCollapsed ? styles.collapsed : isSingleSimpleNotice ? styles.snackbar : ''
+          } ${dragging ? styles.dragging : ''}`}
           style={
             position
               ? { left: `${position.left}px`, top: `${position.top}px`, right: 'auto', bottom: 'auto' }
@@ -324,38 +424,50 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
             if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
           }}
         >
-          <div
-            data-tray-handle
-            title={t('tray.resetPosition')}
-            className={styles.header}
-            onDoubleClick={(event) => {
-              if (!(event.target as Element).closest('button')) setPosition(null);
-            }}
-          >
-            <div className={styles.titleGroup}>
-              <span className={styles.title}>{t('tray.title')}</span>
-              <span className={styles.summary}>
-                {collapsed
-                  ? t('tray.summary', { running: taskCount, notices: noticeCount })
-                  : `(${visibleItems.length})`}
-              </span>
-            </div>
-            <div className={styles.headerActions}>
-              {!collapsed && hasDismissible && (
-                <IconButton icon="trash" label={t('tray.clearAll')} onClick={clearAll} />
+          {isCollapsed ? (
+            <div
+              data-tray-handle
+              title={t('tray.resetPosition')}
+              className={styles.collapsedBar}
+              onDoubleClick={onBlankDoubleClick}
+            >
+              <div className={styles.titleGroup}>
+                <span className={styles.title}>{t('tray.title')}</span>
+                {summaryParts.length > 0 && (
+                  <span className={styles.summary}>{summaryParts.join(' · ')}</span>
+                )}
+              </div>
+              <div className={styles.headerActions}>
+                <IconButton
+                  className={styles.collapseBtn}
+                  icon="up"
+                  label={t('tray.expand')}
+                  aria-expanded={false}
+                  onClick={() => setCollapsed(false)}
+                />
+              </div>
+              {taskCount > 0 && (
+                <div className={`${styles.progressTrack} ${styles.progressTrackEdge}`} aria-hidden="true">
+                  <div className={styles.progressBar} />
+                </div>
               )}
-              <IconButton
-                icon={collapsed ? 'up' : 'down'}
-                label={collapsed ? t('tray.expand') : t('tray.collapse')}
-                aria-expanded={!collapsed}
-                onClick={() => setCollapsed((v) => !v)}
-              />
             </div>
-          </div>
-          {!collapsed && (
-            <div className={styles.list}>
-              {visibleItems.map((item) => (
-                <TrayRow key={item.id} item={item} paused={paused} onDismissed={handleDismissed} />
+          ) : (
+            <div
+              data-tray-handle
+              title={t('tray.resetPosition')}
+              className={styles.list}
+              onDoubleClick={onBlankDoubleClick}
+            >
+              {visibleItems.map((item, index) => (
+                <TrayRow
+                  key={item.id}
+                  item={item}
+                  snackbar={isSingleSimpleNotice}
+                  showCollapse={!isSingleSimpleNotice && index === 0}
+                  onCollapse={() => setCollapsed(true)}
+                  onDismiss={dismissNotice}
+                />
               ))}
             </div>
           )}

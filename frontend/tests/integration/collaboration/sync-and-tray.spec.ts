@@ -46,18 +46,18 @@ test('real SSE syncs external edits when clean, warns when dirty without layout 
   await expect(page.getByRole('textbox', { name: '词 external-v2', exact: true })).toBeVisible();
   expect((await nav.boundingBox())!.y).toBe(navTopBefore);
 
-  // Drag floating tray and confirm it stays inside viewport and updates position.
+  // Drag floating tray from blank padding and confirm it stays inside viewport and resets on double-click.
   const tray = page.locator('[data-floating-tray]');
   const handle = tray.locator('[data-tray-handle]');
   const trayBoxBefore = (await tray.boundingBox())!;
-  await page.mouse.move(trayBoxBefore.x + 24, trayBoxBefore.y + 14);
+  await page.mouse.move(trayBoxBefore.x + 4, trayBoxBefore.y + 4);
   await page.mouse.down();
   await page.mouse.move(trayBoxBefore.x - 120, trayBoxBefore.y - 80, { steps: 4 });
   await page.mouse.up();
   const trayBoxAfter = (await tray.boundingBox())!;
   expect(trayBoxAfter.x).toBeLessThan(trayBoxBefore.x);
   expect(trayBoxAfter.y).toBeLessThan(trayBoxBefore.y);
-  await handle.dblclick();
+  await handle.dblclick({ position: { x: 4, y: 4 } });
 
   // Dirty local state warns on external update and supports reloading external version.
   const wordInput = page.getByRole('textbox', { name: '词 external-v2', exact: true });

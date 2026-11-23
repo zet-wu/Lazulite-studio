@@ -3,7 +3,7 @@
   z-index: 40;
   right: 16px;
   bottom: 16px;
-  width: 356px;
+  width: 320px;
   max-width: calc(100vw - 24px);
   display: flex;
   flex-direction: column;
@@ -15,42 +15,58 @@
   overflow: hidden;
   font-size: 12.5px;
   cursor: grab;
+  touch-action: none;
 }
 
 :root[data-theme='dark'] .tray {
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
 }
 
-.collapsed {
+.tray.snackbar {
+  width: fit-content;
+  min-width: 200px;
+  max-width: min(340px, calc(100vw - 24px));
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.10);
+}
+
+:root[data-theme='dark'] .tray.snackbar {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.36);
+}
+
+.tray.collapsed {
   width: auto;
   min-width: 220px;
   max-width: min(360px, calc(100vw - 24px));
 }
 
-.header {
+.tray :global(button.icon-button[data-role][data-role]) {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+}
+
+.tray button:focus-visible {
+  outline-offset: -1px;
+}
+
+.collapsedBar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
+  min-height: 32px;
   padding: 4px 8px 4px 10px;
   background: var(--surface-container);
-  border-bottom: 1px solid var(--line);
   user-select: none;
   cursor: grab;
   touch-action: none;
 }
 
-.collapsed .header {
-  border-bottom: 0;
-}
-
-.dragging {
+.dragging,
+.dragging .collapsedBar {
   cursor: grabbing;
   user-select: none;
-}
-
-.dragging .header {
-  cursor: grabbing;
 }
 
 .titleGroup {
@@ -70,17 +86,23 @@
 
 .summary {
   font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.headerActions {
+.headerActions,
+.rowActions {
   display: flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+}
+
+.collapseBtn {
+  color: var(--muted);
 }
 
 .list {
@@ -91,12 +113,12 @@
 }
 
 .item {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 8px 10px 8px 12px;
   border-bottom: 1px solid var(--line);
-  border-left: 3px solid transparent;
   background: var(--panel);
 }
 
@@ -104,16 +126,27 @@
   border-bottom: 0;
 }
 
+.itemSnackbar {
+  padding: 6px 8px 6px 12px;
+}
+
 .itemAlert {
-  border-left-color: var(--danger);
+  border-left: 3px solid var(--danger);
+  padding-left: 9px;
 }
 
 .itemWarning {
-  border-left-color: var(--warning);
+  border-left: 3px solid var(--warning);
+  padding-left: 9px;
+}
+
+.itemAccent {
+  border-left: 3px solid var(--blue);
+  padding-left: 9px;
 }
 
 .itemTask {
-  border-left-color: var(--blue);
+  padding-bottom: 10px;
   background: color-mix(in srgb, var(--surface-container) 55%, var(--panel));
 }
 
@@ -123,6 +156,10 @@
   gap: 8px;
 }
 
+.itemSnackbar .itemTop {
+  align-items: center;
+}
+
 .itemText {
   flex: 1;
   min-width: 0;
@@ -130,6 +167,10 @@
   overflow-wrap: anywhere;
   cursor: text;
   user-select: text;
+}
+
+.itemSnackbar .itemText {
+  line-height: 1.35;
 }
 
 .itemAlert .itemText[role='alert'] {
@@ -143,25 +184,30 @@
   flex-wrap: wrap;
 }
 
-.itemActions button {
-  min-height: 26px;
-  padding: 3px 9px;
+.tray .itemActions button[data-role][data-role] {
+  min-height: 24px;
+  padding: 2px 8px;
   font-size: 12px;
 }
 
 .progressTrack {
   position: relative;
-  height: 3px;
-  border-radius: 2px;
+  height: 2px;
   background: var(--surface-high);
   overflow: hidden;
+}
+
+.progressTrackEdge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
 .progressBar {
   position: absolute;
   inset: 0 auto 0 0;
   width: 38%;
-  border-radius: 2px;
   background: var(--blue);
   animation: tray-indeterminate 1.4s ease-in-out infinite;
 }
