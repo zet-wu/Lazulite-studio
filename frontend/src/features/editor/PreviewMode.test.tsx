@@ -19,6 +19,7 @@ function makeDoc(text = 'Line one') {
     {
       id: 't1',
       language: 'zh-Hans',
+      purpose: 'subtitle',
       contents: [{ id: 'tc1', lineId: 'l1', kind: 'plain', text: '第一行' }],
     },
   ];
@@ -69,8 +70,7 @@ describe('PreviewMode paused sync', () => {
       seekMs: vi.fn(),
       play: vi.fn(),
       pause: vi.fn(),
-      toggle: vi.fn(),
-      step: vi.fn(),
+      audition: vi.fn(),
       getPositionMs: () => 2000,
       getPlaybackRate: () => 1,
       isPlaying: () => false,
