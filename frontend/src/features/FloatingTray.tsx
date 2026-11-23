@@ -235,12 +235,19 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('resize', onResize);
   }, [position]);
 
-  const onHeaderPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as Element).closest('button')) return;
+  const onTrayPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if (
+      event.button !== 0 ||
+      (event.target as Element).closest(
+        `button, a, input, select, textarea, [role="button"], .${styles.itemText}`,
+      )
+    ) {
+      return;
+    }
     const box = trayRef.current?.getBoundingClientRect();
     if (!box) return;
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     dragState.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -253,7 +260,7 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
     setDragging(true);
   };
 
-  const onHeaderPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const onTrayPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
     const active = dragState.current;
     if (!active || active.pointerId !== event.pointerId) return;
     const next = clampPosition(
@@ -265,7 +272,7 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
     setPosition(next);
   };
 
-  const onHeaderPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const onTrayPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
     if (dragState.current?.pointerId === event.pointerId) {
       dragState.current = null;
       setDragging(false);
@@ -306,6 +313,10 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
               ? { left: `${position.left}px`, top: `${position.top}px`, right: 'auto', bottom: 'auto' }
               : undefined
           }
+          onPointerDown={onTrayPointerDown}
+          onPointerMove={onTrayPointerMove}
+          onPointerUp={onTrayPointerUp}
+          onPointerCancel={onTrayPointerUp}
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
           onFocusCapture={() => setPaused(true)}
@@ -317,17 +328,10 @@ export function FloatingTrayProvider({ children }: { children: ReactNode }) {
             data-tray-handle
             title={t('tray.resetPosition')}
             className={styles.header}
-            onPointerDown={onHeaderPointerDown}
-            onPointerMove={onHeaderPointerMove}
-            onPointerUp={onHeaderPointerUp}
-            onPointerCancel={onHeaderPointerUp}
             onDoubleClick={(event) => {
               if (!(event.target as Element).closest('button')) setPosition(null);
             }}
           >
-            <span className={styles.grip} aria-hidden="true">
-              ⋮⋮
-            </span>
             <div className={styles.titleGroup}>
               <span className={styles.title}>{t('tray.title')}</span>
               <span className={styles.summary}>

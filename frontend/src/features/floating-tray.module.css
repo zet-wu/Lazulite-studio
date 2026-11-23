@@ -14,6 +14,7 @@
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
   overflow: hidden;
   font-size: 12.5px;
+  cursor: grab;
 }
 
 :root[data-theme='dark'] .tray {
@@ -43,15 +44,13 @@
   border-bottom: 0;
 }
 
-.dragging .header {
+.dragging {
   cursor: grabbing;
+  user-select: none;
 }
 
-.grip {
-  display: inline-flex;
-  align-items: center;
-  color: var(--muted);
-  flex-shrink: 0;
+.dragging .header {
+  cursor: grabbing;
 }
 
 .titleGroup {
@@ -129,6 +128,8 @@
   min-width: 0;
   line-height: 1.4;
   overflow-wrap: anywhere;
+  cursor: text;
+  user-select: text;
 }
 
 .itemAlert .itemText[role='alert'] {

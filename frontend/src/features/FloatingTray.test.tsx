@@ -106,7 +106,7 @@ describe('FloatingTray', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it('clamps dragged position inside viewport and resets on header double-click', () => {
+  it('clamps dragged position inside viewport from blank areas, ignores text/buttons, and resets on header double-click', () => {
     render(
       <FloatingTrayProvider>
         <TrayHarness />
@@ -115,17 +115,34 @@ describe('FloatingTray', () => {
 
     const tray = screen.getByLabelText('消息与处理队列');
     const handle = tray.querySelector('[data-tray-handle]') as HTMLElement;
+    expect(tray.textContent).not.toContain('⋮⋮');
     tray.getBoundingClientRect = () =>
       ({ left: 600, top: 400, width: 356, height: 140, right: 956, bottom: 540, x: 600, y: 400, toJSON: () => {} }) as DOMRect;
-    handle.setPointerCapture = vi.fn();
+    tray.setPointerCapture = vi.fn();
 
     const pointer = (type: string, props: Record<string, unknown>) =>
       Object.assign(new Event(type, { bubbles: true, cancelable: true }), props);
 
+    // Dragging from message text or interactive button does not move the tray.
+    const itemText = screen.getByText('自动对齐 · 正在全局对齐');
+    const cancelBtn = screen.getByRole('button', { name: '取消任务' });
     act(() => {
-      handle.dispatchEvent(pointer('pointerdown', { button: 0, pointerId: 1, clientX: 650, clientY: 420 }));
-      handle.dispatchEvent(pointer('pointermove', { pointerId: 1, clientX: -500, clientY: -500 }));
-      handle.dispatchEvent(pointer('pointerup', { pointerId: 1 }));
+      itemText.dispatchEvent(pointer('pointerdown', { button: 0, pointerId: 1, clientX: 650, clientY: 460 }));
+      tray.dispatchEvent(pointer('pointermove', { pointerId: 1, clientX: 500, clientY: 300 }));
+      tray.dispatchEvent(pointer('pointerup', { pointerId: 1 }));
+      cancelBtn.dispatchEvent(pointer('pointerdown', { button: 0, pointerId: 2, clientX: 650, clientY: 480 }));
+      tray.dispatchEvent(pointer('pointermove', { pointerId: 2, clientX: 500, clientY: 300 }));
+      tray.dispatchEvent(pointer('pointerup', { pointerId: 2 }));
+    });
+    expect(tray.style.left).toBe('');
+    expect(tray.style.top).toBe('');
+
+    // Dragging from blank card area (message row container) moves and clamps position.
+    const messageBar = itemText.closest('[data-message-bar]') as HTMLElement;
+    act(() => {
+      messageBar.dispatchEvent(pointer('pointerdown', { button: 0, pointerId: 3, clientX: 650, clientY: 460 }));
+      tray.dispatchEvent(pointer('pointermove', { pointerId: 3, clientX: -500, clientY: -500 }));
+      tray.dispatchEvent(pointer('pointerup', { pointerId: 3 }));
     });
 
     expect(tray.style.left).toBe('12px');
