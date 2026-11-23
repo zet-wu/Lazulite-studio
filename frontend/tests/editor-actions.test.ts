@@ -194,3 +194,25 @@ it('pastes words across singer lines with nested beats intact and every copied t
   expect(state.present.lines[1]).toMatchObject({ beginMs: 8000, endMs: 9000 });
   expect(undoLyricCommand(state).present).toBe(document);
 });
+
+it.each(['romanizationTracks', 'translationTracks'] as const)('pastes timed contents in %s untimed while full-line paste retains timing', key => {
+  const document = createLyricDocument('源'), source = document.lines[0], destination = createLine('目标');
+  Object.assign(source, { beginMs: 0, endMs: 1000 }); Object.assign(destination, { beginMs: 8000, endMs: 9000 }); document.lines.push(destination);
+  document[key] = [{ id: 't', language: 'ja', purpose: 'subtitle', contents: [
+    { id: 'timed', lineId: source.id, kind: 'timed', units: [{ id: 'u', text: ' gen ', beginMs: 0, endMs: 1000 }] },
+    { id: 'plain', lineId: source.id, kind: 'plain', text: ' plain ' },
+  ] }];
+  const attachment = key === 'translationTracks' ? { attachment: 'translation' as const } : {};
+  const copied = copySelection(document, { kind: 'romanization-content', ...attachment, trackId: 't', contentId: 'timed', lineId: source.id, ids: ['timed', 'plain'], activeId: 'timed', anchorId: 'timed' });
+  const pasted = pasteRich(document, copied, { kind: 'lines', ids: [destination.id], activeId: destination.id, anchorId: destination.id });
+  const state = executeLyricCommand(createLyricEditorState(document), pasted.command);
+  const contents = state.present[key][0].contents.slice(2);
+  expect(contents).toMatchObject([{ lineId: destination.id, kind: 'timed', units: [{ text: ' gen ', beginMs: null, endMs: null }] }, { lineId: destination.id, kind: 'plain', text: ' plain ' }]);
+  expect(contents[0].id).not.toBe('timed');
+  expect(contents[0].kind === 'timed' && contents[0].units[0].id).not.toBe('u');
+  expect(state.present.lines[1]).toBe(destination);
+  expect(undoLyricCommand(state).present).toBe(document);
+  const lineCopy = copySelection(document, { kind: 'lines', ids: [source.id], activeId: source.id, anchorId: source.id });
+  const whole = executeLyricCommand(createLyricEditorState(document), pasteRich(document, lineCopy, null).command);
+  expect(whole.present[key][0].contents.at(-2)).toMatchObject({ kind: 'timed', units: [{ beginMs: 0, endMs: 1000 }] });
+});

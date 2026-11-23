@@ -155,7 +155,7 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
     if (!currentLine) throw new MessageError(message('editing.chooseLine'));
     const contents = clipboard.contents.map((content) => content.kind === 'plain'
       ? { ...content, id: crypto.randomUUID(), lineId: currentLine.id }
-      : { ...content, id: crypto.randomUUID(), lineId: currentLine.id, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID() })) });
+      : { ...content, id: crypto.randomUUID(), lineId: currentLine.id, units: content.units.map((unit) => ({ ...unit, id: crypto.randomUUID(), beginMs: null, endMs: null })) });
     return { command: { type: 'batch', commands: contents.map((content) => ({ type: 'insert-romanization-content', trackId: clipboard.trackId, content })) },
       selection: { kind: 'romanization-content', lineId: currentLine.id, trackId: clipboard.trackId, contentId: contents.at(-1)!.id, ids: contents.map((content) => content.id), anchorId: contents[0].id, activeId: contents.at(-1)!.id } };
   }

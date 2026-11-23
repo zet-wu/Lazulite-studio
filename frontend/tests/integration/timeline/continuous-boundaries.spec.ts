@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { importLyrics } from '../../fixtures/import-lyrics';
 import { continuousBoundariesTtml } from '../../fixtures/continuous-boundaries';
 
-test('linked boundaries, untimed pasted ruby and swapped drag preference survive actual save and reopen', async ({ page }) => {
+test('linked boundaries, untimed pasted ruby and contents, and swapped drag preference survive actual save and reopen', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const pid = 'background-playback';
   await page.goto(`/projects/${pid}/edit`);
@@ -34,11 +34,17 @@ test('linked boundaries, untimed pasted ruby and swapped drag preference survive
   await page.locator('main [data-ruby-id]').first().click({ position: { x: 3, y: 3 } }); await page.keyboard.press('Control+c');
   await page.locator('main [data-line-id="destination"] [data-word-id]').click({ position: { x: 3, y: 3 } }); await page.keyboard.press('Control+v');
   await expect(page.locator('main [data-line-id="destination"] [data-ruby-id]')).toHaveCount(1);
+  await page.locator('main [data-line-id="continuous"] section[data-romanization-content-id]').focus();
+  await page.keyboard.press('Control+c');
+  await page.locator('[data-outline-drag]').nth(1).click(); await page.keyboard.press('Control+v');
+  await expect(page.locator('main [data-line-id="destination"] [data-romanization-unit-id]')).toHaveCount(2);
   const pastedSave = page.waitForResponse(response => response.url().endsWith(`/projects/${pid}/document`) && response.request().method() === 'PUT');
   await page.getByRole('button', { name: '保存', exact: true }).click(); expect((await pastedSave).status()).toBe(200);
   await page.reload(); await page.getByRole('button', { name: '编辑', exact: true }).click();
   const reopened = await readLyrics();
   expect(reopened.lines[0].words).toEqual(before.lines[0].words);
+  expect(reopened.romanizationTracks[0].contents[0]).toEqual(before.romanizationTracks[0].contents[0]);
+  expect(reopened.romanizationTracks[0].contents[1]).toMatchObject({ lineId: 'destination', kind: 'timed', units: [{ text: 'a', beginMs: null, endMs: null }, { text: 'b', beginMs: null, endMs: null }] });
   expect(reopened.lines[1]).toMatchObject({ beginMs: 8000, endMs: 9000, words: [{ beginMs: 8000, endMs: 9000, rubyUnits: [{ reading: 'こう', beginMs: null, endMs: null }] }] });
   await page.locator('[data-settings-button]').click(); await dialog.getByRole('button', { name: '时间轴', exact: true }).click();
   await expect(dialog.getByRole('switch', { name: '交换边界拖动操作', exact: true })).toBeChecked();
