@@ -20,7 +20,7 @@
       "node": {
         "version": "22.22.2",
         "url": "https://nodejs.org/dist/v22.22.2/node-v22.22.2-win-x64.zip",
-        "sha256": "d73718f162d286d1deaf911d8bf224ba823a877cd0ed23c0d09b43923f6bd699"
+        "sha256": "7c93e9d92bf68c07182b471aa187e35ee6cd08ef0f24ab060dfff605fcc1c57c"
       }
     },
     "windows-x64-cuda": {
@@ -39,7 +39,7 @@
       "node": {
         "version": "22.22.2",
         "url": "https://nodejs.org/dist/v22.22.2/node-v22.22.2-win-x64.zip",
-        "sha256": "d73718f162d286d1deaf911d8bf224ba823a877cd0ed23c0d09b43923f6bd699"
+        "sha256": "7c93e9d92bf68c07182b471aa187e35ee6cd08ef0f24ab060dfff605fcc1c57c"
       }
     },
     "macos-arm64": {
@@ -64,7 +64,7 @@
       "node": {
         "version": "22.22.2",
         "url": "https://nodejs.org/dist/v22.22.2/node-v22.22.2-darwin-arm64.tar.gz",
-        "sha256": "f8655beb4b86ff6588ed7e02c37f8574b58557bd3e880012814b1a4956fd9d88"
+        "sha256": "db4b275b83736df67533529a18cc55de2549a8329ace6c7bcc68f8d22d3c9000"
       }
     }
   }
