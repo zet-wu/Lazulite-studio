@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Select } from '../../shared/Select';
 import '@applemusic-like-lyrics/core/style.css';
 import { LyricPlayer, type LyricPlayerRef } from '@applemusic-like-lyrics/react';
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { LyricDocument } from '../../domain/lyric-document';
 import { toAmllLines } from '../../domain/preview-adapter';
 import type { TransportHandle } from '../MediaTransport';
@@ -24,23 +24,26 @@ export function PreviewMode({ document, transport, onSelectLine }: { document: L
   const lines = useMemo(() => toAmllLines(document, showTranslation, showRomanization, romanizationTrackId), [document, showTranslation, showRomanization, romanizationTrackId]);
   const lyricLines = useMemo(() => lines.map((line) => line.lyric), [lines]);
   const duration = Math.max(0, ...lines.map((line) => line.lyric.endTime));
+  useLayoutEffect(() => {
+    const current = transport?.current;
+    if (!current) return;
+    (player.current?.lyricPlayer as StudioLyricPlayer | undefined)?.syncMedia(
+      current.getPositionMs(),
+      current.getPlaybackRate(),
+      current.isPlaying(),
+    );
+  }, [transport, lyricLines]);
   useEffect(() => {
     if (!transport) return;
     let frame = 0;
     let lastPlaying = false;
-    let lastTimeMs = -1;
-    let lastRate = -1;
     const update = () => {
       const current = transport.current;
       if (current) {
         const timeMs = current.getPositionMs();
         const rate = current.getPlaybackRate();
         const nextPlaying = current.isPlaying();
-        if (nextPlaying || lastPlaying || timeMs !== lastTimeMs || rate !== lastRate) {
-          (player.current?.lyricPlayer as StudioLyricPlayer | undefined)?.syncMedia(timeMs, rate, nextPlaying);
-          lastTimeMs = timeMs;
-          lastRate = rate;
-        }
+        (player.current?.lyricPlayer as StudioLyricPlayer | undefined)?.syncMedia(timeMs, rate, nextPlaying);
         if (nextPlaying !== lastPlaying) { lastPlaying = nextPlaying; setPlaying(nextPlaying); }
       }
       frame = requestAnimationFrame(update);
