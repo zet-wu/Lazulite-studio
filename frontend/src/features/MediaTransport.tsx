@@ -124,19 +124,26 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const switching = useRef<{position:number;playing:boolean} | null>(null);
   const [loadingSource,setLoadingSource] = useState(false);
   const audio = useRef<HTMLAudioElement>(null);
+  const raf = useRef<number | undefined>(undefined);
+  const stopFrameLoop = useCallback(() => {
+    if (raf.current !== undefined) {
+      cancelAnimationFrame(raf.current);
+      raf.current = undefined;
+    }
+  }, []);
   useEffect(()=>{
     const next = playbackChoice ? vocalId : null;
     if(next===playbackVocal) return;
     const el=audio.current;
     switching.current={position:el?.currentTime??0,playing:!!el&&!el.paused};
+    stopFrameLoop();
     el?.pause();setLoadingSource(true);setPlaybackVocal(next);
-  },[playbackChoice,vocalId,playbackVocal]);
+  },[playbackChoice,vocalId,playbackVocal,stopFrameLoop]);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [timelineError, setTimelineError] = useMessageText('');
   const [timelinePreview, publishTimelinePreview] = useState<TimelinePreview>(null);
   const clock = useRef<HTMLSpanElement>(null);
   const slider = useRef<HTMLDivElement>(null);
-  const raf = useRef<number | undefined>(undefined);
   const moveAnimation = useRef<number | null>(null);
   const panDrag = useRef<{ x: number; startMs: number; left: number; width: number; pointerId: number; started: boolean; seek: boolean; element: HTMLElement } | null>(null);
   const loopDrag = useRef<{ side: 'a' | 'b'; original: LoopState; left: number; width: number; pointerId: number } | null>(null);
@@ -274,7 +281,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     if (!audio.current || !asset) return;
     setError("");
     if (audio.current.paused)
-      void audio.current.play().catch(() => setError(message('media.playFailed')));
+      void audio.current.play().catch(() => { setPlaying(false); setError(message('media.playFailed')); });
     else audio.current.pause();
   }, [asset]);
   useImperativeHandle(ref, () => ({
@@ -292,74 +299,25 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     },
   }), [asset, play, seekTo, readPosition, rate]);
 
-  useEffect(() => {
-    const d = asset?.duration_ms ? asset.duration_ms / 1e3 : 0;
-    setDuration(d);
-    setSpan(d);
-    setStart(0);
-    setPosition(0);
-    positionRef.current = 0;
-    setLoop(emptyLoop());
-    setPlaying(false);
-  }, [asset?.id, asset?.duration_ms]);
-  useEffect(() => {
-    const el = audio.current;
-    if (!el) return;
-    const sync = () => updateDom(readPosition());
-    const metadata = () => {
-      setError('');
-      if (!asset?.duration_ms && Number.isFinite(el.duration))
-        setDuration(el.duration);
-      if (!asset?.duration_ms && Number.isFinite(el.duration))
-        setSpan(el.duration);
-    };
-    const ended = () => {
-      if (auditionEnd.current !== null) { auditionEnd.current = null; return; }
-      const range = activeLoop();
-      if (!range) return;
-      el.currentTime = Math.max(0, range[0] - offset(asset));
-      updateDom(range[0]);
-      void el.play().catch(() => setError(message('media.playFailed')));
-    };
-    const onError = () => { setLoadingSource(false); setError(message('media.sourceFailed')); };
-    const onPlay = () => {
-      setPlaying(true);
-      sync();
-    };
-    const syncFinalPosition = () => { const current = readPosition(); updateDom(current); setPosition(current); };
-    const onPause = () => {
-      setPlaying(false);
-      syncFinalPosition();
-    };
-    el.addEventListener("loadedmetadata", metadata);
-    el.addEventListener("timeupdate", sync);
-    el.addEventListener("play", onPlay);
-    el.addEventListener("pause", onPause);
-    el.addEventListener("seeked", syncFinalPosition);
-    el.addEventListener("error", onError);
-    el.addEventListener("ended", ended);
-    sync();
-    return () => {
-      el.removeEventListener("loadedmetadata", metadata);
-      el.removeEventListener("timeupdate", sync);
-      el.removeEventListener("play", onPlay);
-      el.removeEventListener("pause", onPause);
-      el.removeEventListener("seeked", syncFinalPosition);
-      el.removeEventListener("error", onError);
-      el.removeEventListener("ended", ended);
-    };
-  }, [activeLoop, asset, readPosition, updateDom]);
+  const activeLoopRef = useRef(activeLoop);
+  activeLoopRef.current = activeLoop;
+  const assetRef = useRef(asset);
+  assetRef.current = asset;
+  const readPositionRef = useRef(readPosition);
+  readPositionRef.current = readPosition;
   const activeLineTracker = useMemo(() => createActiveLineTracker(document?.lines ?? []), [document?.lines]);
   const trackerRef = useRef(activeLineTracker);
   trackerRef.current = activeLineTracker;
   const lastActiveLines = useRef('');
 
-  useEffect(() => {
+  const startFrameLoop = useCallback(() => {
+    stopFrameLoop();
     const el = audio.current;
-    if (!el || !playing) return;
-    lastActiveLines.current = trackerRef.current.key(Math.round(readPosition() * 1_000));
+    if (!el || el.paused) return;
+    lastActiveLines.current = trackerRef.current.key(Math.round(readPositionRef.current() * 1_000));
     const frame = () => {
-      const current = readPosition();
+      raf.current = undefined;
+      const current = readPositionRef.current();
       const view = viewportRef.current;
       if (view.follow && view.span < view.duration) {
         view.start = Math.max(0, Math.min(view.duration - view.span, current - view.span * 0.35));
@@ -376,16 +334,91 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         el.pause();
         return;
       }
-      const range = auditionEnd.current === null ? activeLoop() : null;
+      const range = auditionEnd.current === null ? activeLoopRef.current() : null;
       if (range && current >= range[1]) {
-        el.currentTime = Math.max(0, range[0] - offset(asset));
+        el.currentTime = Math.max(0, range[0] - offset(assetRef.current));
         updateDom(range[0]);
       }
       if (!el.paused) raf.current = requestAnimationFrame(frame);
     };
     raf.current = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf.current ?? 0);
-  }, [activeLoop, asset, playing, readPosition, updateDom]);
+  }, [stopFrameLoop, updateDom]);
+
+  useEffect(() => {
+    stopFrameLoop();
+    const d = asset?.duration_ms ? asset.duration_ms / 1e3 : 0;
+    setDuration(d);
+    setSpan(d);
+    setStart(0);
+    setPosition(0);
+    positionRef.current = 0;
+    setLoop(emptyLoop());
+    setPlaying(false);
+  }, [asset?.id, asset?.duration_ms, stopFrameLoop]);
+  useEffect(() => {
+    const el = audio.current;
+    if (!el) return;
+    const sync = () => updateDom(readPosition());
+    const metadata = () => {
+      setError('');
+      if (!asset?.duration_ms && Number.isFinite(el.duration))
+        setDuration(el.duration);
+      if (!asset?.duration_ms && Number.isFinite(el.duration))
+        setSpan(el.duration);
+    };
+    const ended = () => {
+      stopFrameLoop();
+      if (auditionEnd.current !== null) { auditionEnd.current = null; setPlaying(false); return; }
+      const range = activeLoopRef.current();
+      if (!range) { setPlaying(false); return; }
+      el.currentTime = Math.max(0, range[0] - offset(asset));
+      updateDom(range[0]);
+      void el.play().catch(() => { setPlaying(false); setError(message('media.playFailed')); });
+    };
+    const onError = () => {
+      stopFrameLoop();
+      switching.current = null;
+      setLoadingSource(false);
+      setPlaying(false);
+      setError(message('media.sourceFailed'));
+    };
+    const onPlay = () => {
+      setPlaying(true);
+      sync();
+      startFrameLoop();
+    };
+    const onPlaying = () => {
+      setPlaying(true);
+      startFrameLoop();
+    };
+    const syncFinalPosition = () => { const current = readPosition(); updateDom(current); setPosition(current); };
+    const onPause = () => {
+      stopFrameLoop();
+      setPlaying(false);
+      syncFinalPosition();
+    };
+    el.addEventListener("loadedmetadata", metadata);
+    el.addEventListener("timeupdate", sync);
+    el.addEventListener("play", onPlay);
+    el.addEventListener("playing", onPlaying);
+    el.addEventListener("pause", onPause);
+    el.addEventListener("seeked", syncFinalPosition);
+    el.addEventListener("error", onError);
+    el.addEventListener("ended", ended);
+    sync();
+    if (!el.paused) startFrameLoop();
+    return () => {
+      stopFrameLoop();
+      el.removeEventListener("loadedmetadata", metadata);
+      el.removeEventListener("timeupdate", sync);
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("playing", onPlaying);
+      el.removeEventListener("pause", onPause);
+      el.removeEventListener("seeked", syncFinalPosition);
+      el.removeEventListener("error", onError);
+      el.removeEventListener("ended", ended);
+    };
+  }, [asset, readPosition, startFrameLoop, stopFrameLoop, updateDom]);
 
   useEffect(() => {
     if (loopDrag.current) return;
@@ -687,7 +720,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     <footer data-transport className={`${styles.footer} ${expanded && !timelineHost ? styles.expanded : styles.collapsed}`} onKeyDown={keyDown}>
       <audio
         ref={audio}
-        onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; const captured=switching.current; if(captured){audio.current.currentTime=captured.position; switching.current=null;setLoadingSource(false);if(captured.playing)void audio.current.play().catch(e=>{if(e.name!=='AbortError')setError(message('media.sourceFailed'));});} } }}
+        onLoadedMetadata={() => { if (audio.current) { audio.current.preservesPitch = true; audio.current.playbackRate = rate; const captured=switching.current; if(captured){audio.current.currentTime=captured.position; switching.current=null;setLoadingSource(false);if(captured.playing)void audio.current.play().catch(e=>{if(e.name!=='AbortError'){setPlaying(false);setError(message('media.sourceFailed'));}});} } }}
         preload="metadata"
         src={asset ? studioApi.audioUrl(projectId, playbackVocal, asset.id) : undefined}
       />
