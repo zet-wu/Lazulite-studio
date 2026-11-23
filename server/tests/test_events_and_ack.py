@@ -163,3 +163,10 @@ def test_job_status_exposes_model_identity_and_reuse_without_private_paths(tmp_p
         assert job['request']['model'] == {'alignment':{'id':'a','name':'align','type':'ctc'},'vocal':{'id':'v','name':'voice'}}
         assert not any(key.startswith('_') for key in job['request'])
         assert '/private/' not in json.dumps(job['request'])
+        for jid, request in [('reused', {'_reuse_vocal_id': 'v', 'model_name': 'htdemucs'}), ('uploaded', {'upload_id': 'upload'})]:
+            with app.state.jobs.db.transaction() as c:
+                c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+                          (jid, pid, 'vocal', 'succeeded', json.dumps(request), '0', '0'))
+            public = client.get(f'/api/v1/jobs/{jid}').json()['request']
+            assert public['model'] is None
+            assert public.get('model_name') == request.get('model_name')

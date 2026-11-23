@@ -1,6 +1,9 @@
 import io
 import wave
+from dataclasses import replace
+from server.studio.media import MediaService
 from server.tests.test_project_resources import client_for, HEADERS, binding
+from server.tests.test_api import wav_bytes
 
 
 def test_bounded_listening_endpoint_returns_mono_16k_wav_and_preserves_document(tmp_path):
@@ -36,3 +39,30 @@ def test_bounded_listening_endpoint_returns_mono_16k_wav_and_preserves_document(
         assert client.get('/api/v1/projects/missing/audio-excerpt?start_ms=0&end_ms=100').status_code == 404
         assert client.get(url+'/document').json() == before
         assert client.delete(url, headers=HEADERS).status_code == 200
+
+
+def test_container_tail_is_clipped_to_decoded_frames_with_actual_range(tmp_path, monkeypatch):
+    with client_for(tmp_path) as client:
+        token = client.post('/api/v1/uploads', files={'file': ('tail.wav', wav_bytes(), 'audio/wav')}, headers=HEADERS).json()['id']
+        project = client.post('/api/v1/projects', json={'name': 'tail', 'upload_id': token}, headers=HEADERS).json()
+        url = f'/api/v1/projects/{project["id"]}'
+        assert project['asset']['source_duration_ms'] == 1000
+        before = client.get(url+'/document').json()
+        playback_proxy = MediaService.playback_proxy
+
+        def shorter_proxy(media, asset):
+            proxy = playback_proxy(media, asset)
+            # A decoder may yield 20 ms less PCM than the probed container duration.
+            frames = round(980 * proxy.rate / 1000)
+            return replace(proxy, pcm=proxy.pcm[:frames * proxy.channels * 2])
+
+        monkeypatch.setattr(MediaService, 'playback_proxy', shorter_proxy)
+        response = client.get(url+'/audio-excerpt?start_ms=900&end_ms=1000')
+        assert response.status_code == 200, response.text
+        assert float(response.headers['x-actual-start-ms']) == 900
+        assert float(response.headers['x-actual-end-ms']) == 980
+        with wave.open(io.BytesIO(response.content)) as stream:
+            assert (stream.getframerate(), stream.getnchannels(), stream.getnframes()) == (16000, 1, 80 * 16)
+        assert client.get(url+'/audio-excerpt?start_ms=900&end_ms=1001').status_code == 422
+        assert client.get(url+'/audio-excerpt?start_ms=990&end_ms=1000').status_code == 422
+        assert client.get(url+'/document').json() == before

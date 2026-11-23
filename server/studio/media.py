@@ -206,9 +206,10 @@ class MediaService:
             raise MediaError('audio excerpt must be a positive interval of at most 30 seconds')
         proxy = self.playback_proxy(asset)
         duration = asset.probe.duration_ms if asset.probe.duration_ms is not None else proxy.duration_ms
-        if end_ms > duration or end_ms > proxy.duration_ms:
+        if end_ms > duration:
             raise MediaError('audio excerpt is outside the audio')
-        first, last = round(start_ms * proxy.rate / 1000), round(end_ms * proxy.rate / 1000)
+        first = round(start_ms * proxy.rate / 1000)
+        last = min(len(proxy.pcm) // (proxy.channels * 2), round(end_ms * proxy.rate / 1000))
         pcm = proxy.pcm[first * proxy.channels * 2:last * proxy.channels * 2]
         if not pcm:
             raise MediaError('audio excerpt is empty')
