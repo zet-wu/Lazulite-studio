@@ -4,14 +4,14 @@
 
 ## 编辑画布、选区与快捷键
 
-- `LyricList`、`SyncPanel`、大纲与属性栏共用 `SelectionContext` 的有效选区；虚拟列表保持活动输入框挂载，`selection-recovery.ts` 在删除或撤销后自动恢复最近的存续焦点。
-- `object-drag.ts` 与 `editing-actions.ts` 处理指针拖动、插入线、边缘滚动与共享右键菜单；`InlineAdd` / `SongPartField` 保护中文/日文 IME 输入。
+- `LyricList`、`SyncPanel`、大纲与属性栏共用 `SelectionContext` 的有效选区；高级编辑模式始终使用虚拟列表，按模式保存滚动和测量缓存并保持活动输入框挂载，`selection-recovery.ts` 在删除或撤销后自动恢复最近的存续焦点。
+- `object-drag.ts` 与 `editing-actions.ts` 处理指针拖动、插入线、边缘滚动与共享右键菜单；剪贴板中的词、注音和计时附属单元粘贴为未定时对象，整行粘贴及词复制拖动保留时间；`InlineAdd` / `SongPartField` 保护中文/日文 IME 输入。
 - 非输入状态下空格键固定切换播放/暂停，快捷键配置支持冲突提示与单项重置。
 
 ## 媒体播放、时间轴与声谱图
 
 - `MediaTransport` 维护全局唯一播放器、变速、A/B 循环与播放跟随，在音频页通过 Portal 将时间轴挂入主工作区。
-- `TimelineTracks`、`TimelineStaging`、`VocalTracks` 与 `SpectrogramCanvas` 共享同一水平视窗与毫秒坐标：支持从暂存区拖入分配时间、拖回清空时间、吸附预览与滚轮缩放/平移；声谱图使用常驻 Web Worker 异步渲染瓦片。
+- `TimelineTracks`、`TimelineStaging`、`VocalTracks` 与 `SpectrogramCanvas` 共享同一水平视窗与毫秒坐标：支持从暂存区拖入分配时间、拖回清空时间、吸附预览与滚轮缩放/平移；Ctrl／⌘ 边界拖动联动同行贴合邻居，可在设置中互换默认操作并在拖动中切换修饰键。播放帧通过 ref 推送条块高亮，按有效时间区间跳过重复扫描。声谱图使用常驻 Web Worker 异步渲染瓦片，着色后释放灰度缓冲，按物理整数像素边界绘制。
 - `FloatingTray`、`useProjectJobs` 与 `useBackgroundJobRecovery` 在右下角可折叠、可拖动浮层中统一承接项目修订外部同步通知、活动后台任务进度与取消操作，以及跨刷新/跨标签页的未消费后台人声与对齐结果恢复闭环；`VocalPanel` 与 `AlignmentPanel` 负责发起对应任务并在本页直连时协调认领。
 
 ## 语言工具与卡拉 OK 交互
