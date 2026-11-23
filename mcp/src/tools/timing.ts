@@ -45,6 +45,7 @@ export function registerTimingTools(registry: ToolRegistry) {
           if (op.op === 'set_ruby_time') commands.push({ type: 'set-word-time', lineId: line.id, wordId: word.id, ...timeEnvelope([word, wordTimes]) });
         }
         commands.push(op.op === 'set_word_time' ? { type: 'set-word-time', lineId: line.id, wordId: word.id, ...times } : { type: 'set-ruby-time', lineId: line.id, wordId: word.id, rubyId: op.ruby_id, ...times });
+        if (!args.recompute_envelopes && op.op === 'set_ruby_time') commands.push({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginMs: word.beginMs, endMs: word.endMs });
         if (args.recompute_envelopes) {
           if (op.op === 'set_ruby_time') commands.push({ type: 'set-word-time', lineId: line.id, wordId: word.id, beginMs: wordTimes.beginMs, endMs: wordTimes.endMs });
           commands.push({ type: 'set-line-time', lineId: line.id, ...lineTimes });

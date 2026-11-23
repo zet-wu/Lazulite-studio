@@ -154,6 +154,7 @@ it('ignores late syllable previews after newer inputs and after closing', async 
 it('shares mora boundaries with reading splits while retaining protected terms', () => {
   const options = { ...DEFAULT_SEGMENT_OPTIONS, japaneseMora: true, punctuation: 'separate' as const };
   expect(segmentText('しゃきょティヴァっッんンー', options)).toEqual(['しゃ','きょ','ティ','ヴァ','っ','ッ','ん','ン','ー']);
+  expect(segmentText('AーB', options)).toEqual(['A','ー','B']);
   expect(segmentText('字しゃ、 ティ', options)).toEqual(['字','しゃ','、',' ','ティ']);
   expect(segmentText('彷徨しゃ', { ...options, ignore: ['彷徨'] })).toEqual(['彷徨','しゃ']);
   expect(segmentText('彷徨しゃ', { ...options, rules: [{ source: '彷徨しゃ', parts: ['彷徨','しゃ'] }] })).toEqual(['彷徨','しゃ']);

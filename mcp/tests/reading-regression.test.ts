@@ -32,3 +32,10 @@ it('splits old ruby through line spans and reports exact failed operation withou
   catch (error) { expect(formatToolError(error)).toMatchObject({ code: 'split_text_mismatch', details: { operation_index: 1, line_id: 'l', word_id: 'w', current_revision: revision } }); }
   expect(f.revision()).toBe(revision); expect(f.writes()).toBe(1);
 });
+
+it('splits a kana phrase while preserving a partially timed envelope', async () => {
+  const doc = createProjectDocument(); doc.lyrics.lines = [{ ...createLine('', 'l'), words: [{ ...createWord('しゃっティ', 'w'), beginMs: 100, rubyUnits: [{ id: 'r', reading: 'しゃっティ', beginMs: 100, endMs: null }] }] }];
+  const f = projectFixture(doc);
+  await createToolRegistry().call('apply_readings', { project_id: 'p', overwrite_existing: true, operations: [{ mode: 'split_and_set_word', line_id: 'l', word_id: 'w', parts: ['しゃ','っ','ティ'].map(text => ({ text, readings: [] })) }] }, f);
+  expect(f.doc().lyrics.lines[0].words.map(w => [w.text,w.beginMs,w.endMs])).toEqual([['しゃ',100,null],['っ',null,null],['ティ',null,null]]);
+});

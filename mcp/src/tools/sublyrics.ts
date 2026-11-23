@@ -55,7 +55,7 @@ export function registerSublyricTools(registry: ToolRegistry) {
   registry.register({ name: 'edit_sublyrics', description: 'Atomically manage translation/romanization tracks, contents and timed units. content_kind explicitly selects plain/timed; use earlier client_ref values as IDs. Unspecified time endpoints keep their values; null clears them.', annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     inputSchema: { ...writeSchema, operations: z.array(operations).min(1) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key }, (doc, envelope) => {
-      let next = doc; const refs: Record<string, string> = {}, affectedTracks = new Set<string>(), affectedContents = new Set<string>();
+      let next = doc; const refs: Record<string, string> = Object.create(null), affectedTracks = new Set<string>(), affectedContents = new Set<string>();
       const resolve = (value: string) => reference(refs, value), anchor = (value: string | null) => value === null ? null : resolve(value);
       args.operations.forEach((op, index) => withOperationContext(op, index, envelope.revision, () => {
         const tracks: Array<TranslationTrack | RomanizationTrack> = structuredClone(op.kind === 'translation' ? next.lyrics.translationTracks : next.lyrics.romanizationTracks);

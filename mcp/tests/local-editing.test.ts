@@ -38,3 +38,12 @@ it.each(['translation', 'romanization'] as const)('manages %s tracks and timed u
   await registry.call('edit_sublyrics', { project_id: 'p', operations: [{ op: 'update_content', kind, track_id: result.created_refs.track, content_id: result.created_refs.content, content_kind: 'plain', text: 'plain' }] }, f);
   expect(f.writes()).toBe(2);
 });
+
+it('keeps unset parent endpoints when ruby envelope recomputation is disabled', async () => {
+  const doc = createProjectDocument(); doc.lyrics.lines = [{ ...createLine('', 'l'), words: [{ ...createWord('真','w'), rubyUnits: [{ id: 'r', reading: 'しん', beginMs: null, endMs: null }] }] }];
+  const f = projectFixture(doc), registry = createToolRegistry();
+  await registry.call('edit_timing', { project_id: 'p', recompute_envelopes: false, operations: [{ op: 'set_ruby_time', line_id: 'l', word_id: 'w', ruby_id: 'r', begin_ms: 10, end_ms: 20 }] }, f);
+  expect(f.doc().lyrics.lines[0]).toMatchObject({ beginMs: null, endMs: null, words: [{ beginMs: null, endMs: null, rubyUnits: [{ beginMs: 10, endMs: 20 }] }] });
+  await registry.call('edit_timing', { project_id: 'p', operations: [{ op: 'set_ruby_time', line_id: 'l', word_id: 'w', ruby_id: 'r', end_ms: 30 }] }, f);
+  expect(f.doc().lyrics.lines[0]).toMatchObject({ beginMs: 10, endMs: 30, words: [{ beginMs: 10, endMs: 30 }] });
+});

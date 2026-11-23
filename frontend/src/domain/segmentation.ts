@@ -69,7 +69,8 @@ function tokenizeRaw(text: string, options: SegmentOptions, divide?: (text: stri
     }
     const remainder = text.slice(offset);
     const first = graphemes(remainder)[0];
-    const category = isSpace(first) ? 'space' : isPunctuation(first) ? 'punctuation' : isCjk(first) ? 'cjk' : isWestern(first) ? 'western' : 'other';
+    const mora = options.splitCjk && options.japaneseMora;
+    const category = isSpace(first) ? 'space' : isPunctuation(first) ? 'punctuation' : isCjk(first) || mora && first === 'ー' ? 'cjk' : isWestern(first) ? 'western' : 'other';
     if (category === 'cjk' && options.splitCjk && options.japaneseMora && /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u.test(first)) {
       let run = first;
       for (const part of graphemes(remainder.slice(first.length))) {
@@ -83,7 +84,7 @@ function tokenizeRaw(text: string, options: SegmentOptions, divide?: (text: stri
     }
     let run = first;
     for (const part of graphemes(remainder.slice(first.length))) {
-      const same = category === 'space' ? isSpace(part) : category === 'cjk' ? isCjk(part) : isWestern(part);
+      const same = category === 'space' ? isSpace(part) : category === 'cjk' ? isCjk(part) : isWestern(part) && !(mora && part === 'ー');
       if (!same || protectedTerms.some((term) => remainder.startsWith(term, run.length))) break;
       run += part;
     }

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { createLine, createWord, type LyricLine } from '../../../frontend/src/domain/lyric-document';
-import { previewLineSplit, timeEnvelope, type LyricCommand } from '../../../frontend/src/domain/lyric-commands';
+import { previewLineSplit, type LyricCommand } from '../../../frontend/src/domain/lyric-commands';
 import { createProjectEditorState, executeProjectCommand, type ProjectDocument } from '../../../frontend/src/domain/project-document';
 import { StudioHttpError } from '../client';
 import { mutateProjectDocument } from './cas';
@@ -13,7 +13,7 @@ export function invalid(message: string): never { throw new StudioHttpError(422,
 export function requireLine(doc: ProjectDocument, lineId: string): LyricLine { return doc.lyrics.lines.find(line => line.id === lineId) ?? invalid(`Line "${lineId}" does not exist.`); }
 export function requireWord(doc: ProjectDocument, lineId: string, wordId: string) { return requireLine(doc, lineId).words.find(word => word.id === wordId) ?? invalid(`Word "${wordId}" does not exist in line "${lineId}".`); }
 export function run(doc: ProjectDocument, command: LyricCommand): ProjectDocument { return executeProjectCommand(createProjectEditorState(doc), { type: 'lyrics', command }).present; }
-export function reference(refs: Record<string, string>, value: string): string { return refs[value] ?? value; }
+export function reference(refs: Record<string, string>, value: string): string { return Object.hasOwn(refs, value) ? refs[value] : value; }
 export function remember(refs: Record<string, string>, key: string | undefined, value: string) { if (!key) return; if (Object.hasOwn(refs, key)) invalid(`Duplicate client_ref "${key}".`); refs[key] = value; }
 const lineWord = { line_id: id, word_id: id };
 const op = z.discriminatedUnion('op', [
@@ -38,7 +38,7 @@ export function registerEditingTools(registry: ToolRegistry) {
     inputSchema: { ...writeSchema, operations: z.array(op).min(1) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key }, (doc, envelope) => {
       let next = doc;
-      const refs: Record<string, string> = {}, affected = new Set<string>();
+      const refs: Record<string, string> = Object.create(null), affected = new Set<string>();
       const resolve = (value: string) => reference(refs, value), nullable = (value: string | null) => value === null ? null : resolve(value);
       args.operations.forEach((operation, index) => withOperationContext(operation, index, envelope.revision, () => {
         const lineId = 'line_id' in operation ? resolve(operation.line_id) : undefined;

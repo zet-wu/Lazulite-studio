@@ -155,13 +155,11 @@ function distributeSubPartTimes(
   partCharLengths: number[],
 ): Array<{ beginMs: TimeMs; endMs: TimeMs }> {
   const { beginMs, endMs } = wordTimeEnvelope(word);
-  if (beginMs === null || endMs === null) {
-    return partCharLengths.map(() => ({ beginMs: null, endMs: null }));
-  }
   const totalChars = partCharLengths.reduce((sum, len) => sum + len, 0);
   const boundary = (pos: number): TimeMs => {
     if (pos === 0) return beginMs;
     if (pos === totalChars) return endMs;
+    if (beginMs === null || endMs === null) return null;
     return beginMs + Math.round(((endMs - beginMs) * pos) / totalChars);
   };
   let offset = 0;
