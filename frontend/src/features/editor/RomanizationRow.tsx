@@ -1,5 +1,4 @@
 import { i18n } from '../../i18n';
-import { useTranslation } from 'react-i18next';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import type { RomanizationContent, RomanizationTrack } from '../../domain/lyric-document';
 import { InlineAdd } from './InlineAdd';
@@ -19,7 +18,6 @@ type Props = {
 };
 
 export function RomanizationRow({ track, content, selectedContent, selectedUnitIds, placeholder, placeholderUnitIds, selectContent, selectUnit, apply }: Props) {
-  useTranslation();
   const setContent = (next: RomanizationContent) => apply({ type: 'set-romanization-content', trackId: track.id, content: next });
   const insertUnit = (text: string) => {
     if (content.kind !== 'timed') return false;

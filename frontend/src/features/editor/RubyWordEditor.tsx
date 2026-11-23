@@ -1,7 +1,6 @@
 import { errorMessage, message } from '../../domain/messages';
 import { useMessageText } from '../../shared/useMessageText';
 import { i18n } from '../../i18n';
-import { useTranslation } from 'react-i18next';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { type LyricWord, type RubyUnit } from '../../domain/lyric-document';
@@ -21,7 +20,6 @@ type Props = {
 };
 
 export function RubyWordEditor({ lineId, word, selectedRubyIds, placeholderIds, onSelectRuby, apply, requestAddSerial, requestAfterRubyId }: Props) {
-  useTranslation();
   const [newAfter, setNewAfter] = useState<string | null | undefined>(undefined);
   const [newReading, setNewReading] = useState('');
   const [error, setError] = useMessageText('');

@@ -5,9 +5,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { createLine, createLyricDocument } from '../../domain/lyric-document';
 import { EditorWorkspace } from './EditorWorkspace';
 
-vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
 vi.stubGlobal('matchMedia', () => ({ matches: false }));
 HTMLElement.prototype.scrollTo = vi.fn();
+Object.defineProperties(HTMLElement.prototype, { offsetHeight: { configurable: true, get: () => 800 }, offsetWidth: { configurable: true, get: () => 1200 } });
+Object.defineProperty(document, 'fonts', { configurable: true, value: new EventTarget() });
 
 afterEach(() => { cleanup(); localStorage.clear(); });
 

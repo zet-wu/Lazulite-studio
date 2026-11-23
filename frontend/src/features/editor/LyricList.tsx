@@ -11,6 +11,7 @@ export type ListMemory = { offset: number; handled: number | null; measured?: { 
 
 type Props = {
   memory?: ListMemory;
+  advanced?: boolean;
   pinnedLineIds?: string[];
   lines: LyricLine[];
   append?: () => void;
@@ -98,8 +99,8 @@ function VirtualLyricList(props: ListProps) {
     initialOffset: props.memory?.offset ?? 0,
     getScrollElement: () => scrollRef.current,
     getItemKey: index => lines[index].id,
-    estimateSize: () => 180,
-    overscan: 4,
+    estimateSize: () => props.advanced ? 320 : 180,
+    overscan: props.advanced ? 2 : 4,
     rangeExtractor: range => {
       const visible = defaultRangeExtractor(range);
       const pinned = lines.flatMap((line, index) => props.pinnedLineIds?.includes(line.id) || index === focusedIndex ? [index] : []);
@@ -159,7 +160,7 @@ export function LyricList(props: Props) {
   const renderLine = (line: LyricLine, index: number) => <CachedLine key={line.id} line={line} index={index} version={props.lineVersion?.(line) ?? ''} render={render}/>;
   const handled = useRef<number | null>(props.memory?.handled ?? null);
   useEffect(() => () => { if (props.memory) props.memory.handled = handled.current; }, [props.memory]);
-  return props.lines.length > 80 ? <VirtualLyricList {...props} renderLine={props.lineVersion ? renderLine : props.renderLine} handled={handled} /> : <NormalLyricList {...props} renderLine={props.lineVersion ? renderLine : props.renderLine} handled={handled} />;
+  return props.advanced || props.lines.length > 80 ? <VirtualLyricList {...props} renderLine={props.lineVersion ? renderLine : props.renderLine} handled={handled} /> : <NormalLyricList {...props} renderLine={props.lineVersion ? renderLine : props.renderLine} handled={handled} />;
 }
 
 const t=i18n.t.bind(i18n);

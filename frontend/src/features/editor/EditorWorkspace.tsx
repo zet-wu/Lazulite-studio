@@ -260,7 +260,7 @@ function EditorWorkspaceContent(props: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; title: string; actions: ContextAction[]; target: HTMLElement } | null>(null);
   const [locate, setLocate] = useState<{ id: string; serial: number; focus?: string; selector?: string; nearest?: boolean } | null>(null);
   const locateSerial = useRef(0);
-  const listMemory = useRef<Record<'edit' | 'sync' | 'karaoke', ListMemory>>({ karaoke: {offset:0,handled:null}, edit: { offset: 0, handled: null }, sync: { offset: 0, handled: null } });
+  const listMemory = useRef<Record<string, ListMemory>>({});
   const requestLocate = (id: string, focus?: string) => setLocate({ id, focus, serial: ++locateSerial.current });
   useEffect(()=>{if(cue && cueNavigation){setMode('karaoke');requestLocate(cue.anchor.lineId,`[data-cue-id="${CSS.escape(cue.id)}"]`);}},[selectedCue,cueNavigation]);
   const pendingFocus = useRef<string | null>(null);
@@ -1011,7 +1011,7 @@ function EditorWorkspaceContent(props: Props) {
           syncCursor?.lineId === line.id ? [syncCursor, syncProgress] : null,
           ignoredSyncSet.has(line.id), line.words.map(word => [editing.emptyBeats[word.id], word.rubyUnits.map(unit => editing.emptyBeats[unit.id])]),
           drag.placeholders?.ids ? [...drag.placeholders.ids] : null,
-        ])} pinnedLineIds={pinnedLineIds} key={`${mode}:${mode==='edit'?editorDisplay:''}`} memory={listMemory.current[mode]} lines={displayed.lines} locate={locate} append={() => {
+        ])} pinnedLineIds={pinnedLineIds} key={`${mode}:${mode==='edit'?editorDisplay:''}`} advanced={mode === 'edit' && editorDisplay === 'advanced'} memory={listMemory.current[`${mode}:${editorDisplay}`] ??= { offset: 0, handled: null }} lines={displayed.lines} locate={locate} append={() => {
           const line = createLine('');
           if (dispatch({ type: 'insert-line', afterLineId: mainLines.at(-1)?.id ?? null, line })) {
             setSelection({ kind: 'lines', ids: [line.id], anchorId: line.id, activeId: line.id });

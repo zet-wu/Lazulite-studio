@@ -3,7 +3,7 @@ import { message as describeMessage, errorMessage, MessageError } from '../../do
 import { i18n } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { selectIds } from './editing-actions';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { plainTranslation, type TranslationContent, type LyricDocument, type TranslationTrack } from '../../domain/lyric-document';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { translationTrackLabel } from './TranslationTrackDialog';
@@ -32,15 +32,8 @@ function TranslationRow({ item, index, commit, remove, fresh = false }: {
   };
   const [draft, setDraft] = useState(item);
   const [error, setError] = useMessageText('');
-  const textRef = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false), cancelled = useRef(false);
   useEffect(() => { setDraft(item); setError(''); }, [item]);
-  useLayoutEffect(() => {
-    const element = textRef.current;
-    if (!element) return;
-    const resize = () => { element.style.height = '0px'; element.style.height = `${element.scrollHeight}px`; };
-    resize(); const observer = new ResizeObserver(resize); observer.observe(element); return () => observer.disconnect();
-  }, [draft]);
   const submit = () => {
     if (cancelled.current) { cancelled.current = false; return; }
     if (composing.current) return;
@@ -54,7 +47,7 @@ function TranslationRow({ item, index, commit, remove, fresh = false }: {
     if (event.key === 'Enter') { event.preventDefault(); (event.target as HTMLElement).blur(); }
     if (event.key === 'Escape') { event.stopPropagation(); cancelled.current = true; setDraft(item); setError(''); (event.target as HTMLElement).blur(); if (fresh) remove(); }
   }}>
-    {draft.kind === 'plain' ? <textarea ref={textRef} rows={1} autoFocus={fresh} aria-label={t('translation.inputLabel',{number:index+1})} value={draft.text} onChange={event => setDraft({ ...draft, text: event.target.value })} onBlur={submit} /> : <div><small>{t('translation.timed')}</small>{draft.units.map((unit, unitIndex) => <div key={unit.id} data-translation-unit-id={unit.id} tabIndex={0} data-selected={selected?.kind==='romanization-unit'&&selected.attachment==='translation'&&selected.ids.includes(unit.id)||undefined} onClick={event=>{choose(event,unit.id);if (!(event.target instanceof HTMLInputElement)) event.currentTarget.focus({preventScroll:true});}} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key===' '||event.key==='Enter')){event.preventDefault();choose(event,unit.id);}}}>
+    {draft.kind === 'plain' ? <div className={styles.translationText} data-text={draft.text + " "}><textarea rows={1} autoFocus={fresh} aria-label={t('translation.inputLabel',{number:index+1})} value={draft.text} onChange={event => setDraft({ ...draft, text: event.target.value })} onBlur={submit} /></div> : <div><small>{t('translation.timed')}</small>{draft.units.map((unit, unitIndex) => <div key={unit.id} data-translation-unit-id={unit.id} tabIndex={0} data-selected={selected?.kind==='romanization-unit'&&selected.attachment==='translation'&&selected.ids.includes(unit.id)||undefined} onClick={event=>{choose(event,unit.id);if (!(event.target instanceof HTMLInputElement)) event.currentTarget.focus({preventScroll:true});}} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key===' '||event.key==='Enter')){event.preventDefault();choose(event,unit.id);}}}>
       <input aria-label={t('translation.unitLabel',{number:index+1,unit:unitIndex+1})} value={unit.text} onChange={event => setDraft({ ...draft, units: draft.units.map(value => value.id === unit.id ? { ...value, text: event.target.value } : value) })} onBlur={submit} />
       {(['beginMs', 'endMs'] as const).map(side => <input key={side} type="number" min="0" step="1" placeholder={t('ruby.untimed')} aria-label={t('translation.timeLabel',{number:index+1,unit:unitIndex+1,side:t(side==='beginMs'?'time.begin':'time.end')})} value={unit[side] ?? ''} onChange={event => setDraft({ ...draft, units: draft.units.map(value => value.id === unit.id ? { ...value, [side]: event.target.value === '' ? null : Number(event.target.value) } : value) })} onBlur={submit} />)}
     </div>)}</div>}

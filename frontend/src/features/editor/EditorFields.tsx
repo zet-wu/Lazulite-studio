@@ -16,7 +16,6 @@ function parseSeconds(value: string): TimeMs {
 }
 
 export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSplit, onMove, onNavigate, inputRef, field }: { value: string; label: string; field?: string; placeholder?: string; onCommit: (value: string) => void; onFocus?: () => void; onSplit?: (at: number, draft: string) => void; onMove?: (direction: -1 | 1) => void; onNavigate?: (direction: -1 | 1) => void; inputRef?: (node: HTMLInputElement | null) => void }) {
-  useTranslation();
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
@@ -36,7 +35,6 @@ export function DraftInput({ value, label, placeholder, onCommit, onFocus, onSpl
 }
 
 export function TimePair({ begin, end, label, onCommit }: { begin: TimeMs; end: TimeMs; label: string; onCommit: (begin: TimeMs, end: TimeMs) => void }) {
-  useTranslation();
   const [start, setStart] = useState(seconds(begin));
   const [finish, setFinish] = useState(seconds(end));
   const [error, setError] = useMessageText('');
