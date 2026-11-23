@@ -68,7 +68,7 @@ export const handlers = [
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
     const query = new URL(request.url).searchParams;
     const start = Number(query.get('start_ms') ?? 0), end = Number(query.get('end_ms') ?? 0);
-    if (end <= start || end - start > 4_020) return error(422, 'invalid_range', 'PCM 范围无效');
+    if (end <= start || end - start > 4_060) return error(422, 'invalid_range', 'PCM 范围无效');
     const rate = 48_000;
     const pcm = Int16Array.from({ length: Math.round(end / 1_000 * rate) - Math.round(start / 1_000 * rate) }, (_, index) => Math.round(Math.sin(2 * Math.PI * 440 * (index + Math.round(start / 1_000 * rate)) / rate) * 9000));
     return new HttpResponse(pcm.buffer, { headers: { 'content-type': 'application/octet-stream', 'x-sample-rate': String(rate), 'x-channels': '1' } });

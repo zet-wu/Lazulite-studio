@@ -191,7 +191,7 @@ class MediaService:
             return self._resources[asset.content_hash]
 
     def pcm_window(self, asset: Asset, *, start_ms: int, end_ms: int) -> tuple[bytes, int, int]:
-        """Read at most 4.02 seconds, including FFT context."""
+        """Read at most 4.06 seconds, including FFT context."""
         if start_ms < 0 or end_ms <= start_ms or end_ms - start_ms > 4_060:
             raise MediaError('invalid PCM window')
         proxy = self.playback_proxy(asset)
