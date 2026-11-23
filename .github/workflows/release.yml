@@ -76,7 +76,7 @@ jobs:
           path: ${{ runner.temp }}/model-assets
   draft:
     needs: [source, build, models]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
