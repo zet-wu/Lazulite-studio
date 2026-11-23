@@ -355,6 +355,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     setStart(0);
     setPosition(0);
     positionRef.current = 0;
+    timelinePlaybackFrame.current.positionMs = 0;
+    timelinePlaybackFrame.current.update?.(0);
     setLoop(emptyLoop());
     setPlaying(false);
   }, [asset?.id, asset?.duration_ms, stopFrameLoop]);
