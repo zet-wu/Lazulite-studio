@@ -12,6 +12,7 @@
     "@applemusic-like-lyrics/lyric": "1.0.2",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "@xmldom/xmldom": "^0.9.8",
+    "hyphen": "1.14.1",
     "wanakana": "5.3.1",
     "zod": "^3.24.2"
   },

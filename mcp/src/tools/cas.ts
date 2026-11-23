@@ -16,11 +16,11 @@ export type MutationResult<TExtra extends Record<string, unknown>> = {
 export async function mutateProjectDocument<TExtra extends Record<string, unknown>>(
   client: StudioClient,
   projectId: string,
-  options: { expectedRevision?: string; idempotencyKey?: string },
+  options: { expectedRevision?: string; idempotencyKey?: string; dryRun?: boolean },
   mutate: (
     doc: ProjectDocument,
     envelope: StudioDocumentEnvelope,
-  ) => { nextDoc: ProjectDocument; summary: TExtra },
+  ) => { nextDoc: ProjectDocument; summary: TExtra } | Promise<{ nextDoc: ProjectDocument; summary: TExtra }>,
 ): Promise<MutationResult<TExtra>> {
   const envelope = await client.getDocumentEnvelope(projectId);
   if (options.expectedRevision && envelope.revision !== options.expectedRevision) {
@@ -33,7 +33,7 @@ export async function mutateProjectDocument<TExtra extends Record<string, unknow
   }
 
   const currentDoc = parseProject(envelope.document);
-  const { nextDoc, summary } = mutate(currentDoc, envelope);
+  const { nextDoc, summary } = await mutate(currentDoc, envelope);
   if (nextDoc === currentDoc) {
     return {
       project_id: projectId,
@@ -45,6 +45,7 @@ export async function mutateProjectDocument<TExtra extends Record<string, unknow
   }
 
   const snapshot = serializeProject(nextDoc);
+  if (options.dryRun) return { project_id: projectId, changed: false, previous_revision: envelope.revision, new_revision: envelope.revision, ...summary };
   const saved = await client.saveDocument(
     projectId,
     snapshot,
@@ -58,5 +59,6 @@ export async function mutateProjectDocument<TExtra extends Record<string, unknow
     previous_revision: envelope.revision,
     new_revision: saved.revision,
     ...summary,
+    ...('revision' in summary ? { revision: saved.revision } : {}),
   };
 }

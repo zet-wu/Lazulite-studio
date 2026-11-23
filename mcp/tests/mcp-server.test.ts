@@ -90,6 +90,10 @@ describe('MCP Server transports', () => {
       'get_sublyrics',
       'edit_sublyrics',
       'edit_timing',
+      'segment_lyrics',
+      'generate_romanization',
+      'generate_ruby_from_romanization',
+      'batch_edit_lyrics',
     ]);
 
     const result = await client.callTool({ name: 'get_lyrics', arguments: { project_id: 'p1' } });

@@ -1,3 +1,4 @@
+import { registerTransformTools } from './tools/transforms';
 import { registerEditingTools } from './tools/editing';
 import { registerSublyricTools } from './tools/sublyrics';
 import { registerTimingTools } from './tools/timing';
@@ -22,6 +23,7 @@ export function createToolRegistry(): ToolRegistry {
   registerEditingTools(registry);
   registerSublyricTools(registry);
   registerTimingTools(registry);
+  registerTransformTools(registry);
   return registry;
 }
 

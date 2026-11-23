@@ -265,7 +265,7 @@ function applySetWord(
   return runCommand(state, commands.length === 1 ? commands[0] : { type: 'batch', commands });
 }
 
-function applySplitAndSetWord(
+export function applySplitAndSetWord(
   state: ProjectEditorState,
   lineId: string,
   wordId: string,
