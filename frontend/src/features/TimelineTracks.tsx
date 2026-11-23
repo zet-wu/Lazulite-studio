@@ -336,8 +336,11 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
       });
     }
   };
+  const moveContext = useRef({ applyMove, swapBoundaryDrag });
+  moveContext.current = { applyMove, swapBoundaryDrag };
   useEffect(() => {
     const modifiers = (event: KeyboardEvent) => {
+      const { applyMove, swapBoundaryDrag } = moveContext.current;
       const current = dragRef.current, held = capture.current;
       if (!current || !held || current.side !== 'beginMs' && current.side !== 'endMs') return;
       const modifier = Boolean(event.ctrlKey || event.metaKey);
@@ -348,7 +351,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
     };
     window.addEventListener('keydown', modifiers); window.addEventListener('keyup', modifiers);
     return () => { window.removeEventListener('keydown', modifiers); window.removeEventListener('keyup', modifiers); };
-  });
+  }, []);
   const finish = (event: PointerEvent<HTMLElement>) => {
     if (dragRef.current) dragRef.current = { ...dragRef.current, modifier: Boolean(event.ctrlKey || event.metaKey), linked: Boolean(event.ctrlKey || event.metaKey) !== swapBoundaryDrag };
     const pending = pendingMove.current;
