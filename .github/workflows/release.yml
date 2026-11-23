@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   source:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       commit: ${{ steps.source.outputs.commit }}
       asset_pattern: ${{ steps.source.outputs.asset_pattern }}
