@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { parseProject, serializeProject } from '../../frontend/src/adapters/project-codec';
 import { createLyricDocument, createWord } from '../../frontend/src/domain/lyric-document';
 import { createProjectDocument } from '../../frontend/src/domain/project-document';
 import { StudioClient, StudioHttpError } from '../src/client';
-import { createToolRegistry } from '../src/mcp-server';
+import { createMcpServer, createToolRegistry } from '../src/mcp-server';
 import { installXmlDomShim } from '../src/xml-shim';
 
 installXmlDomShim();
@@ -28,6 +30,12 @@ function createAlignmentServerMock() {
   let failNextAcknowledge = false;
   let putCount = 0;
   const acknowledgements: Array<{ jobId: string; state: string }> = [];
+
+  const revisionMismatch = (expected: unknown) => Response.json({
+    code: 'alignment_revision_mismatch', message: 'Reload project and preview_alignment before submitting.', retryable: false,
+    reason: 'revision_mismatch', current_revision: revision,
+    params: { expected_revision: expected, current_revision: revision, next_action: 'reload_project_and_preview_alignment' },
+  }, { status: 409 });
 
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = new URL(String(input));
@@ -99,6 +107,7 @@ function createAlignmentServerMock() {
     }
 
     if (path === '/api/v1/projects/p1/alignment-preview' && method === 'GET') {
+      if (url.searchParams.get('revision') !== revision) return revisionMismatch(url.searchParams.get('revision'));
       return Response.json({
         model_preview: 'preview-token-1',
         line_count: 1,
@@ -124,6 +133,7 @@ function createAlignmentServerMock() {
         );
       }
       const body = JSON.parse(String(init?.body)) as { params: Record<string, unknown> };
+      if (body.params.revision !== revision) return revisionMismatch(body.params.revision);
       jobCounter += 1;
       activeJob = {
         schema_version: 'studio-job-v1',
@@ -225,6 +235,27 @@ function createAlignmentServerMock() {
 }
 
 describe('Milestone 5 alignment tools', () => {
+  it('returns stale alignment revision and recovery details through the MCP transport', async () => {
+    const mock = createAlignmentServerMock();
+    mock.advanceExternalRevision();
+    const server = createMcpServer(mock.client), client = new Client({ name: 'revision-test', version: '1' });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(b), client.connect(a)]);
+    try {
+      const result = await client.callTool({ name: 'start_alignment', arguments: {
+        project_id: 'p1', revision: 'rev-1', model_preview: 'preview-token-1',
+      } });
+      expect(result.isError).toBe(true);
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(JSON.parse(content[0].text)).toMatchObject({
+        code: 'alignment_revision_mismatch', retryable: false,
+        details: { status: 409, reason: 'revision_mismatch', current_revision: 'rev-2',
+          params: { expected_revision: 'rev-1', current_revision: 'rev-2', next_action: 'reload_project_and_preview_alignment' } },
+      });
+      expect(mock.getPutCount()).toBe(0);
+    } finally { await Promise.all([client.close(), server.close()]); }
+  });
+
   it('orchestrates list -> preview -> start -> status -> apply_alignment_result and acknowledges job', async () => {
     const registry = createToolRegistry();
     const mock = createAlignmentServerMock();

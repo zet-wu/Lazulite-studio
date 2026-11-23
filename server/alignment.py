@@ -16,6 +16,13 @@ def alignment_unavailable():
     return None
 
 
+class AlignmentRevisionMismatchError(ValueError):
+    def __init__(self, expected_revision, current_revision):
+        self.expected_revision = expected_revision
+        self.current_revision = current_revision
+        super().__init__('当前项目修订与提交修订不一致，请重新读取项目并执行 preview_alignment 后再提交')
+
+
 class AlignmentRunner:
     def __init__(self, db, root, models=None, particle_analyzer=None):
         self.db, self.root = db, Path(root)
@@ -29,7 +36,9 @@ class AlignmentRunner:
         with self.db.project_read(pid):
             with self.db.connect() as c:
                 current = c.execute('SELECT source_asset_id,current_revision FROM projects WHERE id=?', (pid,)).fetchone()
-                if not current or current['current_revision'] != revision: raise ValueError('项目版本已改变，请重新运行')
+                if not current: raise ValueError('项目不存在')
+                if current['current_revision'] != revision:
+                    raise AlignmentRevisionMismatchError(revision, current['current_revision'])
                 row = c.execute('SELECT project_path FROM revisions WHERE id=? AND project_id=?', (revision,pid)).fetchone()
                 if not current['source_asset_id']: raise ValueError('请先上传源音频')
                 path = self.db.paths.resolve(row[0])

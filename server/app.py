@@ -639,7 +639,7 @@ def create_app(
             raise ValueError("project source asset not found")
         return root / 'projects' / pid / 'source' / 'original'
 
-    from .alignment import AlignmentRunner, alignment_unavailable
+    from .alignment import AlignmentRunner, AlignmentRevisionMismatchError, alignment_unavailable
     from .alignment_projection import project_alignment
     from .alignment_models import AlignmentModels
     model_catalog = AlignmentModels(preferences, Path(runtime_identity['data_dir']).parent if runtime_identity is not None else None)
@@ -695,6 +695,12 @@ def create_app(
             return result
         except (ValueError, OSError) as exc: fail('alignment_directory_invalid', str(exc), 422)
 
+    def alignment_revision_mismatch(exc):
+        fail('alignment_revision_mismatch', str(exc), 409, retryable=False,
+             reason='revision_mismatch', current_revision=exc.current_revision,
+             params={'expected_revision': exc.expected_revision, 'current_revision': exc.current_revision,
+                     'next_action': 'reload_project_and_preview_alignment'})
+
     @api.get('/projects/{pid}/alignment-preview')
     def alignment_preview(pid: str, revision: str, model: str, latin_normalize: bool = True, strip_tone_digits: bool = False, convert_particles: bool = True, _=Depends(auth)):
         project(pid)
@@ -703,11 +709,13 @@ def create_app(
             options = {'latin_normalize':latin_normalize, 'strip_tone_digits':strip_tone_digits, 'convert_particles':convert_particles}
             key, selected = model_catalog.preview(model, {**options, 'revision':revision})
             return {**project_alignment(snapshot, model=selected, particle_analyzer=configured_reading_proposer, **options)['summary'], 'model_preview':key}
+        except AlignmentRevisionMismatchError as exc: alignment_revision_mismatch(exc)
         except (ValueError, ReadingUnavailable) as exc: fail('alignment_input_invalid', str(exc), 409)
 
     def validate_job_request(pid, kind, params):
         if kind == 'alignment':
             try: snapshot = alignment_runner.validate(pid, params)
+            except AlignmentRevisionMismatchError as exc: alignment_revision_mismatch(exc)
             except (ValueError, ReadingUnavailable) as exc: fail('alignment_input_invalid', str(exc), 422)
             if snapshot['acoustics']['analysisId']:
                 params['_has_vocal'] = True

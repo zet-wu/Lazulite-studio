@@ -95,6 +95,30 @@ def input_options(client,revision):
  return {'model_preview':preview['model_preview'],'convert_particles':True,'latin_normalize':True,'strip_tone_digits':False}
 
 
+def test_stale_revision_reports_recovery_and_refreshed_preview_can_launch(tmp_path,monkeypatch):
+ client,db,revision=prepare(tmp_path,monkeypatch)
+ with client:
+  options=input_options(client,revision)
+  document=client.get('/api/v1/projects/p/document').json()['document']
+  current=RevisionStore(db,tmp_path/'projects').create('p',document,revision)['id']
+  params={'revision':revision,**options,'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500}
+  model=client.get('/api/v1/alignment-models').json()['items'][0]['id']
+  replies=[client.get('/api/v1/projects/p/alignment-preview',params={'revision':revision,'model':model}),
+           client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers={'origin':'http://studio'})]
+  for reply in replies:
+   assert reply.status_code==409,reply.text
+   detail=reply.json()
+   assert detail['code']=='alignment_revision_mismatch' and detail['retryable'] is False
+   assert detail['reason']=='revision_mismatch' and detail['current_revision']==current
+   assert detail['params']=={'expected_revision':revision,'current_revision':current,'next_action':'reload_project_and_preview_alignment'}
+   assert 'preview_alignment' in detail['message']
+  assert client.get('/api/v1/projects/p/jobs').json()['items']==[]
+  params.update(revision=current,**input_options(client,current))
+  launched=client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers={'origin':'http://studio'})
+  assert launched.status_code==202,launched.text
+  assert wait(client,launched.json()['id'])['status']=='succeeded'
+
+
 def wait(client,job):
  deadline=time.monotonic()+20
  while time.monotonic()<deadline:
