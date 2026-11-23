@@ -233,3 +233,66 @@ it('auto-syncs external revisions when clean, ignores self-committed revisions, 
   expect(result.current.dirty).toBe(false);
   expect(result.current.document.lines[0].words[0].text).toBe('ServerNewer');
 });
+
+it('queues and converges to a newer SSE revision received while an earlier sync fetch is in flight', async () => {
+  loadMock.mockReset();
+  saveMock.mockReset();
+  type Envelope = { revision: string; etag: string; document: ProjectSnapshot; source_asset_id: string | null };
+  let resolveR2!: (value: Envelope) => void;
+  const r2Xml =
+    '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="a" begin="0s" end="1s">V2</p></div></body></tt>';
+  const r3Xml =
+    '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="a" begin="0s" end="1s">V3</p></div></body></tt>';
+  const r4Xml =
+    '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="a" begin="0s" end="1s">V4</p></div></body></tt>';
+  const r5Xml =
+    '<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p xml:id="a" begin="0s" end="1s">V5</p></div></body></tt>';
+
+  let resolveR4!: (value: Envelope) => void;
+  loadMock
+    .mockImplementationOnce(() => new Promise<Envelope>((resolve) => { resolveR2 = resolve; }))
+    .mockResolvedValueOnce({ revision: 'r3', etag: '"r3"', document: snapshot(r3Xml), source_asset_id: null })
+    .mockImplementationOnce(() => new Promise<Envelope>((resolve) => { resolveR4 = resolve; }))
+    .mockResolvedValueOnce({ revision: 'r5', etag: '"r5"', document: snapshot(r5Xml), source_asset_id: null });
+
+  const { result } = renderHook(hook);
+
+  // Clean state: r2 fetch starts, r3 arrives before r2 resolves -> converges to r3
+  let syncPromise!: Promise<void>;
+  act(() => {
+    syncPromise = result.current.syncExternalRevision('r2');
+  });
+  await act(async () => {
+    await result.current.syncExternalRevision('r3');
+  });
+  await act(async () => {
+    resolveR2({ revision: 'r2', etag: '"r2"', document: snapshot(r2Xml), source_asset_id: null });
+    await syncPromise;
+    await Promise.resolve();
+  });
+
+  expect(loadMock).toHaveBeenCalledTimes(2);
+  expect(result.current.revision).toBe('r3');
+  expect(result.current.document.lines[0].words[0].text).toBe('V3');
+
+  // Dirty state: r4 fetch starts, r5 arrives before r4 resolves -> externalUpdate converges to r5 while keeping local draft
+  act(() => {
+    result.current.apply({ type: 'edit-word', lineId: 'a', wordId: 'a:word:0', text: 'LocalDraft' });
+  });
+  let dirtySync!: Promise<void>;
+  act(() => {
+    dirtySync = result.current.syncExternalRevision('r4');
+  });
+  await act(async () => {
+    await result.current.syncExternalRevision('r5');
+  });
+  await act(async () => {
+    resolveR4({ revision: 'r4', etag: '"r4"', document: snapshot(r4Xml), source_asset_id: null });
+    await dirtySync;
+    await Promise.resolve();
+  });
+
+  expect(loadMock).toHaveBeenCalledTimes(4);
+  expect(result.current.externalUpdate?.revision).toBe('r5');
+  expect(result.current.document.lines[0].words[0].text).toBe('LocalDraft');
+});

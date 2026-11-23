@@ -220,10 +220,12 @@ export function useProjectDocument(
     } finally {
       inFlight.current = false;
       setSaving(false);
-      const queuedCheck = pendingExternalCheck.current;
-      pendingExternalCheck.current = null;
-      if (queuedCheck !== null && !deletedRef.current) {
-        queueMicrotask(() => { void syncExternalRevision(queuedCheck || undefined); });
+      if (!syncInFlight.current) {
+        const queuedCheck = pendingExternalCheck.current;
+        pendingExternalCheck.current = null;
+        if (queuedCheck !== null && !deletedRef.current) {
+          queueMicrotask(() => { void syncExternalRevision(queuedCheck || undefined); });
+        }
       }
     }
   }, [cancelPendingCheckpoint, conflict, dirty, enqueueRecovery, etag, projectId, revision, saveDocument, writeCheckpoint]);
@@ -266,11 +268,10 @@ export function useProjectDocument(
   const syncExternalRevision = useCallback(async (reportedRevision?: string) => {
     if (deletedRef.current) return;
     if (reportedRevision && selfCommittedRevisions.current.has(reportedRevision)) return;
-    if (inFlight.current) {
+    if (inFlight.current || syncInFlight.current) {
       pendingExternalCheck.current = reportedRevision ?? '';
       return;
     }
-    if (syncInFlight.current) return;
     syncInFlight.current = true;
     try {
       const envelope = await loadDocument();
@@ -319,6 +320,17 @@ export function useProjectDocument(
       // Transient fetch failures should not overwrite local editor state; next focus/SSE event reconciles.
     } finally {
       syncInFlight.current = false;
+      if (!inFlight.current) {
+        const queuedCheck = pendingExternalCheck.current;
+        pendingExternalCheck.current = null;
+        if (
+          queuedCheck !== null &&
+          !deletedRef.current &&
+          (!queuedCheck || (!selfCommittedRevisions.current.has(queuedCheck) && queuedCheck !== revisionRef.current))
+        ) {
+          queueMicrotask(() => { void syncExternalRevision(queuedCheck || undefined); });
+        }
+      }
     }
   }, [acceptSource, cancelPendingCheckpoint, enqueueRecovery, loadDocument, projectId, setError, setSyncNotice]);
   const reloadExternal = useCallback(async () => {
