@@ -11,9 +11,10 @@ Lazulite Studio 由浏览器前端与同源本地/服务端 API 组成，面向 
 | `frontend/src/domain` | 项目与歌词数据结构、纯编辑命令、时间轴投影、注音与卡拉 OK 领域规则 |
 | `frontend/src/adapters` | TTML / LRC / ASS / NicoKara / SUG 格式读写、HTTP 通信与 IndexedDB 恢复 |
 | `frontend/src/shared` | 主题 token、图标、按钮/表单/弹窗/右键菜单等通用控件 |
-| `server` | 项目与修订持久化、音频代理、读音/词典/字形接口、模型任务与媒体打包 |
+| `server` | 项目与修订持久化、项目事件 SSE 流、音频代理、读音/词典/字形接口、模型任务与媒体打包 |
+| `mcp` | 基于共享领域层与后端 HTTP API 的协议无关语义工具集与 MCP Server（`stdio` 与回环 Streamable HTTP） |
 | `contracts` | OpenAPI 契约（`openapi.json`）及前端生成类型来源 |
-| `packaging` | Windows / macOS 便携包与模型下载 ZIP 组装脚本 |
+| `packaging` | Windows / macOS 便携包、精简 Node 22 运行时与模型下载 ZIP 组装脚本 |
 
 详细模块说明见 [前端架构](../frontend/README.md)、[后端架构](../server/README.md) 与 [接口契约](../contracts/README.md)。依赖方向保持单向：`domain` 只包含纯数据与规则；`adapters` 处理格式、网络与存储；`features` 组合交互；`app` 管理应用生命周期；`shared` 提供通用界面组件。
 
@@ -63,10 +64,10 @@ Lazulite Studio 由浏览器前端与同源本地/服务端 API 组成，面向 
 
 ## 持久化、并发与便携运行
 
-- **保存与本地恢复**：前端通过 `If-Match`（修订号 / ETag）和幂等键提交保存，服务端校验文档后原子写入不可变 JSON 修订并更新 SQLite 当前指针。前端同时通过复用的 IndexedDB 连接防抖保存 `recovery-v11` 本地草稿，防止意外关闭丢失编辑。
+- **保存、外部同步与本地恢复**：前端通过 `If-Match`（修订号 / ETag）和幂等键提交保存，服务端校验文档后原子写入不可变 JSON 修订、更新 SQLite 当前指针并发出 `revision_changed` / `job_updated` SSE 事件。前端 `useProjectDocument` 识别外部修订变更（干净状态自动同步，`dirty` 状态在右下角浮层预警并提供重载或保留草稿），同时通过 IndexedDB 保存 `recovery-v11` 本地草稿。
 - **存储与锁边界**：SQLite 开启 WAL 模式，采用按项目粒度的读写锁隔离媒体读取与项目删除/音源替换——`/audio`、`/waveform`、`/pcm` 等耗时读取可并发执行，不再持有全局数据库写锁。媒体代理（48 kHz 双声道 PCM 与多级波形峰值）仅驻留内存，随页面租约和在途请求自动释放。
-- **任务与停服**：人声分离和自动对齐通过单槽任务队列在独立子进程中执行，设备探测结果在锁外运行并缓存，取消状态通过内存事件即时传递。停服前拒绝新任务并清理子进程树。
-- **本地便携包**：`server/portable.py` 以回环地址（默认 `127.0.0.1:15173`）免密码托管静态前端与 API，使用文件锁防止重复启动，并通过 `data/settings.json` 与相对路径管理项目资料库。
+- **任务与停服**：人声分离和自动对齐通过单槽任务队列在独立子进程中执行，设备探测结果在锁外运行并缓存，取消状态通过内存事件即时传递，并在数据库记录任务结果的消费/忽略确认状态（`job_acknowledgements`）供前后端闭环恢复。停服前拒绝新任务并清理子进程树。
+- **本地便携包与 MCP 服务**：`server/portable.py` 以回环地址（默认 `127.0.0.1:15173`）免密码托管静态前端、API 及随包精简 Node 22 运行时的 `app/mcp/server.mjs`（暴露 `/mcp` 回环 Streamable HTTP 端点，并支持独立 `--transport stdio`），使用文件锁防止重复启动，并通过 `data/settings.json` 与相对路径管理项目资料库。
 
 ## 测试分层与自动 CI
 

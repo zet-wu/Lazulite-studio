@@ -146,6 +146,59 @@ def test_licenses_reads_site_packages_and_prebuilt_frontend(tmp_path, monkeypatc
     assert not (root / 'licenses/server-vendor/pkg/helper.py').exists()
 
 
+def test_node_runtime_and_mcp_bundle_strip_npm_and_keep_license(tmp_path):
+    import hashlib
+    import io
+    import os
+    import tarfile
+    import zipfile
+
+    is_win = os.name == 'nt'
+    archive_path = tmp_path / ('node.zip' if is_win else 'node.tar.gz')
+    root_folder = 'node-v22.22.2-win-x64' if is_win else 'node-v22.22.2-darwin-arm64'
+    binary_rel = 'node.exe' if is_win else 'bin/node'
+
+    if is_win:
+        with zipfile.ZipFile(archive_path, 'w') as zf:
+            zf.writestr(f'{root_folder}/node.exe', b'node-binary')
+            zf.writestr(f'{root_folder}/npm.cmd', b'should-be-excluded')
+            zf.writestr(f'{root_folder}/node_modules/corepack/a.js', b'excluded')
+            zf.writestr(f'{root_folder}/LICENSE', b'node-mit-license')
+    else:
+        with tarfile.open(archive_path, 'w:gz') as tf:
+            for rel, data, mode in (
+                (binary_rel, b'#!/bin/sh\necho node\n', 0o755),
+                ('bin/npm', b'excluded', 0o755),
+                ('bin/corepack', b'excluded', 0o755),
+                ('include/node/node.h', b'excluded', 0o644),
+                ('LICENSE', b'node-mit-license', 0o644),
+            ):
+                info = tarfile.TarInfo(f'{root_folder}/{rel}')
+                info.size = len(data)
+                info.mode = mode
+                tf.addfile(info, io.BytesIO(data))
+
+    sha = hashlib.sha256(archive_path.read_bytes()).hexdigest()
+    spec = {'version': '22.22.2', 'url': archive_path.as_uri(), 'sha256': sha}
+
+    dist_root = tmp_path / 'dist'
+    build.node_runtime(dist_root, spec, tmp_path / 'dl', tmp_path / 'work')
+    expected_bin = dist_root / 'runtime/node' / ('node.exe' if is_win else 'node')
+    assert expected_bin.is_file()
+    if not is_win:
+        assert expected_bin.stat().st_mode & 0o111
+    assert not (dist_root / 'runtime/node/npm').exists()
+    assert not (dist_root / 'runtime/node/npm.cmd').exists()
+    assert not (dist_root / 'runtime/node/corepack').exists()
+    assert not (dist_root / 'runtime/node/include').exists()
+    assert (dist_root / 'licenses/node/LICENSE').read_bytes() == b'node-mit-license'
+
+    mcp_src = tmp_path / 'built-server.mjs'
+    mcp_src.write_text('console.log("mcp");', encoding='utf-8')
+    build.validate_mcp_bundle(mcp_src, dist_root / 'app/mcp')
+    assert (dist_root / 'app/mcp/server.mjs').read_text(encoding='utf-8') == 'console.log("mcp");'
+
+
 def test_validate_frontend_dist_strips_msw_and_rejects_external_urls(tmp_path):
     source = tmp_path / 'source'
     source.mkdir()

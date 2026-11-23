@@ -37,3 +37,10 @@ Lazulite Studio 本地打包版
 - 若目标模型目录已存在且非空，脚本会自动跳过；若目录内容损坏，请先手动移走该目录再重试。
 - 下载过程中按 Ctrl+C 取消或失败时，会自动清理 tmp/ 中的临时文件，不影响已安装的模型。
 - 如果在设置中修改过自定义模型总目录，请恢复默认，或将下载后的模型子目录移入你的自定义目录后再刷新。
+
+五、AI / MCP 工具接入（可选）
+- Studio 启动后默认在本机回环地址提供内置 Streamable HTTP MCP 端点：http://127.0.0.1:15173/mcp （若修改了 data/settings.json 中的 port，则对应更换端口）。
+- 支持 stdio 的桌面客户端，也可直接调用包内运行时启动：
+  - Windows：`runtime\node\node.exe app\mcp\server.mjs --transport stdio --data-dir data`
+  - macOS：`runtime/node/node app/mcp/server.mjs --transport stdio --data-dir data`
+- MCP 服务仅监听本机回环地址（127.0.0.1），随主程序一并启动和停止。

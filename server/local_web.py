@@ -10,7 +10,7 @@ def mount_frontend(app, directory):
 
     @app.get('/{resource:path}', include_in_schema=False)
     def frontend(resource: str):
-        if resource == 'api' or resource.startswith('api/'):
+        if resource in {'api', 'mcp'} or resource.startswith(('api/', 'mcp/')):
             raise HTTPException(404, 'API 不存在')
         path = (root / resource).resolve()
         if not path.is_relative_to(root): raise HTTPException(404)

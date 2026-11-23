@@ -37,6 +37,10 @@ def runtime_python(root):
     return root / ('runtime/python/python.exe' if os.name == 'nt' else 'runtime/python/bin/python3')
 
 
+def runtime_node(root):
+    return root / ('runtime/node/node.exe' if os.name == 'nt' else 'runtime/node/node')
+
+
 def validate_frontend_dist(source, destination):
     """Copy built frontend assets and verify no external URLs are referenced."""
     shutil.copytree(source, destination)
@@ -58,10 +62,32 @@ def build_frontend():
     return pnpm, ROOT / 'frontend/dist'
 
 
-def collect_frontend_licenses(destination, pnpm):
-    """Collect production frontend package licenses and sanitized dependency metadata."""
+def build_mcp():
+    pnpm = shutil.which('pnpm')
+    if not pnpm:
+        raise RuntimeError('需要 pnpm')
+    run([pnpm, '--dir', 'mcp', 'install', '--frozen-lockfile'])
+    run([pnpm, '--dir', 'mcp', 'build'])
+    return pnpm, ROOT / 'mcp/dist/server.mjs'
+
+
+def validate_mcp_bundle(source, destination):
+    source = Path(source)
+    if not source.is_file():
+        raise ValueError(f'缺少 MCP 构建产物：{source}')
+    destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
-    data = subprocess.check_output([pnpm, '--dir', 'frontend', 'list', '--prod', '--depth', 'Infinity', '--json'], cwd=ROOT, text=True)
+    shutil.copy2(source, destination / 'server.mjs')
+
+
+def collect_pnpm_licenses(package_dir, destination, pnpm, category):
+    """Collect production Node package licenses and sanitized dependency metadata."""
+    destination.mkdir(parents=True, exist_ok=True)
+    data = subprocess.check_output(
+        [pnpm, '--dir', package_dir, 'list', '--prod', '--depth', 'Infinity', '--json'],
+        cwd=ROOT,
+        text=True,
+    )
     seen = set()
 
     def collect(value):
@@ -70,7 +96,7 @@ def collect_frontend_licenses(destination, pnpm):
                 path = Path(value['path']).resolve()
                 if path not in seen:
                     seen.add(path)
-                    folder = destination / 'frontend' / str(len(seen))
+                    folder = destination / category / str(len(seen))
                     folder.mkdir(parents=True)
                     for source in path.iterdir():
                         if source.is_file() and (source.name.lower().startswith(('license', 'copying', 'notice')) or source.name == 'package.json'):
@@ -91,18 +117,56 @@ def collect_frontend_licenses(destination, pnpm):
             return [without_host_paths(item) for item in value]
         return value
 
-    write_json(destination / 'frontend-dependencies.json', without_host_paths(collected))
+    write_json(destination / f'{category}-dependencies.json', without_host_paths(collected))
     if not seen:
-        raise RuntimeError('无法收集前端生产依赖许可')
+        raise RuntimeError(f'无法收集 {category} 生产依赖许可')
+
+
+def collect_frontend_licenses(destination, pnpm):
+    collect_pnpm_licenses('frontend', destination, pnpm, 'frontend')
+
+
+def collect_mcp_licenses(destination, pnpm):
+    collect_pnpm_licenses('mcp', destination, pnpm, 'mcp')
 
 
 def prepare_frontend(output):
-    """Build frontend dist and collect licenses once for reuse across packaging targets."""
+    """Build frontend dist, single-file MCP server, and collect licenses once for reuse."""
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     pnpm, dist_source = build_frontend()
     validate_frontend_dist(dist_source, output / 'dist')
     collect_frontend_licenses(output / 'licenses', pnpm)
+    pnpm, mcp_source = build_mcp()
+    validate_mcp_bundle(mcp_source, output / 'mcp')
+    collect_mcp_licenses(output / 'licenses', pnpm)
+
+
+def node_runtime(root, spec, downloads, work):
+    """Extract only the minimal Node 22 binary and its license (no npm/corepack/headers)."""
+    dest = root / 'runtime/node'
+    dest.mkdir(parents=True, exist_ok=True)
+    licenses_dir = root / 'licenses/node'
+    licenses_dir.mkdir(parents=True, exist_ok=True)
+    archive_name = 'node.zip' if spec['url'].endswith('.zip') else 'node.tar.gz'
+    archive = download(spec['url'], downloads / archive_name, spec['sha256'], spec.get('size'))
+    unpacked = work / 'node-source'
+    extract(archive, unpacked)
+    roots = list(unpacked.glob('node-*'))
+    node_root = roots[0] if len(roots) == 1 and roots[0].is_dir() else unpacked
+    binary_name = 'node.exe' if spec['url'].endswith('.zip') else 'node'
+    candidate = (node_root / binary_name) if spec['url'].endswith('.zip') else (node_root / 'bin' / binary_name)
+    if not candidate.is_file():
+        raise ValueError(f'Node 归档缺少核心可执行文件：{binary_name}')
+    target_bin = dest / binary_name
+    shutil.copy2(candidate, target_bin)
+    if not spec['url'].endswith('.zip'):
+        target_bin.chmod(0o755)
+    license_file = node_root / 'LICENSE'
+    if not license_file.is_file():
+        raise ValueError('Node 归档缺少 LICENSE 文件')
+    shutil.copy2(license_file, licenses_dir / 'LICENSE')
+    shutil.rmtree(unpacked)
 
 
 def ffmpeg(root, spec, downloads, work, cache_dir=None):
@@ -200,8 +264,13 @@ def licenses(root, *, pnpm=None, frontend_licenses=None):
         frontend_licenses = Path(frontend_licenses)
         shutil.copytree(frontend_licenses / 'frontend', destination / 'frontend')
         shutil.copy2(frontend_licenses / 'frontend-dependencies.json', destination / 'frontend-dependencies.json')
+        if (frontend_licenses / 'mcp').is_dir():
+            shutil.copytree(frontend_licenses / 'mcp', destination / 'mcp')
+        if (frontend_licenses / 'mcp-dependencies.json').is_file():
+            shutil.copy2(frontend_licenses / 'mcp-dependencies.json', destination / 'mcp-dependencies.json')
     else:
         collect_frontend_licenses(destination, pnpm)
+        collect_mcp_licenses(destination, pnpm)
 
 
 def remove_foreign_installer_templates(root):
@@ -307,9 +376,15 @@ def build(target, output, model_release_tag, model_repository, *, frontend_dist=
     if frontend_dist is not None:
         pnpm = None
         validate_frontend_dist(frontend_dist, root / 'app/frontend/dist')
+        prebuilt_mcp = frontend_dist.parent / 'mcp/server.mjs'
+        if not prebuilt_mcp.is_file():
+            raise ValueError(f'预构建包缺少 MCP 单文件产物：{prebuilt_mcp}')
+        validate_mcp_bundle(prebuilt_mcp, root / 'app/mcp')
     else:
         pnpm, dist_source = build_frontend()
         validate_frontend_dist(dist_source, root / 'app/frontend/dist')
+        pnpm, mcp_source = build_mcp()
+        validate_mcp_bundle(mcp_source, root / 'app/mcp')
     (root / 'app/server').mkdir(parents=True)
     tracked = subprocess.check_output(['git', 'ls-files', '-z', 'server'], cwd=ROOT).decode().split('\0')
     for name in filter(None, tracked):
@@ -332,6 +407,8 @@ def build(target, output, model_release_tag, model_repository, *, frontend_dist=
         write_json(diagnostics / 'removed-installer-templates.json', remove_foreign_installer_templates(root))
         write_json(diagnostics / 'app-local-vc-runtime.json', deploy_windows_runtime(root))
     ffmpeg(root, spec['ffmpeg'], downloads, work, cache_dir=ffmpeg_cache)
+    if 'node' in spec:
+        node_runtime(root, spec['node'], downloads, work)
     model_downloads(root, model_release_tag, model_repository, models=models)
     for family in ('demucs',):
         for item in models[family]['files']:
@@ -358,6 +435,7 @@ def build(target, output, model_release_tag, model_repository, *, frontend_dist=
         (root / 'start.command').chmod(0o755)
     manifest = {'schema':1, 'version':commit[:12], 'studio_commit':commit, 'lazulite_commit':library,
                 'target':target, 'database_version':runtime['database_version'], 'python':runtime['python_version'],
+                'node':spec.get('node', {}).get('version'),
                 'build_python':platform.python_version(),
                 'validation':'assembly only; runtime tests run separately during development',
                 'unverified':['minimum Windows/macOS version', 'CUDA/MPS hardware', 'full-song quality',

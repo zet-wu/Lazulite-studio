@@ -16,6 +16,11 @@
         "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
         "checksum_source": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip.sha256",
         "license": "GPL-3.0-or-later"
+      },
+      "node": {
+        "version": "22.22.2",
+        "url": "https://nodejs.org/dist/v22.22.2/node-v22.22.2-win-x64.zip",
+        "sha256": "d73718f162d286d1deaf911d8bf224ba823a877cd0ed23c0d09b43923f6bd699"
       }
     },
     "windows-x64-cuda": {
@@ -30,6 +35,11 @@
         "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
         "checksum_source": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip.sha256",
         "license": "GPL-3.0-or-later"
+      },
+      "node": {
+        "version": "22.22.2",
+        "url": "https://nodejs.org/dist/v22.22.2/node-v22.22.2-win-x64.zip",
+        "sha256": "d73718f162d286d1deaf911d8bf224ba823a877cd0ed23c0d09b43923f6bd699"
       }
     },
     "macos-arm64": {
@@ -50,6 +60,11 @@
           "--disable-shared",
           "--enable-static"
         ]
+      },
+      "node": {
+        "version": "22.22.2",
+        "url": "https://nodejs.org/dist/v22.22.2/node-v22.22.2-darwin-arm64.tar.gz",
+        "sha256": "f8655beb4b86ff6588ed7e02c37f8574b58557bd3e880012814b1a4956fd9d88"
       }
     }
   }

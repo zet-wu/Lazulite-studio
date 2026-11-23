@@ -75,6 +75,7 @@ def launch(root, *, no_browser=False):
         print('已打开正在运行的 Studio：' + origin)
         return
     sock = None
+    mcp_handle = None
     try:
         preferences = RuntimeSettings(data / 'settings.json')
         value = preferences.read()
@@ -101,10 +102,17 @@ def launch(root, *, no_browser=False):
         from .app import create_app
         from .auth import Settings
         from .local_web import mount_frontend
+        from .mcp_host import find_mcp_runtime, mount_mcp_proxy, start_mcp_process
         app = create_app(data / 'projects', Settings(mode='local'), runtime_settings=preferences,
                          runtime_identity=identity, runtime_manifest=manifest)
+        identity_path = data / 'runtime/identity.json'
+        write_atomic(identity_path, json.dumps(identity).encode())
+        mcp_runtime = find_mcp_runtime(root)
+        if mcp_runtime:
+            node_bin, mcp_script = mcp_runtime
+            mcp_handle = start_mcp_process(node_bin, mcp_script, studio_origin=origin, identity_file=identity_path)
+            mount_mcp_proxy(app, f'http://127.0.0.1:{mcp_handle.port}')
         mount_frontend(app, root / 'app/frontend/dist')
-        write_atomic(data / 'runtime/identity.json', json.dumps(identity).encode())
         import uvicorn
         from .local_server import LocalServer
         server = LocalServer(uvicorn.Config(app, host='127.0.0.1', port=port, workers=1, proxy_headers=False, access_log=False, log_config=None, timeout_graceful_shutdown=10), app.state.jobs)
@@ -116,12 +124,15 @@ def launch(root, *, no_browser=False):
                     if not no_browser: webbrowser.open(origin + '/projects')
                     return
         watcher = threading.Thread(target=ready, daemon=True); watcher.start()
-        print(f'Studio {manifest["version"]}\n地址：{origin}\n日志：{logs}\n保留此终端；Ctrl+C 停止服务。', flush=True)
+        mcp_line = f'\nMCP：{origin}/mcp' if mcp_handle else ''
+        print(f'Studio {manifest["version"]}\n地址：{origin}{mcp_line}\n日志：{logs}\n保留此终端；Ctrl+C 停止服务。', flush=True)
         try: server.run(sockets=[sock])
         finally:
             done.set(); watcher.join(timeout=2)
+            if mcp_handle: mcp_handle.stop()
             handler.close(); logging.getLogger().removeHandler(handler)
     finally:
+        if mcp_handle: mcp_handle.stop()
         if sock: sock.close()
         lock.__exit__()
 
