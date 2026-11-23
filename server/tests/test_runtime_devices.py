@@ -50,6 +50,32 @@ def test_cpu_retry_new_task_and_stale_revision_rejected(tmp_path):
         assert wait(client,result['id'])['status'] == 'succeeded'
         assert client.get('/api/v1/jobs/failed').json()['status'] == 'failed'
         assert 'device.vocal' not in client.get('/api/v1/settings').json()['values']
-        assert client.post('/api/v1/jobs/'+result['id']+'/retry-cpu',json={'revision':revision},headers=headers).status_code == 409
+        rejected = client.post('/api/v1/jobs/'+result['id']+'/retry-cpu',json={'revision':revision},headers=headers)
+        assert rejected.status_code == 409
+        detail = rejected.json()
+        assert detail['code'] == 'job_not_failed' and detail['retryable'] is False
+        assert detail['reason'] == 'job_not_failed' and detail['params'] == {'kind':'vocal', 'status':'succeeded'}
+        assert 'succeeded' in detail['message']
+
+
+@pytest.mark.parametrize('kind,status,error,code,reason', [
+    ('vocal','failed',{},'cpu_retry_not_available','cpu_retry_not_available'),
+    ('alignment','failed',{'cpu_retry':False},'cpu_retry_not_available','cpu_retry_not_available'),
+    ('legacy','failed',{'cpu_retry':True},'cpu_retry_unsupported_kind','unsupported_kind'),
+    ('vocal','cancelled',{'cpu_retry':True},'job_not_failed','job_not_failed'),
+])
+def test_cpu_retry_rejection_explains_kind_status_and_availability(tmp_path,kind,status,error,code,reason):
+    import json
+    client, db = setup(tmp_path)
+    with client:
+        with db.transaction() as c:
+            c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,error_json,created_at,updated_at) VALUES('guard','p',?,?,?,?,'0','0')",
+                      (kind,status,json.dumps({}),json.dumps(error)))
+        reply = client.post('/api/v1/jobs/guard/retry-cpu', json={'revision':'unused'}, headers={'origin':'http://studio'})
+        assert reply.status_code == 409,reply.text
+        detail = reply.json()
+        assert detail['code'] == code and detail['reason'] == reason and detail['retryable'] is False
+        assert detail['params'] == {'kind':kind,'status':status}
+        assert len(client.get('/api/v1/projects/p/jobs').json()['items']) == 1
 
 

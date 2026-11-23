@@ -47,3 +47,17 @@ it('keeps unset parent endpoints when ruby envelope recomputation is disabled', 
   await registry.call('edit_timing', { project_id: 'p', operations: [{ op: 'set_ruby_time', line_id: 'l', word_id: 'w', ruby_id: 'r', end_ms: 30 }] }, f);
   expect(f.doc().lyrics.lines[0]).toMatchObject({ beginMs: 10, endMs: 30, words: [{ beginMs: 10, endMs: 30 }] });
 });
+
+it.each(['translation', 'romanization'] as const)('counts cascaded %s content deletions once per content', async kind => {
+  const doc = createProjectDocument(); doc.lyrics.lines = [createLine('あ', 'l')];
+  const contents = [{ id: 'c1', lineId: 'l', kind: 'plain' as const, text: 'a' }, { id: 'c2', lineId: 'l', kind: 'plain' as const, text: 'b' }];
+  if (kind === 'translation') doc.lyrics.translationTracks = [{ id: 't', language: 'en', purpose: 'subtitle', contents }];
+  else doc.lyrics.romanizationTracks = [{ id: 't', language: 'ja-Latn', contents }];
+  const f = projectFixture(doc);
+  expect(await createToolRegistry().call('edit_sublyrics', { project_id: 'p', operations: [
+    { op: 'update_content', kind, track_id: 't', content_id: 'c1', content_kind: 'plain', text: 'changed' },
+    { op: 'delete_track', kind, track_id: 't' },
+  ] }, f)).toMatchObject({ affected_track_count: 1, affected_content_count: 2 });
+  expect(kind === 'translation' ? f.doc().lyrics.translationTracks : f.doc().lyrics.romanizationTracks).toEqual([]);
+  expect(f.writes()).toBe(1);
+});

@@ -7,6 +7,55 @@ import { StudioClient } from '../src/client';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpToolPayload } from '../src/tools/registry';
+
+it('summarizes vocal results and distinguishes available audio from project selection', async () => {
+  const doc = createProjectDocument(); doc.acoustics.analysisId = 'selected';
+  const base = { source_asset_id: 'a', duration_ms: 1000, status: 'ready', audio_id: 'audio', audio_state: 'current' };
+  const items = [
+    { ...base, id: 'selected', model: { model: 'BS Karaoke', config: { device: 'cuda' }, configuration_yaml: 'large config' }, segments: [{ id: 's1' }, { id: 's2' }], created_at: '2026-11-23' },
+    { ...base, id: 'available', model: 'htdemucs' },
+    { ...base, id: 'missing', audio_state: 'missing', model: { name: 'Named model' }, segments: [] },
+    { ...base, id: 'other', model_name: 'Explicit name', model: { model_name: 'Nested name' } },
+  ];
+  const f = projectFixture(doc, url => {
+    expect(url.pathname).toBe('/api/v1/projects/p/vocals'); return Response.json({ items });
+  }), registry = createToolRegistry();
+  const expected = { items: [
+    { ...base, id: 'selected', is_active_in_project: true, model_name: 'BS Karaoke', segment_count: 2, created_at: '2026-11-23' },
+    { ...base, id: 'available', is_active_in_project: false, model_name: 'htdemucs', segment_count: 0 },
+    { ...base, id: 'missing', audio_state: 'missing', is_active_in_project: false, model_name: 'Named model', segment_count: 0 },
+    { ...base, id: 'other', is_active_in_project: false, model_name: 'Explicit name', segment_count: 0 },
+  ] };
+  expect(await registry.call('list_vocal_results', { project_id: 'p' }, f)).toEqual(expected);
+  expect(await registry.call('list_vocal_results', { project_id: 'p', detail: 'summary' }, f)).toEqual(expected);
+  expect(await registry.call('list_vocal_results', { project_id: 'p', detail: 'full' }, f)).toEqual({
+    items: items.map(item => ({ ...item, is_active_in_project: item.id === 'selected' })),
+  });
+  expect(f.writes()).toBe(0);
+});
+
+it('passes CPU retry rejection details through the MCP transport', async () => {
+  let calls = 0;
+  const studio = new StudioClient({ baseUrl: 'http://localhost:15173', fetchImpl: async (input, init) => {
+    calls++;
+    expect(new URL(String(input)).pathname).toBe('/api/v1/jobs/j/retry-cpu');
+    expect(JSON.parse(String(init?.body))).toEqual({ revision: 'r1' });
+    return Response.json({ code: 'job_not_failed', message: 'Only failed jobs can retry on CPU', retryable: false,
+      reason: 'job_not_failed', params: { kind: 'vocal', status: 'succeeded' } }, { status: 409 });
+  } });
+  const server = createMcpServer(studio), client = new Client({ name: 'retry-test', version: '1' });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.connect(b), client.connect(a)]);
+  try {
+    const result = await client.callTool({ name: 'retry_job_cpu', arguments: { job_id: 'j', revision: 'r1' } });
+    expect(result.isError).toBe(true);
+    const content = result.content as Array<{ type: string; text: string }>;
+    expect(JSON.parse(content[0].text)).toMatchObject({ code: 'job_not_failed', retryable: false,
+      details: { status: 409, reason: 'job_not_failed', params: { kind: 'vocal', status: 'succeeded' } } });
+    expect(calls).toBe(1);
+  } finally { await Promise.all([client.close(), server.close()]); }
+});
+
 it('reads acoustic segments/gaps and bounded energy from the selected analysis', async () => {
   const doc = createProjectDocument(); doc.acoustics = { analysisId: 'v', segments: [{ id: 's1', beginMs: 100, endMs: 500 }, { id: 's2', beginMs: 1200, endMs: 1500 }] };
   const f = projectFixture(doc, url => {

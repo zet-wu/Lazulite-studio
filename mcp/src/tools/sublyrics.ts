@@ -67,7 +67,7 @@ export function registerSublyricTools(registry: ToolRegistry) {
           const track = tracks.find(track => track.id === resolve(target)) ?? invalid(`Track "${target}" does not exist.`);
           affectedTracks.add(track.id);
           if (op.op === 'update_track') { if (op.language !== undefined) track.language = op.language; if (op.purpose !== undefined) { if (op.kind !== 'translation') invalid('purpose applies to translation tracks.'); (track as TranslationTrack).purpose = op.purpose; } }
-          else if (op.op === 'delete_track') tracks.splice(tracks.indexOf(track), 1);
+          else if (op.op === 'delete_track') { track.contents.forEach(content => affectedContents.add(content.id)); tracks.splice(tracks.indexOf(track), 1); }
           else if (op.op === 'move_track') { tracks.splice(tracks.indexOf(track), 1); tracks.splice(position(tracks, anchor(op.after_track_id)), 0, track); }
           else {
             const buildContent = (contentId: string, lineId: string, input: z.infer<typeof operations>): TranslationContent => {

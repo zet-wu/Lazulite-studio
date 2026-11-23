@@ -73,8 +73,15 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
     @router.post('/jobs/{jid}/retry-cpu', status_code=202, **read_auth)
     def retry_cpu(jid: str, body: CpuRetry, request: Request, subject=Depends(write_dependency) if write_dependency else None):
         old = owned(jid)
-        if old['status'] != 'failed' or not (old.get('error') or {}).get('cpu_retry') or old['kind'] not in {'vocal','alignment'}:
-            raise HTTPException(409, '此失败不支持 CPU 重试，请按错误说明处理')
+        def reject(code, reason, message):
+            raise HTTPException(409, {'code': code, 'message': message, 'retryable': False,
+                                     'reason': reason, 'params': {'kind': old['kind'], 'status': old['status']}})
+        if old['kind'] not in {'vocal','alignment'}:
+            reject('cpu_retry_unsupported_kind', 'unsupported_kind', '此任务类别不支持 CPU 重试')
+        if old['status'] != 'failed':
+            reject('job_not_failed', 'job_not_failed', f"当前任务状态为 {old['status']}，仅失败任务支持 CPU 重试")
+        if not (old.get('error') or {}).get('cpu_retry'):
+            reject('cpu_retry_not_available', 'cpu_retry_not_available', '此失败不支持 CPU 重试，请按错误说明处理')
         params = old['request']
         revision = params.get('revision', params.get('bound_revision'))
         with service.db.connect() as c:

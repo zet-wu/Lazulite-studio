@@ -234,12 +234,13 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
   registry.register({
     name: 'get_job_status',
     description:
-      'Query background job status, stage, progress, acknowledgement state, hardware engine info, and error details (including cpu_retry availability).',
+      'Query background job status, stage, progress, acknowledgement state, hardware engine info, and error details (including cpu_retry availability). Default summary omits engine configuration; detail=full returns the complete engine.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     inputSchema: {
       job_id: z.string().min(1).describe('Job ID returned by start_alignment or get_project_summary.'),
+      detail: z.enum(['summary', 'full']).default('summary'),
     },
-    execute: async ({ job_id }, { client }) => {
+    execute: async ({ job_id, detail }, { client }) => {
       const job = await client.getJob(job_id);
       return {
         job_id: job.id,
@@ -267,7 +268,8 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
               stage: job.error.stage ?? null,
             }
           : null,
-        engine: job.engine,
+        engine: detail === 'full' || job.engine === null ? job.engine
+          : Object.fromEntries(Object.entries(job.engine).filter(([key]) => !['configuration_yaml', 'config', 'training'].includes(key))),
         created_at: job.created_at,
         updated_at: job.updated_at,
       };

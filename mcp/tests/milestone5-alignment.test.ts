@@ -229,12 +229,31 @@ function createAlignmentServerMock() {
       failNextAcknowledge = true;
     },
     getPutCount: () => putCount,
+    setJobEngine: (engine: Record<string, unknown> | null) => {
+      if (activeJob) activeJob = { ...activeJob, engine };
+    },
     getCurrentDoc: () => parseProject(snapshot),
     acknowledgements,
   };
 }
 
 describe('Milestone 5 alignment tools', () => {
+  it('summarizes job engine configuration by default and exposes it only on request', async () => {
+    const mock = createAlignmentServerMock(), registry = createToolRegistry();
+    const { job_id } = await registry.call('start_alignment', { project_id: 'p1', model_id: 'ja-mfa' }, mock) as { job_id: string };
+    const engine = { model: 'BS Karaoke', device: 'cuda', backend_version: '1',
+      configuration_yaml: 'training: large configuration', config: { layers: [1, 2, 3] }, training: { epochs: 100 } };
+    mock.setJobEngine(engine);
+    const summary = await registry.call('get_job_status', { job_id }, mock) as { engine: unknown };
+    expect(summary.engine).toEqual({ model: 'BS Karaoke', device: 'cuda', backend_version: '1' });
+    expect(await registry.call('get_job_status', { job_id, detail: 'summary' }, mock)).toEqual(summary);
+    const full = await registry.call('get_job_status', { job_id, detail: 'full' }, mock) as { engine: unknown };
+    expect(full.engine).toEqual(engine);
+    mock.setJobEngine(null);
+    expect(await registry.call('get_job_status', { job_id }, mock)).toMatchObject({ engine: null });
+    expect(await registry.call('get_job_status', { job_id, detail: 'full' }, mock)).toMatchObject({ engine: null });
+  });
+
   it('returns stale alignment revision and recovery details through the MCP transport', async () => {
     const mock = createAlignmentServerMock();
     mock.advanceExternalRevision();

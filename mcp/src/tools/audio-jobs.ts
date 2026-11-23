@@ -7,15 +7,38 @@ import { contentPayload, type ToolRegistry } from './registry';
 const read = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
 const write = { readOnlyHint: false, destructiveHint: false, idempotentHint: false };
 const projectPath = (projectId: string) => `/projects/${encodeURIComponent(projectId)}`;
-type VocalResult = { id: string; source_asset_id: string; duration_ms: number; status: string; audio_state: string };
+type VocalResult = {
+  id: string; source_asset_id: string; duration_ms: number; status: string; audio_state: string; audio_id: string;
+  model_name?: string; model?: string | { name?: string; model_name?: string; model?: string };
+  segments?: unknown[]; created_at?: string;
+};
 function post(body: unknown, key?: string): RequestInit { return { method: 'POST', headers: { 'Content-Type': 'application/json', ...(key ? { 'Idempotency-Key': key } : {}) }, body: JSON.stringify(body) }; }
 function jobSummary(job: StudioJob) { return { job_id: job.id, project_id: job.project_id, kind: job.kind, status: job.status, stage: job.stage, acknowledged_state: job.acknowledged_state ?? null, result_available: job.result_available, error: job.error, model: job.request.model ?? job.request.model_name ?? null, devices: job.request.devices ?? null, reused_vocal: job.request.reused_vocal ?? false, bound_revision: job.request.revision ?? job.request.bound_revision ?? null, created_at: job.created_at, updated_at: job.updated_at }; }
 export function registerAudioJobTools(registry: ToolRegistry) {
   registry.register({ name: 'list_vocal_models', description: 'List installed vocal separation models, availability, selected model and usable devices from the desktop backend catalog.', annotations: read,
     inputSchema: { refresh: z.boolean().default(false) }, execute: async ({ refresh }, { client }) => client.json(`/vocal-models?refresh=${refresh}`),
   });
-  registry.register({ name: 'list_vocal_results', description: 'List project vocal results including source binding and current/missing audio state.', annotations: read,
-    inputSchema: { project_id: id() }, execute: async ({ project_id }, { client }) => client.json(`${projectPath(project_id)}/vocals`),
+  registry.register({ name: 'list_vocal_results', description: 'List project vocal results. Default summary includes model name and segment count; detail=full includes configuration and segments. audio_state=current means audio is available; is_active_in_project identifies the project selection.', annotations: read,
+    inputSchema: { project_id: id(), detail: z.enum(['summary', 'full']).default('summary') },
+    execute: async ({ project_id, detail }, { client }) => {
+      const [results, envelope] = await Promise.all([
+        client.json<{ items: VocalResult[] }>(`${projectPath(project_id)}/vocals`),
+        client.getDocumentEnvelope(project_id),
+      ]);
+      const activeId = parseProject(envelope.document).acoustics.analysisId;
+      return { ...results, items: results.items.map(item => {
+        const is_active_in_project = item.id === activeId;
+        if (detail === 'full') return { ...item, is_active_in_project };
+        return {
+          id: item.id, source_asset_id: item.source_asset_id, status: item.status,
+          audio_id: item.audio_id, audio_state: item.audio_state, is_active_in_project,
+          duration_ms: item.duration_ms,
+          model_name: item.model_name ?? (typeof item.model === 'string' ? item.model : item.model?.name ?? item.model?.model_name ?? item.model?.model ?? null),
+          segment_count: Array.isArray(item.segments) ? item.segments.length : 0,
+          ...(item.created_at !== undefined ? { created_at: item.created_at } : {}),
+        };
+      }) };
+    },
   });
   registry.register({ name: 'start_vocal_separation', description: 'Start independent vocal separation using the configured desktop model. Reuses existing audio unless force_separation=true. Returns a background job immediately; a busy queue is retryable.', annotations: write,
     inputSchema: { project_id: id(), force_separation: z.boolean().default(false), idempotency_key: id().optional() },
