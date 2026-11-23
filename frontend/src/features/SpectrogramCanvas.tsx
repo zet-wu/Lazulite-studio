@@ -52,6 +52,7 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
   const worker = useRef<Worker | null>(null);
   const [diagnostics] = useState(spectrumDiagnosticsEnabled);
   const cache = useRef(new SpectrumCache(diagnostics));
+  const stripCanvas = useRef<HTMLCanvasElement | null>(null);
   const pending = useRef(new Map<number, Request>());
   const failed = useRef(new Map<number, Message>());
   const wanted = useRef<number[]>([]);
@@ -143,7 +144,10 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
     changed();
   }, [durationMs, firstTile, lastTile, visible, retry]);
 
-  useEffect(() => () => { cache.current.clear(); }, []);
+  useEffect(() => () => {
+    cache.current.clear();
+    if (stripCanvas.current) { stripCanvas.current.width = 0; stripCanvas.current.height = 0; stripCanvas.current = null; }
+  }, []);
 
   // Match the new content origin in the same paint as the translated layers.
   useLayoutEffect(() => {
@@ -157,20 +161,41 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
     if (!context) return;
     context.fillStyle = '#101622'; context.fillRect(0, 0, element.width, element.height);
     const x = (time: number) => (time - drawStart) / (drawEnd - drawStart) * element.width;
+    const runs: { startMs: number; endMs: number; bitmaps: HTMLCanvasElement[] }[] = [];
+    let run: typeof runs[number] | null = null;
     for (const first of wanted.current) {
-      const last = Math.min(first + SPECTRUM_WINDOW_MS, durationMs), left = Math.round(x(first)), right = Math.round(x(last));
-      if (right <= left) continue;
+      const last = Math.min(first + SPECTRUM_WINDOW_MS, durationMs);
       const tile = cache.current.get(first);
-      if (!tile) {
-        context.fillStyle = failed.current.has(first) ? '#502933' : '#24354b';
-        context.fillRect(left, 0, right - left, element.height);
-        continue;
-      }
-      if (!tile.bitmap && tile.pixels) {
+      if (tile && !tile.bitmap && tile.pixels) {
         tile.bitmap = colorizeTile(tile.pixels);
         if (tile.bitmap) tile.pixels = undefined;
       }
-      if (tile.bitmap) context.drawImage(tile.bitmap, left, 0, right - left, element.height);
+      if (!tile?.bitmap) {
+        run = null;
+        const left = Math.round(x(first)), right = Math.round(x(last));
+        context.fillStyle = failed.current.has(first) ? '#502933' : '#24354b';
+        if (right > left) context.fillRect(left, 0, right - left, element.height);
+        continue;
+      }
+      if (!run || run.endMs !== first) {
+        run = { startMs: first, endMs: last, bitmaps: [] }; runs.push(run);
+      }
+      run.endMs = last; run.bitmaps.push(tile.bitmap);
+    }
+    if (!runs.length) return;
+    const strip = stripCanvas.current ??= document.createElement('canvas');
+    const stripWidth = Math.max(...runs.map(run => run.bitmaps.length)) * SPECTRUM_WIDTH;
+    if (strip.width !== stripWidth) strip.width = stripWidth;
+    if (strip.height !== SPECTRUM_HEIGHT) strip.height = SPECTRUM_HEIGHT;
+    const stripContext = strip.getContext('2d')!;
+    for (const run of runs) {
+      const left = Math.round(x(run.startMs)), right = Math.round(x(run.endMs));
+      if (right <= left) continue;
+      stripContext.clearRect(0, 0, strip.width, strip.height);
+      run.bitmaps.forEach((bitmap, index) => stripContext.drawImage(bitmap, index * SPECTRUM_WIDTH, 0));
+      // Scale a continuous source once so interpolation crosses internal tile edges.
+      const sourceWidth = (run.endMs - run.startMs) / SPECTRUM_WINDOW_MS * SPECTRUM_WIDTH;
+      context.drawImage(strip, 0, 0, sourceWidth, SPECTRUM_HEIGHT, left, 0, right - left, element.height);
     }
   }, [drawEnd, revision, drawStart, visible, width, ratio, displayHeight, durationMs]);
 

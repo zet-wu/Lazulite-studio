@@ -1,5 +1,5 @@
 import { message, MessageError } from './messages';
-export const SPECTRUM_WIDTH = 384;
+export const SPECTRUM_WIDTH = 512;
 export const SPECTRUM_HEIGHT = 256;
 export const FFT_SIZE = 1024;
 const SIZE = FFT_SIZE;
@@ -94,14 +94,15 @@ export function computeSpectrogram(pcm: Int16Array, rate: number, channels: numb
   if (!frames) return output;
   const requestFirst = window ? Math.round(window.requestStartMs * rate / 1e3) : 0;
   const coreFirst = window ? Math.round(window.coreStartMs * rate / 1e3) : 0;
-  const coreLast = window ? Math.round(window.coreEndMs * rate / 1e3) : frames;
   const mediaLast = window ? window.requestEndMs >= window.durationMs ? requestFirst + frames : Math.round(window.durationMs * rate / 1e3) : frames;
   const real = new Float32Array(SIZE), imaginary = new Float32Array(SIZE);
   const bins = binMapForRate(rate);
   const invScale = 1 / (channels * 32768);
   const ampScale = 4 / SIZE;
   const halfSize = SIZE >> 1;
-  const coreSpan = coreLast - coreFirst;
+  // Every tile uses the same time lattice, including the short final tile.
+  // The renderer crops its unused tail instead of stretching time to fill it.
+  const coreSpan = window ? Math.round(SPECTRUM_WINDOW_MS * rate / 1e3) : frames;
   for (let column = 0; column < SPECTRUM_WIDTH; column++) {
     const center = coreFirst + Math.round((column + 0.5) / SPECTRUM_WIDTH * coreSpan) - requestFirst;
     for (let index = 0; index < SIZE; index++) {

@@ -11,7 +11,7 @@
 ## 媒体播放、时间轴与声谱图
 
 - `MediaTransport` 维护全局唯一播放器、变速、A/B 循环与播放跟随，在音频页通过 Portal 将时间轴挂入主工作区。
-- `TimelineTracks`、`TimelineStaging`、`VocalTracks` 与 `SpectrogramCanvas` 共享同一水平视窗与毫秒坐标：支持从暂存区拖入分配时间、拖回清空时间、吸附预览与滚轮缩放/平移；Ctrl／⌘ 边界拖动联动同行贴合邻居，可在设置中互换默认操作并在拖动中切换修饰键。播放帧通过 ref 推送条块高亮，按有效时间区间跳过重复扫描。声谱图使用常驻 Web Worker 异步渲染瓦片，着色后释放灰度缓冲，按物理整数像素边界绘制。
+- `TimelineTracks`、`TimelineStaging`、`VocalTracks` 与 `SpectrogramCanvas` 共享同一水平视窗与毫秒坐标：支持从暂存区拖入分配时间、拖回清空时间、吸附预览与滚轮缩放/平移；Ctrl／⌘ 边界拖动联动同行贴合邻居，可在设置中互换默认操作并在拖动中切换修饰键。播放帧通过 ref 推送条块高亮，按有效时间区间跳过重复扫描。声谱图使用常驻Web Worker异步渲染瓦片，着色后释放灰度缓冲；连续已就绪瓦片先按原始像素拼成可复用离屏条带，再按物理整数像素区间统一缩放。条带随音源组件卸载释放。
 - `FloatingTray`、`useProjectJobs` 与 `useBackgroundJobRecovery` 在右下角可折叠、可拖动浮层中统一承接项目修订外部同步通知、活动后台任务进度与取消操作，以及跨刷新/跨标签页的未消费后台人声与对齐结果恢复闭环；`VocalPanel` 与 `AlignmentPanel` 负责发起对应任务并在本页直连时协调认领。
 
 ## 语言工具与卡拉 OK 交互

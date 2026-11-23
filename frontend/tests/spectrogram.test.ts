@@ -41,3 +41,14 @@ it('encloses frame positions in millisecond requests and rejects missing interna
   const window = spectrumWindow(4000, 8000, 12000);
   expect(() => computeSpectrogram(new Int16Array(100), PROXY_SAMPLE_RATE, 1, window)).toThrow('spectrum.contextMissing');
 });
+
+it('uses the same sample grid when the final tile is shorter than four seconds', () => {
+  const rate = 48000, pcm = Int16Array.from({ length: rate * 4 }, (_, frame) => frame < rate * .1 ? Math.round(Math.sin(frame * 2 * Math.PI * 440 / rate) * 20000) : 0);
+  const full = computeSpectrogram(pcm, rate, 1, spectrumWindow(0, 4000, 4000, rate));
+  const duration = 123, window = spectrumWindow(0, duration, duration, rate);
+  const tail = computeSpectrogram(pcm.slice(0, Math.round(duration * rate / 1000)), rate, 1, window);
+  // Before the tail's half-window context, both media represent identical samples.
+  const commonColumns = Math.floor(100 / 4000 * SPECTRUM_WIDTH);
+  for (let row = 0; row < SPECTRUM_HEIGHT; row++)
+    expect(tail.slice(row * SPECTRUM_WIDTH, row * SPECTRUM_WIDTH + commonColumns)).toEqual(full.slice(row * SPECTRUM_WIDTH, row * SPECTRUM_WIDTH + commonColumns));
+});
