@@ -228,7 +228,24 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       const next = {...current,clear:true,validDrop:true,current:clientX,pointerY:clientY,started:current.started || Math.hypot(clientX-current.x,clientY-current.y)>=3,candidate};
       dragRef.current=next;setDrag(next);publish(null);return;
     }
-    const validDrop = !!hit?.closest('[data-track-lane]') && !!hit && !!tracksRef.current?.contains(hit);
+    const plots = tracksRef.current?.closest('#timeline-plots');
+    const lane = tracksRef.current?.querySelector<HTMLElement>('[data-track-lane]');
+    const laneRect = lane?.getBoundingClientRect();
+    let validDrop = false;
+    if (hit && !(drop && tracksRef.current?.contains(drop))) {
+      const inHorizontal = laneRect ? clientX >= laneRect.left && clientX <= laneRect.right : false;
+      if (plots) {
+        const plotArea = plots.querySelector<HTMLElement>('[data-timeline-plot-area]') ?? plots;
+        const areaRect = plotArea.getBoundingClientRect();
+        validDrop = plots.contains(hit) && inHorizontal && clientY >= areaRect.top && clientY <= areaRect.bottom;
+      } else if (tracksRef.current?.contains(hit)) {
+        const lanes = [...tracksRef.current.querySelectorAll<HTMLElement>('[data-track-lane]')];
+        const rects = lanes.map(item => item.getBoundingClientRect());
+        const top = rects.length ? Math.min(...rects.map(r => r.top)) : Infinity;
+        const bottom = rects.length ? Math.max(...rects.map(r => r.bottom)) : -Infinity;
+        validDrop = inHorizontal && clientY >= top && clientY <= bottom;
+      }
+    }
     const validate=(next:LyricDocument,time:number)=>{
       if(durationMs===null)throw new MessageError(describeMessage('timeline.sourceUnknown'));
       if(projectContext){

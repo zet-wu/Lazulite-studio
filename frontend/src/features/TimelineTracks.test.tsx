@@ -141,3 +141,110 @@ it('filters expanded groups before layout, keeps visible children and restores e
  view.rerender(show(0,900));expect(groups()).toEqual(['line-0']);
  expect(props.apply).not.toHaveBeenCalled();cleanup();vi.unstubAllGlobals();
 });
+
+it('commits drags released across the right-hand plot area and rejects labels, toolbar, overlays, and non-move staging drops', async () => {
+  const { cleanup, fireEvent } = await import('@testing-library/react'); cleanup();
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  const document = createLyricDocument('歌');
+  const line = document.lines[0];
+  Object.assign(line, { beginMs: 1000, endMs: 3000 });
+  Object.assign(line.words[0], { beginMs: 1000, endMs: 3000 });
+  const apply = vi.fn(), onError = vi.fn();
+  const rect = (left: number, top: number, right: number, bottom: number): DOMRect => ({
+    left, top, right, bottom, width: right - left, height: bottom - top, x: left, y: top, toJSON() {},
+  });
+  const view = render(
+    <div>
+      <div id="external-overlay">overlay</div>
+      <div id="timeline-plots">
+        <div data-testid="toolbar">toolbar</div>
+        <div data-timeline-plot-area>
+          <div data-testid="wave">wave</div>
+          <div data-testid="energy">energy</div>
+          <SelectionProvider>
+            <InitialSelection id={line.id}>
+              <TimelineTracks
+                document={document}
+                selectedLineId={line.id}
+                startMs={0}
+                endMs={10000}
+                durationMs={10000}
+                positionMs={0}
+                bpm={120}
+                snap={false}
+                visible={{ staging: true, karaoke: false, line: true, word: true, ruby: false, gap: false, romanization: false }}
+                apply={apply}
+                onPan={() => {}}
+                onError={onError}
+              />
+            </InitialSelection>
+          </SelectionProvider>
+          <div data-testid="spectrogram">spectrogram</div>
+        </div>
+      </div>
+    </div>,
+  );
+  const plots = view.container.querySelector<HTMLElement>('#timeline-plots')!;
+  const toolbar = screen.getByTestId('toolbar');
+  const plotArea = view.container.querySelector<HTMLElement>('[data-timeline-plot-area]')!;
+  const wave = screen.getByTestId('wave');
+  const energy = screen.getByTestId('energy');
+  const spectrogram = screen.getByTestId('spectrogram');
+  const overlay = view.container.querySelector<HTMLElement>('#external-overlay')!;
+  const lane = view.container.querySelector<HTMLElement>('[data-track-lane]')!;
+  const label = view.container.querySelector<HTMLElement>('[data-timeline-text]')!;
+  const staging = view.container.querySelector<HTMLElement>('[data-staging-drop]')!;
+  const lineBar = screen.getByRole('button', { name: '时间轴行 L1' });
+  const endHandle = screen.getByLabelText('时间轴行 L1结束边界');
+  const wordBeginHandle = screen.getByLabelText('时间轴词 歌开始边界');
+  for (const el of [lineBar, endHandle, wordBeginHandle]) {
+    el.setPointerCapture = vi.fn();
+    el.hasPointerCapture = vi.fn(() => false);
+  }
+  plotArea.getBoundingClientRect = () => rect(0, 40, 1060, 320);
+  for (const el of view.container.querySelectorAll<HTMLElement>('[data-track-lane]')) {
+    el.getBoundingClientRect = () => rect(60, 140, 1060, 162);
+  }
+
+  let hit: Element = lane;
+  Object.defineProperty(window.document, 'elementFromPoint', { configurable: true, value: () => hit });
+  const pointer = (target: HTMLElement, type: string, clientX: number, clientY: number) => {
+    const event = new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    fireEvent(target, event);
+  };
+  const drag = (target: HTMLElement, x0: number, y0: number, x1: number, y1: number, dropTarget: Element) => {
+    hit = target;
+    pointer(target, 'pointerdown', x0, y0);
+    hit = dropTarget;
+    pointer(target, 'pointermove', x1, y1);
+    pointer(target, 'pointerup', x1, y1);
+  };
+
+  drag(endHandle, 360, 150, 460, 60, wave);
+  expect(apply).toHaveBeenCalledTimes(1);
+  drag(wordBeginHandle, 160, 180, 210, 280, spectrogram);
+  expect(apply).toHaveBeenCalledTimes(2);
+  drag(lineBar, 200, 150, 250, 100, energy);
+  expect(apply).toHaveBeenCalledTimes(3);
+  drag(lineBar, 200, 150, 260, 170, plots);
+  expect(apply).toHaveBeenCalledTimes(4);
+
+  drag(lineBar, 200, 150, 30, 150, label);
+  drag(endHandle, 360, 150, 460, 20, toolbar);
+  drag(lineBar, 200, 150, 250, 150, overlay);
+  drag(endHandle, 360, 150, 460, 220, staging);
+  expect(apply).toHaveBeenCalledTimes(4);
+
+  drag(lineBar, 200, 150, 250, 220, staging);
+  expect(apply).toHaveBeenCalledTimes(5);
+  expect(apply).toHaveBeenLastCalledWith({
+    type: 'replace-document',
+    document: expect.objectContaining({
+      lines: [expect.objectContaining({ beginMs: null, endMs: null })],
+    }),
+  });
+
+  cleanup();
+  vi.unstubAllGlobals();
+});

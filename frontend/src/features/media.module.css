@@ -134,6 +134,8 @@
   --timeline-bar-inset: 1px;
   --timeline-label-inset: 9px;
   display: grid; grid-auto-rows: max-content; gap: var(--timeline-row-gap); align-content: start; max-height: 300px; overflow-y: auto; min-width: 0; }
+.plotArea {
+  display: grid; grid-auto-rows: max-content; gap: var(--timeline-row-gap); align-content: start; min-width: 0; }
 .trackBar { border: 0; box-shadow: inset 0 0 0 1px #7297d6; }
 .trackSelected { box-shadow: inset 0 0 0 1px #2d64bc; }
 .trackBar:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }

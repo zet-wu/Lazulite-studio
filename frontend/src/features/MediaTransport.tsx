@@ -705,14 +705,16 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
       {timelineError && <p role="alert" className={styles.error}>{timelineError}</p>}
       {timelineHost && <div className={styles.header}>{viewportTools}</div>}
 
-      {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks sourceDurationMs={asset?.source_duration_ms ?? null} locked={editingLocked} projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?` ${t('outline.background')}`:''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={documentAnchors} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
-      {document && onTimelineCommand && <>
+      <div data-timeline-plot-area className={styles.plotArea}>
+        {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks sourceDurationMs={asset?.source_duration_ms ?? null} locked={editingLocked} projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?` ${t('outline.background')}`:''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={documentAnchors} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
+        {document && onTimelineCommand && <>
 
-        <TimelineTracks follow={follow} locked={editingLocked} durationMs={asset?.source_duration_ms ?? null} document={document} selectedLineId={selectedLineId ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
-          visible={visible} externalAnchors={segmentAnchors}
-          apply={onTimelineCommand} onLocate={locate} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
-      </>}
-      {visible.spectrum && asset && <SpectrogramCanvas pcmRate={graphicVocal ? sourceResults.find(result=>result.audio_id===graphicVocal)!.sample_rate : 48000} vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
+          <TimelineTracks follow={follow} locked={editingLocked} durationMs={asset?.source_duration_ms ?? null} document={document} selectedLineId={selectedLineId ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
+            visible={visible} externalAnchors={segmentAnchors}
+            apply={onTimelineCommand} onLocate={locate} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
+        </>}
+        {visible.spectrum && asset && <SpectrogramCanvas pcmRate={graphicVocal ? sourceResults.find(result=>result.audio_id===graphicVocal)!.sample_rate : 48000} vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
+      </div>
       </div>
     </TimelineIndicatorContext.Provider>
   );
