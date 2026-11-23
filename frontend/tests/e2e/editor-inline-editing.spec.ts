@@ -21,7 +21,7 @@ test('注音 main-row right click preserves multi-selection and updates content/
   await expect(dialog.getByLabel('目标词')).toHaveCount(2);
   await expect(dialog.getByText('空单元', { exact: true })).toHaveCount(0);
   await dialog.getByLabel('字符输出').selectOption('roman');
-  await dialog.getByLabel('音译轨道').selectOption({ label: '轨道 2 · ja' });
+  await dialog.getByLabel('音译轨道').selectOption({ label: '轨道2 · ja' });
   await expect(dialog).toContainText('生成 1 / 3 行');
   await dialog.getByLabel('跳过生成', { exact: true }).check();
   await expect(dialog.getByRole('status')).toHaveText('所有单元均跳过，无需生成');
@@ -46,7 +46,7 @@ test('inline addition, native text selection, IME, cancellation and one history 
   await page.mouse.move(5, 5); await expect(input).toHaveValue('新增');
   await input.dispatchEvent('compositionend'); await input.press('Enter');
   await expect(line.getByRole('textbox', { name: '词 新增', exact: true })).toBeVisible();
-  await expect(page.getByText('词已选 1', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('编辑操作').getByText('词已选 1', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(line.getByRole('textbox', { name: '词 新增', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
