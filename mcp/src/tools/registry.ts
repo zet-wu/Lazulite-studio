@@ -3,6 +3,20 @@ import { z } from 'zod';
 import { MessageError, type Message } from '../../../frontend/src/domain/messages';
 import { StudioClient, StudioHttpError } from '../client';
 
+import messages from '../../../frontend/src/i18n/resources/en.json';
+
+export type McpContentBlock = { type: 'text'; text: string } | { type: 'audio'; data: string; mimeType: string };
+export type McpToolPayload = { __mcpContent: true; content: McpContentBlock[] };
+export function contentPayload(content: McpContentBlock[]): McpToolPayload { return { __mcpContent: true, content }; }
+export class OperationError extends Error {
+  constructor(readonly cause: unknown, readonly context: Record<string, unknown>) { super(cause instanceof Error ? cause.message : String(cause)); }
+}
+export function withOperationContext<T>(operation: Record<string, unknown>, index: number, revision: string, run: () => T): T {
+  try { return run(); } catch (error) {
+    throw new OperationError(error, { operation_index: index, ...operation, current_revision: revision, hint: 'Read the affected objects at the current revision, correct this operation, then retry the entire batch.' });
+  }
+}
+
 const MAX_IDEMPOTENCY_ENTRIES = 1024;
 
 export type ToolAnnotations = {
@@ -179,15 +193,21 @@ function formatMessageDetail(detail: Message): string {
   if (detail.parts?.length) {
     return detail.parts.map(formatMessageDetail).join('; ');
   }
-  return detail.values ? `${detail.key} (${JSON.stringify(detail.values)})` : detail.key;
+  const template = (messages as Record<string, string>)[detail.key] ?? detail.key;
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(detail.values?.[key] ?? key));
 }
 
 export function formatToolError(error: unknown): {
   code: string;
   message: string;
   retryable: boolean;
+  message_key?: string;
   details?: Record<string, unknown>;
 } {
+  if (error instanceof OperationError) {
+    const formatted = formatToolError(error.cause);
+    return { ...formatted, details: { ...formatted.details, ...error.context } };
+  }
   if (error instanceof StudioHttpError) {
     return {
       code: error.body.code,
@@ -204,6 +224,7 @@ export function formatToolError(error: unknown): {
   if (error instanceof MessageError) {
     return {
       code: 'domain_error',
+      message_key: error.detail.key,
       message: formatMessageDetail(error.detail),
       retryable: false,
       details: { detail: error.detail },

@@ -25,7 +25,7 @@ import {
 import { distributeRubyTime } from '../../../frontend/src/domain/ruby-editing';
 import { StudioHttpError } from '../client';
 import { mutateProjectDocument } from './cas';
-import type { ToolRegistry } from './registry';
+import { withOperationContext, type ToolRegistry } from './registry';
 
 const NonEmptyReadingSchema = z
   .string()
@@ -308,20 +308,21 @@ function applySplitAndSetWord(
       rubyUnits: [],
       ...(word.agentRefs ? { agentRefs: [...word.agentRefs] } : {}),
     };
-    if (part.readings.length > 0) {
-      subWord.rubyUnits = buildRubyUnits(subWord, [], part.readings);
-    }
+
     return subWord;
   });
 
+  const rubyCommands: AtomicLyricCommand[] = segmentWords.flatMap((part, index) => parts[index].readings.length
+    ? [{ type: 'set-ruby-units' as const, lineId, wordId: part.id, units: buildRubyUnits(part, [], parts[index].readings), overwrite: true }] : []);
   const restoreCommands: AtomicLyricCommand[] = [];
   if (preservedBeat > 0) {
     const first = segmentWords[0];
-    if (first.rubyUnits.length > 0) {
+    const firstRuby = rubyCommands.find(command => command.type === 'set-ruby-units' && command.wordId === first.id);
+    if (firstRuby?.type === 'set-ruby-units') {
       restoreCommands.push({
         type: 'set-empty-beat',
         kind: 'ruby',
-        id: first.rubyUnits[0].id,
+        id: firstRuby.units[0].id,
         count: preservedBeat,
       });
     } else {
@@ -336,7 +337,10 @@ function applySplitAndSetWord(
 
   const commands: AtomicLyricCommand[] = [
     ...clearCommands,
+    ...word.rubyUnits.map(unit => ({ type: 'delete-ruby' as const, lineId, wordId, rubyId: unit.id })),
+    { type: 'set-word-time', lineId, wordId, ...wordTimeEnvelope(word) },
     { type: 'segment-word', lineId, wordId, words: segmentWords },
+    ...rubyCommands,
     ...restoreCommands,
   ];
   return runCommand(state, commands.length === 1 ? commands[0] : { type: 'batch', commands });
@@ -665,11 +669,11 @@ export function registerReadingTools(registry: ToolRegistry): void {
         client,
         project_id,
         { expectedRevision: expected_revision, idempotencyKey: idempotency_key },
-        (doc) => {
+        (doc, envelope) => {
           let state = createProjectEditorState(doc);
           const touchedLineIds = new Set<string>();
 
-          for (const op of operations) {
+          operations.forEach((op, index) => withOperationContext(op, index, envelope.revision, () => {
             touchedLineIds.add(op.line_id);
             switch (op.mode) {
               case 'set_word':
@@ -685,7 +689,7 @@ export function registerReadingTools(registry: ToolRegistry): void {
                 state = applySetLineSpans(state, op.line_id, op.spans, overwrite_existing);
                 break;
             }
-          }
+          }));
 
           const nextDoc = state.present;
           const rubyWordCount = [...touchedLineIds].reduce((count, lineId) => {
@@ -698,6 +702,8 @@ export function registerReadingTools(registry: ToolRegistry): void {
             summary: {
               operations_applied: operations.length,
               touched_line_count: touchedLineIds.size,
+              touched_line_ids: [...touchedLineIds],
+              created_word_ids: nextDoc.lyrics.lines.flatMap(line => line.words).filter(word => !doc.lyrics.lines.some(line => line.words.some(old => old.id === word.id))).map(word => word.id),
               ruby_words_in_touched_lines: rubyWordCount,
             },
           };

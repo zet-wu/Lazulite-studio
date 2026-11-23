@@ -2,7 +2,10 @@ import { z } from 'zod';
 import { parseProject } from '../../../frontend/src/adapters/project-codec';
 import { displayLines } from '../../../frontend/src/domain/amll-compatibility';
 import { lineText, translationText } from '../../../frontend/src/domain/lyric-document';
-import type { ToolRegistry } from './registry';
+import { contentPayload, type ToolRegistry } from './registry';
+import { serializeLyricTtml } from '../../../frontend/src/adapters/ttml/lyric-codec';
+import { createProjectEditing } from '../../../frontend/src/domain/project-editing';
+import { StudioHttpError } from '../client';
 
 const ACTIVE_JOB_STATUSES = new Set(['queued', 'running', 'cancel_requested']);
 
@@ -184,23 +187,55 @@ export function registerReadTools(registry: ToolRegistry): void {
       project_id: z.string().min(1).describe('Target project ID.'),
       start_line: z.number().int().min(1).default(1).describe('1-based starting display line number.'),
       limit: z.number().int().min(1).max(200).default(50).describe('Maximum number of lines to return (1-200).'),
+      line_ids: z.array(z.string().min(1)).min(1).optional(),
+      detail: z.enum(['summary', 'compact', 'full']).default('full'),
+      format: z.enum(['json', 'editable_ttml', 'exchange_ttml']).default('json'),
       include_sublyrics: z
         .boolean()
         .default(true)
         .describe('Whether to include translation and romanization entries attached to each line.'),
     },
-    execute: async ({ project_id, start_line, limit, include_sublyrics }, { client }) => {
+    execute: async ({ project_id, start_line, limit, include_sublyrics, line_ids, detail, format }, { client }) => {
       const envelope = await client.getDocumentEnvelope(project_id);
       const doc = parseProject(envelope.document);
       const ordered = displayLines(doc.lyrics, doc.lineOrder);
       const offset = start_line - 1;
-      const slice = ordered.slice(offset, offset + limit);
+      if (line_ids?.some(id => !ordered.some(line => line.id === id))) throw new StudioHttpError(422, { code: 'line_not_found', message: 'A requested line ID does not exist.', retryable: false });
+      const slice = line_ids ? ordered.filter(line => line_ids.includes(line.id)) : ordered.slice(offset, offset + limit);
+      if (format !== 'json') {
+        const selected = new Set(slice.map(line => line.id));
+        const context = slice.flatMap(line => line.backgroundOf && !selected.has(line.backgroundOf) ? [line.backgroundOf] : []);
+        const included = new Set([...selected, ...context]);
+        const lines = ordered.filter(line => included.has(line.id));
+        const agents = new Set(lines.flatMap(line => [...line.agentRefs, ...line.words.flatMap(word => word.agentRefs ?? [])]));
+        for (const id of agents) {
+          const actor = doc.lyrics.agents.find(agent => agent.id === id)?.actorRef;
+          if (actor) agents.add(actor);
+        }
+        const editing = createProjectEditing();
+        const objectIds = new Set(lines.flatMap(line => line.words.flatMap(word => [word.id, ...word.rubyUnits.map(unit => unit.id)])));
+        editing.emptyBeats = Object.fromEntries(Object.entries(doc.editing.emptyBeats).filter(([id]) => objectIds.has(id)));
+        editing.ignoredSyncLineIds = doc.editing.ignoredSyncLineIds.filter(id => included.has(id));
+        editing.skippedAlignmentLineIds = doc.editing.skippedAlignmentLineIds.filter(id => included.has(id));
+        editing.endLinks = Object.fromEntries(Object.entries(doc.editing.endLinks).filter(([id, target]) => included.has(id) && included.has(target)));
+        const external = Object.fromEntries(Object.entries(doc.editing.endLinks).filter(([id, target]) => included.has(id) && !included.has(target)));
+        const lyrics = { ...doc.lyrics, lines, agents: doc.lyrics.agents.filter(agent => agents.has(agent.id)),
+          translationTracks: include_sublyrics ? doc.lyrics.translationTracks.map(track => ({ ...track, contents: track.contents.filter(content => included.has(content.lineId)) })).filter(track => track.contents.length) : [],
+          romanizationTracks: include_sublyrics ? doc.lyrics.romanizationTracks.map(track => ({ ...track, contents: track.contents.filter(content => included.has(content.lineId)) })).filter(track => track.contents.length) : [],
+        };
+        const partial = selected.size !== ordered.length || !include_sublyrics;
+        return contentPayload([{ type: 'text', text: JSON.stringify({ project_id, revision: envelope.revision, profile: format, partial,
+          roundtrip_safe: false, range: { start_line, line_ids: slice.map(line => line.id) }, context_only_line_ids: [...new Set(context)],
+          omitted_fields: ['karaoke', 'acoustics', 'amll', 'lineOrder', ...(!include_sublyrics ? ['sublyrics'] : [])],
+          sidecar: { editing, external_end_links: external }, warning: 'This is a lyric view; do not import a sliced or filtered view with replace_all.' }) },
+          { type: 'text', text: serializeLyricTtml(lyrics, { draft: format === 'editable_ttml', editing }) }]);
+      }
       const ignoredSync = new Set(doc.editing.ignoredSyncLineIds);
       const skippedAlignment = new Set(doc.editing.skippedAlignmentLineIds);
 
       const lines = slice.map((line, idx) => {
         const entry: Record<string, unknown> = {
-          line_number: offset + idx + 1,
+          line_number: ordered.indexOf(line) + 1,
           line_id: line.id,
           text: lineText(line),
           begin_ms: line.beginMs,
@@ -241,9 +276,12 @@ export function registerReadTools(registry: ToolRegistry): void {
               .filter((content) => content.lineId === line.id)
               .map((content) => ({
                 track_id: track.id,
+                content_id: content.id,
                 language: track.language,
                 purpose: track.purpose,
+                kind: content.kind,
                 text: translationText(content),
+                ...(content.kind === 'timed' ? { units: content.units.map(u => ({ unit_id: u.id, text: u.text, begin_ms: u.beginMs, end_ms: u.endMs })) } : {}),
               })),
           );
           const romanizations = doc.lyrics.romanizationTracks.flatMap((track) =>
@@ -251,13 +289,14 @@ export function registerReadTools(registry: ToolRegistry): void {
               .filter((content) => content.lineId === line.id)
               .map((content) => ({
                 track_id: track.id,
+                content_id: content.id,
                 language: track.language,
                 kind: content.kind,
                 text: translationText(content),
                 ...(content.kind === 'timed'
                   ? {
                       units: content.units.map((u) => ({
-                        id: u.id,
+                        unit_id: u.id,
                         text: u.text,
                         begin_ms: u.beginMs,
                         end_ms: u.endMs,
@@ -270,6 +309,14 @@ export function registerReadTools(registry: ToolRegistry): void {
           if (romanizations.length) entry.romanizations = romanizations;
         }
 
+        if (detail === 'summary') {
+          delete entry.words;
+          entry.word_count = line.words.length;
+          entry.ruby_count = line.words.reduce((n, word) => n + word.rubyUnits.length, 0);
+          entry.translation_count = doc.lyrics.translationTracks.reduce((n, track) => n + track.contents.filter(content => content.lineId === line.id).length, 0);
+          entry.romanization_count = doc.lyrics.romanizationTracks.reduce((n, track) => n + track.contents.filter(content => content.lineId === line.id).length, 0);
+          delete entry.translations; delete entry.romanizations;
+        } else if (detail === 'compact') entry.words = line.words.map(word => ({ word_id: word.id, text: word.text, begin_ms: word.beginMs, end_ms: word.endMs, ruby: word.rubyUnits.map(unit => unit.reading) }));
         return entry;
       });
 
@@ -279,7 +326,7 @@ export function registerReadTools(registry: ToolRegistry): void {
         total_lines: ordered.length,
         start_line,
         returned_lines: lines.length,
-        has_more: offset + lines.length < ordered.length,
+        has_more: !line_ids && offset + lines.length < ordered.length,
         lines,
       };
     },

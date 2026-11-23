@@ -35,6 +35,10 @@ def read_embedded(path: Path):
         except ValueError as exc:
             candidate['error'] = str(exc)
             candidate['error_code'] = exc.code if isinstance(exc, EmbeddedError) else 'invalid_format'
+            if text.strip():
+                candidate.update(raw_text_preview=text[:2000], raw_text_length=len(text))
+                if len(text.encode('utf-8')) <= 128 * 1024:
+                    candidate['raw_text'] = text
         candidates.append(candidate)
     if isinstance(media, MP3):
         for frame in (media.tags.getall('USLT') if media.tags else []):

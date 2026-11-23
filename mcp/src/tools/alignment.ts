@@ -58,12 +58,14 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
         .min(1)
         .optional()
         .describe('Saved document revision to preview. Defaults to the latest saved revision.'),
+      detail: z.enum(['summary', 'issues', 'full']).default('summary'),
+      line_ids: z.array(z.string().min(1)).min(1).optional(),
       convert_particles: z.boolean().default(true).describe('Normalize Japanese particles (は→わ / へ→え / を→お).'),
       latin_normalize: z.boolean().default(true).describe('Normalize Latin characters for phoneme conversion.'),
       strip_tone_digits: z.boolean().default(false).describe('Strip tone digits from pinyin/romanized tokens.'),
     },
     execute: async (
-      { project_id, model_id, revision, convert_particles, latin_normalize, strip_tone_digits },
+      { project_id, model_id, revision, convert_particles, latin_normalize, strip_tone_digits, detail, line_ids },
       { client },
     ) => {
       const targetRevision = revision ?? (await client.getDocumentEnvelope(project_id)).revision;
@@ -72,11 +74,19 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
         latin_normalize,
         strip_tone_digits,
       });
-      return {
-        project_id,
-        revision: targetRevision,
-        model_id,
-        ...summary,
+      const { inputs = [], ...counts } = summary;
+      let allowed: Set<string> | undefined;
+      if (line_ids && detail !== 'summary') {
+        const { parseProject } = await import('../../../frontend/src/adapters/project-codec');
+        const envelope = await client.getDocumentEnvelope(project_id);
+        if (envelope.revision !== targetRevision) throw toolError(412, 'revision_conflict', 'Preview revision changed; read and preview again.');
+        const doc = parseProject(envelope.document);
+        allowed = new Set(doc.lyrics.lines.filter(line => line_ids.includes(line.id)).flatMap(line => line.words.flatMap(word => [word.id, ...word.rubyUnits.map(unit => unit.id)])));
+      }
+      const issues = inputs.filter(input => input.problem || input.unknown_characters?.length);
+      return { project_id, revision: targetRevision, model_id, ...counts,
+        ...(detail === 'summary' ? { issues: issues.map(({ object_id, problem, unknown_characters }) => ({ object_id, problem, unknown_characters })) }
+          : { inputs: (detail === 'full' ? inputs : issues).filter(input => !allowed || allowed.has(input.object_id)) }),
       };
     },
   });
@@ -237,7 +247,10 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
         kind: job.kind,
         status: job.status,
         stage: job.stage,
-        progress: job.progress ?? null,
+        ...(typeof job.progress === 'number' ? { progress: job.progress } : {}),
+        model: Object.fromEntries(Object.entries(job.request).filter(([key]) => !key.startsWith('_') && /model/.test(key))),
+        devices: job.request.devices ?? null,
+        reused_vocal: job.request.reused_vocal ?? null,
         result_available: job.result_available,
         acknowledged_state: job.acknowledged_state ?? null,
         bound_revision:

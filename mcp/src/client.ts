@@ -112,6 +112,9 @@ export type AlignmentPreviewSummary = {
   unknown_count: number;
   hint_count: number;
   emitting_count: number;
+  unknown_objects?: string[];
+  input_version?: string;
+  inputs?: Array<{ unit_id: string; object_id: string; problem: string | null; unknown_characters: string[]; [key: string]: unknown }>;
 };
 
 export type AlignmentOptions = {
@@ -172,6 +175,9 @@ export type EmbeddedLyricCandidate = {
   content?: string;
   error?: string;
   error_code?: string;
+  raw_text_preview?: string;
+  raw_text_length?: number;
+  raw_text?: string;
 };
 
 export type JapaneseReadingRange = {

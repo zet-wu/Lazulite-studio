@@ -63,3 +63,21 @@ def test_multi_sample_stpp_is_listed_as_unsupported_instead_of_first_sample(tmp_
     assert len(candidates)==1
     assert '多 sample' in candidates[0]['error']
     assert 'content' not in candidates[0]
+
+@pytest.mark.parametrize('extension,codec', [('mp3','libmp3lame'),('m4a','aac')])
+def test_plain_tag_keeps_bounded_raw_diagnostics(tmp_path, extension, codec):
+    path = tmp_path / f'plain.{extension}'
+    subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','sine=duration=1','-c:a',codec,str(path)], check=True)
+    for text in ['plain lyric\nsecond line', 'あ' * 50000]:
+        media = File(path)
+        if extension == 'mp3':
+            media.tags.delall('USLT')
+            media.tags.add(USLT(encoding=3, lang='jpn', desc='', text=text))
+        else:
+            media['\xa9lyr'] = [text]
+        media.save()
+        candidate = read_embedded(path)[0]
+        assert candidate['error_code'] == 'invalid_format'
+        assert candidate['raw_text_preview'] == text[:2000]
+        assert candidate['raw_text_length'] == len(text)
+        assert candidate.get('raw_text') == (text if len(text.encode('utf-8')) <= 128 * 1024 else None)

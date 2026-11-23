@@ -1,0 +1,32 @@
+import { expect, it } from 'vitest';
+import { createProjectDocument } from '../../frontend/src/domain/project-document';
+import { createLine, createWord } from '../../frontend/src/domain/lyric-document';
+import { parseLyricTtml, serializeLyricTtml } from '../../frontend/src/adapters/ttml/lyric-codec';
+import { createToolRegistry } from '../src/mcp-server';
+import type { McpToolPayload } from '../src/tools/registry';
+import { projectFixture } from './project-fixture';
+it('projects stable sublyric IDs and emits independently parseable TTML dependency closure', async () => {
+  const doc = createProjectDocument();
+  doc.lyrics.agents = [{ id: 'v', name: 'voice', type: 'character', actorRef: 'a' }, { id: 'a', name: 'actor', type: 'person' }];
+  doc.lyrics.lines = [{ ...createLine(' main ', 'l'), agentRefs: ['v'], endMs: 200 }, { ...createLine(' background ', 'b'), backgroundOf: 'l' }, { ...createLine('next', 'n'), beginMs: 200 }];
+  doc.editing.endLinks = { l: 'n' };
+  doc.lyrics.translationTracks = [{ id: 't', language: 'zh', purpose: 'subtitle', contents: [{ id: 'c', lineId: 'b', kind: 'timed', units: [{ id: 'u', text: ' translation ', beginMs: null, endMs: null }] }] }];
+  doc.lyrics.romanizationTracks = [{ id: 'r', language: 'ja-Latn', contents: [{ id: 'rc', lineId: 'b', kind: 'timed', units: [{ id: 'ru', text: ' roman ', beginMs: null, endMs: null }] }] }];
+  const f = projectFixture(doc), registry = createToolRegistry();
+  const json = await registry.call('get_lyrics', { project_id: 'p', line_ids: ['b'] }, f) as { lines: Record<string, unknown>[] };
+  expect(json.lines[0]).toMatchObject({ translations: [{ content_id: 'c', kind: 'timed', units: [{ unit_id: 'u' }] }], romanizations: [{ content_id: 'rc', units: [{ unit_id: 'ru' }] }] });
+  const result = await registry.call('get_lyrics', { project_id: 'p', line_ids: ['b'], format: 'editable_ttml' }, f) as McpToolPayload;
+  expect(JSON.parse((result.content[0] as { text: string }).text)).toMatchObject({ partial: true, roundtrip_safe: false, context_only_line_ids: ['l'], sidecar: { external_end_links: { l: 'n' } } });
+  const xml = (result.content[1] as { text: string }).text;
+  expect(xml).toContain('studio:null'); expect(xml).toContain('studio:id');
+  const parsed = parseLyricTtml(xml);
+  expect(parsed.lines.map(line => line.id)).toEqual(['l', 'b']);
+  expect(parsed.agents.map(agent => agent.id)).toEqual(['v', 'a']);
+  expect(parsed.lines[1].words.map(word => word.text).join('')).toBe(' background ');
+});
+it('uses the formal TTML exporter for complete exchange views', async () => {
+  const doc = createProjectDocument(); doc.lyrics.lines = [{ ...createLine('', 'l'), beginMs: 100, endMs: 500, words: [{ ...createWord('word', 'w'), beginMs: 100, endMs: 500 }] }];
+  const f = projectFixture(doc), registry = createToolRegistry();
+  const result = await registry.call('get_lyrics', { project_id: 'p', format: 'exchange_ttml' }, f) as McpToolPayload;
+  expect((result.content[1] as { text: string }).text).toBe(serializeLyricTtml(f.doc().lyrics, { editing: doc.editing }));
+});

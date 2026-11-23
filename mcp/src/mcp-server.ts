@@ -38,7 +38,9 @@ export function createMcpServer(client: StudioClient, registry: ToolRegistry = c
         try {
           const result = await registry.execute(tool.name, args as Record<string, unknown>, { client });
           return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            content: result && typeof result === 'object' && '__mcpContent' in result
+              ? (result as import('./tools/registry').McpToolPayload).content
+              : [{ type: 'text', text: JSON.stringify(result) }],
           };
         } catch (error) {
           const formatted = formatToolError(error);
