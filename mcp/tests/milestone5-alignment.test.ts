@@ -25,6 +25,8 @@ function createAlignmentServerMock() {
   let snapshot = serializeProject(initialDoc);
   let activeJob: Record<string, unknown> | null = null;
   let jobCounter = 0;
+  let failNextAcknowledge = false;
+  let putCount = 0;
   const acknowledgements: Array<{ jobId: string; state: string }> = [];
 
   const fetchImpl: typeof fetch = async (input, init) => {
@@ -87,6 +89,7 @@ function createAlignmentServerMock() {
         );
       }
       const body = JSON.parse(String(init?.body)) as { document: typeof snapshot };
+      putCount += 1;
       snapshot = body.document;
       revision = `rev-${Number(revision.split('-')[1]) + 1}`;
       return new Response(JSON.stringify({ revision }), {
@@ -152,6 +155,13 @@ function createAlignmentServerMock() {
         return Response.json(activeJob);
       }
       if (action === 'acknowledge' && method === 'POST') {
+        if (failNextAcknowledge) {
+          failNextAcknowledge = false;
+          return Response.json(
+            { detail: { code: 'service_unavailable', message: 'Temporary failure', retryable: true } },
+            { status: 503 },
+          );
+        }
         const body = JSON.parse(String(init?.body)) as { state: string };
         acknowledgements.push({ jobId: String(activeJob.id), state: body.state });
         activeJob = { ...activeJob, acknowledged_state: body.state };
@@ -205,6 +215,10 @@ function createAlignmentServerMock() {
     advanceExternalRevision: () => {
       revision = 'rev-2';
     },
+    failNextAcknowledge: () => {
+      failNextAcknowledge = true;
+    },
+    getPutCount: () => putCount,
     getCurrentDoc: () => parseProject(snapshot),
     acknowledgements,
   };
@@ -319,5 +333,64 @@ describe('Milestone 5 alignment tools', () => {
       body: { code: 'revision_conflict', current_revision: 'rev-2' },
     });
     expect(mock.acknowledgements).toHaveLength(0);
+  });
+
+  it('recovers apply_alignment_result when document save succeeds but acknowledge fails before retry', async () => {
+    const registry = createToolRegistry();
+    const mock = createAlignmentServerMock();
+
+    const started = (await registry.call(
+      'start_alignment',
+      { project_id: 'p1', model_id: 'ja-mfa' },
+      { client: mock.client },
+    )) as { job_id: string };
+
+    mock.markJobSucceeded();
+    mock.failNextAcknowledge();
+
+    await expect(
+      registry.call(
+        'apply_alignment_result',
+        { job_id: started.job_id, idempotency_key: 'idem-align-1' },
+        { client: mock.client },
+      ),
+    ).rejects.toMatchObject({ status: 503 });
+
+    expect(mock.getPutCount()).toBe(1);
+    expect(mock.acknowledgements).toHaveLength(0);
+
+    // Retry with same idempotency_key and mismatched args rejects with 409.
+    await expect(
+      registry.call(
+        'apply_alignment_result',
+        { job_id: started.job_id, idempotency_key: 'idem-align-1', clear_unmatched: true },
+        { client: mock.client },
+      ),
+    ).rejects.toMatchObject({ status: 409, body: { code: 'idempotency_mismatch' } });
+
+    // Retry with identical args reuses saved mutation, completes acknowledge without 412, and replays on 3rd call.
+    const retried = (await registry.call(
+      'apply_alignment_result',
+      { job_id: started.job_id, idempotency_key: 'idem-align-1' },
+      { client: mock.client },
+    )) as Record<string, unknown>;
+    expect(retried).toMatchObject({
+      changed: true,
+      previous_revision: 'rev-1',
+      new_revision: 'rev-2',
+      job_id: started.job_id,
+      acknowledged_state: 'applied',
+    });
+    expect(mock.getPutCount()).toBe(1);
+    expect(mock.acknowledgements).toEqual([{ jobId: started.job_id, state: 'applied' }]);
+
+    const replayed = (await registry.call(
+      'apply_alignment_result',
+      { job_id: started.job_id, idempotency_key: 'idem-align-1' },
+      { client: mock.client },
+    )) as Record<string, unknown>;
+    expect(replayed).toEqual(retried);
+    expect(mock.getPutCount()).toBe(1);
+    expect(mock.acknowledgements).toHaveLength(1);
   });
 });

@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { MessageError, type Message } from '../../../frontend/src/domain/messages';
 import { StudioClient, StudioHttpError } from '../client';
+
+const MAX_IDEMPOTENCY_ENTRIES = 1024;
 
 export type ToolAnnotations = {
   readOnlyHint?: boolean;
@@ -9,9 +12,39 @@ export type ToolAnnotations = {
   openWorldHint?: boolean;
 };
 
+export type ToolIdempotencyContext = {
+  checkpoint?: unknown;
+  saveCheckpoint: (checkpoint: unknown) => void;
+};
+
 export type ToolContext = {
   client: StudioClient;
+  idempotency?: ToolIdempotencyContext;
 };
+
+type IdempotencyEntry =
+  | { status: 'in_flight'; digest: string; promise: Promise<unknown> }
+  | { status: 'partial'; digest: string; checkpoint: unknown }
+  | { status: 'succeeded'; digest: string; result: unknown };
+
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+      const entry = (value as Record<string, unknown>)[key];
+      if (entry !== undefined) out[key] = stableValue(entry);
+    }
+    return out;
+  }
+  return value;
+}
+
+function requestDigest(name: string, args: unknown): string {
+  return createHash('sha256')
+    .update(JSON.stringify(stableValue({ tool: name, args })))
+    .digest('hex');
+}
 
 export type ToolDefinition<TSchema extends z.ZodRawShape = z.ZodRawShape, TResult = unknown> = {
   name: string;
@@ -24,6 +57,25 @@ export type ToolDefinition<TSchema extends z.ZodRawShape = z.ZodRawShape, TResul
 
 export class ToolRegistry {
   private readonly tools = new Map<string, ToolDefinition<z.ZodRawShape, unknown>>();
+  private readonly idempotency = new Map<string, IdempotencyEntry>();
+
+  private setIdempotencyEntry(key: string, entry: IdempotencyEntry): void {
+    if (this.idempotency.has(key)) {
+      this.idempotency.delete(key);
+    } else if (this.idempotency.size >= MAX_IDEMPOTENCY_ENTRIES) {
+      for (const oldestKey of this.idempotency.keys()) {
+        if (this.idempotency.get(oldestKey)?.status !== 'in_flight') {
+          this.idempotency.delete(oldestKey);
+          break;
+        }
+      }
+      if (this.idempotency.size >= MAX_IDEMPOTENCY_ENTRIES) {
+        const oldestKey = this.idempotency.keys().next().value;
+        if (oldestKey !== undefined) this.idempotency.delete(oldestKey);
+      }
+    }
+    this.idempotency.set(key, entry);
+  }
 
   register<TSchema extends z.ZodRawShape, TResult>(tool: ToolDefinition<TSchema, TResult>): this {
     if (this.tools.has(tool.name)) {
@@ -41,13 +93,85 @@ export class ToolRegistry {
     return this.tools.get(name);
   }
 
+  async execute(name: string, parsedArgs: Record<string, unknown>, ctx: ToolContext): Promise<unknown> {
+    const tool = this.tools.get(name);
+    if (!tool) {
+      throw new Error(`Unknown tool: ${name}`);
+    }
+    const rawKey = parsedArgs.idempotency_key;
+    const idempotencyKey = typeof rawKey === 'string' && rawKey.length > 0 ? rawKey : null;
+    if (!idempotencyKey) {
+      return tool.execute(parsedArgs, ctx);
+    }
+
+    const digest = requestDigest(name, parsedArgs);
+    const existing = this.idempotency.get(idempotencyKey);
+    if (existing) {
+      if (existing.digest !== digest) {
+        throw new StudioHttpError(409, {
+          code: 'idempotency_mismatch',
+          message: `Idempotency-Key "${idempotencyKey}" was already used for a different request.`,
+          retryable: false,
+        });
+      }
+      if (existing.status === 'succeeded') {
+        this.setIdempotencyEntry(idempotencyKey, existing);
+        return structuredClone(existing.result);
+      }
+      if (existing.status === 'in_flight') {
+        return structuredClone(await existing.promise);
+      }
+    }
+
+    const previousPartial = existing?.status === 'partial' ? existing : null;
+    let savedCheckpoint: unknown;
+    let hasSavedCheckpoint = false;
+
+    const execution = (async () => {
+      try {
+        const result = await tool.execute(parsedArgs, {
+          ...ctx,
+          idempotency: {
+            checkpoint: previousPartial ? structuredClone(previousPartial.checkpoint) : undefined,
+            saveCheckpoint: (checkpoint) => {
+              savedCheckpoint = checkpoint;
+              hasSavedCheckpoint = true;
+            },
+          },
+        });
+        this.setIdempotencyEntry(idempotencyKey, {
+          status: 'succeeded',
+          digest,
+          result: structuredClone(result),
+        });
+        return result;
+      } catch (error) {
+        if (hasSavedCheckpoint) {
+          this.setIdempotencyEntry(idempotencyKey, {
+            status: 'partial',
+            digest,
+            checkpoint: structuredClone(savedCheckpoint),
+          });
+        } else if (previousPartial) {
+          this.setIdempotencyEntry(idempotencyKey, previousPartial);
+        } else if (this.idempotency.get(idempotencyKey)?.status === 'in_flight') {
+          this.idempotency.delete(idempotencyKey);
+        }
+        throw error;
+      }
+    })();
+
+    this.setIdempotencyEntry(idempotencyKey, { status: 'in_flight', digest, promise: execution });
+    return execution;
+  }
+
   async call(name: string, rawArgs: unknown, ctx: ToolContext): Promise<unknown> {
     const tool = this.tools.get(name);
     if (!tool) {
       throw new Error(`Unknown tool: ${name}`);
     }
     const parsed = z.object(tool.inputSchema).parse(rawArgs ?? {});
-    return tool.execute(parsed, ctx);
+    return this.execute(name, parsed, ctx);
   }
 }
 

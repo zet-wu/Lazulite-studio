@@ -3,7 +3,7 @@ import { mergeAlignment, type AlignmentResult } from '../../../frontend/src/doma
 import { assertAmll } from '../../../frontend/src/domain/amll-compatibility';
 import { validateProjectEditing } from '../../../frontend/src/domain/project-editing';
 import { StudioHttpError, type AlignmentOptions } from '../client';
-import { mutateProjectDocument } from './cas';
+import { mutateProjectDocument, type MutationResult } from './cas';
 import type { ToolRegistry } from './registry';
 
 const ACTIVE_JOB_STATUSES = new Set(['queued', 'running', 'cancel_requested']);
@@ -316,7 +316,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
         merge_short_gaps,
         gap_threshold_ms,
       },
-      { client },
+      { client, idempotency },
     ) => {
       const job = await client.getJob(job_id);
       if (job.kind !== 'alignment') {
@@ -376,35 +376,44 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
           ? job.request.gap_threshold_ms
           : 500);
 
-      const mutation = await mutateProjectDocument(
-        client,
-        job.project_id,
-        {
-          expectedRevision: result.binding.revision,
-          idempotencyKey: idempotency_key,
-        },
-        (doc) => {
-          const merged = mergeAlignment(
-            doc,
-            result,
-            durationMs,
-            clearUnmatched,
-            mergeShortGaps ? thresholdMs : null,
-          );
-          if (merged.project !== doc) {
-            validateProjectEditing(merged.project.lyrics, merged.project.editing);
-            assertAmll(merged.project.lyrics, merged.project.amll);
-          }
-          return {
-            nextDoc: merged.project,
-            summary: {
-              cleared_count: merged.cleared.length,
-              retained_count: merged.retained.length,
-              merged_gaps: merged.mergedGaps,
-            },
-          };
-        },
-      );
+      type AlignmentMutation = MutationResult<{
+        cleared_count: number;
+        retained_count: number;
+        merged_gaps: number;
+      }>;
+      let mutation = idempotency?.checkpoint as AlignmentMutation | undefined;
+      if (!mutation) {
+        mutation = await mutateProjectDocument(
+          client,
+          job.project_id,
+          {
+            expectedRevision: result.binding.revision,
+            idempotencyKey: idempotency_key,
+          },
+          (doc) => {
+            const merged = mergeAlignment(
+              doc,
+              result,
+              durationMs,
+              clearUnmatched,
+              mergeShortGaps ? thresholdMs : null,
+            );
+            if (merged.project !== doc) {
+              validateProjectEditing(merged.project.lyrics, merged.project.editing);
+              assertAmll(merged.project.lyrics, merged.project.amll);
+            }
+            return {
+              nextDoc: merged.project,
+              summary: {
+                cleared_count: merged.cleared.length,
+                retained_count: merged.retained.length,
+                merged_gaps: merged.mergedGaps,
+              },
+            };
+          },
+        );
+        idempotency?.saveCheckpoint(mutation);
+      }
 
       await client.acknowledgeJob(job_id, 'applied');
 

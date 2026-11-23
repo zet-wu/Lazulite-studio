@@ -49,7 +49,7 @@ export async function mutateProjectDocument<TExtra extends Record<string, unknow
     projectId,
     snapshot,
     envelope.revision,
-    options.idempotencyKey ?? crypto.randomUUID(),
+    options.idempotencyKey || crypto.randomUUID(),
     envelope.etag,
   );
   return {

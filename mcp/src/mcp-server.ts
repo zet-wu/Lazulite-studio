@@ -36,7 +36,7 @@ export function createMcpServer(client: StudioClient, registry: ToolRegistry = c
       },
       async (args) => {
         try {
-          const result = await tool.execute(args as Record<string, unknown>, { client });
+          const result = await registry.execute(tool.name, args as Record<string, unknown>, { client });
           return {
             content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           };
