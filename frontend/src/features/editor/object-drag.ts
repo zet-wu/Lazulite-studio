@@ -28,7 +28,7 @@ export function dragCommand(document: LyricDocument, source: DragSource, slot: D
   if (copy && (source.kind === 'line' || source.kind === 'word')) {
     // The destination row is a real selection; the insertion predecessor is applied below.
     const target: EditorSelection = {kind:'lines',ids:[slot.lineId],anchorId:slot.lineId,activeId:slot.lineId};
-    const result = pasteRich(document, copySelection(document, selection, editing), target);
+    const result = pasteRich(document, copySelection(document, selection, editing), target, 'preserve');
     if (result.command.type === 'batch') {
       const first = result.command.commands.find(command => command.type === (source.kind === 'line' ? 'insert-line' : 'insert-word'));
       if (first?.type === 'insert-line') first.afterLineId = slot.afterId;

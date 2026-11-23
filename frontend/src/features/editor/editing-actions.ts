@@ -122,19 +122,19 @@ function cloneLine(line: LyricLine, id: string, backgroundOf: string | null, ids
 }
 
 function copyId(id: string, ids: Map<string, string>) { const next = crypto.randomUUID(); ids.set(id, next); return next; }
-export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null): { command: LyricCommand; selection: EditorSelection } {
+export function pasteRich(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null, wordTiming: 'clear' | 'preserve' = 'clear'): { command: LyricCommand; selection: EditorSelection } {
   if(clipboard.attachment==='translation') {
-    const result=pasteRich({...document,romanizationTracks:document.translationTracks},{...clipboard,attachment:undefined},selection);
+    const result=pasteRich({...document,romanizationTracks:document.translationTracks},{...clipboard,attachment:undefined},selection,wordTiming);
     const tracks=applyLyricCommand({...document,romanizationTracks:document.translationTracks},result.command).romanizationTracks;
     return {command:{type:'set-translation-tracks',source:document.translationTracks,tracks:tracks.map(track=>({...document.translationTracks.find(item=>item.id===track.id)!,...track}))},selection:{...result.selection,attachment:'translation'} as EditorSelection};
   }
   const ids = new Map<string, string>();
-  const result = pasteObjects(document, clipboard, selection, ids);
+  const result = pasteObjects(document, clipboard, selection, ids, wordTiming);
   if (!clipboard.editing) return result;
   const command: LyricCommand = { type: 'batch', commands: [...(result.command.type === 'batch' ? result.command.commands : [result.command]), { type: 'restore-editing', editing: remapEditing(clipboard.editing, ids) }] };
   return { ...result, command };
 }
-function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null, idMap: Map<string, string>): { command: LyricCommand; selection: EditorSelection } {
+function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selection: EditorSelection | null, idMap: Map<string, string>, wordTiming: 'clear' | 'preserve'): { command: LyricCommand; selection: EditorSelection } {
   const selectedLineId = selectionLineId(selection);
   const currentLine = document.lines.find((line) => line.id === selectedLineId);
   if (clipboard.kind === 'ruby') {
@@ -174,8 +174,12 @@ function pasteObjects(document: LyricDocument, clipboard: EditorClipboard, selec
     if (!currentLine) throw new MessageError(message('editing.choosePasteLine'));
     const afterWordId = selection?.kind === 'words' && currentLine.words.some((word) => word.id === selection.activeId) ? selection.activeId : currentLine.words.at(-1)?.id ?? null;
     const words = clipboard.words.map(word => {const effective=clipboard.sources?.[word.id]; if(!word.agentRefs&&effective&&!sameAgents(effective,lineAgents(document,currentLine))) {if(!effective.length)throw new MessageError(message('editing.singerLoss'));return cloneWord({...word,agentRefs:effective},idMap);}return cloneWord(word,idMap);});
-    const commands: Array<Extract<LyricCommand, { type: 'insert-word' }>> = [];
-    for (const word of words) {
+    const commands: Array<Extract<LyricCommand, { type: 'set-line-time' | 'insert-word' }>> = [];
+    if (wordTiming === 'preserve') {
+      const { beginMs, endMs } = expandedLineTime(currentLine, words);
+      if (beginMs !== currentLine.beginMs || endMs !== currentLine.endMs) commands.push({ type: 'set-line-time', lineId: currentLine.id, beginMs, endMs });
+    }
+    for (const word of wordTiming === 'clear' ? words : []) {
       word.beginMs = null; word.endMs = null;
       word.rubyUnits = word.rubyUnits.map(unit => ({ ...unit, beginMs: null, endMs: null }));
     }
