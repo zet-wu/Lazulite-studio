@@ -9,6 +9,8 @@ export type TimelineTarget =
   | { kind: 'ruby'; lineId: string; wordId: string; rubyId: string }
   | { kind: 'romanization'; attachment?: 'translation'; lineId: string; trackId: string; contentId: string; unitId: string };
 
+type BoundarySide = 'beginMs' | 'endMs';
+
 const changed = (time: TimeMs, delta: number): TimeMs => {
   if (time === null) return null;
   const value = time + delta;
@@ -23,6 +25,16 @@ const envelope = (values: TimeMs[], minimum: boolean): TimeMs => {
   const numbers = values.filter((value): value is number => value !== null);
   return numbers.length ? (minimum ? Math.min(...numbers) : Math.max(...numbers)) : null;
 };
+/** Only a changed ruby envelope moves that side of its parent. */
+function resizeRubyParent(word: LyricWord, rubyUnits: RubyUnit[], sides: Iterable<BoundarySide>): LyricWord {
+  let next = { ...word, rubyUnits };
+  for (const side of sides) {
+    const before = envelope(word.rubyUnits.map(unit => unit[side]), side === 'beginMs');
+    const after = envelope(rubyUnits.map(unit => unit[side]), side === 'beginMs');
+    if (word[side] !== null && before !== after) next = { ...next, [side]: after ?? word[side] };
+  }
+  return next;
+}
 const include = (line: LyricLine, word: LyricWord, editing: ProjectEditing): LyricLine => {
   const beginMs = line.beginMs === null ? null : envelope([line.beginMs, word.beginMs], true);
   const endMs = line.endMs === null ? null : envelope([line.endMs, word.endMs], false);
@@ -116,8 +128,7 @@ function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'be
       const unit: RubyUnit = { ...rubyUnits[rubyIndex], [side]: timeMs };
       valid(unit.beginMs, unit.endMs);
       rubyUnits[rubyIndex] = unit;
-      words[index] = { ...word, rubyUnits,
-        beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true) ?? word.beginMs, endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false) ?? word.endMs };
+      words[index] = resizeRubyParent(word, rubyUnits, [side]);
     }
     return include({ ...line, words }, words[index], editing);
   });
@@ -165,7 +176,6 @@ export function resizeTimeline(document: LyricDocument, target: TimelineTarget, 
   return followChangedEndLinks(document, resizeTarget(document, target, side, timeMs, editing), editing);
 }
 
-type BoundarySide = 'beginMs' | 'endMs';
 export type TimelineBoundary = { target: TimelineTarget; side: BoundarySide };
 const boundaryId = (target: TimelineTarget) => target.kind === 'line' ? target.lineId : target.kind === 'word' ? target.wordId : target.kind === 'ruby' ? target.rubyId : target.unitId;
 
@@ -192,7 +202,7 @@ export function timelineBoundaryTargets(document: LyricDocument, target: Timelin
     ? word.rubyUnits.map(unit => ({ target: { kind: 'ruby', lineId: line.id, wordId: word.id, rubyId: unit.id }, value: unit }))
     : [{ target: wordTarget(word), value: word }];
   const words = line.words.filter(item => item.id === word.id || item.text.trim() || item.beginMs !== null && item.endMs !== null);
-  const sequence = target.kind === 'word' && word.rubyUnits.length
+  const sequence = target.kind === 'word'
     ? words.map(value => ({ target: wordTarget(value), value })) : words.flatMap(leafTargets);
   const index = sequence.findIndex(item => boundaryId(item.target) === boundaryId(target));
   const current = sequence[index], adjacent = sequence[index + direction];
@@ -215,14 +225,18 @@ export function resizeTimelineBoundary(document: LyricDocument, target: Timeline
   if (edges.length === 1) return resizeTimeline(document, target, side, timeMs, editing);
   valid(timeMs, timeMs);
   let next = document;
-  const wordIds = new Set<string>(), rubyWordIds = new Set<string>();
+  const wordIds = new Set<string>(), rubyWordSides = new Map<string, Set<BoundarySide>>();
   for (const edge of edges) {
     const item = edge.target;
     if (item.kind === 'romanization') next = editRomanization(next, item, unit => {
       const updated = { ...unit, [edge.side]: timeMs }; valid(updated.beginMs, updated.endMs); return updated;
     });
     else if (item.kind === 'word' || item.kind === 'ruby') {
-      if (item.kind === 'word') wordIds.add(item.wordId); else rubyWordIds.add(item.wordId);
+      if (item.kind === 'word') wordIds.add(item.wordId);
+      else {
+        const sides = rubyWordSides.get(item.wordId) ?? new Set<BoundarySide>();
+        sides.add(edge.side); rubyWordSides.set(item.wordId, sides);
+      }
       next = editTarget(next, item, line => ({ ...line, words: line.words.map(word => word.id !== item.wordId ? word : item.kind === 'word'
         ? { ...word, [edge.side]: timeMs }
         : { ...word, rubyUnits: word.rubyUnits.map(unit => unit.id === item.rubyId ? { ...unit, [edge.side]: timeMs } : unit) }) }));
@@ -230,10 +244,11 @@ export function resizeTimelineBoundary(document: LyricDocument, target: Timeline
   }
   if (target.kind !== 'romanization') next = editTarget(next, target, line => {
     const words = line.words.map(word => {
-      if (!wordIds.has(word.id) && !rubyWordIds.has(word.id)) return word;
-      if (!wordIds.has(word.id)) word = { ...word,
-        beginMs: word.beginMs === null ? null : envelope(word.rubyUnits.map(unit => unit.beginMs), true) ?? word.beginMs,
-        endMs: word.endMs === null ? null : envelope(word.rubyUnits.map(unit => unit.endMs), false) ?? word.endMs };
+      if (!wordIds.has(word.id) && !rubyWordSides.has(word.id)) return word;
+      if (!wordIds.has(word.id)) {
+        const original = document.lines.find(item => item.id === line.id)!.words.find(item => item.id === word.id)!;
+        word = resizeRubyParent(original, word.rubyUnits, rubyWordSides.get(word.id)!);
+      }
       valid(word.beginMs, word.endMs);
       for (const unit of word.rubyUnits) {
         valid(unit.beginMs, unit.endMs);
@@ -242,7 +257,7 @@ export function resizeTimelineBoundary(document: LyricDocument, target: Timeline
       return word;
     });
     let result = { ...line, words };
-    for (const word of words) if (wordIds.has(word.id) || rubyWordIds.has(word.id)) result = include(result, word, editing);
+    for (const word of words) if (wordIds.has(word.id) || rubyWordSides.has(word.id)) result = include(result, word, editing);
     return result;
   });
   return followChangedEndLinks(document, next, editing);

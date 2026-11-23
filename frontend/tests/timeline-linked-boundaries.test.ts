@@ -103,3 +103,51 @@ it('retains end-link conflict and media-duration checks for the whole candidate'
   const next = resizeTimelineBoundary(source, word, 'endMs', 1800, true);
   expect(() => assertChangedTimes(lyricTimes(source), lyricTimes(next), 1500)).toThrow('time.endOutsideSource');
 });
+
+it.each([false, true])('links the same word boundary from either handle with inset ruby on the left=%s', rubyOnLeft => {
+  const { document, line } = sample();
+  line.words = line.words.filter(word => word.text.trim());
+  const [a, b] = line.words;
+  Object.assign(a, { beginMs: 1000, endMs: 1500 }); Object.assign(b, { beginMs: 1500, endMs: 2000 });
+  const owner = rubyOnLeft ? a : b;
+  owner.rubyUnits = [{ id: 'inset', reading: '音', beginMs: rubyOnLeft ? 1200 : 1550, endMs: rubyOnLeft ? 1450 : 1750 }];
+  const left: TimelineTarget = { kind: 'word', lineId: line.id, wordId: a.id };
+  const right: TimelineTarget = { kind: 'word', lineId: line.id, wordId: b.id };
+  const time = rubyOnLeft ? 1480 : 1520;
+  const fromLeft = resizeTimelineBoundary(document, left, 'endMs', time, true);
+  const fromRight = resizeTimelineBoundary(document, right, 'beginMs', time, true);
+  expect(fromLeft).toEqual(fromRight);
+  expect(fromLeft.lines[0].words.map(word => [word.beginMs, word.endMs])).toEqual([[1000, time], [time, 2000]]);
+  expect(fromLeft.lines[0].words[rubyOnLeft ? 0 : 1].rubyUnits).toEqual(owner.rubyUnits);
+  const rejected = rubyOnLeft ? 1440 : 1560;
+  for (const [target, side] of [[left, 'endMs'], [right, 'beginMs']] as const)
+    expect(() => resizeTimelineBoundary(document, target, side, rejected, true)).toThrow('timeline.wordExcludesRuby');
+  const state = executeLyricCommand(createLyricEditorState(document), { type: 'replace-document', document: fromLeft });
+  expect(undoLyricCommand(state).present).toBe(document);
+  expect(redoLyricCommand(undoLyricCommand(state)).present).toBe(fromLeft);
+});
+
+it('ruby linking preserves the unrelated padding at both owners and matches the opposite handle', () => {
+  const { document, line } = sample();
+  line.words = line.words.filter(word => word.text.trim());
+  const [a, b] = line.words;
+  a.beginMs = 50; a.rubyUnits = [{ id: 'ra', reading: '甲', beginMs: 100, endMs: 1000 }];
+  b.endMs = 2050; b.rubyUnits = [{ id: 'rb', reading: '乙', beginMs: 1000, endMs: 2000 }];
+  const left: TimelineTarget = { kind: 'ruby', lineId: line.id, wordId: a.id, rubyId: 'ra' };
+  const right: TimelineTarget = { kind: 'ruby', lineId: line.id, wordId: b.id, rubyId: 'rb' };
+  const fromLeft = resizeTimelineBoundary(document, left, 'endMs', 1200, true);
+  expect(fromLeft).toEqual(resizeTimelineBoundary(document, right, 'beginMs', 1200, true));
+  expect(fromLeft.lines[0].words.map(word => [word.beginMs, word.endMs])).toEqual([[50, 1200], [1200, 2050]]);
+  const unlinked = resizeTimelineBoundary(document, left, 'endMs', 1200, false);
+  expect(unlinked.lines[0].words[0].beginMs).toBe(50);
+  expect(unlinked.lines[0].words[1]).toBe(b);
+});
+
+it('an internal linked ruby boundary preserves both outer word margins', () => {
+  const { document, line } = sample(); const word = line.words[0];
+  Object.assign(word, { beginMs: 50, endMs: 2050 });
+  word.rubyUnits = [{ id: 'r1', reading: '甲', beginMs: 100, endMs: 1000 }, { id: 'r2', reading: '乙', beginMs: 1000, endMs: 2000 }];
+  const target: TimelineTarget = { kind: 'ruby', lineId: line.id, wordId: word.id, rubyId: 'r1' };
+  const next = resizeTimelineBoundary(document, target, 'endMs', 1200, true).lines[0].words[0];
+  expect(next).toMatchObject({ beginMs: 50, endMs: 2050, rubyUnits: [{ beginMs: 100, endMs: 1200 }, { beginMs: 1200, endMs: 2000 }] });
+});
