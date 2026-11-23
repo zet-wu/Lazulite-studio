@@ -590,7 +590,7 @@ def create_app(
 
     @api.get("/projects/{pid}/pcm")
     def pcm_window(pid: str, start_ms: int, end_ms: int, vocal: str | None = None, _: object = Depends(auth)):
-        """Read a PCM proxy window of at most 4,020 milliseconds (FFT context included)."""
+        """Read a PCM proxy window of at most 4,060 milliseconds (FFT context included)."""
         with db.project_read(pid):
             _, row = asset_for(pid)
             if not row:
@@ -601,6 +601,30 @@ def create_app(
             except MediaError as exc:
                 fail("pcm_invalid", str(exc), 422)
             return Response(data, media_type="application/octet-stream", headers={"X-Sample-Rate": str(rate), "X-Channels": str(channels), "Cache-Control": "private, max-age=60"})
+
+    @api.get('/projects/{pid}/audio-excerpt')
+    def audio_excerpt(pid: str, start_ms: int, end_ms: int, vocal: str | None = None, source_asset_id: str | None = None, _: object = Depends(auth)):
+        with db.project_read(pid):
+            _, row = asset_for(pid)
+            if not row:
+                fail('audio_not_found', '上传音乐后可用', 404)
+            if source_asset_id and source_asset_id != row[0]:
+                fail('source_conflict', '源音频已改变，请重新读取项目', 409)
+            if vocal:
+                try: _, metadata = vocal_runner.get(pid, vocal)
+                except KeyError: fail('vocal_not_found', '人声结果不存在', 404)
+                if metadata['source_asset_id'] != row[0]:
+                    fail('source_conflict', '人声与当前源音频不匹配', 409)
+            try:
+                with media_lifetime.use(pid) as media:
+                    asset = vocal_asset(vocal_runner, pid, vocal) if vocal else asset_model(row, pid)
+                    data, actual_start, actual_end = media.audio_excerpt(asset, start_ms=start_ms, end_ms=end_ms)
+            except MediaError as exc:
+                fail('audio_excerpt_invalid', str(exc), 422)
+            return Response(data, media_type='audio/wav', headers={
+                'X-Actual-Start-Ms': str(actual_start), 'X-Actual-End-Ms': str(actual_end),
+                'X-Sample-Rate': '16000', 'X-Source-Kind': 'vocal' if vocal else 'original',
+                'Cache-Control': 'no-store'})
 
     def job_project_exists(pid):
         try:
@@ -631,7 +655,8 @@ def create_app(
     def vocal_catalog(refresh: bool = False, _=Depends(auth)):
         if refresh:
             devices.refresh()
-        return vocal_models.scan(refresh)
+        return {**vocal_models.scan(refresh), 'devices': devices.snapshot('vocal'),
+                'selected_model_id': preferences.read()['values'].get('studio:vocal-model', 'demucs')}
 
     @api.post('/vocal-models/directory')
     def vocal_directory(body: dict, _=Depends(write)):

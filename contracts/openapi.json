@@ -879,7 +879,7 @@
               "type": "integer",
               "minimum": 1
             },
-            "description": "Exclusive end, at most 4,020,000 milliseconds after start_ms (including FFT context)"
+            "description": "Exclusive end, at most 4,060 milliseconds after start_ms (including FFT context)"
           },
           {
             "name": "vocal",
@@ -1275,53 +1275,48 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "candidates"
+                  ],
                   "properties": {
-                    "asset_id": {
-                      "type": "string"
-                    },
-                    "supported": {
-                      "type": "boolean"
-                    },
-                    "container": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "tracks": {
+                    "candidates": {
                       "type": "array",
                       "items": {
                         "type": "object",
+                        "required": [
+                          "id",
+                          "label"
+                        ],
                         "properties": {
-                          "track_id": {
-                            "type": "integer"
-                          },
-                          "language": {
+                          "id": {
                             "type": "string"
                           },
-                          "name": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "format": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": "string"
+                          },
+                          "error_code": {
+                            "type": "string"
+                          },
+                          "raw_text_preview": {
+                            "type": "string"
+                          },
+                          "raw_text_length": {
+                            "type": "integer"
+                          },
+                          "raw_text": {
                             "type": "string"
                           }
                         }
                       }
-                    },
-                    "error": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "filename": {
-                      "type": "string"
-                    },
-                    "format_label": {
-                      "type": "string"
-                    },
-                    "extension": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
                     }
                   }
                 }
@@ -2314,6 +2309,92 @@
             "$ref": "#/components/responses/Error"
           }
         }
+      }
+    },
+    "/projects/{projectId}/audio-excerpt": {
+      "get": {
+        "operationId": "getAudioExcerpt",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "start_ms",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "end_ms",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Exclusive end; start < end <= audio duration, at most 30,000 ms after start"
+          },
+          {
+            "name": "vocal",
+            "in": "query",
+            "required": false,
+            "description": "当前项目已注册的人声结果 ID；省略为原曲。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source_asset_id",
+            "in": "query",
+            "required": false,
+            "description": "Expected current source asset; returns 409 if the audio was replaced.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded WAV listening window using the source playback clock",
+            "headers": {
+              "X-Actual-Start-Ms": {
+                "schema": {
+                  "type": "number"
+                }
+              },
+              "X-Actual-End-Ms": {
+                "schema": {
+                  "type": "number"
+                }
+              },
+              "X-Sample-Rate": {
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-Source-Kind": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Read a listening window of at most 30 seconds as 16 kHz mono 16-bit PCM WAV"
       }
     }
   },

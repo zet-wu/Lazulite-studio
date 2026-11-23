@@ -200,6 +200,27 @@ class MediaService:
         if first >= last: raise MediaError('PCM window is outside the audio')
         return proxy.pcm[first:last], proxy.rate, proxy.channels
 
+    def audio_excerpt(self, asset: Asset, *, start_ms: int, end_ms: int) -> tuple[bytes, float, float]:
+        """Bounded listening window, sharing playback's source clock and lifetime."""
+        if start_ms < 0 or end_ms <= start_ms or end_ms - start_ms > 30_000:
+            raise MediaError('audio excerpt must be a positive interval of at most 30 seconds')
+        proxy = self.playback_proxy(asset)
+        duration = asset.probe.duration_ms if asset.probe.duration_ms is not None else proxy.duration_ms
+        if end_ms > duration or end_ms > proxy.duration_ms:
+            raise MediaError('audio excerpt is outside the audio')
+        first, last = round(start_ms * proxy.rate / 1000), round(end_ms * proxy.rate / 1000)
+        pcm = proxy.pcm[first * proxy.channels * 2:last * proxy.channels * 2]
+        if not pcm:
+            raise MediaError('audio excerpt is empty')
+        try:
+            result = run_process([self.ffmpeg, '-v', 'error', '-f', 's16le', '-ar', str(proxy.rate),
+                '-ac', str(proxy.channels), '-i', 'pipe:0', '-ac', '1', '-ar', '16000',
+                '-f', 's16le', '-c:a', 'pcm_s16le', 'pipe:1'], input=pcm, check=True, capture_output=True)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise MediaError('audio excerpt resampling failed') from exc
+        output = Proxy(result.stdout, 16000, 1, 0, len(result.stdout) // 2)
+        return output.header + output.pcm, first * 1000 / proxy.rate, last * 1000 / proxy.rate
+
     def peaks(self, asset: Asset, *, level: int, start_ms: int, end_ms: int) -> PeakWindow:
         if level < 0 or level > 15 or end_ms <= start_ms:
             raise MediaError('invalid waveform window')

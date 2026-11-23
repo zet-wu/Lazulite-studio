@@ -94,6 +94,14 @@ describe('MCP Server transports', () => {
       'generate_romanization',
       'generate_ruby_from_romanization',
       'batch_edit_lyrics',
+      'list_vocal_models',
+      'list_vocal_results',
+      'start_vocal_separation',
+      'list_jobs',
+      'retry_job_cpu',
+      'acknowledge_job',
+      'get_acoustics',
+      'get_audio_excerpt',
     ]);
 
     const result = await client.callTool({ name: 'get_lyrics', arguments: { project_id: 'p1' } });

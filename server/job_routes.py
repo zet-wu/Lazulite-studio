@@ -26,7 +26,12 @@ def create_job_router(service, project_exists, *, auth_dependency=None, write_de
     read_auth = {"dependencies": read_dependencies}
     write_auth = {"dependencies": write_dependencies}
     def public_job(item):
-        return {**item, 'request':{k:v for k,v in item['request'].items() if not k.startswith('_')}}
+        request = item['request']
+        public = {k:v for k,v in request.items() if not k.startswith('_')}
+        public['reused_vocal'] = bool(request.get('_reuse_vocal_id') or request.get('_has_vocal'))
+        public['model'] = {kind: {key: model[key] for key in ('id', 'name', 'type') if key in model}
+                           for kind, model in (('alignment', request.get('_model')), ('vocal', request.get('_vocal_model'))) if model}
+        return {**item, 'request': public}
     def check_project(pid):
         if not project_exists(pid): raise HTTPException(404, {"code":"project_not_found","message":"project not found","retryable":False})
     @router.post("/projects/{pid}/jobs/{kind}", status_code=202, **read_auth)

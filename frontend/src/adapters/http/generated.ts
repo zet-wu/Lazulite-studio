@@ -986,6 +986,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectId}/audio-excerpt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a listening window of at most 30 seconds as 16 kHz mono 16-bit PCM WAV */
+        get: operations["getAudioExcerpt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2411,7 +2428,7 @@ export interface operations {
         parameters: {
             query: {
                 start_ms: number;
-                /** @description Exclusive end, at most 4,020,000 milliseconds after start_ms (including FFT context) */
+                /** @description Exclusive end, at most 4,060 milliseconds after start_ms (including FFT context) */
                 end_ms: number;
                 /** @description 当前项目已注册的人声结果 ID；省略为原曲。 */
                 vocal?: string;
@@ -2676,18 +2693,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        asset_id?: string;
-                        supported?: boolean;
-                        container?: string | null;
-                        tracks?: {
-                            track_id?: number;
-                            language?: string;
-                            name?: string;
+                        candidates: {
+                            id: string;
+                            label: string;
+                            format?: string;
+                            content?: string;
+                            error?: string;
+                            error_code?: string;
+                            raw_text_preview?: string;
+                            raw_text_length?: number;
+                            raw_text?: string;
                         }[];
-                        error?: string | null;
-                        filename?: string;
-                        format_label?: string;
-                        extension?: string | null;
                     };
                 };
             };
@@ -3156,6 +3172,41 @@ export interface operations {
             };
             409: components["responses"]["Error"];
             422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getAudioExcerpt: {
+        parameters: {
+            query: {
+                start_ms: number;
+                /** @description Exclusive end; start < end <= audio duration, at most 30,000 ms after start */
+                end_ms: number;
+                /** @description 当前项目已注册的人声结果 ID；省略为原曲。 */
+                vocal?: string;
+                /** @description Expected current source asset; returns 409 if the audio was replaced. */
+                source_asset_id?: string;
+            };
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded WAV listening window using the source playback clock */
+            200: {
+                headers: {
+                    "X-Actual-Start-Ms"?: number;
+                    "X-Actual-End-Ms"?: number;
+                    "X-Sample-Rate"?: number;
+                    "X-Source-Kind"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/wav": string;
+                };
+            };
             default: components["responses"]["Error"];
         };
     };

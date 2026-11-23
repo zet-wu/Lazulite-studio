@@ -11,7 +11,7 @@ let searchConditions={title:'',artist:'',album:''};
 
 const mockPreferences = {version:1,revision:0,library_id:'00000000000000000000000000000001',values:JSON.parse(sessionStorage.getItem('studio-mock-preferences')??'{}') as Record<string,string>};
 export const handlers = [
-  http.get(`${root}/vocal-models`,()=>response({directory:'/portable/vocal-models',editable:true,source:'portable',error:null,items:[
+  http.get(`${root}/vocal-models`,()=>response({directory:'/portable/vocal-models',editable:true,source:'portable',error:null,devices:{vocal:{actual:'cpu',preferred:'cpu',label:'CPU',runtime_ok:true,reason:null}},selected_model_id:'demucs',items:[
     {id:'demucs',type:'demucs',name:'Demucs',status:'ready'},
     {id:'bs-karaoke',type:'bs-karaoke',name:'BS Karaoke',status:scenario()==='missing-vocal-model'?'invalid':'ready',reason:'Missing weights'},
   ]})),
@@ -40,6 +40,7 @@ export const handlers = [
   http.get(`${root}/projects/:projectId/embedded-lyrics`, () => response({ asset_id: 'sample-asset', candidates: [
     { id: 'one', label: 'USLT · eng', format: 'elrc', content: '[00:01.000]<00:01.000>Hello<00:02.000> world<00:03.000>' },
     { id: 'two', label: 'USLT · jpn', format: 'lrc', content: '[00:02.000]別の歌詞' },
+    { id: 'plain', label: 'USLT · und', error_code: 'invalid_format', error: '不支持的内嵌歌词结构', raw_text_preview: 'Plain lyric', raw_text_length: 11, raw_text: 'Plain lyric' },
   ] })),
   http.get(`${root}/projects/:projectId/vocals`, () => HttpResponse.json({items:[]})),
   http.get(`${root}/projects/:projectId/source-metadata`, () => response({asset_id:sampleProject.asset?.id,conditions:{title:"源音频标题",artist:"",album:""}})),
@@ -63,6 +64,18 @@ export const handlers = [
     const end_ms = Math.ceil(Number(query.get('end_ms') ?? 120_000) / bucket_ms) * bucket_ms;
     const maximum = Array.from({ length: Math.max(0, (end_ms - start_ms) / bucket_ms) }, (_, index) => (Math.floor((start_ms + index * bucket_ms) / 500) !== Math.floor((start_ms + (index - 1) * bucket_ms) / 500) ? 0.8 : 0.1));
     return response({ schema_version: 'studio-waveform-v1', asset_id: 'sample-asset', asset_hash: 'sample', version: 'peaks-v1', level: Number(query.get('level') ?? 8), start_ms, end_ms, bucket_ms, minimum: maximum.map((value) => -value), maximum });
+  }),
+  http.get(`${root}/projects/:projectId/audio-excerpt`, ({ params, request }) => {
+    if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');
+    const query = new URL(request.url).searchParams, start = Number(query.get('start_ms')), end = Number(query.get('end_ms'));
+    if (query.has('source_asset_id') && query.get('source_asset_id') !== sampleProject.asset?.id) return error(409, 'source_conflict', '源音频已改变');
+    if (query.has('vocal')) return error(404, 'vocal_not_found', '演示模式没有人声结果');
+    if (!query.has('start_ms') || !query.has('end_ms') || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end-start > 30000 || end > (sampleProject.asset?.duration_ms ?? 0)) return error(422, 'audio_excerpt_invalid', '音频范围无效');
+    const frames = (end-start)*16, buffer = new ArrayBuffer(44+frames*2), view = new DataView(buffer);
+    const text = (offset: number, value: string) => Array.from(value).forEach((char,index) => view.setUint8(offset+index,char.charCodeAt(0)));
+    text(0,'RIFF'); view.setUint32(4,36+frames*2,true); text(8,'WAVE'); text(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,1,true); view.setUint32(24,16000,true); view.setUint32(28,32000,true); view.setUint16(32,2,true); view.setUint16(34,16,true); text(36,'data'); view.setUint32(40,frames*2,true);
+    for (let index=0; index<frames; index++) view.setInt16(44+index*2,Math.round(Math.sin(2*Math.PI*440*(start/1000+index/16000))*9000),true);
+    return new HttpResponse(buffer, { headers: { 'Content-Type':'audio/wav', 'X-Sample-Rate':'16000', 'X-Source-Kind':'original', 'X-Actual-Start-Ms':String(start), 'X-Actual-End-Ms':String(end) } });
   }),
   http.get(`${root}/projects/:projectId/pcm`, ({ params, request }) => {
     if (params.projectId !== 'sample-project') return error(404, 'project_not_found', '项目不存在');

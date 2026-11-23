@@ -15,7 +15,7 @@ pnpm --dir frontend contracts:generate
 | 会话与设置 | 密码登录/登出、能力探测、`GET/PATCH /settings`（`If-Match` 逐字段更新） |
 | 项目与音频 | 项目增删查、音频/视频分块上传与音源替换、源音频元数据标签（`source-metadata`）、空间统计（`storage`） |
 | 文档与修订 | `GET/PUT /projects/{pid}/document`（`studio-document-v9` 与 `studio-project-v9`，保存使用 `If-Match` 与幂等键） |
-| 媒体与租约 | `audio`（Range 流）、`waveform`（多级峰值）、`pcm`（声谱图窗口）、`media-users/{page_id}`（页面内存租约） |
+| 媒体与租约 | `audio`（Range 流）、`waveform`（多级峰值）、`pcm`（声谱图窗口）、`audio-excerpt`（最多 30 秒的 16 kHz 单声道 WAV 听审窗口）、`media-users/{page_id}`（页面内存租约） |
 | 歌词与语言工具 | 在线歌词搜索、源音频内嵌歌词（`embedded-lyrics`）、日文读音与助词（`reading/*`）、固定词典管理与注音、字形转换（`shapes/analyze`） |
 | 任务、人声与对齐 | 统一任务查询/取消/CPU 重试、人声分离/上传/能量/下载、模型目录管理与自动对齐预览/启动 |
 | 媒体打包与归档 | 打包信息查询与无持久化直下（`packaging`、`packaging/download`）、`.lazp` 工程导入导出 |

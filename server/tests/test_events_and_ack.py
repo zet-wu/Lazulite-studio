@@ -146,3 +146,20 @@ def test_live_sse_streams_revision_and_job_events_and_closes_on_shutdown(tmp_pat
         server.should_exit = True
         server_thread.join(timeout=3.0)
         assert not server_thread.is_alive()
+
+
+def test_job_status_exposes_model_identity_and_reuse_without_private_paths(tmp_path):
+    app = create_app(tmp_path / 'data', Settings(mode='local'))
+    with TestClient(app) as client:
+        pid = client.post('/api/v1/projects', json={'name':'model status'}).json()['id']
+        request = {'_model':{'id':'a','name':'align','type':'ctc','path':'/private/model'},
+                   '_vocal_model':{'id':'v','name':'voice','config':{'weights':'/private/weights'}},
+                   '_reuse_vocal_id':'v', 'devices':{'alignment':{'actual':'cpu'}}}
+        with app.state.jobs.db.transaction() as c:
+            c.execute("INSERT INTO jobs(id,project_id,kind,status,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+                      ('model-job',pid,'alignment','succeeded',json.dumps(request),'0','0'))
+        job = client.get('/api/v1/jobs/model-job').json()
+        assert job['request']['reused_vocal'] is True
+        assert job['request']['model'] == {'alignment':{'id':'a','name':'align','type':'ctc'},'vocal':{'id':'v','name':'voice'}}
+        assert not any(key.startswith('_') for key in job['request'])
+        assert '/private/' not in json.dumps(job['request'])

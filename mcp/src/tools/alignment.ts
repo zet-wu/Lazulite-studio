@@ -248,7 +248,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
         status: job.status,
         stage: job.stage,
         ...(typeof job.progress === 'number' ? { progress: job.progress } : {}),
-        model: Object.fromEntries(Object.entries(job.request).filter(([key]) => !key.startsWith('_') && /model/.test(key))),
+        model: job.request.model ?? (job.request.model_name ? { name: job.request.model_name } : null),
         devices: job.request.devices ?? null,
         reused_vocal: job.request.reused_vocal ?? null,
         result_available: job.result_available,

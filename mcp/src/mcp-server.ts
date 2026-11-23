@@ -1,3 +1,4 @@
+import { registerAudioJobTools } from './tools/audio-jobs';
 import { registerTransformTools } from './tools/transforms';
 import { registerEditingTools } from './tools/editing';
 import { registerSublyricTools } from './tools/sublyrics';
@@ -24,6 +25,7 @@ export function createToolRegistry(): ToolRegistry {
   registerSublyricTools(registry);
   registerTimingTools(registry);
   registerTransformTools(registry);
+  registerAudioJobTools(registry);
   return registry;
 }
 
@@ -46,7 +48,7 @@ export function createMcpServer(client: StudioClient, registry: ToolRegistry = c
         try {
           const result = await registry.execute(tool.name, args as Record<string, unknown>, { client });
           return {
-            content: result && typeof result === 'object' && '__mcpContent' in result
+            content: result && typeof result === 'object' && '__mcpContent' in result && result.__mcpContent === true
               ? (result as import('./tools/registry').McpToolPayload).content
               : [{ type: 'text', text: JSON.stringify(result) }],
           };

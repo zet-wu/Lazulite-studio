@@ -166,7 +166,7 @@ def test_mcp_process_lifecycle_proxy_security_and_clean_stop(tmp_path):
             else:
                 payload = tools_resp.json()
             names = [t["name"] for t in payload["result"]["tools"]]
-            assert len(names) == 20
+            assert len(names) == 36
             assert "apply_alignment_result" in names
     finally:
         handle.stop()
@@ -176,10 +176,10 @@ def test_mcp_process_lifecycle_proxy_security_and_clean_stop(tmp_path):
 
 
 @pytest.mark.skipif(not MCP_BUNDLE.is_file() or _node_binary() is None, reason="Node 22 and mcp/dist/server.mjs required")
-def test_real_fastapi_end_to_end_four_scenarios_via_mcp(tmp_path, monkeypatch):
+def test_real_fastapi_lyric_editing_and_alignment_via_mcp(tmp_path, monkeypatch):
     from server import alignment, worker_process
     from server.tests.test_alignment_models import model as build_test_model
-    from server.tests.test_vocals import setup as setup_vocal_project
+    from server.tests.test_vocals import setup as setup_vocal_project, Separator
 
     monkeypatch.setattr(alignment, "alignment_unavailable", lambda: None)
     original_popen = worker_process.subprocess.Popen
@@ -202,7 +202,7 @@ def test_real_fastapi_end_to_end_four_scenarios_via_mcp(tmp_path, monkeypatch):
     monkeypatch.setenv("STUDIO_VOCAL_MODELS_DIR", str(vocal_dir.parent))
 
     # Build app with real SQLite + asset + Sudachi reading + vocal/alignment runners
-    test_client, db = setup_vocal_project(tmp_path, factory=None)
+    test_client, db = setup_vocal_project(tmp_path, factory=Separator)
     app = test_client.app
     # Seed a clean initial document on project 'p'
     with db.connect() as conn:
@@ -280,7 +280,7 @@ def test_real_fastapi_end_to_end_four_scenarios_via_mcp(tmp_path, monkeypatch):
 
             req_id = 1
 
-            def call_tool(name: str, arguments: dict) -> dict:
+            def call_tool(name: str, arguments: dict, *, raw=False) -> dict:
                 nonlocal req_id
                 req_id += 1
                 resp = _mcp_post(
@@ -292,7 +292,7 @@ def test_real_fastapi_end_to_end_four_scenarios_via_mcp(tmp_path, monkeypatch):
                 assert resp.status_code == 200
                 body = _parse_mcp_json(resp)["result"]
                 assert not body.get("isError"), f"{name} failed: {body}"
-                return json.loads(body["content"][0]["text"])
+                return body if raw else json.loads(body["content"][0]["text"])
 
             # Scenario 1: Import plain Japanese lyrics + preserve acoustics
             imported = call_tool(
@@ -386,6 +386,51 @@ def test_real_fastapi_end_to_end_four_scenarios_via_mcp(tmp_path, monkeypatch):
             assert final_lyrics["lines"][0]["words"][0]["ruby_units"][0]["reading"] == "きょう"
             assert final_lyrics["lines"][0]["words"][0]["ruby_units"][0]["begin_ms"] == 100
             assert final_lyrics["lines"][0]["words"][0]["ruby_units"][0]["end_ms"] == 200
+
+            # Local P0 reannotation with no reimport: saved ruby -> split surface -> new ruby.
+            word_id = final_lyrics['lines'][0]['words'][0]['word_id']
+            rewritten = call_tool('apply_readings', {'project_id':'p', 'expected_revision':final_lyrics['revision'], 'overwrite_existing':True,
+                'operations':[{'mode':'split_and_set_word','line_id':line_id,'word_id':word_id,
+                               'parts':[{'text':'今','readings':['きょ']},{'text':'日','readings':['う']}]}]})
+            segmented = call_tool('get_lyrics', {'project_id':'p'})
+            assert [w['text'] for w in segmented['lines'][0]['words']] == ['今','日']
+            assert rewritten['created_word_ids'] == [segmented['lines'][0]['words'][1]['word_id']]
+            # Default preview leaves the actual backend revision unchanged.
+            dry = call_tool('generate_romanization', {'project_id':'p'})
+            assert dry['dry_run'] and not dry['changed']
+            assert call_tool('get_lyrics', {'project_id':'p'})['revision'] == segmented['revision']
+            generated = call_tool('generate_romanization', {'project_id':'p','dry_run':False,'expected_revision':segmented['revision']})
+            assert generated['changed'] and generated['revision'] == generated['new_revision']
+            translation = call_tool('edit_sublyrics', {'project_id':'p','operations':[
+                {'op':'create_track','kind':'translation','language':'zh','client_ref':'t'},
+                {'op':'insert_content','kind':'translation','track_ref':'t','line_id':line_id,'content_kind':'plain','text':'测试译文','client_ref':'c'}]})
+            tracks = call_tool('get_sublyrics', {'project_id':'p'})['tracks']
+            assert len(tracks) == 2 and any(t['contents'][0]['text'] == '测试译文' for t in tracks)
+            split = call_tool('edit_lyrics', {'project_id':'p','operations':[{'op':'split_line','line_id':line_id,'before_word_id':rewritten['created_word_ids'][0],'client_ref':'right',
+                'translation_targets':{translation['created_refs']['c']:1}}]})
+            right = split['created_refs']['right']
+            adjusted = call_tool('edit_timing', {'project_id':'p','operations':[{'op':'set_word_time','line_id':right,'word_id':rewritten['created_word_ids'][0],'end_ms':250}]})
+            assert adjusted['changed']
+            ttml = call_tool('get_lyrics', {'project_id':'p','format':'editable_ttml','line_ids':[right]}, raw=True)
+            assert len(ttml['content']) == 2
+            assert json.loads(ttml['content'][0]['text'])['partial']
+            assert 'studio:id' in ttml['content'][1]['text']
+            vocal_job = call_tool('start_vocal_separation', {'project_id':'p','force_separation':True,'idempotency_key':'listen-vocal'})
+            for _ in range(200):
+                vocal_status = call_tool('get_job_status', {'job_id':vocal_job['job_id']})
+                if vocal_status['status'] == 'succeeded': break
+                assert vocal_status['status'] in ('queued','running'), vocal_status
+                time.sleep(.05)
+            else: raise AssertionError('Vocal analysis did not finish')
+            vocal_result = call_tool('list_vocal_results', {'project_id':'p'})['items'][0]
+            acoustics = call_tool('get_acoustics', {'project_id':'p','start_ms':0,'end_ms':500,'include_energy':True,'vocal_result_id':vocal_result['id'],'energy_buckets':25})
+            assert len(acoustics['energy']['values']) <= 25
+            excerpt = call_tool('get_audio_excerpt', {'project_id':'p','line_id':right,'source':'vocal','padding_ms':0}, raw=True)
+            import base64, io, wave
+            assert excerpt['content'][1]['type'] == 'audio'
+            with wave.open(io.BytesIO(base64.b64decode(excerpt['content'][1]['data']))) as wav:
+                assert (wav.getframerate(),wav.getnchannels(),wav.getsampwidth()) == (16000,1,2)
+            assert call_tool('list_jobs', {'project_id':'p','kind':'alignment'})['items'][0]['acknowledged_state'] == 'applied'
 
             stop_sse.set()
             sse_thread.join(timeout=2.0)
