@@ -44,7 +44,7 @@ import styles from "./media.module.css";
 import type { LyricCommand } from '../domain/lyric-commands';
 import type { LyricDocument } from '../domain/lyric-document';
 import { TimelineContent } from './TimelineContent';
-import { TimelineTracks } from './TimelineTracks';
+import { TimelineTracks, type TimelinePlaybackFrame } from './TimelineTracks';
 import { useCanvasMetrics } from './useCanvasMetrics';
 import { SpectrogramCanvas } from './SpectrogramCanvas';
 import { estimateBpm } from '../domain/bpm';
@@ -253,11 +253,14 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   useLayoutEffect(() => { projectHead(readPosition()); }, [start, span, expanded, timelineHost, readPosition, projectHead]);
   const onPositionRef = useRef(onPosition);
   onPositionRef.current = onPosition;
+  const timelinePlaybackFrame = useRef<TimelinePlaybackFrame>({ positionMs: 0, update: null });
   const updateDom = useCallback(
     (raw: number) => {
       const { duration: mediaDuration } = viewportRef.current;
       const current = Math.max(0, Math.min(mediaDuration || raw, raw));
       positionRef.current = current;
+      timelinePlaybackFrame.current.positionMs = Math.round(current * 1_000);
+      timelinePlaybackFrame.current.update?.(timelinePlaybackFrame.current.positionMs);
       if (clock.current)
         clock.current.textContent = `${fmt(current)} / ${fmt(mediaDuration)}`;
       slider.current?.setAttribute("aria-valuenow", String(current));
@@ -709,7 +712,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
         {timelineHost && acoustics && onAcoustics && onAssign ? <VocalTracks sourceDurationMs={asset?.source_duration_ms ?? null} locked={editingLocked} projectId={projectId} acoustics={acoustics} startMs={startMs} endMs={endMs} durationMs={durationMs} selectedLineId={selectedLineId??null} lineLabel={selectedLineId?`L${(document?.lines.filter(l=>!l.backgroundOf).findIndex(l=>l.id===(document.lines.find(l=>l.id===selectedLineId)?.backgroundOf??selectedLineId))??-1)+1}${document?.lines.find(l=>l.id===selectedLineId)?.backgroundOf?` ${t('outline.background')}`:''}`:''} apply={onAcoustics} assign={onAssign} pause={()=>audio.current?.pause()} bpm={bpm} snap={snap} anchors={documentAnchors} showEnergy={visible.energy} showSegments={visible.segments}>{acousticPlots}</VocalTracks>:acousticPlots}
         {document && onTimelineCommand && <>
 
-          <TimelineTracks follow={follow} locked={editingLocked} durationMs={asset?.source_duration_ms ?? null} document={document} selectedLineId={selectedLineId ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
+          <TimelineTracks playbackFrame={timelinePlaybackFrame} follow={follow} locked={editingLocked} durationMs={asset?.source_duration_ms ?? null} document={document} selectedLineId={selectedLineId ?? null} startMs={startMs} endMs={endMs} positionMs={Math.round(position * 1e3)} bpm={bpm} snap={snap}
             visible={visible} externalAnchors={segmentAnchors}
             apply={onTimelineCommand} onLocate={locate} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
         </>}

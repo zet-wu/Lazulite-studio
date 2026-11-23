@@ -248,3 +248,27 @@ it('commits drags released across the right-hand plot area and rejects labels, t
   cleanup();
   vi.unstubAllGlobals();
 });
+
+it('updates mounted word/ruby/attached highlights from frame time without React commits and releases its callback', async () => {
+  const { cleanup } = await import('@testing-library/react'); cleanup();
+  const { Profiler } = await import('react');
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  const document = createLyricDocument('唱'); const line = document.lines[0], word = line.words[0];
+  Object.assign(line, { beginMs: 0, endMs: 5000 }); Object.assign(word, { beginMs: 1000, endMs: 2000 });
+  word.rubyUnits = [{ id: 'r', reading: 'しょう', beginMs: 1000, endMs: 1500 }];
+  document.romanizationTracks = [{ id: 't', language: 'ja-Latn', contents: [{ id: 'c', lineId: line.id, kind: 'timed', units: [{ id: 'u', text: 'shou', beginMs: 1500, endMs: 2500 }] }] }];
+  const frame = { current: { positionMs: 0, update: null as ((position: number) => void) | null } };
+  const commits = vi.fn();
+  const props = { document, playbackFrame: frame, selectedLineId: line.id, follow: true, startMs: 0, endMs: 5000, positionMs: 0, bpm: 0, snap: false, visible: { staging: false, karaoke: false, line: true, word: true, ruby: true, gap: false, romanization: true }, apply: vi.fn(), onPan: vi.fn(), onError: vi.fn() };
+  const view = render(<SelectionProvider><InitialSelection id={line.id}><Profiler id="tracks" onRender={commits}><TimelineTracks {...props}/></Profiler></InitialSelection></SelectionProvider>);
+  const mounted = commits.mock.calls.length;
+  const wordBar = view.container.querySelector(`[data-timeline-key="${word.id}"]`)!;
+  const rubyBar = view.container.querySelector('[data-timeline-key="r"]')!;
+  const unitBar = view.container.querySelector('[data-timeline-key="u"]')!;
+  for (const [position, expected] of [[1000, [true, true, false]], [1499, [true, true, false]], [1500, [true, false, true]], [2000, [false, false, true]], [2600, [false, false, false]], [1100, [true, true, false]]] as const) {
+    frame.current.positionMs = position; frame.current.update!(position);
+    [wordBar, rubyBar, unitBar].forEach((bar, index) => expect(bar.getAttribute('aria-current') === 'time').toBe(expected[index]));
+  }
+  expect(commits).toHaveBeenCalledTimes(mounted);
+  view.unmount(); expect(frame.current.update).toBeNull(); vi.unstubAllGlobals();
+});

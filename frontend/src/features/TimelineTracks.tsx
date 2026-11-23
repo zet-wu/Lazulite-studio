@@ -18,14 +18,16 @@ import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { useEditorSelection } from './editor/SelectionContext';
 import { lyricSnapAnchors, stableSnapAnchor, documentTargets, targetId, targetSelection, selectionKind, selectionTargets, targetInterval, type LyricSnapAnchor } from './editor/selection-targets';
 import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
-import { useCallback, useContext, useEffect, useMemo, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useLayoutEffect, useRef, useState, type PointerEvent, type RefObject } from 'react';
 import type { LyricCommand } from '../domain/lyric-commands';
 import type { LyricDocument, LyricWord, RomanizationContent } from '../domain/lyric-document';
 import { clearTimelineTimes, moveTimeline, resizeTimeline, resizeTimelineBoundary, timelineBoundaryTargets, snapTimelineInterval, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
 import { packIntervals } from '../domain/pack-intervals';
 import styles from './media.module.css';
 
-type Props = { follow?: boolean; locked?: boolean; document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
+export type TimelinePlaybackFrame = { positionMs: number; update: ((positionMs: number) => void) | null };
+
+type Props = { playbackFrame?: RefObject<TimelinePlaybackFrame>; follow?: boolean; locked?: boolean; document: LyricDocument; selectedLineId: string | null; startMs: number; endMs: number; positionMs: number; bpm: number; snap: boolean;
   visible: { staging?: boolean; karaoke: boolean; line: boolean; word: boolean; ruby: boolean; gap: boolean; romanization: boolean };
   onLocate?: (begin:number,end:number)=>void;
   externalAnchors?: number[]; durationMs?: number | null;
@@ -33,12 +35,40 @@ type Props = { follow?: boolean; locked?: boolean; document: LyricDocument; sele
 type Drag = { linked: boolean; modifier: boolean; viewStartMs: number; pointerY?:number; clear?: boolean; validDrop?: boolean; started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; y: number; current: number; width: number; originalMs: number; moving: TimelineTarget[]; basePoints: number[]; moveSnapOptions: LyricSnapAnchor[]; moveSnapTimes: number[]; baseTimes: ReturnType<typeof lyricTimes>; candidate: { timeMs: number; document: LyricDocument; error: string | Message } };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
 
-export function TimelineTracks({ follow = false, locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onLocate, onPan, onError }: Props) {
+export function TimelineTracks({ playbackFrame, follow = false, locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onLocate, onPan, onError }: Props) {
   useTranslation();
   const editing = useProjectEditing();
   const {paddingMs = 0} = useContext(TimelineIndicatorContext);
   const projectContext = useContext(KaraokeContext);
   const tracksRef = useRef<HTMLDivElement>(null);
+  const playingBars = useRef(new Map<string, { element: HTMLElement; beginMs: number | null; endMs: number | null }>());
+  const playbackRange = useRef({ validFrom: Infinity, validUntil: -Infinity });
+  const updatePlaying = useCallback((position: number) => {
+    const range = playbackRange.current;
+    if (position >= range.validFrom && position < range.validUntil) return;
+    let validFrom = -Infinity, validUntil = Infinity;
+    for (const { element, beginMs, endMs } of playingBars.current.values()) {
+      const playing = beginMs !== null && endMs !== null && position >= beginMs && position < endMs;
+      if (element.classList.contains(styles.trackPlaying) !== playing) element.classList.toggle(styles.trackPlaying, playing);
+      if (playing && element.getAttribute('aria-current') !== 'time') element.setAttribute('aria-current', 'time');
+      else if (!playing && element.hasAttribute('aria-current')) element.removeAttribute('aria-current');
+      if (beginMs === null || endMs === null || beginMs >= endMs) continue;
+      for (const boundary of [beginMs, endMs]) {
+        if (boundary <= position) validFrom = Math.max(validFrom, boundary);
+        else validUntil = Math.min(validUntil, boundary);
+      }
+    }
+    playbackRange.current = { validFrom, validUntil };
+  }, []);
+  useLayoutEffect(() => {
+    playbackRange.current = { validFrom: Infinity, validUntil: -Infinity };
+    updatePlaying(playbackFrame?.current.positionMs ?? positionMs);
+  });
+  useLayoutEffect(() => {
+    if (!playbackFrame) return;
+    playbackFrame.current.update = updatePlaying;
+    return () => { playbackFrame.current.update = null; };
+  }, [playbackFrame, updatePlaying]);
   const [plotWidth, setPlotWidth] = useState(640);
   useEffect(() => {
     const lane = tracksRef.current!.querySelector('[data-track-lane]');
@@ -387,7 +417,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     const clippedBegin = beginMs;
     const right = endMs;
     const narrow = (endMs - beginMs) / spanMs * plotWidth < 16;
-    return <div key={key} data-timeline-key={key} data-line-id={target.lineId} data-word-id={target.kind==='word'||target.kind==='ruby'?target.wordId:undefined} data-ruby-id={target.kind==='ruby'?target.rubyId:undefined} data-romanization-content-id={target.kind==='romanization'&&!target.attachment?target.contentId:undefined} data-romanization-unit-id={target.kind==='romanization'&&!target.attachment?target.unitId:undefined} data-translation-id={target.kind==='romanization'&&target.attachment?target.contentId:undefined} data-translation-unit-id={target.kind==='romanization'&&target.attachment?target.unitId:undefined}
+    return <div key={key} ref={element => { if (element) playingBars.current.set(key, { element, beginMs: real?.beginMs ?? null, endMs: real?.endMs ?? null }); else playingBars.current.delete(key); }} data-timeline-key={key} data-line-id={target.lineId} data-word-id={target.kind==='word'||target.kind==='ruby'?target.wordId:undefined} data-ruby-id={target.kind==='ruby'?target.rubyId:undefined} data-romanization-content-id={target.kind==='romanization'&&!target.attachment?target.contentId:undefined} data-romanization-unit-id={target.kind==='romanization'&&!target.attachment?target.unitId:undefined} data-translation-id={target.kind==='romanization'&&target.attachment?target.contentId:undefined} data-translation-unit-id={target.kind==='romanization'&&target.attachment?target.unitId:undefined}
       className={`${styles.trackBar} ${target.kind === 'line' && documentById.get(target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${playing ? styles.trackPlaying : ''}`} role="button" aria-current={playing ? "time" : undefined} aria-disabled={locked} tabIndex={0} aria-label={label} title={description} aria-description={description} data-temporary-begin={ghostBegin || undefined} data-temporary-end={ghostEnd || undefined}
       style={{ transform: narrow && beginMs === endMs && beginMs === propsEndMs ? 'translateX(-100%)' : undefined, left: pct(clippedBegin), width: `${Math.max(0, right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
       onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}

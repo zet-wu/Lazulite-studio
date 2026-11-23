@@ -72,3 +72,26 @@ test('linked boundary leaves its original snap point and Escape cancels the cand
   await expect.poll(async () => (await b.boundingBox())!.x).toBeCloseTo(original, 0);
 });
 
+test('frame playback advances word, ruby and timed romanization highlights within one followed line', async ({ page }) => {
+  await load(page);
+  await page.getByRole('checkbox', { name: '播放跟随', exact: true }).check();
+  const a = page.getByRole('button', { name: '时间轴词 甲', exact: true });
+  const b = page.getByRole('button', { name: '时间轴词 乙', exact: true });
+  const rubyB = page.getByRole('button', { name: '时间轴注音 おつ', exact: true });
+  const romanB = page.locator('[data-timeline-key][data-romanization-unit-id]').filter({ hasText: /^b$/ });
+  await page.locator('audio').evaluate((audio: HTMLAudioElement) => {
+    let position = 1.2;
+    Object.defineProperty(audio, 'currentTime', { configurable: true, get: () => position, set: value => { position = value; } });
+    Object.defineProperty(audio, 'paused', { configurable: true, get: () => false });
+    audio.dispatchEvent(new Event('seeked')); audio.dispatchEvent(new Event('play'));
+  });
+  await expect(a).toHaveAttribute('aria-current', 'time');
+  await page.locator('audio').evaluate((audio: HTMLAudioElement) => { audio.currentTime = 2.2; });
+  await expect(b).toHaveAttribute('aria-current', 'time');
+  await expect(rubyB).toHaveAttribute('aria-current', 'time');
+  await expect(romanB).toHaveAttribute('aria-current', 'time');
+  await expect(a).not.toHaveAttribute('aria-current');
+  await page.locator('audio').evaluate((audio: HTMLAudioElement) => { audio.currentTime = 3.2; audio.dispatchEvent(new Event('pause')); });
+  await expect(b).not.toHaveAttribute('aria-current');
+  await expect(page.getByRole('button', { name: '时间轴词 丙', exact: true })).toHaveAttribute('aria-current', 'time');
+});
