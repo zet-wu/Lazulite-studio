@@ -15,8 +15,9 @@ it('projects stable sublyric IDs and emits independently parseable TTML dependen
   const f = projectFixture(doc), registry = createToolRegistry();
   const json = await registry.call('get_lyrics', { project_id: 'p', line_ids: ['b'] }, f) as { lines: Record<string, unknown>[] };
   expect(json.lines[0]).toMatchObject({ translations: [{ content_id: 'c', kind: 'timed', units: [{ unit_id: 'u' }] }], romanizations: [{ content_id: 'rc', units: [{ unit_id: 'ru' }] }] });
-  const result = await registry.call('get_lyrics', { project_id: 'p', line_ids: ['b'], format: 'editable_ttml' }, f) as McpToolPayload;
+  const result = await registry.call('get_lyrics', { project_id: 'p', line_ids: ['b'], start_line: 99, format: 'editable_ttml' }, f) as McpToolPayload;
   expect(JSON.parse((result.content[0] as { text: string }).text)).toMatchObject({ partial: true, roundtrip_safe: false, context_only_line_ids: ['l'], sidecar: { external_end_links: { l: 'n' } } });
+  expect(JSON.parse((result.content[0] as { text: string }).text).range).toEqual({ line_ids: ['b'] });
   const xml = (result.content[1] as { text: string }).text;
   expect(xml).toContain('studio:null'); expect(xml).toContain('studio:id');
   const parsed = parseLyricTtml(xml);

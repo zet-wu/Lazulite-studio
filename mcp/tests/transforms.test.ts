@@ -61,3 +61,23 @@ it('matches batch domain commands and rejects stale apply revisions without writ
   await expect(registry.call('batch_edit_lyrics', { ...args, dry_run: false, expected_revision: 'stale' }, f)).rejects.toMatchObject({ status: 412 }); expect(f.writes()).toBe(0);
   await registry.call('batch_edit_lyrics', { ...args, dry_run: false }, f); expect(f.doc()).toEqual(expected); expect(f.writes()).toBe(1);
 });
+
+it.each(['translation', 'romanization'] as const)('reports a shift affecting only timed %s contents in both preview and apply', async kind => {
+  const doc = createProjectDocument();
+  doc.lyrics.lines = [createLine('untimed', 'l'), createLine('unchanged', 'other')];
+  const contents = [{ id: 'c', lineId: 'l', kind: 'timed' as const, units: [{ id: 'u', text: 'timed', beginMs: 100, endMs: 900 }] }];
+  if (kind === 'translation') doc.lyrics.translationTracks = [{ id: 't', language: 'zh', purpose: 'subtitle', contents }];
+  else doc.lyrics.romanizationTracks = [{ id: 't', language: 'ja-Latn', contents }];
+  const f = projectFixture(doc), registry = createToolRegistry();
+  const args = { project_id: 'p', scope: { all: true }, action: { type: 'shift', delta_ms: 200 } };
+  const expected = { changed_count: 1, affected_lines: ['l'], invalidates_alignment: true };
+  expect(await registry.call('batch_edit_lyrics', args, f)).toMatchObject({ ...expected, changed: false, dry_run: true });
+  expect(f.writes()).toBe(0); expect(f.revision()).toBe('r1');
+  expect(await registry.call('batch_edit_lyrics', { ...args, dry_run: false }, f)).toMatchObject({ ...expected, changed: true, dry_run: false, previous_revision: 'r1', new_revision: 'r2' });
+  expect(f.writes()).toBe(1);
+  const saved = f.doc(), tracks = kind === 'translation' ? saved.lyrics.translationTracks : saved.lyrics.romanizationTracks;
+  expect(tracks[0].contents[0]).toMatchObject({ units: [{ beginMs: 300, endMs: 1100 }] });
+  expect(saved.lyrics.lines).toEqual(doc.lyrics.lines);
+  expect(await registry.call('batch_edit_lyrics', { ...args, dry_run: false, action: { type: 'shift', delta_ms: 0 } }, f)).toMatchObject({ changed: false, changed_count: 0, affected_lines: [], invalidates_alignment: false });
+  expect(f.writes()).toBe(1);
+});

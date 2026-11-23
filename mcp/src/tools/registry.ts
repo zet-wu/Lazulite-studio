@@ -13,7 +13,9 @@ export class OperationError extends Error {
 }
 export function withOperationContext<T>(operation: Record<string, unknown>, index: number, revision: string, run: () => T): T {
   try { return run(); } catch (error) {
-    throw new OperationError(error, { operation_index: index, ...operation, current_revision: revision, hint: 'Read the affected objects at the current revision, correct this operation, then retry the entire batch.' });
+    const target = Object.fromEntries(Object.entries(operation).filter(([key]) =>
+      key === 'op' || key === 'mode' || key === 'kind' || key === 'target_kind' || key.endsWith('_id') || key.endsWith('_ids') || key.endsWith('_ref')));
+    throw new OperationError(error, { operation_index: index, ...target, current_revision: revision, hint: 'Read the affected objects at the current revision, correct this operation, then retry the entire batch.' });
   }
 }
 

@@ -225,7 +225,7 @@ export function registerReadTools(registry: ToolRegistry): void {
         };
         const partial = selected.size !== ordered.length || !include_sublyrics;
         return contentPayload([{ type: 'text', text: JSON.stringify({ project_id, revision: envelope.revision, profile: format, partial,
-          roundtrip_safe: false, range: { start_line, line_ids: slice.map(line => line.id) }, context_only_line_ids: [...new Set(context)],
+          roundtrip_safe: false, range: { ...(!line_ids ? { start_line } : {}), line_ids: slice.map(line => line.id) }, context_only_line_ids: [...new Set(context)],
           omitted_fields: ['karaoke', 'acoustics', 'amll', 'lineOrder', ...(!include_sublyrics ? ['sublyrics'] : [])],
           sidecar: { editing, external_end_links: external }, warning: 'This is a lyric view; do not import a sliced or filtered view with replace_all.' }) },
           { type: 'text', text: serializeLyricTtml(lyrics, { draft: format === 'editable_ttml', editing }) }]);

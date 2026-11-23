@@ -29,7 +29,11 @@ it('splits old ruby through line spans and reports exact failed operation withou
   expect(f.doc().lyrics.lines[0].words.map(word => word.text)).toEqual(['真', '彷徨', 'しゃっ']);
   const revision = f.revision();
   try { await registry.call('apply_readings', { project_id: 'p', overwrite_existing: true, operations: [{ mode: 'set_word', line_id: 'l', word_id: 'w', readings: ['ま'] }, { mode: 'split_and_set_word', line_id: 'l', word_id: 'w', parts: [{ text: 'あ', readings: [] }, { text: 'い', readings: [] }] }] }, f); expect.unreachable(); }
-  catch (error) { expect(formatToolError(error)).toMatchObject({ code: 'split_text_mismatch', details: { operation_index: 1, line_id: 'l', word_id: 'w', current_revision: revision } }); }
+  catch (error) {
+    const formatted = formatToolError(error);
+    expect(formatted).toMatchObject({ code: 'split_text_mismatch', details: { operation_index: 1, mode: 'split_and_set_word', line_id: 'l', word_id: 'w', current_revision: revision } });
+    expect(formatted.details).not.toHaveProperty('parts');
+  }
   expect(f.revision()).toBe(revision); expect(f.writes()).toBe(1);
 });
 

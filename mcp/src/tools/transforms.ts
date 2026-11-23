@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createProjectEditorState, type ProjectDocument } from '../../../frontend/src/domain/project-document';
-import { lineText } from '../../../frontend/src/domain/lyric-document';
-import { DEFAULT_SEGMENT_OPTIONS, segmentText, segmentationPreview, distributeSegmentTime, loadSyllableDivider, type SegmentOptions } from '../../../frontend/src/domain/segmentation';
+import { lineText, type TranslationContent } from '../../../frontend/src/domain/lyric-document';
+import { DEFAULT_SEGMENT_OPTIONS, segmentationPreview, distributeSegmentTime, loadSyllableDivider, type SegmentOptions } from '../../../frontend/src/domain/segmentation';
 import { splitReadingMora } from '../../../frontend/src/domain/ruby-editing';
 import { proposeRomanization, romanizationGenerationCommand, hasGeneratedContent, type ParticleRange } from '../../../frontend/src/domain/romanization-generation';
 import { rubySourceRows, proposeRuby, defaultRubySkips, rubyGenerationIssues, rubyGenerationCommand } from '../../../frontend/src/domain/ruby-generation';
@@ -24,11 +24,40 @@ function select(doc: ProjectDocument, scope: Scope) {
 }
 const optionsSchema = z.object({ split_cjk: z.boolean().optional(), japanese_mora: z.boolean().optional(), western: z.enum(['word','syllable']).optional(), language: z.enum(['en-us','de','fr','es','id','it','pt','ru']).optional(), punctuation: z.enum(['merge','separate']).optional(), whitespace: z.enum(['separate','previous','next']).optional(), punctuation_weight: z.number().nonnegative().optional(), ignore: z.array(z.string()).optional(), rules: z.array(z.object({ source: id, parts: z.array(id).min(2) })).optional() });
 const annotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false };
+
+function batchAffectedLines(before: ProjectDocument, after: ProjectDocument): string[] {
+  const lineStates = (doc: ProjectDocument) => {
+    const states = new Map(doc.lyrics.lines.map(line => [line.id, {
+      line,
+      endLink: doc.editing.endLinks[line.id] ?? null,
+      emptyBeats: Object.fromEntries(line.words.flatMap(word => [word.id, ...word.rubyUnits.map(unit => unit.id)])
+        .filter(id => doc.editing.emptyBeats[id]).map(id => [id, doc.editing.emptyBeats[id]])),
+      translations: [] as TranslationContent[],
+      romanizations: [] as TranslationContent[],
+    }]));
+    for (const track of doc.lyrics.translationTracks) for (const content of track.contents) states.get(content.lineId)!.translations.push(content);
+    for (const track of doc.lyrics.romanizationTracks) for (const content of track.contents) states.get(content.lineId)!.romanizations.push(content);
+    return new Map([...states].map(([id, state]) => [id, JSON.stringify(state)]));
+  };
+  const previous = lineStates(before), next = lineStates(after);
+  return [...new Set([...previous.keys(), ...next.keys()])].filter(id => previous.get(id) !== next.get(id));
+}
+
 export function registerTransformTools(registry: ToolRegistry) {
   registry.register({ name: 'segment_lyrics', description: 'Preview/apply shared desktop word segmentation or ruby mora splits. dry_run defaults to true. Existing ruby is blocked unless allow_overwrite_ruby=true. Scope is explicit; summary omits per-word previews.', annotations,
     inputSchema: { ...transformSchema, target: z.enum(['words','ruby']), scope: scopeSchema, options: optionsSchema.default({}), allow_overwrite_ruby: z.boolean().default(false), detail: z.enum(['summary','full']).default('full') },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key, dryRun: args.dry_run }, async (doc, envelope) => {
-      const options: SegmentOptions = { ...DEFAULT_SEGMENT_OPTIONS, ...Object.fromEntries(Object.entries(args.options).filter(([,value]) => value !== undefined)), splitCjk: args.options.split_cjk ?? DEFAULT_SEGMENT_OPTIONS.splitCjk, japaneseMora: args.options.japanese_mora ?? false, punctuationWeight: args.options.punctuation_weight ?? DEFAULT_SEGMENT_OPTIONS.punctuationWeight };
+      const options: SegmentOptions = {
+        splitCjk: args.options.split_cjk ?? DEFAULT_SEGMENT_OPTIONS.splitCjk,
+        japaneseMora: args.options.japanese_mora ?? DEFAULT_SEGMENT_OPTIONS.japaneseMora,
+        western: args.options.western ?? DEFAULT_SEGMENT_OPTIONS.western,
+        language: args.options.language ?? DEFAULT_SEGMENT_OPTIONS.language,
+        punctuation: args.options.punctuation ?? DEFAULT_SEGMENT_OPTIONS.punctuation,
+        whitespace: args.options.whitespace ?? DEFAULT_SEGMENT_OPTIONS.whitespace,
+        punctuationWeight: args.options.punctuation_weight ?? DEFAULT_SEGMENT_OPTIONS.punctuationWeight,
+        ignore: args.options.ignore ?? DEFAULT_SEGMENT_OPTIONS.ignore,
+        rules: args.options.rules ?? DEFAULT_SEGMENT_OPTIONS.rules,
+      };
       const divider = options.western === 'syllable' ? await loadSyllableDivider(options.language) : undefined;
       const targets = select(doc, args.scope); let next = doc, changed = 0, blocked = 0, skipped = 0;
       const preview: Array<Record<string, unknown>> = [];
@@ -129,7 +158,7 @@ export function registerTransformTools(registry: ToolRegistry) {
         case 'unlink_ends': if (action.line_ids.some(id => !lineIds.includes(id))) invalid('Unlink source is outside scope.'); command = { type: 'batch', commands: action.line_ids.map(id => ({ type: 'unlink-line-end', lineId: id })) }; hits = action.line_ids.length; break;
       }
       let next = run(doc, command);
-      const changedLines = next.lyrics.lines.filter(line => JSON.stringify(line) !== JSON.stringify(doc.lyrics.lines.find(l => l.id === line.id)) || next.editing.endLinks[line.id] !== doc.editing.endLinks[line.id]).map(line => line.id);
+      const changedLines = batchAffectedLines(doc, next);
       if (JSON.stringify(next) === JSON.stringify(doc)) next = doc;
       return { nextDoc: next, summary: { dry_run: args.dry_run, revision: envelope.revision, hit_count: hits, changed_count: changedLines.length, deleted_words: deletedWords, deleted_ruby: deletedRuby, deleted_beats: deletedBeats, affected_lines: changedLines, invalidates_alignment: next !== doc } };
     }),
