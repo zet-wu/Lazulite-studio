@@ -1716,5 +1716,7 @@
   "alignment.backgroundDirty": "后台自动对齐已完成，请先保存或丢弃本地未保存草稿后再应用",
   "alignment.rerun": "重新对齐",
   "vocal.backgroundApplied": "后台人声分离已完成并自动应用",
-  "vocal.backgroundConflict": "后台人声分离已完成，是否采用新结果覆盖当前声学片段？"
+  "vocal.backgroundConflict": "后台人声分离已完成，是否采用新结果覆盖当前声学片段？",
+  "settings.swapBoundaryDrag": "交换边界拖动操作",
+  "settings.swapBoundaryDragHelp": "默认拖动调整单侧边界，Ctrl／⌘＋拖动联动相邻边界；开启后两者互换。"
 }

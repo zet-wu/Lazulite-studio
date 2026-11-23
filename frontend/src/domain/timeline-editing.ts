@@ -165,6 +165,89 @@ export function resizeTimeline(document: LyricDocument, target: TimelineTarget, 
   return followChangedEndLinks(document, resizeTarget(document, target, side, timeMs, editing), editing);
 }
 
+type BoundarySide = 'beginMs' | 'endMs';
+export type TimelineBoundary = { target: TimelineTarget; side: BoundarySide };
+const boundaryId = (target: TimelineTarget) => target.kind === 'line' ? target.lineId : target.kind === 'word' ? target.wordId : target.kind === 'ruby' ? target.rubyId : target.unitId;
+
+/** Resolve against the source document so preview changes cannot break adjacency. */
+export function timelineBoundaryTargets(document: LyricDocument, target: TimelineTarget, side: BoundarySide, linked: boolean): TimelineBoundary[] {
+  const edges: TimelineBoundary[] = [{ target, side }];
+  if (!linked || target.kind === 'line') return edges;
+  const opposite = side === 'beginMs' ? 'endMs' : 'beginMs';
+  const direction = side === 'beginMs' ? -1 : 1;
+  if (target.kind === 'romanization') {
+    const tracks = document[target.attachment === 'translation' ? 'translationTracks' : 'romanizationTracks'];
+    const content = tracks.find(track => track.id === target.trackId)?.contents.find(item => item.id === target.contentId && item.lineId === target.lineId);
+    if (content?.kind !== 'timed') return edges;
+    const index = content.units.findIndex(unit => unit.id === target.unitId);
+    const current = content.units[index], adjacent = content.units[index + direction];
+    if (current && adjacent && current.beginMs !== null && current.endMs !== null && adjacent.beginMs !== null && adjacent.endMs !== null && current[side] === adjacent[opposite])
+      edges.push({ target: { ...target, unitId: adjacent.id }, side: opposite });
+    return edges;
+  }
+  const line = document.lines.find(line => line.id === target.lineId)!;
+  const word = line.words.find(word => word.id === target.wordId)!;
+  const wordTarget = (word: LyricWord): TimelineTarget => ({ kind: 'word', lineId: line.id, wordId: word.id });
+  const leafTargets = (word: LyricWord): { target: TimelineTarget; value: LyricWord | RubyUnit }[] => word.rubyUnits.length
+    ? word.rubyUnits.map(unit => ({ target: { kind: 'ruby', lineId: line.id, wordId: word.id, rubyId: unit.id }, value: unit }))
+    : [{ target: wordTarget(word), value: word }];
+  const words = line.words.filter(item => item.id === word.id || item.text.trim() || item.beginMs !== null && item.endMs !== null);
+  const sequence = target.kind === 'word' && word.rubyUnits.length
+    ? words.map(value => ({ target: wordTarget(value), value })) : words.flatMap(leafTargets);
+  const index = sequence.findIndex(item => boundaryId(item.target) === boundaryId(target));
+  const current = sequence[index], adjacent = sequence[index + direction];
+  if (!current || !adjacent || current.value.beginMs === null || current.value.endMs === null || adjacent.value.beginMs === null || adjacent.value.endMs === null || current.value[side] !== adjacent.value[opposite]) return edges;
+  edges.push({ target: adjacent.target, side: opposite });
+  // A word handle carries only a coincident first/last ruby endpoint.
+  for (const edge of [...edges]) {
+    if (edge.target.kind !== 'word') continue;
+    const wordId = edge.target.wordId;
+    const owner = line.words.find(item => item.id === wordId)!;
+    const ruby = edge.side === 'beginMs' ? owner.rubyUnits[0] : owner.rubyUnits.at(-1);
+    if (ruby && ruby[edge.side] === owner[edge.side]) edges.push({ target: { kind: 'ruby', lineId: line.id, wordId: owner.id, rubyId: ruby.id }, side: edge.side });
+  }
+  return edges;
+}
+
+/** Apply every endpoint before validating parents; the caller commits one document. */
+export function resizeTimelineBoundary(document: LyricDocument, target: TimelineTarget, side: BoundarySide, timeMs: number, linked: boolean, editing = createProjectEditing()): LyricDocument {
+  const edges = timelineBoundaryTargets(document, target, side, linked);
+  if (edges.length === 1) return resizeTimeline(document, target, side, timeMs, editing);
+  valid(timeMs, timeMs);
+  let next = document;
+  const wordIds = new Set<string>(), rubyWordIds = new Set<string>();
+  for (const edge of edges) {
+    const item = edge.target;
+    if (item.kind === 'romanization') next = editRomanization(next, item, unit => {
+      const updated = { ...unit, [edge.side]: timeMs }; valid(updated.beginMs, updated.endMs); return updated;
+    });
+    else if (item.kind === 'word' || item.kind === 'ruby') {
+      if (item.kind === 'word') wordIds.add(item.wordId); else rubyWordIds.add(item.wordId);
+      next = editTarget(next, item, line => ({ ...line, words: line.words.map(word => word.id !== item.wordId ? word : item.kind === 'word'
+        ? { ...word, [edge.side]: timeMs }
+        : { ...word, rubyUnits: word.rubyUnits.map(unit => unit.id === item.rubyId ? { ...unit, [edge.side]: timeMs } : unit) }) }));
+    }
+  }
+  if (target.kind !== 'romanization') next = editTarget(next, target, line => {
+    const words = line.words.map(word => {
+      if (!wordIds.has(word.id) && !rubyWordIds.has(word.id)) return word;
+      if (!wordIds.has(word.id)) word = { ...word,
+        beginMs: word.beginMs === null ? null : envelope(word.rubyUnits.map(unit => unit.beginMs), true) ?? word.beginMs,
+        endMs: word.endMs === null ? null : envelope(word.rubyUnits.map(unit => unit.endMs), false) ?? word.endMs };
+      valid(word.beginMs, word.endMs);
+      for (const unit of word.rubyUnits) {
+        valid(unit.beginMs, unit.endMs);
+        if (word.beginMs !== null && unit.beginMs !== null && unit.beginMs < word.beginMs || word.endMs !== null && unit.endMs !== null && unit.endMs > word.endMs) throw new MessageError(message('timeline.wordExcludesRuby'));
+      }
+      return word;
+    });
+    let result = { ...line, words };
+    for (const word of words) if (wordIds.has(word.id) || rubyWordIds.has(word.id)) result = include(result, word, editing);
+    return result;
+  });
+  return followChangedEndLinks(document, next, editing);
+}
+
 export type TimelineAssignment={beginMs:number;endMs:number;fixed:boolean;minBegin:number;maxEnd:number;childBegin:number;childEnd:number};
 /** Choose allocation from the raw drop, before snapping. Only real ancestors constrain it. */
 export function prepareTimelineAssignment(document: LyricDocument, target: TimelineTarget, dropMs: number, durationMs: number): TimelineAssignment {

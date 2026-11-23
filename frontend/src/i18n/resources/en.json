@@ -1730,5 +1730,7 @@
   "alignment.backgroundDirty": "Background alignment finished. Save or discard local unsaved edits before applying.",
   "alignment.rerun": "Re-run alignment",
   "vocal.backgroundApplied": "Background vocal separation finished and applied.",
-  "vocal.backgroundConflict": "Background vocal separation finished. Replace existing acoustic segments with the new result?"
+  "vocal.backgroundConflict": "Background vocal separation finished. Replace existing acoustic segments with the new result?",
+  "settings.swapBoundaryDrag": "Swap boundary drag actions",
+  "settings.swapBoundaryDragHelp": "Drag adjusts one boundary; Ctrl/⌘ + drag links the adjacent boundary. Enable to swap these actions."
 }

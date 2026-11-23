@@ -1716,5 +1716,7 @@
   "alignment.backgroundDirty": "背景自動對齊已完成，請先儲存或放棄本機未儲存草稿後再套用",
   "alignment.rerun": "重新對齊",
   "vocal.backgroundApplied": "背景人聲分離已完成並自動套用",
-  "vocal.backgroundConflict": "背景人聲分離已完成，是否採用新結果覆蓋目前聲學片段？"
+  "vocal.backgroundConflict": "背景人聲分離已完成，是否採用新結果覆蓋目前聲學片段？",
+  "settings.swapBoundaryDrag": "交換邊界拖曳操作",
+  "settings.swapBoundaryDragHelp": "預設拖曳調整單側邊界，Ctrl／⌘＋拖曳連動相鄰邊界；開啟後兩者互換。"
 }

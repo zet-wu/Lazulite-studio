@@ -11261,5 +11261,15 @@
     "source": "后台人声分离已完成，是否采用新结果覆盖当前声学片段？",
     "params": [],
     "parameterNotes": {}
+  },
+  "settings.swapBoundaryDrag": {
+    "context": "Timeline boundary drag preference and Ctrl/Command modifier behavior",
+    "source": "交换边界拖动操作",
+    "params": []
+  },
+  "settings.swapBoundaryDragHelp": {
+    "context": "Timeline boundary drag preference and Ctrl/Command modifier behavior",
+    "source": "默认拖动调整单侧边界，Ctrl／⌘＋拖动联动相邻边界；开启后两者互换。",
+    "params": []
   }
 }

@@ -1,5 +1,5 @@
 import { TimelineContent, timelineViewStart } from './TimelineContent';
-import { useTimelineAutoExpand } from '../adapters/timeline-preferences';
+import { useTimelineAutoExpand, useTimelineSwapBoundaryDrag } from '../adapters/timeline-preferences';
 import { TimelineStaging } from './TimelineStaging';
 import { message as describeMessage, MessageError, errorMessage, type Message } from '../domain/messages';
 import { i18n, formatMessage } from '../i18n';
@@ -21,7 +21,7 @@ import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicato
 import { useCallback, useContext, useEffect, useMemo, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
 import type { LyricCommand } from '../domain/lyric-commands';
 import type { LyricDocument, LyricWord, RomanizationContent } from '../domain/lyric-document';
-import { clearTimelineTimes, moveTimeline, resizeTimeline, snapTimelineInterval, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
+import { clearTimelineTimes, moveTimeline, resizeTimeline, resizeTimelineBoundary, timelineBoundaryTargets, snapTimelineInterval, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
 import { packIntervals } from '../domain/pack-intervals';
 import styles from './media.module.css';
 
@@ -30,7 +30,7 @@ type Props = { follow?: boolean; locked?: boolean; document: LyricDocument; sele
   onLocate?: (begin:number,end:number)=>void;
   externalAnchors?: number[]; durationMs?: number | null;
   apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string | Message) => void };
-type Drag = { viewStartMs: number; pointerY?:number; clear?: boolean; validDrop?: boolean; started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; y: number; current: number; width: number; originalMs: number; moving: TimelineTarget[]; basePoints: number[]; moveSnapOptions: LyricSnapAnchor[]; moveSnapTimes: number[]; baseTimes: ReturnType<typeof lyricTimes>; candidate: { timeMs: number; document: LyricDocument; error: string | Message } };
+type Drag = { linked: boolean; modifier: boolean; viewStartMs: number; pointerY?:number; clear?: boolean; validDrop?: boolean; started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; y: number; current: number; width: number; originalMs: number; moving: TimelineTarget[]; basePoints: number[]; moveSnapOptions: LyricSnapAnchor[]; moveSnapTimes: number[]; baseTimes: ReturnType<typeof lyricTimes>; candidate: { timeMs: number; document: LyricDocument; error: string | Message } };
 const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
 
 export function TimelineTracks({ follow = false, locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onLocate, onPan, onError }: Props) {
@@ -50,6 +50,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
   const [stagingTarget,setStagingTarget]=useState<TimelineTarget|null>(null);
   const { selection, setSelection, expanded, commands, area, focusRequest, requestFocus } = useEditorSelection()!;
   const [autoExpand] = useTimelineAutoExpand();
+  const [swapBoundaryDrag] = useTimelineSwapBoundaryDrag();
   const activeLineIds = autoExpand === 'always' || autoExpand === 'follow' && follow
     ? document.lines.filter(line => line.beginMs !== null && line.endMs !== null && line.beginMs <= positionMs && positionMs < line.endMs).map(line => line.id) : [];
   const activeKey = activeLineIds.join(':');
@@ -189,13 +190,13 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     if (target) {
       const node = event.currentTarget.closest<HTMLElement>('[data-timeline-key]');
       if (node) focusObject(node);
-      if (event.shiftKey || event.ctrlKey || event.metaKey || !selectionTargets(document, selection).some(item => targetId(item) === targetId(target))) {
-        choose(target, event.shiftKey, event.ctrlKey || event.metaKey);
+      if (side === 'move' && (event.shiftKey || event.ctrlKey || event.metaKey) || !selectionTargets(document, selection).some(item => targetId(item) === targetId(target))) {
+        choose(target, side === 'move' && event.shiftKey, side === 'move' && (event.ctrlKey || event.metaKey));
       }
-      if (event.shiftKey || event.ctrlKey || event.metaKey) return;
+      if (side === 'move' && (event.shiftKey || event.ctrlKey || event.metaKey)) return;
     }
     const currentSelected = selectionTargets(document, nextSelection);
-    const moving = target ? (currentSelected.some(item => targetId(item) === targetId(target)) ? currentSelected : [target]) : [];
+    const moving = target ? side !== 'move' ? [target] : (currentSelected.some(item => targetId(item) === targetId(target)) ? currentSelected : [target]) : [];
     const basePoints = [...externalAnchors];
     if (bpm > 0) for (let time = Math.ceil(startMs / (60000 / bpm)) * (60000 / bpm); time <= endMs && basePoints.length < 20000; time += 60000 / bpm) basePoints.push(Math.round(time));
     const movingIds = new Set(moving.map(targetId));
@@ -204,7 +205,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       : [];
     const moveSnapTimes = moveSnapOptions.map(option => option.time);
     const lane = (event.currentTarget.closest('[data-track-lane]') ?? tracksRef.current!.querySelector('[data-track-lane]')) as HTMLElement;
-    const next: Drag = { viewStartMs: timelineViewStart(event.currentTarget,startMs), started: false, source: document, target, side, x: event.clientX, y: event.clientY, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, moving, basePoints, moveSnapOptions, moveSnapTimes, baseTimes: lyricTimes(document), candidate: { timeMs: originalMs, document, error: '' } };
+    const next: Drag = { linked: Boolean(event.ctrlKey || event.metaKey) !== swapBoundaryDrag, modifier: Boolean(event.ctrlKey || event.metaKey), viewStartMs: timelineViewStart(event.currentTarget,startMs), started: false, source: document, target, side, x: event.clientX, y: event.clientY, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, moving, basePoints, moveSnapOptions, moveSnapTimes, baseTimes: lyricTimes(document), candidate: { timeMs: originalMs, document, error: '' } };
     event.currentTarget.setPointerCapture(event.pointerId);
     capture.current = { element: event.currentTarget, id: event.pointerId };
     if (side !== 'pan') publish({ timeMs: originalMs, valid: true });
@@ -269,10 +270,11 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
     }else if(current.side!=='select'&&current.side!=='pan'){
       let unsnapped = document;
       if (current.target) try {
-        unsnapped = resizeTimeline(document, current.target, current.side as 'beginMs' | 'endMs', proposed, editing);
+        unsnapped = resizeTimelineBoundary(document, current.target, current.side as 'beginMs' | 'endMs', proposed, current.linked, editing);
       } catch { /* Invalid candidates still receive the normal validation below. */ }
       const movingIds = new Set(moving.map(targetId));
-      const options = lyricSnapAnchors(document, unsnapped, item => movingIds.has(targetId(item)), current.basePoints);
+      const edges = current.target ? timelineBoundaryTargets(document, current.target, current.side as 'beginMs' | 'endMs', current.linked) : [];
+      const options = lyricSnapAnchors(document, unsnapped, item => movingIds.has(targetId(item)), current.basePoints).filter(anchor => !anchor.target || !edges.some(edge => targetId(edge.target) === targetId(anchor.target!) && edge.side === anchor.side));
       timeMs = snapTimelineTime(proposed, options.map(option => option.time), spanMs, current.width, snap);
     }
     const candidate: Drag['candidate'] = { timeMs, document, error: '' };
@@ -282,7 +284,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
         if (durationMs === null) throw new MessageError(describeMessage('timeline.sourceUnknown'));
         candidate.document = current.side === 'move'
           ? moveTimeline(document, moving, timeMs - current.originalMs, editing)
-          : resizeTimeline(document, target, current.side as 'beginMs' | 'endMs', timeMs, editing);
+          : resizeTimelineBoundary(document, target, current.side as 'beginMs' | 'endMs', timeMs, current.linked, editing);
         validate(candidate.document,timeMs);
       } catch (cause) { candidate.error = errorMessage(cause); }
     } else if (current.target) candidate.timeMs = current.originalMs;
@@ -293,6 +295,7 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
   };
   const move = (event: PointerEvent<HTMLElement>) => {
     if (!dragRef.current) return;
+    dragRef.current = { ...dragRef.current, modifier: Boolean(event.ctrlKey || event.metaKey), linked: Boolean(event.ctrlKey || event.metaKey) !== swapBoundaryDrag };
     pendingMove.current = { clientX: event.clientX, clientY: event.clientY, element: event.currentTarget };
     if (moveFrame.current === null) {
       moveFrame.current = requestAnimationFrame(() => {
@@ -303,7 +306,21 @@ export function TimelineTracks({ follow = false, locked, document, selectedLineI
       });
     }
   };
+  useEffect(() => {
+    const modifiers = (event: KeyboardEvent) => {
+      const current = dragRef.current, held = capture.current;
+      if (!current || !held || current.side !== 'beginMs' && current.side !== 'endMs') return;
+      const modifier = Boolean(event.ctrlKey || event.metaKey);
+      if (modifier === current.modifier && current.linked === (modifier !== swapBoundaryDrag)) return;
+      dragRef.current = { ...current, modifier, linked: modifier !== swapBoundaryDrag };
+      const pending = pendingMove.current;
+      applyMove(pending?.clientX ?? current.current, pending?.clientY ?? current.pointerY ?? current.y, held.element);
+    };
+    window.addEventListener('keydown', modifiers); window.addEventListener('keyup', modifiers);
+    return () => { window.removeEventListener('keydown', modifiers); window.removeEventListener('keyup', modifiers); };
+  });
   const finish = (event: PointerEvent<HTMLElement>) => {
+    if (dragRef.current) dragRef.current = { ...dragRef.current, modifier: Boolean(event.ctrlKey || event.metaKey), linked: Boolean(event.ctrlKey || event.metaKey) !== swapBoundaryDrag };
     const pending = pendingMove.current;
     cancelMoveFrame();
     if (pending || (dragRef.current?.target && dragRef.current.started)) applyMove(pending?.clientX ?? event.clientX, pending?.clientY ?? event.clientY, pending?.element ?? event.currentTarget);

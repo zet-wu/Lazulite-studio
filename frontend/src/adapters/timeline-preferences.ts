@@ -17,3 +17,4 @@ export const useTimelineAutoExpand = () => usePreference('studio:timeline-auto-e
 export const useSpectrumHeight = () => usePreference('studio:spectrum-height', 72);
 
 export const useTimelineSwapWheel = () => usePreference('studio:timeline-swap-wheel', false);
+export const useTimelineSwapBoundaryDrag = () => usePreference('studio:timeline-swap-boundary-drag', false);
