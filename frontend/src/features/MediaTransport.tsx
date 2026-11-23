@@ -106,6 +106,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const lyricEnvelope = document && sharedSelection ? selectionEnvelope(document, sharedSelection.selection, asset?.duration_ms ?? 0) : { range: lyricLoopRange, reason: '' };
   const loopRange = sharedSelection?.effective?.kind === 'segments' ? (selectedSegments.length ? { begin_ms: Math.min(...selectedSegments.map(segment => segment.beginMs)), end_ms: Math.max(...selectedSegments.map(segment => segment.endMs)) } : undefined) : lyricEnvelope.range;
   const plotsRef=useRef<HTMLDivElement>(null);
+  const [plotsElement, setPlotsElement] = useState<HTMLDivElement | null>(null);
+  const setPlotsRef = useCallback((node: HTMLDivElement | null) => {
+    plotsRef.current = node;
+    setPlotsElement(node);
+  }, []);
   const keys = useShortcuts();
   const queryClient = useQueryClient();
   const results = useQuery({ queryKey:['vocals',projectId], queryFn:()=>vocalApi.list(projectId), enabled:!!asset });
@@ -452,7 +457,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   const wheelStateRef = useRef({ asset, adding: Boolean(ui?.adding), swapWheel, span, durationMs, setFollow, zoomAt });
   wheelStateRef.current = { asset, adding: Boolean(ui?.adding), swapWheel, span, durationMs, setFollow, zoomAt };
   useEffect(()=>{
-    const node=plotsRef.current;if(!node)return;
+    const node=plotsElement;if(!node)return;
     const wheel=(event:globalThis.WheelEvent)=>{
       const state=wheelStateRef.current;
       if(!state.asset||event.ctrlKey||event.metaKey||state.adding)return;
@@ -472,7 +477,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     };
     node.addEventListener('wheel',wheel,{passive:false});
     return()=>node.removeEventListener('wheel',wheel);
-  },[]);
+  },[plotsElement]);
   const beginPan = (event: PointerEvent<HTMLElement>, plot: HTMLElement, seek: boolean) => {
     if (event.defaultPrevented || ui?.adding || !asset || event.button !== 0 || (event.target as Element).closest('[data-timeline-text], [data-loop-handle], button, input, textarea, select, [contenteditable="true"]')) return;
     if (moveAnimation.current !== null) { cancelAnimationFrame(moveAnimation.current); moveAnimation.current = null; }
@@ -657,7 +662,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   </div>);
   const plots = (
     <TimelineIndicatorContext.Provider value={{ paddingMs, startMs, endMs, preview: timelinePreview, publish: publishTimelinePreview }}>
-      <div id="timeline-plots" tabIndex={-1} aria-label={t('media.timeline')} ref={plotsRef} className={styles.timelinePlots}
+      <div id="timeline-plots" tabIndex={-1} aria-label={t('media.timeline')} ref={setPlotsRef} className={styles.timelinePlots}
         onPointerDown={event => {
           const plot = (event.target as Element).closest<HTMLElement>('[data-timeline-pan]');
           if (plot) beginPan(event, plot, plot.dataset.timelinePan === 'seek');
