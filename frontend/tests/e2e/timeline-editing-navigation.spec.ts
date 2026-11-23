@@ -44,14 +44,14 @@ test('multi-selection stamps active member, background is line-only and ignored 
   await expect(page.locator('main [data-word-id][data-selected]')).toHaveCount(2);
   await clock(page, 4000); await page.getByRole('button', { name: '起始轴', exact: true }).click();
   await expect(page.getByRole('region', { name: '连续打轴' })).toContainText('B');
-  await word(page, 'BG').click(); await expect(page.getByText('背景 · 本行', { exact: true })).toBeVisible();
+  await word(page, 'BG').click(); await expect(page.getByRole('region', { name: '连续打轴' })).toContainText('背景'); await expect(page.getByRole('combobox', { name: '打轴模式', exact: true })).toHaveValue('line'); await expect(page.getByRole('combobox', { name: '打轴模式', exact: true })).toBeDisabled();
   await clock(page, 3000); await page.getByRole('button', { name: '起始轴', exact: true }).click();
   await clock(page, 4000); await page.getByRole('button', { name: '结束轴', exact: true }).click();
   await expect(page.locator('[data-sync-marker][data-current]')).toHaveCount(0);
   await expect(page.getByText('本行已完成', { exact: true })).toHaveCount(0);
   await page.locator('main [data-line-id="bg"]').click({ position: { x: 3, y: 3 } });
-  await page.getByLabel('跳过打轴', { exact: true }).check();
-  await expect(page.getByLabel('此行跳过打轴')).toBeVisible();
+  await page.getByRole('switch', { name: '跳过连续打轴', exact: true }).check();
+  await expect(page.locator('main [data-line-id="bg"]')).toHaveAttribute('data-ignored-sync', 'true');
   await word(page, 'BG').dblclick(); await expect(page.getByRole('textbox', { name: '词 背景' })).toBeFocused();
 });
 test('word/Ruby drafts, keyboard beat menus and ignored background persist through undo', async ({ page }) => {
