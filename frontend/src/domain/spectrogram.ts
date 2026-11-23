@@ -1,7 +1,7 @@
 import { message, MessageError } from './messages';
 export const SPECTRUM_WIDTH = 384;
-export const SPECTRUM_HEIGHT = 96;
-export const FFT_SIZE = 512;
+export const SPECTRUM_HEIGHT = 256;
+export const FFT_SIZE = 1024;
 const SIZE = FFT_SIZE;
 export const SPECTRUM_WINDOW_MS = 4_000;
 export const PROXY_SAMPLE_RATE = 48_000;
@@ -27,16 +27,16 @@ for (let index = 0; index < SIZE >> 1; index++) {
   SIN_TABLE[index] = Math.sin(angle);
 }
 
-const BIN_MAPS = new Map<number, Uint16Array>();
-function binMapForRate(rate: number): Uint16Array {
+const BIN_MAPS = new Map<number, Float32Array>();
+function binMapForRate(rate: number): Float32Array {
   let bins = BIN_MAPS.get(rate);
   if (bins) return bins;
-  bins = new Uint16Array(SPECTRUM_HEIGHT);
+  bins = new Float32Array(SPECTRUM_HEIGHT);
   const high = Math.min(8000, rate / 2);
   const ratio = high / 80;
   for (let row = 0; row < SPECTRUM_HEIGHT; row++) {
     const frequency = 80 * ratio ** (row / (SPECTRUM_HEIGHT - 1));
-    bins[row] = Math.min(SIZE >> 1, Math.round((frequency * SIZE) / rate));
+    bins[row] = Math.min(SIZE >> 1, (frequency * SIZE) / rate);
   }
   BIN_MAPS.set(rate, bins);
   return bins;
@@ -118,8 +118,9 @@ export function computeSpectrogram(pcm: Int16Array, rate: number, channels: numb
     }
     fft(real, imaginary);
     for (let row = 0; row < SPECTRUM_HEIGHT; row++) {
-      const bin = bins[row];
-      const amplitude = Math.hypot(real[bin], imaginary[bin]) * ampScale;
+      const position = bins[row], low = Math.floor(position), high = Math.min(halfSize, low + 1);
+      const fraction = position - low;
+      const amplitude = (Math.hypot(real[low], imaginary[low]) * (1 - fraction) + Math.hypot(real[high], imaginary[high]) * fraction) * ampScale;
       const db = 20 * Math.log10(Math.max(1e-6, amplitude));
       output[(SPECTRUM_HEIGHT - row - 1) * SPECTRUM_WIDTH + column] = Math.max(0, Math.min(255, Math.round((db + 70) / 70 * 255)));
     }

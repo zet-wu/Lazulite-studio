@@ -2,11 +2,12 @@ export const SPECTRUM_CACHE_LIMIT = 128;
 export type SpectrumTile = {
   startMs: number;
   endMs: number;
-  pixels: Uint8Array;
+  pixels?: Uint8Array;
   bitmap?: HTMLCanvasElement;
 };
 
 function releaseTile(tile: SpectrumTile | undefined) {
+  if (tile) tile.pixels = undefined;
   if (tile?.bitmap) {
     tile.bitmap.width = 0;
     tile.bitmap.height = 0;

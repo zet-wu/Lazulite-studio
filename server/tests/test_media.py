@@ -81,12 +81,12 @@ def test_pcm_window_context_limit_and_exact_sample_coordinates(tmp_path: Path) -
         output.writeframes(b"\x00\x00\x00\x00" * (48000 * 9 + 123))
     service = MediaService(tmp_path / "store")
     asset = service.import_asset(source)
-    for first, last in [(0, 4000), (3994, 8006), (0, 4020)]:
+    for first, last in [(0, 4000), (3994, 8006), (0, 4060)]:
         data, rate, channels = service.pcm_window(asset, start_ms=first, end_ms=last)
         assert rate == 48000 and channels == 2
         assert len(data) == (round(last * rate / 1e3) - round(first * rate / 1e3)) * 4
     with pytest.raises(MediaError):
-        service.pcm_window(asset, start_ms=0, end_ms=4021)
+        service.pcm_window(asset, start_ms=0, end_ms=4061)
     for frame in (1, 2, 255, 256, 191744, 192256):
         timestamp = round(frame * 1e3 / 48000)
         assert abs(timestamp * 48000 / 1e3 - frame) <= 24

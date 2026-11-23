@@ -10,7 +10,7 @@ import { IconButton } from '../shared/Controls';
 import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { studioApi } from '../adapters/http/client';
-import { SPECTRUM_HEIGHT, SPECTRUM_WIDTH, SPECTRUM_WINDOW_MS, PROXY_SAMPLE_RATE, spectrumWindow } from '../domain/spectrogram';
+import { FFT_SIZE, SPECTRUM_HEIGHT, SPECTRUM_WIDTH, SPECTRUM_WINDOW_MS, PROXY_SAMPLE_RATE, spectrumWindow } from '../domain/spectrogram';
 import { useCanvasMetrics } from './useCanvasMetrics';
 import { SpectrumCache } from './spectrum-cache';
 import styles from './media.module.css';
@@ -40,7 +40,7 @@ function colorizeTile(pixels: Uint8Array): HTMLCanvasElement | undefined {
 
 export function SpectrogramCanvas(props: Props) {
   useTranslation();
-  return <AssetSpectrum key={`${props.projectId}:${props.assetIdentity}:${props.durationMs}:${props.pcmRate ?? PROXY_SAMPLE_RATE}:fft512-${SPECTRUM_WIDTH}x${SPECTRUM_HEIGHT}`} {...props} />;
+  return <AssetSpectrum key={`${props.projectId}:${props.assetIdentity}:${props.durationMs}:${props.pcmRate ?? PROXY_SAMPLE_RATE}:fft${FFT_SIZE}-${SPECTRUM_WIDTH}x${SPECTRUM_HEIGHT}`} {...props} />;
 }
 
 function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs, endMs, durationMs }: Props) {
@@ -101,11 +101,12 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
       pending.current.delete(result.id);
       if (result.error) { failed.current.set(result.id, result.error); }
       else {
+        const bitmap = colorizeTile(result.pixels);
         cache.current.set({
           startMs: result.id,
           endMs: Math.min(result.id + SPECTRUM_WINDOW_MS, durationMs),
-          pixels: result.pixels,
-          bitmap: colorizeTile(result.pixels),
+          pixels: bitmap ? undefined : result.pixels,
+          bitmap,
         });
         if (stats.current) {
           stats.current.completed++;
@@ -157,14 +158,18 @@ function AssetSpectrum({ pcmRate = PROXY_SAMPLE_RATE, vocal, projectId, startMs,
     context.fillStyle = '#101622'; context.fillRect(0, 0, element.width, element.height);
     const x = (time: number) => (time - drawStart) / (drawEnd - drawStart) * element.width;
     for (const first of wanted.current) {
-      const last = Math.min(first + SPECTRUM_WINDOW_MS, durationMs), left = x(first), right = x(last);
+      const last = Math.min(first + SPECTRUM_WINDOW_MS, durationMs), left = Math.round(x(first)), right = Math.round(x(last));
+      if (right <= left) continue;
       const tile = cache.current.get(first);
       if (!tile) {
         context.fillStyle = failed.current.has(first) ? '#502933' : '#24354b';
         context.fillRect(left, 0, right - left, element.height);
         continue;
       }
-      if (!tile.bitmap) tile.bitmap = colorizeTile(tile.pixels);
+      if (!tile.bitmap && tile.pixels) {
+        tile.bitmap = colorizeTile(tile.pixels);
+        if (tile.bitmap) tile.pixels = undefined;
+      }
       if (tile.bitmap) context.drawImage(tile.bitmap, left, 0, right - left, element.height);
     }
   }, [drawEnd, revision, drawStart, visible, width, ratio, displayHeight, durationMs]);

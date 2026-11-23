@@ -29,7 +29,7 @@ it.each([44100,48000])('matches full PCM to padded tiles at %i Hz across transie
     const tiled = computeSpectrogram(pcm.slice(first * 2, last * 2), rate, 2, window);
     const whole = computeSpectrogram(pcm, rate, 2, { ...window, requestStartMs: 0, requestEndMs: durationMs });
     expect(tiled).toEqual(whole);
-    expect(window.requestEndMs - window.requestStartMs).toBeLessThanOrEqual(4020);
+    expect(window.requestEndMs - window.requestStartMs).toBeLessThanOrEqual(4060);
   }
 });
 
