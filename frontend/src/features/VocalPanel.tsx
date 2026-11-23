@@ -19,7 +19,7 @@ import { useAudioReview } from './AudioReviewContext';
 import { TopMenu } from './editor/TopMenu';
 import editorStyles from './editor/semantic-editor.module.css';
 import styles from './vocal.module.css';
-export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, durationMs, visible }: { locked?: boolean; projectId: string; project: ProjectDocument; sourceAssetId: string; apply: (command: ProjectCommand) => void; durationMs: number | null; visible: boolean }) {
+export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, save, durationMs, visible }: { locked?: boolean; projectId: string; project: ProjectDocument; sourceAssetId: string; apply: (command: ProjectCommand) => void; save?: () => Promise<unknown>; durationMs: number | null; visible: boolean }) {
   useTranslation();
   const ui = useAudioReview();
   const queryClient = useQueryClient();
@@ -28,7 +28,8 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const [menu, setMenu] = useState<string|null>(null);
   const [notice, publish] = useNotice(), [issue, publishIssue] = useNotice(), [readError, publishReadError] = useNotice();
   const [cancelling, setCancelling] = useState(false);
-  const submitting = useRef(false), cancelRequested = useRef(false);
+  const [adopting, setAdopting] = useState(false);
+  const submitting = useRef(false), cancelRequested = useRef(false), adoptingRef = useRef(false);
   const [dismissed, setDismissed] = useState<string|null>(null);
   const intentKey=scopedSessionKey(`studio-vocal-intent-v1:${projectId}`);
   const [pending, setPending] = useState<{id:string; baseline:string}|null>(()=>{
@@ -55,7 +56,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const currentAudio = sourceResults.find(r=>r.audio_state==='current') ?? sourceResults[0];
   const repair = currentAudio?.audio_state==='missing';
   const failure = latest && ['failed','cancelled','interrupted'].includes(latest.status);
-  const conflict = pending && latest?.status==='succeeded' && !handled.current.has(pending.id) && pending.baseline!==JSON.stringify(project.acoustics);
+  const conflict = pending && latest?.status==='succeeded' && !handled.current.has(pending.id) && pending.baseline!==JSON.stringify(project.acoustics) && project.acoustics.analysisId!==result?.id;
   const adopted = sourceResults.find(r=>r.id===project.acoustics.analysisId);
   const adoptedAvailable = !!adopted && adopted.audio_state !== 'missing';
   const ready = !!project.acoustics.analysisId || project.acoustics.segments.length>0;
@@ -75,20 +76,25 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
   const readingFailed = jobs.isError || results.isError || completed.isError;
   useEffect(()=>{publishReadError(readingFailed ? describeMessage('vocal.readFailed') : null);},[readingFailed,publishReadError]);
   useEffect(()=>{if(!active)setCancelling(false);},[active?.id]);
-  const adopt = () => { if(locked)return;
+  const adopt = async () => { if(locked || adoptingRef.current)return;
     if(!pending || !result || result.status!=='ready') return;
+    const jobId = pending.id;
+    adoptingRef.current = true;
+    setAdopting(true);
     try {
       if (durationMs === null) throw new MessageError(describeMessage('vocal.durationUnknown'));
       if(result.source_asset_id!==sourceAssetId)throw new MessageError(describeMessage('vocal.sourceChanged'));
       const normalized = intersectSegments(result.segments!, durationMs);
       apply({type:'acoustics', acoustics:{analysisId:result.id,segments:normalized.segments}});
+      await save?.();
       if(normalized.clipped || normalized.dropped) publish(describeMessage('task.normalized',{clipped:normalized.clipped,dropped:normalized.dropped}), 'status');
-      void jobsApi.acknowledge(pending.id, 'applied').catch(() => undefined);
-      handled.current.add(pending.id); setPending(null); setError('');
+      await jobsApi.acknowledge(jobId, 'applied').catch(() => undefined);
+      handled.current.add(jobId); setPending(null); setError('');
     } catch(e) {setError(errorMessage(e));}
+    finally { adoptingRef.current = false; setAdopting(false); }
   };
   useEffect(()=>{
-    if(pending && latest?.status==='succeeded' && result?.status==='ready' && !conflict && !handled.current.has(pending.id) && !error) adopt();
+    if(pending && latest?.status==='succeeded' && result?.status==='ready' && !conflict && !handled.current.has(pending.id) && !error) void adopt();
   },[pending,latest?.status,result,conflict,error]);
   const run = async (reuse?: string, upload?: {upload_id:string;offset_ms:number}, force=false) => {
     if(locked)return false;
@@ -158,7 +164,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, d
       </TopMenu> : <button data-role="primary" disabled={locked||busy||!!active} onClick={()=>void run(currentAudio?.source_kind==='upload' ? currentAudio.id : undefined)}>{repair?t('vocal.regenerate'):currentAudio?t('vocal.useExisting'):t('vocal.separate')}</button>}
     </>, ui.analysisHost)}
     {ui.statusHost && (conflictVisible || !ready || pendingFailure && !notice) && createPortal(<section className={styles.panel} aria-label={t('vocal.results')}>
-      {conflictVisible ? <><p>{t('vocal.changed')}</p><button data-role="primary" disabled={locked} onClick={adopt}>{t('vocal.replaceSegments')}</button>{ready && <button data-role="secondary" onClick={()=>setDismissed(latest!.id)}>{t('vocal.previous')}</button>}</> : pendingFailure && !notice ? <><p>{latest.error ? formatMessage(taskError(latest.error)) : t(latest.status==='failed'?'vocal.failed':'vocal.interrupted')}</p>{retryActions}</> : <p>{active||busy?t('vocal.runningHelp'):t('vocal.empty')}</p>}
+      {conflictVisible ? <><p>{t('vocal.changed')}</p><button data-role="primary" disabled={locked||adopting} onClick={()=>void adopt()}>{t('vocal.replaceSegments')}</button>{ready && <button data-role="secondary" onClick={()=>setDismissed(latest!.id)}>{t('vocal.previous')}</button>}</> : pendingFailure && !notice ? <><p>{latest.error ? formatMessage(taskError(latest.error)) : t(latest.status==='failed'?'vocal.failed':'vocal.interrupted')}</p>{retryActions}</> : <p>{active||busy?t('vocal.runningHelp'):t('vocal.empty')}</p>}
     </section>,ui.statusHost)}
   </>;
 }

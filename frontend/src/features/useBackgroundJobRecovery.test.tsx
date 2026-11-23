@@ -269,6 +269,141 @@ describe('useBackgroundJobRecovery', () => {
     expect(conflictHook.current.vocalConflictPrompt).toBeNull();
   });
 
+  it('does not acknowledge background vocal results when saving fails or dirty analysisId is unsaved', async () => {
+    const emptyProject = makeProjectWithLine();
+    vi.spyOn(vocalApi, 'jobResult').mockResolvedValue({ kind: 'vocal', analysis_id: 'voc-1' });
+    vi.spyOn(vocalApi, 'list').mockResolvedValue({
+      items: [
+        {
+          id: 'voc-1',
+          project_id: 'p1',
+          source_asset_id: 'a1',
+          audio_state: 'current',
+          source_kind: 'separated',
+          status: 'ready',
+          segments: [{ id: 's1', beginMs: 100, endMs: 2000, confidence: 0.9 }],
+        },
+      ],
+    } as never);
+    const ackSpy = vi.spyOn(jobsApi, 'acknowledge').mockResolvedValue(makeVocalJob({ acknowledged_state: 'applied' }));
+    const saveForPackaging = vi.fn().mockRejectedValue(Object.assign(new Error('Service Unavailable'), { status: 503 }));
+    const onNotice = vi.fn();
+
+    let currentProject = emptyProject;
+    let isDirty = false;
+    const applyProject = vi.fn((cmd: ProjectCommand) => {
+      if (cmd.type === 'acoustics') {
+        currentProject = { ...currentProject, acoustics: cmd.acoustics };
+        isDirty = true;
+      }
+    });
+
+    const { rerender } = renderHook(
+      ({ project, dirty }: { project: ProjectDocument; dirty: boolean }) =>
+        useBackgroundJobRecovery({
+          projectId: 'p1',
+          sourceAssetId: 'a1',
+          durationMs: 10000,
+          revision: 'rev-1',
+          dirty,
+          conflict: false,
+          editingLocked: false,
+          project,
+          jobs: [makeVocalJob()],
+          claimedJobIds: new Set(),
+          lockEditing: () => ({ source: project, apply: vi.fn(), release: vi.fn() }),
+          saveForPackaging,
+          applyProject,
+          requestAlignmentOpen: vi.fn(),
+          onNotice,
+        }),
+      { wrapper: createWrapper(), initialProps: { project: currentProject, dirty: isDirty } },
+    );
+
+    await waitFor(() => {
+      expect(saveForPackaging).toHaveBeenCalledTimes(1);
+    });
+    expect(ackSpy).not.toHaveBeenCalled();
+    expect(onNotice).toHaveBeenCalledWith(expect.anything(), 'alert');
+
+    // Rerendering while dirty with the applied analysisId must still not acknowledge or retry in a loop.
+    rerender({ project: currentProject, dirty: true });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(saveForPackaging).toHaveBeenCalledTimes(1);
+    expect(ackSpy).not.toHaveBeenCalled();
+
+    // Once the document is actually saved (!dirty), the matching analysisId is acknowledged.
+    rerender({ project: currentProject, dirty: false });
+    await waitFor(() => {
+      expect(ackSpy).toHaveBeenCalledWith('job-vocal-1', 'applied');
+    });
+  });
+
+  it('keeps conflict vocal prompt unacknowledged when saveForPackaging fails in adoptVocal', async () => {
+    const existingProject: ProjectDocument = {
+      ...makeProjectWithLine(),
+      acoustics: { analysisId: null, segments: [{ id: 'manual-1', beginMs: 50, endMs: 500 }] },
+    };
+    vi.spyOn(vocalApi, 'jobResult').mockResolvedValue({ kind: 'vocal', analysis_id: 'voc-1' });
+    vi.spyOn(vocalApi, 'list').mockResolvedValue({
+      items: [
+        {
+          id: 'voc-1',
+          project_id: 'p1',
+          source_asset_id: 'a1',
+          audio_state: 'current',
+          source_kind: 'separated',
+          status: 'ready',
+          segments: [{ id: 's1', beginMs: 100, endMs: 2000, confidence: 0.9 }],
+        },
+      ],
+    } as never);
+    const ackSpy = vi.spyOn(jobsApi, 'acknowledge').mockResolvedValue(makeVocalJob({ acknowledged_state: 'applied' }));
+    const saveForPackaging = vi.fn().mockRejectedValueOnce(new Error('503')).mockResolvedValueOnce({ revision: 'rev-2' });
+    const onNotice = vi.fn();
+
+    const { result } = renderHook(
+      () =>
+        useBackgroundJobRecovery({
+          projectId: 'p1',
+          sourceAssetId: 'a1',
+          durationMs: 10000,
+          revision: 'rev-1',
+          dirty: false,
+          conflict: false,
+          editingLocked: false,
+          project: existingProject,
+          jobs: [makeVocalJob()],
+          claimedJobIds: new Set(),
+          lockEditing: () => ({ source: existingProject, apply: vi.fn(), release: vi.fn() }),
+          saveForPackaging,
+          applyProject: vi.fn(),
+          requestAlignmentOpen: vi.fn(),
+          onNotice,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.vocalConflictPrompt?.matchedId).toBe('voc-1');
+    });
+
+    await act(async () => {
+      await result.current.adoptVocal();
+    });
+    expect(ackSpy).not.toHaveBeenCalled();
+    expect(result.current.vocalConflictPrompt).not.toBeNull();
+    expect(onNotice).toHaveBeenCalledWith(expect.anything(), 'alert');
+
+    await act(async () => {
+      await result.current.adoptVocal();
+    });
+    expect(ackSpy).toHaveBeenCalledWith('job-vocal-1', 'applied');
+    expect(result.current.vocalConflictPrompt).toBeNull();
+  });
+
   it('tracks external MCP alignment acknowledgement transitions without claiming', () => {
     const project = makeProjectWithLine();
     const { result, rerender } = renderHook(

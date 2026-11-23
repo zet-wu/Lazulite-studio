@@ -69,8 +69,18 @@ export function useBackgroundJobRecovery({
   const [busyVocal, setBusyVocal] = useState(false);
   const [externalAlignmentRevision, setExternalAlignmentRevision] = useState<string | null>(null);
   const locallyHandledIds = useRef(new Set<string>());
+  const autoApplyingVocalRef = useRef(false);
+  const failedAutoVocalIds = useRef(new Set<string>());
+  const mountedRef = useRef(true);
   const [handledVersion, setHandledVersion] = useState(0);
   const seenJobs = useRef(new Map<string, { status: string; acknowledgedState: string | null }>());
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const markHandled = useCallback((jobId: string) => {
     locallyHandledIds.current.add(jobId);
@@ -240,7 +250,7 @@ export function useBackgroundJobRecovery({
   // Auto-apply only when no conflict exists; prompt is derived cleanly without state loops.
   useEffect(() => {
     if (!vocalNeedsRecovery || !latestVocal || !vocalJobResultQuery.data || !vocalsListQuery.data) return;
-    if (locallyHandledIds.current.has(latestVocal.id)) return;
+    if (locallyHandledIds.current.has(latestVocal.id) || autoApplyingVocalRef.current) return;
     const analysisId = vocalJobResultQuery.data.analysis_id;
     const matched = vocalsListQuery.data.items.find((item) => item.id === analysisId);
     if (!matched || matched.source_asset_id !== sourceAssetId || matched.status !== 'ready') {
@@ -248,26 +258,39 @@ export function useBackgroundJobRecovery({
       void jobsApi.acknowledge(latestVocal.id, 'dismissed').catch(() => undefined);
       return;
     }
-    if (project.acoustics.analysisId === matched.id) {
+    if (project.acoustics.analysisId === matched.id && !dirty) {
       markHandled(latestVocal.id);
       void jobsApi.acknowledge(latestVocal.id, 'applied').catch(() => undefined);
       return;
     }
+    if (project.acoustics.analysisId === matched.id || failedAutoVocalIds.current.has(latestVocal.id)) return;
     if (durationMs === null || conflict || editingLocked) return;
 
     const hasExisting = Boolean(project.acoustics.analysisId || project.acoustics.segments.length > 0);
     if (hasExisting) return;
 
     const normalized = intersectSegments(matched.segments ?? [], durationMs);
-    markHandled(latestVocal.id);
-    try {
-      applyProject({ type: 'acoustics', acoustics: { analysisId: matched.id, segments: normalized.segments } });
-      void jobsApi.acknowledge(latestVocal.id, 'applied').catch(() => undefined);
-      void queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] });
-      onNotice(describeMessage('vocal.backgroundApplied'), 'status', 4000);
-    } catch (cause) {
-      onNotice(errorMessage(cause), 'alert');
-    }
+    const jobId = latestVocal.id;
+    autoApplyingVocalRef.current = true;
+    void (async () => {
+      try {
+        applyProject({ type: 'acoustics', acoustics: { analysisId: matched.id, segments: normalized.segments } });
+        await saveForPackaging();
+        markHandled(jobId);
+        await jobsApi.acknowledge(jobId, 'applied').catch(() => undefined);
+        await queryClient.invalidateQueries({ queryKey: ['vocal-jobs', projectId] });
+        if (mountedRef.current) {
+          onNotice(describeMessage('vocal.backgroundApplied'), 'status', 4000);
+        }
+      } catch (cause) {
+        failedAutoVocalIds.current.add(jobId);
+        if (mountedRef.current) {
+          onNotice(errorMessage(cause), 'alert');
+        }
+      } finally {
+        autoApplyingVocalRef.current = false;
+      }
+    })();
   }, [
     vocalNeedsRecovery,
     latestVocal,
@@ -276,11 +299,13 @@ export function useBackgroundJobRecovery({
     sourceAssetId,
     project.acoustics.analysisId,
     project.acoustics.segments.length,
+    dirty,
     durationMs,
     conflict,
     editingLocked,
     markHandled,
     applyProject,
+    saveForPackaging,
     queryClient,
     projectId,
     onNotice,
@@ -325,6 +350,7 @@ export function useBackgroundJobRecovery({
         type: 'acoustics',
         acoustics: { analysisId: vocalConflictPrompt.matchedId, segments: vocalConflictPrompt.segments },
       });
+      await saveForPackaging();
       markHandled(vocalConflictPrompt.job.id);
       setDismissedVocalIds((ids) => [...ids, vocalConflictPrompt.job.id]);
       await jobsApi.acknowledge(vocalConflictPrompt.job.id, 'applied').catch(() => undefined);
@@ -335,7 +361,7 @@ export function useBackgroundJobRecovery({
     } finally {
       setBusyVocal(false);
     }
-  }, [vocalConflictPrompt, busyVocal, applyProject, markHandled, queryClient, projectId, onNotice]);
+  }, [vocalConflictPrompt, busyVocal, applyProject, saveForPackaging, markHandled, queryClient, projectId, onNotice]);
 
   const dismissVocal = useCallback(async () => {
     if (!vocalConflictPrompt) return;
