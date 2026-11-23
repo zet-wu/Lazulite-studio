@@ -150,3 +150,13 @@ it('ignores late syllable previews after newer inputs and after closing', async 
     expect(apply).toHaveBeenCalledTimes(1);
   } finally {view.unmount();loader.mockRestore();cleanup();}
 });
+
+it('shares mora boundaries with reading splits while retaining protected terms', () => {
+  const options = { ...DEFAULT_SEGMENT_OPTIONS, japaneseMora: true, punctuation: 'separate' as const };
+  expect(segmentText('しゃきょティヴァっッんンー', options)).toEqual(['しゃ','きょ','ティ','ヴァ','っ','ッ','ん','ン','ー']);
+  expect(segmentText('字しゃ、 ティ', options)).toEqual(['字','しゃ','、',' ','ティ']);
+  expect(segmentText('彷徨しゃ', { ...options, ignore: ['彷徨'] })).toEqual(['彷徨','しゃ']);
+  expect(segmentText('彷徨しゃ', { ...options, rules: [{ source: '彷徨しゃ', parts: ['彷徨','しゃ'] }] })).toEqual(['彷徨','しゃ']);
+  expect(segmentText('しゃきょ', { ...options, splitCjk: false })).toEqual(['しゃきょ']);
+  expect(segmentText('しゃきょ', DEFAULT_SEGMENT_OPTIONS)).toEqual(['し','ゃ','き','ょ']);
+});

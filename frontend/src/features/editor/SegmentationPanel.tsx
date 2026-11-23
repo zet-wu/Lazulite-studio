@@ -111,6 +111,7 @@ export function SegmentationPanel({ document, wordIds, apply, close, navigation,
       {!targets.length && <p role="status">{t('segment.noWords')}</p>}
       {mode !== 'manual' && <div className={fields.group}>
         <SettingToggle label={t('segment.cjk')} checked={options.splitCjk} onChange={value=>updateOption('splitCjk',value)}/>
+        <SettingToggle label={t('segment.japaneseMora')} checked={options.japaneseMora} disabled={!options.splitCjk} onChange={value=>updateOption('japaneseMora',value)}/>
         <SettingField label={t('segment.western')}><Select value={options.western} onChange={(event) => updateOption('western', event.target.value as SegmentOptions['western'])}><option value="word">{t('segment.words')}</option><option value="syllable">{t('segment.syllables')}</option></Select></SettingField>
         {options.western === 'syllable' && <SettingField label={t('segment.language')}><Select value={options.language} onChange={(event) => updateOption('language', event.target.value as SegmentOptions['language'])}>{SYLLABLE_LANGUAGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></SettingField>}
         <SettingField label={t('segment.punctuation')}><Select value={options.punctuation} onChange={(event) => updateOption('punctuation', event.target.value as SegmentOptions['punctuation'])}><option value="merge">{t('segment.adjacent')}</option><option value="separate">{t('segment.separate')}</option></Select></SettingField>

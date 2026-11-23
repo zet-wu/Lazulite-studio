@@ -1,3 +1,4 @@
+import { splitReadingMora } from './ruby-editing';
 import { message, MessageError } from './messages';
 import { createProjectEditing, emptyBeatCount } from './project-editing';
 import { createWord, type LyricDocument, type LyricWord } from './lyric-document';
@@ -10,6 +11,7 @@ export const SYLLABLE_LANGUAGES = [
 export type SyllableLanguage = typeof SYLLABLE_LANGUAGES[number][0];
 export type SegmentOptions = {
   splitCjk: boolean;
+  japaneseMora: boolean;
   western: 'word' | 'syllable';
   language: SyllableLanguage;
   punctuation: 'merge' | 'separate';
@@ -19,7 +21,7 @@ export type SegmentOptions = {
   rules: Array<{ source: string; parts: string[] }>;
 };
 export const DEFAULT_SEGMENT_OPTIONS: SegmentOptions = {
-  splitCjk: true, western: 'word', language: 'en-us', punctuation: 'merge',
+  splitCjk: true, japaneseMora: false, western: 'word', language: 'en-us', punctuation: 'merge',
   whitespace: 'separate', punctuationWeight: 0.2, ignore: [], rules: [],
 };
 
@@ -68,6 +70,14 @@ function tokenizeRaw(text: string, options: SegmentOptions, divide?: (text: stri
     const remainder = text.slice(offset);
     const first = graphemes(remainder)[0];
     const category = isSpace(first) ? 'space' : isPunctuation(first) ? 'punctuation' : isCjk(first) ? 'cjk' : isWestern(first) ? 'western' : 'other';
+    if (category === 'cjk' && options.splitCjk && options.japaneseMora && /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u.test(first)) {
+      let run = first;
+      for (const part of graphemes(remainder.slice(first.length))) {
+        if (!/^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u.test(part) || protectedTerms.some(term => remainder.startsWith(term, run.length))) break;
+        run += part;
+      }
+      tokens.push(...splitReadingMora(run)); offset += run.length; continue;
+    }
     if (category === 'cjk' && options.splitCjk || category === 'punctuation' || category === 'other') {
       tokens.push(first); offset += first.length; continue;
     }

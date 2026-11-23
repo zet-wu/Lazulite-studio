@@ -867,6 +867,7 @@
   "edit.fromLine": "從第",
   "edit.lineUnit": "行",
   "edit.toLine": "到第",
+  "segment.japaneseMora": "按日語音拍合併小假名",
   "segment.cjk": "CJK 按字元切分",
   "segment.western": "西文處理",
   "segment.words": "按詞",

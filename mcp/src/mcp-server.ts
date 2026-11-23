@@ -1,3 +1,6 @@
+import { registerEditingTools } from './tools/editing';
+import { registerSublyricTools } from './tools/sublyrics';
+import { registerTimingTools } from './tools/timing';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { StudioClient } from './client';
 import { registerAlignmentTools } from './tools/alignment';
@@ -16,6 +19,9 @@ export function createToolRegistry(): ToolRegistry {
   registerLyricAcquisitionTools(registry);
   registerReadingTools(registry);
   registerAlignmentTools(registry);
+  registerEditingTools(registry);
+  registerSublyricTools(registry);
+  registerTimingTools(registry);
   return registry;
 }
 

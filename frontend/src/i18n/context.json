@@ -5635,6 +5635,12 @@
     "params": [],
     "parameterNotes": {}
   },
+  "segment.japaneseMora": {
+    "context": "自动分词开关：按日语音拍合并小假名；CJK 按字符切分关闭时禁用。",
+    "source": "按日语音拍合并小假名",
+    "params": [],
+    "parameterNotes": {}
+  },
   "segment.cjk": {
     "context": "segment interface: segment.cjk",
     "source": "CJK 按字符切分",

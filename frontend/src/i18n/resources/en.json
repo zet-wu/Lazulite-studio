@@ -871,6 +871,7 @@
   "edit.fromLine": "From line",
   "edit.lineUnit": "line",
   "edit.toLine": "To line",
+  "segment.japaneseMora": "Merge small kana by Japanese mora",
   "segment.cjk": "Split CJK by character",
   "segment.western": "Latin text",
   "segment.words": "By word",

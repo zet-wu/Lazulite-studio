@@ -2,7 +2,7 @@ import { message, MessageError } from './messages';
 import type { LyricWord, RubyUnit, TimeMs } from './lyric-document';
 
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-const smallKana = /^[ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ]$/u;
+const smallKana = /^[ぁぃぅぇぉゃゅょゎァィゥェォャュョヮヵヶ]$/u;
 const kana = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
 export const isKanaReading = (reading: string) => kana.test(reading.normalize('NFC'));
 export const readingWeight = (reading: string) => isKanaReading(reading) ? Math.max(1, splitReadingMora(reading).length) : 1;
