@@ -4,19 +4,19 @@ import { id, time, writeSchema, invalid, requireLine, requireWord, run } from '.
 import { commitSublyricTracks } from './sublyrics';
 import { mutateProjectDocument } from './cas';
 import { withOperationContext, type ToolRegistry } from './registry';
-const endpoints = { begin_ms: time.optional(), end_ms: time.optional() };
+const endpoints = () => ({ begin_ms: time().optional(), end_ms: time().optional() });
 const operation = z.discriminatedUnion('op', [
-  z.object({ op: z.literal('set_line_time'), line_id: id, ...endpoints }),
-  z.object({ op: z.literal('set_word_time'), line_id: id, word_id: id, ...endpoints }),
-  z.object({ op: z.literal('set_ruby_time'), line_id: id, word_id: id, ruby_id: id, ...endpoints }),
-  z.object({ op: z.literal('set_sublyric_unit_time'), kind: z.enum(['translation','romanization']), track_id: id, content_id: id, unit_id: id, ...endpoints }),
-  z.object({ op: z.literal('link_line_end'), line_id: id, target_line_id: id }),
-  z.object({ op: z.literal('unlink_line_end'), line_id: id }),
-  z.object({ op: z.literal('set_empty_beat'), target_kind: z.enum(['word','ruby']), target_id: id, count: z.number().int().min(0).max(32) }),
+  z.object({ op: z.literal('set_line_time'), line_id: id(), ...endpoints() }),
+  z.object({ op: z.literal('set_word_time'), line_id: id(), word_id: id(), ...endpoints() }),
+  z.object({ op: z.literal('set_ruby_time'), line_id: id(), word_id: id(), ruby_id: id(), ...endpoints() }),
+  z.object({ op: z.literal('set_sublyric_unit_time'), kind: z.enum(['translation','romanization']), track_id: id(), content_id: id(), unit_id: id(), ...endpoints() }),
+  z.object({ op: z.literal('link_line_end'), line_id: id(), target_line_id: id() }),
+  z.object({ op: z.literal('unlink_line_end'), line_id: id() }),
+  z.object({ op: z.literal('set_empty_beat'), target_kind: z.enum(['word','ruby']), target_id: id(), count: z.number().int().min(0).max(32) }),
 ]);
 export function registerTimingTools(registry: ToolRegistry) {
   registry.register({ name: 'edit_timing', description: 'Atomically edit nullable lyric timing endpoints, empty beats and line end links. Omitted endpoints remain unchanged. Word/ruby edits recompute parent envelopes by default using the same domain commands as the desktop editor.', annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
-    inputSchema: { ...writeSchema, recompute_envelopes: z.boolean().default(true), operations: z.array(operation).min(1) },
+    inputSchema: { ...writeSchema(), recompute_envelopes: z.boolean().default(true), operations: z.array(operation).min(1) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key }, (doc, envelope) => {
       let next = doc; const affected = new Set<string>();
       args.operations.forEach((op, index) => withOperationContext(op, index, envelope.revision, () => {

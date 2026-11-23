@@ -27,7 +27,7 @@ import { StudioHttpError } from '../client';
 import { mutateProjectDocument } from './cas';
 import { withOperationContext, type ToolRegistry } from './registry';
 
-const NonEmptyReadingSchema = z
+const nonEmptyReadingSchema = () => z
   .string()
   .min(1)
   .refine((value) => value.trim().length > 0, 'Reading string must not be whitespace-only.');
@@ -37,7 +37,7 @@ const SetWordOperationSchema = z.object({
   line_id: z.string().min(1).describe('Target line ID.'),
   word_id: z.string().min(1).describe('Target word ID within the line.'),
   readings: z
-    .array(NonEmptyReadingSchema)
+    .array(nonEmptyReadingSchema())
     .describe('Ruby unit readings for this word (e.g. ["きょう"] or ["あ","し","た"]), or [] to clear ruby units.'),
 });
 
@@ -49,7 +49,7 @@ const SplitAndSetWordOperationSchema = z.object({
     .array(
       z.object({
         text: z.string().min(1).describe('Surface text slice of the split word.'),
-        readings: z.array(NonEmptyReadingSchema).default([]).describe('Ruby units for this part ([] for none).'),
+        readings: z.array(nonEmptyReadingSchema()).default([]).describe('Ruby units for this part ([] for none).'),
       }),
     )
     .min(2)
@@ -64,7 +64,7 @@ const MergeWordsOperationSchema = z.object({
     .min(2)
     .describe('Consecutive compatible word IDs in the same line to merge into one word.'),
   readings: z
-    .array(NonEmptyReadingSchema)
+    .array(nonEmptyReadingSchema())
     .optional()
     .describe('Optional ruby units for the merged word. When omitted, existing ruby units from merged words are kept.'),
 });
@@ -74,7 +74,7 @@ const LineSpanSchema = z.object({
   base_end: z.number().int().min(1).describe('Exclusive end Unicode code-point offset in line text.'),
   base: z.string().min(1).optional().describe('Optional expected substring at [base_start, base_end) for verification.'),
   readings: z
-    .array(NonEmptyReadingSchema)
+    .array(nonEmptyReadingSchema())
     .describe('Ruby unit readings for this span (e.g. ["あした"] or ["あ","し","た"]), or [] to clear ruby units.'),
 });
 

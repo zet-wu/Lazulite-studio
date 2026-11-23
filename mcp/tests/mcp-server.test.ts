@@ -104,6 +104,30 @@ describe('MCP Server transports', () => {
       'get_audio_excerpt',
     ]);
 
+    for (const tool of tools.tools) {
+      expect(JSON.stringify(tool.inputSchema), tool.name).not.toContain('"$ref"');
+    }
+    const sublyrics = tools.tools.find(tool => tool.name === 'edit_sublyrics')!;
+    const schema = sublyrics.inputSchema as unknown as {
+      properties: { operations: { items: { anyOf: Array<{ properties: Record<string, { const?: string }>; required: string[] }> } } };
+    };
+    const requiredByOp = Object.fromEntries(schema.properties.operations.items.anyOf.map(branch => [branch.properties.op.const, branch.required]));
+    expect(requiredByOp).toEqual({
+      create_track: ['op', 'kind'],
+      update_track: ['op', 'kind'],
+      delete_track: ['op', 'kind'],
+      move_track: ['op', 'kind', 'after_track_id'],
+      insert_content: ['op', 'kind', 'content_kind', 'line_id'],
+      update_content: ['op', 'kind', 'content_id', 'content_kind'],
+      delete_content: ['op', 'kind', 'content_id'],
+      move_content: ['op', 'kind', 'content_id', 'line_id', 'after_content_id'],
+      update_unit: ['op', 'kind', 'content_id', 'unit_id'],
+      insert_unit: ['op', 'kind', 'content_id', 'text', 'after_unit_id'],
+      delete_unit: ['op', 'kind', 'content_id', 'unit_id'],
+      split_unit: ['op', 'kind', 'content_id', 'unit_id', 'at'],
+      move_unit: ['op', 'kind', 'content_id', 'unit_id', 'after_unit_id'],
+    });
+
     const result = await client.callTool({ name: 'get_lyrics', arguments: { project_id: 'p1' } });
     expect(result.isError).toBeFalsy();
     const content = result.content as Array<{ type: string; text: string }>;

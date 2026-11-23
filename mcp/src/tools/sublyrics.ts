@@ -9,25 +9,25 @@ import { mutateProjectDocument } from './cas';
 import { id, time, writeSchema, invalid, reference, remember, run } from './editing';
 import { withOperationContext, type ToolRegistry } from './registry';
 
-const kind = z.enum(['translation', 'romanization']);
-const unit = z.object({ text: id, begin_ms: time.optional(), end_ms: time.optional(), client_ref: id.optional() });
-const content = { content_kind: z.enum(['plain', 'timed']), text: z.string().optional(), units: z.array(unit).optional() };
-const trackTarget = { kind, track_id: id.optional(), track_ref: id.optional() };
-const contentTarget = { ...trackTarget, content_id: id };
+const kind = () => z.enum(['translation', 'romanization']);
+const unit = () => z.object({ text: id(), begin_ms: time().optional(), end_ms: time().optional(), client_ref: id().optional() });
+const content = () => ({ content_kind: z.enum(['plain', 'timed']), text: z.string().optional(), units: z.array(unit()).optional() });
+const trackTarget = () => ({ kind: kind(), track_id: id().optional(), track_ref: id().optional() });
+const contentTarget = () => ({ ...trackTarget(), content_id: id() });
 const operations = z.discriminatedUnion('op', [
-  z.object({ op: z.literal('create_track'), kind, language: z.string().nullable().default(null), purpose: z.enum(['subtitle','replacement']).default('subtitle'), client_ref: id.optional() }),
-  z.object({ op: z.literal('update_track'), ...trackTarget, language: z.string().nullable().optional(), purpose: z.enum(['subtitle','replacement']).optional() }),
-  z.object({ op: z.literal('delete_track'), ...trackTarget }),
-  z.object({ op: z.literal('move_track'), ...trackTarget, after_track_id: id.nullable() }),
-  z.object({ op: z.literal('insert_content'), ...trackTarget, ...content, line_id: id, after_content_id: id.nullable().optional(), client_ref: id.optional() }),
-  z.object({ op: z.literal('update_content'), ...contentTarget, ...content }),
-  z.object({ op: z.literal('delete_content'), ...contentTarget }),
-  z.object({ op: z.literal('move_content'), ...contentTarget, line_id: id, to_track_id: id.optional(), after_content_id: id.nullable() }),
-  z.object({ op: z.literal('update_unit'), ...contentTarget, unit_id: id, text: id.optional(), begin_ms: time.optional(), end_ms: time.optional() }),
-  z.object({ op: z.literal('insert_unit'), ...contentTarget, ...unit.shape, after_unit_id: id.nullable() }),
-  z.object({ op: z.literal('delete_unit'), ...contentTarget, unit_id: id }),
-  z.object({ op: z.literal('split_unit'), ...contentTarget, unit_id: id, at: z.number().int().positive(), client_ref: id.optional() }),
-  z.object({ op: z.literal('move_unit'), ...contentTarget, unit_id: id, after_unit_id: id.nullable() }),
+  z.object({ op: z.literal('create_track'), kind: kind(), language: z.string().nullable().default(null), purpose: z.enum(['subtitle','replacement']).default('subtitle'), client_ref: id().optional() }),
+  z.object({ op: z.literal('update_track'), ...trackTarget(), language: z.string().nullable().optional(), purpose: z.enum(['subtitle','replacement']).optional() }),
+  z.object({ op: z.literal('delete_track'), ...trackTarget() }),
+  z.object({ op: z.literal('move_track'), ...trackTarget(), after_track_id: id().nullable() }),
+  z.object({ op: z.literal('insert_content'), ...trackTarget(), ...content(), line_id: id(), after_content_id: id().nullable().optional(), client_ref: id().optional() }),
+  z.object({ op: z.literal('update_content'), ...contentTarget(), ...content() }),
+  z.object({ op: z.literal('delete_content'), ...contentTarget() }),
+  z.object({ op: z.literal('move_content'), ...contentTarget(), line_id: id(), to_track_id: id().optional(), after_content_id: id().nullable() }),
+  z.object({ op: z.literal('update_unit'), ...contentTarget(), unit_id: id(), text: id().optional(), begin_ms: time().optional(), end_ms: time().optional() }),
+  z.object({ op: z.literal('insert_unit'), ...contentTarget(), ...unit().shape, after_unit_id: id().nullable() }),
+  z.object({ op: z.literal('delete_unit'), ...contentTarget(), unit_id: id() }),
+  z.object({ op: z.literal('split_unit'), ...contentTarget(), unit_id: id(), at: z.number().int().positive(), client_ref: id().optional() }),
+  z.object({ op: z.literal('move_unit'), ...contentTarget(), unit_id: id(), after_unit_id: id().nullable() }),
 ]);
 
 export function commitSublyricTracks(doc: ProjectDocument, kind: 'translation' | 'romanization', tracks: Array<TranslationTrack | RomanizationTrack>): ProjectDocument {
@@ -41,7 +41,7 @@ export function commitSublyricTracks(doc: ProjectDocument, kind: 'translation' |
 function position<T extends { id: string }>(items: T[], after: string | null) { if (after === null) return 0; const index = items.findIndex(item => item.id === after); if (index < 0) invalid(`Insertion anchor "${after}" does not exist.`); return index + 1; }
 export function registerSublyricTools(registry: ToolRegistry) {
   registry.register({ name: 'get_sublyrics', description: 'Read translation/romanization tracks with stable content and unit IDs; paginate by lyric display lines.', annotations: { readOnlyHint: true, idempotentHint: true },
-    inputSchema: { project_id: id, kind: z.enum(['translation','romanization','all']).default('all'), track_ids: z.array(id).min(1).optional(), line_ids: z.array(id).min(1).optional(), detail: z.enum(['summary','full']).default('full'), start_line: z.number().int().positive().default(1), limit: z.number().int().positive().max(200).default(50) },
+    inputSchema: { project_id: id(), kind: z.enum(['translation','romanization','all']).default('all'), track_ids: z.array(id()).min(1).optional(), line_ids: z.array(id()).min(1).optional(), detail: z.enum(['summary','full']).default('full'), start_line: z.number().int().positive().default(1), limit: z.number().int().positive().max(200).default(50) },
     execute: async (args, { client }) => {
       const envelope = await client.getDocumentEnvelope(args.project_id), doc = parseProject(envelope.document), ordered = displayLines(doc.lyrics, doc.lineOrder);
       if (args.line_ids?.some(value => !ordered.some(line => line.id === value))) invalid('A requested line does not exist.');
@@ -52,8 +52,8 @@ export function registerSublyricTools(registry: ToolRegistry) {
       return { revision: envelope.revision, total_lines: ordered.length, returned_lines: selected.length, tracks };
     },
   });
-  registry.register({ name: 'edit_sublyrics', description: 'Atomically manage translation/romanization tracks, contents and timed units. content_kind explicitly selects plain/timed; use earlier client_ref values as IDs. Unspecified time endpoints keep their values; null clears them.', annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
-    inputSchema: { ...writeSchema, operations: z.array(operations).min(1) },
+  registry.register({ name: 'edit_sublyrics', description: 'Atomically manage translation/romanization tracks, contents and timed units. Operations: create/update/delete/move_track, insert/update/delete/move_content, update/insert/delete/split/move_unit. kind selects translation/romanization; content_kind selects plain/timed. client_ref names a new object; track_ref targets a track created earlier in this batch. Example operations=[{"op":"create_track","kind":"translation","client_ref":"t"},{"op":"insert_content","kind":"translation","track_ref":"t","content_kind":"plain","line_id":"L","text":"译文"}]. Timed edit: {"op":"update_unit","kind":"romanization","track_id":"T","content_id":"C","unit_id":"U","text":"uta","begin_ms":100}. IDs may reference earlier client_ref values. Unspecified time endpoints keep their values; null clears them.', annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    inputSchema: { ...writeSchema(), operations: z.array(operations).min(1) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key }, (doc, envelope) => {
       let next = doc; const refs: Record<string, string> = Object.create(null), affectedTracks = new Set<string>(), affectedContents = new Set<string>();
       const resolve = (value: string) => reference(refs, value), anchor = (value: string | null) => value === null ? null : resolve(value);

@@ -12,9 +12,9 @@ import { applySplitAndSetWord } from './reading';
 import { id, time, writeSchema, invalid, run } from './editing';
 import type { ToolRegistry } from './registry';
 
-const transformSchema = { ...writeSchema, dry_run: z.boolean().default(true) };
-const scopeSchema = z.object({ all: z.boolean().optional(), line_ids: z.array(id).min(1).optional(), word_ids: z.array(id).min(1).optional(), include_background: z.boolean().default(true) });
-type Scope = z.infer<typeof scopeSchema>;
+const transformSchema = () => ({ ...writeSchema(), dry_run: z.boolean().default(true) });
+const scopeSchema = () => z.object({ all: z.boolean().optional(), line_ids: z.array(id()).min(1).optional(), word_ids: z.array(id()).min(1).optional(), include_background: z.boolean().default(true) });
+type Scope = z.infer<ReturnType<typeof scopeSchema>>;
 function select(doc: ProjectDocument, scope: Scope) {
   if (!scope.all && !scope.line_ids && !scope.word_ids) invalid('Scope requires all=true, line_ids, or word_ids.');
   if (scope.all && (scope.line_ids || scope.word_ids)) invalid('Scope all cannot be combined with ID filters.');
@@ -22,7 +22,7 @@ function select(doc: ProjectDocument, scope: Scope) {
   if (scope.word_ids?.some(id => !doc.lyrics.lines.some(l => l.words.some(w => w.id === id)))) invalid('A scope word does not exist.');
   return doc.lyrics.lines.filter(line => scope.include_background || !line.backgroundOf).flatMap(line => line.words.filter(word => scope.all || (!scope.line_ids || scope.line_ids.includes(line.id)) && (!scope.word_ids || scope.word_ids.includes(word.id))).map(word => ({ line, word })));
 }
-const optionsSchema = z.object({ split_cjk: z.boolean().optional(), japanese_mora: z.boolean().optional(), western: z.enum(['word','syllable']).optional(), language: z.enum(['en-us','de','fr','es','id','it','pt','ru']).optional(), punctuation: z.enum(['merge','separate']).optional(), whitespace: z.enum(['separate','previous','next']).optional(), punctuation_weight: z.number().nonnegative().optional(), ignore: z.array(z.string()).optional(), rules: z.array(z.object({ source: id, parts: z.array(id).min(2) })).optional() });
+const optionsSchema = () => z.object({ split_cjk: z.boolean().optional(), japanese_mora: z.boolean().optional(), western: z.enum(['word','syllable']).optional(), language: z.enum(['en-us','de','fr','es','id','it','pt','ru']).optional(), punctuation: z.enum(['merge','separate']).optional(), whitespace: z.enum(['separate','previous','next']).optional(), punctuation_weight: z.number().nonnegative().optional(), ignore: z.array(z.string()).optional(), rules: z.array(z.object({ source: id(), parts: z.array(id()).min(2) })).optional() });
 const annotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false };
 
 function batchAffectedLines(before: ProjectDocument, after: ProjectDocument): string[] {
@@ -45,7 +45,7 @@ function batchAffectedLines(before: ProjectDocument, after: ProjectDocument): st
 
 export function registerTransformTools(registry: ToolRegistry) {
   registry.register({ name: 'segment_lyrics', description: 'Preview/apply shared desktop word segmentation or ruby mora splits. dry_run defaults to true. Existing ruby is blocked unless allow_overwrite_ruby=true. Scope is explicit; summary omits per-word previews.', annotations,
-    inputSchema: { ...transformSchema, target: z.enum(['words','ruby']), scope: scopeSchema, options: optionsSchema.default({}), allow_overwrite_ruby: z.boolean().default(false), detail: z.enum(['summary','full']).default('full') },
+    inputSchema: { ...transformSchema(), target: z.enum(['words','ruby']), scope: scopeSchema(), options: optionsSchema().default({}), allow_overwrite_ruby: z.boolean().default(false), detail: z.enum(['summary','full']).default('full') },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key, dryRun: args.dry_run }, async (doc, envelope) => {
       const options: SegmentOptions = {
         splitCjk: args.options.split_cjk ?? DEFAULT_SEGMENT_OPTIONS.splitCjk,
@@ -87,8 +87,8 @@ export function registerTransformTools(registry: ToolRegistry) {
       return { nextDoc: next, summary: { dry_run: args.dry_run, revision: envelope.revision, changed_count: changed, blocked_count: blocked, skipped_count: skipped, ...(args.detail === 'full' ? { preview } : {}) } };
     }),
   });
-  registry.register({ name: 'generate_romanization', description: 'Preview/apply Japanese romanization using shared desktop generation, optional backend particle normalization, and explicit per-line conflict decisions. Defaults to dry_run=true and skip existing content.', annotations,
-    inputSchema: { ...transformSchema, line_ids: z.array(id).min(1).optional(), include_background: z.boolean().default(true), kind: z.enum(['plain','timed']).default('timed'), convert_particles: z.boolean().default(true), target_track_id: id.optional(), language: z.string().default('ja-Latn'), default_conflict_policy: z.enum(['skip','append','replace']).default('skip'), line_decisions: z.array(z.object({ line_id: id, action: z.enum(['skip','append','replace']), replace_content_id: id.optional(), override_text: z.string().optional(), override_units: z.array(z.object({ text: id, begin_ms: time.optional(), end_ms: time.optional() })).optional() })).default([]) },
+  registry.register({ name: 'generate_romanization', description: 'Preview/apply Japanese romanization using shared desktop generation, optional backend particle normalization, and explicit per-line conflict decisions. Defaults to dry_run=true and skip existing content. Review proposals, then supply line_decisions.override_units (timed) or override_text (plain); reread unit IDs after replacement.', annotations,
+    inputSchema: { ...transformSchema(), line_ids: z.array(id()).min(1).optional(), include_background: z.boolean().default(true), kind: z.enum(['plain','timed']).default('timed'), convert_particles: z.boolean().default(true), target_track_id: id().optional(), language: z.string().default('ja-Latn'), default_conflict_policy: z.enum(['skip','append','replace']).default('skip'), line_decisions: z.array(z.object({ line_id: id(), action: z.enum(['skip','append','replace']), replace_content_id: id().optional(), override_text: z.string().optional(), override_units: z.array(z.object({ text: id(), begin_ms: time().optional(), end_ms: time().optional() })).optional() })).default([]) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key, dryRun: args.dry_run }, async (doc, envelope) => {
       if (args.line_ids?.some(id => !doc.lyrics.lines.some(l => l.id === id))) invalid('A requested line does not exist.');
       const lines = doc.lyrics.lines.filter(line => (!args.line_ids || args.line_ids.includes(line.id)) && (args.include_background || !line.backgroundOf));
@@ -120,8 +120,8 @@ export function registerTransformTools(registry: ToolRegistry) {
       return { nextDoc: next, summary: { dry_run: args.dry_run, revision: envelope.revision, changed_count: active.length, proposals: rows, conflicts, hints: rows.flatMap(row => row.kind === 'plain' ? row.hint ? [{ line_id: row.lineId, hint: row.hint }] : [] : row.groups.filter(u => u.hint).map(u => ({ line_id: row.lineId, unit_key: u.key, hint: u.hint }))) } };
     }),
   });
-  registry.register({ name: 'generate_ruby_from_romanization', description: 'Preview/apply reverse ruby generation with shared candidate matching and target/reading/overwrite/link/kana-difference issues. Resolve blocking issues through assignments/readings/skip_keys/overwrite_word_ids before applying.', annotations,
-    inputSchema: { ...transformSchema, track_id: id, content_ids: z.array(id).min(1).optional(), output: z.enum(['roman','hiragana','katakana']).default('hiragana'), assignments: z.record(id.nullable()).default({}), readings: z.record(z.string()).default({}), skip_keys: z.array(id).default([]), overwrite_word_ids: z.array(id).default([]) },
+  registry.register({ name: 'generate_ruby_from_romanization', description: 'Preview/apply reverse ruby generation with shared candidate matching and target/reading/overwrite/link/kana-difference issues. Resolve blocking issues through assignments/readings/skip_keys/overwrite_word_ids before applying. Review dry_run candidates, then pass readings and assignments keyed by candidate row key.', annotations,
+    inputSchema: { ...transformSchema(), track_id: id(), content_ids: z.array(id()).min(1).optional(), output: z.enum(['roman','hiragana','katakana']).default('hiragana'), assignments: z.record(id().nullable()).default({}), readings: z.record(z.string()).default({}), skip_keys: z.array(id()).default([]), overwrite_word_ids: z.array(id()).default([]) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key, dryRun: args.dry_run }, (doc, envelope) => {
       const track = doc.lyrics.romanizationTracks.find(t => t.id === args.track_id) ?? invalid('Source romanization track does not exist.');
       const rows = proposeRuby(rubySourceRows(doc.lyrics, track.id, args.content_ids ?? track.contents.map(c => c.id)), args.output, args.assignments);
@@ -137,10 +137,10 @@ export function registerTransformTools(registry: ToolRegistry) {
     }),
   });
   registry.register({ name: 'batch_edit_lyrics', description: 'Preview/apply shared desktop batch replacement, ruby clearing, time shift/smoothing/sync and explicit end links. dry_run defaults to true. Time operations use selected lines; partial word scope is rejected for them.', annotations,
-    inputSchema: { ...transformSchema, scope: scopeSchema, action: z.discriminatedUnion('type', [
-      z.object({ type: z.literal('replace'), kind: z.enum(['words','ruby']), search: id, replacement: z.string(), ignore_case: z.boolean().default(false) }),
+    inputSchema: { ...transformSchema(), scope: scopeSchema(), action: z.discriminatedUnion('type', [
+      z.object({ type: z.literal('replace'), kind: z.enum(['words','ruby']), search: id(), replacement: z.string(), ignore_case: z.boolean().default(false) }),
       z.object({ type: z.literal('clear_ruby') }), z.object({ type: z.literal('shift'), delta_ms: z.number().int() }), z.object({ type: z.literal('smooth'), threshold_ms: z.number().int().nonnegative() }), z.object({ type: z.literal('sync') }),
-      z.object({ type: z.literal('link_ends'), pairs: z.array(z.object({ line_id: id, target_line_id: id })).min(1) }), z.object({ type: z.literal('unlink_ends'), line_ids: z.array(id).min(1) }),
+      z.object({ type: z.literal('link_ends'), pairs: z.array(z.object({ line_id: id(), target_line_id: id() })).min(1) }), z.object({ type: z.literal('unlink_ends'), line_ids: z.array(id()).min(1) }),
     ]) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key, dryRun: args.dry_run }, (doc, envelope) => {
       const targets = select(doc, args.scope), wordIds = targets.map(t => t.word.id);

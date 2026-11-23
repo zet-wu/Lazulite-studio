@@ -15,10 +15,10 @@ export function registerAudioJobTools(registry: ToolRegistry) {
     inputSchema: { refresh: z.boolean().default(false) }, execute: async ({ refresh }, { client }) => client.json(`/vocal-models?refresh=${refresh}`),
   });
   registry.register({ name: 'list_vocal_results', description: 'List project vocal results including source binding and current/missing audio state.', annotations: read,
-    inputSchema: { project_id: id }, execute: async ({ project_id }, { client }) => client.json(`${projectPath(project_id)}/vocals`),
+    inputSchema: { project_id: id() }, execute: async ({ project_id }, { client }) => client.json(`${projectPath(project_id)}/vocals`),
   });
   registry.register({ name: 'start_vocal_separation', description: 'Start independent vocal separation using the configured desktop model. Reuses existing audio unless force_separation=true. Returns a background job immediately; a busy queue is retryable.', annotations: write,
-    inputSchema: { project_id: id, force_separation: z.boolean().default(false), idempotency_key: id.optional() },
+    inputSchema: { project_id: id(), force_separation: z.boolean().default(false), idempotency_key: id().optional() },
     execute: async ({ project_id, force_separation, idempotency_key }, { client }) => {
       const project = await client.getProject(project_id); if (!project.asset) invalid('Upload source audio before separating vocals.');
       try { return jobSummary(await client.json<StudioJob>(`${projectPath(project_id)}/jobs/vocal`, post({ params: { asset_id: project.asset.id, force_separation } }, idempotency_key))); }
@@ -26,18 +26,18 @@ export function registerAudioJobTools(registry: ToolRegistry) {
     },
   });
   registry.register({ name: 'list_jobs', description: 'List project background jobs, optionally filtered by kind/status. limit bounds the backend history fetched before filtering.', annotations: read,
-    inputSchema: { project_id: id, limit: z.number().int().positive().max(100).default(50), kind: z.enum(['vocal','alignment']).optional(), status: z.enum(['queued','running','cancel_requested','succeeded','failed','cancelled','interrupted']).optional() },
+    inputSchema: { project_id: id(), limit: z.number().int().positive().max(100).default(50), kind: z.enum(['vocal','alignment']).optional(), status: z.enum(['queued','running','cancel_requested','succeeded','failed','cancelled','interrupted']).optional() },
     execute: async ({ project_id, limit, kind, status }, { client }) => ({ items: (await client.listJobs(project_id, limit)).items.filter(job => (!kind || job.kind === kind) && (!status || job.status === status)).map(jobSummary) }),
   });
   registry.register({ name: 'retry_job_cpu', description: 'Retry a failed CPU-retryable job against its bound project revision and source. revision is required; the backend validates it atomically before creating the retry.', annotations: write,
-    inputSchema: { job_id: id, revision: id, idempotency_key: id.optional() },
+    inputSchema: { job_id: id(), revision: id(), idempotency_key: id().optional() },
     execute: async ({ job_id, revision, idempotency_key }, { client }) => jobSummary(await client.json<StudioJob>(`/jobs/${encodeURIComponent(job_id)}/retry-cpu`, post({ revision }, idempotency_key))),
   });
   registry.register({ name: 'acknowledge_job', description: 'Explicitly mark a completed job result as applied or dismissed for desktop recovery/notification state.', annotations: write,
-    inputSchema: { job_id: id, state: z.enum(['applied','dismissed']) }, execute: async ({ job_id, state }, { client }) => jobSummary(await client.acknowledgeJob(job_id, state)),
+    inputSchema: { job_id: id(), state: z.enum(['applied','dismissed']) }, execute: async ({ job_id, state }, { client }) => jobSummary(await client.acknowledgeJob(job_id, state)),
   });
   registry.register({ name: 'get_acoustics', description: 'Read saved vocal acoustic segments, silent gaps, and optionally bounded downsampled energy. Gaps indicate model segmentation and need listening review.', annotations: read,
-    inputSchema: { project_id: id, start_ms: z.number().int().nonnegative().optional(), end_ms: z.number().int().positive().optional(), include_energy: z.boolean().default(false), vocal_result_id: id.optional(), energy_buckets: z.number().int().positive().max(500).default(100) },
+    inputSchema: { project_id: id(), start_ms: z.number().int().nonnegative().optional(), end_ms: z.number().int().positive().optional(), include_energy: z.boolean().default(false), vocal_result_id: id().optional(), energy_buckets: z.number().int().positive().max(500).default(100) },
     execute: async (args, { client }) => {
       const [envelope, project] = await Promise.all([client.getDocumentEnvelope(args.project_id), client.getProject(args.project_id)]), doc = parseProject(envelope.document);
       const duration = project.asset?.source_duration_ms ?? project.asset?.duration_ms ?? null;
@@ -57,7 +57,7 @@ export function registerAudioJobTools(registry: ToolRegistry) {
     },
   });
   registry.register({ name: 'get_audio_excerpt', description: 'Return a short listening window as metadata text plus MCP audio (16kHz mono PCM WAV). Supply start_ms/end_ms or line_id with optional padding. Line windows clamp to duration and 30 seconds; explicit windows must be valid. Default source=vocal; choose original explicitly if no separated vocal is available.', annotations: read,
-    inputSchema: { project_id: id, start_ms: z.number().int().nonnegative().optional(), end_ms: z.number().int().positive().optional(), line_id: id.optional(), padding_ms: z.number().int().nonnegative().max(30000).default(500), source: z.enum(['original','vocal']).default('vocal'), vocal_result_id: id.optional() },
+    inputSchema: { project_id: id(), start_ms: z.number().int().nonnegative().optional(), end_ms: z.number().int().positive().optional(), line_id: id().optional(), padding_ms: z.number().int().nonnegative().max(30000).default(500), source: z.enum(['original','vocal']).default('vocal'), vocal_result_id: id().optional() },
     execute: async (args, { client }) => {
       if (args.line_id && (args.start_ms !== undefined || args.end_ms !== undefined) || !args.line_id && (args.start_ms === undefined || args.end_ms === undefined)) invalid('Provide either line_id or both start_ms and end_ms.');
       if (args.source === 'original' && args.vocal_result_id) invalid('vocal_result_id requires source=vocal.');

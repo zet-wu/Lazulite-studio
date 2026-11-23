@@ -6,36 +6,36 @@ import { StudioHttpError } from '../client';
 import { mutateProjectDocument } from './cas';
 import { withOperationContext, type ToolRegistry } from './registry';
 
-export const id = z.string().min(1);
-export const time = z.number().int().nonnegative().nullable();
-export const writeSchema = { project_id: id, expected_revision: id.optional(), idempotency_key: id.optional() };
+export const id = () => z.string().min(1);
+export const time = () => z.number().int().nonnegative().nullable();
+export const writeSchema = () => ({ project_id: id(), expected_revision: id().optional(), idempotency_key: id().optional() });
 export function invalid(message: string): never { throw new StudioHttpError(422, { code: 'invalid_edit', message, retryable: false }); }
 export function requireLine(doc: ProjectDocument, lineId: string): LyricLine { return doc.lyrics.lines.find(line => line.id === lineId) ?? invalid(`Line "${lineId}" does not exist.`); }
 export function requireWord(doc: ProjectDocument, lineId: string, wordId: string) { return requireLine(doc, lineId).words.find(word => word.id === wordId) ?? invalid(`Word "${wordId}" does not exist in line "${lineId}".`); }
 export function run(doc: ProjectDocument, command: LyricCommand): ProjectDocument { return executeProjectCommand(createProjectEditorState(doc), { type: 'lyrics', command }).present; }
 export function reference(refs: Record<string, string>, value: string): string { return Object.hasOwn(refs, value) ? refs[value] : value; }
 export function remember(refs: Record<string, string>, key: string | undefined, value: string) { if (!key) return; if (Object.hasOwn(refs, key)) invalid(`Duplicate client_ref "${key}".`); refs[key] = value; }
-const lineWord = { line_id: id, word_id: id };
+const lineWord = () => ({ line_id: id(), word_id: id() });
 const op = z.discriminatedUnion('op', [
-  z.object({ op: z.literal('edit_word'), ...lineWord, text: id }),
-  z.object({ op: z.literal('insert_word'), line_id: id, after_word_id: id.nullable(), text: id, begin_ms: time.optional(), end_ms: time.optional(), client_ref: id.optional() }),
-  z.object({ op: z.literal('delete_word'), ...lineWord }),
-  z.object({ op: z.literal('split_word'), ...lineWord, at: z.number().int().positive(), client_ref: id.optional() }),
-  z.object({ op: z.literal('merge_words'), line_id: id, word_ids: z.array(id).min(2) }),
-  z.object({ op: z.literal('move_word'), ...lineWord, to_line_id: id, after_word_id: id.nullable() }),
-  z.object({ op: z.literal('insert_line'), after_line_id: id.nullable(), text: z.string().default(''), background_of: id.nullable().optional(), client_ref: id.optional() }),
-  z.object({ op: z.literal('delete_line'), line_id: id }),
-  z.object({ op: z.literal('move_line'), line_id: id, after_line_id: id.nullable() }),
-  z.object({ op: z.literal('split_line'), line_id: id, before_word_id: id, client_ref: id.optional(),
+  z.object({ op: z.literal('edit_word'), ...lineWord(), text: id() }),
+  z.object({ op: z.literal('insert_word'), line_id: id(), after_word_id: id().nullable(), text: id(), begin_ms: time().optional(), end_ms: time().optional(), client_ref: id().optional() }),
+  z.object({ op: z.literal('delete_word'), ...lineWord() }),
+  z.object({ op: z.literal('split_word'), ...lineWord(), at: z.number().int().positive(), client_ref: id().optional() }),
+  z.object({ op: z.literal('merge_words'), line_id: id(), word_ids: z.array(id()).min(2) }),
+  z.object({ op: z.literal('move_word'), ...lineWord(), to_line_id: id(), after_word_id: id().nullable() }),
+  z.object({ op: z.literal('insert_line'), after_line_id: id().nullable(), text: z.string().default(''), background_of: id().nullable().optional(), client_ref: id().optional() }),
+  z.object({ op: z.literal('delete_line'), line_id: id() }),
+  z.object({ op: z.literal('move_line'), line_id: id(), after_line_id: id().nullable() }),
+  z.object({ op: z.literal('split_line'), line_id: id(), before_word_id: id(), client_ref: id().optional(),
     content_targets: z.record(z.number().int().min(0).max(1)).optional(), translation_targets: z.record(z.number().int().min(0).max(1)).optional(), background_targets: z.record(z.number().int().min(0).max(1)).optional() }),
-  z.object({ op: z.literal('merge_lines'), line_ids: z.array(id).min(2) }),
-  z.object({ op: z.literal('set_background_of'), line_id: id, parent_line_id: id.nullable() }),
-  z.object({ op: z.literal('set_line_flags'), line_id: id, song_part: z.string().nullable().optional(), skip_alignment: z.boolean().optional(), skip_sync: z.boolean().optional() }),
+  z.object({ op: z.literal('merge_lines'), line_ids: z.array(id()).min(2) }),
+  z.object({ op: z.literal('set_background_of'), line_id: id(), parent_line_id: id().nullable() }),
+  z.object({ op: z.literal('set_line_flags'), line_id: id(), song_part: z.string().nullable().optional(), skip_alignment: z.boolean().optional(), skip_sync: z.boolean().optional() }),
 ]);
 
 export function registerEditingTools(registry: ToolRegistry) {
-  registry.register({ name: 'edit_lyrics', description: 'Atomically edit local lyric words and line structure with shared desktop domain commands. IDs may reference earlier client_ref values. split_line keeps attached contents/backgrounds on the first segment by default; explicit *_targets select segment 0 or 1.', annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
-    inputSchema: { ...writeSchema, operations: z.array(op).min(1) },
+  registry.register({ name: 'edit_lyrics', description: 'Atomically edit local lyric words and line structure with shared desktop domain commands. Operations: edit/insert/delete/split/merge/move words or lines, set_background_of, set_line_flags. Example: operations=[{"op":"edit_word","line_id":"L","word_id":"W","text":"歌"}]. IDs may reference earlier client_ref values. split_line keeps attached contents/backgrounds on the first segment by default; explicit *_targets select segment 0 or 1.', annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    inputSchema: { ...writeSchema(), operations: z.array(op).min(1) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key }, (doc, envelope) => {
       let next = doc;
       const refs: Record<string, string> = Object.create(null), affected = new Set<string>();
