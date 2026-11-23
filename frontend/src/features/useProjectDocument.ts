@@ -78,6 +78,7 @@ export function useProjectDocument(
     base: string;
     snapshot: ProjectSnapshot;
   } | null>(null);
+  const mountedRef = useRef(true);
   const recoveryQueue = useRef<Promise<void>>(Promise.resolve());
   const checkpointSerial = useRef(0);
   const checkpointTimer = useRef<number | null>(null);
@@ -114,21 +115,20 @@ export function useProjectDocument(
     const entry = pendingCheckpoint.current;
     pendingCheckpoint.current = null;
     if (entry && !deletedRef.current) {
-      void writeCheckpoint(entry.project, entry.baseRevision, entry.sourceAssetId).catch(() =>
-        setError(message('save.checkpointFailed')),
-      );
+      void writeCheckpoint(entry.project, entry.baseRevision, entry.sourceAssetId).catch(() => {
+        if (mountedRef.current) setError(message('save.checkpointFailed'));
+      });
     }
   }, [writeCheckpoint]);
   useEffect(() => {
+    mountedRef.current = true;
     window.addEventListener('pagehide', flushCheckpoint);
     window.addEventListener('beforeunload', flushCheckpoint);
     return () => {
+      mountedRef.current = false;
       window.removeEventListener('pagehide', flushCheckpoint);
       window.removeEventListener('beforeunload', flushCheckpoint);
-      if (checkpointTimer.current !== null) {
-        clearTimeout(checkpointTimer.current);
-        checkpointTimer.current = null;
-      }
+      flushCheckpoint();
     };
   }, [flushCheckpoint]);
   const checkpoint = useCallback(

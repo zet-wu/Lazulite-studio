@@ -102,7 +102,40 @@ describe("useProjectDocument save lifecycle", () => {
     expect(result.current.canUndo).toBe(false);
   });
 
+  it("flushes pending checkpoint immediately on unmount before debounce expires", async () => {
+    const { result, unmount } = renderHook(hook, { wrapper: StrictMode });
+    act(() => {
+      result.current.apply({
+        type: "edit-word",
+        lineId: "a",
+        wordId: "a:word:0",
+        text: "B1",
+      });
+    });
+    act(() => {
+      result.current.apply({
+        type: "edit-word",
+        lineId: "a",
+        wordId: "a:word:0",
+        text: "B2",
+      });
+    });
+    act(() => {
+      result.current.undo();
+    });
+    expect(recovery.save).not.toHaveBeenCalled();
 
+    unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(recovery.save).toHaveBeenCalledTimes(1);
+    const saved = recovery.save.mock.calls[0];
+    expect(saved[0]).toBe("p");
+    expect(saved[1].lyrics.lines[0].words[0].text).toBe("B1");
+    expect(saved[2]).toBe("r1");
+  });
 });
 
 it('packaging returns the captured revision while later edits remain dirty', async () => {
