@@ -18,7 +18,7 @@ PREFERENCE_KEYS = {
     'lazulite-editor-columns', 'studio.playback-rate',
     'studio:sync-mode', 'studio:sync-offset',
     'studio:timeline-layers', 'studio:staging-ignored-characters',
-    'studio:timeline-swap-wheel', 'studio:timeline-auto-expand', 'studio:spectrum-height',
+    'studio:timeline-swap-wheel', 'studio:timeline-swap-boundary-drag', 'studio:timeline-auto-expand', 'studio:spectrum-height',
     'studio:reading-dictionary', 'studio:ui-language',
 }
 PROJECT_KEY = re.compile(r'^(?:lazulite-romanization-mode|studio:sync-offset|studio:download|studio:packaging|studio:workspace-mode):project:([a-zA-Z0-9_-]+)$')
@@ -60,7 +60,7 @@ class RuntimeSettings:
             for key, value in changes.items():
                 if not allowed_key(key): raise ValueError('不支持的偏好字段')
                 if value is not None and (not isinstance(value, str) or len(value) > 16384): raise ValueError('偏好值无效')
-                if value is not None and key in {'studio:background-skip-alignment', 'studio:background-skip-sync', 'studio:convert-particles', 'studio:preview-translation', 'studio:preview-romanization', 'studio:preview-hide', 'studio:timeline-swap-wheel'} and value not in {'true', 'false'}:
+                if value is not None and key in {'studio:background-skip-alignment', 'studio:background-skip-sync', 'studio:convert-particles', 'studio:preview-translation', 'studio:preview-romanization', 'studio:preview-hide', 'studio:timeline-swap-wheel', 'studio:timeline-swap-boundary-drag'} and value not in {'true', 'false'}:
                     raise ValueError('设置值必须为布尔值')
                 if value is not None and key == 'studio:preview-fade' and not 0.05 <= float(value) <= 1.5:
                     raise ValueError('渐变宽度必须在 0.05 到 1.5 之间')

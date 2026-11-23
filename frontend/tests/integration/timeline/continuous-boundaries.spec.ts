@@ -1,0 +1,45 @@
+import { expect, test } from '@playwright/test';
+import { importLyrics } from '../../fixtures/import-lyrics';
+import { continuousBoundariesTtml } from '../../fixtures/continuous-boundaries';
+
+test('linked boundaries, untimed pasted ruby and swapped drag preference survive actual save and reopen', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const pid = 'background-playback';
+  await page.goto(`/projects/${pid}/edit`);
+  await importLyrics(page, { name: 'continuous.ttml', mimeType: 'application/xml', buffer: Buffer.from(continuousBoundariesTtml.replace('</div></body>', '<p xml:id="destination" begin="8" end="9"><span begin="8" end="9">丁</span></p></div></body>')) });
+  await page.locator('[data-outline-drag]').first().click();
+  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: '放大波形', exact: true }).click();
+  await page.getByRole('checkbox', { name: '吸附', exact: true }).uncheck();
+  await page.locator('[data-settings-button]').click();
+  const dialog = page.getByRole('dialog', { name: '设置', exact: true });
+  await dialog.getByRole('button', { name: '时间轴', exact: true }).click();
+  await dialog.getByRole('switch', { name: '交换边界拖动操作', exact: true }).check();
+  await expect.poll(async () => (await (await page.request.get('/api/v1/settings')).json()).values['studio:timeline-swap-boundary-drag']).toBe('true');
+  await page.keyboard.press('Escape');
+  const edge = page.getByLabel('时间轴词 甲结束边界', { exact: true }), b = page.getByRole('button', { name: '时间轴词 乙', exact: true });
+  const original = (await b.boundingBox())!.x, box = (await edge.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 16, box.y + box.height / 2, { steps: 4 }); await page.mouse.up();
+  await expect.poll(async () => (await b.boundingBox())!.x).toBeGreaterThan(original + 10);
+  const saved = page.waitForResponse(response => response.url().endsWith(`/projects/${pid}/document`) && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: '保存', exact: true }).click(); expect((await saved).status()).toBe(200);
+  const readLyrics = () => page.evaluate(async pid => {
+    const clientPath = '/src/adapters/http/client.ts', codecPath = '/src/adapters/project-codec.ts';
+    const client = await import(clientPath), codec = await import(codecPath);
+    return codec.parseProject((await client.studioApi.getDocumentEnvelope(pid)).document).lyrics;
+  }, pid);
+  const before = await readLyrics(), a = before.lines[0].words[0], neighbor = before.lines[0].words[1];
+  expect(a.endMs).toBeGreaterThan(2000); expect(a.endMs).toBe(neighbor.beginMs);
+  expect(a.rubyUnits[0].endMs).toBe(a.endMs); expect(neighbor.rubyUnits[0].beginMs).toBe(a.endMs);
+  await page.locator('main [data-ruby-id]').first().click({ position: { x: 3, y: 3 } }); await page.keyboard.press('Control+c');
+  await page.locator('main [data-line-id="destination"] [data-word-id]').click({ position: { x: 3, y: 3 } }); await page.keyboard.press('Control+v');
+  await expect(page.locator('main [data-line-id="destination"] [data-ruby-id]')).toHaveCount(1);
+  const pastedSave = page.waitForResponse(response => response.url().endsWith(`/projects/${pid}/document`) && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: '保存', exact: true }).click(); expect((await pastedSave).status()).toBe(200);
+  await page.reload(); await page.getByRole('button', { name: '编辑', exact: true }).click();
+  const reopened = await readLyrics();
+  expect(reopened.lines[0].words).toEqual(before.lines[0].words);
+  expect(reopened.lines[1]).toMatchObject({ beginMs: 8000, endMs: 9000, words: [{ beginMs: 8000, endMs: 9000, rubyUnits: [{ reading: 'こう', beginMs: null, endMs: null }] }] });
+  await page.locator('[data-settings-button]').click(); await dialog.getByRole('button', { name: '时间轴', exact: true }).click();
+  await expect(dialog.getByRole('switch', { name: '交换边界拖动操作', exact: true })).toBeChecked();
+});

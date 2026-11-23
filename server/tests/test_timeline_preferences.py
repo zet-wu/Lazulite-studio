@@ -43,7 +43,12 @@ def test_active_line_and_spectrum_preferences_are_atomic_and_portable(tmp_path):
         for mode, height in [('always', '36'), ('follow', '72'), ('off', '216')]:
             assert save({'studio:timeline-auto-expand': mode, 'studio:spectrum-height': height, 'studio:timeline-swap-wheel': 'true'}).status_code == 200
             assert RuntimeSettings(settings.path).read()['values']['studio:spectrum-height'] == height
+        for value in ('true', 'false'):
+            assert save({'studio:timeline-swap-boundary-drag': value}).status_code == 200
+            assert RuntimeSettings(settings.path).read()['values']['studio:timeline-swap-boundary-drag'] == value
         before = settings.read()
+        assert save({'studio:timeline-swap-boundary-drag': 'yes'}).status_code == 422
+        assert settings.read() == before
         for invalid in ('35', '217', '72.5', '', 'NaN', 'Infinity', '７２'):
             assert save({'studio:timeline-auto-expand': 'always', 'studio:spectrum-height': invalid}).status_code == 422
             assert settings.read() == before
