@@ -1,6 +1,8 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import {createPortal} from 'react-dom';
+import { useLayoutEffect, useRef, useState, useId, type ReactNode } from 'react';
 import { measureTextWidth } from '../../shared/measure-text';
 import styles from './semantic-editor.module.css';
+import candidatesStyle from './reading-candidates.module.css';
 
 // Both reading workflows share presentation; callers retain their input semantics.
 export function ReadingPair({text, status, hint, children}:{text:string;status?:string;hint?:string;children?:ReactNode}) {
@@ -28,14 +30,38 @@ export function ReadingPair({text, status, hint, children}:{text:string;status?:
  </div>;
 }
 
-export function ReadingInput({value,label,hint,disabled,needsReview=false,change,focus,composition}:{
+export function ReadingInput({value,label,hint,disabled,needsReview=false,change,focus,composition,alternatives,alternativeIndex,choose}:{
+ alternatives?:string[];alternativeIndex?:number;choose?:(index:number)=>void;
  value:string;label:string;hint?:string;needsReview?:boolean;disabled?:boolean;change:(value:string)=>void;focus:(active:boolean)=>void;composition:(active:boolean)=>void;
 }) {
  const start=useRef(value),composing=useRef(false);
+ const [open,setOpen]=useState(false),[active,setActive]=useState(0);
+ const listId=useId(), inputRef=useRef<HTMLInputElement>(null);
+ const [position,setPosition]=useState({left:0,top:0,bottom:undefined as number|undefined});
+ useLayoutEffect(()=>{
+   if(!open)return;
+   const locate=()=>{const rect=inputRef.current!.getBoundingClientRect();const below=window.innerHeight-rect.bottom;setPosition({left:Math.max(8,Math.min(rect.left,window.innerWidth-320)),top:below>=170?rect.bottom:0,bottom:below>=170?undefined:window.innerHeight-rect.top});};
+   locate();window.addEventListener('resize',locate);window.addEventListener('scroll',locate,true);
+   return()=>{window.removeEventListener('resize',locate);window.removeEventListener('scroll',locate,true);};
+ },[open]);
+ const options=alternatives??[];
+ const available=options.length>1;
  const missing=!value.trim()||needsReview;
- return <input title={hint||value||undefined} aria-label={label} aria-description={hint} data-status={missing?'missing':undefined}
+ const pick=(index:number)=>{choose?.(index);setOpen(false);};
+ const input=<input ref={inputRef} title={hint||value||undefined} aria-label={label} aria-description={hint} data-status={missing?'missing':undefined}
+  role={available?'combobox':undefined} aria-autocomplete={available?'list':undefined} aria-expanded={available?open:undefined} aria-controls={open?listId:undefined} aria-activedescendant={open?`${listId}-${active}`:undefined}
+  name={label} autoComplete="off" spellCheck={false}
   className={`${styles.romanPreviewInput} ${missing?styles.japaneseRubyMissing:''}`} value={value} disabled={disabled}
-  onChange={e=>change(e.target.value)} onFocus={()=>{start.current=value;focus(true);}} onBlur={()=>focus(false)}
-  onCompositionStart={()=>{composing.current=true;composition(true);}} onCompositionEnd={()=>{composing.current=false;composition(false);}}
-  onKeyDown={e=>{if(composing.current||e.nativeEvent.isComposing){e.stopPropagation();return;}if(e.key==='Escape'){e.preventDefault();e.stopPropagation();change(start.current);}if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}/>;
+  onChange={e=>{setOpen(false);change(e.target.value);}} onFocus={()=>{start.current=value;focus(true);setActive(Math.max(0,alternativeIndex??options.indexOf(value)));setOpen(available);}} onBlur={()=>{setOpen(false);focus(false);}}
+  onCompositionStart={()=>{composing.current=true;setOpen(false);composition(true);}} onCompositionEnd={()=>{composing.current=false;composition(false);}}
+  onKeyDown={e=>{
+    if(composing.current||e.nativeEvent.isComposing){e.stopPropagation();return;}
+    if(available&&(e.key==='ArrowDown'||e.key==='ArrowUp')){e.preventDefault();e.stopPropagation();setOpen(true);setActive(i=>(i+(e.key==='ArrowDown'?1:-1)+options.length)%options.length);return;}
+    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(open)setOpen(false);else change(start.current);}
+    if(e.key==='Enter'){e.preventDefault();e.stopPropagation();if(open)pick(active);else e.currentTarget.blur();}
+  }}/>;
+ if(!available)return input;
+ return <span className={candidatesStyle.anchor}>{input}{open&&createPortal(<span id={listId} role="listbox" aria-label={label} className={candidatesStyle.list} style={{left:position.left,top:position.bottom===undefined?position.top:undefined,bottom:position.bottom}}>
+   {options.map((option,index)=><button type="button" data-role="inline" id={`${listId}-${index}`} role="option" aria-selected={index===active} key={index} tabIndex={-1} onPointerDown={e=>e.preventDefault()} onClick={()=>pick(index)}>{option}</button>)}
+ </span>,inputRef.current?.closest('[role="dialog"]')??document.body)}</span>;
 }

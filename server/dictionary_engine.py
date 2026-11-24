@@ -27,7 +27,13 @@ class DictionaryIndex:
             result = []
             for segment in segments:
                 value = (segment.base, segment.annotate, segment.units)
-                result.append(segment_pool.setdefault(value, value))
+                stored = segment_pool.get(value)
+                if stored is None:
+                    if not segment.base.strip() or '\x00' in segment.base or bool(segment.units) != segment.annotate or any(not unit.strip() or '\x00' in unit for unit in segment.units):
+                        raise ValueError("正文对应段或读音单元无效")
+                    segment_pool[value] = value
+                    stored = value
+                result.append(stored)
             return tuple(result)
         for entry in entries:
             if self.count % 1024 == 0:
@@ -53,7 +59,8 @@ class DictionaryIndex:
                 self.alternatives[surface] = tuple(dict.fromkeys(tuple((s["base"], s["annotate"], tuple(s["units"])) for s in c["segments"])
                                                                for c in sorted(entry["candidates"], key=lambda c: -c["priority"])))
             self.entries[surface] = (cost, candidates)
-            self.max_len[surface[0]] = max(self.max_len.get(surface[0], 0), len(surface))
+            if len(surface) > self.max_len.get(surface[0], 0):
+                self.max_len[surface[0]] = len(surface)
             self.count += 1
 
     def analyze(self, text, cancel=None, *, mode="weighted", trace=None):

@@ -1,0 +1,4 @@
+.anchor { position:relative; display:inline-flex; max-width:100%; min-width:0; }
+.list { position:fixed; z-index:1100; display:flex; gap:4px; padding:4px; max-width:min(420px,70vw); max-height:160px; overflow:auto; background:var(--surface-high); color:var(--ink); border:1px solid var(--line); border-radius:8px; box-shadow:0 3px 10px #0003; }
+.list button { flex-shrink:0; white-space:pre-wrap; overflow-wrap:anywhere; max-width:320px; }
+.list button[aria-selected="true"] { background:var(--blue-soft); color:var(--ink); }

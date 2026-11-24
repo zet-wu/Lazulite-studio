@@ -4,13 +4,14 @@ import { planWordMerge, type LyricCommand } from './lyric-commands';
 
 export type DictionaryRange = {
   lineId: string; start: number; end: number; base: string;
+  alternatives?:string[][];
   status: 'known' | 'unknown' | 'ambiguous' | 'boundary' | 'unannotated'; units: string[];
 };
 export type DictionaryBlock = Readonly<{
   key: string; start: number; end: number; base: string; existing: boolean;
   status: DictionaryRange['status']; spans: readonly { wordId: string; start: number; end: number }[];
   original: readonly string[]; merge: boolean;
-}> & { units: string[]; reviewed: boolean[] };
+}> & { alternatives?:string[][]; units: string[]; reviewed: boolean[] };
 export type DictionaryRow = { lineId: string; blocks: DictionaryBlock[] };
 
 export function proposeDictionaryRuby(source: LyricDocument, ids: string[], ranges: DictionaryRange[]): DictionaryRow[] {

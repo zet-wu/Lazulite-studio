@@ -25,7 +25,7 @@ export async function analyzeDictionary(id:string,instance:string,lines:Array<{i
   const ranges:DictionaryRange[]=result.ranges.map(r=>{
     const map=offsets.get(r.line_id);
     if(!map||!Number.isInteger(r.base_start)||!Number.isInteger(r.base_end)||map[r.base_start]===undefined||map[r.base_end]===undefined)throw new MessageError(message('http.dictionaryRange'));
-    return {lineId:r.line_id,start:map[r.base_start],end:map[r.base_end],base:r.base,status:r.status,units:r.units};
+    return {lineId:r.line_id,start:map[r.base_start],end:map[r.base_end],base:r.base,status:r.status,units:r.units,alternatives:r.alternatives??undefined};
   });
   return {...result,ranges};
 }

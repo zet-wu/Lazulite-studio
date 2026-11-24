@@ -11,6 +11,12 @@ let searchConditions={title:'',artist:'',album:''};
 
 const mockPreferences = {version:1,revision:0,library_id:'00000000000000000000000000000001',values:JSON.parse(sessionStorage.getItem('studio-mock-preferences')??'{}') as Record<string,string>};
 export const handlers = [
+  http.get(`${root}/reading/dictionaries`,()=>response({dictionaries:scenario()==='dictionary-candidates'?[{id:'dict',instance:'test',manifest:{name:'测试词典',version:'1',region:'粤语'},sources:{},error:null}]:[],errors:[]})),
+  http.post(`${root}/reading/dictionaries/:ident/analyze`,async({request})=>{
+    const body=await request.json() as {instance:string;lines:{id:string;text:string}[]};
+    const result={instance:body.instance,version:'1',ranges:body.lines.map(line=>({line_id:line.id,base_start:0,base_end:Array.from(line.text).length,base:line.text,status:'ambiguous',units:['syut3'],alternatives:[['syut3'],['jyut6']]}))};
+    return new URL(request.url).searchParams.get('stream')==='true'?new HttpResponse(JSON.stringify({result})+'\n',{headers:{'Content-Type':'application/x-ndjson'}}):response(result);
+  }),
   http.get(`${root}/vocal-models`,()=>response({directory:'/portable/vocal-models',editable:true,source:'portable',error:null,devices:{vocal:{actual:'cpu',preferred:'cpu',label:'CPU',runtime_ok:true,reason:null}},selected_model_id:'demucs',items:[
     {id:'demucs',type:'demucs',name:'Demucs',status:'ready'},
     {id:'bs-karaoke',type:'bs-karaoke',name:'BS Karaoke',status:scenario()==='missing-vocal-model'?'invalid':'ready',reason:'Missing weights'},

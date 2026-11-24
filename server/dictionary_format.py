@@ -2,6 +2,7 @@
 import json
 import re
 import stat
+from operator import attrgetter
 import zipfile
 from pathlib import Path, PurePosixPath
 
@@ -29,11 +30,15 @@ class EntryRecord(msgspec.Struct):
     candidates: Annotated[tuple[CandidateRecord, ...], msgspec.Meta(min_length=1, max_length=1024)]
     cost: Annotated[int, msgspec.Meta(ge=0, le=2**53-1)] | None = None
 
+SEGMENT_BASE = attrgetter("base")
 ENTRY_DECODER = msgspec.json.Decoder(EntryRecord)
-COMPLEX_GRAPHEME = regex.compile(r"[\p{M}\u200c\u200d\ud800-\uffff]")
+REGULAR_SURFACE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fffA-Za-z0-9]+\Z")
+COMPLEX_GRAPHEME = regex.compile(r"[\p{M}\p{gcb=Prepend}\u1100-\u11ff\u200c\u200d\ud800-\uffff]")
 
 HARD_BOUNDARIES = frozenset(',，、.。!！?？:：;；()（）[]［］{}｛｝「」『』【】〈〉《》“”"…⋯')
 
+
+HARD_BOUNDARY_PATTERN = regex.compile("[\\s" + regex.escape("".join(HARD_BOUNDARIES)) + "\\x00]")
 
 def hard_boundary(text):
     return any(c.isspace() or c in HARD_BOUNDARIES for c in text)
@@ -134,11 +139,27 @@ def read_directory(directory, *, installed=False):
                     except msgspec.DecodeError as exc:
                         raise ValueError(f"词典条目无效：{exc}") from exc
                     surface = entry.surface
+                    ends = None
+                    if REGULAR_SURFACE.fullmatch(surface) is None:
+                        if HARD_BOUNDARY_PATTERN.search(surface):
+                            raise ValueError("词条正文为空或跨句读边界")
+                        if COMPLEX_GRAPHEME.search(surface) is not None:
+                            ends = {0, *(m.end() for m in regex.finditer(r"\X", surface))}
+                    if len(entry.candidates) > 1 and len({candidate.id for candidate in entry.candidates}) != len(entry.candidates):
+                        raise ValueError("候选标识重复")
+                    for candidate in entry.candidates:
+                        if (candidate.segments[0].base if len(candidate.segments)==1 else "".join(map(SEGMENT_BASE,candidate.segments))) != surface:
+                            raise ValueError("对应段无法重组正文")
+                        if ends is not None:
+                            offset = 0
+                            for segment in candidate.segments:
+                                offset += len(segment.base)
+                                if offset not in ends:
+                                    raise ValueError("正文对应段切断字素")
                     if (entry.cost is not None) != (manifest["scoring"]["mode"] == "weighted"):
                         raise ValueError("词条 cost 与评分模式不一致")
-                    # Installed packages passed the complete validator during import.
-                    # Typed decoding checks their structure again; correspondence and
-                    # duplicate JSON fields are checked at the import boundary.
+                    # Repeated segment values are validated once while the index
+                    # interns them; duplicate JSON fields are checked during import.
                 else:
                     entry = validate_entry(read_json(line.decode("utf-8")), manifest["scoring"]["mode"])
                     surface = entry["surface"]

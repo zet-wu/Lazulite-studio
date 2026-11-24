@@ -60,3 +60,21 @@ it('keeps nonempty ambiguity highlighted until edited, preserves review on regen
   fireEvent.click(screen.getByRole('button',{name:'应用'}));
   expect(apply.mock.calls[0][0].document.lines[0].words.flatMap((w:any)=>w.rubyUnits.map((u:any)=>u.reading))).toEqual(['qìng']);
 });
+
+it('shows candidates on focus, switches the complete reading and collapses for typing or Escape',async()=>{
+ const source=createLyricDocument('重庆'),lineId=source.lines[0].id,apply=vi.fn(()=>true);
+ vi.mocked(analyzeDictionary).mockResolvedValue({instance:'a',version:'1',ranges:[{lineId,start:0,end:2,base:'重庆',status:'ambiguous',units:['chóng','qìng'],alternatives:[['chóng','qìng'],['zhòng','qìng']]}]});
+ render(<DictionaryRubyDialog document={source} lineIds={[lineId]} apply={apply} close={()=>{}}/>);
+ await screen.findByRole('option',{name:'a · 1 · a'});
+ fireEvent.change(screen.getByRole('combobox'),{target:{value:'a'}});
+ const first=await screen.findByLabelText('重庆读音 1');
+ expect(screen.queryByRole('listbox')).toBeNull();
+ fireEvent.focus(first);expect(screen.getByRole('listbox')).toBeVisible();
+ fireEvent.keyDown(first,{key:'ArrowDown'});fireEvent.keyDown(first,{key:'Enter'});
+ expect(first).toHaveValue('zhòng');expect(screen.getByLabelText('重庆读音 2')).toHaveValue('qìng');
+ expect(first).not.toHaveAttribute('data-status','missing');expect(screen.queryByRole('listbox')).toBeNull();
+ fireEvent.blur(first);fireEvent.focus(first);fireEvent.keyDown(first,{key:'Escape'});
+ expect(first).toHaveValue('zhòng');expect(screen.queryByRole('listbox')).toBeNull();
+ fireEvent.blur(first);fireEvent.focus(first);fireEvent.click(screen.getByRole('option',{name:'chóng · qìng'}));expect(first).toHaveValue('chóng');
+ fireEvent.blur(first);fireEvent.focus(first);fireEvent.change(first,{target:{value:'custom'}});expect(screen.queryByRole('listbox')).toBeNull();
+});
