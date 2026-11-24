@@ -1,7 +1,7 @@
 import { message, MessageError } from '../../domain/messages';
 import { wordAgents, lineAgents, sameAgents } from '../../domain/amll-compatibility';
 import { createProjectEditing, remapEditing, type ProjectEditing } from '../../domain/project-editing';
-import { applyLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
+import { timeEnvelope, applyLyricCommand, type LyricCommand } from '../../domain/lyric-commands';
 import { createLine, createWord, lineText, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationUnit, type RubyUnit } from '../../domain/lyric-document';
 
 import { type ObjectSelection } from '../../domain/selection-editing';
@@ -89,9 +89,8 @@ export function deleteSelection(document: LyricDocument, selection: EditorSelect
 export const cutSelection = deleteSelection;
 
 function expandedLineTime(target: LyricLine, words: LyricWord[]) {
-  const starts = words.map((word) => word.beginMs).filter((value): value is number => value !== null);
-  const ends = words.map((word) => word.endMs).filter((value): value is number => value !== null);
-  return { beginMs: target.beginMs === null ? null : Math.min(target.beginMs, ...starts), endMs: target.endMs === null ? null : Math.max(target.endMs, ...ends) };
+  const span = timeEnvelope([target, ...words]);
+  return { beginMs: target.beginMs === null ? null : span.beginMs, endMs: target.endMs === null ? null : span.endMs };
 }
 
 export function moveWordsAcrossLine(document: LyricDocument, selection: Extract<EditorSelection, { kind: 'words' }>, targetLineId: string, afterWordId?: string | null): LyricCommand {

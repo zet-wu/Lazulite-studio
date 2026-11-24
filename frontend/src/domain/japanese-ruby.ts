@@ -2,7 +2,7 @@ import {message,MessageError} from './messages';
 import { toHiragana } from 'wanakana';
 export type ReadingRange = { line_id: string; base_start: number; base_end: number; base: string; reading: string };
 import { lineText, rubyReading, type LyricDocument, type LyricWord } from './lyric-document';
-import { planWordMerge, type LyricCommand } from './lyric-commands';
+import { timeEnvelope, planWordMerge, type LyricCommand } from './lyric-commands';
 import { makeRubyUnits, splitReadingMora } from './ruby-editing';
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
@@ -147,9 +147,7 @@ export function japaneseRubyCommand(current: LyricDocument, source: LyricDocumen
       if (word.rubyUnits.length) {
         const reading = blocks[0].block.reading;
         if (!reading.trim() || reading === rubyReading(word)) return [word];
-        const starts = word.rubyUnits.flatMap(u => u.beginMs === null ? [] : [u.beginMs]), ends = word.rubyUnits.flatMap(u => u.endMs === null ? [] : [u.endMs]);
-        if (starts.length && ends.length && Math.min(...starts) > Math.max(...ends)) throw new MessageError(message('reading.invalidEnvelope'));
-        return [{ ...word, rubyUnits: makeRubyUnits({ ...word, beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null }, splitReadingMora(reading)) }];
+        return [{ ...word, rubyUnits: makeRubyUnits({ ...word, ...timeEnvelope(word.rubyUnits) }, splitReadingMora(reading)) }];
       }
       const accepted = blocks.filter(({block}) => block.editable && block.reading.trim());
       if (!accepted.length) return [word];

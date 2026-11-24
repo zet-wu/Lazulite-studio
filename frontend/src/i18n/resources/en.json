@@ -1727,5 +1727,10 @@
   "alignment.localRangeRequired": "Select at least two reading units and set a valid time range first",
   "alignment.audioSource": "Alignment audio source",
   "alignment.vocals": "Vocals",
-  "alignment.cropVocals": "Crop to vocal segments"
+  "alignment.cropVocals": "Crop to vocal segments",
+  "sync.innerBeatHelp": ": each press records a rhythm point; release completes a stop checkpoint",
+  "editor.increaseInnerBeats": "Add inner rhythm point",
+  "editor.decreaseInnerBeats": "Remove inner rhythm point",
+  "editor.clearInnerBeats": "Clear inner rhythm points",
+  "field.whitespaceInnerBeats": "Whitespace does not participate in timing; set 0 to clear."
 }

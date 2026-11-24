@@ -14,7 +14,7 @@ it('drags through the opposite endpoint and keeps reversed endpoints through TTM
   expect(projectTimeline(next).lines[0].words[0]).toMatchObject({ beginMs: 3000, endMs: 2000 });
   expect(parseLyricTtml(serializeLyricTtml(next)).lines[0].words[0]).toMatchObject({ beginMs: 3000, endMs: 2000 });
   expect(collectOutputIssues(next, 'ttml')).toEqual([]);
-  for (const format of ['elrc', 'ass', 'sug', 'krc', 'yrc', 'qrc'] as const) expect(collectOutputIssues(next, format).length).toBeGreaterThan(0);
+  for (const format of ['lrc', 'elrc', 'ass', 'sug', 'krc', 'yrc', 'qrc'] as const) expect(collectOutputIssues(next, format).length).toBeGreaterThan(0);
   line.beginMs = 3000; line.endMs = 2000;
   expect(collectOutputIssues(doc, 'lrc').length).toBeGreaterThan(0);
   const state = executeLyricCommand(createLyricEditorState(doc), { type: 'replace-document', document: next });

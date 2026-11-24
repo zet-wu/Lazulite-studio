@@ -39,5 +39,5 @@ it('splits a kana phrase while preserving a partially timed envelope', async () 
   const doc = createProjectDocument(); doc.lyrics.lines = [{ ...createLine('', 'l'), words: [{ ...createWord('しゃっティ', 'w'), beginMs: 100, rubyUnits: [{ id: 'r', reading: 'しゃっティ', beginMs: 100, endMs: null }] }] }];
   const f = projectFixture(doc);
   await createToolRegistry().call('apply_readings', { project_id: 'p', overwrite_existing: true, operations: [{ mode: 'split_and_set_word', line_id: 'l', word_id: 'w', parts: ['しゃ','っ','ティ'].map(text => ({ text, readings: [] })) }] }, f);
-  expect(f.doc().lyrics.lines[0].words.map(w => [w.text,w.beginMs,w.endMs])).toEqual([['しゃ',100,null],['っ',null,null],['ティ',null,null]]);
+  expect(f.doc().lyrics.lines[0].words.map(w => [w.text,w.beginMs,w.endMs])).toEqual([['しゃ',100,100],['っ',100,100],['ティ',100,100]]);
 });

@@ -49,6 +49,7 @@ export function prepareOutputDocument(document: LyricDocument, target: LyricForm
      const wordBase={kind:'word' as const,lineId:line.id,wordId:word.id},wordPrefix=`${prefix}第 ${i+1} 词`;
      const begin=word.beginMs;
      const end=word.endMs;
+     if(target==='lrc' && begin !== null && end !== null && end < begin) add(wordBase,wordPrefix,begin,end,false,'结束时间必须晚于开始');
      if(fullBody) add(wordBase,wordPrefix,begin,end,true, begin !== null && end !== null && end <= begin ? '结束时间必须晚于开始' : undefined);
      if(target==='elrc') {
        const b=begin === null ? null : begin,e=end===null ? null : end;

@@ -23,7 +23,7 @@ def cardinal(text: str) -> str:
             parts.append(DIGITS[value])
         return ''.join(parts)
 
-    number = int(digits)
+    number = int(digits.lstrip('0') or '0')
     if number == 0:
         return DIGITS[0]
     parts = []

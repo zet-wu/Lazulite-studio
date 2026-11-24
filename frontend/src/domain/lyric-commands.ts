@@ -363,6 +363,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
           wordFitsLine(part, line);
         }
         validateSegmentContent(word, command.words);
+        if (!word.rubyUnits.length && editing.syncStops[word.id]) { editing.syncStops[command.words.at(-1)!.id]=editing.syncStops[word.id]; delete editing.syncStops[word.id]; }
         return command.words.map(part=>({...part,...(word.agentRefs?{agentRefs:[...word.agentRefs]}:{})}));
       });
     case 'segment-words': {
@@ -386,6 +387,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
             generatedIds.add(part.id);
             wordFitsLine(part, line);
           }
+          if (!word.rubyUnits.length && editing.syncStops[word.id]) { editing.syncStops[change.words.at(-1)!.id]=editing.syncStops[word.id]; delete editing.syncStops[word.id]; }
           applied++;
           return change.words.map(part=>({...part,...(word.agentRefs?{agentRefs:[...word.agentRefs]}:{})}));
         });
@@ -663,6 +665,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
         const newId = wordCommand.newWordId ?? crypto.randomUUID();
         if (line.words.some((item) => item.id === newId)) throw new MessageError(message('command.wordIdExists'));
         const middle = splitTime(word.beginMs, word.endMs, Array.from(left).length, Array.from(word.text).length);
+        if (editing.syncStops[word.id]) { editing.syncStops[newId]=editing.syncStops[word.id]; delete editing.syncStops[word.id]; }
         return [
           { ...word, text: left, endMs: middle },
           { ...word, id:newId, text:right, beginMs: middle, endMs: word.endMs },

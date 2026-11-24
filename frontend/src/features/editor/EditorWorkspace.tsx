@@ -693,9 +693,9 @@ function EditorWorkspaceContent(props: Props) {
       const id = beat.dataset.beatOwner!, kind = beat.dataset.beatKind as 'word' | 'ruby', count = emptyBeatCount(editing, id);
       const change = (count: number) => dispatch({ type: 'set-empty-beat', id, kind, count });
       setContextMenu({ x, y, target: beat, title: t(syncStyle === 'sug' ? 'editor.innerBeats' : 'editor.emptyBeats'), actions: [
-        { label: t('editor.increaseBeats'), disabled: count >= 32, run: () => change(count + 1) },
-        { label: t('editor.decreaseBeats'), disabled: count === 0, run: () => change(count - 1) },
-        { label: t('editor.clearBeats'), disabled: count === 0, run: () => change(0) },
+        { label: t(syncStyle === 'sug' ? 'editor.increaseInnerBeats' : 'editor.increaseBeats'), disabled: count >= 32, run: () => change(count + 1) },
+        { label: t(syncStyle === 'sug' ? 'editor.decreaseInnerBeats' : 'editor.decreaseBeats'), disabled: count === 0, run: () => change(count - 1) },
+        { label: t(syncStyle === 'sug' ? 'editor.clearInnerBeats' : 'editor.clearBeats'), disabled: count === 0, run: () => change(0) },
       ] }); return true;
     }
     const rubyId = target.closest<HTMLElement>('[data-ruby-id]')?.dataset.rubyId;

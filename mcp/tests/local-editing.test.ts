@@ -26,7 +26,7 @@ it('edits partial timing and recomputes envelopes, clears endpoints, and rejects
   await registry.call('edit_timing', { project_id: 'p', operations: [{ op: 'set_word_time', line_id: 'l', word_id: 'w1', begin_ms: null }] }, f);
   expect(f.doc().lyrics.lines[0].words[0]).toMatchObject({ beginMs: null, endMs: 300 });
   const before = f.revision();
-  try { await registry.call('edit_timing', { project_id: 'p', operations: [{ op: 'set_word_time', line_id: 'l', word_id: 'w2', end_ms: 800 }, { op: 'set_word_time', line_id: 'l', word_id: 'w1', end_ms: 50, begin_ms: 100 }] }, f); expect.unreachable(); }
+  try { await registry.call('edit_timing', { project_id: 'p', recompute_envelopes:false, operations: [{ op: 'set_word_time', line_id: 'l', word_id: 'w2', end_ms: 800 }, { op: 'set_word_time', line_id: 'l', word_id: 'w1', end_ms: 50, begin_ms: 100 }] }, f); expect.unreachable(); }
   catch (error) { expect(formatToolError(error)).toMatchObject({ code: 'domain_error', details: { operation_index: 1, word_id: 'w1' } }); }
   expect(f.revision()).toBe(before);
 });

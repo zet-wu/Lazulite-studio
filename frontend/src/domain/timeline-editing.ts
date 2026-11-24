@@ -2,7 +2,7 @@ import { message, MessageError } from './messages';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
 import { shiftLineTimes } from './batch-editing';
-import { intervalContains, timeEnvelope } from './lyric-commands';
+import { intervalBounds, intervalContains, timeEnvelope } from './lyric-commands';
 
 export type TimelineTarget =
   | { kind: 'line'; lineId: string }
@@ -281,8 +281,9 @@ export function prepareTimelineAssignment(document: LyricDocument, target: Timel
   const global = target.kind === 'line' ? document.lines : target.kind === 'word' ? document.lines.flatMap(l=>l.words) : target.kind === 'ruby' ? document.lines.flatMap(l=>l.words.flatMap(w=>w.rubyUnits)) : tracks.flatMap(t=>t.contents.flatMap(c=>c.kind==='timed'?c.units:[]));
   const samples = (local.length ? local : global).filter(full);
   let beginMs = Math.round(dropMs), endMs = beginMs + (samples.length ? Math.round(samples.reduce((sum,item)=>sum+item.endMs!-item.beginMs!,0)/samples.length) : target.kind==='line'?1000:300);
-  const ancestorBegin=target.kind==='line'?null:target.kind==='ruby'?word!.beginMs??line.beginMs:line.beginMs;
-  const ancestorEnd=target.kind==='line'?null:target.kind==='ruby'?word!.endMs??line.endMs:line.endMs;
+  const lineBounds=intervalBounds(line),wordBounds=word?intervalBounds(word):null;
+  const ancestorBegin=target.kind==='line'?null:target.kind==='ruby'?wordBounds!.min??lineBounds.min:lineBounds.min;
+  const ancestorEnd=target.kind==='line'?null:target.kind==='ruby'?wordBounds!.max??lineBounds.max:lineBounds.max;
   const internal=(ancestorBegin===null||dropMs>=ancestorBegin)&&(ancestorEnd===null||dropMs<=ancestorEnd);
   const minBegin=internal?Math.max(0,ancestorBegin??0):0, maxEnd=internal?Math.min(durationMs,ancestorEnd??durationMs):durationMs;
   const timedSiblings = siblings.filter(item=>item.id!==id && full(item)).sort((a,b)=>a.beginMs!-b.beginMs!);
@@ -302,13 +303,14 @@ export function prepareTimelineAssignment(document: LyricDocument, target: Timel
   if(internal){beginMs=Math.max(minBegin,beginMs);endMs=Math.min(maxEnd,endMs);}
   const attachments = [...document.romanizationTracks,...document.translationTracks].flatMap(t=>t.contents.flatMap(c=>c.lineId===line.id&&c.kind==='timed'?c.units:[]));
   const children = target.kind==='line' ? [...line.words.flatMap(w=>[w,...w.rubyUnits]),...attachments] : target.kind==='word' ? word!.rubyUnits : [];
-  beginMs = Math.max(0,Math.min(beginMs,...children.flatMap(c=>c.beginMs===null?[]:[c.beginMs])));
-  endMs = Math.min(durationMs,Math.max(endMs,...children.flatMap(c=>c.endMs===null?[]:[c.endMs])));
+  const childSpan=timeEnvelope(children);
+  beginMs = Math.max(0,Math.min(beginMs,childSpan.beginMs??beginMs));
+  endMs = Math.min(durationMs,Math.max(endMs,childSpan.endMs??endMs));
   valid(beginMs,endMs);
-  if (!Number.isSafeInteger(durationMs) || beginMs >= endMs || children.some(c=>c.endMs!==null&&c.endMs>durationMs)) throw new MessageError(message('timeline.rangeInvalid'));
+  if (!Number.isSafeInteger(durationMs) || beginMs >= endMs || children.some(c=>[c.beginMs,c.endMs].some(time=>time!==null&&time>durationMs))) throw new MessageError(message('timeline.rangeInvalid'));
   return {beginMs,endMs,fixed,minBegin,maxEnd,
-    childBegin:Math.min(Infinity,...children.flatMap(child=>child.beginMs===null?[]:[child.beginMs])),
-    childEnd:Math.max(0,...children.flatMap(child=>child.endMs===null?[]:[child.endMs]))};
+    childBegin:childSpan.beginMs??Infinity,
+    childEnd:childSpan.endMs??0};
 }
 
 /** Assign both endpoints without moving descendants; expand parents in the same transaction. */

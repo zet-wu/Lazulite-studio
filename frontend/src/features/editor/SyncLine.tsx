@@ -74,10 +74,10 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
     const filled = shared ? left && right ? 'full' : left ? 'left' : right ? 'right' : 'none' : right ? 'full' : 'none';
     const stop = stopAt(index);
     return <div className={`${styles.syncMarkers} ${sug ? styles.sugMarkers : ''}`}>
-      <button data-role="inline" className={styles.syncDot} tabIndex={-1} aria-label={t('sync.unit')} data-sync-marker="dot" data-current={activeId === id && !progress.started || undefined}
+      <button data-role="inline" className={styles.syncDot} tabIndex={-1} aria-label={t('sync.unit')} data-sync-marker="dot" data-current={activeId === id && (sug ? !progress.started : progress.consumed === 0) || undefined}
         onClick={event => { event.stopPropagation(); choose(); }}><Icon name={sug ? 'sync-triangle' : 'sync-dot'} filled={filled} size={16}/></button>
       <span className={styles.syncBeats}>{Array.from({ length: emptyBeatCount(editing, id) }, (_, beat) => <button key={beat} data-role="inline" className={styles.syncBeat} data-beat-owner={id} data-beat-kind={kind} data-sync-marker="beat"
-        data-current={activeId === id && (sug ? progress.started && progress.consumed === beat : progress.consumed === beat + 1) || undefined} data-passed={activeId === id && progress.consumed > beat || undefined}
+        data-current={activeId === id && (sug ? progress.started && progress.consumed === beat : progress.consumed === beat + 1) || undefined} data-passed={activeId === id && progress.consumed > beat + (sug ? 0 : 1) || undefined}
         aria-label={t(sug ? 'sync.innerBeat' : 'sync.trailingBeat',{number:beat+1})} onClick={event => event.stopPropagation()}><Icon name="sync-beat" size={16}/></button>)}</span>
       {sug && <button data-role="inline" className={styles.syncStop} aria-label={t('sync.stop')} aria-pressed={stop} data-sync-marker="stop" data-stop-owner={id} data-stop-kind={kind} data-current={activeId === id && progress.started && progress.consumed === emptyBeatCount(editing,id) && stop || undefined}
         onClick={event => { event.stopPropagation(); apply({type:'set-sync-stop',id,kind,stop:!stop}); }} onContextMenu={event => { event.preventDefault(); event.stopPropagation(); apply({type:'set-sync-stop',id,kind,stop:!stop}); }}>

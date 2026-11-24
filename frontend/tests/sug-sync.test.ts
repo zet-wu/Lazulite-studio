@@ -6,7 +6,7 @@ import { hasSyncStop, sugSyncStep, syncUnits, stampSync, type SugProgress } from
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
 it.each([0,1,3])('consumes %i inner checkpoints on presses and closes only a terminal release', count => {
  let doc=createLyricDocument('AB');doc.lines[0].words=['A','B'].map(text=>createWord(text,text));
- const editing=createProjectEditing();editing.emptyBeats.A={kind:'word',count};editing.syncStops.A={kind:'word',stop:true};
+ const editing=createProjectEditing();if(count)editing.emptyBeats.A={kind:'word',count};editing.syncStops.A={kind:'word',stop:true};
  const cursor=syncUnits(doc)[0];let progress:SugProgress={consumed:0,completed:false};
  const event=(type:'pressed'|'released',time:number)=>{const next=sugSyncStep(doc,editing,cursor,progress,type,time);if(next.action)doc=stampSync(doc,cursor,next.action,time,'continuous',editing);progress=next.progress;return next;};
  event('pressed',1000);
@@ -36,4 +36,10 @@ it('keeps explicit stop overrides through history, save, remapping and ruby conv
  expect(remapEditing(ruby.present.editing,new Map([['r','copy']])).syncStops).toEqual({copy:{kind:'ruby',stop:false}});
  const removed=executeProjectCommand(ruby,{type:'lyrics',command:{type:'delete-word',lineId:doc.lines[0].id,wordId:word.id}});
  expect(removed.present.editing.syncStops).toEqual({});validateProjectEditing(removed.present.lyrics,removed.present.editing);
+});
+it('keeps a manual stop on the final part when splitting a word',()=>{
+ const doc=createLyricDocument('AB'),word=doc.lines[0].words[0];let state=createProjectEditorState(createProjectDocument(doc));
+ state=executeProjectCommand(state,{type:'lyrics',command:{type:'set-sync-stop',id:word.id,kind:'word',stop:true}});
+ state=executeProjectCommand(state,{type:'lyrics',command:{type:'split-word',lineId:doc.lines[0].id,wordId:word.id,at:1,newWordId:'tail'}});
+ expect(state.present.editing.syncStops).toEqual({tail:{kind:'word',stop:true}});
 });

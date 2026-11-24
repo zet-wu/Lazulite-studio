@@ -1713,5 +1713,10 @@
   "alignment.localRangeRequired": "选择至少两个读音单元，并先设置有效起止时间",
   "alignment.audioSource": "对齐音频来源",
   "alignment.vocals": "人声",
-  "alignment.cropVocals": "人声片段裁切"
+  "alignment.cropVocals": "人声片段裁切",
+  "sync.innerBeatHelp": "：每次按下记录一个节奏点，终止点在松开时收尾",
+  "editor.increaseInnerBeats": "增加词内节奏点",
+  "editor.decreaseInnerBeats": "减少词内节奏点",
+  "editor.clearInnerBeats": "清空词内节奏点",
+  "field.whitespaceInnerBeats": "纯空白不参与打轴；0 可清除配置。"
 }

@@ -11223,5 +11223,30 @@
     "source": "人声片段裁切",
     "context": "局部与全局对齐共用选项；原曲和人声均可独立切换片段裁切。",
     "params": []
+  },
+  "sync.innerBeatHelp": {
+    "source": "：每次按下记录一个节奏点，终止点在松开时收尾",
+    "context": "SUG 风格词内节奏点控制与帮助文案。",
+    "params": []
+  },
+  "editor.increaseInnerBeats": {
+    "source": "增加词内节奏点",
+    "context": "SUG 风格词内节奏点控制与帮助文案。",
+    "params": []
+  },
+  "editor.decreaseInnerBeats": {
+    "source": "减少词内节奏点",
+    "context": "SUG 风格词内节奏点控制与帮助文案。",
+    "params": []
+  },
+  "editor.clearInnerBeats": {
+    "source": "清空词内节奏点",
+    "context": "SUG 风格词内节奏点控制与帮助文案。",
+    "params": []
+  },
+  "field.whitespaceInnerBeats": {
+    "source": "纯空白不参与打轴；0 可清除配置。",
+    "context": "SUG 风格词内节奏点控制与帮助文案。",
+    "params": []
   }
 }

@@ -69,7 +69,7 @@ export function EmptyBeatField({ count, commit, whitespace }: { count: number; c
     if (event.nativeEvent.isComposing) return;
     if (event.key === 'Enter') event.currentTarget.blur();
     if (event.key === 'Escape') { event.stopPropagation(); cancelled.current = true; setDraft(String(count)); setError(''); event.currentTarget.blur(); }
-  }}/></label>{error && <small role="alert">{error}</small>}{whitespace && <small>{t('field.whitespaceBeats')}</small>}</div>;
+  }}/></label>{error && <small role="alert">{error}</small>}{whitespace && <small>{t(syncStyle === 'sug' ? 'field.whitespaceInnerBeats' : 'field.whitespaceBeats')}</small>}</div>;
 }
 
 const t=i18n.t.bind(i18n);
