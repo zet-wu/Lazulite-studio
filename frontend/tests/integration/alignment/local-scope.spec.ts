@@ -1,11 +1,15 @@
 import {expect,test} from '@playwright/test';
 
-test('local alignment overrides skipped rows, snapshots source/crop options and preserves unrelated timing through save and undo',async({page},info)=>{
+test.beforeEach(async({page})=>{
  const pid='music-packaging',url=`/api/v1/projects/${pid}/document`;
  const before=await(await page.request.get(url)).json();
  const xml='<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="selected" begin="0.5" end="2"><span studio:id="a" begin="0.5" end="1">a</span><span studio:id="b" begin="1" end="2">b</span></p><p xml:id="keep" begin="6" end="7"><span studio:id="c" begin="6" end="7">keep</span></p></body></tt>';
  const snapshot={...before.document,lyrics:{draftTtml:xml},lineOrder:[],karaoke:{...before.document.karaoke,lineGroups:{selected:'main',keep:'main'},cues:[]},editing:{syncStops:{},emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:['selected','keep']}};
  expect((await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:{schema_version:before.schema_version,project_id:pid,revision:before.revision,document:snapshot}})).ok()).toBeTruthy();
+});
+
+test('local alignment overrides skipped rows, snapshots source/crop options and preserves unrelated timing through save and undo',async({page},info)=>{
+ const pid='music-packaging',url=`/api/v1/projects/${pid}/document`;
  const asset=(await(await page.request.get(`/api/v1/projects/${pid}`)).json()).asset.id;
  let params:any=null,ack=false;
  await page.route('**/api/v1/capabilities',route=>route.fulfill({json:{schema_version:'studio-capabilities-v1',items:[{id:'job.alignment',enabled:true,reason:null}]}}));
@@ -31,4 +35,33 @@ test('local alignment overrides skipped rows, snapshots source/crop options and 
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('begin="00:00.500"');
  await page.getByRole('button',{name:'重做',exact:true}).click();await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toBe(saved);
  await page.reload();await expect(page.getByRole('textbox',{name:'词 keep',exact:true})).toBeVisible();
+});
+
+test('selected timeline words share local alignment with canvas and timing options follow sync mode',async({page})=>{
+ await page.route('**/api/v1/capabilities',route=>route.fulfill({json:{schema_version:'studio-capabilities-v1',items:[{id:'job.alignment',enabled:true,reason:null}]}}));
+ await page.goto('/projects/music-packaging/edit');
+ await page.locator('[data-outline-drag]').first().click();
+ const a=page.getByRole('button',{name:'时间轴词 a',exact:true}),b=page.getByRole('button',{name:'时间轴词 b',exact:true});
+ await a.click();await b.click({modifiers:['ControlOrMeta']});await a.click({button:'right'});
+ await expect(page.getByRole('menuitem',{name:'局部对齐',exact:true})).toBeEnabled();
+ await expect(page.getByRole('menuitem',{name:/词内节奏点|空拍|终止点/})).toHaveCount(0);
+ await page.getByRole('menuitem',{name:'局部对齐',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'局部对齐',exact:true});await expect(dialog).toBeVisible();
+ const preview=page.waitForRequest(r=>r.url().includes('/alignment-preview?'));
+ await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});
+ expect(new URL((await preview).url()).searchParams.getAll('scope_ids')).toEqual(['a','b']);
+ await dialog.getByRole('button',{name:'取消',exact:true}).click();
+ const canvas=page.locator('main [data-word-id="a"]').first();
+ await canvas.dispatchEvent('contextmenu',{clientX:300,clientY:200});
+ await expect(page.getByRole('menuitem',{name:'局部对齐',exact:true})).toBeEnabled();
+ await expect(page.getByRole('menuitem',{name:/词内节奏点|空拍|终止点/})).toHaveCount(0);await page.keyboard.press('Escape');
+ await a.click();await expect(page.getByRole('textbox',{name:'词内节奏点',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'打轴',exact:true}).click();
+ await a.click({button:'right'});
+ await expect(page.getByRole('menuitem',{name:'添加词内节奏点',exact:true})).toBeVisible();
+ await expect(page.getByRole('menuitem',{name:'开启终止点',exact:true})).toBeVisible();
+ await page.getByRole('menuitem',{name:'添加词内节奏点',exact:true}).click();
+ await expect(page.getByRole('textbox',{name:'词内节奏点',exact:true})).toHaveValue('1');
+ await page.getByRole('button',{name:'编辑',exact:true}).click();
+ await a.click({button:'right'});await expect(page.getByRole('menuitem',{name:/词内节奏点|空拍|终止点/})).toHaveCount(0);
 });

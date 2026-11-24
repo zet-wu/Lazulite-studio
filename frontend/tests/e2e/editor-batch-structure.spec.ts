@@ -13,10 +13,10 @@ test('batch feedback, literal body and Ruby replacements, clear preview and undo
  dialog=await batch(page);await dialog.getByRole('button',{name:'清除注音',exact:true}).click();await expect(dialog.getByRole('status')).toContainText('清除 2 个 Ruby');await dialog.getByRole('button',{name:'应用'}).click();await expect(line(page).locator('[data-ruby-id]')).toHaveCount(0);
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(line(page).locator('[data-ruby-id]')).toHaveCount(2);
 });
-test('multi-word beats and group movement, main merge attachment migration and song-part draft',async({page})=>{
- await edge(page,2);await edge(page,3,{modifiers:['Shift']});await edge(page,2,{button:'right'});await page.getByRole('menuitem',{name:'添加空拍',exact:true}).click();
- await expect.poll(()=>page.evaluate(async()=>Object.keys((await(await fetch('/api/v1/projects/sample-project/document')).json()).document.editing.emptyBeats))).toEqual(['w0-2','w0-3']);
- await edge(page,2,{button:'right'});await page.getByRole('menuitem',{name:'词前移',exact:true}).click();await expect(line(page).locator('[data-word-id]').nth(1)).toHaveAttribute('data-word-id','w0-2');
+test('multi-word beats and word movement, main merge attachment migration and song-part draft',async({page})=>{
+ await page.getByRole('button',{name:'打轴',exact:true}).click();await edge(page,2);await edge(page,3,{modifiers:['Shift']});await edge(page,2,{button:'right'});await page.getByRole('menuitem',{name:'添加词内节奏点',exact:true}).click();
+ await expect.poll(()=>page.evaluate(async()=>Object.keys((await(await fetch('/api/v1/projects/sample-project/document')).json()).document.editing.emptyBeats))).toEqual(['w0-2','w0-3']);await page.getByRole('button',{name:'编辑',exact:true}).click();
+ await line(page).getByRole('textbox',{name:'词 は',exact:true}).press('Alt+ArrowLeft');await expect(line(page).locator('[data-word-id]').nth(1)).toHaveAttribute('data-word-id','w0-2');
  await page.getByRole('button',{name:'撤销',exact:true}).click();
  const outlines=page.locator('[data-outline-drag]');await outlines.nth(0).click();await outlines.nth(2).click({modifiers:['Control']});
  const part=page.getByLabel('歌曲段落',{exact:true});await part.fill('My Verse');await part.press('Enter');

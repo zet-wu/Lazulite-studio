@@ -32,7 +32,7 @@ test('output preference survives a panel switch', async ({ page }) => {
  await expect(page.getByLabel('导出格式')).toHaveValue('lrc');
 });
 test('single switches and mixed batch checkboxes preserve one-step undo',async({page})=>{
- await load(page);await page.locator('[data-outline-drag]').first().click();await page.getByRole('switch',{name:'跳过连续打轴'}).check();
+ await load(page);await page.getByRole('button',{name:'打轴',exact:true}).click();await page.locator('[data-outline-drag]').first().click();await page.getByRole('switch',{name:'跳过连续打轴'}).check();
  await page.locator('[data-outline-drag]').nth(1).click({modifiers:['ControlOrMeta']});const batch=page.getByRole('checkbox',{name:'跳过连续打轴'});await expect(batch).toHaveAttribute('aria-checked','mixed');await batch.click();await expect(batch).toBeChecked();await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(batch).toHaveAttribute('aria-checked','mixed');
 });
 test('table fields protect IME and cancel drafts without changing the saved metadata',async({page})=>{

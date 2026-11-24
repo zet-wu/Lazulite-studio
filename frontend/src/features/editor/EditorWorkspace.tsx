@@ -689,7 +689,7 @@ function EditorWorkspaceContent(props: Props) {
       setContextMenu({x,y,target:cueNode,title:t('editor.cueActions'),actions:[{id:'delete-cue',danger:true,label:t('editor.deleteCue'),run:()=>insertKaraoke({kind:'remove',id:cue.id})}]});return true;
     }
     const beat = target.closest<HTMLElement>('[data-beat-owner]');
-    if (beat) {
+    if (mode === 'sync' && beat) {
       const id = beat.dataset.beatOwner!, kind = beat.dataset.beatKind as 'word' | 'ruby', count = emptyBeatCount(editing, id);
       const change = (count: number) => dispatch({ type: 'set-empty-beat', id, kind, count });
       setContextMenu({ x, y, target: beat, title: t(syncStyle === 'sug' ? 'editor.innerBeats' : 'editor.emptyBeats'), actions: [
@@ -727,21 +727,22 @@ function EditorWorkspaceContent(props: Props) {
       const enabled = scope.ids.length >= 2 && scope.beginMs !== null && scope.endMs !== null && scope.beginMs < scope.endMs;
       actions.push({id:'local-alignment',label:t('alignment.local'),disabled:!enabled,reason:enabled?undefined:t('alignment.localRangeRequired'),run:()=>audioReview.requestAlignmentOpen(scope.ids)});
     }
-    if (effective.kind === 'words' || effective.kind === 'ruby') {
+    if (mode === 'sync' && (effective.kind === 'words' || effective.kind === 'ruby')) {
+      actions.push(selectionAction(effective,'beat',t(syncStyle === 'sug' ? 'editor.addInnerBeats' : 'editor.addBeats')));
       const selectedUnits = stopUnits(document, editing, undefined, [], true).filter(unit => effective.ids.includes(effective.kind === 'words' ? unit.wordId : unit.rubyUnitId ?? ''));
       const allStops = selectedUnits.every(unit => hasSyncStop(document, editing, unit));
       actions.push({id:'sync-stop',label:t(allStops?'sync.removeStop':'sync.addStop'),disabled:!selectedUnits.length,run:()=>dispatch({type:'batch',commands:selectedUnits.map(unit=>({type:'set-sync-stop',id:unit.rubyUnitId??unit.wordId,kind:unit.rubyUnitId?'ruby':'word',stop:!allStops}))})});
     }
     if(effective.kind==='ruby'&&word) {
       title=t('editor.rubyActions');
-      actions.push(selectionAction(effective,'beat',t(syncStyle === 'sug' ? 'editor.addInnerBeats' : 'editor.addBeats')),single('insert-ruby',t('editor.addReading'),()=>setRubyShortcut({wordId:word.id,afterRubyId:rubyId,serial:++rubyShortcutSerial.current})),
+      actions.push(single('insert-ruby',t('editor.addReading'),()=>setRubyShortcut({wordId:word.id,afterRubyId:rubyId,serial:++rubyShortcutSerial.current})),
         selectionAction(effective,'merge',t('editor.merge')),selectionAction(effective,'mora',t('editor.splitBeats')),selectionAction(effective,'redistribute',t('editor.redistributeReading')));
       const unit=word.rubyUnits.find(unit=>unit.id===rubyId)!;
       actions.push({...single('split-ruby',t('editor.splitReading'),()=>dispatch({type:'split-ruby',lineId:line.id,wordId:word.id,rubyId:unit.id,at:Math.floor(Array.from(unit.reading).length/2)})),disabled:multiple||Array.from(unit.reading).length<2});
     } else if(effective.kind==='words'&&word) {
       title=t('editor.wordActions');
       const index=line.words.indexOf(word);
-      actions.push(selectionAction(effective,'beat',t(syncStyle === 'sug' ? 'editor.addInnerBeats' : 'editor.addBeats')),{id:'insert-before',label:t('editor.insertWordBefore'),run:()=>startWordDraft(line.id,line.words[index-1]?.id??null)},{id:'insert-after',label:t('editor.insertWordAfter'),run:()=>startWordDraft(line.id,word.id)},
+      actions.push({id:'insert-before',label:t('editor.insertWordBefore'),run:()=>startWordDraft(line.id,line.words[index-1]?.id??null)},{id:'insert-after',label:t('editor.insertWordAfter'),run:()=>startWordDraft(line.id,word.id)},
         single('split-word',t('editor.splitWord'),()=>setSplitWordId(word.id)),selectionAction(effective,'merge',t('editor.merge')));
       actions.push(single('add-ruby',t('editor.addRuby'),()=>setRubyShortcut({wordId:word.id,serial:++rubyShortcutSerial.current})),selectionAction(effective,'redistribute',t('editor.redistributeReading')));
     } else if(effective.kind==='lines') {
@@ -1080,7 +1081,7 @@ function EditorWorkspaceContent(props: Props) {
             else if (target.kind === 'romanization') { const key=target.attachment==='translation'?'translationTracks':'romanizationTracks'; dispatch({type:'replace-document',document:{...document,[key]:document[key].map(track=>track.id!==target.trackId?track:{...track,contents:track.contents.map(content=>content.id!==target.contentId||content.kind!=='timed'?content:{...content,units:content.units.map(unit=>unit.id===target.unitId?{...unit,beginMs,endMs}:unit)})})}}); }
           }} /> : <small>{t('editor.multiTimeHelp')}</small>}
         </>}
-        {selection?.ids.length === 1 && activePropertyTarget && propertyWord && (activePropertyTarget.kind === 'ruby' || activePropertyTarget.kind === 'word' && propertyWord.rubyUnits.length === 0) && <EmptyBeatField
+        {mode === 'sync' && selection?.ids.length === 1 && activePropertyTarget && propertyWord && (activePropertyTarget.kind === 'ruby' || activePropertyTarget.kind === 'word' && propertyWord.rubyUnits.length === 0) && <EmptyBeatField
           key={targetId(activePropertyTarget)} count={emptyBeatCount(editing, targetId(activePropertyTarget))} whitespace={!propertyText?.trim()}
           commit={count => dispatch({ type: 'set-empty-beat', kind: activePropertyTarget.kind as 'ruby' | 'word', id: targetId(activePropertyTarget), count })}/>}
         {selection?.kind === 'words' && <WordProperties words={document.lines.flatMap(line=>line.words.filter(word=>selection.ids.includes(word.id)).map(word=>({lineId:line.id,word})))} agents={document.agents} noWordAgents={props.project?.amll.noWordAgents} apply={dispatch}/>}
@@ -1090,7 +1091,7 @@ function EditorWorkspaceContent(props: Props) {
         {selection?.kind === 'lines' && selection.ids.length > 1 && <small>{t('editor.multiLineTimeHelp')}</small>}
         {propertyLines.length > 0 && <>
           <BooleanField label={t('editor.skipAlignment')} switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={propertyLines.every(line => editing.skippedAlignmentLineIds.includes(line.id))} mixed={propertyLines.some(line => editing.skippedAlignmentLineIds.includes(line.id)) && !propertyLines.every(line => editing.skippedAlignmentLineIds.includes(line.id))} onChange={checked => dispatch({type:'batch', commands:propertyLines.map(line=>({type:'set-skip-alignment',lineId:line.id,skip:checked}))})}/>
-          <BooleanField label={t('editor.skipSync')} switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} mixed={propertyLines.some(line => editing.ignoredSyncLineIds.includes(line.id)) && !propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} onChange={checked => dispatch({type:'batch', commands:propertyLines.map(line=>({type:'set-ignore-sync',lineId:line.id,ignoreSync:checked}))})}/>
+          {mode === 'sync' && <BooleanField label={t('editor.skipSync')} switchControl={!(selection?.kind === 'lines' && selection.ids.length > 1)} checked={propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} mixed={propertyLines.some(line => editing.ignoredSyncLineIds.includes(line.id)) && !propertyLines.every(line => editing.ignoredSyncLineIds.includes(line.id))} onChange={checked => dispatch({type:'batch', commands:propertyLines.map(line=>({type:'set-ignore-sync',lineId:line.id,ignoreSync:checked}))})}/>}
         </>}
         <SongPartField document={document} lines={propertyLines} apply={dispatch}/>
         {props.project?.amll.simplified ? selectedMainLines.map(line=><BooleanField key={line.id} label={t('editor.duet')} switchControl checked={line.agentRefs.includes('v2')} onChange={duet=>props.applyProject?.({type:'duet',lineId:line.id,duet})}/>) : <SingerSelection agents={document.agents} lines={propertyLines} apply={dispatch} />}
