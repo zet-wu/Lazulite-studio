@@ -200,6 +200,7 @@ export type DictionaryInfo = {
 };
 
 export type DictionaryRange = {
+  alternatives?: string[][] | null;
   line_id: string;
   base_start: number;
   base_end: number;

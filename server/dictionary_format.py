@@ -6,6 +6,31 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 import regex
+import msgspec
+from typing import Annotated
+
+
+ShortText = Annotated[str, msgspec.Meta(min_length=1, max_length=1024)]
+ReadingText = Annotated[str, msgspec.Meta(min_length=1, max_length=4096)]
+SafeInt = Annotated[int, msgspec.Meta(ge=-(2**53-1), le=2**53-1)]
+
+class SegmentRecord(msgspec.Struct):
+    base: ShortText
+    annotate: bool
+    units: Annotated[tuple[ReadingText, ...], msgspec.Meta(max_length=1024)]
+
+class CandidateRecord(msgspec.Struct):
+    id: ShortText
+    priority: SafeInt
+    segments: Annotated[tuple[SegmentRecord, ...], msgspec.Meta(min_length=1, max_length=1024)]
+
+class EntryRecord(msgspec.Struct):
+    surface: ShortText
+    candidates: Annotated[tuple[CandidateRecord, ...], msgspec.Meta(min_length=1, max_length=1024)]
+    cost: Annotated[int, msgspec.Meta(ge=0, le=2**53-1)] | None = None
+
+ENTRY_DECODER = msgspec.json.Decoder(EntryRecord)
+COMPLEX_GRAPHEME = regex.compile(r"[\p{M}\u200c\u200d\ud800-\uffff]")
 
 HARD_BOUNDARIES = frozenset(',，、.。!！?？:：;；()（）[]［］{}｛｝「」『』【】〈〉《》“”"…⋯')
 
@@ -62,7 +87,9 @@ def validate_entry(entry, mode):
     if not isinstance(candidates, list) or not 1 <= len(candidates) <= 1024:
         raise ValueError("读音候选无效")
     ids = set()
-    ends = {0, *(m.end() for m in regex.finditer(r"\X", entry["surface"]))}
+    surface = entry["surface"]
+    simple = COMPLEX_GRAPHEME.search(surface) is None
+    ends = None if simple else {0, *(m.end() for m in regex.finditer(r"\X", surface))}
     for candidate in candidates:
         if not isinstance(candidate, dict) or not nonempty(candidate.get("id")) or candidate["id"] in ids or not integer(candidate.get("priority")):
             raise ValueError("候选标识或优先级无效")
@@ -81,14 +108,14 @@ def validate_entry(entry, mode):
                 raise ValueError("标注段须有读音，不标注段须为空列表")
             bases.append(segment["base"])
             offset += len(segment["base"])
-            if offset not in ends:
+            if ends is not None and offset not in ends:
                 raise ValueError("正文对应段切断字素")
         if "".join(bases) != entry["surface"]:
             raise ValueError("对应段无法重组正文")
     return entry
 
 
-def read_directory(directory):
+def read_directory(directory, *, installed=False):
     directory = Path(directory)
     paths = list(directory.rglob("*"))
     if any(p.is_symlink() for p in paths):
@@ -101,10 +128,23 @@ def read_directory(directory):
     def entries():
         with (directory / "entries.jsonl").open("rb") as stream:
             for line in stream:
-                entry = validate_entry(read_json(line.decode("utf-8")), manifest["scoring"]["mode"])
-                if entry["surface"] in seen:
+                if installed:
+                    try:
+                        entry = ENTRY_DECODER.decode(line)
+                    except msgspec.DecodeError as exc:
+                        raise ValueError(f"词典条目无效：{exc}") from exc
+                    surface = entry.surface
+                    if (entry.cost is not None) != (manifest["scoring"]["mode"] == "weighted"):
+                        raise ValueError("词条 cost 与评分模式不一致")
+                    # Installed packages passed the complete validator during import.
+                    # Typed decoding checks their structure again; correspondence and
+                    # duplicate JSON fields are checked at the import boundary.
+                else:
+                    entry = validate_entry(read_json(line.decode("utf-8")), manifest["scoring"]["mode"])
+                    surface = entry["surface"]
+                if surface in seen:
                     raise ValueError("正文重复，应在同一词条保留全部候选")
-                seen.add(entry["surface"])
+                seen.add(surface)
                 yield entry
         if not seen:
             raise ValueError("词典没有可用词条")

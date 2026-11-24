@@ -15,7 +15,7 @@
 | `jobs.py`、`job_routes.py`、`worker_process.py`、`process_supervisor.py`、`runtime_devices.py` | 单槽任务队列、子进程监督、内存事件取消与设备探测缓存 |
 | `vocals.py`、`vocal_audio.py`、`vocal_models.py`、`vocal_offset.py`、`vocal_worker.py`、`vocal_routes.py` | 人声分离与上传处理、偏移估算、声学分析与人声模型管理 |
 | `alignment.py`、`alignment_models.py`、`alignment_projection.py`、`alignment_postprocessing.py`、`alignment_worker.py` | CTC 对齐输入投影、模型目录管理、受监管子进程推理与尾点延长 |
-| `reading.py`、`furigana.py`、`dictionaries.py`、`dictionary_format.py`、`dictionary_engine.py`、`dictionary_cache.py`、`dictionary_routes.py` | Sudachi/JmdictFurigana 日文注音与助词分析、固定词典安装及压缩前缀树索引 |
+| `reading.py`、`furigana.py`、`dictionaries.py`、`dictionary_format.py`、`dictionary_engine.py`、`dictionary_cache.py`、`dictionary_routes.py` | Sudachi/JmdictFurigana 日文注音与助词分析、固定词典安装、扁平词形索引与读音候选；已安装条目采用类型化 JSON 解码，临时缓存后台写入并随进程回收 |
 | `shape_conversion.py`、`shape_routes.py`、`generate_shapes.py` | OpenCC 多目标字形转换分析与词典资源生成 |
 | `lyric_sources.py`、`embedded_lyrics.py`、`search_conditions.py` | 在线歌词源抓取、内嵌歌词读取与源音频标签搜索条件 |
 | `publish.py`、`publish_routes.py`、`packaging.py`、`publishing.py`、`media_format.py` | 无持久化音乐文件打包（MP4 STPP / LRC、MP3 USLT、FLAC LYRICS）与回读校验 |

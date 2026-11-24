@@ -7,25 +7,10 @@ import shutil
 import tempfile
 import time
 
-from .dictionary_engine import DictionaryIndex, Entry
+from .dictionary_engine import DictionaryIndex
 from .instance_lock import AlreadyRunning, InstanceLock
 
 log = logging.getLogger(__name__)
-
-
-def pack(node):
-    if isinstance(node, Entry):
-        return (node.cost, node.candidates)
-    return {key: pack(value) if key is None else (value[0], pack(value[1]))
-            for key, value in node.items()}
-
-
-def unpack(node):
-    if isinstance(node, tuple):
-        return Entry(*node)
-    for key, value in node.items():
-        node[key] = unpack(value) if key is None else (value[0], unpack(value[1]))
-    return node
 
 
 class IndexCache:
@@ -95,10 +80,11 @@ class IndexCache:
 
     def restore(self, instance):
         with self.path(instance).open("rb") as stream:
-            manifest, sources, count, unknown, root = marshal.load(stream)
+            manifest, sources, count, unknown, entries, max_len, alternatives = marshal.load(stream)
         index = DictionaryIndex.__new__(DictionaryIndex)
         index.manifest, index.sources = manifest, sources
-        index.count, index.unknown, index.root = count, unknown, unpack(root)
+        index.count, index.unknown, index.entries, index.max_len = count, unknown, entries, max_len
+        index.alternatives = alternatives
         return index
 
     def write(self, instance, index):
@@ -106,7 +92,7 @@ class IndexCache:
         temporary = path.with_suffix(".tmp")
         try:
             with temporary.open("wb") as stream:
-                marshal.dump((index.manifest, index.sources, index.count, index.unknown, pack(index.root)), stream)
+                marshal.dump((index.manifest, index.sources, index.count, index.unknown, index.entries, index.max_len, index.alternatives), stream)
             temporary.replace(path)
             return True
         except (OSError, ValueError):

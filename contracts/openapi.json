@@ -4583,6 +4583,23 @@
             },
             "type": "array",
             "title": "Units"
+          },
+          "alternatives": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alternatives"
           }
         },
         "type": "object",

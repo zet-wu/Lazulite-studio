@@ -46,6 +46,7 @@ class DictionaryRange(BaseModel):
     base: str
     status: Literal["known", "unknown", "ambiguous", "boundary", "unannotated"]
     units: list[str]
+    alternatives: list[list[str]] | None = None
 
 
 class DictionaryAnalysis(BaseModel):
@@ -83,7 +84,7 @@ def dictionary_router(manager, *, auth, write):
         except (ValueError, KeyError, OSError) as exc:
             raise error(exc) from exc
 
-    @router.post("/{ident}/analyze", response_model=DictionaryAnalysis)
+    @router.post("/{ident}/analyze", response_model=DictionaryAnalysis, response_model_exclude_none=True)
     async def analyze(ident: str, body: DictionarySnapshot, request: Request, stream: bool = Query(False), _: object = Depends(write)):
         cancelled = threading.Event()
         ready = threading.Event()

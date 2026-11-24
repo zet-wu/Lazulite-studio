@@ -125,7 +125,7 @@ def test_optimal_paths_local_ambiguity_candidates_and_boundaries(tmp_path):
             ("重", "known"), ("庆", "ambiguous"), ("甲", "ambiguous"), ("乙丙", "ambiguous"), ("👩‍👩‍👧‍👦", "unknown")]
         assert "".join(r["base"] for r in values) == "重庆甲乙丙👩‍👩‍👧‍👦，重 庆"
         assert not any(r["base"] == "重庆" for r in values)
-        assert [r["units"] for r in values[:4]] == [["chóng"], ["Q"], ["a"], ["B"]]
+        assert [r["units"] for r in values[:4]] == [["chóng"], ["qìng"], ["a"], ["B"]]
         assert index.analyze("重庆甲乙丙👩‍👩‍👧‍👦，重 庆") == values
         cancel = threading.Event()
         cancel.set()
@@ -253,6 +253,10 @@ def test_two_memory_indexes_disk_restore_expiry_and_corruption(tmp_path, monkeyp
     manager.cache.path(first).write_bytes(b"broken cache")
     with manager.acquire("one", first) as index:
         assert index.count == 1
+    with manager.lock:
+        writer = manager.writing.get(first)
+    if writer is not None:
+        writer.result()
     manager.cache.recent[first] -= manager.cache.ttl + 1
     manager.list()
     assert not manager.cache.path(first).exists()
@@ -260,9 +264,9 @@ def test_two_memory_indexes_disk_restore_expiry_and_corruption(tmp_path, monkeyp
         assert index.count == 1  # expiry leaves the in-memory index usable
     manager.cache.memory.clear()
     calls = []
-    def build(*args):
+    def build(*args, **kwargs):
         calls.append(1)
-        return DictionaryIndex(*args)
+        return DictionaryIndex(*args, **kwargs)
     monkeypatch.setattr("server.dictionaries.DictionaryIndex", build)
     with manager.acquire("one", first):
         pass
@@ -281,11 +285,11 @@ def test_shared_loading_cancel_and_replacement_do_not_block_manager(tmp_path, mo
     manager.cache.invalidate(instance)
     started, resume, cancel = threading.Event(), threading.Event(), threading.Event()
     calls = []
-    def build(*args):
+    def build(*args, **kwargs):
         calls.append(1)
         started.set()
         assert resume.wait(5)
-        return DictionaryIndex(*args)
+        return DictionaryIndex(*args, **kwargs)
     def acquire(cancel=None):
         with manager.acquire("custom", instance, cancel) as index:
             return index.analyze("重庆")
@@ -319,11 +323,11 @@ def test_same_version_replacement_during_load_cannot_republish_old_index(tmp_pat
     old = manager.install(package())["instance"]
     manager.cache.invalidate(old)
     started, resume = threading.Event(), threading.Event()
-    def build(path):
+    def build(path, **kwargs):
         if str(path).endswith(manager.record["installed"]["custom"]):
             started.set()
             assert resume.wait(5)
-        return DictionaryIndex(path)
+        return DictionaryIndex(path, **kwargs)
     def acquire():
         with manager.acquire("custom", old) as index:
             return index.analyze("重庆")
@@ -404,8 +408,41 @@ def test_ambiguous_defaults_keep_one_candidate_and_unannotated_segments(tmp_path
         with manager.acquire('custom', info['instance']) as index:
             result = index.analyze('甲乙丙丁戊')
             assert [(r['status'], r['units']) for r in result] == [
-                ('ambiguous', ['A']), ('ambiguous', ['z']), ('unannotated', []),
+                ('ambiguous', ['B' if reverse else 'A']), ('ambiguous', ['a' if reverse else 'z']), ('ambiguous', ['c']) if reverse else ('unannotated', []),
                 ('known', ['d']), ('unknown', [])]
             if previous is not None:
-                assert result == previous
+                assert result[0]['alternatives'] == list(reversed(previous[0]['alternatives']))
             previous = result
+
+
+def test_cold_analysis_returns_before_cache_write_and_removed_instance_stays_retired(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    manager = Dictionaries(tmp_path)
+    installed = manager.install(package())
+    instance = installed['instance']
+    manager.cache.invalidate(instance)
+    started, resume = threading.Event(), threading.Event()
+    write = manager.cache.write
+    def slow_write(*args):
+        started.set()
+        assert resume.wait(5)
+        return write(*args)
+    monkeypatch.setattr(manager.cache, 'write', slow_write)
+    def analyze():
+        with manager.acquire('custom', instance) as index:
+            return index.analyze('重庆')
+    try:
+        with ThreadPoolExecutor(1) as pool:
+            future = pool.submit(analyze)
+            assert started.wait(5)
+            assert future.result(timeout=1)[0]['units'] == ['chóng', 'qìng']
+            with manager.lock:
+                writer = manager.writing[instance]
+            manager.remove('custom')
+            resume.set()
+            writer.result(timeout=5)
+        assert manager.cache.get(instance) is None
+        assert not manager.cache.path(instance).exists()
+    finally:
+        resume.set()
+        manager.close()

@@ -1624,6 +1624,8 @@ export interface components {
             status: "known" | "unknown" | "ambiguous" | "boundary" | "unannotated";
             /** Units */
             units: string[];
+            /** Alternatives */
+            alternatives?: string[][] | null;
         };
         /** DictionarySnapshot */
         DictionarySnapshot: {

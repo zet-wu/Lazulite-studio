@@ -37,6 +37,7 @@ class Dictionaries:
         self.instances = {ident: uuid.uuid4().hex for ident in self.record["installed"]}
         self.cache = IndexCache(self.root)
         self.loading = {}
+        self.writing = {}
         self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="dictionary-index")
         self.closed = False
         self.leases = {}
@@ -191,15 +192,17 @@ class Dictionaries:
                 except (OSError, ValueError, EOFError, TypeError, AttributeError, KeyError):
                     logging.getLogger(__name__).warning("临时词典索引恢复失败，重新读取源词典", exc_info=True)
             if index is None:
-                index = DictionaryIndex(self.root / directory)
+                index = DictionaryIndex(self.root / directory, installed=True)
                 if index.manifest["id"] != ident:
                     raise ValueError("已安装词典 ID 被修改，请重新导入")
-                disk = self.cache.write(instance, index)
+                disk = False
             else:
                 disk = True
             with self.lock:
                 if not self.closed and self.instances.get(ident) == instance:
                     self.cache.publish(instance, index, disk)
+                    if not disk and instance not in self.writing:
+                        self.writing[instance] = self.executor.submit(self._write_index, ident, instance, index)
                 else:
                     self.cache.invalidate(instance)
             return index
@@ -207,6 +210,16 @@ class Dictionaries:
             with self.lock:
                 self.loading.pop(instance, None)
                 self._release(directory)
+
+    def _write_index(self, ident, instance, index):
+        disk = self.cache.write(instance, index)
+        with self.lock:
+            self.writing.pop(instance, None)
+            if not self.closed and self.instances.get(ident) == instance:
+                if disk:
+                    self.cache.recent[instance] = time.monotonic()
+            else:
+                self.cache.invalidate(instance)
 
     @contextmanager
     def acquire(self, ident, instance, cancel=None):
