@@ -28,13 +28,13 @@ for (const swapped of [false, true]) test(`boundary drag toggles adjacency durin
   await rubyEdge.scrollIntoViewIfNeeded();
   const r = (await rubyEdge.boundingBox())!;
   await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
-  if (!swapped) await page.keyboard.down('Control');
+  if (swapped) await page.keyboard.down('Control');
   await page.mouse.down();
   await page.mouse.move(r.x + r.width / 2 + 16, r.y + r.height / 2, { steps: 4 });
   await expect.poll(async () => (await b.boundingBox())!.x).toBeGreaterThan(original + 10);
-  if (swapped) await page.keyboard.down('Control'); else await page.keyboard.up('Control');
-  await expect.poll(async () => (await b.boundingBox())!.x).toBeCloseTo(original, 0);
   if (swapped) await page.keyboard.up('Control'); else await page.keyboard.down('Control');
+  await expect.poll(async () => (await b.boundingBox())!.x).toBeCloseTo(original, 0);
+  if (swapped) await page.keyboard.down('Control'); else await page.keyboard.up('Control');
   await expect.poll(async () => (await b.boundingBox())!.x).toBeGreaterThan(original + 10);
   await page.mouse.up(); await page.keyboard.up('Control');
   const after = (await b.boundingBox())!.x;
@@ -44,7 +44,7 @@ for (const swapped of [false, true]) test(`boundary drag toggles adjacency durin
   await expect.poll(async () => (await b.boundingBox())!.x).toBeCloseTo(after, 0);
   // Word track handles carry the coincident tail/head ruby endpoints too.
   await page.getByRole('button', { name: '撤销', exact: true }).click();
-  if (!swapped) await page.keyboard.down('Meta');
+  if (swapped) await page.keyboard.down('Meta');
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down();
   await page.mouse.move(handle.x + handle.width / 2 + 18, handle.y + handle.height / 2, { steps: 4 });
   await page.mouse.up(); await page.keyboard.up('Meta');
@@ -64,11 +64,10 @@ test('linked boundary leaves its original snap point and Escape cancels the cand
   const original = (await b.boundingBox())!.x;
   const edge = page.getByLabel('时间轴词 甲结束边界', { exact: true });
   const r = (await edge.boundingBox())!;
-  await page.keyboard.down('Control');
   await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2); await page.mouse.down();
   await page.mouse.move(r.x + r.width / 2 + 5, r.y + r.height / 2, { steps: 3 });
   await expect.poll(async () => (await b.boundingBox())!.x).toBeGreaterThan(original + 2);
-  await page.keyboard.press('Escape'); await page.mouse.up(); await page.keyboard.up('Control');
+  await page.keyboard.press('Escape'); await page.mouse.up();
   await expect.poll(async () => (await b.boundingBox())!.x).toBeCloseTo(original, 0);
 });
 

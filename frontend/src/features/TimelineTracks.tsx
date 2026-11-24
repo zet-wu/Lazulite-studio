@@ -236,7 +236,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
       : [];
     const moveSnapTimes = moveSnapOptions.map(option => option.time);
     const lane = (event.currentTarget.closest('[data-track-lane]') ?? tracksRef.current!.querySelector('[data-track-lane]')) as HTMLElement;
-    const next: Drag = { linked: Boolean(event.ctrlKey || event.metaKey) !== swapBoundaryDrag, modifier: Boolean(event.ctrlKey || event.metaKey), viewStartMs: timelineViewStart(event.currentTarget,startMs), started: false, source: document, target, side, x: event.clientX, y: event.clientY, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, moving, basePoints, moveSnapOptions, moveSnapTimes, baseTimes: lyricTimes(document), candidate: { timeMs: originalMs, document, error: '' } };
+    const next: Drag = { linked: Boolean(event.ctrlKey || event.metaKey) === swapBoundaryDrag, modifier: Boolean(event.ctrlKey || event.metaKey), viewStartMs: timelineViewStart(event.currentTarget,startMs), started: false, source: document, target, side, x: event.clientX, y: event.clientY, current: event.clientX, width: lane.getBoundingClientRect().width, originalMs, moving, basePoints, moveSnapOptions, moveSnapTimes, baseTimes: lyricTimes(document), candidate: { timeMs: originalMs, document, error: '' } };
     event.currentTarget.setPointerCapture(event.pointerId);
     capture.current = { element: event.currentTarget, id: event.pointerId };
     if (side !== 'pan') publish({ timeMs: originalMs, valid: true });
@@ -327,7 +327,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
   };
   const move = (event: PointerEvent<HTMLElement>) => {
     if (!dragRef.current) return;
-    dragRef.current = { ...dragRef.current, modifier: Boolean(event.ctrlKey || event.metaKey), linked: Boolean(event.ctrlKey || event.metaKey) !== swapBoundaryDrag };
+    dragRef.current = { ...dragRef.current, modifier: Boolean(event.ctrlKey || event.metaKey), linked: Boolean(event.ctrlKey || event.metaKey) === swapBoundaryDrag };
     pendingMove.current = { clientX: event.clientX, clientY: event.clientY, element: event.currentTarget };
     if (moveFrame.current === null) {
       moveFrame.current = requestAnimationFrame(() => {
@@ -346,8 +346,8 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
       const current = dragRef.current, held = capture.current;
       if (!current || !held || current.side !== 'beginMs' && current.side !== 'endMs') return;
       const modifier = Boolean(event.ctrlKey || event.metaKey);
-      if (modifier === current.modifier && current.linked === (modifier !== swapBoundaryDrag)) return;
-      dragRef.current = { ...current, modifier, linked: modifier !== swapBoundaryDrag };
+      if (modifier === current.modifier && current.linked === (modifier === swapBoundaryDrag)) return;
+      dragRef.current = { ...current, modifier, linked: modifier === swapBoundaryDrag };
       const pending = pendingMove.current;
       applyMove(pending?.clientX ?? current.current, pending?.clientY ?? current.pointerY ?? current.y, held.element);
     };
@@ -355,7 +355,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
     return () => { window.removeEventListener('keydown', modifiers); window.removeEventListener('keyup', modifiers); };
   }, []);
   const finish = (event: PointerEvent<HTMLElement>) => {
-    if (dragRef.current) dragRef.current = { ...dragRef.current, modifier: Boolean(event.ctrlKey || event.metaKey), linked: Boolean(event.ctrlKey || event.metaKey) !== swapBoundaryDrag };
+    if (dragRef.current) dragRef.current = { ...dragRef.current, modifier: Boolean(event.ctrlKey || event.metaKey), linked: Boolean(event.ctrlKey || event.metaKey) === swapBoundaryDrag };
     const pending = pendingMove.current;
     cancelMoveFrame();
     if (pending || (dragRef.current?.target && dragRef.current.started)) applyMove(pending?.clientX ?? event.clientX, pending?.clientY ?? event.clientY, pending?.element ?? event.currentTarget);

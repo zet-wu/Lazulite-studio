@@ -18,8 +18,10 @@ test('linked boundaries, untimed pasted ruby and contents, and swapped drag pref
   await page.keyboard.press('Escape');
   const edge = page.getByLabel('时间轴词 甲结束边界', { exact: true }), b = page.getByRole('button', { name: '时间轴词 乙', exact: true });
   const original = (await b.boundingBox())!.x, box = (await edge.boundingBox())!;
+  await page.keyboard.down('Control');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 16, box.y + box.height / 2, { steps: 4 }); await page.mouse.up();
+  await page.keyboard.up('Control');
   await expect.poll(async () => (await b.boundingBox())!.x).toBeGreaterThan(original + 10);
   const saved = page.waitForResponse(response => response.url().endsWith(`/projects/${pid}/document`) && response.request().method() === 'PUT');
   await page.getByRole('button', { name: '保存', exact: true }).click(); expect((await saved).status()).toBe(200);
