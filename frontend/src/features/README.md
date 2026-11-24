@@ -18,7 +18,7 @@
 
 - **注音与文字工具**：`JapaneseRubyDialog`（智能日文注音）、`DictionaryRubyDialog`（词典注音）、`RomanizationGenerationDialog`（生成日文罗马字音译）、`RubyGenerationDialog`（从音译生成注音）与 `ShapeConversionDialog`（字形转换）共用源快照校验与可编辑预览，确认后以单次撤销提交。
 - **管理弹窗**：`SingerDialog`（歌手管理）、`TranslationTrackDialog`（翻译/音译轨道）、`DictionaryManager`（词典安装）、`DeviceSettings` / `VocalModels` / `AlignmentDefaults`（模型与设备管理）以及 `StudioSettings`（外观、时间轴、快捷键与语言偏好）。
-- **卡拉 OK**：`KaraokeTools`、`KaraokeTrack`、`SingerMarkersDialog` 与 `SugSingersDialog` 提供分组管理、导唱符编辑、NicoKara 歌手标记和 SUG 歌手名称覆盖。
+- **卡拉 OK**：`KaraokeTools`、`KaraokeTrack`、`SingerMarkersDialog` 与 `SugSingersDialog` 提供分组管理、导唱符编辑、NicoKara 歌手标记和 SUG 歌手名称覆盖。歌词画布沿用简洁编辑的读音／正文两行布局；打轴点与进度仅在打轴模式展示。
 
 ## 歌词获取与导出打包
 

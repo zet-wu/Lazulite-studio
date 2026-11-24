@@ -43,4 +43,6 @@ pnpm --dir mcp build
 node mcp/dist/server.mjs --transport stdio --data-dir path/to/data
 ```
 
-`preview_alignment` 与 `start_alignment` 接受相同的 `scope_ids` 以对齐选中的读音单元。启动参数的 `audio_source`（`vocals`／`original`）和 `crop_vocals` 分别控制波形来源与人声片段裁切；原曲关闭裁切时直接使用源音频。结果中的 `selection` 由共享领域合并逻辑约束更新范围。
+`preview_alignment` 与 `start_alignment` 接受相同的 `scope_ids` 以对齐选中的读音单元。`analyze_japanese_reading` 的 `auto_merge` 控制数字与日文量词的合并注音，默认关闭。
+
+启动参数的 `audio_source`（`vocals`／`original`）和 `crop_vocals` 分别控制波形来源与人声片段裁切；原曲模式直接使用源音频，并可独立使用现有手工片段裁切。结果中的 `selection` 由共享领域合并逻辑约束更新范围。
