@@ -1,3 +1,4 @@
+import {useShortcuts,matchesBinding,shortcutInput} from './shortcuts';
 import { errorMessage, message as describeMessage, MessageError } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { i18n } from '../i18n';
@@ -50,6 +51,7 @@ export function Workspace({ projectId }: { projectId: string }) {
 
 function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, asset }: { projectId: string; title: string; initialSnapshot: ProjectSnapshot; initialRevision: string; asset: Asset | null }) {
   useTranslation();
+  const keys=useShortcuts();
   const transport = useRef<TransportHandle>(null);
   const prepareAudioImport=useRef<(()=>boolean)|null>(null);
   const [timelineHost, setTimelineHost] = useState<HTMLDivElement | null>(null);
@@ -402,9 +404,11 @@ function ProjectEditor({ projectId, title, initialSnapshot, initialRevision, ass
     downloadBlob(content, `${title}.${format === 'elrc' ? 'extended.lrc' : format}`, format === 'ttml' ? 'application/ttml+xml' : 'text/plain;charset=utf-8');
   };
   return <KaraokeContext value={{project:editor.project,locked:editor.editingLocked,apply:command=>{if(editor.conflict)throw new MessageError(describeMessage('workspace.conflict'));editor.applyProject(command);}}}><ProjectEditingContext value={editor.project.editing}><div className={styles.editorShell} onKeyDown={event=>{
-    if(event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || !(event.ctrlKey||event.metaKey) || (event.target as Element).closest('input,textarea,select,[role="dialog"]'))return;
-    if(event.key.toLowerCase()==='z'&&!editor.editingLocked){event.preventDefault();if(event.shiftKey)editor.redo();else editor.undo();}
-    if(event.key.toLowerCase()==='s'){event.preventDefault();void editor.save();}
+    if(event.defaultPrevented||event.nativeEvent.isComposing||window.document.querySelector('[role="dialog"], [role="menu"], details[data-top-menu][open]'))return;
+    if(matchesBinding(event.nativeEvent,keys.save)){event.preventDefault();if(!editor.saving)void editor.save();return;}
+    if(shortcutInput(event.target,event.code)||editor.editingLocked)return;
+    if(matchesBinding(event.nativeEvent,keys.undo)){event.preventDefault();editor.undo();}
+    else if(matchesBinding(event.nativeEvent,keys.redo)){event.preventDefault();editor.redo();}
   }}><EditorWorkspace audioImportDisabled={audioImportBusy||editor.editingLocked||editor.saving} prepareAudioImport={prepareAudioImport} onImportAudio={()=>setImportRequest(v=>v+1)} alignment={{locked:editor.editingLocked,lock:editor.lockEditing,save:editor.saveForPackaging}} historyVersion={editor.historyVersion} project={editor.project} applyProject={command=>{if(editor.conflict)throw new MessageError(describeMessage('workspace.conflict'));editor.applyProject(command);}} sourceAssetId={asset?.id} audioDurationMs={asset?.source_duration_ms ?? undefined} onTimelineHost={setTimelineHost} assignmentError={assignmentError} projectId={projectId} title={title} document={editor.document} apply={(command) => { if (!editor.apply(command)) throw new MessageError(describeMessage('workspace.conflict')); }} undo={editor.undo} redo={editor.redo}
     canUndo={editor.canUndo&&!editor.editingLocked} canRedo={editor.canRedo&&!editor.editingLocked} dirty={editor.dirty} saving={editor.saving}
     onSave={() => void editor.save()}

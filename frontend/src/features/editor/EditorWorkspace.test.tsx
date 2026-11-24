@@ -43,20 +43,20 @@ it('routes desktop history shortcuts only outside inputs, dialogs and IME compos
     /></MemoryRouter>);
   const line = container.querySelector<HTMLElement>('[data-line-id]')!;
   const word = screen.getByRole('textbox', { name: '词 歌' });
-  fireEvent.keyDown(line, { key: 'z', ctrlKey: true });
-  fireEvent.keyDown(line, { key: 'Z', metaKey: true, shiftKey: true });
+  fireEvent.keyDown(line, { key: 'z', code:'KeyZ', ctrlKey: true });
+  fireEvent.keyDown(line, { key: 'Z', code:'KeyZ', ctrlKey: true, shiftKey: true });
   expect(undo).toHaveBeenCalledOnce();
   expect(redo).toHaveBeenCalledOnce();
-  fireEvent.keyDown(word, { key: 'z', ctrlKey: true });
-  fireEvent.keyDown(word, { key: 'Z', metaKey: true, shiftKey: true });
-  fireEvent.keyDown(line, { key: 'z', ctrlKey: true, isComposing: true });
+  fireEvent.keyDown(word, { key: 'z', code:'KeyZ', ctrlKey: true });
+  fireEvent.keyDown(word, { key: 'Z', code:'KeyZ', ctrlKey: true, shiftKey: true });
+  fireEvent.keyDown(line, { key: 'z', code:'KeyZ', ctrlKey: true, isComposing: true });
   expect(undo).toHaveBeenCalledOnce();
   expect(redo).toHaveBeenCalledOnce();
   fireEvent.click(screen.getByText('歌词设置'));
   fireEvent.click(screen.getByRole('button', { name: '歌词元数据' }));
-  fireEvent.keyDown(screen.getByRole('dialog', { name: '歌词元数据' }), { key: 'z', ctrlKey: true });
+  fireEvent.keyDown(screen.getByRole('dialog', { name: '歌词元数据' }), { key: 'z', code:'KeyZ', ctrlKey: true });
   expect(undo).toHaveBeenCalledOnce();
-  fireEvent.keyDown(line, { key: 's', metaKey: true });
+  fireEvent.keyDown(line, { key: 's', code:'KeyS', ctrlKey: true });
   expect(onSave).toHaveBeenCalledOnce();
 });
 
@@ -122,7 +122,7 @@ it('keeps the selected object and real focus when deletion is rejected', () => {
     undo={() => {}} redo={() => {}} canUndo={false} canRedo={false} dirty={false} onSave={() => {}} /></MemoryRouter>);
   const word = container.querySelector<HTMLElement>('[data-word-id]')!;
   fireEvent.click(word); word.focus();
-  fireEvent.keyDown(word, { key: 'Delete' });
+  fireEvent.keyDown(word, { key: 'Delete', code:'Delete' });
   expect(apply).toHaveBeenCalledOnce();
   expect(screen.getByRole('alert')).toHaveTextContent('删除被拒绝');
   expect(word).toHaveFocus();

@@ -1,7 +1,9 @@
+import {quickSplitOptions} from '../../adapters/quick-split';
+import {segmentText, distributeSegmentTime, loadSyllableDivider} from '../../domain/segmentation';
 import { useSyncStyle } from '../../adapters/sync-style';
 import { hasSyncStop, syncUnits as stopUnits } from '../../domain/sync-editing';
 import { localAlignmentTargets } from '../../domain/alignment';
-import { usePlaybackShortcut } from '../shortcuts';
+import { usePlaybackShortcut, useShortcuts, matchesBinding, shortcutInput } from '../shortcuts';
 import {usePreference} from '../../adapters/studio-preferences';
 import { message as describeMessage, errorMessage } from '../../domain/messages';
 import { i18n, formatMessage } from '../../i18n';
@@ -147,6 +149,11 @@ function useLiveCallback<Args extends unknown[], Result>(callback: (...args: Arg
 }
 
 function EditorWorkspaceContent(props: Props) {
+  const keys=useShortcuts();
+  const splitBusy=useRef(false);
+  const splitVersion=useRef(0);
+  useEffect(()=>{splitVersion.current++;},[props.document]);
+
   useTranslation();
   const editing = useProjectEditing();
   const [syncStyle] = useSyncStyle();
@@ -679,6 +686,47 @@ function EditorWorkspaceContent(props: Props) {
       } catch(cause) { setMessage(errorMessage(cause)); }
     } };
   };
+  const quickSplit = async (current:EditorSelection) => {
+    if(splitBusy.current)return;
+    const version=splitVersion.current;
+    try {
+      if(current.kind==='words') {
+        if(current.ids.length!==1)throw new Error(t('editor.singleRequired'));
+        const line=document.lines.find(line=>line.id===current.lineId)!;
+        const word=line.words.find(word=>word.id===current.ids[0])!;
+        if(word.rubyUnits.length){setSplitWordId(word.id);return;}
+        if(word.obscene||emptyBeatCount(editing,word.id))throw new Error(t(word.obscene?'segment.blockObscene':'segment.blockBeat'));
+        if(Array.from(new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(word.text)).length<2)throw new Error(t('shortcuts.cannotSplit'));
+        const options=quickSplitOptions();
+        splitBusy.current=true;
+        const divide=options.western==='syllable'?await loadSyllableDivider(options.language):undefined;
+        if(version!==splitVersion.current)return;
+        const parts=segmentText(word.text,options,divide);
+        if(parts.length<2){setSplitWordId(word.id);return;}
+        dispatch({type:'segment-words',changes:[{lineId:line.id,wordId:word.id,words:distributeSegmentTime(word,parts,options.punctuationWeight,editing)}]});
+      } else if(current.kind==='lines') {
+        if(current.ids.length!==1)throw new Error(t('editor.singleRequired'));
+        const line=document.lines.find(line=>line.id===current.ids[0])!;
+        if(line.backgroundOf||line.words.length<2)throw new Error(t('shortcuts.cannotSplit'));
+        setSplitLineId(line.id);
+      } else if(current.kind==='ruby') {
+        const mora=selectionAction(current,'mora',t('editor.splitBeats'));
+        if(!mora.disabled){mora.run();return;}
+        if(current.ids.length!==1)throw new Error(t('shortcuts.cannotSplit'));
+        const word=document.lines.find(line=>line.id===current.lineId)!.words.find(word=>word.id===current.wordId)!;
+        const unit=word.rubyUnits.find(unit=>unit.id===current.ids[0])!;
+        const parts=Array.from(new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(unit.reading),item=>item.segment);
+        if(parts.length<2)throw new Error(t('shortcuts.cannotSplit'));
+        dispatch({type:'split-ruby',lineId:current.lineId,wordId:word.id,rubyId:unit.id,at:Array.from(parts.slice(0,Math.floor(parts.length/2)).join('')).length});
+      } else {
+        if(current.ids.length!==1)throw new Error(t('editor.singleRequired'));
+        const action=selectionAction(current,current.kind==='romanization-unit'?'split':'tokenize',t('editor.splitUnit'));
+        if(action.disabled)throw new Error(action.reason);
+        action.run();
+      }
+    } catch(cause){setMessage(errorMessage(cause));}
+    finally{splitBusy.current=false;}
+  };
   const openContext = (target: HTMLElement, x: number, y: number) => {
     selectionArea.current = target.closest('[data-editable-timeline]') ? 'timeline' : outlineRef.current?.contains(target) ? 'outline' : 'canvas';
     const cueNode=target.closest<HTMLElement>('[data-cue-id]');
@@ -925,15 +973,22 @@ function EditorWorkspaceContent(props: Props) {
     paste(clipboard && event.clipboardData.getData(CLIPBOARD_MIME) === clipboardToken.current ? clipboard : null, text);
   }} onKeyDown={(event) => {
     if (event.key === 'Escape' && drag.active()) { drag.cancel(); event.preventDefault(); return; }
-    if (event.nativeEvent.isComposing || (event.target instanceof Element && event.target.closest('[role="dialog"]'))) return;
-    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 's') {
+    if (event.defaultPrevented || event.nativeEvent.isComposing || (event.target instanceof Element && event.target.closest('[role="dialog"]'))) return;
+    if (matchesBinding(event.nativeEvent,keys.save)) {
       event.preventDefault();
       if (!props.saving) props.onSave();
       return;
     }
-    if (isTextInput(event.target)) return;
-    if (event.key === 'Delete') {
-      if (!event.defaultPrevented && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey
+    if (shortcutInput(event.target,event.code)) return;
+    if ((matchesBinding(event.nativeEvent,keys.merge)||matchesBinding(event.nativeEvent,keys.split)) && selection?.ids.length && ownsSelection(event.target) && !props.alignment?.locked && !drag.active()) {
+      event.preventDefault();
+      if(event.repeat)return;
+      if(matchesBinding(event.nativeEvent,keys.split))void quickSplit(selection);
+      else {const action=selectionAction(selection,'merge',t('editor.merge'));if(action.disabled)setMessage(action.reason??'');else action.run();}
+      return;
+    }
+    if (matchesBinding(event.nativeEvent,keys.remove)) {
+      if (!event.defaultPrevented && !event.repeat
         && !drag.active() && !window.document.querySelector('[role="dialog"], [role="menu"], details[data-top-menu][open]')
         && ownsSelection(event.target)) {
         event.preventDefault();
@@ -942,14 +997,14 @@ function EditorWorkspaceContent(props: Props) {
       return;
     }
 
-    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
+    if ((matchesBinding(event.nativeEvent,keys.undo)||matchesBinding(event.nativeEvent,keys.redo))) {
       event.preventDefault();
       // History may remove the focused object. Keep the next key in the editor.
       const focused = event.target as HTMLElement;
       requestAnimationFrame(() => {
         if (!focused.isConnected && window.document.activeElement === window.document.body) mainRef.current?.focus({ preventScroll: true });
       });
-      if (event.shiftKey) { if (props.canRedo) props.redo(); }
+      if (matchesBinding(event.nativeEvent,keys.redo)) { if (props.canRedo) props.redo(); }
       else if (props.canUndo) props.undo();
       return;
     }
@@ -958,7 +1013,7 @@ function EditorWorkspaceContent(props: Props) {
       const rect = target.getBoundingClientRect();
       if (openContext(target, rect.left + 12, rect.bottom)) event.preventDefault();
     }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(false); }
+    if (matchesBinding(event.nativeEvent,keys.selectAll)) { event.preventDefault(); selectAll(false); }
     if (event.key === 'Escape') { event.preventDefault(); setSelection({ kind: 'lines', ids: [], anchorId: '', activeId: '' }); }
   }}>
     <EditorMenu {...props} editingLocked={props.alignment?.locked} amllSettings={props.project&&props.applyProject?close=><AmllSettings project={props.project!} apply={command=>{if(props.alignment?.locked)return;try{props.applyProject!(command);}catch(e){setMessage(errorMessage(e));}}} locate={rule=>{close();setValidationTab('amll');setFocusRule(rule);setMode('package');}}/>:undefined} activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} outlineVisible={columns.outlineVisible} inspectorVisible={columns.inspectorVisible} onToggleOutline={() => toggleColumn('outline')} onToggleInspector={() => toggleColumn('inspector')} canUndo={props.canUndo && !props.alignment?.locked} canRedo={props.canRedo && !props.alignment?.locked} />

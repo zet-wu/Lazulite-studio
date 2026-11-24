@@ -598,6 +598,11 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   };
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
+      if(asset && !e.defaultPrevented && !e.isComposing && !e.repeat && !shortcutInput(e.target,e.code)) {
+        if(matchesBinding(e,keys.slower)||matchesBinding(e,keys.faster)) {
+          e.preventDefault();changeRate(rate+(matchesBinding(e,keys.faster)?0.1:-0.1));
+        }
+      }
       if (e.key === 'Escape' && (panDrag.current || loopDrag.current)) {
         cancelPan();
         if (loopDrag.current) setLoop(loopDrag.current.original);
@@ -607,7 +612,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [asset, play, keys]);
+  }, [asset, play, keys, rate, changeRate]);
   const disabled = !asset;
   const retryMedia = () => {
     audio.current?.load();

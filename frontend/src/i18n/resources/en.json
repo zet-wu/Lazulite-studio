@@ -1732,5 +1732,13 @@
   "editor.increaseInnerBeats": "Add inner rhythm point",
   "editor.decreaseInnerBeats": "Remove inner rhythm point",
   "editor.clearInnerBeats": "Clear inner rhythm points",
-  "field.whitespaceInnerBeats": "Whitespace does not participate in timing; set 0 to clear."
+  "field.whitespaceInnerBeats": "Whitespace does not participate in timing; set 0 to clear.",
+  "shortcuts.fileHistory": "File and history",
+  "shortcuts.editing": "Editing",
+  "shortcuts.slower": "Slower",
+  "shortcuts.faster": "Faster",
+  "shortcuts.selectAll": "Select all",
+  "shortcuts.remove": "Delete selection",
+  "settings.quickSplit": "Quick split defaults",
+  "shortcuts.cannotSplit": "The selected unit cannot be split further"
 }

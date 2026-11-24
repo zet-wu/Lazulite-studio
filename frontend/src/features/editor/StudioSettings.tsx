@@ -1,3 +1,5 @@
+import {quickSplitKey} from '../../adapters/quick-split';
+import {DEFAULT_SEGMENT_OPTIONS, SYLLABLE_LANGUAGES, type SegmentOptions} from '../../domain/segmentation';
 import {useSyncStyle, type SyncStyle} from '../../adapters/sync-style';
 import {changeEditorDisplay, type EditorDisplay} from '../../adapters/editor-display';
 import {VocalModels} from '../VocalModels';
@@ -42,6 +44,9 @@ export function StudioSettings({close, amll, locked=false, initial='appearance'}
   const [ignored,setIgnored]=useStagingIgnoredCharacters();
   const [ignoredDraft,setIgnoredDraft]=useState(ignored);
   useEffect(()=>setIgnoredDraft(ignored),[ignored]);
+  const [splitRaw,setSplitRaw]=usePreference(quickSplitKey,JSON.stringify(DEFAULT_SEGMENT_OPTIONS));
+  const splitOptions:SegmentOptions={...DEFAULT_SEGMENT_OPTIONS,...JSON.parse(splitRaw)};
+  const setSplit=<K extends keyof SegmentOptions>(key:K,value:SegmentOptions[K])=>setSplitRaw(JSON.stringify({...splitOptions,[key]:value}));
   const [page,setPage]=useState(initial);
   const [display]=usePreference('studio:editor-display','advanced');
   const [theme,setTheme]=usePreference('lazulite-editor-theme','light');
@@ -58,7 +63,7 @@ export function StudioSettings({close, amll, locked=false, initial='appearance'}
   const [hide,setHide]=usePreference('studio:preview-hide',false);
   const [fade,setFade]=usePreference('studio:preview-fade',0.5);
   useEffect(()=>{document.documentElement.dataset.theme=theme;},[theme]);
-  const categories=[['appearance','settings.appearance'],['editing','settings.editing'],['reading','settings.reading'],['models','settings.modelsCompute'],['timeline','settings.timeline'],['shortcuts','menu.shortcuts'],['preview','preview.title']] as const;
+  const categories=[['appearance','settings.appearance'],['editing','settings.editing'],['sync','editor.sync'],['reading','settings.reading'],['models','settings.modelsCompute'],['timeline','settings.timeline'],['shortcuts','menu.shortcuts'],['preview','preview.title']] as const;
   const title=page==='amll'?t('menu.amll'):t(categories.find(([key])=>key===page)![1]);
   return <SettingsDialog wide title={t('menu.settings')} close={close}><div className={styles.layout}>
     <nav aria-label={t('menu.settings')} className={`${styles.navigation} ${fields.navigation}`}><strong>{t('settings.studio')}</strong>
@@ -71,7 +76,15 @@ export function StudioSettings({close, amll, locked=false, initial='appearance'}
         <SettingField label={t('settings.editorDisplay')}><Select aria-label={t('settings.editorDisplay')} value={display} onChange={e=>changeEditorDisplay(e.target.value as EditorDisplay)}><option value="simple">{t('settings.simpleMode')}</option><option value="advanced">{t('settings.advancedMode')}</option></Select></SettingField>
         {(['outlineVisible','inspectorVisible'] as const).map(key=><SettingToggle key={key} label={t(key==='outlineVisible'?'menu.outline':'menu.inspector')} checked={columnValues[key]} onChange={value=>setColumns(JSON.stringify({...columnValues,[key]:value}))}/>)}
         <SettingField label={t('settings.resetWidths')}><IconButton icon="refresh" data-role="secondary" label={t('settings.resetWidths')} onClick={()=>setColumns(JSON.stringify({...columnValues,outlineWidth:COLUMN_DEFAULTS.outlineWidth,inspectorWidth:COLUMN_DEFAULTS.inspectorWidth}))}/></SettingField></>}
-      {page==='editing'&&<><SettingField label={t('settings.syncStyle')}><Select aria-label={t('settings.syncStyle')} value={syncStyle} onChange={e=>setSyncStyle(e.target.value as SyncStyle)}><option value="sug">StrangeUtaGame</option><option value="amll">AMLL</option></Select></SettingField><SettingToggle label={t('settings.backgroundSkipAlignment')} checked={skipAlignment} onChange={setSkipAlignment}/><SettingToggle label={t('settings.backgroundSkipSync')} checked={skipSync} onChange={setSkipSync}/></>}
+      {page==='sync'&&<><SettingField label={t('settings.syncStyle')}><Select aria-label={t('settings.syncStyle')} value={syncStyle} onChange={e=>setSyncStyle(e.target.value as SyncStyle)}><option value="sug">StrangeUtaGame</option><option value="amll">AMLL</option></Select></SettingField><SettingToggle label={t('settings.backgroundSkipSync')} checked={skipSync} onChange={setSkipSync}/></>}
+      {page==='editing'&&<><SettingToggle label={t('settings.backgroundSkipAlignment')} checked={skipAlignment} onChange={setSkipAlignment}/><h3>{t('settings.quickSplit')}</h3>
+        <SettingToggle label={t('segment.cjk')} checked={splitOptions.splitCjk} onChange={v=>setSplit('splitCjk',v)}/>
+        <SettingToggle label={t('segment.japaneseMora')} checked={splitOptions.japaneseMora} disabled={!splitOptions.splitCjk} onChange={v=>setSplit('japaneseMora',v)}/>
+        <SettingField label={t('segment.western')}><Select value={splitOptions.western} onChange={e=>setSplit('western',e.target.value as SegmentOptions['western'])}><option value="word">{t('segment.words')}</option><option value="syllable">{t('segment.syllables')}</option></Select></SettingField>
+        {splitOptions.western==='syllable'&&<SettingField label={t('segment.language')}><Select value={splitOptions.language} onChange={e=>setSplit('language',e.target.value as SegmentOptions['language'])}>{SYLLABLE_LANGUAGES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</Select></SettingField>}
+        <SettingField label={t('segment.punctuation')}><Select value={splitOptions.punctuation} onChange={e=>setSplit('punctuation',e.target.value as SegmentOptions['punctuation'])}><option value="merge">{t('segment.adjacent')}</option><option value="separate">{t('segment.separate')}</option></Select></SettingField>
+        <SettingField label={t('segment.whitespace')}><Select value={splitOptions.whitespace} onChange={e=>setSplit('whitespace',e.target.value as SegmentOptions['whitespace'])}>{(['next','previous','separate'] as const).map(value=><option key={value} value={value}>{t(value==='separate'?'segment.keepSeparate':`segment.${value}`)}</option>)}</Select></SettingField>
+      </>}
       {page==='reading'&&<><DictionaryManager embedded close={close}/><h3>{t('settings.latinization')}</h3><SettingToggle label={t('settings.convertParticles')} description={t('settings.particleHelp')} checked={particles} onChange={setParticles}/>
         <SettingField label={t('settings.defaultHighlight')} error={error}><input value={draft} onChange={e=>setDraft(e.target.value)} onBlur={()=>{try{const value=normalizeKanaHighlight(draft);setHighlight(value);setDraft(value);setError('');}catch(cause){setError(formatMessage(errorMessage(cause)));}}}/></SettingField></>}
       {page==='models'&&<><VocalModels/><AlignmentModelsDialog embedded close={close}/><AlignmentDefaults/><h3>{t('menu.devices')}</h3><DeviceSettings embedded/></>}

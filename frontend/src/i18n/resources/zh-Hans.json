@@ -1718,5 +1718,13 @@
   "editor.increaseInnerBeats": "增加词内节奏点",
   "editor.decreaseInnerBeats": "减少词内节奏点",
   "editor.clearInnerBeats": "清空词内节奏点",
-  "field.whitespaceInnerBeats": "纯空白不参与打轴；0 可清除配置。"
+  "field.whitespaceInnerBeats": "纯空白不参与打轴；0 可清除配置。",
+  "shortcuts.fileHistory": "文件与历史",
+  "shortcuts.editing": "编辑",
+  "shortcuts.slower": "减速",
+  "shortcuts.faster": "加速",
+  "shortcuts.selectAll": "全选",
+  "shortcuts.remove": "删除所选",
+  "settings.quickSplit": "快捷拆分默认参数",
+  "shortcuts.cannotSplit": "所选单元无法继续拆分"
 }
