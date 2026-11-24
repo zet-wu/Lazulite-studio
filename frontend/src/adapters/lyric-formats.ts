@@ -4,10 +4,10 @@ import { message, MessageError } from '../domain/messages';
 import type { ProjectEditing } from '../domain/project-editing';
 import { prepareAss, renderAss } from './ass';
 import { plainTranslation, createLine, createLyricDocument, createWord, type LyricDocument, type RomanizationTrack, type TranslationTrack } from '../domain/lyric-document';
-import { parseWordFormat, parseLrcSource } from './source-codec';
+import { parseWordFormat, parseLrcSource, parseLysSource } from './source-codec';
 import { prepareOutputDocument, DocumentOutputError } from './output-validation';
 import { renderLrc } from './lrc';
-import { parseEslrc, parseLrc, parseLys, parseQrc, parseYrc, stringifyEslrc, type LyricLine as FormatLine } from '@applemusic-like-lyrics/lyric';
+import { parseEslrc, stringifyEslrc, type LyricLine as FormatLine } from '@applemusic-like-lyrics/lyric';
 import { parseLyricTtml, serializeLyricTtml } from './ttml/lyric-codec';
 
 export type LyricFormat = 'sug' | 'ttml' | 'txt' | 'lrc' | 'elrc' | 'eslrc' | 'qrc' | 'krc' | 'yrc' | 'lys' | 'ass';
@@ -16,7 +16,6 @@ export const exportFormats = [
   ['eslrc', 'format.eslrc'], ['qrc', 'QRC'], ['yrc', 'YRC'], ['lys', 'LYS'], ['ass', 'ASS'],
 ] as const;
 export type ExportFormat = typeof exportFormats[number][0];
-const parseTimed = { elrc: parseLrc, lrc: parseLrc, eslrc: parseEslrc, qrc: parseQrc, yrc: parseYrc, lys: parseLys };
 const milliseconds = (ms: number): number => {
   if (!Number.isFinite(ms) || ms < 0) throw new MessageError(message('parse.timeInvalid'));
   return Math.round(ms);
@@ -39,7 +38,8 @@ function parseLyricFile(content: string, format: Exclude<LyricFormat, 'ass'>, on
   }
   if (format === 'krc' || format === 'yrc' || format === 'qrc') return parseWordFormat(content, format, onSidecarIssue);
   if (format === 'lrc' || format === 'elrc') return parseLrcSource(content, lineTimedWords,warnings);
-  const parsed = parseTimed[format](content);
+  if(format==='lys')return parseLysSource(content,warnings);
+  const parsed = parseEslrc(content);
   if (!parsed.length || parsed.length > 20_000) throw new MessageError(message('parse.noLines'));
   let mainId: string | null = null;
   const timedTrack: RomanizationTrack = { id: crypto.randomUUID(), language: null, contents: [] };

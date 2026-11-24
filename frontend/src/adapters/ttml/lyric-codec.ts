@@ -224,19 +224,22 @@ export function parseLyricTtml(xml: string, { draft = false, warnings }: { draft
   if (root.namespaceURI !== TTML || root.localName !== 'tt') throw new MessageError(message('ttml.root'));
   if(warnings&&!draft) {
     externalWarnings.set(parsed,warnings);
-    const ids=new Set<string>();
     for(const node of Array.from(root.getElementsByTagName('*'))) {
       const role=attr(node,TTM,'role');
       if(role) {
         const known=role.split(/\s+/).filter(value=>['expletive','x-bg','x-translation','x-roman'].includes(value));
         if(known.join(' ')!==role){addImportWarning(warnings,'import.ignoredRole');if(known.length)node.setAttributeNS(TTM,'ttm:role',known.join(' '));else node.removeAttributeNS(TTM,'role');}
       }
-      const id=attr(node,XML,'id');
-      if(id&&is(node,TTML,'p')){if(ids.has(id)){let replacement:string;do{replacement=`${id}-${crypto.randomUUID()}`;}while(ids.has(replacement));node.setAttributeNS(XML,'xml:id',replacement);addImportWarning(warnings,'import.duplicateId');ids.add(replacement);}else ids.add(id);}
     }
   }
   checkAttributes(root, ['begin', 'end']);
   const absoluteTimes = attr(root, ITUNES, 'timing') !== null;
+  const usedLineIds=new Set<string>();
+  const uniqueLineId=(id:string)=>{
+    let next=id;
+    if(warnings&&!draft&&usedLineIds.has(id)){next=`${id}-${crypto.randomUUID()}`;addImportWarning(warnings,'import.duplicateId');}
+    usedLineIds.add(next);return next;
+  };
   const agents: LyricAgent[] = [];
   const metadata: Record<string, string[]> = Object.create(null);
   const lines: LyricLine[] = [];
@@ -336,7 +339,7 @@ export function parseLyricTtml(xml: string, { draft = false, warnings }: { draft
       if (!is(child, TTML, 'p')) {if(warn(child,'import.ignoredElement'))continue;throw new MessageError(message('ttml.elementUnsupported',{context:'TTML body child',element:child.localName}));}
       checkAttributes(child, ['begin', 'end', 'dur']);
       const [beginMs, endMs] = boundaries(child, start, ownEnd, absoluteTimes, draft);
-      const id = attr(child, XML, 'id') ?? attr(child, ITUNES, 'key') ?? `line-${lines.length + 1}`;
+      const id = uniqueLineId(attr(child, XML, 'id') ?? attr(child, ITUNES, 'key') ?? `line-${lines.length + 1}`);
       const wordStart = beginMs ?? start;
       const inlineRomanizations: Array<{ language: string | null; content: RomanizationContent }> = [];
       const backgrounds: Element[] = [];
@@ -378,7 +381,7 @@ export function parseLyricTtml(xml: string, { draft = false, warnings }: { draft
       for (const [bgIndex, background] of backgrounds.entries()) {
         checkAttributes(background, ['begin', 'end', 'dur']);
         const [bgBegin, bgEnd] = boundaries(background, wordStart, ownEnd, absoluteTimes, draft);
-        const bgId = attr(background, STUDIO, 'id') ?? attr(background, XML, 'id') ?? `${id}-bg${bgIndex || ''}`;
+        const bgId = uniqueLineId(attr(background, STUDIO, 'id') ?? attr(background, XML, 'id') ?? `${id}-bg${bgIndex || ''}`);
         const bgStart = bgBegin ?? wordStart;
         const bgUpper = bgBegin !== null && bgEnd !== null ? Math.max(bgBegin, bgEnd) : bgEnd;
         const bgRomanizations: typeof inlineRomanizations = [];
@@ -442,7 +445,7 @@ export function parseLyricTtml(xml: string, { draft = false, warnings }: { draft
   for (const agent of agents) if (agent.actorRef && !agents.some(a => a.id === agent.actorRef)) throw new MessageError(message('ttml.actorMissing',{id:agent.id,reference:agent.actorRef}));
   validateTranslationTracks(translationTracks, new Set(lines.map(line => line.id)));
   const document = { schemaVersion: LYRIC_SCHEMA_VERSION, lines, romanizationTracks, translationTracks, agents, metadata, language: attr(root, XML, 'lang') };
-  if(!lines.length||lines.length>20000)throw new MessageError(message('parse.lineCount'));
+  if(warnings&&!draft&&(!lines.length||lines.length>20000))throw new MessageError(message('parse.lineCount'));
   if(warnings&&!draft){for(const line of lines)for(const word of line.words)for(const ref of word.agentRefs??[])if(!agents.some(agent=>agent.id===ref)){agents.push({id:ref,name:null,type:'person'});addImportWarning(warnings,'import.unknownAgent');}}
   validateAgents(document);
   return document;

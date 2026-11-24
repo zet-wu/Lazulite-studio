@@ -1,4 +1,4 @@
-import {type ImportWarning} from './import-warnings';
+import {addImportWarning, type ImportWarning} from './import-warnings';
 import { message, MessageError } from '../domain/messages';
 import { plainTranslation, createLyricDocument, createLine, createWord, lineText, type LyricDocument, type RomanizationTrack } from '../domain/lyric-document';
 const time = (ms: number) => { if (!Number.isFinite(ms) || ms < 0) throw new MessageError(message('parse.timeInvalid')); return Math.round(ms); };
@@ -111,4 +111,30 @@ export function attachSidecar(d: LyricDocument, text: string, kind: 'translation
   }
   if (track.contents.length) { if (kind === 'translation') d.translationTracks.push({ ...track, purpose: 'subtitle' }); else d.romanizationTracks.push(track); }
   return issues;
+}
+
+/** LYS durations may be negative in external files; retain the endpoints for review. */
+export function parseLysSource(text:string,warnings:ImportWarning[]):LyricDocument {
+  const document=createLyricDocument();document.lines=[];
+  let mainId:string|null=null;
+  for(const raw of text.split(/\r?\n/)) {
+    const row=raw.trim().match(/^\[(\d+)\](.*)$/);if(!row)continue;
+    const property=Number(row[1])<=8?Number(row[1]):0;
+    const line=createLine('');let consumed=0;
+    for(const match of row[2].matchAll(/(.*?)\((\d+),(-?\d+)\)/g)) {
+      if(match.index!==consumed)throw new MessageError(message('parse.wordTagText'));
+      const beginMs=time(Number(match[2])),endMs=time(beginMs+Number(match[3]));
+      line.words.push({...createWord(match[1]),beginMs,endMs});consumed=match.index!+match[0].length;
+    }
+    if(consumed!==row[2].length||!line.words.length)throw new MessageError(message('parse.wordTagsIncomplete'));
+    line.beginMs=line.words[0].beginMs;line.endMs=line.words.at(-1)!.endMs;
+    const background=property>=6||property<=2&&/^[（(]/.test(line.words[0].text)&&/[）)]$/.test(line.words.at(-1)!.text);
+    if(background) {
+      if(!mainId){addImportWarning(warnings,'import.orphan');continue;}
+      line.backgroundOf=mainId;line.words[0].text=line.words[0].text.replace(/^[（(]/,'');line.words.at(-1)!.text=line.words.at(-1)!.text.replace(/[）)]$/,'');
+    }else mainId=line.id;
+    line.agentRefs=[property%3===2?'v2':'v1'];document.lines.push(line);
+  }
+  if(!document.lines.length||document.lines.length>20000)throw new MessageError(message('parse.noLines'));
+  document.agents=[{id:'v1',name:null,type:'person'},{id:'v2',name:null,type:'person'}];return document;
 }

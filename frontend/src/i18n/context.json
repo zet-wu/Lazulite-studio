@@ -5793,7 +5793,7 @@
   },
   "batch.noSmooth": {
     "context": "batch interface: batch.noSmooth",
-    "source": "范围内没有可平滑的 CJK 相邻词边界；含注音的边界会跳过",
+    "source": "范围内没有符合条件的词边界",
     "params": [],
     "parameterNotes": {}
   },
@@ -5823,7 +5823,7 @@
   },
   "batch.smooth": {
     "context": "batch interface: batch.smooth",
-    "source": "音节平滑",
+    "source": "消除词间空隙",
     "params": [],
     "parameterNotes": {}
   },
@@ -6691,7 +6691,7 @@
   },
   "batch.smoothSummary": {
     "context": "batch interface: batch.smoothSummary",
-    "source": "平滑 {{count}} 处词边界",
+    "source": "调整 {{count}} 处词边界",
     "params": [
       "count"
     ],
@@ -6721,13 +6721,9 @@
   },
   "batch.smoothHelp": {
     "context": "batch interface: batch.smoothHelp",
-    "source": "目标：{{count}} 行；仅填平阈值内的 CJK 相邻词边界，注音/对齐边界保持原样。",
-    "params": [
-      "count"
-    ],
-    "parameterNotes": {
-      "count": "Item count used for grammatical plural selection."
-    }
+    "source": "仅调整间隔或重叠不超过阈值的相邻纯中日韩无注音词：将前词结束与后词开始对齐到中点。含注音、标点／西文及超出阈值的边界保持原样。",
+    "params": [],
+    "parameterNotes": {}
   },
   "batch.syncHelp": {
     "context": "batch interface: batch.syncHelp",
@@ -8149,7 +8145,7 @@
   },
   "batch.integerThreshold": {
     "context": "batch interface: batch.integerThreshold",
-    "source": "平滑阈值必须是非负整数毫秒",
+    "source": "间隙／重叠阈值必须是非负整数毫秒",
     "params": [],
     "parameterNotes": {}
   },
@@ -11248,5 +11244,143 @@
     "source": "纯空白不参与打轴；0 可清除配置。",
     "context": "SUG 风格词内节奏点控制与帮助文案。",
     "params": []
+  },
+  "shortcuts.fileHistory": {
+    "source": "文件与历史",
+    "context": "编辑工作台设置与快捷键",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "shortcuts.editing": {
+    "source": "编辑",
+    "context": "编辑工作台设置与快捷键",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "shortcuts.slower": {
+    "source": "减速",
+    "context": "编辑工作台设置与快捷键",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "shortcuts.faster": {
+    "source": "加速",
+    "context": "编辑工作台设置与快捷键",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "shortcuts.selectAll": {
+    "source": "全选",
+    "context": "编辑工作台设置与快捷键",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "shortcuts.remove": {
+    "source": "删除所选",
+    "context": "编辑工作台设置与快捷键",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "settings.quickSplit": {
+    "source": "快捷拆分默认参数",
+    "context": "编辑工作台设置与快捷键",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "shortcuts.cannotSplit": {
+    "source": "所选单元无法继续拆分",
+    "context": "编辑工作台设置与快捷键",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "import.childOutside": {
+    "source": "{{count}} 处子单元时间超出父单元（已保留原时间）",
+    "context": "外部歌词导入预览：按类别汇总恢复、保留或忽略项",
+    "params": [
+      "count"
+    ],
+    "parameterNotes": {
+      "count": "本次统计项数"
+    }
+  },
+  "import.ignoredAttribute": {
+    "source": "忽略 {{count}} 项不支持的属性",
+    "context": "外部歌词导入预览：按类别汇总恢复、保留或忽略项",
+    "params": [
+      "count"
+    ],
+    "parameterNotes": {
+      "count": "本次统计项数"
+    }
+  },
+  "import.ignoredElement": {
+    "source": "忽略 {{count}} 个样式、布局或扩展元素",
+    "context": "外部歌词导入预览：按类别汇总恢复、保留或忽略项",
+    "params": [
+      "count"
+    ],
+    "parameterNotes": {
+      "count": "本次统计项数"
+    }
+  },
+  "import.ignoredRole": {
+    "source": "忽略 {{count}} 项未知角色",
+    "context": "外部歌词导入预览：按类别汇总恢复、保留或忽略项",
+    "params": [
+      "count"
+    ],
+    "parameterNotes": {
+      "count": "本次统计项数"
+    }
+  },
+  "import.duplicateId": {
+    "source": "改写 {{count}} 个重复行 ID",
+    "context": "外部歌词导入预览：按类别汇总恢复、保留或忽略项",
+    "params": [
+      "count"
+    ],
+    "parameterNotes": {
+      "count": "本次统计项数"
+    }
+  },
+  "import.unknownAgent": {
+    "source": "补建 {{count}} 个未声明的歌手",
+    "context": "外部歌词导入预览：按类别汇总恢复、保留或忽略项",
+    "params": [
+      "count"
+    ],
+    "parameterNotes": {
+      "count": "本次统计项数"
+    }
+  },
+  "import.orphan": {
+    "source": "跳过 {{count}} 条孤立附属行",
+    "context": "外部歌词导入预览：按类别汇总恢复、保留或忽略项",
+    "params": [
+      "count"
+    ],
+    "parameterNotes": {
+      "count": "本次统计项数"
+    }
+  },
+  "import.reversed": {
+    "source": "{{count}} 处起止时间倒置（已保留原时间）",
+    "context": "外部歌词导入预览：按类别汇总恢复、保留或忽略项",
+    "params": [
+      "count"
+    ],
+    "parameterNotes": {
+      "count": "本次统计项数"
+    }
+  },
+  "batch.smoothPreview": {
+    "source": "预计调整 {{count}} 处词边界",
+    "context": "批处理：消除词间空隙并预览预计调整边界数",
+    "params": [
+      "count"
+    ],
+    "parameterNotes": {
+      "count": "本次统计项数"
+    }
   }
 }

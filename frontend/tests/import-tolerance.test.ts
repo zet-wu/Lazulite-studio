@@ -19,6 +19,12 @@ it('summarizes ignored styling, attributes and unknown roles, repairs duplicate 
  expect(importedWarnings.get(document)).toEqual(expect.arrayContaining([{key:'import.ignoredElement',count:2},{key:'import.ignoredAttribute',count:2},{key:'import.ignoredRole',count:1},{key:'import.duplicateId',count:1},{key:'import.unknownAgent',count:1}]));
 });
 it.each(['<!DOCTYPE tt><tt/>','<tt','<wrong/>','<tt xmlns="http://www.w3.org/ns/ttml"/>'])('rejects unrecoverable XML %s',xml=>expect(()=>importLyricFile(xml,'ttml')).toThrow());
-it.each([['elrc','[00:02.00]字<00:01.00>'],['yrc','[2000,-1000](2000,-1000,0)字'],['qrc','[2000,-1000]字(2000,-1000)']] as const)('keeps reversed %s endpoints', (format,text)=>{
+it.each([['elrc','[00:02.00]字<00:01.00>'],['yrc','[2000,-1000](2000,-1000,0)字'],['qrc','[2000,-1000]字(2000,-1000)'],['lys','[1]字(2000,-1000)']] as const)('keeps reversed %s endpoints', (format,text)=>{
  const d=importLyricFile(text,format);expect(d.lines[0].words[0].beginMs).toBe(2000);expect(d.lines[0].words[0].endMs).toBe(1000);expect(importedWarnings.get(d)?.some(w=>w.key==='import.reversed')).toBe(true);expect(()=>exportLyricFile(d,'yrc')).toThrow();
+});
+
+it('keeps empty internal drafts readable while rejecting empty external lyrics',()=>{
+ const xml='<tt xmlns="http://www.w3.org/ns/ttml"><body/></tt>';
+ expect(parseLyricTtml(xml,{draft:true}).lines).toHaveLength(0);
+ expect(()=>importLyricFile(xml,'ttml')).toThrow();
 });
