@@ -122,3 +122,14 @@ it('keeps alignment skipping independent, copies/splits it and merges only unani
   expect(serializeProject(merged.present).lyrics.draftTtml).not.toContain('skippedAlignment');
   expect(apply(merged, { type: 'delete-line', lineId: 'a' }).present.editing.skippedAlignmentLineIds).toEqual([]);
 });
+
+it.each([true,false])('merging ruby and plain words assigns the tail stop to a reading leaf (%s)', stop => {
+ const state=fixture(),word=state.present.lyrics.lines[0].words[0];
+ word.rubyUnits=[{id:'r',reading:'あ',beginMs:null,endMs:null}];
+ state.present.editing.syncStops.a2={kind:'word',stop};
+ const next=apply(state,{type:'merge-words',wordIds:['a1','a2']});
+ expect(next.present.editing.syncStops).toEqual({r:{kind:'ruby',stop}});
+ expect(parseProject(serializeProject(next.present))).toEqual(next.present);
+ expect(undoProjectCommand(next).present).toBe(state.present);
+ expect(redoProjectCommand(undoProjectCommand(next)).present).toBe(next.present);
+});

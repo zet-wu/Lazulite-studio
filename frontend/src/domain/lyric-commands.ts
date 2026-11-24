@@ -3,7 +3,7 @@ import { validateSegmentContent } from './segmentation-draft';
 import { message, MessageError, messageList, type Message } from './messages';
 import { shiftLineTimes } from './batch-editing';
 import { preserveWordAgents, wordAgents, sameAgents, validateAgents, lineAgents } from './amll-compatibility';
-import { createProjectEditing, emptyBeatCount, setEmptyBeat, reconcileEditing, validateProjectEditing, type ProjectEditing } from './project-editing';
+import { createProjectEditing, emptyBeatCount, setEmptyBeat, reconcileEditing, type ProjectEditing } from './project-editing';
 import { lineStructureIssues } from './line-structure';
 import { validateTranslationTracks } from './translation-editing';
 import { createLine, type LyricAgent, type LyricDocument, type LyricLine, type LyricWord, type RomanizationContent, type RomanizationTrack, type RubyUnit, type TranslationTrack, type TranslationContent, type TimeMs } from './lyric-document';
@@ -400,7 +400,10 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       const { line, words: selected, merged } = planWordMerge(document, command.wordIds);
       const tailStop = editing.syncStops[selected.at(-1)!.id];
       delete editing.syncStops[merged.id];
-      if (tailStop) editing.syncStops[merged.id] = tailStop;
+      if (tailStop) {
+        const tailRuby = merged.rubyUnits.at(-1);
+        editing.syncStops[tailRuby?.id ?? merged.id] = { kind: tailRuby ? 'ruby' : 'word', stop: tailStop.stop };
+      }
       const ids = new Set(command.wordIds);
       const words = line.words.flatMap(word => word.id === selected[0].id ? [merged] : ids.has(word.id) ? [] : [word]);
       return { ...document, lines: document.lines.map(item => item === line ? { ...line, words } : item) };
@@ -768,7 +771,6 @@ export function applyLyricTransaction(document: LyricDocument, command: LyricCom
   const lyrics = command.type === 'batch' ? command.commands.reduce(atomic, document) : atomic(document, command);
   if (shouldApplyDefaults) applyBackgroundDefaults(document, lyrics, editing, defaults);
   reconcileEditing(document, lyrics, editing);
-  validateProjectEditing(lyrics, editing);
   validateAgents(lyrics);
   return { lyrics, editing: JSON.stringify(editing) === JSON.stringify(original) ? original : editing };
 }

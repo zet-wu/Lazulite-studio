@@ -21,7 +21,7 @@ const changed = (time: TimeMs, delta: number): TimeMs => {
 const valid = (begin: TimeMs, end: TimeMs) => {
   for (const time of [begin, end]) if (time !== null && (!Number.isSafeInteger(time) || time < 0)) throw new MessageError(message('timeline.integerTime'));
 };
-/** Only a changed ruby envelope moves that side of its parent. */
+/** Move edited sides with the ruby envelope and include crossed endpoints on either side. */
 function resizeRubyParent(word: LyricWord, rubyUnits: RubyUnit[], sides: Iterable<BoundarySide>): LyricWord {
   let next = { ...word, rubyUnits };
   const beforeEnvelope = timeEnvelope(word.rubyUnits);
@@ -31,7 +31,8 @@ function resizeRubyParent(word: LyricWord, rubyUnits: RubyUnit[], sides: Iterabl
     const after = afterEnvelope[side];
     if (word[side] !== null && before !== after) next = { ...next, [side]: after ?? word[side] };
   }
-  return next;
+  const span = timeEnvelope([next, ...rubyUnits]);
+  return { ...next, beginMs: next.beginMs === null ? null : span.beginMs, endMs: next.endMs === null ? null : span.endMs };
 }
 const include = (line: LyricLine, word: LyricWord): LyricLine => {
   const span = timeEnvelope([line, word]);
@@ -102,12 +103,11 @@ function moveTargets(document: LyricDocument, targets: TimelineTarget[], deltaMs
 
 function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'beginMs' | 'endMs', timeMs: number): LyricDocument {
   valid(timeMs, timeMs);
-  if (target.kind === 'romanization') return editRomanization(document, target, unit => { const next = { ...unit, [side]: timeMs }; valid(next.beginMs, next.endMs); return next; });
+  if (target.kind === 'romanization') return editRomanization(document, target, unit => ({ ...unit, [side]: timeMs }));
   return editTarget(document, target, (line) => {
     if (target.kind === 'line') {
       const beginMs = side === 'beginMs' ? timeMs : line.beginMs;
       const endMs = side === 'endMs' ? timeMs : line.endMs;
-      valid(beginMs, endMs);
       if (line.words.flatMap(word => [word, ...word.rubyUnits]).some((word) => !intervalContains({ beginMs, endMs }, word))) throw new MessageError(message('timeline.lineExcludesWords'));
       return { ...line, beginMs, endMs };
     }
@@ -118,7 +118,6 @@ function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'be
     if (target.kind === 'word') {
       const beginMs = side === 'beginMs' ? timeMs : word.beginMs;
       const endMs = side === 'endMs' ? timeMs : word.endMs;
-      valid(beginMs, endMs);
       if (word.rubyUnits.some((unit) => !intervalContains({ beginMs, endMs }, unit))) throw new MessageError(message('timeline.wordExcludesRuby'));
       words[index] = { ...word, beginMs, endMs };
     } else {
@@ -126,7 +125,6 @@ function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'be
       if (rubyIndex < 0) throw new MessageError(message('timeline.rubyMissing'));
       const rubyUnits = word.rubyUnits.slice();
       const unit: RubyUnit = { ...rubyUnits[rubyIndex], [side]: timeMs };
-      valid(unit.beginMs, unit.endMs);
       rubyUnits[rubyIndex] = unit;
       words[index] = resizeRubyParent(word, rubyUnits, [side]);
     }
@@ -228,9 +226,7 @@ export function resizeTimelineBoundary(document: LyricDocument, target: Timeline
   const wordIds = new Set<string>(), rubyWordSides = new Map<string, Set<BoundarySide>>();
   for (const edge of edges) {
     const item = edge.target;
-    if (item.kind === 'romanization') next = editRomanization(next, item, unit => {
-      const updated = { ...unit, [edge.side]: timeMs }; valid(updated.beginMs, updated.endMs); return updated;
-    });
+    if (item.kind === 'romanization') next = editRomanization(next, item, unit => ({ ...unit, [edge.side]: timeMs }));
     else if (item.kind === 'word' || item.kind === 'ruby') {
       if (item.kind === 'word') wordIds.add(item.wordId);
       else {
@@ -250,9 +246,7 @@ export function resizeTimelineBoundary(document: LyricDocument, target: Timeline
       if (!wordIds.has(word.id)) {
         word = resizeRubyParent(originalWord, word.rubyUnits, rubyWordSides.get(word.id)!);
       }
-      valid(word.beginMs, word.endMs);
       for (const unit of word.rubyUnits) {
-        valid(unit.beginMs, unit.endMs);
         if (!intervalContains(word, unit)) throw new MessageError(message('timeline.wordExcludesRuby'));
       }
       return word;

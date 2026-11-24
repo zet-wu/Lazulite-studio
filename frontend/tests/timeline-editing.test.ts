@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
 import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
-import { moveTimeline, resizeTimeline, snapTime } from '../src/domain/timeline-editing';
+import { moveTimeline, resizeTimeline, resizeTimelineBoundary, snapTime } from '../src/domain/timeline-editing';
 
 describe('E6 timeline editing', () => {
   const sample = () => {
@@ -59,4 +59,17 @@ describe('E6 timeline editing', () => {
     expect(() => moveTimeline(document, targets, -2000)).toThrow('timeline.rangeInvalid');
     expect(snapTime(1498, [1000, 1500, 2000], 10_000)).toBe(1500);
   });
+});
+
+it.each([false,true])('ruby crossing updates both parent envelope edges and commits atomically, linked=%s', linked => {
+  const document=createLyricDocument('あい'),line=document.lines[0],word=line.words[0];
+  Object.assign(line,{beginMs:0,endMs:4000});Object.assign(word,{beginMs:1000,endMs:2000});
+  word.rubyUnits=[{id:'r',reading:'あい',beginMs:1000,endMs:2000}];
+  const target={kind:'ruby' as const,lineId:line.id,wordId:word.id,rubyId:'r'};
+  for(const [side,time,begin,end] of [['beginMs',2500,2000,2500],['endMs',500,500,1000]] as const){
+    const next=resizeTimelineBoundary(document,target,side,time,linked);
+    const state=executeLyricCommand(createLyricEditorState(document),{type:'replace-document',document:next});
+    expect(state.present.lines[0].words[0]).toMatchObject({beginMs:begin,endMs:end});
+    expect(undoLyricCommand(state).present).toBe(document);
+  }
 });

@@ -296,14 +296,14 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
           const next=moveTimeline(document,moving,delta+correction,editing);
           assertChangedTimes(current.baseTimes,lyricTimes(next),durationMs);
           return stableSnapAnchor(current.moveSnapOptions[index],next);
-        }catch{return false;}
+        }catch(error){if(error instanceof MessageError)return false;throw error;}
       });
       timeMs+=correction;
     }else if(current.side!=='select'&&current.side!=='pan'){
       let unsnapped = document;
       if (current.target) try {
         unsnapped = resizeTimelineBoundary(document, current.target, current.side as 'beginMs' | 'endMs', proposed, current.linked, editing);
-      } catch { /* Invalid candidates still receive the normal validation below. */ }
+      } catch (error) { if (!(error instanceof MessageError)) throw error; }
       const movingIds = new Set(moving.map(targetId));
       const edges = current.target ? timelineBoundaryTargets(document, current.target, current.side as 'beginMs' | 'endMs', current.linked) : [];
       const options = lyricSnapAnchors(document, unsnapped, item => movingIds.has(targetId(item)), current.basePoints).filter(anchor => !anchor.target || !edges.some(edge => targetId(edge.target) === targetId(anchor.target!) && edge.side === anchor.side));
@@ -346,7 +346,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
       const current = dragRef.current, held = capture.current;
       if (!current || !held || current.side !== 'beginMs' && current.side !== 'endMs') return;
       const modifier = Boolean(event.ctrlKey || event.metaKey);
-      if (modifier === current.modifier && current.linked === (modifier === swapBoundaryDrag)) return;
+      if (modifier === current.modifier) return;
       dragRef.current = { ...current, modifier, linked: modifier === swapBoundaryDrag };
       const pending = pendingMove.current;
       applyMove(pending?.clientX ?? current.current, pending?.clientY ?? current.pointerY ?? current.y, held.element);

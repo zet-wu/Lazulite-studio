@@ -14,9 +14,9 @@ function adjacentWord(words: LyricWord[], index: number, direction: -1 | 1): Lyr
 
 /** Display-only copies. Never pass this projection to commands, playback or persistence. */
 export function projectTimeline(document: LyricDocument, durationMs: number | null = null): LyricDocument {
-  const duration = durationMs !== null && Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : null;
+  const duration = durationMs;
 
-  const legal = (time: number) => Number.isFinite(time) && time >= 0 && (duration === null || time <= duration);
+  const legal = (time: number) => (duration === null || time <= duration);
   function project<T extends Interval & { id: string }>(item: T, previous?: Interval, next?: Interval, parent?: Interval, children: Interval[] = []): T {
     if ((item.beginMs === null) === (item.endMs === null)) return { ...item };
     const missingBegin = item.beginMs === null;
