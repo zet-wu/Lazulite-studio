@@ -47,10 +47,21 @@ export function readBindings(): Bindings {
   const result = { ...defaultBindings };
   if (value && typeof value === 'object') {
     const stored = value as Partial<Bindings>;
-    for (const action of Object.keys(shortcutActions) as ShortcutAction[]) {
+    const actions=Object.keys(shortcutActions) as ShortcutAction[];
+    for (const action of actions) {
       const binding = stored[action];
-      if (!binding || typeof binding.code !== 'string' || !['ctrl', 'meta', 'alt', 'shift'].every(key => typeof binding[key as keyof Binding] === 'boolean')) continue;
-      if (!bindingError(action, binding, result)) result[action] = binding;
+      if (binding && typeof binding.code === 'string' && ['ctrl', 'meta', 'alt', 'shift'].every(key => typeof binding[key as keyof Binding] === 'boolean')) result[action] = binding;
+    }
+    // Check the complete saved table so valid swaps do not collide with defaults
+    // that another saved action has already moved away from.
+    let changed=true;
+    while(changed) {
+      changed=false;
+      for(const action of actions) {
+        if(!same(result[action],defaultBindings[action])&&bindingError(action,result[action],result)) {
+          result[action]=defaultBindings[action];changed=true;
+        }
+      }
     }
 
   }
@@ -64,8 +75,8 @@ export function useShortcuts() {
   const [bindings, setBindings] = useState(readBindings);
   useEffect(() => {
     const update = () => setBindings(readBindings());
-    window.addEventListener('storage', update); window.addEventListener('studio-shortcuts-change', update);
-    return () => { window.removeEventListener('storage', update); window.removeEventListener('studio-shortcuts-change', update); };
+    window.addEventListener('studio-preference-change',update); window.addEventListener('storage', update); window.addEventListener('studio-shortcuts-change', update);
+    return () => { window.removeEventListener('studio-preference-change',update); window.removeEventListener('storage', update); window.removeEventListener('studio-shortcuts-change', update); };
   }, []);
   return bindings;
 }

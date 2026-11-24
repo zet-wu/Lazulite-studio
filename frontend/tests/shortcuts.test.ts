@@ -18,3 +18,16 @@ it('reserves plain Space for playback even when playback has an additional custo
   expect(bindingError('start', defaultBindings.play, bindings)?.key).toBe('shortcuts.reserved');
   expect(bindingError('play', bindings.play, bindings)).toBeNull();
 });
+
+it('recovers an invalid entry without discarding other custom actions or missing new defaults',async()=>{
+ const {readBindings}=await import('../src/features/shortcuts');
+ localStorage.setItem('lazulite-shortcuts',JSON.stringify({start:{...defaultBindings.start,code:'KeyG'},end:{...defaultBindings.end,code:'F5'}}));
+ const values=readBindings();expect(values.start.code).toBe('KeyG');expect(values.end).toEqual(defaultBindings.end);expect(values.faster).toEqual(defaultBindings.faster);
+ localStorage.clear();
+});
+
+it('keeps a valid swap between two saved action bindings',async()=>{
+ const {readBindings}=await import('../src/features/shortcuts');
+ localStorage.setItem('lazulite-shortcuts',JSON.stringify({...defaultBindings,merge:defaultBindings.split,split:defaultBindings.merge}));
+ const result=readBindings();expect(result.merge).toEqual(defaultBindings.split);expect(result.split).toEqual(defaultBindings.merge);localStorage.clear();
+});
