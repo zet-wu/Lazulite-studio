@@ -179,7 +179,7 @@ class DictionaryIndex:
                 alternatives = [units for end, units in alternative_segments[start] if end == stop]
                 output.append({"base_start": start, "base_end": stop, "base": text[start:stop],
                                "status": "ambiguous" if ambiguous and state == "known" else state,
-                               "units": list(units), **({"alternatives": [list(units), *[list(value) for value in alternatives if value != units]]} if len(alternatives) > 1 else {})})
+                               "units": list(units), **({"alternatives": [list(units), *[list(value) for value in alternatives if value != units]]} if state != "unannotated" and len(alternatives) > 1 else {})})
             at = end
         return output
 

@@ -692,8 +692,9 @@ function EditorWorkspaceContent(props: Props) {
     try {
       if(current.kind==='words') {
         if(current.ids.length!==1)throw new Error(t('editor.singleRequired'));
-        const line=document.lines.find(line=>line.id===current.lineId)!;
-        const word=line.words.find(word=>word.id===current.ids[0])!;
+        const line=document.lines.find(line=>line.id===current.lineId);
+        const word=line?.words.find(word=>word.id===current.ids[0]);
+        if(!line||!word)return;
         if(word.rubyUnits.length){setSplitWordId(word.id);return;}
         if(word.obscene||emptyBeatCount(editing,word.id))throw new Error(t(word.obscene?'segment.blockObscene':'segment.blockBeat'));
         if(Array.from(new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(word.text)).length<2)throw new Error(t('shortcuts.cannotSplit'));
@@ -706,15 +707,17 @@ function EditorWorkspaceContent(props: Props) {
         dispatch({type:'segment-words',changes:[{lineId:line.id,wordId:word.id,words:distributeSegmentTime(word,parts,options.punctuationWeight,editing)}]});
       } else if(current.kind==='lines') {
         if(current.ids.length!==1)throw new Error(t('editor.singleRequired'));
-        const line=document.lines.find(line=>line.id===current.ids[0])!;
+        const line=document.lines.find(line=>line.id===current.ids[0]);
+        if(!line)return;
         if(line.backgroundOf||line.words.length<2)throw new Error(t('shortcuts.cannotSplit'));
         setSplitLineId(line.id);
       } else if(current.kind==='ruby') {
         const mora=selectionAction(current,'mora',t('editor.splitBeats'));
         if(!mora.disabled){mora.run();return;}
         if(current.ids.length!==1)throw new Error(t('shortcuts.cannotSplit'));
-        const word=document.lines.find(line=>line.id===current.lineId)!.words.find(word=>word.id===current.wordId)!;
-        const unit=word.rubyUnits.find(unit=>unit.id===current.ids[0])!;
+        const word=document.lines.find(line=>line.id===current.lineId)?.words.find(word=>word.id===current.wordId);
+        const unit=word?.rubyUnits.find(unit=>unit.id===current.ids[0]);
+        if(!word||!unit)return;
         const parts=Array.from(new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(unit.reading),item=>item.segment);
         if(parts.length<2)throw new Error(t('shortcuts.cannotSplit'));
         dispatch({type:'split-ruby',lineId:current.lineId,wordId:word.id,rubyId:unit.id,at:Array.from(parts.slice(0,Math.floor(parts.length/2)).join('')).length});

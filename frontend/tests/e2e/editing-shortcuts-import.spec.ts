@@ -68,5 +68,5 @@ for(const theme of ['light','dark'])test(`candidate popup supports keyboard and 
  await input.focus();await expect(page.getByRole('listbox')).toBeVisible();await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');await expect(input).toHaveValue('jyut6');await expect(page.getByRole('listbox')).toHaveCount(0);
  await input.blur();await input.focus();await page.getByRole('option',{name:'syut3',exact:true}).click();await expect(input).toHaveValue('syut3');
  await input.blur();await input.focus();await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
- await page.screenshot({path:`/tmp/phase20-candidate-${theme}.png`});await page.keyboard.press('Escape');await expect(page.getByRole('listbox')).toHaveCount(0);await expect(dialog).toBeVisible();
+ await expect(page.getByRole('listbox')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('listbox')).toHaveCount(0);await expect(dialog).toBeVisible();
 });
