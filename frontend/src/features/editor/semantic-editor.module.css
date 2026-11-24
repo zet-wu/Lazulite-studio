@@ -301,6 +301,8 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .japaneseRubyBlock small { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .japaneseRubyMerge { display: flex; align-items: center; gap: 8px; }
 .japaneseRubyMissing { border: 1px solid var(--danger) !important; }
+.japaneseRubyAlternative { border: 1px dashed color-mix(in srgb, var(--warning) 70%, transparent) !important; }
+.japaneseRubyAlternative:hover, .japaneseRubyAlternative:focus { border-color: var(--warning) !important; }
 
 .translationTrackSection { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding-block: 8px; border-bottom: 1px solid var(--line); }
 .translationTrackSection > strong, .translationTrackContents { flex-basis: 100%; }
@@ -395,7 +397,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .deviceSettingsMenu > div button { white-space: normal; }
 
 .readingHint { position: relative; }
-.readingHint:focus-within::after { content: attr(data-tooltip); position: absolute; z-index: 20; top: 100%; left: 0; width: max-content; max-width: 260px; padding: 5px 8px; color: var(--ink); background: var(--surface-high); border: 1px solid var(--line); border-radius: 4px; font: 12px system-ui; pointer-events: none; }
+.readingHint:focus-within:not(:has([aria-expanded="true"]))::after { content: attr(data-tooltip); position: absolute; z-index: 20; top: 100%; left: 0; width: max-content; max-width: 260px; padding: 5px 8px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 2px 8px #0002; font: 12px system-ui; pointer-events: none; }
 
 .romanTrackOptions { display:flex; align-items:center; gap:16px; width:100%; min-width:0; }
 .romanTrackOptions > label:first-child { flex:1; min-width:0; }

@@ -80,6 +80,7 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
       <IconButton icon="refresh" label={t('dictionary.regenerate')} data-role="secondary" disabled={!selected||pending||composing||stale} onClick={()=>setAttempt(a=>a+1)}/>
     </div>
     {!items.length&&<p>{t('dictionary.importRequired')}</p>}
+    {rows.length>0&&<p className={styles.hint}>{t('dictionary.emptyHelp')}</p>}
     {rows.some(r=>r.blocks.some(b=>b.merge))&&<label><input type="checkbox" checked={merge} disabled={composing||stale} onChange={e=>setMerge(e.target.checked)}/>{t('dictionary.allowMerge')}</label>}
     {pending&&<p role="status">{phase==='loading'?t('dictionary.loading'):t('dictionary.analyzing')}</p>}
     {error&&<p role="alert">{error}</p>}
@@ -91,11 +92,11 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
           <small>{source.lines.findIndex(l=>l.id===row.lineId)+1} {t('selection.line')}</small>
           <div className={preview.japaneseRubyBlocks}>{row.blocks.map(block=>{
             const editable=!['boundary','unannotated'].includes(block.status);
-            const hint=editable?((block.merge&&!merge?t('dictionary.mergeRequired'):'')+t('dictionary.emptyHelp')):undefined;
+            const hint=editable&&block.merge&&!merge?t('dictionary.mergeRequired'):undefined;
             return <ReadingPair key={block.key} text={block.base} hint={hint} status={block.existing?t('reading.existing'):block.merge&&dictionaryBlockApplies(block,merge)?t('reading.willMerge'):undefined}>
               {editable&&<div className={styles.units}>{block.units.map((unit,i)=><ReadingInput key={i}
                 alternatives={block.alternatives?.map(units=>units.join(' · '))} alternativeIndex={block.alternatives?.findIndex(candidate=>candidate.length===block.units.length&&candidate.every((unit,index)=>unit===block.units[index]))} choose={index=>choose(block.key,block.alternatives![index])}
-                value={unit} needsReview={block.status==='ambiguous'&&!block.reviewed[i]} label={t('reading.unitReading',{text:block.base,number:i+1})} hint={hint}
+                value={unit} needsReview={block.status==='ambiguous'&&!block.reviewed[i]} hasAlternatives={!block.reviewed[i]&&block.status!=='ambiguous'&&(block.alternatives?.length??0)>1} label={t('reading.unitReading',{text:block.base,number:i+1})} hint={hint}
                 disabled={stale||pending} change={value=>change(block.key,i,value)}
                 focus={value=>setActive(value?row.lineId:null)} composition={setComposing}/>)}</div>}
             </ReadingPair>;

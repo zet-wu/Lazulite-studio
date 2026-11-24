@@ -78,3 +78,20 @@ it('shows candidates on focus, switches the complete reading and collapses for t
  fireEvent.blur(first);fireEvent.focus(first);fireEvent.click(screen.getByRole('option',{name:'chóng · qìng'}));expect(first).toHaveValue('chóng');
  fireEvent.blur(first);fireEvent.focus(first);fireEvent.change(first,{target:{value:'custom'}});expect(screen.queryByRole('listbox')).toBeNull();
 });
+
+it('highlights unequal-weight polyphones as secondary, clears on review, and reopens on click while focused',async()=>{
+ const source=createLyricDocument('说'),lineId=source.lines[0].id,apply=vi.fn(()=>true);
+ vi.mocked(analyzeDictionary).mockResolvedValue({instance:'a',version:'1',ranges:[{lineId,start:0,end:1,base:'说',status:'known',units:['syut3'],alternatives:[['syut3'],['jyut6']]}]});
+ render(<DictionaryRubyDialog document={source} lineIds={[lineId]} apply={apply} close={()=>{}}/>);
+ await screen.findByRole('option',{name:'a · 1 · a'});
+ fireEvent.change(screen.getByRole('combobox'),{target:{value:'a'}});
+ const input=await screen.findByLabelText('说读音 1');
+ expect(input).toHaveAttribute('data-status','alternatives');
+ fireEvent.focus(input);expect(screen.getByRole('listbox')).toBeVisible();
+ fireEvent.click(screen.getByRole('option',{name:'jyut6'}));
+ expect(input).toHaveValue('jyut6');expect(input).not.toHaveAttribute('data-status');expect(screen.queryByRole('listbox')).toBeNull();
+ // Still focused: clicking again must reopen the candidate picker.
+ fireEvent.click(input);expect(screen.getByRole('listbox')).toBeVisible();
+ fireEvent.click(screen.getByRole('option',{name:'syut3'}));
+ expect(input).toHaveValue('syut3');expect(screen.queryByRole('listbox')).toBeNull();
+});
