@@ -137,3 +137,26 @@ def test_proposer_range_boundary_rejects_mismatches_and_overlap():
     valid = ReadingProposal('l', 0, 2, '今日', 'きょう')
     for items in [[ReadingProposal('l',0,2,'昨日','きのう')], [valid,valid]]:
         with pytest.raises(ValueError): analyze_snapshot(body, Proposer(items))
+
+
+def test_arabic_numbers_cardinals_and_counter_merge():
+    from server.reading import JapaneseReadingSnapshot, analyze_snapshot
+    proposer = SudachiReadingProposer()
+    text = '300 ６００ 800 3000 8000 1024 3本 6匹 1人 2人 20歳'
+    def ranges(merge):
+        result = analyze_snapshot(JapaneseReadingSnapshot(lines=[{'id':'l','text':text}], auto_merge=merge), proposer)
+        assert ''.join(r.base for r in result.ranges) == text
+        return {r.base:r.reading for r in result.ranges if r.reading}
+    separate = ranges(False)
+    assert separate['300'] == 'さんびゃく'
+    assert separate['６００'] == 'ろっぴゃく'
+    assert separate['800'] == 'はっぴゃく'
+    assert separate['3000'] == 'さんぜん'
+    assert separate['8000'] == 'はっせん'
+    assert separate['1024'] == 'せんにじゅうよん'
+    assert separate['1'] == 'いち' and '1人' not in separate
+    merged = ranges(True)
+    assert merged['3本'] == 'さんぼん'
+    assert merged['6匹'] == 'ろっぴき'
+    assert merged['1人'] == 'ひとり' and merged['2人'] == 'ふたり'
+    assert merged['20歳'] == 'はたち'

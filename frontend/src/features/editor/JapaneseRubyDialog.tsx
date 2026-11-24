@@ -23,7 +23,7 @@ export function JapaneseRubyDialog({ document, lineIds, apply, close }: { docume
  const edited = useRef(new Map<string,string>()), scroll = useRef<HTMLDivElement>(null);
  useEffect(()=>{
   const controller=new AbortController();setPending(true);setError('');
-  Promise.resolve().then(()=>{if(controller.signal.aborted)return null;return analyzeReadings(source.lines.filter(l=>ids.includes(l.id)).map(l=>({id:l.id,text:lineText(l)})),controller.signal);}).then(result=>{
+  Promise.resolve().then(()=>{if(controller.signal.aborted)return null;return analyzeReadings(source.lines.filter(l=>ids.includes(l.id)).map(l=>({id:l.id,text:lineText(l)})),controller.signal,autoMerge);}).then(result=>{
    if(controller.signal.aborted||!result)return;
    const next=proposeJapaneseRuby(source,ids,result.ranges,autoMerge);
    setRows(previous=>next.map(row=>{

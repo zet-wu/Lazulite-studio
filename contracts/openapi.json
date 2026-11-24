@@ -1095,7 +1095,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReadingSnapshot"
+                "$ref": "#/components/schemas/JapaneseReadingSnapshot"
               }
             }
           }
@@ -4762,6 +4762,28 @@
             "minLength": 1
           }
         }
+      },
+      "JapaneseReadingSnapshot": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReadingLine"
+            },
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          },
+          "auto_merge": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "lines"
+        ],
+        "title": "JapaneseReadingSnapshot",
+        "type": "object"
       }
     }
   }

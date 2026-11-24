@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Protocol, Sequence
 from threading import Lock
+import re
+from .japanese_numbers import cardinal, counted, COUNTERS
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -25,7 +27,7 @@ class ReadingProposer(Protocol):
     def particles(self, lines: Sequence[Mapping[str, str]]) -> list[dict]:
         """Return は/へ particle positions using whole-line code-point offsets."""
 
-    def propose(self, lines: Sequence[Mapping[str, str]]) -> Sequence[ReadingProposal]:
+    def propose(self, lines: Sequence[Mapping[str, str]], auto_merge: bool = False) -> Sequence[ReadingProposal]:
         """Return whole-word proposals using code-point offsets in each line."""
 
 
@@ -35,7 +37,7 @@ def _hiragana(reading: str) -> str:
 
 def _contains_japanese(text: str) -> bool:
     return any(
-        "ぁ" <= char <= "ゖ" or "ァ" <= char <= "ヺ" or "一" <= char <= "龯"
+        "0" <= char <= "9" or "０" <= char <= "９" or "ぁ" <= char <= "ゖ" or "ァ" <= char <= "ヺ" or "一" <= char <= "龯"
         for char in text
     )
 
@@ -74,7 +76,7 @@ class SudachiReadingProposer:
                                        'reading': {'は': 'わ', 'へ': 'え'}[token.surface()]})
         return output
 
-    def propose(self, lines: Sequence[Mapping[str, str]]) -> Sequence[ReadingProposal]:
+    def propose(self, lines: Sequence[Mapping[str, str]], auto_merge: bool = False) -> Sequence[ReadingProposal]:
         if self._tokenizer is None:
             raise ReadingUnavailable(self.unavailable_reason or "SudachiPy 不可用")
         output: list[ReadingProposal] = []
@@ -86,10 +88,29 @@ class SudachiReadingProposer:
                     raise ReadingUnavailable(f"日文读音资源不可用：{type(exc).__name__}: {exc}") from exc
             for line in lines:
                 line_id, text = line["id"], line["text"]
+                number_ranges = []
+                matches = COUNTERS.finditer(text) if auto_merge else []
+                for match in matches:
+                    suffix = re.sub(r'^[0-9０-９]+', '', match.group())
+                    suffix_reading = ''.join(_hiragana(t.reading_form()) for t in self._tokenizer.tokenize(suffix, self._mode))
+                    number_ranges.append((match.start(), match.end(), match.group(), counted(match.group(), suffix_reading)))
+                for match in re.finditer(r'[0-9０-９]+', text):
+                    if not any(a <= match.start() < b for a,b,_,_ in number_ranges):
+                        number_ranges.append((match.start(), match.end(), match.group(), cardinal(match.group())))
+                output.extend(ReadingProposal(line_id, a, b, base, reading) for a,b,base,reading in number_ranges)
                 # Keep token reads and split(A) inside the tokenizer lock too.
                 for token in self._tokenizer.tokenize(text, self._mode):
                     segments = token_segments(token, self._furigana, self._mode_a, _hiragana)
                     for start, end, base, reading in segments:
+                        if any(a < end and b > start for a,b,_,_ in number_ranges):
+                            # A dictionary token may combine a digit and its counter.
+                            for match in re.finditer(r'[^0-9０-９]+', base):
+                                a, b = start + match.start(), start + match.end()
+                                if any(x < b and y > a for x,y,_,_ in number_ranges):
+                                    continue
+                                value = ''.join(_hiragana(t.reading_form()) for t in self._tokenizer.tokenize(match.group(), self._mode))
+                                output.append(ReadingProposal(line_id, a, b, match.group(), value))
+                            continue
                         if not _contains_japanese(base) or not reading or reading == '*' or _hiragana(base) == reading:
                             continue
                         output.append(ReadingProposal(
@@ -103,9 +124,9 @@ class ReadingUnavailable(RuntimeError):
     pass
 
 
-def propose_readings(lines: Sequence[Mapping[str, str]], proposer: ReadingProposer) -> Sequence[ReadingProposal]:
+def propose_readings(lines: Sequence[Mapping[str, str]], proposer: ReadingProposer, auto_merge: bool = False) -> Sequence[ReadingProposal]:
     texts = {line['id']: line['text'] for line in lines}
-    proposals = proposer.propose(lines)
+    proposals = proposer.propose(lines, auto_merge=auto_merge) if auto_merge else proposer.propose(lines)
     for item in proposals:
         if item.line_id not in texts:
             raise ValueError('proposal line does not belong to snapshot')
@@ -124,6 +145,10 @@ class ReadingSnapshot(BaseModel):
     lines: list[ReadingLine] = Field(min_length=1, max_length=10000)
 
 
+class JapaneseReadingSnapshot(ReadingSnapshot):
+    auto_merge: bool = False
+
+
 class ReadingRange(BaseModel):
     line_id: str
     base_start: int
@@ -136,14 +161,14 @@ class ReadingAnalysis(BaseModel):
     ranges: list[ReadingRange]
 
 
-def analyze_snapshot(body: ReadingSnapshot, proposer: ReadingProposer) -> ReadingAnalysis:
+def analyze_snapshot(body: JapaneseReadingSnapshot | ReadingSnapshot, proposer: ReadingProposer) -> ReadingAnalysis:
     """Analyze current text, with explicit empty readings for every uncovered range."""
     lines = [line.model_dump() for line in body.lines]
     if len({line.id for line in body.lines}) != len(lines):
         raise ValueError('行标识重复')
     if sum(len(line.text) for line in body.lines) > 1000000:
         raise ValueError('本次正文过长，请减少所选行')
-    proposals = propose_readings(lines, proposer)
+    proposals = propose_readings(lines, proposer, getattr(body, "auto_merge", False))
     by_line: dict[str, list[ReadingProposal]] = {}
     for p in proposals:
         by_line.setdefault(p.line_id, []).append(p)
@@ -168,7 +193,7 @@ def build_analysis_router(proposer: ReadingProposer, *, write) -> APIRouter:
     router = APIRouter()
 
     @router.post('/reading/analyze', response_model=ReadingAnalysis)
-    def analyze(body: ReadingSnapshot, _: object = Depends(write)):
+    def analyze(body: JapaneseReadingSnapshot, _: object = Depends(write)):
         try:
             return analyze_snapshot(body, proposer)
         except ReadingUnavailable as exc:

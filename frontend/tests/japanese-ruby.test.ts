@@ -132,3 +132,11 @@ it.each([[2,3],[null,3],[2,null]])('splitting retains exact outer endpoints and 
  const words=state.present.lines[0].words;expect(words[0].beginMs).toBe(beginMs);expect(words[1].endMs).toBe(endMs);
  expect(words[0].endMs).toBe(beginMs===null||endMs===null?null:3);expect(words[1].beginMs).toBe(words[0].endMs);
 });
+
+it('accepts half/full width numeric blocks and merges counter readings only when enabled', () => {
+ const d=createLyricDocument('３００本'),l=d.lines[0];l.words=['３００','本'].map(text=>createWord(text));
+ const separate=proposeJapaneseRuby(d,[l.id],[{line_id:l.id,base_start:0,base_end:3,base:'３００',reading:'さんびゃく'},{line_id:l.id,base_start:3,base_end:4,base:'本',reading:'ほん'}]);
+ expect(separate[0].blocks.map(b=>[b.text,b.reading,b.editable])).toEqual([['３００','さんびゃく',true],['本','ほん',true]]);
+ const merged=proposeJapaneseRuby(d,[l.id],[{line_id:l.id,base_start:0,base_end:4,base:'３００本',reading:'さんびゃっぽん'}],true);
+ expect(merged[0].blocks[0].spans).toHaveLength(2);
+});

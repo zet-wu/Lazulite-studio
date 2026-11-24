@@ -1687,6 +1687,13 @@ export interface components {
             agentIds: string[];
             name: string;
         };
+        /** JapaneseReadingSnapshot */
+        JapaneseReadingSnapshot: {
+            /** Lines */
+            lines: components["schemas"]["ReadingLine"][];
+            /** @default false */
+            auto_merge: boolean;
+        };
     };
     responses: {
         /** @description Session expired */
@@ -2560,7 +2567,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReadingSnapshot"];
+                "application/json": components["schemas"]["JapaneseReadingSnapshot"];
             };
         };
         responses: {
