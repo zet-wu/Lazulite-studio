@@ -92,17 +92,17 @@ class Sources:
         if source == 'netease':
             data = self.request('https://music.163.com/api/search/get/web', params={'s': query, 'type': 1, 'offset': 0, 'limit': 30})
             if data.get('code', 200) != 200: raise ValueError(f"网易云搜索失败：{data.get('code')}")
-            return [Candidate(source=source, id=str(s['id']), title=s['name'], artists=[a['name'] for a in s.get('ar', s.get('artists', []))], album=s.get('al', s.get('album', {})).get('name', ''), duration_ms=s.get('dt', s.get('duration'))) for s in data.get('result', {}).get('songs', [])]
+            return [Candidate(source=source, id=str(s['id']), title=s['name'], artists=[a['name'] for a in s.get('ar', s.get('artists', []))], album=(s.get('al') or s.get('album') or {}).get('name', ''), duration_ms=s.get('dt', s.get('duration'))) for s in data.get('result', {}).get('songs', [])]
         if source == 'qqmusic':
             try:
                 data = self.request('https://u.y.qq.com/cgi-bin/musicu.fcg', body={'comm':{'format':'json','ct':24}, 'music.search.SearchCgiService':{'module':'music.search.SearchCgiService','method':'DoSearchForQQMusicDesktop','param':{'query':query,'search_type':0,'page_num':1,'num_per_page':30}}})
                 search = data.get('music.search.SearchCgiService', {})
                 if data.get('code', 0) != 0 or search.get('code', 0) != 0: raise ValueError('QQ 搜索失败')
                 songs = search.get('data',{}).get('body',{}).get('song',{}).get('list',[])
-                if not songs: songs = self._qq_legacy(query)
             except (httpx.HTTPError, ValueError):
-                songs = self._qq_legacy(query)
-            return [Candidate(source=source, id=str(s.get('mid') or s.get('songmid') or s.get('id') or s['songid']), songmid=s.get('mid') or s.get('songmid'), songid=str(s.get('id') or s.get('songid')) if s.get('id') or s.get('songid') else None, title=s.get('name') or s.get('songname',''), artists=[a['name'] for a in s.get('singer',[])], album=s.get('album',{}).get('name','') or s.get('albumname',''), duration_ms=round(s['interval']*1000) if s.get('interval') is not None else None) for s in songs]
+                songs = []
+            if not songs: songs = self._qq_legacy(query)
+            return [Candidate(source=source, id=str(s.get('mid') or s.get('songmid') or s.get('id') or s['songid']), songmid=s.get('mid') or s.get('songmid') or None, songid=str(s.get('id') or s.get('songid')) if s.get('id') or s.get('songid') else None, title=s.get('name') or s.get('songname',''), artists=[a['name'] for a in s.get('singer',[])], album=(s.get('album') or {}).get('name','') or s.get('albumname',''), duration_ms=round(s['interval']*1000) if s.get('interval') is not None else None) for s in songs]
         if source == 'kugou':
             try:
                 data = self.request('https://mobiles.kugou.com/api/v3/search/song', params={'format':'json','keyword':query,'page':1,'pagesize':30,'showtype':14,'plat':0,'sver':5,'correct':1,'api_ver':1,'version':9108})
@@ -181,7 +181,7 @@ def build_sources_router(*, write, sources=None):
             raise HTTPException(502, {'code':'source_decode','message':str(exc),'retryable':True}) from exc
         except httpx.HTTPError as exc:
             raise HTTPException(502, {'code':'source_network','message':f'来源网络请求失败：{type(exc).__name__}','retryable':True}) from exc
-        except (ValueError, KeyError, TypeError, zlib.error) as exc:
+        except (ValueError, zlib.error) as exc:
             raise HTTPException(502, {'code':'source_payload','message':str(exc),'retryable':True}) from exc
         finally: semaphore.release()
     @router.post('/search')

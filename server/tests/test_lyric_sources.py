@@ -86,3 +86,23 @@ def test_kugou_search_uses_thirty_results_and_splits_multiple_singers(fallback):
         return httpx.Response(200,json={'data':{'lists':[{'FileHash':'hash','SongName':'歌','SingerName':'A、B / C','Duration':120}]}})
     row=Sources(httpx.MockTransport(respond)).search('kugou','歌 A')[0]
     assert row.artists==['A','B','C'] and row.duration_ms==120000
+
+def test_qq_empty_primary_does_not_retry_a_failed_legacy(monkeypatch):
+    source = Sources()
+    calls = []
+    def request(url, **kwargs):
+        calls.append(url)
+        if 'musicu' in url: return {'code':0}
+        raise httpx.ConnectError('offline')
+    monkeypatch.setattr(source, 'request', request)
+    with pytest.raises(httpx.HTTPError): source.search('qqmusic', '歌')
+    assert len(calls) == 2
+
+
+def test_upstream_null_albums_and_empty_mid_are_valid_search_payloads(monkeypatch):
+    source = Sources()
+    monkeypatch.setattr(source, 'request', lambda *args, **kwargs: {'result':{'songs':[{'id':1,'name':'歌','album':None}]}})
+    assert source.search('netease','歌')[0].album == ''
+    monkeypatch.setattr(source, 'request', lambda *args, **kwargs: {'music.search.SearchCgiService':{'data':{'body':{'song':{'list':[{'id':1,'mid':'','songmid':'','name':'歌','album':None}]}}}}})
+    candidate = source.search('qqmusic','歌')[0]
+    assert candidate.id == '1' and candidate.songmid is None
