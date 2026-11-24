@@ -65,3 +65,25 @@ test('selected timeline words share local alignment with canvas and timing optio
  await page.getByRole('button',{name:'编辑',exact:true}).click();
  await a.click({button:'right'});await expect(page.getByRole('menuitem',{name:/词内节奏点|空拍|终止点/})).toHaveCount(0);
 });
+
+
+test('local failure retries its selection and leaves the skipped global entry disabled',async({page})=>{
+ const pid='music-packaging';let params:any=null;
+ await page.route('**/api/v1/capabilities',route=>route.fulfill({json:{schema_version:'studio-capabilities-v1',items:[{id:'job.alignment',enabled:true,reason:null}]}}));
+ const job=()=>({id:'local-failed',project_id:pid,kind:'alignment',status:'failed',request:params,result_available:false,error:{message:'局部对齐失败',code:'alignment_failed'},acknowledged_state:null});
+ await page.route(`**/api/v1/projects/${pid}/jobs`,route=>route.fulfill({json:{schema_version:'studio-job-list-v1',items:params?[job()]:[]}}));
+ await page.route(`**/api/v1/projects/${pid}/jobs/alignment`,route=>{params=route.request().postDataJSON().params;return route.fulfill({status:202,json:job()});});
+ await page.goto(`/projects/${pid}/edit`);
+ await page.locator('[data-outline-drag]').first().click({button:'right'});await page.getByRole('menuitem',{name:'局部对齐',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'局部对齐',exact:true});
+ await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});
+ await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();
+ await page.getByRole('button',{name:'重试自动对齐',exact:true}).click();
+ await expect(dialog).toBeVisible();
+ const preview=page.waitForRequest(r=>r.url().includes('/alignment-preview?'));
+ await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});
+ expect(new URL((await preview).url()).searchParams.getAll('scope_ids')).toEqual(['a','b']);
+ await dialog.getByRole('button',{name:'取消',exact:true}).click();
+ await page.getByRole('button',{name:'音频处理',exact:true}).click();
+ await expect(page.getByRole('button',{name:'自动对齐',exact:true})).toBeDisabled();
+});

@@ -93,7 +93,6 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
     const proposed = timeEnvelope(children);
     // Parents do not count as retained/cleared leaf objects.
     const candidate = clearUnmatched ? proposed : {beginMs:proposed.beginMs ?? old.beginMs,endMs:proposed.endMs ?? old.endMs};
-    if ([candidate.beginMs, candidate.endMs].some(value => value !== null && (!Number.isSafeInteger(value) || value < 0))) return old;
     return timeEnvelope([candidate, ...children]);
   }
   for (const [lineIndex, line] of next.lyrics.lines.entries()) {

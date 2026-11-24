@@ -388,15 +388,13 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
 
       const clearUnmatched =
         clear_unmatched ??
-        (typeof job.request.clear_unmatched === 'boolean' ? job.request.clear_unmatched : false);
+        job.request.clear_unmatched as boolean;
       const mergeShortGaps =
         merge_short_gaps ??
-        (typeof job.request.merge_short_gaps === 'boolean' ? job.request.merge_short_gaps : false);
+        job.request.merge_short_gaps as boolean;
       const thresholdMs =
         gap_threshold_ms ??
-        (typeof job.request.gap_threshold_ms === 'number' && Number.isSafeInteger(job.request.gap_threshold_ms)
-          ? job.request.gap_threshold_ms
-          : 500);
+        job.request.gap_threshold_ms as number;
 
       type AlignmentMutation = MutationResult<{
         cleared_count: number;

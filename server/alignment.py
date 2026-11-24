@@ -7,7 +7,7 @@ from .vocals import VocalCancelled
 from .worker_process import WorkerProcess
 from .project_document import load_project
 from .audio_boundaries import source_duration, intersect_segments
-from .alignment_projection import project_alignment, alignment_envelope
+from .alignment_projection import project_alignment, build_alignment_projection, alignment_envelope
 
 
 def alignment_unavailable():
@@ -98,10 +98,10 @@ def _run_alignment(request, emit, cancelled, media_lifetime):
     duration_ms = source_duration(db, pid, asset)
     if cancelled(): raise VocalCancelled()
     check_snapshot(params['_model'])
-    projection = project_alignment(snapshot, params['use_hints'], model=params['_model'], scope_ids=params.get('scope_ids'), **{k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles')})
+    projection = build_alignment_projection(snapshot, params['use_hints'], model=params['_model'], scope_ids=params.get('scope_ids'), **{k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles')})
     vocal = VocalRunner(db, root, cleanup=False, media_lifetime=media_lifetime)
     acoustics = snapshot['acoustics']; new_acoustics = None
-    needs_vocal = params['audio_source'] == 'vocals' or params['crop_vocals']
+    needs_vocal = params['audio_source'] == 'vocals' or params['crop_vocals'] and not acoustics['segments']
     metadata = None
     automatic_normalization = {'clipped':0, 'dropped':0}
     if needs_vocal:
@@ -124,7 +124,7 @@ def _run_alignment(request, emit, cancelled, media_lifetime):
         audio = AudioBuffer(samples.T, rate, metadata['audio_result_id'])
     lower, upper = alignment_envelope(snapshot, params['scope_ids']) if params.get('scope_ids') is not None else (0, duration_ms)
     if params['crop_vocals']:
-        rows, automatic_normalization = intersect_segments(acoustics['segments'] if acoustics['analysisId'] else metadata['segments'], duration_ms)
+        rows, automatic_normalization = intersect_segments(acoustics['segments'] if acoustics['segments'] else metadata['segments'], duration_ms)
     else:
         rows = [{'id':'alignment-range','beginMs':lower,'endMs':upper}]
     rows = [{**row,'beginMs':max(row['beginMs'],lower),'endMs':min(row['endMs'],upper)} for row in rows]

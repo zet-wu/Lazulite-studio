@@ -8,7 +8,7 @@ from .amll_compatibility import TT, TM, XML, ST, RUBY
 from .time_units import parse_ttml_seconds
 
 
-def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=True, strip_tone_digits=False, convert_particles=False, particle_analyzer=None, scope_ids=None):
+def build_alignment_projection(snapshot, use_hints=False, *, model=None, latin_normalize=True, strip_tone_digits=False, convert_particles=False, particle_analyzer=None, scope_ids=None):
     root = ET.fromstring(snapshot['lyrics']['draftTtml'])
     rows = []
     for parent in root.iter(TT+'p'):
@@ -23,7 +23,6 @@ def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=
     order_set = set(order)
     rows = [by_id[key] for key in order] + [row for row in rows if identity(row) not in order_set]
     selected = set(scope_ids) if scope_ids is not None else None
-    if selected is not None and (len(selected) != len(scope_ids) or len(selected) < 2): raise ValueError('局部对齐至少需要两个不同读音单元')
     skipped = set() if selected is not None else set(snapshot['editing']['skippedAlignmentLineIds'])
     mapping, lines, unknown, hinted, emitted = [], [], set(), 0, 0
     scope = []
@@ -60,7 +59,6 @@ def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=
             hinted += 1
             if use_hints: hint = StartHint(float(value), 'unknown')
         lines.append(JapaneseLine(line_id, text, tuple(units), hint))
-    if selected is not None and {item['object_id'] for item in scope} != selected: raise ValueError('局部对齐范围与当前读音单元不匹配')
     original_readings = {u.unit_id:u.reading for l in lines for u in l.units}
     if latin_normalize and convert_particles:
         if particle_analyzer is None:
@@ -92,6 +90,18 @@ def project_alignment(snapshot, use_hints=False, *, model=None, latin_normalize=
         by_object[item['object_id']]['target_ids'].append(item['unit_id'])
     return {'request': {'schema': 'lazulite-japanese-request-v1', **asdict(request)}, 'mapping': mapping, 'scope': scope,
             'summary': {'unknown_objects': sorted(unknown), 'input_version':prepared['version'], 'inputs':[{'unit_id':u.unit_id,'object_id':original_mapping[prepared['origins'][u.unit_id]]['object_id'],'reading':u.reading,'original_reading':original_readings[prepared['origins'][u.unit_id]],'reading_range':u.reading_range,'model_text':prepared['texts'][u.unit_id],'problem':prepared['problems'].get(u.unit_id),'unknown_characters':prepared['unknown_characters'].get(u.unit_id,[])} for l in request.lines for u in l.units], 'line_count': len(lines), 'skipped_count': len(skipped), 'unknown_count': len(unknown), 'hint_count': hinted, 'emitting_count': emitted}}
+
+
+def project_alignment(snapshot, use_hints=False, **options):
+    """Validate an external selection while projecting a preview or a submitted run."""
+    scope_ids = options.get('scope_ids')
+    selected = set(scope_ids) if scope_ids is not None else None
+    if selected is not None and (len(selected) != len(scope_ids) or len(selected) < 2):
+        raise ValueError('局部对齐至少需要两个不同读音单元')
+    projection = build_alignment_projection(snapshot, use_hints, **options)
+    if selected is not None and {item['object_id'] for item in projection['scope']} != selected:
+        raise ValueError('局部对齐范围与当前读音单元不匹配')
+    return projection
 
 
 def alignment_envelope(snapshot, scope_ids):

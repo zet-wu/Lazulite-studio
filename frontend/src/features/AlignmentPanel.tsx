@@ -92,7 +92,7 @@ export function AlignmentPanel({
       recent.current.origin = launchButton.current;
       if (taskId) {
         recent.current.onDismiss = () => {
-          void jobsApi.acknowledge(taskId, 'dismissed').catch(() => undefined);
+          void jobsApi.acknowledge(taskId, 'dismissed').catch(error => setMessage(errorMessage(error)));
         };
       }
     }
@@ -105,6 +105,7 @@ export function AlignmentPanel({
   } | null>(null);
   const [launching, setLaunching] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [failedRun, setFailedRun] = useState<PendingRun | null>(null);
   const [pendingRun, setPendingRun] = useState<PendingRun | null>(null);
   const handledRuns = useRef(new Set<string>());
   const handledAlignmentRequest = useRef(ui.alignmentRequest);
@@ -133,11 +134,11 @@ export function AlignmentPanel({
   const activeJob = jobs.data?.items.find((j) => ['vocal', 'alignment'].includes(j.kind) && ACTIVE_STATUSES.has(j.status));
   const active = Boolean(activeJob);
   const runningAlignment = activeJob?.kind === 'alignment' || launching;
-  const reason = !assetId
+  const unavailable = (scopeIds: string[] | null) => !assetId
     ? t('alignment.uploadRequired')
     : durationMs === null
       ? t('alignment.durationUnknown')
-      : ui.alignmentScope === null && !project.lyrics.lines.some((l) => !project.editing.skippedAlignmentLineIds.includes(l.id))
+      : scopeIds === null && !project.lyrics.lines.some((l) => !project.editing.skippedAlignmentLineIds.includes(l.id))
         ? t('alignment.noLines')
         : !capability?.enabled
           ? capability
@@ -146,6 +147,7 @@ export function AlignmentPanel({
           : active
             ? t('alignment.busy')
             : null;
+  const reason = unavailable(null);
 
   useEffect(() => {
     if (!pendingRun) {
@@ -194,7 +196,7 @@ export function AlignmentPanel({
               pendingRun.options.merge_short_gaps ? pendingRun.options.gap_threshold_ms : null,
             );
             lock.apply(merged.project);
-            void jobsApi.acknowledge(job.id, 'applied').catch(() => undefined);
+            void jobsApi.acknowledge(job.id, 'applied').catch(error => setMessage(errorMessage(error)));
             resultMessage(
               messageList([
                 ...(result.normalization && (result.normalization.clipped || result.normalization.dropped)
@@ -236,6 +238,7 @@ export function AlignmentPanel({
         options: pendingRun.options,
       });
     }
+    setFailedRun(pendingRun);
     resultMessage(
       job.error
         ? taskError(job.error)
@@ -282,8 +285,10 @@ export function AlignmentPanel({
   useEffect(() => {
     if (ui.alignmentRequest === handledAlignmentRequest.current) return;
     handledAlignmentRequest.current = ui.alignmentRequest;
-    if (!dialog && !active && !launching && !opening && !reason) {
-      void open(ui.alignmentScope);
+    const scopeIds = ui.alignmentScope;
+    ui.setAlignmentScope(null);
+    if (!dialog && !active && !launching && !opening && !unavailable(scopeIds)) {
+      void open(scopeIds);
     }
   }, [ui.alignmentRequest, dialog, active, launching, opening, reason]);
 
@@ -401,8 +406,8 @@ export function AlignmentPanel({
                 icon="refresh"
                 label={t('alignment.retry')}
                 data-role="secondary"
-                disabled={runningAlignment || control.locked || !!reason}
-                onClick={() => void open()}
+                disabled={runningAlignment || control.locked || !!unavailable(failedRun?.options.scope_ids ?? null)}
+                onClick={() => void open(failedRun?.options.scope_ids ?? null)}
               />
             ) : undefined,
         }

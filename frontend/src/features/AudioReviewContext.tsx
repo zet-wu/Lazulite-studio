@@ -23,7 +23,7 @@ function useAudioState() {
   const [alignmentRequest, setAlignmentRequest] = useState(0);
   const [alignmentScope, setAlignmentScope] = useState<string[] | null>(null);
   const requestAlignmentOpen = useCallback((scopeIds: string[] | null = null) => { setAlignmentScope(scopeIds); setAlignmentRequest((v) => v + 1); }, []);
-  return { uploadHost, setUploadHost, analysisHost, setAnalysisHost, selected, setSelected, segmentTarget, adding, setAdding, toolsHost, setToolsHost, alignmentHost, setAlignmentHost, statusHost, setStatusHost, timelineReady, setTimelineReady, claimedJobIds, claimJobId, alignmentRequest, alignmentScope, requestAlignmentOpen };
+  return { uploadHost, setUploadHost, analysisHost, setAnalysisHost, selected, setSelected, segmentTarget, adding, setAdding, toolsHost, setToolsHost, alignmentHost, setAlignmentHost, statusHost, setStatusHost, timelineReady, setTimelineReady, claimedJobIds, claimJobId, alignmentRequest, alignmentScope, setAlignmentScope, requestAlignmentOpen };
 }
 const Context = createContext<ReturnType<typeof useAudioState> | null>(null);
 export const useAudioReview = () => useContext(Context)!;

@@ -104,6 +104,8 @@ def test_audio_source_crop_and_scope_are_independent(tmp_path,monkeypatch,audio_
     _,db,revision=prepare(tmp_path,monkeypatch)
     snapshot=initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="line" begin="0" end="2"><span studio:id="a" begin="0.6" end="0.8">a</span><span studio:id="b" begin="0.8" end="1.2">b</span></p></body></tt>')
     if local:snapshot['editing']['skippedAlignmentLineIds']=['line']
+    manual = audio_source == 'original' and crop
+    if manual: snapshot['acoustics'] = {'analysisId':None,'segments':[{'id':'manual','beginMs':500,'endMs':1500}]}
     revision=RevisionStore(db,tmp_path/'projects').create('p',snapshot,revision)['id']
     calls=[]
     class CountSeparator(Separator):
@@ -118,11 +120,12 @@ def test_audio_source_crop_and_scope_are_independent(tmp_path,monkeypatch,audio_
     with db.connect() as c:asset=c.execute("SELECT source_asset_id FROM projects WHERE id='p'").fetchone()[0]
     params={'revision':revision,'asset_id':asset,'_model':model_snapshot(tmp_path/'models/model'),'convert_particles':False,'latin_normalize':True,'strip_tone_digits':False,'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'audio_source':audio_source,'crop_vocals':crop,'scope_ids':['a','b'] if local else None}
     result=run_alignment({'database':str(db.path),'root':str(tmp_path/'projects'),'project_id':'p','params':params,'asset_path':str(tmp_path/'projects/p/source/original'),'job_id':'matrix'},lambda *args:None,lambda:False)
-    assert len(calls)==(0 if audio_source=='original' and not crop else 1)
+    assert len(calls)==(0 if audio_source=='original' else 1)
     assert result['selection']==params['scope_ids']
     assert len(result['scope'])==2
     assert captured[0]
     if local:assert all(.6<=a<b<=1.2 for a,b in captured[0])
+    if manual:assert captured==[[(.6,1.2) if local else (.5,1.5)]]
     if not crop:assert captured==[[(.6,1.2) if local else (0,2)]]
     # Every model result is in original media coordinates, even after native cutting.
     if local:
