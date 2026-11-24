@@ -3,6 +3,7 @@ import { importLyrics } from '../fixtures/import-lyrics';
 import { japaneseReadingTtml } from '../fixtures/japanese-reading';
 
 for (const startKey of ['s', 'Shift+G']) test(`timing keys work after button clicks (${startKey})`, async ({ page }) => {
+  await page.addInitScript(()=>localStorage.setItem('studio:sync-style','amll'));
   await page.goto('/projects/sample-project/edit');
   await importLyrics(page, { name: 'ruby.ttml', mimeType: 'application/xml', buffer: Buffer.from(japaneseReadingTtml) });
   if (startKey !== 's') {

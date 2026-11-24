@@ -52,6 +52,7 @@ type AtomicLyricCommand =
   | { type: 'sync-stamp'; cursor: SyncCursor; action: SyncAction; timeMs: number; mode?: SyncMode; lineOrder?: string[] }
   | { type: 'replace-document'; document: LyricDocument; editing?: ProjectEditing }
   | { type: 'restore-editing'; editing: ProjectEditing }
+  | { type: 'set-sync-stop'; kind: 'word' | 'ruby'; id: string; stop: boolean }
   | { type: 'set-empty-beat'; kind: 'word' | 'ruby'; id: string; count: number }
   | { type: 'split-word'; lineId: string; wordId: string; at: number; newWordId?: string }
   | { type: 'set-word-obscene'; lineId: string; wordId: string; obscene: boolean }
@@ -395,12 +396,18 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
     }
     case 'merge-words': {
       const { line, words: selected, merged } = planWordMerge(document, command.wordIds);
+      const tailStop = editing.syncStops[selected.at(-1)!.id];
+      delete editing.syncStops[merged.id];
+      if (tailStop) editing.syncStops[merged.id] = tailStop;
       const ids = new Set(command.wordIds);
       const words = line.words.flatMap(word => word.id === selected[0].id ? [merged] : ids.has(word.id) ? [] : [word]);
       return { ...document, lines: document.lines.map(item => item === line ? { ...line, words } : item) };
     }
     case 'merge-ruby': {
       const { line, word, units, merged } = planRubyMerge(document, command.rubyIds);
+      const tailStop = editing.syncStops[units.at(-1)!.id];
+      delete editing.syncStops[merged.id];
+      if (tailStop) editing.syncStops[merged.id] = tailStop;
       const ids = new Set(command.rubyIds);
       return editWord(document, line.id, word.id, () => [{ ...word, rubyUnits: word.rubyUnits.flatMap(unit => unit.id === units[0].id ? [merged] : ids.has(unit.id) ? [] : [unit]) }]);
     }
@@ -457,6 +464,12 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       if (command.ignoreSync) editing.ignoredSyncLineIds.push(command.lineId);
       return document;
     }
+    case 'set-sync-stop': {
+      const exists = document.lines.some(line => line.words.some(word => command.kind === 'word' ? word.id === command.id && !word.rubyUnits.length : word.rubyUnits.some(unit => unit.id === command.id)));
+      if (!exists) throw new MessageError(message('command.beatMissing'));
+      editing.syncStops[command.id] = {kind: command.kind, stop: command.stop};
+      return document;
+    }
     case 'set-empty-beat': {
       const exists = document.lines.some(line => line.words.some(word => command.kind === 'word' ? word.id === command.id : word.rubyUnits.some(unit => unit.id === command.id)));
       if (!exists) throw new MessageError(message('command.beatMissing'));
@@ -464,6 +477,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       return document;
     }
     case 'restore-editing':
+      Object.assign(editing.syncStops, command.editing.syncStops);
       Object.assign(editing.emptyBeats, command.editing.emptyBeats);
       editing.skippedAlignmentLineIds = [...new Set([...editing.skippedAlignmentLineIds, ...command.editing.skippedAlignmentLineIds])];
       editing.ignoredSyncLineIds = [...new Set([...editing.ignoredSyncLineIds, ...command.editing.ignoredSyncLineIds])];
@@ -710,6 +724,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
             const [left, right] = splitAtGrapheme(unit.reading, wordCommand.at);
           const id = wordCommand.newRubyId ?? crypto.randomUUID();
           if (word.rubyUnits.some((item) => item.id === id)) throw new MessageError(message('command.rubyDuplicate'));
+          if (editing.syncStops[unit.id]) { editing.syncStops[id] = editing.syncStops[unit.id]; delete editing.syncStops[unit.id]; }
           const middle = isKanaReading(unit.reading)
             ? splitTime(unit.beginMs, unit.endMs, splitReadingMora(left).length, splitReadingMora(unit.reading).length)
             : splitTime(unit.beginMs, unit.endMs, 1, 2);
@@ -721,6 +736,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
         return [updated];
       }
       case 'delete-ruby':
+        delete editing.syncStops[wordCommand.rubyId];
         delete editing.emptyBeats[wordCommand.rubyId];
         return [{ ...updateRuby(word, wordCommand.rubyId, () => []) }];
       case 'set-ruby-time': {

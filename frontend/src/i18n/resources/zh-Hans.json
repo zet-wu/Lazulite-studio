@@ -1700,5 +1700,13 @@
   "vocal.backgroundApplied": "后台人声分离已完成并自动应用",
   "vocal.backgroundConflict": "后台人声分离已完成，是否采用新结果覆盖当前声学片段？",
   "settings.swapBoundaryDrag": "交换边界拖动操作",
-  "settings.swapBoundaryDragHelp": "默认拖动联动相邻边界，Ctrl／⌘＋拖动调整单侧边界；开启后两者互换。"
+  "settings.swapBoundaryDragHelp": "默认拖动联动相邻边界，Ctrl／⌘＋拖动调整单侧边界；开启后两者互换。",
+  "settings.syncStyle": "打轴风格",
+  "editor.innerBeats": "词内节奏点",
+  "editor.addInnerBeats": "添加词内节奏点",
+  "sync.innerBeat": "词内节奏点 {{number}}",
+  "sync.stop": "终止点",
+  "sync.addStop": "开启终止点",
+  "sync.removeStop": "关闭终止点",
+  "sync.singleKey": "单键打轴"
 }

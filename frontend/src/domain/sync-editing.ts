@@ -64,3 +64,27 @@ export function stampSync(document: LyricDocument, cursor: SyncCursor, action: S
   const lines = document.lines.map((line) => changes.get(line.id) ?? line);
   return { ...document, lines };
 }
+
+export function hasSyncStop(document: LyricDocument, editing: ProjectEditing, cursor: SyncCursor): boolean {
+  const id = cursor.rubyUnitId ?? cursor.wordId;
+  const explicit = editing.syncStops[id];
+  if (explicit) return explicit.stop;
+  const units = syncUnits(document, editing, cursor.lineId);
+  return syncIndex(units, cursor) === units.length - 1;
+}
+
+export type SugProgress = { consumed: number; completed: boolean; started?: boolean };
+/** Each press consumes one checkpoint; only a stop checkpoint responds to release. */
+export function sugSyncStep(document: LyricDocument, editing: ProjectEditing, cursor: SyncCursor, progress: SugProgress, event: 'pressed' | 'released', timeMs: number): { action?: SyncAction; progress: SugProgress; advance?: boolean } {
+  if (progress.completed) return { progress };
+  const word = document.lines.find(line => line.id === cursor.lineId)!.words.find(word => word.id === cursor.wordId)!;
+  const unit = cursor.rubyUnitId ? word.rubyUnits.find(unit => unit.id === cursor.rubyUnitId)! : word;
+  if (progress.started && unit.beginMs !== null && timeMs < unit.beginMs) throw new MessageError(message('sync.endBeforeStart'));
+  const count = editing.emptyBeats[cursor.rubyUnitId ?? cursor.wordId]?.count ?? 0;
+  const stop = hasSyncStop(document, editing, cursor);
+  if (event === 'released') return progress.started && stop && progress.consumed === count
+    ? { action: 'end', progress: { consumed: 0, completed: false }, advance: true } : { progress };
+  if (!progress.started) return { action: 'start', progress: { consumed: 0, completed: false, started: true } };
+  if (progress.consumed < count) return { progress: { ...progress, consumed: progress.consumed + 1 } };
+  return stop ? { progress } : { action: 'next', progress: { consumed: 0, completed: false, started: true }, advance: true };
+}

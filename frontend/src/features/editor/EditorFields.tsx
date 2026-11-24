@@ -1,3 +1,4 @@
+import { useSyncStyle } from '../../adapters/sync-style';
 import { useMessageText } from '../../shared/useMessageText';
 import { message, MessageError, errorMessage } from '../../domain/messages';
 import { i18n } from '../../i18n';
@@ -52,6 +53,8 @@ export function TimePair({ begin, end, label, onCommit }: { begin: TimeMs; end: 
 
 export function EmptyBeatField({ count, commit, whitespace }: { count: number; commit: (count: number) => boolean; whitespace: boolean }) {
   useTranslation();
+  const [syncStyle] = useSyncStyle();
+  const label = t(syncStyle === 'sug' ? 'editor.innerBeats' : 'editor.emptyBeats');
   const [draft, setDraft] = useState(String(count));
   const [error, setError] = useMessageText('');
   const cancelled = useRef(false);
@@ -62,7 +65,7 @@ export function EmptyBeatField({ count, commit, whitespace }: { count: number; c
     if (Number(draft) !== count && !commit(Number(draft))) return;
     setError(''); setDraft(String(Number(draft)));
   };
-  return <div><label>{t('editor.emptyBeats')}<input aria-label={t('editor.emptyBeats')} inputMode="numeric" value={draft} aria-invalid={Boolean(error)} onChange={event => setDraft(event.target.value)} onBlur={submit} onKeyDown={event => {
+  return <div><label>{label}<input aria-label={label} inputMode="numeric" value={draft} aria-invalid={Boolean(error)} onChange={event => setDraft(event.target.value)} onBlur={submit} onKeyDown={event => {
     if (event.nativeEvent.isComposing) return;
     if (event.key === 'Enter') event.currentTarget.blur();
     if (event.key === 'Escape') { event.stopPropagation(); cancelled.current = true; setDraft(String(count)); setError(''); event.currentTarget.blur(); }

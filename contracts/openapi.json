@@ -3327,7 +3327,8 @@
                 "required": [
                   "emptyBeats",
                   "ignoredSyncLineIds",
-                  "skippedAlignmentLineIds"
+                  "skippedAlignmentLineIds",
+                  "syncStops"
                 ],
                 "additionalProperties": false,
                 "properties": {
@@ -3368,6 +3369,28 @@
                       "type": "string"
                     },
                     "uniqueItems": true
+                  },
+                  "syncStops": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "stop"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "word",
+                            "ruby"
+                          ]
+                        },
+                        "stop": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
                   }
                 }
               },

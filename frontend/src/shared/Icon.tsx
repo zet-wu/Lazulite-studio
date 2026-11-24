@@ -28,11 +28,14 @@ const icons = {
   "minus": <><path d="M5 12h14" /></>,
 };
 
-type IconName = keyof typeof icons | 'karaoke' | 'sync-dot' | 'sync-beat';
+type IconName = keyof typeof icons | 'karaoke' | 'sync-dot' | 'sync-triangle' | 'sync-beat';
 
-export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
-  if (name === 'sync-dot' || name === 'sync-beat') return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 16 16">
-    {name === 'sync-dot' ? <circle cx="8" cy="8" r="2.5" fill="currentColor"/> : <rect x="6.5" y="2" width="3" height="12" rx="1" fill="currentColor"/>}
+export function Icon({ name, size = 16, filled = 'full' }: { name: IconName; size?: number; filled?: 'none' | 'left' | 'right' | 'full' }) {
+  if (name === 'sync-dot' || name === 'sync-triangle' || name === 'sync-beat') return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 16 16">
+    {name === 'sync-beat' ? <rect x="6.5" y="2" width="3" height="12" rx="1" fill="currentColor"/> : <>
+      {name === 'sync-triangle' ? <path d="M3 3 13 8 3 13Z" fill={filled === 'full' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1"/> : <circle cx="8" cy="8" r="4" fill={filled === 'full' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1"/>}
+      {(filled === 'left' || filled === 'right') && <path fill="currentColor" d={name === 'sync-triangle' ? filled === 'left' ? 'M3 3 8 5.5V10.5L3 13Z' : 'M8 5.5 13 8 8 10.5Z' : filled === 'left' ? 'M8 4A4 4 0 0 0 8 12Z' : 'M8 4A4 4 0 0 1 8 12Z'}/>}
+    </>}
   </svg>;
   if (name === 'karaoke') return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 16 16" fill="currentColor"><path d="M1.8 2.3 3.5.7C5 2.3 5.5 3.8 5.5 5.4v2.1L9 4.1h3.6L8.8 7.8l5.6 7.2h-3.3L6.9 9.7l-1.4 1.4V15H3V5.5q0-1.7-1.2-3.2Z" /></svg>;
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icons[name]}</svg>;

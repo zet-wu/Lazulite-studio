@@ -26,8 +26,15 @@ class EmptyBeat(BaseModel):
     kind: Literal['word', 'ruby']
     count: StrictInt = Field(ge=1, le=32)
 
+class SyncStop(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    kind: Literal['word', 'ruby']
+    stop: StrictBool
+
+
 class Editing(BaseModel):
     model_config = ConfigDict(extra='forbid')
+    syncStops: dict[str, SyncStop]
     emptyBeats: dict[str, EmptyBeat]
     skippedAlignmentLineIds: list[str]
     ignoredSyncLineIds: list[str]
@@ -53,7 +60,7 @@ class ProjectSnapshot(BaseModel):
 def initial_project(ttml: str) -> dict:
     from .amll_compatibility import DEFAULTS
     return {'schemaVersion': 'studio-project-v9', 'karaoke': initial_karaoke(ttml), 'amll': dict(DEFAULTS), 'lineOrder': [],
-            'editing': {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': []}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
+            'editing': {'syncStops': {}, 'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': []}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
 
 def load_project(path: str | Path) -> dict:
     """Fast load of an immutable, already-validated persisted revision snapshot."""
@@ -124,6 +131,8 @@ def validate_editing(snapshot, root):
     editing = snapshot['editing']
     for key, beat in editing['emptyBeats'].items():
         if objects.get(key) != beat['kind']: raise DocumentInvalid('empty_beat_invalid_reference', f'空拍对象 {key} 或类别不合法', object_id=key, kind=beat['kind'])
+    for key, stop in editing['syncStops'].items():
+        if objects.get(key) != stop['kind']: raise DocumentInvalid('sync_stop_invalid_reference', f'终止点对象 {key} 或类别不合法', object_id=key)
     skipped = editing['skippedAlignmentLineIds']
     if len(set(skipped)) != len(skipped) or any(key not in lines for key in skipped): raise DocumentInvalid('skipped_alignment_invalid_reference', '跳过对齐的行引用无效或重复', object_ids=skipped)
     ignored = editing['ignoredSyncLineIds']

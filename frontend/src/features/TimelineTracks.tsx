@@ -92,8 +92,8 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
   const interactionLineIds = [focusedLineId, drag?.target?.lineId, menu?.target.closest<HTMLElement>('[data-expanded-line]')?.dataset.expandedLine];
   const heldLineIds = [...interactionLineIds,stagingTarget?.lineId];
   const projection = useMemo(() => projectTimeline(document, durationMs), [document, durationMs]);
-  const intersects = (begin: number | null, end: number | null) => timed(begin, end) && Math.max(begin, end) >= startMs && Math.min(begin, end) <= endMs;
-  const buffered = (begin: number | null, end: number | null) => timed(begin,end) && Math.max(begin, end) >= startMs-paddingMs && Math.min(begin, end) <= endMs+paddingMs;
+  const intersects = (begin: number | null, end: number | null) => timed(begin, end) && Math.max(begin, end!) >= startMs && Math.min(begin, end!) <= endMs;
+  const buffered = (begin: number | null, end: number | null) => timed(begin,end) && Math.max(begin, end!) >= startMs-paddingMs && Math.min(begin, end!) <= endMs+paddingMs;
   const expandedLines = projection.lines.filter(line => {
     if (!expanded.includes(line.id) && !activeLineIds.includes(line.id) && !heldLineIds.includes(line.id)) return false;
     if (!(visible.word || visible.ruby && line.words.some(word => word.rubyUnits.length) || visible.romanization && [...document.romanizationTracks,...document.translationTracks].some(track => track.contents.some(content => content.lineId === line.id)))) return false;

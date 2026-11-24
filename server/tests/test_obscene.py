@@ -21,7 +21,7 @@ def test_flags_survive_service_save_and_reopen(tmp_path):
     assert len(flagged) == 3
     assert [e.get('{urn:lazulite:studio:draft}id') for e in flagged] == ['w', 'rw', 'bw']
     assert list(flagged[0].itertext()) == ['Alpha']
-    assert reopened['document']['editing'] == {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': []}
+    assert reopened['document']['editing'] == {'syncStops': {}, 'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': []}
 
 @pytest.mark.parametrize('source', [SOURCE.replace('obscene="true"', 'obscene="yes"', 1), SOURCE.replace('<p ', '<p amll:obscene="true" '), SOURCE.replace('tts:ruby="text"', 'tts:ruby="text" amll:obscene="true"'), SOURCE.replace('tts:ruby="base"', 'tts:ruby="base" amll:obscene="true"'), SOURCE.replace('ttm:role="x-bg"', 'ttm:role="x-bg" amll:obscene="true"')])
 def test_invalid_flags_rejected(source):

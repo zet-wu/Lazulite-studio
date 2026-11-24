@@ -1,3 +1,5 @@
+import { useSyncStyle } from '../../adapters/sync-style';
+import { hasSyncStop, syncUnits as stopUnits } from '../../domain/sync-editing';
 import { usePlaybackShortcut } from '../shortcuts';
 import {usePreference} from '../../adapters/studio-preferences';
 import { message as describeMessage, errorMessage } from '../../domain/messages';
@@ -146,6 +148,7 @@ function useLiveCallback<Args extends unknown[], Result>(callback: (...args: Arg
 function EditorWorkspaceContent(props: Props) {
   useTranslation();
   const editing = useProjectEditing();
+  const [syncStyle] = useSyncStyle();
   const audioReview = useAudioReview();
   const { document, apply } = props;
   const searchConditions = useSearchConditions(props.projectId, props.sourceAssetId);
@@ -688,7 +691,7 @@ function EditorWorkspaceContent(props: Props) {
     if (beat) {
       const id = beat.dataset.beatOwner!, kind = beat.dataset.beatKind as 'word' | 'ruby', count = emptyBeatCount(editing, id);
       const change = (count: number) => dispatch({ type: 'set-empty-beat', id, kind, count });
-      setContextMenu({ x, y, target: beat, title: t('editor.emptyBeats'), actions: [
+      setContextMenu({ x, y, target: beat, title: t(syncStyle === 'sug' ? 'editor.innerBeats' : 'editor.emptyBeats'), actions: [
         { label: t('editor.increaseBeats'), disabled: count >= 32, run: () => change(count + 1) },
         { label: t('editor.decreaseBeats'), disabled: count === 0, run: () => change(count - 1) },
         { label: t('editor.clearBeats'), disabled: count === 0, run: () => change(0) },
@@ -718,16 +721,21 @@ function EditorWorkspaceContent(props: Props) {
     const single = (id: string,label:string,run:()=>void,reason=t('editor.singleRequired')): ContextAction => ({id,label,run,disabled:multiple,reason:multiple?reason:undefined});
     let title=t('editor.lineActions');
     const actions: ContextAction[]=[];
+    if (effective.kind === 'words' || effective.kind === 'ruby') {
+      const selectedUnits = stopUnits(document, editing, undefined, [], true).filter(unit => effective.ids.includes(effective.kind === 'words' ? unit.wordId : unit.rubyUnitId ?? ''));
+      const allStops = selectedUnits.every(unit => hasSyncStop(document, editing, unit));
+      actions.push({id:'sync-stop',label:t(allStops?'sync.removeStop':'sync.addStop'),disabled:!selectedUnits.length,run:()=>dispatch({type:'batch',commands:selectedUnits.map(unit=>({type:'set-sync-stop',id:unit.rubyUnitId??unit.wordId,kind:unit.rubyUnitId?'ruby':'word',stop:!allStops}))})});
+    }
     if(effective.kind==='ruby'&&word) {
       title=t('editor.rubyActions');
-      actions.push(selectionAction(effective,'beat',t('editor.addBeats')),single('insert-ruby',t('editor.addReading'),()=>setRubyShortcut({wordId:word.id,afterRubyId:rubyId,serial:++rubyShortcutSerial.current})),
+      actions.push(selectionAction(effective,'beat',t(syncStyle === 'sug' ? 'editor.addInnerBeats' : 'editor.addBeats')),single('insert-ruby',t('editor.addReading'),()=>setRubyShortcut({wordId:word.id,afterRubyId:rubyId,serial:++rubyShortcutSerial.current})),
         selectionAction(effective,'merge',t('editor.merge')),selectionAction(effective,'mora',t('editor.splitBeats')),selectionAction(effective,'redistribute',t('editor.redistributeReading')));
       const unit=word.rubyUnits.find(unit=>unit.id===rubyId)!;
       actions.push({...single('split-ruby',t('editor.splitReading'),()=>dispatch({type:'split-ruby',lineId:line.id,wordId:word.id,rubyId:unit.id,at:Math.floor(Array.from(unit.reading).length/2)})),disabled:multiple||Array.from(unit.reading).length<2});
     } else if(effective.kind==='words'&&word) {
       title=t('editor.wordActions');
       const index=line.words.indexOf(word);
-      actions.push(selectionAction(effective,'beat',t('editor.addBeats')),{id:'insert-before',label:t('editor.insertWordBefore'),run:()=>startWordDraft(line.id,line.words[index-1]?.id??null)},{id:'insert-after',label:t('editor.insertWordAfter'),run:()=>startWordDraft(line.id,word.id)},
+      actions.push(selectionAction(effective,'beat',t(syncStyle === 'sug' ? 'editor.addInnerBeats' : 'editor.addBeats')),{id:'insert-before',label:t('editor.insertWordBefore'),run:()=>startWordDraft(line.id,line.words[index-1]?.id??null)},{id:'insert-after',label:t('editor.insertWordAfter'),run:()=>startWordDraft(line.id,word.id)},
         single('split-word',t('editor.splitWord'),()=>setSplitWordId(word.id)),selectionAction(effective,'merge',t('editor.merge')));
       actions.push(single('add-ruby',t('editor.addRuby'),()=>setRubyShortcut({wordId:word.id,serial:++rubyShortcutSerial.current})),selectionAction(effective,'redistribute',t('editor.redistributeReading')));
     } else if(effective.kind==='lines') {
@@ -976,7 +984,7 @@ function EditorWorkspaceContent(props: Props) {
     {mode === 'preview' && <Suspense fallback={<p>{t('editor.previewLoading')}</p>}><PreviewMode document={document} transport={props.transport} onSelectLine={id => { const line = document.lines.find(line => line.id === id); if (line) selectLine(line); }} /></Suspense>}
     {mode === 'karaoke' && props.project && props.applyProject && <KaraokeTools project={props.project} apply={props.applyProject} />}
     {mode === 'sync' && <SyncPanel progress={syncProgress} onProgress={setSyncProgress} preferenceScope={props.projectId ? `project:${props.projectId}` : `local:${props.title}`} document={document} lineOrder={props.project?.lineOrder} cursor={syncCursor} targetVersion={syncTargetVersion} apply={dispatch} transport={props.transport}
-      onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; if (cursor.rubyUnitId) selectRuby(line, word, cursor.rubyUnitId); else selectWord(line, word); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
+      onCursor={(cursor) => { const line = document.lines.find((item) => item.id === cursor.lineId)!; const word = line.words.find((item) => item.id === cursor.wordId)!; const id=cursor.rubyUnitId??cursor.wordId; setSelection(cursor.rubyUnitId?{kind:'ruby',lineId:line.id,wordId:word.id,ids:[id],anchorId:id,activeId:id}:{kind:'words',lineId:line.id,ids:[id],anchorId:id,activeId:id}); requestLocate(line.id, cursor.rubyUnitId ? `[data-ruby-id="${cursor.rubyUnitId}"]` : `[data-word-id="${cursor.wordId}"]`); }} />}
     {mode === 'edit' && <EditorRibbon activeMenuId={activeMenuId} onMenuChange={setActiveMenuId} selection={selection} canCopy={canCopySelection} canPaste={Boolean(clipboard)}
       canMoveUp={selectedWordLineIndexes.length === 1 && selectedWordLineIndexes[0] > 0}
       canMoveDown={selectedWordLineIndexes.length === 1 && selectedWordLineIndexes.at(-1) !== document.lines.length - 1}
@@ -1009,7 +1017,7 @@ function EditorWorkspaceContent(props: Props) {
           line.words.some(word => word.id === rubyShortcut?.wordId) ? rubyShortcut : null,
           line.words.some(word => word.id === syncEditingId || word.rubyUnits.some(unit => unit.id === syncEditingId)) ? syncEditingId : null,
           syncCursor?.lineId === line.id ? [syncCursor, syncProgress] : null,
-          ignoredSyncSet.has(line.id), line.words.map(word => [editing.emptyBeats[word.id], word.rubyUnits.map(unit => editing.emptyBeats[unit.id])]),
+          syncStyle, ignoredSyncSet.has(line.id), line.words.map(word => [editing.syncStops[word.id], editing.emptyBeats[word.id], word.rubyUnits.map(unit => [editing.emptyBeats[unit.id], editing.syncStops[unit.id]])]),
           drag.placeholders?.ids ? [...drag.placeholders.ids] : null,
         ])} pinnedLineIds={pinnedLineIds} key={`${mode}:${mode==='edit'?editorDisplay:''}`} advanced={mode === 'edit' && editorDisplay === 'advanced'} memory={listMemory.current[`${mode}:${editorDisplay}`] ??= { offset: 0, handled: null }} lines={displayed.lines} locate={locate} append={() => {
           const line = createLine('');

@@ -27,6 +27,6 @@ it('preserves explicit copied editing state and does not reset values on reparen
  const moved=executeProjectCommand(state,{type:'lyrics',command:{type:'set-background-of',lineId:'bg',parentLineId:'second'}});
  expect(moved.present.editing.ignoredSyncLineIds).toEqual([]);expect(moved.present.editing.skippedAlignmentLineIds).toEqual([]);
  const copy=createLine('copied','copy');copy.backgroundOf='second';
- const pasted=executeProjectCommand(moved,{type:'lyrics',command:{type:'batch',commands:[{type:'replace-document',document:{...moved.present.lyrics,lines:[...moved.present.lyrics.lines,copy]}},{type:'restore-editing',editing:{emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:[]}}]}});
+ const pasted=executeProjectCommand(moved,{type:'lyrics',command:{type:'batch',commands:[{type:'replace-document',document:{...moved.present.lyrics,lines:[...moved.present.lyrics.lines,copy]}},{type:'restore-editing',editing:{syncStops: {}, emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:[]}}]}});
  expect(pasted.present.editing.ignoredSyncLineIds).toEqual([]);expect(pasted.present.editing.skippedAlignmentLineIds).toEqual([]);
 });

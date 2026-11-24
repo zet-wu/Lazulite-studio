@@ -1714,5 +1714,13 @@
   "vocal.backgroundApplied": "Background vocal separation finished and applied.",
   "vocal.backgroundConflict": "Background vocal separation finished. Replace existing acoustic segments with the new result?",
   "settings.swapBoundaryDrag": "Swap boundary drag actions",
-  "settings.swapBoundaryDragHelp": "Drag links the adjacent boundary; Ctrl/⌘ + drag adjusts one boundary. Enable to swap these actions."
+  "settings.swapBoundaryDragHelp": "Drag links the adjacent boundary; Ctrl/⌘ + drag adjusts one boundary. Enable to swap these actions.",
+  "settings.syncStyle": "Timing style",
+  "editor.innerBeats": "Inner rhythm points",
+  "editor.addInnerBeats": "Add inner rhythm point",
+  "sync.innerBeat": "Inner rhythm point {{number}}",
+  "sync.stop": "Stop checkpoint",
+  "sync.addStop": "Enable stop checkpoint",
+  "sync.removeStop": "Disable stop checkpoint",
+  "sync.singleKey": "Single-key timing"
 }

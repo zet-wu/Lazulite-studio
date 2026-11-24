@@ -3,11 +3,12 @@ import type { LyricDocument } from './lyric-document';
 
 /** Project-only editing data. Never encoded in a lyric or a TTML node. */
 export type ProjectEditing = {
+  syncStops: Record<string, { kind: 'word' | 'ruby'; stop: boolean }>;
   emptyBeats: Record<string, { kind: 'word' | 'ruby'; count: number }>;
   skippedAlignmentLineIds: string[];
   ignoredSyncLineIds: string[];
 };
-export const createProjectEditing = (): ProjectEditing => ({ emptyBeats: {}, skippedAlignmentLineIds: [], ignoredSyncLineIds: [] });
+export const createProjectEditing = (): ProjectEditing => ({ syncStops: {}, emptyBeats: {}, skippedAlignmentLineIds: [], ignoredSyncLineIds: [] });
 export const emptyBeatCount = (editing: ProjectEditing, id: string) => editing.emptyBeats[id]?.count ?? 0;
 export function setEmptyBeat(editing: ProjectEditing, id: string, kind: 'word' | 'ruby', count: number) {
   if (!Number.isSafeInteger(count) || count < 0 || count > 32) throw new MessageError(message('editing.beatCount'));
@@ -16,8 +17,8 @@ export function setEmptyBeat(editing: ProjectEditing, id: string, kind: 'word' |
 }
 
 export function validateProjectEditing(document: LyricDocument, editing: ProjectEditing) {
-  if (!editing || typeof editing !== 'object' || !editing.emptyBeats || Array.isArray(editing.emptyBeats) || !Array.isArray(editing.skippedAlignmentLineIds) || !Array.isArray(editing.ignoredSyncLineIds)
-    || Object.keys(editing).some(key => !['emptyBeats', 'ignoredSyncLineIds', 'skippedAlignmentLineIds'].includes(key))) throw new MessageError(message('editing.configInvalid'));
+  if (!editing || typeof editing !== 'object' || !editing.syncStops || Array.isArray(editing.syncStops) || !editing.emptyBeats || Array.isArray(editing.emptyBeats) || !Array.isArray(editing.skippedAlignmentLineIds) || !Array.isArray(editing.ignoredSyncLineIds)
+    || Object.keys(editing).some(key => !['syncStops', 'emptyBeats', 'ignoredSyncLineIds', 'skippedAlignmentLineIds'].includes(key))) throw new MessageError(message('editing.configInvalid'));
   const objects = new Map<string, 'line' | 'word' | 'ruby'>();
   const add = (id: string, kind: 'line' | 'word' | 'ruby') => { if (!id || objects.has(id)) throw new MessageError(message('editing.objectIdInvalid')); objects.set(id, kind); };
   for (const line of document.lines) {
@@ -26,6 +27,9 @@ export function validateProjectEditing(document: LyricDocument, editing: Project
   }
   for (const [id, value] of Object.entries(editing.emptyBeats)) {
     if (!value || !['word', 'ruby'].includes(value.kind) || objects.get(id) !== value.kind || !Number.isSafeInteger(value.count) || value.count < 1 || value.count > 32 || Object.keys(value).some(key => !['kind', 'count'].includes(key))) throw new MessageError(message('editing.beatsInvalid'));
+  }
+  for (const [id, value] of Object.entries(editing.syncStops)) {
+    if (!value || objects.get(id) !== value.kind || !['word', 'ruby'].includes(value.kind) || typeof value.stop !== 'boolean' || Object.keys(value).some(key => !['kind', 'stop'].includes(key))) throw new MessageError(message('editing.configInvalid'));
   }
   if (new Set(editing.ignoredSyncLineIds).size !== editing.ignoredSyncLineIds.length || editing.ignoredSyncLineIds.some(id => objects.get(id) !== 'line')) throw new MessageError(message('editing.skipTimingInvalid'));
   if (new Set(editing.skippedAlignmentLineIds).size !== editing.skippedAlignmentLineIds.length || editing.skippedAlignmentLineIds.some(id => objects.get(id) !== 'line')) throw new MessageError(message('editing.skipAlignmentInvalid'));
@@ -53,6 +57,22 @@ export function reconcileEditing(before: LyricDocument, after: LyricDocument, ed
       if (configured.length) setEmptyBeat(editing, word.id, 'word', emptyBeatCount(editing, configured[0].id));
     }
   }
+  for (const old of before.lines.flatMap(line => line.words)) {
+    const word = words.get(old.id);
+    if (!word) continue;
+    const oldTail = old.rubyUnits.at(-1);
+    if (oldTail && word.rubyUnits.length && old.rubyUnits.every(unit => !rubies.has(unit.id)) && editing.syncStops[oldTail.id]) {
+      editing.syncStops[word.rubyUnits.at(-1)!.id] = {kind:'ruby',stop:editing.syncStops[oldTail.id].stop};
+    }
+    if (!old.rubyUnits.length && word.rubyUnits.length && editing.syncStops[word.id]) {
+      editing.syncStops[word.rubyUnits.at(-1)!.id] = { kind: 'ruby', stop: editing.syncStops[word.id].stop };
+      delete editing.syncStops[word.id];
+    } else if (old.rubyUnits.length && !word.rubyUnits.length) {
+      const last = old.rubyUnits.at(-1)!;
+      if (!rubies.has(last.id) && editing.syncStops[last.id]) editing.syncStops[word.id] = { kind: 'word', stop: editing.syncStops[last.id].stop };
+    }
+  }
+  for (const [id, value] of Object.entries(editing.syncStops)) if (!(value.kind === 'word' ? words.has(id) : rubies.has(id))) delete editing.syncStops[id];
   for (const [id, value] of Object.entries(editing.emptyBeats)) if (!(value.kind === 'word' ? words.has(id) : rubies.has(id))) delete editing.emptyBeats[id];
   editing.skippedAlignmentLineIds = editing.skippedAlignmentLineIds.filter(id => lines.has(id));
   editing.ignoredSyncLineIds = editing.ignoredSyncLineIds.filter(id => lines.has(id));
@@ -60,6 +80,7 @@ export function reconcileEditing(before: LyricDocument, after: LyricDocument, ed
 
 export function remapEditing(source: ProjectEditing, ids: Map<string, string>): ProjectEditing {
   return {
+    syncStops: Object.fromEntries(Object.entries(source.syncStops).filter(([id]) => ids.has(id)).map(([id, value]) => [ids.get(id)!, value])),
     emptyBeats: Object.fromEntries(Object.entries(source.emptyBeats).filter(([id]) => ids.has(id)).map(([id, value]) => [ids.get(id)!, value])),
     skippedAlignmentLineIds: source.skippedAlignmentLineIds.filter(id => ids.has(id)).map(id => ids.get(id)!),
     ignoredSyncLineIds: source.ignoredSyncLineIds.filter(id => ids.has(id)).map(id => ids.get(id)!),

@@ -89,3 +89,11 @@ it('line mode can navigate to a skipped row, but its unit stepping remains local
  expect(screen.getByRole('button',{name:'上一行'})).toBeEnabled();stamp('上一行');
  expect(screen.getByRole('combobox',{name:'打轴模式'})).toBeEnabled();
 });
+it('uses D presses for inner checkpoints and releases the final stop, carrying a shared start to its successor',()=>{
+ const run=setup();
+ const down=()=>fireEvent.keyDown(window,{code:'KeyD',key:'d'}),up=()=>fireEvent.keyUp(window,{code:'KeyD',key:'d'});
+ down();up();expect(run.state().present.lyrics.lines[0].words[0].beginMs).toBe(1000);
+ run.time(1200);down();up();run.time(1400);down();up();expect(run.progress().consumed).toBe(2);
+ run.time(1800);down();expect(run.state().present.lyrics.lines[0].words.map(w=>[w.beginMs,w.endMs])).toEqual([[1000,1800],[1800,null]]);
+ run.time(2100);up();expect(run.state().present.lyrics.lines[0].words[1].endMs).toBe(2100);
+});

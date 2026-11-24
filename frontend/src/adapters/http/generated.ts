@@ -1244,6 +1244,13 @@ export interface components {
                     };
                     ignoredSyncLineIds: string[];
                     skippedAlignmentLineIds: string[];
+                    syncStops: {
+                        [key: string]: {
+                            /** @enum {unknown} */
+                            kind: "word" | "ruby";
+                            stop: boolean;
+                        };
+                    };
                 };
                 amll: {
                     simplified: boolean;

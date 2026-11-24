@@ -137,9 +137,9 @@ def test_invalid_project_editing_is_rejected_without_revision_change(tmp_path):
     before = client.get('/api/v1/projects/p/document')
     snapshot = initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="0" end="1"><span studio:id="w" begin="0" end="1">A</span></p></body></tt>')
     invalid = [
-        {'emptyBeats': {'w': {'kind': 'word', 'count': 33}}},
-        {'emptyBeats': {'w': {'kind': 'ruby', 'count': 1}}},
-        {'emptyBeats': {'missing': {'kind': 'word', 'count': 1}}},
+        {'syncStops': {}, 'emptyBeats': {'w': {'kind': 'word', 'count': 33}}},
+        {'syncStops': {}, 'emptyBeats': {'w': {'kind': 'ruby', 'count': 1}}},
+        {'syncStops': {}, 'emptyBeats': {'missing': {'kind': 'word', 'count': 1}}},
         {'ignoredSyncLineIds': ['a', 'a']},
         {'skippedAlignmentLineIds': ['missing']},
     ]

@@ -1,27 +1,29 @@
 import { useMessageText } from '../../shared/useMessageText';
-import { message as describeMessage } from '../../domain/messages';
+import { message as describeMessage, errorMessage } from '../../domain/messages';
 import { i18n } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { DisclosureTrigger } from '../../shared/Disclosure';
 import type { SyncProgress } from './sync-progress';
 import { useProjectEditing } from './ProjectEditingContext';
+import { useSyncStyle } from '../../adapters/sync-style';
 import { emptyBeatCount } from '../../domain/project-editing';
 import { Select } from '../../shared/Select';
 import { usePreference } from './use-preference';
 import { useEffect, useMemo, useRef, useState, useId, type RefObject } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import type { LyricDocument } from '../../domain/lyric-document';
-import { syncIndex, syncUnits, type SyncAction, type SyncMode, type SyncCursor } from '../../domain/sync-editing';
+import { sugSyncStep, syncIndex, syncUnits, type SyncAction, type SyncMode, type SyncCursor } from '../../domain/sync-editing';
 import { matchesBinding, shortcutInput, useShortcuts } from '../shortcuts';
 import { visibleLineOrdinals } from '../../adapters/output-validation';
 import type { TransportHandle } from '../MediaTransport';
 import styles from './semantic-editor.module.css';
 
-type Props = { lineOrder?: string[]; progress: SyncProgress; onProgress: (progress: SyncProgress) => void; preferenceScope?: string; document: LyricDocument; cursor: SyncCursor | null; targetVersion?: number; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
+type Props = { lineOrder?: string[]; progress: SyncProgress; onProgress: (progress: SyncProgress, cursor?: SyncCursor) => void; preferenceScope?: string; document: LyricDocument; cursor: SyncCursor | null; targetVersion?: number; apply: (command: LyricCommand) => boolean; transport?: RefObject<TransportHandle | null>; onCursor: (cursor: SyncCursor) => void };
 
 export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, targetVersion, apply, transport, onCursor, preferenceScope = 'local:untitled' }: Props) {
   useTranslation();
   const editing = useProjectEditing();
+  const [style] = useSyncStyle();
   const [extrasOpen, setExtrasOpen] = useState(false);
   const extrasId = useId();
   const skipped = editing.ignoredSyncLineIds.includes(cursor?.lineId ?? '');
@@ -63,11 +65,36 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
     if (action === 'next' && emptyBeats < beatCount) { onProgress({ completed: false, consumed: emptyBeats + 1 }); setError(''); return; }
     if (!apply({ type: 'sync-stamp', cursor: active, action, timeMs, mode: effectiveMode, lineOrder })) return;
     setError('');
-    if (action === 'start') { onProgress({ completed: false, consumed: 0 }); return; }
+    if (action === 'start') { onProgress({ completed: false, consumed: 0, ...(style === 'sug' ? {started:true} : {}) }); return; }
     const next = units[index + 1];
     if (!next || effectiveMode === 'line' && next.lineId !== active.lineId) onProgress({ completed: true, consumed: 0 });
     else moveTo(index + 1);
   };
+  const sugStamp = (event: 'pressed' | 'released') => {
+    if (!active || !transport?.current || completed) return;
+    try {
+      const timeMs = Math.max(0, transport.current.getPositionMs() + Math.round(offsetMs));
+      const step = sugSyncStep(document, editing, active, progress, event, timeMs);
+      if (step.action && !apply({ type: 'sync-stamp', cursor: active, action: step.action, timeMs, mode: effectiveMode, lineOrder })) return;
+      setError('');
+      if (step.advance) {
+        const next = units[index + 1];
+        if (!next || effectiveMode === 'line' && next.lineId !== active.lineId) onProgress({ completed: true, consumed: 0 });
+        else { onProgress(step.progress, next); onCursor(next); }
+      } else onProgress(step.progress);
+    } catch (cause) { setError(errorMessage(cause)); }
+  };
+  const heldKey = useRef<string | null>(null);
+  const releaseRef = useRef(sugStamp); releaseRef.current = sugStamp;
+  useEffect(() => {
+    const release = (event: KeyboardEvent) => {
+      if (event.code !== heldKey.current) return;
+      heldKey.current = null; event.preventDefault(); releaseRef.current('released');
+    };
+    const cancel = () => { heldKey.current = null; };
+    window.addEventListener('keyup', release); window.addEventListener('blur', cancel);
+    return () => { window.removeEventListener('keyup', release); window.removeEventListener('blur', cancel); heldKey.current = null; };
+  }, [style, targetVersion]);
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
   keyHandlerRef.current = (event: KeyboardEvent) => {
     if (event.defaultPrevented || event.isComposing || event.repeat) return;
@@ -82,6 +109,7 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
     else if (action === 'following') moveUnit(index + 1);
     else if (action === 'previousLine') previousLine();
     else if (action === 'followingLine') followingLine();
+    else if (style === 'sug' && action === 'next') { heldKey.current = event.code; sugStamp('pressed'); }
     else stamp(action);
   };
   useEffect(() => {
@@ -106,6 +134,7 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
     <div className={styles.syncButtons}>
       <button data-role="secondary" disabled={!canMoveUnit(index - 1)} onClick={() => moveUnit(index - 1)}>{t('sync.previousUnit')}</button>
       <button data-role="secondary" disabled={!units.slice(0, index).some((unit) => unit.lineId !== active?.lineId)} onClick={previousLine}>{t('sync.previousLine')}</button>
+      {style === 'sug' && <button data-role="primary" disabled={!transport || !active || completed} onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); sugStamp('pressed'); }} onPointerUp={() => sugStamp('released')} onPointerCancel={() => { heldKey.current = null; }} onKeyDown={event => { if (event.key === 'Enter' && !event.repeat) { event.preventDefault(); event.stopPropagation(); sugStamp('pressed'); } }} onKeyUp={event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); sugStamp('released'); } }}>{t('sync.singleKey')}</button>}
       <button data-role="secondary" disabled={!canStamp('start')} onClick={() => stamp('start')}>{t('sync.start')}</button>
       <button data-role="secondary" disabled={!canStamp('next')} onClick={() => stamp('next')}>{t('sync.step')}</button>
       <button data-role="secondary" disabled={!canStamp('end')} onClick={() => stamp('end')}>{t('sync.end')}</button>

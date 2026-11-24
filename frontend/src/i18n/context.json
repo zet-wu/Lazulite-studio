@@ -11152,8 +11152,50 @@
     "params": []
   },
   "settings.swapBoundaryDragHelp": {
-    "context": "Timeline boundary drag preference and Ctrl/Command modifier behavior",
-    "source": "默认拖动调整单侧边界，Ctrl／⌘＋拖动联动相邻边界；开启后两者互换。",
+    "source": "默认拖动联动相邻边界，Ctrl／⌘＋拖动调整单侧边界；开启后两者互换。",
+    "context": "时间轴 Phase 6：桌面打轴风格、节奏点与终止点设置。",
+    "params": []
+  },
+  "settings.syncStyle": {
+    "source": "打轴风格",
+    "context": "时间轴 Phase 6：桌面打轴风格、节奏点与终止点设置。",
+    "params": []
+  },
+  "editor.innerBeats": {
+    "source": "词内节奏点",
+    "context": "时间轴 Phase 6：桌面打轴风格、节奏点与终止点设置。",
+    "params": []
+  },
+  "editor.addInnerBeats": {
+    "source": "添加词内节奏点",
+    "context": "时间轴 Phase 6：桌面打轴风格、节奏点与终止点设置。",
+    "params": []
+  },
+  "sync.innerBeat": {
+    "source": "词内节奏点 {{number}}",
+    "context": "时间轴 Phase 6：桌面打轴风格、节奏点与终止点设置。",
+    "params": [
+      "number"
+    ]
+  },
+  "sync.stop": {
+    "source": "终止点",
+    "context": "时间轴 Phase 6：桌面打轴风格、节奏点与终止点设置。",
+    "params": []
+  },
+  "sync.addStop": {
+    "source": "开启终止点",
+    "context": "时间轴 Phase 6：桌面打轴风格、节奏点与终止点设置。",
+    "params": []
+  },
+  "sync.removeStop": {
+    "source": "关闭终止点",
+    "context": "时间轴 Phase 6：桌面打轴风格、节奏点与终止点设置。",
+    "params": []
+  },
+  "sync.singleKey": {
+    "source": "单键打轴",
+    "context": "时间轴 Phase 6：桌面打轴风格、节奏点与终止点设置。",
     "params": []
   }
 }

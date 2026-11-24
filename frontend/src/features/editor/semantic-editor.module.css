@@ -338,16 +338,21 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .syncWord { display: grid; grid-template-rows: minmax(24px, auto) minmax(34px, auto) minmax(24px, auto); position: relative; min-width: 24px; max-width: 100%; border-radius: 5px; outline-offset: -2px; }
 .syncBody { grid-row: 2; grid-column: 1 / -1; text-align: center; padding: 0; font-size: 24px; font-weight: 650; line-height: 1.4; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .syncRubyColumn { display: grid; grid-template-rows: subgrid; grid-row: 1 / 4; min-width: 0; }
-.syncRuby { grid-row: 1; padding: 0 min(calc(4px + var(--beat-space)), max(4px, calc(100% - 28px))) 0 4px; text-align: center; font-size: 14px; font-weight: 600; min-width: 24px; border-radius: 4px; }
+.syncRuby { grid-row: 1; padding: 0 4px; text-align: center; font-size: 14px; font-weight: 600; min-width: 24px; border-radius: 4px; }
 .syncRubyDraft { grid-row: 1; min-width: 60px; }
 .syncText { display: inline-block; white-space: pre-wrap; min-width: 12px; max-width: 100%; vertical-align: baseline; }
 .syncText > span { display: inline-block; transition: transform 100ms ease, color 100ms ease; }
 .syncText input { max-width: 100%; min-width: 24px; font: inherit; padding: 0; border: 0; border-bottom: 1px solid var(--blue); border-radius: 0; background: var(--panel); color: var(--ink); }
 .syncText small { display: block; font-size: 11px; color: var(--error); }
 .syncText[data-sync-active] > span { color: var(--blue); transform: translateY(-2px); }
-.syncMarkers { grid-row: 3; display: flex; flex-wrap: wrap; align-items: center; min-width: 24px; }
+.syncMarkers { grid-row: 3; display: flex; justify-content: center; align-items: center; min-width: 24px; }
+.syncBeats { display: flex; flex-wrap: wrap; justify-content: center; min-width: 0; }
+.sugMarkers { display: grid; grid-template-columns: 16px minmax(0, 1fr) 16px; min-width: 32px; }
+.syncMarkers .syncStop { width: 16px; opacity: .45; }
+.syncMarkers .syncStop[aria-pressed="true"], .syncMarkers .syncStop:focus-visible, .syncMarkers .syncStop:hover { opacity: 1; }
+.syncMarkers .syncStop[aria-pressed="false"]:hover::after, .syncMarkers .syncStop[aria-pressed="false"]:focus-visible::after { content: ""; width: 7px; height: 7px; border: 1px solid currentColor; border-radius: 50%; }
 .syncMarkers button[data-role][data-role] { display: grid; place-items: center; height: 24px; min-height: 24px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--muted); }
-.syncMarkers .syncDot { flex: 1 0 24px; min-width: 24px; }
+.syncMarkers .syncDot { flex: 0 0 16px; min-width: 16px; }
 .syncMarkers .syncBeat { flex: 0 0 16px; width: 16px; }
 .syncMarkers button[data-role][data-current] { color: var(--blue); }
 .syncMarkers button[data-current] svg { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--blue) 80%, transparent)); }
