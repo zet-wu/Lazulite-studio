@@ -53,6 +53,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
     inputSchema: {
       project_id: z.string().min(1).describe('Target project ID.'),
       model_id: z.string().min(1).describe('Alignment model ID returned by list_alignment_models.'),
+      scope_ids: z.array(z.string().min(1)).min(2).optional().describe('Selected reading leaf IDs for local alignment; overrides globally skipped lines. Preview and start must use the same IDs.'),
       revision: z
         .string()
         .min(1)
@@ -65,7 +66,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
       strip_tone_digits: z.boolean().default(false).describe('Strip tone digits from pinyin/romanized tokens.'),
     },
     execute: async (
-      { project_id, model_id, revision, convert_particles, latin_normalize, strip_tone_digits, detail, line_ids },
+      { project_id, model_id, revision, convert_particles, latin_normalize, strip_tone_digits, detail, line_ids, scope_ids },
       { client },
     ) => {
       const targetRevision = revision ?? (await client.getDocumentEnvelope(project_id)).revision;
@@ -73,6 +74,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
         convert_particles,
         latin_normalize,
         strip_tone_digits,
+        scope_ids:scope_ids??null,
       });
       const { inputs = [], ...counts } = summary;
       let allowed: Set<string> | undefined;
@@ -117,6 +119,9 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
       convert_particles: z.boolean().default(true),
       latin_normalize: z.boolean().default(true),
       strip_tone_digits: z.boolean().default(false),
+      audio_source: z.enum(['vocals','original']).default('vocals').describe('Audio waveform source; original with crop_vocals=false skips separation.'),
+      crop_vocals: z.boolean().default(true).describe('Intersect the selected envelope with vocal analysis segments.'),
+      scope_ids: z.array(z.string().min(1)).min(2).optional().describe('Reading leaf IDs from the same local preview. Omit for global alignment.'),
       use_hints: z.boolean().default(false),
       line_blank: z.boolean().default(false),
       rest_blank: z.boolean().default(false),
@@ -141,6 +146,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
           convert_particles: args.convert_particles,
           latin_normalize: args.latin_normalize,
           strip_tone_digits: args.strip_tone_digits,
+          scope_ids:args.scope_ids??null,
         });
         if (!summary.emitting_count) {
           throw toolError(
@@ -174,6 +180,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
       }
 
       const options: AlignmentOptions = {
+        audio_source:args.audio_source, crop_vocals:args.crop_vocals,scope_ids:args.scope_ids??null,
         convert_particles: args.convert_particles,
         latin_normalize: args.latin_normalize,
         strip_tone_digits: args.strip_tone_digits,

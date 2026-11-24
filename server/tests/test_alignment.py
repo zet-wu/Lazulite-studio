@@ -158,3 +158,26 @@ def test_cpu_retry_uses_original_snapshot_after_catalog_switch(tmp_path,monkeypa
   (tmp_path/'models/model/model.pt').write_bytes(b'changed')
   assert client.post(f'/api/v1/jobs/{jid}/retry-cpu',json={'revision':revision},headers=headers).status_code==409
   assert client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers=headers).status_code==409
+
+
+def test_local_preview_binding_and_original_without_separation(tmp_path,monkeypatch):
+ client,db,revision=prepare(tmp_path,monkeypatch)
+ snapshot=initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="l" begin="0" end="2"><span studio:id="a" begin="0.5" end="1">a</span><span studio:id="b" begin="1" end="1.5">b</span></p></body></tt>')
+ snapshot['editing']['skippedAlignmentLineIds']=['l']
+ revision=RevisionStore(db,tmp_path/'projects').create('p',snapshot,revision)['id']
+ with client:
+  model=client.get('/api/v1/alignment-models').json()['items'][0]['id']
+  preview=client.get('/api/v1/projects/p/alignment-preview',params={'revision':revision,'model':model,'scope_ids':['a','b']})
+  assert preview.status_code==200,preview.text
+  assert preview.json()['line_count']==1 and preview.json()['skipped_count']==0
+  params={'revision':revision,'model_preview':preview.json()['model_preview'],'convert_particles':True,'latin_normalize':True,'strip_tone_digits':False,'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'clear_unmatched':False,'merge_short_gaps':False,'gap_threshold_ms':500,'audio_source':'original','crop_vocals':False,'scope_ids':['a','b']}
+  headers={'origin':'http://studio'}
+  wrong={**params,'scope_ids':['a','missing']}
+  assert client.post('/api/v1/projects/p/jobs/alignment',json={'params':wrong},headers=headers).status_code==422
+  started=client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers=headers)
+  assert started.status_code==202,started.text
+  jid=started.json()['id'];assert 'vocal' not in started.json()['request']['devices']
+  assert wait(client,jid)['status']=='succeeded'
+  result=client.get(f'/api/v1/jobs/{jid}/result').json()
+  assert result['selection']==['a','b'] and {s['object_id'] for s in result['scope']}=={'a','b'}
+  assert client.get('/api/v1/projects/p/document').json()['revision']==revision

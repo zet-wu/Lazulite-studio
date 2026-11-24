@@ -1722,5 +1722,10 @@
   "sync.addStop": "Enable stop checkpoint",
   "sync.removeStop": "Disable stop checkpoint",
   "sync.singleKey": "Single-key timing",
-  "search.score": "Match {{score}}%"
+  "search.score": "Match {{score}}%",
+  "alignment.local": "Align selection",
+  "alignment.localRangeRequired": "Select at least two reading units and set a valid time range first",
+  "alignment.audioSource": "Alignment audio source",
+  "alignment.vocals": "Vocals",
+  "alignment.cropVocals": "Crop to vocal segments"
 }

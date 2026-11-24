@@ -1292,7 +1292,7 @@
     },
     "/projects/{projectId}/alignment-preview": {
       "get": {
-        "summary": "Preview the saved global alignment input without running a model",
+        "summary": "Preview saved global or selected reading units without running a model",
         "parameters": [
           {
             "name": "projectId",
@@ -1341,6 +1341,18 @@
               "type": "boolean",
               "default": true
             }
+          },
+          {
+            "name": "scope_ids",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 2
+            },
+            "description": "Selected reading leaf IDs; overrides global skip flags. Repeated query parameter."
           }
         ],
         "responses": {
@@ -3102,6 +3114,16 @@
                 }
               }
             }
+          },
+          "selection": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Selected reading IDs, or null for global alignment"
           }
         },
         "additionalProperties": true

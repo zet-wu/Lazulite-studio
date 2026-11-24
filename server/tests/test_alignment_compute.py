@@ -38,7 +38,7 @@ def test_independent_run_and_manual_resource_reuse(tmp_path,monkeypatch):
     with db.connect() as c:
         asset=c.execute("SELECT source_asset_id FROM projects WHERE id='p'").fetchone()[0]
     root=tmp_path/'projects'
-    params={'revision':revision,'asset_id':asset,'_model':selected,'convert_particles':True,'latin_normalize':True,'strip_tone_digits':False,'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False}
+    params={'audio_source':'vocals','crop_vocals':True,'scope_ids':None,'revision':revision,'asset_id':asset,'_model':selected,'convert_particles':True,'latin_normalize':True,'strip_tone_digits':False,'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False}
     request={'database':str(db.path),'root':str(root),'project_id':'p','params':params,
              'asset_path':str(root/'p/source/original'),'job_id':'first'}
     first=run_alignment(request,lambda *args:None,lambda:False)
@@ -89,6 +89,43 @@ def test_backend_is_released_on_decode_failure(tmp_path,monkeypatch):
     before=AcousticBackend.closes
     with pytest.raises(RuntimeError,match='injected'):
         run_alignment({'database':str(db.path),'root':str(tmp_path/'projects'),'project_id':'p',
-            'params':{'revision':revision,'asset_id':asset,'_model':selected,'convert_particles':True,'latin_normalize':True,'strip_tone_digits':False,'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False},
+            'params':{'audio_source':'vocals','crop_vocals':True,'scope_ids':None,'revision':revision,'asset_id':asset,'_model':selected,'convert_particles':True,'latin_normalize':True,'strip_tone_digits':False,'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False},
             'asset_path':str(tmp_path/'projects/p/source/original'),'job_id':'failed'},lambda *a:None,lambda:False)
     assert AcousticBackend.closes==before+1
+
+@pytest.mark.parametrize('audio_source',['original','vocals'])
+@pytest.mark.parametrize('crop',[False,True])
+@pytest.mark.parametrize('local',[False,True])
+def test_audio_source_crop_and_scope_are_independent(tmp_path,monkeypatch,audio_source,crop,local):
+    from lazulite.audio import separation
+    from lazulite.alignment.japanese import backend,run
+    from server.alignment_models import model_snapshot
+    from server.project_document import initial_project
+    _,db,revision=prepare(tmp_path,monkeypatch)
+    snapshot=initial_project('<tt xmlns="http://www.w3.org/ns/ttml" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="line" begin="0" end="2"><span studio:id="a" begin="0.6" end="0.8">a</span><span studio:id="b" begin="0.8" end="1.2">b</span></p></body></tt>')
+    if local:snapshot['editing']['skippedAlignmentLineIds']=['line']
+    revision=RevisionStore(db,tmp_path/'projects').create('p',snapshot,revision)['id']
+    calls=[]
+    class CountSeparator(Separator):
+        def separate(self,audio):calls.append('separate');return super().separate(audio)
+    monkeypatch.setattr(separation,'DemucsSeparator',lambda config:CountSeparator())
+    monkeypatch.setattr(backend,'open_backend',lambda path,device:AcousticBackend(None))
+    captured=[];original=run.align_japanese
+    def align(prepared,*args,**kwargs):
+        captured.append([(s.core_start,s.core_end) for s in prepared.segments])
+        return original(prepared,*args,**kwargs)
+    monkeypatch.setattr(run,'align_japanese',align)
+    with db.connect() as c:asset=c.execute("SELECT source_asset_id FROM projects WHERE id='p'").fetchone()[0]
+    params={'revision':revision,'asset_id':asset,'_model':model_snapshot(tmp_path/'models/model'),'convert_particles':False,'latin_normalize':True,'strip_tone_digits':False,'smart_extend':False,'use_hints':False,'line_blank':False,'rest_blank':False,'rest_token':False,'audio_source':audio_source,'crop_vocals':crop,'scope_ids':['a','b'] if local else None}
+    result=run_alignment({'database':str(db.path),'root':str(tmp_path/'projects'),'project_id':'p','params':params,'asset_path':str(tmp_path/'projects/p/source/original'),'job_id':'matrix'},lambda *args:None,lambda:False)
+    assert len(calls)==(0 if audio_source=='original' and not crop else 1)
+    assert result['selection']==params['scope_ids']
+    assert len(result['scope'])==2
+    assert captured[0]
+    if local:assert all(.6<=a<b<=1.2 for a,b in captured[0])
+    if not crop:assert captured==[[(.6,1.2) if local else (0,2)]]
+    # Every model result is in original media coordinates, even after native cutting.
+    if local:
+        for unit in result['alignment']['units']:
+            for point in unit['proposed_timing'].values():
+                if point is not None:assert .6<=point['time']<=1.2

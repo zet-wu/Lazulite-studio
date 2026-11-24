@@ -16,7 +16,7 @@ PREFERENCE_KEYS = {
     'studio:preview-translation', 'studio:preview-romanization', 'studio:preview-hide', 'studio:preview-fade',
     'lazulite-editor-theme', 'lazulite-shortcuts',
     'lazulite-editor-columns', 'studio.playback-rate',
-    'studio:sync-mode', 'studio:sync-offset',
+    'studio:sync-style', 'studio:sync-mode', 'studio:sync-offset',
     'studio:timeline-layers', 'studio:staging-ignored-characters',
     'studio:timeline-swap-wheel', 'studio:timeline-swap-boundary-drag', 'studio:timeline-auto-expand', 'studio:spectrum-height',
     'studio:reading-dictionary', 'studio:ui-language',
@@ -74,9 +74,10 @@ class RuntimeSettings:
                         raise ValueError('时间轴图层偏好无效')
                 if value is not None and key == 'studio:alignment-defaults':
                     defaults = json.loads(value)
-                    flags = {'latin_normalize', 'strip_tone_digits', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps'}
-                    if not isinstance(defaults, dict) or set(defaults) - (flags | {'gap_threshold_ms'}) or any(type(v) is not bool for k, v in defaults.items() if k in flags):
+                    flags = {'crop_vocals', 'latin_normalize', 'strip_tone_digits', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps'}
+                    if not isinstance(defaults, dict) or set(defaults) - (flags | {'gap_threshold_ms', 'audio_source'}) or any(type(v) is not bool for k, v in defaults.items() if k in flags):
                         raise ValueError('对齐默认参数无效')
+                    if defaults.get('audio_source', 'vocals') not in {'vocals', 'original'}: raise ValueError('对齐音频来源无效')
                     threshold = defaults.get('gap_threshold_ms', 500)
                     if type(threshold) is not int or not 0 < threshold <= 9007199254740991:
                         raise ValueError('行内空隙阈值必须为正的安全整数毫秒')
@@ -87,6 +88,7 @@ class RuntimeSettings:
                 if key == 'studio:ui-language' and value not in UI_LANGUAGES: raise ValueError('界面语言未注册')
                 if key.startswith('device.') and value not in {'auto', 'cpu'}: raise ValueError('设备只能选择自动或 CPU')
                 if key == 'studio:vocal-model' and value not in {'demucs', 'bs-karaoke'}: raise ValueError('人声模型无效')
+                if key == 'studio:sync-style' and value not in {'sug', 'amll'}: raise ValueError('打轴风格无效')
                 if key == 'studio:editor-display' and value not in {'simple', 'advanced'}: raise ValueError('编辑显示模式无效')
                 if key in {'alignment.models_dir', 'vocal.models_dir'} and value is not None:
                     if not Path(value).is_absolute(): raise ValueError('模型总目录必须为绝对路径')

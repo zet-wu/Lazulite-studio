@@ -8,6 +8,7 @@ import type { TimeMs } from './lyric-document';
 type Endpoint = { time: number; source: string } | null;
 export type AlignmentResult = {
   kind: 'alignment';
+  selection?: string[] | null;
   normalization?: { clipped: number; dropped: number };
   binding: { project_id: string; revision: string; asset_id: string };
   alignment: { schema: 'lazulite-japanese-result-v1'; units: { unit_id: string; line_id: string; proposed_timing: { start: Endpoint; end: Endpoint } }[] };
@@ -20,7 +21,9 @@ type Pair = { beginMs: TimeMs; endMs: TimeMs };
 export function mergeAlignment(project: ProjectDocument, result: AlignmentResult, durationMs: number, clearUnmatched = false, gapThresholdMs: number | null = null) {
   if (gapThresholdMs !== null && (!Number.isSafeInteger(gapThresholdMs) || gapThresholdMs <= 0)) throw new MessageError(message('alignment.gapThreshold'));
   if (result.alignment.schema !== 'lazulite-japanese-result-v1') throw new MessageError(message('alignment.resultVersion'));
-  const next = structuredClone(project), skipped = new Set(project.editing.skippedAlignmentLineIds);
+  const selection = result.selection ? new Set(result.selection) : null;
+  if (selection && (selection.size < 2 || selection.size !== result.selection!.length)) throw new MessageError(message('alignment.rangeMismatch'));
+  const next = structuredClone(project), skipped = new Set(selection ? [] : project.editing.skippedAlignmentLineIds);
   const units = new Map(result.alignment.units.map(unit => [unit.unit_id, unit]));
   if (units.size !== result.alignment.units.length) throw new MessageError(message('alignment.duplicateIds'));
   const groups = new Map<string, string[]>();
@@ -34,9 +37,9 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
   }
   if (seen.size !== units.size) throw new MessageError(message('alignment.mappingIncomplete'));
   const leaves = project.lyrics.lines.filter(l => !skipped.has(l.id)).flatMap(l => l.words.flatMap(w =>
-    w.rubyUnits.length ? w.rubyUnits.map(r => ({object_id:r.id,word_id:w.id,line_id:l.id,kind:'ruby'})) : [{object_id:w.id,word_id:w.id,line_id:l.id,kind:'word'}]));
+    w.rubyUnits.length ? w.rubyUnits.map(r => ({object_id:r.id,word_id:w.id,line_id:l.id,kind:'ruby'})) : [{object_id:w.id,word_id:w.id,line_id:l.id,kind:'word'}])).filter(leaf => !selection || selection.has(leaf.object_id));
   const scope = new Map(result.scope.map(item => [item.object_id,item]));
-  if ([...groups.keys()].some(id => !scope.has(id)) || scope.size !== result.scope.length || scope.size !== leaves.length || leaves.some(leaf => {
+  if ([...groups.keys()].some(id => !scope.has(id)) || scope.size !== result.scope.length || scope.size !== leaves.length || selection && leaves.length !== selection.size || leaves.some(leaf => {
     const item = scope.get(leaf.object_id);
     return !item || item.word_id !== leaf.word_id || item.line_id !== leaf.line_id || item.kind !== leaf.kind
       || JSON.stringify(item.target_ids) !== JSON.stringify(groups.get(leaf.object_id) ?? []);
@@ -95,12 +98,14 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
   }
   for (const [lineIndex, line] of next.lyrics.lines.entries()) {
     if (skipped.has(line.id)) continue;
+    if (selection && !line.words.some(word => scope.has(word.id) || word.rubyUnits.some(unit => scope.has(unit.id)))) continue;
     const before = JSON.stringify(line.words);
     const lineLeaves = line.words.flatMap<Pair & {id:string}>(word => word.rubyUnits.length ? word.rubyUnits : [word]);
-    for (const leaf of lineLeaves) Object.assign(leaf, adopt(leaf.id, leaf));
+    for (const leaf of lineLeaves) if (scope.has(leaf.id)) Object.assign(leaf, adopt(leaf.id, leaf));
     if (gapThresholdMs !== null) {
       let previous: (Pair & {id:string}) | undefined;
       for (const leaf of lineLeaves) {
+        if (!scope.has(leaf.id)) { previous = undefined; continue; }
         // Only authoritative omitted, finally untimed separators are transparent.
         if (!scope.get(leaf.id)!.target_ids.length && leaf.beginMs === null && leaf.endMs === null) continue;
         if (!adoptedComplete.has(leaf.id)) { previous = undefined; continue; }
@@ -115,14 +120,22 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
       }
     }
     for (const [wordIndex, word] of line.words.entries()) {
-      if (word.rubyUnits.length) {
+      if (word.rubyUnits.length && (!selection || word.rubyUnits.some(unit => scope.has(unit.id)))) {
         const original = project.lyrics.lines[lineIndex].words[wordIndex];
-        if (clearUnmatched || JSON.stringify(word) !== JSON.stringify(original)) Object.assign(word, envelope(word, word.rubyUnits.filter(r => !clearUnmatched || scope.get(r.id)!.target_ids.length)));
+        if (clearUnmatched || JSON.stringify(word) !== JSON.stringify(original)) Object.assign(word, envelope(word, word.rubyUnits.filter(r => !clearUnmatched || !scope.has(r.id) || scope.get(r.id)!.target_ids.length)));
       }
     }
     const lineChanged = JSON.stringify(line.words) !== before;
-    if (clearUnmatched || lineChanged) Object.assign(line, envelope(line, line.words.filter(word => clearUnmatched ? (word.rubyUnits.length ? word.rubyUnits.some(r => scope.get(r.id)!.target_ids.length) : scope.get(word.id)!.target_ids.length) : word.text.trim() || word.rubyUnits.length)));
+    if (clearUnmatched || lineChanged) Object.assign(line, envelope(line, line.words.filter(word => selection ? true : clearUnmatched ? (word.rubyUnits.length ? word.rubyUnits.some(r => scope.get(r.id)!.target_ids.length) : scope.get(word.id)!.target_ids.length) : word.text.trim() || word.rubyUnits.length)));
   }
   if (result.acoustics) { validateSegments(result.acoustics.segments); next.acoustics = {...result.acoustics, segments:intersectSegments(result.acoustics.segments,durationMs).segments}; }
   return { project: JSON.stringify(next) === JSON.stringify(project) ? project : next, retained, cleared, mergedGaps };
+}
+
+
+export function localAlignmentTargets(document: ProjectDocument['lyrics'], kind: 'lines' | 'words', ids: string[]) {
+  const selected = new Set(ids);
+  const units = document.lines.flatMap(line => line.words.filter(word => selected.has(kind === 'lines' ? line.id : word.id)).flatMap<{id:string;beginMs:TimeMs;endMs:TimeMs}>(word =>
+    word.rubyUnits.length ? word.rubyUnits.filter(unit => unit.reading.trim()) : word.text.trim() ? [word] : []));
+  return { ids: units.map(unit => unit.id), ...timeEnvelope(units) };
 }

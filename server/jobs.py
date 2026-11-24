@@ -43,7 +43,7 @@ class JobService:
             raise ValueError("不支持此任务类别")
         digest=json.dumps([subject, kind, request],sort_keys=True,separators=(",",":"),ensure_ascii=False)
         need_devices = not (request.get('upload_id') or request.get('retry_analysis_id') or (kind == 'vocal' and request.get('_reuse_vocal_id')))
-        skip_vocal = bool(request.get('_reuse_vocal_id') or request.get('_has_vocal'))
+        skip_vocal = bool(request.get('_reuse_vocal_id') or request.get('_has_vocal') or request.get('_skip_vocal'))
         devices_snapshot = self.devices.snapshot(kind, cpu_retry=request.get('cpu_retry', False), skip_vocal=skip_vocal) if need_devices else {}
         with self._lock, self.db.transaction() as c:
             if self._closing: raise ValueError("服务正在停止，不再接受任务")

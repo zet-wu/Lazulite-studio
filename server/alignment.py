@@ -7,7 +7,7 @@ from .vocals import VocalCancelled
 from .worker_process import WorkerProcess
 from .project_document import load_project
 from .audio_boundaries import source_duration, intersect_segments
-from .alignment_projection import project_alignment
+from .alignment_projection import project_alignment, alignment_envelope
 
 
 def alignment_unavailable():
@@ -45,16 +45,22 @@ class AlignmentRunner:
             return load_project(path), current['source_asset_id']
 
     def validate(self, pid, params):
-        if set(params) != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'gap_threshold_ms', 'latin_normalize', 'strip_tone_digits', 'convert_particles', 'model_preview'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'latin_normalize', 'strip_tone_digits', 'convert_particles')):
+        if set(params) - {'audio_source', 'crop_vocals', 'scope_ids'} != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'gap_threshold_ms', 'latin_normalize', 'strip_tone_digits', 'convert_particles', 'model_preview'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'latin_normalize', 'strip_tone_digits', 'convert_particles')):
             raise ValueError('自动对齐只接受项目版本、布尔选项及行内空隙阈值')
         if type(params['gap_threshold_ms']) is not int or not 0 < params['gap_threshold_ms'] <= 9007199254740991:
             raise ValueError('行内空隙阈值必须为正的安全整数毫秒')
         if not params['merge_short_gaps']:
             params['gap_threshold_ms'] = 500
+        params.setdefault('audio_source', 'vocals')
+        params.setdefault('crop_vocals', True)
+        params.setdefault('scope_ids', None)
+        if params['audio_source'] not in ('vocals', 'original') or type(params['crop_vocals']) is not bool: raise ValueError('音频来源或人声片段裁切选项无效')
+        if params['scope_ids'] is not None and (not isinstance(params['scope_ids'], list) or any(not isinstance(value, str) for value in params['scope_ids'])): raise ValueError('局部对齐范围无效')
         snapshot, asset = self.snapshot(pid, params['revision'])
         if not isinstance(params['model_preview'], str): raise ValueError('需要有效模型预览')
-        model = self.models.capture(params['model_preview'], {k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles','revision')})
-        projection = project_alignment(snapshot, params['use_hints'], model=model, particle_analyzer=self.particle_analyzer, **{k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles')})
+        model = self.models.capture(params['model_preview'], {k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles','revision','scope_ids')})
+        projection = project_alignment(snapshot, params['use_hints'], model=model, scope_ids=params['scope_ids'], particle_analyzer=self.particle_analyzer, **{k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles')})
+        if params['scope_ids'] is not None: alignment_envelope(snapshot, params['scope_ids'])
         params['_model'] = model
         if not projection['summary']['line_count']: raise ValueError('没有未跳过的歌词行')
         if not projection['summary']['emitting_count']: raise ValueError('没有可用读音，无法计算')
@@ -92,31 +98,43 @@ def _run_alignment(request, emit, cancelled, media_lifetime):
     duration_ms = source_duration(db, pid, asset)
     if cancelled(): raise VocalCancelled()
     check_snapshot(params['_model'])
-    projection = project_alignment(snapshot, params['use_hints'], model=params['_model'], **{k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles')})
+    projection = project_alignment(snapshot, params['use_hints'], model=params['_model'], scope_ids=params.get('scope_ids'), **{k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles')})
     vocal = VocalRunner(db, root, cleanup=False, media_lifetime=media_lifetime)
     acoustics = snapshot['acoustics']; new_acoustics = None
-    if acoustics['analysisId']:
-        row, metadata = vocal.get(pid, acoustics['analysisId'])
-        if row['status'] != 'ready' or metadata['source_asset_id'] != asset or not vocal.audio_available(pid, metadata):
-            raise ValueError('现有人工片段无法匹配完整人声，请先检查音频处理')
-    else:
-        if acoustics['segments']: raise ValueError('现有片段没有可匹配的人声资源')
-        result = vocal.run_in_process(pid, Path(request['asset_path']), {**{k:v for k,v in params.items() if k in {'_vocal_model', '_reuse_vocal_id'}}, 'asset_id': asset, 'model_name': params.get('_vocal_model', {}).get('name', 'htdemucs'), 'device': params.get('devices', {}).get('vocal', {}).get('actual', os.getenv('STUDIO_VOCAL_DEVICE','cpu'))}, request['job_id'], emit, cancelled)
-        _, metadata = vocal.get(pid, result['analysis_id'])
-        normalized, _ = intersect_segments(metadata['segments'], duration_ms)
-        new_acoustics = {'analysisId': metadata['id'], 'segments': normalized}
+    needs_vocal = params['audio_source'] == 'vocals' or params['crop_vocals']
+    metadata = None
+    automatic_normalization = {'clipped':0, 'dropped':0}
+    if needs_vocal:
+        if acoustics['analysisId']:
+            row, metadata = vocal.get(pid, acoustics['analysisId'])
+            if row['status'] != 'ready' or metadata['source_asset_id'] != asset or params['audio_source'] == 'vocals' and not vocal.audio_available(pid, metadata):
+                raise ValueError('现有人工片段无法匹配完整人声，请先检查音频处理')
+        else:
+            if acoustics['segments']: raise ValueError('现有片段没有可匹配的人声资源')
+            result = vocal.run_in_process(pid, Path(request['asset_path']), {**{k:v for k,v in params.items() if k in {'_vocal_model', '_reuse_vocal_id'}}, 'asset_id': asset, 'model_name': params.get('_vocal_model', {}).get('name', 'htdemucs'), 'device': params.get('devices', {}).get('vocal', {}).get('actual', os.getenv('STUDIO_VOCAL_DEVICE','cpu'))}, request['job_id'], emit, cancelled)
+            _, metadata = vocal.get(pid, result['analysis_id'])
+            normalized, _ = intersect_segments(metadata['segments'], duration_ms)
+            new_acoustics = {'analysisId': metadata['id'], 'segments': normalized}
     if cancelled(): raise VocalCancelled()
-    samples, rate = vocal.decoded_audio(pid, metadata)
-    audio = AudioBuffer(samples.T, rate, metadata['audio_result_id'])
+    if params['audio_source'] == 'original':
+        from lazulite.audio.io import decode_native_audio
+        audio = decode_native_audio(request['asset_path'])
+    else:
+        samples, rate = vocal.decoded_audio(pid, metadata)
+        audio = AudioBuffer(samples.T, rate, metadata['audio_result_id'])
+    lower, upper = alignment_envelope(snapshot, params['scope_ids']) if params.get('scope_ids') is not None else (0, duration_ms)
+    if params['crop_vocals']:
+        rows, automatic_normalization = intersect_segments(acoustics['segments'] if acoustics['analysisId'] else metadata['segments'], duration_ms)
+    else:
+        rows = [{'id':'alignment-range','beginMs':lower,'endMs':upper}]
+    rows = [{**row,'beginMs':max(row['beginMs'],lower),'endMs':min(row['endMs'],upper)} for row in rows]
     def segments(rows):
-        # Samples are read only inside the decoded PCM, independently of source metadata.
         return tuple(VocalSegment(s['id'], None, max(0,s['beginMs']/1000), min(s['endMs']/1000,audio.duration), max(0,s['beginMs']/1000), min(s['endMs']/1000,audio.duration), None, None) for s in rows if max(0,s['beginMs']/1000) < min(s['endMs']/1000,audio.duration))
-    selected = segments(acoustics['segments']) if acoustics['analysisId'] else None
-    automatic_segments, automatic_normalization = intersect_segments(metadata['segments'], duration_ms)
-    automatic = VocalAnalysis(audio.source_id, segments(automatic_segments))
+    selected = segments(rows)
+    automatic = VocalAnalysis(audio.source_id, selected)
     prepared = prepare_existing_vocals(audio, original_id=asset,
-        analysis=automatic, analysis_description={'configuration': metadata['analysis_config'], 'reference':'full_scale'},
-        segments=selected, separation=metadata['model'])
+        analysis=automatic, analysis_description={'configuration': metadata['analysis_config'] if metadata else {}, 'reference':'full_scale'},
+        segments=selected, separation=metadata['model'] if metadata else None)
     if not prepared.segments: raise ValueError('没有可用人声片段')
     backend = open_backend(params['_model']['path'], device=params.get('devices', {}).get('alignment', {}).get('actual', os.getenv('STUDIO_ALIGNMENT_DEVICE','cpu')))
     try:
@@ -145,4 +163,4 @@ def _run_alignment(request, emit, cancelled, media_lifetime):
     backend_info['model_name'] = params['_model']['name']
     from .alignment_postprocessing import object_timings
     timings = object_timings(result, projection['mapping'], audio, params['smart_extend'], segments=prepared.segments)
-    return {'kind':'alignment', 'object_timings':timings, 'alignment':result_data, 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'normalization':automatic_normalization, 'summary':projection['summary']}
+    return {'kind':'alignment', 'selection':params.get('scope_ids'), 'object_timings':timings, 'alignment':result_data, 'mapping':projection['mapping'], 'scope':projection['scope'], 'acoustics':new_acoustics, 'normalization':automatic_normalization, 'summary':projection['summary']}

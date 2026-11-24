@@ -125,3 +125,18 @@ it('does not clear a multi-target object when only its middle suggestion is miss
  r.alignment.units.push({unit_id:'middle',line_id:'a',proposed_timing:{start:null,end:null}},{unit_id:'last',line_id:'a',proposed_timing:{start:null,end:{time:2,source:'interpolated'}}});r.scope=scopeFor(p,r);
  expect(mergeAlignment(p,r,5000,true).project.lyrics.lines[0].words[0]).toMatchObject({beginMs:1000,endMs:2000});
 });
+
+it('locally aligns skipped rows without changing unselected leaves and rejects incomplete selection results',()=>{
+ const p=fixture();p.lyrics.lines[0].words.push({...p.lyrics.lines[0].words[0],id:'keep',text:'keep',beginMs:4100,endMs:4500});p.editing.skippedAlignmentLineIds=['a','b'];
+ const r=result(p,[[1,2],[3,4],[4,4.5]]);const a=p.lyrics.lines[0].words[0].id,b=p.lyrics.lines[1].words[0].id;
+ r.selection=[a,b];r.mapping=r.mapping.filter(item=>item.object_id!== 'keep');r.alignment.units=r.alignment.units.filter(unit=>r.mapping.some(item=>item.unit_id===unit.unit_id));
+ r.scope=r.selection.map(id=>{const m=r.mapping.find(item=>item.object_id===id)!;return {...m,target_ids:[m.unit_id]};});
+ const merged=mergeAlignment(p,r,5000,true).project;
+ expect(merged.lyrics.lines[0].words[1]).toEqual(p.lyrics.lines[0].words[1]);
+ expect(merged.lyrics.lines[0].words[0]).toMatchObject({beginMs:1000,endMs:2000});
+ expect(merged.lyrics.lines[0]).toMatchObject({beginMs:1000,endMs:4500});
+ const state=executeProjectCommand(createProjectEditorState(p),{type:'alignment',source:p,project:merged});
+ expect(undoProjectCommand(state).present).toBe(p);expect(redoProjectCommand(undoProjectCommand(state)).present).toEqual(merged);
+ expect(parseProject(serializeProject(merged))).toEqual(merged);
+ r.scope.pop();expect(()=>mergeAlignment(p,r,5000,true)).toThrow('alignment.rangeMismatch');
+});

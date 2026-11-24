@@ -1,5 +1,6 @@
 import { useSyncStyle } from '../../adapters/sync-style';
 import { hasSyncStop, syncUnits as stopUnits } from '../../domain/sync-editing';
+import { localAlignmentTargets } from '../../domain/alignment';
 import { usePlaybackShortcut } from '../shortcuts';
 import {usePreference} from '../../adapters/studio-preferences';
 import { message as describeMessage, errorMessage } from '../../domain/messages';
@@ -172,7 +173,7 @@ function EditorWorkspaceContent(props: Props) {
   useEffect(() => {
     if (alignmentRequest === handledAlignmentRequest.current) return;
     handledAlignmentRequest.current = alignmentRequest;
-    setMode('audio');
+    if (!audioReview.alignmentScope) setMode('audio');
   }, [alignmentRequest]);
   const [editorDisplay]=usePreference('studio:editor-display','advanced');
   const compact = mode === 'sync' || mode === 'karaoke' || mode === 'edit' && editorDisplay === 'simple';
@@ -721,6 +722,11 @@ function EditorWorkspaceContent(props: Props) {
     const single = (id: string,label:string,run:()=>void,reason=t('editor.singleRequired')): ContextAction => ({id,label,run,disabled:multiple,reason:multiple?reason:undefined});
     let title=t('editor.lineActions');
     const actions: ContextAction[]=[];
+    if ((effective.kind === 'lines' || effective.kind === 'words') && props.alignment) {
+      const scope = localAlignmentTargets(document,effective.kind,effective.ids);
+      const enabled = scope.ids.length >= 2 && scope.beginMs !== null && scope.endMs !== null && scope.beginMs < scope.endMs;
+      actions.push({id:'local-alignment',label:t('alignment.local'),disabled:!enabled,reason:enabled?undefined:t('alignment.localRangeRequired'),run:()=>audioReview.requestAlignmentOpen(scope.ids)});
+    }
     if (effective.kind === 'words' || effective.kind === 'ruby') {
       const selectedUnits = stopUnits(document, editing, undefined, [], true).filter(unit => effective.ids.includes(effective.kind === 'words' ? unit.wordId : unit.rubyUnitId ?? ''));
       const allStops = selectedUnits.every(unit => hasSyncStop(document, editing, unit));

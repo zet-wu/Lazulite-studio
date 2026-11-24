@@ -17,7 +17,7 @@ export const particlesEnabled = () => preferences.getItem('studio:convert-partic
 export function alignmentDefaults() {
   const defaults = defaultAlignmentOptions();
   const stored = preferences.getItem('studio:alignment-defaults');
-  return {...defaults, ...(stored ? JSON.parse(stored) : {}), model_preview: '', convert_particles: particlesEnabled()};
+  return {...defaults, ...(stored ? JSON.parse(stored) : {}), model_preview: '', scope_ids:null, convert_particles: particlesEnabled()};
 }
 export function resolveDefaultModel(items: {name:string; type:string|null; status:string; id:string|null}[], raw = preferences.getItem('studio:alignment-model')) {
   if (!raw) return {id: '', missing: false};

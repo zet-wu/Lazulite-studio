@@ -16,6 +16,7 @@ from fastapi import (
     Header,
     HTTPException,
     Request,
+    Query,
     UploadFile,
 )
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -702,13 +703,13 @@ def create_app(
                      'next_action': 'reload_project_and_preview_alignment'})
 
     @api.get('/projects/{pid}/alignment-preview')
-    def alignment_preview(pid: str, revision: str, model: str, latin_normalize: bool = True, strip_tone_digits: bool = False, convert_particles: bool = True, _=Depends(auth)):
+    def alignment_preview(pid: str, revision: str, model: str, latin_normalize: bool = True, strip_tone_digits: bool = False, convert_particles: bool = True, scope_ids: list[str] | None = Query(default=None), _=Depends(auth)):
         project(pid)
         try:
             snapshot, _ = alignment_runner.snapshot(pid, revision)
             options = {'latin_normalize':latin_normalize, 'strip_tone_digits':strip_tone_digits, 'convert_particles':convert_particles}
-            key, selected = model_catalog.preview(model, {**options, 'revision':revision})
-            return {**project_alignment(snapshot, model=selected, particle_analyzer=configured_reading_proposer, **options)['summary'], 'model_preview':key}
+            key, selected = model_catalog.preview(model, {**options, 'revision':revision, 'scope_ids':scope_ids})
+            return {**project_alignment(snapshot, model=selected, particle_analyzer=configured_reading_proposer, scope_ids=scope_ids, **options)['summary'], 'model_preview':key}
         except AlignmentRevisionMismatchError as exc: alignment_revision_mismatch(exc)
         except (ValueError, ReadingUnavailable) as exc: fail('alignment_input_invalid', str(exc), 409)
 
@@ -717,7 +718,9 @@ def create_app(
             try: snapshot = alignment_runner.validate(pid, params)
             except AlignmentRevisionMismatchError as exc: alignment_revision_mismatch(exc)
             except (ValueError, ReadingUnavailable) as exc: fail('alignment_input_invalid', str(exc), 422)
-            if snapshot['acoustics']['analysisId']:
+            if params['audio_source'] == 'original' and not params['crop_vocals']:
+                params['_skip_vocal'] = True
+            elif snapshot['acoustics']['analysisId']:
                 params['_has_vocal'] = True
             else:
                 capture_vocal(pid, params)

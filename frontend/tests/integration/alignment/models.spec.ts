@@ -31,7 +31,7 @@ test('models remain explicitly selected and stale input previews cannot enable s
   await page.locator('[data-settings-button]').click();
   await page.getByRole('button',{name:'模型与计算',exact:true}).click();
   items=[];
-  await page.getByRole('button',{name:'刷新模型列表'}).click();
+  await page.getByRole('button',{name:'刷新模型列表'}).last().click();
   await expect(page.getByText('没有可用模型，请配置目录并刷新。')).toBeVisible();
   await page.getByRole('button',{name:'关闭设置',exact:true}).click();
   await expect(page.locator('[data-settings-button]')).toBeFocused();
@@ -52,8 +52,8 @@ test('settings manager is reachable without a project and refresh keeps the dire
   await page.getByRole('button',{name:'模型与计算',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'设置'}),input=dialog.getByRole('textbox');
   await expect(input).toHaveValue('/active');await input.fill('/draft');
-  await dialog.getByRole('button',{name:'刷新模型列表'}).click();
-  await expect(dialog.getByRole('button',{name:'刷新模型列表'})).toBeEnabled();
+  await dialog.getByRole('button',{name:'刷新模型列表'}).last().click();
+  await expect(dialog.getByRole('button',{name:'刷新模型列表'}).last()).toBeEnabled();
   await expect(input).toHaveValue('/draft');expect(applied).toEqual([]);
   await expect(dialog.getByText('Missing weights')).toBeVisible();
   await expect(dialog.getByText('没有可用模型，请配置目录并刷新。')).toBeVisible();

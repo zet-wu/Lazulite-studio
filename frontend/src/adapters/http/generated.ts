@@ -414,7 +414,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Preview the saved global alignment input without running a model */
+        /** Preview saved global or selected reading units without running a model */
         get: {
             parameters: {
                 query: {
@@ -423,6 +423,8 @@ export interface paths {
                     latin_normalize?: boolean;
                     strip_tone_digits?: boolean;
                     convert_particles?: boolean;
+                    /** @description Selected reading leaf IDs; overrides global skip flags. Repeated query parameter. */
+                    scope_ids?: string[];
                 };
                 header?: never;
                 path: {
@@ -1172,6 +1174,8 @@ export interface components {
                 kind: "word" | "ruby";
                 target_ids: string[];
             }[];
+            /** @description Selected reading IDs, or null for global alignment */
+            selection?: string[] | null;
         } & {
             [key: string]: unknown;
         };

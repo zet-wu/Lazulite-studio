@@ -13,5 +13,5 @@ send('boundary')
 if json.loads(sys.stdin.readline())['cancel']:
  send('error',type='cancelled',message='cancelled');sys.exit(1)
 db=Database(request['database']);snapshot,_=AlignmentRunner(db,request['root']).snapshot(request['project_id'],request['params']['revision'])
-projection=project_alignment(snapshot,request['params']['use_hints'])
-send('result',value={'kind':'alignment','engine':{'worker_pid':os.getpid(),'params':request['params']},'scope':projection['scope'],'mapping':projection['mapping'],'alignment':{'schema':'lazulite-japanese-result-v1','units':[{'unit_id':m['unit_id'],'line_id':m['line_id'],'proposed_timing':{'start':{'time':.1,'source':'test'},'end':{'time':.2,'source':'test'}}} for m in projection['mapping']]},'acoustics':None})
+projection=project_alignment(snapshot,request['params']['use_hints'],scope_ids=request['params'].get('scope_ids'))
+send('result',value={'kind':'alignment','selection':request['params'].get('scope_ids'),'engine':{'worker_pid':os.getpid(),'params':request['params']},'scope':projection['scope'],'mapping':projection['mapping'],'alignment':{'schema':'lazulite-japanese-result-v1','units':[{'unit_id':m['unit_id'],'line_id':m['line_id'],'proposed_timing':{'start':{'time':.1,'source':'test'},'end':{'time':.2,'source':'test'}}} for m in projection['mapping']]},'acoustics':None})

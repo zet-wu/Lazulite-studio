@@ -15,7 +15,7 @@ export function AlignmentDefaults() {
   const [gap,setGap]=useState(String(options.gap_threshold_ms)),[error,setError]=useState('');
   const catalog=useQuery({queryKey:['alignment-models'],queryFn:()=>alignmentApi.models()});
   const [model,setModel]=usePreference('studio:alignment-model','');
-  const choose=(key:keyof AlignmentOptions,value:boolean|number)=>{const {model_preview:_preview,convert_particles:_particles,...defaults}=options;setRaw(JSON.stringify({...defaults,[key]:value}));};
+  const choose=(key:keyof AlignmentOptions,value:boolean|number|string)=>{const {model_preview:_preview,scope_ids:_scope,convert_particles:_particles,...defaults}=options;setRaw(JSON.stringify({...defaults,[key]:value}));};
   const selected=model?JSON.parse(model):null;
   const valid=catalog.data?.items.find(item=>item.name===selected?.name&&item.type===selected?.type&&item.status==='ready');
   const descriptions:Partial<Record<keyof AlignmentOptions,string>>={clear_unmatched:'alignment.clearHelp',smart_extend:'alignment.smartExtendHelp',use_hints:'alignment.startsHelp',line_blank:'alignment.blankHelp',rest_blank:'alignment.restBlankHelp',rest_token:'alignment.restTokenHelp'};
@@ -24,6 +24,8 @@ export function AlignmentDefaults() {
     <SettingField label={t('settings.defaultModel')}><Select aria-label={t('settings.defaultModel')} value={valid?.id??''} onChange={e=>{const item=catalog.data?.items.find(item=>item.id===e.target.value);if(item)setModel(JSON.stringify({name:item.name,type:item.type}));else {void savePreference('studio:alignment-model',null).catch(()=>undefined);}}}>
       <option value="">{t('alignment.selectModel')}</option>{catalog.data?.items.filter(item=>item.status==='ready').map(item=><option key={item.name} value={item.id!}>{item.name} · {item.type}</option>)}
     </Select></SettingField>
+    <SettingField label={t('alignment.audioSource')}><Select aria-label={t('alignment.audioSource')} value={options.audio_source} onChange={event=>choose('audio_source',event.target.value)}><option value="vocals">{t('alignment.vocals')}</option><option value="original">{t('media.original')}</option></Select></SettingField>
+    <SettingToggle label={t('alignment.cropVocals')} checked={options.crop_vocals} onChange={value=>choose('crop_vocals',value)}/>
     {selected&&!valid&&<p role="alert">{t('settings.defaultModelMissing')}</p>}
     {catalog.isError&&<p role="alert">{catalog.error.message}<button data-role="secondary" onClick={()=>void catalog.refetch()}>{t('common.retry')}</button></p>}
     {groups.map(([title,items])=><fieldset key={title} className={fields.group}><legend>{t(title)}</legend>{items.map(([key,label])=><SettingToggle key={key} label={t(label)} description={descriptions[key]?t(descriptions[key]!):undefined} checked={Boolean(options[key])} onChange={value=>choose(key,value)}/>)}

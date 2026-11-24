@@ -1708,5 +1708,10 @@
   "sync.addStop": "開啟終止點",
   "sync.removeStop": "關閉終止點",
   "sync.singleKey": "單鍵打軸",
-  "search.score": "匹配度 {{score}}%"
+  "search.score": "匹配度 {{score}}%",
+  "alignment.local": "局部對齊",
+  "alignment.localRangeRequired": "選擇至少兩個讀音單元，並先設定有效起止時間",
+  "alignment.audioSource": "對齊音訊來源",
+  "alignment.vocals": "人聲",
+  "alignment.cropVocals": "人聲片段裁切"
 }

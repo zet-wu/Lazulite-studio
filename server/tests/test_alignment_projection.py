@@ -100,3 +100,18 @@ def test_particles_use_whole_line_codepoints_and_preserve_ruby():
  source['lyrics']['draftTtml']=source['lyrics']['draftTtml'].replace('<span studio:id="w1">は</span>', '<span studio:id="w1" xmlns:tts="http://www.w3.org/ns/ttml#styling" tts:ruby="container"><span tts:ruby="base">は</span><span tts:ruby="textContainer"><span studio:id="r" tts:ruby="text">は</span></span></span>')
  result=project_alignment(source,convert_particles=True,particle_analyzer=analyzer)
  assert next(u for u in result['summary']['inputs'] if u['object_id']=='r')['reading']=='は'
+
+
+def test_local_projection_overrides_skip_flags_and_only_projects_selected_leaves():
+    from server.alignment_projection import alignment_envelope
+    import pytest
+    snapshot=fixture();snapshot['editing']['skippedAlignmentLineIds']=['main']
+    snapshot['lyrics']['draftTtml']=snapshot['lyrics']['draftTtml'].replace('studio:id="r1"','studio:id="r1" begin="0.2" end="0.4"').replace('studio:id="r3"','studio:id="r3" begin="0.8" end="0.6"')
+    result=project_alignment(snapshot,scope_ids=['r1','r3'])
+    assert [line['line_id'] for line in result['request']['lines']]==['main']
+    assert [item['object_id'] for item in result['scope']]==['r1','r3']
+    assert result['summary']['skipped_count']==0
+    assert alignment_envelope(snapshot,['r1','r3'])==(200,800)
+    for ids in [['r1'],['r1','r1'],['r1','missing']]:
+        with pytest.raises(ValueError):project_alignment(snapshot,scope_ids=ids)
+    with pytest.raises(ValueError,match='时间包络'):alignment_envelope(snapshot,['mixed','space'])

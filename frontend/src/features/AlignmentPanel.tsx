@@ -137,7 +137,7 @@ export function AlignmentPanel({
     ? t('alignment.uploadRequired')
     : durationMs === null
       ? t('alignment.durationUnknown')
-      : !project.lyrics.lines.some((l) => !project.editing.skippedAlignmentLineIds.includes(l.id))
+      : ui.alignmentScope === null && !project.lyrics.lines.some((l) => !project.editing.skippedAlignmentLineIds.includes(l.id))
         ? t('alignment.noLines')
         : !capability?.enabled
           ? capability
@@ -176,7 +176,8 @@ export function AlignmentPanel({
             current.revision !== pendingRun.revision ||
             result.binding.revision !== pendingRun.revision ||
             result.binding.project_id !== pid ||
-            result.binding.asset_id !== assetIdRef.current
+            result.binding.asset_id !== assetIdRef.current ||
+            JSON.stringify(result.selection ?? null) !== JSON.stringify(pendingRun.options.scope_ids)
           ) {
             throw new MessageError(describeMessage('alignment.sourceChanged'));
           }
@@ -249,13 +250,13 @@ export function AlignmentPanel({
     setConnection(null);
   }, [pendingRun, jobs.data?.items, pid, control, setConnection]);
 
-  const open = async () => {
+  const open = async (scopeIds: string[] | null = null) => {
     if (!finishDraft()) return;
     setOpening(true);
     setMessage('');
     const defaults = alignmentDefaults();
     const defaultModel = preferences.getItem('studio:alignment-model');
-    setOptions(defaults);
+    setOptions({...defaults,scope_ids:scopeIds});
     setGapDraft(String(defaults.gap_threshold_ms));
     setGapError('');
     try {
@@ -282,7 +283,7 @@ export function AlignmentPanel({
     if (ui.alignmentRequest === handledAlignmentRequest.current) return;
     handledAlignmentRequest.current = ui.alignmentRequest;
     if (!dialog && !active && !launching && !opening && !reason) {
-      void open();
+      void open(ui.alignmentScope);
     }
   }, [ui.alignmentRequest, dialog, active, launching, opening, reason]);
 
@@ -314,6 +315,7 @@ export function AlignmentPanel({
     options.latin_normalize,
     options.strip_tone_digits,
     options.convert_particles,
+    options.scope_ids,
     catalog,
     previewAttempt,
   ]);
@@ -438,7 +440,7 @@ export function AlignmentPanel({
       {visible && ui.alignmentHost && createPortal(button, ui.alignmentHost)}
       {dialog && (
         <SettingsDialog
-          title={t('settings.alignment')}
+          title={t(options.scope_ids ? 'alignment.local' : 'settings.alignment')}
           close={() => setDialog(false)}
           actions={
             <>
@@ -478,6 +480,8 @@ export function AlignmentPanel({
             </Select>
           </SettingField>
 
+          <SettingField label={t('alignment.audioSource')}><Select aria-label={t('alignment.audioSource')} value={options.audio_source} onChange={event=>setOptions({...options,audio_source:event.target.value as 'vocals'|'original'})}><option value="vocals">{t('alignment.vocals')}</option><option value="original">{t('media.original')}</option></Select></SettingField>
+          <SettingToggle label={t('alignment.cropVocals')} checked={options.crop_vocals} onChange={value=>setOptions({...options,crop_vocals:value})}/>
           {catalog?.error && <p role="alert">{catalog.error}</p>}
           {previewError && (
             <p role="alert">
