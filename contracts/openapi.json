@@ -232,42 +232,6 @@
         }
       }
     },
-    "/lyric-sources/resolve": {
-      "post": {
-        "operationId": "lyricSourceResolve",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LyricSourceCandidate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Authenticated provider response with original lyric format",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Session required"
-          },
-          "429": {
-            "description": "Provider concurrency limit"
-          },
-          "502": {
-            "description": "Upstream network or payload error"
-          }
-        }
-      }
-    },
     "/projects/{projectId}/packaging": {
       "get": {
         "operationId": "getPackagingInfo",

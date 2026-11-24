@@ -6,7 +6,7 @@ import { attachSidecar } from '../source-codec';
 export type Source = 'netease' | 'qqmusic' | 'kugou' | 'amll';
 export type Candidate = { source: Source; id: string; title: string; artists: string[]; album: string; duration_ms: number | null; songmid?: string | null; songid?: string | null; platform?: string | null; file?: string | null };
 export class SourceError extends MessageError { constructor(diagnostic:string,readonly code:string) {super(message(code==='session_expired'?'search.sessionExpired':'search.requestError',{diagnostic}));this.message=diagnostic;} }
-export async function sourceRequest<T>(action: 'search' | 'fetch' | 'resolve', body: unknown, signal?: AbortSignal): Promise<T> {
+export async function sourceRequest<T>(action: 'search' | 'fetch', body: unknown, signal?: AbortSignal): Promise<T> {
  try {
    return await apiJson<T>(`/lyric-sources/${action}`, { method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
  } catch (error) {

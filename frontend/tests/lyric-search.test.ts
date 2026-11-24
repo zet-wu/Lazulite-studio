@@ -15,3 +15,8 @@ test('identity score follows weighted fuzzy matching and CJK views without chang
  expect(identityScore({...query,artist:'',album:''},missing)).toBeCloseTo(100);
  expect(query.title).toBe('國々 (Live)'); expect(exact.title).toBe('国国');
 });
+test('artist keywords precede deduplicated title fallback for online providers',async()=>{
+ const {searchKeywords}=await import('../src/domain/lyric-search');const query={title:'Song',artist:' A ',album:''};
+ for(const source of ['qqmusic','netease','kugou'] as const)expect(searchKeywords(query,source)).toEqual(['Song A','Song']);
+ expect(searchKeywords(query,'amll')).toEqual(['Song']);
+});

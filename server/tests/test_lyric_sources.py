@@ -58,3 +58,31 @@ def test_kugou_invalid_base64_is_a_decode_failure():
     service.request = lambda url, **kwargs: {'candidates': [{'id': '1', 'accesskey': 'key'}]} if '/search' in url else {'content': 'invalid!'}
     with pytest.raises(SourceDecodeError):
         service.fetch(Candidate(source='kugou', id='1'))
+
+@pytest.mark.parametrize('fallback', [False, True])
+def test_qq_search_returns_full_identifiers_without_detail_requests(fallback):
+    seen = []
+    def respond(request):
+        seen.append(request)
+        song = {'mid':'mid123','id':123,'name':'歌','singer':[{'name':'A'},{'name':'B'}],'album':{'name':'专辑'},'interval':187}
+        if request.method == 'POST':
+            body=json.loads(request.content)
+            assert body['music.search.SearchCgiService']['param']['num_per_page'] == 30
+            return httpx.Response(503) if fallback else httpx.Response(200,json={'code':0,'music.search.SearchCgiService':{'code':0,'data':{'body':{'song':{'list':[song]}}}}})
+        assert request.url.path.endswith('search_for_qq_cp') and request.url.params['n']=='30'
+        return httpx.Response(200,json={'code':0,'data':{'song':{'list':[song]}}})
+    rows=Sources(httpx.MockTransport(respond)).search('qqmusic','歌 A')
+    assert rows[0].songmid=='mid123' and rows[0].songid=='123' and rows[0].duration_ms==187000
+    assert rows[0].artists==['A','B'] and rows[0].album=='专辑'
+    assert len(seen)==(2 if fallback else 1)
+
+@pytest.mark.parametrize('fallback', [False, True])
+def test_kugou_search_uses_thirty_results_and_splits_multiple_singers(fallback):
+    def respond(request):
+        assert request.url.params['pagesize']=='30'
+        if request.url.host=='mobiles.kugou.com':
+            return httpx.Response(503) if fallback else httpx.Response(200,json={'status':1,'data':{'info':[{'hash':'hash','songname':'歌','singername':'A、B / C','duration':120}]}})
+        assert request.url.host=='songsearch.kugou.com'
+        return httpx.Response(200,json={'data':{'lists':[{'FileHash':'hash','SongName':'歌','SingerName':'A、B / C','Duration':120}]}})
+    row=Sources(httpx.MockTransport(respond)).search('kugou','歌 A')[0]
+    assert row.artists==['A','B','C'] and row.duration_ms==120000

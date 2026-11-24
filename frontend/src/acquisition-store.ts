@@ -1,6 +1,6 @@
 import {message,MessageError,errorMessage,type Message} from './domain/messages';
 import { SourceError, sourceRequest, type Candidate, type Source, parsePayload, type Payload } from './adapters/http/lyric-sources';
-import { identityScore, titleVariants } from './domain/lyric-search';
+import { identityScore, searchKeywords } from './domain/lyric-search';
 import type { LyricDocument } from './domain/lyric-document';
 import type { SearchConditions } from './features/useSearchConditions';
 export const SOURCES: Source[] = ['netease','qqmusic','kugou','amll'];
@@ -41,8 +41,7 @@ export class AcquisitionStore {
   search(query: SearchConditions) {
     this.cancelAll(); this.cache.clear();
     this.state = { ...this.state, round: this.state.round+1, query: { ...query }, sources: freshSources() };
-    const variants = titleVariants(query.title);
-    for (const source of SOURCES) this.queueSearch(source,variants);
+    for (const source of SOURCES) this.queueSearch(source,searchKeywords(query,source));
     this.emit(); this.pump();
   }
   ensureSearch(query: SearchConditions) { if (!this.state.query && query.title.trim()) this.search(query); }
@@ -103,17 +102,7 @@ export class AcquisitionStore {
       let parsing = false;
       try {
         record.status = 'fetching'; this.emit();
-        let candidate = record.candidate;
-        if (source === 'qqmusic' && !candidate.songmid) {
-          try {
-            candidate = await this.request<Candidate>('resolve',candidate,controller.signal);
-            if (!this.valid(task)) return;
-            record.candidate = candidate;
-          } catch (e) {
-            if (!this.valid(task)) return;
-            record.error = message('search.resolveFailed');
-          }
-        }
+        const candidate = record.candidate;
         const payload = await this.request<Payload>('fetch',candidate,controller.signal);
         if (!this.valid(task)) return;
         if (payload.empty) { record.status = 'empty'; record.error = message('search.emptyCandidate'); return; }

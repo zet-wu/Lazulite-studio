@@ -42,8 +42,8 @@ export function NetworkLyrics({ store, searchConditions, source, document, apply
  {Object.values(snapshot.sources).some(s=>s.pending>0) && <button data-role="secondary" onClick={()=>store.cancelSearch()}>{t('search.cancel')}</button>}
  <div ref={list} className={styles.results} aria-label={t('search.candidates')} onPointerEnter={()=>{pointer.current=true;store.setInteracting(source,true);}} onPointerLeave={()=>{pointer.current=false;if(!list.current?.contains(window.document.activeElement))store.setInteracting(source,false);}} onFocusCapture={()=>store.setInteracting(source,true)} onBlurCapture={e=>{if(!e.currentTarget.contains(e.relatedTarget) && !pointer.current)store.setInteracting(source,false);}}>
  {state.rows.map(id=>{const record=state.records[id],c=record.candidate; const status=t(checkLabels[record.status]),failed=['fetch-failed','decode-failed','parse-failed','empty'].includes(record.status); return <LyricCandidate key={id} selected={state.selected===id} onSelect={()=>{store.select(source,id);setMessage('');}}
- title={c.title} detail={<>{c.artists.join(' / ')}{c.album && ` · ${c.album}`}{c.duration_ms ? ' · '+t('search.duration',{seconds:(c.duration_ms/1000).toFixed(0)}) : ''}</>}
- badges={record.badges} status={status} failed={failed}/>
+ title={c.title} detail={<>{c.artists.join(' / ')}{c.album && ` · ${c.album}`}{c.duration_ms !== null ? ` · ${Math.floor(c.duration_ms/60000)}:${String(Math.floor(c.duration_ms/1000)%60).padStart(2,'0')}` : ''}</>}
+ badges={[t('search.score',{score:Math.round(record.score)}),...record.badges]} status={status} failed={failed}/>
  ;})}</div>
  {state.failed.length>0 && <p role="status">{state.succeeded ? t('search.partialHelp') : t('search.failedHelp')} <IconButton icon="refresh" label={t('search.retrySource')} data-role="secondary" onClick={()=>store.retrySearch(source)}/></p>}
  {!state.pending && !state.failed.length && !state.cancelled && snapshot.query && !state.rows.length && <p>{t('search.empty')}</p>}

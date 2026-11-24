@@ -59,3 +59,8 @@ export function identityScore(query: SearchConditions, candidate: Candidate) {
   const artist = Math.max(0, ...candidate.artists.map(value=>similarity(query.artist,value,.2)));
   return (.7*title + albumWeight*album + artistWeight*artist)/(.7+albumWeight+artistWeight);
 }
+
+export function searchKeywords(query: SearchConditions, source: Candidate['source']): string[] {
+  const titles = titleVariants(query.title), artist = query.artist.trim();
+  return [...new Set([...(source !== 'amll' && artist ? titles.map(title => `${title} ${artist}`) : []), ...titles])];
+}

@@ -90,17 +90,31 @@ class Sources:
 
     def search(self, source, query):
         if source == 'netease':
-            data = self.request('https://music.163.com/api/search/get/web', params={'s': query, 'type': 1, 'offset': 0, 'limit': 20})
+            data = self.request('https://music.163.com/api/search/get/web', params={'s': query, 'type': 1, 'offset': 0, 'limit': 30})
             if data.get('code', 200) != 200: raise ValueError(f"网易云搜索失败：{data.get('code')}")
             return [Candidate(source=source, id=str(s['id']), title=s['name'], artists=[a['name'] for a in s.get('ar', s.get('artists', []))], album=s.get('al', s.get('album', {})).get('name', ''), duration_ms=s.get('dt', s.get('duration'))) for s in data.get('result', {}).get('songs', [])]
         if source == 'qqmusic':
-            data = self.request('https://c.y.qq.com/splcloud/fcgi-bin/smartbox_new.fcg', params={'format':'json', 'key':query})
-            if data.get('code', 0) != 0: raise ValueError(f"QQ 搜索失败：{data.get('code')}")
-            return [Candidate(source=source, id=str(s.get('mid') or s['id']), songmid=s.get('mid') or None, songid=str(s['id']) if s.get('id') else None, title=s['name'], artists=[s.get('singer','')], album=s.get('albumname','')) for s in data.get('data',{}).get('song',{}).get('itemlist',[])]
+            try:
+                data = self.request('https://u.y.qq.com/cgi-bin/musicu.fcg', body={'comm':{'format':'json','ct':24}, 'music.search.SearchCgiService':{'module':'music.search.SearchCgiService','method':'DoSearchForQQMusicDesktop','param':{'query':query,'search_type':0,'page_num':1,'num_per_page':30}}})
+                search = data.get('music.search.SearchCgiService', {})
+                if data.get('code', 0) != 0 or search.get('code', 0) != 0: raise ValueError('QQ 搜索失败')
+                songs = search.get('data',{}).get('body',{}).get('song',{}).get('list',[])
+                if not songs: songs = self._qq_legacy(query)
+            except (httpx.HTTPError, ValueError):
+                songs = self._qq_legacy(query)
+            return [Candidate(source=source, id=str(s.get('mid') or s.get('songmid') or s.get('id') or s['songid']), songmid=s.get('mid') or s.get('songmid'), songid=str(s.get('id') or s.get('songid')) if s.get('id') or s.get('songid') else None, title=s.get('name') or s.get('songname',''), artists=[a['name'] for a in s.get('singer',[])], album=s.get('album',{}).get('name','') or s.get('albumname',''), duration_ms=round(s['interval']*1000) if s.get('interval') is not None else None) for s in songs]
         if source == 'kugou':
-            data = self.request('https://mobiles.kugou.com/api/v3/search/song', params={'format':'json','keyword':query,'page':1,'pagesize':20,'showtype':14,'plat':0,'sver':5,'correct':1,'api_ver':1,'version':9108})
-            if data.get('status', 1) != 1: raise ValueError('酷狗搜索失败')
-            return [Candidate(source=source, id=s['hash'], title=s.get('songname',''), artists=[s.get('singername','')], album=s.get('album_name',''), duration_ms=s.get('duration',0)*1000) for s in data.get('data',{}).get('info',[])]
+            try:
+                data = self.request('https://mobiles.kugou.com/api/v3/search/song', params={'format':'json','keyword':query,'page':1,'pagesize':30,'showtype':14,'plat':0,'sver':5,'correct':1,'api_ver':1,'version':9108})
+                if data.get('status', 1) != 1: raise ValueError('酷狗搜索失败')
+                songs = data.get('data',{}).get('info',[])
+            except (httpx.HTTPError, ValueError):
+                songs = []
+            if not songs:
+                data = self.request('https://songsearch.kugou.com/song_search_v2',params={'keyword':query,'page':1,'pagesize':30})
+                if data.get('status',1) != 1: raise ValueError('酷狗备用搜索失败')
+                songs = [{'hash':s['FileHash'],'songname':s.get('SongName') or s.get('FileName',''),'singername':s.get('SingerName',''),'album_name':s.get('AlbumName',''),'duration':s.get('Duration')} for s in data.get('data',{}).get('lists',[])]
+            return [Candidate(source=source, id=s['hash'], title=s.get('songname',''), artists=[a.strip() for a in re.split(r'[、/&;,，]+',s.get('singername','')) if a.strip()], album=s.get('album_name',''), duration_ms=round(s['duration']*1000) if s.get('duration') is not None else None) for s in songs]
         data = self.request(AMLL_BASE+'/api/search-lyrics', body={'query':query,'type':'all'})
         if not isinstance(data, list): raise ValueError('AMLL 搜索响应格式错误')
         result = []
@@ -110,12 +124,10 @@ class Sources:
             result.append(Candidate(source=source,id=f'{platform}:{file}',platform=platform,file=file,title=s.get('title') or (s.get('titles') or [query])[0],artists=s.get('artists') or [s.get('artist','')],album=(s.get('albums') or [''])[0]))
         return result
 
-    def resolve(self, candidate):
-        if candidate.source == 'qqmusic' and not candidate.songmid and candidate.songid:
-            data = self.request('https://u.y.qq.com/cgi-bin/musicu.fcg', body={'req_0':{'module':'music.pf_song_detail_svr','method':'get_song_detail_yqq','param':{'song_id':int(candidate.songid)}},'comm':{'format':'json','ct':24}})
-            mid = data.get('req_0',{}).get('data',{}).get('track_info',{}).get('mid')
-            if mid: return Candidate(**{**candidate.model_dump(), 'songmid': mid})
-        return candidate
+    def _qq_legacy(self, query):
+        data = self.request('https://c.y.qq.com/soso/fcgi-bin/search_for_qq_cp',params={'w':query,'n':30,'p':1,'format':'json','remoteplace':'txt.yqq.song','ct':24,'qqmusic_ver':'1298','platform':'yqq.json'})
+        if data.get('code',0) != 0: raise ValueError('QQ 备用搜索失败')
+        return data.get('data',{}).get('song',{}).get('list',[])
 
     def fetch(self, c):
         metadata = {k: v for k,v in {'title':[c.title] if c.title else [], 'artist':c.artists, 'album':[c.album] if c.album else []}.items() if v}
@@ -178,7 +190,4 @@ def build_sources_router(*, write, sources=None):
     @router.post('/fetch')
     def fetch(body: Candidate, _=Depends(write)):
         return invoke(body.source, lambda: sources.fetch(body))
-    @router.post('/resolve')
-    def resolve(body: Candidate, _=Depends(write)):
-        return invoke(body.source, lambda: sources.resolve(body).model_dump())
     return router

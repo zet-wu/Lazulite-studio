@@ -703,7 +703,6 @@
   "search.resultCount": "{{count}} 条",
   "search.duration": "{{seconds}} 秒",
   "search.sourceMismatch": "来源响应不一致",
-  "search.resolveFailed": "歌曲 ID 补查失败，可继续取词或重试",
   "search.emptyCandidate": "此候选没有可用歌词，仍可关联已确认的歌曲 ID",
   "search.noUsableLyrics": "此候选没有可用歌词",
   "search.noUsableText": "此候选没有可用正文",
@@ -1708,5 +1707,6 @@
   "sync.stop": "终止点",
   "sync.addStop": "开启终止点",
   "sync.removeStop": "关闭终止点",
-  "sync.singleKey": "单键打轴"
+  "sync.singleKey": "单键打轴",
+  "search.score": "匹配度 {{score}}%"
 }

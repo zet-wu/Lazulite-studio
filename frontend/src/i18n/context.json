@@ -4593,12 +4593,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "search.resolveFailed": {
-    "context": "search interface: search.resolveFailed",
-    "source": "歌曲 ID 补查失败，可继续取词或重试",
-    "params": [],
-    "parameterNotes": {}
-  },
   "search.emptyCandidate": {
     "context": "search interface: search.emptyCandidate",
     "source": "此候选没有可用歌词，仍可关联已确认的歌曲 ID",
@@ -11197,5 +11191,12 @@
     "source": "单键打轴",
     "context": "时间轴 Phase 6：桌面打轴风格、节奏点与终止点设置。",
     "params": []
+  },
+  "search.score": {
+    "source": "匹配度 {{score}}%",
+    "context": "歌词候选的元数据匹配分数，不按时长过滤。",
+    "params": [
+      "score"
+    ]
   }
 }

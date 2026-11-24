@@ -707,7 +707,6 @@
   "search.resultCount": "Results: {{count}}",
   "search.duration": "{{seconds}} seconds",
   "search.sourceMismatch": "The response does not match the requested source.",
-  "search.resolveFailed": "Song ID lookup failed. You can continue fetching lyrics or retry.",
   "search.emptyCandidate": "This candidate has no usable lyrics. You can still link its confirmed song ID.",
   "search.noUsableLyrics": "This candidate has no usable lyrics.",
   "search.noUsableText": "This candidate has no usable lyric text.",
@@ -1722,5 +1721,6 @@
   "sync.stop": "Stop checkpoint",
   "sync.addStop": "Enable stop checkpoint",
   "sync.removeStop": "Disable stop checkpoint",
-  "sync.singleKey": "Single-key timing"
+  "sync.singleKey": "Single-key timing",
+  "search.score": "Match {{score}}%"
 }
