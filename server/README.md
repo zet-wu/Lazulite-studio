@@ -32,11 +32,12 @@
 
 - **原曲内存代理**：原曲按需解码为 48 kHz 双声道 int16 PCM 与多级波形峰值，全部驻留内存供 `/audio`、`/waveform`、`/pcm`、`/audio-excerpt` 复用。听审端点校验当前源绑定与最多 30 秒的范围，将有界 PCM 切片重采样为 16 kHz 单声道 WAV，并通过响应头返回实际范围。页面通过 `media-users/{page_id}` 续租，最后一个页面和在途请求释放后自动回收内存。
 - **视频上传处理**：`upload_audio.py` 对视频上传提取第一条音轨，优先无损重封装，若容器时间轴不一致则回退为 24-bit FLAC，并校验解码后的播放时间轴一致。
+- **局部与全局对齐**：`alignment_projection.py` 按保存修订与可选 `scope_ids` 投影，局部范围覆盖跳过行并使用所选端点包络。人声／原曲与片段裁切独立配置，原曲关闭裁切时跳过分离；原生片段准备保留源音频时间坐标。预览令牌绑定修订、模型、文本处理选项与局部范围。
 - **人声与对齐**：人声统一编码为 M4A（AAC-LC）并记录有效采样帧数；`vocals.py` 复用单次 `build_activity_profile` 计算人声能量与片段。对齐与人声分离都在独立子进程中执行，设备探测结果在锁外按首选设备去重并缓存，取消状态通过内存 `Event` 即时通知。
 
 ## 注音、词典与字形
 
-- **日文注音与助词**：`reading.py` 复用 Sudachi 与按需懒加载的 JmdictFurigana 索引，提供整行读音分段与 `は`/`へ` 助词识别；第三方词典来源与许可见 [vendor/README.md](vendor/README.md)。
+- **日文注音与助词**：`reading.py` 复用 Sudachi 与按需懒加载的 JmdictFurigana 索引，提供整行读音分段与 `は`/`へ` 助词识别，`japanese_numbers.py` 生成半角／全角数字基数读音及可选量词音变；第三方词典来源与许可见 [vendor/README.md](vendor/README.md)。
 - **固定词典**：词典安装时在临时目录完成公开格式 v1 校验与压缩前缀树构建，原子发布后生效，最多保留两份活动内存索引，并在 `dictionaries/.indexes/` 维护受文件锁保护的运行期磁盘缓存（服务退出自动清理）。分析接口支持 NDJSON 流式进度（`stream=true`）。
 - **字形转换**：`shape_conversion.py` 调用原生 OpenCC 输出歧义候选，返回逐字素转换结果与 UTF-16 范围。
 

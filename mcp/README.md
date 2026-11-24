@@ -42,3 +42,5 @@ pnpm --dir mcp build
 ```sh
 node mcp/dist/server.mjs --transport stdio --data-dir path/to/data
 ```
+
+`preview_alignment` 与 `start_alignment` 接受相同的 `scope_ids` 以对齐选中的读音单元。启动参数的 `audio_source`（`vocals`／`original`）和 `crop_vocals` 分别控制波形来源与人声片段裁切；原曲关闭裁切时直接使用源音频。结果中的 `selection` 由共享领域合并逻辑约束更新范围。

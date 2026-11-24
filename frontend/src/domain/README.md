@@ -9,7 +9,7 @@
 
 ## 打轴、时间轴与声学
 
-- `sync-editing.ts`：从有效选区派生连续/本行打轴游标，处理空拍消耗与忽略打轴行。
+- `sync-editing.ts`：从有效选区派生连续/本行打轴游标，处理 SUG／AMLL 检查点、词内节奏点／空拍、终止点及忽略打轴行。
 - `timeline-editing.ts`、`timeline-projection.ts`、`pack-intervals.ts`、`active-lines.ts`：负责时间端点拖动、同行贴合叶子单元的原子边界联动及重合首尾注音保护、缩放吸附、单端未定对象的显示投影、分轨排布与播放头活动行快速查找。`WeakMap` 缓存与线性索引避免长文档上的重复扫描。
 - `spectrogram.ts`：预计算 1024 点 FFT 旋转因子、Hann 窗与对数频率映射表，以相邻频率 bin 幅值插值生成512×256强度瓦片；不足4秒的末片沿用固定时间采样网格，由渲染端裁掉未使用尾部。
 - `vocal-editing.ts`、`alignment.ts`：管理人声片段增删改与时间分配，以及自动对齐结果的范围校验、空隙合并与包络重算。
