@@ -5,7 +5,7 @@
 ## 歌词编辑与结构命令
 
 - `lyric-commands.ts`、`line-structure.ts`、`selection-editing.ts`：负责增删改、拆行、合行、合词、合注音、复制、字形替换、歌手管理与附属内容编辑，所有复合操作以单次原子事务提交并自动维护引用一致性。
-- `segmentation.ts`、`batch-editing.ts`、`translation-editing.ts`：提供按原文边界分词、时间偏移、相邻词边界平滑、批处理替换、清除注音/导唱符与翻译/音译轨道归轨。
+- `segmentation.ts`、`batch-editing.ts`、`translation-editing.ts`：提供按原文边界分词、时间偏移、消除相邻词间空隙、批处理替换、清除注音/导唱符与翻译/音译轨道归轨。
 
 ## 打轴、时间轴与声学
 

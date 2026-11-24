@@ -142,3 +142,18 @@ it('keeps project dialog writes locked while close remains available during alig
   expect(screen.queryByRole('dialog')).toBeNull();
   expect(apply).not.toHaveBeenCalled();
 });
+
+it('falls back to manual word splitting when automatic segmentation leaves one part', async()=>{
+  const apply=vi.fn();
+  const lyric=createLyricDocument('hello');
+  const view=render(<MemoryRouter><EditorWorkspace title="测试" document={lyric} project={createProjectDocument(lyric)} apply={apply} undo={()=>{}} redo={()=>{}} canUndo={false} canRedo={false} dirty={false} onSave={()=>{}}/></MemoryRouter>);
+  const word=view.container.querySelector<HTMLElement>('main [data-word-id]')!;fireEvent.click(word);fireEvent.keyDown(word,{key:'k',code:'KeyK'});
+  expect(await screen.findByRole('dialog',{name:'拆分词'})).toBeVisible();expect(apply).not.toHaveBeenCalled();
+});
+
+it.each([['きょう','batch'],['abc','split-ruby']])('routes K from the reading %s to %s', (reading,type)=>{
+  const lyric=createLyricDocument('字');lyric.lines[0].words[0].rubyUnits=[{id:'reading',reading,beginMs:null,endMs:null}];
+  const apply=vi.fn();const view=render(<MemoryRouter><EditorWorkspace title="测试" document={lyric} project={createProjectDocument(lyric)} apply={apply} undo={()=>{}} redo={()=>{}} canUndo={false} canRedo={false} dirty={false} onSave={()=>{}}/></MemoryRouter>);
+  const unit=view.container.querySelector<HTMLElement>('[data-ruby-id="reading"]')!;fireEvent.click(unit);fireEvent.keyDown(unit,{key:'k',code:'KeyK'});
+  expect(apply).toHaveBeenCalledOnce();expect(apply.mock.calls[0][0].type).toBe(type);
+});

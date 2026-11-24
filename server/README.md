@@ -38,7 +38,7 @@
 ## 注音、词典与字形
 
 - **日文注音与助词**：`reading.py` 复用 Sudachi 与按需懒加载的 JmdictFurigana 索引，提供整行读音分段与 `は`/`へ` 助词识别，`japanese_numbers.py` 生成半角／全角数字基数读音及可选量词音变；第三方词典来源与许可见 [vendor/README.md](vendor/README.md)。
-- **固定词典**：词典安装时在临时目录完成公开格式 v1 校验与压缩前缀树构建，原子发布后生效，最多保留两份活动内存索引，并在 `dictionaries/.indexes/` 维护受文件锁保护的运行期磁盘缓存（服务退出自动清理）。分析接口支持 NDJSON 流式进度（`stream=true`）。
+- **固定词典**：词典安装时在临时目录完成公开格式 v1 校验与扁平词形索引构建，原子发布后生效，最多保留两份活动内存索引，并在 `dictionaries/.indexes/` 维护受文件锁保护的运行期磁盘缓存（服务退出自动清理）。分析接口支持 NDJSON 流式进度（`stream=true`）。
 - **字形转换**：`shape_conversion.py` 调用原生 OpenCC 输出歧义候选，返回逐字素转换结果与 UTF-16 范围。
 
 ## 媒体打包与本机便携模式
