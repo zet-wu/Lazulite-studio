@@ -88,9 +88,12 @@ class SudachiReadingProposer:
                     raise ReadingUnavailable(f"日文读音资源不可用：{type(exc).__name__}: {exc}") from exc
             for line in lines:
                 line_id, text = line["id"], line["text"]
+                tokens = list(self._tokenizer.tokenize(text, self._mode))
+                token_ends = {token.end() for token in tokens}
                 number_ranges = []
                 matches = COUNTERS.finditer(text) if auto_merge else []
                 for match in matches:
+                    if match.end() not in token_ends: continue
                     suffix = re.sub(r'^[0-9０-９]+', '', match.group())
                     suffix_reading = ''.join(_hiragana(t.reading_form()) for t in self._tokenizer.tokenize(suffix, self._mode))
                     number_ranges.append((match.start(), match.end(), match.group(), counted(match.group(), suffix_reading)))
@@ -99,7 +102,7 @@ class SudachiReadingProposer:
                         number_ranges.append((match.start(), match.end(), match.group(), cardinal(match.group())))
                 output.extend(ReadingProposal(line_id, a, b, base, reading) for a,b,base,reading in number_ranges)
                 # Keep token reads and split(A) inside the tokenizer lock too.
-                for token in self._tokenizer.tokenize(text, self._mode):
+                for token in tokens:
                     segments = token_segments(token, self._furigana, self._mode_a, _hiragana)
                     for start, end, base, reading in segments:
                         if any(a < end and b > start for a,b,_,_ in number_ranges):
@@ -109,7 +112,10 @@ class SudachiReadingProposer:
                                 if any(x < b and y > a for x,y,_,_ in number_ranges):
                                     continue
                                 value = ''.join(_hiragana(t.reading_form()) for t in self._tokenizer.tokenize(match.group(), self._mode))
-                                output.append(ReadingProposal(line_id, a, b, match.group(), value))
+                                base_part = match.group()
+                                if not _contains_japanese(base_part) or not value or value == '*' or _hiragana(base_part) == value:
+                                    continue
+                                output.append(ReadingProposal(line_id, a, b, base_part, value))
                             continue
                         if not _contains_japanese(base) or not reading or reading == '*' or _hiragana(base) == reading:
                             continue
@@ -126,7 +132,7 @@ class ReadingUnavailable(RuntimeError):
 
 def propose_readings(lines: Sequence[Mapping[str, str]], proposer: ReadingProposer, auto_merge: bool = False) -> Sequence[ReadingProposal]:
     texts = {line['id']: line['text'] for line in lines}
-    proposals = proposer.propose(lines, auto_merge=auto_merge) if auto_merge else proposer.propose(lines)
+    proposals = proposer.propose(lines, auto_merge=auto_merge)
     for item in proposals:
         if item.line_id not in texts:
             raise ValueError('proposal line does not belong to snapshot')
@@ -161,14 +167,14 @@ class ReadingAnalysis(BaseModel):
     ranges: list[ReadingRange]
 
 
-def analyze_snapshot(body: JapaneseReadingSnapshot | ReadingSnapshot, proposer: ReadingProposer) -> ReadingAnalysis:
+def analyze_snapshot(body: JapaneseReadingSnapshot, proposer: ReadingProposer) -> ReadingAnalysis:
     """Analyze current text, with explicit empty readings for every uncovered range."""
     lines = [line.model_dump() for line in body.lines]
     if len({line.id for line in body.lines}) != len(lines):
         raise ValueError('行标识重复')
     if sum(len(line.text) for line in body.lines) > 1000000:
         raise ValueError('本次正文过长，请减少所选行')
-    proposals = propose_readings(lines, proposer, getattr(body, "auto_merge", False))
+    proposals = propose_readings(lines, proposer, body.auto_merge)
     by_line: dict[str, list[ReadingProposal]] = {}
     for p in proposals:
         by_line.setdefault(p.line_id, []).append(p)

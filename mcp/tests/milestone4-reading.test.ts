@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseProject, serializeProject } from '../../frontend/src/adapters/project-codec';
 import { createLine, createLyricDocument, createWord } from '../../frontend/src/domain/lyric-document';
 import { createProjectDocument, type ProjectDocument } from '../../frontend/src/domain/project-document';
@@ -126,15 +126,17 @@ describe('Milestone 4 reading & dictionary tools', () => {
     const { client } = createStatefulReadingClient(doc);
     const registry = createToolRegistry();
     const firstLineId = doc.lyrics.lines[0].id;
+    const analyze = vi.spyOn(client, 'analyzeJapaneseReading');
 
     const jaResult = (await registry.call(
       'analyze_japanese_reading',
-      { project_id: 'p1', line_ids: [firstLineId] },
+      { project_id: 'p1', line_ids: [firstLineId], auto_merge: true },
       { client },
     )) as {
       returned_lines: number;
       lines: Array<{ line_id: string; text: string; ranges: Array<{ base: string; reading: string }> }>;
     };
+    expect(analyze).toHaveBeenCalledWith([{id:firstLineId,text:'今日世界'}], true);
     expect(jaResult.returned_lines).toBe(1);
     expect(jaResult.lines[0].line_id).toBe(firstLineId);
     expect(jaResult.lines[0].ranges[0]).toMatchObject({ base: '今日', reading: 'きょう' });

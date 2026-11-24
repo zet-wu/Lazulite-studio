@@ -34,7 +34,7 @@ def cardinal(text: str) -> str:
     return ''.join(parts)
 
 
-COUNTERS = re.compile(r'[0-9０-９]+(?:か月|ヶ月|[人本匹杯分個回階歳才冊台枚年円月日時秒])')
+COUNTERS = re.compile(r'[0-9０-９]+(?:か月|ヶ月|ヵ月|[人本匹杯分個回階歳才冊台枚年円月日時秒])')
 
 
 def counted(text: str, suffix_reading: str) -> str:
@@ -52,7 +52,7 @@ def counted(text: str, suffix_reading: str) -> str:
     if suffix == '月':
         return {4:'し',7:'しち',9:'く'}.get(n, stem) + 'がつ'
     if suffix == '時':
-        return {4:'よ',7:'しち',9:'く'}.get(n, stem) + 'じ'
+        return (stem[:-2] + 'よ' if n % 10 == 4 else {7:'しち',9:'く'}.get(n, stem)) + 'じ'
     ending = n % 10
     if suffix in ('本', '匹', '杯', '分'):
         unvoiced, voiced, semi = {'本':('ほん','ぼん','ぽん'),'匹':('ひき','びき','ぴき'),'杯':('はい','ばい','ぱい'),'分':('ふん','ふん','ぷん')}[suffix]
@@ -60,17 +60,19 @@ def counted(text: str, suffix_reading: str) -> str:
             for old, new in [('いち','いっ'),('ろく','ろっ'),('はち','はっ'),('じゅう','じゅっ'),('ひゃく','ひゃっ'),('びゃく','びゃっ'),('ぴゃく','ぴゃっ')]:
                 if stem.endswith(old):
                     return stem[:-len(old)] + new + semi
+        if suffix in ('本', '匹', '杯') and stem.endswith('せん'):
+            return stem + voiced
         if ending == 3:
             return stem + (semi if suffix == '分' else voiced)
         return stem + (semi if suffix == '分' and ending == 4 else unvoiced)
-    if suffix in ('個','回','階','歳','才','冊','か月','ヶ月'):
+    if suffix in ('個','回','階','歳','才','冊','か月','ヶ月','ヵ月'):
         for old, new in [('いち','いっ'),('はち','はっ'),('じゅう','じゅっ')]:
             if stem.endswith(old):
                 stem = stem[:-len(old)] + new
                 break
-        if suffix in ('個','回','階','か月','ヶ月') and stem.endswith('ろく'):
+        if suffix in ('個','回','階','か月','ヶ月','ヵ月') and stem.endswith('ろく'):
             stem = stem[:-2] + 'ろっ'
-        reading = {'個':'こ','回':'かい','階':'かい','歳':'さい','才':'さい','冊':'さつ','か月':'かげつ','ヶ月':'かげつ'}[suffix]
+        reading = {'個':'こ','回':'かい','階':'かい','歳':'さい','才':'さい','冊':'さつ','か月':'かげつ','ヶ月':'かげつ','ヵ月':'かげつ'}[suffix]
         if suffix == '階' and ending == 3:
             reading = 'がい'
         return stem + reading

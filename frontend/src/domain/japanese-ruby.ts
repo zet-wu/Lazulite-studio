@@ -6,7 +6,7 @@ import { timeEnvelope, planWordMerge, type LyricCommand } from './lyric-commands
 import { makeRubyUnits, splitReadingMora } from './ruby-editing';
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-const han = /[\p{Script=Han}々〆0-9０-９]/u;
+const han = /[\p{Script=Han}々〆ヶヵ0-9０-９]/u;
 const length = (text: string) => Array.from(text).length;
 const slice = (text: string, start: number, end: number) => Array.from(text).slice(start, end).join('');
 export type ReadingSpan = Readonly<{ wordId: string; start: number; end: number }>;

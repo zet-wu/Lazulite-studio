@@ -520,11 +520,12 @@ export class StudioClient {
 
   analyzeJapaneseReading(
     lines: Array<{ id: string; text: string }>,
+    autoMerge = false,
   ): Promise<{ ranges: JapaneseReadingRange[] }> {
     return this.json('/reading/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lines }),
+      body: JSON.stringify({ lines, auto_merge: autoMerge }),
     });
   }
 

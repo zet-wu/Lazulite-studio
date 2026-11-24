@@ -16,8 +16,8 @@ def test_sudachi_uses_whole_word_and_code_point_offsets():
 
 
 def test_current_snapshot_analysis_has_no_project_dependency():
-    from server.reading import ReadingSnapshot, analyze_snapshot
-    body = ReadingSnapshot(lines=[{'id': 'main', 'text': '𝄞今日 食べる'}, {'id': 'bg', 'text': '魂'}])
+    from server.reading import JapaneseReadingSnapshot, analyze_snapshot
+    body = JapaneseReadingSnapshot(lines=[{'id': 'main', 'text': '𝄞今日 食べる'}, {'id': 'bg', 'text': '魂'}])
     result = analyze_snapshot(body, SudachiReadingProposer())
     assert [(r.base, r.reading) for r in result.ranges if r.reading] == [('今日', 'きょう'), ('食', 'た'), ('魂', 'たましい')]
     assert result.ranges[0].base == '𝄞'
@@ -27,14 +27,14 @@ def test_current_snapshot_analysis_has_no_project_dependency():
 
 def test_snapshot_rejects_duplicate_ids_and_surfaces_failure():
     import pytest
-    from server.reading import ReadingSnapshot, analyze_snapshot, ReadingUnavailable
+    from server.reading import JapaneseReadingSnapshot, analyze_snapshot, ReadingUnavailable
     with pytest.raises(ValueError, match='行标识重复'):
-        analyze_snapshot(ReadingSnapshot(lines=[{'id': 'a', 'text': '今日'}] * 2), SudachiReadingProposer())
+        analyze_snapshot(JapaneseReadingSnapshot(lines=[{'id': 'a', 'text': '今日'}] * 2), SudachiReadingProposer())
     class Unavailable:
-        def propose(self, lines):
+        def propose(self, lines, auto_merge=False):
             raise ReadingUnavailable('offline')
     with pytest.raises(ReadingUnavailable):
-        analyze_snapshot(ReadingSnapshot(lines=[{'id': 'a', 'text': '今日'}]), Unavailable())
+        analyze_snapshot(JapaneseReadingSnapshot(lines=[{'id': 'a', 'text': '今日'}]), Unavailable())
 
 
 def test_snapshot_http_real_sudachi_and_no_revision_write(tmp_path):
@@ -49,17 +49,17 @@ def test_snapshot_http_real_sudachi_and_no_revision_write(tmp_path):
 
 def test_shared_sudachi_accepts_concurrent_snapshot_requests():
     from concurrent.futures import ThreadPoolExecutor
-    from server.reading import ReadingSnapshot, analyze_snapshot
+    from server.reading import JapaneseReadingSnapshot, analyze_snapshot
     proposer = SudachiReadingProposer()
-    body = ReadingSnapshot(lines=[{'id': 'a', 'text': '今日、食べる、魂'}] )
+    body = JapaneseReadingSnapshot(lines=[{'id': 'a', 'text': '今日、食べる、魂'}] )
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = list(pool.map(lambda _: analyze_snapshot(body, proposer), range(32)))
     assert all(result == results[0] for result in results)
 
 
 def test_exact_furigana_and_consistent_a_on_current_text():
-    from server.reading import ReadingSnapshot, analyze_snapshot
-    result = analyze_snapshot(ReadingSnapshot(lines=[{'id': 'l', 'text': '夜空見上げて 今日 海原 微笑む'}]), SudachiReadingProposer())
+    from server.reading import JapaneseReadingSnapshot, analyze_snapshot
+    result = analyze_snapshot(JapaneseReadingSnapshot(lines=[{'id': 'l', 'text': '夜空見上げて 今日 海原 微笑む'}]), SudachiReadingProposer())
     assert [(r.base, r.reading) for r in result.ranges if r.reading] == [
         ('夜', 'よ'), ('空', 'ぞら'), ('見', 'み'), ('上', 'あ'),
         ('今日', 'きょう'), ('海原', 'うなばら'), ('微笑', 'ほほえ')]
@@ -129,11 +129,11 @@ def test_dictionary_load_accepts_replacement_content_and_rejects_bad_structure(t
 
 def test_proposer_range_boundary_rejects_mismatches_and_overlap():
     import pytest
-    from server.reading import ReadingProposal, ReadingSnapshot, analyze_snapshot
-    body = ReadingSnapshot(lines=[{'id':'l','text':'今日'}])
+    from server.reading import ReadingProposal, JapaneseReadingSnapshot, analyze_snapshot
+    body = JapaneseReadingSnapshot(lines=[{'id':'l','text':'今日'}])
     class Proposer:
         def __init__(self, items): self.items = items
-        def propose(self, lines): return self.items
+        def propose(self, lines, auto_merge=False): return self.items
     valid = ReadingProposal('l', 0, 2, '今日', 'きょう')
     for items in [[ReadingProposal('l',0,2,'昨日','きのう')], [valid,valid]]:
         with pytest.raises(ValueError): analyze_snapshot(body, Proposer(items))
@@ -160,3 +160,18 @@ def test_arabic_numbers_cardinals_and_counter_merge():
     assert merged['6匹'] == 'ろっぴき'
     assert merged['1人'] == 'ひとり' and merged['2人'] == 'ふたり'
     assert merged['20歳'] == 'はたち'
+
+def test_numeric_tokens_filter_remainder_and_respect_counter_boundaries():
+    from server.reading import JapaneseReadingSnapshot, analyze_snapshot
+    proposer = SudachiReadingProposer()
+    for merge in (False, True):
+        text = '1つ 100% 3-4 1ヶ月 1日本 3人間 14時 24時 1000本'
+        result = analyze_snapshot(JapaneseReadingSnapshot(lines=[{'id':'l','text':text}], auto_merge=merge), proposer)
+        assert ''.join(row.base for row in result.ranges) == text
+        readings = {row.base:row.reading for row in result.ranges if row.reading}
+        assert not any(base in readings for base in ('つ','%','-','1日','3人'))
+        if merge:
+            assert readings['1ヶ月'] == 'いっかげつ'
+            assert readings['14時'] == 'じゅうよじ'
+            assert readings['24時'] == 'にじゅうよじ'
+            assert readings['1000本'] == 'せんぼん'

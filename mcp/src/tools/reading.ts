@@ -496,10 +496,11 @@ export function registerReadingTools(registry: ToolRegistry): void {
         .min(1)
         .optional()
         .describe('Optional specific line IDs to analyze. When omitted, paginates using start_line and limit.'),
+      auto_merge: z.boolean().default(false).describe('Merge Arabic numbers with Japanese counters when proposing readings.'),
       start_line: z.number().int().min(1).default(1).describe('1-based starting line number when line_ids is omitted.'),
       limit: z.number().int().min(1).max(100).default(50).describe('Maximum number of lines to analyze (1-100).'),
     },
-    execute: async ({ project_id, line_ids, start_line, limit }, { client }) => {
+    execute: async ({ project_id, line_ids, start_line, limit, auto_merge }, { client }) => {
       const envelope = await client.getDocumentEnvelope(project_id);
       const doc = parseProject(envelope.document);
       const { totalLines, selected } = selectTargetLines(doc, line_ids, start_line, limit);
@@ -508,7 +509,7 @@ export function registerReadingTools(registry: ToolRegistry): void {
         .map(({ line }) => ({ id: line.id, text: lineText(line) }))
         .filter((item) => item.text.length > 0);
       const analysis = snapshotLines.length
-        ? await client.analyzeJapaneseReading(snapshotLines)
+        ? await client.analyzeJapaneseReading(snapshotLines, auto_merge)
         : { ranges: [] };
 
       const byLine = new Map<string, Array<{ base_start: number; base_end: number; base: string; reading: string }>>();

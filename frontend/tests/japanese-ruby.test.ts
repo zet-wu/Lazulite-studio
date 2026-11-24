@@ -140,3 +140,11 @@ it('accepts half/full width numeric blocks and merges counter readings only when
  const merged=proposeJapaneseRuby(d,[l.id],[{line_id:l.id,base_start:0,base_end:4,base:'３００本',reading:'さんびゃっぽん'}],true);
  expect(merged[0].blocks[0].spans).toHaveLength(2);
 });
+
+it.each(['1ヶ月','1ヵ月'])('anchors the merged counter %s without losing its reading',text=>{
+ const d=createLyricDocument(text),line=d.lines[0];
+ const rows=proposeJapaneseRuby(d,[line.id],[range(text,'いっかげつ',line.id)],true);
+ expect(rows[0].blocks.map(b=>b.reading).join('')).toBe('いっかげつ');
+ const result=executeLyricCommand(createLyricEditorState(d),japaneseRubyCommand(d,d,rows));
+ expect(result.present.lines[0].words.flatMap(w=>w.rubyUnits).map(r=>r.reading).join('')).toBe('いっかげつ');
+});
