@@ -372,6 +372,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 
 .karaokeBodySlot { max-width:100%; min-width:0; }
 .karaokeBodySlot:not(:has(.syncBody > *)) { display:none; }
+.syncLine[data-karaoke] .syncLineNumber { display: grid; grid-template-rows: 24px minmax(34px, auto); align-content: start; gap: 0; padding-top: 0; }
 .syncLine[data-karaoke] .syncRuby, .karaokeRubySlot { line-height:24px; }
 .karaokeRubySlot { font-size:14px; font-weight:600; --karaoke-slot-width:16px; }
 
