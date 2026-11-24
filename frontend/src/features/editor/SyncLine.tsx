@@ -58,8 +58,8 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
   const sug = syncStyle === 'sug';
   const units = line.words.flatMap<{id:string;beginMs:number|null;endMs:number|null;kind:'word'|'ruby'}>(word => word.rubyUnits.length ? word.rubyUnits.filter(unit => unit.reading.trim()).map(unit => ({...unit, kind:'ruby' as const})) : word.text.trim() ? [{...word,kind:'word' as const}] : []);
   const stopAt = (index: number) => editing.syncStops[units[index].id]?.stop ?? index === units.length - 1;
-  const ignored = presentation !== 'edit' && editing.ignoredSyncLineIds.includes(line.id);
-  const activeId = presentation !== 'edit' && !ignored && !progress.completed && cursor?.lineId === line.id ? cursor.rubyUnitId ?? cursor.wordId : null;
+  const ignored = presentation === 'sync' && editing.ignoredSyncLineIds.includes(line.id);
+  const activeId = presentation === 'sync' && !ignored && !progress.completed && cursor?.lineId === line.id ? cursor.rubyUnitId ?? cursor.wordId : null;
   const selected = (kind: EditorSelection['kind'], id: string) => selection?.kind === kind && selection.ids.includes(id);
   const chooseKey = (event: React.KeyboardEvent, choose: () => void, id?: string) => {
     if (event.target !== event.currentTarget) return;
@@ -67,7 +67,7 @@ export function SyncLine({ line, ordinal, gutterDigits, editing, selection, curs
     if (event.key === 'Enter') { event.preventDefault(); choose(); }
   };
   const markers = (id: string, kind: 'word' | 'ruby', participates: boolean, choose: () => void) => {
-    if (presentation === 'edit' || !participates) return null;
+    if (presentation !== 'sync' || !participates) return null;
     const index = units.findIndex(unit => unit.id === id), unit = units[index];
     const shared = index > 0 && (!sug || !stopAt(index - 1));
     const left = shared && units[index - 1].endMs !== null, right = unit.beginMs !== null;

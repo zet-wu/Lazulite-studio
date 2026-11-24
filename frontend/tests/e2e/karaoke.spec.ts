@@ -3,8 +3,9 @@ import {loadTimeline} from '../fixtures/timeline-setup';
 import { importLyrics } from '../fixtures/import-lyrics';
 const xml=`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:studio="urn:lazulite:studio:draft"><body><p xml:id="a" begin="4" end="7"><span studio:id="w" tts:ruby="container" begin="4" end="5"><span tts:ruby="base">愛</span><span tts:ruby="textContainer"><span studio:id="r1" tts:ruby="text" begin="4.2" end="4.3">あ</span><span studio:id="r2" tts:ruby="text" begin="4.9" end="5">い</span></span></span><span studio:id="b" begin="5.6" end="7">●</span></p><p xml:id="c" begin="10" end="11"><span studio:id="cw" begin="10" end="11">C</span></p></body></tt>`;
 async function load(page:import('@playwright/test').Page){await page.setViewportSize({width:1440,height:1000});await page.goto('/projects/sample-project/edit');await importLyrics(page,{name:'karaoke.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();}
-test('yellow slots insert once on double click, share cue properties and keep original literal circles',async({page})=>{
+test('yellow slots insert once on double click, share cue properties and keep original literal circles',async({page},info)=>{
  await load(page);
+ for(const theme of ['light','dark']){await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},theme);await page.screenshot({path:info.outputPath(`karaoke-${theme}.png`)});}
  await page.getByRole('button',{name:'插入行内导唱',exact:true}).dblclick();
  await expect(page.locator('main [data-cue-id]')).toHaveCount(1);
  await expect(page.getByLabel('导唱开始秒数')).toHaveValue('5');
@@ -73,7 +74,7 @@ test('singer marker drafts cancel locally and apply dependencies in one undo',as
  await page.getByRole('button',{name:'NicoKara 歌手标记管理',exact:true}).click();
  await expect(dialog.getByLabel('触发标记',{exact:true})).toHaveValue('【A】');await expect(dialog.getByRole('switch',{name:'NoDecor',exact:true})).toBeChecked();
 });
-test('wrapped multiline canvas keeps multi-character Ruby and editing above timing markers; normal sync stays unchanged',async({page})=>{
+test('compact karaoke keeps multiline Ruby and cue editing while returning to the sync layout',async({page})=>{
  await load(page);await page.setViewportSize({width:1000,height:1000});
  const source=xml.replace('</p><p xml:id="c"',Array.from({length:10},(_,i)=>`<span studio:id="more-${i}" begin="${8+i*2}" end="${9+i*2}">多个正文</span>`).join('')+'</p><p xml:id="c"').replace('end="7"><span','end="30"><span').replace('>あ<','>ながいよみ<');
  await importLyrics(page,{name:'wrapped.ttml',mimeType:'application/xml',buffer:Buffer.from(source)});await page.getByRole('button',{name:'打轴',exact:true}).click();
@@ -90,20 +91,20 @@ for(const mode of ['编辑','打轴','音频处理']) test(`timeline cue selecti
  await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
  const cue=page.getByRole('button',{name:'时间轴导唱 ●',exact:true});
  await page.locator('main [data-word-id="w"]').click();
- await page.getByRole('button',{name:mode,exact:true}).click();
+ await page.getByLabel('工作模式',{exact:true}).getByRole('button',{name:mode,exact:true}).click();
  await expect(cue).toHaveAttribute('aria-pressed','false');
  await cue.click({button:'right'});
  const menu=page.getByRole('menu',{name:'导唱操作'});
  await expect(menu.getByRole('menuitem')).toHaveCount(1);
  await expect(menu.getByRole('menuitem',{name:'删除导唱',exact:true})).toBeVisible();
  await expect(cue).toHaveAttribute('aria-pressed','true');
- await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
+ await expect(page.getByLabel('工作模式',{exact:true}).getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
  await page.keyboard.press('Escape');await expect(cue).toBeFocused();
  await page.keyboard.press('Shift+F10');await expect(menu).toBeVisible();
  await page.keyboard.press('Enter');await expect(cue).toHaveCount(0);
- await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
+ await expect(page.getByLabel('工作模式',{exact:true}).getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(cue).toHaveCount(1);
  await cue.click();await expect(cue).toHaveAttribute('aria-pressed','true');
- await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
- for(const key of ['Enter','Space']) {await cue.focus();await cue.press(key);await expect(cue).toHaveAttribute('aria-pressed','true');await expect(page.getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');}
+ await expect(page.getByLabel('工作模式',{exact:true}).getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
+ for(const key of ['Enter','Space']) {await cue.focus();await cue.press(key);await expect(cue).toHaveAttribute('aria-pressed','true');await expect(page.getByLabel('工作模式',{exact:true}).getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');}
 });

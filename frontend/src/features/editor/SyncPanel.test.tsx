@@ -92,6 +92,8 @@ it('line mode can navigate to a skipped row, but its unit stepping remains local
 });
 it('uses D presses for inner checkpoints and releases the final stop, carrying a shared start to its successor',()=>{
  const run=setup(false,true,false,'sug');
+ for(const code of ['KeyS','KeyF'])fireEvent.keyDown(window,{code});
+ expect(run.state().past).toHaveLength(0);
  const down=()=>fireEvent.keyDown(window,{code:'KeyD',key:'d'}),up=()=>fireEvent.keyUp(window,{code:'KeyD',key:'d'});
  down();up();expect(run.state().present.lyrics.lines[0].words[0].beginMs).toBe(1000);
  run.time(1200);down();up();run.time(1400);down();up();expect(run.progress().consumed).toBe(2);

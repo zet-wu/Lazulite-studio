@@ -730,8 +730,8 @@ function EditorWorkspaceContent(props: Props) {
     if (mode === 'sync' && (effective.kind === 'words' || effective.kind === 'ruby')) {
       actions.push(selectionAction(effective,'beat',t(syncStyle === 'sug' ? 'editor.addInnerBeats' : 'editor.addBeats')));
       const selectedUnits = stopUnits(document, editing, undefined, [], true).filter(unit => effective.ids.includes(effective.kind === 'words' ? unit.wordId : unit.rubyUnitId ?? ''));
-      const allStops = selectedUnits.every(unit => hasSyncStop(document, editing, unit));
-      actions.push({id:'sync-stop',label:t(allStops?'sync.removeStop':'sync.addStop'),disabled:!selectedUnits.length,run:()=>dispatch({type:'batch',commands:selectedUnits.map(unit=>({type:'set-sync-stop',id:unit.rubyUnitId??unit.wordId,kind:unit.rubyUnitId?'ruby':'word',stop:!allStops}))})});
+      const allStops = selectedUnits.length > 0 && selectedUnits.every(unit => hasSyncStop(document, editing, unit));
+      if (syncStyle === 'sug') actions.push({id:'sync-stop',label:t(allStops?'sync.removeStop':'sync.addStop'),disabled:!selectedUnits.length,run:()=>dispatch({type:'batch',commands:selectedUnits.map(unit=>({type:'set-sync-stop',id:unit.rubyUnitId??unit.wordId,kind:unit.rubyUnitId?'ruby':'word',stop:!allStops}))})});
     }
     if(effective.kind==='ruby'&&word) {
       title=t('editor.rubyActions');

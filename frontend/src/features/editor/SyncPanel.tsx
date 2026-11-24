@@ -57,17 +57,17 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
   const followingLine = () => { const at = units.findIndex((unit, position) => position > index && unit.lineId !== active?.lineId); if (at >= 0) moveTo(at); };
   const canStamp = (action: SyncAction) => !!transport && !!active && (action === 'start' || !completed);
   const stamp = (action: SyncAction) => {
-    if (!canStamp(action) || !active) return;
+    if (!canStamp(action)) return;
     const clock = transport?.current;
     if (!clock) return;
     const timeMs = Math.max(0, clock.getPositionMs() + Math.round(offsetMs));
-    if (action !== 'start' && (beginMs === null || !Number.isSafeInteger(beginMs) || beginMs < 0)) { setError(describeMessage('sync.startFirst')); return; }
+    if (action !== 'start' && beginMs === null) { setError(describeMessage('sync.startFirst')); return; }
     if (action === 'next' && emptyBeats < beatCount) { onProgress({ completed: false, consumed: emptyBeats + 1 }); setError(''); return; }
-    if (!apply({ type: 'sync-stamp', cursor: active, action, timeMs, mode: effectiveMode, lineOrder })) return;
+    if (!apply({ type: 'sync-stamp', cursor: active!, action, timeMs, mode: effectiveMode, lineOrder })) return;
     setError('');
     if (action === 'start') { onProgress({ completed: false, consumed: 0, ...(style === 'sug' ? {started:true} : {}) }); return; }
     const next = units[index + 1];
-    if (!next || effectiveMode === 'line' && next.lineId !== active.lineId) onProgress({ completed: true, consumed: 0 });
+    if (!next || effectiveMode === 'line' && next.lineId !== active!.lineId) onProgress({ completed: true, consumed: 0 });
     else moveTo(index + 1);
   };
   const sugStamp = (event: 'pressed' | 'released') => {
@@ -100,7 +100,7 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
     if (event.defaultPrevented || event.isComposing || event.repeat) return;
     if (shortcutInput(event.target, event.code)) return;
     const action = (['start', 'next', 'end', 'previous', 'following', 'previousLine', 'followingLine'] as const).find(action => matchesBinding(event, keys[action]));
-    if (!action) return;
+    if (!action || style === 'sug' && (action === 'start' || action === 'end')) return;
     if (event.target instanceof Element && event.target.closest('[data-transport]')
       && (!['start', 'next', 'end'].includes(action)
         || (['seekStart', 'seekEnd', 'seekBack', 'seekForward'] as const).some(key => matchesBinding(event, keys[key])))) return;
@@ -134,7 +134,7 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
     <div className={styles.syncButtons}>
       <button data-role="secondary" disabled={!canMoveUnit(index - 1)} onClick={() => moveUnit(index - 1)}>{t('sync.previousUnit')}</button>
       <button data-role="secondary" disabled={!units.slice(0, index).some((unit) => unit.lineId !== active?.lineId)} onClick={previousLine}>{t('sync.previousLine')}</button>
-      {style === 'sug' && <button data-role="primary" disabled={!transport || !active || completed} onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); sugStamp('pressed'); }} onPointerUp={() => sugStamp('released')} onPointerCancel={() => { heldKey.current = null; }} onKeyDown={event => { if (event.key === 'Enter' && !event.repeat) { event.preventDefault(); event.stopPropagation(); sugStamp('pressed'); } }} onKeyUp={event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); sugStamp('released'); } }}>{t('sync.singleKey')}</button>}
+      {style === 'sug' && <button data-role="primary" disabled={!transport || !active || completed} onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); sugStamp('pressed'); }} onPointerUp={() => sugStamp('released')} onKeyDown={event => { if (event.key === 'Enter' && !event.repeat) { event.preventDefault(); event.stopPropagation(); sugStamp('pressed'); } }} onKeyUp={event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); sugStamp('released'); } }}>{t('sync.singleKey')}</button>}
       {style === 'amll' && <><button data-role="secondary" disabled={!canStamp('start')} onClick={() => stamp('start')}>{t('sync.start')}</button>
       <button data-role="secondary" disabled={!canStamp('next')} onClick={() => stamp('next')}>{t('sync.step')}</button>
       <button data-role="secondary" disabled={!canStamp('end')} onClick={() => stamp('end')}>{t('sync.end')}</button></>}
