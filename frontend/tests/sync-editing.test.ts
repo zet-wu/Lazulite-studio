@@ -93,16 +93,15 @@ describe('E5 sync editing', () => {
   });
 });
 
-it('preserves line margins and its unchanged link, and limits line-mode successors atomically', () => {
+it('preserves line margins and limits line-mode successors atomically', () => {
   const document = createLyricDocument('one');
   const line = document.lines[0];
   line.beginMs = 0; line.endMs = 10000;
   line.words[0].beginMs = 2000; line.words[0].endMs = 8000;
   const next = createLine('two'); next.beginMs = 10000;
   document.lines.push(next);
-  const editing = createProjectEditing(); editing.endLinks[line.id] = next.id;
   const cursor = syncUnits(document)[0];
-  let state = createLyricEditorState(document, editing);
+  let state = createLyricEditorState(document);
   state = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 3000 });
   expect(state.present.lines[0]).toMatchObject({ beginMs: 0, endMs: 10000 });
   const before = state.present;
@@ -112,23 +111,4 @@ it('preserves line margins and its unchanged link, and limits line-mode successo
   expect(undoLyricCommand(state).present).toBe(before);
   const outside = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'end', timeMs: 12000, mode: 'line' }).present;
   expect(outside.lines[0]).toMatchObject({ beginMs: 0, endMs: 12000 });
-});
-
-it('updates incoming line links and rejects an excluded word without changing document or history', () => {
-  const document = createLyricDocument('source');
-  const source = document.lines[0];
-  source.beginMs = 0; source.endMs = 10000;
-  source.words[0].beginMs = 0; source.words[0].endMs = 8000;
-  const target = createLine('target'); target.beginMs = 10000; target.endMs = 20000;
-  target.words[0].beginMs = 12000; target.words[0].endMs = 18000;
-  const editing = createProjectEditing(); editing.endLinks[source.id] = target.id;
-  document.lines.push(target);
-  const state = createLyricEditorState(document, editing), cursor = syncUnits(document)[1];
-  const accepted = executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 9000 });
-  expect(accepted.present.lines[0]).toMatchObject({ endMs: 9000 });
-  expect(accepted.present.lines[1].beginMs).toBe(9000);
-  expect(undoLyricCommand(accepted).present).toBe(document);
-  expect(() => executeLyricCommand(state, { type: 'sync-stamp', cursor, action: 'start', timeMs: 7000 })).toThrow('sync.linkConflict');
-  expect(state.present).toBe(document); expect(state.past).toHaveLength(0);
-  expect(source.endMs).toBe(10000); expect(target.beginMs).toBe(10000);
 });

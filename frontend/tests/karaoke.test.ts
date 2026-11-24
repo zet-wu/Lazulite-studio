@@ -86,12 +86,12 @@ it('rejects the whole shift when only a before cue would become negative',()=>{
  const p=fixture();p.karaoke=autoInsertCues(p.lyrics,p.karaoke);const state=createProjectEditorState(p),before=structuredClone(state);
  expect(()=>executeProjectCommand(state,{type:'lyrics',command:{type:'shift-lines',lineIds:[p.lyrics.lines[0].id],deltaMs:-3500}})).toThrow('project.cueLocation');expect(state).toEqual(before);
 });
-it('linked end propagation does not shift cues of an unselected line',()=>{
+it('keeps cues of an unselected line untouched when shifting a following line',()=>{
  const p=fixture(), selected=p.lyrics.lines[0];p.karaoke=autoInsertCues(p.lyrics,p.karaoke);
- const previous=createLine('previous','previous');previous.beginMs=1000;previous.endMs=4000;Object.assign(previous.words[0],{beginMs:1000,endMs:2000});p.lyrics.lines.unshift(previous);p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);p.karaoke=insertCue(p.lyrics,p.karaoke,{kind:'before',lineId:previous.id});p.editing.endLinks.previous=selected.id;
+ const previous=createLine('previous','previous');previous.beginMs=1000;previous.endMs=4000;Object.assign(previous.words[0],{beginMs:1000,endMs:2000});p.lyrics.lines.unshift(previous);p.karaoke=reconcileKaraoke(p.lyrics,p.karaoke);p.karaoke=insertCue(p.lyrics,p.karaoke,{kind:'before',lineId:previous.id});
  const before=p.karaoke.cues.find(c=>c.anchor.lineId===previous.id)!;
  const next=executeProjectCommand(createProjectEditorState(p),{type:'lyrics',command:{type:'shift-lines',lineIds:[selected.id],deltaMs:500}}).present;
- expect(next.lyrics.lines[0].endMs).toBe(4500);expect(next.karaoke.cues.find(c=>c.id===before.id)).toEqual(before);
+ expect(next.karaoke.cues.find(c=>c.id===before.id)).toEqual(before);
 });
 it('persists output offsets in one history step and migrates or removes their identities',()=>{
  const p=fixture(),body=outputId('main'),track=outputId('main','translation','t');

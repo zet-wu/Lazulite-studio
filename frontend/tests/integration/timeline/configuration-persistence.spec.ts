@@ -17,7 +17,6 @@ test('project configuration survives actual save and reopen, with one undo and c
  expect(envelope.document.editing.emptyBeats).toEqual({ 'word-a': { kind:'word', count:1 } });
  expect(envelope.document.editing.ignoredSyncLineIds).toEqual(['a']);
  expect(envelope.document.lyrics.draftTtml).not.toMatch(/emptyBeat|ignoreSync|endLink/);
- envelope.document.editing.endLinks={a:'b'};
  const saved=await page.request.put(url,{ data:{schema_version:envelope.schema_version,project_id:envelope.project_id,revision:envelope.revision,document:envelope.document}, headers:{origin:'http://127.0.0.1:5175','if-match':before.headers().etag} });
  expect(saved.status(),await saved.text()).toBe(200);
  await page.reload(); await page.getByRole('button', { name: '打轴', exact: true }).click();

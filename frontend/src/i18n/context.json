@@ -5493,12 +5493,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "ruby.endLink": {
-    "context": "ruby interface: ruby.endLink",
-    "source": "行尾链接会受时间扩展影响，请先处理链接",
-    "params": [],
-    "parameterNotes": {}
-  },
   "ruby.stale": {
     "context": "ruby interface: ruby.stale",
     "source": "文档已变化，请重新生成提案",
@@ -5809,33 +5803,9 @@
     "params": [],
     "parameterNotes": {}
   },
-  "batch.selectLead": {
-    "context": "batch interface: batch.selectLead",
-    "source": "请先选择主行",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "batch.unlinked": {
-    "context": "batch interface: batch.unlinked",
-    "source": "已取消链接并保留当前结束时间",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "batch.noNextLead": {
-    "context": "batch interface: batch.noNextLead",
-    "source": "当前行后没有主行",
-    "params": [],
-    "parameterNotes": {}
-  },
   "batch.title": {
     "context": "batch interface: batch.title",
     "source": "批处理",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "batch.unlink": {
-    "context": "batch interface: batch.unlink",
-    "source": "取消链接",
     "params": [],
     "parameterNotes": {}
   },
@@ -5866,12 +5836,6 @@
   "batch.syncLine": {
     "context": "batch interface: batch.syncLine",
     "source": "同步行时间",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "batch.linkEnd": {
-    "context": "batch interface: batch.linkEnd",
-    "source": "结束时间链接",
     "params": [],
     "parameterNotes": {}
   },
@@ -5956,12 +5920,6 @@
   "batch.emptyDeletes": {
     "context": "batch interface: batch.emptyDeletes",
     "source": "空结果删除对应对象。",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "batch.linkHelp": {
-    "context": "batch interface: batch.linkHelp",
-    "source": "将当前主行的结束时间链接到下一主行的开始时间。",
     "params": [],
     "parameterNotes": {}
   },
@@ -6757,16 +6715,6 @@
       "count": "Item count used for grammatical plural selection."
     }
   },
-  "batch.linkSummary": {
-    "context": "batch interface: batch.linkSummary",
-    "source": "结束时间链接到下一行：{{text}}",
-    "params": [
-      "text"
-    ],
-    "parameterNotes": {
-      "text": "Original lyric, reading, guide, or entered text; preserve it."
-    }
-  },
   "batch.targetLines": {
     "context": "batch interface: batch.targetLines",
     "source": "目标：{{count}} 行",
@@ -6795,16 +6743,6 @@
     ],
     "parameterNotes": {
       "count": "Item count used for grammatical plural selection."
-    }
-  },
-  "batch.linkedHelp": {
-    "context": "batch interface: batch.linkedHelp",
-    "source": "当前行链接到 {{id}}；取消后保留当前结束时间。",
-    "params": [
-      "id"
-    ],
-    "parameterNotes": {
-      "id": "Stable object or account identifier; preserve it."
     }
   },
   "timeline.sourceUnknown": {
@@ -7639,12 +7577,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "command.endLinkExists": {
-    "context": "command interface: command.endLinkExists",
-    "source": "此行有行尾链接，请先处理",
-    "params": [],
-    "parameterNotes": {}
-  },
   "command.newLineId": {
     "context": "command interface: command.newLineId",
     "source": "新行 ID 无效",
@@ -7720,18 +7652,6 @@
   "command.segmentMissing": {
     "context": "command interface: command.segmentMissing",
     "source": "分词目标不存在",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "command.linkTarget": {
-    "context": "command interface: command.linkTarget",
-    "source": "只能链接到其他已定开始时间的主行",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "command.linkBeforeWords": {
-    "context": "command interface: command.linkBeforeWords",
-    "source": "目标行开始时间早于当前词结束时间",
     "params": [],
     "parameterNotes": {}
   },
@@ -8089,12 +8009,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "timeline.linkConflict": {
-    "context": "timeline interface: timeline.linkConflict",
-    "source": "时间修改与行尾链接冲突",
-    "params": [],
-    "parameterNotes": {}
-  },
   "timeline.lineMissing": {
     "context": "timeline interface: timeline.lineMissing",
     "source": "时间轴行已不存在",
@@ -8236,12 +8150,6 @@
   "batch.integerOffset": {
     "context": "batch interface: batch.integerOffset",
     "source": "时间偏移必须是整数毫秒",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "batch.linkExcludesWords": {
-    "context": "batch interface: batch.linkExcludesWords",
-    "source": "偏移后链接的行结束时间不能覆盖词块",
     "params": [],
     "parameterNotes": {}
   },
@@ -8431,12 +8339,6 @@
     "params": [],
     "parameterNotes": {}
   },
-  "editing.linkInvalid": {
-    "context": "editing interface: editing.linkInvalid",
-    "source": "行尾链接对象、关系或已求值时间无效",
-    "params": [],
-    "parameterNotes": {}
-  },
   "editing.replaceRubyBeats": {
     "context": "editing interface: editing.replaceRubyBeats",
     "source": "替换注音会丢失空拍归属，请先清除原注音空拍",
@@ -8452,12 +8354,6 @@
   "editing.removeRubyBeats": {
     "context": "editing interface: editing.removeRubyBeats",
     "source": "移除注音会丢失或覆盖空拍，请先调整注音空拍",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "editing.linkTiming": {
-    "context": "editing interface: editing.linkTiming",
-    "source": "时间修改使行尾链接排除已有词或早于行起点",
     "params": [],
     "parameterNotes": {}
   },
@@ -8584,12 +8480,6 @@
   "sync.endBeforeStart": {
     "context": "sync interface: sync.endBeforeStart",
     "source": "结束轴不能早于起始轴",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "sync.linkConflict": {
-    "context": "sync interface: sync.linkConflict",
-    "source": "打轴会使关联行终点早于行起点或排除已有词，请先处理行尾链接",
     "params": [],
     "parameterNotes": {}
   },
@@ -9404,12 +9294,6 @@
   "command.lineExcludesWord": {
     "context": "command interface: command.lineExcludesWord",
     "source": "行时间不能排除所属词",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "command.linkBeforeWordsEnglish": {
-    "context": "command interface: command.linkBeforeWordsEnglish",
-    "source": "链接行的结束不能早于所属词",
     "params": [],
     "parameterNotes": {}
   },
@@ -10955,12 +10839,6 @@
   "timeline.clearTimes": {
     "context": "Clear the selected lyric units own times; related end links must be removed explicitly",
     "source": "清空时间",
-    "params": [],
-    "parameterNotes": {}
-  },
-  "timeline.clearLinked": {
-    "context": "Clear the selected lyric units own times; related end links must be removed explicitly",
-    "source": "请先解除相关行尾链接，再清空时间。",
     "params": [],
     "parameterNotes": {}
   },

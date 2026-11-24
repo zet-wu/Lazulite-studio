@@ -1,14 +1,13 @@
 import { message, MessageError } from './messages';
-import type { LyricDocument, LyricLine } from './lyric-document';
+import type { LyricDocument } from './lyric-document';
 
 /** Project-only editing data. Never encoded in a lyric or a TTML node. */
 export type ProjectEditing = {
   emptyBeats: Record<string, { kind: 'word' | 'ruby'; count: number }>;
   skippedAlignmentLineIds: string[];
   ignoredSyncLineIds: string[];
-  endLinks: Record<string, string>;
 };
-export const createProjectEditing = (): ProjectEditing => ({ emptyBeats: {}, skippedAlignmentLineIds: [], ignoredSyncLineIds: [], endLinks: {} });
+export const createProjectEditing = (): ProjectEditing => ({ emptyBeats: {}, skippedAlignmentLineIds: [], ignoredSyncLineIds: [] });
 export const emptyBeatCount = (editing: ProjectEditing, id: string) => editing.emptyBeats[id]?.count ?? 0;
 export function setEmptyBeat(editing: ProjectEditing, id: string, kind: 'word' | 'ruby', count: number) {
   if (!Number.isSafeInteger(count) || count < 0 || count > 32) throw new MessageError(message('editing.beatCount'));
@@ -17,14 +16,12 @@ export function setEmptyBeat(editing: ProjectEditing, id: string, kind: 'word' |
 }
 
 export function validateProjectEditing(document: LyricDocument, editing: ProjectEditing) {
-  if (!editing || typeof editing !== 'object' || !editing.emptyBeats || Array.isArray(editing.emptyBeats) || !Array.isArray(editing.skippedAlignmentLineIds) || !Array.isArray(editing.ignoredSyncLineIds) || !editing.endLinks || Array.isArray(editing.endLinks)
-    || Object.keys(editing).some(key => !['emptyBeats', 'ignoredSyncLineIds', 'skippedAlignmentLineIds', 'endLinks'].includes(key))) throw new MessageError(message('editing.configInvalid'));
+  if (!editing || typeof editing !== 'object' || !editing.emptyBeats || Array.isArray(editing.emptyBeats) || !Array.isArray(editing.skippedAlignmentLineIds) || !Array.isArray(editing.ignoredSyncLineIds)
+    || Object.keys(editing).some(key => !['emptyBeats', 'ignoredSyncLineIds', 'skippedAlignmentLineIds'].includes(key))) throw new MessageError(message('editing.configInvalid'));
   const objects = new Map<string, 'line' | 'word' | 'ruby'>();
-  const lineById = new Map<string, LyricLine>();
   const add = (id: string, kind: 'line' | 'word' | 'ruby') => { if (!id || objects.has(id)) throw new MessageError(message('editing.objectIdInvalid')); objects.set(id, kind); };
   for (const line of document.lines) {
     add(line.id, 'line');
-    lineById.set(line.id, line);
     for (const word of line.words) { add(word.id, 'word'); for (const ruby of word.rubyUnits) add(ruby.id, 'ruby'); }
   }
   for (const [id, value] of Object.entries(editing.emptyBeats)) {
@@ -32,11 +29,6 @@ export function validateProjectEditing(document: LyricDocument, editing: Project
   }
   if (new Set(editing.ignoredSyncLineIds).size !== editing.ignoredSyncLineIds.length || editing.ignoredSyncLineIds.some(id => objects.get(id) !== 'line')) throw new MessageError(message('editing.skipTimingInvalid'));
   if (new Set(editing.skippedAlignmentLineIds).size !== editing.skippedAlignmentLineIds.length || editing.skippedAlignmentLineIds.some(id => objects.get(id) !== 'line')) throw new MessageError(message('editing.skipAlignmentInvalid'));
-  for (const [id, targetId] of Object.entries(editing.endLinks)) {
-    const line = lineById.get(id), target = lineById.get(targetId);
-    if (!line || !target || line === target || line.backgroundOf || target.backgroundOf || target.beginMs === null || line.endMs !== target.beginMs
-      || line.beginMs !== null && line.beginMs > line.endMs! || line.words.some(word => word.endMs !== null && word.endMs > line.endMs!)) throw new MessageError(message('editing.linkInvalid'));
-  }
 }
 
 /** Called within the same transaction, before commit; never an effect or save repair. */
@@ -64,7 +56,6 @@ export function reconcileEditing(before: LyricDocument, after: LyricDocument, ed
   for (const [id, value] of Object.entries(editing.emptyBeats)) if (!(value.kind === 'word' ? words.has(id) : rubies.has(id))) delete editing.emptyBeats[id];
   editing.skippedAlignmentLineIds = editing.skippedAlignmentLineIds.filter(id => lines.has(id));
   editing.ignoredSyncLineIds = editing.ignoredSyncLineIds.filter(id => lines.has(id));
-  for (const [id, target] of Object.entries(editing.endLinks)) if (!lines.has(id) || !lines.has(target)) delete editing.endLinks[id];
 }
 
 export function remapEditing(source: ProjectEditing, ids: Map<string, string>): ProjectEditing {
@@ -72,23 +63,7 @@ export function remapEditing(source: ProjectEditing, ids: Map<string, string>): 
     emptyBeats: Object.fromEntries(Object.entries(source.emptyBeats).filter(([id]) => ids.has(id)).map(([id, value]) => [ids.get(id)!, value])),
     skippedAlignmentLineIds: source.skippedAlignmentLineIds.filter(id => ids.has(id)).map(id => ids.get(id)!),
     ignoredSyncLineIds: source.ignoredSyncLineIds.filter(id => ids.has(id)).map(id => ids.get(id)!),
-    endLinks: Object.fromEntries(Object.entries(source.endLinks).filter(([id, target]) => ids.has(id) && ids.has(target)).map(([id, target]) => [ids.get(id)!, ids.get(target)!])),
   };
-}
-
-export function followChangedEndLinks(before: LyricDocument, after: LyricDocument, editing: ProjectEditing): LyricDocument {
-  const beforeById = new Map(before.lines.map(line => [line.id, line]));
-  const changedStarts = new Map(after.lines.filter(line => beforeById.get(line.id)?.beginMs !== line.beginMs).map(line => [line.id, line.beginMs]));
-  let changed = false;
-  const lines = after.lines.map(line => {
-    const target = editing.endLinks[line.id];
-    if (!target || !changedStarts.has(target)) return line;
-    const endMs = changedStarts.get(target)!;
-    if (endMs === null || line.beginMs !== null && line.beginMs > endMs || line.words.some(word => word.endMs !== null && word.endMs > endMs)) throw new MessageError(message('editing.linkTiming'));
-    if (line.endMs === endMs) return line;
-    changed = true; return { ...line, endMs };
-  });
-  return changed ? { ...after, lines } : after;
 }
 
 export type BackgroundDefaults = { skipAlignment: boolean; skipSync: boolean };

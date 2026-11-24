@@ -64,19 +64,16 @@ describe('word and Ruby merges', () => {
   });
 });
 
-it('splits into three segments retaining original units, links, independent attached times and atomic history', () => {
+it('splits into three segments retaining original units, independent attached times and atomic history', () => {
   const { document, line } = fixture();
   line.beginMs = 500; line.endMs = 5000;
   line.words.forEach((word, i) => { word.beginMs = 1000 + i * 900; word.endMs = 2400 + i * 700; });
-  const editing = createProjectEditing(); editing.endLinks[line.id] = 'next';
   document.lines.push({ ...createLine('', 'bg'), backgroundOf: line.id, beginMs: 200, endMs: 9000 }, { ...createLine('', 'next'), beginMs: 5000 });
   document.romanizationTracks = [{ id: 'r', language: 'ja-Latn', contents: [{ id: 'rc', lineId: line.id, kind: 'timed', units: [{ id: 'ru', text: ' ima ', beginMs: 300, endMs: 8000 }] }] }];
   document.translationTracks = [{ id: 't', language: 'en', purpose: 'subtitle', contents: [{ id: 'tc', lineId: line.id, kind: 'plain', text: ' now ' }] }];
-  const state = executeLyricCommand(createLyricEditorState(document, editing), { type: 'split-line', lineId: line.id, beforeWordIds: ['w3', 'w1'], newLineIds: ['part2', 'part3'], translationTargets: { tc: 1 }, contentTargets: { rc: 2 }, backgroundTargets: { bg: 2 } });
+  const state = executeLyricCommand(createLyricEditorState(document), { type: 'split-line', lineId: line.id, beforeWordIds: ['w3', 'w1'], newLineIds: ['part2', 'part3'], translationTargets: { tc: 1 }, contentTargets: { rc: 2 }, backgroundTargets: { bg: 2 } });
   expect(state.present.lines.slice(0, 3).map(item => [item.beginMs, item.endMs])).toEqual([[1000, 2400], [1900, 3800], [3700, 4500]]);
   expect(state.present.lines.slice(0, 3).flatMap(item => item.words)).toEqual(line.words);
-  expect(state.editing.endLinks[state.present.lines[0].id]).toBeUndefined(); expect(state.editing.endLinks[state.present.lines[1].id]).toBeUndefined();
-  expect(state.editing.endLinks[state.present.lines[2].id]).toBeUndefined();
   expect(state.present.lines[3]).toEqual({ ...document.lines[1], backgroundOf: 'part3' });
   expect(state.present.romanizationTracks[0].contents[0]).toEqual({ ...document.romanizationTracks[0].contents[0], lineId: 'part3' });
   expect(state.present.translationTracks[0].contents[0]).toEqual({ ...document.translationTracks[0].contents[0], lineId: 'part2' });
@@ -140,13 +137,24 @@ it('splits a 1ms reversed punctuation boundary by word envelope without changing
   expect(undoLyricCommand(result).present).toBe(document);
 });
 
-it('freezes incoming links when the first start changes and leaves fully unknown split times unknown', () => {
+it('leaves fully unknown split times unknown and assigns translations with romanization and background', () => {
   const { document, line } = fixture();
   line.beginMs = 1000; line.endMs = 5000;
-  document.lines.unshift({ ...createLine('', 'incoming'), beginMs: 0, endMs: 1000 });
-  const editing = createProjectEditing(); editing.endLinks.incoming = line.id;
-  const result = executeLyricCommand(createLyricEditorState(document, editing), { type: 'split-line', lineId: line.id, beforeWordIds: ['w2'], newLineIds: ['new'], translationTargets: {}, contentTargets: {}, backgroundTargets: {} });
-  expect(result.present.lines[0]).toMatchObject({ endMs: 1000 });
-  expect(result.present.lines.slice(1).map(item => [item.beginMs, item.endMs])).toEqual([[null, null], [null, null]]);
+  document.translationTracks = [
+    { id: 't1', language: 'en', purpose: 'subtitle', contents: [{ id: 'translation-4196', lineId: line.id, kind: 'plain', text: 'one' }] },
+    { id: 't2', language: 'zh-Hans', purpose: 'subtitle', contents: [{ id: 'translation-4229', lineId: line.id, kind: 'plain', text: '二' }] },
+    { id: 't3', language: 'ja', purpose: 'subtitle', contents: [{ id: 'translation-4265', lineId: line.id, kind: 'plain', text: '三' }] },
+  ];
+  document.lines.push({ ...createLine('声', 'bg'), backgroundOf: line.id });
+  document.romanizationTracks = [{ id: 't', language: 'ja-Latn', contents: [{ id: 'r', lineId: line.id, kind: 'plain', text: 'a' }] }];
+  const state = createLyricEditorState(document);
+  const result = executeLyricCommand(state, { type: 'split-line', lineId: line.id, beforeWordIds: ['w1'], newLineIds: ['new'], contentTargets: { r: 1 }, translationTargets: { 'translation-4196': 0, 'translation-4229': 1, 'translation-4265': 1 }, backgroundTargets: { bg: 1 } });
+  expect(result.present.lines.slice(0, 2).map(item => [item.beginMs, item.endMs])).toEqual([[null, null], [null, null]]);
+  expect(result.present.lines[2].backgroundOf).toBe('new');
+  expect(result.present.romanizationTracks[0].contents[0].lineId).toBe('new');
+  expect(result.present.translationTracks[0].contents[0].lineId).toBe(line.id);
+  expect(result.present.translationTracks[1].contents[0].lineId).toBe('new');
+  expect(result.present.translationTracks[2].contents[0].lineId).toBe('new');
+  expect(() => executeLyricCommand(state, { type: 'split-line', lineId: line.id, beforeWordIds: ['w1'], newLineIds: ['new'], contentTargets: { r: 0 }, translationTargets: { missing: 1 }, backgroundTargets: { bg: 0 } })).toThrow('split.assignmentMissing');
   expect(undoLyricCommand(result).present).toBe(document);
 });

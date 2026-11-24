@@ -55,7 +55,7 @@ function RubyProposalRows({ rows, renderRow, navigation }: {
         if (virtualized) { virtualizer.measureElement(node); virtualizer.scrollToIndex(index, { align: 'center' }); }
         measured = true; frame = requestAnimationFrame(locate); return;
       }
-      const control = node.querySelector<HTMLElement>(issue.kind === 'target' ? 'select' : issue.kind === 'link' ? '[data-ruby-source]' : 'input:not([type="checkbox"])');
+      const control = node.querySelector<HTMLElement>(issue.kind === 'target' ? 'select' : 'input:not([type="checkbox"])');
       node.scrollIntoView({ block: 'nearest' });
       control?.focus({ preventScroll: true });
       completedNavigation.current = navigation;
@@ -163,7 +163,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
             <div className={styles.rubySource} data-ruby-source tabIndex={0} aria-describedby={descriptionId}>
               <small>{lineLabel(line.id)}</small><strong>{row.sourceText}</strong>
             </div>
-            <label>{t('ruby.targetWord')}<Select aria-label={t('ruby.targetWord')} value={selected} quotes={Object.fromEntries(line.words.map((word, index) => [word.id, { prefix: `${index + 1} · `, text: word.text }]))} data-attention={attention(['target', 'link', 'overwrite']) || undefined} aria-invalid={invalid(['target'])} aria-describedby={descriptionId} disabled={skipped.has(row.key)} onChange={(event) => { const nextWordId = event.target.value || null;
+            <label>{t('ruby.targetWord')}<Select aria-label={t('ruby.targetWord')} value={selected} quotes={Object.fromEntries(line.words.map((word, index) => [word.id, { prefix: `${index + 1} · `, text: word.text }]))} data-attention={attention(['target', 'overwrite']) || undefined} aria-invalid={invalid(['target'])} aria-describedby={descriptionId} disabled={skipped.has(row.key)} onChange={(event) => { const nextWordId = event.target.value || null;
                 setSkipOverrides(current => Object.fromEntries(Object.entries(current).filter(([key]) => {
                   const affected = rows.find(item => item.key === key)!;
                   return affected.lineId !== row.lineId || affected.wordId !== row.wordId && affected.wordId !== nextWordId;
@@ -171,7 +171,7 @@ export function RubyGenerationDialog({ document, lineIds, initialTrackId, initia
                 setAssignments((current) => ({ ...current, [row.key]: nextWordId })); setReadings((current) => { const next = { ...current }; delete next[row.key]; return next; }); }}>
               <option value="">{t('ruby.manualAssignment')}</option>{line.words.map((word, index) => <option key={word.id} value={word.id}>{index + 1} · {word.text}{row.candidates.includes(word.id) ? t('ruby.overlapSuffix') : ''}</option>)}
             </Select></label>
-            <label>{t('ruby.targetReading')}<input aria-describedby={descriptionId} aria-invalid={invalid(['reading'])} data-attention={attention(['reading', 'kana-difference', 'link', 'overwrite']) || undefined} value={readings[row.key] ?? row.reading ?? ''} disabled={skipped.has(row.key)} onChange={(event) => setReadings((current) => ({ ...current, [row.key]: event.target.value }))} /></label>
+            <label>{t('ruby.targetReading')}<input aria-describedby={descriptionId} aria-invalid={invalid(['reading'])} data-attention={attention(['reading', 'kana-difference', 'overwrite']) || undefined} value={readings[row.key] ?? row.reading ?? ''} disabled={skipped.has(row.key)} onChange={(event) => setReadings((current) => ({ ...current, [row.key]: event.target.value }))} /></label>
             <label><input type="checkbox" checked={skipped.has(row.key)} onChange={(event) => setSkipOverrides(current => ({ ...current, [row.key]: event.target.checked }))} /> {t('ruby.skip')}</label>
           </Tooltip>;
         }} />

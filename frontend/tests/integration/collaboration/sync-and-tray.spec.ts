@@ -12,7 +12,7 @@ test('real SSE syncs external edits when clean, warns when dirty without layout 
     karaoke: { ...initial.document.karaoke, lineGroups: { a: 'main' }, cues: [] },
     lyrics: { draftTtml: baseXml },
     lineOrder: [],
-    editing: { emptyBeats: {}, ignoredSyncLineIds: [], skippedAlignmentLineIds: [], endLinks: {} },
+    editing: { emptyBeats: {}, ignoredSyncLineIds: [], skippedAlignmentLineIds: [] },
     acoustics: { analysisId: null, segments: [] },
   };
   const reset = await page.request.put(docUrl, {
@@ -91,7 +91,7 @@ test('recovers unacknowledged background alignment result across reload and prev
     karaoke: { ...initial.document.karaoke, lineGroups: { l1: 'main' }, cues: [] },
     lyrics: { draftTtml: baseXml },
     lineOrder: [],
-    editing: { emptyBeats: {}, ignoredSyncLineIds: [], skippedAlignmentLineIds: [], endLinks: {} },
+    editing: { emptyBeats: {}, ignoredSyncLineIds: [], skippedAlignmentLineIds: [] },
     acoustics: { analysisId: null, segments: [] },
   };
   const reset = await page.request.put(docUrl, {

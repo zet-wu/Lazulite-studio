@@ -71,11 +71,11 @@ it.each([false,true])('uses continuous coverage of the adopted acoustic snapshot
 it('keeps rows separate and skipped rows and independent tracks protected',()=>{
  const p=fixture();p.lyrics.lines.push(createLine('え','b'),createLine('お','skip'));
  p.lyrics.lines[1].words.push(createLine('か','temp').words[0]);p.lyrics.lines[1].backgroundOf='a';
- p.editing.skippedAlignmentLineIds=['skip'];Object.assign(p.lyrics.lines[2],{beginMs:1000,endMs:2000});p.editing.endLinks={skip:'a'};
+ p.editing.skippedAlignmentLineIds=['skip'];Object.assign(p.lyrics.lines[2],{beginMs:1000,endMs:2000});
  p.lyrics.translationTracks=[{id:'t',language:'en',purpose:'subtitle',contents:[{id:'tc',lineId:'a',kind:'timed',units:[{id:'tu',text:'hi',beginMs:100,endMs:900}]}]}];
  const r=result(p,[[1,2],[2.2,3],[3.2,4],[4.1,5],[5.2,6]]),m=mergeAlignment(p,r,10000,true,500);
  expect(m.mergedGaps).toBe(3);expect(m.project.lyrics.lines[0].endMs).toBe(4000);expect(m.project.lyrics.lines[1].words[0].endMs).toBe(5200);
- expect(m.project.lyrics.lines[2]).toEqual(p.lyrics.lines[2]);expect(m.project.lyrics.translationTracks).toEqual(p.lyrics.translationTracks);expect(m.project.editing.endLinks).toEqual({});
+ expect(m.project.lyrics.lines[2]).toEqual(p.lyrics.lines[2]);expect(m.project.lyrics.translationTracks).toEqual(p.lyrics.translationTracks);
 });
 it('does not treat a broken mapping as a transparent separator',()=>{
  const p=fixture(),r=result(p,[[1,2],[2.1,2.2],[2.3,3]]);r.mapping.splice(1,1);r.alignment.units.splice(1,1);

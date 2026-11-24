@@ -149,7 +149,7 @@ describe('注音 candidate tolerance and grouped defaults', () => {
   });
 });
 
-it('automatic expansion retains link, assignment, reading and empty-generation guards', () => {
+it('automatic expansion retains assignment, reading and empty-generation guards', () => {
   const document = createLyricDocument('粉'), line = document.lines[0];
   line.beginMs = 1000; line.endMs = 2000;
   Object.assign(line.words[0], { beginMs: 1000, endMs: 2000 });
@@ -158,8 +158,6 @@ it('automatic expansion retains link, assignment, reading and empty-generation g
   expect(() => rubyGenerationCommand(document, document, rows, {}, new Set([rows[0].key]), new Set())).toThrow('ruby.noChanges');
   expect(() => rubyGenerationCommand(document, document, [{ ...rows[0], wordId: null }], {}, new Set(), new Set())).toThrow('ruby.targetRequired');
   expect(() => rubyGenerationCommand(document, document, [{ ...rows[0], reading: null }], {}, new Set(), new Set())).toThrow('ruby.readingRequired');
-  const editing = createProjectEditing(); editing.endLinks[line.id] = 'next';
-  expect(() => rubyGenerationCommand(document, document, rows, {}, new Set(), new Set(), editing)).toThrow('ruby.endLink');
   expect(line.beginMs).toBe(1000); expect(line.words[0].rubyUnits).toHaveLength(0);
 });
 
@@ -223,15 +221,14 @@ describe('structured reverse-ruby issues', () => {
       expect(issues({ 'c:a': reading, 'c:b': 'ー' })).toHaveLength(difference ? 1 : 0);
     }
   });
-  it('collects target, reading, overwrite and link errors without stale conversion gates', () => {
+  it('collects target, reading and overwrite errors without stale conversion gates', () => {
     const { document, line, rows, issues, editing } = fixture();
     rows[0].reading = null; rows[0].conversionIssue = 'ruby.groupConversion';
     expect(issues().map(issue => issue.kind)).toEqual(['reading']);
     expect(issues({ 'c:a': 'か', 'c:b': 'な' })).toEqual([]);
     line.words[0].rubyUnits = [{ id: 'old', reading: 'か', beginMs: 0, endMs: 1000 }];
-    editing.endLinks[line.id] = 'next'; rows[1].endMs = 1001;
     const result = issues();
-    expect(result.map(issue => issue.kind)).toEqual(['reading', 'overwrite', 'link']);
+    expect(result.map(issue => issue.kind)).toEqual(['reading', 'overwrite']);
     const skipped = new Set(rows.map(row => row.key));
     expect(issues({}, skipped)).toEqual([]);
     rows[0].wordId = null;

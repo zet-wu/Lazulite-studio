@@ -12,22 +12,15 @@ const shifted = (value: TimeMs, delta: number): TimeMs => {
   return result;
 };
 
-export function shiftLineTimes(document: LyricDocument, lineIds: string[], deltaMs: number, editing = createProjectEditing()): LyricCommand {
+export function shiftLineTimes(document: LyricDocument, lineIds: string[], deltaMs: number, _editing = createProjectEditing()): LyricCommand {
   if (!Number.isSafeInteger(deltaMs)) throw new MessageError(message('batch.integerOffset'));
   const selected = new Set(lineIds);
-  const shiftedLines = document.lines.map((line): LyricLine => {
+  const lines = document.lines.map((line): LyricLine => {
     if (!selected.has(line.id)) return line;
     return { ...line, beginMs: shifted(line.beginMs, deltaMs), endMs: shifted(line.endMs, deltaMs),
       words: line.words.map((word): LyricWord => ({ ...word, beginMs: shifted(word.beginMs, deltaMs), endMs: shifted(word.endMs, deltaMs),
         rubyUnits: word.rubyUnits.map((unit): RubyUnit => ({ ...unit, beginMs: shifted(unit.beginMs, deltaMs), endMs: shifted(unit.endMs, deltaMs) })),
       })) };
-  });
-  const lines = shiftedLines.map((line) => {
-    if (!editing.endLinks[line.id]) return line;
-    const target = shiftedLines.find((item) => item.id === editing.endLinks[line.id])!;
-    const endMs = target.beginMs;
-    if (endMs === null || line.beginMs !== null && endMs < line.beginMs || line.words.some((word) => word.endMs !== null && word.endMs > endMs)) throw new MessageError(message('batch.linkExcludesWords'));
-    return endMs === line.endMs ? line : { ...line, endMs };
   });
   const romanizationTracks = document.romanizationTracks.map((track) => ({ ...track, contents: track.contents.map((content) =>
     selected.has(content.lineId) && content.kind === 'timed'

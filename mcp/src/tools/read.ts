@@ -217,8 +217,6 @@ export function registerReadTools(registry: ToolRegistry): void {
         editing.emptyBeats = Object.fromEntries(Object.entries(doc.editing.emptyBeats).filter(([id]) => objectIds.has(id)));
         editing.ignoredSyncLineIds = doc.editing.ignoredSyncLineIds.filter(id => included.has(id));
         editing.skippedAlignmentLineIds = doc.editing.skippedAlignmentLineIds.filter(id => included.has(id));
-        editing.endLinks = Object.fromEntries(Object.entries(doc.editing.endLinks).filter(([id, target]) => included.has(id) && included.has(target)));
-        const external = Object.fromEntries(Object.entries(doc.editing.endLinks).filter(([id, target]) => included.has(id) && !included.has(target)));
         const lyrics = { ...doc.lyrics, lines, agents: doc.lyrics.agents.filter(agent => agents.has(agent.id)),
           translationTracks: include_sublyrics ? doc.lyrics.translationTracks.map(track => ({ ...track, contents: track.contents.filter(content => included.has(content.lineId)) })).filter(track => track.contents.length) : [],
           romanizationTracks: include_sublyrics ? doc.lyrics.romanizationTracks.map(track => ({ ...track, contents: track.contents.filter(content => included.has(content.lineId)) })).filter(track => track.contents.length) : [],
@@ -227,7 +225,7 @@ export function registerReadTools(registry: ToolRegistry): void {
         return contentPayload([{ type: 'text', text: JSON.stringify({ project_id, revision: envelope.revision, profile: format, partial,
           roundtrip_safe: false, range: { ...(!line_ids ? { start_line } : {}), line_ids: slice.map(line => line.id) }, context_only_line_ids: [...new Set(context)],
           omitted_fields: ['karaoke', 'acoustics', 'amll', 'lineOrder', ...(!include_sublyrics ? ['sublyrics'] : [])],
-          sidecar: { editing, external_end_links: external }, warning: 'This is a lyric view; do not import a sliced or filtered view with replace_all.' }) },
+          sidecar: { editing }, warning: 'This is a lyric view; do not import a sliced or filtered view with replace_all.' }) },
           { type: 'text', text: serializeLyricTtml(lyrics, { draft: format === 'editable_ttml', editing }) }]);
       }
       const ignoredSync = new Set(doc.editing.ignoredSyncLineIds);
@@ -245,7 +243,6 @@ export function registerReadTools(registry: ToolRegistry): void {
           song_part: line.songPart,
           skip_sync: ignoredSync.has(line.id),
           skip_alignment: skippedAlignment.has(line.id),
-          end_linked_to: doc.editing.endLinks[line.id] ?? null,
           words: line.words.map((word) => {
             const wordBeats = doc.editing.emptyBeats[word.id]?.count ?? 0;
             return {

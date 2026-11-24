@@ -92,13 +92,7 @@ it.each(['romanizationTracks', 'translationTracks'] as const)('links only adjace
   expect(content.kind === 'timed' && content.units.map(unit => [unit.beginMs, unit.endMs])).toEqual([[0, 700], [700, 2000]]);
 });
 
-it('retains end-link conflict and media-duration checks for the whole candidate', () => {
-  const { document, line, target } = sample();
-  const editing = createProjectEditing(); editing.endLinks[line.id] = 'next';
-  document.lines.push({ ...createLine('后', 'next'), beginMs: 3000, endMs: 4000 });
-  expect(resizeTimelineBoundary(document, target, 'endMs', 1200, true, editing).lines[0].endMs).toBe(3000);
-  const last: TimelineTarget = { kind: 'word', lineId: line.id, wordId: 'w2' };
-  expect(() => resizeTimelineBoundary(document, last, 'endMs', 3500, true, editing)).toThrow('timeline.linkConflict');
+it('retains media-duration checks for the whole candidate', () => {
   const { document: source, target: word } = sample();
   const next = resizeTimelineBoundary(source, word, 'endMs', 1800, true);
   expect(() => assertChangedTimes(lyricTimes(source), lyricTimes(next), 1500)).toThrow('time.endOutsideSource');

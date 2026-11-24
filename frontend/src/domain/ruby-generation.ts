@@ -97,13 +97,13 @@ const envelope = (base: Envelope, begins: TimeMs[], ends: TimeMs[]): Envelope =>
   return { beginMs: starts.length ? Math.min(...starts) : null, endMs: finishes.length ? Math.max(...finishes) : null };
 };
 
-export type RubyIssueKind = 'target' | 'reading' | 'overwrite' | 'link' | 'kana-difference';
+export type RubyIssueKind = 'target' | 'reading' | 'overwrite' | 'kana-difference';
 export type RubyIssue = {
   id: string; kind: RubyIssueKind; severity: 'error' | 'warning';
   lineId: string; rowKey: string; rowKeys: string[]; wordId: string | null;
   position: number; order: number; message: string; detail: Message;
 };
-const issueOrder: Record<RubyIssueKind, number> = { target: 0, reading: 1, overwrite: 2, link: 3, 'kana-difference': 4 };
+const issueOrder: Record<RubyIssueKind, number> = { target: 0, reading: 1, overwrite: 2, 'kana-difference': 3 };
 const effectiveReading = (row: RubyProposalRow, readings: Record<string, string>) => (readings[row.key] ?? row.reading ?? '').trim();
 const wordEnvelope = (word: LyricWord, rows: RubyProposalRow[]) => envelope(word,
   [...word.rubyUnits.map(unit => unit.beginMs), ...rows.map(row => row.beginMs)],
@@ -112,7 +112,7 @@ const comparableKana = (text: string) => toHiragana(text.normalize('NFC')).norma
 
 /** Shared by preflight and submission; all determinable errors are collected together. */
 export function rubyGenerationIssues(document: LyricDocument, rows: RubyProposalRow[], readings: Record<string, string>,
-  skipped: Set<string>, overwrite: Set<string>, output: RubyOutput = 'roman', editing = createProjectEditing()): RubyIssue[] {
+  skipped: Set<string>, overwrite: Set<string>, output: RubyOutput = 'roman', _editing = createProjectEditing()): RubyIssue[] {
   const issues: RubyIssue[] = [];
   const positions = new Map(rows.map((row, index) => [row.key, index]));
   const add = (kind: RubyIssueKind, group: RubyProposalRow[], key: string, values?:Message['values']) => {
@@ -145,19 +145,6 @@ export function rubyGenerationIssues(document: LyricDocument, rows: RubyProposal
     if (output !== 'roman' && kana.test(text) && values.every(value => kana.test(value))
       && comparableKana(values.join('')) !== comparableKana(text)) {
       add('kana-difference', group, 'ruby.kanaDifference');
-    }
-  }
-  for (const line of document.lines) {
-    const active = rows.filter(row => row.lineId === line.id && row.wordId && !skipped.has(row.key));
-    if (!active.length) continue;
-    const nextWords = line.words.map(word => {
-      const assigned = active.filter(row => row.wordId === word.id);
-      return assigned.length ? wordEnvelope(word, assigned) : word;
-    });
-    const next = envelope(line, nextWords.map(word => word.beginMs), nextWords.map(word => word.endMs));
-    if ((next.beginMs !== line.beginMs || next.endMs !== line.endMs)
-      && (editing.endLinks[line.id] || Object.values(editing.endLinks).includes(line.id))) {
-      add('link', active, 'ruby.endLink');
     }
   }
   return issues.sort((a, b) => a.position - b.position || a.order - b.order);

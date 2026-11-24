@@ -1243,9 +1243,6 @@ export interface components {
                         };
                     };
                     ignoredSyncLineIds: string[];
-                    endLinks: {
-                        [key: string]: string;
-                    };
                     skippedAlignmentLineIds: string[];
                 };
                 amll: {

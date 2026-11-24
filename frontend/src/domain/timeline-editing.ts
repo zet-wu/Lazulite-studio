@@ -1,5 +1,5 @@
 import { message, MessageError } from './messages';
-import { createProjectEditing, followChangedEndLinks, type ProjectEditing } from './project-editing';
+import { createProjectEditing, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
 import { shiftLineTimes } from './batch-editing';
 
@@ -35,10 +35,9 @@ function resizeRubyParent(word: LyricWord, rubyUnits: RubyUnit[], sides: Iterabl
   }
   return next;
 }
-const include = (line: LyricLine, word: LyricWord, editing: ProjectEditing): LyricLine => {
+const include = (line: LyricLine, word: LyricWord): LyricLine => {
   const beginMs = line.beginMs === null ? null : envelope([line.beginMs, word.beginMs], true);
   const endMs = line.endMs === null ? null : envelope([line.endMs, word.endMs], false);
-  if (editing.endLinks[line.id] && endMs !== line.endMs) throw new MessageError(message('timeline.linkConflict'));
   return { ...line, beginMs, endMs };
 };
 const moveWord = (word: LyricWord, deltaMs: number): LyricWord => ({ ...word,
@@ -93,13 +92,13 @@ function moveTargets(document: LyricDocument, targets: TimelineTarget[], deltaMs
         words[index] = { ...word, rubyUnits,
           beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true) ?? word.beginMs, endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false) ?? word.endMs, };
       }
-      return include({ ...line, words }, words[index], editing);
+      return include({ ...line, words }, words[index]);
     });
   }
   return result;
 }
 
-function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'beginMs' | 'endMs', timeMs: number, editing = createProjectEditing()): LyricDocument {
+function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'beginMs' | 'endMs', timeMs: number): LyricDocument {
   valid(timeMs, timeMs);
   if (target.kind === 'romanization') return editRomanization(document, target, unit => { const next = { ...unit, [side]: timeMs }; valid(next.beginMs, next.endMs); return next; });
   return editTarget(document, target, (line) => {
@@ -108,7 +107,6 @@ function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'be
       const endMs = side === 'endMs' ? timeMs : line.endMs;
       valid(beginMs, endMs);
       if (line.words.flatMap(word => [word, ...word.rubyUnits]).some((word) => beginMs !== null && word.beginMs !== null && word.beginMs < beginMs || endMs !== null && word.endMs !== null && word.endMs > endMs)) throw new MessageError(message('timeline.lineExcludesWords'));
-      if (editing.endLinks[line.id] && endMs !== line.endMs) throw new MessageError(message('timeline.linkConflict'));
       return { ...line, beginMs, endMs };
     }
     const index = line.words.findIndex((word) => word.id === target.wordId);
@@ -130,7 +128,7 @@ function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'be
       rubyUnits[rubyIndex] = unit;
       words[index] = resizeRubyParent(word, rubyUnits, [side]);
     }
-    return include({ ...line, words }, words[index], editing);
+    return include({ ...line, words }, words[index]);
   });
 }
 
@@ -170,10 +168,10 @@ function editRomanization(document: LyricDocument, target: Extract<TimelineTarge
 }
 
 export function moveTimeline(document: LyricDocument, targets: TimelineTarget[], deltaMs: number, editing = createProjectEditing()) {
-  return followChangedEndLinks(document, moveTargets(document, targets, deltaMs, editing), editing);
+  return moveTargets(document, targets, deltaMs, editing);
 }
-export function resizeTimeline(document: LyricDocument, target: TimelineTarget, side: 'beginMs' | 'endMs', timeMs: number, editing = createProjectEditing()) {
-  return followChangedEndLinks(document, resizeTarget(document, target, side, timeMs, editing), editing);
+export function resizeTimeline(document: LyricDocument, target: TimelineTarget, side: 'beginMs' | 'endMs', timeMs: number, _editing = createProjectEditing()) {
+  return resizeTarget(document, target, side, timeMs);
 }
 
 export type TimelineBoundary = { target: TimelineTarget; side: BoundarySide };
@@ -257,10 +255,10 @@ export function resizeTimelineBoundary(document: LyricDocument, target: Timeline
       return word;
     });
     let result = { ...line, words };
-    for (const word of words) if (wordIds.has(word.id) || rubyWordSides.has(word.id)) result = include(result, word, editing);
+    for (const word of words) if (wordIds.has(word.id) || rubyWordSides.has(word.id)) result = include(result, word);
     return result;
   });
-  return followChangedEndLinks(document, next, editing);
+  return next;
 }
 
 export type TimelineAssignment={beginMs:number;endMs:number;fixed:boolean;minBegin:number;maxEnd:number;childBegin:number;childEnd:number};
@@ -311,7 +309,7 @@ export function prepareTimelineAssignment(document: LyricDocument, target: Timel
 }
 
 /** Assign both endpoints without moving descendants; expand parents in the same transaction. */
-export function applyTimelineAssignment(document:LyricDocument,target:TimelineTarget,assignment:TimelineAssignment,deltaMs=0,editing=createProjectEditing()):LyricDocument {
+export function applyTimelineAssignment(document:LyricDocument,target:TimelineTarget,assignment:TimelineAssignment,deltaMs=0,_editing=createProjectEditing()):LyricDocument {
   const {beginMs:start,endMs:end,minBegin,maxEnd,childBegin,childEnd,fixed}=assignment;
   const beginMs=start+deltaMs,endMs=end+deltaMs;
   if((fixed&&deltaMs!==0)||beginMs<minBegin||endMs>maxEnd||beginMs>childBegin||endMs<childEnd||beginMs>=endMs)throw new MessageError(message('timeline.rangeInvalid'));
@@ -326,15 +324,11 @@ export function applyTimelineAssignment(document:LyricDocument,target:TimelineTa
     return includeChildren({...current,words},[...words.flatMap(w=>[w,...w.rubyUnits]),...attachments]);
   });
   if (target.kind==='romanization') next=editTarget(next,target,current=>includeChildren(current,[{beginMs,endMs},...current.words.flatMap(w=>[w,...w.rubyUnits]),...attachments]));
-  const changedLine=next.lines.find(l=>l.id===line.id)!;
-  if (editing.endLinks[line.id] && changedLine.endMs!==line.endMs) throw new MessageError(message('timeline.linkConflict'));
-  return followChangedEndLinks(document,next,editing);
+  return next;
 }
 
 /** Clear only explicit targets, preserving descendant times and editing configuration. */
-export function clearTimelineTimes(document: LyricDocument, targets: TimelineTarget[], editing = createProjectEditing()): LyricDocument {
-  const clearedLines = new Set(targets.filter(target => target.kind === 'line').map(target => target.lineId));
-  if (Object.entries(editing.endLinks).some(([source,target]) => clearedLines.has(source) || clearedLines.has(target))) throw new MessageError(message('timeline.clearLinked'));
+export function clearTimelineTimes(document: LyricDocument, targets: TimelineTarget[], _editing = createProjectEditing()): LyricDocument {
   let next = document;
   for (const target of targets) {
     if (target.kind === 'romanization') next = editRomanization(next,target,unit => ({...unit,beginMs:null,endMs:null}));

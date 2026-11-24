@@ -121,11 +121,6 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
     const lineChanged = JSON.stringify(line.words) !== before;
     if (clearUnmatched || lineChanged) Object.assign(line, envelope(line, line.words.filter(word => clearUnmatched ? (word.rubyUnits.length ? word.rubyUnits.some(r => scope.get(r.id)!.target_ids.length) : scope.get(word.id)!.target_ids.length) : word.text.trim() || word.rubyUnits.length)));
   }
-  // Keep evaluated links only when already consistent. Never propagate into skipped rows.
-  for (const [id, target] of Object.entries(next.editing.endLinks)) {
-    const line = next.lyrics.lines.find(l => l.id === id)!, destination = next.lyrics.lines.find(l => l.id === target)!;
-    if (line.endMs !== destination.beginMs || destination.beginMs === null) delete next.editing.endLinks[id];
-  }
   if (result.acoustics) { validateSegments(result.acoustics.segments); next.acoustics = {...result.acoustics, segments:intersectSegments(result.acoustics.segments,durationMs).segments}; }
   return { project: JSON.stringify(next) === JSON.stringify(project) ? project : next, retained, cleared, mergedGaps };
 }

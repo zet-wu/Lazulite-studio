@@ -19,7 +19,7 @@ it('saves project-only configuration, rejects obsolete TTML and restores one sha
   const original = fixture();
   const next = apply(original, { type: 'batch', commands: [
     { type: 'set-empty-beat', id: 'a1', kind: 'word', count: 32 }, { type: 'set-ignore-sync', lineId: 'a', ignoreSync: true },
-    { type: 'set-line-time', lineId: 'b', beginMs: 2000, endMs: 3000 }, { type: 'link-line-end', lineId: 'a', targetLineId: 'b' },
+    { type: 'set-line-time', lineId: 'b', beginMs: 2000, endMs: 3000 },
   ] });
   const snapshot = serializeProject(next.present);
   expect(snapshot.lyrics.draftTtml).not.toMatch(/emptyBeat|ignoreSync|endLink/);
@@ -47,13 +47,12 @@ it('transfers word beats to first Ruby, retains first merged beat and clears exp
   state = apply(state, { type: 'delete-ruby', lineId: 'a', wordId: 'a1', rubyId: 'r' });
   expect(state.present.editing.emptyBeats).toEqual({});
 });
-it('copies mapped beats, ignore and internal links without linking to original objects', () => {
+it('copies mapped beats and ignore flags without linking to original objects', () => {
   let state = fixture();
-  state = apply(state, { type: 'batch', commands: [{ type: 'set-empty-beat', kind: 'word', id: 'a1', count: 3 }, { type: 'set-ignore-sync', lineId: 'a', ignoreSync: true }, { type: 'set-line-time', lineId: 'b', beginMs: 1000, endMs: 2000 }, { type: 'link-line-end', lineId: 'a', targetLineId: 'b' }] });
+  state = apply(state, { type: 'batch', commands: [{ type: 'set-empty-beat', kind: 'word', id: 'a1', count: 3 }, { type: 'set-ignore-sync', lineId: 'a', ignoreSync: true }, { type: 'set-line-time', lineId: 'b', beginMs: 1000, endMs: 2000 }] });
   const clipboard = copySelection(state.present.lyrics, { kind: 'lines', ids: ['a', 'b'], activeId: 'b', anchorId: 'a' }, state.present.editing);
   const result = pasteRich(state.present.lyrics, clipboard, null);
-  const next = apply(state, result.command), [a, b] = next.present.lyrics.lines.slice(2);
-  expect(next.present.editing.endLinks[a.id]).toBe(b.id);
+  const next = apply(state, result.command), [a] = next.present.lyrics.lines.slice(2);
   expect(next.present.editing.ignoredSyncLineIds).toContain(a.id);
   expect(emptyBeatCount(next.present.editing, a.words[0].id)).toBe(3);
   expect(undoProjectCommand(next).present).toBe(state.present);
@@ -74,24 +73,14 @@ it('filters expanded units by trim without rewriting text, times or stored count
   expect(next.present.lyrics).toBe(lyrics);
   expect(emptyBeatCount(next.present.editing, 's0')).toBe(2);
 });
-it('validates IDs, categories, limits and evaluated relationships at restore boundaries', () => {
+it('validates IDs, categories and limits at restore boundaries', () => {
   const state = fixture();
   for (const editing of [
     { ...state.present.editing, emptyBeats: { missing: { kind: 'word', count: 1 } } },
     { ...state.present.editing, emptyBeats: { a1: { kind: 'ruby', count: 1 } } },
     { ...state.present.editing, ignoredSyncLineIds: ['a', 'a'] },
-    { ...state.present.editing, endLinks: { a: 'b' } },
+    { ...state.present.editing, extra: true },
   ]) expect(() => validateProjectEditing(state.present.lyrics, editing as any)).toThrow();
-});
-it('timeline target start follows incoming links and rejects invalid endpoints atomically', async () => {
-  const { resizeTimeline } = await import('../src/domain/timeline-editing');
-  let state = fixture();
-  state = apply(state, { type: 'batch', commands: [{ type: 'set-line-time', lineId: 'b', beginMs: 1000, endMs: 2000 }, { type: 'link-line-end', lineId: 'a', targetLineId: 'b' }] });
-  const moved = resizeTimeline(state.present.lyrics, { kind: 'line', lineId: 'b' }, 'beginMs', 1500, state.present.editing);
-  expect(moved.lines[0].endMs).toBe(1500);
-  expect(() => resizeTimeline(state.present.lyrics, { kind: 'line', lineId: 'a' }, 'endMs', 900, state.present.editing)).toThrow('timeline.linkConflict');
-  const next = apply(state, { type: 'replace-document', document: moved });
-  expect(undoProjectCommand(next).present).toBe(state.present);
 });
 
 it('retains configured whitespace export gates without leaking configuration into TTML', () => {

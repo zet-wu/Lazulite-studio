@@ -9,14 +9,13 @@ it('projects stable sublyric IDs and emits independently parseable TTML dependen
   const doc = createProjectDocument();
   doc.lyrics.agents = [{ id: 'v', name: 'voice', type: 'character', actorRef: 'a' }, { id: 'a', name: 'actor', type: 'person' }];
   doc.lyrics.lines = [{ ...createLine(' main ', 'l'), agentRefs: ['v'], endMs: 200 }, { ...createLine(' background ', 'b'), backgroundOf: 'l' }, { ...createLine('next', 'n'), beginMs: 200 }];
-  doc.editing.endLinks = { l: 'n' };
   doc.lyrics.translationTracks = [{ id: 't', language: 'zh', purpose: 'subtitle', contents: [{ id: 'c', lineId: 'b', kind: 'timed', units: [{ id: 'u', text: ' translation ', beginMs: null, endMs: null }] }] }];
   doc.lyrics.romanizationTracks = [{ id: 'r', language: 'ja-Latn', contents: [{ id: 'rc', lineId: 'b', kind: 'timed', units: [{ id: 'ru', text: ' roman ', beginMs: null, endMs: null }] }] }];
   const f = projectFixture(doc), registry = createToolRegistry();
   const json = await registry.call('get_lyrics', { project_id: 'p', line_ids: ['b'] }, f) as { lines: Record<string, unknown>[] };
   expect(json.lines[0]).toMatchObject({ translations: [{ content_id: 'c', kind: 'timed', units: [{ unit_id: 'u' }] }], romanizations: [{ content_id: 'rc', units: [{ unit_id: 'ru' }] }] });
   const result = await registry.call('get_lyrics', { project_id: 'p', line_ids: ['b'], start_line: 99, format: 'editable_ttml' }, f) as McpToolPayload;
-  expect(JSON.parse((result.content[0] as { text: string }).text)).toMatchObject({ partial: true, roundtrip_safe: false, context_only_line_ids: ['l'], sidecar: { external_end_links: { l: 'n' } } });
+  expect(JSON.parse((result.content[0] as { text: string }).text)).toMatchObject({ partial: true, roundtrip_safe: false, context_only_line_ids: ['l'], sidecar: { editing: { emptyBeats: {} } } });
   expect(JSON.parse((result.content[0] as { text: string }).text).range).toEqual({ line_ids: ['b'] });
   const xml = (result.content[1] as { text: string }).text;
   expect(xml).toContain('studio:null'); expect(xml).toContain('studio:id');

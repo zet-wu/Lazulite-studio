@@ -162,7 +162,7 @@ describe('Milestone 4 reading & dictionary tools', () => {
     expect(dictResult.lines[0].ranges[0].status).toBe('ambiguous');
   });
 
-  it('applies readings on untimed and timed lyrics, preserving timing, splitting/merging words, background lines, emptyBeats, and endLinks', async () => {
+  it('applies readings on untimed and timed lyrics, preserving timing, splitting/merging words, background lines, and emptyBeats', async () => {
     const lyrics = createLyricDocument('');
     const line1Id = lyrics.lines[0].id;
     lyrics.lines[0] = {
@@ -201,7 +201,6 @@ describe('Milestone 4 reading & dictionary tools', () => {
     doc.editing.emptyBeats = {
       'w-compound': { kind: 'word', count: 1 },
     };
-    doc.editing.endLinks = { [line1Id]: line2Id };
 
     const { client, getCurrentDoc } = createStatefulReadingClient(doc);
     const registry = createToolRegistry();
@@ -255,10 +254,9 @@ describe('Milestone 4 reading & dictionary tools', () => {
     expect(savedLine1.words[2]).toMatchObject({ beginMs: 1800, endMs: 2500 });
     expect(savedLine1.words[2].rubyUnits.map((u) => u.reading)).toEqual(['きょ', 'う']);
 
-    // Empty beat preserved cleanly on split part0 ruby & endLinks intact
+    // Empty beat preserved cleanly on split part0 ruby
     expect(saved.editing.emptyBeats['w-compound']).toBeUndefined();
     expect(saved.editing.emptyBeats[savedLine1.words[0].rubyUnits[0].id]).toEqual({ kind: 'ruby', count: 1 });
-    expect(saved.editing.endLinks).toEqual({ [line1Id]: line2Id });
 
     // Untimed line word kept untimed
     const savedLine2 = saved.lyrics.lines.find((l) => l.id === line2Id)!;

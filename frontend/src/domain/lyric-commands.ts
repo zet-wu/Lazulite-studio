@@ -26,8 +26,6 @@ type AtomicLyricCommand =
   | { type: 'merge-words'; wordIds: string[] }
   | { type: 'move-word'; lineId: string; wordId: string; toLineId: string; afterWordId: string | null }
   | { type: 'set-line-time'; lineId: string; beginMs: TimeMs; endMs: TimeMs }
-  | { type: 'link-line-end'; lineId: string; targetLineId: string }
-  | { type: 'unlink-line-end'; lineId: string }
   | { type: 'set-word-agents'; lineId: string; wordId: string; agentRefs: string[] }
   | { type: 'set-song-part'; lineIds: string[]; value: string | null }
   | { type: 'set-line-agents'; lineId: string; agentRefs: string[] }
@@ -240,7 +238,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       if (source.id === parent.id || parent.backgroundOf) throw new MessageError(message('command.backgroundParent'));
       if (document.lines.some((line) => line.backgroundOf === source.id)) throw new MessageError(message('command.backgroundExists'));
 
-      if (editing.endLinks[source.id] || Object.values(editing.endLinks).includes(source.id)) throw new MessageError(message('command.endLinkExists'));
       const lines = document.lines.filter((line) => line.id !== source.id);
       const parentIndex = afterLineGroup(lines, parent.id);
       lines.splice(parentIndex + 1, 0, { ...source, backgroundOf: parent.id, songPart: null });
@@ -285,10 +282,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       const target = (id: string) => command.backgroundTargets[id];
       if (Object.keys(command.backgroundTargets).some(id => !backgrounds.some(bg => bg.id === id))) throw new MessageError(message('command.backgroundAssignmentMissing'));
       if (backgrounds.some(bg => target(bg.id) === null || !Number.isInteger(target(bg.id)) || !segments[target(bg.id)!])) throw new MessageError(message('command.backgroundReassign'));
-      for (const [id, target] of Object.entries(editing.endLinks)) if (target === line.id && segments[0].beginMs !== line.beginMs) delete editing.endLinks[id];
-      const outgoing = editing.endLinks[line.id];
-      delete editing.endLinks[line.id];
-      if (outgoing && segments.at(-1)!.endMs === line.endMs) editing.endLinks[segments.at(-1)!.id] = outgoing;
       if (editing.skippedAlignmentLineIds.includes(line.id)) editing.skippedAlignmentLineIds.push(...command.newLineIds);
       if (editing.ignoredSyncLineIds.includes(line.id)) editing.ignoredSyncLineIds.push(...command.newLineIds);
       const lines = document.lines.filter(item => !backgrounds.includes(item));
@@ -302,9 +295,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       const ids = new Set(selected.map(line => line.id));
       // Skip-alignment is an all-lines flag; ignore-sync retains the first line's flag.
       if (!selected.every(line => editing.skippedAlignmentLineIds.includes(line.id))) editing.skippedAlignmentLineIds = editing.skippedAlignmentLineIds.filter(id => id !== merged.id);
-      const outgoing = editing.endLinks[selected.at(-1)!.id];
-      for (const [source, target] of Object.entries(editing.endLinks)) if (ids.has(source) || ids.has(target) && target !== merged.id) delete editing.endLinks[source];
-      if (outgoing && !ids.has(outgoing)) editing.endLinks[merged.id] = outgoing;
       const backgrounds = document.lines.filter(line => line.backgroundOf && ids.has(line.backgroundOf)).map(line => ({ ...line, backgroundOf: merged.id }));
       const lines = document.lines.flatMap(line => line.id === merged.id ? [merged, ...backgrounds] : ids.has(line.id) || line.backgroundOf && ids.has(line.backgroundOf) ? [] : [line]);
       const migrate = <T extends { contents: RomanizationContent[] }>(tracks: T[]): T[] => tracks.map(track => {
@@ -429,35 +419,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       if (line.beginMs === command.beginMs && line.endMs === command.endMs) return document;
       const lines = document.lines.slice();
       lines[index] = { ...line, beginMs: command.beginMs, endMs: command.endMs };
-      if (line.endMs !== command.endMs) delete editing.endLinks[line.id];
-      for (let linkedIndex = 0; linkedIndex < lines.length; linkedIndex++) {
-        const linked = lines[linkedIndex];
-        if (editing.endLinks[linked.id] !== line.id) continue;
-        const linkedEnd = command.beginMs;
-        if (linkedEnd === null || linked.words.some((word) => word.endMs !== null && word.endMs > linkedEnd)) throw new MessageError(message('command.linkBeforeWordsEnglish'));
-        validTime(linked.beginMs, linkedEnd);
-        lines[linkedIndex] = { ...linked, endMs: linkedEnd };
-      }
       return { ...document, lines };
-    }
-    case 'link-line-end': {
-      const index = lineIndex(document, command.lineId);
-      const target = document.lines[lineIndex(document, command.targetLineId)];
-      const line = document.lines[index];
-      if (line.id === target.id || line.backgroundOf || target.backgroundOf || target.beginMs === null) throw new MessageError(message('command.linkTarget'));
-      const targetBegin = target.beginMs;
-      if (line.words.some((word) => word.endMs !== null && word.endMs > targetBegin)) throw new MessageError(message('command.linkBeforeWords'));
-      validTime(line.beginMs, targetBegin);
-      if (editing.endLinks[line.id] === target.id) return document;
-      const lines = document.lines.slice();
-      lines[index] = { ...line, endMs: targetBegin };
-      editing.endLinks[line.id] = target.id;
-      return { ...document, lines };
-    }
-    case 'unlink-line-end': {
-      lineIndex(document, command.lineId);
-      delete editing.endLinks[command.lineId];
-      return document;
     }
     case 'set-line-agents': {
       const index = lineIndex(document, command.lineId);
@@ -489,7 +451,6 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       Object.assign(editing.emptyBeats, command.editing.emptyBeats);
       editing.skippedAlignmentLineIds = [...new Set([...editing.skippedAlignmentLineIds, ...command.editing.skippedAlignmentLineIds])];
       editing.ignoredSyncLineIds = [...new Set([...editing.ignoredSyncLineIds, ...command.editing.ignoredSyncLineIds])];
-      Object.assign(editing.endLinks, command.editing.endLinks);
       return document;
     case 'set-translation-tracks': {
       if (command.source !== document.translationTracks) throw new MessageError(message('command.translationChanged'));

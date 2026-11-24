@@ -37,27 +37,12 @@ it('merges the entire main selection with separately inherited attributes, attac
   expect(parseProject(serializeProject(next.present))).toEqual(next.present);
   expect(undoProjectCommand(next).present).toBe(project);expect(redoProjectCommand(undoProjectCommand(next)).present).toBe(next.present);
 });
-it('keeps outer boundaries only, freezes external source ends, and follows retained outgoing links',()=>{
-  const project=fixture();
-  for(const [id,target] of [['x','a'],['y','b'],['z','c'],['unrelated','d']] as const) {
-    const end=project.lyrics.lines.find(line=>line.id===target)!.beginMs!;
-    project.lyrics.lines.push({...createLine('',id),beginMs:0,endMs:end,words:[]});project.editing.endLinks[id]=target;
-  }
-  project.lyrics.lines.find(line=>line.id==='d')!.words=[];
-  project.editing.endLinks.a='b';project.editing.endLinks.b='c';project.editing.endLinks.c='d';
-  const next=executeProjectCommand(createProjectEditorState(project),{type:'lyrics',command:{type:'merge-lines',lineIds:['a','b','c']}});
-  expect(next.present.editing.endLinks).toEqual({x:'a',a:'d',unrelated:'d'});
-  expect(next.present.lyrics.lines.find(line=>line.id==='y')!.endMs).toBe(2000);
-  const changed=executeProjectCommand(next,{type:'lyrics',command:{type:'set-line-time',lineId:'d',beginMs:4500,endMs:5000}});
-  expect(changed.present.lyrics.lines[0].endMs).toBe(4500);
-  expect(changed.present.lyrics.lines.find(line=>line.id==='y')!.endMs).toBe(2000);
-});
-it('drops earlier outgoing external boundary and never fills missing first pre-cue or unassigned groups',()=>{
-  const project=fixture(); project.lyrics.lines[3].beginMs=2000;project.lyrics.lines[3].words=[];project.editing.endLinks.a='d';
+it('drops unassigned line groups and clears pre-cues on merged internal boundaries',()=>{
+  const project=fixture(); project.lyrics.lines[3].beginMs=2000;project.lyrics.lines[3].words=[];
   project.karaoke.lineGroups={a:'',b:'',c:'',d:''};
   project.karaoke.cues=[{id:'later',text:'x',beginMs:0,endMs:50,anchor:{kind:'before',lineId:'b'}}];
   const next=executeProjectCommand(createProjectEditorState(project),{type:'lyrics',command:{type:'merge-lines',lineIds:['a','b','c']}}).present;
-  expect(next.editing.endLinks).toEqual({});expect(next.karaoke.cues).toEqual([]);expect(next.karaoke.lineGroups.a).toBe('');
+  expect(next.karaoke.cues).toEqual([]);expect(next.karaoke.lineGroups.a).toBe('');
 });
 it('retains word and Ruby cue identities on later main lines and never modifies explicit word singers',()=>{
   const project=fixture(),word=project.lyrics.lines[1].words[0];project.amll.noWordAgents=false;word.agentRefs=['v1'];

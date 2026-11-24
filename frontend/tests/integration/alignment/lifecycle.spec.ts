@@ -13,7 +13,7 @@ async function setup(page: Page) {
     karaoke: { ...before.document.karaoke, lineGroups: { a: 'main' }, cues: [] },
     lyrics: { draftTtml: xml },
     lineOrder: [],
-    editing: { emptyBeats: {}, ignoredSyncLineIds: [], skippedAlignmentLineIds: [], endLinks: {} },
+    editing: { emptyBeats: {}, ignoredSyncLineIds: [], skippedAlignmentLineIds: [] },
     acoustics: { analysisId: null, segments: [] },
   };
   const response = await page.request.put(url, {

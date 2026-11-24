@@ -3327,7 +3327,6 @@
                 "required": [
                   "emptyBeats",
                   "ignoredSyncLineIds",
-                  "endLinks",
                   "skippedAlignmentLineIds"
                 ],
                 "additionalProperties": false,
@@ -3360,12 +3359,6 @@
                     "type": "array",
                     "uniqueItems": true,
                     "items": {
-                      "type": "string"
-                    }
-                  },
-                  "endLinks": {
-                    "type": "object",
-                    "additionalProperties": {
                       "type": "string"
                     }
                   },

@@ -24,14 +24,14 @@ it('only all-unknown rows receive both segment endpoints',()=>{
  const unknown=createLyricDocument('未知');const next=assignVocalSegment(unknown,unknown.lines[0].id,segment);
  expect(next.lines[0]).toMatchObject({beginMs:30000,endMs:32000,words:[{beginMs:null,endMs:null}]});
 });
-it('freezes incoming links, unlinks outgoing, leaves backgrounds and unrelated links untouched',()=>{
+it('moves assigned line without altering siblings or background lines',()=>{
  const doc=fixture();doc.lines.push({...createLine('来源','in'),beginMs:0,endMs:10000},{...createLine('目标','out'),beginMs:14000,endMs:18000},{...createLine('背景','bg'),beginMs:10000,endMs:14000,backgroundOf:'a'});
- const project=createProjectDocument(doc);project.editing.endLinks={in:'a',a:'out'};
+ const project=createProjectDocument(doc);
  const command=assignVocalSegmentCommand(project,'a',segment); if(command.type!=='replace-document')throw Error(); const next=command.document;
- expect(command.editing?.endLinks).toEqual({});expect(next.lines[1]).toMatchObject({beginMs:0,endMs:10000});
+ expect(next.lines[1]).toBe(doc.lines[1]);
  expect(next.lines[2]).toBe(doc.lines[2]);expect(next.lines[3]).toBe(doc.lines[3]);
  const bg=assignVocalSegment(doc,'bg',segment);expect(bg.lines[0]).toBe(doc.lines[0]);
- expect(assignVocalSegment(doc,'a',segment).lines[0].endMs).toBe(34000);expect(project.editing.endLinks.a).toBe('out');
+ expect(assignVocalSegment(doc,'a',segment).lines[0].endMs).toBe(34000);
 });
 it('accepts exact song endpoints and rejects every moved internal outlier atomically',()=>{
  const doc=fixture();doc.lines[0].words[0].rubyUnits[0].beginMs=500;

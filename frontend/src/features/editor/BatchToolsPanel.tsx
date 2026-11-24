@@ -13,12 +13,12 @@ import { SegmentationPanel } from './SegmentationPanel';
 import { useState } from 'react';
 import type { LyricCommand } from '../../domain/lyric-commands';
 import { replaceText, clearRuby, smoothWordTimes, syncLineTimes } from '../../domain/batch-editing';
-import { lineText, type LyricDocument } from '../../domain/lyric-document';
+import { type LyricDocument } from '../../domain/lyric-document';
 import type { EditorSelection } from './editing-actions';
 import styles from './semantic-editor.module.css';
 
 type Props = { project?: ProjectDocument; document: LyricDocument; selection: EditorSelection | null; currentLineId: string | null; apply: (command: LyricCommand) => boolean; close: () => void };
-type Operation = 'segment' | 'clear-ruby' | 'replace' | 'shift' | 'smooth' | 'sync' | 'link';
+type Operation = 'segment' | 'clear-ruby' | 'replace' | 'shift' | 'smooth' | 'sync';
 
 export function BatchToolsPanel({ project, document, selection, currentLineId, apply, close }: Props) {
   useTranslation();
@@ -34,7 +34,6 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
   const [amountMs, setAmountMs] = useState('100');
   const [thresholdMs, setThresholdMs] = useState('15');
   const [message, setMessage] = useMessageText('');
-  const current = document.lines.find((line) => line.id === currentLineId);
   const targets = document.lines.filter((line, index) => scope === 'all' || scope === 'range' && index + 1 >= from && index + 1 <= to ||
     scope === 'selected' && selection?.kind === 'ruby' && line.words.some(word => word.rubyUnits.some(unit => selection.ids.includes(unit.id))) ||
     scope === 'selected' && selection?.kind === 'words' && line.words.some((word) => selection.ids.includes(word.id)) ||
@@ -64,7 +63,7 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
   const run = () => {
     try {
       setMessage('');
-      if (operation !== 'link' && !targets.length) throw new MessageError(describeMessage('batch.noLines'));
+      if (!targets.length) throw new MessageError(describeMessage('batch.noLines'));
       let command: LyricCommand;
       let summary: string | import('../../domain/messages').Message = '';
       if (operation === 'replace' || operation === 'clear-ruby') {
@@ -82,40 +81,28 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
         const result = smoothWordTimes(document, targets.map((line) => line.id), Math.round(amount));
         if (!result.count) throw new MessageError(describeMessage('batch.noSmooth'));
         command = result.command; summary = describeMessage('batch.smoothSummary',{count:result.count});
-      } else if (operation === 'sync') {
+      } else {
         command = syncLineTimes(document, targets.map((line) => line.id));
         summary = describeMessage('batch.syncSummary',{count:targets.length});
-      } else {
-        if (!current || current.backgroundOf) throw new MessageError(describeMessage('batch.selectLead'));
-        if (editing.endLinks[current.id]) {
-          command = { type: 'unlink-line-end', lineId: current.id };
-          summary = describeMessage('batch.unlinked');
-        } else {
-          const main = document.lines.filter((line) => !line.backgroundOf);
-          const target = main[main.findIndex((line) => line.id === current.id) + 1];
-          if (!target) throw new MessageError(describeMessage('batch.noNextLead'));
-          command = { type: 'link-line-end', lineId: current.id, targetLineId: target.id };
-          summary = describeMessage('batch.linkSummary',{text:lineText(target)});
-        }
       }
-      if (apply(command)) { setMessage(summary); if (operation !== 'link') close(); }
+      if (apply(command)) { setMessage(summary); close(); }
     } catch (cause) { setMessage(errorMessage(cause)); }
   };
-  const navigation = (<div className={styles.dialogTabs}>{([['replace', t('batch.replace')], ['segment', t('editor.segment')], ['clear-ruby', t('batch.clearRuby')], ['shift', t('batch.offset')], ['smooth', t('batch.smooth')], ['sync', t('batch.syncLine')], ['link', t('batch.linkEnd')]] as const).map(([value, label]) => <button data-role="secondary" key={value} aria-pressed={operation === value} className={operation === value ? styles.activeTab : ''} onClick={() => { setOperation(value); setMessage(''); }}>{label}</button>)}</div>);
+  const navigation = (<div className={styles.dialogTabs}>{([['replace', t('batch.replace')], ['segment', t('editor.segment')], ['clear-ruby', t('batch.clearRuby')], ['shift', t('batch.offset')], ['smooth', t('batch.smooth')], ['sync', t('batch.syncLine')]] as const).map(([value, label]) => <button data-role="secondary" key={value} aria-pressed={operation === value} className={operation === value ? styles.activeTab : ''} onClick={() => { setOperation(value); setMessage(''); }}>{label}</button>)}</div>);
   const scopeControl = (<div className={styles.batchScope}><SettingField label={t('batch.scope')}><Select value={scope} onChange={(event) => setScope(event.target.value)}><option value="current">{operation === 'shift' ? t('edit.currentLine') : t('batch.lineBackground')}</option><option value="selected">{operation === 'replace' && replaceTarget === 'ruby' ? t('batch.selectedRuby') : operation === 'shift' ? t('edit.selected') : t('batch.selectedBackground')}</option><option value="range">{t('edit.lineRange')}</option><option value="all">{t('edit.allLines')}</option></Select></SettingField>
       {scope === 'range' && <div className={styles.batchRange}><label>{t('edit.fromLine')}<input type="number" min="1" max={document.lines.length} value={from} onChange={(event) => setFrom(Number(event.target.value))} /> {t('edit.lineUnit')}</label><label>{t('edit.toLine')}<input type="number" min="1" max={document.lines.length} value={to} onChange={(event) => setTo(Number(event.target.value))} /> {t('edit.lineUnit')}</label></div>}
       </div>);
   if (operation === 'segment') return <SegmentationPanel document={document} wordIds={scope === 'selected' && selection?.kind !== 'words' && selection?.kind !== 'lines' ? [] : wordIds} apply={apply} close={close} navigation={navigation} scopeControl={scopeControl}/>;
-  return <SettingsDialog title={t('batch.title')} close={close} actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.close')}</button><button data-role="primary" onClick={run}>{operation === 'link' && (current && editing.endLinks[current.id]) ? t('batch.unlink') : t('edit.applyUndo')}</button></>}>
+  return <SettingsDialog title={t('batch.title')} close={close} actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.close')}</button><button data-role="primary" onClick={run}>{t('edit.applyUndo')}</button></>}>
     {navigation}
-    {operation !== 'link' && <div className={fields.group}>
+    <div className={fields.group}>
       {scopeControl}
       {operation === 'replace' && <div className={`${fields.row} ${styles.replaceTarget}`} role="group" aria-labelledby="batch-replace-target"><span id="batch-replace-target">{t('batch.target')}</span><div className={styles.replaceOptions}><label><input type="radio" name="replace-target" checked={replaceTarget === 'words'} onChange={() => setReplaceTarget('words')}/>{t('batch.mainText')}</label><label><input type="radio" name="replace-target" checked={replaceTarget === 'ruby'} onChange={() => setReplaceTarget('ruby')}/>{t('batch.reading')}</label></div></div>}
       {operation === 'replace' && <div className={fields.group}><SettingField label={t('batch.find')}><input value={search} onChange={(event) => setSearch(event.target.value)} /></SettingField><SettingField label={t('batch.replaceWith')}><input value={replacement} onChange={(event) => setReplacement(event.target.value)} /></SettingField><SettingToggle label={t('batch.ignoreCase')} checked={ignoreCase} onChange={setIgnoreCase}/></div>}
       {operation === 'shift' && <SettingField label={t('batch.offsetLabel')}><input type="number" step="1" value={amountMs} onChange={(event) => setAmountMs(event.target.value)} /></SettingField>}
       {operation === 'smooth' && <SettingField label={t('batch.threshold')}><input type="number" min="0" step="1" value={thresholdMs} onChange={(event) => setThresholdMs(event.target.value)} /></SettingField>}
-    </div>}
-    <p className={styles.toolHint}>{operation === 'clear-ruby' ? t('batch.clearHelp') : operation === 'replace' ? t('batch.emptyDeletes') : operation === 'shift' ? t('batch.targetLines',{count:targets.length}) : operation === 'smooth' ? t('batch.smoothHelp',{count:targets.length}) : operation === 'sync' ? t('batch.syncHelp',{count:targets.length}) : (current && editing.endLinks[current.id]) ? t('batch.linkedHelp',{id:editing.endLinks[current.id]}) : t('batch.linkHelp')}</p>
+    </div>
+    <p className={styles.toolHint}>{operation === 'clear-ruby' ? t('batch.clearHelp') : operation === 'replace' ? t('batch.emptyDeletes') : operation === 'shift' ? t('batch.targetLines',{count:targets.length}) : operation === 'smooth' ? t('batch.smoothHelp',{count:targets.length}) : t('batch.syncHelp',{count:targets.length})}</p>
 
     {(preview || previewError) && <p role="status">{previewError ? formatMessage(previewError) : preview?.summary}{preview && !preview.changed ? operation === 'clear-ruby' ? t('notice.separator')+t('batch.noRuby') : t('notice.separator')+t('batch.noChanges') : ''}</p>}
     {message && <p role="alert">{message}</p>}

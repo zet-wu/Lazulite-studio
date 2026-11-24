@@ -218,17 +218,14 @@ describe('semantic lyric commands', () => {
   });
 });
 
-it.each(['child', 'link', 'referenced'])('rejects background %s without modifying document or history', reason => {
+it('rejects background line with child background without modifying document or history', () => {
   const document = createLyricDocument('主唱');
   const main = document.lines[0], source = createLine('源歌词', 'source');
   main.beginMs = 1000; main.endMs = 10000;
   source.beginMs = 2000; source.endMs = 3000;
   document.lines.push(source);
-  if (reason === 'child') document.lines.push({ ...createLine('子背景', 'child'), backgroundOf: source.id });
-  const editing = createProjectEditing();
-  if (reason === 'link') editing.endLinks[source.id] = main.id;
-  if (reason === 'referenced') editing.endLinks[main.id] = source.id;
-  const snapshot = structuredClone(document), state = createLyricEditorState(document, editing);
+  document.lines.push({ ...createLine('子背景', 'child'), backgroundOf: source.id });
+  const snapshot = structuredClone(document), state = createLyricEditorState(document);
   expect(() => executeLyricCommand(state, { type: 'set-background-of', lineId: source.id, parentLineId: main.id })).toThrow();
   expect(state.present).toEqual(snapshot);
   expect(state.past).toHaveLength(0);

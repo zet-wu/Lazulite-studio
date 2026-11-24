@@ -29,7 +29,6 @@ function batchAffectedLines(before: ProjectDocument, after: ProjectDocument): st
   const lineStates = (doc: ProjectDocument) => {
     const states = new Map(doc.lyrics.lines.map(line => [line.id, {
       line,
-      endLink: doc.editing.endLinks[line.id] ?? null,
       emptyBeats: Object.fromEntries(line.words.flatMap(word => [word.id, ...word.rubyUnits.map(unit => unit.id)])
         .filter(id => doc.editing.emptyBeats[id]).map(id => [id, doc.editing.emptyBeats[id]])),
       translations: [] as TranslationContent[],
@@ -120,7 +119,7 @@ export function registerTransformTools(registry: ToolRegistry) {
       return { nextDoc: next, summary: { dry_run: args.dry_run, revision: envelope.revision, changed_count: active.length, proposals: rows, conflicts, hints: rows.flatMap(row => row.kind === 'plain' ? row.hint ? [{ line_id: row.lineId, hint: row.hint }] : [] : row.groups.filter(u => u.hint).map(u => ({ line_id: row.lineId, unit_key: u.key, hint: u.hint }))) } };
     }),
   });
-  registry.register({ name: 'generate_ruby_from_romanization', description: 'Preview/apply reverse ruby generation with shared candidate matching and target/reading/overwrite/link/kana-difference issues. Resolve blocking issues through assignments/readings/skip_keys/overwrite_word_ids before applying. Review dry_run candidates, then pass readings and assignments keyed by candidate row key.', annotations,
+  registry.register({ name: 'generate_ruby_from_romanization', description: 'Preview/apply reverse ruby generation with shared candidate matching and target/reading/overwrite/kana-difference issues. Resolve blocking issues through assignments/readings/skip_keys/overwrite_word_ids before applying. Review dry_run candidates, then pass readings and assignments keyed by candidate row key.', annotations,
     inputSchema: { ...transformSchema(), track_id: id(), content_ids: z.array(id()).min(1).optional(), output: z.enum(['roman','hiragana','katakana']).default('hiragana'), assignments: z.record(id().nullable()).default({}), readings: z.record(z.string()).default({}), skip_keys: z.array(id()).default([]), overwrite_word_ids: z.array(id()).default([]) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key, dryRun: args.dry_run }, (doc, envelope) => {
       const track = doc.lyrics.romanizationTracks.find(t => t.id === args.track_id) ?? invalid('Source romanization track does not exist.');
@@ -136,11 +135,10 @@ export function registerTransformTools(registry: ToolRegistry) {
       return { nextDoc: next, summary: { dry_run: args.dry_run, revision: envelope.revision, candidates: rows, issues, skipped_keys: [...skipped], changed_count: next === doc ? 0 : active.length } };
     }),
   });
-  registry.register({ name: 'batch_edit_lyrics', description: 'Preview/apply shared desktop batch replacement, ruby clearing, time shift/smoothing/sync and explicit end links. dry_run defaults to true. Time operations use selected lines; partial word scope is rejected for them.', annotations,
+  registry.register({ name: 'batch_edit_lyrics', description: 'Preview/apply shared desktop batch replacement, ruby clearing, and time shift/smoothing/sync. dry_run defaults to true. Time operations use selected lines; partial word scope is rejected for them.', annotations,
     inputSchema: { ...transformSchema(), scope: scopeSchema(), action: z.discriminatedUnion('type', [
       z.object({ type: z.literal('replace'), kind: z.enum(['words','ruby']), search: id(), replacement: z.string(), ignore_case: z.boolean().default(false) }),
       z.object({ type: z.literal('clear_ruby') }), z.object({ type: z.literal('shift'), delta_ms: z.number().int() }), z.object({ type: z.literal('smooth'), threshold_ms: z.number().int().nonnegative() }), z.object({ type: z.literal('sync') }),
-      z.object({ type: z.literal('link_ends'), pairs: z.array(z.object({ line_id: id(), target_line_id: id() })).min(1) }), z.object({ type: z.literal('unlink_ends'), line_ids: z.array(id()).min(1) }),
     ]) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key, dryRun: args.dry_run }, (doc, envelope) => {
       const targets = select(doc, args.scope), wordIds = targets.map(t => t.word.id);
@@ -154,8 +152,6 @@ export function registerTransformTools(registry: ToolRegistry) {
         case 'shift': command = shiftLineTimes(doc.lyrics, lineIds, action.delta_ms, doc.editing); hits = lineIds.length; break;
         case 'smooth': { const result = smoothWordTimes(doc.lyrics, lineIds, action.threshold_ms); command = result.command; hits = result.count; break; }
         case 'sync': command = syncLineTimes(doc.lyrics, lineIds); hits = lineIds.length; break;
-        case 'link_ends': if (action.pairs.some(pair => !lineIds.includes(pair.line_id))) invalid('Link source is outside scope.'); command = { type: 'batch', commands: action.pairs.map(pair => ({ type: 'link-line-end', lineId: pair.line_id, targetLineId: pair.target_line_id })) }; hits = action.pairs.length; break;
-        case 'unlink_ends': if (action.line_ids.some(id => !lineIds.includes(id))) invalid('Unlink source is outside scope.'); command = { type: 'batch', commands: action.line_ids.map(id => ({ type: 'unlink-line-end', lineId: id })) }; hits = action.line_ids.length; break;
       }
       let next = run(doc, command);
       const changedLines = batchAffectedLines(doc, next);

@@ -109,15 +109,13 @@ it.each([[null,9],[2,null],[null,null],[2,3]])('merging retains known endpoint e
  const state=executeLyricCommand(createLyricEditorState(d),japaneseRubyCommand(d,d,proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)],true)));
  expect(state.present.lines[0].words[0]).toMatchObject({beginMs,endMs});
 });
-it('merging reconciles invalid cue anchors and keeps external links in the same project history',()=>{
+it('merging reconciles invalid cue anchors in the same project history',()=>{
  const d=createLyricDocument(),l=d.lines[0];l.beginMs=0;l.endMs=1000;
  l.words=[{...createWord('今'),beginMs:100,endMs:300},{...createWord('日'),beginMs:500,endMs:700}];
- const next={...createLine('かな'),beginMs:1000,endMs:2000};d.lines.push(next);
- const editing=createProjectEditing();editing.endLinks[l.id]=next.id;
- const initial=createLyricEditorState(d,editing);
+ const initial=createLyricEditorState(d);
  initial.project.present.karaoke.cues=[{id:'between',text:'●',anchor:{kind:'word',lineId:l.id,leftId:l.words[0].id,rightId:l.words[1].id},beginMs:300,endMs:500},{id:'before',text:'●',anchor:{kind:'before',lineId:l.id},beginMs:0,endMs:100}];
  const state=executeLyricCommand(initial,japaneseRubyCommand(d,d,proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)],true)));
- expect(state.project.present.karaoke.cues.map(c=>c.id)).toEqual(['before']);expect(state.editing.endLinks).toEqual(editing.endLinks);
+ expect(state.project.present.karaoke.cues.map(c=>c.id)).toEqual(['before']);
  expect(undoLyricCommand(state).project.present).toEqual(initial.project.present);expect(redoLyricCommand(undoLyricCommand(state)).project.present).toEqual(state.project.present);
 });
 it('rejects merged incompatible agents and existing ruby beat loss without modifying any source',()=>{

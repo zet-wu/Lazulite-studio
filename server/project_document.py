@@ -31,7 +31,6 @@ class Editing(BaseModel):
     emptyBeats: dict[str, EmptyBeat]
     skippedAlignmentLineIds: list[str]
     ignoredSyncLineIds: list[str]
-    endLinks: dict[str, str]
 
 class AmllSettings(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -54,7 +53,7 @@ class ProjectSnapshot(BaseModel):
 def initial_project(ttml: str) -> dict:
     from .amll_compatibility import DEFAULTS
     return {'schemaVersion': 'studio-project-v9', 'karaoke': initial_karaoke(ttml), 'amll': dict(DEFAULTS), 'lineOrder': [],
-            'editing': {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': [], 'endLinks': {}}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
+            'editing': {'emptyBeats': {}, 'skippedAlignmentLineIds': [], 'ignoredSyncLineIds': []}, 'lyrics': {'draftTtml': ttml}, 'acoustics': {'analysisId': None, 'segments': []}}
 
 def load_project(path: str | Path) -> dict:
     """Fast load of an immutable, already-validated persisted revision snapshot."""
@@ -93,13 +92,12 @@ def _validate_snapshot(model: ProjectSnapshot) -> dict:
 
 
 def validate_editing(snapshot, root):
-    from .time_units import milliseconds, parse_ttml_seconds
     studio = '{urn:lazulite:studio:draft}'
     tt = '{http://www.w3.org/ns/ttml}'
     tts = '{http://www.w3.org/ns/ttml#styling}'
     ttm = '{http://www.w3.org/ns/ttml#metadata}'
     xml = '{http://www.w3.org/XML/1998/namespace}'
-    objects, lines, backgrounds = {}, {}, set()
+    objects, lines = {}, {}
     def identity(node, kind):
         key = node.get(studio+'id') or node.get(xml+'id')
         if key:
@@ -121,7 +119,7 @@ def validate_editing(snapshot, root):
             for child in node:
                 if child.get(ttm+'role') == 'x-bg':
                     key = identity(child, 'line')
-                    if key: lines[key] = child; backgrounds.add(key)
+                    if key: lines[key] = child
                     words(child)
     editing = snapshot['editing']
     for key, beat in editing['emptyBeats'].items():
@@ -130,14 +128,3 @@ def validate_editing(snapshot, root):
     if len(set(skipped)) != len(skipped) or any(key not in lines for key in skipped): raise DocumentInvalid('skipped_alignment_invalid_reference', '跳过对齐的行引用无效或重复', object_ids=skipped)
     ignored = editing['ignoredSyncLineIds']
     if len(set(ignored)) != len(ignored) or any(key not in lines for key in ignored): raise DocumentInvalid('ignored_sync_invalid_reference', '忽略打轴的行引用无效或重复', object_ids=ignored)
-    def time(node, side):
-        if side in node.get(studio+'null', '').split(): return None
-        raw = node.get(side)
-        return milliseconds(parse_ttml_seconds(raw)) if raw is not None else None
-    for source, target in editing['endLinks'].items():
-        if source not in lines or target not in lines or source == target or source in backgrounds or target in backgrounds: raise DocumentInvalid('end_link_invalid_reference', f'行尾链接 {source} → {target} 不合法', object_id=source, target_id=target)
-        line, destination = lines[source], lines[target]
-        end, begin = time(line, 'end'), time(destination, 'begin')
-        if begin is None or end != begin or time(line, 'begin') is not None and time(line, 'begin') > end: raise DocumentInvalid('end_link_invalid_time', f'行尾链接 {source} 的时间与目标行不一致', object_id=source, target_id=target)
-        for child in line:
-            if child.tag == tt+'span' and all(role == 'expletive' for role in child.get(ttm+'role', '').split()) and time(child, 'end') is not None and time(child, 'end') > end: raise DocumentInvalid('end_link_excludes_word', f'行 {source} 的链接结束时间未包含正文词', object_id=source, target_id=target)

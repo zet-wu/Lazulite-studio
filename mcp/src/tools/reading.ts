@@ -647,7 +647,7 @@ export function registerReadingTools(registry: ToolRegistry): void {
   registry.register({
     name: 'apply_readings',
     description:
-      'Batch apply ruby pronunciation annotations by word_id (set_word, split_and_set_word, merge_words) or code-point line spans (set_line_spans). Preserves existing word/ruby timestamps, maintains emptyBeats & endLinks, validates AMLL compatibility, and saves with optimistic concurrency CAS.',
+      'Batch apply ruby pronunciation annotations by word_id (set_word, split_and_set_word, merge_words) or code-point line spans (set_line_spans). Preserves existing word/ruby timestamps, maintains emptyBeats, validates AMLL compatibility, and saves with optimistic concurrency CAS.',
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     inputSchema: {
       project_id: z.string().min(1).describe('Target project ID.'),

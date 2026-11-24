@@ -45,12 +45,10 @@ it('locates envelopes with bounded zoom and preserves zoom for one point',()=>{
  expect(locateViewport({startMs:0,spanMs:1000},10000,0,1000)).toEqual({startMs:0,spanMs:2000});
 });
 
-it('expands only outward, respects end links and keeps attachment children inside assigned rows',()=>{
+it('expands only outward and keeps attachment children inside assigned rows',()=>{
  const doc=createLyricDocument('a'),line=doc.lines[0],word=line.words[0];
  line.beginMs=100;line.endMs=500;word.beginMs=100;word.endMs=200;
  word.rubyUnits=[{id:'r',reading:'a',beginMs:null,endMs:null}];
- const editing={emptyBeats:{},ignoredSyncLineIds:[],skippedAlignmentLineIds:[],endLinks:{[line.id]:'next'}};
- expect(()=>assignTimeline(doc,{kind:'ruby',lineId:line.id,wordId:word.id,rubyId:'r'},1000,3000,editing)).toThrow('timeline.linkConflict');
  doc.romanizationTracks=[{id:'t',language:null,contents:[{id:'c',lineId:line.id,kind:'timed',units:[{id:'u',text:'a',beginMs:100,endMs:2500}]}]}];
  expect(assignTimeline(doc,{kind:'line',lineId:line.id},1000,3000).lines[0]).toMatchObject({beginMs:100,endMs:2500});
  const next=assignTimeline(doc,{kind:'ruby',lineId:line.id,wordId:word.id,rubyId:'r'},150,3000);

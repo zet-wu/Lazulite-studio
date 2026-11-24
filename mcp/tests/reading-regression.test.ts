@@ -5,12 +5,11 @@ import { createToolRegistry } from '../src/mcp-server';
 import { formatToolError } from '../src/tools/registry';
 import { projectFixture } from './project-fixture';
 
-it.each([true, false])('atomically reannotates ruby words with inherited timing=%s, beats, singers and end links', async timed => {
+it.each([true, false])('atomically reannotates ruby words with inherited timing=%s, beats and singers', async timed => {
   const doc = createProjectDocument();
   const word = { ...createWord('待っ', 'w'), agentRefs: ['v'], rubyUnits: [{ id: 'old', reading: 'まっ', beginMs: timed ? 100 : null, endMs: timed ? 900 : null }] };
   doc.lyrics.agents = [{ id: 'v', type: 'person', name: null }]; doc.amll.noWordAgents = false;
   doc.lyrics.lines = [{ ...createLine('', 'l'), beginMs: timed ? 100 : null, endMs: timed ? 900 : null, words: [word] }, { ...createLine('', 'next'), beginMs: 900 }];
-  if (timed) doc.editing.endLinks = { l: 'next' };
   doc.editing.emptyBeats = { old: { kind: 'ruby', count: 2 } };
   const fixture = projectFixture(doc), registry = createToolRegistry();
   const result = await registry.call('apply_readings', { project_id: 'p', expected_revision: 'r1', overwrite_existing: true, operations: [{ mode: 'split_and_set_word', line_id: 'l', word_id: 'w', parts: [{ text: '待', readings: ['ま'] }, { text: 'っ', readings: [] }] }] }, fixture) as { created_word_ids: string[] };
@@ -20,7 +19,6 @@ it.each([true, false])('atomically reannotates ruby words with inherited timing=
   expect(words[0].rubyUnits[0]).toMatchObject({ reading: 'ま', beginMs: timed ? 100 : null, endMs: timed ? 500 : null });
   expect(words[1]).toMatchObject({ beginMs: timed ? 500 : null, endMs: timed ? 900 : null, agentRefs: ['v'] });
   expect(saved.editing.emptyBeats).toEqual({ [words[0].rubyUnits[0].id]: { kind: 'ruby', count: 2 } });
-  expect(saved.editing.endLinks).toEqual(timed ? { l: 'next' } : {});
 });
 it('splits old ruby through line spans and reports exact failed operation without saving', async () => {
   const doc = createProjectDocument(); doc.lyrics.lines = [{ ...createLine('', 'l'), words: [{ ...createWord('真彷徨しゃっ', 'w'), rubyUnits: [{ id: 'r', reading: 'しんさまようしゃっ', beginMs: null, endMs: null }] }] }];

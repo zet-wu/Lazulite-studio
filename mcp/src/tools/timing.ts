@@ -10,12 +10,10 @@ const operation = z.discriminatedUnion('op', [
   z.object({ op: z.literal('set_word_time'), line_id: id(), word_id: id(), ...endpoints() }),
   z.object({ op: z.literal('set_ruby_time'), line_id: id(), word_id: id(), ruby_id: id(), ...endpoints() }),
   z.object({ op: z.literal('set_sublyric_unit_time'), kind: z.enum(['translation','romanization']), track_id: id(), content_id: id(), unit_id: id(), ...endpoints() }),
-  z.object({ op: z.literal('link_line_end'), line_id: id(), target_line_id: id() }),
-  z.object({ op: z.literal('unlink_line_end'), line_id: id() }),
   z.object({ op: z.literal('set_empty_beat'), target_kind: z.enum(['word','ruby']), target_id: id(), count: z.number().int().min(0).max(32) }),
 ]);
 export function registerTimingTools(registry: ToolRegistry) {
-  registry.register({ name: 'edit_timing', description: 'Atomically edit nullable lyric timing endpoints, empty beats and line end links. Omitted endpoints remain unchanged. Word/ruby edits recompute parent envelopes by default using the same domain commands as the desktop editor.', annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+  registry.register({ name: 'edit_timing', description: 'Atomically edit nullable lyric timing endpoints and empty beats. Omitted endpoints remain unchanged. Word/ruby edits recompute parent envelopes by default using the same domain commands as the desktop editor.', annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     inputSchema: { ...writeSchema(), recompute_envelopes: z.boolean().default(true), operations: z.array(operation).min(1) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key }, (doc, envelope) => {
       let next = doc; const affected = new Set<string>();
@@ -30,8 +28,6 @@ export function registerTimingTools(registry: ToolRegistry) {
           next = commitSublyricTracks(next, op.kind, tracks); affected.add(content.lineId); return;
         }
         const line = requireLine(next, op.line_id); affected.add(line.id);
-        if (op.op === 'link_line_end') { next = run(next, { type: 'link-line-end', lineId: line.id, targetLineId: op.target_line_id }); return; }
-        if (op.op === 'unlink_line_end') { next = run(next, { type: 'unlink-line-end', lineId: line.id }); return; }
         if (op.op === 'set_line_time') { next = run(next, { type: 'set-line-time', lineId: line.id, beginMs: op.begin_ms === undefined ? line.beginMs : op.begin_ms, endMs: op.end_ms === undefined ? line.endMs : op.end_ms }); return; }
         const word = requireWord(next, line.id, op.word_id);
         const unit = op.op === 'set_ruby_time' ? word.rubyUnits.find(u => u.id === op.ruby_id) ?? invalid('Ruby unit does not exist.') : word;

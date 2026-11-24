@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { importLyrics } from '../fixtures/import-lyrics';
 
-async function open(page: Page, count = 3, source = 'ka', body = 'は', setup: 'normal' | 'untimed' | 'overwrite' | 'link' = 'normal') {
+async function open(page: Page, count = 3, source = 'ka', body = 'は', setup: 'normal' | 'untimed' | 'overwrite' = 'normal') {
   await page.goto('/projects/sample-project/edit?scenario=no-music');
   const xml = await page.evaluate(async ({ count, source, body, setup }) => {
     const domainPath = '/src/domain/lyric-document.ts'; const domain = await import(domainPath);
@@ -13,24 +13,9 @@ async function open(page: Page, count = 3, source = 'ka', body = 'は', setup: '
       units: Array.from({ length: count }, (_, i) => ({ id: `u${i}`, text: source, beginMs: i * 1000, endMs: (i + 1) * 1000 })) }] }];
     if (setup === 'untimed') doc.romanizationTracks[0].contents[0].units.forEach((unit: any) => { unit.beginMs = null; unit.endMs = null; });
     if (setup === 'overwrite') line.words[0].rubyUnits = [{ id: 'old', reading: 'は', beginMs: 0, endMs: 1000 }];
-    if (setup === 'link') {
-      const next = domain.createLyricDocument('次').lines[0]; next.id = 'next'; next.beginMs = count * 1000;
-      next.endMs = (count + 1) * 1000; Object.assign(next.words[0], { beginMs: next.beginMs, endMs: next.endMs });
-      doc.lines.push(next);
-      doc.romanizationTracks[0].contents[0].units.at(-1).endMs += 1;
-    }
     return codec.serializeLyricTtml(doc, { draft: true });
   }, { count, source, body, setup });
   await importLyrics(page, { name: 'reverse.ttml', mimeType: 'application/xml', buffer: Buffer.from(xml) });
-  if (setup === 'link') {
-    await page.locator('[data-outline-drag]').first().click();
-    await page.locator('[data-top-menu="tools"] summary').click();
-    await page.getByRole('button', { name: '批处理', exact: true }).click();
-    const batch = page.getByRole('dialog', { name: '批处理', exact: true });
-    await batch.getByRole('button', { name: '结束时间链接', exact: true }).click();
-    await batch.getByRole('button', { name: '应用', exact: true }).click();
-    await batch.getByRole('button', { name: '关闭', exact: true }).click();
-  }
   await page.locator('[data-top-menu="tools"] summary').click();
   await page.getByRole('button', { name: '从音译生成注音', exact: true }).click();
   return page.getByRole('dialog', { name: '从音译生成注音', exact: true });
@@ -92,7 +77,7 @@ test('invalid readings recover after manual edits, output resets patrol and punc
   await expect(empty.getByRole('button', { name: '生成注音', exact: true })).toBeDisabled();
 });
 
-test('target and overwrite navigation focus real controls, links stay blocked', async ({ page }) => {
+test('target and overwrite navigation focus real controls', async ({ page }) => {
   let dialog = await open(page, 2, 'ka', '字', 'untimed');
   const patrol = dialog.getByRole('button', { name: '下一处错误／警告' });
   await patrol.click();
@@ -108,12 +93,6 @@ test('target and overwrite navigation focus real controls, links stay blocked', 
   await expect(dialog.getByRole('checkbox', { name: /覆盖/ })).toBeFocused();
   await dialog.getByRole('checkbox', { name: /覆盖/ }).check();
   await expect(dialog.getByRole('button', { name: '生成注音', exact: true })).toBeEnabled();
-  await dialog.getByRole('button', { name: '取消', exact: true }).click();
-  dialog = await open(page, 2, 'ka', '字', 'link');
-  await dialog.getByRole('button', { name: /阻塞.*行尾链接/ }).click();
-  await expect(dialog.locator('[data-ruby-source]').first()).toBeFocused();
-  await expect(page.getByRole('tooltip')).toContainText('请先处理链接');
-  await expect(dialog.getByRole('button', { name: '生成注音', exact: true })).toBeDisabled();
 });
 
 for (const count of [80, 81]) test(`virtualization boundary ${count} and output change reset巡查`, async ({ page }) => {

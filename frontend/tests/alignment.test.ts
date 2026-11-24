@@ -38,13 +38,13 @@ it('uses available internal boundaries and avoids history when all proposals are
  expect(mergeAlignment(p,r,5000).project.lyrics.lines[0].words[0]).toMatchObject({beginMs:2000,endMs:3000});
  expect(mergeAlignment(p,result(p,[[null,null],[null,null]]),5000).project).toBe(p);
 });
-it('freezes skipped rows and restores cross-boundary links on undo',()=>{
- const p=fixture();p.lyrics.lines[0].beginMs=0;p.lyrics.lines[0].endMs=1000;p.lyrics.lines[1].beginMs=1000;p.editing.skippedAlignmentLineIds=['a'];p.editing.endLinks={a:'b'};
+it('freezes skipped rows and restores aligned project on undo',()=>{
+ const p=fixture();p.lyrics.lines[0].beginMs=0;p.lyrics.lines[0].endMs=1000;p.lyrics.lines[1].beginMs=1000;p.editing.skippedAlignmentLineIds=['a'];
  const r=result(p,[[2,3]]);r.mapping[0]={...r.mapping[0],line_id:'b',word_id:p.lyrics.lines[1].words[0].id,object_id:p.lyrics.lines[1].words[0].id};r.alignment.units[0].line_id='b';
  r.scope=scopeFor(p,r);
  const next=mergeAlignment(p,r,5000).project;
- expect(next.lyrics.lines[0]).toEqual(p.lyrics.lines[0]);expect(next.editing.endLinks).toEqual({});
- expect(undoProjectCommand(executeProjectCommand(createProjectEditorState(p),{type:'alignment',source:p,project:next})).present.editing.endLinks).toEqual({a:'b'});
+ expect(next.lyrics.lines[0]).toEqual(p.lyrics.lines[0]);
+ expect(undoProjectCommand(executeProjectCommand(createProjectEditorState(p),{type:'alignment',source:p,project:next})).present).toBe(p);
 });
 
 it('clears missing endpoints but preserves illegal proposals and available target envelopes',()=>{

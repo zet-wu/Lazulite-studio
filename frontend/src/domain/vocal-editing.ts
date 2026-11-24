@@ -49,7 +49,5 @@ export function editSegments(acoustics: Acoustics, operation: { type: 'put'; seg
 
 export function assignVocalSegmentCommand(project: import('./project-document').ProjectDocument, lineId: string, segment: VocalSegment): import('./lyric-commands').LyricCommand {
   const document = assignVocalSegment(project.lyrics, lineId, segment);
-  const editing = structuredClone(project.editing);
-  for (const [source, target] of Object.entries(editing.endLinks)) if (source === lineId || target === lineId) delete editing.endLinks[source];
-  return { type: 'replace-document', document, editing };
+  return { type: 'replace-document', document };
 }

@@ -68,12 +68,11 @@ def test_project_editing_survives_real_project_save(tmp_path):
             '</div></body></tt>')
     before = client.get("/api/v1/projects/p/document")
     snapshot = initial_project(ttml)
-    snapshot['editing']['endLinks'] = {'a': 'b'}
     snapshot['editing']['ignoredSyncLineIds'] = ['a']
     saved = client.put("/api/v1/projects/p/document", json={
         "schema_version": "studio-document-v9", "project_id": "p", "revision": before.json()["revision"],
         "document": snapshot},
-        headers={"origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "e3-end-link"})
+        headers={"origin": "http://studio", "if-match": before.headers["etag"], "idempotency-key": "e3-editing"})
     assert saved.status_code == 200
     reopened = client.get("/api/v1/projects/p/document")
     assert reopened.json()["document"]["lyrics"]["draftTtml"] == normalized_ttml(ttml)
@@ -142,7 +141,7 @@ def test_invalid_project_editing_is_rejected_without_revision_change(tmp_path):
         {'emptyBeats': {'w': {'kind': 'ruby', 'count': 1}}},
         {'emptyBeats': {'missing': {'kind': 'word', 'count': 1}}},
         {'ignoredSyncLineIds': ['a', 'a']},
-        {'endLinks': {'a': 'missing'}},
+        {'skippedAlignmentLineIds': ['missing']},
     ]
     for patch in invalid:
         document = deepcopy(snapshot)

@@ -34,7 +34,7 @@ function assign(word: LyricWord, rubyUnitId: string | null, side: 'beginMs' | 'e
   return { ...word, rubyUnits, beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null };
 }
 
-function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endMs', timeMs: number, editing: ProjectEditing): LyricLine {
+function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endMs', timeMs: number): LyricLine {
   const index = line.words.findIndex((word) => word.id === cursor.wordId);
   if (index < 0) throw new MessageError(message('sync.wordMissing'));
   const words = line.words.slice();
@@ -43,7 +43,6 @@ function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endM
   const ends = words.map((word) => word.endMs).filter((value): value is number => value !== null);
   const beginMs = starts.length ? Math.min(...starts, ...(line.beginMs === null ? [] : [line.beginMs])) : line.beginMs;
   const endMs = ends.length ? Math.max(...ends, ...(line.endMs === null ? [] : [line.endMs])) : line.endMs;
-  if (endMs !== line.endMs) delete editing.endLinks[line.id];
   return { ...line, words, beginMs, endMs };
 }
 
@@ -58,28 +57,15 @@ export function stampSync(document: LyricDocument, cursor: SyncCursor, action: S
   const next = action === 'next' && (mode === 'continuous' || successor?.lineId === current.lineId) ? successor : null;
   const changes = new Map<string, LyricLine>();
   const read = (id: string) => changes.get(id) ?? document.lines.find((line) => line.id === id)!;
-  if (action === 'start') changes.set(current.lineId, updateUnit(read(current.lineId), current, 'beginMs', timeMs, editing));
+  if (action === 'start') changes.set(current.lineId, updateUnit(read(current.lineId), current, 'beginMs', timeMs));
   else {
     const original = read(current.lineId).words.find((word) => word.id === current.wordId)!;
     const begin = current.rubyUnitId ? original.rubyUnits.find((unit) => unit.id === current.rubyUnitId)!.beginMs : original.beginMs;
     if (begin === null) throw new MessageError(message('sync.startFirst'));
     if (timeMs < begin) throw new MessageError(message('sync.endBeforeStart'));
-    changes.set(current.lineId, updateUnit(read(current.lineId), current, 'endMs', timeMs, editing));
-    if (next) changes.set(next.lineId, updateUnit(read(next.lineId), next, 'beginMs', timeMs, editing));
+    changes.set(current.lineId, updateUnit(read(current.lineId), current, 'endMs', timeMs));
+    if (next) changes.set(next.lineId, updateUnit(read(next.lineId), next, 'beginMs', timeMs));
   }
   const lines = document.lines.map((line) => changes.get(line.id) ?? line);
-  // A linked end follows the target start, but never excludes the source words.
-  // Validate the whole result before exposing the single timing transaction.
-  return { ...document, lines: lines.map(line => {
-    if (!editing.endLinks[line.id] || !changes.has(editing.endLinks[line.id])) return line;
-    const target = changes.get(editing.endLinks[line.id])!;
-    const original = document.lines.find(item => item.id === target.id)!;
-    if (target.beginMs === original.beginMs) return line;
-    const endMs = target.beginMs;
-    if (endMs === null || line.beginMs !== null && line.beginMs > endMs || line.words.some(word => word.endMs !== null && word.endMs > endMs)) {
-      throw new MessageError(message('sync.linkConflict'));
-    }
-    return { ...line, endMs };
-  }) };
-
+  return { ...document, lines };
 }

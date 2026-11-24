@@ -32,12 +32,8 @@ it('clears each child kind without changing ancestors or siblings',()=>{
   if(i>=3){expect(next.lines[0]).toBe(line);const key=i===3?'romanizationTracks':'translationTracks';expect(next[key][0].contents[0]).toMatchObject({units:[{beginMs:null,endMs:null,text:'ai'}]});}
  }
 });
-it('clears a multi-selection atomically and rejects links at either end without altering source',()=>{
- const {doc,line,targets}=sample(),project=createProjectDocument(doc);
- const second={...createLine('次','next'),beginMs:4000,endMs:6000};doc.lines.push(second);project.editing.endLinks[line.id]=second.id;
- const original=structuredClone(doc);
- for(const lineId of [line.id,second.id])expect(()=>clearTimelineTimes(doc,[targets[1],{kind:'line',lineId}],project.editing)).toThrow(/timeline.clearLinked/);
- expect(doc).toEqual(original);
+it('clears a multi-selection atomically without altering other targets',()=>{
+ const {doc,targets}=sample();
  const next=clearTimelineTimes(doc,[targets[1],targets[2]]);expect(next.lines[0].words[0]).toMatchObject({beginMs:null,endMs:null,rubyUnits:[{beginMs:null,endMs:null}]});
 });
 
