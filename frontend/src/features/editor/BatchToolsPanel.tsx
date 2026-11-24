@@ -43,11 +43,15 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
   const rubyIds = scope === 'selected' && selection?.kind === 'ruby' ? selection.ids : document.lines.flatMap(line => line.words.filter(word => wordIds.includes(word.id)).flatMap(word => word.rubyUnits.map(unit => unit.id)));
   let preview: { command: LyricCommand; changed: number; summary: string } | undefined;
   let previewError: import('../../domain/messages').Message | null = null;
-  if (operation === 'replace' || operation === 'clear-ruby') {
+  if (operation === 'replace' || operation === 'clear-ruby' || operation === 'smooth') {
     try {
       if (scope === 'selected' && selection?.kind === 'ruby' && (replaceTarget === 'words' || operation === 'clear-ruby')) throw new MessageError(describeMessage('batch.selectText'));
       if (scope === 'selected' && selection?.kind !== 'words' && selection?.kind !== 'lines' && selection?.kind !== 'ruby') throw new MessageError(describeMessage('batch.select'));
-      if (operation === 'clear-ruby') {
+      if(operation==='smooth'){
+        if(!thresholdMs.trim())throw new MessageError(describeMessage('batch.integerThreshold'));
+        const result=smoothWordTimes(document,targets.map(line=>line.id),Number(thresholdMs));
+        preview={command:result.command,changed:result.count,summary:t('batch.smoothPreview',{count:result.count})};
+      } else if (operation === 'clear-ruby') {
         const result = clearRuby(document, wordIds, editing);
         preview = { command: result.command, changed: result.ruby, summary: t('batch.clearSummary',{words:result.words,ruby:result.ruby,beats:result.beats}) };
       } else {
@@ -66,7 +70,7 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
       if (!targets.length) throw new MessageError(describeMessage('batch.noLines'));
       let command: LyricCommand;
       let summary: string | import('../../domain/messages').Message = '';
-      if (operation === 'replace' || operation === 'clear-ruby') {
+      if (operation === 'replace' || operation === 'clear-ruby' || operation === 'smooth') {
         if (previewError) throw new MessageError(previewError);
         if (!preview?.changed) throw new MessageError(describeMessage(operation === 'clear-ruby' ? 'batch.noRuby' : 'batch.noChanges'));
         command = preview.command; summary = preview.summary;
@@ -75,12 +79,6 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
         if (!Number.isFinite(amount) || !Number.isSafeInteger(Math.round(amount))) throw new MessageError(describeMessage('batch.offsetInvalid'));
         command = { type: 'shift-lines', lineIds: targets.map(line => line.id), deltaMs: Math.round(amount) };
         summary = describeMessage('batch.shiftSummary',{count:targets.length});
-      } else if (operation === 'smooth') {
-        const amount = Number(thresholdMs);
-        if (!Number.isFinite(amount) || !Number.isSafeInteger(Math.round(amount))) throw new MessageError(describeMessage('batch.thresholdInvalid'));
-        const result = smoothWordTimes(document, targets.map((line) => line.id), Math.round(amount));
-        if (!result.count) throw new MessageError(describeMessage('batch.noSmooth'));
-        command = result.command; summary = describeMessage('batch.smoothSummary',{count:result.count});
       } else {
         command = syncLineTimes(document, targets.map((line) => line.id));
         summary = describeMessage('batch.syncSummary',{count:targets.length});
@@ -93,7 +91,7 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
       {scope === 'range' && <div className={styles.batchRange}><label>{t('edit.fromLine')}<input type="number" min="1" max={document.lines.length} value={from} onChange={(event) => setFrom(Number(event.target.value))} /> {t('edit.lineUnit')}</label><label>{t('edit.toLine')}<input type="number" min="1" max={document.lines.length} value={to} onChange={(event) => setTo(Number(event.target.value))} /> {t('edit.lineUnit')}</label></div>}
       </div>);
   if (operation === 'segment') return <SegmentationPanel document={document} wordIds={scope === 'selected' && selection?.kind !== 'words' && selection?.kind !== 'lines' ? [] : wordIds} apply={apply} close={close} navigation={navigation} scopeControl={scopeControl}/>;
-  return <SettingsDialog title={t('batch.title')} close={close} actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.close')}</button><button data-role="primary" onClick={run}>{t('edit.applyUndo')}</button></>}>
+  return <SettingsDialog title={t('batch.title')} close={close} actions={<><button data-dialog-close data-role="secondary" onClick={close}>{t('common.close')}</button><button data-role="primary" disabled={operation==='smooth'&&(!preview?.changed||!!previewError)} onClick={run}>{t('edit.applyUndo')}</button></>}>
     {navigation}
     <div className={fields.group}>
       {scopeControl}

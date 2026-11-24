@@ -1,3 +1,6 @@
+import {addImportWarning, type ImportWarning} from '../import-warnings';
+const externalWarnings=new WeakMap<Document,ImportWarning[]>();
+function warn(node:Element,key:string){const warnings=externalWarnings.get(node.ownerDocument);if(!warnings)return false;addImportWarning(warnings,key);return true;}
 import { message, MessageError } from '../../domain/messages';
 import { validateAgents } from '../../domain/amll-compatibility';
 import { timeEnvelope } from '../../domain/lyric-commands';
@@ -25,6 +28,7 @@ function readAgent(node: Element): LyricAgent {
     for (const a of Array.from(element.attributes)) {
       if (a.namespaceURI === 'http://www.w3.org/2000/xmlns/') continue;
       if (allowed.includes(a.namespaceURI ? `{${a.namespaceURI}}${a.localName}` : a.localName)) continue;
+      if(warn(element,'import.ignoredAttribute'))continue;
       throw new MessageError(message('ttml.agentAttribute',{id,element:element.localName,attribute:a.name}));
     }
   };
@@ -80,7 +84,7 @@ function boundaries(node: Element, parentStart: number, parentEnd: TimeMs, absol
   const endFromDur = durRaw === null ? null : (begin ?? parentStart) + parseTime(durRaw);
   const end = nulls.includes('end') ? null : [endFromEnd, endFromDur].filter((value): value is number => value !== null).reduce<number | null>((left, value) => left === null ? value : Math.min(left, value), null);
   // Saved editor drafts may contain timing issues; reopen them without changing endpoints.
-  if (!draft && parentEnd !== null && ((begin !== null && begin > parentEnd) || (end !== null && end > parentEnd))) throw new MessageError(message('ttml.childOutside'));
+  if (!draft && parentEnd !== null && ((begin !== null && begin > parentEnd) || (end !== null && end > parentEnd)) && !warn(node,'import.childOutside')) throw new MessageError(message('ttml.childOutside'));
   return [begin, end];
 }
 
@@ -109,6 +113,7 @@ function checkAttributes(node: Element, allowed: string[], word = false) {
     }
     if ([ITUNES, ITUNES_EXT].includes(attribute.namespaceURI ?? '') && ['key', 'timing', 'songPart'].includes(attribute.localName)) continue;
     if (attribute.namespaceURI === STUDIO && ['id', 'kind', 'null'].includes(attribute.localName)) continue;
+    if(warn(node,'import.ignoredAttribute'))continue;
     throw new MessageError(message('ttml.attribute',{attribute:attribute.name,element:node.localName}));
   }
 }
@@ -211,12 +216,25 @@ function readRomanization(item: Element, lineId: string, absoluteTimes: boolean,
   return { id, lineId, kind: 'timed', units };
 }
 
-export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean } = {}): LyricDocument {
+export function parseLyricTtml(xml: string, { draft = false, warnings }: { draft?: boolean; warnings?:ImportWarning[] } = {}): LyricDocument {
   if (/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml)) throw new MessageError(message('ttml.entities'));
   const parsed = new DOMParser().parseFromString(xml, 'application/xml');
   if (parsed.querySelector('parsererror')) throw new MessageError(message('ttml.xml'));
   const root = parsed.documentElement;
   if (root.namespaceURI !== TTML || root.localName !== 'tt') throw new MessageError(message('ttml.root'));
+  if(warnings&&!draft) {
+    externalWarnings.set(parsed,warnings);
+    const ids=new Set<string>();
+    for(const node of Array.from(root.getElementsByTagName('*'))) {
+      const role=attr(node,TTM,'role');
+      if(role) {
+        const known=role.split(/\s+/).filter(value=>['expletive','x-bg','x-translation','x-roman'].includes(value));
+        if(known.join(' ')!==role){addImportWarning(warnings,'import.ignoredRole');if(known.length)node.setAttributeNS(TTM,'ttm:role',known.join(' '));else node.removeAttributeNS(TTM,'role');}
+      }
+      const id=attr(node,XML,'id');
+      if(id&&is(node,TTML,'p')){if(ids.has(id)){let replacement:string;do{replacement=`${id}-${crypto.randomUUID()}`;}while(ids.has(replacement));node.setAttributeNS(XML,'xml:id',replacement);addImportWarning(warnings,'import.duplicateId');ids.add(replacement);}else ids.add(id);}
+    }
+  }
   checkAttributes(root, ['begin', 'end']);
   const absoluteTimes = attr(root, ITUNES, 'timing') !== null;
   const agents: LyricAgent[] = [];
@@ -230,17 +248,17 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
   const readAppleMetadata = (node: Element) => {
     checkAttributes(node, []);
     for (const group of Array.from(node.children)) {
-      if (!is(group, ITUNES, 'songwriters') && !is(group, ITUNES, 'translations') && !is(group, ITUNES, 'transliterations')) throw new MessageError(message('ttml.elementUnsupported',{context:'iTunes metadata',element:group.localName}));
+      if (!is(group, ITUNES, 'songwriters') && !is(group, ITUNES, 'translations') && !is(group, ITUNES, 'transliterations')) {if(warn(group,'import.ignoredElement'))continue;throw new MessageError(message('ttml.elementUnsupported',{context:'iTunes metadata',element:group.localName}));}
       checkAttributes(group, []);
       for (const entry of Array.from(group.children)) {
         if (is(group, ITUNES, 'songwriters')) {
-          if (!is(entry, ITUNES, 'songwriter')) throw new MessageError(message('ttml.elementUnsupported',{context:'songwriter',element:entry.localName}));
+          if (!is(entry, ITUNES, 'songwriter')) {if(warn(entry,'import.ignoredElement'))continue;throw new MessageError(message('ttml.elementUnsupported',{context:'songwriter',element:entry.localName}));}
           checkAttributes(entry, []);
           addMetadata('songwriter', textOnly(entry, 'Songwriter'));
           continue;
         }
         const translation = is(group, ITUNES, 'translations');
-        if (!is(entry, ITUNES, translation ? 'translation' : 'transliteration')) throw new MessageError(message('ttml.elementUnsupported',{context:'iTunes sublyric',element:entry.localName}));
+        if (!is(entry, ITUNES, translation ? 'translation' : 'transliteration')) {if(warn(entry,'import.ignoredElement'))continue;throw new MessageError(message('ttml.elementUnsupported',{context:'iTunes sublyric',element:entry.localName}));}
         checkAttributes(entry, translation ? ['type'] : []);
         const purpose = attr(entry, null, 'type') ?? 'subtitle';
         if (translation && purpose !== 'subtitle' && purpose !== 'replacement') throw new MessageError(message('ttml.translationType'));
@@ -249,9 +267,10 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
           language: attr(entry, XML, 'lang'), contents: [] as RomanizationContent[],
         };
         for (const item of Array.from(entry.children)) {
-          if (!is(item, ITUNES, 'text')) throw new MessageError(message('ttml.elementUnsupported',{context:'iTunes sublyric child',element:item.localName}));
+          if (!is(item, ITUNES, 'text')) {if(warn(item,'import.ignoredElement'))continue;throw new MessageError(message('ttml.elementUnsupported',{context:'iTunes sublyric child',element:item.localName}));}
           checkAttributes(item, ['for']);
           const lineId = attr(item, null, 'for');
+          if (!lineId&&warn(item,'import.orphan'))continue;
           if (!lineId) throw new MessageError(message('ttml.sublyricReference'));
           const background = Array.from(item.children).filter(node => attr(node, TTM, 'role') === 'x-bg');
 
@@ -293,15 +312,16 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
             continue;
           }
           if (is(entry, ITUNES, 'iTunesMetadata')) { readAppleMetadata(entry); continue; }
-          if (entry.namespaceURI !== TTM) throw new MessageError(message('ttml.elementUnsupported',{context:'metadata',element:entry.localName}));
+          if (entry.namespaceURI !== TTM) {if(warn(entry,'import.ignoredElement'))continue;throw new MessageError(message('ttml.elementUnsupported',{context:'metadata',element:entry.localName}));}
           checkAttributes(entry, []);
+          if(entry.children.length&&warn(entry,'import.ignoredElement'))continue;
           addMetadata(entry.localName, textOnly(entry, 'Metadata'));
         }
-      } else throw new MessageError(message('ttml.elementUnsupported',{context:'TTML head child',element:child.localName}));
+      } else if(!warn(child,'import.ignoredElement')) throw new MessageError(message('ttml.elementUnsupported',{context:'TTML head child',element:child.localName}));
     }
   }
   const body = Array.from(root.children).find((child) => is(child, TTML, 'body'));
-  if (!body || Array.from(root.children).some((child) => child !== head && child !== body)) throw new MessageError(message('ttml.body'));
+  if (!body || Array.from(root.children).some((child) => child !== head && child !== body && !warn(child,'import.ignoredElement'))) throw new MessageError(message('ttml.body'));
   const visit = (parent: Element, parentStart: number, parentEnd: TimeMs, depth: number, songPart: string | null) => {
     if (depth > 128) throw new MessageError(message('ttml.depth'));
     checkAttributes(parent, ['begin', 'end', 'dur', 'timeContainer']);
@@ -313,7 +333,7 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
         visit(child, start, ownEnd, depth + 1, part);
         continue;
       }
-      if (!is(child, TTML, 'p')) throw new MessageError(message('ttml.elementUnsupported',{context:'TTML body child',element:child.localName}));
+      if (!is(child, TTML, 'p')) {if(warn(child,'import.ignoredElement'))continue;throw new MessageError(message('ttml.elementUnsupported',{context:'TTML body child',element:child.localName}));}
       checkAttributes(child, ['begin', 'end', 'dur']);
       const [beginMs, endMs] = boundaries(child, start, ownEnd, absoluteTimes, draft);
       const id = attr(child, XML, 'id') ?? attr(child, ITUNES, 'key') ?? `line-${lines.length + 1}`;
@@ -342,6 +362,7 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
         if (word) words.push(word);
       }
       const agentRefs = (attr(child, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
+      if(warnings&&!draft)for(const ref of agentRefs)if(!agents.some(agent=>agent.id===ref)){agents.push({id:ref,name:null,type:'person'});addImportWarning(warnings,'import.unknownAgent');}
       if (agentRefs.some((ref) => !agents.some((agent) => agent.id === ref))) throw new MessageError(message('ttml.unknownAgent',{id}));
       lines.push({ id, words, beginMs, endMs, agentRefs, backgroundOf: null, songPart: part });
       const addInline = (values: typeof inlineRomanizations, lineId: string) => values.forEach((value, index) => {
@@ -380,6 +401,7 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
         }
         addInline(bgRomanizations, bgId);
         const bgAgents = (attr(background, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
+        if(warnings&&!draft)for(const ref of bgAgents)if(!agents.some(agent=>agent.id===ref)){agents.push({id:ref,name:null,type:'person'});addImportWarning(warnings,'import.unknownAgent');}
         if (bgAgents.some(ref => !agents.some(agent => agent.id === ref))) throw new MessageError(message('ttml.unknownAgent',{id:bgId}));
         if (bgWords[0]?.text.startsWith('(') && bgWords.at(-1)!.text.endsWith(')')) {
           bgWords[0] = { ...bgWords[0], text: bgWords[0].text.replace(/^\(/, '') };
@@ -398,10 +420,12 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
     const candidates = lines.filter(line => line.backgroundOf === parentId);
     if (!backgroundId && candidates.length > 1) throw new MessageError(message('ttml.backgroundFor'));
     const background = candidates.find(line => !backgroundId || line.id === backgroundId);
+    if (!background && warnings&&!draft){for(const track of [...translationTracks,...romanizationTracks])track.contents=track.contents.filter(item=>item!==content);addImportWarning(warnings,'import.orphan');continue;}
     if (!background) throw new MessageError(message('ttml.backgroundParent',{id:parentId}));
     content.lineId = background.id;
   }
   romanizationTracks.push(...inlineRomanizationTracks.values());
+  if(warnings&&!draft)for(const track of [...romanizationTracks,...translationTracks])track.contents=track.contents.filter(content=>{if(lines.some(line=>line.id===content.lineId))return true;addImportWarning(warnings,'import.orphan');return false;});
   for (const track of [...romanizationTracks, ...translationTracks]) for (const content of track.contents) {
     if (!lines.some((line) => line.id === content.lineId)) throw new MessageError(message('ttml.unknownLine',{id:content.lineId}));
   }
@@ -418,6 +442,8 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
   for (const agent of agents) if (agent.actorRef && !agents.some(a => a.id === agent.actorRef)) throw new MessageError(message('ttml.actorMissing',{id:agent.id,reference:agent.actorRef}));
   validateTranslationTracks(translationTracks, new Set(lines.map(line => line.id)));
   const document = { schemaVersion: LYRIC_SCHEMA_VERSION, lines, romanizationTracks, translationTracks, agents, metadata, language: attr(root, XML, 'lang') };
+  if(!lines.length||lines.length>20000)throw new MessageError(message('parse.lineCount'));
+  if(warnings&&!draft){for(const line of lines)for(const word of line.words)for(const ref of word.agentRefs??[])if(!agents.some(agent=>agent.id===ref)){agents.push({id:ref,name:null,type:'person'});addImportWarning(warnings,'import.unknownAgent');}}
   validateAgents(document);
   return document;
 }

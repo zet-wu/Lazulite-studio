@@ -1,3 +1,4 @@
+import {type ImportWarning} from './import-warnings';
 import { message, MessageError } from '../domain/messages';
 import { plainTranslation, createLyricDocument, createLine, createWord, lineText, type LyricDocument, type RomanizationTrack } from '../domain/lyric-document';
 const time = (ms: number) => { if (!Number.isFinite(ms) || ms < 0) throw new MessageError(message('parse.timeInvalid')); return Math.round(ms); };
@@ -10,13 +11,13 @@ export function parseWordFormat(text: string, kind: 'krc' | 'qrc' | 'yrc', onSid
   const d = createLyricDocument(); d.lines = [];
   const offset = Number(text.match(/^\[offset:([+-]?\d+)\]/m)?.[1] ?? 0);
   for (const [index, raw] of text.split(/\r?\n/).entries()) {
-    const row = raw.match(/^\[(\d+),(\d+)\](.*)$/);
+    const row = raw.match(/^\[(\d+),(-?\d+)\](.*)$/);
     if (!row) {
       if (raw.trim() && !/^\[[a-zA-Z]+:.*\]$/.test(raw.trim())) throw new MessageError(message('parse.invalidLine',{number:index+1}));
       continue;
     }
     const start = Number(row[1]), line = createLine(''); line.beginMs = time(start + offset); line.endMs = time(start + Number(row[2]) + offset);
-    const pattern = kind === 'krc' ? /<(\d+),(\d+),\d+>([\s\S]*?)(?=<\d+,\d+,\d+>|$)/g : kind === 'yrc' ? /\((\d+),(\d+),\d+\)([\s\S]*?)(?=\(\d+,\d+,\d+\)|$)/g : /([\s\S]*?)\((\d+),(\d+)\)/g;
+    const pattern = kind === 'krc' ? /<(\d+),(-?\d+),\d+>([\s\S]*?)(?=<\d+,-?\d+,\d+>|$)/g : kind === 'yrc' ? /\((\d+),(-?\d+),\d+\)([\s\S]*?)(?=\(\d+,-?\d+,\d+\)|$)/g : /([\s\S]*?)\((\d+),(-?\d+)\)/g;
     let consumed = 0;
     for (const m of row[3].matchAll(pattern)) {
       if (m.index !== consumed) throw new MessageError(message('parse.wordTagText'));
@@ -63,7 +64,7 @@ export async function decodeKrcFile(file: File): Promise<string> {
   try { while (true) { const { value, done } = await reader.read(); if (done) break; result += decoder.decode(value, { stream: true }); } return result + decoder.decode(); }
   finally { await reader.cancel(); }
 }
-export function parseLrcSource(text: string, lineTimedWords?: Set<string>): LyricDocument {
+export function parseLrcSource(text: string, lineTimedWords?: Set<string>, warnings?:ImportWarning[]): LyricDocument {
   const d = createLyricDocument(); d.lines = [];
   const offset = Number(text.match(/^\[offset:([+-]?\d+)\]/m)?.[1] ?? 0);
   const clock = (a: string, b: string) => time(Number(a) * 60000 + Number(b) * 1000 + offset);
@@ -75,7 +76,7 @@ export function parseLrcSource(text: string, lineTimedWords?: Set<string>): Lyri
       const line = createLine(''); line.beginMs = clock(h[1], h[2]);
       let begin = line.beginMs, pos = 0;
       for (const marker of body.matchAll(/<(\d+):(\d+(?:\.\d+)?)>/g)) {
-        const end = clock(marker[1], marker[2]); if (end < begin) throw new MessageError(message('parse.elrcReversed'));
+        const end = clock(marker[1], marker[2]); if (end < begin && !warnings) throw new MessageError(message('parse.elrcReversed'));
         const value = body.slice(pos, marker.index); if (value) line.words.push({ ...createWord(value), beginMs: begin, endMs: end });
         begin = end; pos = marker.index! + marker[0].length;
       }

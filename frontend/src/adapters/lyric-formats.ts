@@ -1,3 +1,4 @@
+import {addImportWarning, importedWarnings, type ImportWarning} from './import-warnings';
 import { importSugFile } from './sug-import';
 import { message, MessageError } from '../domain/messages';
 import type { ProjectEditing } from '../domain/project-editing';
@@ -28,16 +29,16 @@ export function detectLyricFormat(name: string): LyricFormat {
   throw new MessageError(message('parse.unsupportedFormat'));
 }
 
-export function importLyricFile(content: string, format: Exclude<LyricFormat, 'ass'>, onSidecarIssue?: () => void, lineTimedWords?: Set<string>): LyricDocument {
+function parseLyricFile(content: string, format: Exclude<LyricFormat, 'ass'>, onSidecarIssue?: () => void, lineTimedWords?: Set<string>, warnings:ImportWarning[]=[]): LyricDocument {
   if (format === 'sug') return importSugFile(content).document;
-  if (format === 'ttml') return parseLyricTtml(content);
+  if (format === 'ttml') return parseLyricTtml(content,{warnings});
   if (format === 'txt') {
     const text = content.replace(/^\uFEFF/, '').split(/\r?\n/).filter((value) => value.trim());
     if (!text.length || text.length > 20_000) throw new MessageError(message('parse.lineCount'));
     return { ...createLyricDocument(), lines: text.map((value) => createLine(value)) };
   }
   if (format === 'krc' || format === 'yrc' || format === 'qrc') return parseWordFormat(content, format, onSidecarIssue);
-  if (format === 'lrc' || format === 'elrc') return parseLrcSource(content, lineTimedWords);
+  if (format === 'lrc' || format === 'elrc') return parseLrcSource(content, lineTimedWords,warnings);
   const parsed = parseTimed[format](content);
   if (!parsed.length || parsed.length > 20_000) throw new MessageError(message('parse.noLines'));
   let mainId: string | null = null;
@@ -50,7 +51,7 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
     else mainId = line.id;
     line.agentRefs = item.isDuet ? ['v2'] : ['v1'];
     line.beginMs = milliseconds(item.startTime); line.endMs = milliseconds(item.endTime);
-    if (line.endMs < line.beginMs) throw new MessageError(message('parse.reversed'));
+
     line.words = item.words.map((word) => ({ ...createWord(word.word), beginMs: milliseconds(word.startTime), endMs: milliseconds(word.endTime) }));
     const romanUnits = item.words.filter((word) => word.romanWord !== undefined).map((word) => ({ id: crypto.randomUUID(), text: word.romanWord ?? '', beginMs: milliseconds(word.startTime), endMs: milliseconds(word.endTime) }));
     if (romanUnits.length) timedTrack.contents.push({ id: crypto.randomUUID(), lineId: line.id, kind: 'timed', units: romanUnits });
@@ -61,6 +62,16 @@ export function importLyricFile(content: string, format: Exclude<LyricFormat, 'a
   return { ...createLyricDocument(), lines, translationTracks: translationTrack.contents.length ? [translationTrack] : [],
     agents: [{ id: 'v1', name: null, type: 'person' }, { id: 'v2', name: null, type: 'person' }],
     romanizationTracks: [timedTrack, plainTrack].filter((track) => track.contents.length) };
+}
+
+export function importLyricFile(content:string,format:Exclude<LyricFormat,'ass'>,onSidecarIssue?:()=>void,lineTimedWords?:Set<string>):LyricDocument {
+  const warnings:ImportWarning[]=[];
+  const document=parseLyricFile(content,format,onSidecarIssue,lineTimedWords,warnings);
+  for(const line of document.lines)for(const item of [line,...line.words,...line.words.flatMap(word=>word.rubyUnits)]) {
+    if(item.beginMs!==null&&item.endMs!==null&&item.endMs<item.beginMs)addImportWarning(warnings,'import.reversed');
+  }
+  importedWarnings.set(document,warnings);
+  return document;
 }
 
 export function exportLyricFile(document: LyricDocument, format: LyricFormat, editing?: ProjectEditing): string {
