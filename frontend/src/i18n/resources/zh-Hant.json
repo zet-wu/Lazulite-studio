@@ -1707,7 +1707,7 @@
   "sync.stop": "終止點",
   "sync.addStop": "開啟終止點",
   "sync.removeStop": "關閉終止點",
-  "sync.singleKey": "單鍵打軸",
+  "sync.singleKey": "打軸",
   "search.score": "匹配度 {{score}}%",
   "alignment.local": "局部對齊",
   "alignment.localRangeRequired": "選擇至少兩個讀音單元，並先設定有效起止時間",

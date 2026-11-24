@@ -351,7 +351,7 @@ textarea.romanPreviewInput { width: 100%; resize: none; overflow: hidden; min-he
 .syncMarkers .syncStop { width: 16px; opacity: .45; }
 .syncMarkers .syncStop[aria-pressed="true"], .syncMarkers .syncStop:focus-visible, .syncMarkers .syncStop:hover { opacity: 1; }
 .syncMarkers .syncStop[aria-pressed="false"]:hover::after, .syncMarkers .syncStop[aria-pressed="false"]:focus-visible::after { content: ""; width: 7px; height: 7px; border: 1px solid currentColor; border-radius: 50%; }
-.syncMarkers button[data-role][data-role] { display: grid; place-items: center; height: 24px; min-height: 24px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--muted); }
+.syncMarkers button[data-role][data-role] { display: grid; place-items: center; height: 24px; min-height: 24px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--muted); box-shadow: none; }
 .syncMarkers .syncDot { flex: 0 0 16px; min-width: 16px; }
 .syncMarkers .syncBeat { flex: 0 0 16px; width: 16px; }
 .syncMarkers button[data-role][data-current] { color: var(--blue); }

@@ -11188,7 +11188,7 @@
     "params": []
   },
   "sync.singleKey": {
-    "source": "单键打轴",
+    "source": "打轴",
     "context": "桌面打轴风格、节奏点与终止点设置。",
     "params": []
   },

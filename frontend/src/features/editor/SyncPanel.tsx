@@ -135,9 +135,9 @@ export function SyncPanel({ progress, onProgress, document, lineOrder, cursor, t
       <button data-role="secondary" disabled={!canMoveUnit(index - 1)} onClick={() => moveUnit(index - 1)}>{t('sync.previousUnit')}</button>
       <button data-role="secondary" disabled={!units.slice(0, index).some((unit) => unit.lineId !== active?.lineId)} onClick={previousLine}>{t('sync.previousLine')}</button>
       {style === 'sug' && <button data-role="primary" disabled={!transport || !active || completed} onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); sugStamp('pressed'); }} onPointerUp={() => sugStamp('released')} onPointerCancel={() => { heldKey.current = null; }} onKeyDown={event => { if (event.key === 'Enter' && !event.repeat) { event.preventDefault(); event.stopPropagation(); sugStamp('pressed'); } }} onKeyUp={event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); sugStamp('released'); } }}>{t('sync.singleKey')}</button>}
-      <button data-role="secondary" disabled={!canStamp('start')} onClick={() => stamp('start')}>{t('sync.start')}</button>
+      {style === 'amll' && <><button data-role="secondary" disabled={!canStamp('start')} onClick={() => stamp('start')}>{t('sync.start')}</button>
       <button data-role="secondary" disabled={!canStamp('next')} onClick={() => stamp('next')}>{t('sync.step')}</button>
-      <button data-role="secondary" disabled={!canStamp('end')} onClick={() => stamp('end')}>{t('sync.end')}</button>
+      <button data-role="secondary" disabled={!canStamp('end')} onClick={() => stamp('end')}>{t('sync.end')}</button></>}
       <button data-role="secondary" disabled={index < 0 || !canMoveUnit(index + 1)} onClick={() => moveUnit(index + 1)}>{t('sync.nextUnit')}</button>
       <button data-role="secondary" disabled={!units.some((unit, position) => position > index && unit.lineId !== active?.lineId)} onClick={followingLine}>{t('sync.nextLine')}</button>
     </div>

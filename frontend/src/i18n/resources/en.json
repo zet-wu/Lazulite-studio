@@ -1721,7 +1721,7 @@
   "sync.stop": "Stop checkpoint",
   "sync.addStop": "Enable stop checkpoint",
   "sync.removeStop": "Disable stop checkpoint",
-  "sync.singleKey": "Single-key timing",
+  "sync.singleKey": "Time lyrics",
   "search.score": "Match {{score}}%",
   "alignment.local": "Align selection",
   "alignment.localRangeRequired": "Select at least two reading units and set a valid time range first",

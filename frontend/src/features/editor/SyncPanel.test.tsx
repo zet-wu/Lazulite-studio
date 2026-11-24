@@ -9,7 +9,8 @@ import { SyncPanel } from './SyncPanel';
 import { useSyncProgress } from './sync-progress';
 import { ProjectEditingContext } from './ProjectEditingContext';
 afterEach(() => { cleanup(); localStorage.clear(); });
-function setup(background = false, audio = true, skip = false) {
+function setup(background = false, audio = true, skip = false, style = 'amll') {
+  localStorage.setItem('studio:sync-style',style);
   const document = createLyricDocument(); document.lines = [createLine('', 'a'), createLine('', 'b')];
   document.lines[0].words = [createWord('A', 'A'), createWord('B', 'B')]; document.lines[1].words = [createWord('C', 'C')];
   if (background) document.lines[1].backgroundOf = 'a';
@@ -90,7 +91,7 @@ it('line mode can navigate to a skipped row, but its unit stepping remains local
  expect(screen.getByRole('combobox',{name:'打轴模式'})).toBeEnabled();
 });
 it('uses D presses for inner checkpoints and releases the final stop, carrying a shared start to its successor',()=>{
- const run=setup();
+ const run=setup(false,true,false,'sug');
  const down=()=>fireEvent.keyDown(window,{code:'KeyD',key:'d'}),up=()=>fireEvent.keyUp(window,{code:'KeyD',key:'d'});
  down();up();expect(run.state().present.lyrics.lines[0].words[0].beginMs).toBe(1000);
  run.time(1200);down();up();run.time(1400);down();up();expect(run.progress().consumed).toBe(2);
