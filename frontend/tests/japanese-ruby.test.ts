@@ -107,7 +107,7 @@ it('does not merge across existing ruby, whitespace, punctuation, or independent
 it.each([[null,9],[2,null],[null,null],[2,3]])('merging retains known endpoint envelope %s %s',(beginMs,endMs)=>{
  const d=createLyricDocument(),l=d.lines[0];l.words=['今','日'].map(t=>createWord(t));l.words[0].beginMs=beginMs;l.words[1].endMs=endMs;
  const state=executeLyricCommand(createLyricEditorState(d),japaneseRubyCommand(d,d,proposeJapaneseRuby(d,[l.id],[range('今日','きょう',l.id)],true)));
- expect(state.present.lines[0].words[0]).toMatchObject({beginMs,endMs});
+ expect(state.present.lines[0].words[0]).toMatchObject({beginMs:beginMs ?? endMs,endMs:endMs ?? beginMs});
 });
 it('merging reconciles invalid cue anchors in the same project history',()=>{
  const d=createLyricDocument(),l=d.lines[0];l.beginMs=0;l.endMs=1000;

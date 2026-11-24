@@ -1,13 +1,12 @@
 import { type LyricWord, type RubyUnit } from './lyric-document';
+import { timeEnvelope } from './lyric-commands';
 import { DEFAULT_SEGMENT_OPTIONS, distributeSegmentTime } from './segmentation';
 import { message, MessageError } from './messages';
 import { isGraphemeBoundary } from './text-boundaries';
 
 export const graphemes = (text: string) => Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), part => part.segment);
 export function rubyEnvelope(units: RubyUnit[]) {
-  const starts = units.flatMap(unit => unit.beginMs === null ? [] : [unit.beginMs]);
-  const ends = units.flatMap(unit => unit.endMs === null ? [] : [unit.endMs]);
-  return { beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null };
+  return timeEnvelope(units);
 }
 function withRuby(word: LyricWord, rubyUnits: RubyUnit[]): LyricWord {
   return { ...word, rubyUnits, ...rubyEnvelope(rubyUnits) };

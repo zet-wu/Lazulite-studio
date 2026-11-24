@@ -74,7 +74,6 @@ type WordCommand = Extract<AtomicLyricCommand, { type: 'set-word-agents' | 'set-
 
 function validTime(beginMs: TimeMs, endMs: TimeMs) {
   for (const value of [beginMs, endMs]) if (value !== null && (!Number.isSafeInteger(value) || value < 0)) throw new MessageError(message('command.timeInvalid'));
-  if (beginMs !== null && endMs !== null && beginMs > endMs) throw new MessageError(message('command.timeReversed'));
 }
 
 function splitTime(beginMs: TimeMs, endMs: TimeMs, leftLength: number, totalLength: number): TimeMs {
@@ -124,9 +123,26 @@ function afterLineGroup(lines: LyricLine[], id: string): number {
   return Math.max(background,index);
 }
 
+export type TimeInterval = { beginMs: TimeMs; endMs: TimeMs };
+export function intervalBounds(item: TimeInterval): { min: number | null; max: number | null } {
+  if (item.beginMs !== null && item.endMs !== null) {
+    return { min: Math.min(item.beginMs, item.endMs), max: Math.max(item.beginMs, item.endMs) };
+  }
+  return { min: item.beginMs, max: item.endMs };
+}
+export function intervalContains(parent: TimeInterval, child: TimeInterval): boolean {
+  const { min, max } = intervalBounds(parent);
+  for (const point of [child.beginMs, child.endMs]) {
+    if (point === null) continue;
+    if (min !== null && point < min) return false;
+    if (max !== null && point > max) return false;
+  }
+  return true;
+}
+
 function wordFitsLine(word: LyricWord, line: LyricLine) {
   validTime(word.beginMs, word.endMs);
-  if (line.beginMs !== null && word.beginMs !== null && word.beginMs < line.beginMs || line.endMs !== null && word.endMs !== null && word.endMs > line.endMs) throw new MessageError(message('command.wordOutsideLine'));
+  if (!intervalContains(line, word)) throw new MessageError(message('command.wordOutsideLine'));
 }
 
 /** Resolve every ID from the current document, then check document-order continuity. */
@@ -138,17 +154,17 @@ export function consecutive<T extends { id: string }>(siblings: T[], ids: string
   return selected;
 }
 
-export function timeEnvelope(units: { beginMs: TimeMs; endMs: TimeMs }[]) {
-  const starts = units.flatMap(unit => unit.beginMs === null ? [] : [unit.beginMs]);
-  const ends = units.flatMap(unit => unit.endMs === null ? [] : [unit.endMs]);
-  const beginMs = starts.length ? Math.min(...starts) : null;
-  const endMs = ends.length ? Math.max(...ends) : null;
-  return { beginMs, endMs };
+export function timeEnvelope(units: readonly TimeInterval[]): TimeInterval {
+  const points = units.flatMap(unit => [unit.beginMs, unit.endMs].filter((value): value is number => value !== null));
+  return {
+    beginMs: points.length ? Math.min(...points) : null,
+    endMs: points.length ? Math.max(...points) : null,
+  };
 }
 
 function rubyFitsWord(unit: RubyUnit, word: LyricWord) {
   validTime(unit.beginMs, unit.endMs);
-  if (word.beginMs !== null && unit.beginMs !== null && unit.beginMs < word.beginMs || word.endMs !== null && unit.endMs !== null && unit.endMs > word.endMs) throw new MessageError(message('command.rubyOutsideWordAdjust'));
+  if (!intervalContains(word, unit)) throw new MessageError(message('command.rubyOutsideWordAdjust'));
 }
 
 export function planWordMerge(document: LyricDocument, ids: string[]) {
@@ -415,7 +431,7 @@ function applyStructure(document: LyricDocument, command: AtomicLyricCommand, ed
       validTime(command.beginMs, command.endMs);
       const index = lineIndex(document, command.lineId);
       const line = document.lines[index];
-      if (line.words.some((word) => command.beginMs !== null && word.beginMs !== null && word.beginMs < command.beginMs || command.endMs !== null && word.endMs !== null && word.endMs > command.endMs)) throw new MessageError(message('command.lineExcludesWord'));
+      if (line.words.some((word) => !intervalContains(command, word))) throw new MessageError(message('command.lineExcludesWord'));
       if (line.beginMs === command.beginMs && line.endMs === command.endMs) return document;
       const lines = document.lines.slice();
       lines[index] = { ...line, beginMs: command.beginMs, endMs: command.endMs };
@@ -648,12 +664,14 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
       case 'edit-word':
         if (!wordCommand.text) throw new MessageError(message('command.wordTextEmpty'));
         return [wordCommand.text === word.text ? word : { ...word, text: wordCommand.text }];
-      case 'set-word-time':
+      case 'set-word-time': {
         validTime(wordCommand.beginMs, wordCommand.endMs);
-        if (line.beginMs !== null && wordCommand.beginMs !== null && wordCommand.beginMs < line.beginMs) throw new MessageError(message('command.wordBeforeLine'));
-        if (line.endMs !== null && wordCommand.endMs !== null && wordCommand.endMs > line.endMs) throw new MessageError(message('command.wordAfterLine'));
-        if (word.rubyUnits.some((unit) => wordCommand.beginMs !== null && unit.beginMs !== null && unit.beginMs < wordCommand.beginMs || wordCommand.endMs !== null && unit.endMs !== null && unit.endMs > wordCommand.endMs)) throw new MessageError(message('command.rubyOutsideWord'));
+        const lineBounds = intervalBounds(line);
+        if (lineBounds.min !== null && [wordCommand.beginMs, wordCommand.endMs].some((time) => time !== null && time < lineBounds.min!)) throw new MessageError(message('command.wordBeforeLine'));
+        if (lineBounds.max !== null && [wordCommand.beginMs, wordCommand.endMs].some((time) => time !== null && time > lineBounds.max!)) throw new MessageError(message('command.wordAfterLine'));
+        if (word.rubyUnits.some((unit) => !intervalContains(wordCommand, unit))) throw new MessageError(message('command.rubyOutsideWord'));
         return [word.beginMs === wordCommand.beginMs && word.endMs === wordCommand.endMs ? word : { ...word, beginMs: wordCommand.beginMs, endMs: wordCommand.endMs }];
+      }
       case 'add-ruby': {
         if (!wordCommand.reading) throw new MessageError(message('command.rubyEmpty'));
         const id = wordCommand.rubyId ?? crypto.randomUUID();
@@ -676,7 +694,7 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
         if (new Set(wordCommand.units.map((unit) => unit.id)).size !== wordCommand.units.length) throw new MessageError(message('command.rubyDuplicate'));
         for (const unit of wordCommand.units) {
           validTime(unit.beginMs, unit.endMs);
-          if (word.beginMs !== null && unit.beginMs !== null && unit.beginMs < word.beginMs || word.endMs !== null && unit.endMs !== null && unit.endMs > word.endMs) throw new MessageError(message('command.rubyTimeOutside'));
+          if (!intervalContains(word, unit)) throw new MessageError(message('command.rubyTimeOutside'));
         }
         return [{ ...word, rubyUnits: wordCommand.units }];
       }
@@ -707,11 +725,12 @@ function applyAtomic(document: LyricDocument, command: AtomicLyricCommand, editi
         return [{ ...updateRuby(word, wordCommand.rubyId, () => []) }];
       case 'set-ruby-time': {
         validTime(wordCommand.beginMs, wordCommand.endMs);
-        if (word.beginMs !== null && wordCommand.beginMs !== null && wordCommand.beginMs < word.beginMs || word.endMs !== null && wordCommand.endMs !== null && wordCommand.endMs > word.endMs) throw new MessageError(message('command.rubyTimeOutside'));
+        if (!intervalContains(word, wordCommand)) throw new MessageError(message('command.rubyTimeOutside'));
         const updated = updateRuby(word, wordCommand.rubyId, (unit) => unit.beginMs === wordCommand.beginMs && unit.endMs === wordCommand.endMs ? [unit] : [{ ...unit, beginMs: wordCommand.beginMs, endMs: wordCommand.endMs }]);
         if (updated === word) return [word];
-        const beginMs = word.beginMs ?? (updated.rubyUnits.every((unit) => unit.beginMs !== null) ? Math.min(...updated.rubyUnits.map((unit) => unit.beginMs!)) : null);
-        const endMs = word.endMs ?? (updated.rubyUnits.every((unit) => unit.endMs !== null) ? Math.max(...updated.rubyUnits.map((unit) => unit.endMs!)) : null);
+        const rubyEnvelope = timeEnvelope(updated.rubyUnits);
+        const beginMs = word.beginMs ?? (updated.rubyUnits.every((unit) => unit.beginMs !== null) ? rubyEnvelope.beginMs : null);
+        const endMs = word.endMs ?? (updated.rubyUnits.every((unit) => unit.endMs !== null) ? rubyEnvelope.endMs : null);
         return [{ ...updated, beginMs, endMs }];
       }
     }

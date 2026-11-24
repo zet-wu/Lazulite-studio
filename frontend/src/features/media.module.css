@@ -100,6 +100,13 @@
 
 .trackBarText { flex: 1; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .trackHandle { width: 5px; min-width: 5px; height: 100%; cursor: ew-resize; background: #487acb66; }
+.trackBar[data-reversed] { border-radius: 0; background: #e9b9b0; color: #5b1d17; box-shadow: inset 0 0 0 1px #c76258; }
+:global([data-theme='dark']) .trackBar[data-reversed] { color: #3a100c; }
+.trackBar[data-reversed].trackSelected { background: #c76258; color: #fff; box-shadow: inset 0 0 0 1px #98372e; }
+.trackBar[data-reversed] .reversedLeftHandle { width: 6px; min-width: 6px; border-radius: 0 999px 999px 0; background: #a73e3499; }
+.trackBar[data-reversed] .reversedRightHandle { width: 6px; min-width: 6px; border-radius: 999px 0 0 999px; background: #a73e3499; }
+.trackBar[data-reversed] .narrowColor { background: #e9b9b0; }
+.trackBar[data-reversed].trackSelected .narrowColor { background: #c76258; }
 .gapBar.gapBar[data-role] { height: var(--timeline-bar-height); min-height: var(--timeline-bar-height); border: 1px solid #c58c45; border-radius: 3px; justify-content: center; min-width: 12px; padding: 0 2px; border-color: #c58c45; background: #f7d6a3; color: #674414; font-size: 9px; }
 .gapBar.overlap[data-role] { border-color: #be3248; background: #f5a0ab; color: #641525; }
 .dragGuide { position: absolute; z-index: 3; inset-block: 0; width: 0; border-left: 2px dashed var(--timeline-guide); box-shadow: 1px 0 0 rgb(255 255 255 / 70%); pointer-events: none; }

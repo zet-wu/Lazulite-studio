@@ -1,6 +1,6 @@
 import { message, MessageError } from './messages';
 import { createProjectEditing, emptyBeatCount } from './project-editing';
-import type { LyricCommand } from './lyric-commands';
+import { timeEnvelope, type LyricCommand } from './lyric-commands';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
 
 const safe = (value: number) => Number.isSafeInteger(value) && value >= 0;
@@ -56,10 +56,9 @@ export function smoothWordTimes(document: LyricDocument, lineIds: string[], thre
 export function syncLineTimes(document: LyricDocument, lineIds: string[]): LyricCommand {
   const selected = new Set(lineIds);
   const commands = document.lines.filter((line) => selected.has(line.id)).flatMap((line) => {
-    const starts = line.words.map((word) => word.beginMs).filter((value): value is number => value !== null);
-    const ends = line.words.map((word) => word.endMs).filter((value): value is number => value !== null);
-    if (!starts.length && !ends.length) return [];
-    return [{ type: 'set-line-time' as const, lineId: line.id, beginMs: starts.length ? Math.min(...starts) : line.beginMs, endMs: ends.length ? Math.max(...ends) : line.endMs }];
+    const envelope = timeEnvelope(line.words);
+    if (envelope.beginMs === null && envelope.endMs === null) return [];
+    return [{ type: 'set-line-time' as const, lineId: line.id, beginMs: envelope.beginMs ?? line.beginMs, endMs: envelope.endMs ?? line.endMs }];
   });
   return { type: 'batch', commands };
 }

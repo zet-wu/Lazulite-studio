@@ -76,7 +76,7 @@ export function prepareOutputDocument(document: LyricDocument, target: LyricForm
  if (target === 'ttml') for (const track of document.translationTracks) for (const content of track.contents) if (content.kind === 'timed') {
    const line = document.lines.find(line => line.id === content.lineId)!;
    if (!content.units.length) issues.push({ kind: 'translation-content', lineId: line.id, trackId: track.id, contentId: content.id, code: 'empty-content', missing: [], detail:message('validation.emptyTimed'), message: `${label(line)}翻译没有单元` });
-   for (const [index, unit] of content.units.entries()) { if (isUntimedSeparator(unit)) continue; add({ kind: 'translation-unit', lineId: line.id, trackId: track.id, contentId: content.id, unitId: unit.id }, `${label(line)}翻译第 ${index + 1} 单元`, unit.beginMs, unit.endMs, true, unit.beginMs !== null && unit.endMs !== null && unit.beginMs > unit.endMs ? '时间倒序' : undefined); }
+   for (const [index, unit] of content.units.entries()) { if (isUntimedSeparator(unit)) continue; add({ kind: 'translation-unit', lineId: line.id, trackId: track.id, contentId: content.id, unitId: unit.id }, `${label(line)}翻译第 ${index + 1} 单元`, unit.beginMs, unit.endMs, true); }
  }
  return {issues, lines};
 }

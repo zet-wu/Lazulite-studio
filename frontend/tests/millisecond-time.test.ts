@@ -12,11 +12,17 @@ it('quantizes high precision, carries minutes/hours and is accepted by the exter
   expect(parseTTML(output).lines[0].words[0].startTime).toBe(expected);
  }
 });
-it('resolves relative ancestors once, preserves collapsed and null endpoints, rejects raw inversion', () => {
+it('resolves relative ancestors once, preserves collapsed, reversed and null endpoints', () => {
  const document = parseLyricTtml(xml('<div begin="0.0004s"><p begin="0.0004s" end="0.0005s"><span begin="0s" end="0.0001s">歌</span></p></div>'));
  expect(document.lines[0]).toMatchObject({beginMs:1,endMs:1});
  expect(document.lines[0].words[0]).toMatchObject({beginMs:1,endMs:1});
  expect(parseLyricTtml(xml('<p>歌</p>')).lines[0].beginMs).toBeNull();
- expect(()=>parseLyricTtml(xml('<p begin="0.00049" end="0.00048">歌</p>'))).toThrow('ttml.reversed');
+ const tinyReversed = parseLyricTtml(xml('<p begin="0.00049" end="0.00048">歌</p>'));
+ expect(tinyReversed.lines[0]).toMatchObject({ beginMs: 0, endMs: 0 });
+ const reversed = parseLyricTtml(xml('<p begin="2" end="1"><span begin="2" end="1">歌</span></p>'));
+ expect(reversed.lines[0]).toMatchObject({ beginMs: 2000, endMs: 1000 });
+ expect(reversed.lines[0].words[0]).toMatchObject({ beginMs: 2000, endMs: 1000 });
+ expect(serializeLyricTtml(reversed)).toContain('dur="00:02.000"');
+ expect(parseLyricTtml(serializeLyricTtml(reversed)).lines[0]).toMatchObject({ beginMs: 2000, endMs: 1000 });
  expect(()=>parseLyricTtml(xml('<p begin="-0.0001" end="1">歌</p>'))).toThrow();
 });

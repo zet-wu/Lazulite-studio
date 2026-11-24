@@ -1,7 +1,7 @@
 import {message,MessageError,type Message} from './messages';
 import { createProjectEditing } from './project-editing';
 import { toHiragana, toKatakana } from 'wanakana';
-import type { LyricCommand } from './lyric-commands';
+import { timeEnvelope, type LyricCommand } from './lyric-commands';
 import type { LyricDocument, LyricWord, RomanizationContent, RubyUnit, TimeMs } from './lyric-document';
 
 export type RubyOutput = 'roman' | 'hiragana' | 'katakana';
@@ -91,11 +91,11 @@ export function defaultRubySkips(document: LyricDocument, rows: RubyProposalRow[
 }
 
 type Envelope = { beginMs: TimeMs; endMs: TimeMs };
-const envelope = (base: Envelope, begins: TimeMs[], ends: TimeMs[]): Envelope => {
-  const starts = [base.beginMs, ...begins].filter((value): value is number => value !== null);
-  const finishes = [base.endMs, ...ends].filter((value): value is number => value !== null);
-  return { beginMs: starts.length ? Math.min(...starts) : null, endMs: finishes.length ? Math.max(...finishes) : null };
-};
+const envelope = (base: Envelope, begins: TimeMs[], ends: TimeMs[]): Envelope => timeEnvelope([
+  base,
+  ...begins.map((beginMs) => ({ beginMs, endMs: null })),
+  ...ends.map((endMs) => ({ beginMs: null, endMs })),
+]);
 
 export type RubyIssueKind = 'target' | 'reading' | 'overwrite' | 'kana-difference';
 export type RubyIssue = {

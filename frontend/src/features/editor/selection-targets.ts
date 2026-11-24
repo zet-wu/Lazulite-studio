@@ -85,8 +85,9 @@ export function selectionEnvelope(document: LyricDocument, selection: EditorSele
   const intervals = selection?.kind === 'romanization-content' ? attachmentTracks(document,selection).flatMap(track => track.contents.filter(content => selection.ids.includes(content.id)).flatMap(content => content.kind === 'timed' ? (content.units.length ? content.units : [{ id: content.id, text: '', beginMs: null, endMs: null }]) : [{ id: content.id, text: content.text, beginMs: null, endMs: null }])) : targets.map(target => targetInterval(document, target));
   if (selection && selection.kind !== 'romanization-content' && targets.length !== selection.ids.length) return { reason: 'selection.staleEnvelope' };
   if (!selection?.ids.length || !intervals.length) return { reason: 'selection.chooseTimed' };
-  if (intervals.some(item => !item || item.beginMs === null || item.endMs === null || !Number.isSafeInteger(item.beginMs) || !Number.isSafeInteger(item.endMs) || item.beginMs < 0 || item.endMs < item.beginMs)) return { reason: 'selection.invalidTimes' };
-  const begin_ms = Math.min(...intervals.map(item => item!.beginMs!)), end_ms = Math.max(...intervals.map(item => item!.endMs!));
+  if (intervals.some(item => !item || item.beginMs === null || item.endMs === null || !Number.isSafeInteger(item.beginMs) || !Number.isSafeInteger(item.endMs) || item.beginMs < 0 || item.endMs < 0)) return { reason: 'selection.invalidTimes' };
+  const points = intervals.flatMap(item => [item!.beginMs!, item!.endMs!]);
+  const begin_ms = Math.min(...points), end_ms = Math.max(...points);
   return begin_ms < end_ms && end_ms <= duration ? { range: { begin_ms, end_ms }, reason: '' } : { reason: 'selection.outsideMedia' };
 }
 
@@ -95,7 +96,7 @@ export function selectionLocation(document: LyricDocument, selection: EditorSele
   const intervals = selection?.kind === 'romanization-content'
     ? attachmentTracks(document,selection).flatMap(track=>track.contents.filter(content=>selection.ids.includes(content.id)).flatMap(content=>content.kind==='timed'?content.units:[]))
     : selectionTargets(document,selection).map(target=>targetInterval(document,target));
-  const times=intervals.flatMap(item=>item&&(item.beginMs===null||item.endMs===null||item.beginMs<=item.endMs)?[item.beginMs,item.endMs]:[]).filter((value):value is number=>value!==null&&Number.isSafeInteger(value)&&value>=0&&value<=duration);
+  const times=intervals.flatMap(item=>item?[item.beginMs,item.endMs]:[]).filter((value):value is number=>value!==null&&Number.isSafeInteger(value)&&value>=0&&value<=duration);
   return times.length?{beginMs:Math.min(...times),endMs:Math.max(...times)}:null;
 }
 

@@ -68,10 +68,8 @@ def validate_ttml(ttml: str) -> ET.Element:
                 raise ValueError("duplicate xml:id")
             ids.add(xml_id)
         if element.tag.startswith(ttml_prefix):
-            b = try_parse_media_seconds(element.attrib.get("begin"))
-            e = try_parse_media_seconds(element.attrib.get("end"))
-            if b is not None and e is not None and e < b:
-                raise ValueError("end timing precedes begin")
+            try_parse_media_seconds(element.attrib.get("begin"))
+            try_parse_media_seconds(element.attrib.get("end"))
         roles = element.get(role, "").split()
         expletive = "expletive" in roles
         if amll_obscene in element.attrib or expletive:

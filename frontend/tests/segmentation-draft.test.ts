@@ -31,7 +31,7 @@ it('keeps empty ruby children untimed on further subdivision and handles partial
  const {source}=fixture();source.rubyUnits=source.rubyUnits.slice(0,1);source.rubyUnits[0].beginMs=null;
  let words=splitRubyWord(source,['甲乙','丙丁']);words=moveSegmentRuby(words,['a'],1)!;
  words=toggleSegmentBoundary(source,words,1);expect(words.slice(0,2).map(w=>[w.beginMs,w.endMs])).toEqual([[null,null],[null,null]]);
- expect(words[2]).toMatchObject({beginMs:null,endMs:200});
+ expect(words[2]).toMatchObject({beginMs:200,endMs:200});
  source.rubyUnits[0].endMs=null;expect(splitRubyWord(source,['甲','乙','丙','丁']).every(w=>w.beginMs===null&&w.endMs===null)).toBe(true);
 });
 it.each(['segment-word','segment-words'] as const)('validates and atomically undoes/redoes %s ruby structure',type=>{

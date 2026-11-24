@@ -75,8 +75,7 @@ def validate_output_ttml(path: str | Path, *, xml: bool = False) -> ET.Element:
             end is not None and (end_s is None or not math.isfinite(end_s) or end_s < 0)
         ):
             raise PublishInvalid("timing must be finite and non-negative")
-        if begin_s is not None and end_s is not None and end_s < begin_s:
-            raise PublishInvalid("end timing precedes begin")
+        # Reversed timing units remain valid in TTML publish artifacts.
     return root
 
 

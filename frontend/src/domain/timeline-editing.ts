@@ -2,6 +2,7 @@ import { message, MessageError } from './messages';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
 import { shiftLineTimes } from './batch-editing';
+import { intervalContains, timeEnvelope } from './lyric-commands';
 
 export type TimelineTarget =
   | { kind: 'line'; lineId: string }
@@ -19,26 +20,26 @@ const changed = (time: TimeMs, delta: number): TimeMs => {
 };
 const valid = (begin: TimeMs, end: TimeMs) => {
   for (const time of [begin, end]) if (time !== null && (!Number.isSafeInteger(time) || time < 0)) throw new MessageError(message('timeline.integerTime'));
-  if (begin !== null && end !== null && begin > end) throw new MessageError(message('timeline.reversed'));
-};
-const envelope = (values: TimeMs[], minimum: boolean): TimeMs => {
-  const numbers = values.filter((value): value is number => value !== null);
-  return numbers.length ? (minimum ? Math.min(...numbers) : Math.max(...numbers)) : null;
 };
 /** Only a changed ruby envelope moves that side of its parent. */
 function resizeRubyParent(word: LyricWord, rubyUnits: RubyUnit[], sides: Iterable<BoundarySide>): LyricWord {
   let next = { ...word, rubyUnits };
+  const beforeEnvelope = timeEnvelope(word.rubyUnits);
+  const afterEnvelope = timeEnvelope(rubyUnits);
   for (const side of sides) {
-    const before = envelope(word.rubyUnits.map(unit => unit[side]), side === 'beginMs');
-    const after = envelope(rubyUnits.map(unit => unit[side]), side === 'beginMs');
+    const before = beforeEnvelope[side];
+    const after = afterEnvelope[side];
     if (word[side] !== null && before !== after) next = { ...next, [side]: after ?? word[side] };
   }
   return next;
 }
 const include = (line: LyricLine, word: LyricWord): LyricLine => {
-  const beginMs = line.beginMs === null ? null : envelope([line.beginMs, word.beginMs], true);
-  const endMs = line.endMs === null ? null : envelope([line.endMs, word.endMs], false);
-  return { ...line, beginMs, endMs };
+  const span = timeEnvelope([line, word]);
+  return {
+    ...line,
+    beginMs: line.beginMs === null ? null : span.beginMs,
+    endMs: line.endMs === null ? null : span.endMs,
+  };
 };
 const moveWord = (word: LyricWord, deltaMs: number): LyricWord => ({ ...word,
   beginMs: changed(word.beginMs, deltaMs), endMs: changed(word.endMs, deltaMs),
@@ -89,8 +90,9 @@ function moveTargets(document: LyricDocument, targets: TimelineTarget[], deltaMs
         const unit = rubyUnits[rubyIndex];
         if (unit.beginMs === null || unit.endMs === null) throw new MessageError(message('timeline.rubyTimesRequired'));
         rubyUnits[rubyIndex] = { ...unit, beginMs: changed(unit.beginMs, deltaMs), endMs: changed(unit.endMs, deltaMs) };
+        const rubyEnvelope = timeEnvelope(rubyUnits);
         words[index] = { ...word, rubyUnits,
-          beginMs: word.beginMs === null ? null : envelope(rubyUnits.map((item) => item.beginMs), true) ?? word.beginMs, endMs: word.endMs === null ? null : envelope(rubyUnits.map((item) => item.endMs), false) ?? word.endMs, };
+          beginMs: word.beginMs === null ? null : rubyEnvelope.beginMs ?? word.beginMs, endMs: word.endMs === null ? null : rubyEnvelope.endMs ?? word.endMs, };
       }
       return include({ ...line, words }, words[index]);
     });
@@ -106,7 +108,7 @@ function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'be
       const beginMs = side === 'beginMs' ? timeMs : line.beginMs;
       const endMs = side === 'endMs' ? timeMs : line.endMs;
       valid(beginMs, endMs);
-      if (line.words.flatMap(word => [word, ...word.rubyUnits]).some((word) => beginMs !== null && word.beginMs !== null && word.beginMs < beginMs || endMs !== null && word.endMs !== null && word.endMs > endMs)) throw new MessageError(message('timeline.lineExcludesWords'));
+      if (line.words.flatMap(word => [word, ...word.rubyUnits]).some((word) => !intervalContains({ beginMs, endMs }, word))) throw new MessageError(message('timeline.lineExcludesWords'));
       return { ...line, beginMs, endMs };
     }
     const index = line.words.findIndex((word) => word.id === target.wordId);
@@ -117,7 +119,7 @@ function resizeTarget(document: LyricDocument, target: TimelineTarget, side: 'be
       const beginMs = side === 'beginMs' ? timeMs : word.beginMs;
       const endMs = side === 'endMs' ? timeMs : word.endMs;
       valid(beginMs, endMs);
-      if (word.rubyUnits.some((unit) => beginMs !== null && unit.beginMs !== null && unit.beginMs < beginMs || endMs !== null && unit.endMs !== null && unit.endMs > endMs)) throw new MessageError(message('timeline.wordExcludesRuby'));
+      if (word.rubyUnits.some((unit) => !intervalContains({ beginMs, endMs }, unit))) throw new MessageError(message('timeline.wordExcludesRuby'));
       words[index] = { ...word, beginMs, endMs };
     } else {
       const rubyIndex = word.rubyUnits.findIndex((unit) => unit.id === target.rubyId);
@@ -243,14 +245,15 @@ export function resizeTimelineBoundary(document: LyricDocument, target: Timeline
   if (target.kind !== 'romanization') next = editTarget(next, target, line => {
     const words = line.words.map(word => {
       if (!wordIds.has(word.id) && !rubyWordSides.has(word.id)) return word;
+      const originalLine = document.lines.find(item => item.id === line.id)!;
+      const originalWord = originalLine.words.find(item => item.id === word.id)!;
       if (!wordIds.has(word.id)) {
-        const original = document.lines.find(item => item.id === line.id)!.words.find(item => item.id === word.id)!;
-        word = resizeRubyParent(original, word.rubyUnits, rubyWordSides.get(word.id)!);
+        word = resizeRubyParent(originalWord, word.rubyUnits, rubyWordSides.get(word.id)!);
       }
       valid(word.beginMs, word.endMs);
       for (const unit of word.rubyUnits) {
         valid(unit.beginMs, unit.endMs);
-        if (word.beginMs !== null && unit.beginMs !== null && unit.beginMs < word.beginMs || word.endMs !== null && unit.endMs !== null && unit.endMs > word.endMs) throw new MessageError(message('timeline.wordExcludesRuby'));
+        if (!intervalContains(word, unit)) throw new MessageError(message('timeline.wordExcludesRuby'));
       }
       return word;
     });
@@ -317,7 +320,7 @@ export function applyTimelineAssignment(document:LyricDocument,target:TimelineTa
   const line=document.lines.find(line=>line.id===target.lineId)!;
   const attachments=[...document.romanizationTracks,...document.translationTracks].flatMap(t=>t.contents.flatMap(c=>c.lineId===line.id&&c.kind==='timed'?c.units:[]));
   const includeChildren = <T extends {beginMs:TimeMs;endMs:TimeMs}>(parent:T, children:{beginMs:TimeMs;endMs:TimeMs}[]):T => ({...parent,
-    beginMs:envelope([parent.beginMs,...children.map(c=>c.beginMs)],true),endMs:envelope([parent.endMs,...children.map(c=>c.endMs)],false)});
+    ...timeEnvelope([parent, ...children])});
   let next = target.kind==='romanization' ? editRomanization(document,target,unit=>({...unit,beginMs,endMs})) : editTarget(document,target,current=>{
     if (target.kind==='line') return {...current,beginMs,endMs};
     const words=current.words.map(w=>w.id!==target.wordId?w:target.kind==='word'?{...w,beginMs,endMs}:includeChildren({...w,rubyUnits:w.rubyUnits.map(u=>u.id===target.rubyId?{...u,beginMs,endMs}:u)},w.rubyUnits.map(u=>u.id===target.rubyId?{...u,beginMs,endMs}:u)));

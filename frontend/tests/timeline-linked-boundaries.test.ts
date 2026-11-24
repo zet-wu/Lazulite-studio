@@ -39,7 +39,7 @@ it.each([900, 1100])('falls back for overlap/gap at %i, and never skips an untim
 it('uses a timed blank as an adjacent leaf and stops at the row boundary', () => {
   const { document, line, target } = sample();
   Object.assign(line.words[1], { beginMs: 1000, endMs: 1000 });
-  expect(() => resizeTimelineBoundary(document, target, 'endMs', 1200, true)).toThrow('timeline.reversed');
+  expect(resizeTimelineBoundary(document, target, 'endMs', 1200, true).lines[0].words[1]).toMatchObject({ beginMs: 1200, endMs: 1000 });
   const next = resizeTimelineBoundary(document, target, 'endMs', 900, true);
   expect(next.lines[0].words[1].beginMs).toBe(900);
   expect(next.lines[0].words[2].beginMs).toBe(1000);
@@ -65,7 +65,7 @@ it.each(['same-word', 'cross-word', 'ruby-word', 'word-ruby'] as const)('resizes
   }
 });
 
-it('word handles carry coincident ruby endpoints, protect inset readings and reject reversed neighbors atomically', () => {
+it('word handles carry coincident ruby endpoints, protect inset readings and allow reversed neighbors atomically', () => {
   const { document, line, target } = sample();
   const [a, , b] = line.words;
   a.rubyUnits = [{ id: 'a', reading: 'a', beginMs: 0, endMs: 1000 }];
@@ -74,7 +74,7 @@ it('word handles carry coincident ruby endpoints, protect inset readings and rej
   const next = resizeTimelineBoundary(document, target, 'endMs', 1200, true).lines[0];
   expect(next.words[0].rubyUnits[0].endMs).toBe(1200);
   expect(next.words[2].rubyUnits[0].beginMs).toBe(1200);
-  expect(() => resizeTimelineBoundary(document, target, 'endMs', 2100, true)).toThrow('timeline.reversed');
+  expect(resizeTimelineBoundary(document, target, 'endMs', 2100, true).lines[0].words[2]).toMatchObject({ beginMs: 2100, endMs: 2000 });
   expect(document).toEqual(original);
   a.rubyUnits[0].endMs = 900; b.rubyUnits[0].beginMs = 1100;
   const inset = resizeTimelineBoundary(document, target, 'endMs', 1050, true).lines[0];

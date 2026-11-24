@@ -5,7 +5,7 @@ import {
   emptyBeatCount,
   type ProjectEditing,
 } from '../../../frontend/src/domain/project-editing';
-import { type LyricCommand } from '../../../frontend/src/domain/lyric-commands';
+import { timeEnvelope, type LyricCommand } from '../../../frontend/src/domain/lyric-commands';
 
 type AtomicLyricCommand = Exclude<LyricCommand, { type: 'batch' }>;
 import {
@@ -142,11 +142,10 @@ function wordTimeEnvelope(word: LyricWord): { beginMs: TimeMs; endMs: TimeMs } {
   if (word.beginMs !== null && word.endMs !== null) {
     return { beginMs: word.beginMs, endMs: word.endMs };
   }
-  const starts = word.rubyUnits.flatMap((unit) => (unit.beginMs === null ? [] : [unit.beginMs]));
-  const ends = word.rubyUnits.flatMap((unit) => (unit.endMs === null ? [] : [unit.endMs]));
+  const envelope = timeEnvelope(word.rubyUnits);
   return {
-    beginMs: word.beginMs ?? (starts.length ? Math.min(...starts) : null),
-    endMs: word.endMs ?? (ends.length ? Math.max(...ends) : null),
+    beginMs: word.beginMs ?? envelope.beginMs,
+    endMs: word.endMs ?? envelope.endMs,
   };
 }
 

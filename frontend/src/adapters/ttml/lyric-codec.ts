@@ -1,5 +1,6 @@
 import { message, MessageError } from '../../domain/messages';
 import { validateAgents } from '../../domain/amll-compatibility';
+import { timeEnvelope } from '../../domain/lyric-commands';
 import type { ProjectEditing } from '../../domain/project-editing';
 import { isUntimedSeparator, isUntimedXmlWhitespace } from '../export-separators';
 import { validateTranslationTracks } from '../../domain/translation-editing';
@@ -78,7 +79,6 @@ function boundaries(node: Element, parentStart: number, parentEnd: TimeMs, absol
   const endFromEnd = endRaw === null ? null : value(endRaw);
   const endFromDur = durRaw === null ? null : (begin ?? parentStart) + parseTime(durRaw);
   const end = nulls.includes('end') ? null : [endFromEnd, endFromDur].filter((value): value is number => value !== null).reduce<number | null>((left, value) => left === null ? value : Math.min(left, value), null);
-  if (begin !== null && end !== null && begin > end) throw new MessageError(message('ttml.reversed'));
   // Saved editor drafts may contain timing issues; reopen them without changing endpoints.
   if (!draft && parentEnd !== null && ((begin !== null && begin > parentEnd) || (end !== null && end > parentEnd))) throw new MessageError(message('ttml.childOutside'));
   return [begin, end];
@@ -168,10 +168,11 @@ function makeWord(node: Node, lineId: string, index: number, lineStart: number, 
   }
   if (!rubyUnits.length) throw new MessageError(message('command.rubyEmpty'));
   const explicitNulls = (attr(element, STUDIO, 'null') ?? '').split(/\s+/);
+  const rubyEnvelope = timeEnvelope(rubyUnits);
   return {
     ...createWord(text, wordId), obscene, ...identity,
-    beginMs: explicitNulls.includes('begin') ? null : beginMs ?? (rubyUnits.every((unit) => unit.beginMs !== null) ? Math.min(...rubyUnits.map((unit) => unit.beginMs!)) : null),
-    endMs: explicitNulls.includes('end') ? null : endMs ?? (rubyUnits.every((unit) => unit.endMs !== null) ? Math.max(...rubyUnits.map((unit) => unit.endMs!)) : null),
+    beginMs: explicitNulls.includes('begin') ? null : beginMs ?? (rubyUnits.every((unit) => unit.beginMs !== null) ? rubyEnvelope.beginMs : null),
+    endMs: explicitNulls.includes('end') ? null : endMs ?? (rubyUnits.every((unit) => unit.endMs !== null) ? rubyEnvelope.endMs : null),
     rubyUnits,
   };
 }
@@ -320,6 +321,7 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
       const inlineRomanizations: Array<{ language: string | null; content: RomanizationContent }> = [];
       const backgrounds: Element[] = [];
       const words: LyricWord[] = [];
+      const lineUpper = beginMs !== null && endMs !== null ? Math.max(beginMs, endMs) : endMs;
       for (const [index, node] of Array.from(child.childNodes).entries()) {
         if (node.nodeType === Node.ELEMENT_NODE) {
           const role = attr(node as Element, TTM, 'role');
@@ -336,7 +338,7 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
           }
           if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new MessageError(message('ttml.roleUnsupported',{context:'TTML',role:role}));
         }
-        const word = makeWord(node, id, index, wordStart, endMs, absoluteTimes, draft);
+        const word = makeWord(node, id, index, wordStart, lineUpper, absoluteTimes, draft);
         if (word) words.push(word);
       }
       const agentRefs = (attr(child, TTM, 'agent') ?? '').split(/\s+/).filter(Boolean);
@@ -357,6 +359,7 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
         const [bgBegin, bgEnd] = boundaries(background, wordStart, ownEnd, absoluteTimes, draft);
         const bgId = attr(background, STUDIO, 'id') ?? attr(background, XML, 'id') ?? `${id}-bg${bgIndex || ''}`;
         const bgStart = bgBegin ?? wordStart;
+        const bgUpper = bgBegin !== null && bgEnd !== null ? Math.max(bgBegin, bgEnd) : bgEnd;
         const bgRomanizations: typeof inlineRomanizations = [];
         const bgWords: LyricWord[] = [];
         for (const [index, node] of Array.from(background.childNodes).entries()) {
@@ -371,7 +374,7 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
             }
           } else {
             if (role && role.split(/\s+/).filter(Boolean).some(value => value !== 'expletive')) throw new MessageError(message('ttml.roleUnsupported',{context:'background',role:role}));
-            const word = makeWord(node, bgId, index, bgStart, bgEnd, absoluteTimes, draft);
+            const word = makeWord(node, bgId, index, bgStart, bgUpper, absoluteTimes, draft);
             if (word) bgWords.push(word);
           }
         }
@@ -384,7 +387,8 @@ export function parseLyricTtml(xml: string, { draft = false }: { draft?: boolean
           bgWords[last] = { ...bgWords[last], text: bgWords[last].text.replace(/\)$/, '') };
         }
         const explicitNulls = (attr(background, STUDIO, 'null') ?? '').split(/\s+/);
-        lines.push({ id: bgId, words: bgWords, beginMs: explicitNulls.includes('begin') ? null : bgBegin ?? (bgWords.every((word) => word.beginMs !== null) && bgWords.length ? Math.min(...bgWords.map((word) => word.beginMs!)) : null), endMs: explicitNulls.includes('end') ? null : bgEnd ?? (bgWords.every((word) => word.endMs !== null) && bgWords.length ? Math.max(...bgWords.map((word) => word.endMs!)) : null), agentRefs: bgAgents, backgroundOf: id, songPart: null });
+        const bgEnvelope = bgWords.length ? timeEnvelope(bgWords) : { beginMs: null, endMs: null };
+        lines.push({ id: bgId, words: bgWords, beginMs: explicitNulls.includes('begin') ? null : bgBegin ?? (bgWords.every((word) => word.beginMs !== null) && bgWords.length ? bgEnvelope.beginMs : null), endMs: explicitNulls.includes('end') ? null : bgEnd ?? (bgWords.every((word) => word.endMs !== null) && bgWords.length ? bgEnvelope.endMs : null), agentRefs: bgAgents, backgroundOf: id, songPart: null });
       }
     }
   };
@@ -555,9 +559,9 @@ export function serializeLyricTtml(document: LyricDocument, options: { draft?: b
     root.insertBefore(head, root.firstChild);
   }
   const body = Array.from(root.children).find((child) => is(child, TTML, 'body'))!;
-  const lineEnds = document.lines.map((line) => line.endMs).filter((value): value is number => value !== null);
-  if (lineEnds.length) {
-    body.setAttribute('dur', timeText(Math.max(...lineEnds)));
+  const lineBounds = document.lines.flatMap((line) => [line.beginMs, line.endMs]).filter((value): value is number => value !== null);
+  if (lineBounds.length) {
+    body.setAttribute('dur', timeText(Math.max(...lineBounds)));
   }
   let div: Element | null = null;
   let currentPart: string | null | undefined;

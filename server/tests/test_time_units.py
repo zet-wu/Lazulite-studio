@@ -12,8 +12,10 @@ def test_half_millisecond_and_clock_carries(raw,expected):
     p=ET.fromstring(normalized).find('.//{http://www.w3.org/ns/ttml}p')
     assert milliseconds(parse_ttml_seconds(p.get('begin')))==expected
 
-def test_relative_round_once_and_original_inversion():
+def test_relative_round_once_and_reversed_ttml():
     normalized=normalized_ttml('<tt xmlns="http://www.w3.org/ns/ttml"><body><div begin="0.0004s"><p begin="0.0004s" end="0.0005s">歌</p></div></body></tt>')
     p=ET.fromstring(normalized).find('.//{http://www.w3.org/ns/ttml}p')
     assert p.get('begin')==p.get('end')=='00:00.001'
-    with pytest.raises(ValueError): normalized_ttml('<tt><p begin="0.00049" end="0.00048"/></tt>')
+    reversed_xml=normalized_ttml('<tt xmlns="http://www.w3.org/ns/ttml"><body><p begin="2s" end="1s">歌</p></body></tt>')
+    rp=ET.fromstring(reversed_xml).find('.//{http://www.w3.org/ns/ttml}p')
+    assert rp.get('begin')=='00:02.000' and rp.get('end')=='00:01.000'

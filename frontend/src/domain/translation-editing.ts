@@ -14,7 +14,6 @@ export function validateTranslationTracks(tracks: TranslationTrack[], lineIds: S
       if (content.kind === 'timed') for (const unit of content.units) {
         identity(unit.id);
         for (const time of [unit.beginMs, unit.endMs]) if (time !== null && (!Number.isSafeInteger(time) || time < 0)) throw new MessageError(message('translation.integerTime'));
-        if (unit.beginMs !== null && unit.endMs !== null && unit.beginMs > unit.endMs) throw new MessageError(message('translation.reversed'));
       }
     }
   }

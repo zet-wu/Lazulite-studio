@@ -65,14 +65,13 @@ def normalize_ttml_tree(root):
         duration = parse_ttml_seconds(node.get('dur'))
         if duration is not None:
             end = min(end, start+duration) if end is not None else start+duration
-        if begin is not None and end is not None and end < begin:
-            raise ValueError('end timing precedes begin')
+        # Keep distinct begin/end timestamps even when begin > end in TTML.
         for child in node: visit(child,start)
         if begin is not None: node.set('begin',clock(milliseconds(begin)))
         if end is not None and node.get('end') is not None: node.set('end',clock(milliseconds(end)))
         if duration is not None:
             # Preserve body duration, canonicalize other duration-only intervals.
-            if node.tag.endswith('}body'): node.set('dur',clock(milliseconds(end)-milliseconds(start)))
+            if node.tag.endswith('}body'): node.set('dur',clock(max(milliseconds(start), milliseconds(end))-milliseconds(start)))
             else:
                 node.attrib.pop('dur')
                 if node.get('begin') is None: node.set('begin',clock(milliseconds(start)))

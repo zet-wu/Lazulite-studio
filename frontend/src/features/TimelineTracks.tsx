@@ -33,7 +33,8 @@ type Props = { playbackFrame?: RefObject<TimelinePlaybackFrame>; follow?: boolea
   externalAnchors?: number[]; durationMs?: number | null;
   apply: (command: LyricCommand) => void; onPan: (startMs: number) => void; onError: (message: string | Message) => void };
 type Drag = { linked: boolean; modifier: boolean; viewStartMs: number; pointerY?:number; clear?: boolean; validDrop?: boolean; started: boolean; source: LyricDocument; target: TimelineTarget | null; side: 'move' | 'beginMs' | 'endMs' | 'select' | 'pan'; x: number; y: number; current: number; width: number; originalMs: number; moving: TimelineTarget[]; basePoints: number[]; moveSnapOptions: LyricSnapAnchor[]; moveSnapTimes: number[]; baseTimes: ReturnType<typeof lyricTimes>; candidate: { timeMs: number; document: LyricDocument; error: string | Message } };
-const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null && end >= begin;
+const timed = (begin: number | null, end: number | null): begin is number => begin !== null && end !== null;
+const intervalSpan = (begin: number, end: number): [number, number] => begin <= end ? [begin, end] : [end, begin];
 
 export function TimelineTracks({ playbackFrame, follow = false, locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onLocate, onPan, onError }: Props) {
   useTranslation();
@@ -91,8 +92,8 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
   const interactionLineIds = [focusedLineId, drag?.target?.lineId, menu?.target.closest<HTMLElement>('[data-expanded-line]')?.dataset.expandedLine];
   const heldLineIds = [...interactionLineIds,stagingTarget?.lineId];
   const projection = useMemo(() => projectTimeline(document, durationMs), [document, durationMs]);
-  const intersects = (begin: number | null, end: number | null) => timed(begin, end) && end! >= startMs && begin! <= endMs;
-  const buffered = (begin: number | null, end: number | null) => timed(begin,end) && end! >= startMs-paddingMs && begin! <= endMs+paddingMs;
+  const intersects = (begin: number | null, end: number | null) => timed(begin, end) && Math.max(begin, end) >= startMs && Math.min(begin, end) <= endMs;
+  const buffered = (begin: number | null, end: number | null) => timed(begin,end) && Math.max(begin, end) >= startMs-paddingMs && Math.min(begin, end) <= endMs+paddingMs;
   const expandedLines = projection.lines.filter(line => {
     if (!expanded.includes(line.id) && !activeLineIds.includes(line.id) && !heldLineIds.includes(line.id)) return false;
     if (!(visible.word || visible.ruby && line.words.some(word => word.rubyUnits.length) || visible.romanization && [...document.romanizationTracks,...document.translationTracks].some(track => track.contents.some(content => content.lineId === line.id)))) return false;
@@ -201,7 +202,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
   }, [mainLines]);
   const line = displayedById.get(selectedLineId ?? '');
   const overview = mainLines.filter(item => buffered(item.beginMs, item.endMs) || timed(item.beginMs,item.endMs) && heldTargetIds.includes(item.id));
-  const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => buffered(item.beginMs, item.endMs) || timed(item.beginMs,item.endMs) && heldTargetIds.includes(item.id)).map(item => ({ key: item.id, beginMs: item.beginMs!, endMs: item.endMs! }))), [projection, startMs, endMs, focusedTargetId, menu, paddingMs]);
+  const currentLayout = useMemo(() => packIntervals(projection.lines.filter(item => buffered(item.beginMs, item.endMs) || timed(item.beginMs,item.endMs) && heldTargetIds.includes(item.id)).map(item => { const [begin, end] = intervalSpan(item.beginMs!, item.endMs!); return { key: item.id, beginMs: begin, endMs: end }; })), [projection, startMs, endMs, focusedTargetId, menu, paddingMs]);
   const frozenLayout = useRef(currentLayout);
   const draggingTime = drag && !['pan', 'select'].includes(drag.side);
   if (!draggingTime) frozenLayout.current = currentLayout;
@@ -288,7 +289,8 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
     let timeMs=proposed;
     if(current.side==='move'&&current.target){
       const interval=targetInterval(document,current.target)!;
-      const correction=snapTimelineInterval(interval.beginMs!+delta,interval.endMs!+delta,current.moveSnapTimes,spanMs,current.width,snap,(correction,index)=>{
+      const [intervalBegin, intervalEnd] = intervalSpan(interval.beginMs!, interval.endMs!);
+      const correction=snapTimelineInterval(intervalBegin+delta,intervalEnd+delta,current.moveSnapTimes,spanMs,current.width,snap,(correction,index)=>{
         try{
           if(durationMs===null)return false;
           const next=moveTimeline(document,moving,delta+correction,editing);
@@ -362,7 +364,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
     if (!current || current.source !== document || current.side === 'pan') return;
     if (current.side === 'select') {
       const first = current.originalMs, last = current.candidate.timeMs;
-      const picked = boxTargets.current.filter(target => { const item = targetInterval(projection, target); return item && item.beginMs !== null && item.endMs !== null && item.beginMs < Math.max(first, last) && item.endMs > Math.min(first, last); });
+      const picked = boxTargets.current.filter(target => { const item = targetInterval(projection, target); return item && item.beginMs !== null && item.endMs !== null && Math.min(item.beginMs, item.endMs) < Math.max(first, last) && Math.max(item.beginMs, item.endMs) > Math.min(first, last); });
       if (picked.length) setSelection(targetSelection(picked.at(-1)!, picked.map(targetId), targetId(picked[0])));
       return;
     }
@@ -391,8 +393,9 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
     const target = selectionTargets(projection, wanted).find(item => targetId(item) === wanted.activeId);
     const interval = target && targetInterval(projection, target);
     if (interval?.beginMs != null && interval.endMs != null) {
-      if (interval.beginMs < startMs) onPan(interval.beginMs);
-      else if (interval.beginMs > endMs) onPan(Math.max(0, interval.beginMs - (endMs - startMs) + 100));
+      const [lo] = intervalSpan(interval.beginMs, interval.endMs);
+      if (lo < startMs) onPan(lo);
+      else if (lo > endMs) onPan(Math.max(0, lo - (endMs - startMs) + 100));
     }
     let frame = 0, attempts = 0;
     const focus = () => {
@@ -413,17 +416,28 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
     const key = target.kind === 'line' ? target.lineId : target.kind === 'word' ? target.wordId : target.kind === 'ruby' ? target.rubyId : target.unitId;
     const layout = laneLayoutOverride ?? lineLayout;
     const real = targetInterval(candidateDocument, target);
-    const playing = real?.beginMs != null && real?.endMs != null && positionMs >= real.beginMs && positionMs < real.endMs;
+    const playing = real?.beginMs != null && real?.endMs != null && real.beginMs < real.endMs && positionMs >= real.beginMs && positionMs < real.endMs;
+    const reversed = beginMs > endMs;
+    const leftMs = reversed ? endMs : beginMs;
+    const rightMs = reversed ? beginMs : endMs;
     const ghostBegin = real?.beginMs === null, ghostEnd = real?.endMs === null;
+    const leftSide = reversed ? 'endMs' : 'beginMs';
+    const leftValue = reversed ? endMs : beginMs;
+    const leftGhost = reversed ? ghostEnd : ghostBegin;
+    const rightSide = reversed ? 'beginMs' : 'endMs';
+    const rightValue = reversed ? beginMs : endMs;
+    const rightGhost = reversed ? ghostBegin : ghostEnd;
+    const leftDescription = leftGhost ? t('timeline.temporary',{side:t(leftSide==='beginMs'?'time.begin':'time.end'),time:leftValue}) : undefined;
+    const rightDescription = rightGhost ? t('timeline.temporary',{side:t(rightSide==='beginMs'?'time.begin':'time.end'),time:rightValue}) : undefined;
     const description = ghostBegin || ghostEnd ? t('timeline.temporary',{side:t(ghostBegin?'time.begin':'time.end'),time:ghostBegin?beginMs:endMs}) : undefined;
     active = selection?.kind === selectionKind(target) && selection.ids.includes(key) || false;
-    const clippedBegin = beginMs;
-    const right = endMs;
-    const narrow = (endMs - beginMs) / spanMs * plotWidth < 16;
-    return <div key={key} ref={element => { if (element) playingBars.current.set(key, { element, beginMs: real?.beginMs ?? null, endMs: real?.endMs ?? null }); else playingBars.current.delete(key); }} data-timeline-key={key} data-line-id={target.lineId} data-word-id={target.kind==='word'||target.kind==='ruby'?target.wordId:undefined} data-ruby-id={target.kind==='ruby'?target.rubyId:undefined} data-romanization-content-id={target.kind==='romanization'&&!target.attachment?target.contentId:undefined} data-romanization-unit-id={target.kind==='romanization'&&!target.attachment?target.unitId:undefined} data-translation-id={target.kind==='romanization'&&target.attachment?target.contentId:undefined} data-translation-unit-id={target.kind==='romanization'&&target.attachment?target.unitId:undefined}
-      className={`${styles.trackBar} ${target.kind === 'line' && documentById.get(target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${playing ? styles.trackPlaying : ''}`} role="button" aria-current={playing ? "time" : undefined} aria-disabled={locked} tabIndex={0} aria-label={label} title={description} aria-description={description} data-temporary-begin={ghostBegin || undefined} data-temporary-end={ghostEnd || undefined}
-      style={{ transform: narrow && beginMs === endMs && beginMs === propsEndMs ? 'translateX(-100%)' : undefined, left: pct(clippedBegin), width: `${Math.max(0, right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
-      onPointerDown={(event) => begin(event, target, 'move', beginMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
+    const clippedBegin = leftMs;
+    const right = rightMs;
+    const narrow = (rightMs - leftMs) / spanMs * plotWidth < 16;
+    return <div key={key} ref={element => { if (element) playingBars.current.set(key, { element, beginMs: real?.beginMs ?? null, endMs: real?.endMs ?? null }); else playingBars.current.delete(key); }} data-timeline-key={key} data-reversed={reversed || undefined} data-line-id={target.lineId} data-word-id={target.kind==='word'||target.kind==='ruby'?target.wordId:undefined} data-ruby-id={target.kind==='ruby'?target.rubyId:undefined} data-romanization-content-id={target.kind==='romanization'&&!target.attachment?target.contentId:undefined} data-romanization-unit-id={target.kind==='romanization'&&!target.attachment?target.unitId:undefined} data-translation-id={target.kind==='romanization'&&target.attachment?target.contentId:undefined} data-translation-unit-id={target.kind==='romanization'&&target.attachment?target.unitId:undefined}
+      className={`${styles.trackBar} ${target.kind === 'line' && documentById.get(target.lineId)?.backgroundOf ? styles.backgroundBar : ''} ${active ? styles.trackSelected : ''} ${narrow ? styles.narrowHit : ''} ${playing ? styles.trackPlaying : ''}`} role="button" aria-current={playing ? "time" : undefined} aria-disabled={locked} tabIndex={0} aria-label={label} title={description} aria-description={description} data-temporary-begin={leftGhost || undefined} data-temporary-end={rightGhost || undefined}
+      style={{ transform: narrow && leftMs === rightMs && leftMs === propsEndMs ? 'translateX(-100%)' : undefined, left: pct(clippedBegin), width: `${Math.max(0, right - clippedBegin) / spanMs * 100}%`, top: `calc(${layout.lanes.get(key) ?? 0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`, height: 'var(--timeline-bar-height)' }}
+      onPointerDown={(event) => begin(event, target, 'move', leftMs)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
       onFocus={event => { if (!preserveSelectionOnFocus(selection, event.currentTarget) && !dragRef.current) choose(target); }}
       onContextMenu={event => { event.preventDefault(); if(locked)return; event.stopPropagation(); focusObject(event.currentTarget); if(!commands.current?.openContext(event.currentTarget,event.clientX,event.clientY)){choose(target); setMenu({ x: event.clientX, y: event.clientY, target: event.currentTarget });} }}
       onKeyDown={event => {
@@ -432,9 +446,9 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
         if (event.key === 'Delete' && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); }
       }}>
       {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanMs * plotWidth }} /><span className={styles.narrowMarker} title={t('timeline.narrow')} /></>}
-      {(!narrow || ghostBegin) && <span className={`${styles.trackHandle} ${ghostBegin ? styles.temporaryHandle : ''}`} title={ghostBegin ? description : undefined} aria-label={t('timeline.beginBoundary',{label})} onPointerDown={(event) => begin(event, target, 'beginMs', beginMs)} onPointerMove={move} onPointerUp={finish} />}
+      {(!narrow || leftGhost) && <span className={`${styles.trackHandle} ${reversed ? styles.reversedLeftHandle : ''} ${leftGhost ? styles.temporaryHandle : ''}`} title={leftGhost ? leftDescription : undefined} aria-label={t(leftSide === 'beginMs' ? 'timeline.beginBoundary' : 'timeline.endBoundary',{label})} onPointerDown={(event) => begin(event, target, leftSide, leftValue)} onPointerMove={move} onPointerUp={finish} />}
       <span className={styles.trackBarText}>{caption}</span>
-      {(!narrow || ghostEnd) && <span className={`${styles.trackHandle} ${ghostEnd ? styles.temporaryHandle : ''}`} title={ghostEnd ? description : undefined} aria-label={t('timeline.endBoundary',{label})} onPointerDown={(event) => begin(event, target, 'endMs', endMs)} onPointerMove={move} onPointerUp={finish} />}
+      {(!narrow || rightGhost) && <span className={`${styles.trackHandle} ${reversed ? styles.reversedRightHandle : ''} ${rightGhost ? styles.temporaryHandle : ''}`} title={rightGhost ? rightDescription : undefined} aria-label={t(rightSide === 'beginMs' ? 'timeline.beginBoundary' : 'timeline.endBoundary',{label})} onPointerDown={(event) => begin(event, target, rightSide, rightValue)} onPointerMove={move} onPointerUp={finish} />}
     </div>;
   };
   const row = (name: string, content: React.ReactNode, selectable: TimelineTarget[] = [], laneCount = 1, caption = name, assignmentKind?: TimelineTarget['kind']) => <div className={styles.trackRow} key={name}><strong data-timeline-text title={caption}>{caption}</strong><div data-wheel-zoom data-track-lane data-assignment-kind={assignmentKind ?? selectable[0]?.kind} className={styles.trackLane} style={{ height: `calc(${Math.max(1, laneCount)} * var(--timeline-lane-height))` }}
@@ -477,7 +491,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
         const intervals = targets.filter(target => { const value = targetInterval(projection, target); return value && timed(value.beginMs,value.endMs) && (buffered(value.beginMs, value.endMs) || heldTargetIds.includes(targetId(target))); });
         const assigning=stagingTarget&&targets.some(target=>targetId(target)===targetId(stagingTarget));
         if (!intervals.length && !assigning && !interactionLineIds.includes(item.id)) return null;
-        const layout = packIntervals(intervals.map(target => { const value = targetInterval(projection, target)!; return { key: targetId(target), beginMs: value.beginMs!, endMs: value.endMs! }; }));
+        const layout = packIntervals(intervals.map(target => { const value = targetInterval(projection, target)!; const [begin, end] = intervalSpan(value.beginMs!, value.endMs!); return { key: targetId(target), beginMs: begin, endMs: end }; }));
         return row(`${label} ${name}`, intervals.map(target => { const value = targetInterval(displayed, target)!; const text = 'text' in value ? value.text : 'reading' in value ? value.reading : ''; return bar(target, t('timeline.itemLabel',{name,text}), value.beginMs!, value.endMs!, false, layout, text); }), targets, layout.laneCount, name);
       };
       const targets = targetsByLine.get(item.id) ?? [];

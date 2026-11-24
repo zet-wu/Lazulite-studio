@@ -1,5 +1,6 @@
 import {displayLines} from './amll-compatibility';
 import { message, MessageError } from './messages';
+import { timeEnvelope } from './lyric-commands';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit } from './lyric-document';
 
@@ -29,9 +30,7 @@ function assign(word: LyricWord, rubyUnitId: string | null, side: 'beginMs' | 'e
   const unit = rubyUnits[index];
   const other = side === 'beginMs' ? 'endMs' : 'beginMs';
   rubyUnits[index] = { ...unit, [side]: timeMs, [other]: unit[other] !== null && (side === 'beginMs' ? unit[other] < timeMs : unit[other] > timeMs) ? null : unit[other] } as RubyUnit;
-  const starts = rubyUnits.map((item) => item.beginMs).filter((value): value is number => value !== null);
-  const ends = rubyUnits.map((item) => item.endMs).filter((value): value is number => value !== null);
-  return { ...word, rubyUnits, beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null };
+  return { ...word, rubyUnits, ...timeEnvelope(rubyUnits) };
 }
 
 function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endMs', timeMs: number): LyricLine {
@@ -39,11 +38,7 @@ function updateUnit(line: LyricLine, cursor: SyncCursor, side: 'beginMs' | 'endM
   if (index < 0) throw new MessageError(message('sync.wordMissing'));
   const words = line.words.slice();
   words[index] = assign(words[index], cursor.rubyUnitId, side, timeMs);
-  const starts = words.map((word) => word.beginMs).filter((value): value is number => value !== null);
-  const ends = words.map((word) => word.endMs).filter((value): value is number => value !== null);
-  const beginMs = starts.length ? Math.min(...starts, ...(line.beginMs === null ? [] : [line.beginMs])) : line.beginMs;
-  const endMs = ends.length ? Math.max(...ends, ...(line.endMs === null ? [] : [line.endMs])) : line.endMs;
-  return { ...line, words, beginMs, endMs };
+  return { ...line, words, ...timeEnvelope([...words, line]) };
 }
 
 export function stampSync(document: LyricDocument, cursor: SyncCursor, action: SyncAction, timeMs: number, mode: SyncMode = 'continuous', editing = createProjectEditing(), lineOrder: string[] = []): LyricDocument {

@@ -1,4 +1,5 @@
 import { message, MessageError } from './messages';
+import { timeEnvelope } from './lyric-commands';
 import { intersectSegments } from './time-boundaries';
 import type { Acoustics, ProjectDocument } from './project-document';
 import { validateSegments } from './project-document';
@@ -77,19 +78,20 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
       retained.push({id,reason:'alignment.invalidEndpoint'}); return old;
     }
     const processed = result.object_timings?.[id];
-    const starts = ids.flatMap(uid => { const value=endpoint(units.get(uid)!.proposed_timing.start); return value===null?[]:[value]; });
-    const ends = ids.flatMap(uid => { const value=endpoint(units.get(uid)!.proposed_timing.end); return value===null?[]:[value]; });
-    return merge(id, old, processed ? {beginMs:endpoint(processed.start),endMs:endpoint(processed.end)} : {beginMs:starts.length?Math.min(...starts):null,endMs:ends.length?Math.max(...ends):null});
+    const proposedPairs = ids.map((uid) => {
+      const timing = units.get(uid)!.proposed_timing;
+      return { beginMs: endpoint(timing.start), endMs: endpoint(timing.end) };
+    });
+    const proposedEnvelope = proposedPairs.length === 1 ? proposedPairs[0] : timeEnvelope(proposedPairs);
+    return merge(id, old, processed ? {beginMs:endpoint(processed.start),endMs:endpoint(processed.end)} : proposedEnvelope);
   }
   function envelope(old: Pair, children: Pair[]): Pair {
     if (!children.length) return clearUnmatched ? {beginMs:null,endMs:null} : old;
-    const starts = children.flatMap(c => c.beginMs === null ? [] : [c.beginMs]);
-    const ends = children.flatMap(c => c.endMs === null ? [] : [c.endMs]);
-    const proposed = {beginMs: starts.length ? Math.min(...starts) : null, endMs: ends.length ? Math.max(...ends) : null};
+    const proposed = timeEnvelope(children);
     // Parents do not count as retained/cleared leaf objects.
     const candidate = clearUnmatched ? proposed : {beginMs:proposed.beginMs ?? old.beginMs,endMs:proposed.endMs ?? old.endMs};
-    if (!legal(candidate)) return old;
-    return {beginMs: candidate.beginMs === null ? null : Math.min(candidate.beginMs, ...starts), endMs: candidate.endMs === null ? null : Math.max(candidate.endMs, ...ends)};
+    if ([candidate.beginMs, candidate.endMs].some(value => value !== null && (!Number.isSafeInteger(value) || value < 0))) return old;
+    return timeEnvelope([candidate, ...children]);
   }
   for (const [lineIndex, line] of next.lyrics.lines.entries()) {
     if (skipped.has(line.id)) continue;

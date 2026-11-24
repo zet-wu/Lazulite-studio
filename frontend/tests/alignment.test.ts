@@ -30,7 +30,7 @@ it('preserves absent, inverted, out-of-range and quantized-zero suggestions loca
   expect(next.project.lyrics.lines[0].words[0]).toEqual(p.lyrics.lines[0].words[0]);expect(next.project.lyrics.lines[1].beginMs).toBe(2000);
  }
  const one=mergeAlignment(p,result(p,[[.2,null],[2,null]]),5000).project;
- expect(one.lyrics.lines[0].words[0]).toMatchObject({beginMs:200,endMs:500});expect(one.lyrics.lines[1]).toMatchObject({beginMs:2000,endMs:null});
+ expect(one.lyrics.lines[0].words[0]).toMatchObject({beginMs:200,endMs:500});expect(one.lyrics.lines[1]).toMatchObject({beginMs:2000,endMs:2000});
 });
 it('uses available internal boundaries and avoids history when all proposals are absent',()=>{
  const p=fixture(),r=result(p,[[null,null]]);r.mapping.push({...r.mapping[0],unit_id:'middle'});r.alignment.units.push({unit_id:'middle',line_id:'a',proposed_timing:{start:{time:2,source:'x'},end:{time:3,source:'x'}}});
@@ -52,7 +52,7 @@ it('clears missing endpoints but preserves illegal proposals and available targe
  let r=result(p,[[3,null],[null,null]]);
  const next=mergeAlignment(p,r,5000,true);
  expect(next.project.lyrics.lines[0].words[0]).toMatchObject({beginMs:3000,endMs:null});expect(next.cleared).toHaveLength(1);
- expect(next.retained).toHaveLength(0);expect(next.project.lyrics.lines[0]).toMatchObject({beginMs:3000,endMs:null});
+ expect(next.retained).toHaveLength(0);expect(next.project.lyrics.lines[0]).toMatchObject({beginMs:3000,endMs:3000});
  for(const pair of [[4,3],[-1,null],[1,9],[1.0001,1.0002]] as [number|null,number|null][]){
   r=result(p,[pair,[2,3]]);const merged=mergeAlignment(p,r,5000,true);
   expect(merged.project.lyrics.lines[0].words[0]).toEqual(p.lyrics.lines[0].words[0]);expect(merged.retained).toHaveLength(1);expect(merged.cleared).toHaveLength(0);

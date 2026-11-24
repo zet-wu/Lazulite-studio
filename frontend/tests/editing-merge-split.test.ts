@@ -29,10 +29,10 @@ describe('word and Ruby merges', () => {
   it.each([
     [[1000, 1500], [null, null], [1000, 1500]],
     [[1000, null], [null, 2000], [1000, 2000]],
-    [[1000, null], [1500, null], [1000, null]],
+    [[1000, null], [1500, null], [1000, 1500]],
     [[null, null], [null, null], [null, null]],
     [[1500, 2000], [1000, 1300], [1000, 2000]],
-  ])('takes known endpoints separately: %j, %j', (a, b, expected) => {
+  ])('takes an envelope of all known endpoints: %j, %j', (a, b, expected) => {
     const { document, line } = fixture();
     [line.words[0].beginMs, line.words[0].endMs] = a;
     [line.words[1].beginMs, line.words[1].endMs] = b;
@@ -45,7 +45,7 @@ describe('word and Ruby merges', () => {
     const state = createLyricEditorState(document);
     for (const wordIds of [['w0', 'w2'], ['w0', 'missing'], ['w0', 'bg']]) expect(() => executeLyricCommand(state, { type: 'merge-words', wordIds })).toThrow();
     line.words[0].beginMs = 2000; line.words[1].endMs = 1000;
-    expect(() => executeLyricCommand(state, { type: 'merge-words', wordIds: ['w0', 'w1'] })).toThrow();
+    expect(executeLyricCommand(state, { type: 'merge-words', wordIds: ['w0', 'w1'] }).present.lines[0].words[0]).toMatchObject({ beginMs: 1000, endMs: 2000 });
     line.words[0].beginMs = 1000; line.words[1].endMs = 2000;
     line.words[1].rubyUnits = [{ id: 'r', reading: 'あ', beginMs: 500, endMs: 1200 }];
     expect(() => executeLyricCommand(state, { type: 'merge-words', wordIds: ['w0', 'w1'] })).toThrow('command.rubyOutsideWordAdjust');
@@ -89,7 +89,7 @@ it('uses known endpoints despite unknown siblings, and rejects invalid intervals
   line.words[2].beginMs = 1500; line.words[3].beginMs = 1000;
   expect(executeLyricCommand(createLyricEditorState(document), command).present.lines[1].beginMs).toBe(1000);
   line.words[3].endMs = 500;
-  expect(() => executeLyricCommand(createLyricEditorState(document), command)).toThrow('split.invalidSegment');
+  expect(executeLyricCommand(createLyricEditorState(document), command).present.lines[1]).toMatchObject({ beginMs: 500, endMs: 1500 });
   expect(() => executeLyricCommand(createLyricEditorState(document), { ...command, beforeWordIds: [] })).toThrow('command.splitPoint');
 });
 
