@@ -92,7 +92,8 @@ class VocalModels(AlignmentModels):
         self.settings.patch({'vocal.models_dir':path},current['revision'])
         return self.scan(True)
 
-    def capture(self):
-        kind=self.settings.read()['values'].get('studio:vocal-model','demucs')
+    def capture(self, model_id=None):
+        if model_id is not None and model_id not in ('demucs', 'bs-karaoke'): raise ValueError('人声模型 ID 无效')
+        kind=model_id if model_id is not None else self.settings.read()['values'].get('studio:vocal-model','demucs')
         try: return self.describe(kind)
         except (KeyError, TypeError) as exc: raise ValueError('人声模型配置无效，请刷新并检查模型文件') from exc

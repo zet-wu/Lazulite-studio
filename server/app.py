@@ -670,12 +670,17 @@ def create_app(
 
     def capture_vocal(pid, params):
         if params.get('upload_id') or params.get('retry_analysis_id'): return
+        model_id = params.get('model_id')
+        if model_id is not None:
+            try: params['_vocal_model'] = vocal_models.capture(model_id)
+            except (ValueError, OSError) as exc: fail('vocal_model_unavailable', str(exc), 422)
+            params['model_name'] = params['_vocal_model']['name']
         if not params.get('force_separation'):
-            reusable = vocal_runner.reusable(pid, params['asset_id'])
+            reusable = vocal_runner.reusable(pid, params['asset_id'], model_id)
             if reusable:
                 params['_reuse_vocal_id'] = reusable
                 return
-        if vocal_runner.separator_factory: return
+        if vocal_runner.separator_factory or model_id is not None: return
         try:
             params['_vocal_model'] = vocal_models.capture()
             params['model_name'] = params['_vocal_model']['name']
@@ -729,8 +734,9 @@ def create_app(
         if kind == 'vocal':
             row = project(pid)
             if not row[2] or params.get('asset_id') != row[2]: fail('job_input_invalid', '人声任务需要当前项目源音频', 422)
-            if set(params) - {'asset_id', 'retry_analysis_id', 'upload_id', 'offset_ms', 'force_separation'}: fail('job_input_invalid', '人声参数由服务配置', 422)
+            if set(params) - {'asset_id', 'retry_analysis_id', 'upload_id', 'offset_ms', 'force_separation', 'model_id'}: fail('job_input_invalid', '人声参数由服务配置', 422)
             if 'force_separation' in params and (type(params['force_separation']) is not bool or params.get('retry_analysis_id') or params.get('upload_id')): fail('job_input_invalid', '重新分离参数无效', 422)
+            if 'model_id' in params and (params['model_id'] not in ('demucs', 'bs-karaoke') or params.get('retry_analysis_id') or params.get('upload_id')): fail('job_input_invalid', '人声模型 ID 或请求组合无效', 422)
             if 'offset_ms' in params and 'upload_id' not in params: fail('job_input_invalid', '偏移仅用于上传人声', 422)
             if 'upload_id' in params:
                 if params.get('retry_analysis_id'): fail('job_input_invalid', '上传与重试不可同时指定', 422)

@@ -69,7 +69,7 @@ class JobService:
                 return self.get(active[0])
             request['devices'] = devices_snapshot
             if kind == 'vocal' and request['devices']: request['device'] = request['devices']['vocal']['actual']
-            if request.get('_vocal_model', {}).get('type') == 'bs-karaoke' and request['devices']['vocal']['actual'] not in {'cpu','cuda'}:
+            if not skip_vocal and request.get('_vocal_model', {}).get('type') == 'bs-karaoke' and request['devices']['vocal']['actual'] not in {'cpu','cuda'}:
                 raise ValueError('BS Karaoke 当前支持 CPU 或 NVIDIA GPU，请选择 CPU 或其他模型')
             jid=uuid.uuid4().hex; t=now()
             if request.get('_upload_path'):

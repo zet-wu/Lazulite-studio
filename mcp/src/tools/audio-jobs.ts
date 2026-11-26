@@ -15,7 +15,7 @@ type VocalResult = {
 function post(body: unknown, key?: string): RequestInit { return { method: 'POST', headers: { 'Content-Type': 'application/json', ...(key ? { 'Idempotency-Key': key } : {}) }, body: JSON.stringify(body) }; }
 function jobSummary(job: StudioJob) { return { job_id: job.id, project_id: job.project_id, kind: job.kind, status: job.status, stage: job.stage, acknowledged_state: job.acknowledged_state ?? null, result_available: job.result_available, error: job.error, model: job.request.model ?? job.request.model_name ?? null, devices: job.request.devices ?? null, reused_vocal: job.request.reused_vocal ?? false, bound_revision: job.request.revision ?? job.request.bound_revision ?? null, created_at: job.created_at, updated_at: job.updated_at }; }
 export function registerAudioJobTools(registry: ToolRegistry) {
-  registry.register({ name: 'list_vocal_models', description: 'List installed vocal separation models, availability, selected model and usable devices from the desktop backend catalog.', annotations: read,
+  registry.register({ name: 'list_vocal_models', description: 'List installed vocal separation models, availability, selected model and usable devices from the desktop backend catalog. Use the returned ID as start_vocal_separation.model_id.', annotations: read,
     inputSchema: { refresh: z.boolean().default(false) }, execute: async ({ refresh }, { client }) => client.json(`/vocal-models?refresh=${refresh}`),
   });
   registry.register({ name: 'list_vocal_results', description: 'List project vocal results. Default summary includes model name and segment count; detail=full includes configuration and segments. audio_state=current means audio is available; is_active_in_project identifies the project selection.', annotations: read,
@@ -40,11 +40,11 @@ export function registerAudioJobTools(registry: ToolRegistry) {
       }) };
     },
   });
-  registry.register({ name: 'start_vocal_separation', description: 'Start independent vocal separation using the configured desktop model. Reuses existing audio unless force_separation=true. Returns a background job immediately; a busy queue is retryable.', annotations: write,
-    inputSchema: { project_id: id(), force_separation: z.boolean().default(false), idempotency_key: id().optional() },
-    execute: async ({ project_id, force_separation, idempotency_key }, { client }) => {
+  registry.register({ name: 'start_vocal_separation', description: 'Start independent vocal separation using optional model_id (demucs or bs-karaoke), otherwise the desktop preference. Explicit model selection only reuses results from the same model. Reuses existing audio unless force_separation=true. Returns a background job immediately; a busy queue is retryable.', annotations: write,
+    inputSchema: { project_id: id(), force_separation: z.boolean().default(false), model_id: z.enum(['demucs','bs-karaoke']).optional(), idempotency_key: id().optional() },
+    execute: async ({ project_id, force_separation, model_id, idempotency_key }, { client }) => {
       const project = await client.getProject(project_id); if (!project.asset) invalid('Upload source audio before separating vocals.');
-      try { return jobSummary(await client.json<StudioJob>(`${projectPath(project_id)}/jobs/vocal`, post({ params: { asset_id: project.asset.id, force_separation } }, idempotency_key))); }
+      try { return jobSummary(await client.json<StudioJob>(`${projectPath(project_id)}/jobs/vocal`, post({ params: { asset_id: project.asset.id, force_separation, ...(model_id ? { model_id } : {}) } }, idempotency_key))); }
       catch (error) { if (error instanceof StudioHttpError && error.status === 409) { const jobs = await client.listJobs(project_id); const active = jobs.items.find(job => ['queued','running','cancel_requested'].includes(job.status)); if (active) throw new StudioHttpError(409, { code: 'job_slot_busy', message: `Wait for or cancel active job ${active.id} before starting separation.`, retryable: true, params: { active_job_id: active.id } }); } throw error; }
     },
   });

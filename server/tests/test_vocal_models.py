@@ -15,6 +15,8 @@ def test_catalog_directory_snapshot_and_missing_resources(tmp_path):
     (bs/'config_karaoke_frazer_becruily.yaml').write_text('audio: {}')
     assert [i['status'] for i in models.scan()['items']]==['invalid','ready']
     settings.patch({'studio:vocal-model':'bs-karaoke'},0)
+    assert models.capture('bs-karaoke')['type']=='bs-karaoke'
+    with pytest.raises(ValueError,match='ID'):models.capture('unknown')
     captured=models.capture()
     settings.patch({'studio:vocal-model':'demucs'},1)
     assert captured['type']=='bs-karaoke'
@@ -90,3 +92,32 @@ def test_cpu_retry_retains_original_model_and_force_intent(tmp_path):
             request=json.loads(c.execute('SELECT request_json FROM jobs WHERE id=?',(job['id'],)).fetchone()[0])
         assert request['_vocal_model']==params['_vocal_model']
         assert request['device']=='cpu' and request['force_separation'] is True
+
+
+def test_per_request_model_reuses_only_matching_results(tmp_path, monkeypatch):
+    root = tmp_path/'models'
+    demucs = root/'demucs'; demucs.mkdir(parents=True)
+    (demucs/'htdemucs.yaml').write_text('models: [test]')
+    (demucs/'test-weights.th').write_bytes(b'fixture')
+    bs = root/'bs-karaoke'; bs.mkdir()
+    (bs/'bs_roformer_karaoke_frazer_becruily.ckpt').write_bytes(b'fixture')
+    (bs/'config_karaoke_frazer_becruily.yaml').write_text('audio: {}')
+    monkeypatch.setenv('STUDIO_VOCAL_MODELS_DIR',str(root))
+    calls=[]
+    class Counted(Separator):
+        def separate(self,audio): calls.append(audio.source_id);return super().separate(audio)
+    client,db=setup(tmp_path,Counted)
+    with client:
+        asset=client.get('/api/v1/projects/p').json()['asset']['id']
+        def run(model):
+            reply=client.post('/api/v1/projects/p/jobs/vocal',json={'params':{'asset_id':asset,'model_id':model}},headers={'origin':'http://studio'})
+            assert reply.status_code==202,reply.text
+            job=wait(client,reply.json()['id']);assert job['status']=='succeeded',job
+            return client.get('/api/v1/jobs/'+job['id']+'/result').json()['analysis_id']
+        first=run('demucs');second=run('bs-karaoke')
+        assert first!=second and len(calls)==2
+        assert run('demucs')==first and run('bs-karaoke')==second and len(calls)==2
+        for invalid in ['other',None,42]:
+            reply=client.post('/api/v1/projects/p/jobs/vocal',json={'params':{'asset_id':asset,'model_id':invalid}},headers={'origin':'http://studio'})
+            assert reply.status_code==422
+        assert client.get('/api/v1/settings').json()['values'].get('studio:vocal-model','demucs')=='demucs'

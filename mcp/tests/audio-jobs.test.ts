@@ -89,6 +89,8 @@ it('adapts job management calls with bound revision, idempotency and filtered hi
   await registry.call('start_vocal_separation', { project_id: 'p', force_separation: true, idempotency_key: 'separate' }, { client });
   expect(JSON.parse(String(calls.at(-1)?.init?.body))).toEqual({ params: { asset_id: 'a', force_separation: true } });
   expect(new Headers(calls.at(-1)?.init?.headers).get('Idempotency-Key')).toBe('separate');
+  await registry.call('start_vocal_separation', { project_id:'p', model_id:'bs-karaoke' }, {client});
+  expect(JSON.parse(String(calls.at(-1)?.init?.body))).toEqual({params:{asset_id:'a',force_separation:false,model_id:'bs-karaoke'}});
   await registry.call('retry_job_cpu', { job_id: 'j', revision: 'r1', idempotency_key: 'retry' }, { client });
   expect(calls.at(-1)?.path).toBe('/api/v1/jobs/j/retry-cpu'); expect(JSON.parse(String(calls.at(-1)?.init?.body))).toEqual({ revision: 'r1' });
   await registry.call('acknowledge_job', { job_id: 'j', state: 'dismissed' }, { client }); expect(JSON.parse(String(calls.at(-1)?.init?.body))).toEqual({ state: 'dismissed' });

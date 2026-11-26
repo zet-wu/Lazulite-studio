@@ -68,7 +68,7 @@ class VocalRunner:
             if row['source_asset_id'] != params['asset_id']: raise ValueError('人声来源不匹配')
             reuse = (row, candidate)
         elif not params.get('upload_id') and not params.get('force_separation'):
-            reuse = self._find_reusable(project_id, params['asset_id'])
+            reuse = self._find_reusable(project_id, params['asset_id'], params.get('model_id'))
         if reuse:
             row, metadata = reuse
             if not params.get('retry_analysis_id') and row['status'] == 'ready':
@@ -157,17 +157,18 @@ class VocalRunner:
     def result(project_id, metadata):
         return {'kind': 'vocal', 'analysis_id': metadata['id'], 'binding': {'project_id': project_id, 'asset_id': metadata['source_asset_id']}, 'engine': metadata['model']}
 
-    def _find_reusable(self, project_id, asset_id):
+    def _find_reusable(self, project_id, asset_id, model_type=None):
         with self.db.connect() as c:
             rows = c.execute('SELECT * FROM vocal_results WHERE project_id=? AND source_asset_id=? ORDER BY rowid DESC', (project_id, asset_id)).fetchall()
         for row in rows:
             candidate = json.loads(row['metadata_json'])
+            if model_type is not None and model_type not in (candidate.get('source_kind'), candidate.get('generation_settings', {}).get('model')): continue
             if candidate.get('source_kind') != 'upload' and self.audio_available(project_id, candidate):
                 return row, candidate
         return None
 
-    def reusable(self, project_id, asset_id):
-        found = self._find_reusable(project_id, asset_id)
+    def reusable(self, project_id, asset_id, model_type=None):
+        found = self._find_reusable(project_id, asset_id, model_type)
         return found[1]['id'] if found else None
 
     def generation_settings(self, asset_id, model_name=None, device=None):
