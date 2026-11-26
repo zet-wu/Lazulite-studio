@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../../adapters/runtime';
+import { DesktopOnlyNotice } from '../../shared/DesktopOnlyNotice';
 import {quickSplitOptions} from '../../adapters/quick-split';
 import {segmentText, distributeSegmentTime, loadSyllableDivider} from '../../domain/segmentation';
 import { useSyncStyle } from '../../adapters/sync-style';
@@ -1040,7 +1042,7 @@ function EditorWorkspaceContent(props: Props) {
       return !editRejected.current && !pageRef.current?.querySelector('[aria-invalid="true"]');
     }}/>}
     {props.projectId && props.project && props.applyProject && props.sourceAssetId && <VocalPanel key={props.sourceAssetId} locked={props.alignment?.locked} visible={mode==='audio'} projectId={props.projectId} project={props.project} sourceAssetId={props.sourceAssetId} apply={props.applyProject} save={props.saveForPackaging} durationMs={props.audioDurationMs??null}/>}
-    {mode === 'audio' && (props.projectId && props.project && props.applyProject && props.sourceAssetId ? <div ref={layoutRef} className={vocalStyles.audioLayout} style={{gridTemplateColumns:template(rendered)}}>
+    {mode === 'audio' && (isBrowserRuntime ? <section className={styles.auxiliaryPlaceholder}><DesktopOnlyNotice/></section> : props.projectId && props.project && props.applyProject && props.sourceAssetId ? <div ref={layoutRef} className={vocalStyles.audioLayout} style={{gridTemplateColumns:template(rendered)}}>
       {columns.outlineVisible && <aside onFocusCapture={() => { selectionArea.current = 'outline'; }} ref={outlineRef} className={styles.outline} aria-label={t('editor.audioOutline')}><h2>{t('editor.outline')}</h2><div className={styles.panelBody}>{displayOrder.map(line => <div key={line.id} draggable onDragStart={e=>{selectLine(line);e.dataTransfer.setData(VOCAL_LINE_MIME,line.id);e.dataTransfer.effectAllowed="copy";const ghost=e.currentTarget.cloneNode(true) as HTMLElement;ghost.style.cssText="position:fixed;left:-10000px;opacity:.6;width:220px";window.document.body.appendChild(ghost);e.dataTransfer.setDragImage(ghost,20,16);setTimeout(()=>ghost.remove(),0);}}>
         <div onClick={event => selectLine(line, event.shiftKey, event.ctrlKey || event.metaKey)}><OutlineRow line={line} ordinal={ordinalById.get(line.backgroundOf ?? line.id)} selected={selection?.kind === 'lines' && selection.ids.includes(line.id)}/></div>
         {props.assignmentError?.lineId===line.id && <div role="alert" className={vocalStyles.error}>{formatMessage(props.assignmentError.detail)}{assignmentIssues.map((issue,i)=><button data-role="secondary" key={i} onClick={()=>locateIssue(issue)}>{t('editor.locate')}{issue.kind==='ruby'?t('selection.ruby'):issue.kind==='word'?t('selection.word'):issue.kind==='romanization-unit'?t('selection.romanizationUnit'):t('selection.line')}{i+1}</button>)}</div>}

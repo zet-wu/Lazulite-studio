@@ -1,3 +1,4 @@
+import { isBrowserRuntime } from '../../adapters/runtime';
 import { apiJson } from '../../adapters/http/client';
 import { particlesEnabled } from '../../adapters/studio-preferences';
 import type { ParticleRange } from '../../domain/romanization-generation';
@@ -107,7 +108,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
   const [sourceIds] = useState(lineIds);
   const modeStorage = `lazulite-romanization-mode:${preferenceScope}`;
   const [kind, setKind] = useState<RomanizationKind>(() => preferences.getItem(modeStorage) === 'plain' ? 'plain' : 'timed');
-  const [convertParticles] = useState(particlesEnabled);
+  const [convertParticles] = useState(() => !isBrowserRuntime && particlesEnabled());
   const [particles, setParticles] = useState<ParticleRange[] | null>(() => convertParticles ? null : []);
   const [analysisError, setAnalysisError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -165,6 +166,7 @@ export function RomanizationGenerationDialog({ document, lineIds, preferenceScop
           preferences.setItem(modeStorage, next);
         }}><option value="plain">{t('romanization.plain')}</option><option value="timed">{t('romanization.timed')}</option></Select></Tooltip></label>
       </div>
+      {isBrowserRuntime && <p>{t('demo.particlesHelp')}</p>}
       {particles === null && <p role={analysisError ? 'alert' : 'status'}>{analysisError || t('settings.particleLoading')}{analysisError && <button data-role="secondary" onClick={() => setAttempt(value => value + 1)}>{t('common.retry')}</button>}</p>}
       <div ref={scroll} data-proposal-count={rows.length} className={`${styles.rubyGenerationRows} ${virtualized ? styles.rubyGenerationRowsVirtual : ''}`}>
         <div style={virtualized ? { position: 'relative', height: virtualizer.getTotalSize() } : { display: 'grid', gap: 8 }}>

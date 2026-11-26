@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../adapters/runtime';
+import { DesktopOnlyNotice } from '../shared/DesktopOnlyNotice';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {Tooltip} from '../shared/Tooltip';
@@ -100,7 +102,7 @@ export function PackagingPanel(props:Props){
  {message&&<p role="alert">{message}</p>}
  </div>
  <div role="tabpanel" id="output-panel-music" aria-labelledby="output-tab-music" hidden={outputTab!=='music'}>
- {props.projectId&&props.sourceAssetId&&props.saveForPackaging?<MusicPackaging key={props.projectId} onIssues={next=>{setMusicBlocking(next);if(next.length){choose('lyrics');setAll(false);}}} projectId={props.projectId} document={props.document} saveForPackaging={props.saveForPackaging}/>:<p>{t('packaging.uploadHelp')}</p>}
+ {isBrowserRuntime ? <DesktopOnlyNotice/> : props.projectId&&props.sourceAssetId&&props.saveForPackaging?<MusicPackaging key={props.projectId} onIssues={next=>{setMusicBlocking(next);if(next.length){choose('lyrics');setAll(false);}}} projectId={props.projectId} document={props.document} saveForPackaging={props.saveForPackaging}/>:<p>{t('packaging.uploadHelp')}</p>}
  </div>
  {dialog&&props.project&&<>{dialog==='sug-singers'?<SugSingersDialog error={message} project={props.project} close={()=>setDialog(null)} apply={command=>apply({type:'karaoke',command})}/>:<SingerMarkersDialog error={message} project={props.project} close={()=>setDialog(null)} apply={command=>apply({type:'karaoke',command})}/>}</>}
  </section></div>;

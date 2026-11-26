@@ -11465,5 +11465,11 @@
     "source": "项目保存失败，浏览器存储空间可能不足。请导出歌词备份并释放空间后重试。",
     "params": [],
     "parameterNotes": {}
+  },
+  "demo.particlesHelp": {
+    "context": "Browser romaji generation: local kana/readings work, server morphological particle recognition is desktop-only.",
+    "source": "在线演示按已有注音或假名生成罗马字；自动识别助词读音需要桌面完整版。",
+    "params": [],
+    "parameterNotes": {}
   }
 }

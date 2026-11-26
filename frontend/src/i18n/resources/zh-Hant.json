@@ -1749,5 +1749,6 @@
   "demo.storageUnavailable": "瀏覽器專案儲存無法使用，請允許此網站使用本機儲存後重試。",
   "demo.decodeFailed": "瀏覽器無法解碼此音訊，請轉換為 WAV、MP3 或瀏覽器支援的格式後重試。",
   "demo.processing": "正在本機解碼音訊…",
-  "demo.storageFailed": "專案儲存失敗，瀏覽器儲存空間可能不足。請匯出歌詞備份並釋放空間後重試。"
+  "demo.storageFailed": "專案儲存失敗，瀏覽器儲存空間可能不足。請匯出歌詞備份並釋放空間後重試。",
+  "demo.particlesHelp": "線上示範依已有注音或假名產生羅馬字；自動辨識助詞讀音需要桌面完整版。"
 }
