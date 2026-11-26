@@ -20,6 +20,7 @@ const op = z.discriminatedUnion('op', [
   z.object({ op: z.literal('edit_word'), ...lineWord(), text: id() }),
   z.object({ op: z.literal('insert_word'), line_id: id(), after_word_id: id().nullable(), text: id(), begin_ms: time().optional(), end_ms: time().optional(), client_ref: id().optional() }),
   z.object({ op: z.literal('delete_word'), ...lineWord() }),
+  z.object({ op: z.literal('delete_ruby'), ...lineWord(), ruby_id: id() }),
   z.object({ op: z.literal('split_word'), ...lineWord(), at: z.number().int().positive(), client_ref: id().optional() }),
   z.object({ op: z.literal('merge_words'), line_id: id(), word_ids: z.array(id()).min(2) }),
   z.object({ op: z.literal('move_word'), ...lineWord(), to_line_id: id(), after_word_id: id().nullable() }),
@@ -50,6 +51,11 @@ export function registerEditingTools(registry: ToolRegistry) {
           case 'insert_word': {
             const word = { ...createWord(operation.text), beginMs: operation.begin_ms ?? null, endMs: operation.end_ms ?? null };
             remember(refs, operation.client_ref, word.id); command = { type: 'insert-word', lineId: lineId!, afterWordId: nullable(operation.after_word_id), word }; break;
+          }
+          case 'delete_ruby': {
+            const word=requireWord(next,lineId!,wordId!);
+            if(!word.rubyUnits.some(unit=>unit.id===resolve(operation.ruby_id))) invalid('Ruby unit does not exist in the specified word.');
+            command={type:'delete-ruby',lineId:lineId!,wordId:wordId!,rubyId:resolve(operation.ruby_id)};break;
           }
           case 'delete_word': command = { type: 'delete-word', lineId: lineId!, wordId: wordId! }; break;
           case 'split_word': { const newWordId = crypto.randomUUID(); remember(refs, operation.client_ref, newWordId); command = { type: 'split-word', lineId: lineId!, wordId: wordId!, at: operation.at, newWordId }; break; }

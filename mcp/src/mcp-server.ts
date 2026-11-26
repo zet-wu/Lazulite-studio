@@ -1,3 +1,4 @@
+import { registerKaraokeTools } from './tools/karaoke';
 import { registerAudioJobTools } from './tools/audio-jobs';
 import { registerTransformTools } from './tools/transforms';
 import { registerEditingTools } from './tools/editing';
@@ -26,6 +27,7 @@ export function createToolRegistry(): ToolRegistry {
   registerTimingTools(registry);
   registerTransformTools(registry);
   registerAudioJobTools(registry);
+  registerKaraokeTools(registry);
   return registry;
 }
 

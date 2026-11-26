@@ -45,17 +45,20 @@ export function cueProblem(lyrics: LyricDocument, karaoke: Karaoke, cue: Karaoke
   if (karaoke.cues.some(other => other.id !== cue.id && anchorKey(other.anchor) === anchorKey(cue.anchor) && (cue.anchor.kind !== 'before' || other.beginMs < cue.endMs && other.endMs > cue.beginMs))) return 'karaoke.overlap';
   return null;
 }
-export function insertCue(lyrics: LyricDocument, karaoke: Karaoke, anchor: CueAnchor): Karaoke {
+export function insertCue(lyrics: LyricDocument, karaoke: Karaoke, anchor: CueAnchor, values: Partial<Pick<KaraokeCue, 'text' | 'beginMs' | 'endMs'>> = {}): Karaoke {
   const range = anchorRange(lyrics, anchor);
   if (!range) throw new MessageError(message('karaoke.noGap'));
   if (anchor.kind !== 'before' && karaoke.cues.some(cue => anchorKey(cue.anchor) === anchorKey(anchor))) return karaoke;
   let { beginMs, endMs } = range;
-  if (anchor.kind === 'before') {
+  if (anchor.kind === 'before' && (values.beginMs === undefined || values.endMs === undefined)) {
     endMs = Math.min(endMs, ...karaoke.cues.filter(cue => anchorKey(cue.anchor) === anchorKey(anchor)).map(cue => cue.beginMs));
     beginMs = Math.max(0, endMs - 1000);
     if (endMs <= beginMs) throw new MessageError(message('karaoke.noIntro'));
   }
-  return { ...karaoke, cues: [...karaoke.cues, { id: crypto.randomUUID(), text: karaoke.defaults.text, anchor, beginMs, endMs }] };
+  const cue = { id: crypto.randomUUID(), text: values.text ?? karaoke.defaults.text, anchor, beginMs:values.beginMs ?? beginMs, endMs:values.endMs ?? endMs };
+  const problem = cueProblem(lyrics,karaoke,cue);
+  if (problem) throw new MessageError(message(problem));
+  return { ...karaoke, cues: [...karaoke.cues, cue] };
 }
 export function autoInsertCues(lyrics: LyricDocument, karaoke: Karaoke, groupIds = karaoke.groups.map(group => group.id)): Karaoke {
   const validGroups = new Set(karaoke.groups.map(group => group.id));
@@ -184,7 +187,7 @@ export function groupIdProblem(original: Karaoke['groups'], groups: Karaoke['gro
   }
   return null;
 }
-export type KaraokeCommand = { kind: 'sug-singer-names'; names: NonNullable<Karaoke['sugSingerNames']> } | { kind: 'remove-lines'; lineIds: string[] } | { kind: 'singer-markers'; markers: SingerMarker[] } | { kind: 'insert'; anchor: CueAnchor } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; renames: Record<string, string> } | { kind: 'outputs'; outputs: string[] } | { kind: 'offsets'; offsets: Record<string, number> };
+export type KaraokeCommand = { kind: 'sug-singer-names'; names: NonNullable<Karaoke['sugSingerNames']> } | { kind: 'remove-lines'; lineIds: string[] } | { kind: 'singer-markers'; markers: SingerMarker[] } | { kind: 'insert'; anchor: CueAnchor; text?: string; beginMs?: number; endMs?: number } | { kind: 'auto'; groupIds: string[]; thresholds: Pick<Karaoke['defaults'], 'beforeMs' | 'wordMs' | 'rubyMs'> } | { kind: 'cue'; id: string; text: string; beginMs: number; endMs: number } | { kind: 'remove'; id: string } | { kind: 'assign'; lineIds: string[]; groupId: string } | { kind: 'settings'; defaults: Karaoke['defaults'] } | { kind: 'groups'; groups: Karaoke['groups']; renames: Record<string, string> } | { kind: 'outputs'; outputs: string[] } | { kind: 'offsets'; offsets: Record<string, number> };
 export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: KaraokeCommand): Karaoke {
   let next = karaoke;
   switch (command.kind) {
@@ -193,7 +196,7 @@ export function applyKaraoke(lyrics: LyricDocument, karaoke: Karaoke, command: K
       for (const marker of command.markers) { const problem=markerProblem(marker); if(problem)throw new MessageError(message(problem)); }
       next = { ...karaoke, singerMarkers: command.markers }; break;
     }
-    case 'insert': next = insertCue(lyrics, karaoke, command.anchor); break;
+    case 'insert': next = insertCue(lyrics, karaoke, command.anchor, command); break;
     case 'auto': {
       const configured = { ...karaoke, defaults: { ...karaoke.defaults, ...command.thresholds } };
       next = autoInsertCues(lyrics, configured, command.groupIds); break;

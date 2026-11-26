@@ -1,9 +1,11 @@
+import { createProjectEditorState, executeProjectCommand, validateSegments } from '../../../frontend/src/domain/project-document';
+import { mutateProjectDocument } from './cas';
 import { z } from 'zod';
 import { parseProject } from '../../../frontend/src/adapters/project-codec';
 import { timeEnvelope } from '../../../frontend/src/domain/lyric-commands';
 import { StudioHttpError, type StudioJob } from '../client';
-import { id, invalid, requireLine } from './editing';
-import { contentPayload, type ToolRegistry } from './registry';
+import { id, invalid, requireLine, writeSchema, reference, remember } from './editing';
+import { contentPayload, withOperationContext, type ToolRegistry } from './registry';
 const read = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
 const write = { readOnlyHint: false, destructiveHint: false, idempotentHint: false };
 const projectPath = (projectId: string) => `/projects/${encodeURIComponent(projectId)}`;
@@ -77,6 +79,36 @@ export function registerAudioJobTools(registry: ToolRegistry) {
         energy = await client.json(`${projectPath(args.project_id)}/vocals/${encodeURIComponent(resultId)}/energy?${new URLSearchParams({ start_ms: String(start), end_ms: String(end), buckets: String(args.energy_buckets) })}`);
       }
       return { revision: envelope.revision, analysis_id: doc.acoustics.analysisId, duration_ms: duration, range_ms: [start,end], segments, gaps, gap_count: gaps.length, total_gap_ms: gaps.reduce((n,gap) => n+gap.duration_ms,0), ...(energy !== undefined ? { energy } : {}) };
+    },
+  });
+  registry.register({name:'edit_acoustics',description:'Atomically insert/update/delete/replace saved acoustic segments using shared project commands and If-Match CAS. Times must be within source audio and segments must not overlap. Optional analysis_id selects or clears a vocal result binding; omit to preserve it. Adopt a ready result using list_vocal_results(detail=full) then replace_segments plus analysis_id; the backend verifies its source at CAS save.',annotations:write,
+    inputSchema:{...writeSchema(),analysis_id:id().nullable().optional(),operations:z.array(z.discriminatedUnion('op',[
+      z.object({op:z.literal('insert_segment'),begin_ms:z.number().int().nonnegative(),end_ms:z.number().int().positive(),client_ref:id().optional()}),
+      z.object({op:z.literal('update_segment'),segment_id:id(),begin_ms:z.number().int().nonnegative().optional(),end_ms:z.number().int().positive().optional()}),
+      z.object({op:z.literal('delete_segment'),segment_id:id()}),
+      z.object({op:z.literal('replace_segments'),segments:z.array(z.object({id:id().optional(),begin_ms:z.number().int().nonnegative(),end_ms:z.number().int().positive()}))}),
+    ])).min(1)},
+    execute:async(args,{client})=>{
+      const project=await client.getProject(args.project_id),duration=project.asset?.source_duration_ms??project.asset?.duration_ms;
+      if(duration===undefined||duration===null)invalid('Source audio duration is required to edit acoustic segments.');
+      return mutateProjectDocument(client,args.project_id,{expectedRevision:args.expected_revision,idempotencyKey:args.idempotency_key},(doc,envelope)=>{
+        let segments=doc.acoustics.segments.map(segment=>({...segment}));const refs:Record<string,string>=Object.create(null);
+        args.operations.forEach((op,index)=>withOperationContext(op,index,envelope.revision,()=>{
+          if(op.op==='replace_segments')segments=op.segments.map(segment=>({id:segment.id??crypto.randomUUID(),beginMs:segment.begin_ms,endMs:segment.end_ms}));
+          else if(op.op==='insert_segment'){const segment={id:crypto.randomUUID(),beginMs:op.begin_ms,endMs:op.end_ms};remember(refs,op.client_ref,segment.id);segments.push(segment);}
+          else {
+            const target=reference(refs,op.segment_id),segment=segments.find(segment=>segment.id===target)??invalid('Acoustic segment does not exist.');
+            if(op.op==='delete_segment')segments=segments.filter(item=>item.id!==target);
+            else {if(op.begin_ms!==undefined)segment.beginMs=op.begin_ms;if(op.end_ms!==undefined)segment.endMs=op.end_ms;}
+          }
+        }));
+        validateSegments(segments);
+        const sorted=[...segments].sort((a,b)=>a.beginMs-b.beginMs);
+        if(sorted.some((segment,index)=>segment.endMs>duration||index>0&&sorted[index-1].endMs>segment.beginMs))invalid('Acoustic segments must stay within source duration and must not overlap.');
+        const acoustics={analysisId:args.analysis_id===undefined?doc.acoustics.analysisId:args.analysis_id,segments};
+        const next=JSON.stringify(acoustics)===JSON.stringify(doc.acoustics)?doc:executeProjectCommand(createProjectEditorState(doc),{type:'acoustics',acoustics}).present;
+        return {nextDoc:next,summary:{created_refs:refs,segment_count:segments.length,operations_applied:args.operations.length}};
+      });
     },
   });
   registry.register({ name: 'get_audio_excerpt', description: 'Return a short listening window as metadata text plus MCP audio (16kHz mono PCM WAV). Supply start_ms/end_ms or line_id with optional padding. Line windows clamp to duration and 30 seconds; explicit windows must be valid. Default source=vocal; choose original explicitly if no separated vocal is available.', annotations: read,

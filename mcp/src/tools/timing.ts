@@ -6,6 +6,8 @@ import { mutateProjectDocument } from './cas';
 import { withOperationContext, type ToolRegistry } from './registry';
 const endpoints = () => ({ begin_ms: time().optional(), end_ms: time().optional() });
 const operation = z.discriminatedUnion('op', [
+  z.object({op:z.literal('clear_line_timing'),line_id:id()}),
+  z.object({op:z.literal('clear_word_timing'),line_id:id(),word_id:id()}),
   z.object({ op: z.literal('set_line_time'), line_id: id(), ...endpoints() }),
   z.object({ op: z.literal('set_word_time'), line_id: id(), word_id: id(), ...endpoints() }),
   z.object({ op: z.literal('set_ruby_time'), line_id: id(), word_id: id(), ruby_id: id(), ...endpoints() }),
@@ -28,6 +30,16 @@ export function registerTimingTools(registry: ToolRegistry) {
           next = commitSublyricTracks(next, op.kind, tracks); affected.add(content.lineId); return;
         }
         const line = requireLine(next, op.line_id); affected.add(line.id);
+        if (op.op === 'clear_line_timing' || op.op === 'clear_word_timing') {
+          const words=op.op==='clear_line_timing'?line.words:[requireWord(next,line.id,op.word_id)];
+          const commands: Exclude<LyricCommand,{type:'batch'}>[] = words.flatMap(word=>[
+            ...word.rubyUnits.map(unit=>({type:'set-ruby-time' as const,lineId:line.id,wordId:word.id,rubyId:unit.id,beginMs:null,endMs:null})),
+            {type:'set-word-time' as const,lineId:line.id,wordId:word.id,beginMs:null,endMs:null},
+          ]);
+          if(op.op==='clear_line_timing')commands.push({type:'set-line-time',lineId:line.id,beginMs:null,endMs:null});
+          else if(args.recompute_envelopes) commands.push({type:'set-line-time',lineId:line.id,...timeEnvelope(line.words.filter(word=>word.id!==op.word_id))});
+          next=run(next,{type:'batch',commands});return;
+        }
         if (op.op === 'set_line_time') { next = run(next, { type: 'set-line-time', lineId: line.id, beginMs: op.begin_ms === undefined ? line.beginMs : op.begin_ms, endMs: op.end_ms === undefined ? line.endMs : op.end_ms }); return; }
         const word = requireWord(next, line.id, op.word_id);
         const unit = op.op === 'set_ruby_time' ? word.rubyUnits.find(u => u.id === op.ruby_id) ?? invalid('Ruby unit does not exist.') : word;

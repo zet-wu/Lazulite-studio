@@ -102,7 +102,10 @@ describe('MCP Server transports', () => {
       'retry_job_cpu',
       'acknowledge_job',
       'get_acoustics',
+      'edit_acoustics',
       'get_audio_excerpt',
+      'get_karaoke_cues',
+      'edit_karaoke_cues',
     ]);
 
     for (const tool of tools.tools) {
