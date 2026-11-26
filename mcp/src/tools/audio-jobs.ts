@@ -1,4 +1,6 @@
-import { renderTimelineVisual } from '../timeline-visual';
+import { renderComparisonVisual, renderTimelineVisual, VISUAL_PLOT_WIDTH, type ComparisonCandidateInput } from '../timeline-visual';
+import { mergeAlignment, type AlignmentResult } from '../../../frontend/src/domain/alignment';
+import type { EnergyWindow } from '../../../frontend/src/domain/energy-window';
 import type { ProjectDocument } from '../../../frontend/src/domain/project-document';
 import type { StudioClient } from '../client';
 import { createProjectEditorState, executeProjectCommand, validateSegments } from '../../../frontend/src/domain/project-document';
@@ -26,13 +28,13 @@ async function fetchExcerpt(args:ExcerptArgs,client:StudioClient,maxWindow:numbe
       if (args.source === 'original' && args.vocal_result_id) invalid('vocal_result_id requires source=vocal.');
       const project = await client.getProject(args.project_id); if (!project.asset) invalid('Project has no source audio.');
       if (sourceAssetId !== undefined && sourceAssetId !== project.asset.id) throw new StudioHttpError(409,{code:'source_asset_changed',message:'Source audio changed; read the document and retry.',retryable:true});
-      let duration = project.asset.source_duration_ms ?? project.asset.duration_ms, resultId: string | undefined;
+      let duration = project.asset.source_duration_ms ?? project.asset.duration_ms, resultId: string | undefined, resultStatus: string | undefined;
       if (args.source === 'vocal') {
         const { items } = await client.json<{ items: VocalResult[] }>(`${projectPath(args.project_id)}/vocals`);
         const selectedId = args.vocal_result_id ?? snapshot?.acoustics.analysisId;
         const result = items.find(item => (!selectedId || item.id === selectedId) && item.source_asset_id === project.asset!.id && item.audio_state === 'current' && ['ready','separated'].includes(item.status));
         if (!result) invalid('No available vocal result for the current source. Separate vocals first or request source=original.');
-        resultId = result.id; duration = result.duration_ms;
+        resultId = result.id; resultStatus = result.status; duration = result.duration_ms;
       }
       let start = args.start_ms!, end = args.end_ms!, requested: number[];
       if (args.line_id) {
@@ -46,7 +48,28 @@ async function fetchExcerpt(args:ExcerptArgs,client:StudioClient,maxWindow:numbe
       const params = new URLSearchParams({ start_ms: String(start), end_ms: String(end), source_asset_id: project.asset.id }); if (resultId) params.set('vocal',resultId);
       const response = await client.request(`${projectPath(args.project_id)}/audio-excerpt?${params}`), bytes = Buffer.from(await response.arrayBuffer());
       const actual: [number, number] = [Number(response.headers.get('X-Actual-Start-Ms')),Number(response.headers.get('X-Actual-End-Ms'))];
-      return {bytes,actual,requested,resultId};
+      return {bytes,actual,requested,resultId,resultStatus};
+}
+async function fetchVisualEnergy(
+  client: StudioClient,
+  projectId: string,
+  source: 'original' | 'vocal',
+  resultId: string | undefined,
+  resultStatus: string | undefined,
+  actual: [number, number],
+): Promise<{ data: EnergyWindow | null; vocal_result_id: string | null; reason: string | null }> {
+  if (source !== 'vocal') return { data: null, vocal_result_id: null, reason: 'source_is_original' };
+  if (!resultId || resultStatus !== 'ready') return { data: null, vocal_result_id: resultId ?? null, reason: 'vocal_analysis_not_ready' };
+  if (actual[1] <= actual[0]) return { data: null, vocal_result_id: resultId, reason: 'empty_window' };
+  const data = await client.json<EnergyWindow>(
+    `${projectPath(projectId)}/vocals/${encodeURIComponent(resultId)}/energy?${new URLSearchParams({ start_ms: String(actual[0]), end_ms: String(actual[1]), buckets: String(VISUAL_PLOT_WIDTH) })}`,
+  );
+  return { data, vocal_result_id: resultId, reason: null };
+}
+function alignmentModelName(job: StudioJob, result: AlignmentResult): string | null {
+  const model = job.request.model as { alignment?: { name?: string; id?: string } } | null | undefined;
+  const backend = (result.alignment as { execution?: { backend?: { model_name?: string } } }).execution?.backend;
+  return model?.alignment?.name ?? model?.alignment?.id ?? backend?.model_name ?? null;
 }
 export function registerAudioJobTools(registry: ToolRegistry) {
   registry.register({ name: 'list_vocal_models', description: 'List installed vocal separation models, availability, selected model and usable devices from the desktop backend catalog. Use the returned ID as start_vocal_separation.model_id.', annotations: read,
@@ -144,13 +167,123 @@ export function registerAudioJobTools(registry: ToolRegistry) {
       });
     },
   });
-  registry.register({ name:'get_timeline_visual', description:'Read-only compact 840×280 PNG of a local logarithmic spectrogram, vocal activity, line ranges and numbered word/ruby reading leaves. Returns text JSON mapping image numbers to exact IDs/text/times plus an MCP image. Supply line_id OR start_ms/end_ms; maximum 15 seconds, line windows clamp automatically. Default vocal source uses the saved analysis selection when present. Inspect long sustained tails, overlap/reverb, silence boundaries and multilingual alignment errors alongside get_acoustics and get_audio_excerpt.',annotations:read,
+  registry.register({ name:'get_timeline_visual', description:'Read-only compact PNG of vocal RMS energy (when ready vocal analysis is available), a local logarithmic spectrogram, vocal activity, line ranges and numbered word/ruby reading leaves. Returns text JSON mapping image numbers to exact IDs/text/times plus an MCP image. Supply line_id OR start_ms/end_ms; maximum 15 seconds, line windows clamp automatically. Default vocal source uses the saved analysis selection when present. Inspect long sustained tails, overlap/reverb, silence boundaries and multilingual alignment errors alongside get_acoustics and get_audio_excerpt.',annotations:read,
     inputSchema:{project_id:id(),line_id:id().optional(),start_ms:z.number().int().nonnegative().optional(),end_ms:z.number().int().positive().optional(),padding_ms:z.number().int().nonnegative().max(10000).default(500),source:z.enum(['vocal','original']).default('vocal'),vocal_result_id:id().optional()},
     execute:async(args,{client})=>{
       const envelope=await client.getDocumentEnvelope(args.project_id),doc=parseProject(envelope.document);
-      const {bytes,actual,resultId}=await fetchExcerpt(args,client,15000,doc,envelope.source_asset_id);
-      const {png,...metadata}=renderTimelineVisual(bytes,doc,actual);
-      return contentPayload([{type:'text',text:JSON.stringify({project_id:args.project_id,revision:envelope.revision,source:args.source,vocal_result_id:resultId??null,actual_range_ms:actual,duration_ms:actual[1]-actual[0],...metadata})},{type:'image',data:png.toString('base64'),mimeType:'image/png'}]);
+      const {bytes,actual,resultId,resultStatus}=await fetchExcerpt(args,client,15000,doc,envelope.source_asset_id);
+      const energyResult=await fetchVisualEnergy(client,args.project_id,args.source,resultId,resultStatus,actual);
+      const {png,energy,...metadata}=renderTimelineVisual(bytes,doc,actual,energyResult.data);
+      const energyMeta={...energy,vocal_result_id:energyResult.vocal_result_id,...(!energy.included&&energyResult.reason?{reason:energyResult.reason}:{})};
+      return contentPayload([{type:'text',text:JSON.stringify({project_id:args.project_id,revision:envelope.revision,source:args.source,vocal_result_id:resultId??null,actual_range_ms:actual,duration_ms:actual[1]-actual[0],energy:energyMeta,...metadata})},{type:'image',data:png.toString('base64'),mimeType:'image/png'}]);
+    },
+  });
+  registry.register({
+    name:'compare_alignment_results',
+    description:'Read-only multi-track comparison PNG + structured unit timing diff between the current saved timeline and 1 or 2 succeeded, unapplied alignment jobs bound to the same current revision. Renders vocal RMS energy, shared spectrogram, current saved track (CUR), candidate tracks (A, optional B), and divergent boundary markers (default threshold 80 ms, configurable). Runs mergeAlignment in memory only without saving or acknowledging jobs; differences indicate model disagreement, not automatic ground truth.',
+    annotations:read,
+    inputSchema:{
+      project_id:id(),
+      job_ids:z.array(id()).min(1).max(2).describe('1 or 2 distinct succeeded alignment job IDs bound to the current saved revision.'),
+      line_id:id().optional(),
+      start_ms:z.number().int().nonnegative().optional(),
+      end_ms:z.number().int().positive().optional(),
+      padding_ms:z.number().int().nonnegative().max(10000).default(500),
+      source:z.enum(['vocal','original']).default('vocal'),
+      vocal_result_id:id().optional(),
+      divergence_threshold_ms:z.number().int().positive().default(80).describe('Endpoint spread threshold in milliseconds to flag divergent units (default 80).'),
+    },
+    execute:async(args,{client})=>{
+      if(new Set(args.job_ids).size!==args.job_ids.length) invalid('job_ids must contain distinct job IDs.');
+      const [envelope,project,...jobs]=await Promise.all([
+        client.getDocumentEnvelope(args.project_id),
+        client.getProject(args.project_id),
+        ...args.job_ids.map(jobId=>client.getJob(jobId)),
+      ]);
+      const durationMs=project.asset?.source_duration_ms??project.asset?.duration_ms??null;
+      if(!project.asset||durationMs===null) invalid('Project source audio duration is unavailable.');
+      if(envelope.source_asset_id!==project.asset.id) throw new StudioHttpError(409,{code:'source_asset_changed',message:'Source audio changed; read the document and retry.',retryable:true});
+      for(const job of jobs){
+        if(job.kind!=='alignment') throw new StudioHttpError(422,{code:'invalid_job_kind',message:`Job "${job.id}" has kind "${job.kind}", expected "alignment".`,retryable:false});
+        if(job.project_id!==args.project_id) throw new StudioHttpError(422,{code:'project_mismatch',message:`Job "${job.id}" belongs to project "${job.project_id}", not "${args.project_id}".`,retryable:false});
+        if(job.status!=='succeeded'||!job.result_available) throw new StudioHttpError(409,{code:'result_not_ready',message:`Alignment job "${job.id}" is not ready (status=${job.status}, result_available=${job.result_available}).`,retryable:['queued','running','cancel_requested'].includes(job.status)});
+      }
+      const results=await Promise.all(args.job_ids.map(jobId=>client.getJobResult<AlignmentResult>(jobId)));
+      const doc=parseProject(envelope.document);
+      const labels=['A','B'] as const;
+      const candidates:ComparisonCandidateInput[]=[];
+      const conditions:Array<Record<string,unknown>>=[];
+      for(let idx=0;idx<jobs.length;idx++){
+        const job=jobs[idx],result=results[idx],label=labels[idx];
+        if(result.binding.asset_id!==project.asset.id) throw new StudioHttpError(409,{code:'source_asset_changed',message:`Alignment job "${job.id}" was computed on a different source audio.`,retryable:false});
+        if(result.binding.revision!==envelope.revision){
+          throw new StudioHttpError(412,{
+            code:'revision_conflict',
+            message:`Alignment job "${job.id}" is bound to revision "${result.binding.revision}", which does not match current saved revision "${envelope.revision}". Compare only jobs from the current saved revision.`,
+            retryable:false,
+            current_revision:envelope.revision,
+            params:{job_id:job.id,bound_revision:result.binding.revision,current_revision:envelope.revision},
+          });
+        }
+        const clearUnmatched=Boolean(job.request.clear_unmatched);
+        const mergeShortGaps=Boolean(job.request.merge_short_gaps);
+        const gapThresholdMs=typeof job.request.gap_threshold_ms==='number'?job.request.gap_threshold_ms:500;
+        const merged=mergeAlignment(doc,result,durationMs,clearUnmatched,mergeShortGaps?gapThresholdMs:null);
+        const modelName=alignmentModelName(job,result);
+        candidates.push({
+          label,
+          jobId:job.id,
+          modelName,
+          doc:merged.project,
+          scopeIds:new Set(result.scope.map(item=>item.object_id)),
+        });
+        conditions.push({
+          label,
+          job_id:job.id,
+          model:modelName,
+          audio_source:job.request.audio_source??'vocals',
+          crop_vocals:job.request.crop_vocals??true,
+          smart_extend:Boolean(job.request.smart_extend),
+          clear_unmatched:clearUnmatched,
+          merge_short_gaps:mergeShortGaps,
+          gap_threshold_ms:mergeShortGaps?gapThresholdMs:null,
+          use_hints:Boolean(job.request.use_hints),
+          convert_particles:Boolean(job.request.convert_particles),
+          latin_normalize:Boolean(job.request.latin_normalize),
+          strip_tone_digits:Boolean(job.request.strip_tone_digits),
+          reused_vocal:Boolean(job.request.reused_vocal),
+          scope_kind:result.selection?'local':'full',
+          scope_unit_count:result.scope.length,
+          acoustics_updated:Boolean(result.acoustics),
+          acknowledged_state:job.acknowledged_state??null,
+          retained_count:merged.retained.length,
+          cleared_count:merged.cleared.length,
+          merged_gaps:merged.mergedGaps,
+        });
+      }
+      const comparedConditionKeys=['model','audio_source','crop_vocals','smart_extend','clear_unmatched','merge_short_gaps','gap_threshold_ms','use_hints','convert_particles','latin_normalize','strip_tone_digits','scope_kind','scope_unit_count','acoustics_updated'] as const;
+      const condition_differences=conditions.length===2
+        ? comparedConditionKeys.filter(key=>JSON.stringify(conditions[0][key])!==JSON.stringify(conditions[1][key]))
+        : [];
+      const {bytes,actual,resultId,resultStatus}=await fetchExcerpt(args,client,15000,doc,envelope.source_asset_id);
+      const energyResult=await fetchVisualEnergy(client,args.project_id,args.source,resultId,resultStatus,actual);
+      const {png,energy,...visual}=renderComparisonVisual(bytes,doc,candidates,actual,{energy:energyResult.data,divergenceThresholdMs:args.divergence_threshold_ms});
+      const energyMeta={...energy,vocal_result_id:energyResult.vocal_result_id,...(!energy.included&&energyResult.reason?{reason:energyResult.reason}:{})};
+      return contentPayload([
+        {type:'text',text:JSON.stringify({
+          project_id:args.project_id,
+          revision:envelope.revision,
+          source:args.source,
+          vocal_result_id:resultId??null,
+          actual_range_ms:actual,
+          duration_ms:actual[1]-actual[0],
+          energy:energyMeta,
+          conditions,
+          condition_differences,
+          ...visual,
+        })},
+        {type:'image',data:png.toString('base64'),mimeType:'image/png'},
+      ]);
     },
   });
   registry.register({ name: 'get_audio_excerpt', description: 'Return a short listening window as metadata text plus MCP audio (16kHz mono PCM WAV). Supply start_ms/end_ms or line_id with optional padding. Line windows clamp to duration and 30 seconds; explicit windows must be valid. Default source=vocal; choose original explicitly if no separated vocal is available.', annotations: read,

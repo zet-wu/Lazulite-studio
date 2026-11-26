@@ -11,9 +11,9 @@ it('advertises instructions, two usable workflow prompts and a readable guide ov
  try{
   await Promise.all([server.connect(b),client.connect(a)]);
   expect(client.getInstructions()).toContain(ALIGNMENT_GUIDE_URI);
-  for(const term of ['get_timeline_visual','discontiguous','not a complete error list','>1,000 ms','reverb','interlude','multilingual'])expect(client.getInstructions()).toContain(term);
+  for(const term of ['get_timeline_visual','compare_alignment_results','discontiguous','not a complete error list','>1,000 ms','reverb','interlude','multilingual'])expect(client.getInstructions()).toContain(term);
   expect(client.getInstructions()).toContain('Never repeat local alignment with the same model');
-  expect((await client.listTools()).tools).toHaveLength(41);
+  expect((await client.listTools()).tools).toHaveLength(42);
   const prompts=await client.listPrompts();expect(prompts.prompts.map(p=>p.name)).toEqual(['full_lyric_workflow','refine_alignment_anomalies']);
   for(const prompt of prompts.prompts){
    const result=await client.getPrompt({name:prompt.name,arguments:{project_id:'p',...(prompt.name==='full_lyric_workflow'?{language:'ja',quality:'fast'}:{mode:'conservative'})}});
