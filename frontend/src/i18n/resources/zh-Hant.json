@@ -912,7 +912,7 @@
   "batch.replaceWith": "取代為",
   "batch.ignoreCase": "忽略大小寫",
   "batch.offsetLabel": "位移毫秒（正值延後，負值提前）",
-  "batch.threshold": "相鄰詞間隙或重疊臨界值（毫秒）",
+  "batch.threshold": "相鄰讀音間隙或重疊閾值（毫秒）",
   "batch.clearHelp": "清除所選範圍內的全部注音，以及關聯的空拍與失效導唱符。",
   "batch.emptyDeletes": "空結果會刪除對應物件。",
   "split.unassigned": "請重新選擇歸屬",

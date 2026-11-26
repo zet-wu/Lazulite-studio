@@ -916,7 +916,7 @@
   "batch.replaceWith": "Replace with",
   "batch.ignoreCase": "Ignore case",
   "batch.offsetLabel": "Offset in ms (positive delays, negative advances)",
-  "batch.threshold": "Adjacent word gap or overlap threshold (ms)",
+  "batch.threshold": "Adjacent reading gap or overlap threshold (ms)",
   "batch.clearHelp": "Clear all readings, their countdown beats, and invalid guides in the selected range.",
   "batch.emptyDeletes": "Empty results delete the corresponding objects.",
   "split.unassigned": "Choose an assignment again",

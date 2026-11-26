@@ -52,9 +52,9 @@ test('gap removal previews exactly the boundary it changes and undoes once',asyn
  await importLyrics(page,{name:'gap.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
  await page.locator('main [data-word-id="left"]').click({position:{x:2,y:2}});
  await page.locator('[data-top-menu="tools"] summary').click();await page.getByRole('button',{name:'批处理',exact:true}).click();
- const dialog=page.getByRole('dialog',{name:'批处理',exact:true});await dialog.getByRole('button',{name:'消除词间空隙',exact:true}).click();
- await expect(dialog.getByRole('status')).toContainText('预计调整 0 处词边界');await expect(dialog.getByRole('button',{name:'应用',exact:true})).toBeDisabled();
- await dialog.getByLabel('相邻词间隙或重叠阈值（毫秒）',{exact:true}).fill('25');await expect(dialog.getByRole('status')).toContainText('预计调整 1 处词边界');
+ const dialog=page.getByRole('dialog',{name:'批处理',exact:true});await dialog.getByRole('button',{name:'消除读音间空隙',exact:true}).click();
+ await expect(dialog.getByRole('status')).toContainText('将调整 0 处读音边界');await expect(dialog.getByRole('button',{name:'应用',exact:true})).toBeDisabled();
+ await dialog.getByLabel('相邻读音间隙或重叠阈值（毫秒）',{exact:true}).fill('25');await expect(dialog.getByRole('status')).toContainText('将调整 1 处读音边界');
  await dialog.getByRole('button',{name:'应用',exact:true}).click();
  await expect(page.getByLabel('词 你结束秒数',{exact:true})).toHaveValue('1.01');await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.getByLabel('词 你结束秒数',{exact:true})).toHaveValue('1');
 });

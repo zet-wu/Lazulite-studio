@@ -5906,7 +5906,7 @@
   },
   "batch.threshold": {
     "context": "batch interface: batch.threshold",
-    "source": "相邻词间隙或重叠阈值（毫秒）",
+    "source": "相邻读音间隙或重叠阈值（毫秒）",
     "params": [],
     "parameterNotes": {}
   },
