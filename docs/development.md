@@ -124,6 +124,11 @@ pnpm --dir frontend test
 pnpm --dir frontend i18n:check
 pnpm --dir frontend build
 
+# MCP 服务类型检查、单元测试与构建
+pnpm --dir mcp typecheck
+pnpm --dir mcp test
+pnpm --dir mcp build
+
 # 服务端与打包脚本单元测试
 python -m pytest server/tests packaging/tests
 
