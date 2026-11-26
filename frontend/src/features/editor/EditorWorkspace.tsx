@@ -991,6 +991,11 @@ function EditorWorkspaceContent(props: Props) {
       return;
     }
     if (matchesBinding(event.nativeEvent,keys.remove)) {
+      if (mode === 'karaoke' && cue && !event.repeat && !props.alignment?.locked && !drag.active() && mainRef.current?.contains(event.target as Node)) {
+        event.preventDefault(); event.stopPropagation();
+        try { applyKaraokeCommand({kind:'remove',id:cue.id}); } catch (error) { setMessage(errorMessage(error)); }
+        return;
+      }
       if (!event.defaultPrevented && !event.repeat
         && !drag.active() && !window.document.querySelector('[role="dialog"], [role="menu"], details[data-top-menu][open]')
         && ownsSelection(event.target)) {

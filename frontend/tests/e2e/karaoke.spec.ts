@@ -14,7 +14,7 @@ test('yellow slots insert once on double click, share cue properties and keep or
  await expect(page.locator('main [data-word-id="b"]')).toHaveText('●');
  await page.locator('main [data-cue-id]').dblclick();await page.locator('main').getByRole('textbox',{name:'导唱文字',exact:true}).fill('●●');await page.locator('main').getByRole('textbox',{name:'导唱文字',exact:true}).press('Enter');
  await expect(page.locator('main [data-cue-id]')).toHaveText('●●');
- await page.locator('main [data-cue-id]').first().focus();await page.keyboard.press('Delete');await expect(page.getByRole('button',{name:'插入行内导唱',exact:true})).toBeVisible();
+ await page.locator('main [data-cue-id]').first().click();await page.locator('main').focus();await page.keyboard.press('Delete');await expect(page.getByRole('button',{name:'插入行内导唱',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('main [data-cue-id]')).toHaveText('●●');
 
  await page.locator('[data-top-menu="view"] summary').click();await page.getByRole('button',{name:'夜间模式',exact:true}).click();
