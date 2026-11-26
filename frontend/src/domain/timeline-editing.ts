@@ -1,3 +1,4 @@
+import { readingLeaves, closeReadingBoundary, type ReadingLeaf } from './reading-units';
 import { message, MessageError } from './messages';
 import { createProjectEditing, type ProjectEditing } from './project-editing';
 import type { LyricDocument, LyricLine, LyricWord, RubyUnit, TimeMs } from './lyric-document';
@@ -348,4 +349,28 @@ export function clearTimelineTimes(document: LyricDocument, targets: TimelineTar
     });
   }
   return next;
+}
+
+export type ReadingTarget = Extract<TimelineTarget, {kind:'word'|'ruby'}>;
+export type ReadingGap = {leftTarget:ReadingTarget;rightTarget:ReadingTarget;beginMs:number;endMs:number;overlap:boolean};
+const readingTarget = (line:LyricLine, leaf:ReadingLeaf):ReadingTarget => leaf.rubyIndex === null
+  ? {kind:'word',lineId:line.id,wordId:line.words[leaf.wordIndex].id}
+  : {kind:'ruby',lineId:line.id,wordId:line.words[leaf.wordIndex].id,rubyId:leaf.value.id};
+
+export function timelineReadingGaps(line:LyricLine):ReadingGap[] {
+  const leaves=readingLeaves(line);
+  return leaves.slice(1).flatMap((right,index)=>{
+    const left=leaves[index],a=left.value.endMs,b=right.value.beginMs;
+    return a===null||b===null||a===b ? [] : [{leftTarget:readingTarget(line,left),rightTarget:readingTarget(line,right),beginMs:Math.min(a,b),endMs:Math.max(a,b),overlap:a>b}];
+  });
+}
+
+/** One document replacement keeps both edges and parent envelopes in one undo step. */
+export function closeTimelineGap(document:LyricDocument,leftTarget:ReadingTarget,rightTarget:ReadingTarget):LyricDocument {
+  return editTarget(document,leftTarget,line=>{
+    const leaves=readingLeaves(line),index=leaves.findIndex(leaf=>boundaryId(readingTarget(line,leaf))===boundaryId(leftTarget));
+    const left=leaves[index],right=leaves[index+1];
+    if(!left||!right||rightTarget.lineId!==line.id||boundaryId(readingTarget(line,right))!==boundaryId(rightTarget)) throw new MessageError(message('timeline.rangeInvalid'));
+    return closeReadingBoundary(line,left,right);
+  });
 }

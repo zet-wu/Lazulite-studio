@@ -21,8 +21,8 @@ import { lyricSnapAnchors, stableSnapAnchor, documentTargets, targetId, targetSe
 import { TimelineIndicators, TimelineIndicatorContext } from './TimelineIndicators';
 import { useCallback, useContext, useEffect, useMemo, useLayoutEffect, useRef, useState, type PointerEvent, type RefObject } from 'react';
 import type { LyricCommand } from '../domain/lyric-commands';
-import type { LyricDocument, LyricWord, RomanizationContent } from '../domain/lyric-document';
-import { clearTimelineTimes, moveTimeline, resizeTimeline, resizeTimelineBoundary, timelineBoundaryTargets, snapTimelineInterval, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
+import type { LyricDocument, RomanizationContent } from '../domain/lyric-document';
+import { timelineReadingGaps, closeTimelineGap, type ReadingTarget, clearTimelineTimes, moveTimeline, resizeTimelineBoundary, timelineBoundaryTargets, snapTimelineInterval, snapTimelineTime, timelineDelta, type TimelineTarget } from '../domain/timeline-editing';
 import { packIntervals } from '../domain/pack-intervals';
 import styles from './media.module.css';
 
@@ -209,10 +209,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
   const draggingTime = drag && !['pan', 'select'].includes(drag.side);
   if (!draggingTime) frozenLayout.current = currentLayout;
   const lineLayout = draggingTime ? frozenLayout.current : currentLayout;
-  const gaps = line?.words.flatMap((word, index) => {
-    const right = line.words[index + 1];
-    return right && word.endMs !== null && right.beginMs !== null && word.endMs !== right.beginMs ? [{ left: word, right, beginMs: Math.min(word.endMs, right.beginMs), endMs: Math.max(word.endMs, right.beginMs), overlap: word.endMs > right.beginMs }] : [];
-  }) ?? [];
+  const gaps = line ? timelineReadingGaps(line) : [];
   const pct = (timeMs: number) => `${((timeMs - startMs) / spanMs) * 100}%`;
   const begin = (event: PointerEvent<HTMLElement>, target: TimelineTarget | null, side: Drag['side'], originalMs: number) => {
     if (event.button !== 0 || locked && target !== null) return;
@@ -457,12 +454,9 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
     onPointerDown={(event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); boxTargets.current = selectable; begin(event, null, selectable.length > 0 && event.shiftKey ? 'select' : 'pan', selectable.length > 0 && event.shiftKey ? timelineViewStart(event.currentTarget,startMs) + Math.round((event.clientX - rect.left) / rect.width * spanMs) : timelineViewStart(event.currentTarget,startMs)); } }}
     onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}>
     <TimelineContent>{content}</TimelineContent><TimelineIndicators /></div></div>;
-  const closeGap = (left: LyricWord, right: LyricWord) => {
-    if (!line || left.endMs === null || right.beginMs === null) return;
+  const closeGap = (left: ReadingTarget, right: ReadingTarget) => {
     try {
-      const middle = Math.round((left.endMs + right.beginMs) / 2);
-      let changed = resizeTimeline(document, { kind: 'word', lineId: line.id, wordId: left.id }, 'endMs', middle, editing);
-      changed = resizeTimeline(changed, { kind: 'word', lineId: line.id, wordId: right.id }, 'beginMs', middle, editing);
+      const changed = closeTimelineGap(document, left, right);
       apply({ type: 'replace-document', document: changed }); onError('');
     } catch (cause) { onError(errorMessage(cause)); }
   };
@@ -509,7 +503,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
       </section>;
     })}
     </div></div>
-    {visible.gap && line && row('gaps', gaps.map(({ left, right, beginMs, endMs, overlap }) => <button data-role="secondary" disabled={locked} key={`${left.id}:${right.id}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? t('timeline.removeOverlap') : t('timeline.closeGap')} onClick={() => closeGap(left, right)}>{overlap ? t('timeline.overlap') : t('timeline.gap')}</button>),[],1,t('timeline.gap'))}
+    {visible.gap && line && row('gaps', gaps.map(({ leftTarget: left, rightTarget: right, beginMs, endMs, overlap }) => <button data-role="secondary" disabled={locked} key={`${targetId(left)}:${targetId(right)}`} className={`${styles.gapBar} ${overlap ? styles.overlap : ''}`} style={{ left: pct(beginMs), width: `${Math.max(1, (endMs - beginMs) / spanMs * 100)}%` }} title={overlap ? t('timeline.removeOverlap') : t('timeline.closeGap')} onClick={() => closeGap(left, right)}>{overlap ? t('timeline.overlap') : t('timeline.gap')}</button>),[],1,t('timeline.gap'))}
     {visible.staging !== false && <TimelineStaging clearPreview={drag?.clear} onDragTarget={setStagingTarget} document={document} startMs={startMs} endMs={endMs} durationMs={durationMs} snap={snap} bpm={bpm} anchors={externalAnchors} locked={locked} visible={visible} host={tracksRef} apply={apply} onLocate={onLocate} onError={onError}/>}
   </div>;
 }

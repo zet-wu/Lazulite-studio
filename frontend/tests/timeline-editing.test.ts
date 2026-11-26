@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createLine, createLyricDocument, createWord } from '../src/domain/lyric-document';
-import { createLyricEditorState, executeLyricCommand, undoLyricCommand } from './helpers/project-history';
-import { moveTimeline, resizeTimeline, resizeTimelineBoundary, snapTime } from '../src/domain/timeline-editing';
+import { createLyricEditorState, executeLyricCommand, undoLyricCommand, redoLyricCommand } from './helpers/project-history';
+import { closeTimelineGap, timelineReadingGaps, moveTimeline, resizeTimeline, resizeTimelineBoundary, snapTime } from '../src/domain/timeline-editing';
 
 describe('E6 timeline editing', () => {
   const sample = () => {
@@ -72,4 +72,26 @@ it.each([false,true])('ruby crossing updates both parent envelope edges and comm
     expect(state.present.lines[0].words[0]).toMatchObject({beginMs:begin,endMs:end});
     expect(undoLyricCommand(state).present).toBe(document);
   }
+});
+
+it.each([20,-20])('closes within-word, cross-word ruby and mixed gaps atomically (%s)',gap=>{
+ const document=createLyricDocument(''),line=createLine('','l');document.lines=[line];
+ Object.assign(line,{beginMs:100,endMs:800});
+ line.words=[{...createWord('愛','a'),beginMs:100,endMs:400,rubyUnits:[{id:'r1',reading:'あ',beginMs:100,endMs:200},{id:'r2',reading:'い',beginMs:200+gap,endMs:400}]},
+ {...createWord('詩','b'),beginMs:400+gap,endMs:600,rubyUnits:[{id:'r3',reading:'し',beginMs:400+gap,endMs:600}]},
+ {...createWord('よ','c'),beginMs:600+gap,endMs:900}];
+ const gaps=timelineReadingGaps(line);expect(gaps).toHaveLength(3);expect(gaps.every(g=>g.overlap===(gap<0))).toBe(true);
+ let next=document;for(const g of gaps)next=closeTimelineGap(next,g.leftTarget,g.rightTarget);
+ const state=executeLyricCommand(createLyricEditorState(document),{type:'replace-document',document:next});
+ expect(next.lines[0].words.map(w=>[w.beginMs,w.endMs])).toEqual([[100,400+gap/2],[400+gap/2,600+gap/2],[600+gap/2,900]]);
+ expect(next.lines[0].words[0].rubyUnits[0].endMs).toBe(200+gap/2);
+ expect(next.lines[0]).toMatchObject({beginMs:100,endMs:900});
+ expect(undoLyricCommand(state).present).toBe(document);expect(redoLyricCommand(undoLyricCommand(state)).present).toEqual(next);
+ expect(()=>executeLyricCommand(state,{type:'set-ruby-time',lineId:'l',wordId:'a',rubyId:'r1',beginMs:0,endMs:150})).toThrow('command.rubyTimeOutside');
+});
+it('does not reverse leaf times when closing overlaps and ignores missing endpoints',()=>{
+ const document=createLyricDocument(''),line=createLine('','l');document.lines=[line];
+ line.words=[{...createWord('a','a'),beginMs:100,endMs:300},{...createWord('b','b'),beginMs:50,endMs:120}];
+ const [gap]=timelineReadingGaps(line);expect(closeTimelineGap(document,gap.leftTarget,gap.rightTarget)).toEqual(document);
+ line.words[1].beginMs=null;expect(timelineReadingGaps(line)).toEqual([]);
 });
