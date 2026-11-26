@@ -121,6 +121,7 @@ export type AlignmentOptions = {
   audio_source: 'vocals' | 'original';
   crop_vocals: boolean;
   scope_ids: string[] | null;
+  scope_envelope_ids?: string[] | null;
   convert_particles: boolean;
   latin_normalize: boolean;
   strip_tone_digits: boolean;
@@ -554,7 +555,7 @@ export class StudioClient {
     projectId: string,
     revision: string,
     model: string,
-    options: Pick<AlignmentOptions, 'convert_particles' | 'latin_normalize' | 'strip_tone_digits'> & {scope_ids?:string[]|null},
+    options: Pick<AlignmentOptions, 'convert_particles' | 'latin_normalize' | 'strip_tone_digits'> & {scope_ids?:string[]|null;scope_envelope_ids?:string[]|null},
   ): Promise<AlignmentPreviewSummary> {
     const query = new URLSearchParams({
       revision,
@@ -564,6 +565,7 @@ export class StudioClient {
       strip_tone_digits: String(options.strip_tone_digits),
     });
     for (const id of options.scope_ids ?? []) query.append('scope_ids',id);
+    for (const id of options.scope_envelope_ids ?? []) query.append('scope_envelope_ids',id);
     return this.json(`/projects/${encodeURIComponent(projectId)}/alignment-preview?${query.toString()}`);
   }
 

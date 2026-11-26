@@ -43,8 +43,8 @@ function batchAffectedLines(before: ProjectDocument, after: ProjectDocument): st
 }
 
 export function registerTransformTools(registry: ToolRegistry) {
-  registry.register({ name: 'segment_lyrics', description: 'Preview/apply shared desktop word segmentation or ruby mora splits. dry_run defaults to true. Existing ruby is blocked unless allow_overwrite_ruby=true. Scope is explicit; summary omits per-word previews.', annotations,
-    inputSchema: { ...transformSchema(), target: z.enum(['words','ruby']), scope: scopeSchema(), options: optionsSchema().default({}), allow_overwrite_ruby: z.boolean().default(false), detail: z.enum(['summary','full']).default('full') },
+  registry.register({ name: 'segment_lyrics', description: 'Preview/apply shared desktop word segmentation or ruby mora splits. dry_run defaults to true. Existing ruby words are skipped by default while other body words continue; skip_existing_ruby=false reports them as blocked, allow_overwrite_ruby=true explicitly replaces them. Scope is explicit; summary omits per-word previews.', annotations,
+    inputSchema: { ...transformSchema(), target: z.enum(['words','ruby']), scope: scopeSchema(), options: optionsSchema().default({}), allow_overwrite_ruby: z.boolean().default(false), skip_existing_ruby: z.boolean().default(true), detail: z.enum(['summary','full']).default('full') },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key, dryRun: args.dry_run }, async (doc, envelope) => {
       const options: SegmentOptions = {
         splitCjk: args.options.split_cjk ?? DEFAULT_SEGMENT_OPTIONS.splitCjk,
@@ -58,10 +58,11 @@ export function registerTransformTools(registry: ToolRegistry) {
         rules: args.options.rules ?? DEFAULT_SEGMENT_OPTIONS.rules,
       };
       const divider = options.western === 'syllable' ? await loadSyllableDivider(options.language) : undefined;
-      const targets = select(doc, args.scope); let next = doc, changed = 0, blocked = 0, skipped = 0;
+      const targets = select(doc, args.scope); let next = doc, changed = 0, blocked = 0, skipped = 0, skippedRuby = 0;
       const preview: Array<Record<string, unknown>> = [];
       for (const { line, word } of targets) {
         if (args.target === 'words') {
+          if (word.rubyUnits.length && !args.allow_overwrite_ruby && args.skip_existing_ruby) { skippedRuby++; preview.push({line_id:line.id,word_id:word.id,skipped:'existing_ruby'}); continue; }
           const entry = segmentationPreview(doc.lyrics, [word.id], options, divider, doc.editing)[0];
           if (entry.parts.length < 2) { skipped++; continue; }
           const reason = word.obscene ? 'obscene_word' : word.rubyUnits.length ? args.allow_overwrite_ruby ? null : 'existing_ruby' : entry.blocked ? 'empty_beats' : null;
@@ -83,7 +84,7 @@ export function registerTransformTools(registry: ToolRegistry) {
           next = run(next, { type: 'batch', commands }); changed++;
         }
       }
-      return { nextDoc: next, summary: { dry_run: args.dry_run, revision: envelope.revision, changed_count: changed, blocked_count: blocked, skipped_count: skipped, ...(args.detail === 'full' ? { preview } : {}) } };
+      return { nextDoc: next, summary: { dry_run: args.dry_run, revision: envelope.revision, changed_count: changed, blocked_count: blocked, skipped_count: skipped, skipped_existing_ruby_count: skippedRuby, ...(args.detail === 'full' ? { preview } : {}) } };
     }),
   });
   registry.register({ name: 'generate_romanization', description: 'Preview/apply Japanese romanization using shared desktop generation, optional backend particle normalization, and explicit per-line conflict decisions. Defaults to dry_run=true and skip existing content. Review proposals, then supply line_decisions.override_units (timed) or override_text (plain); reread unit IDs after replacement.', annotations,

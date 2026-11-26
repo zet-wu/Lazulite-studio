@@ -31,7 +31,7 @@ it('blocks word ruby overwrite and splits ruby mora with time and beats preserve
   expect(f.doc().lyrics.lines[0].words[0].rubyUnits.map(u => [u.reading,u.beginMs,u.endMs])).toEqual([['し',100,500],['ん',500,900]]);
   expect(f.doc().editing.emptyBeats.r).toEqual({ kind: 'ruby', count: 2 });
   const blocked = projectFixture(fixture()); const bdoc = blocked.doc(); bdoc.lyrics.lines[0].words[0].rubyUnits = [{ id: 'r', reading: 'しゃっティ', beginMs: 100, endMs: 900 }]; const bf = projectFixture(bdoc);
-  expect(await registry.call('segment_lyrics', { project_id: 'p', target: 'words', scope: { all: true }, options: { japanese_mora: true } }, bf)).toMatchObject({ blocked_count: 1 });
+  expect(await registry.call('segment_lyrics', { project_id: 'p', target: 'words', scope: { all: true }, options: { japanese_mora: true }, skip_existing_ruby:false }, bf)).toMatchObject({ blocked_count: 1 });
 });
 it('normalizes particles and applies identical romanization commands while preserving null timing', async () => {
   const doc = fixture('は'); doc.lyrics.lines[0].words[0].beginMs = null; doc.lyrics.lines[0].words[0].endMs = null; let particleCalls = 0;

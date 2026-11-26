@@ -1,5 +1,9 @@
+import { parseProject } from '../../../frontend/src/adapters/project-codec';
+import { toRomaji } from 'wanakana';
+import { lineText } from '../../../frontend/src/domain/lyric-document';
+import { id, invalid, requireLine } from './editing';
 import { z } from 'zod';
-import { mergeAlignment, type AlignmentResult } from '../../../frontend/src/domain/alignment';
+import { localAlignmentTargets, mergeAlignment, type AlignmentResult } from '../../../frontend/src/domain/alignment';
 import { assertAmll } from '../../../frontend/src/domain/amll-compatibility';
 import { validateProjectEditing } from '../../../frontend/src/domain/project-editing';
 import { StudioHttpError, type AlignmentOptions } from '../client';
@@ -17,7 +21,66 @@ function toolError(status: number, code: string, message: string, extra: Partial
   });
 }
 
+const scopeSchema = () => ({
+  scope_ids: z.array(id()).min(2).optional().describe('Reading leaf IDs; mutually exclusive with scope_line_ids and scope_word_ids.'),
+  scope_line_ids: z.array(id()).min(1).optional().describe('Local row selection; includes row/word/ruby union envelope without padding.'),
+  scope_word_ids: z.array(id()).min(1).optional().describe('Local word selection; includes word/ruby union envelope without padding.'),
+});
+async function resolveScope(client: import('../client').StudioClient, projectId: string, revision: string, args: {scope_ids?:string[];scope_line_ids?:string[];scope_word_ids?:string[]}) {
+  if ([args.scope_ids,args.scope_line_ids,args.scope_word_ids].filter(value => value !== undefined).length > 1) invalid('scope_ids, scope_line_ids and scope_word_ids are mutually exclusive.');
+  const ids = args.scope_line_ids ?? args.scope_word_ids;
+  if (!ids) return {scope_ids:args.scope_ids ?? null,scope_envelope_ids:null};
+  const envelope = await client.getDocumentEnvelope(projectId);
+  if (envelope.revision !== revision) throw toolError(412,'revision_conflict','Selection revision changed; read and preview again.');
+  const doc = parseProject(envelope.document), kind = args.scope_line_ids ? 'lines' : 'words';
+  if (new Set(ids).size !== ids.length || ids.some(id => kind === 'lines' ? !doc.lyrics.lines.some(line => line.id === id) : !doc.lyrics.lines.some(line => line.words.some(word => word.id === id)))) invalid('Selection contains duplicate or unknown line/word IDs.');
+  const scope = localAlignmentTargets(doc.lyrics,kind,ids);
+  if (scope.ids.length < 2) invalid('Local alignment requires at least two reading leaves.');
+  if (scope.beginMs === null || scope.endMs === null || scope.beginMs >= scope.endMs) invalid('Selected units have no valid time envelope; set row/word timing first.');
+  return {scope_ids:scope.ids,scope_envelope_ids:scope.envelopeIds};
+}
+
 export function registerAlignmentTools(registry: ToolRegistry): void {
+  registry.register({
+    name:'inspect_alignment_anomalies',
+    description:'Read-only M8 anomaly scan after Japanese first-pass alignment. balanced flags short units OR adjacent same-vowel/reading imbalance; conservative only flags imbalance. Missing/invalid timings are also reported for repair. Use get_acoustics before choosing a safe row envelope and a different alignment model.',
+    annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true},
+    inputSchema:{project_id:id(),line_ids:z.array(id()).min(1).optional(),short_threshold_ms:z.number().int().positive().default(40),mode:z.enum(['balanced','conservative']).default('balanced')},
+    execute:async(args,{client})=>{
+      const envelope=await client.getDocumentEnvelope(args.project_id),doc=parseProject(envelope.document);
+      args.line_ids?.forEach(id=>requireLine(doc,id));
+      const lines=doc.lyrics.lines.filter(line=>args.line_ids ? args.line_ids.includes(line.id) : !doc.editing.skippedAlignmentLineIds.includes(line.id));
+      const anomalies=lines.flatMap(line=>{
+        const leaves=line.words.flatMap<{id:string;text:string;beginMs:number|null;endMs:number|null}>(word=>word.rubyUnits.length ? word.rubyUnits.filter(u=>u.reading.trim()).map(u=>({...u,text:u.reading})) : word.text.trim() ? [word] : []);
+        const reasons=new Set<string>(),flags=new Map<string, {unit_id:string;text:string;begin_ms:number|null;end_ms:number|null;duration_ms:number|null;reasons:string[]}>();
+        const flag=(unit:typeof leaves[number],reason:string)=>{
+          reasons.add(reason);
+          let item=flags.get(unit.id);
+          if(!item){item={unit_id:unit.id,text:unit.text,begin_ms:unit.beginMs,end_ms:unit.endMs,duration_ms:unit.beginMs===null||unit.endMs===null?null:unit.endMs-unit.beginMs,reasons:[]};flags.set(unit.id,item);}
+          if(!item.reasons.includes(reason))item.reasons.push(reason);
+        };
+        const valid=(unit:typeof leaves[number])=>unit.beginMs!==null&&unit.endMs!==null&&unit.endMs>unit.beginMs;
+        for(const unit of leaves){
+          if(unit.beginMs===null||unit.endMs===null)flag(unit,'missing_timing');
+          else if(!valid(unit))flag(unit,'invalid_timing');
+          else if(args.mode==='balanced'&&unit.endMs!-unit.beginMs!<args.short_threshold_ms)flag(unit,'short_unit');
+        }
+        for(let index=1;index<leaves.length;index++){
+          const left=leaves[index-1],right=leaves[index];if(!valid(left)||!valid(right))continue;
+          const a=toRomaji(left.text).toLowerCase(),b=toRomaji(right.text).toLowerCase();
+          // M8 compares identical readings or vowels touching at the unit boundary.
+          const same=!!a&&(a===b||/[aeiou]$/.test(a)&&b[0]===a.at(-1));
+          const small=Math.min(left.endMs!-left.beginMs!,right.endMs!-right.beginMs!),large=Math.max(left.endMs!-left.beginMs!,right.endMs!-right.beginMs!);
+          if(same&&(small<40||small<80&&large>=4*small)){flag(left,'same_vowel_imbalance');flag(right,'same_vowel_imbalance');}
+        }
+        const scope=localAlignmentTargets(doc.lyrics,'lines',[line.id]);
+        if(!reasons.size)return [];
+        return [{line_id:line.id,line_number:doc.lyrics.lines.indexOf(line)+1,text:lineText(line),reasons:[...reasons],line_envelope_ms:[scope.beginMs,scope.endMs],flagged_units:[...flags.values()]}];
+      });
+      return {revision:envelope.revision,scanned_lines:lines.length,anomaly_count:anomalies.length,anomalies};
+    },
+  });
+
   registry.register({
     name: 'list_alignment_models',
     description:
@@ -53,7 +116,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
     inputSchema: {
       project_id: z.string().min(1).describe('Target project ID.'),
       model_id: z.string().min(1).describe('Alignment model ID returned by list_alignment_models.'),
-      scope_ids: z.array(z.string().min(1)).min(2).optional().describe('Selected reading leaf IDs for local alignment; overrides globally skipped lines. Preview and start must use the same IDs.'),
+      ...scopeSchema(),
       revision: z
         .string()
         .min(1)
@@ -66,15 +129,16 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
       strip_tone_digits: z.boolean().default(false).describe('Strip tone digits from pinyin/romanized tokens.'),
     },
     execute: async (
-      { project_id, model_id, revision, convert_particles, latin_normalize, strip_tone_digits, detail, line_ids, scope_ids },
+      { project_id, model_id, revision, convert_particles, latin_normalize, strip_tone_digits, detail, line_ids, ...selection },
       { client },
     ) => {
       const targetRevision = revision ?? (await client.getDocumentEnvelope(project_id)).revision;
+      const scope = await resolveScope(client,project_id,targetRevision,selection);
       const summary = await client.previewAlignment(project_id, targetRevision, model_id, {
         convert_particles,
         latin_normalize,
         strip_tone_digits,
-        scope_ids:scope_ids??null,
+        ...scope,
       });
       const { inputs = [], ...counts } = summary;
       let allowed: Set<string> | undefined;
@@ -86,7 +150,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
         allowed = new Set(doc.lyrics.lines.filter(line => line_ids.includes(line.id)).flatMap(line => line.words.flatMap(word => [word.id, ...word.rubyUnits.map(unit => unit.id)])));
       }
       const issues = inputs.filter(input => input.problem || input.unknown_characters?.length);
-      return { project_id, revision: targetRevision, model_id, ...counts,
+      return { project_id, revision: targetRevision, model_id, ...scope, ...counts,
         ...(detail === 'summary' ? { issues: issues.map(({ object_id, problem, unknown_characters }) => ({ object_id, problem, unknown_characters })) }
           : { inputs: (detail === 'full' ? inputs : issues).filter(input => !allowed || allowed.has(input.object_id)) }),
       };
@@ -121,7 +185,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
       strip_tone_digits: z.boolean().default(false),
       audio_source: z.enum(['vocals','original']).default('vocals').describe('Audio waveform source; original with crop_vocals=false skips separation.'),
       crop_vocals: z.boolean().default(true).describe('Intersect the selected envelope with vocal analysis segments.'),
-      scope_ids: z.array(z.string().min(1)).min(2).optional().describe('Reading leaf IDs from the same local preview. Omit for global alignment.'),
+      ...scopeSchema(),
       use_hints: z.boolean().default(false),
       line_blank: z.boolean().default(false),
       rest_blank: z.boolean().default(false),
@@ -133,6 +197,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
     },
     execute: async (args, { client }) => {
       const targetRevision = args.revision ?? (await client.getDocumentEnvelope(args.project_id)).revision;
+      const scope = await resolveScope(client,args.project_id,targetRevision,args);
       let modelPreview = args.model_preview;
       if (!modelPreview) {
         if (!args.model_id) {
@@ -146,7 +211,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
           convert_particles: args.convert_particles,
           latin_normalize: args.latin_normalize,
           strip_tone_digits: args.strip_tone_digits,
-          scope_ids:args.scope_ids??null,
+          ...scope,
         });
         if (!summary.emitting_count) {
           throw toolError(
@@ -180,7 +245,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
       }
 
       const options: AlignmentOptions = {
-        audio_source:args.audio_source, crop_vocals:args.crop_vocals,scope_ids:args.scope_ids??null,
+        audio_source:args.audio_source, crop_vocals:args.crop_vocals,...scope,
         convert_particles: args.convert_particles,
         latin_normalize: args.latin_normalize,
         strip_tone_digits: args.strip_tone_digits,

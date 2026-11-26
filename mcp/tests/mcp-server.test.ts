@@ -80,6 +80,7 @@ describe('MCP Server transports', () => {
       'list_dictionaries',
       'analyze_dictionary_reading',
       'apply_readings',
+      'inspect_alignment_anomalies',
       'list_alignment_models',
       'preview_alignment',
       'start_alignment',
