@@ -1,5 +1,7 @@
 import {useTimelineSwapWheel, useTimelineVisibility, timelineLayers} from '../adapters/timeline-preferences';
 import { retainProjectMedia } from '../adapters/http/media-lifetime';
+import { isBrowserRuntime } from '../adapters/runtime';
+import { audioSampleRate, getAudioObjectUrl } from '../adapters/browser/media';
 import { createActiveLineTracker } from '../domain/active-lines';
 import { projectTimeline } from '../domain/timeline-projection';
 import { selectionLocation } from './editor/selection-targets';
@@ -113,7 +115,8 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
   }, []);
   const keys = useShortcuts();
   const queryClient = useQueryClient();
-  const results = useQuery({ queryKey:['vocals',projectId], queryFn:()=>vocalApi.list(projectId), enabled:!!asset });
+  const audioAvailable = !!asset && (!isBrowserRuntime || !!getAudioObjectUrl(projectId, asset.id));
+  const results = useQuery({ queryKey:['vocals',projectId], queryFn:()=>vocalApi.list(projectId), enabled:!!asset && !isBrowserRuntime });
   useEffect(()=>{if(timelineHost&&asset)void queryClient.invalidateQueries({queryKey:['vocals',projectId]});},[timelineHost,asset,projectId,queryClient]);
   const sourceResults = results.data?.items.filter(r=>r.source_asset_id===asset?.id && r.audio_state!=='missing') ?? [];
   const vocalId = (acoustics ? sourceResults.find(r=>r.id===acoustics.analysisId) : sourceResults.find(r=>r.status==='ready'))?.audio_id ?? null;
@@ -166,7 +169,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
 
   const [loop, setLoop] = useState<LoopState>(emptyLoop);
   const [error, setError] = useMessageText("");
-  useEffect(() => retainProjectMedia(projectId, cause => setError(errorMessage(cause))), [projectId, setError]);
+  useEffect(() => isBrowserRuntime ? undefined : retainProjectMedia(projectId, cause => setError(errorMessage(cause))), [projectId, setError]);
   const [bpm, setBpm] = useState(120);
   const [snap, setSnap] = useState(true);
   const [bottomExpanded, setExpanded] = useState(true);
@@ -203,7 +206,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     queryKey: ["waveform", projectId, asset?.id, graphicVocal, requestWindow.startMs, requestWindow.endMs, level],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       studioApi.getWaveform(projectId, requestWindow.startMs, requestWindow.endMs, level, signal, graphicVocal),
-    enabled: Boolean(asset) && expanded && span > 0 && end > start,
+    enabled: audioAvailable && expanded && span > 0 && end > start,
     staleTime: Infinity, gcTime: 0, retry: false,
     placeholderData: (data, query) => query?.queryKey[1] === projectId && query.queryKey[2] === asset?.id && query.queryKey[3] === graphicVocal && query.queryKey[6] === level ? data : undefined,
   });
@@ -613,7 +616,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [asset, play, keys, rate, changeRate]);
-  const disabled = !asset;
+  const disabled = !audioAvailable;
   const retryMedia = () => {
     audio.current?.load();
     play();
@@ -723,7 +726,7 @@ export const MediaTransport = forwardRef<TransportHandle, Props>(function MediaT
             visible={visible} externalAnchors={segmentAnchors}
             apply={onTimelineCommand} onLocate={locate} onPan={(nextStartMs) => { setFollow(false); setStart(panViewport({ startMs: 0, spanMs: Math.round(span * 1e3) }, durationMs, nextStartMs).startMs / 1e3); }} onError={setTimelineError} />
         </>}
-        {visible.spectrum && asset && <SpectrogramCanvas pcmRate={graphicVocal ? sourceResults.find(result=>result.audio_id===graphicVocal)!.sample_rate : 48000} vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
+        {visible.spectrum && asset && audioAvailable && <SpectrogramCanvas pcmRate={graphicVocal ? sourceResults.find(result=>result.audio_id===graphicVocal)!.sample_rate : isBrowserRuntime ? audioSampleRate(projectId) : 48000} vocal={graphicVocal} assetIdentity={`${asset.id}:${asset.asset_hash}:${graphicVocal}`} projectId={projectId} startMs={startMs} endMs={endMs} durationMs={durationMs} />}
       </div>
       </div>
     </TimelineIndicatorContext.Provider>

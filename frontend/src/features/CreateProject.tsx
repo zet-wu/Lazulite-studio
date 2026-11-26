@@ -1,3 +1,4 @@
+import { isBrowserRuntime } from '../adapters/runtime';
 import { errorMessage, message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { i18n } from '../i18n';
@@ -115,7 +116,7 @@ export function CreateProject({
           ? message('create.expired')
           : caught instanceof ApiError
             ? errorMessage(caught)
-            : message('common.failed'),
+            : errorMessage(caught),
       );
       setStatus("idle");
     } finally {
@@ -179,7 +180,7 @@ export function CreateProject({
             <>
               <progress max="1" value={progress} />
               <span className={styles.hint}>
-                {progress >= 1
+                {isBrowserRuntime ? t('demo.processing') : progress >= 1
                   ? t('create.processing')
                   : t('project.uploadProgress',{percent:Math.round(progress*100)})}
               </span>

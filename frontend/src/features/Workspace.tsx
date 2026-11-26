@@ -16,6 +16,9 @@ import { assignVocalSegmentCommand, AssignmentError } from '../domain/vocal-edit
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
+import { isBrowserRuntime } from '../adapters/runtime';
+import { getAudioObjectUrl, isEphemeralAsset } from '../adapters/browser/media';
+import { retainProjectMedia } from '../adapters/http/media-lifetime';
 import { studioApi, type Asset } from '../adapters/http/client';
 import { subscribeProjectEvents } from '../adapters/http/events';
 import { jobsApi } from '../adapters/http/jobs';
@@ -36,8 +39,9 @@ import styles from './workspace.module.css';
 export function Workspace({ projectId }: { projectId: string }) {
   useTranslation();
   const [cleanupError,setCleanupError]=useMessageText('');
+  useEffect(() => isBrowserRuntime ? retainProjectMedia(projectId, cause => setCleanupError(errorMessage(cause))) : undefined, [projectId, setCleanupError]);
   const envelope = useQuery({ queryKey: ['document-envelope', projectId], queryFn: () => studioApi.getDocumentEnvelope(projectId), refetchOnMount: 'always', refetchOnWindowFocus: false });
-  const project = useQuery({ queryKey: ['project', projectId], queryFn: () => studioApi.getProject(projectId) });
+  const project = useQuery({ queryKey: ['project', projectId], queryFn: () => studioApi.getProject(projectId), ...(isBrowserRuntime ? { gcTime: 0, staleTime: 0, refetchOnWindowFocus: false, refetchOnMount: 'always' as const } : {}) });
   const paired=useRef(false);
   const mismatch=!!envelope.data&&!!project.data&&envelope.data.source_asset_id!==(project.data.asset?.id??null);
   useEffect(()=>{if(mismatch&&!paired.current){void envelope.refetch();void project.refetch();}},[mismatch]);
@@ -45,7 +49,7 @@ export function Workspace({ projectId }: { projectId: string }) {
   if(!paired.current&&mismatch)return <main>{t('workspace.sourceChanging')}</main>;
   if (envelope.isLoading || project.isLoading) return <main>{t('workspace.loading')}</main>;
   if (envelope.isError || !envelope.data) return <main><p role="alert">{(envelope.error as {status?:number})?.status === 404 ? t('workspace.missing') : t('workspace.openFailed')}</p><button data-role="secondary" onClick={() => void envelope.refetch()}>{t('common.retry')}</button></main>;
-  return <SelectionProvider><AudioReviewProvider><FloatingTrayProvider>{project.data?.music_cleanup_pending&&<aside role="alert">{t('workspace.cleanupPending')}<button data-role="secondary" onClick={()=>void studioApi.cleanupMusic(projectId).then(()=>project.refetch()).catch(cause=>setCleanupError(errorMessage(cause)))}>{t('music.cleanupRetry')}</button>{cleanupError}</aside>}<ProjectEditor key={projectId} projectId={projectId} title={project.data?.name ?? t('workspace.defaultName')} initialSnapshot={envelope.data.document}
+  return <SelectionProvider><AudioReviewProvider><FloatingTrayProvider>{isBrowserRuntime && project.data?.asset && (isEphemeralAsset(project.data.asset) || !getAudioObjectUrl(projectId, project.data.asset.id)) && <aside role="status">{t(getAudioObjectUrl(projectId, project.data.asset.id) ? 'demo.ephemeral' : 'demo.audioMissing')}</aside>}{project.data?.music_cleanup_pending&&<aside role="alert">{t('workspace.cleanupPending')}<button data-role="secondary" onClick={()=>void studioApi.cleanupMusic(projectId).then(()=>project.refetch()).catch(cause=>setCleanupError(errorMessage(cause)))}>{t('music.cleanupRetry')}</button>{cleanupError}</aside>}<ProjectEditor key={projectId} projectId={projectId} title={project.data?.name ?? t('workspace.defaultName')} initialSnapshot={envelope.data.document}
     initialRevision={envelope.data.revision ?? ''} asset={project.data?.asset ?? null} /></FloatingTrayProvider></AudioReviewProvider></SelectionProvider>;
 }
 

@@ -1,6 +1,7 @@
 import { MessageError, message } from '../../domain/messages';
 import { isBrowserRuntime } from '../runtime';
 import { browserApi } from '../browser/client';
+import { uploadLocalAudio } from '../browser/media';
 import type { ProjectSnapshot } from '../../domain/project-document';
 import type { components } from "./generated";
 import {
@@ -70,6 +71,7 @@ export function uploadMusic(
   onProgress: (value: number) => void,
   signal?: AbortSignal,
 ): Promise<Asset> {
+  if (isBrowserRuntime) return uploadLocalAudio(file, onProgress, signal);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API_ROOT}/uploads`);

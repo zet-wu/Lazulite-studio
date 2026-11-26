@@ -1,9 +1,9 @@
-import { Blob } from 'node:buffer';
+import { Blob as NodeBlob } from 'node:buffer';
 import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import type { BrowserAsset } from './db';
 
-beforeEach(() => { vi.resetModules(); vi.stubGlobal('indexedDB', new IDBFactory()); vi.stubGlobal('Blob', Blob); });
+beforeEach(() => { vi.resetModules(); vi.stubGlobal('indexedDB', new IDBFactory()); vi.stubGlobal('Blob', NodeBlob); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const asset = (id: string): BrowserAsset => ({ schema_version: 'studio-asset-v1', id, filename: `${id}.wav`, content_type: 'audio/wav', size_bytes: 4, duration_ms: 1000, source_duration_ms: 1000, source_start_ms: 0, proxy_offset_ms: 0, asset_hash: id, status: 'ready', project_id: null, sample_rate: 48000, channels: 1, ephemeral: false });
 
