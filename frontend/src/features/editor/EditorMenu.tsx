@@ -53,7 +53,7 @@ export function EditorMenu(props: Props) {
     {props.title !== undefined && <><strong>{props.title}</strong>
     <span>{props.saving ? t('menu.saving') : props.dirty ? t('menu.unsaved') : t('menu.saved')}</span></>}
     <div className={styles.actions}>
-      {isBrowserRuntime && <a className={demoStyles.siteLink} href={siteUrl} target="_blank" rel="noopener noreferrer">{t('demo.site')}</a>}
+      {isBrowserRuntime && <a data-role="secondary" href={siteUrl} target="_blank" rel="noopener noreferrer">{t('demo.site')}</a>}
       {props.title !== undefined && <><IconButton icon="save" label={t('menu.save')} data-role="primary" className={styles.primaryButton} onClick={props.onSave} disabled={props.saving || props.editingLocked}/>
       <IconButton icon="undo" label={t('menu.undo')} data-role="inline" onClick={props.undo} disabled={!props.canUndo}/>
       <IconButton icon="redo" label={t('menu.redo')} data-role="inline" onClick={props.redo} disabled={!props.canRedo}/>

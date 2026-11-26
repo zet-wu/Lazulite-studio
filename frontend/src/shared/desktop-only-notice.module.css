@@ -1,10 +1,7 @@
 .notice { padding:16px; color:var(--ink); background:var(--surface-container); border:1px solid var(--line); border-radius:var(--surface-radius); line-height:1.6; overflow-wrap:anywhere; }
-.notice p { margin:6px 0 10px; color:var(--muted); }
-.notice a { color:var(--blue); text-underline-offset:3px; }
-.notice a:focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
+.notice p { margin:6px 0 12px; color:var(--muted); }
 .dialog { width:min(440px, calc(100vw - 48px)); padding:16px; border:1px solid var(--line); border-radius:var(--surface-radius); background:var(--panel); color:var(--ink); overscroll-behavior:contain; }
 .dialog::backdrop { background:#0006; }
 .dialog > button { display:block; margin:12px 0 0 auto; }
 
 .badge { padding:2px 7px; border:1px solid var(--line); border-radius:var(--control-radius); background:var(--blue-soft); color:var(--blue); white-space:nowrap; }
-.siteLink { color:var(--blue); text-underline-offset:3px; font-size:12px; }

@@ -98,13 +98,13 @@ export function ProjectList() {
       <main className={styles.centerState}>
         <strong>{t('projects.empty')}</strong>
         {archiveNotice}
-        {isBrowserRuntime && <><p className={styles.demoHelp}>{t('demo.emptyHelp')}</p><DesktopDownloadLink/></>}
-        {importControl}
+        {isBrowserRuntime ? <p className={styles.demoHelp}>{t('demo.emptyHelp')}</p> : <p className={styles.muted}>{t('projects.emptyHelp')}</p>}
         {archiveError && <p role="alert">{archiveError}</p>}
-        {!isBrowserRuntime && <p className={styles.muted}>{t('projects.emptyHelp')}</p>}
-        <CreateProject
-          onCreated={onCreated}
-        />
+        <div className={styles.emptyActions}>
+          <CreateProject onCreated={onCreated} />
+          {importControl}
+          {isBrowserRuntime && <DesktopDownloadLink/>}
+        </div>
       </main>
     );
   return (

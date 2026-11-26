@@ -3,7 +3,7 @@
 .header > strong { min-width: 0; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brand { color: var(--blue); text-decoration: none; font-weight: 700; }
 .header > span { font-size: 12px; color: var(--muted); }
-.actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; gap: 6px; }
+.actions { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; min-width: 0; gap: 6px; }
 .settingsMenu { position: relative; }
 .settingsMenu summary { cursor: pointer; list-style: none; border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; background: var(--panel); }
 .settingsMenu > div { position: absolute; right: 0; top: 100%; z-index: 12; display: grid; min-width: 130px; padding: 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); box-shadow: 0 5px 16px #0003; }

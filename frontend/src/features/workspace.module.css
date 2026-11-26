@@ -909,4 +909,5 @@
 
 .recoveryActions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-block:8px; }
 
-.demoHelp { max-width:460px; color:var(--muted); line-height:1.7; }
+.demoHelp { max-width:460px; color:var(--muted); line-height:1.7; text-align:center; }
+.emptyActions { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin-top:4px; }

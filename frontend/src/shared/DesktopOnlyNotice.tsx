@@ -5,7 +5,7 @@ import styles from './desktop-only-notice.module.css';
 
 export function DesktopDownloadLink() {
   const { t } = useTranslation();
-  return <a href={desktopDownloadUrl} target="_blank" rel="noopener noreferrer">{t('demo.download')}</a>;
+  return <a data-role="secondary" href={desktopDownloadUrl} target="_blank" rel="noopener noreferrer">{t('demo.download')}</a>;
 }
 
 export function DesktopOnlyNotice() {
