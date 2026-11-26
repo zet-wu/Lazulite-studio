@@ -902,7 +902,8 @@
   "batch.replace": "Replace",
   "batch.clearRuby": "Clear readings",
   "batch.offset": "Time offset",
-  "batch.smooth": "Remove gaps between words",
+  "batch.includeNonCjk": "Include non-CJK words and readings",
+  "batch.smooth": "Close reading gaps",
   "batch.syncLine": "Synchronize line times",
   "batch.scope": "Range",
   "batch.lineBackground": "Current line and background",
@@ -1020,10 +1021,10 @@
   "batch.replaceSummary": "Matches: {{matches}}; objects changed: {{changed}}; words deleted: {{words}}; readings deleted: {{ruby}}; countdown beats deleted: {{beats}}",
   "batch.cuesRemoved": "Guides removed: {{count}}",
   "batch.shiftSummary": "Lines moved: {{count}}. Words, readings, attached times, and guides move together.",
-  "batch.smoothSummary": "Adjusted {{count}} word boundaries",
+  "batch.smoothSummary": "Adjusted {{count}} reading boundaries",
   "batch.syncSummary": "Lines synchronized to their word timing envelopes: {{count}}",
   "batch.targetLines": "Target lines: {{count}}",
-  "batch.smoothHelp": "For adjacent CJK words without readings, move the preceding end and following start to their midpoint when the gap or overlap is within the threshold. Skip readings, punctuation, Western text and larger gaps.",
+  "batch.smoothHelp": "Close gaps and overlaps within the threshold along each line’s words and ruby readings, updating parent word times. Defaults to CJK readings. Enable the option for pinyin, romanized readings and Western words; whitespace and punctuation are always skipped.",
   "batch.syncHelp": "{{count}} lines: update each line’s start and end from its timed words (changing a linked line’s end removes its link).",
   "timeline.sourceUnknown": "The source audio duration is unknown; lyric times cannot be dragged",
   "timeline.narrow": "This interval is narrow. Zoom in to adjust its boundaries.",
@@ -1749,5 +1750,5 @@
   "import.unknownAgent": "Created {{count}} undeclared singers",
   "import.orphan": "Skipped {{count}} orphan attached lines",
   "import.reversed": "{{count}} reversed timing ranges (original times preserved)",
-  "batch.smoothPreview": "Will adjust {{count}} word boundaries"
+  "batch.smoothPreview": "Will adjust {{count}} reading boundaries"
 }

@@ -898,7 +898,8 @@
   "batch.replace": "取代",
   "batch.clearRuby": "清除注音",
   "batch.offset": "時間位移",
-  "batch.smooth": "消除詞間空隙",
+  "batch.includeNonCjk": "包含非中日韓詞與注音",
+  "batch.smooth": "消除讀音間空隙",
   "batch.syncLine": "同步行時間",
   "batch.scope": "範圍",
   "batch.lineBackground": "目前行（含背景）",
@@ -1016,10 +1017,10 @@
   "batch.replaceSummary": "符合 {{matches}} 處，實際修改 {{changed}} 個物件；刪除 {{words}} 詞、{{ruby}} 個注音、{{beats}} 個空拍",
   "batch.cuesRemoved": "移除 {{count}} 個導唱",
   "batch.shiftSummary": "移動 {{count}} 行，詞、注音、附屬時間與導唱一併移動",
-  "batch.smoothSummary": "調整 {{count}} 處詞邊界",
+  "batch.smoothSummary": "調整 {{count}} 處讀音邊界",
   "batch.syncSummary": "同步 {{count}} 行的首尾至詞塊包絡",
   "batch.targetLines": "目標：{{count}} 行",
-  "batch.smoothHelp": "僅調整間隔或重疊不超過閾值的相鄰純中日韓無注音詞：將前詞結束與後詞開始對齊到中點。含注音、標點／西文及超出閾值的邊界保持原樣。",
+  "batch.smoothHelp": "按行內詞與注音的連續讀音序列，閉合閾值內的空隙與重疊，並同步父詞時間。預設僅處理中日韓讀音；開啟選項可包含拼音、粵拼、羅馬音和西文詞，始終跳過純空白與標點。",
   "batch.syncHelp": "共 {{count}} 行：依行內已有詞時間更新行起止（若變更連結行結尾，將自動取消連結）。",
   "timeline.sourceUnknown": "來源音訊時長未知，無法拖動歌詞時間",
   "timeline.narrow": "區間過窄，請縮放時間軸後調整邊界",
@@ -1735,5 +1736,5 @@
   "import.unknownAgent": "補建 {{count}} 個未宣告的歌手",
   "import.orphan": "跳過 {{count}} 條孤立附屬行",
   "import.reversed": "{{count}} 處起止時間倒置（已保留原時間）",
-  "batch.smoothPreview": "預計調整 {{count}} 處詞邊界"
+  "batch.smoothPreview": "將調整 {{count}} 處讀音邊界"
 }

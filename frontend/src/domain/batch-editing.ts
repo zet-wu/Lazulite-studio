@@ -1,3 +1,4 @@
+import { readingLeaves, hasPronounceableText, closeReadingBoundary } from './reading-units';
 import { message, MessageError } from './messages';
 import { createProjectEditing, emptyBeatCount } from './project-editing';
 import { timeEnvelope, type LyricCommand } from './lyric-commands';
@@ -30,25 +31,24 @@ export function shiftLineTimes(document: LyricDocument, lineIds: string[], delta
   return { type: 'replace-document', document: { ...document, lines, romanizationTracks, translationTracks } };
 }
 
-export function smoothWordTimes(document: LyricDocument, lineIds: string[], thresholdMs: number): { command: LyricCommand; count: number } {
+export function smoothWordTimes(document: LyricDocument, lineIds: string[], thresholdMs: number, includeNonCjk = false): { command: LyricCommand; count: number } {
   if (!safe(thresholdMs)) throw new MessageError(message('batch.integerThreshold'));
   const selected = new Set(lineIds);
+  const eligible = includeNonCjk ? hasPronounceableText : cjkSyllable;
   let count = 0;
   const lines = document.lines.map((line) => {
     if (!selected.has(line.id)) return line;
-    const words = line.words.slice();
-    for (let index = 0; index < words.length - 1; index++) {
-      const left = words[index], right = words[index + 1];
-      if (!cjkSyllable(left.text) || !cjkSyllable(right.text)) continue;
-      if (left.endMs === null || right.beginMs === null || Math.abs(right.beginMs - left.endMs) > thresholdMs || left.endMs === right.beginMs) continue;
-      if (left.rubyUnits.length || right.rubyUnits.length) continue;
-      const middle = Math.round((left.endMs + right.beginMs) / 2);
-      if (left.beginMs !== null && middle < left.beginMs || right.endMs !== null && middle > right.endMs) continue;
-      words[index] = { ...left, endMs: middle };
-      words[index + 1] = { ...right, beginMs: middle };
-      count++;
+    const leaves = readingLeaves(line);
+    let next = line;
+    for (let index = 1; index < leaves.length; index++) {
+      const left = leaves[index - 1], right = leaves[index];
+      if (!eligible(left.text) || !eligible(right.text)) continue;
+      if (left.value.endMs === null || right.value.beginMs === null || Math.abs(right.value.beginMs - left.value.endMs) > thresholdMs) continue;
+      const changed = closeReadingBoundary(next, left, right);
+      if (changed !== next) count++;
+      next = changed;
     }
-    return words.every((word, index) => word === line.words[index]) ? line : { ...line, words };
+    return next;
   });
   return { command: { type: 'replace-document', document: { ...document, lines } }, count };
 }

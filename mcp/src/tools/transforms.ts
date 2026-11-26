@@ -136,10 +136,10 @@ export function registerTransformTools(registry: ToolRegistry) {
       return { nextDoc: next, summary: { dry_run: args.dry_run, revision: envelope.revision, candidates: rows, issues, skipped_keys: [...skipped], changed_count: next === doc ? 0 : active.length } };
     }),
   });
-  registry.register({ name: 'batch_edit_lyrics', description: 'Preview/apply shared desktop batch replacement, ruby clearing, and time shift/smoothing/sync. dry_run defaults to true. Time operations use selected lines; partial word scope is rejected for them.', annotations,
+  registry.register({ name: 'batch_edit_lyrics', description: 'Preview/apply shared desktop batch replacement, ruby clearing, and time shift/smoothing/sync. dry_run defaults to true. Smooth closes short gaps/overlaps in each row’s word/ruby reading-leaf stream and synchronizes ruby parent word envelopes. Time operations use selected lines; partial word scope is rejected for them.', annotations,
     inputSchema: { ...transformSchema(), scope: scopeSchema(), action: z.discriminatedUnion('type', [
       z.object({ type: z.literal('replace'), kind: z.enum(['words','ruby']), search: id(), replacement: z.string(), ignore_case: z.boolean().default(false) }),
-      z.object({ type: z.literal('clear_ruby') }), z.object({ type: z.literal('shift'), delta_ms: z.number().int() }), z.object({ type: z.literal('smooth'), threshold_ms: z.number().int().nonnegative() }), z.object({ type: z.literal('sync') }),
+      z.object({ type: z.literal('clear_ruby') }), z.object({ type: z.literal('shift'), delta_ms: z.number().int() }), z.object({ type: z.literal('smooth'), threshold_ms: z.number().int().nonnegative(), include_non_cjk: z.boolean().default(false).describe('When true, also smooth Latin/pinyin/romanized readings and Western words while still excluding whitespace and punctuation.') }), z.object({ type: z.literal('sync') }),
     ]) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key, dryRun: args.dry_run }, (doc, envelope) => {
       const targets = select(doc, args.scope), wordIds = targets.map(t => t.word.id);
@@ -151,7 +151,7 @@ export function registerTransformTools(registry: ToolRegistry) {
         case 'replace': { const result = replaceText(doc.lyrics, action.kind === 'words' ? wordIds : targets.flatMap(t => t.word.rubyUnits.map(u => u.id)), action.kind, action.search, action.replacement, action.ignore_case, doc.editing); command = result.command; hits = result.count; deletedWords = result.deletedWords; deletedRuby = result.deletedRuby; deletedBeats = result.deletedBeats; break; }
         case 'clear_ruby': { const result = clearRuby(doc.lyrics, wordIds, doc.editing); command = result.command; hits = result.words; deletedRuby = result.ruby; deletedBeats = result.beats; break; }
         case 'shift': command = shiftLineTimes(doc.lyrics, lineIds, action.delta_ms, doc.editing); hits = lineIds.length; break;
-        case 'smooth': { const result = smoothWordTimes(doc.lyrics, lineIds, action.threshold_ms); command = result.command; hits = result.count; break; }
+        case 'smooth': { const result = smoothWordTimes(doc.lyrics, lineIds, action.threshold_ms, action.include_non_cjk); command = result.command; hits = result.count; break; }
         case 'sync': command = syncLineTimes(doc.lyrics, lineIds); hits = lineIds.length; break;
       }
       let next = run(doc, command);

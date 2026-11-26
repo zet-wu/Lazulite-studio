@@ -33,6 +33,7 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
   const [ignoreCase, setIgnoreCase] = useState(false);
   const [amountMs, setAmountMs] = useState('100');
   const [thresholdMs, setThresholdMs] = useState('15');
+  const [includeNonCjk, setIncludeNonCjk] = useState(false);
   const [message, setMessage] = useMessageText('');
   const targets = document.lines.filter((line, index) => scope === 'all' || scope === 'range' && index + 1 >= from && index + 1 <= to ||
     scope === 'selected' && selection?.kind === 'ruby' && line.words.some(word => word.rubyUnits.some(unit => selection.ids.includes(unit.id))) ||
@@ -49,7 +50,7 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
       if (scope === 'selected' && selection?.kind !== 'words' && selection?.kind !== 'lines' && selection?.kind !== 'ruby') throw new MessageError(describeMessage('batch.select'));
       if(operation==='smooth'){
         if(!thresholdMs.trim())throw new MessageError(describeMessage('batch.integerThreshold'));
-        const result=smoothWordTimes(document,targets.map(line=>line.id),Number(thresholdMs));
+        const result=smoothWordTimes(document,targets.map(line=>line.id),Number(thresholdMs),includeNonCjk);
         preview={command:result.command,changed:result.count,summary:t('batch.smoothPreview',{count:result.count})};
       } else if (operation === 'clear-ruby') {
         const result = clearRuby(document, wordIds, editing);
@@ -98,7 +99,7 @@ export function BatchToolsPanel({ project, document, selection, currentLineId, a
       {operation === 'replace' && <div className={`${fields.row} ${styles.replaceTarget}`} role="group" aria-labelledby="batch-replace-target"><span id="batch-replace-target">{t('batch.target')}</span><div className={styles.replaceOptions}><label><input type="radio" name="replace-target" checked={replaceTarget === 'words'} onChange={() => setReplaceTarget('words')}/>{t('batch.mainText')}</label><label><input type="radio" name="replace-target" checked={replaceTarget === 'ruby'} onChange={() => setReplaceTarget('ruby')}/>{t('batch.reading')}</label></div></div>}
       {operation === 'replace' && <div className={fields.group}><SettingField label={t('batch.find')}><input value={search} onChange={(event) => setSearch(event.target.value)} /></SettingField><SettingField label={t('batch.replaceWith')}><input value={replacement} onChange={(event) => setReplacement(event.target.value)} /></SettingField><SettingToggle label={t('batch.ignoreCase')} checked={ignoreCase} onChange={setIgnoreCase}/></div>}
       {operation === 'shift' && <SettingField label={t('batch.offsetLabel')}><input type="number" step="1" value={amountMs} onChange={(event) => setAmountMs(event.target.value)} /></SettingField>}
-      {operation === 'smooth' && <SettingField label={t('batch.threshold')}><input type="number" min="0" step="1" value={thresholdMs} onChange={(event) => setThresholdMs(event.target.value)} /></SettingField>}
+      {operation === 'smooth' && <><SettingField label={t('batch.threshold')}><input type="number" min="0" step="1" value={thresholdMs} onChange={(event) => setThresholdMs(event.target.value)} /></SettingField><SettingToggle label={t('batch.includeNonCjk')} checked={includeNonCjk} onChange={setIncludeNonCjk}/></>}
     </div>
     <p className={styles.toolHint}>{operation === 'clear-ruby' ? t('batch.clearHelp') : operation === 'replace' ? t('batch.emptyDeletes') : operation === 'shift' ? t('batch.targetLines',{count:targets.length}) : operation === 'smooth' ? t('batch.smoothHelp',{count:targets.length}) : t('batch.syncHelp',{count:targets.length})}</p>
 

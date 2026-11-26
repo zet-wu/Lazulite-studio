@@ -81,3 +81,15 @@ it.each(['translation', 'romanization'] as const)('reports a shift affecting onl
   expect(await registry.call('batch_edit_lyrics', { ...args, dry_run: false, action: { type: 'shift', delta_ms: 0 } }, f)).toMatchObject({ changed: false, changed_count: 0, affected_lines: [], invalidates_alignment: false });
   expect(f.writes()).toBe(1);
 });
+
+it('previews/applies reading-leaf smoothing with the non-CJK switch',async()=>{
+ const doc=fixture('愛');doc.lyrics.lines[0].words[0].rubyUnits=[{id:'r1',reading:'ai',beginMs:100,endMs:300},{id:'r2',reading:'a',beginMs:320,endMs:600}];
+ doc.lyrics.lines[0].words.push({...createWord('love','en'),beginMs:620,endMs:900});
+ const f=projectFixture(doc),registry=createToolRegistry(),args={project_id:'p',scope:{all:true},action:{type:'smooth',threshold_ms:30}};
+ expect(await registry.call('batch_edit_lyrics',args,f)).toMatchObject({changed_count:0});
+ const expanded={...args,action:{...args.action,include_non_cjk:true}};
+ expect(await registry.call('batch_edit_lyrics',expanded,f)).toMatchObject({changed_count:1,hit_count:2,dry_run:true});expect(f.writes()).toBe(0);
+ expect(await registry.call('batch_edit_lyrics',{...expanded,dry_run:false},f)).toMatchObject({changed_count:1,hit_count:2,dry_run:false});
+ expect(f.doc().lyrics.lines[0].words[0]).toMatchObject({beginMs:100,endMs:610,rubyUnits:[{endMs:310},{beginMs:310,endMs:610}]});
+ expect(f.doc().lyrics.lines[0].words[1].beginMs).toBe(610);expect(f.writes()).toBe(1);
+});
