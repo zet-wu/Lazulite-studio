@@ -166,7 +166,8 @@ def test_mcp_process_lifecycle_proxy_security_and_clean_stop(tmp_path):
             else:
                 payload = tools_resp.json()
             names = [t["name"] for t in payload["result"]["tools"]]
-            assert len(names) == 40
+            assert len(names) == 41
+            assert "get_timeline_visual" in names
             assert "apply_alignment_result" in names
             assert 'inspect_alignment_anomalies' in names and 'edit_karaoke_cues' in names
             assert 'lazulite://guides/alignment-and-segmentation' in _parse_mcp_json(init_resp)['result']['instructions']
@@ -446,6 +447,15 @@ def test_real_fastapi_lyric_editing_and_alignment_via_mcp(tmp_path, monkeypatch)
             assert excerpt['content'][1]['type'] == 'audio'
             with wave.open(io.BytesIO(base64.b64decode(excerpt['content'][1]['data']))) as wav:
                 assert (wav.getframerate(),wav.getnchannels(),wav.getsampwidth()) == (16000,1,2)
+            visual = call_tool('get_timeline_visual', {'project_id':'p','line_id':right,'source':'vocal','padding_ms':0,'vocal_result_id':vocal_result['id']}, raw=True)
+            visual_meta = json.loads(visual['content'][0]['text'])
+            assert visual_meta['revision'] == call_tool('get_lyrics', {'project_id':'p'})['revision']
+            assert visual_meta['vocal_result_id'] == vocal_result['id']
+            assert visual_meta['units'][0]['line_id'] == right
+            assert visual['content'][1]['type'] == 'image'
+            image = base64.b64decode(visual['content'][1]['data'])
+            assert image[:8] == b'\x89PNG\r\n\x1a\n'
+            assert (int.from_bytes(image[16:20], 'big'), int.from_bytes(image[20:24], 'big')) == (840, 280)
             assert call_tool('list_jobs', {'project_id':'p','kind':'alignment'})['items'][0]['acknowledged_state'] == 'applied'
 
             # Shared acoustic CAS path adopts the new result and rejects foreign bindings.

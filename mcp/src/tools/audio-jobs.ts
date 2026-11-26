@@ -1,3 +1,6 @@
+import { renderTimelineVisual } from '../timeline-visual';
+import type { ProjectDocument } from '../../../frontend/src/domain/project-document';
+import type { StudioClient } from '../client';
 import { createProjectEditorState, executeProjectCommand, validateSegments } from '../../../frontend/src/domain/project-document';
 import { mutateProjectDocument } from './cas';
 import { z } from 'zod';
@@ -16,6 +19,35 @@ type VocalResult = {
 };
 function post(body: unknown, key?: string): RequestInit { return { method: 'POST', headers: { 'Content-Type': 'application/json', ...(key ? { 'Idempotency-Key': key } : {}) }, body: JSON.stringify(body) }; }
 function jobSummary(job: StudioJob) { return { job_id: job.id, project_id: job.project_id, kind: job.kind, status: job.status, stage: job.stage, acknowledged_state: job.acknowledged_state ?? null, result_available: job.result_available, error: job.error, model: job.request.model ?? job.request.model_name ?? null, devices: job.request.devices ?? null, reused_vocal: job.request.reused_vocal ?? false, bound_revision: job.request.revision ?? job.request.bound_revision ?? null, created_at: job.created_at, updated_at: job.updated_at }; }
+
+type ExcerptArgs = {project_id:string;start_ms?:number;end_ms?:number;line_id?:string;padding_ms:number;source:'original'|'vocal';vocal_result_id?:string};
+async function fetchExcerpt(args:ExcerptArgs,client:StudioClient,maxWindow:number,snapshot?:ProjectDocument,sourceAssetId?:string|null) {
+      if (args.line_id && (args.start_ms !== undefined || args.end_ms !== undefined) || !args.line_id && (args.start_ms === undefined || args.end_ms === undefined)) invalid('Provide either line_id or both start_ms and end_ms.');
+      if (args.source === 'original' && args.vocal_result_id) invalid('vocal_result_id requires source=vocal.');
+      const project = await client.getProject(args.project_id); if (!project.asset) invalid('Project has no source audio.');
+      if (sourceAssetId !== undefined && sourceAssetId !== project.asset.id) throw new StudioHttpError(409,{code:'source_asset_changed',message:'Source audio changed; read the document and retry.',retryable:true});
+      let duration = project.asset.source_duration_ms ?? project.asset.duration_ms, resultId: string | undefined;
+      if (args.source === 'vocal') {
+        const { items } = await client.json<{ items: VocalResult[] }>(`${projectPath(args.project_id)}/vocals`);
+        const selectedId = args.vocal_result_id ?? snapshot?.acoustics.analysisId;
+        const result = items.find(item => (!selectedId || item.id === selectedId) && item.source_asset_id === project.asset!.id && item.audio_state === 'current' && ['ready','separated'].includes(item.status));
+        if (!result) invalid('No available vocal result for the current source. Separate vocals first or request source=original.');
+        resultId = result.id; duration = result.duration_ms;
+      }
+      let start = args.start_ms!, end = args.end_ms!, requested: number[];
+      if (args.line_id) {
+        const doc = snapshot ?? parseProject((await client.getDocumentEnvelope(args.project_id)).document), line = requireLine(doc, args.line_id);
+        const times = timeEnvelope([line, ...line.words, ...line.words.flatMap(word => word.rubyUnits)]);
+        if (times.beginMs === null || times.endMs === null) invalid('Line has no complete timing; provide an explicit time window.');
+        requested = [times.beginMs-args.padding_ms, times.endMs+args.padding_ms];
+        start = Math.max(0,requested[0]); end = Math.min(requested[1],duration ?? requested[1], start+maxWindow);
+      } else requested = [start,end];
+      if (end <= start || end-start > maxWindow || duration !== null && end > duration) invalid(`Audio window must be within the source and at most ${maxWindow/1000} seconds; request a smaller window.`);
+      const params = new URLSearchParams({ start_ms: String(start), end_ms: String(end), source_asset_id: project.asset.id }); if (resultId) params.set('vocal',resultId);
+      const response = await client.request(`${projectPath(args.project_id)}/audio-excerpt?${params}`), bytes = Buffer.from(await response.arrayBuffer());
+      const actual: [number, number] = [Number(response.headers.get('X-Actual-Start-Ms')),Number(response.headers.get('X-Actual-End-Ms'))];
+      return {bytes,actual,requested,resultId};
+}
 export function registerAudioJobTools(registry: ToolRegistry) {
   registry.register({ name: 'list_vocal_models', description: 'List installed vocal separation models, availability, selected model and usable devices from the desktop backend catalog. Use the returned ID as start_vocal_separation.model_id.', annotations: read,
     inputSchema: { refresh: z.boolean().default(false) }, execute: async ({ refresh }, { client }) => client.json(`/vocal-models?refresh=${refresh}`),
@@ -112,31 +144,19 @@ export function registerAudioJobTools(registry: ToolRegistry) {
       });
     },
   });
+  registry.register({ name:'get_timeline_visual', description:'Read-only compact 840×280 PNG of a local logarithmic spectrogram, vocal activity, line ranges and numbered word/ruby reading leaves. Returns text JSON mapping image numbers to exact IDs/text/times plus an MCP image. Supply line_id OR start_ms/end_ms; maximum 15 seconds, line windows clamp automatically. Default vocal source uses the saved analysis selection when present. Inspect long sustained tails, overlap/reverb, silence boundaries and multilingual alignment errors alongside get_acoustics and get_audio_excerpt.',annotations:read,
+    inputSchema:{project_id:id(),line_id:id().optional(),start_ms:z.number().int().nonnegative().optional(),end_ms:z.number().int().positive().optional(),padding_ms:z.number().int().nonnegative().max(10000).default(500),source:z.enum(['vocal','original']).default('vocal'),vocal_result_id:id().optional()},
+    execute:async(args,{client})=>{
+      const envelope=await client.getDocumentEnvelope(args.project_id),doc=parseProject(envelope.document);
+      const {bytes,actual,resultId}=await fetchExcerpt(args,client,15000,doc,envelope.source_asset_id);
+      const {png,...metadata}=renderTimelineVisual(bytes,doc,actual);
+      return contentPayload([{type:'text',text:JSON.stringify({project_id:args.project_id,revision:envelope.revision,source:args.source,vocal_result_id:resultId??null,actual_range_ms:actual,duration_ms:actual[1]-actual[0],...metadata})},{type:'image',data:png.toString('base64'),mimeType:'image/png'}]);
+    },
+  });
   registry.register({ name: 'get_audio_excerpt', description: 'Return a short listening window as metadata text plus MCP audio (16kHz mono PCM WAV). Supply start_ms/end_ms or line_id with optional padding. Line windows clamp to duration and 30 seconds; explicit windows must be valid. Default source=vocal; choose original explicitly if no separated vocal is available.', annotations: read,
     inputSchema: { project_id: id(), start_ms: z.number().int().nonnegative().optional(), end_ms: z.number().int().positive().optional(), line_id: id().optional(), padding_ms: z.number().int().nonnegative().max(30000).default(500), source: z.enum(['original','vocal']).default('vocal'), vocal_result_id: id().optional() },
     execute: async (args, { client }) => {
-      if (args.line_id && (args.start_ms !== undefined || args.end_ms !== undefined) || !args.line_id && (args.start_ms === undefined || args.end_ms === undefined)) invalid('Provide either line_id or both start_ms and end_ms.');
-      if (args.source === 'original' && args.vocal_result_id) invalid('vocal_result_id requires source=vocal.');
-      const project = await client.getProject(args.project_id); if (!project.asset) invalid('Project has no source audio.');
-      let duration = project.asset.source_duration_ms ?? project.asset.duration_ms, resultId: string | undefined;
-      if (args.source === 'vocal') {
-        const { items } = await client.json<{ items: VocalResult[] }>(`${projectPath(args.project_id)}/vocals`);
-        const result = items.find(item => (!args.vocal_result_id || item.id === args.vocal_result_id) && item.source_asset_id === project.asset!.id && item.audio_state === 'current' && ['ready','separated'].includes(item.status));
-        if (!result) invalid('No available vocal result for the current source. Separate vocals first or request source=original.');
-        resultId = result.id; duration = result.duration_ms;
-      }
-      let start = args.start_ms!, end = args.end_ms!, requested: number[];
-      if (args.line_id) {
-        const envelope = await client.getDocumentEnvelope(args.project_id), doc = parseProject(envelope.document), line = requireLine(doc, args.line_id);
-        const times = timeEnvelope([line, ...line.words, ...line.words.flatMap(word => word.rubyUnits)]);
-        if (times.beginMs === null || times.endMs === null) invalid('Line has no complete timing; provide an explicit time window.');
-        requested = [times.beginMs-args.padding_ms, times.endMs+args.padding_ms];
-        start = Math.max(0,requested[0]); end = Math.min(requested[1],duration ?? requested[1], start+30000);
-      } else requested = [start,end];
-      if (end <= start || end-start > 30000 || duration !== null && end > duration) invalid('Audio window must be within the source and at most 30 seconds.');
-      const params = new URLSearchParams({ start_ms: String(start), end_ms: String(end), source_asset_id: project.asset.id }); if (resultId) params.set('vocal',resultId);
-      const response = await client.request(`${projectPath(args.project_id)}/audio-excerpt?${params}`), bytes = Buffer.from(await response.arrayBuffer());
-      const actual = [Number(response.headers.get('X-Actual-Start-Ms')),Number(response.headers.get('X-Actual-End-Ms'))];
+      const {bytes,actual,requested,resultId} = await fetchExcerpt(args,client,30000);
       return contentPayload([{ type: 'text', text: JSON.stringify({ project_id: args.project_id, source: args.source, vocal_result_id: resultId ?? null, requested_range_ms: requested, actual_range_ms: actual, duration_ms: actual[1]-actual[0], sample_rate: 16000, channels: 1, bytes: bytes.length }) }, { type: 'audio', data: bytes.toString('base64'), mimeType: 'audio/wav' }]);
     },
   });

@@ -103,6 +103,7 @@ describe('MCP Server transports', () => {
       'acknowledge_job',
       'get_acoustics',
       'edit_acoustics',
+      'get_timeline_visual',
       'get_audio_excerpt',
       'get_karaoke_cues',
       'edit_karaoke_cues',

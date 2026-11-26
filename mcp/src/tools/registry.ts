@@ -5,7 +5,7 @@ import { StudioClient, StudioHttpError } from '../client';
 
 import messages from '../../../frontend/src/i18n/resources/en.json';
 
-export type McpContentBlock = { type: 'text'; text: string } | { type: 'audio'; data: string; mimeType: string };
+export type McpContentBlock = { type: 'text'; text: string } | { type: 'audio' | 'image'; data: string; mimeType: string };
 export type McpToolPayload = { __mcpContent: true; content: McpContentBlock[] };
 export function contentPayload(content: McpContentBlock[]): McpToolPayload { return { __mcpContent: true, content }; }
 export class OperationError extends Error {

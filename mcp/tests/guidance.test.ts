@@ -12,7 +12,7 @@ it('advertises instructions, two usable workflow prompts and a readable guide ov
   await Promise.all([server.connect(b),client.connect(a)]);
   expect(client.getInstructions()).toContain(ALIGNMENT_GUIDE_URI);
   expect(client.getInstructions()).toContain('Never repeat local alignment with the same model');
-  expect((await client.listTools()).tools).toHaveLength(40);
+  expect((await client.listTools()).tools).toHaveLength(41);
   const prompts=await client.listPrompts();expect(prompts.prompts.map(p=>p.name)).toEqual(['full_lyric_workflow','refine_alignment_anomalies']);
   for(const prompt of prompts.prompts){
    const result=await client.getPrompt({name:prompt.name,arguments:{project_id:'p',...(prompt.name==='full_lyric_workflow'?{language:'ja',quality:'fast'}:{mode:'conservative'})}});
