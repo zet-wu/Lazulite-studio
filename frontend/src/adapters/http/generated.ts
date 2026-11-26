@@ -425,6 +425,8 @@ export interface paths {
                     convert_particles?: boolean;
                     /** @description Selected reading leaf IDs; overrides global skip flags. Repeated query parameter. */
                     scope_ids?: string[];
+                    /** @description 所选读音所属行/词的时间包络标识，严格无缓冲 */
+                    scope_envelope_ids?: string[];
                 };
                 header?: never;
                 path: {

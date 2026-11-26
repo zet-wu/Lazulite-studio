@@ -45,7 +45,7 @@ class AlignmentRunner:
             return load_project(path), current['source_asset_id']
 
     def validate(self, pid, params):
-        if set(params) - {'audio_source', 'crop_vocals', 'scope_ids'} != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'gap_threshold_ms', 'latin_normalize', 'strip_tone_digits', 'convert_particles', 'model_preview'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'latin_normalize', 'strip_tone_digits', 'convert_particles')):
+        if set(params) - {'audio_source', 'crop_vocals', 'scope_ids', 'scope_envelope_ids'} != {'revision', 'use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'gap_threshold_ms', 'latin_normalize', 'strip_tone_digits', 'convert_particles', 'model_preview'} or not isinstance(params['revision'], str) or any(type(params[k]) is not bool for k in ('use_hints', 'line_blank', 'rest_blank', 'rest_token', 'clear_unmatched', 'smart_extend', 'merge_short_gaps', 'latin_normalize', 'strip_tone_digits', 'convert_particles')):
             raise ValueError('自动对齐只接受项目版本、布尔选项及行内空隙阈值')
         if type(params['gap_threshold_ms']) is not int or not 0 < params['gap_threshold_ms'] <= 9007199254740991:
             raise ValueError('行内空隙阈值必须为正的安全整数毫秒')
@@ -56,11 +56,12 @@ class AlignmentRunner:
         params.setdefault('scope_ids', None)
         if params['audio_source'] not in ('vocals', 'original') or type(params['crop_vocals']) is not bool: raise ValueError('音频来源或人声片段裁切选项无效')
         if params['scope_ids'] is not None and (not isinstance(params['scope_ids'], list) or any(not isinstance(value, str) for value in params['scope_ids'])): raise ValueError('局部对齐范围无效')
+        if params.get('scope_envelope_ids') is not None and not params['scope_ids']: raise ValueError('局部对齐包络需要读音范围')
         snapshot, asset = self.snapshot(pid, params['revision'])
         if not isinstance(params['model_preview'], str): raise ValueError('需要有效模型预览')
         model = self.models.capture(params['model_preview'], {k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles','revision','scope_ids')})
         projection = project_alignment(snapshot, params['use_hints'], model=model, scope_ids=params['scope_ids'], particle_analyzer=self.particle_analyzer, **{k:params[k] for k in ('latin_normalize','strip_tone_digits','convert_particles')})
-        if params['scope_ids'] is not None: alignment_envelope(snapshot, params['scope_ids'])
+        if params['scope_ids'] is not None: alignment_envelope(snapshot, params['scope_ids'], params.get('scope_envelope_ids'))
         params['_model'] = model
         if not projection['summary']['line_count']: raise ValueError('没有未跳过的歌词行')
         if not projection['summary']['emitting_count']: raise ValueError('没有可用读音，无法计算')
@@ -122,7 +123,7 @@ def _run_alignment(request, emit, cancelled, media_lifetime):
     else:
         samples, rate = vocal.decoded_audio(pid, metadata)
         audio = AudioBuffer(samples.T, rate, metadata['audio_result_id'])
-    lower, upper = alignment_envelope(snapshot, params['scope_ids']) if params.get('scope_ids') is not None else (0, duration_ms)
+    lower, upper = alignment_envelope(snapshot, params['scope_ids'], params.get('scope_envelope_ids')) if params.get('scope_ids') is not None else (0, duration_ms)
     if params['crop_vocals']:
         rows, automatic_normalization = intersect_segments(acoustics['segments'] if acoustics['segments'] else metadata['segments'], duration_ms)
     else:

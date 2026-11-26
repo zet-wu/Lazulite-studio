@@ -1,3 +1,4 @@
+import type { AlignmentScope } from './AudioReviewContext';
 import { preferences } from '../adapters/preferences';
 import { alignmentDefaults, resolveDefaultModel } from '../adapters/studio-preferences';
 import { Select } from '../shared/Select';
@@ -134,11 +135,11 @@ export function AlignmentPanel({
   const activeJob = jobs.data?.items.find((j) => ['vocal', 'alignment'].includes(j.kind) && ACTIVE_STATUSES.has(j.status));
   const active = Boolean(activeJob);
   const runningAlignment = activeJob?.kind === 'alignment' || launching;
-  const unavailable = (scopeIds: string[] | null) => !assetId
+  const unavailable = (scope: AlignmentScope | null) => !assetId
     ? t('alignment.uploadRequired')
     : durationMs === null
       ? t('alignment.durationUnknown')
-      : scopeIds === null && !project.lyrics.lines.some((l) => !project.editing.skippedAlignmentLineIds.includes(l.id))
+      : scope === null && !project.lyrics.lines.some((l) => !project.editing.skippedAlignmentLineIds.includes(l.id))
         ? t('alignment.noLines')
         : !capability?.enabled
           ? capability
@@ -253,13 +254,13 @@ export function AlignmentPanel({
     setConnection(null);
   }, [pendingRun, jobs.data?.items, pid, control, setConnection]);
 
-  const open = async (scopeIds: string[] | null = null) => {
+  const open = async (scope: AlignmentScope | null = null) => {
     if (!finishDraft()) return;
     setOpening(true);
     setMessage('');
     const defaults = alignmentDefaults();
     const defaultModel = preferences.getItem('studio:alignment-model');
-    setOptions({...defaults,scope_ids:scopeIds});
+    setOptions({...defaults,scope_ids:scope?.scopeIds ?? null,scope_envelope_ids:scope?.envelopeIds ?? null});
     setGapDraft(String(defaults.gap_threshold_ms));
     setGapError('');
     try {
@@ -321,6 +322,7 @@ export function AlignmentPanel({
     options.strip_tone_digits,
     options.convert_particles,
     options.scope_ids,
+    options.scope_envelope_ids,
     catalog,
     previewAttempt,
   ]);
@@ -406,8 +408,8 @@ export function AlignmentPanel({
                 icon="refresh"
                 label={t('alignment.retry')}
                 data-role="secondary"
-                disabled={runningAlignment || control.locked || !!unavailable(failedRun?.options.scope_ids ?? null)}
-                onClick={() => void open(failedRun?.options.scope_ids ?? null)}
+                disabled={runningAlignment || control.locked || !!unavailable(failedRun?.options.scope_ids ? {scopeIds:failedRun.options.scope_ids,envelopeIds:failedRun.options.scope_envelope_ids ?? []} : null)}
+                onClick={() => void open(failedRun?.options.scope_ids ? {scopeIds:failedRun.options.scope_ids,envelopeIds:failedRun.options.scope_envelope_ids ?? []} : null)}
               />
             ) : undefined,
         }

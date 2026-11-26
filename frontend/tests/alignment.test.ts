@@ -2,7 +2,7 @@ import { createKaraoke } from '../src/domain/karaoke';
 import { it, expect } from 'vitest';
 import { createLine, createLyricDocument } from '../src/domain/lyric-document';
 import { createProjectDocument, createProjectEditorState, executeProjectCommand, undoProjectCommand, redoProjectCommand } from '../src/domain/project-document';
-import { mergeAlignment, type AlignmentResult } from '../src/domain/alignment';
+import { localAlignmentTargets, mergeAlignment, type AlignmentResult } from '../src/domain/alignment';
 import { parseProject, serializeProject } from '../src/adapters/project-codec';
 function fixture(){const p=createProjectDocument(createLyricDocument());p.lyrics.lines=[createLine('あ','a'),createLine('い','b')];p.karaoke=createKaraoke(p.lyrics);return p;}
 function result(p:ReturnType<typeof fixture>, times:([number|null,number|null])[]):AlignmentResult{
@@ -139,4 +139,17 @@ it('locally aligns skipped rows without changing unselected leaves and rejects i
  expect(undoProjectCommand(state).present).toBe(p);expect(redoProjectCommand(undoProjectCommand(state)).present).toEqual(merged);
  expect(parseProject(serializeProject(merged))).toEqual(merged);
  r.scope.pop();expect(()=>mergeAlignment(p,r,5000,true)).toThrow('alignment.rangeMismatch');
+});
+
+it('uses row/word and leaf union envelopes even before leaf timing exists', () => {
+ const p=fixture(), line=p.lyrics.lines[0], word=line.words[0];
+ word.rubyUnits=[{id:'r1',reading:'あ',beginMs:null,endMs:null},{id:'r2',reading:'い',beginMs:null,endMs:null}];
+ Object.assign(line,{beginMs:100,endMs:2000});
+ expect(localAlignmentTargets(p.lyrics,'lines',[line.id])).toEqual({ids:['r1','r2'],envelopeIds:[line.id],beginMs:100,endMs:2000});
+ Object.assign(word,{beginMs:50,endMs:2200});
+ expect(localAlignmentTargets(p.lyrics,'lines',[line.id])).toMatchObject({beginMs:50,endMs:2200});
+ expect(localAlignmentTargets(p.lyrics,'words',[word.id])).toEqual({ids:['r1','r2'],envelopeIds:[word.id],beginMs:50,endMs:2200});
+ Object.assign(line,{beginMs:null,endMs:null});Object.assign(word,{beginMs:null,endMs:null});
+ Object.assign(word.rubyUnits[0],{beginMs:300,endMs:800});
+ expect(localAlignmentTargets(p.lyrics,'lines',[line.id])).toMatchObject({beginMs:300,endMs:800});
 });

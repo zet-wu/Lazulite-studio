@@ -134,7 +134,9 @@ export function mergeAlignment(project: ProjectDocument, result: AlignmentResult
 
 export function localAlignmentTargets(document: ProjectDocument['lyrics'], kind: 'lines' | 'words', ids: string[]) {
   const selected = new Set(ids);
-  const units = document.lines.flatMap(line => line.words.filter(word => selected.has(kind === 'lines' ? line.id : word.id)).flatMap<{id:string;beginMs:TimeMs;endMs:TimeMs}>(word =>
-    word.rubyUnits.length ? word.rubyUnits.filter(unit => unit.reading.trim()) : word.text.trim() ? [word] : []));
-  return { ids: units.map(unit => unit.id), ...timeEnvelope(units) };
+  const lines = document.lines.filter(line => kind === 'lines' && selected.has(line.id));
+  const words = document.lines.flatMap(line => line.words.filter(word => selected.has(kind === 'lines' ? line.id : word.id)));
+  const units = words.flatMap<{id:string;beginMs:TimeMs;endMs:TimeMs}>(word =>
+    word.rubyUnits.length ? word.rubyUnits.filter(unit => unit.reading.trim()) : word.text.trim() ? [word] : []);
+  return { ids: units.map(unit => unit.id), envelopeIds: (kind === 'lines' ? lines : words).map(node => node.id), ...timeEnvelope([...lines, ...words, ...units]) };
 }

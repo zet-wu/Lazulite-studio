@@ -641,7 +641,7 @@ def create_app(
         return root / 'projects' / pid / 'source' / 'original'
 
     from .alignment import AlignmentRunner, AlignmentRevisionMismatchError, alignment_unavailable
-    from .alignment_projection import project_alignment
+    from .alignment_projection import project_alignment, alignment_envelope
     from .alignment_models import AlignmentModels
     model_catalog = AlignmentModels(preferences, Path(runtime_identity['data_dir']).parent if runtime_identity is not None else None)
     from .vocal_models import VocalModels
@@ -703,11 +703,12 @@ def create_app(
                      'next_action': 'reload_project_and_preview_alignment'})
 
     @api.get('/projects/{pid}/alignment-preview')
-    def alignment_preview(pid: str, revision: str, model: str, latin_normalize: bool = True, strip_tone_digits: bool = False, convert_particles: bool = True, scope_ids: list[str] | None = Query(default=None), _=Depends(auth)):
+    def alignment_preview(pid: str, revision: str, model: str, latin_normalize: bool = True, strip_tone_digits: bool = False, convert_particles: bool = True, scope_ids: list[str] | None = Query(default=None), scope_envelope_ids: list[str] | None = Query(default=None), _=Depends(auth)):
         project(pid)
         try:
             snapshot, _ = alignment_runner.snapshot(pid, revision)
             options = {'latin_normalize':latin_normalize, 'strip_tone_digits':strip_tone_digits, 'convert_particles':convert_particles}
+            if scope_envelope_ids is not None or scope_ids is not None: alignment_envelope(snapshot, scope_ids or [], scope_envelope_ids)
             key, selected = model_catalog.preview(model, {**options, 'revision':revision, 'scope_ids':scope_ids})
             return {**project_alignment(snapshot, model=selected, particle_analyzer=configured_reading_proposer, scope_ids=scope_ids, **options)['summary'], 'model_preview':key}
         except AlignmentRevisionMismatchError as exc: alignment_revision_mismatch(exc)

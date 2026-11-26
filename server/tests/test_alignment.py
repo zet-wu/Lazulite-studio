@@ -174,8 +174,13 @@ def test_local_preview_binding_and_original_without_separation(tmp_path,monkeypa
   headers={'origin':'http://studio'}
   wrong={**params,'scope_ids':['a','missing']}
   assert client.post('/api/v1/projects/p/jobs/alignment',json={'params':wrong},headers=headers).status_code==422
+  # Envelope-only changes keep the text/model preview binding valid.
+  params['scope_envelope_ids']=['l']
+  invalid={**params,'scope_envelope_ids':['unrelated']}
+  assert client.post('/api/v1/projects/p/jobs/alignment',json={'params':invalid},headers=headers).status_code==422
   started=client.post('/api/v1/projects/p/jobs/alignment',json={'params':params},headers=headers)
   assert started.status_code==202,started.text
+  assert started.json()['request']['scope_envelope_ids']==['l']
   jid=started.json()['id'];assert 'vocal' not in started.json()['request']['devices']
   assert wait(client,jid)['status']=='succeeded'
   result=client.get(f'/api/v1/jobs/{jid}/result').json()

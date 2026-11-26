@@ -104,11 +104,30 @@ def project_alignment(snapshot, use_hints=False, **options):
     return projection
 
 
-def alignment_envelope(snapshot, scope_ids):
-    """All known endpoints of the selected leaves, without padding."""
+def alignment_envelope(snapshot, scope_ids, envelope_ids=None):
+    """Selected leaves and their requested parent envelopes, without padding."""
     selected = set(scope_ids)
     points = []
     root = ET.fromstring(snapshot['lyrics']['draftTtml'])
+    if envelope_ids is not None:
+        if not scope_ids or not isinstance(envelope_ids, list) or not envelope_ids or any(not isinstance(value, str) or not value for value in envelope_ids):
+            raise ValueError('局部对齐包络范围无效')
+        envelopes = {}
+        for row in root.iter():
+            if row.tag != TT+'p' and row.get(TM+'role') != 'x-bg': continue
+            words = [word for word in row if word.tag == TT+'span' and not any(role != 'expletive' for role in word.get(TM+'role', '').split())]
+            row_id = row.get(ST+'id') or row.get(XML+'id')
+            row_targets = {row_id}
+            for word in words:
+                word_id = word.get(ST+'id') or word.get(XML+'id')
+                leaves = [leaf for leaf in word.iter(TT+'span') if leaf.get(RUBY) == 'text'] or [word]
+                leaf_ids = {leaf.get(ST+'id') or leaf.get(XML+'id') for leaf in leaves}
+                if selected & leaf_ids:
+                    envelopes[word_id] = {word_id} | leaf_ids
+                row_targets.update({word_id} | leaf_ids)
+            if selected & row_targets: envelopes[row_id] = row_targets
+        if not set(envelope_ids) <= envelopes.keys(): raise ValueError('局部对齐包络引用了无关或不存在的行/词')
+        selected.update(target for identity in envelope_ids for target in envelopes[identity])
     for node in root.iter():
         if (node.get(ST+'id') or node.get(XML+'id')) not in selected: continue
         missing = node.get(ST+'null', '').split()

@@ -115,3 +115,17 @@ def test_local_projection_overrides_skip_flags_and_only_projects_selected_leaves
     for ids in [['r1'],['r1','r1'],['r1','missing']]:
         with pytest.raises(ValueError):project_alignment(snapshot,scope_ids=ids)
     with pytest.raises(ValueError,match='时间包络'):alignment_envelope(snapshot,['mixed','space'])
+
+
+def test_local_envelope_includes_related_rows_words_and_leaves_without_padding():
+    from server.alignment_projection import alignment_envelope
+    import pytest
+    snapshot = fixture()
+    snapshot['lyrics']['draftTtml'] = snapshot['lyrics']['draftTtml'].replace('begin="0"', 'begin="0.1" end="2"').replace('studio:id="word"', 'studio:id="word" begin="0.05" end="2.2"')
+    assert alignment_envelope(snapshot, ['r1', 'r3'], ['main']) == (50, 2200)
+    assert alignment_envelope(snapshot, ['r1', 'r3'], ['word']) == (50, 2200)
+    for invalid in [['bg'], ['bgword'], ['missing'], ['r1'], [], [1]]:
+        with pytest.raises(ValueError): alignment_envelope(snapshot, ['r1', 'r3'], invalid)
+    with pytest.raises(ValueError): alignment_envelope(snapshot, [], ['main'])
+    snapshot['lyrics']['draftTtml'] = snapshot['lyrics']['draftTtml'].replace('begin="0.05" end="2.2"', 'begin="0.05" end="2.2" studio:null="begin end"')
+    assert alignment_envelope(snapshot, ['r1', 'r3'], ['main']) == (100, 2000)

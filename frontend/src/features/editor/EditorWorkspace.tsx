@@ -776,7 +776,7 @@ function EditorWorkspaceContent(props: Props) {
     if ((effective.kind === 'lines' || effective.kind === 'words') && props.alignment) {
       const scope = localAlignmentTargets(document,effective.kind,effective.ids);
       const enabled = scope.ids.length >= 2 && scope.beginMs !== null && scope.endMs !== null && scope.beginMs < scope.endMs;
-      actions.push({id:'local-alignment',label:t('alignment.local'),disabled:!enabled,reason:enabled?undefined:t('alignment.localRangeRequired'),run:()=>audioReview.requestAlignmentOpen(scope.ids)});
+      actions.push({id:'local-alignment',label:t('alignment.local'),disabled:!enabled,reason:enabled?undefined:t('alignment.localRangeRequired'),run:()=>audioReview.requestAlignmentOpen({scopeIds:scope.ids,envelopeIds:scope.envelopeIds})});
     }
     if (mode === 'sync' && (effective.kind === 'words' || effective.kind === 'ruby')) {
       actions.push(selectionAction(effective,'beat',t(syncStyle === 'sug' ? 'editor.addInnerBeats' : 'editor.addBeats')));
