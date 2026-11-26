@@ -42,6 +42,10 @@ it('returns a decodable PNG, exact numbered leaves, saved segments and actual ex
  expect([bytes.readUInt32BE(16),bytes.readUInt32BE(20)]).toEqual([840,280]);
  const chunks:Buffer[]=[];for(let offset=8;offset<bytes.length;){const size=bytes.readUInt32BE(offset);if(bytes.toString('ascii',offset+4,offset+8)==='IDAT')chunks.push(bytes.subarray(offset+8,offset+8+size));offset+=12+size;}
  const pixels=inflateSync(Buffer.concat(chunks));expect(pixels.length).toBe((840*3+1)*280);
+ for(let y=0;y<280;y++){
+  const row=y*(840*3+1);expect(pixels[row]).toBe(1);
+  for(let x=3;x<840*3;x++)pixels[row+1+x]=(pixels[row+1+x]+pixels[row+1+x-3])&255;
+ }
  // At 440 Hz the tone is visibly stronger than a quiet band at 4 kHz.
  const at=(hz:number)=>{const y=195-Math.round(Math.log(hz/80)/Math.log(100)*167);return pixels[(840*3+1)*y+1+400*3+1];};expect(at(440)).toBeGreaterThan(at(4000)+40);
  expect(f.urls.at(-1)!.searchParams.get('vocal')).toBe('selected');expect(f.writes()).toBe(0);

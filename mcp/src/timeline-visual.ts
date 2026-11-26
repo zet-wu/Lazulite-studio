@@ -40,7 +40,11 @@ function chunk(kind:string,data:Buffer):Buffer {
 function png(pixels:Buffer):Buffer {
   const header=Buffer.alloc(13);header.writeUInt32BE(WIDTH);header.writeUInt32BE(HEIGHT,4);header[8]=8;header[9]=2;
   const rows=Buffer.alloc((WIDTH*3+1)*HEIGHT);
-  for(let y=0;y<HEIGHT;y++)pixels.copy(rows,y*(WIDTH*3+1)+1,y*WIDTH*3,(y+1)*WIDTH*3);
+  // PNG Sub filtering compresses smooth spectrogram gradients before deflate.
+  for(let y=0;y<HEIGHT;y++){
+    const row=y*(WIDTH*3+1);rows[row]=1;
+    for(let x=0;x<WIDTH*3;x++)rows[row+1+x]=(pixels[y*WIDTH*3+x]-(x>=3?pixels[y*WIDTH*3+x-3]:0))&255;
+  }
   return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(rows)),chunk('IEND',Buffer.alloc(0))]);
 }
 
