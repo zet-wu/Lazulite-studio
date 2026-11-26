@@ -8,5 +8,6 @@ mutagen==1.48.1
 msgspec==0.19.0
 regex==2026.9.29
 OpenCC==1.4.2
+PyYAML==6.0.3
 # Run installation from the repository root; bundled calculation library.
 ./vendor/Lazulite
